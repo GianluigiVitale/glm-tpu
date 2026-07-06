@@ -39,9 +39,19 @@ def extract_mc_letter(text: str, n_choices: int = 4) -> str | None:
     pat = f"[{valid}]"
     for rx in (rf"\\boxed\{{\s*({pat})\s*\}}",
                rf"(?:final\s+answer|answer)\s*(?:is|:)?\s*\(?\s*({pat})\b",
-               rf"\boption\s*\(?\s*({pat})\b",
-               rf"\b({pat})\b(?!.*\b[{valid}]\b)"):   # last standalone valid letter
+               rf"\boption\s*\(?\s*({pat})\b"):
         m = re.search(rx, body, flags=re.IGNORECASE | re.DOTALL)
+        if m:
+            return m.group(1).upper()
+    # Conservative fallback: accept a bare letter ONLY if the last non-empty line
+    # IS just that letter (optionally wrapped/punctuated). We never guess an answer
+    # from a valid letter buried in prose — 'A'/'I' etc. are common words, so that
+    # would fabricate wrong answers (e.g. "A, B, C all plausible" -> 'C'). No clear
+    # answer -> None -> scored wrong, with the raw output stored for audit.
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    if lines:
+        m = re.fullmatch(rf"\(?\s*({pat})\s*\)?[.):]?",
+                         lines[-1], flags=re.IGNORECASE)
         if m:
             return m.group(1).upper()
     return None

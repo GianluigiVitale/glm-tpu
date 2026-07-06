@@ -70,17 +70,22 @@ while the pod is in **us-central2**. Every storage decision here is made to mini
 - **ONE copy of the model.** Use the **FP8-native** checkpoint (`zai-org/GLM-5.2-FP8`, ~744 GB) — do **not**
   make a bf16 conversion (that is ~1.5 TB and v4 dequants FP8→bf16 **on-device** at load anyway; the DSV4 530 GB
   bf16 bucket was pure waste — that lesson is why we keep only FP8).
-- **DO NOT download the model to every host's local disk.** The DSV4 port proved the cost-optimal path: stage
-  **HF → a us-central2 GCS bucket ONCE** (streaming, zero local disk — the `scripts/stage_*_to_gcs.py` pattern
-  in `~/moe-tpu/scripts`), then at serve time each host streams **GCS → HBM** in parallel via
-  **`load_format="runai_streamer"`** with on-device FP8→bf16 dequant. **No per-host local copy is needed, and
-  no new VM is needed for serving.**
-- **Operate ONLY inside the existing 32 v4 chips.** No new TPUs, no other accelerators — the owner has nothing
-  else and cannot spin up more. A **CPU helper VM in us-central2 is authorized ONLY if** the HF→GCS staging
-  genuinely needs more disk/NIC than host 0 has (it likely does not — DSV4 staged 295 GB from host 0 with zero
-  local disk via `gcloud storage cp -`). If you do create one: us-central2 only, minimal, and **delete it the
-  moment staging is done.**
-- **Clean up as you go** — no redundant checkpoints, no stale XLA caches, no EU copies, no orphaned VMs.
+- **PREFER streaming — it is cost-optimal and DSV4 proved it works.** Stage **HF → a us-central2 GCS bucket
+  ONCE** (streaming, zero local disk — the `scripts/stage_*_to_gcs.py` pattern in `~/moe-tpu/scripts`), then at
+  serve time each host streams **GCS → HBM** in parallel via **`load_format="runai_streamer"`** with on-device
+  FP8→bf16 dequant. DSV4 did this for a 295 GB checkpoint with no per-host local copy — try it first.
+- **BUT a per-host local copy IS allowed if it is genuinely required.** If you determine (or discover it is
+  mandatory) that each host needs the model on local disk — e.g., GLM's load path won't stream, or the streamer
+  can't keep 8 hosts fed — you are **EXPLICITLY AUTHORIZED to create and attach a large (~1000 GB) persistent
+  DISK to each of the 8 existing hosts** and copy the model onto it from the same-region bucket. **Say so
+  explicitly, then do it** (it is storage attached to hosts we already have, not a new machine). Prefer the
+  smallest disk that fits (the FP8 is ~744 GB) and delete the disks when done.
+- **⛔ THE TWO HARD RULES (the only ones that matter):** (1) the bucket **MUST be same-region (us-central2)** as
+  the pod; (2) **NEVER create or request any new compute MACHINE or any TPU** — you may use ONLY the existing
+  32 v4 chips / 8 hosts. Attaching disks to those 8 hosts is fine; adding a host, a VM, or a TPU is NOT — the
+  owner has nothing else and cannot spin up more.
+- **ONE model copy** (FP8, no bf16 conversion — above). **Clean up as you go** — no redundant checkpoints, no
+  stale XLA caches, no EU copies, no orphaned disks.
 
 ---
 

@@ -19,6 +19,11 @@ def test_extractors():
     assert ex.extract_mc_letter("I pick option D.", 4) == "D"
     assert ex.extract_mc_letter("no letter here 123", 4) is None
     assert ex.extract_mc_letter("A is wrong, B is wrong, final answer: J", 10) == "J"
+    # a trailing bare letter on its own line is accepted...
+    assert ex.extract_mc_letter("Long reasoning here.\n\nD", 4) == "D"
+    # ...but a valid letter buried in prose is NOT guessed (the fallback misfire fix):
+    assert ex.extract_mc_letter("I am unsure. A, B, C all plausible.", 10) is None
+    assert ex.extract_mc_letter("The letters A and I appear often in text.", 4) is None
     assert ex.extract_boxed(r"work \boxed{\frac{1}{2}} done") == r"\frac{1}{2}"
     assert ex.extract_boxed(r"nested \boxed{x^{2}+1}") == "x^{2}+1"
     assert ex.extract_final_number("so 12 + 30 = 42. #### 42") == "42"

@@ -8,7 +8,9 @@ is the **DSA sparse-attention kernel** (which no one has on TPU). Advance only w
 - Fork GLM branch off `dsv4-flash-v4` (`glm-5.2-v4`); editable-install.
 - **Stage `zai-org/GLM-5.2-FP8` (~744 GB) HF → `gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/`** (us-central2, same
   region as the pod). Streaming, zero local disk (adapt `~/moe-tpu/scripts/stage_base_to_gcs.py`). Never the EU
-  bucket; no per-host download; no VM unless host 0 lacks disk/NIC (then us-central2, delete after).
+  bucket (must be same-region — the two hard rules are same-region bucket + NO new machines/TPUs). Prefer
+  streaming GCS→HBM (no local copy); if a per-host local copy proves mandatory, you may create + attach a
+  ~1000 GB disk to each of the 8 hosts (see CLAUDE.md §COST).
 - Register `GlmMoeDsaForCausalLM` (vLLM/torchax path; PR #2324's registry entry).
 - **Done when:** the FP8 weights are one same-region copy on GCS and the model constructs on the engine.
 

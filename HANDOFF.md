@@ -40,12 +40,13 @@ Do these in order; validate each against a reference; commit + push as you go.
 
 1. **Fork GLM branch.** In `~/tpu-inference`, create a GLM working branch off the DSV4 work
    (`git checkout dsv4-flash-v4 && git checkout -b glm-5.2-v4`). Re-`pip install -e` into `~/vllm-env`.
-2. **Stage the FP8 weights → us-central2 (cost-optimal, no local disk, no new VM).** Adapt
-   `~/moe-tpu/scripts/stage_base_to_gcs.py`: stream `zai-org/GLM-5.2-FP8` HF → `gs://driftbench-dsv4-uc/models/
-   GLM-5.2-FP8/` via `gcloud storage cp -` (resumable, skip-if-present, size-verify). Use the token from
-   `~/glm-tpu/.env` (`HF_TOKEN`). **Do NOT** download to local
-   disk or per-host; **do NOT** put it in the EU `driftbench-storage` bucket. Only create a us-central2 helper VM
-   if host 0 genuinely lacks the disk/NIC (it should not) — and delete it after.
+2. **Stage the FP8 weights → us-central2.** Adapt `~/moe-tpu/scripts/stage_base_to_gcs.py`: stream
+   `zai-org/GLM-5.2-FP8` HF → `gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/` via `gcloud storage cp -` (resumable,
+   skip-if-present, size-verify). Token from `~/glm-tpu/.env` (`HF_TOKEN`). **Do NOT** put it in the EU
+   `driftbench-storage` bucket (must be same-region). **Prefer streaming GCS→HBM at serve time (no local copy)** —
+   but if a per-host local copy turns out to be required, you ARE authorized to **create + attach a ~1000 GB disk
+   to each of the 8 hosts** and copy the model from the bucket (see CLAUDE.md §COST — the two hard rules are
+   same-region bucket + NO new machines/TPUs).
 3. **Register `GlmMoeDsaForCausalLM`** through the vLLM/torchax path (port PR #2324's registry entry +
    `_PP_DISABLED_MODELS`; see `docs/00` §2). Run **dense MLA** (DSA bypassed) first.
 4. **Port the v4 MLA workarounds** (FP8→bf16 tile dequant in `kernels/mla/v2/kernel.py`, v4 block sizes,
