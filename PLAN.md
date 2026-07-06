@@ -4,7 +4,7 @@ Built on `docs/00-feasibility-memo.md` (the config-verified GO study) and the co
 (`~/moe-tpu`). The three poles are the same as DSV4 — **correctness → v4 enablement → fit** — but the *headline*
 is the **DSA sparse-attention kernel** (which no one has on TPU). Advance only when a stage's threshold is met.
 
-## Stage 0 — staging + registration (days; cost-critical)
+## Stage 1a — staging + registration (days; cost-critical)
 - Fork GLM branch off `dsv4-flash-v4` (`glm-5.2-v4`); editable-install.
 - **Stage `zai-org/GLM-5.2-FP8` (~744 GB) HF → `gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/`** (us-central2, same
   region as the pod). Streaming, zero local disk (adapt `~/moe-tpu/scripts/stage_base_to_gcs.py`). Never the EU
@@ -14,13 +14,13 @@ is the **DSA sparse-attention kernel** (which no one has on TPU). Advance only w
 - Register `GlmMoeDsaForCausalLM` (vLLM/torchax path; PR #2324's registry entry).
 - **Done when:** the FP8 weights are one same-region copy on GCS and the model constructs on the engine.
 
-## Stage 1 — dense-MLA correctness (days)
+## Stage 1b — dense-MLA correctness (days)
 - Run attention as **dense MLA (DSA bypassed)** — the fast correctness win PR #2324 already de-risked on v4-64.
 - Port the v4 MLA workarounds (FP8→bf16 tile dequant, v4 block sizes, fp32 softmax) — re-verify vs GLM's MLA
   dims (qk_head_dim 256, v_head_dim 256, kv_lora_rank 512, q_lora_rank 2048, 64 heads).
 - Validate the forward **bit-faithfully vs the HF/GPU reference** (fp32 + bf16 controls) at a tiny config, then
   real dims; head-shard for HBM fit (reuse `~/moe-tpu/docs/12`); runai_streamer + on-device dequant on the pod.
-- Build the **provenance DB** and reproduce a first benchmark (GPQA-Diamond or an MMLU-family loglikelihood).
+- Build the **provenance DB** and reproduce a first benchmark (GPQA-Diamond or a generation-scored MMLU-family MC).
 - **Threshold → Stage 2:** the reproduced benchmark is within ~1–2 pts of the GPU/SGLang reference at ≤8K
   context, with 3/3 clean pod runs and every item stored in `bench/results.db`.
 
@@ -47,11 +47,11 @@ is the **DSA sparse-attention kernel** (which no one has on TPU). Advance only w
 - Full benchmark provenance (every question/answer/timestamp in `bench/results.db`); honest signed Δ vs the HF
   card; nulls first-class.
 - v4 gates liftable to v6e/v7 (Ironwood = native FP8).
-- Cost: one us-central2 FP8 copy; stream, don't stage locally; clean up as you go.
+- Cost: one same-region (us-central2) FP8 copy kept resident; prefer streaming, per-host disks only if required; clean up as you go (§COST).
 
 ## Benchmark targets (HF card — reproduce with provenance; verify at runtime)
 Reasoning/agentic: HLE 40.5, HLE+Tools 54.7, AIME 2026 99.2, HMMT Nov-25 94.4 / Feb-26 92.5, GPQA-Diamond 91.2,
 IMOAnswerBench 91.0, CritPt 20.9. Coding/agentic (heavier harnesses): SWE-bench Pro 62.1, Terminal Bench 2.1
 81.0–82.7, NL2Repo 48.9, DeepSWE 46.2, ProgramBench 63.7, FrontierSWE 74.4, MCP-Atlas 76.8, Tool-Decathlon 48.2,
-SWE-Marathon 13.0, PostTrainBench 34.3. Start with the tractable loglikelihood/short-generation ones; the
+SWE-Marathon 13.0, PostTrainBench 34.3. Start with the tractable short-generation card benchmarks (GPQA-Diamond, AIME) + the MMLU-Pro/GSM8K sanity gates; the
 agentic coding benchmarks need full agentic harnesses (later).

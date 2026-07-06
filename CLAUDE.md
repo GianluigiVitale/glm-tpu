@@ -20,8 +20,9 @@ Long autonomous build. **Do not stop at phase boundaries or to ask for reassuran
 update the docs, continue. Self-correct; try multiple approaches when something fails.
 
 **Only stop and surface to the owner when genuinely blocked:**
-1. **A decision only the owner can make** — spending money beyond the explicitly-authorized staging VM (below),
-   changing scope/target, anything outside the two repos / this VM / the 32-chip pod.
+1. **A decision only the owner can make** — provisioning any new machine/VM/TPU (never allowed — §COST; only a
+   same-region bucket + disk-attach to the existing 8 hosts), changing scope/target, anything outside the two
+   repos / this VM / the 32-chip pod.
 2. **Missing access/credentials** you cannot obtain (a gated download you lack a token for, a quota).
 3. **An irreversible or outward-facing action** — pushing a PR to *upstream* `vllm-project/tpu-inference`,
    sending external comms, force-pushing, deleting/overwriting something you did not create. **Draft it, don't
@@ -67,9 +68,11 @@ while the pod is in **us-central2**. Every storage decision here is made to mini
   **`gs://driftbench-dsv4-uc` (US-CENTRAL2)**. **NEVER `gs://driftbench-storage` (EUROPE-WEST4)** — EU storage
   is dearer and streaming EU→us-central2 incurs cross-region egress. Same-region also gives the fast load
   (~12 GiB/s, ~3.5 min — the DSV4 number).
-- **ONE copy of the model.** Use the **FP8-native** checkpoint (`zai-org/GLM-5.2-FP8`, ~744 GB) — do **not**
-  make a bf16 conversion (that is ~1.5 TB and v4 dequants FP8→bf16 **on-device** at load anyway; the DSV4 530 GB
-  bf16 bucket was pure waste — that lesson is why we keep only FP8).
+- **ONE copy of the model, kept FP8.** Use the **FP8-native** checkpoint (`zai-org/GLM-5.2-FP8`, ~744 GB) — do
+  **not** make a bf16 conversion: 753B in bf16 is **~1.5 TB > the 1024 GB pod HBM** (>32 GiB/chip even sharded),
+  so it will not fit. The FP8 weights must stay **resident in HBM** (~750 GB / ~23 GiB/chip fits); v4 has no FP8
+  MXU, so dequant FP8→bf16 **per-tile INSIDE the Pallas MLA/GMM kernels** (memo §4d / PR #2324) — **NOT** the
+  DSV4 load-time full-bf16 dequant (that OOMs at 753B; see the transfer table).
 - **PREFER streaming — it is cost-optimal and DSV4 proved it works.** Stage **HF → a us-central2 GCS bucket
   ONCE** (streaming, zero local disk — the `scripts/stage_*_to_gcs.py` pattern in `~/moe-tpu/scripts`), then at
   serve time each host streams **GCS → HBM** in parallel via **`load_format="runai_streamer"`** with on-device
@@ -138,7 +141,7 @@ these before writing GLM code:
 | vLLM/torchax arch registration | **Direct** — one-line registry add | `docs/05-existing-work-audit.md`; fork `models/vllm/vllm_model_wrapper.py`, `model_loader.py`. PR #2324 shows the exact `GlmMoeDsaForCausalLM` registry entry to port. |
 | **CSA/HCA compressed-attention Pallas decode kernel** | **Modify — highest-value asset** | fork `kernels/mla/dsv4/kernel.py` + `custom_ops/deepseek_v4_attention.py`; `docs/09` (kernel plan), `docs/11` (mla.v2 map). Adapt to GLM DSA: topk=2048, 32 heads, interleaved-RoPE, IndexShare. |
 | ATTN_HEAD head-sharding for HBM fit | **Direct→Modify** (re-verify GLM dims) | `docs/12-prc-dense-weight-sharding.md`; fork head-shard commits. 744 GB FP8 needs the same multi-host HBM mgmt. |
-| FP8→bf16 dequant-on-v4 load path | **Modify** | GLM is FP8-native (DSV4 instruct was FP4). Reuse the `REQUANTIZE_WEIGHT_DTYPE=bfloat16` on-device dequant; watch the flaky FP8-dequant-during-load crash (DSV4 hit it too). |
+| FP8-on-v4 compute | **Modify — do NOT reuse the DSV4 load-time dequant** | DSV4's `REQUANTIZE_WEIGHT_DTYPE=bfloat16` dequants the whole model to **bf16 resident in HBM** — that fit only because DSV4 was 284B (bf16 909 GiB). 753B bf16 ≈ 1.5 TB **> 1024 GB HBM → OOM at load.** Keep FP8 **resident** and dequant FP8→bf16 **per-tile in the Pallas MLA/GMM kernels** (memo §4d, PR #2324; Mosaic rejects an FP8 RHS on v4). Watch the flaky dequant crash (DSV4 hit it too). |
 | runai streaming load (GCS→HBM) | **Direct** | `~/moe-tpu/scripts/stage_base_to_gcs.py` (HF→GCS), `load_format="runai_streamer"`, the `F8_E8M0`/FP8 dtype-map fix. |
 | per-rank KV-sizing + DPScheduler long-ctx fix | **Direct** | `docs/16` + the DPScheduler warning. GLM targets 1M context — KV capacity is the named bottleneck. |
 | multi-host serving-race elimination | **Direct** (methodology) | `docs/15-worker3-multihost-race-blocker.md` + `ExecutableCompileObserver`. The model>1 hybrid mesh will re-expose it. |
@@ -157,7 +160,7 @@ before porting; coordinate with the maintainers so the DSA kernel is positioned 
 
 - **Stage 1 (dense-MLA correctness) — days.** Register `GlmMoeDsaForCausalLM`; stage FP8 → us-central2 bucket;
   serve GLM-5.2-FP8 on the 32-chip v4 pod with **DSA bypassed (dense MLA)**; validate the forward vs the GPU/HF
-  reference; reproduce a first benchmark (GPQA-Diamond / an MMLU-family loglikelihood) within ~1–2 pts at
+  reference; reproduce a first benchmark (GPQA-Diamond / a generation-scored MMLU-family MC) within ~1–2 pts at
   ≤8K context. Threshold to proceed → Stage 2.
 - **Stage 2 (the DSA kernel) — weeks, the critical path.** Adapt the DSV4 CSA compressed-decode kernel into a
   GLM DSA lightning-indexer (`index_n_heads=32`, `index_head_dim=128`, ReLU scoring, interleaved-RoPE) +
@@ -178,7 +181,7 @@ traceable**. **Do NOT run anything that cannot be traced back to a stored, times
 
 - **Get the benchmarks + test cases autonomously** (datasets from HF; the card's exact metrics/protocols). The
   card's set is agentic/reasoning-heavy — **prioritize the tractable ones first** (GPQA-Diamond, AIME 2026,
-  HMMT, an MMLU-family loglikelihood as the Stage-1 gate), then the heavy agentic ones (SWE-bench Pro, Terminal
+  HMMT, a generation-scored MMLU-family MC as the Stage-1 gate), then the heavy agentic ones (SWE-bench Pro, Terminal
   Bench, NL2Repo, Tool-Decathlon) which need full agentic harnesses. Card scores to match (verify at runtime):
   HLE 40.5 / AIME 2026 99.2 / GPQA-Diamond 91.2 / SWE-bench Pro 62.1 / Terminal Bench 2.1 ~81–82.7 / etc.
 - **Provenance DB — `bench/results.db` (SQLite).** Store **literally everything** so any number is auditable:
@@ -232,8 +235,8 @@ traceable**. **Do NOT run anything that cannot be traced back to a stored, times
 - Commit + push both repos often; update `docs/RESEARCH_LOG.md` + this Progress section each session.
 - **No external comms** — draft only; the owner sends. PRs to upstream `vllm-project` are **drafted; the owner
   submits**.
-- **No paid cloud beyond the explicitly-authorized us-central2 staging VM** (and delete it after). No new TPUs.
-  No force-push.
+- **No new compute machines/VMs or TPUs** — only the existing 32 v4 chips / 8 hosts, plus (if needed) a
+  same-region us-central2 bucket + disk-attach to those 8 hosts (§COST). No force-push.
 
 ---
 
@@ -266,7 +269,7 @@ glm-tpu/
   (`zai-org/GLM-5.2-FP8`, ~744 GB). **The benchmark + provenance machinery is PRE-BUILT (CPU-tested):** `bench/`
   — the SQLite provenance DB (every question/timestamp/verbatim-reply/pass-fail + run provenance), the benchmark
   registry (GPQA-Diamond/MMLU-Pro/GSM8K/AIME-2026) + extractors/scorers, and a pluggable harness; datasets
-  cached (MMLU-Pro/GSM8K/AIME-2026; GPQA gated → owner access-request). NOTHING ported yet — Stage 1 is the next
+  cached (GPQA-Diamond/MMLU-Pro/GSM8K/AIME-2026 — all accessible). NOTHING ported yet — Stage 1 is the next
   chat's first task (see HANDOFF).
 
 > Append dated entries each session. Keep `HANDOFF.md` in sync.

@@ -27,10 +27,7 @@ reply, extracted answer, and pass/fail goes into `results.db`.
 - Datasets **cached** (`bench/data/`, 13 MB): **MMLU-Pro** (12032), **GSM8K** (1319),
   **AIME-2026** (30, `MathArena/aime_2026`). Pipeline validated end-to-end on real
   data with the stub.
-- **GPQA-Diamond is gated** (`Idavidrein/gpqa`) — the HF token lacks access.
-  **[OWNER]** request access at https://huggingface.co/datasets/Idavidrein/gpqa (or
-  point `benchmarks.GPQA_DIAMOND.hf_path` at an ungated mirror), then re-run
-  `download_data.py`.
+- **GPQA-Diamond (198)** cached + accessible (the dataset is gated on HF, but the token has access).
 - `results.db` is a clean schema-ready DB (gitignored runtime artifact; schema in
   `provenance.py`).
 

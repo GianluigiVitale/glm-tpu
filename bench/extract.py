@@ -35,25 +35,26 @@ def extract_mc_letter(text: str, n_choices: int = 4) -> str | None:
     if not text:
         return None
     body = strip_think(text)
-    valid = _LETTERS[:n_choices]
-    pat = f"[{valid}]"
+    # The captured LETTER class is UPPERCASE + case-sensitive (answer letters are
+    # A..); only the KEYWORDS are case-insensitive (inline (?i:...)). A global
+    # re.IGNORECASE would make [A-J] match lowercase 'a'/'i' in prose, so
+    # "the answer is a function" would fabricate 'A' — we must never guess.
+    pat = f"[{_LETTERS[:n_choices]}]"
     for rx in (rf"\\boxed\{{\s*({pat})\s*\}}",
-               rf"(?:final\s+answer|answer)\s*(?:is|:)?\s*\(?\s*({pat})\b",
-               rf"\boption\s*\(?\s*({pat})\b"):
-        m = re.search(rx, body, flags=re.IGNORECASE | re.DOTALL)
+               rf"(?i:final\s+answer|answer)\s*(?i:is|:)?\s*\(?\s*({pat})\b",
+               rf"(?i:option)\s*\(?\s*({pat})\b"):
+        m = re.search(rx, body, flags=re.DOTALL)   # NOT IGNORECASE
         if m:
-            return m.group(1).upper()
+            return m.group(1)
     # Conservative fallback: accept a bare letter ONLY if the last non-empty line
-    # IS just that letter (optionally wrapped/punctuated). We never guess an answer
-    # from a valid letter buried in prose — 'A'/'I' etc. are common words, so that
-    # would fabricate wrong answers (e.g. "A, B, C all plausible" -> 'C'). No clear
-    # answer -> None -> scored wrong, with the raw output stored for audit.
+    # IS just that (uppercase) letter, optionally wrapped/punctuated. Never guess an
+    # answer from a letter buried in prose. No clear answer -> None -> scored wrong,
+    # with the raw output stored for audit.
     lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
     if lines:
-        m = re.fullmatch(rf"\(?\s*({pat})\s*\)?[.):]?",
-                         lines[-1], flags=re.IGNORECASE)
+        m = re.fullmatch(rf"\(?\s*({pat})\s*\)?[.):]?", lines[-1])   # NOT IGNORECASE
         if m:
-            return m.group(1).upper()
+            return m.group(1)
     return None
 
 

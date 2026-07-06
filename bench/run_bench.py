@@ -51,13 +51,18 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0)
         t0 = time.time()
         reply = generate(it.prompt)
         latency = (time.time() - t0) * 1000.0
-        extracted = spec.extract(reply)
-        correct = spec.score(extracted, it.gold)
+        # The audit trail must never be lost: store the verbatim reply even if
+        # extraction/scoring raises (extracted/correct = None on failure).
+        try:
+            extracted = spec.extract(reply, it)
+            correct = spec.score(extracted, it.gold)
+        except Exception:
+            extracted, correct = None, None
         n_correct += int(bool(correct))
         pv.record_item(conn, run_id, benchmark=spec.name, item_id=it.item_id,
                        prompt=it.prompt, gold=it.gold, raw_output=reply,
                        extracted=extracted, correct=correct,
-                       score=1.0 if correct else 0.0,
+                       score=(1.0 if correct else 0.0) if correct is not None else None,
                        n_gen_tokens=None, latency_ms=round(latency, 1), seed=seed)
     summ = pv.finalize(conn, run_id, benchmark=spec.name, metric="acc")
     print(f"[{spec.name}] n={summ['n']} acc={summ['value']}"

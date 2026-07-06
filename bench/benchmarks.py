@@ -50,7 +50,7 @@ class BenchSpec:
     hf_config: str | None
     hf_split: str
     build: Callable        # (raw_row, idx) -> Item
-    extract: Callable      # (reply) -> extracted
+    extract: Callable      # (reply, item) -> extracted  (item carries per-item n_choices)
     score: Callable        # (extracted, gold) -> bool
     note: str = ""
 
@@ -80,7 +80,7 @@ def _gpqa_build(row, idx):
 
 GPQA_DIAMOND = BenchSpec(
     "gpqa_diamond", "gpqa_diamond", "Idavidrein/gpqa", "gpqa_diamond", "train",
-    _gpqa_build, lambda r: ex.extract_mc_letter(r, 4), ex.score_mc,
+    _gpqa_build, lambda r, it: ex.extract_mc_letter(r, it.n_choices), ex.score_mc,
     note="gated on HF — needs HF_TOKEN; only a train split exists (198 items).")
 
 
@@ -96,8 +96,8 @@ def _mmlu_pro_build(row, idx):
 
 MMLU_PRO = BenchSpec(
     "mmlu_pro", "mmlu_pro", "TIGER-Lab/MMLU-Pro", None, "test",
-    _mmlu_pro_build, lambda r: ex.extract_mc_letter(r, 10), ex.score_mc,
-    note="10-way MC; a fast loglikelihood/generation sanity gate (not on the card).")
+    _mmlu_pro_build, lambda r, it: ex.extract_mc_letter(r, it.n_choices), ex.score_mc,
+    note="generation-based MC; a fast sanity gate (NOT on the GLM-5.2 card).")
 
 
 # ---- GSM8K (openai/gsm8k) ---------------------------------------------------
@@ -111,21 +111,22 @@ def _gsm8k_build(row, idx):
 GSM8K = BenchSpec(
     "gsm8k", "gsm8k", "openai/gsm8k", "main", "test",
     _gsm8k_build,
-    lambda r: (ex.extract_boxed(r) or ex.extract_final_number(r)),
+    lambda r, it: (ex.extract_boxed(r) or ex.extract_final_number(r)),
     ex.score_math, note="grade-school math; fast generation sanity gate.")
 
 
 # ---- AIME 2026 (best-effort; verify dataset path at download time) ----------
 def _aime_build(row, idx):
     q = row.get("problem") or row.get("question") or ""
-    gold = str(row.get("answer") or row.get("solution") or "").strip()
+    ans = row.get("answer")
+    gold = str(ans).strip() if ans is not None else str(row.get("solution") or "").strip()
     prompt = f"{q}\n\n{_THINK_HINT}"
     return Item(f"aime_{idx}", q, prompt, gold, meta={})
 
 
 AIME_2026 = BenchSpec(
     "aime_2026", "aime_2026", "MathArena/aime_2026", None, "train",
-    _aime_build, lambda r: (ex.extract_boxed(r) or ex.extract_final_number(r)),
+    _aime_build, lambda r, it: (ex.extract_boxed(r) or ex.extract_final_number(r)),
     ex.score_math,
     note="⚠ verify the exact HF dataset path/split at download time (AIME 2026 is "
          "recent; candidates: MathArena/aime_2026, opencompass/AIME2026).")

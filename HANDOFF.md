@@ -21,8 +21,8 @@ CLAUDE.md §"What transfers" maps every reusable piece to where it lives.**
 - **The benchmark + provenance machinery is PRE-BUILT** (`bench/`, CPU-tested): the SQLite provenance DB
   (`bench/provenance.py` → `results.db`) that stores every question/timestamp/verbatim-reply/pass-fail + full
   run provenance, the benchmark registry + extractors/scorers, and a pluggable harness (`run_bench.py`, wire
-  `make_generate()` to the engine in Stage 1). Datasets cached (MMLU-Pro, GSM8K, AIME-2026); **GPQA-Diamond is
-  gated — [OWNER] request access** (see `bench/README.md`). So Stage-1 benchmarking is data-ready + traceable
+  `make_generate()` to the engine in Stage 1). Datasets cached (GPQA-Diamond 198, MMLU-Pro, GSM8K, AIME-2026 — all accessible; access was granted). So Stage-1
+  benchmarking is data-ready + traceable
   from run #1 — do NOT run anything that isn't stored in the DB.
 
 ## Target (confirmed)
@@ -52,10 +52,10 @@ Do these in order; validate each against a reference; commit + push as you go.
 4. **Port the v4 MLA workarounds** (FP8→bf16 tile dequant in `kernels/mla/v2/kernel.py`, v4 block sizes,
    fp32 softmax) — mostly done on the DSV4 branch; re-verify against GLM's MLA dims (qk_head_dim 256,
    v_head_dim 256, kv_lora_rank 512, q_lora_rank 2048).
-5. **Load + correctness on the pod.** runai_streamer GCS→HBM + on-device FP8→bf16 dequant; head-shard for HBM
+5. **Load + correctness on the pod.** runai_streamer GCS→HBM, FP8 kept resident + per-tile in-kernel FP8→bf16 dequant (NOT load-time bf16 — that OOMs at 753B); head-shard for HBM
    fit (`docs/12` reused); a prefill MC gate (like DSV4's 6/6) then a first benchmark.
 6. **Provenance DB from run #1.** Build `bench/results.db` (schema in CLAUDE.md §Benchmarks) and score the
-   first benchmark (GPQA-Diamond or an MMLU-family loglikelihood) storing every question/answer/timestamp.
+   first benchmark (GPQA-Diamond or a generation-scored MMLU-family MC) storing every question/answer/timestamp.
    **Threshold to proceed to Stage 2:** within ~1–2 pts of the GPU/SGLang reference at ≤8K context.
 
 Stages 2 (the DSA kernel — the critical path) and 3 (IndexShare + MTP) are in `PLAN.md`.
@@ -70,5 +70,5 @@ Stages 2 (the DSA kernel — the critical path) and 3 (IndexShare + MTP) are in 
 
 ## Owner-gated (draft, don't do)
 
-Upstream PRs to `vllm-project/tpu-inference` (owner submits); any spend beyond the authorized us-central2 staging
-VM; force-push; external comms.
+Upstream PRs to `vllm-project/tpu-inference` (owner submits); provisioning any new machine/VM/TPU (never — only a
+same-region bucket + disk-attach to the 8 existing hosts, §COST in CLAUDE.md); force-push; external comms.

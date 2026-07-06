@@ -17,7 +17,7 @@ what you did, what you validated it against, the exact numbers, and the honest n
   (`provenance.py` = the SQLite DB storing every question/timestamp/reply/pass-fail + run-level provenance;
   `benchmarks.py` registry; `extract.py`; `run_bench.py` with a pluggable `make_generate()`; `download_data.py`;
   `test_bench.py` **all CPU tests pass**). Datasets **cached** (13 MB): MMLU-Pro (12032), GSM8K (1319),
-  AIME-2026 (30). Pipeline validated end-to-end on real data via `--stub`. **GPQA-Diamond gated** → [OWNER]
-  request access at the HF dataset page (or use an ungated mirror). `CARD_TARGETS` holds all 20 HF-card values.
+  AIME-2026 (30). Pipeline validated end-to-end on real data via `--stub`. **GPQA-Diamond (198) now cached** too (access granted). `CARD_TARGETS` holds the 18 HF-card benchmark targets +
+  2 non-card sanity gates (mmlu_pro, gsm8k, value=None).
 - NEXT: Stage 1 (see HANDOFF) — fork GLM branch, stage FP8 → us-central2, register the arch, dense-MLA
   correctness, then wire `make_generate()` to the engine and reproduce the first benchmark (data + DB ready).
