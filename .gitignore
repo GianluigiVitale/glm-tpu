@@ -14,3 +14,11 @@ __pycache__/
 weights/
 results/
 *.safetensors
+
+# secrets — never commit
+.env
+
+# bench data cache + runtime DB (schema lives in bench/provenance.py)
+bench/data/
+bench/results.db
+*.db-journal
