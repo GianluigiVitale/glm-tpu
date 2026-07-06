@@ -36,7 +36,8 @@ Pod `db-v4-64-od`, us-central2-b, 32 v4 chips. **HARD RULES: (1) the bucket MUST
 `gs://driftbench-dsv4-uc` (us-central2), NEVER the EU `gs://driftbench-storage` (the bill driver); (2) NEVER
 create/request a new compute machine or any TPU — only these 32 v4 chips / 8 hosts.** ONE FP8 copy (no bf16).
 **Prefer streaming** (stage HF→GCS once via `~/moe-tpu/scripts/stage_base_to_gcs.py`, then runai_streamer
-GCS→HBM + on-device FP8→bf16 dequant). BUT if a per-host local copy proves required you ARE authorized to
+GCS→HBM; FP8 stays RESIDENT + dequant per-tile in-kernel — NOT load-time bf16, which OOMs 753B). BUT if a
+per-host local copy proves required you ARE authorized to
 **create + attach a ~1000 GB disk to each of the 8 hosts** and copy from the bucket (disks on the existing hosts
 OK; new machines/TPUs NOT). Clean up after.
 
