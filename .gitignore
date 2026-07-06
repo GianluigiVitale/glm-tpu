@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+*-env/
+*.log
+*.tmp
+# LaTeX build artifacts
+*.aux
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+# large weights / results stay out of git (bucket/GCS only)
+weights/
+results/
+*.safetensors
