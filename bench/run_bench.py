@@ -89,6 +89,10 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
     """
     # vllm import stays INSIDE make_generate: `import run_bench` and --stub must
     # work with no vllm/TPU (module-top import would break the offline pipeline).
+    # Import order matters: tpu_inference must register the TPU platform
+    # plugin BEFORE any vllm.config import chain runs, or vllm.platforms is
+    # entered re-entrantly mid-init (ImportError: current_platform).
+    import tpu_inference  # noqa: F401
     from vllm import SamplingParams
 
     llm = engine.build_llm(model, max_len=max_len, max_seqs=max_seqs,
