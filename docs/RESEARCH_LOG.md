@@ -340,3 +340,39 @@ what you did, what you validated it against, the exact numbers, and the honest n
   the beyond-`indexer_types` fall-through (offset 3, freq 4); 39/39 layer-78 keyset keys classified to
   loader routes (11 stacked / 6 expert / 22 direct); expected-shared set exactly {embed_tokens,
   shared_head.head}; rewrite transcription == installed vLLM's `_rewrite_spec_layer_name` on all keys.
+
+## 2026-07-07 — Observability-first instrumentation: flight recorder + crash triage + stats knob (CPU-only)
+
+- **Blindness being closed** (docs/suggestions.md philosophy: instrument BEFORE debugging): pod runs
+  die with roaming single-host fatal `Error Interrupt`/core-halts (probeA2: .15+.17, A3: .15, A5: .20,
+  A6: .15) and nothing recorded WHAT each worker was executing at death, nor per-step throughput
+  (tqdm only).
+- **Flight recorder (fork, worktree branch `glm-5.2-v4-obs` off local `glm-5.2-v4`** — NOTE:
+  `origin/glm-5.2-v4` did not exist on the remote; based off the local branch head 183f18ce and pushed):
+  new `tpu_inference/runner/flight_recorder.py` + 5 minimal hooks in `tpu_runner.py`
+  (`__init__`/`execute_model` post-hook/`load_model`/`capture_model`/`_execute_continue_decode` tail).
+  Gated `GLM_FLIGHT_RECORDER=1` (default off = None recorder = zero behavioral change). One JSON line
+  per serving step to `/tmp/glm_flight_<host>_<pid>.jsonl`: ts, step, num_reqs, real/padded tokens,
+  decode_only, prefill chunks, finished, req-id-set hash (xor-crc32), kv_len min/max, padded_num_reqs;
+  lifecycle events (model_loaded, warmup_done, continue_decode summary). Host-side only, outside jit,
+  per-line O_APPEND `os.write` (SIGKILL-durable), 50 MB rotation keep-2, fail-open after 3 errors.
+  **Measured 15 µs/step** (16-req decode batch, CPU) vs the <100 µs target. CPU tests:
+  `tests/runner/test_flight_recorder.py` (11 pass: gate-off writes nothing, field values, hash
+  stability, rotation, fail-open, cost smoke).
+- **Triage tool (harness): `scripts/triage_crash.sh <run_log> [--no-fetch]`** — shellcheck-clean;
+  extracts halted-IP(s)+first fatal ts, deduped error lines, per-host last step+composition from
+  `[OBSERVE_COMPILES]` (Ray-dedup caveat documented), jit names near the fatal window, RESOURCE/ICI
+  dedup, then fetches `tail -100` of the flight files from all 8 hosts (gcloud --worker=all) and
+  aligns last steps (newest file per host wins; earliest-stopping host = diverged). **Validated on
+  probeA5.log**: halted 192.168.0.20 first fatal E0707 11:01:39.201727; log-side last step 233 vs
+  cluster max 386 (delta −153). Fetch path tested against a stubbed gcloud (diverged host flagged,
+  stale files ignored, no-file host reported).
+- **Throughput knob (harness `bench/engine.py`): `GLM_LOG_STATS=1`** → passes
+  `disable_log_stats=False` into `LLM(...)` (offline LLM force-defaults it True — verified in
+  installed vLLM) → 10 s tok/s + running/waiting. Default unchanged.
+- **Launcher**: `GLM_FLIGHT_RECORDER=${GLM_FLIGHT_RECORDER:-0}` baked into the raylet ENVS
+  (worker-side read; the vLLM Ray executor does not forward custom envs).
+- **Doc: `docs/10-observability.md`** — instrument inventory (recorder, triage, stats,
+  DSV4_OBSERVE_COMPILES, vLLM dump_input) + run-books (crash → triage; next run →
+  GLM_FLIGHT_RECORDER=1 + GLM_LOG_STATS=1) + limits (async dispatch semantics: the signal is the
+  silence after the last line, not the line itself).

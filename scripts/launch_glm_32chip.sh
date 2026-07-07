@@ -81,12 +81,17 @@ RAY=~/vllm-env/bin/ray
 #   per-host compile-stagger launch race. Must be set BEFORE
 #   jax.distributed.initialize (the raylet env is inherited by the engine
 #   procs -> satisfied). Timeout 120 s fail-fast when enabled.
+# GLM_FLIGHT_RECORDER (passthrough, default 0 = off, byte-identical)
+#   Per-step flight recorder (the black box): every worker appends one JSON
+#   line per serving step to /tmp/glm_flight_<host>_<pid>.jsonl (fork
+#   runner/flight_recorder.py). Read by the WORKER processes -> must be in
+#   the raylet env. After a crash: bash scripts/triage_crash.sh <run_log>.
 #
 # Adding future envs: append KEY=VALUE to the single ENVS string below (it is
 # used verbatim on the head and on every worker), or pass one-offs without
 # editing the script:
 #   EXTRA_ENVS="GLM_FOO=1 GLM_BAR=2" bash scripts/launch_glm_32chip.sh
-ENVS="export NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=${TPU_MIN_TOKEN_BUCKET:-512} RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=${JAX_SHARE_BINARY_BETWEEN_HOSTS:-0} JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=${JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS:-120000}${EXTRA_ENVS:+ $EXTRA_ENVS}"
+ENVS="export NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=${TPU_MIN_TOKEN_BUCKET:-512} RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=${JAX_SHARE_BINARY_BETWEEN_HOSTS:-0} JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=${JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS:-120000} GLM_FLIGHT_RECORDER=${GLM_FLIGHT_RECORDER:-0}${EXTRA_ENVS:+ $EXTRA_ENVS}"
 
 usage() {
   cat <<'EOF'
@@ -97,6 +102,8 @@ Usage: bash ~/glm-tpu/scripts/launch_glm_32chip.sh [--dry-run]
 
 Optional env passthrough:
   JAX_SHARE_BINARY_BETWEEN_HOSTS=1    leader-compile + broadcast executables
+  GLM_FLIGHT_RECORDER=1               per-step flight recorder on every worker
+                                      (/tmp/glm_flight_*.jsonl; triage_crash.sh)
   EXTRA_ENVS="KEY=VALUE ..."          extra envs baked into every raylet
 EOF
 }
