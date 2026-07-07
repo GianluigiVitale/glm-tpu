@@ -121,6 +121,7 @@ def norm_math(s: str | None) -> str | None:
         return None
     s = s.strip().replace(" ", "")
     s = re.sub(r"\\?\$", "", s)                       # $ / \$ (money, math-mode)
+    s = re.sub(r"\\?%$", "", s)                        # trailing % / \% ("60\%" == "60")
     s = s.replace("\\left", "").replace("\\right", "")
     s = re.sub(r"\\text\{.*?\}", "", s)
     s = s.rstrip(".")
