@@ -245,3 +245,22 @@ what you did, what you validated it against, the exact numbers, and the honest n
   all-gather; no distributed softmax on the sparse path). 1M endpoint: dcp≥16 + fp8 (2.9 GiB/chip/seq).
 - Validation plans per step in the doc (dcp=1 byte-identity, new `parity/mla_dcp_parity.py`, two-step engine
   parity, zero-serving-compile re-enumeration, pod 3/3 + longctx ladder). No code changed this session.
+
+## 2026-07-07 — docs/04: per-decode-step HOST-path audit (READ-ONLY; no TPU touched)
+- New `docs/04-decode-hostpath-audit.md`: one decode step traced end-to-end through EngineCore.step →
+  RayDistributedExecutor (compiled Ray DAG **forced on**, channel shm, built lazily on step 1) →
+  RayWorkerWrapper.execute_model_ray → tpu_runner (prepare/upload/jit-dispatch) → sample →
+  the async result protocol (DAG returns an **int result_id**; a second classic actor-RPC round
+  `get_execute_model_output` fetches the real output, and its `jax.device_get(next_tokens)` is THE
+  per-step blocking sync). Key findings: async scheduling defaults ON (batch queue depth 2) ⇒ exposed
+  host floor ≈ **2–7 ms/step** multi-host (sync mode ≈ 8–20 ms); per-step payloads are tiny (SchedulerOutput
+  0.9 KB @ 8 reqs, ModelRunnerOutput 0.6 KB — measured by pickling on CPU with the tree's vllm); worker
+  H2D is ~5–9 small device_puts ≈ 10 KB (blob-packed already); the vllm-impl `state_leaves` is the raw
+  params dict ⇒ per-call pytree flatten on model_fn+compute_logits (est. 0.5–3 ms/call — measure first).
+  vs DSV4's 61.2 ms/step flat-in-ctx floor: host was ~3–11% then, <1% of GLM's current 1,053 ms/step —
+  but returns to 3–30% after Stage-2 device wins. Top-3 fixes: (1) `enable_continue_decode`+`max_decode_steps`
+  (already in the fork; amortizes BOTH Ray rounds over ≤10 on-device steps, needs async off, decode-only);
+  (2) protect the async pipeline (assert the "Asynchronous scheduling is enabled" log line; zero
+  "does nothing" cycles — DSV4 burned 5,189); (3) piggyback step-N output on step-N+1's DAG round +
+  pre-flatten the params dict + fold positions into the blob. §5 lists what the 20-step profiler trace
+  must confirm (the inter-step bubble, 0 backend compiles, instant device_get after copy_to_host_async).
