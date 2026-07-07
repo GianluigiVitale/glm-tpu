@@ -133,8 +133,27 @@ def test_item_builders():
              ("A.", "B.", "C.", "D.")]
     gold_line = [l for l in lines if l.startswith(it.gold + ".")][0]
     assert gold_line.endswith("4"), gold_line
-    # deterministic: same idx → same ordering
+    # deterministic AND row-order independent: the shuffle seed is a sha256
+    # content hash of the question text, NOT the row index — an upstream row
+    # reorder must not relabel gold letters (round3-ac37c8d finding 3; this
+    # CHANGED gold letters vs the pre-2026-07-07 idx-seeded scheme — fine, no
+    # real runs were recorded under it)
     assert B._gpqa_build(row, 7).gold == it.gold
+    it3 = B._gpqa_build(row, 3)
+    assert it3.gold == it.gold and it3.n_choices == it.n_choices
+    assert [l.split(". ", 1)[1] for l in it3.prompt.splitlines()
+            if l[:2] in ("A.", "B.", "C.", "D.")] == \
+           [l.split(". ", 1)[1] for l in lines]
+    # pinned canary (guards a hypothetical CPython shuffle change AND the
+    # content-hash seed derivation itself — round3-ac37c8d finding 5):
+    assert it.meta["shuffle_seed"] == 3507495222521963811
+    assert it.gold == "C" and [l.split(". ", 1)[1] for l in lines] == \
+        ["5", "6", "4", "3"]
+    # every registered benchmark carries a pinned 40-hex dataset revision
+    import re as _re
+    for spec in B.REGISTRY.values():
+        assert spec.hf_revision and _re.fullmatch(r"[0-9a-f]{40}",
+                                                  spec.hf_revision), spec.name
     # MMLU-Pro + GSM8K builders
     mp = B._mmlu_pro_build({"question": "q", "options": ["a", "b", "c"],
                             "answer": "B", "category": "x"}, 0)

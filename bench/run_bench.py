@@ -161,7 +161,7 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0)
     return summ
 
 
-def _run_env(args) -> dict:
+def _run_env(args, benches) -> dict:
     """Run-level env/config provenance (stored in runs.env_json alongside the
     harness/fork git hashes that pv.start_run already records). Secrets are
     filtered — never store tokens/keys."""
@@ -172,6 +172,8 @@ def _run_env(args) -> dict:
               and not any(s in k.upper() for s in ("TOKEN", "KEY", "SECRET"))}
     return {
         "model": args.model, "stub": bool(args.stub),
+        # pinned dataset commit shas (BenchSpec.hf_revision) — reproducibility
+        "dataset_revisions": {b: B.REGISTRY[b].hf_revision for b in benches},
         "tp": int(os.environ.get("GLM_TP", "32")),
         "dp_attention": False,   # GLM Stage 1: pure TP x EP (no DP attention)
         "expert_parallel": True,
@@ -224,7 +226,7 @@ def main():
 
     conn = pv.connect()
     run_id = pv.start_run(conn, model=("STUB" if args.stub else args.model),
-                          revision=args.revision, env=_run_env(args),
+                          revision=args.revision, env=_run_env(args, benches),
                           note=args.note or ("offline-stub" if args.stub else ""))
     gen = stub_generate if args.stub else make_generate(
         args.model, max_len=args.max_len, max_new=args.max_new,

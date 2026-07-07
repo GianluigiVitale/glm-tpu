@@ -17,6 +17,7 @@ Datasets are cached under bench/data/ (HF datasets cache; gitignored). Needs
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import random
 from dataclasses import dataclass, field
@@ -52,6 +53,12 @@ class BenchSpec:
     build: Callable        # (raw_row, idx) -> Item
     extract: Callable      # (reply, item) -> extracted  (item carries per-item n_choices)
     score: Callable        # (extracted, gold) -> bool
+    # PINNED dataset commit sha (HfApi.dataset_info, fetched 2026-07-07):
+    # an unpinned load_dataset() silently tracks upstream pushes — gold
+    # answers (and for GPQA even row ORDER) could drift with no error
+    # (review round3-ac37c8d finding 3). Recorded per item in Item.meta and
+    # in the run's provenance env (run_bench._run_env).
+    hf_revision: str | None = None
     note: str = ""
 
 
@@ -69,18 +76,26 @@ def _gpqa_build(row, idx):
     correct = row["Correct Answer"]
     choices = [correct, row["Incorrect Answer 1"],
                row["Incorrect Answer 2"], row["Incorrect Answer 3"]]
-    rng = random.Random(1000 + idx)           # deterministic per-item ordering
+    # Per-item shuffle seed = a STABLE CONTENT HASH of the question text, NOT
+    # the row index: an upstream row reorder must not silently relabel gold
+    # letters (review round3-ac37c8d finding 3). NOTE: this CHANGES the gold
+    # letters vs the idx-seeded scheme used before 2026-07-07 — acceptable, no
+    # real (non-stub) runs were recorded under the old scheme.
+    seed = int.from_bytes(hashlib.sha256(q.encode("utf-8")).digest()[:8], "big")
+    rng = random.Random(seed)                 # deterministic per-item ordering
     order = list(range(4)); rng.shuffle(order)
     shuffled = [choices[i] for i in order]
     gold_letter = ex._LETTERS[order.index(0)]  # where the correct answer landed
     prompt, n = _mc_prompt(q, shuffled)
     return Item(f"gpqa_{idx}", q, prompt, gold_letter, n_choices=n,
-                meta={"category": row.get("Subdomain", "")})
+                meta={"category": row.get("Subdomain", ""),
+                      "shuffle_seed": seed})
 
 
 GPQA_DIAMOND = BenchSpec(
     "gpqa_diamond", "gpqa_diamond", "Idavidrein/gpqa", "gpqa_diamond", "train",
     _gpqa_build, lambda r, it: ex.extract_mc_letter(r, it.n_choices), ex.score_mc,
+    hf_revision="633f5ee89ab8ad4522a9f850766b73f62147ffdd",  # pinned 2026-07-07
     note="gated on HF — needs HF_TOKEN; only a train split exists (198 items).")
 
 
@@ -97,6 +112,7 @@ def _mmlu_pro_build(row, idx):
 MMLU_PRO = BenchSpec(
     "mmlu_pro", "mmlu_pro", "TIGER-Lab/MMLU-Pro", None, "test",
     _mmlu_pro_build, lambda r, it: ex.extract_mc_letter(r, it.n_choices), ex.score_mc,
+    hf_revision="b189ec765aa7ed75c8acfea42df31fdae71f97be",  # pinned 2026-07-07
     note="generation-based MC; a fast sanity gate (NOT on the GLM-5.2 card).")
 
 
@@ -112,7 +128,9 @@ GSM8K = BenchSpec(
     "gsm8k", "gsm8k", "openai/gsm8k", "main", "test",
     _gsm8k_build,
     lambda r, it: (ex.extract_boxed(r) or ex.extract_final_number(r)),
-    ex.score_math, note="grade-school math; fast generation sanity gate.")
+    ex.score_math,
+    hf_revision="740312add88f781978c0658806c59bc2815b9866",  # pinned 2026-07-07
+    note="grade-school math; fast generation sanity gate.")
 
 
 # ---- AIME 2026 (best-effort; verify dataset path at download time) ----------
@@ -129,6 +147,7 @@ AIME_2026 = BenchSpec(
     "aime_2026", "aime_2026", "MathArena/aime_2026", None, "train",
     _aime_build, lambda r, it: (ex.extract_boxed(r) or ex.extract_final_number(r)),
     ex.score_math,
+    hf_revision="d2de22f3c656b4f56cf8981212186377d1e23bc3",  # pinned 2026-07-07
     note="VERIFIED 2026-07-07: MathArena/aime_2026 [train] = the official 30-problem "
          "set (fields problem_idx/answer/problem; problem_idx 1-15 = AIME I, 16-30 = "
          "AIME II; all integer answers 0-999). All 30 answers cross-checked against "
@@ -140,14 +159,20 @@ REGISTRY = {b.name: b for b in (GPQA_DIAMOND, MMLU_PRO, GSM8K, AIME_2026)}
 
 
 def load_items(spec: BenchSpec, limit: int | None = None) -> list[Item]:
-    """Load + build items for a benchmark (needs the `datasets` lib + HF_TOKEN)."""
+    """Load + build items for a benchmark (needs the `datasets` lib + HF_TOKEN).
+    Loads the PINNED dataset revision (spec.hf_revision) and stamps it into
+    every item's meta so each stored row is traceable to the exact dataset
+    commit it was built from."""
     from datasets import load_dataset
     token = os.environ.get("HF_TOKEN")
     ds = load_dataset(spec.hf_path, spec.hf_config, split=spec.hf_split,
-                      token=token, cache_dir=os.environ["HF_DATASETS_CACHE"])
+                      revision=spec.hf_revision, token=token,
+                      cache_dir=os.environ["HF_DATASETS_CACHE"])
     items = []
     for idx, row in enumerate(ds):
         if limit and idx >= limit:
             break
-        items.append(spec.build(row, idx))
+        it = spec.build(row, idx)
+        it.meta["hf_revision"] = spec.hf_revision
+        items.append(it)
     return items
