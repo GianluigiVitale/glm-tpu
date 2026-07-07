@@ -74,7 +74,10 @@ open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the
   hook), `scripts/sync_workers.sh` (ff-only fetch/checkout/pull on all 8 hosts, drift echo),
   `bench/run_bench.py make_generate()` (in-process `vllm.LLM`, GLM's own chat template → token ids, greedy,
   stop ids [154820,154827,154829], full env provenance into `results.db`; `--stub` + CPU tests pass —
-  datasets + AIME-2026 verified and extractor gaps fixed in `ac37c8d`).
+  datasets + AIME-2026 verified and extractor gaps fixed in `ac37c8d`), and `bench/glm_longctx.py` +
+  `bench/engine.py` (`e27c3c5` — the Stage-2 passkey/NIAH threshold instrument, generation-based
+  retrieval, raw-completion prompts, 1M-capable, provenance-backed; CPU tests 9/9; shares the exact
+  Stage-1 engine recipe with run_bench via the factored `build_llm`). None of it has touched the pod.
 - **Stage-2 design is written** (`docs/01-dsa-kernel-design.md`, commit `8d069ba`): indexer math + the
   RoPE-interleave E1/E2/E3 resolution experiments, indexer k-cache KVCacheSpec, gathered `[R,2048,640]`
   decode segment, gates S/K/D0/D/P, IndexShare via the wrapper context, VMEM/HBM budget, 2a/2b/2c phasing.
@@ -98,8 +101,9 @@ open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the
    TP×EP topology validation (the W_UV_scale fix, EP-head gather, cross-shard all-gather and
    TPU_MIN_TOKEN_BUCKET are all only meaningful at mesh product > 1 and are so far validated only by
    1-chip no-regression), no engine boot through the real runner/KV-spec path on real weights, no 3/3 runs.
-3. **RESEARCH_LOG is one entry behind** — it ends at "parity green + known open items"; the two-step green,
-   the cd8eeb6c port, the launcher/bench commits and the T>128 finding are not yet logged.
+3. **RESEARCH_LOG is partially behind** — the 2026-07-07 long-context-harness entry is logged (`e27c3c5`),
+   but the two-step green, the cd8eeb6c port, the launcher/bench-wiring commits and above all the **T>128
+   finding** are not yet logged.
 4. **Bench numbers:** none yet. `results.db` has stub runs only; no real benchmark has been scored.
 
 ## Target (confirmed — unchanged)
