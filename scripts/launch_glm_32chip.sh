@@ -21,7 +21,7 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-HEAD_IP=192.168.0.8
+HEAD_IP=$(hostname -i)  # worker 0 = this host (was hardcoded 192.168.0.8 — the pod was re-created since DSV4 and w-0 is now .21)
 RAY=~/vllm-env/bin/ray
 
 # ── Env baked into every raylet (GLM-5.2 Stage-1 set) ────────────────────────
@@ -85,7 +85,7 @@ dry() { printf 'DRY-RUN> %s\n' "$*"; }
 
 # Same stop hygiene as the DSV4 launcher: force-stop ray, kill stray raylets /
 # engine cores / ray workers, unmount any stale gcsfuse mount (no-op if absent).
-STOP_CMD="$RAY stop -f >/dev/null 2>&1; pkill -9 -f 'VLLM::EngineCore' >/dev/null 2>&1; pkill -9 -f RayWorkerWrapper >/dev/null 2>&1; pkill -9 -x raylet >/dev/null 2>&1; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
+STOP_CMD="$RAY stop -f >/dev/null 2>&1; pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; pkill -9 -x raylet >/dev/null 2>&1; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
 
 # Worker join: bake ENVS into the raylet, then join the head. Escaped $(...)
 # and $? run on the REMOTE host, not here.
