@@ -36,6 +36,34 @@ def test_extractors():
     print("  extractors OK")
 
 
+def test_adversarial_extractors():
+    """Red cases found 2026-07-07 (hand-written adversarial replies; all were
+    misses before the extract.py fixes). The prompt asks for \\boxed{}, and a
+    reasoning model wraps the letter in \\text{}/parens/punct/markdown."""
+    # MC: boxed-letter variants (brace-balanced, \text-unwrapped, punct-stripped)
+    assert ex.extract_mc_letter(
+        "<think>maybe A or B</think>\nAfter analysis, the final answer is "
+        r"\boxed{\text{C}}", 4) == "C"
+    assert ex.extract_mc_letter(r"\boxed{(B)}", 4) == "B"
+    assert ex.extract_mc_letter(r"So the answer is \boxed{D.}", 4) == "D"
+    # MC: markdown-bold letter + 'option is'
+    assert ex.extract_mc_letter("The final answer is **B**.", 4) == "B"
+    assert ex.extract_mc_letter("The correct option is (C).", 4) == "C"
+    # MC: the LAST boxed is the final answer
+    assert ex.extract_mc_letter(r"try \boxed{A}... reconsider: \boxed{B}", 4) == "B"
+    # MC never-guess guards must survive the forgiving boxed path:
+    assert ex.extract_mc_letter(r"\boxed{42}", 4) is None      # non-letter boxed
+    assert ex.extract_mc_letter(r"\boxed{AB}", 4) is None      # two letters
+    assert ex.extract_mc_letter("the answer is a function of x", 4) is None
+    # math: thousands-separator comma + (escaped) dollar inside \boxed{}
+    assert ex.score_math(ex.extract_boxed(r"The total is \boxed{1,234}."), "1234")
+    assert ex.score_math(ex.extract_boxed(r"she makes \boxed{\$18} per day"), "18")
+    assert ex.norm_math("1,234,567") == "1234567"
+    assert ex.norm_math("(1,2)") == "(1,2)"    # NOT a thousands separator — kept
+    assert ex.norm_math("$42.") == "42"
+    print("  adversarial extractors OK")
+
+
 def test_scorers():
     assert ex.score_mc("C", "C") and not ex.score_mc("C", "D")
     assert not ex.score_mc(None, "A")
@@ -99,6 +127,7 @@ def test_item_builders():
 
 if __name__ == "__main__":
     test_extractors()
+    test_adversarial_extractors()
     test_scorers()
     test_db_roundtrip()
     test_item_builders()

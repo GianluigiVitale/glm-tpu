@@ -40,9 +40,20 @@ def extract_mc_letter(text: str, n_choices: int = 4) -> str | None:
     # re.IGNORECASE would make [A-J] match lowercase 'a'/'i' in prose, so
     # "the answer is a function" would fabricate 'A' — we must never guess.
     pat = f"[{_LETTERS[:n_choices]}]"
-    for rx in (rf"\\boxed\{{\s*({pat})\s*\}}",
-               rf"(?i:final\s+answer|answer)\s*(?i:is|:)?\s*\(?\s*({pat})\b",
-               rf"(?i:option)\s*\(?\s*({pat})\b"):
+    # \boxed{} first (the prompt's requested format), brace-balanced via
+    # extract_boxed so \boxed{\text{C}} / \boxed{(B)} / \boxed{D.} all resolve;
+    # takes the LAST boxed (the final answer). Falls through if the boxed
+    # content is not a single valid letter (never guess).
+    boxed = extract_boxed(body)
+    if boxed:
+        b = re.sub(r"\\text(?:bf|rm|it)?\s*\{([^{}]*)\}", r"\1", boxed)
+        m = re.fullmatch(rf"[\s(\[*_]*({pat})[\s)\]*_.:]*", b)
+        if m:
+            return m.group(1)
+    # keyword patterns: [\s(*_]* admits '(' and markdown emphasis ('**B**');
+    # the letter itself stays UPPERCASE-only (see above).
+    for rx in (rf"(?i:final\s+answer|answer)\s*(?i:is|:)?\s*[\s(*_]*({pat})\b",
+               rf"(?i:option)\s*(?i:is|:)?\s*[\s(*_]*({pat})\b"):
         m = re.search(rx, body, flags=re.DOTALL)   # NOT IGNORECASE
         if m:
             return m.group(1)
@@ -97,7 +108,9 @@ def norm_math(s: str | None) -> str | None:
     """Light normalization for math-answer string comparison."""
     if s is None:
         return None
-    s = s.strip().strip("$").replace(" ", "")
+    s = s.strip().replace(" ", "")
+    s = re.sub(r"\\?\$", "", s)                       # $ / \$ (money, math-mode)
+    s = re.sub(r"(?<=\d),(?=\d{3}(\D|$))", "", s)     # 1,234,567 -> 1234567
     s = s.replace("\\left", "").replace("\\right", "")
     s = re.sub(r"\\text\{.*?\}", "", s)
     s = s.rstrip(".")

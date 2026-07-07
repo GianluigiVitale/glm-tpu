@@ -121,15 +121,19 @@ def _aime_build(row, idx):
     ans = row.get("answer")
     gold = str(ans).strip() if ans is not None else str(row.get("solution") or "").strip()
     prompt = f"{q}\n\n{_THINK_HINT}"
-    return Item(f"aime_{idx}", q, prompt, gold, meta={})
+    return Item(f"aime_{idx}", q, prompt, gold,
+                meta={"problem_idx": row.get("problem_idx")})
 
 
 AIME_2026 = BenchSpec(
     "aime_2026", "aime_2026", "MathArena/aime_2026", None, "train",
     _aime_build, lambda r, it: (ex.extract_boxed(r) or ex.extract_final_number(r)),
     ex.score_math,
-    note="⚠ verify the exact HF dataset path/split at download time (AIME 2026 is "
-         "recent; candidates: MathArena/aime_2026, opencompass/AIME2026).")
+    note="VERIFIED 2026-07-07: MathArena/aime_2026 [train] = the official 30-problem "
+         "set (fields problem_idx/answer/problem; problem_idx 1-15 = AIME I, 16-30 = "
+         "AIME II; all integer answers 0-999). All 30 answers cross-checked against "
+         "two independent HF copies (MathArena/aime_2026_I, 96kevinli29/aime2026-en). "
+         "opencompass/AIME2026 does not exist on the Hub.")
 
 
 REGISTRY = {b.name: b for b in (GPQA_DIAMOND, MMLU_PRO, GSM8K, AIME_2026)}
