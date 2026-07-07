@@ -22,7 +22,20 @@ PR #2324 cross-shard class). Exits nonzero if the machine gate fails.
   TPU_VISIBLE_DEVICES=0 OMP_NUM_THREADS=1 \
   NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_DISABLE_DSA_INDEXER=1 \
   [DISABLE_WEIGHT_REQUANTIZATION=1] \
-  ~/vllm-env/bin/python parity/glm_engine_parity.py [--fp8] [--layers 5] [--T 32]
+  ~/vllm-env/bin/python parity/glm_engine_parity.py [--fp8] [--layers 5] [--T 32] \
+      [--two-step [--split-at N]]
+
+--two-step (the DSV4 cached 2-step pattern, dsv4_engine_full_parity.py):
+after the single full-prefill forward (kept as the reference), re-create
+FRESH zeroed kv_caches and run the SAME wrapper/params twice — step 1
+prefills tokens [0, split) (seq_lens=[split]), step 2 continues with
+tokens [split, T) reading the paged latent KV cache step 1 wrote
+(seq_lens=[T], query_start_loc=[0, T-split]). The cache persists because
+VllmMLAAttention.forward writes vllm_model_wrapper_context.kv_caches[idx]
+in place on the SAME list object the harness closes over. A REVERSED
+block table exercises the paging indirection (GLM_IDENTITY_BT=1 disables).
+Gate: concat(step1, step2) must match the full-prefill hidden states
+within 1e-2 relative (bf16-exact expected modulo bucketing).
 """
 from __future__ import annotations
 
@@ -43,7 +56,8 @@ import glm_engine_common as C
 # Engine side
 # ----------------------------------------------------------------------------
 def run_engine(ckpt_dir: str, input_ids_np: np.ndarray,
-               positions_np: np.ndarray):
+               positions_np: np.ndarray, two_step: bool = False,
+               split_at: int | None = None):
     import jax
     import torch
     import torchax
@@ -206,7 +220,73 @@ def run_engine(ckpt_dir: str, input_ids_np: np.ndarray,
     except Exception as e:
         print(f"  (logits capture skipped: {e!r})")
 
-    return hidden, logits, caps
+    # ---- cached 2-step (prefill + continuation decode chunk) ----
+    # Mirrors ~/moe-tpu/parity/dsv4_engine_full_parity.py: step 1 prefills
+    # [0, split_at), step 2 runs [split_at, T) reading the paged latent KV
+    # cache written by step 1. VllmMLAAttention.forward writes
+    # vllm_model_wrapper_context.kv_caches[idx] = new_kv_cache, i.e. item
+    # assignment on the SAME list object _forward closes over — so the
+    # update propagates between steps as long as we mutate `kv_caches` in
+    # place (slice assignment below) and never rebind a fresh list into
+    # the closure.
+    hidden_two_step = None
+    if two_step:
+        if split_at is None:
+            split_at = T // 2
+        assert 0 < split_at < T, f"--split-at must be in (0, {T})"
+        # Snapshot the full-prefill hook captures — the two extra forwards
+        # would overwrite them (restored after, so the caller's per-layer
+        # diffs still compare the reference full-prefill forward).
+        caps_snapshot = {k: (v.copy() if isinstance(v, np.ndarray) else v)
+                         for k, v in caps.items()}
+        # FRESH zeroed caches, in place (same list object → closure sees
+        # them, and step 2 sees step 1's writes).
+        kv_caches[:] = [device_array(mesh, np.zeros(cache_shape, np.float32))
+                        .astype(jnp.bfloat16) for _ in range(n_layers)]
+        # Non-identity (reversed) block table to exercise the paging
+        # indirection, exactly like DSV4; GLM_IDENTITY_BT=1 disables.
+        if os.environ.get("GLM_IDENTITY_BT"):
+            ts_block_table_np = np.arange(num_pages, dtype=np.int32)
+        else:
+            ts_block_table_np = np.array(
+                [num_pages - 1 - i for i in range(num_pages)], np.int32)
+
+        def _step_am(pos_slice_np, total_len_after):
+            # seq_lens = the sequence length in the cache AFTER this step;
+            # query_start_loc covers only the new tokens. distribution
+            # [0,0,1] = 1 mixed sequence (mla.v2 kernel docstring:
+            # sequences[0:i] decode-only, [i:j] chunked-prefill-only,
+            # [j:k] mixed; k = total) — correct for both the fresh prefill
+            # chunk and the continuation chunk.
+            n_new = int(pos_slice_np.shape[0])
+            return AttentionMetadata(
+                input_positions=device_array(
+                    mesh, pos_slice_np.astype(np.int32)),
+                block_tables=device_array(mesh, ts_block_table_np),
+                seq_lens=device_array(
+                    mesh, np.array([total_len_after], np.int32)),
+                query_start_loc=device_array(
+                    mesh, np.array([0, n_new], np.int32)),
+                request_distribution=device_array(
+                    mesh, np.array([0, 0, 1], np.int32)),
+                padded_num_reqs=1)
+
+        outs = []
+        for (a, b) in [(0, split_at), (split_at, T)]:
+            ids_j = device_array(mesh, input_ids_np[a:b].astype(np.int32))
+            pos_j = device_array(mesh, positions_np[a:b].astype(np.int32))
+            # positions stay ABSOLUTE for both steps (RoPE + cache slots).
+            outs.append(_forward(ids_j, pos_j, _step_am(positions_np[a:b],
+                                                        b)))
+        hidden_two_step = np.concatenate(outs, axis=0)
+        bt_kind = "identity" if os.environ.get("GLM_IDENTITY_BT") \
+            else "reversed"
+        print(f"  [two-step] split_at={split_at} block_table={bt_kind} "
+              f"step1={outs[0].shape} step2={outs[1].shape}")
+        caps.clear()
+        caps.update(caps_snapshot)
+
+    return hidden, logits, caps, hidden_two_step
 
 
 # ----------------------------------------------------------------------------
@@ -248,12 +328,23 @@ def main():
     ap.add_argument("--real-dims", action="store_true",
                     help="GLM-5.2's real per-layer dims (nope 192/v 256/"
                          "64 heads/2048+512 lora/32x128 indexer, block 128)")
+    ap.add_argument("--two-step", action="store_true",
+                    help="ALSO run the cached 2-step path (prefill [0,split)"
+                         " + continuation [split,T) through the paged KV "
+                         "cache, reversed block table) and gate it against "
+                         "the single full-prefill hidden states")
+    ap.add_argument("--split-at", type=int, default=None,
+                    help="two-step split point (default T//2)")
     ap.add_argument("--keep", action="store_true")
     args = ap.parse_args()
     if args.real_dims:
         C.use_real_dims()
 
     assert args.T <= C.IDX_TOPK, "index_topk must cover T (tie-free DSA)"
+    if args.two_step:
+        split = args.split_at if args.split_at is not None else args.T // 2
+        assert 0 < split < args.T, \
+            f"--split-at must be in (0, {args.T}), got {split}"
 
     fp8_block = 128 if args.real_dims else 64
     cfg = C.make_mini_config(n_layers=args.layers, fp8=args.fp8,
@@ -285,7 +376,9 @@ def main():
     print(f"[parity] HF reference done: {len(hs32)} hidden states, "
           f"logits {logits32.shape}")
 
-    hidden_eng, logits_eng, caps = run_engine(eng_dir, input_ids, positions)
+    hidden_eng, logits_eng, caps, hidden_ts = run_engine(
+        eng_dir, input_ids, positions, two_step=args.two_step,
+        split_at=args.split_at)
     print(f"[parity] engine done: hidden {hidden_eng.shape}")
 
     # bf16 noise floor: |HF bf16 - HF fp32| per checkpoint site.
@@ -320,6 +413,18 @@ def main():
         # reference itself does (allow 1 flip of slack at small T)
         t1_ok = eng_t1 >= ref_t1 - (1.0 / len(t1_eng))
 
+    # two-step vs single full-prefill: same math through the paged cache
+    # modulo bucketing → bf16-exact expected; gate at 1e-2 relative.
+    rel_ts = None
+    if args.two_step:
+        print("\n== two-step (prefill+decode via the paged KV cache) vs "
+              "single full-prefill ==")
+        d_ts = np.abs(hidden_ts - hidden_eng).max()
+        rel_ts = float(d_ts / (np.abs(hidden_eng).max() + 1e-9))
+        exact_ts = bool(np.array_equal(hidden_ts, hidden_eng))
+        print(f"  two_step      max|Δ|={d_ts:.6f}  rel={rel_ts:.6f}  "
+              f"exact_bit_match={exact_ts}")
+
     # ---- machine gate (exit nonzero on failure) ----
     floor_hs = np.abs(hs16[-1] - hs32[-1]).max()
     floor_lg = np.abs(logits16 - logits32).max()
@@ -335,6 +440,8 @@ def main():
             (d_lg is not None and d_lg <= K * floor_lg),
         "top1": bool(t1_ok),
     }
+    if args.two_step:
+        checks[f"two_step rel {rel_ts:.6f} <= 0.01"] = rel_ts <= 1e-2
     failed = [k for k, v in checks.items() if not v]
     print(f"\n[GATE] {'PASS' if not failed else 'FAIL: ' + '; '.join(failed)}")
 
