@@ -51,6 +51,19 @@ def test_adversarial_extractors():
     assert ex.extract_mc_letter("The correct option is (C).", 4) == "C"
     # MC: the LAST boxed is the final answer
     assert ex.extract_mc_letter(r"try \boxed{A}... reconsider: \boxed{B}", 4) == "B"
+    # MC round3-ac37c8d flip cases — the LATEST explicit answer wins, in BOTH
+    # directions (no silent-wrong, no lost extraction):
+    # (i) explicit final-answer prose AFTER the last boxed supersedes it...
+    assert ex.extract_mc_letter(
+        r"Let me try \boxed{(A)} first. Hmm, that fails the check. "
+        "The final answer is B.", 4) == "B"
+    # (ii) ...while a decorated boxed AFTER earlier boxed/prose still wins
+    assert ex.extract_mc_letter(r"maybe \boxed{A}? No. Final: \boxed{(C)}", 4) == "C"
+    assert ex.extract_mc_letter("The final answer is B, i.e. "
+                                r"\boxed{B}", 4) == "B"
+    # (iii) prose revised by later prose: last keyword phrase wins
+    assert ex.extract_mc_letter("the answer is A... wait, "
+                                "the final answer is D", 4) == "D"
     # MC never-guess guards must survive the forgiving boxed path:
     assert ex.extract_mc_letter(r"\boxed{42}", 4) is None      # non-letter boxed
     assert ex.extract_mc_letter(r"\boxed{AB}", 4) is None      # two letters
@@ -61,6 +74,15 @@ def test_adversarial_extractors():
     assert ex.norm_math("1,234,567") == "1234567"
     assert ex.norm_math("(1,2)") == "(1,2)"    # NOT a thousands separator — kept
     assert ex.norm_math("$42.") == "42"
+    # round3-ac37c8d comma flip cases: strip ONLY a whole plain grouped number
+    assert ex.norm_math("(1,200)") == "(1,200)"   # tuple/interval — kept
+    assert not ex.score_math("(1,200)", "1200")   # no silent-wrong inflation
+    assert ex.norm_math("0,001") == "0,001"       # European decimal — kept
+    assert not ex.score_math("0,001", "1")        # (old code scored this True)
+    assert ex.score_math("1,234.56", "1234.56")   # grouped decimal still works
+    assert ex.score_math("$1,234.56", "1234.56")
+    assert ex.score_math("-1,234", "-1234")
+    assert ex.score_math(ex.extract_boxed(r"\boxed{1,234}."), "1234")  # trailing .
     print("  adversarial extractors OK")
 
 
