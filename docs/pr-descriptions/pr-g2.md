@@ -5,7 +5,9 @@
 **Base:** `97938b62` (fork main, 2026-06-13 — the newest base the local vLLM install can run).
 Forward-port to `vllm-project/tpu-inference` main @ `0d59fee9` (2026-07-07): **conflict-free**
 (`git merge-tree` verified; `mla_attention.py` and the test file are byte-identical on the tip).
-**Status:** owner decision needed on the #2988 overlap before submission (see Duplicate-work).
+**Status:** owner decision needed before submission on two overlaps (see Overlap section):
+commit 2 duplicates #2988; commit 1's bug also has an alternative (untested, needs-rebase)
+fix inside #2324.
 
 ---
 
@@ -32,16 +34,28 @@ size-1 axis 0 → `IndivisibleError` at load whenever the head-TP mesh product >
 should be **dropped** if #2988 merges first (its 4-CPU-device regression test can be offered
 to #2988, which currently ships no test).
 
-## Why this is not duplicating an existing PR
+## Overlap with existing PRs (disclosed, verified against the live diffs)
 
 Searches run (2026-07-07, `api.github.com/search`, equivalent to
 `gh pr list --repo vllm-project/tpu-inference --state open --search "…"`):
-`MLA`, `kv_cache_dtype`, `fp8 v4`, `block scale`. Findings:
+`MLA`, `kv_cache_dtype`, `fp8 v4`, `block scale`; plus a live-diff check of the open GLM PR
+**#2324** (head `c2822bd7`, updated 2026-07-04), whose title matches none of those terms but
+which reworks the same function. Findings:
 
 - **PR #2988** (dawnhan1111, "Fix tensor parallelism (model>1) for MLA models (Kimi K2.6)",
   open, non-draft) contains the **same `W_UV_scale` fix** (`P(None, ATTN_HEAD)`). Bug 2 is
-  therefore split into its own commit, marked droppable. **Bug 1 (the auto-dtype NaN) is not
-  addressed by #2988 or any other open PR** — it is the substance of this PR.
+  therefore split into its own commit, marked droppable.
+- **Bug 1 (the auto-dtype NaN) is not addressed by #2988, but it IS addressed — differently —
+  inside open PR #2324** (GLM-5.1-FP8 multi-host): its `mla_attention.py` rework adds an
+  explicit `kv_cache_dtype=auto` else-branch that keeps `W_UK_T`/`W_UV` unquantized and
+  device_puts a replicated **scalar** 1.0 for both scales (vs the shaped identity scales
+  here). Why this PR still stands on its own: #2324 is a ~5.9k-line multi-purpose PR whose
+  `mla_attention.py` hunks are written against pre-refactor context (its scale
+  `expand_dims` axes predate current main — it needs a rebase), it ships the fix entangled
+  with a TP-selective loader, and it carries no regression test for this path; this PR is the
+  minimal, on-tip, tested vehicle for the same bug. As with commit 2 / #2988: coordinate with
+  #2324's author, and if maintainers prefer the fix landing there, this PR's auto-dtype
+  regression test can be offered to #2324 instead.
 - No other open PR touches `process_weights_after_loading` in the MLA wrapper.
 
 # Tests
@@ -79,6 +93,8 @@ reviewed and is defended by the human submitter.
 
 - [ ] Re-check #2988 state; if merged, `git rebase --onto` dropping commit `1716f345` and offer
       the 4-device test to #2988 as a review comment.
+- [ ] Watch #2324 (contains an alternative scalar-identity-scale fix for Bug 1): if it lands
+      first, drop commit `8eab375b` too and offer its regression test there.
 - [ ] Re-run the 1-chip machine-gated parity harness on the re-cut branch (owner TPU time).
 - [ ] `pre-commit run --all-files` (yapf applied; isort/ruff not runnable in the local env).
 - [ ] Add DCO `Signed-off-by` when pushing.

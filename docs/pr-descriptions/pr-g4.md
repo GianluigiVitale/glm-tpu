@@ -1,7 +1,8 @@
 # PR-G4 — [Quantization] Blockwise-FP8: checkpoint-exact ragged block scales for fused linears
 
 **Branch:** `pr-g4-fp8-ragged-block-scales` (worktree `~/tpu-inference-prs`)
-**Commit:** `1cfaf85b`
+**Commit:** `c349d1d6` (re-cut of `1cfaf85b`: comment/commit-message accuracy fixes from the
+round-6 adversarial review — same code)
 **Base:** `97938b62` (fork main, 2026-06-13).
 Forward-port to `vllm-project/tpu-inference` main @ `0d59fee9` (2026-07-07): **conflict-free**
 (`linear.py` and `quantization/fp8.py` are byte-identical between the base and the tip).
@@ -29,8 +30,13 @@ Two fixes:
   (`block_size_out = out_features // out_blocks`), which cannot represent a ragged tail at all
   (the reshape fails outright at 576 @ 5 columns, and would silently mis-scale if it didn't).
   Replaced with repeat+clip expansion: the block size is derived from the always-block-aligned
-  contracting axis, and a hard assert rejects interior-ragged fused concatenations (only the
-  LAST fused part may be ragged) instead of silently mis-scaling.
+  contracting axis. Only the LAST fused part may be ragged. An assert rejects fused layouts
+  whose **total** scale-column count is inconsistent with a uniform ceil grid (which catches
+  e.g. two or more ragged parts) — but a **lone ragged part in an interior position** produces
+  a consistent total count (Σ per-part ceils == ceil of the sum) and **cannot be detected at
+  this call site** (per-part sizes are unavailable there); such a layout would be silently
+  mis-scaled. No known checkpoint fuses one: GLM's ragged part (`kv_a_proj_with_mqa`) is last,
+  DeepSeek/Kimi parts are block-aligned. See Risk for the honest trade-off vs main.
 
 Block-aligned checkpoints produce identical scale layouts (`ceil == div` when aligned) and take
 the byte-identical path.
@@ -53,7 +59,9 @@ Result: **5 passed** (new file):
 - ragged 576@128 expansion **bit-exact** vs an explicit per-block dequantization reference
   (matmul outputs compared with `assert_array_equal`);
 - block-aligned expansion bit-exact (no-regression case — also passes on main);
-- interior-ragged concatenation fails loudly (assert), never silently mis-scales;
+- a fused layout with an inconsistent total scale-column count (2×6 scale columns vs 576
+  outputs) fails loudly (assert) — this covers the detectable interior-ragged class; a lone
+  interior-ragged part is undetectable at this call site (see Description) and has no test;
 - `process_blockwise_fp8_linear_weights` keeps all `ceil` scale columns per fused part,
   fused (`reorder`) and unfused (`slice`) paths, verified column-by-column.
 
@@ -68,8 +76,15 @@ The re-cut branch needs the submitter's parity re-run.
 # Risk
 
 Only the `DISABLE_WEIGHT_REQUANTIZATION` / 2D-block-scale path changes. Block-aligned
-checkpoints: identical layouts, byte-identical behavior. The new assert converts a silent
-mis-scale into a loud failure for the (unsupported) interior-ragged case.
+checkpoints: identical layouts, byte-identical behavior. Interior-ragged fused layouts
+(unsupported) split into two classes: with an inconsistent total scale-column count (e.g. two
+ragged parts) the new assert fails loudly; with a **lone** interior-ragged part (e.g. a
+hypothetical `[576, 512]` @ 128 fusion — no known checkpoint) the count check passes and the
+expansion silently mis-scales every column from the ragged boundary on, **where main failed
+loudly at the uniform reshape** — a loud→silent trade for that class, accepted because
+detecting it needs per-part sizes (available in `process_blockwise_fp8_linear_weights`, not
+at this call site); flagged in code comments and open to a follow-up that validates part
+sizes upstream of the matmul.
 
 # Disclosure
 

@@ -58,14 +58,33 @@ intend to offer that as a separate tiny vLLM PR; this wrap stands until it lands
 end-to-end correctness under the default kv-cache dtype; this PR declares it a prerequisite
 for the whole-model gate.
 
-## Why this is not duplicating an existing PR
+## Overlap with existing PRs (disclosed, verified against the live diffs)
 
-Searches run (2026-07-07): open PRs matching `GLM`, `DSA`, `MLA`, `kv_cache_dtype`. Findings:
-the only GLM PR is **#2324** (GLM-**5.1**-FP8 multi-host), which runs DSA *disabled* via env
-gating but does **not** register `GlmMoeDsaForCausalLM`, does not handle GLM-5.2 IndexShare
-construction, and does not fix the `DeepseekV32IndexerCache` boot crash. The
-`TPU_DISABLE_DSA_INDEXER` env name is adopted from #2324 deliberately so the two PRs converge.
-No other open PR registers this architecture or touches these code paths.
+Searches run (2026-07-07): open PRs matching `GLM`, `DSA`, `MLA`, `kv_cache_dtype`; the only
+GLM PR is **#2324** (yiqiliu2, GLM-**5.1**-FP8 multi-host, open non-draft, ~5.9k-line diff;
+overlap re-verified against its live diff at head `c2822bd7`, updated 2026-07-04). **Four of
+this PR's six changed source files carry hunks shared with (ported from) #2324**, disclosed
+so maintainers can reconcile whichever lands first:
+
+- `model_loader.py`: #2324 also adds `GlmMoeDsaForCausalLM` to both
+  `_VLLM_PREFERRED_ARCHITECTURES` and `_PP_DISABLED_MODELS` (near-identical comment);
+- `envs.py`: #2324 carries the same `DISABLE_DSA_INDEXER` / `TPU_DISABLE_DSA_INDEXER` entry
+  but defaults it **OFF** (its launch script exports `=1`); this PR defaults it **ON**, since
+  the out-of-box default must not crash (rationale in the Description). Same entry with a
+  different default and a different insertion point — whichever PR lands second must rebase
+  to a single entry, and the default is the one real decision point;
+- `mla_attention.py`: the indexer gate line is byte-identical in both PRs;
+- `tpu_platform.py`: #2324 also allow-lists `TPU_DISABLE_DSA_INDEXER` for Ray workers; the
+  `DISABLE_WEIGHT_REQUANTIZATION` allow-list entry is unique to this PR.
+
+What #2324 does **not** contain (this PR's own substance): the GLM-**5.2** IndexShare
+constructor handling (`_maybe_patch_for_glm_moe_dsa` — #2324's only `vllm_model_wrapper.py`
+hunk concerns expert-parallel weight loading, not the Indexer), the `DeepseekV32IndexerCache`
+`get_kv_cache_spec` boot fix, the default-ON env decision, and the 15 CPU tests. Conversely,
+this PR carries none of #2324's multi-host loader / MoE / quantization work — it is the
+minimal registration-and-boot slice. If #2324 lands first, this PR rebases to just the
+IndexShare + KV-spec + default/allow-list deltas; if this lands first, #2324 drops the four
+shared hunks. No other open PR registers this architecture.
 
 # Tests
 
