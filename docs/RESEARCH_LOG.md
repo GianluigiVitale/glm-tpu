@@ -376,3 +376,75 @@ what you did, what you validated it against, the exact numbers, and the honest n
   DSV4_OBSERVE_COMPILES, vLLM dump_input) + run-books (crash → triage; next run →
   GLM_FLIGHT_RECORDER=1 + GLM_LOG_STATS=1) + limits (async dispatch semantics: the signal is the
   silence after the last line, not the line itself).
+
+## 2026-07-07 — Round-5 review fixes applied: Stage-2 DSA kernels + S1 + 2a path (branch `glm-5.2-v4-r5fix`; CPU-only, TPU untouched)
+
+Applied the round-5 adversarial-review findings (docs/reviews/round5-agent*.md: indexer-kernel, sparse-MLA,
+dsa-path+S1) in a dedicated worktree, branch **`glm-5.2-v4-r5fix`** off `glm-5.2-v4` (main checkout never
+touched — live pod imports it). One commit: **`c8a51543`** (9 files, +598/−29; NOT pushed per task).
+
+**Fixes applied (fork):**
+- **[dsa-path 1, CRITICAL] fp8-resident `indexer.wq_b` read without scales** → new
+  `_linear_weight_f32` adapter in `glm_dsa_indexer.py`: dequantizes fp8 codes with their separate
+  `weight_scale` (per-tensor / axis-0-block / 2-D-block / kernel-formatted scales, via `dequantize_tensor`
+  ceil-block expansion); loud `ValueError` on fp8-without-scale. GLM-5.2-FP8 quantizes wq_b (not in
+  `modules_to_not_convert`) and gate D0 (topk ≥ T) is structurally blind to garbage scores. + 4-case fp8 test.
+- **[dsa-path 2, HIGH] `xla_ref` silently wrong off single-prefill** → runtime guard
+  (`jax.debug.callback`, positions == arange(T)) inside `glm_dsa_xla_ref_attention` refuses decode / chunked /
+  batched-multi-sequence use with a loud error; docstrings now say SINGLE-SEQUENCE single-chunk. + 3-case test.
+- **[dsa-path 3, MED] S1 head-sharded unsafe on DP meshes** → `mla_attention` raises
+  `NotImplementedError` when GLM_MLA_HEAD_SHARDED=1 on a mesh with data/attn_dp product > 1. + test.
+- **[dsa-path 5, MED] "born head-sharded" is a propagation hope** → belt-and-braces
+  `with_sharding_constraint(q_NTA, P(ATTN_HEAD, None, None))` before the shard_map (no-op if GSPMD already
+  chose it); on-TPU HLO collective-count check still on the checklist.
+- **[dsa-path 6, LOW] "XLA folds the adapter" comment wrong at runtime** → honest comment (casts execute
+  every step, ~0.75 GB/step at fp32 over 22 full layers; production must precompute in PWAL). Ray env-forward
+  warning added at the GLM_MLA_HEAD_SHARDED read (cheap half of finding 7).
+- **[indexer 1, MED] mixed-dtype q/k contract** → `assert q.dtype == kv_cache.dtype` in both scorers
+  (shared `_check_scoring_shapes`) + explicit `q.astype(kv_cache.dtype)` at the `dsa_topk_indexer` boundary
+  + mixed-dtype test (direct scorer calls raise; wrapper cast bit-equals pre-cast on both paths).
+- **[indexer 3f] `page_size % 128` guard** when `interpret=False`; **[indexer 5] `n_valid` clamped** to
+  `min(topk, S)` (kv_lens-contract-violation hardening) + tests. **[indexer 4, doc]** pad-page-id contract
+  tightened to "constant/repeated id" (DMA-elision); signed-zero top-k note; on-TPU checklist extended
+  (1-sublane matmul LHS risk + SMEM table scaling).
+- **[sparse-MLA F1, MED] false "degrades to output 0" claim** → made TRUE instead of reworded:
+  `_finalize` (and the XLA oracle, keeping Gate K meaningful) now explicitly zeroes fully-masked rows
+  (`where(m > _MASK_VALUE, out, 0)`) — exact-identity for any live row; a seg_valid==0 padded slot now
+  yields exactly 0 even with NaN/inf garbage in the gathered segment. + 2 tests (direct + gather composition).
+- **[sparse-MLA F3, LOW] effective `seg_block` 128-multiple assert** after the `min(seg_block, seg_len)`
+  bypass, gated on `interpret=False`. **[indexer 6 / glue]** "decode always selects the self token"
+  justification corrected (real guarantee: n_valid ≥ 1 ⇐ kv_len ≥ 1); seg_valid==0 padding-row
+  discard note added to the gather/kernel contracts.
+- **[sparse-MLA F4c/R5, doc]** `MLA_TRANSPOSE_KV_CACHE` incompatibility + reshape-is-a-bitcast condition +
+  index-clamp/-1-interleave robustness limits documented in `gather_kv_segment`; Gate-K bars flagged as
+  interpreter measurements (re-measure on real MXU before upstreaming).
+- **[sparse-MLA R1] packed-cache layout discriminating test ported into the suite**:
+  `test_gather_layout_vs_upstream_v1_writer` writes via the UPSTREAM mla/v1 reference writer (independent
+  (row,col) convention; the v2 Pallas fused writer is pinned bit-exact to it on TPU) and asserts the port's
+  row-major reshape + gather round-trips token-identifiable payloads at kv_packing ∈ {2,4,32} ×
+  page_size ∈ {8,32,64}.
+
+**Doc fixes (this repo, docs/01-dsa-kernel-design.md):**
+- **Gate S amended (indexer finding 2)**: two tiers — **S1 (fp32 algorithmic): 0 mismatches modulo exact
+  ties — ACHIEVED**; **S2 (production bf16): boundary-band criterion** (every mismatch within
+  |s − s_kth| ≤ ε, ε ≈ 2⁻⁸ relative — bf16 churn measured 1–2 non-tie indices/2048 typical, ~2% adversarial;
+  "0 modulo ties" vs fp32 is unachievable by construction). Tests' `_assert_topk_set_equiv` = the S2 form.
+- **§3.1 write-then-attend bullet CORRECTED (sparse-MLA F2)**: mla.v2 does NOT write-then-attend (write is
+  fused in its own pallas_call; the read-only kernel.py:319-320 contract is DSV4's) → Stage-3 must scatter
+  the step's latents BEFORE `gather_kv_segment`. §3.1 also now states indices are descending-score,
+  not position-sorted.
+
+**Skipped (with reasons):** [dsa-path 4] mla.v2 `_INTERPRET` shim prefill bug — upstream kernel, needs
+dedicated debugging + on-TPU A/B (prefill at H_local=2 has no off-TPU evidence; keep GLM_MLA_HEAD_SHARDED
+off until the on-TPU gate); [dsa-path 7 full fix] env plumbing through vllm config — PR-shaping work, doesn't
+change the operative mitigation (launcher bakes GLM_* into the raylet env); [indexer 3a-e, 4-perf] on-TPU-only
+verifications (documented in the kernel's real-TPU checklist); [sparse-MLA F4a/b runtime asserts] inputs are
+jit tracers — documented as contracts instead.
+
+**Tests (CPU, vllm-env, JAX_PLATFORMS=cpu):** the five DSA/MLA files **93/93 PASS** (incl. +12 new cases):
+`test_dsa_indexer_kernel` 24, `test_dsa_sparse_mla` 42, `test_glm_dsa_indexer` 17, `test_mla_attention` 5,
+`test_mla_head_sharded` 5. Full `tests/kernels/` sweep as tasked: 1238 failed / 137 passed / 870 skipped in
+33 min — the failures are the PRE-EXISTING CPU baseline (TPU-only Pallas kernel tests — spmm, transpose,
+RPA, GMM, … — that compile-fail off-TPU; sampled failures reproduce identically at pristine HEAD via a
+stash round-trip; no DSA/MLA file among them; the diff imports nothing they use).
+Commit: fork `glm-5.2-v4-r5fix` @ c8a51543 (not pushed, per task); glm-tpu docs committed + pushed.

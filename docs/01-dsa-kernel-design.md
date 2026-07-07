@@ -240,6 +240,10 @@ K==V). Absorbed q per head: `[ql_nope(512) | q_pe(64→128 zero-pad)]`.
 **(a) Fixed gathered segment (RECOMMENDED for decode).** XLA pre-step per decode step, per full/shared layer:
 
 1. `topk_indices [R, 2048]` int32 (from §1 / §5), padded with −1 where ctx < 2048 (or: dense fallback, below).
+   The −1 fill is a strict TAIL suffix, and the valid prefix is in **descending-score order, NOT
+   position-sorted** (round-5 note): the gather and the flash kernel are permutation-invariant and require no
+   sort, but any future kernel exploiting index monotonicity would silently break — restate this contract
+   before reordering anything.
 2. Gather: absolute index `t` → `page = block_tables[r, t // page_size]`, offset `t % page_size`. The mla.v2
    packed cache `[pages, page_size//packing, packing, 640]` (mla_v2.py:111-118) reshapes to a token-major
    `[pages·page_size, 640]` view (row-major (page, row, sub) = token order), so the gather is one fused XLA
@@ -269,8 +273,15 @@ form (§3.3) where per-query gather explodes. Edge cases for (a):
 
 - **ctx ≤ 2048**: skip the sparse path entirely and run the dense mla.v2 kernel — bit-exact with the Stage-1
   dense gate by construction (topk = all). This is also gate D0 (§4) for free.
-- The just-written token's latent is in the cache before the kernel runs (mla.v2/dsv4 both write-then-attend;
-  kernel read-only over cache, kernel.py:319-320), so a selected self-index gathers correctly.
+- **Latent-cache write ordering (CORRECTED, round-5 F2).** The earlier claim "mla.v2/dsv4 both
+  write-then-attend" is wrong for mla.v2: the `kernel.py:319-320` read-only contract is **DSV4's** (its layer
+  does an explicit XLA scatter before its read-only kernel, deepseek_v4_attention.py:1876), whereas mla.v2's
+  cache write is **fused inside** its attention `pallas_call` (`new_kv_c`/`new_k_pe` operands,
+  `donate_argnames=("cache_kv",)`, mla/v2/kernel.py:2169,2505-2508). On a sparse decode step mla.v2 does NOT
+  run, so nothing writes the new token's latent before `gather_kv_segment` — Stage-3 integration MUST add an
+  explicit XLA scatter of the step's `(kv_c, k_pe)` into the token-major cache view BEFORE the gather (and
+  gather from the post-scatter array so jit orders the ops). Only then does a selected self-index gather
+  correctly.
 
 ### 3.2 Kernel deltas from `dsv4/kernel.py` (what changes, what is verbatim)
 
@@ -325,12 +336,22 @@ layer:
 Every phase is gated; a phase without its gate is not done. All harnesses live in `~/glm-tpu/parity/`,
 machine-gated with exit codes, fp32 + bf16 controls, results in the provenance discipline.
 
-- **Gate S — selected-set exact.** TPU indexer (2a XLA, then 2b Pallas) vs a torch reference implementing the
-  HF math (modeling.py:198-262) with the §1.2-resolved rope layout, fp32: **0 index mismatches modulo ties**
-  — compare as sets; where `score == score_kth` (tie group straddling the boundary), any member is
-  acceptable; assert the tie by checking score equality at the boundary. Chunk patterns: one-shot prefill,
-  prefill+1, 1-by-1 decode (the dsv4 harness patterns, doc09 §4), shuffled block tables.
-  NOT the reference: the GPU fp8 pipeline (it deviates from HF bf16 math by construction, §1.4).
+- **Gate S — selected-set exact (AMENDED round 5: two tiers).** TPU indexer (2a XLA, then 2b Pallas) vs a
+  torch reference implementing the HF math (modeling.py:198-262) with the §1.2-resolved rope layout:
+  - **S1 (fp32, algorithmic) — ACHIEVED (2a + 2b CPU suites):** **0 index mismatches modulo exact ties** —
+    compare as sets; where `score == score_kth` (tie group straddling the boundary), any member is
+    acceptable; assert the tie by checking score equality at the boundary.
+  - **S2 (production bf16) — boundary-band criterion.** The original "0 mismatches modulo ties" is
+    **unachievable by construction** for bf16 scoring (bf16 k-cache, DEFAULT MXU precision) against an fp32
+    reference: bf16 perturbs scores by ~2⁻⁸ relative (measured per-score median ≈6e-3, p99 ≈2.6e-2 on
+    unit-variance scores), which swaps NEAR-equal — not exactly tied — boundary scores. Measured churn
+    (H=32, D=128, Gaussian, ctx 4K–16K): 1–2 non-tie indices per 2048 (0.05–0.10%) typical; 26–42 positions
+    sit inside the p99 noise band of the k-th score, so adversarial worst case is ~2%. S2 therefore requires:
+    every mismatch lies in the k-th-score boundary band **|s − s_kth| ≤ ε, ε ≈ 2⁻⁸ relative to the score
+    scale** (the suites' `_assert_topk_set_equiv` atol=1e-4 form is this criterion at unit variance) — or,
+    equivalently strict, exactness vs a bf16-scored reference with matched rounding.
+  Chunk patterns: one-shot prefill, prefill+1, 1-by-1 decode (the dsv4 harness patterns, doc09 §4), shuffled
+  block tables. NOT the reference: the GPU fp8 pipeline (it deviates from HF bf16 math by construction, §1.4).
 - **Gate K — kernel bit-faithfulness.** The sparse-MLA Pallas kernel vs an XLA oracle attending the **same
   gathered segment** (same indices, same bias): fp32 max-abs ~3e-8 (DSV4 achieved 4e-8 compressed); bf16
   target ≤ 3e-4 (DSV4 compressed standalone 5e-5–2.7e-4; dense achieved 0.0 bit-identical — pursue 0.0 where
@@ -427,8 +448,8 @@ phase diffs against — it is allowed to be slow (it is DSV4's `_compressed_deco
 Fused q·k→relu→weighted-sum kernel (§1.3), per-block score tiles or per-block candidates to HBM; blocked
 top-k merge unchanged in XLA. New `TuningKey`-style entries are NOT needed (this is a new kernel, not mla.v2;
 but note mla.v2's tuned tables assume 128 q-heads — doc11 §3 — when touching the dense path for GLM's 64).
-**Gates: S (vs 2a, 0 mismatch modulo ties), microbench vs the 2a blocked XLA core** (the DSV4 analogue ran
-1.4×@512 → 4.3×@8K, doc09 §4).
+**Gates: S (vs 2a — S1 fp32 exact-modulo-ties, S2 bf16 boundary-band; §4), microbench vs the 2a blocked XLA
+core** (the DSV4 analogue ran 1.4×@512 → 4.3×@8K, doc09 §4).
 
 **2c — sparse-MLA Pallas decode consuming indices.**
 The §3.1(a) gathered-segment kernel (§3.2 deltas: no sink/no inverse-rope/no local blocks, PV over
