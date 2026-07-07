@@ -139,3 +139,12 @@ what you did, what you validated it against, the exact numbers, and the honest n
   factually wrong), extractor silent-wrong regressions, dataset revision-pinning, doc-truthfulness items —
   fix batch delegated; none pod-blocking. Reports in docs/reviews/round3-*.
 - **Sub-cube validation is COMPLETE. Next: pod bring-up** (sync workers @ fork a429be54, launch, engine build).
+
+## 2026-07-07 (round-3 fix batch) — review findings fixed; CORRECTION to the long-context-harness entry above
+
+- **CORRECTION (appended, history not rewritten):** the 2026-07-07 long-context-harness entry above claims the
+  raw prompt is "Tokenized `add_special_tokens=True` ([gMASK]<sop>)". That was **factually wrong**: the GLM-5.2
+  tokenizer's post_processor is plain ByteLevel — `add_special_tokens=True` adds NOTHING (verified on the real
+  tokenizer.json; review round3-unknown finding 2), so the harness was sending a bare BPE stream with no special
+  tokens at all. Fixed in `bench/glm_longctx.py` by prepending the ids **explicitly**
+  (`PROMPT_PREFIX_IDS = [154822 [gMASK], 154824 <sop>]`); the module docstring now documents the no-op.

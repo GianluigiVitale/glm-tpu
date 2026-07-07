@@ -12,17 +12,31 @@ passkey at a controlled DEPTH inside filler of a target token LENGTH, ask for
 it, greedy-decode <=20 tokens, and exact-match the extracted digits. The model
 can only produce the key if it ATTENDED to the needle far back in the context.
 
-PROMPT-STYLE DECISION — RAW COMPLETION, not the chat template (documented):
-  * GLM-5.2's chat template ends with `<|assistant|><think>` — the model
-    reasons at length before answering, so a <=20-token greedy budget would be
-    consumed by thinking preamble, and a large budget would measure "reasoning
-    length", not retrieval.
+PROMPT-STYLE DECISION — RAW COMPLETION by default (--protocol raw):
+  * GLM-5.2's chat template (thinking ON, its default) ends with
+    `<|assistant|><think>` — the model reasons at length before answering, so
+    a <=20-token greedy budget would be consumed by thinking preamble, and a
+    large budget would measure "reasoning length", not retrieval.
   * The cue "...The secret passcode is" invites the direct continuation —
     exactly the DSV4/Mohtashami-&-Jaggi passkey protocol.
-  * The prompt is tokenized with add_special_tokens=True (the tokenizer's own
-    [gMASK]<sop> text prefix) and decoding stops at the GLM EOS ids
-    [154820 <|endoftext|>, 154827 <|user|>, 154829 <|observation|>], so a
-    turn-taking continuation halts immediately.
+  * Prompt ids = [gMASK]<sop> (154822, 154824) prepended EXPLICITLY + the bare
+    BPE stream. The tokenizer's post-processor is plain ByteLevel — it adds NO
+    special tokens, add_special_tokens=True is a no-op — yet every GLM
+    training/serving sequence starts with that pair (the chat template emits
+    it as literal text), so the harness must prepend the ids by hand.
+  * Decoding stops at the GLM EOS ids [154820 <|endoftext|>, 154827 <|user|>,
+    154829 <|observation|>] PLUS 154828 <|assistant|>: a turn-taking
+    continuation halts immediately instead of burning the 20-token budget on
+    chat markup.
+
+FALLBACK PROTOCOL — CHAT WITHOUT THINKING (--protocol chat): if raw completion
+proves unreliable on the pod (a chat/thinking post-trained model may ramble
+off-template rather than continue bare filler — short-L cells are the control:
+if SHORT lengths fail, suspect the protocol, not long-context attention),
+rerun with `--protocol chat`: one user turn through the model's OWN chat
+template with enable_thinking=False — the template then ends
+`<|assistant|><think></think>` and the model answers directly (no thinking
+preamble); greedy budget 32 tokens.
 
 Filler length is targeted ITERATIVELY on the CONCATENATED prompt with the real
 tokenizer — BPE boundary merges make per-sentence token counts non-additive
@@ -85,6 +99,20 @@ MAX_CONTEXT = 1_048_576
 # finding 3 — '--lengths 1M' used to crash at engine build). The 1M-endpoint
 # cell is --lengths 1048288.
 MAX_TARGET_LEN = MAX_CONTEXT - 256 - 32   # = 1_048_288
+
+# Every GLM-5.2 training/serving sequence starts `[gMASK]<sop>`, but the
+# tokenizer does NOT add it: its post_processor is plain ByteLevel (no
+# special-token template), so add_special_tokens=True adds NOTHING (verified
+# on the real tokenizer.json 2026-07-07; review round3-unknown finding 2).
+# The chat template emits the pair as literal text; the RAW protocol prepends
+# the ids explicitly:
+GMASK_ID, SOP_ID = 154822, 154824             # [gMASK], <sop>
+PROMPT_PREFIX_IDS = [GMASK_ID, SOP_ID]
+# <|assistant|> is not an EOS in generation_config, but under the RAW protocol
+# an emitted `<|assistant|><think>...` turn would burn the whole decode budget
+# on chat markup — stop on it too (review round3-unknown finding 4):
+ASSISTANT_ID = 154828                         # <|assistant|>
+RAW_STOP_IDS = engine.EOS_IDS + [ASSISTANT_ID]
 
 # Canonical passkey-retrieval filler (Mohtashami & Jaggi 2023), split into
 # SENTENCE units (~4-8 tokens each) for fine-grained depth placement.
@@ -222,14 +250,24 @@ def extract_passkey(reply: str | None) -> str | None:
     return None
 
 
+def _prompt_ids(tok, context: str) -> list:
+    """RAW-protocol prompt ids: [gMASK]<sop> prepended EXPLICITLY + the bare
+    BPE stream (add_special_tokens is a no-op for this tokenizer — see
+    PROMPT_PREFIX_IDS above)."""
+    return PROMPT_PREFIX_IDS + list(
+        tok(context, add_special_tokens=False)["input_ids"])
+
+
 def make_raw_generate(llm, tok, max_len: int, max_new: int = 20):
-    """RAW-COMPLETION greedy generator (see the module docstring for why raw
-    completion, not the chat template). Returns
+    """RAW-COMPLETION greedy generator (--protocol raw; see the module
+    docstring for why raw completion is the default and chat-without-thinking
+    the fallback). Prompt = explicit [gMASK]<sop> ids + bare BPE stream; stops
+    on the GLM EOS ids + <|assistant|>. Returns
     `generate(context) -> (text, n_gen_tokens, n_prompt_tokens)`."""
     from vllm import SamplingParams
 
     def generate(context: str):
-        ids = tok(context, add_special_tokens=True)["input_ids"]
+        ids = _prompt_ids(tok, context)
         room = max_len - len(ids)
         if room <= 0:
             # Prompt alone exceeds the context window: record an empty reply
@@ -239,6 +277,51 @@ def make_raw_generate(llm, tok, max_len: int, max_new: int = 20):
             return "", 0, len(ids)
         sp = SamplingParams(
             temperature=0.0,               # greedy — the retrieval protocol
+            max_tokens=min(max_new, room),
+            stop_token_ids=RAW_STOP_IDS,   # EOS ids + <|assistant|>
+            ignore_eos=False,
+        )
+        outs = llm.generate([{"prompt_token_ids": ids}], sp, use_tqdm=False)
+        o = outs[0].outputs[0]
+        return o.text, len(o.token_ids), len(ids)
+
+    return generate
+
+
+def make_chat_generate(llm, tok, max_len: int, max_new: int = 32):
+    """CHAT-protocol greedy generator (--protocol chat — the fallback if raw
+    completion proves unreliable on the pod): one user turn through GLM-5.2's
+    OWN chat template with enable_thinking=False, so the rendered prompt ends
+    `<|assistant|><think></think>` and the model answers directly (no thinking
+    preamble) — a 32-token budget suffices. The template itself emits the
+    literal [gMASK]<sop> prefix. Returns
+    `generate(context) -> (text, n_gen_tokens, n_prompt_tokens)`."""
+    from vllm import SamplingParams
+
+    chat_template = None
+    if getattr(tok, "chat_template", None) is None:
+        # The checkpoint ships chat_template.jinja (transformers 5.x auto-loads
+        # it); if this tokenizer instance didn't pick it up, fall back to the
+        # committed reference copy (same pattern as run_bench.make_generate).
+        ref = os.path.join(HERE, "..", "reference", "hf-repo",
+                           "chat_template.jinja")
+        with open(ref, encoding="utf-8") as f:
+            chat_template = f.read()
+        print("[longctx] tokenizer had no chat template — using the reference "
+              "chat_template.jinja copy", flush=True)
+
+    def generate(context: str):
+        ids = tok.apply_chat_template(
+            [{"role": "user", "content": context}],
+            add_generation_prompt=True, tokenize=True, return_dict=False,
+            chat_template=chat_template, enable_thinking=False)
+        room = max_len - len(ids)
+        if room <= 0:
+            print(f"[longctx] SKIP: prompt {len(ids)} tok >= max_len {max_len}",
+                  flush=True)
+            return "", 0, len(ids)
+        sp = SamplingParams(
+            temperature=0.0,
             max_tokens=min(max_new, room),
             stop_token_ids=engine.EOS_IDS,
             ignore_eos=False,
@@ -253,7 +336,7 @@ def make_raw_generate(llm, tok, max_len: int, max_new: int = 20):
 def _stub_generate(tok):
     """Offline pipeline check: empty replies (all trials score wrong)."""
     def generate(context: str):
-        return "", 0, len(tok(context, add_special_tokens=True)["input_ids"])
+        return "", 0, len(_prompt_ids(tok, context))
     return generate
 
 
@@ -320,7 +403,12 @@ def run_ladder(generate, tok, lengths, depths, trials, conn=None, run_id=None,
     return grid, rows, overall
 
 
-def _run_env(args, lengths, depths, max_len) -> dict:
+def _prompt_mode(args) -> str:
+    return ("stub" if args.stub else
+            {"raw": "raw_completion", "chat": "chat_no_think"}[args.protocol])
+
+
+def _run_env(args, lengths, depths, max_len, max_new) -> dict:
     """Run-level env/config provenance (mirrors run_bench._run_env; secrets
     are filtered — never store tokens/keys)."""
     os_env = {k: v for k, v in sorted(os.environ.items())
@@ -329,17 +417,21 @@ def _run_env(args, lengths, depths, max_len) -> dict:
                                "OMP_NUM_THREADS", "DISABLE_WEIGHT_REQUANTIZATION",
                                "REQUANTIZE_WEIGHT_DTYPE"))
               and not any(s in k.upper() for s in ("TOKEN", "KEY", "SECRET"))}
+    raw = args.protocol == "raw"
     return {
         "benchmark": "longctx_passkey", "stub": bool(args.stub),
-        "prompt_mode": "raw_completion",   # NOT the chat template (see docstring)
+        "protocol": args.protocol,
+        "prompt_mode": _prompt_mode(args),         # see the module docstring
+        "prompt_prefix_ids": PROMPT_PREFIX_IDS if raw else "chat_template",
         "model": args.model,
         "tp": int(os.environ.get("GLM_TP", "32")),
         "dp_attention": False, "expert_parallel": True,
         "lengths": lengths, "depths": depths, "trials": args.trials,
-        "max_new": args.max_new, "max_len": max_len,
+        "max_new": max_new, "max_len": max_len,
         "max_seqs": args.max_seqs, "max_batched_tokens": args.max_batched_tokens,
         "gmu": args.gmu, "num_gpu_blocks": args.num_gpu_blocks,
         "temperature": 0.0, "eos_ids": engine.EOS_IDS,
+        "stop_ids": RAW_STOP_IDS if raw else engine.EOS_IDS,
         "base_seed": args.seed, "load_format": "runai_streamer",
         "os_env": os_env,
     }
@@ -356,8 +448,15 @@ def main(argv=None):
                          "tokens before the needle)")
     ap.add_argument("--trials", type=int, default=12,
                     help="trials per (length,depth) cell")
-    ap.add_argument("--max-new", type=int, default=20,
-                    help="greedy decode budget per trial (retrieval needs ~8)")
+    ap.add_argument("--protocol", choices=("raw", "chat"), default="raw",
+                    help="raw = bare completion with an explicit [gMASK]<sop> "
+                         "prefix (default — the canonical passkey protocol); "
+                         "chat = the model's own chat template with "
+                         "enable_thinking=False (the fallback if raw proves "
+                         "unreliable on the pod; see the module docstring)")
+    ap.add_argument("--max-new", type=int, default=0,
+                    help="greedy decode budget per trial; 0 = auto (20 raw / "
+                         "32 chat; retrieval needs ~8)")
     ap.add_argument("--max-len", type=int, default=0,
                     help="engine max_model_len; 0 = auto (max length + 256)")
     ap.add_argument("--max-seqs", type=int, default=1)
@@ -392,11 +491,12 @@ def main(argv=None):
     # (parse_lengths caps targets at MAX_TARGET_LEN, so the auto value already
     # fits; the clamp also guards an explicit --max-len overshoot)
     max_len = min(args.max_len or (max(lengths) + 256), MAX_CONTEXT)
+    max_new = args.max_new or (32 if args.protocol == "chat" else 20)
 
     conn = pv.connect(args.db) if args.db else pv.connect()
     run_id = pv.start_run(conn, model=("STUB" if args.stub else args.model),
                           revision=args.revision,
-                          env=_run_env(args, lengths, depths, max_len),
+                          env=_run_env(args, lengths, depths, max_len, max_new),
                           note=args.note or ("offline-stub" if args.stub
                                              else "longctx passkey ladder"))
     if args.stub:
@@ -407,13 +507,14 @@ def main(argv=None):
                                max_seqs=args.max_seqs,
                                max_batched_tokens=args.max_batched_tokens,
                                gmu=args.gmu, num_gpu_blocks=args.num_gpu_blocks,
-                               log_extra=f"max_new={args.max_new}")
+                               log_extra=f"max_new={max_new}")
         tok = llm.get_tokenizer()
-        generate = make_raw_generate(llm, tok, max_len, args.max_new)
+        make = make_chat_generate if args.protocol == "chat" else make_raw_generate
+        generate = make(llm, tok, max_len, max_new)
 
     print(f"[longctx] run_id={run_id} lengths={lengths} depths={depths} "
-          f"trials={args.trials} max_len={max_len} max_new={args.max_new} "
-          f"mode={'stub' if args.stub else 'raw_completion'}", flush=True)
+          f"trials={args.trials} max_len={max_len} max_new={max_new} "
+          f"mode={_prompt_mode(args)}", flush=True)
     t0 = time.time()
     grid, rows, overall = run_ladder(generate, tok, lengths, depths, args.trials,
                                      conn=conn, run_id=run_id,
@@ -431,9 +532,8 @@ def main(argv=None):
     out_json = args.out_json or os.path.join(RESULTS, "longctx_passkey.json")
     res = dict(benchmark="longctx_passkey", run_id=run_id,
                overall_accuracy=overall, lengths=lengths, depths=depths,
-               trials=args.trials, max_new=args.max_new, max_len=max_len,
-               prompt_mode=("stub" if args.stub else "raw_completion"),
-               grid=grid, seconds=round(dt, 1))
+               trials=args.trials, max_new=max_new, max_len=max_len,
+               prompt_mode=_prompt_mode(args), grid=grid, seconds=round(dt, 1))
     with open(out_json, "w") as f:
         json.dump(res, f, indent=2)
     with open(os.path.splitext(out_json)[0] + ".jsonl", "w") as f:

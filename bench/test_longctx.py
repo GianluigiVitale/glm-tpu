@@ -128,6 +128,20 @@ def test_extractor():
     # the exact-match scoring (extracted == 6-digit gold) honestly.
 
 
+def test_raw_prompt_protocol():
+    """RAW-protocol facts (round3 findings 2+4): [gMASK]<sop> ids are prepended
+    EXPLICITLY (add_special_tokens is a no-op for the GLM tokenizer — plain
+    ByteLevel post-processor) and <|assistant|> is a stop id (an emitted chat
+    token must not burn the decode budget)."""
+    import engine
+    ids = LC._prompt_ids(_tok(), "hello world")
+    assert ids[:2] == [154822, 154824] == LC.PROMPT_PREFIX_IDS  # [gMASK]<sop>
+    assert len(ids) == 2 + 2                                    # prefix + words
+    assert LC.ASSISTANT_ID == 154828
+    assert LC.RAW_STOP_IDS == engine.EOS_IDS + [LC.ASSISTANT_ID]
+    assert LC.ASSISTANT_ID not in engine.EOS_IDS  # generation_config unchanged
+
+
 def test_parse_lengths():
     p = LC.parse_lengths
     assert p("1024,2048") == [1024, 2048]
