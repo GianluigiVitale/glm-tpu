@@ -132,8 +132,13 @@ def test_parse_lengths():
     p = LC.parse_lengths
     assert p("1024,2048") == [1024, 2048]
     assert p("32k,128K") == [32 * 1024, 128 * 1024]
-    assert p("1M") == [1024 ** 2] == [LC.MAX_CONTEXT]    # up to 1M accepted
-    for bad in ("2M", "0", "abc"):
+    # the 1M-endpoint cell: MAX_TARGET_LEN leaves the +256 auto max_len
+    # headroom and a >=32-token answer budget inside max_position_embeddings
+    assert LC.MAX_TARGET_LEN == LC.MAX_CONTEXT - 256 - 32 == 1048288
+    assert p(str(LC.MAX_TARGET_LEN)) == [LC.MAX_TARGET_LEN]
+    # a bare 1M target cannot fit its own answer -> rejected (round3 finding 3:
+    # '--lengths 1M' used to crash at engine build with max_len 1048832 > 1M)
+    for bad in ("1M", "2M", "0", "abc"):
         try:
             p(bad)
             raise AssertionError(f"{bad!r} should have raised")
@@ -169,6 +174,7 @@ def test_stub_pipeline_records_provenance():
         res = json.load(open(out))
         assert res["overall_accuracy"] == 0.0 and len(res["grid"]) == 2
         assert res["prompt_mode"] == "stub"
+        assert res["max_len"] == 512 + 256      # auto max_len = max(L) + 256
 
 
 def test_prompt_storage_cap():

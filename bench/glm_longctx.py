@@ -30,7 +30,9 @@ tokenizer — BPE boundary merges make per-sentence token counts non-additive
 under the real GLM tokenizer; see build_trial) — landing within 1% of the
 requested token length at every ladder length >= 1024, and never above it.
 The needle's token position lands within a fraction of a percent of the
-requested depth; --lengths accepts k/K (x1024) and m/M (x1024^2) suffixes.
+requested depth; --lengths accepts k/K (x1024) and m/M (x1024^2) suffixes up
+to 1048288 (= max_position_embeddings 1048576 - 256 engine max_len headroom -
+32 answer budget — the 1M-endpoint cell).
 
 Every trial is stored in the provenance DB (bench/results.db) via
 provenance.record_item under benchmark="passkey_L{L}_d{depth}" (per-cell
@@ -73,8 +75,16 @@ import provenance as pv
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(HERE, "results")
 
-# GLM-5.2 config max_position_embeddings — the hard ceiling for --lengths.
+# GLM-5.2 config max_position_embeddings — the hard ceiling for the engine's
+# max_model_len (the auto-derived max_len below is clamped to it: installed
+# vLLM refuses max_model_len > the derived limit).
 MAX_CONTEXT = 1_048_576
+# Largest allowed --lengths target: the auto max_len adds +256 headroom and the
+# answer needs a >=32-token budget INSIDE max_position_embeddings, so a full-1M
+# TARGET could not decode a single answer token (review round3-unknown
+# finding 3 — '--lengths 1M' used to crash at engine build). The 1M-endpoint
+# cell is --lengths 1048288.
+MAX_TARGET_LEN = MAX_CONTEXT - 256 - 32   # = 1_048_288
 
 # Canonical passkey-retrieval filler (Mohtashami & Jaggi 2023), split into
 # SENTENCE units (~4-8 tokens each) for fine-grained depth placement.
@@ -101,8 +111,10 @@ class _MockTok:
 
 def parse_lengths(spec: str) -> list[int]:
     """Parse --lengths: comma-separated ints with optional k/K (x1024) or
-    m/M (x1024^2) suffix, e.g. '1024,32k,128K,1M'. Capped at 1M (=1048576,
-    GLM-5.2's max_position_embeddings)."""
+    m/M (x1024^2) suffix, e.g. '1024,32k,128K'. Capped at MAX_TARGET_LEN
+    (=1048288 = max_position_embeddings 1048576 - 256 max_len headroom -
+    32 answer budget) — a bare '1M' target cannot fit its own answer inside
+    the model's positional range; use 1048288 for the 1M-endpoint cell."""
     out = []
     for x in spec.split(","):
         x = x.strip()
@@ -110,11 +122,13 @@ def parse_lengths(spec: str) -> list[int]:
             continue
         m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([kKmM]?)", x)
         if not m:
-            raise ValueError(f"bad length {x!r} (want e.g. 4096, 128K, 1M)")
+            raise ValueError(f"bad length {x!r} (want e.g. 4096, 128K, 1000k)")
         v = int(float(m.group(1)) * {"": 1, "k": 1024, "m": 1024**2}[m.group(2).lower()])
-        if not 0 < v <= MAX_CONTEXT:
-            raise ValueError(f"length {x!r} -> {v} out of range (1..{MAX_CONTEXT} "
-                             f"= GLM-5.2 max_position_embeddings)")
+        if not 0 < v <= MAX_TARGET_LEN:
+            raise ValueError(
+                f"length {x!r} -> {v} out of range (1..{MAX_TARGET_LEN} = "
+                f"max_position_embeddings {MAX_CONTEXT} - 256 max_len headroom "
+                f"- 32 answer budget; use {MAX_TARGET_LEN} for the 1M endpoint)")
         out.append(v)
     return out
 
@@ -335,8 +349,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--lengths", default="1024,2048,4096,8192",
                     help="comma-separated target context lengths in TOKENS; "
-                         "k/K=x1024, m/M=x1024^2 suffixes OK (e.g. 128K,1M); "
-                         f"max {MAX_CONTEXT}")
+                         "k/K=x1024, m/M=x1024^2 suffixes OK (e.g. 128K); "
+                         f"max {MAX_TARGET_LEN} (the 1M-endpoint cell)")
     ap.add_argument("--depths", default="0.25,0.5,0.75",
                     help="comma-separated needle depths (fraction of prompt "
                          "tokens before the needle)")
@@ -374,7 +388,10 @@ def main(argv=None):
     depths = [float(x) for x in args.depths.split(",") if x.strip()]
     if not lengths or not depths:
         ap.error("empty --lengths or --depths")
-    max_len = args.max_len or (max(lengths) + 256)
+    # clamp to max_position_embeddings: vLLM refuses a larger max_model_len
+    # (parse_lengths caps targets at MAX_TARGET_LEN, so the auto value already
+    # fits; the clamp also guards an explicit --max-len overshoot)
+    max_len = min(args.max_len or (max(lengths) + 256), MAX_CONTEXT)
 
     conn = pv.connect(args.db) if args.db else pv.connect()
     run_id = pv.start_run(conn, model=("STUB" if args.stub else args.model),
