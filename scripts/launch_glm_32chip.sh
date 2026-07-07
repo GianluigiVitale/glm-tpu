@@ -15,6 +15,35 @@
 # (tcp:1024-65535 on 192.168.0.0/16) so Ray's ports work across the private
 # TPU fabric (the fabric only opens TPU ports by default).
 #
+# ── SHARED-POD COLLISION POLICY (READ BEFORE RUNNING) ────────────────────────
+# This pod is SHARED: the ASPt serving stack COHABITS on these same 8 hosts
+# (a Gemma FP8 TP=4 vLLM server in docker, a Qwen3-Reranker vLLM proc on w-5,
+# Qdrant on w-0 — see the owner's aspt-pod-restart-recovery notes).
+# The stop phase below (STOP_CMD) runs AS ROOT on ALL 8 workers and its kill
+# patterns are NOT GLM-specific:
+#   CAN kill (and WILL, silently):
+#     - sudo pkill -9 -f 'VLLM::[E]ngineCore'  -> EVERY vLLM engine on each
+#       host, including ASPt's dockerized Gemma + the reranker (vLLM v1 titles
+#       every engine proc "VLLM::EngineCore"; container procs are visible in
+#       the host PID namespace, run as root, and sudo reaches them).
+#     - sudo pkill -9 -x raylet                -> ANY user's raylet.
+#     - sudo pkill -9 -f '[R]ayWorkerWrapper'  -> any Ray worker, any user.
+#   CANNOT kill: qdrant, gcsfuse mounts other than ~/gcs-models, non-vLLM
+#     python (parity harnesses, ASPt's non-vLLM JAX procs). Such a survivor
+#     may still HOLD the libtpu flock while `sudo rm -f /tmp/libtpu_lockfile`
+#     removes the lock inode — the next engine then fails later at device-open
+#     (DEADLINE_EXCEEDED-style) instead of the unambiguous "ABORTED: lockfile".
+#   All stop-phase output is DISCARDED (>/dev/null ...; true): kills and sudo
+#   failures are silent by design — nothing here logs what was killed.
+# POLICY — COORDINATE BEFORE RUNNING:
+#   * If the ASPt vLLM server is up (check on the workers: `docker ps`,
+#     `pgrep -af EngineCore`), do NOT launch until its owner agrees — this
+#     script WILL SIGKILL it on every host, with zero output.
+#   * The reverse collision is just as real: ASPt's documented "nuclear reset"
+#     (`sudo pkill -9 python` on all workers) kills a GLM driver/EngineCore
+#     mid-benchmark, leaving a half-recorded run in bench/results.db.
+#   * The 32 TPU chips cannot be shared anyway — one serving stack at a time.
+#
 # Usage:
 #   bash ~/glm-tpu/scripts/launch_glm_32chip.sh [--dry-run]
 set -u
@@ -85,6 +114,8 @@ dry() { printf 'DRY-RUN> %s\n' "$*"; }
 
 # Same stop hygiene as the DSV4 launcher: force-stop ray, kill stray raylets /
 # engine cores / ray workers, unmount any stale gcsfuse mount (no-op if absent).
+# ⚠ These patterns kill ANY vLLM/Ray proc as root on all 8 hosts — including
+# the cohabiting ASPt stack. See the SHARED-POD COLLISION POLICY in the header.
 STOP_CMD="$RAY stop -f >/dev/null 2>&1; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
 
 # Worker join: bake ENVS into the raylet, then join the head. Escaped $(...)

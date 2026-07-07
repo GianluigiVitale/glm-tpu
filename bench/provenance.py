@@ -92,7 +92,9 @@ CREATE TABLE IF NOT EXISTS items (
     n_prompt_tokens INTEGER,
     n_gen_tokens  INTEGER,
     latency_ms    REAL,
-    seed          INTEGER
+    seed          INTEGER,
+    finish_reason TEXT,
+    truncated     INTEGER
 );
 CREATE TABLE IF NOT EXISTS summary (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,9 +126,28 @@ def _git(path: str) -> str:
         return "unknown"
 
 
+# Columns added after the first real runs were recorded — applied to an
+# existing DB via ALTER TABLE (append-only migration; never rewrites rows).
+#   finish_reason/truncated (2026-07-07, round-4 review): vLLM's per-output
+#   finish_reason ('stop' | 'length' | ...) and the derived truncated flag
+#   (finish_reason == 'length', i.e. the reply hit max_tokens mid-CoT).
+#   Truncated items are STILL SCORED AS-IS (honest — extraction salvage noise
+#   is possible in both directions) but are now flagged, and the summary
+#   reports n_truncated. NULL on rows recorded before the migration or by
+#   paths that cannot see a finish_reason (e.g. --stub).
+_ITEM_MIGRATIONS = {
+    "finish_reason": "ALTER TABLE items ADD COLUMN finish_reason TEXT",
+    "truncated": "ALTER TABLE items ADD COLUMN truncated INTEGER",
+}
+
+
 def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.executescript(_SCHEMA)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(items)")}
+    for col, ddl in _ITEM_MIGRATIONS.items():
+        if col not in have:
+            conn.execute(ddl)
     conn.commit()
     return conn
 
@@ -147,26 +168,37 @@ def start_run(conn, *, model, revision=None, env=None, pod="db-v4-64-od",
 def record_item(conn, run_id, *, benchmark, item_id, prompt, gold=None,
                 raw_output=None, extracted=None, correct=None, score=None,
                 n_prompt_tokens=None, n_gen_tokens=None, latency_ms=None,
-                seed=None, asked_utc=None):
+                seed=None, asked_utc=None, finish_reason=None, truncated=None):
     conn.execute(
         "INSERT INTO items(run_id,benchmark,item_id,asked_utc,prompt,gold,raw_output,"
-        "extracted,correct,score,n_prompt_tokens,n_gen_tokens,latency_ms,seed)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "extracted,correct,score,n_prompt_tokens,n_gen_tokens,latency_ms,seed,"
+        "finish_reason,truncated)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (run_id, benchmark, str(item_id), asked_utc or _utc(), prompt, gold,
          raw_output, extracted, None if correct is None else int(bool(correct)),
-         score, n_prompt_tokens, n_gen_tokens, latency_ms, seed))
+         score, n_prompt_tokens, n_gen_tokens, latency_ms, seed,
+         finish_reason, None if truncated is None else int(bool(truncated))))
     conn.commit()
 
 
 def finalize(conn, run_id, *, benchmark, metric="acc", value=None, note=""):
     """Compute the summary from the stored items and the card target; store it.
-    Recomputes n/value from items when value is None (single source of truth)."""
+    Recomputes n/value from items when value is None (single source of truth).
+    n_truncated (items with truncated=1, i.e. finish_reason=='length') is
+    counted for honesty: those items ARE scored as-is (never excluded — no
+    scoring change), but a nonzero count is appended to the stored note and
+    always returned so summaries can flag salvage-extraction noise."""
     rows = conn.execute(
         "SELECT correct FROM items WHERE run_id=? AND benchmark=? AND correct IS NOT NULL",
         (run_id, benchmark)).fetchall()
     n = len(rows)
     if value is None and n:
         value = 100.0 * sum(r[0] for r in rows) / n
+    n_truncated = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE run_id=? AND benchmark=? AND truncated=1",
+        (run_id, benchmark)).fetchone()[0]
+    if n_truncated:
+        note = (note + " " if note else "") + f"n_truncated={n_truncated}"
     card = CARD_TARGETS.get(benchmark, {}).get("value")
     delta = None if (value is None or card is None) else round(value - card, 2)
     conn.execute(
@@ -175,7 +207,7 @@ def finalize(conn, run_id, *, benchmark, metric="acc", value=None, note=""):
         (run_id, benchmark, _utc(), n, metric, value, card, delta, note))
     conn.commit()
     return {"benchmark": benchmark, "n": n, "value": value,
-            "card_value": card, "delta": delta}
+            "card_value": card, "delta": delta, "n_truncated": n_truncated}
 
 
 def report(conn, run_id=None):

@@ -2,7 +2,8 @@
 """GLM-5.2 benchmark harness — loads a benchmark, queries the model, extracts +
 scores every item, and records EVERYTHING to the provenance DB (bench/results.db).
 
-Model-pluggable: `generate(prompt) -> str | (str, n_gen_tokens)`. Two modes:
+Model-pluggable: `generate(prompt) -> str | (str, n_gen_tokens) |
+(str, n_gen_tokens, finish_reason)`. Two modes:
   --stub     offline pipeline check (no model; vllm is NEVER imported — the vllm
              import lives inside make_generate so this runs on any CPU box)
   (default)  the REAL in-process vLLM engine on the 32-chip v4 pod
@@ -10,7 +11,7 @@ Model-pluggable: `generate(prompt) -> str | (str, n_gen_tokens)`. Two modes:
              thinking-mode decode through GLM-5.2's own chat template).
 
 Engine runs are BATCHED: make_generate's generator also exposes
-`generate_batch(prompts) -> [(text, n_gen_tokens), ...]`, and run_benchmark
+`generate_batch(prompts) -> [(text, n_gen_tokens, finish_reason), ...]`, and run_benchmark
 submits ALL items (or --batch-size chunks) in ONE llm.generate call so vLLM's
 scheduler runs up to --max-seqs sequences concurrently (~1 tok/s single-stream
 decode -> batch-factor aggregate throughput). Provenance is unchanged per item;
@@ -103,23 +104,35 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
     The LLM(...) build itself lives in bench/engine.py (shared with
     glm_longctx.py). Env knobs: GLM_MODEL (checkpoint), GLM_TP (default 32),
     RUNAI_STREAMER_CONCURRENCY / RUNAI_STREAMER_MEMORY_LIMIT (streaming load).
-    Returns `generate(prompt) -> (text, n_gen_tokens)` — the VERBATIM completion
-    text plus the generated-token count (for the items.n_gen_tokens column).
+    Returns `generate(prompt) -> (text, n_gen_tokens, finish_reason)` — the
+    VERBATIM completion text, the generated-token count (items.n_gen_tokens),
+    and vLLM's finish_reason ('length' = truncated at max_tokens; recorded in
+    the items row, still scored as-is).
     The returned callable also exposes `generate.generate_batch(prompts) ->
-    [(text, n_gen_tokens), ...]` (one llm.generate call for MANY prompts —
+    [(text, n_gen_tokens, finish_reason), ...]` (one llm.generate call for MANY prompts —
     vLLM's scheduler then runs up to max_seqs sequences concurrently, which is
     what turns ~1 tok/s single-stream decode into batch-factor aggregate
     throughput). run_benchmark auto-uses it when present.
     """
     # vllm import stays INSIDE make_generate: `import run_bench` and --stub must
     # work with no vllm/TPU (module-top import would break the offline pipeline).
-    # Import order matters: `from vllm import LLM` must come before any
-    # other vllm import — it initializes vllm.platforms fully (a bare
-    # SamplingParams import first enters vllm.platforms re-entrantly:
-    # ImportError current_platform). Do NOT import tpu_inference in the
-    # DRIVER: its import queries/initializes the TPU and the driver then
-    # holds the libtpu multi-process lockfile against its own EngineCore
-    # child (ABORTED: lockfile).
+    # Import order: `from vllm import LLM` first so vllm.platforms resolves
+    # once, up front (importing a vllm submodule before platform resolution
+    # can re-enter vllm.platforms: ImportError current_platform).
+    # MECHANISM CORRECTION (round-4 review, docs/reviews/round4-launcher-bench.md
+    # finding 3 — an earlier comment here claimed import order kept
+    # tpu_inference out of the driver and that its import held the libtpu
+    # lockfile; both claims were false): the driver imports tpu_inference on
+    # EVERY run regardless — vllm.platforms resolution itself does
+    # `from tpu_inference.platforms import TpuPlatform`. That import is
+    # TPU-NEUTRAL (env-var overrides, GCE metadata, /dev/accel glob — no
+    # jax/libtpu client init, no lockfile). The historical "ABORTED: lockfile"
+    # hangs were caused by (1) the fork's get_page_size() calling
+    # jax.devices() in the DRIVER config path — fixed in fork commit 7ae390f2
+    # (see flash_attn_mla.py's NOTE) — and (2) a leaked EngineCore holding the
+    # lock (cleared by the launcher stop phase, harness commit 33576f9).
+    # Driver TPU-neutrality holds because no driver-side call path touches
+    # jax devices TODAY — it is not guaranteed by import order.
     from vllm import LLM  # noqa: F401
     from vllm import SamplingParams
 
@@ -151,7 +164,7 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
             ignore_eos=False,
         )
 
-    def generate(prompt: str) -> tuple[str, int]:
+    def generate(prompt: str) -> tuple[str, int, str | None]:
         ids = _chat_prompt_ids(tok, prompt, chat_template)
         room = max_len - len(ids) - 8
         if room <= 0:
@@ -159,21 +172,26 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
             # (scored wrong, auditable) rather than crash the run.
             print(f"[bench] SKIP: prompt {len(ids)} tok > max_len {max_len}",
                   flush=True)
-            return "", 0
+            return "", 0, None
         outs = llm.generate([{"prompt_token_ids": ids}], _sp(room),
                             use_tqdm=False)
         o = outs[0].outputs[0]
-        return o.text, len(o.token_ids)
+        # finish_reason ('stop' | 'length' | ...) rides along for truncation
+        # honesty: 'length' = the reply hit max_tokens mid-CoT and is flagged
+        # truncated in the items row (still scored as-is, never excluded).
+        return o.text, len(o.token_ids), getattr(o, "finish_reason", None)
 
-    def generate_batch(prompts: list[str]) -> list[tuple[str, int]]:
+    def generate_batch(prompts: list[str]) -> list[tuple[str, int, str | None]]:
         """ONE llm.generate call for a list of prompts — vLLM schedules up to
         max_seqs of them concurrently. Same sampling protocol as generate()
         (the per-prompt SamplingParams differ ONLY in the room clamp on
         max_tokens, exactly as the sequential path computed it). Results are
-        returned IN INPUT ORDER: over-long prompts keep their slot as ("", 0)
-        (recorded empty + scored wrong, same as the sequential SKIP), and the
-        vLLM outputs are mapped back by request order/id."""
-        results: list[tuple[str, int] | None] = [None] * len(prompts)
+        returned IN INPUT ORDER: over-long prompts keep their slot as
+        ("", 0, None) (recorded empty + scored wrong, same as the sequential
+        SKIP), and the vLLM outputs are mapped back by request order/id. Each
+        result carries vLLM's finish_reason (truncation honesty — additive,
+        nothing else about the batched protocol changed)."""
+        results: list[tuple[str, int, str | None] | None] = [None] * len(prompts)
         submit_idx: list[int] = []
         token_prompts, sps = [], []
         for i, prompt in enumerate(prompts):
@@ -182,7 +200,7 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
             if room <= 0:
                 print(f"[bench] SKIP: prompt {len(ids)} tok > max_len "
                       f"{max_len}", flush=True)
-                results[i] = ("", 0)
+                results[i] = ("", 0, None)
                 continue
             submit_idx.append(i)
             token_prompts.append({"prompt_token_ids": ids})
@@ -196,7 +214,8 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
                 f"vLLM returned {len(outs)} outputs for {len(token_prompts)} prompts"
             for i, out in zip(submit_idx, outs):
                 o = out.outputs[0]
-                results[i] = (o.text, len(o.token_ids))
+                results[i] = (o.text, len(o.token_ids),
+                              getattr(o, "finish_reason", None))
         return results  # type: ignore[return-value]  # every slot is filled
 
     generate.generate_batch = generate_batch
@@ -204,20 +223,26 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
 
 
 def _score_and_record(conn, run_id, spec: B.BenchSpec, it, reply, n_gen,
-                      latency_ms, seed):
+                      latency_ms, seed, finish_reason=None):
     """Extract + score ONE reply and store the full item row. The audit trail
     must never be lost: the verbatim reply is stored even if extraction/scoring
-    raises (extracted/correct = None on failure)."""
+    raises (extracted/correct = None on failure). finish_reason (vLLM's, when
+    the generator provides it) flags truncation: 'length' means the reply hit
+    max_tokens mid-CoT — the item is STILL SCORED AS-IS (scoring unchanged;
+    salvage extraction from a truncated CoT can be wrong in both directions)
+    but the row records finish_reason + truncated so it is auditable."""
     try:
         extracted = spec.extract(reply, it)
         correct = spec.score(extracted, it.gold)
     except Exception:
         extracted, correct = None, None
+    truncated = None if finish_reason is None else (finish_reason == "length")
     pv.record_item(conn, run_id, benchmark=spec.name, item_id=it.item_id,
                    prompt=it.prompt, gold=it.gold, raw_output=reply,
                    extracted=extracted, correct=correct,
                    score=(1.0 if correct else 0.0) if correct is not None else None,
-                   n_gen_tokens=n_gen, latency_ms=latency_ms, seed=seed)
+                   n_gen_tokens=n_gen, latency_ms=latency_ms, seed=seed,
+                   finish_reason=finish_reason, truncated=truncated)
     return extracted, correct
 
 
@@ -241,14 +266,20 @@ def _run_items_batched(conn, run_id, spec: B.BenchSpec, generate_batch, items,
         assert len(outs) == len(chunk), \
             f"generate_batch returned {len(outs)} results for {len(chunk)} prompts"
         chunk_tok = 0
-        for it, (reply, n_gen) in zip(chunk, outs):
+        for it, out in zip(chunk, outs):
+            # additive: results are (reply, n_gen) historically, now
+            # (reply, n_gen, finish_reason) — accept both.
+            reply, n_gen = out[0], out[1]
+            finish = out[2] if len(out) > 2 else None
             extracted, correct = _score_and_record(
-                conn, run_id, spec, it, reply, n_gen, latency_ms=None, seed=seed)
+                conn, run_id, spec, it, reply, n_gen, latency_ms=None,
+                seed=seed, finish_reason=finish)
             done += 1
             chunk_tok += n_gen or 0
+            trunc_flag = " TRUNCATED" if finish == "length" else ""
             print(f"[{spec.name}] {done}/{len(items)} {it.item_id}: "
                   f"correct={correct} extracted={extracted!r} gold={it.gold!r} "
-                  f"gen_tok={n_gen} (batched)", flush=True)
+                  f"gen_tok={n_gen}{trunc_flag} (batched)", flush=True)
         total_tok += chunk_tok
         rate = chunk_tok / (wall_ms / 1000.0) if wall_ms > 0 else 0.0
         print(f"[{spec.name}] batch of {len(chunk)} done in "
@@ -272,20 +303,95 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
         for i, it in enumerate(items):
             t0 = time.time()
             out = generate(it.prompt)
-            # generate may return plain text (stub) or (text, n_gen_tokens) (engine).
-            reply, n_gen = out if isinstance(out, tuple) else (out, None)
+            # generate may return plain text (stub), (text, n_gen_tokens), or
+            # (text, n_gen_tokens, finish_reason) (engine).
+            if isinstance(out, tuple):
+                reply, n_gen = out[0], out[1]
+                finish = out[2] if len(out) > 2 else None
+            else:
+                reply, n_gen, finish = out, None, None
             latency = (time.time() - t0) * 1000.0
             extracted, correct = _score_and_record(
                 conn, run_id, spec, it, reply, n_gen,
-                latency_ms=round(latency, 1), seed=seed)
+                latency_ms=round(latency, 1), seed=seed, finish_reason=finish)
+            trunc_flag = " TRUNCATED" if finish == "length" else ""
             print(f"[{spec.name}] {i + 1}/{len(items)} {it.item_id}: "
                   f"correct={correct} extracted={extracted!r} gold={it.gold!r} "
-                  f"gen_tok={n_gen} {latency / 1000.0:.1f}s", flush=True)
+                  f"gen_tok={n_gen}{trunc_flag} {latency / 1000.0:.1f}s",
+                  flush=True)
     summ = pv.finalize(conn, run_id, benchmark=spec.name, metric="acc", note=note)
     print(f"[{spec.name}] n={summ['n']} acc={summ['value']}"
           f" card={summ['card_value']} Δ={summ['delta']}"
+          f" n_truncated={summ['n_truncated']}"
           f"{'  [' + note + ']' if note else ''}")
     return summ
+
+
+# The env vars that decide the SERVED NUMERICS (FP8 checkpoint-exactness, the
+# DSA bypass, the token-bucket floor). The workers' effective env is a MERGE
+# the DB could previously not see: raylet-baked (the launcher's ENVS string)
+# OVERRIDDEN by any driver-side value for vars on vLLM's TPU allow-list
+# (tpu_platform.py additional_env_vars -> ray_distributed_executor copies
+# driver os.environ to the workers when set). DISABLE_WEIGHT_REQUANTIZATION /
+# TPU_DISABLE_DSA_INDEXER / TPU_MIN_TOKEN_BUCKET are on that allow-list —
+# a stale driver-shell export silently changes what all 32 chips serve.
+# REQUANTIZE_WEIGHT_DTYPE is NOT on it (a driver value stays driver-only), but
+# a mismatch still signals a confused environment. Record the launcher-baked
+# string verbatim + a live comparison; warn LOUDLY on mismatch.
+_NUMERICS_CRITICAL_ENVS = ("DISABLE_WEIGHT_REQUANTIZATION",
+                           "REQUANTIZE_WEIGHT_DTYPE",
+                           "TPU_DISABLE_DSA_INDEXER",
+                           "TPU_MIN_TOKEN_BUCKET")
+_LAUNCHER_SH = os.path.abspath(
+    os.path.join(HERE, "..", "scripts", "launch_glm_32chip.sh"))
+
+
+def _launcher_env_provenance() -> dict:
+    """Read the launcher's ENVS string (the env baked into every raylet — what
+    the workers actually run with) at RUN time and compare the numerics-critical
+    vars against the driver's live os.environ. Returns env_json fields:
+    'launcher_envs_baked' (the verbatim string) and 'launcher_env_check'
+    ({var: {baked, baked_nominal, driver}}). A `${VAR:-default}` token in the
+    ENVS string is a launch-shell passthrough; its default is the nominal baked
+    value (the value at actual launch time is not reconstructable here)."""
+    import re
+    out: dict = {"launcher_envs_baked": None, "launcher_env_check": {}}
+    try:
+        with open(_LAUNCHER_SH, encoding="utf-8") as f:
+            text = f.read()
+        m = re.search(r'^ENVS="export (.*)"$', text, re.MULTILINE)
+        if not m:
+            out["launcher_envs_baked"] = f"UNPARSED: no ENVS line in {_LAUNCHER_SH}"
+            return out
+        baked_str = m.group(1)
+        out["launcher_envs_baked"] = baked_str
+        for name in _NUMERICS_CRITICAL_ENVS:
+            vm = re.search(rf"\b{name}=(\S+)", baked_str)
+            baked_raw = vm.group(1) if vm else None
+            baked = baked_raw
+            if baked_raw:
+                dm = re.fullmatch(r"\$\{" + name + r":-([^}]*)\}", baked_raw)
+                if dm:
+                    baked = dm.group(1)
+            driver = os.environ.get(name)
+            out["launcher_env_check"][name] = {
+                "baked": baked_raw, "baked_nominal": baked, "driver": driver}
+            if driver is not None and baked is not None and driver != baked:
+                print("!" * 78, flush=True)
+                print(f"[bench] WARNING: driver os.environ[{name!r}] = "
+                      f"{driver!r} != launcher-baked {baked!r}.\n"
+                      "  DISABLE_WEIGHT_REQUANTIZATION / TPU_DISABLE_DSA_INDEXER /"
+                      " TPU_MIN_TOKEN_BUCKET\n"
+                      "  FORCE-PROPAGATE driver->workers (tpu_platform"
+                      " additional_env_vars), overriding\n"
+                      "  the raylet-baked value on all 32 chips — served numerics"
+                      " may differ from the\n"
+                      "  launcher recipe. Both values are recorded in"
+                      " runs.env_json['launcher_env_check'].", flush=True)
+                print("!" * 78, flush=True)
+    except Exception as exc:  # never fail a run over provenance introspection
+        out["launcher_envs_baked"] = f"UNAVAILABLE: {exc}"
+    return out
 
 
 def _run_env(args, benches) -> dict:
@@ -295,9 +401,14 @@ def _run_env(args, benches) -> dict:
     os_env = {k: v for k, v in sorted(os.environ.items())
               if k.startswith(("GLM_", "RUNAI_STREAMER_", "VLLM_", "TPU_", "JAX_",
                                "NEW_MODEL_DESIGN", "MODEL_IMPL_TYPE",
-                               "OMP_NUM_THREADS"))
+                               "OMP_NUM_THREADS",
+                               # numerics-critical, prefix-matched exactly —
+                               # previously unrecorded (round-4 finding 2)
+                               "DISABLE_WEIGHT_REQUANTIZATION",
+                               "REQUANTIZE_WEIGHT_DTYPE"))
               and not any(s in k.upper() for s in ("TOKEN", "KEY", "SECRET"))}
     return {
+        **_launcher_env_provenance(),
         "model": args.model, "stub": bool(args.stub),
         # pinned dataset commit shas (BenchSpec.hf_revision) — reproducibility
         "dataset_revisions": {b: B.REGISTRY[b].hf_revision for b in benches},

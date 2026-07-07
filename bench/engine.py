@@ -51,7 +51,15 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     """
     # vllm import stays INSIDE build_llm: `import engine` and the --stub paths
     # must work with no vllm/TPU (a module-top import would break them).
-    from vllm import LLM  # first vllm import — initializes platforms fully
+    # NOTE (round-4 review finding 3): resolving vllm.platforms here imports
+    # tpu_inference in the DRIVER (vllm/platforms/tpu.py does
+    # `from tpu_inference.platforms import TpuPlatform`) — that is expected
+    # and TPU-neutral (no jax/libtpu init, no /tmp/libtpu_lockfile). The old
+    # "keep tpu_inference out of the driver" story was wrong; the real
+    # driver-side lockfile causes were get_page_size()'s jax.devices() call
+    # (fixed in fork 7ae390f2) and leaked EngineCore procs (launcher stop
+    # phase clears them). See bench/run_bench.py's mechanism-correction note.
+    from vllm import LLM  # first vllm import — resolves vllm.platforms once, up front
 
     t0 = time.time()
     extra = {}
