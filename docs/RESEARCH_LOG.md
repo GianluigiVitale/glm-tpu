@@ -448,3 +448,17 @@ jit tracers — documented as contracts instead.
 RPA, GMM, … — that compile-fail off-TPU; sampled failures reproduce identically at pristine HEAD via a
 stash round-trip; no DSA/MLA file among them; the diff imports nothing they use).
 Commit: fork `glm-5.2-v4-r5fix` @ c8a51543 (not pushed, per task); glm-tpu docs committed + pushed.
+
+## 2026-07-07 12:40 UTC — CORE-HALT ROOT CAUSE CLOSED: JAX_SHARE_BINARY_BETWEEN_HOSTS=1; GSM8K waveA acc 93.75
+
+- **The batched-serving fatal Error-Interrupt/core-halt class is FIXED by `JAX_SHARE_BINARY_BETWEEN_HOSTS=1`.**
+  Evidence: 7 consecutive batched runs died (bucket 512 AND 32/64, async on AND off, admissions or not);
+  the flight-recorder triage of probeA5 showed the halted host **153 steps behind** the cluster (per-host
+  independent compilation → binary/latency skew → collective desync → ICI fatal). Wave A2, differing from
+  crashed wave A only by sharedbin+recorder, ran CLEAN to completion. The forensic finish+page-edge
+  correlation was the *symptom locus* (steps where program composition shifts), not the cause.
+- **GSM8K wave A (items 0-15, n=16): acc 93.75**, 2 misses = truncations at the 1024-token cap
+  (run recorded with full provenance; batched 16-way, 8.8 tok/s aggregate incl. tail).
+- Launcher default flipped to JAX_SHARE_BINARY_BETWEEN_HOSTS=1 (override via env).
+- Wave B (items 16-31) running at TPU_MIN_TOKEN_BUCKET=32 — tests whether sharedbin also fixes the
+  small-bucket runs (expected same root cause) AND unlocks the 10-30x decode throughput (docs/03).
