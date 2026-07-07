@@ -310,3 +310,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
   substitutes. test_bench.py: +3 test groups (adversarial exact-answer, README byte-pin, card-run
   plumbing/avg@N provenance); all green; `--stub` green in both protocols (gsm8k greedy, aime card
   samples=2, gpqa card). Pod commands for AIME n=30 / GPQA n=198 card mode: docs/07 §6.
+
+## 2026-07-07 — Stage-3 MTP design (docs/08) + glm_mtp contract skeleton (CPU-only; no TPU runs)
+
+- **`docs/08-mtp-design.md` committed** — full Stage-3 design for GLM-5.2 MTP spec decode on the fork.
+  Core finding: vLLM maps `glm_moe_dsa → deepseek_mtp` (`DeepSeekMTPModel`) and builds the MTP block
+  from the SAME `DeepseekV2DecoderLayer` as the target, so the fork's OOT MLA wrapper, FP8-on-v4
+  linears, indexer patch and EP filter apply to the draft for free; tpu-inference already routes
+  `method=="mtp"` through Eagle3Proposer (target `full_hidden_states` as the MTP hidden input, own
+  draft KV, advancing positions) and `draft_step_fun` has the MTP branch. Checkpoint layer 78 =
+  enorm/hnorm/eh_proj/shared_head.norm + FULL attn+indexer+MoE, NO embed/shared_head.head → must be
+  shared from target (GPU proposer does this unconditionally). Five gaps: G1 one-line arch resolution
+  (`DeepSeekMTPModel` → `_VLLM_PREFERRED_ARCHITECTURES`, else the eagle3 impl-equality check raises);
+  G2 shared-weight NAME MAP (lm_head → layers.78.shared_head.head; hard-error on miss; target sharding
+  preserved via `_tensor_is_in_cpu` skip; lm_head-probe V3); G3 draft load re-streams 755 GB → filter
+  files by index.json weight_map; G4 DSA index-share across draft steps (step-0 stash emitted from the
+  jitted draft fn, re-seeded into the wrapper context for static step≥1 traces — GPU's `set_skip_topk`
+  toggle can't survive jit); G5 verification items (glm patch engages on draft load, single KV group,
+  logits-probe). KVShare = training-side robustness; inference artifacts = index share + acceptance
+  4.56→5.47 (≤5 drafts). DSV4's `_disable_ds_v4_mtp_buffer` stub is a torchax in-place-buffer issue in
+  DSV4's TARGET forward — structurally absent from the GLM path. Gates: M0 CPU contracts → M1 draft
+  parity vs COMPOSED HF reference (HF has NO MTP module — GlmMoeDsaDecoderLayer + transcribed glue) →
+  M2 greedy spec-decode ≡ non-spec greedy (exact tokens; tie-flip protocol) → M3 acceptance-length
+  (≥~4.5 @ k=5) + provenance-DB recording from fork-aggregated SpecDecodingStats → M4 DSA-mode MTP
+  after 2a.2. Effort ≈ 2–3 weeks; dense-MTP (2–4× decode) does not wait for DSA.
+- **Skeleton `tpu_inference/models/vllm/glm_mtp/` committed on `glm-5.2-v4`** (contract-level only:
+  draft_config.py, shared_weights.py, index_share.py). **M0 self-check PASS** (CPU, vllm-env):
+  config surgery → `DeepSeekMTPModel`/n_predict=1 on the real config.json; layer 78 = FULL indexer via
+  the beyond-`indexer_types` fall-through (offset 3, freq 4); 39/39 layer-78 keyset keys classified to
+  loader routes (11 stacked / 6 expert / 22 direct); expected-shared set exactly {embed_tokens,
+  shared_head.head}; rewrite transcription == installed vLLM's `_rewrite_spec_layer_name` on all keys.
