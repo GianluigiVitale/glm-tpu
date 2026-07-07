@@ -257,8 +257,12 @@ def main():
     hf_dir = os.path.join(tmp, "hf_ckpt")
     C.write_checkpoint(eng_dir, w, cfg, fp8=args.fp8)
     if args.fp8:
+        # HF twin: SAME effective weights (fp8 quant->dequant roundtrip) so
+        # the diff isolates the engine's fp8 handling, not quantization error.
+        blk = cfg["quantization_config"]["weight_block_size"][0]
         cfg_bf16 = C.make_mini_config(n_layers=args.layers, fp8=False)
-        C.write_checkpoint(hf_dir, w, cfg_bf16, fp8=False)
+        C.write_checkpoint(hf_dir, w, cfg_bf16, fp8=False,
+                           roundtrip_fp8_block=blk)
     else:
         hf_dir = eng_dir
     print(f"[parity] checkpoint(s) at {tmp} (fp8={args.fp8})")

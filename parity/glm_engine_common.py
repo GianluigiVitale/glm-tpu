@@ -223,12 +223,20 @@ def _quantize_block_fp8(a: np.ndarray, blk: int):
     return w_q, s.numpy()
 
 
-def write_checkpoint(d: str, w: dict, cfg: dict, fp8: bool = False) -> None:
-    """Write config.json + model.safetensors (bf16, or fp8+block scale_inv)."""
+def write_checkpoint(d: str, w: dict, cfg: dict, fp8: bool = False,
+                     roundtrip_fp8_block: int | None = None) -> None:
+    """Write config.json + model.safetensors (bf16, or fp8+block scale_inv).
+
+    roundtrip_fp8_block: for the bf16 TWIN of an fp8 engine checkpoint —
+    quantize+dequantize every would-be-fp8 tensor at this block size so the
+    reference sees the SAME effective weights as the fp8 engine (the parity
+    diff then isolates the engine's dequant math, not quantization error).
+    """
     import torch
     from safetensors.torch import save_file
     os.makedirs(d, exist_ok=True)
-    blk = cfg.get("quantization_config", {}).get("weight_block_size", [64])[0]
+    blk = cfg.get("quantization_config", {}).get("weight_block_size",
+                                                 [roundtrip_fp8_block or 64])[0]
     t = {}
     for k, v in w.items():
         is_proj = k.endswith(".weight") and v.ndim == 2 and \
@@ -237,6 +245,15 @@ def write_checkpoint(d: str, w: dict, cfg: dict, fp8: bool = False) -> None:
             w_q, s_inv = _quantize_block_fp8(v, blk)
             t[k] = w_q
             t[k + "_scale_inv"] = torch.from_numpy(s_inv)
+        elif roundtrip_fp8_block and is_proj:
+            w_q, s_inv = _quantize_block_fp8(v, roundtrip_fp8_block)
+            deq = w_q.to(torch.float32).numpy()
+            b = roundtrip_fp8_block
+            for bo in range(s_inv.shape[0]):
+                for bi in range(s_inv.shape[1]):
+                    deq[bo * b:(bo + 1) * b, bi * b:(bi + 1) * b] *= \
+                        s_inv[bo, bi]
+            t[k] = torch.from_numpy(deq).to(torch.bfloat16)
         else:
             t[k] = torch.from_numpy(v).to(torch.bfloat16)
     save_file(t, os.path.join(d, "model.safetensors"))
