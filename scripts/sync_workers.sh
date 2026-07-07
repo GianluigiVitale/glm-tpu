@@ -23,8 +23,8 @@ FAILED=0
 
 # Escaped $(...) run on the REMOTE host; ~ expands remotely (same user/layout
 # on all 8 hosts).
-SYNC_TPU_INFERENCE="cd ~/tpu-inference && git fetch origin && git checkout $TPU_INFERENCE_BRANCH && git pull --ff-only origin $TPU_INFERENCE_BRANCH && echo \"\$(hostname): tpu-inference @ \$(git rev-parse --short HEAD)\""
-SYNC_GLM_TPU="cd ~/glm-tpu && git fetch origin && git checkout $GLM_TPU_BRANCH && git pull --ff-only origin $GLM_TPU_BRANCH && echo \"\$(hostname): glm-tpu @ \$(git rev-parse --short HEAD)\""
+SYNC_TPU_INFERENCE="cd ~/tpu-inference && git fetch origin && git checkout $TPU_INFERENCE_BRANCH && git pull --ff-only origin $TPU_INFERENCE_BRANCH && echo \"\$(hostname): tpu-inference @ \$(git rev-parse --short HEAD) dirty=\$(git status --porcelain | wc -l)\""
+SYNC_GLM_TPU="if [ -d ~/glm-tpu ]; then cd ~/glm-tpu && git fetch origin && git checkout $GLM_TPU_BRANCH && git pull --ff-only origin $GLM_TPU_BRANCH && echo \"\$(hostname): glm-tpu @ \$(git rev-parse --short HEAD) dirty=\$(git status --porcelain | wc -l)\"; else echo \"\$(hostname): glm-tpu ABSENT (only worker 0 / the driver needs it)\"; fi"
 
 echo "[1/2] sync ~/tpu-inference -> $TPU_INFERENCE_BRANCH on all workers"
 if ! gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \

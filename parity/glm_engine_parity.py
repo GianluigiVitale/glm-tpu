@@ -78,9 +78,10 @@ def run_engine(ckpt_dir: str, input_ids_np: np.ndarray,
         set_vllm_model_wrapper_context
     from tpu_inference.utils import device_array
 
+    T_cap = max(64, int(input_ids_np.shape[0]) + 32)
     ea = EngineArgs(
         model=ckpt_dir, skip_tokenizer_init=True, trust_remote_code=True,
-        max_model_len=64, max_num_batched_tokens=64, max_num_seqs=4,
+        max_model_len=T_cap, max_num_batched_tokens=T_cap, max_num_seqs=4,
         dtype="bfloat16", enforce_eager=True,
         additional_config={
             "sharding": {"sharding_strategy": {"enable_dp_attention": True}}})
@@ -385,6 +386,11 @@ def main():
     print("\n== control: HF bf16 vs HF fp32 (the bf16 noise floor) ==")
     _diff("final_hs", hs16[-1], hs32[-1])
     _diff("logits", logits16, logits32)
+
+    if os.environ.get("GLM_DUMP_NPZ"):
+        np.savez(os.environ["GLM_DUMP_NPZ"], eng=hidden_eng, ref32=hs32[-1],
+                 ref16=hs16[-1])
+        print(f"[dump] saved to {os.environ['GLM_DUMP_NPZ']}")
 
     print("\n== engine (bf16 TPU) vs HF fp32 ==")
     # transformers hidden_states[i] = INPUT of layer i; [-1] = final (post-norm)

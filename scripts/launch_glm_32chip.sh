@@ -57,7 +57,7 @@ RAY=~/vllm-env/bin/ray
 # used verbatim on the head and on every worker), or pass one-offs without
 # editing the script:
 #   EXTRA_ENVS="GLM_FOO=1 GLM_BAR=2" bash scripts/launch_glm_32chip.sh
-ENVS="export NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=${JAX_SHARE_BINARY_BETWEEN_HOSTS:-0} JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=${JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS:-120000}${EXTRA_ENVS:+ $EXTRA_ENVS}"
+ENVS="export NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=${TPU_MIN_TOKEN_BUCKET:-512} RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=${JAX_SHARE_BINARY_BETWEEN_HOSTS:-0} JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=${JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS:-120000}${EXTRA_ENVS:+ $EXTRA_ENVS}"
 
 usage() {
   cat <<'EOF'
@@ -85,7 +85,7 @@ dry() { printf 'DRY-RUN> %s\n' "$*"; }
 
 # Same stop hygiene as the DSV4 launcher: force-stop ray, kill stray raylets /
 # engine cores / ray workers, unmount any stale gcsfuse mount (no-op if absent).
-STOP_CMD="$RAY stop -f >/dev/null 2>&1; pkill -9 -f raylet >/dev/null 2>&1; pkill -9 -f 'VLLM::EngineCore' >/dev/null 2>&1; pkill -9 -f RayWorkerWrapper >/dev/null 2>&1; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
+STOP_CMD="$RAY stop -f >/dev/null 2>&1; pkill -9 -f 'VLLM::EngineCore' >/dev/null 2>&1; pkill -9 -f RayWorkerWrapper >/dev/null 2>&1; pkill -9 -x raylet >/dev/null 2>&1; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
 
 # Worker join: bake ENVS into the raylet, then join the head. Escaped $(...)
 # and $? run on the REMOTE host, not here.
