@@ -51,8 +51,7 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     """
     # vllm import stays INSIDE build_llm: `import engine` and the --stub paths
     # must work with no vllm/TPU (a module-top import would break them).
-    import tpu_inference  # noqa: F401  (platform plugin registration order)
-    from vllm import LLM
+    from vllm import LLM  # first vllm import — initializes platforms fully
 
     t0 = time.time()
     extra = {}
