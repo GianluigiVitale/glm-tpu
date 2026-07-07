@@ -649,6 +649,13 @@ def _run_env(args, benches) -> dict:
                 "source": cp.source,
                 "substitutes": cp.substitutes,
             }
+
+    # AUDIT (2026-07-07): record the ATTENTION PATH explicitly so no benchmark
+    # number can be misattributed. dense-mla = Stage-1 (DSA indexer bypassed);
+    # dsa-sparse = Stage-2 kernel path. Derived from the live env, not inferred.
+    _mode = os.environ.get("GLM_DSA_MODE", "off")
+    env["attention_path"] = (
+        "dsa-sparse:" + _mode if _mode not in ("", "off") else "dense-mla")
     return {
         **_launcher_env_provenance(),
         "model": args.model, "stub": bool(args.stub),

@@ -61,6 +61,35 @@ step 3, which now implements that review's ordered on-TPU gate list. `round7-pg2
 
 ---
 
+
+> **AUDIT REORDER (2026-07-07, independent audit adopted):** the Stage-2 items below run
+> CHEAPEST-RISK-FIRST — the single-chip kernel gates (§2a/§2b, minutes each) come BEFORE any
+> engine-level DSA work or staging switch. The kernel logic is FROZEN at c1456937 behavior
+> until these gates run; only a gate failure reopens it. Every outcome (incl. compile
+> rejections) goes to results.db or docs/artifacts/ — a number with no stored rows is not a
+> result. Benchmarks state their attention_path (now recorded in run env_json); GPQA-198 is
+> a DENSE-path Stage-1 result and must never be cited as a Stage-2/kernel result.
+
+## §2a (NEW, runs FIRST after §0/§1): single-chip indexer-kernel compile probe (interpret=False)
+One v4 chip on w-0 (pod idle — NEVER concurrent with an engine). Tiny shapes. The ONE question:
+does Mosaic accept the (1, H) w-tile as a matmul LHS (round-5 flagged, no validated precedent)?
+```
+cd ~/tpu-inference-spre && TPU_VISIBLE_DEVICES=0 ~/vllm-env/bin/python -m pytest \
+  tests/kernels/test_dsa_indexer_kernel.py -k "pallas" --interpret-off 2>&1 | tee ~/glm-run/kernelprobe_2b.log
+```
+(adapt: the suite runs interpret=True by default — flip via the test's env/param hook; if none
+exists, a 10-line driver calling indexer_scores_pallas with interpret=False at R=2,ctx=512.)
+- ACCEPT -> §2b. REJECT (Mosaic error) -> apply the documented fallback (broadcast-multiply
+  w[0,:,None]*s + sublane reduction), re-run, commit the fallback as the gate-fix.
+- Save the log either way: docs/artifacts/kernelprobe-2b-<date>.log.
+
+## §2b (NEW): single-chip real-MXU parity
+Same chip. interpret=False runs of: indexer kernel vs indexer_scores_xla + hierarchical_topk vs
+the HF-math oracle (fp32: selected-set EXACT mod ties; bf16: S2 boundary-band); sparse-MLA kernel
+vs dsa_sparse_decode_xla (fp32 ~1e-6-class, bf16 per round-5 bars re-measured on real MXU);
+pack_new_kv OOB suite interpret=False. Save deltas verbatim to docs/artifacts/. Exit: parity
+green on silicon. ONLY THEN proceed to the staging switch + engine-level DSA (§2/§3 below).
+
 ## Step 0 — GPQA outcome triage (do this first, whatever happened)
 
 **0a. Determine the outcome:**
