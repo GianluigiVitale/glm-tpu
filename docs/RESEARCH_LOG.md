@@ -84,3 +84,37 @@ what you did, what you validated it against, the exact numbers, and the honest n
   end-to-end `--stub` pipeline test asserting all rows land in a temp provenance DB, and the prompt-storage cap.
   `test_bench.py` still green. NOT run on the engine/TPU (pod run is a next-session task, after Stage-1 serving
   is up).
+
+## 2026-07-07 — Stage-2a (first slice): XLA-reference DSA indexer + RoPE-layout verdict = INTERLEAVED (E1+E2 on real weights)
+
+- **`parity/glm_indexer_reference.py`** — pure-jnp, layout-parameterized transcription of the indexer forward
+  (docs/01 §1.1): `indexer_scores(..., *, interleaved)` + exact `topk_indices` (`lax.top_k`; `approx_max_k`
+  banned per §1.4). Math line-cited against BOTH refs (HF modeling.py:166-262; vLLM deepseek_v2.py:678-742).
+  Hadamard+fp8 skipped per the HF-documented equivalence (modeling.py:211-215); scale pre-relu like HF
+  (fold-into-w is the 2b Pallas form, §1.1). fp32 throughout.
+- **`parity/test_indexer_reference.py`** — machine-gated CPU test (JAX_PLATFORMS=cpu forced pre-import),
+  **ALL PASS, exit 0**: (a) score parity vs a line-cited torch transcription using HF's own rope functions
+  (installed transformers 5.12 module asserted byte-identical to reference/), T=64 real dims, BOTH layouts
+  same-side-same-layout: max|Δ| 6.1e-6 / 6.3e-6 ≤ 1e-5 fp32; cross-layout max|Δ| 2.69 (distinguishable);
+  (b) selected-set equality vs torch.topk k∈{8,16,64} modulo boundary tie-groups + vs the actual
+  `GlmMoeDsaIndexer.forward`; (c) determinism (2× eager + jit identical) + engineered-tie semantics
+  (62 tie rows; value-multisets exact).
+- **`parity/glm_indexer_rope_experiment.py`** — the §1.2 offline discriminator on REAL GLM-5.2-FP8 weights
+  (layer 0 full-indexer layer from `gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/` shard 1, fp8 block-128
+  dequant via weight_scale_inv; h = input_layernorm(embed), q_resid = q_a_layernorm(q_a_proj(h));
+  ground truth = the same layer's dense MLA attention row-mass per key from kv_b_proj, main rope
+  interleaved/uncontested). 1024 tokens natural text ([gMASK]<sop> prefix).
+  - **E1 (T=1024): INTERLEAVED wins all 5 metrics** — recall@64 **0.898 vs 0.680**, mass@64 0.475 vs 0.436,
+    recall@256 0.965 vs 0.897, mass@256 0.793 vs 0.781, Spearman **0.984 vs 0.928**. Inter-layout top-64
+    overlap 0.674 (the layouts genuinely differ). Robustness rerun T=512: interleaved wins all 5 again
+    (recall@64 0.948 vs 0.834, Spearman 0.984 vs 0.940).
+  - **E2 (corroborating)**: within-pair |log2 norm-ratio| far lower under interleaved pairing (wk 0.31 vs
+    0.70; wq_b 0.19 vs 0.79) — rope-pair norm matching exists only under the (2i,2i+1) hypothesis.
+  - **VERDICT: interleaved** — matches the §1.2 prior (vLLM honoring `indexer_rope_interleave: true`);
+    HF's non-interleaved `apply_rotary_pos_emb` call at modeling.py:239 is a DSV3.2 copy-paste. Per §1.2,
+    2a hard-codes interleaved (comment citing docs/01 §1.2) with non-interleaved reachable only behind a
+    parity-harness debug flag.
+  - **Residual uncertainty**: E3 (behavioral: passkey + logprob divergence-from-dense at ctx 4K-16K under
+    both layouts, + gate-S TPU-vs-torch selected sets) still required on the pod once the 2a sparse path
+    exists — E1/E2 are score/weight-level, single-layer (0), and cannot see output-level effects at
+    ctx > 2048. Layers 1-2 (other shards) can be added to E1 if more evidence is wanted.
