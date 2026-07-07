@@ -1,0 +1,137 @@
+#!/bin/bash
+# Bring up the 32-chip Ray cluster on the db-v4-64-od v4-64 pod (8 hosts x 4
+# chips) for the GLM-5.2 run, with the required env baked into every raylet.
+#
+# LOAD-BEARING PATTERN (inherited from the proven DSV4 launcher,
+# ~/moe-tpu/scripts/launch_32chip.sh): vLLM's Ray executor only carries VLLM_*
+# plus a small fixed allow-list of env vars over to the Ray TPU workers — NOT
+# our custom ones. Ray workers DO inherit the raylet's environment, so every
+# custom env below MUST be exported before `ray start` on EVERY host (head +
+# workers), i.e. baked into the raylet env here. Setting them only on the
+# driver silently leaves the workers without them.
+#
+# Prereqs: fork + harness synced on all 8 workers (scripts/sync_workers.sh);
+# venv at ~/vllm-env on all workers; firewall rule allow-ray-pod-internal
+# (tcp:1024-65535 on 192.168.0.0/16) so Ray's ports work across the private
+# TPU fabric (the fabric only opens TPU ports by default).
+#
+# Usage:
+#   bash ~/glm-tpu/scripts/launch_glm_32chip.sh [--dry-run]
+set -u
+
+ZONE=us-central2-b
+POD=db-v4-64-od
+HEAD_IP=192.168.0.8
+RAY=~/vllm-env/bin/ray
+
+# ── Env baked into every raylet (GLM-5.2 Stage-1 set) ────────────────────────
+# NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray
+#   The vLLM/torchax model path + the Ray multi-host backend (same trio as the
+#   DSV4 and GLM-5.1 launchers).
+# OMP_NUM_THREADS=1
+#   Required: OpenMP-after-fork segfaults in the engine-core subprocess
+#   otherwise.
+# HF_HUB_DISABLE_XET=1
+#   Plain HTTP hub transfers (the xet backend is flaky on the pod).
+# TPU_DISABLE_DSA_INDEXER=1
+#   GLM-5.x config.json ships index_topk, which makes vLLM try to run the DSA
+#   indexer in the forward pass; it is not ported to torchax/TPU and the
+#   Pallas DSA kernel has not landed -> disable the indexer forward and fall
+#   back to DENSE MLA. Drop this once the Pallas DSA kernel lands.
+# DISABLE_WEIGHT_REQUANTIZATION=1
+#   Keep the FP8 weights CHECKPOINT-EXACT (block scales as shipped). Do NOT
+#   set REQUANTIZE_WEIGHT_DTYPE=bfloat16 here: that is the DSV4 load-time
+#   dequant-to-bf16 path and it OOMs at GLM-5.2's 753B scale.
+# RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 (32 GiB)
+#   Tune the runai streamer's per-host parallel byte-range streaming for
+#   load_format="runai_streamer" reading gs:// DIRECTLY (no gcsfuse mount, no
+#   disk cache). Read on every host at weight load -> must be in the raylet env.
+# JAX_SHARE_BINARY_BETWEEN_HOSTS (passthrough, default 0 = off, byte-identical)
+#   One leader host compiles each executable and broadcasts the binary via the
+#   jax coordination store; followers load instead of compiling — kills the
+#   per-host compile-stagger launch race. Must be set BEFORE
+#   jax.distributed.initialize (the raylet env is inherited by the engine
+#   procs -> satisfied). Timeout 120 s fail-fast when enabled.
+#
+# Adding future envs: append KEY=VALUE to the single ENVS string below (it is
+# used verbatim on the head and on every worker), or pass one-offs without
+# editing the script:
+#   EXTRA_ENVS="GLM_FOO=1 GLM_BAR=2" bash scripts/launch_glm_32chip.sh
+ENVS="export NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=${JAX_SHARE_BINARY_BETWEEN_HOSTS:-0} JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=${JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS:-120000}${EXTRA_ENVS:+ $EXTRA_ENVS}"
+
+usage() {
+  cat <<'EOF'
+Usage: bash ~/glm-tpu/scripts/launch_glm_32chip.sh [--dry-run]
+
+  --dry-run   print the exact commands (stop / head start / join / status)
+              instead of executing them; nothing is run locally or over ssh.
+
+Optional env passthrough:
+  JAX_SHARE_BINARY_BETWEEN_HOSTS=1    leader-compile + broadcast executables
+  EXTRA_ENVS="KEY=VALUE ..."          extra envs baked into every raylet
+EOF
+}
+
+DRY_RUN=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $arg" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+dry() { printf 'DRY-RUN> %s\n' "$*"; }
+
+# Same stop hygiene as the DSV4 launcher: force-stop ray, kill stray raylets /
+# engine cores / ray workers, unmount any stale gcsfuse mount (no-op if absent).
+STOP_CMD="$RAY stop -f >/dev/null 2>&1; pkill -9 -f raylet >/dev/null 2>&1; pkill -9 -f 'VLLM::EngineCore' >/dev/null 2>&1; pkill -9 -f RayWorkerWrapper >/dev/null 2>&1; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
+
+# Worker join: bake ENVS into the raylet, then join the head. Escaped $(...)
+# and $? run on the REMOTE host, not here.
+JOIN_CMD="$ENVS; $RAY start --address=$HEAD_IP:6379 --node-ip-address=\$(hostname -i) >/tmp/rayjoin.log 2>&1; echo \"\$(hostname) rc=\$?\"; true"
+
+# Soft sanity check: this script must run on worker 0 (the Ray head).
+if ! hostname -i 2>/dev/null | grep -qw -- "$HEAD_IP"; then
+  echo "WARNING: $HEAD_IP is not among this host's IPs — run this on worker 0 (the head)." >&2
+fi
+
+echo "[1/3] stop any existing ray + stray procs on all workers"
+if (( DRY_RUN )); then
+  dry "gcloud compute tpus tpu-vm ssh $POD --zone $ZONE --worker=all --command=\"$STOP_CMD\""
+else
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$STOP_CMD" >/dev/null 2>&1
+fi
+
+# NOTE: NO gcsfuse mount step — the runai streamer reads gs:// directly.
+
+echo "[2/3] start ray head on w-0 (with env)"
+if (( DRY_RUN )); then
+  dry "$ENVS"
+  dry "$RAY stop -f; sleep 2"
+  dry "$RAY start --head --port=6379 --node-ip-address=$HEAD_IP --disable-usage-stats"
+else
+  eval "$ENVS"
+  "$RAY" stop -f >/dev/null 2>&1
+  sleep 2
+  "$RAY" start --head --port=6379 --node-ip-address="$HEAD_IP" --disable-usage-stats 2>&1 \
+    | grep -i "runtime started"
+fi
+
+echo "[3/3] join workers 1-7 (with env)"
+if (( DRY_RUN )); then
+  dry "gcloud compute tpus tpu-vm ssh $POD --zone $ZONE --worker=1,2,3,4,5,6,7 --command=\"$JOIN_CMD\""
+else
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=1,2,3,4,5,6,7 \
+    --command="$JOIN_CMD" 2>&1 | grep "rc="
+fi
+
+if (( DRY_RUN )); then
+  dry "$RAY status   # expect 8 nodes / 32 TPU"
+else
+  sleep 3
+  echo "=== ray status ==="
+  "$RAY" status 2>&1 | grep -E "^ 1 node_|/.*TPU|Total Usage" | head
+  echo "nodes: $("$RAY" status 2>&1 | grep -cE '^ 1 node_') (expect 8 nodes / 32 TPU)"
+fi
