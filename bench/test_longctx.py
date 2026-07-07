@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import sys
 import tempfile
@@ -19,6 +20,21 @@ import glm_longctx as LC
 
 def _tok():
     return LC._MockTok()   # whitespace: ~1 token per space-separated word
+
+
+class _MergingTok:
+    """Boundary-MERGING mock, mimicking the real BPE failure mode (round3
+    review, finding 1): a sentence's trailing space tokenizes standalone as its
+    own token but merges into the next sentence's first word when concatenated
+    (ByteLevel 'Gword'), so per-sentence counts are NOT additive — summing
+    standalone counts overshoots the true concatenated length by ~20%. The
+    pre-fix per-sentence-sum targeting undershoots real length by the same
+    factor and MUST fail the concatenated-length test below."""
+    def __call__(self, s, add_special_tokens=False):
+        toks = re.findall(r"\s*\S+", s)          # space attaches to NEXT word
+        if s and s[-1].isspace():
+            toks.append("<trail>")               # standalone-only trailing tok
+        return {"input_ids": toks}
 
 
 def _needle_frac(ctx: str) -> float:
@@ -32,9 +48,33 @@ def test_token_length_targeting():
     tok = _tok()
     for L in [256, 1024, 4096, 32768]:
         ctx, key = LC.build_trial(tok, L, 0.5, seed=L)
-        n = len(ctx.split())
-        # sentence-granularity filling: at or just under target (one unit slack)
-        assert L - 8 <= n <= L, f"L={L} got {n}"
+        n = len(tok(ctx)["input_ids"])
+        # measured on the CONCATENATED prompt: within max(one unit, 1% of L),
+        # never above L
+        assert L - max(8, L // 100) <= n <= L, f"L={L} got {n}"
+
+
+def test_token_length_targeting_merging_tokenizer():
+    """The round-3 regression guard: with a BPE-like boundary-MERGING tokenizer
+    (per-sentence counts non-additive), the CONCATENATED prompt length must
+    still land within 1% of the target. The old per-sentence-sum targeting
+    produced ~80% of L here (-17.2% with the real GLM tokenizer) and fails."""
+    tok = _MergingTok()
+    # sanity: the mock really merges — standalone sums must overshoot concat
+    standalone = sum(len(tok(u)["input_ids"]) for u in LC.FILLER_SENTENCES)
+    concat = len(tok("".join(LC.FILLER_SENTENCES))["input_ids"])
+    assert standalone > concat, (standalone, concat)
+    for L in [1024, 4096, 32768]:
+        ctx, _ = LC.build_trial(tok, L, 0.5, seed=L)
+        n = len(tok(ctx)["input_ids"])
+        assert L * 0.99 <= n <= L, f"L={L} got {n} ({100.0 * n / L:.1f}% of L)"
+    # depth placement survives the merging tokenizer too (fractions are
+    # preserved under uniform boundary-merge deflation)
+    for d in [0.25, 0.5, 0.75]:
+        ctx, _ = LC.build_trial(tok, 8192, d, seed=3)
+        before = len(tok(ctx[:ctx.index("Remember this.")])["input_ids"])
+        frac = before / len(tok(ctx)["input_ids"])
+        assert abs(frac - d) <= 0.02, f"d={d} got {frac:.4f}"
 
 
 def test_depth_placement_within_2pct():

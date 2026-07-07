@@ -24,11 +24,13 @@ PROMPT-STYLE DECISION — RAW COMPLETION, not the chat template (documented):
     [154820 <|endoftext|>, 154827 <|user|>, 154829 <|observation|>], so a
     turn-taking continuation halts immediately.
 
-Filler is token-counted with the REAL tokenizer, sentence-by-sentence (~4-8
-tokens per unit), so the needle's token position lands within a fraction of a
-percent of the requested depth; --lengths accepts values up to 1M (1048576 =
-GLM-5.2's max_position_embeddings), with k/K (x1024) and m/M (x1024^2)
-suffixes.
+Filler length is targeted ITERATIVELY on the CONCATENATED prompt with the real
+tokenizer — BPE boundary merges make per-sentence token counts non-additive
+(summing standalone counts overshoots the true concatenated length by ~17%
+under the real GLM tokenizer; see build_trial) — landing within 1% of the
+requested token length at every ladder length >= 1024, and never above it.
+The needle's token position lands within a fraction of a percent of the
+requested depth; --lengths accepts k/K (x1024) and m/M (x1024^2) suffixes.
 
 Every trial is stored in the provenance DB (bench/results.db) via
 provenance.record_item under benchmark="passkey_L{L}_d{depth}" (per-cell
@@ -127,37 +129,69 @@ def _passkey(rng) -> str:
 
 
 def build_trial(tok, target_len: int, depth: float, seed: int) -> tuple[str, str]:
-    """Return (context, true_key): filler of ~target_len tokens (counted with
-    `tok`) with the needle's first token placed as close as possible to
-    depth*target_len tokens into the prompt, ending in the retrieval CUE.
+    """Return (context, true_key): filler targeting target_len tokens AS
+    MEASURED ON THE CONCATENATED PROMPT, with the needle placed at fraction
+    `depth` of the prompt tokens, ending in the retrieval CUE.
+
+    Length targeting is ITERATIVE on the whole assembled prompt. Per-sentence
+    token counts are NOT additive under a real BPE tokenizer: each filler
+    sentence's trailing space tokenizes standalone as its own token but merges
+    into the next sentence's first word in context, so summing standalone
+    counts overshoots the real concatenated length by ~17% on the real GLM
+    tokenizer (review round3-unknown finding 1 — the old code tested "128K"
+    at ~108K real tokens). Newton-style loop: assemble, tokenize the WHOLE
+    prompt, correct the unit count by the measured effective tokens-per-unit
+    rate — O(a few whole-prompt tokenizations), never a per-sentence
+    retokenize loop. Terminates within max(one filler unit, 1% of target_len)
+    BELOW-or-at target_len (never above — the auto max_len headroom must
+    hold), i.e. within 1% at every ladder length >= 1024.
 
     Depth is the fraction of prompt tokens BEFORE the needle. Placement is at
-    sentence granularity (~4-8 tokens), so the achieved depth is within a
-    fraction of a percent of the request at every ladder length (the CPU test
-    asserts +-2%). Deterministic in (tok, target_len, depth, seed)."""
+    sentence granularity; boundary merges deflate the before-needle count and
+    the total uniformly, so the achieved depth stays within a fraction of a
+    percent of the request (the CPU test asserts +-2%). Deterministic in
+    (tok, target_len, depth, seed)."""
     rng = np.random.RandomState(seed)
     true_key = _passkey(rng)
     needle = NEEDLE.format(key=true_key)
-    n_needle = _tok_len(tok, needle)
-    n_cue = _tok_len(tok, CUE)
+    n_sent = len(FILLER_SENTENCES)
     unit_toks = [_tok_len(tok, u) for u in FILLER_SENTENCES]
+    overhead = _tok_len(tok, needle) + _tok_len(tok, CUE)
 
-    # fill with whole sentences until the next one would exceed the budget
-    fill_budget = max(0, target_len - n_needle - n_cue)
-    counts, total, i = [], 0, 0
-    while total + unit_toks[i % len(FILLER_SENTENCES)] <= fill_budget:
-        counts.append(unit_toks[i % len(FILLER_SENTENCES)])
-        total += counts[-1]
-        i += 1
-    n_units = len(counts)
+    def assemble(n_units: int) -> str:
+        # Insert the needle where the cumulative STANDALONE filler count is
+        # closest to depth * (filler total + overhead): token FRACTIONS survive
+        # the uniform boundary-merge deflation even though absolute counts
+        # do not (clamps naturally to [0, n_units]).
+        counts = [unit_toks[j % n_sent] for j in range(n_units)]
+        cum = np.concatenate([[0], np.cumsum(counts)]) if n_units else np.array([0])
+        ins = int(np.argmin(np.abs(cum - depth * (cum[-1] + overhead))))
+        parts = [FILLER_SENTENCES[j % n_sent] for j in range(n_units)]
+        context = "".join(parts[:ins]) + needle + "".join(parts[ins:])
+        return context.rstrip() + CUE
 
-    # insert the needle where the cumulative filler token count is closest to
-    # depth * target_len (clamps naturally to [0, n_units])
-    cum = np.concatenate([[0], np.cumsum(counts)]) if n_units else np.array([0])
-    ins = int(np.argmin(np.abs(cum - depth * target_len)))
-    parts = [FILLER_SENTENCES[j % len(FILLER_SENTENCES)] for j in range(n_units)]
-    context = "".join(parts[:ins]) + needle + "".join(parts[ins:])
-    return context.rstrip() + CUE, true_key
+    tol = max(max(unit_toks), int(0.01 * target_len))  # 1% governs at L >= ~1K
+    rate = sum(unit_toks) / n_sent   # standalone rate (merge-free upper bound)
+    n_units = max(0, int((target_len - overhead) // rate))
+    prompt = assemble(n_units)
+    best = None                      # longest measurement <= target so far
+    for _ in range(8):               # converges in 2-3 passes in practice
+        n = _tok_len(tok, prompt)
+        if n <= target_len and (best is None or n > best[1]):
+            best = (prompt, n)
+        if target_len - tol <= n <= target_len:
+            break
+        if n_units:
+            # effective tokens-per-unit measured on the CONCATENATED prompt
+            rate = max((n - overhead) / n_units, 0.25)
+        # aim half a tolerance under target: a tiny rate misestimate must
+        # never push the prompt ABOVE target_len
+        step = int(round((target_len - tol / 2 - n) / rate))
+        n_units = max(0, n_units + (step or (1 if n < target_len else -1)))
+        prompt = assemble(n_units)
+    else:
+        prompt = best[0] if best else assemble(0)
+    return prompt, true_key
 
 
 def extract_passkey(reply: str | None) -> str | None:
