@@ -426,6 +426,142 @@ def test_card_protocol_run():
     print("  card-protocol run (sampling/seeds/avg@N provenance) OK")
 
 
+def test_seed_provenance_gating():
+    """Round-6 F1/F10 (docs/reviews/round6-mtp-card.md): items.seed records
+    the seed the ENGINE actually received. A generator that declares
+    per_request_seeds=False (make_generate's platform probe result on the TPU
+    stack) still RECEIVES the per-sample seed (label/keying) but the rows
+    record NULL and the note says seed_passthrough=off. Greedy rows record
+    NULL (no seed is ever sent; previously they recorded the unused --seed
+    value, so the column meant different things across protocols)."""
+    import run_bench as rb
+
+    sysp = B.CARD_REASONING_SYSTEM_PROMPT
+    items = [B.Item("a0", "Q0", "Q0", "42", system_prompt=sysp)]
+    reply = "Explanation: e\nExact Answer: 42\nConfidence: 90%"
+    calls = []
+
+    def fake_gen(prompt, **kw):
+        raise AssertionError("batched path must be used")
+
+    def fake_batch(prompts, *, system_prompts=None, sampling=None, seed=None):
+        calls.append(seed)
+        return [(reply, 5, "stop") for _ in prompts]
+
+    fake_gen.generate_batch = fake_batch
+    fake_gen.per_request_seeds = False          # the TPU engine path
+
+    orig_load = B.load_items
+    B.load_items = (lambda spec, limit=None, protocol="greedy", offset=0:
+                    list(items))
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            conn = pv.connect(os.path.join(d, "t.db"))
+
+            # card, 2 samples: the generator still gets 5 then 6 (it is the
+            # layer that omits them from SamplingParams); rows record NULL
+            rid = pv.start_run(conn, model="FAKE", env={}, note="unit")
+            rb.run_benchmark(conn, rid, B.AIME_2026, fake_gen, batch_size=0,
+                             protocol="card", samples=2, seed=5)
+            assert calls == [5, 6]
+            rows = conn.execute("SELECT item_id, seed FROM items WHERE "
+                                "run_id=? ORDER BY id", (rid,)).fetchall()
+            assert rows == [("a0#s0", None), ("a0#s1", None)]
+            note = conn.execute("SELECT note FROM summary WHERE run_id=?",
+                                (rid,)).fetchone()[0]
+            assert "seed_passthrough=off" in note and "labels only" in note
+
+            # a seed-capable generator (no attribute = passthrough on, the
+            # pre-existing fake/stub behavior) records the real seeds
+            del fake_gen.per_request_seeds
+            calls.clear()
+            rid2 = pv.start_run(conn, model="FAKE", env={}, note="unit2")
+            rb.run_benchmark(conn, rid2, B.AIME_2026, fake_gen, batch_size=0,
+                             protocol="card", samples=2, seed=5)
+            assert calls == [5, 6]
+            rows2 = conn.execute("SELECT seed FROM items WHERE run_id=? "
+                                 "ORDER BY id", (rid2,)).fetchall()
+            assert [r[0] for r in rows2] == [5, 6]
+            note2 = conn.execute("SELECT note FROM summary WHERE run_id=?",
+                                 (rid2,)).fetchone()[0]
+            assert "seed_passthrough=on" in note2
+
+            # greedy: no seed is ever sent -> NULL even with --seed 9
+            def gfake(prompt):
+                raise AssertionError("batched path must be used")
+
+            def gfake_batch(prompts):
+                return [(r"\boxed{2}", 3, "stop") for _ in prompts]
+
+            gfake.generate_batch = gfake_batch
+            rid3 = pv.start_run(conn, model="FAKE", env={}, note="unit3")
+            rb.run_benchmark(conn, rid3, B.GSM8K, gfake, batch_size=0, seed=9)
+            rows3 = conn.execute("SELECT seed FROM items WHERE run_id=?",
+                                 (rid3,)).fetchall()
+            assert [r[0] for r in rows3] == [None]
+    finally:
+        B.load_items = orig_load
+    print("  seed provenance gating (F1/F10: items.seed = engine seed) OK")
+
+
+def test_platform_seed_probe():
+    """Round-6 F1's engine-side gap: 'seeds reach the generator' was tested,
+    'the engine accepts them' was NOT. Probe the REAL installed vllm platform
+    exactly as make_generate does. On this stack vllm resolves the fork's
+    TpuPlatform, whose validate_request rejects SamplingType.RANDOM_SEED —
+    the probe MUST return False here (that is what keeps --protocol card from
+    crashing on its first request after a ~45-min engine build), and the
+    seedless params card mode now sends MUST pass validation. The real-vllm
+    probe runs in a SUBPROCESS (JAX_PLATFORMS=cpu forced before python
+    starts) so this test process never imports vllm — test_longctx's offline
+    contract ('vllm' not in sys.modules after a --stub run) must keep holding
+    in a combined pytest session. Prints a SKIP when vllm is not importable
+    so the suite stays runnable on any box."""
+    import subprocess
+    import sys
+
+    import run_bench as rb
+
+    # fail-SAFE contract: a broken/unknown platform API counts as unsupported
+    class _Boom:
+        def __init__(self, *a, **kw):
+            raise TypeError("no SamplingParams here")
+
+    ok, msg = rb._per_request_seed_support(_Boom)
+    assert ok is False and "probe failed" in msg, (ok, msg)
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    script = f"""
+import os, sys
+sys.path.insert(0, {here!r})
+import run_bench as rb
+try:
+    # LLM first: platform resolution must settle before any vllm submodule
+    # import (the exact order make_generate uses — see its comment).
+    from vllm import LLM  # noqa: F401
+    from vllm import SamplingParams
+    from vllm.platforms import current_platform
+except Exception as exc:
+    print("SKIP:" + type(exc).__name__); sys.exit(0)
+ok, msg = rb._per_request_seed_support(SamplingParams)
+plat = type(current_platform).__name__
+if "tpu" in plat.lower():
+    assert ok is False, (plat, msg)
+    assert "per-request seed" in msg, msg
+    # what card mode now sends (seed omitted) must be accepted
+    current_platform.validate_request(
+        None, SamplingParams(temperature=1.0, top_p=0.95, seed=None))
+print("RESULT:%s:per_request_seeds=%s" % (plat, ok))
+"""
+    env = dict(os.environ, JAX_PLATFORMS="cpu")     # never touch a TPU
+    proc = subprocess.run([sys.executable, "-c", script], env=env,
+                          capture_output=True, text=True, timeout=600)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+    tail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
+    assert tail.startswith(("RESULT:", "SKIP:")), (proc.stdout, proc.stderr)
+    print(f"  engine-side seed probe OK ({tail})")
+
+
 def test_item_builders():
     # GPQA: synthetic row → deterministic 4-way MC, gold letter tracks the correct answer
     row = {"Question": "2+2?", "Correct Answer": "4",
@@ -481,5 +617,7 @@ if __name__ == "__main__":
     test_batched_run()
     test_card_protocol_specs()
     test_card_protocol_run()
+    test_seed_provenance_gating()
+    test_platform_seed_probe()
     test_item_builders()
     print("ALL bench CPU tests passed.")

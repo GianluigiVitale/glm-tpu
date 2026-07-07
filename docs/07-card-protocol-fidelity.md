@@ -48,12 +48,12 @@ Parsed, that is:
 
 | | greedy (`--protocol greedy`, default) | HF card | our card mode (`--protocol card`) |
 |---|---|---|---|
-| sampling | temperature=0.0 (greedy), top_p=1.0, no seed | temperature=1.0, top_p=0.95 | **card's**: temperature=1.0, top_p=0.95, per-sample seed `base_seed+s` (seeds are OURS, recorded — the card publishes none) |
+| sampling | temperature=0.0 (greedy), top_p=1.0, no seed | temperature=1.0, top_p=0.95 | **card's**: temperature=1.0, top_p=0.95, NO per-request seed on this backend (round-6 F1: the TPU platform rejects seeded requests — `SamplingParams.seed` is omitted; per-sample seeds `base_seed+s` are provenance LABELS only, `items.seed`=NULL; see §3) |
 | max gen | `--max-new` (default 2048) | 163,840 tokens | **163,840**, min-ed with the context-window room and any explicit `--max-new` pod-capacity cap; every binding cap is visible (`n_truncated`, `finish_reason='length'`) |
 | system prompt | none (template's own `Reasoning Effort: Max` block only) | the `Explanation:/Exact Answer:/Confidence:` prompt | **the card's, byte-derived from the committed README** (`CARD_REASONING_SYSTEM_PROMPT`; a CPU test pins it against `reference/hf-repo/README.md`) |
 | user turn | problem text + `"Reason step by step... \\boxed{}"` hint | (unspecified beyond the system prompt) | **the bare problem text, verbatim** — nothing appended (we do not invent) |
 | extraction | last `\boxed{}` → final number | GPT-5.5 (medium) judge | **SUBSTITUTE, labeled**: the `Exact Answer:` field (`extract_exact_answer`; last marker wins, cut at `Confidence:`, `\boxed{}` unwrapped) → fallback `\boxed{}`/final-number AFTER dropping `Confidence:` lines. Exact-match scoring (`score_math`), NOT a semantic judge |
-| samples | 1 | unspecified | `--samples N` = avg@N over independent seeds — **a harness-side variance knob, not a card spec**; every sample is its own provenance row (`item_id#sN`, per-row seed) |
+| samples | 1 | unspecified | `--samples N` = avg@N over independent samples — **a harness-side variance knob, not a card spec**; every sample is its own provenance row (`item_id#sN`; sample independence comes from the engine's advancing global RNG, not per-request seeds — §3) |
 
 ### gpqa_diamond (card value 91.2)
 
@@ -64,7 +64,7 @@ AIME/HMMT/IMOAnswerBench only.
 
 | | greedy | HF card | our card mode |
 |---|---|---|---|
-| sampling | temperature=0.0 | temperature=1.0, top_p=0.95 | **card's** (+ recorded seed) |
+| sampling | temperature=0.0 | temperature=1.0, top_p=0.95 | **card's** (no per-request seed — §3) |
 | max gen | `--max-new` | 163,840 | **163,840** (min-ed as above) |
 | prompt | question + content-hash-shuffled A–D choices + `\boxed{}` hint | **unspecified** | **greedy's, unchanged** — a HARNESS choice, not a card reproduction (documented; changing it would be inventing a protocol) |
 | extraction / scoring | `extract_mc_letter` → exact letter match | **unspecified** | **greedy's, unchanged** |
@@ -102,7 +102,15 @@ same system prompt, same judge-substitute), plus their own pinned dataset revisi
 
 **Unspecified by the card — our choices, recorded, NOT fidelity claims:**
 - Number of samples per item (we default 1; `--samples N` = avg@N variance knob).
-- Seeds (ours, `base_seed+s` per sample, recorded per item row).
+- Seeds — **labels only on this backend** (round-6 F1, docs/reviews/round6-mtp-card.md). The
+  card publishes none; ours (`base_seed+s` per sample) never reach the engine: the fork's
+  `TpuPlatform.validate_request` rejects every seeded request (`SamplingType.RANDOM_SEED`),
+  and the TPU sampler has one global RNG chain (`model_config.seed`, split per step) — no
+  per-request generators, so `(prompt, seed)` reproducibility is impossible here even in
+  principle. `make_generate` probes the platform once, omits `SamplingParams.seed`, prints a
+  loud banner, records `items.seed`=NULL, and the summary note says `seed_passthrough=off`.
+  Sample identity lives in the `#sN` item ids + `base_seed` in the note/`env_json`; sample
+  independence comes from the global RNG advancing across steps.
 - GPQA prompt format / choice ordering / extraction (we keep the greedy MC machinery).
 - Thinking mode / reasoning effort (we use the shipped chat template defaults: thinking ON,
   `Reasoning Effort: Max`).
@@ -148,8 +156,10 @@ same system prompt, same judge-substitute), plus their own pinned dataset revisi
   `drop_confidence_lines` (fallback extraction can never grab the confidence percentage).
 - `bench/run_bench.py` — `--protocol card|greedy` (default greedy, byte-identical: same
   prompts — DB-verified against pre-change stub runs — same `SamplingParams`, same note),
-  `--samples N` (card-only avg@N; per-sample `#sN` rows), `--seed` (base seed; sample s = seed+s,
-  recorded per row); per-request sampling override plumbing (`_sp(room, sampling=, seed=)`),
+  `--samples N` (card-only avg@N; per-sample `#sN` rows), `--seed` (base seed; sample s = seed+s
+  — a LABEL on this backend, dropped from `SamplingParams` after the platform probe
+  `_per_request_seed_support`, rows record NULL); per-request sampling override plumbing
+  (`_sp(room, sampling=, seed=)`),
   system-prompt-aware chat templating; full protocol provenance in `runs.env_json`
   (`protocol`, `samples`, `base_seed`, `card_protocols` = params + verbatim system prompt +
   card quote + labeled substitutes per benchmark).
@@ -177,3 +187,10 @@ Notes: no `--max-new` = no CLI cap; the effective cap is min(163,840, window roo
 `--max-len 165888` (163,840 + prompt), which Stage-1 KV sizing may not allow; whatever is used,
 a binding cap shows up as `n_truncated` in the summary and must be reported with the Δ (§4.3).
 Dry-run first: append `--stub --limit 3` (validated on this VM).
+
+`--seed 0` above is the base sample LABEL only: the TPU platform rejects per-request seeds, so
+the harness omits `SamplingParams.seed` on every request (round-6 F1 fix — before it, these
+exact commands built the engine for ~45 min and crashed on the FIRST request with
+`ValueError: JAX does not support per-request seed.`). Expect the loud
+"per-request sampling seeds are UNSUPPORTED" banner at engine build — that is the fix working,
+not an error.

@@ -42,6 +42,16 @@ Exact Answer/Confidence system prompt + the Exact-Answer extractor as the
 labeled GPT-5.5-judge substitute; optional --samples N = avg@N with per-sample
 provenance rows). What card mode can and cannot reproduce, with the card
 quotes: docs/07-card-protocol-fidelity.md.
+
+Per-request seeds (round-6 F1, docs/reviews/round6-mtp-card.md): the TPU
+backend REJECTS seeded requests (TpuPlatform.validate_request raises on
+SamplingType.RANDOM_SEED, per request, AFTER the ~45-min engine build) and its
+sampler has no per-request RNG anyway (one global key chain from
+model_config.seed). make_generate probes the platform once: when seeds are
+unsupported, SamplingParams.seed is OMITTED on every request and items.seed is
+recorded NULL — the card-mode per-sample seeds remain provenance LABELS only
+('#sN' item ids + base_seed in the summary note/env_json; sample independence
+comes from the engine's advancing global RNG).
 """
 from __future__ import annotations
 
@@ -102,6 +112,40 @@ def _chat_prompt_ids(tok, prompt: str, chat_template: str | None = None,
         chat_template=chat_template)
 
 
+def _per_request_seed_support(SamplingParams) -> tuple[bool, str]:
+    """Does the CURRENT vLLM platform accept a per-request SamplingParams.seed?
+
+    Round-6 F1 (docs/reviews/round6-mtp-card.md): the fork's
+    TpuPlatform.validate_request (tpu_platform.py:418-428) raises
+    ValueError("JAX does not support per-request seed.") on every
+    SamplingType.RANDOM_SEED request (temperature>0 + seed is not None); vLLM
+    calls it per request from v1/engine/input_processor.py — so a card run
+    that sets SamplingParams.seed builds the engine (~45 min of weight
+    streaming) and then crashes on the FIRST llm.generate call. Even if the
+    seed were accepted, the TPU sampler has NO per-request RNG (one global key
+    chain from model_config.seed, split per step), so (prompt, seed)
+    reproducibility could not be delivered anyway.
+
+    Probe the platform ONCE with a representative seeded request. Returns
+    (supported, reason). ANY probe failure counts as unsupported — omitting a
+    seed is always safe; keeping one risks the post-load crash. The params are
+    constructed BEFORE the platform import so a broken SamplingParams never
+    drags vllm into the process (test_platform_seed_probe's fail-safe check
+    runs vllm-free; callers with a real SamplingParams — make_generate — have
+    vllm imported already, LLM first, so platform resolution is settled)."""
+    try:
+        probe = SamplingParams(temperature=1.0, top_p=0.95, seed=0)
+        from vllm.platforms import current_platform
+        current_platform.validate_request(None, probe)
+        return True, (f"platform "
+                      f"{getattr(current_platform, 'device_name', None) or type(current_platform).__name__}"
+                      " accepts per-request seeds")
+    except ValueError as exc:          # the platform's explicit rejection
+        return False, str(exc)
+    except Exception as exc:           # unknown platform API: fail SAFE
+        return False, f"seed-support probe failed: {type(exc).__name__}: {exc}"
+
+
 def _sort_by_request_id(outs):
     """Defensively re-assert submission order on vLLM outputs. The LLM API
     already returns outputs in input order (its _run_engine sorts by request
@@ -160,6 +204,29 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int | None = 2048
     from vllm import LLM  # noqa: F401
     from vllm import SamplingParams
 
+    # Round-6 F1: probe ONCE whether this platform accepts per-request seeds
+    # (the TPU fork platform does not — it raises per request, AFTER the
+    # engine build). When unsupported, _sp OMITS SamplingParams.seed and
+    # run_benchmark records items.seed = NULL (seeds stay sample labels).
+    seed_ok, seed_msg = _per_request_seed_support(SamplingParams)
+    if not seed_ok:
+        print("!" * 78, flush=True)
+        print("[bench] NOTE: per-request sampling seeds are UNSUPPORTED on "
+              f"this backend\n  ({seed_msg}).\n"
+              "  SamplingParams.seed will be OMITTED on every request (round-6"
+              " F1: setting it\n"
+              "  crashes the first llm.generate AFTER the engine build)."
+              " Card-mode per-sample\n"
+              "  seeds are provenance LABELS only ('#sN' item ids + base_seed"
+              " in the summary\n"
+              "  note); items.seed is recorded NULL ('seed=None,"
+              " TPU-unsupported'). Sample\n"
+              "  independence comes from the engine's advancing global RNG"
+              " (model_config.seed),\n"
+              "  NOT from per-request seeds — (prompt, seed) pairs are NOT"
+              " reproducible here.", flush=True)
+        print("!" * 78, flush=True)
+
     llm = engine.build_llm(model, max_len=max_len, max_seqs=max_seqs,
                            max_batched_tokens=max_batched_tokens, gmu=gmu,
                            num_gpu_blocks=num_gpu_blocks,
@@ -188,13 +255,16 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int | None = 2048
         # a per-sample seed — all recorded in provenance. The effective
         # max_tokens is the min of every cap present: the engine-level
         # --max-new (None = no CLI cap), the card's max generation length,
-        # and the window room.
+        # and the window room. The seed is passed through ONLY when the
+        # platform accepts per-request seeds (round-6 F1: the TPU platform
+        # rejects SamplingType.RANDOM_SEED per request — a kept seed would
+        # crash the first llm.generate after the engine build).
         s = sampling or {}
         caps = [c for c in (max_new, s.get("max_new"), room) if c is not None]
         return SamplingParams(
             temperature=s.get("temperature", temperature),  # default 0.0 = greedy
             top_p=s.get("top_p", top_p),
-            seed=seed,
+            seed=(seed if seed_ok else None),
             max_tokens=min(caps),
             stop_token_ids=EOS_IDS,
             ignore_eos=False,
@@ -238,9 +308,12 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int | None = 2048
         Card protocol (all optional, None = the greedy call, unchanged):
         `system_prompts` aligns 1:1 with `prompts`; `sampling` is the
         per-benchmark card param dict (temperature/top_p/max_new); `seed` is
-        the per-SAMPLE seed (uniform across the batch — vLLM seeds its RNG
-        per request, so equal seeds on different prompts stay independent,
-        while re-running the same (prompt, seed) reproduces)."""
+        the per-SAMPLE seed, passed to SamplingParams ONLY on platforms that
+        accept per-request seeds. On this TPU backend it is OMITTED (round-6
+        F1: the platform rejects seeded requests, and the TPU sampler has one
+        global RNG chain — no per-request generators), so (prompt, seed) is
+        NOT reproducible here; samples differ because the global RNG advances
+        across steps."""
         results: list[tuple[str, int, str | None] | None] = [None] * len(prompts)
         submit_idx: list[int] = []
         token_prompts, sps = [], []
@@ -272,6 +345,9 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int | None = 2048
         return results  # type: ignore[return-value]  # every slot is filled
 
     generate.generate_batch = generate_batch
+    # run_benchmark reads this to decide what items.seed records: the seed the
+    # ENGINE actually got (NULL when the platform drops per-request seeds).
+    generate.per_request_seeds = seed_ok
     return generate
 
 
@@ -305,7 +381,8 @@ def _score_and_record(conn, run_id, spec: B.BenchSpec, it, reply, n_gen,
 
 
 def _run_items_batched(conn, run_id, spec: B.BenchSpec, generate_batch, items,
-                       seed=0, batch_size=0, protocol="greedy", sampling=None,
+                       seed=0, record_seed=None, batch_size=0,
+                       protocol="greedy", sampling=None,
                        extract_fn=None, tag="") -> str:
     """Submit prompts in bulk through generate_batch (ONE llm.generate per
     chunk; batch_size <= 0 = ALL items in one call) so vLLM runs up to max_seqs
@@ -319,7 +396,11 @@ def _run_items_batched(conn, run_id, spec: B.BenchSpec, generate_batch, items,
     pre-protocol harness did. protocol='card' passes the items' card system
     prompts, the card sampling dict, and this sample's seed; `tag` ('#sN' in
     multi-sample runs) suffixes the stored item_id so every sample is its own
-    row, and `seed` is recorded per row."""
+    row. `record_seed` is what items.seed stores: the seed the ENGINE actually
+    received — run_benchmark passes NULL for greedy (no seed is ever sent) and
+    for card on backends that reject per-request seeds (round-6 F1/F10:
+    previously the column recorded the label seed even when SamplingParams got
+    seed=None, meaning different things across protocols)."""
     chunks = ([items] if batch_size <= 0 else
               [items[i:i + batch_size] for i in range(0, len(items), batch_size)])
     total_wall_ms, total_tok, done = 0.0, 0, 0
@@ -344,7 +425,7 @@ def _run_items_batched(conn, run_id, spec: B.BenchSpec, generate_batch, items,
             finish = out[2] if len(out) > 2 else None
             extracted, correct = _score_and_record(
                 conn, run_id, spec, it, reply, n_gen, latency_ms=None,
-                seed=seed, finish_reason=finish, extract_fn=extract_fn,
+                seed=record_seed, finish_reason=finish, extract_fn=extract_fn,
                 item_id=(it.item_id + tag) if tag else None)
             done += 1
             chunk_tok += n_gen or 0
@@ -375,8 +456,16 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
     judge substitute), and `samples` independent samples per item (avg@N —
     the card specifies NO k/averaging, so N>1 is a harness-side variance
     knob; the summary value is the mean over ALL sample rows). Sample s uses
-    seed `seed + s`, recorded on every row; multi-sample rows get an '#sN'
-    item_id suffix so each sample is individually auditable."""
+    seed `seed + s`; multi-sample rows get an '#sN' item_id suffix so each
+    sample is individually auditable.
+
+    Seed provenance (round-6 F1/F10): items.seed records the seed the ENGINE
+    actually received. Generators expose `per_request_seeds` (make_generate
+    probes the platform); when False — the TPU backend, whose platform rejects
+    seeded requests — the per-sample seed is still handed to the generator
+    (which omits it from SamplingParams) but the rows record NULL and the
+    summary note says seed_passthrough=off. Greedy rows record NULL too (no
+    seed is ever sent; they previously recorded the unused --seed value)."""
     if samples < 1:
         raise ValueError(f"samples must be >= 1, got {samples}")
     if protocol != "card" and samples != 1:
@@ -388,16 +477,33 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
     sampling = (None if cp is None else
                 {"temperature": cp.temperature, "top_p": cp.top_p,
                  "max_new": cp.max_new})
+    # Does this generator actually pass per-request seeds to its engine?
+    # make_generate sets it from the platform probe (False on the TPU stack);
+    # absent attribute (stub/fakes) = True, the generator receives and may use
+    # the seed. Decides what items.seed records (round-6 F1/F10).
+    seeds_ok = bool(getattr(generate, "per_request_seeds", True))
     proto_note = ""
     if cp is not None:
         proto_note = (f"protocol=card temp={cp.temperature} top_p={cp.top_p} "
                       f"card_max_new={cp.max_new} samples={samples} "
-                      f"base_seed={seed}")
+                      f"base_seed={seed} "
+                      + ("seed_passthrough=on" if seeds_ok else
+                         "seed_passthrough=off(backend rejects per-request "
+                         "seeds; per-sample seeds are labels only, "
+                         "items.seed=NULL)"))
+        if not seeds_ok:
+            print(f"[{spec.name}] NOTE: per-request seeds unsupported on this "
+                  "backend — per-sample seeds are provenance labels only "
+                  "(items.seed=NULL; see the make_generate banner)", flush=True)
     notes = []
     generate_batch = getattr(generate, "generate_batch", None)
     for s in range(samples):
         tag = f"#s{s}" if samples > 1 else ""
-        sample_seed = (seed + s) if protocol == "card" else seed
+        # card: the generator receives base_seed+s (and omits it from
+        # SamplingParams when the backend rejects per-request seeds); greedy
+        # sends NO seed. items.seed records what the engine actually got.
+        sample_seed = (seed + s) if protocol == "card" else None
+        record_seed = sample_seed if seeds_ok else None
         if samples > 1:
             print(f"[{spec.name}] sample {s + 1}/{samples} "
                   f"(seed={sample_seed})", flush=True)
@@ -406,6 +512,7 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
             # bulk (the stub does not, and keeps the sequential path unchanged).
             notes.append(_run_items_batched(
                 conn, run_id, spec, generate_batch, items, seed=sample_seed,
+                record_seed=record_seed,
                 batch_size=batch_size, protocol=protocol, sampling=sampling,
                 extract_fn=extract_fn, tag=tag))
         else:
@@ -426,7 +533,7 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
                 latency = (time.time() - t0) * 1000.0
                 extracted, correct = _score_and_record(
                     conn, run_id, spec, it, reply, n_gen,
-                    latency_ms=round(latency, 1), seed=sample_seed,
+                    latency_ms=round(latency, 1), seed=record_seed,
                     finish_reason=finish, extract_fn=extract_fn,
                     item_id=(it.item_id + tag) if tag else None)
                 trunc_flag = " TRUNCATED" if finish == "length" else ""
@@ -601,9 +708,14 @@ def main():
                          "— N>1 is a harness-side variance knob, honestly "
                          "labeled in provenance. Requires --protocol card.")
     ap.add_argument("--seed", type=int, default=0,
-                    help="base sampling seed (card mode; sample s uses seed+s, "
-                         "recorded per item row). The card publishes no seeds "
-                         "— ours are for OUR reproducibility only.")
+                    help="base sampling seed (card mode; sample s uses seed+s)."
+                         " The card publishes no seeds. On the TPU backend the "
+                         "platform REJECTS per-request seeds (round-6 F1), so "
+                         "the engine never receives them: they remain sample "
+                         "LABELS ('#sN' ids + base_seed in the note), "
+                         "items.seed records NULL, and (prompt, seed) is NOT "
+                         "reproducible (sample variety comes from the global "
+                         "RNG advancing).")
     ap.add_argument("--max-new", type=int, default=None,
                     help="max generated tokens; GLM-5.2 thinks before answering "
                          "— AIME/GPQA need long CoT, raise (e.g. 4096-16384). "
