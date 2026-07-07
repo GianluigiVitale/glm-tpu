@@ -86,6 +86,64 @@ def test_adversarial_extractors():
     print("  adversarial extractors OK")
 
 
+def test_exact_answer_extractor():
+    """extract_exact_answer — the card-protocol 'Exact Answer:' field (the
+    labeled GPT-5.5-judge substitute), incl. adversarial replies."""
+    E = ex.extract_exact_answer
+    # the card format, verbatim shape
+    assert E("Explanation: because reasons\nExact Answer: 42\n"
+             "Confidence: 95%") == "42"
+    # think block stripped; the field lives after it
+    assert E("<think>maybe 7? no.</think>\nExplanation: x\n"
+             "Exact Answer: 128\nConfidence: 100%") == "128"
+    # markdown emphasis on marker and/or answer
+    assert E("**Exact Answer:** 042") == "042"
+    assert E("Exact Answer: **17**\nConfidence: 80%") == "17"
+    assert E("__Exact Answer__: 5") == "5"
+    # \boxed{} inside the field is unwrapped (brace-balanced)
+    assert E("Exact Answer: \\boxed{128}\nConfidence: 99%") == "128"
+    assert E("Exact Answer: \\boxed{\\frac{1}{2}}") == "\\frac{1}{2}"
+    # Confidence on the SAME line is cut off
+    assert E("Exact Answer: 42 Confidence: 90%") == "42"
+    assert E("Exact Answer: 42. Confidence: 90%") == "42"
+    # the LAST marker wins (drafted format restated later)
+    assert E("Exact Answer: 7\n...wait, recompute...\n"
+             "Exact Answer: 128\nConfidence: 99%") == "128"
+    # answer on the NEXT line still found
+    assert E("Exact Answer:\n128\nConfidence: 99%") == "128"
+    # ADVERSARIAL — never guess:
+    assert E("the exact answer might be 7") is None          # no colon
+    assert E("the exact answer is 7, I think") is None       # no colon
+    assert E("an inexact answer: 7") is None                 # \b guard
+    assert E("Exact Answer:\nConfidence: 90%") is None       # empty field
+    assert E("Exact Answer:   \n\nConfidence: 90%") is None  # whitespace field
+    assert E("") is None and E("no field here 42") is None
+    # marker ONLY inside a closed think block does not count
+    assert E("<think>Exact Answer: 5</think>\nThe answer is 6") is None
+    # case-insensitive marker, uppercase answer preserved
+    assert E("EXACT ANSWER: 10") == "10"
+    # normalization compatibility with score_math (trailing '.', leading 0s, $)
+    assert ex.score_math(E("Exact Answer: 042.\nConfidence: 1%"), "42")
+    assert ex.score_math(E("Exact Answer: \\boxed{1,234}\nConfidence: 5%"), "1234")
+    assert ex.score_math(E("Exact Answer: $18\nConfidence: 5%"), "18")
+    # drop_confidence_lines: the fallback path must never grab a confidence
+    # percentage as the answer (card reply that skipped 'Exact Answer:')
+    nonconforming = "I believe the result is 128.\nConfidence: 95%"
+    assert ex.extract_final_number(nonconforming) == "95"     # the trap...
+    body = ex.drop_confidence_lines(nonconforming)
+    assert ex.extract_final_number(body) == "128"             # ...defused
+    import benchmarks as _B
+    assert _B.card_math_extract(nonconforming, None) == "128"
+    assert _B.card_math_extract(
+        "Explanation: y\nExact Answer: 42\nConfidence: 90%", None) == "42"
+    # fallback chain still finds a boxed answer in a nonconforming reply
+    assert _B.card_math_extract(
+        "<think>t</think> the answer is \\boxed{60}", None) == "60"
+    # a reply that is ONLY a confidence line extracts nothing (scored wrong)
+    assert _B.card_math_extract("Confidence: 100%", None) is None
+    print("  exact-answer extractor (card protocol) OK")
+
+
 def test_scorers():
     assert ex.score_mc("C", "C") and not ex.score_mc("C", "D")
     assert not ex.score_mc(None, "A")
@@ -150,7 +208,8 @@ def test_batched_run():
     fake_gen.generate_batch = fake_batch
 
     orig_load = B.load_items
-    B.load_items = lambda spec, limit=None: list(items[:limit] if limit else items)
+    B.load_items = (lambda spec, limit=None, protocol="greedy":
+                    list(items[:limit] if limit else items))
     try:
         with tempfile.TemporaryDirectory() as d:
             conn = pv.connect(os.path.join(d, "t.db"))
@@ -204,6 +263,169 @@ def test_batched_run():
     print("  batched run (ordering + provenance + chunking) OK")
 
 
+def test_card_protocol_specs():
+    """The card-protocol registry mapping — what the HF card ACTUALLY
+    specifies (docs/07-card-protocol-fidelity.md), pinned so it cannot drift."""
+    # the card system prompt is BYTE-DERIVED from the committed README copy:
+    # decode the backticked \n-escaped string and compare
+    readme = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "..", "reference", "hf-repo", "README.md")
+    with open(readme, encoding="utf-8") as f:
+        text = f.read()
+    escaped = B.CARD_REASONING_SYSTEM_PROMPT.replace("\n", "\\n")
+    assert f"`{escaped}`" in text, \
+        "CARD_REASONING_SYSTEM_PROMPT drifted from reference/hf-repo/README.md"
+    # sampling params + generation cap, as the footnote states them
+    for spec in (B.AIME_2026, B.GPQA_DIAMOND):
+        cp = spec.card
+        assert cp is not None
+        assert cp.temperature == 1.0 and cp.top_p == 0.95, spec.name
+        assert cp.max_new == 163840, spec.name
+        assert "temperature=1.0" in cp.source and "top_p=0.95" in cp.source
+        assert "163,840" in cp.source
+    # AIME: the card's system prompt + Exact-Answer extractor; bare question
+    assert B.AIME_2026.card.system_prompt == B.CARD_REASONING_SYSTEM_PROMPT
+    assert B.AIME_2026.card.extract is B.card_math_extract
+    assert "GPT-5.5" in B.AIME_2026.card.substitutes   # judge substitute labeled
+    row = {"problem": "Find x such that x+1=2.", "answer": 1, "problem_idx": 3}
+    it = B._aime_card_build(row, 2)
+    assert it.prompt == "Find x such that x+1=2."     # VERBATIM, no \boxed hint
+    assert "\\boxed" not in it.prompt
+    assert it.system_prompt == B.CARD_REASONING_SYSTEM_PROMPT
+    assert it.gold == "1" and it.item_id == "aime_2"
+    # greedy AIME items are unchanged (byte-identical default protocol)
+    itg = B._aime_build(row, 2)
+    assert itg.prompt.endswith(B._THINK_HINT) and itg.system_prompt is None
+    # GPQA: the card is SILENT on prompt/extraction — card mode keeps the
+    # greedy MC machinery (build/extract None => spec.build/spec.extract)
+    assert B.GPQA_DIAMOND.card.build is None
+    assert B.GPQA_DIAMOND.card.extract is None
+    assert B.GPQA_DIAMOND.card.system_prompt is None
+    assert "NO GPQA-specific protocol" in B.GPQA_DIAMOND.card.substitutes
+    # not-on-card benchmarks have NO card protocol and card mode refuses them
+    assert B.MMLU_PRO.card is None and B.GSM8K.card is None
+    try:
+        B.load_items(B.GSM8K, limit=1, protocol="card")
+        raise AssertionError("card protocol on gsm8k must be refused")
+    except ValueError as e:
+        assert "no card protocol" in str(e)
+    try:
+        B.load_items(B.GSM8K, limit=1, protocol="typo")
+        raise AssertionError("unknown protocol must be refused")
+    except ValueError as e:
+        assert "unknown protocol" in str(e)
+    print("  card-protocol specs (README-pinned) OK")
+
+
+def test_card_protocol_run():
+    """run_benchmark --protocol card end-to-end on a fake generator (no vllm):
+    card sampling params + system prompts + per-sample seeds reach the
+    generator; every sample is its own provenance row ('#sN' ids, seed
+    recorded); the summary is avg@N; the stub accepts card kwargs."""
+    import run_bench as rb
+
+    # the stub swallows card kwargs (--stub --protocol card works offline)
+    assert rb.stub_generate("x", system_prompt="s", sampling={}, seed=3) == ""
+
+    sysp = B.CARD_REASONING_SYSTEM_PROMPT
+    items = [B.Item("a0", "Q0", "Q0", "42", system_prompt=sysp),
+             B.Item("a1", "Q1", "Q1", "7", system_prompt=sysp)]
+    canned = {  # (prompt, seed) -> reply; sample 1 gets a1 wrong
+        ("Q0", 5): "Explanation: e\nExact Answer: 42\nConfidence: 90%",
+        ("Q1", 5): "Explanation: e\nExact Answer: 7\nConfidence: 90%",
+        ("Q0", 6): "Explanation: f\nExact Answer: 42\nConfidence: 80%",
+        ("Q1", 6): "Explanation: f\nExact Answer: 9\nConfidence: 80%"}
+    calls = []
+
+    def fake_gen(prompt, **kw):
+        raise AssertionError("batched path must be used")
+
+    def fake_batch(prompts, *, system_prompts=None, sampling=None, seed=None):
+        calls.append((list(prompts), list(system_prompts), dict(sampling), seed))
+        return [(canned[(p, seed)], 5, "stop") for p in prompts]
+
+    fake_gen.generate_batch = fake_batch
+
+    orig_load = B.load_items
+    seen_protocols = []
+
+    def fake_load(spec, limit=None, protocol="greedy"):
+        seen_protocols.append(protocol)
+        return list(items)
+
+    B.load_items = fake_load
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            conn = pv.connect(os.path.join(d, "t.db"))
+            rid = pv.start_run(conn, model="FAKE-CARD", env={}, note="unit")
+            summ = rb.run_benchmark(conn, rid, B.AIME_2026, fake_gen,
+                                    batch_size=0, protocol="card", samples=2,
+                                    seed=5)
+            assert seen_protocols == ["card"]
+            # card sampling params + system prompts + per-sample seeds
+            assert len(calls) == 2
+            card_sampling = {"temperature": 1.0, "top_p": 0.95,
+                             "max_new": 163840}
+            assert calls[0] == (["Q0", "Q1"], [sysp, sysp], card_sampling, 5)
+            assert calls[1] == (["Q0", "Q1"], [sysp, sysp], card_sampling, 6)
+            # per-sample provenance rows: '#sN' ids, per-row seed, own replies
+            rows = conn.execute(
+                "SELECT item_id,seed,extracted,correct,raw_output FROM items"
+                " WHERE run_id=? ORDER BY id", (rid,)).fetchall()
+            assert [r[0] for r in rows] == ["a0#s0", "a1#s0", "a0#s1", "a1#s1"]
+            assert [r[1] for r in rows] == [5, 5, 6, 6]
+            assert [(r[2], r[3]) for r in rows] == \
+                [("42", 1), ("7", 1), ("42", 1), ("9", 0)]
+            assert rows[3][4] == canned[("Q1", 6)]      # verbatim reply stored
+            # avg@2 = mean over ALL sample rows = 3/4
+            assert summ["n"] == 4 and abs(summ["value"] - 75.0) < 1e-9
+            note = conn.execute("SELECT note FROM summary WHERE run_id=?",
+                                (rid,)).fetchone()[0]
+            assert note.startswith("protocol=card temp=1.0 top_p=0.95 "
+                                   "card_max_new=163840 samples=2 "
+                                   "base_seed=5"), note
+
+            # samples=1 keeps plain item ids (no suffix); card seed recorded
+            calls.clear()
+            rid2 = pv.start_run(conn, model="FAKE-CARD", env={}, note="unit2")
+            rb.run_benchmark(conn, rid2, B.AIME_2026, fake_gen, batch_size=0,
+                             protocol="card", samples=1, seed=5)
+            rows2 = conn.execute(
+                "SELECT item_id,seed FROM items WHERE run_id=? ORDER BY id",
+                (rid2,)).fetchall()
+            assert rows2 == [("a0", 5), ("a1", 5)]
+
+            # SEQUENTIAL card path (no generate_batch): kwargs + latency kept
+            seq_calls = []
+
+            def fake_seq(prompt, *, system_prompt=None, sampling=None,
+                         seed=None):
+                seq_calls.append((prompt, system_prompt, dict(sampling), seed))
+                return (canned[(prompt, seed)], 5, "stop")
+
+            rid3 = pv.start_run(conn, model="FAKE-CARD", env={}, note="unit3")
+            rb.run_benchmark(conn, rid3, B.AIME_2026, fake_seq, batch_size=0,
+                             protocol="card", samples=1, seed=5)
+            assert seq_calls == [("Q0", sysp, card_sampling, 5),
+                                 ("Q1", sysp, card_sampling, 5)]
+            rows3 = conn.execute(
+                "SELECT extracted,correct,latency_ms FROM items WHERE run_id=?"
+                " ORDER BY id", (rid3,)).fetchall()
+            assert [r[:2] for r in rows3] == [("42", 1), ("7", 1)]
+            assert all(r[2] is not None for r in rows3)
+
+            # greedy refuses samples>1
+            try:
+                rb.run_benchmark(conn, rid3, B.AIME_2026, fake_gen,
+                                 protocol="greedy", samples=2)
+                raise AssertionError("greedy samples>1 must be refused")
+            except ValueError as e:
+                assert "card" in str(e)
+    finally:
+        B.load_items = orig_load
+    print("  card-protocol run (sampling/seeds/avg@N provenance) OK")
+
+
 def test_item_builders():
     # GPQA: synthetic row → deterministic 4-way MC, gold letter tracks the correct answer
     row = {"Question": "2+2?", "Correct Answer": "4",
@@ -253,8 +475,11 @@ def test_item_builders():
 if __name__ == "__main__":
     test_extractors()
     test_adversarial_extractors()
+    test_exact_answer_extractor()
     test_scorers()
     test_db_roundtrip()
     test_batched_run()
+    test_card_protocol_specs()
+    test_card_protocol_run()
     test_item_builders()
     print("ALL bench CPU tests passed.")

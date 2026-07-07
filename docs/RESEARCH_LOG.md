@@ -286,3 +286,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
   max_seqs 16 (~2×, KV already covers 16×4096 exactly) → continue_decode (docs/04) → head-sharded
   attention specs (docs/05 S1) → Stage-2 DSA+DCP. Also flagged: both gsm8k runs died on pass 2 with a
   device-fatal TPU_EXECUTE_ERROR (reliability item, separate from throughput).
+
+## 2026-07-07 — bench: card-protocol fidelity (--protocol card|greedy) + docs/07 (CPU-only; no engine runs)
+
+- **`docs/07-card-protocol-fidelity.md` committed** — per-benchmark map of the HF card's ACTUAL protocol
+  (README footnote 1, quoted verbatim): reasoning tasks = `temperature=1.0, top_p=0.95`, max gen 163,840;
+  AIME/HMMT/IMOAnswerBench additionally get the exact `Explanation:/Exact Answer:/Confidence:` SYSTEM
+  prompt and a GPT-5.5 (medium) judge; **GPQA gets NO benchmark-specific protocol** (no prompt format, no
+  judge — the Exact-Answer prompt is explicitly scoped to AIME/HMMT/IMOAnswerBench); **no k/averaging, no
+  seeds, no effort level are published for any reasoning task**. Comparability caveats for any published Δ
+  are in docs/07 §4 (judge substitution, n=30 sampling variance, generation-cap deviations via n_truncated,
+  GPQA prompt = harness choice).
+- **Implemented `--protocol card|greedy`** (default greedy = pre-protocol harness, byte-identical —
+  DB-verified same prompts vs old stub runs, same SamplingParams): card mode sets the card sampling params
+  per request, the card system prompt (byte-derived from reference/hf-repo/README.md, test-pinned) with the
+  bare-question user turn for AIME, the 163,840 cap (min-ed with window room + optional CLI cap), per-sample
+  seeds (`--seed`, sample s = seed+s, recorded per row), and `--samples N` (avg@N, item_id `#sN` rows —
+  labeled harness variance knob, NOT a card spec). GPQA card mode = greedy MC machinery + card sampling only
+  (documented as such). `extract_exact_answer` + `drop_confidence_lines` added to extract.py (judge
+  SUBSTITUTE = exact-match on the card's answer format; fallback chain can never grab the Confidence
+  percentage); mmlu_pro/gsm8k refused in card mode (not on the card). Provenance: runs.env_json now records
+  protocol/samples/base_seed + per-benchmark card params + verbatim system prompt + card quote + labeled
+  substitutes. test_bench.py: +3 test groups (adversarial exact-answer, README byte-pin, card-run
+  plumbing/avg@N provenance); all green; `--stub` green in both protocols (gsm8k greedy, aime card
+  samples=2, gpqa card). Pod commands for AIME n=30 / GPQA n=198 card mode: docs/07 §6.

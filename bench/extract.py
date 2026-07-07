@@ -115,6 +115,67 @@ def extract_final_number(text: str) -> str | None:
     return nums[-1].replace(",", "") if nums else None
 
 
+# ---- card-protocol extraction (docs/07-card-protocol-fidelity.md) -----------
+# The GLM-5.2 card evaluates AIME/HMMT/IMOAnswerBench with a system prompt that
+# mandates the reply format
+#     Explanation: {...}\nExact Answer: {...}\nConfidence: {...}
+# and grades with a GPT-5.5 judge. Our judge SUBSTITUTE is: extract the
+# 'Exact Answer:' field, then exact-match (score_math) — labeled as such in
+# provenance; extract_exact_answer below is that extractor.
+
+# (?<![A-Za-z0-9]) not \b: '__Exact Answer__:' must match (underscore is a
+# word char, so \b would reject it) while 'inexact answer:' must not.
+_EXACT_ANSWER_MARK = re.compile(
+    r"(?i)(?<![A-Za-z0-9])exact\s+answer\s*(?:\*\*|__)?\s*[:：]")
+_CONFIDENCE_MARK = re.compile(r"(?i)[\s,;.]*(?:\*\*|__)?\s*confidence\s*(?:\*\*|__)?\s*[:：]")
+_CONFIDENCE_LINE = re.compile(r"(?im)^\s*(?:\*\*|__)?\s*confidence\s*(?:\*\*|__)?\s*[:：][^\n]*$")
+
+
+def extract_exact_answer(text: str) -> str | None:
+    """Extract the 'Exact Answer:' field mandated by the GLM-5.2 card's
+    Explanation/Exact Answer/Confidence system prompt (the AIME/HMMT/
+    IMOAnswerBench card protocol).
+
+    The LAST 'Exact Answer:' marker wins (a reasoning model may draft the
+    format, then restate it); the field is cut at the next 'Confidence:'
+    marker (same line or later) and reduced to its first non-empty line;
+    a \\boxed{...} inside the field is unwrapped and markdown emphasis /
+    stray whitespace stripped. The literal colon is REQUIRED — prose like
+    'the exact answer might be 7' never matches (never guess; the card-mode
+    fallback chain handles nonconforming replies). Returns None when the
+    field is absent or empty (scored wrong, raw output stored for audit)."""
+    if not text:
+        return None
+    body = strip_think(text)
+    marks = list(_EXACT_ANSWER_MARK.finditer(body))
+    if not marks:
+        return None
+    tail = body[marks[-1].end():]
+    cut = _CONFIDENCE_MARK.search(tail)
+    if cut:
+        tail = tail[:cut.start()]
+    lines = [ln.strip() for ln in tail.splitlines() if ln.strip()]
+    if not lines:
+        return None
+    ans = lines[0]
+    if r"\boxed{" in ans:
+        ans = extract_boxed(ans) or ans
+    # strip markdown emphasis / backticks / stray whitespace at both ends
+    # ('**42**', '** 42', '`42`'); interior characters are never touched.
+    ans = re.sub(r"^[\s*_`]+", "", re.sub(r"[\s*_`]+$", "", ans))
+    return ans or None
+
+
+def drop_confidence_lines(text: str) -> str:
+    """Remove whole 'Confidence: ...' lines (the card format's third field)
+    so card-mode FALLBACK extraction (last \\boxed{} / final number on a reply
+    that ignored the format) can never grab the confidence percentage as the
+    answer ('Confidence: 95%' -> extract_final_number would return '95')."""
+    if not text:
+        return ""
+    return _CONFIDENCE_LINE.sub("", text)
+
+
 def norm_math(s: str | None) -> str | None:
     """Light normalization for math-answer string comparison."""
     if s is None:
