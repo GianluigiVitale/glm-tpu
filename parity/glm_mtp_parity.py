@@ -389,9 +389,21 @@ def main():
     # kernel is TPU-only; MoE-MTP is covered by the load audit below) -------
     cfg_fwd = C.make_mini_config(n_layers=L, first_k_dense=L + 2,
                                  num_mtp_layers=1)
-    assert C.mtp_layer_indexer_is_full(cfg_fwd, L) or L != 2, \
-        "mini MTP layer should derive FULL (mirrors real layer 78)"
+    assert C.mtp_layer_indexer_is_full(cfg_fwd, L), (
+        f"mini MTP layer {L} derives SHARED — pick --layers so the MTP "
+        "layer is a FULL indexer layer (mirrors real layer 78)")
     assert cfg_fwd["index_topk"] >= T, "index_topk must cover T (== dense)"
+    # The harness copy of the indexer-schedule formula must not drift from
+    # the fork's authoritative derivation (docs/08 §1.2).
+    from types import SimpleNamespace
+
+    from tpu_inference.models.vllm.glm_mtp.draft_config import \
+        mtp_layer_indexer_is_full as fork_indexer_is_full
+    _cfg_ns = SimpleNamespace(**cfg_fwd)
+    for _lid in range(L + 2):
+        assert fork_indexer_is_full(_cfg_ns, _lid) == \
+            C.mtp_layer_indexer_is_full(cfg_fwd, _lid), (
+                f"indexer-schedule formula drift at layer {_lid}")
     w = C.gen_weights(args.seed, cfg_fwd)
     eng_dir = os.path.join(tmp, "engine_ckpt")
     twin_dir = os.path.join(tmp, "hf_twin_ckpt")
@@ -488,9 +500,8 @@ def main():
     try:
         _audit_draft_load(moe_draft_wrapper, spy, L)
         moe_vm = moe_draft_wrapper.model.vllm_model
-        n_expert_params = sum(
-            1 for n, _ in moe_vm.named_parameters() if ".experts." in n
-            or "experts" in n)
+        n_expert_params = sum(1 for n, _ in moe_vm.named_parameters()
+                              if ".experts." in n)
         assert n_expert_params > 0, "MoE draft has no expert params"
         print(f"  [audit] MoE draft OK ({n_expert_params} fused expert "
               "param(s) fed by layer-MTP checkpoint keys)")
