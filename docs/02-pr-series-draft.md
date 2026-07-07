@@ -1,13 +1,17 @@
 # docs/02 — Decomposing the GLM-5.2 fork work into upstreamable PRs (draft blueprint)
 
-**Status:** decomposition + draft descriptions (2026-07-07; Stage-1 state — sub-cube parity green at
-T ≤ 128, the T>128 divergence OPEN, pod bring-up pending). Mirrors the proven DSV4 pattern in
+**Status:** decomposition + draft descriptions (2026-07-07; Stage-1 state — sub-cube parity fully green:
+the "T>128 divergence" was RESOLVED as a harness false alarm, engine exonerated — see RESEARCH_LOG
+2026-07-07 (later); pod bring-up pending). Mirrors the proven DSV4 pattern in
 `~/moe-tpu/docs/13-pr-f-upstream-decomposition.md` (read in full; summarized in
 `docs/recon/doc13-pr-decomp.md`). The deliverable is **merge-ready, individually-gated branches** —
 one concern per PR, a CPU test where the math is pure, a functionally-RUN gate otherwise, and a draft
 description (Motivation / Changes / Tests-run-with-numbers / Risk / AI-assisted disclosure). **The OWNER
-submits to `vllm-project/tpu-inference`** — the project's `AGENTS.md` forbids pure code-agent PRs: a human
-must understand and defend every line. No PR is pushed/opened by an agent, ever.
+submits to `vllm-project/tpu-inference`** — the **upstream vllm-project `AGENTS.md` policy** forbids pure
+code-agent PRs: a human must understand and defend every line. (Attribution note: tpu-inference itself
+ships NO `AGENTS.md`; the policy file lives in **`vllm-project/vllm`** — local copy verified at
+`~/vllm-build/AGENTS.md`. Whether tpu-inference maintainers formally enforce the parent repo's policy is
+an assumption; we comply with it regardless.) No PR is pushed/opened by an agent, ever.
 
 Source commits (fork `GianluigiVitale/tpu-inference`, branch `glm-5.2-v4`, cut from `dsv4-flash-v4`
 @ `17d635a1`):
@@ -18,12 +22,15 @@ Source commits (fork `GianluigiVitale/tpu-inference`, branch `glm-5.2-v4`, cut f
 | `8ad980e7` | FP8-on-v4: per-tile GMM dequant + checkpoint-exact block-scale linears | gmm_v2.py, linear.py, quantization/fp8.py |
 | `3f745ddc` | Stage-1 hardening: review fixes + real-dims VMEM tiling | envs.py, gmm_v2.py, mla_attention.py, vllm_model_wrapper.py, tpu_platform.py, kv_cache_manager.py |
 | `cd8eeb6c` | PR #2324 TP-topology MLA port | attention_interface.py, flash_attn_mla.py, tpu_platform.py |
-| *(WIP, uncommitted)* | all-gather-before-TuningKey, page-512 v4 gate, TPU_MIN_TOKEN_BUCKET | attention_interface.py, flash_attn_mla.py, tpu_platform.py, tpu_runner.py |
+| `a429be54` | round-2 review fixes: all-gather-before-TuningKey, page-512 v4 gate, TPU_MIN_TOKEN_BUCKET, TPU_MLA_V4_KV_PAGES/QUERIES debug overrides | attention_interface.py, flash_attn_mla.py, tpu_platform.py, tpu_runner.py |
 
 ## The packaging realities (different from DSV4's — read before cutting branches)
 
-1. **The GLM delta is small (4 commits) but `3f745ddc` is a cross-cutting hardening commit** whose hunks
-   belong to four different concerns. Unlike DSV4's 49-commit branch-order stacking, the GLM PRs are built
+1. **The GLM delta is small (5 commits) but `3f745ddc` is a cross-cutting hardening commit** whose hunks
+   belong to four different concerns — and `9bb2c23e`'s `mla_attention.py` diff carries **three** concerns
+   (the identity-scales fix, the W_UV_scale axis fix, AND the `TPU_DISABLE_DSA_INDEXER` forward gate +
+   its `envs`/`utils` import — the gate hunk belongs to **PR-G1**, not G2; see the hunk maps below).
+   Unlike DSV4's 49-commit branch-order stacking, the GLM PRs are built
    by **hunk-level regrouping** (cherry-pick + split, or re-commit per concern). That makes the docs/13
    lesson binding: *clean cherry-pick + py_compile ≠ works* — every PR branch must be **functionally run**
    (the parity harness at minimum) before it is called ready. Both DSV4 decomposition bugs
@@ -53,13 +60,19 @@ Source commits (fork `GianluigiVitale/tpu-inference`, branch `glm-5.2-v4`, cut f
   reproduced on CPU — `docs/reviews/stage1-a.md` item (a), `stage1-b.md` finding 8, `stage1-correctness.md`);
   (b) `W_UV_scale` is `[1, H, v]` (head axis 1) but was `device_put` with `P(ATTN_HEAD,)` on axis 0 →
   **IndivisibleError** whenever head-TP > 1 (reproduced on a 4-device CPU mesh, `stage1-b.md` finding 4).
-- **Commits/hunks:** `9bb2c23e` (mla_attention.py identity-scales + resharding) + `3f745ddc`
+- **Commits/hunks:** `9bb2c23e` (mla_attention.py identity-scales + resharding hunks **ONLY** — ⚠️ the
+  same file's `TPU_DISABLE_DSA_INDEXER` forward-gate hunk and its `from tpu_inference import envs, utils`
+  import belong to **PR-G1**, which owns the `envs.py` entry the gate reads; carrying them here would make
+  G2 depend on G1 and void the "INDEPENDENT — submit first" claim, per the round-3 review of this doc's
+  original hunk map) + `3f745ddc`
   (ndim-agnostic scale shape — repairs the pre-existing `tests/layers/vllm/test_mla_attention.py`, now
   6/6 — and `t2j_dtype` act-dtype mapping, fp16-safe).
 - **Files:** `tpu_inference/layers/vllm/custom_ops/mla_attention.py` (+ the test file).
 - **Gate/risk:** bug fixes on existing paths. The auto-dtype branch was *always*-NaN, so no working config
   regresses; the quantized-KV branch makes the byte-identical `quantize_tensor(self.kv_cache_quantized_dtype,…)`
   call. Head-TP=1 behavior equivalent (verified).
+- **Independence caveat:** INDEPENDENT only under the hunk split above (no gate hunk, no envs import).
+  Verify when cutting the branch: G2's mla_attention.py must not reference `envs.DISABLE_DSA_INDEXER`.
 - **Tests carried:** `tests/layers/vllm/test_mla_attention.py` 6/6 (CPU); the 1-chip engine parity
   (bf16 + fp8, machine-gated) as the run gate. **Add before submission:** a 4-CPU-device sharding unit test
   (`XLA_FLAGS=--xla_force_host_platform_device_count=4`; old spec → IndivisibleError, new spec → OK — the
@@ -123,11 +136,17 @@ Source commits (fork `GianluigiVitale/tpu-inference`, branch `glm-5.2-v4`, cut f
   `DeepseekV32IndexerCache` defines neither `kv_sharing_target_layer_name` nor `attn_type` →
   `get_kv_cache_spec` AttributeError on every GLM/DSV3.2 config; the dense stage gives it no KV slot), and
   Ray propagation of the new env vars.
-- **Commits/hunks:** `9bb2c23e` (model_loader.py, envs.py, vllm_model_wrapper.py) + `3f745ddc` (gate
-  default-ON, kv_cache_manager.py skip, tpu_platform.py env list, `_layer_is_shared` list-form fix).
+- **Commits/hunks:** `9bb2c23e` (model_loader.py, envs.py, vllm_model_wrapper.py, **and the
+  mla_attention.py forward-gate hunk** — `if self.indexer and self.is_sparse and not
+  envs.DISABLE_DSA_INDEXER:` plus the `from tpu_inference import envs, utils` import; without this hunk
+  the registered model registers the gate env but nothing READS it in the forward, and vLLM's
+  `SparseAttnIndexer` — no TPU forward, raises NotImplementedError — runs on every full-schedule layer:
+  exactly the out-of-box crash this PR claims to fix; round-3 review finding 1 on this doc) + `3f745ddc`
+  (gate default-ON, kv_cache_manager.py skip, tpu_platform.py env list, `_layer_is_shared` list-form fix).
 - **Files:** `tpu_inference/models/common/model_loader.py`, `tpu_inference/envs.py`,
   `tpu_inference/models/vllm/vllm_model_wrapper.py`, `tpu_inference/runner/kv_cache_manager.py`,
-  `tpu_inference/platforms/tpu_platform.py`.
+  `tpu_inference/platforms/tpu_platform.py`, `tpu_inference/layers/vllm/custom_ops/mla_attention.py`
+  (the gate hunk only — the rest of that file's `9bb2c23e` delta ships in PR-G2).
 - **Gate/risk:** additive frozenset entries; the construction patch is arch-sniffed
   (`_maybe_patch_for_glm_moe_dsa`) and yields early for non-GLM; the KV-spec skip keys on the vLLM
   `DeepseekV32IndexerCache` class; non-GLM configs byte-identical. Known review-flagged residue to state
@@ -158,15 +177,18 @@ Source commits (fork `GianluigiVitale/tpu-inference`, branch `glm-5.2-v4`, cut f
   page_size 512 when kv_lora_rank > 256 (v4 VMEM, gated to v4), the EP-head layout constraint before
   o_proj, drop the hard MLA→DP-attention requirement, and `TPU_MIN_TOKEN_BUCKET` (buckets below the 32-way
   token-shard product fail shard_map divisibility; default 0 = bucket table byte-identical).
-- **Commits:** `cd8eeb6c` **+ the currently-uncommitted WIP** (all-gather moved before the TuningKey so the
-  key sees post-gather shapes; page-512 gated to v4; tpu_runner min-bucket env + Ray propagation).
+- **Commits:** `cd8eeb6c` + `a429be54` (round-2 review fixes: all-gather moved before the TuningKey so the
+  key sees post-gather shapes; page-512 gated to v4; tpu_runner min-bucket env + Ray propagation; **plus
+  the `TPU_MLA_V4_KV_PAGES`/`TPU_MLA_V4_KV_QUERIES` debug block-size overrides** — decide at cut time
+  whether the debug knobs ship in this PR or are dropped as investigation scaffolding).
 - **Files:** `tpu_inference/layers/common/attention_interface.py`,
   `tpu_inference/layers/vllm/backends/flash_attn_mla.py`, `tpu_inference/platforms/tpu_platform.py`,
   `tpu_inference/runner/tpu_runner.py`.
-- **⚠️ NOT ready to cut:** (a) the open **T>128 parity divergence** is under investigation in exactly this
-  code region (even though it reproduces at mesh product 1, where the gather is a no-op); (b) every
-  multi-host-only behavior here is **pod-unvalidated** (1-chip no-regression only). Bar before drafting:
-  T>128 green on the sub-cube + pod 3/3 with zero serving-region backend compiles.
+- **⚠️ NOT ready to cut:** (a) ~~the open T>128 parity divergence~~ **RESOLVED** — a harness false alarm
+  (the HF reference ran top-128 sparse DSA past position 128; the engine was exonerated and T=136/256/300
+  now PASS — RESEARCH_LOG 2026-07-07 later entry); (b) every
+  multi-host-only behavior here is **pod-unvalidated** (1-chip no-regression only) — still blocking. Bar
+  before drafting: pod 3/3 with zero serving-region backend compiles.
 - **Gate/risk:** all pieces are v4-gated, mesh-product-1-no-op, or default-off; v5/v6 tuned paths unchanged.
 - **Coordination (the load-bearing part):** this PR is a port of **PR #2324** (yiqiliu2 — GLM-5.1-FP8 on
   v4-64, DSA disabled), axis-adapted to this branch's head-major q layout. #2324 is unmerged/stalled
@@ -197,7 +219,8 @@ parity harness numbers + a CPU test where pure-math, and the same disclosure lin
    running each branch (the docs/13 rule); can go in parallel with G2.
 3. **PR-G1** (registration + enablement) — declares G2 as a whole-model-gate prerequisite; optionally
    paired with the tiny companion vLLM PR (indexer=None on shared layers).
-4. **PR-G5** — only after the T>128 fix + pod 3/3, and only after the #2324 conversation.
+4. **PR-G5** — only after pod 3/3 (the T>128 scare resolved as a harness false alarm), and only after
+   the #2324 conversation.
 5. **PR-G6 series** — as Stage 2 lands, phase by phase.
 
 ## CI gate (model after the Kimi `.buildkite/models/...` gate; v4 queue = part of the contribution)
@@ -212,7 +235,13 @@ parity harness numbers + a CPU test where pure-math, and the same disclosure lin
 
 - **Every PR body carries:** *"Portions of this change were developed with AI assistance (Claude); every
   line has been reviewed and is defended by the human submitter."*
-- **The owner submits and defends** every PR (vLLM/tpu-inference `AGENTS.md`: no pure code-agent PRs).
-  Agents draft branches + descriptions only; no push to upstream, no PR opened, no comments posted.
+- **The owner submits and defends** every PR (the upstream **vllm-project `AGENTS.md`** policy — the file
+  lives in `vllm-project/vllm`, local copy at `~/vllm-build/AGENTS.md`; tpu-inference has no AGENTS.md of
+  its own: no pure code-agent PRs). Agents draft branches + descriptions only; no push to upstream, no PR
+  opened, no comments posted.
+- **Two further vllm AGENTS.md requirements to satisfy in EVERY PR** (not just the G3/G5 #2324 overlap):
+  (a) the PR description states the **duplicate-work check** performed ("why this is not duplicating an
+  existing PR", with the `gh pr list`/issue searches run); (b) commits carry an **AI-attribution trailer**
+  (`Co-authored-by: Claude`) in addition to the body disclosure line.
 - Each branch: re-cut onto current `origin/main`, **functionally run** (parity, not just py_compile),
   gates + numbers quoted in the description, model-unchanged byte-identical when its gate is off.

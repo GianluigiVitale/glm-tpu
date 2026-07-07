@@ -1,7 +1,8 @@
 # HANDOFF — GLM-5.2 on TPU v4 (read this first, every new chat)
 
-**Updated:** 2026-07-07 — **Stage 1 (dense-MLA correctness) is sub-cube GREEN at T ≤ 128 and BLOCKED on an
-open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the pod has not been touched yet.**
+**Updated:** 2026-07-07 (round-3 fix batch) — **Stage 1 (dense-MLA correctness) is sub-cube GREEN — including
+T > 128: the earlier "divergence" was a HARNESS false alarm, engine exonerated (RESOLVED, see §Open items +
+RESEARCH_LOG 2026-07-07 later entry). Weights are staged; the pod has not been touched yet.**
 
 **Read, in full, before doing anything:** this file → `CLAUDE.md` (rules) → `PLAN.md` (phases + thresholds) →
 `docs/00-feasibility-memo.md` (the config-verified GO study) → `docs/RESEARCH_LOG.md` (latest entry) →
@@ -20,7 +21,7 @@ open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the
   fingerprint committed at `configs/glm-5.2-fp8-keyset.json`: **118,629 params**; `indexers_proj` does
   **NOT** exist (the quant-config entry is a red herring); indexer weights ship ONLY on the `full`-schedule
   layers (0,1,2,6,10,…,74) + MTP layer 78 — IndexShare reuse is structurally required in Stage 2 (docs/01 §5).
-- **Fork branch `glm-5.2-v4`** (off `dsv4-flash-v4` @ `17d635a1`), 4 commits, all adversarially reviewed:
+- **Fork branch `glm-5.2-v4`** (off `dsv4-flash-v4` @ `17d635a1`), 5 commits, all adversarially reviewed:
   - `9bb2c23e` — register `GlmMoeDsaForCausalLM` (+`_PP_DISABLED_MODELS`), `TPU_DISABLE_DSA_INDEXER` gate,
     `_maybe_patch_for_glm_moe_dsa` (indexer only on `full` layers; cpu device for the topk buffer), and
     **2 latent upstream MLA-wrapper bug fixes**: kv_cache_dtype=auto NaN (identity scales) + W_UV_scale
@@ -34,10 +35,10 @@ open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the
   - `cd8eeb6c` — port of **PR #2324's TP-topology MLA fixes** (cross-shard all-gather on MLP_TENSOR inside
     the shard_map, v4 block sizes (1,1,1)/(1,8,8) + s_dtype=f32, page_size 512 for kv_lora>256, EP-head
     gather before o_proj, MLA no longer hard-requires DP attention). 1-chip regression re-PASSED after it.
-  - ⚠️ **UNCOMMITTED WIP in the fork** (4 files, part of the T>128 investigation — do NOT commit blind):
-    move the cross-shard all-gather BEFORE the TuningKey (key must see post-gather shapes); gate page-512 to
-    v4 only; `TPU_MIN_TOKEN_BUCKET` env in `tpu_runner.py` (default 0 = byte-identical; launcher sets 512)
-    + its Ray propagation. Validate, then commit with the T>128 fix.
+  - `a429be54` — round-2 review fixes (the former WIP, validated + committed): cross-shard all-gather moved
+    BEFORE the TuningKey (key must see post-gather shapes); page-512 gated to v4 only; `TPU_MIN_TOKEN_BUCKET`
+    env in `tpu_runner.py` (default 0 = byte-identical; launcher sets 512) + its Ray propagation;
+    `TPU_MLA_V4_KV_PAGES`/`TPU_MLA_V4_KV_QUERIES` debug block-size overrides (T>128 investigation scaffolding).
 - **Parity harness green (machine-gated, exit-code, 1 chip)** — `parity/glm_engine_{common,parity}.py`:
   production stack (VllmModelWrapper → vLLM GlmMoeDsa → fork MLA wrapper → mla.v2 Pallas + fused-MoE GMM)
   vs transformers 5.12 `GlmMoeDsaForCausalLM` (fp32 + bf16 controls), synthetic native-key checkpoint
@@ -61,49 +62,53 @@ open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the
     final_hs 0.619 < 0.722, logits 0.910 < 0.958, top-1 vs fp32 0.906 > bf16-ref 0.875. Also PASS at T=128.
   - **two-step** (prefill [0,split) + continuation via the paged KV cache, reversed block table):
     `exact_bit_match=True` in both bf16 and fp8 at T=32.
-- **Stage-1 serving config settled** (baked in `scripts/launch_glm_32chip.sh` ENVS): `NEW_MODEL_DESIGN=1
-  MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 TPU_DISABLE_DSA_INDEXER=1` (dense MLA),
-  `DISABLE_WEIGHT_REQUANTIZATION=1` + **`REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn` pinned** (FP8 stays
-  checkpoint-resident; explicitly NOT `bfloat16` — that OOMs at 753B), `TPU_MIN_TOKEN_BUCKET=512`
-  (32-way token-shard divisibility, PR #2324's validated value), **kv-cache dtype auto** (bf16 + identity
-  scales; FP8-KV NaNs under EP per PR #2324), **pure TP×EP, NO DP-attention** (no `additional_config`
-  sharding — the 753B attention weights cannot replicate; PR #2324's validated topology),
-  `load_format=runai_streamer` from the us-central2 bucket (`RUNAI_STREAMER_CONCURRENCY=32`, 32 GiB limit).
+- **Stage-1 serving config settled** — the FULL baked raylet env (all **13** envs, verbatim from
+  `scripts/launch_glm_32chip.sh` ENVS; the ${VAR:-default} ones are overridable):
+  `NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1
+  HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1
+  REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=${TPU_MIN_TOKEN_BUCKET:-512}
+  RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368
+  JAX_SHARE_BINARY_BETWEEN_HOSTS=${JAX_SHARE_BINARY_BETWEEN_HOSTS:-0}
+  JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=${JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS:-120000}`.
+  Rationale: `TPU_DISABLE_DSA_INDEXER=1` = dense MLA; `DISABLE_WEIGHT_REQUANTIZATION=1` +
+  **`REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn` pinned** (FP8 stays checkpoint-resident; explicitly NOT
+  `bfloat16` — that OOMs at 753B); `TPU_MIN_TOKEN_BUCKET=512` (32-way token-shard divisibility, PR #2324's
+  validated value); the two `JAX_SHARE_BINARY_*` envs pin multi-host binary-share behavior (share OFF,
+  120 s timeout). Plus (in the engine recipe, not envs): **kv-cache dtype auto** (bf16 + identity scales;
+  FP8-KV NaNs under EP per PR #2324), **pure TP×EP, NO DP-attention** (no `additional_config` sharding —
+  the 753B attention weights cannot replicate; PR #2324's validated topology), `load_format=runai_streamer`
+  from the us-central2 bucket.
 - **Launch/sync/bench wiring EXISTS but is POD-UNTESTED** (never executed on the 8 hosts):
   `scripts/launch_glm_32chip.sh` (DSV4-cloned 3-phase launcher, env-baked raylets, `--dry-run`, EXTRA_ENVS
   hook), `scripts/sync_workers.sh` (ff-only fetch/checkout/pull on all 8 hosts, drift echo),
   `bench/run_bench.py make_generate()` (in-process `vllm.LLM`, GLM's own chat template → token ids, greedy,
   stop ids [154820,154827,154829], full env provenance into `results.db`; `--stub` + CPU tests pass —
-  datasets + AIME-2026 verified and extractor gaps fixed in `ac37c8d`), and `bench/glm_longctx.py` +
-  `bench/engine.py` (`e27c3c5` — the Stage-2 passkey/NIAH threshold instrument, generation-based
-  retrieval, raw-completion prompts, 1M-capable, provenance-backed; CPU tests 9/9; shares the exact
-  Stage-1 engine recipe with run_bench via the factored `build_llm`). None of it has touched the pod.
+  datasets + AIME-2026 verified and extractor gaps fixed in `ac37c8d`; dataset revisions PINNED +
+  GPQA content-hash shuffle in the round-3 batch), and `bench/glm_longctx.py` + `bench/engine.py`
+  (`e27c3c5` — the Stage-2 passkey/NIAH threshold instrument, generation-based retrieval,
+  raw-completion prompts with an explicit `[gMASK]<sop>` prefix + `--protocol chat` fallback,
+  concatenated-prompt length targeting (within 1% of the target L), lengths to 1048288 (the 1M-endpoint
+  cell), provenance-backed; CPU tests 11/11 after the round-3 fixes; shares the exact Stage-1 engine
+  recipe with run_bench via the factored `build_llm`). None of it has touched the pod.
 - **Stage-2 design is written** (`docs/01-dsa-kernel-design.md`, commit `8d069ba`): indexer math + the
   RoPE-interleave E1/E2/E3 resolution experiments, indexer k-cache KVCacheSpec, gathered `[R,2048,640]`
   decode segment, gates S/K/D0/D/P, IndexShare via the wrapper context, VMEM/HBM budget, 2a/2b/2c phasing.
 
 ## Open items (honest status — what is NOT validated)
 
-1. **T > 128 divergence — IN PROGRESS, blocks everything downstream.** The real-dims fp8 parity FAILS as
-   soon as the sequence exceeds 128 tokens (bisected on 1 chip): **T=128 PASS** / **T=136 FAIL** (layer-0
-   max|Δ| jumps 6.2 → 108; final_hs 3.04 vs the 1.5×floor bar 1.22; top-1 0.860 < 0.875). T=300 two-step
-   (split 130, reversed BT) fails catastrophically (top-1 0.42, two_step rel 0.14). Evidence in the session
-   scratchpad (`bis_128.log`/`bis_136.log`/`reg_c2.log`); **NOT yet in RESEARCH_LOG — log it with the fix
-   (staleness is a bug)**. Facts constraining the root cause: it reproduces on 1 chip where the PR #2324
-   cross-shard all-gather is a no-op (mesh product 1), so it is NOT the gather itself; divergence starts at
-   layer 0 (the first MLA attention); this regime had ZERO coverage before this session (review stage1-a
-   finding 5 — multi-page/bucketed prefill untested), so it cannot be attributed to (or excluded from) the
-   cd8eeb6c port without a pre-port bisect. Prime suspects: the mla.v2 multi-page paged-KV walk under the
-   newly-exercised v4 block sizes, page/bucket boundary handling, or the harness's hand-built metadata at
-   T past one page. Harness note: an odd token count hit the fused-MoE GMM assert
-   (`num_tokens*topk % 16`, 131×8) — pick T/split multiples of 2; the pod path pads buckets anyway.
-2. **Pod bring-up — NOT STARTED, gated on (1).** Nothing has run on the 8 hosts: no multi-host load, no
+1. **T > 128 divergence — RESOLVED (harness false alarm; engine EXONERATED).** The "divergence" was the
+   HF REFERENCE running top-128 sparse DSA past position 128: `make_mini_config`'s `index_topk` default
+   bound the module-import value (mini 128), so `--real-dims` checkpoints carried `index_topk: 128` while
+   the engine ran dense — the 128 cliff was `index_topk`, not the page size. Fixed in the harness
+   (late-bound default + written-artifact assert); T=136/256 real-dims fp8 and T=300 two-step now **PASS**;
+   the mla.v2 multi-page path was hand-verified clean. Full story: RESEARCH_LOG 2026-07-07 (later entry,
+   "harness false alarm"). Nothing blocks pod bring-up from the parity side.
+2. **Pod bring-up — NOT STARTED (now unblocked).** Nothing has run on the 8 hosts: no multi-host load, no
    TP×EP topology validation (the W_UV_scale fix, EP-head gather, cross-shard all-gather and
    TPU_MIN_TOKEN_BUCKET are all only meaningful at mesh product > 1 and are so far validated only by
    1-chip no-regression), no engine boot through the real runner/KV-spec path on real weights, no 3/3 runs.
-3. **RESEARCH_LOG is partially behind** — the 2026-07-07 long-context-harness entry is logged (`e27c3c5`),
-   but the two-step green, the cd8eeb6c port, the launcher/bench-wiring commits and above all the **T>128
-   finding** are not yet logged.
+3. **RESEARCH_LOG** — the T>128 resolution, two-step gate correction and round-3 review are logged
+   (2026-07-07 later entries); the cd8eeb6c port and launcher-wiring commits are still only summarized here.
 4. **Bench numbers:** none yet. `results.db` has stub runs only; no real benchmark has been scored.
 
 ## Target (confirmed — unchanged)
@@ -115,13 +120,10 @@ open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the
 
 ## The exact next task (in order)
 
-1. **Root-cause + fix the T>128 divergence on the sub-cube** (no pod time until green). Bisect layer-0
-   attention at T∈{128,136}: dump per-site (q/k/rope/kernel-out) diffs, test the pre-cd8eeb6c tree at T=136
-   to attribute the port, check page-boundary/bucket handling in the mla.v2 call, and validate the WIP
-   TuningKey/page-512 changes. Then re-run the FULL parity matrix (bf16 / fp8 / real-dims / two-step at
-   T ≤ 128 AND well beyond) — commit fork WIP + harness together, update RESEARCH_LOG (incl. the missing
-   entry for the port/two-step), push both repos.
-2. **Pod bring-up** (gated on 1): `bash scripts/sync_workers.sh` → `bash scripts/launch_glm_32chip.sh`
+1. ~~Root-cause + fix the T>128 divergence~~ **DONE — harness false alarm, engine exonerated** (the HF
+   reference ran top-128 sparse DSA; fix + full parity matrix re-run logged in RESEARCH_LOG 2026-07-07
+   later entry; fork WIP committed as `a429be54`).
+2. **Pod bring-up** (now the first task): `bash scripts/sync_workers.sh` → `bash scripts/launch_glm_32chip.sh`
    (use `--dry-run` first — the script is pod-untested) → engine boot with the Stage-1 serving config →
    a cold-cache compile observation pass (the `DSV4_OBSERVE_COMPILES` detector exists on the branch —
    drive serving-region backend compiles to 0 BEFORE trusting anything, docs/recon/doc15) → prefill MC

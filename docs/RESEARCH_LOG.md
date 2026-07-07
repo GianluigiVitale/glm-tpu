@@ -148,3 +148,32 @@ what you did, what you validated it against, the exact numbers, and the honest n
   tokenizer.json; review round3-unknown finding 2), so the harness was sending a bare BPE stream with no special
   tokens at all. Fixed in `bench/glm_longctx.py` by prepending the ids **explicitly**
   (`PROMPT_PREFIX_IDS = [154822 [gMASK], 154824 <sop>]`); the module docstring now documents the no-op.
+- **Second correction to the same entry:** "the needle's token position lands within a fraction of a percent" was
+  true, but the LENGTH claim was not — per-sentence token counts are not additive under BPE (boundary merges), so
+  the "128K" cell really tested **~108K tokens (−17.2%)**. `build_trial` now targets the CONCATENATED prompt
+  iteratively (Newton on the measured effective rate, 2-3 whole-prompt tokenizations): real-tokenizer check
+  L=131072 → 130,418 (99.50%), L=1,048,288 → 1,043,047 (99.50%), depth 0.5000 exact, 1M build 5.0 s. New CPU test
+  uses a boundary-MERGING mock tokenizer (old code measures 79.2% under it → the old bug is now caught).
+- **Round-3 fix batch** (reports in `docs/reviews/round3-*`; commits this session, none pod-blocking):
+  - longctx: `<|assistant|>` (154828) added to the RAW-protocol stop ids (a chat-token emission burned the
+    20-token budget); `--protocol {raw,chat}` — chat = the model's own template with `enable_thinking=False`
+    (renders `…<|assistant|><think></think>`, verified on the real tokenizer; 32-token budget) as the documented
+    fallback if raw completion proves unreliable on the pod.
+  - longctx: `--lengths` capped at **1048288** (= max_position_embeddings 1048576 − 256 max_len headroom − 32
+    answer budget) and `max_len = min(max(lengths)+256, 1048576)` — a bare `1M` target used to crash at engine
+    build (derived max_model_len 1048832 > 1M).
+  - extract.py: the last `\boxed{}` and the last "final answer is X"/"option X" phrase now compete BY POSITION
+    (a boxed candidate revised later in prose was silently kept before); thousands-commas stripped only when the
+    ENTIRE token is a plain grouped number — `(1,200)` / `0,001` no longer rewritten (silent-wrong fixes, tests
+    cover both flip directions).
+  - benchmarks.py: dataset revisions PINNED (HfApi shas fetched 2026-07-07: gpqa `633f5ee8…`, mmlu-pro
+    `b189ec76…`, gsm8k `740312ad…`, aime_2026 `d2de22f3…`) — recorded per item (meta) + per run (env);
+    GPQA per-item shuffle seed now = sha256(question) content hash, row-order independent — **gold letters
+    CHANGE vs the previous idx-seeded scheme** (acceptable: no real runs were recorded under it; pinned canary
+    added to the tests).
+  - docs: 02-pr-series hunk map regrouped (`9bb2c23e`'s indexer-forward-gate hunk → PR-G1, not G2; `a429be54`
+    added to the series incl. the `TPU_MLA_V4_KV_PAGES/QUERIES` debug overrides); the "AGENTS.md" policy
+    correctly attributed to **vllm-project/vllm** (`~/vllm-build/AGENTS.md`; tpu-inference has none) with its
+    duplicate-work-check + AI-attribution-trailer requirements added to the PR checklist; HANDOFF ENVS list
+    corrected to the launcher's 13 envs verbatim and the T>128 item marked RESOLVED.
+  - All bench CPU tests green after the batch: `test_bench.py` 5/5 suites, `test_longctx.py` 11/11.
