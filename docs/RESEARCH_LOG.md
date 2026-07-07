@@ -224,3 +224,24 @@ what you did, what you validated it against, the exact numbers, and the honest n
   ≈ 87.8 KiB/token per chip (replicated across TP ranks) → 128 blocks = 65,536 KV tokens ≈ 5.4 GiB/chip,
   the proven smoke sizing inside the 30.75−23.06 = 7.69 GiB/chip free; coverage max_seqs ≤ 128/16 = 8.
   260k KV tokens (max_seqs 32) needs ~22 GiB/chip — only possible with a sharded latent cache (Stage-2+).
+
+## 2026-07-07 — docs/05: KV-scaling design (fixing the 32x-replicated MLA latent cache) — READ-ONLY
+
+- Written `docs/05-kv-scaling-design.md` (no TPU touched). Problem: MLA cache spec `P(BATCH)` with BATCH
+  product 1 on the pure-TP mesh → full latent cache on every chip (~97.5 KiB/token padded / 87.8 unpadded;
+  128 blocks × 512 = 65,536 tokens ≈ 6 GiB/chip) → max_seqs 8 @4K, 128K ctx impossible (11.9 GiB/seq).
+- KEY FINDING: upstream commit `f940073e` (#2398) already landed DCP (`--decode-context-parallel-size`) as
+  the sanctioned mechanism — `dcp` mesh axis, cache `P(BATCH, CONTEXT)` striped over the in-page token dim,
+  scheduler `block_size *= dcp`, weight shardings invariant (every axis tuple includes 'dcp') — **but the
+  MLA attention path was never finished**: `mla_attention` cache specs are still `P(BATCH)`, so dcp>1 today
+  would all-gather every layer's cache over dcp each step (~17 GiB ICI/step at dcp=4). Storage-only support.
+- Options evaluated: (A) head-sharded attention specs (kills 32x redundant FLOPs + q all-gather; no kernel
+  change; no memory win); (B) page-sharded cache — REJECTED (same combine machinery as DCP + table/ownership
+  complexity DCP avoids); (C) finish DCP for MLA = per-shard kernel + LSE output + XLA softmax-combine over
+  'dcp' + strided position walk + owner-shard new-KV write routing; (D) transpose layout (+11%, env-only) and
+  fp8 KV (x2, gated on PR #2324's NaN-under-EP + streaming-loader conflict).
+- Recommended sequence: S0 transpose → S1 option A → S2 DCP=4→8 (128K×4 seqs, passkey ladder runnable) →
+  S3 fp8 KV → Stage-2 DSA composes with DCP as a pure storage layer (local gather + 2.5 MiB segment
+  all-gather; no distributed softmax on the sparse path). 1M endpoint: dcp≥16 + fp8 (2.9 GiB/chip/seq).
+- Validation plans per step in the doc (dcp=1 byte-identity, new `parity/mla_dcp_parity.py`, two-step engine
+  parity, zero-serving-compile re-enumeration, pod 3/3 + longctx ladder). No code changed this session.
