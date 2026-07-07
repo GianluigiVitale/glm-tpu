@@ -122,6 +122,12 @@ def norm_math(s: str | None) -> str | None:
     s = s.strip().replace(" ", "")
     s = re.sub(r"\\?\$", "", s)                       # $ / \$ (money, math-mode)
     s = re.sub(r"\\?%$", "", s)                        # trailing % / \% ("60\%" == "60")
+    # "160 minutes" / "12dollars" -> "160" / "12": drop a PURELY alphabetic
+    # unit tail after a number (never digits/operators in the tail, so
+    # composites like "2 of 3" or "3x+1" are untouched).
+    m = re.fullmatch(r"(-?\d[\d,]*(?:\.\d+)?)[a-zA-Z\\ ]+", s)
+    if m:
+        s = m.group(1)
     s = s.replace("\\left", "").replace("\\right", "")
     s = re.sub(r"\\text\{.*?\}", "", s)
     s = s.rstrip(".")
