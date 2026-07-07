@@ -270,7 +270,7 @@ REGISTRY = {b.name: b for b in (GPQA_DIAMOND, MMLU_PRO, GSM8K, AIME_2026)}
 
 
 def load_items(spec: BenchSpec, limit: int | None = None,
-               protocol: str = "greedy") -> list[Item]:
+               protocol: str = "greedy", offset: int = 0) -> list[Item]:
     """Load + build items for a benchmark (needs the `datasets` lib + HF_TOKEN).
     Loads the PINNED dataset revision (spec.hf_revision) and stamps it into
     every item's meta so each stored row is traceable to the exact dataset
@@ -297,7 +297,9 @@ def load_items(spec: BenchSpec, limit: int | None = None,
                       cache_dir=os.environ["HF_DATASETS_CACHE"])
     items = []
     for idx, row in enumerate(ds):
-        if limit and idx >= limit:
+        if idx < offset:
+            continue
+        if limit and idx >= offset + limit:
             break
         it = build(row, idx)
         it.meta["hf_revision"] = spec.hf_revision

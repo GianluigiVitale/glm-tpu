@@ -21,7 +21,9 @@ paths (run_bench --stub, glm_longctx --stub, the CPU tests) never import
 vllm or touch TPU code.
 
 Env knobs: GLM_MODEL (checkpoint), GLM_TP (default 32),
-RUNAI_STREAMER_CONCURRENCY / RUNAI_STREAMER_MEMORY_LIMIT (streaming load).
+RUNAI_STREAMER_CONCURRENCY / RUNAI_STREAMER_MEMORY_LIMIT (streaming load),
+GLM_ASYNC_SCHED=0 (sync scheduling), GLM_LOG_STATS=1 (vLLM 10s engine stats:
+tok/s + running/waiting — default off, unchanged behavior).
 """
 from __future__ import annotations
 
@@ -71,6 +73,14 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     # Unset/1 keeps vLLM's default (async on for the Ray TPU executor).
     if os.environ.get("GLM_ASYNC_SCHED") == "0":
         extra["async_scheduling"] = False
+    # GLM_LOG_STATS=1 enables vLLM's periodic engine stats logger (~10 s
+    # cadence: prompt/generation tok/s, running/waiting request counts).
+    # Offline `LLM()` forcibly defaults disable_log_stats=True, so pod runs
+    # fly blind on throughput except the tqdm bar — this knob is the
+    # observability counterpart to GLM_FLIGHT_RECORDER (fork side). Driver-
+    # side env: no raylet baking needed. Default unset = quiet (unchanged).
+    if os.environ.get("GLM_LOG_STATS") == "1":
+        extra["disable_log_stats"] = False
     llm = LLM(
         model=model,
         trust_remote_code=True,

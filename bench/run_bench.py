@@ -362,7 +362,7 @@ def _run_items_batched(conn, run_id, spec: B.BenchSpec, generate_batch, items,
 
 
 def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
-                  batch_size=0, protocol="greedy", samples=1):
+                  batch_size=0, protocol="greedy", samples=1, offset=0):
     """Run one benchmark under `protocol`:
 
     'greedy' (default) — the pre-protocol harness, byte-identical: greedy
@@ -382,7 +382,7 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
     if protocol != "card" and samples != 1:
         raise ValueError("--samples N>1 requires --protocol card "
                          "(greedy resamples are identical by construction)")
-    items = B.load_items(spec, limit=limit, protocol=protocol)
+    items = B.load_items(spec, limit=limit, protocol=protocol, offset=offset)
     cp = spec.card if protocol == "card" else None
     extract_fn = cp.extract if (cp and cp.extract) else None
     sampling = (None if cp is None else
@@ -575,6 +575,9 @@ def main():
                     help="comma-separated multi-run, e.g. gsm8k,gpqa_diamond "
                          "(ONE engine build; overrides --benchmark)")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--offset", type=int, default=0,
+                    help="skip the first N items (wave runs: no waiting queue "
+                    "-> avoids the finish+admit core-halt step; docs/09)")
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help="checkpoint path/repo (default: GLM_MODEL env or the "
                          "staged us-central2 GCS copy)")
@@ -659,7 +662,7 @@ def main():
         max_seqs=args.max_seqs, max_batched_tokens=args.max_batched_tokens,
         gmu=args.gmu, num_gpu_blocks=args.num_gpu_blocks)
     for b in benches:
-        run_benchmark(conn, run_id, B.REGISTRY[b], gen, limit=args.limit,
+        run_benchmark(conn, run_id, B.REGISTRY[b], gen, limit=args.limit, offset=args.offset,
                       batch_size=args.batch_size, protocol=args.protocol,
                       samples=args.samples, seed=args.seed)
 
