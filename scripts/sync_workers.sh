@@ -11,13 +11,19 @@
 # so drift is immediately visible: all 8 lines must show the SAME hash per repo.
 #
 # Usage: bash ~/glm-tpu/scripts/sync_workers.sh
+#        TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash ~/glm-tpu/scripts/sync_workers.sh
+#
+# TPU_INFERENCE_BRANCH selects the fork branch (default glm-5.2-v4 = mainline;
+# the Stage-2 staging switch uses glm-5.2-v4-next — docs/11-pod-runbook.md §2).
+# The branch MUST exist on origin (push it first): the workers pull from
+# origin, never from this host.
 set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
 
-TPU_INFERENCE_BRANCH=glm-5.2-v4
-GLM_TPU_BRANCH=main
+TPU_INFERENCE_BRANCH="${TPU_INFERENCE_BRANCH:-glm-5.2-v4}"
+GLM_TPU_BRANCH="${GLM_TPU_BRANCH:-main}"
 
 FAILED=0
 

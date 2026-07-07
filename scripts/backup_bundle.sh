@@ -76,10 +76,15 @@ bundle_and_verify() {  # <repo_dir> <bundle_path> <clone_branch|-> <refs...>
 echo "-- git bundle: glm-tpu (HEAD $(git -C "$GLM_TPU" rev-parse --short HEAD))"
 bundle_and_verify "$GLM_TPU" "$WORK/glm-tpu.bundle" - --branches --tags HEAD
 
-echo "-- git bundle: tpu-inference $FORK_BRANCH" \
-     "($(git -C "$FORK" rev-parse --short "$FORK_BRANCH"))"
+# ALL local branches (not just $FORK_BRANCH): the Stage-2 feature/staging
+# branches (glm-5.2-v4-{next,2int,dcp,mtp,...}, pr-g1..4) live only in the
+# local repo + worktrees — several are NOT on origin, so a branch-scoped
+# bundle would silently drop them. The test clone still checks out
+# $FORK_BRANCH (the restore one-liner's branch).
+echo "-- git bundle: tpu-inference ALL branches (clone branch $FORK_BRANCH" \
+     "@ $(git -C "$FORK" rev-parse --short "$FORK_BRANCH"))"
 bundle_and_verify "$FORK" "$WORK/tpu-inference-${FORK_BRANCH}.bundle" \
-    "$FORK_BRANCH" "$FORK_BRANCH"
+    "$FORK_BRANCH" --branches --tags
 
 # ---- 2. results.db snapshot (concurrent-writer safe) -------------------------
 echo "-- results.db snapshot (sqlite backup API)"

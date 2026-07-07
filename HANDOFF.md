@@ -1,163 +1,134 @@
 # HANDOFF — GLM-5.2 on TPU v4 (read this first, every new chat)
 
-**Updated:** 2026-07-07 (round-3 fix batch) — **Stage 1 (dense-MLA correctness) is sub-cube GREEN — including
-T > 128: the earlier "divergence" was a HARNESS false alarm, engine exonerated (RESOLVED, see §Open items +
-RESEARCH_LOG 2026-07-07 later entry). Weights are staged; the pod has not been touched yet.**
+**Updated:** 2026-07-07 (evening) — **STAGE 1 IS DONE on the 32-chip pod** (GLM-5.2-FP8 serves,
+GSM8K banked, the fatal core-halt class root-caused and fixed on hardware, 32.9 tok/s aggregate);
+**GPQA-Diamond n=198 is IN FLIGHT** (run 48, `~/glm-run/gpqa198.log`); **Stage-2 (DSA sparse
+decode) + DCP + dense-MTP M1 are CODE-COMPLETE on staging branches, CPU-validated, adversarially
+reviewed through round 6 (round 7 in flight), NOT yet run on TPU.**
+**The exact next work is scripted: `docs/11-pod-runbook.md` — the ordered post-GPQA pod sequence
+with copy-paste commands, expected outcomes and abort criteria. Execute it top to bottom.**
 
-**Read, in full, before doing anything:** this file → `CLAUDE.md` (rules) → `PLAN.md` (phases + thresholds) →
-`docs/00-feasibility-memo.md` (the config-verified GO study) → `docs/RESEARCH_LOG.md` (latest entry) →
-`docs/01-dsa-kernel-design.md` (the Stage-2 DSA kernel design — already written) → `docs/recon/*.md`
-(9 recon summaries: PR #2324 full map, fork layout, DSV4 docs 09/11/12/13/15/16, GLM references) →
-`docs/reviews/stage1-*.md` (the 4-lens adversarial review of the Stage-1 diff). Then the **DSV4 base**:
-`~/moe-tpu/CLAUDE.md`, `~/moe-tpu/HANDOFF.md`, `~/moe-tpu/docs/{09,11,12,13,15,16}` + the fork branch
-`~/tpu-inference@dsv4-flash-v4`. **Don't reinvent — CLAUDE.md §"What transfers" maps every reusable piece.**
+**Read, in full, before doing anything:** this file → `CLAUDE.md` (rules) → `docs/11-pod-runbook.md`
+(the next actions) → `docs/RESEARCH_LOG.md` (latest entries) → `PLAN.md` → the design docs as needed:
+`docs/01` (DSA kernel), `docs/03` (throughput), `docs/04` (host path), `docs/05` (KV/DCP), `docs/06`
+(pass-boundary crash forensics), `docs/07` (card protocol), `docs/08` (MTP), `docs/10` (observability),
+`docs/reviews/*` (the adversarial-review ledger). DSV4 base: `~/moe-tpu/{CLAUDE,HANDOFF}.md`.
 
 ---
 
-## State (what is DONE and validated)
+## State — what is DONE and hardware-validated
 
-- **Weights staged (DONE):** `zai-org/GLM-5.2-FP8` → `gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/` —
-  **150/150 files, 755.7 GB, size-verified, 0 failures** (~45 min @ ~300 MB/s aggregate). Key-set
-  fingerprint committed at `configs/glm-5.2-fp8-keyset.json`: **118,629 params**; `indexers_proj` does
-  **NOT** exist (the quant-config entry is a red herring); indexer weights ship ONLY on the `full`-schedule
-  layers (0,1,2,6,10,…,74) + MTP layer 78 — IndexShare reuse is structurally required in Stage 2 (docs/01 §5).
-- **Fork branch `glm-5.2-v4`** (off `dsv4-flash-v4` @ `17d635a1`), 5 commits, all adversarially reviewed:
-  - `9bb2c23e` — register `GlmMoeDsaForCausalLM` (+`_PP_DISABLED_MODELS`), `TPU_DISABLE_DSA_INDEXER` gate,
-    `_maybe_patch_for_glm_moe_dsa` (indexer only on `full` layers; cpu device for the topk buffer), and
-    **2 latent upstream MLA-wrapper bug fixes**: kv_cache_dtype=auto NaN (identity scales) + W_UV_scale
-    sharding axis (`P(None, ATTN_HEAD)`).
-  - `8ad980e7` — FP8-on-v4: gmm_v2 routes FP8 RHS through in-VMEM dequant (gated `tpu_generation()==4`);
-    checkpoint-exact block-scale linears (ceil scale columns for non-aligned fused parts; ragged-aware
-    2D-scale expansion in `xla_quantized_matmul`).
-  - `3f745ddc` — review fixes (kv_cache_spec indexer-cache skip [engine-boot HIGH], indexer gate default-ON,
-    Ray env propagation, test repair 6/6) + **2 real gmm_v2 tiling bugs** the real-dims run caught
-    (dequant-buffer VMEM modeling; the at-floor tile_k-shrink dead branch).
-  - `cd8eeb6c` — port of **PR #2324's TP-topology MLA fixes** (cross-shard all-gather on MLP_TENSOR inside
-    the shard_map, v4 block sizes (1,1,1)/(1,8,8) + s_dtype=f32, page_size 512 for kv_lora>256, EP-head
-    gather before o_proj, MLA no longer hard-requires DP attention). 1-chip regression re-PASSED after it.
-  - `a429be54` — round-2 review fixes (the former WIP, validated + committed): cross-shard all-gather moved
-    BEFORE the TuningKey (key must see post-gather shapes); page-512 gated to v4 only; `TPU_MIN_TOKEN_BUCKET`
-    env in `tpu_runner.py` (default 0 = byte-identical; launcher sets 512) + its Ray propagation;
-    `TPU_MLA_V4_KV_PAGES`/`TPU_MLA_V4_KV_QUERIES` debug block-size overrides (T>128 investigation scaffolding).
-- **Parity harness green (machine-gated, exit-code, 1 chip)** — `parity/glm_engine_{common,parity}.py`:
-  production stack (VllmModelWrapper → vLLM GlmMoeDsa → fork MLA wrapper → mla.v2 Pallas + fused-MoE GMM)
-  vs transformers 5.12 `GlmMoeDsaForCausalLM` (fp32 + bf16 controls), synthetic native-key checkpoint
-  (HF loads 0 missing/unexpected). Exact commands (from `~/glm-tpu`; single-chip pin is REQUIRED — the
-  harness hand-builds single-shard metadata; multi-chip goes through the real runner on the pod):
+- **Stage-1 serving WORKS on the pod** (details: RESEARCH_LOG 06:40 + 15:05 entries): 753B FP8
+  streamed GCS→HBM in ~10 min (runai + sharding-derived EP filter, 32/256 experts/host), FP8 kept
+  resident (23.06/30.75 GiB/chip), checkpoint-exact block scales, dense MLA via mla.v2 +
+  cross-shard all-gather, pure TP-32 mesh, KV 128 blocks × 512 = 65,536 tokens.
+- **GSM8K numbers (all in `bench/results.db`, full per-item provenance):**
+  - run 26 "smoke16" n=4 @ fork `10efa393`: acc 75.0 (1 truncation miss at cap 512) — the
+    byte-identity reference for the staging switch (runbook §2).
+  - run 43 "waveA2" n=16: **acc 93.75** (2 truncation misses at cap 1024).
+  - run 47 n=32 @ `02e44b36`, bucket 32, max_seqs 16: **acc 87.5** (6/32 = truncation misses at
+    cap 1024), 20,280 gen tokens in 616.7 s = **32.9 tok/s aggregate** (~35× the 0.92 tok/s
+    single-stream start). The cap, not the model, drives the misses → runbook §1 reruns n=128 at
+    `--max-new 2048`.
+- **The fatal core-halt class is CLOSED — the OOB fix story:** 7 consecutive batched runs died
+  with roaming single-host `Error Interrupt`/core-halts. First attributed to per-host compile
+  skew (`JAX_SHARE_BINARY_BETWEEN_HOSTS=1` — CORRECTED in-log: Ray-dedup artifact + composition
+  luck; waveB/waveB2 crashed WITH sharedbin). Real root cause: **OOB VMEM read in mla.v2
+  `pack_new_kv` at bkv-block-boundary decode (kv_len % 512 == 0, odd-slot alignment)** — fork fix
+  `63427f86`, merged `02e44b36`, **validated on hardware** by run 47 (the exact config that
+  previously died 100% at the first 512-page crossing ran clean). Forensics: `docs/06`;
+  round-7 review of the fix pending (`docs/reviews/round7-pg2-oob.md`).
+- **GPQA-Diamond n=198 IN FLIGHT** (run 48: bucket 32, max_seqs 8, max-len 8192, max-new 4096,
+  greedy, launched 19:40 UTC, ~4–5 h). `--batch-size 0` ⇒ items land in the DB only at the end.
+  Runbook §0 = outcome triage (completed → log Δ vs card 91.2; crashed → `triage_crash.sh` +
+  retry recipe).
+- **Stage-2 + DCP + MTP are CODE-COMPLETE (CPU-only so far; TPU untouched by them):**
+  - `GLM_DSA_MODE=off|xla_ref|pallas_decode` — 2a XLA-reference indexer + oracle (RoPE verdict:
+    **interleaved**, E1/E2 on real weights), 2b Pallas lightning-indexer + exact hierarchical
+    top-k, 2c gathered-segment sparse-MLA decode kernel, 2a.2 paged indexer k-cache (KVCacheSpec),
+    integration `pallas_decode` (decode sparse, prefill/mixed falls back dense in-graph).
+    118 tests on the integration branch; gate-off byte-identity hash-tested.
+  - DCP (`GLM_MLA_DCP=1` + `decode_context_parallel_size`): per-shard kernel + LSE combine +
+    strided positions — the 128K-passkey capacity unlock (docs/05; KV table in runbook §5).
+  - Dense-MTP M1 (G1–G3): draft parity vs composed-HF reference **max rel Δ 3.1e-6, top-1 100%**;
+    M2 (pod greedy-equivalence) is runbook §7.
+- **Benchmark harness**: batched generation (`--batch-size`), `--protocol card|greedy` (card =
+  temp 1.0/top_p 0.95/163,840 cap/byte-pinned Exact-Answer system prompt; per-request seeds
+  OMITTED on this backend — the round-6 F1 fix; the loud banner at build is the fix working),
+  pinned dataset revisions, GPQA content-hash shuffle, `glm_longctx.py` passkey ladder to 1M.
+- **Observability toolkit** (docs/10): per-step **flight recorder** (`GLM_FLIGHT_RECORDER=1`,
+  JSON lines to `/tmp/glm_flight_*.jsonl`, 15 µs/step, SIGKILL-durable), **`triage_crash.sh`**
+  (log parse + 8-host flight fetch + step alignment; sync mode ⇒ halted step = last line),
+  `GLM_LOG_STATS=1` (10 s tok/s), `DSV4_OBSERVE_COMPILES`, launcher flight-file pruning.
+  Read docs/10's field notes before interpreting any crash.
 
-  ```
-  TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=0 \
-  OMP_NUM_THREADS=1 NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_DISABLE_DSA_INDEXER=1 \
-  ~/vllm-env/bin/python parity/glm_engine_parity.py                      # mini bf16 (5L, T=32)
-  … glm_engine_parity.py --fp8                                           # + DISABLE_WEIGHT_REQUANTIZATION=1
-  … glm_engine_parity.py --fp8 --real-dims                               # 3L, real GLM dims, fp8 block 128
-  … glm_engine_parity.py --two-step            [--split-at N]            # cached prefill+decode, reversed BT
-  … glm_engine_parity.py --fp8 --two-step
-  ```
+## Fork branch map (`~/tpu-inference`, worktrees at `~/tpu-inference-<tag>`)
 
-  Results (all PASS, re-confirmed after cd8eeb6c — the v4-blocks + fp32-scores path is now exercised):
-  - mini bf16: final_hs 0.344 < floor 0.375, logits 0.106 < 0.127, top-1 1.000 vs bf16 ref.
-  - mini fp8 block-64 (HF twin = quant-dequant roundtrip, same effective weights): top-1 1.000/1.000.
-  - **real-dims fp8 block-128** (H6144, 64h, nope192/rope64/v256, lora 2048/512, idx 32×128):
-    final_hs 0.619 < 0.722, logits 0.910 < 0.958, top-1 vs fp32 0.906 > bf16-ref 0.875. Also PASS at T=128.
-  - **two-step** (prefill [0,split) + continuation via the paged KV cache, reversed block table):
-    `exact_bit_match=True` in both bf16 and fp8 at T=32.
-- **Stage-1 serving config settled** — the FULL baked raylet env (all **13** envs, verbatim from
-  `scripts/launch_glm_32chip.sh` ENVS; the ${VAR:-default} ones are overridable):
-  `NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1
-  HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1
-  REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=${TPU_MIN_TOKEN_BUCKET:-512}
-  RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368
-  JAX_SHARE_BINARY_BETWEEN_HOSTS=${JAX_SHARE_BINARY_BETWEEN_HOSTS:-0}
-  JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=${JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS:-120000}`.
-  Rationale: `TPU_DISABLE_DSA_INDEXER=1` = dense MLA; `DISABLE_WEIGHT_REQUANTIZATION=1` +
-  **`REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn` pinned** (FP8 stays checkpoint-resident; explicitly NOT
-  `bfloat16` — that OOMs at 753B); `TPU_MIN_TOKEN_BUCKET=512` (32-way token-shard divisibility, PR #2324's
-  validated value); the two `JAX_SHARE_BINARY_*` envs pin multi-host binary-share behavior (share OFF,
-  120 s timeout). Plus (in the engine recipe, not envs): **kv-cache dtype auto** (bf16 + identity scales;
-  FP8-KV NaNs under EP per PR #2324), **pure TP×EP, NO DP-attention** (no `additional_config` sharding —
-  the 753B attention weights cannot replicate; PR #2324's validated topology), `load_format=runai_streamer`
-  from the us-central2 bucket.
-- **Launch/sync/bench wiring EXISTS but is POD-UNTESTED** (never executed on the 8 hosts):
-  `scripts/launch_glm_32chip.sh` (DSV4-cloned 3-phase launcher, env-baked raylets, `--dry-run`, EXTRA_ENVS
-  hook), `scripts/sync_workers.sh` (ff-only fetch/checkout/pull on all 8 hosts, drift echo),
-  `bench/run_bench.py make_generate()` (in-process `vllm.LLM`, GLM's own chat template → token ids, greedy,
-  stop ids [154820,154827,154829], full env provenance into `results.db`; `--stub` + CPU tests pass —
-  datasets + AIME-2026 verified and extractor gaps fixed in `ac37c8d`; dataset revisions PINNED +
-  GPQA content-hash shuffle in the round-3 batch), and `bench/glm_longctx.py` + `bench/engine.py`
-  (`e27c3c5` — the Stage-2 passkey/NIAH threshold instrument, generation-based retrieval,
-  raw-completion prompts with an explicit `[gMASK]<sop>` prefix + `--protocol chat` fallback,
-  concatenated-prompt length targeting (within 1% of the target L), lengths to 1048288 (the 1M-endpoint
-  cell), provenance-backed; CPU tests 11/11 after the round-3 fixes; shares the exact Stage-1 engine
-  recipe with run_bench via the factored `build_llm`). None of it has touched the pod.
-- **Stage-2 design is written** (`docs/01-dsa-kernel-design.md`, commit `8d069ba`): indexer math + the
-  RoPE-interleave E1/E2/E3 resolution experiments, indexer k-cache KVCacheSpec, gathered `[R,2048,640]`
-  decode segment, gates S/K/D0/D/P, IndexShare via the wrapper context, VMEM/HBM budget, 2a/2b/2c phasing.
+| branch | tip | what | on origin? |
+|---|---|---|---|
+| `glm-5.2-v4` | `02e44b36` | **mainline** — Stage-1 + obs + OOB fix; the pod runs this NOW | yes |
+| `glm-5.2-v4-next` | `cda23c81` | **staging** — mainline + r5fix + 2a2 + 2int + dcp + r6fix (all gated off) | **no — push before use** |
+| `glm-5.2-v4-2int` / `-2a2` / `-r5fix` / `-r6fix` / `-obs` / `-pg2` / `-dcp` | — | feature branches, all merged into `-next` | no |
+| `glm-5.2-v4-mtp` | `6beacb5d` | dense-MTP M1 — **lacks the OOB fix; merge `02e44b36` before pod use** (runbook §7a) | no |
+| `glm-5.2-v4-sparse-prefill` | `53c5e5ee` | Stage-2 sparse-prefill pointer (work in flight, another session) | no |
+| `pr-g1..4-*` | — | upstream PR series slices (`docs/02` + `docs/pr-descriptions/`; owner submits) | no |
 
-## Open items (honest status — what is NOT validated)
+## Review-round ledger (adversarial review is part of the loop — every change-set gets one)
 
-1. **T > 128 divergence — RESOLVED (harness false alarm; engine EXONERATED).** The "divergence" was the
-   HF REFERENCE running top-128 sparse DSA past position 128: `make_mini_config`'s `index_topk` default
-   bound the module-import value (mini 128), so `--real-dims` checkpoints carried `index_topk: 128` while
-   the engine ran dense — the 128 cliff was `index_topk`, not the page size. Fixed in the harness
-   (late-bound default + written-artifact assert); T=136/256 real-dims fp8 and T=300 two-step now **PASS**;
-   the mla.v2 multi-page path was hand-verified clean. Full story: RESEARCH_LOG 2026-07-07 (later entry,
-   "harness false alarm"). Nothing blocks pod bring-up from the parity side.
-2. **Pod bring-up — NOT STARTED (now unblocked).** Nothing has run on the 8 hosts: no multi-host load, no
-   TP×EP topology validation (the W_UV_scale fix, EP-head gather, cross-shard all-gather and
-   TPU_MIN_TOKEN_BUCKET are all only meaningful at mesh product > 1 and are so far validated only by
-   1-chip no-regression), no engine boot through the real runner/KV-spec path on real weights, no 3/3 runs.
-3. **RESEARCH_LOG** — the T>128 resolution, two-step gate correction and round-3 review are logged
-   (2026-07-07 later entries); the cd8eeb6c port and launcher-wiring commits are still only summarized here.
-4. **Bench numbers:** none yet. `results.db` has stub runs only; no real benchmark has been scored.
+| round | scope | reports | outcome |
+|---|---|---|---|
+| 1 | Stage-1 diff (4 lenses) | `docs/reviews/stage1-{a,b,correctness,numerics}.md` | 3 HIGHs fixed (engine-boot kv_cache_spec, default-on indexer, CPU test) |
+| 2 | PR #2324 TP-topology port | (no standalone files; fixes = fork `a429be54`) | gather-before-TuningKey, page-512 v4 gate, TPU_MIN_TOKEN_BUCKET plumbing |
+| 3 | parallel-agent deliverables (longctx/extract/datasets/docs) | `round3-*.md` | 2 HIGHs (BPE length −17.2%, `[gMASK]` claim), revision pinning, extractor fixes |
+| 4 | pod bring-up series (EP filter, launcher, scales/logits) | `round4-*.md` | hardening `761ea755` |
+| 5 | Stage-2 kernels (indexer, sparse-MLA, dsa-path+S1) | `round5-agent*.md` | fixes on `-r5fix` (`c8a51543`); **their on-TPU checklists = runbook §3's expected-failure list** |
+| 6 | dcp, paged-indexer, observability, mtp-card, pr-branches | `round6-*.md` | fixes on `-r6fix`/`-dcp`/`-2a2` + bench F1 seed fix; honest-nulls CORRECTION of the sharedbin claim |
+| 7 | pg2 OOB fix + 2int integration | `round7-2int.md` LANDED (correctness green, 108/108; F1–F3 = MAJOR perf/HBM/aliasing blockers for ENABLING `pallas_decode` — folded into runbook §3, incl. its ordered on-TPU gate list; F4: MTP spec-decode forces dense fallback); `round7-pg2-oob.md` pending | in flight |
 
-## Target (confirmed — unchanged)
+## Operating landmines (learned the hard way — expect these)
 
-- **Model:** `zai-org/GLM-5.2-FP8` (FP8-native, ~744 GB; bf16 ~1.5 TB does NOT fit). `GlmMoeDsaForCausalLM`,
-  753B/40B, 78L, 256+1 experts top-8 (sigmoid noaux_tc ×2.5), MLA (lora 2048/512, nope 192, rope 64, v 256,
-  64 heads) + DSA (index_topk=2048, 32×128 indexer heads, IndexShare freq 4), 1M context. Spec in `docs/00`.
-- **Hardware:** the 32-chip v4 pod `db-v4-64-od` ONLY (us-central2-b; no new TPUs). All storage us-central2.
+- **Worktree policy: agents NEVER edit the main checkout** `~/tpu-inference` — the live pod
+  imports it on every host. All feature work in worktrees (`git worktree add`) on feature
+  branches, merged via `-next`. Same for review agents: read-only on the main checkout.
+- **The pkill self-match landmine:** un-escaped `pkill -f` patterns match the pkill/ssh command
+  line itself — a launcher stop-phase pattern once killed its own ssh carrier. Every pattern is
+  bracket-escaped (`'VLLM::[E]ngineCore'`, `'[R]ayWorkerWrapper'`). Keep it that way; the stop
+  phase also SIGKILLs the cohabiting ASPt stack (see the launcher's SHARED-POD POLICY — coordinate).
+- **TPU access is serialized to the main session.** Helper agents run `JAX_PLATFORMS=cpu` set
+  BEFORE python starts (one reviewer grabbed the TPU by setting it after import).
+- **`GLM_*` envs are trace-time + worker-side** → raylet-baked via the launcher (`EXTRA_ENVS`)
+  AND exported on the driver. Only `TPU_DISABLE_DSA_INDEXER`/`DISABLE_WEIGHT_REQUANTIZATION`/
+  `TPU_MIN_TOKEN_BUCKET` force-propagate. `GLM_DSA_MODE` now shapes the **KV-cache spec** —
+  cross-host divergence = inconsistent cache topology, not just a wrong mode.
+- **Relaunch after any pod crash** (leaked EngineCore / ~1800 s PG timeout) — but fetch flight
+  files FIRST (`triage_crash.sh`); the launcher prunes them and a pod restart wipes /tmp.
+- Flaky FP8-dequant-during-load crash (~60% on DSV4, environmental) → retry; 2 consecutive =
+  full relaunch. `OMP_NUM_THREADS=1` everywhere. No pipeline parallelism. The parity harness is
+  single-chip-only BY DESIGN. Buckets: real constraint is 32-way divisibility — bucket 32 is
+  legal and validated (run 47).
+- **Durable backups**: `scripts/backup_bundle.sh` → `gs://driftbench-dsv4-uc/backups/glm-tpu/<ts>/`
+  (verified bundles, ALL fork branches, results.db snapshot, logs, docs). Run it after every
+  milestone; us-central2 ONLY (§COST in CLAUDE.md).
 
-## The exact next task (in order)
+## Target (unchanged)
 
-1. ~~Root-cause + fix the T>128 divergence~~ **DONE — harness false alarm, engine exonerated** (the HF
-   reference ran top-128 sparse DSA; fix + full parity matrix re-run logged in RESEARCH_LOG 2026-07-07
-   later entry; fork WIP committed as `a429be54`).
-2. **Pod bring-up** (now the first task): `bash scripts/sync_workers.sh` → `bash scripts/launch_glm_32chip.sh`
-   (use `--dry-run` first — the script is pod-untested) → engine boot with the Stage-1 serving config →
-   a cold-cache compile observation pass (the `DSV4_OBSERVE_COMPILES` detector exists on the branch —
-   drive serving-region backend compiles to 0 BEFORE trusting anything, docs/recon/doc15) → prefill MC
-   gate → **3/3 runs** (one pass ≠ done).
-3. **First benchmark with provenance:** `bench/run_bench.py` (make_generate is wired) → GPQA-Diamond or a
-   generation-scored MMLU-family MC into `results.db`. Stage-1 threshold: within ~1–2 pts of the GPU/SGLang
-   reference at ≤8K context (PLAN.md).
-4. **Stage 2 (the DSA kernel — the critical path):** execute `docs/01` phase 2a — indexer KVCacheSpec
-   (replace the Stage-1 skip), XLA blocked scoring + exact top-k, settle the RoPE-interleave conflict
-   (E1→E2→E3; run output-level tests at ctx > 2048 or they cannot discriminate), IndexShare via the wrapper
-   context. Gates S/D0/D + passkey. Upstream PR packaging: `docs/02-pr-series-draft.md` (drafted; owner submits).
+`zai-org/GLM-5.2-FP8` (753B/40B, 78L, MLA + DSA index_topk=2048/32 heads/IndexShare freq 4,
+MTP layer 78, 1M ctx) on the 32-chip v4 pod `db-v4-64-od` ONLY. Weights staged at
+`gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/` (150/150 files, 755.7 GB, verified).
+Stage-1 gate: card-family scores within ~1–2 pts at ≤8K ctx. Stage-2 gate: passkey ≥95% to
+≥128K + bounded divergence. Stage-3: MTP acceptance ~5.
 
-## Landmines (carried over from DSV4 + new ones — expect these)
+## The exact next task
 
-- **Flaky FP8-dequant-during-load crash** (~60% on DSV4, environmental) → retry/relaunch loop; 2+
-  consecutive crashes = full cluster relaunch.
-- **Multi-host serving-time recompile race** under any mesh with cross-host collectives
-  (`~/moe-tpu/docs/15`, summarized in `docs/recon/doc15-multihost-race.md`): dummy-precompile-vs-real
-  XLA-layout misses live-compile at serving, staggered across hosts, and worker-3 loses the launch-group
-  race. `VLLM_XLA_CHECK_RECOMPILATION` is BLIND to it. Use the `ExecutableCompileObserver`
-  (`DSV4_OBSERVE_COMPILES=1|trace`, on the branch) + the drive-real-layout fix pattern; note GLM Stage 1
-  is pure TP×EP (no DP-attention) — a different mesh than DSV4's hybrid, so re-enumerate, don't assume.
-- **`GLM_*`/`TPU_*` env vars must be baked into the raylet env** (the launcher does this; vLLM's Ray
-  executor carries only `VLLM_*` + `TpuPlatform.additional_env_vars` — keep that list in sync).
-- **Relaunch after any pod crash** before re-running (leaked EngineCore / ~1800 s placement-group timeout).
-- `OMP_NUM_THREADS=1` everywhere (copy_ OpenMP-after-fork segfault).
-- **Token-count divisibility:** fused-MoE GMM asserts `num_tokens*topk % 16 == 0`; the MLA-without-DP mesh
-  token-shards 32-way → buckets < 32 fail shard_map divisibility (hence `TPU_MIN_TOKEN_BUCKET=512`).
-- The parity harness is **single-chip-only by design**; don't "fix" it to multi-chip — pod validation goes
-  through the real runner.
+**Execute `docs/11-pod-runbook.md` in order:** (0) GPQA triage → (1) GSM8K n=128 max-new 2048 →
+(2) `-next` staging switch + byte-identity smoke vs run 26 → (3) DSA compile probe
+(`pallas_decode`, expected-Mosaic-error list enumerated) → (4) Gate D0 sparse==dense →
+(5) DCP bring-up + passkey ladder 8K/32K/128K → (6) AIME-2026 card n=30 → (7) MTP M2 k=1→5.
+Each step: env block, expected outcome, abort criteria, 3/3 rule. After each milestone:
+RESEARCH_LOG + HANDOFF + commit/push + backup bundle.
 
 ## Owner-gated (draft, don't do)
 
-Submitting PRs to `vllm-project/tpu-inference` (see `docs/02-pr-series-draft.md` — the owner submits,
-human-defended, AI-assist disclosed; coordinate with PR #2324 / yiqiliu2 first); provisioning any new
-machine/VM/TPU (never — only same-region bucket + disk-attach to the 8 existing hosts, §COST in CLAUDE.md);
-force-push; external comms.
+Upstream PR submission (`docs/02` + `docs/pr-descriptions/` — the owner submits, AI-assist
+disclosed; coordinate with PR #2324/yiqiliu2), any new machine/VM/TPU (never — only same-region
+bucket + disk-attach to the 8 existing hosts), force-push, external comms.
