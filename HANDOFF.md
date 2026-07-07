@@ -73,7 +73,8 @@ open T > 128 divergence (IN PROGRESS, see §Open items). Weights are staged; the
   `scripts/launch_glm_32chip.sh` (DSV4-cloned 3-phase launcher, env-baked raylets, `--dry-run`, EXTRA_ENVS
   hook), `scripts/sync_workers.sh` (ff-only fetch/checkout/pull on all 8 hosts, drift echo),
   `bench/run_bench.py make_generate()` (in-process `vllm.LLM`, GLM's own chat template → token ids, greedy,
-  stop ids [154820,154827,154829], full env provenance into `results.db`; `--stub` + CPU tests 4/4 pass).
+  stop ids [154820,154827,154829], full env provenance into `results.db`; `--stub` + CPU tests pass —
+  datasets + AIME-2026 verified and extractor gaps fixed in `ac37c8d`).
 - **Stage-2 design is written** (`docs/01-dsa-kernel-design.md`, commit `8d069ba`): indexer math + the
   RoPE-interleave E1/E2/E3 resolution experiments, indexer k-cache KVCacheSpec, gathered `[R,2048,640]`
   decode segment, gates S/K/D0/D/P, IndexShare via the wrapper context, VMEM/HBM budget, 2a/2b/2c phasing.

@@ -33,18 +33,16 @@ import time
 
 import provenance as pv
 import benchmarks as B
+import engine  # CPU-safe: the vllm import lives inside engine.build_llm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Default checkpoint: the FP8-native staged copy in the SAME-REGION (us-central2)
-# bucket — streamed GCS->HBM at load (runai_streamer), never the EU bucket.
-DEFAULT_MODEL = os.environ.get("GLM_MODEL",
-                               "gs://driftbench-dsv4-uc/models/GLM-5.2-FP8")
-
-# GLM-5.2 stop tokens, from the checkpoint's generation_config.json (verified
-# against the real tokenizer 2026-07-07):
-#   154820 = <|endoftext|>   154827 = <|user|>   154829 = <|observation|>
-EOS_IDS = [154820, 154827, 154829]
+# The engine recipe (checkpoint default, EOS ids, LLM(...) build) lives in
+# bench/engine.py — shared with glm_longctx.py so both harnesses run the
+# IDENTICAL engine. Re-exported here so `run_bench.DEFAULT_MODEL` /
+# `run_bench.EOS_IDS` keep working.
+DEFAULT_MODEL = engine.DEFAULT_MODEL
+EOS_IDS = engine.EOS_IDS
 
 
 def stub_generate(prompt: str) -> str:
@@ -83,45 +81,20 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
       `additional_config={"sharding": ...}` / `enable_dp_attention` (that was
       DSV4's MLA recipe; the GLM fork branch does not require it).
 
-    Env knobs: GLM_MODEL (checkpoint), GLM_TP (default 32),
+    The LLM(...) build itself lives in bench/engine.py (shared with
+    glm_longctx.py). Env knobs: GLM_MODEL (checkpoint), GLM_TP (default 32),
     RUNAI_STREAMER_CONCURRENCY / RUNAI_STREAMER_MEMORY_LIMIT (streaming load).
     Returns `generate(prompt) -> (text, n_gen_tokens)` — the VERBATIM completion
     text plus the generated-token count (for the items.n_gen_tokens column).
     """
     # vllm import stays INSIDE make_generate: `import run_bench` and --stub must
     # work with no vllm/TPU (module-top import would break the offline pipeline).
-    from vllm import LLM, SamplingParams
+    from vllm import SamplingParams
 
-    t0 = time.time()
-    extra = {}
-    if num_gpu_blocks and num_gpu_blocks > 0:
-        # Cap the KV pool (frees HBM for the per-forward program — the DSV4
-        # fragmentation-OOM lesson; 0 = let vLLM auto-size to the GMU budget).
-        extra["num_gpu_blocks_override"] = int(num_gpu_blocks)
-    llm = LLM(
-        model=model,
-        trust_remote_code=True,
-        dtype="bfloat16",
-        kv_cache_dtype="auto",
-        max_model_len=max_len,
-        max_num_seqs=max_seqs,
-        max_num_batched_tokens=max_batched_tokens,   # chunked-prefill chunk size
-        enable_prefix_caching=False,
-        gpu_memory_utilization=gmu,
-        tensor_parallel_size=int(os.environ.get("GLM_TP", "32")),
-        enable_expert_parallel=True,     # EP: 256 routed experts sharded chip-wise
-        distributed_executor_backend="ray",
-        load_format="runai_streamer",    # stream GCS -> HBM, no local copy
-        model_loader_extra_config={
-            "concurrency": int(os.environ.get("RUNAI_STREAMER_CONCURRENCY", "32")),
-            "memory_limit": int(os.environ.get("RUNAI_STREAMER_MEMORY_LIMIT",
-                                               str(32 * 1024**3))),
-        },
-        **extra,
-    )
-    print(f"[bench] engine built in {time.time() - t0:.1f}s "
-          f"(model={model}, tp={os.environ.get('GLM_TP', '32')}, ep=on, "
-          f"max_len={max_len}, max_new={max_new})", flush=True)
+    llm = engine.build_llm(model, max_len=max_len, max_seqs=max_seqs,
+                           max_batched_tokens=max_batched_tokens, gmu=gmu,
+                           num_gpu_blocks=num_gpu_blocks,
+                           log_extra=f"max_new={max_new}")
 
     tok = llm.get_tokenizer()
     chat_template = None

@@ -58,6 +58,11 @@ CARD_TARGETS = {
     # a standard loglikelihood sanity gate (not on the card; a fast Stage-1 check)
     "mmlu_pro":            {"value": None, "kind": "loglikelihood"},
     "gsm8k":               {"value": None, "kind": "math"},
+    # long-context passkey/NIAH retrieval (glm_longctx.py) — the Stage-2
+    # threshold instrument (>=95% out to >=128K). No card value; the gate is
+    # the per-length curve. Per-cell rows are stored as passkey_L{L}_d{d};
+    # this key holds the aggregate summary row.
+    "longctx_passkey":     {"value": None, "kind": "passkey"},
 }
 
 _SCHEMA = """
