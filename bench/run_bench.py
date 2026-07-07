@@ -9,6 +9,14 @@ Model-pluggable: `generate(prompt) -> str | (str, n_gen_tokens)`. Two modes:
              (make_generate: runai_streamer GCS->HBM load, TP=32 x EP, greedy
              thinking-mode decode through GLM-5.2's own chat template).
 
+Engine runs are BATCHED: make_generate's generator also exposes
+`generate_batch(prompts) -> [(text, n_gen_tokens), ...]`, and run_benchmark
+submits ALL items (or --batch-size chunks) in ONE llm.generate call so vLLM's
+scheduler runs up to --max-seqs sequences concurrently (~1 tok/s single-stream
+decode -> batch-factor aggregate throughput). Provenance is unchanged per item;
+per-item latency_ms is NULL in batched runs (never faked) — the real batch wall
+time is recorded in the run's summary note as batch_wall_ms.
+
 Nothing is scored that is not stored. Every item row carries the verbatim prompt,
 the verbatim model reply, the extracted answer, correct/score, n_gen_tokens,
 timing, and the run-level provenance (model+revision, harness+fork git commits,
@@ -69,6 +77,17 @@ def _chat_prompt_ids(tok, prompt: str, chat_template: str | None = None) -> list
         chat_template=chat_template)
 
 
+def _sort_by_request_id(outs):
+    """Defensively re-assert submission order on vLLM outputs. The LLM API
+    already returns outputs in input order (its _run_engine sorts by request
+    id), but the mapping back to items is correctness-critical — so re-sort by
+    the integer request id when possible instead of trusting it silently."""
+    try:
+        return sorted(outs, key=lambda o: int(o.request_id))
+    except (TypeError, ValueError):
+        return list(outs)
+
+
 def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
                   max_seqs: int = 8, max_batched_tokens: int = 4096,
                   gmu: float = 0.94, num_gpu_blocks: int = 0,
@@ -86,6 +105,11 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
     RUNAI_STREAMER_CONCURRENCY / RUNAI_STREAMER_MEMORY_LIMIT (streaming load).
     Returns `generate(prompt) -> (text, n_gen_tokens)` — the VERBATIM completion
     text plus the generated-token count (for the items.n_gen_tokens column).
+    The returned callable also exposes `generate.generate_batch(prompts) ->
+    [(text, n_gen_tokens), ...]` (one llm.generate call for MANY prompts —
+    vLLM's scheduler then runs up to max_seqs sequences concurrently, which is
+    what turns ~1 tok/s single-stream decode into batch-factor aggregate
+    throughput). run_benchmark auto-uses it when present.
     """
     # vllm import stays INSIDE make_generate: `import run_bench` and --stub must
     # work with no vllm/TPU (module-top import would break the offline pipeline).
@@ -116,6 +140,17 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
         print("[bench] tokenizer had no chat template — using the reference "
               "chat_template.jinja copy", flush=True)
 
+    def _sp(room: int) -> "SamplingParams":
+        # ONE sampling protocol for both paths: greedy, the GLM EOS set, and
+        # max_tokens clamped to the room this prompt leaves in the window
+        # (identical to what the sequential path always did).
+        return SamplingParams(
+            temperature=temperature,          # 0.0 = greedy (the bench protocol)
+            max_tokens=min(max_new, room),
+            stop_token_ids=EOS_IDS,
+            ignore_eos=False,
+        )
+
     def generate(prompt: str) -> tuple[str, int]:
         ids = _chat_prompt_ids(tok, prompt, chat_template)
         room = max_len - len(ids) - 8
@@ -125,47 +160,131 @@ def make_generate(model: str, *, max_len: int = 8192, max_new: int = 2048,
             print(f"[bench] SKIP: prompt {len(ids)} tok > max_len {max_len}",
                   flush=True)
             return "", 0
-        sp = SamplingParams(
-            temperature=temperature,          # 0.0 = greedy (the bench protocol)
-            max_tokens=min(max_new, room),
-            stop_token_ids=EOS_IDS,
-            ignore_eos=False,
-        )
-        outs = llm.generate([{"prompt_token_ids": ids}], sp, use_tqdm=False)
+        outs = llm.generate([{"prompt_token_ids": ids}], _sp(room),
+                            use_tqdm=False)
         o = outs[0].outputs[0]
         return o.text, len(o.token_ids)
 
+    def generate_batch(prompts: list[str]) -> list[tuple[str, int]]:
+        """ONE llm.generate call for a list of prompts — vLLM schedules up to
+        max_seqs of them concurrently. Same sampling protocol as generate()
+        (the per-prompt SamplingParams differ ONLY in the room clamp on
+        max_tokens, exactly as the sequential path computed it). Results are
+        returned IN INPUT ORDER: over-long prompts keep their slot as ("", 0)
+        (recorded empty + scored wrong, same as the sequential SKIP), and the
+        vLLM outputs are mapped back by request order/id."""
+        results: list[tuple[str, int] | None] = [None] * len(prompts)
+        submit_idx: list[int] = []
+        token_prompts, sps = [], []
+        for i, prompt in enumerate(prompts):
+            ids = _chat_prompt_ids(tok, prompt, chat_template)
+            room = max_len - len(ids) - 8
+            if room <= 0:
+                print(f"[bench] SKIP: prompt {len(ids)} tok > max_len "
+                      f"{max_len}", flush=True)
+                results[i] = ("", 0)
+                continue
+            submit_idx.append(i)
+            token_prompts.append({"prompt_token_ids": ids})
+            sps.append(_sp(room))
+        if token_prompts:
+            print(f"[bench] submitting {len(token_prompts)} prompts in ONE "
+                  f"llm.generate (up to {max_seqs} concurrent)", flush=True)
+            outs = _sort_by_request_id(
+                llm.generate(token_prompts, sps, use_tqdm=True))
+            assert len(outs) == len(token_prompts), \
+                f"vLLM returned {len(outs)} outputs for {len(token_prompts)} prompts"
+            for i, out in zip(submit_idx, outs):
+                o = out.outputs[0]
+                results[i] = (o.text, len(o.token_ids))
+        return results  # type: ignore[return-value]  # every slot is filled
+
+    generate.generate_batch = generate_batch
     return generate
 
 
-def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0):
-    items = B.load_items(spec, limit=limit)
-    n_correct = 0
-    for i, it in enumerate(items):
+def _score_and_record(conn, run_id, spec: B.BenchSpec, it, reply, n_gen,
+                      latency_ms, seed):
+    """Extract + score ONE reply and store the full item row. The audit trail
+    must never be lost: the verbatim reply is stored even if extraction/scoring
+    raises (extracted/correct = None on failure)."""
+    try:
+        extracted = spec.extract(reply, it)
+        correct = spec.score(extracted, it.gold)
+    except Exception:
+        extracted, correct = None, None
+    pv.record_item(conn, run_id, benchmark=spec.name, item_id=it.item_id,
+                   prompt=it.prompt, gold=it.gold, raw_output=reply,
+                   extracted=extracted, correct=correct,
+                   score=(1.0 if correct else 0.0) if correct is not None else None,
+                   n_gen_tokens=n_gen, latency_ms=latency_ms, seed=seed)
+    return extracted, correct
+
+
+def _run_items_batched(conn, run_id, spec: B.BenchSpec, generate_batch, items,
+                       seed=0, batch_size=0) -> str:
+    """Submit prompts in bulk through generate_batch (ONE llm.generate per
+    chunk; batch_size <= 0 = ALL items in one call) so vLLM runs up to max_seqs
+    sequences concurrently. Provenance per item is EXACTLY the sequential
+    path's (verbatim prompt/raw output/extracted/correct/n_gen_tokens); only
+    per-item latency is not individually measurable inside a batch, so
+    latency_ms is stored as NULL — never faked — and the real batch wall times
+    go into the summary note (returned) as batch_wall_ms."""
+    chunks = ([items] if batch_size <= 0 else
+              [items[i:i + batch_size] for i in range(0, len(items), batch_size)])
+    total_wall_ms, total_tok, done = 0.0, 0, 0
+    for chunk in chunks:
         t0 = time.time()
-        out = generate(it.prompt)
-        # generate may return plain text (stub) or (text, n_gen_tokens) (engine).
-        reply, n_gen = out if isinstance(out, tuple) else (out, None)
-        latency = (time.time() - t0) * 1000.0
-        # The audit trail must never be lost: store the verbatim reply even if
-        # extraction/scoring raises (extracted/correct = None on failure).
-        try:
-            extracted = spec.extract(reply, it)
-            correct = spec.score(extracted, it.gold)
-        except Exception:
-            extracted, correct = None, None
-        n_correct += int(bool(correct))
-        pv.record_item(conn, run_id, benchmark=spec.name, item_id=it.item_id,
-                       prompt=it.prompt, gold=it.gold, raw_output=reply,
-                       extracted=extracted, correct=correct,
-                       score=(1.0 if correct else 0.0) if correct is not None else None,
-                       n_gen_tokens=n_gen, latency_ms=round(latency, 1), seed=seed)
-        print(f"[{spec.name}] {i + 1}/{len(items)} {it.item_id}: "
-              f"correct={correct} extracted={extracted!r} gold={it.gold!r} "
-              f"gen_tok={n_gen} {latency / 1000.0:.1f}s", flush=True)
-    summ = pv.finalize(conn, run_id, benchmark=spec.name, metric="acc")
+        outs = generate_batch([it.prompt for it in chunk])
+        wall_ms = (time.time() - t0) * 1000.0
+        total_wall_ms += wall_ms
+        assert len(outs) == len(chunk), \
+            f"generate_batch returned {len(outs)} results for {len(chunk)} prompts"
+        chunk_tok = 0
+        for it, (reply, n_gen) in zip(chunk, outs):
+            extracted, correct = _score_and_record(
+                conn, run_id, spec, it, reply, n_gen, latency_ms=None, seed=seed)
+            done += 1
+            chunk_tok += n_gen or 0
+            print(f"[{spec.name}] {done}/{len(items)} {it.item_id}: "
+                  f"correct={correct} extracted={extracted!r} gold={it.gold!r} "
+                  f"gen_tok={n_gen} (batched)", flush=True)
+        total_tok += chunk_tok
+        rate = chunk_tok / (wall_ms / 1000.0) if wall_ms > 0 else 0.0
+        print(f"[{spec.name}] batch of {len(chunk)} done in "
+              f"{wall_ms / 1000.0:.1f}s ({chunk_tok} gen tok, "
+              f"{rate:.1f} tok/s aggregate)", flush=True)
+    return (f"batched:{len(items)} chunks={len(chunks)} "
+            f"batch_wall_ms={total_wall_ms:.0f} gen_tok={total_tok}")
+
+
+def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
+                  batch_size=0):
+    items = B.load_items(spec, limit=limit)
+    note = ""
+    generate_batch = getattr(generate, "generate_batch", None)
+    if generate_batch is not None:
+        # BATCHED: the engine generator exposes generate_batch — submit in bulk
+        # (the stub does not, and keeps the sequential path below unchanged).
+        note = _run_items_batched(conn, run_id, spec, generate_batch, items,
+                                  seed=seed, batch_size=batch_size)
+    else:
+        for i, it in enumerate(items):
+            t0 = time.time()
+            out = generate(it.prompt)
+            # generate may return plain text (stub) or (text, n_gen_tokens) (engine).
+            reply, n_gen = out if isinstance(out, tuple) else (out, None)
+            latency = (time.time() - t0) * 1000.0
+            extracted, correct = _score_and_record(
+                conn, run_id, spec, it, reply, n_gen,
+                latency_ms=round(latency, 1), seed=seed)
+            print(f"[{spec.name}] {i + 1}/{len(items)} {it.item_id}: "
+                  f"correct={correct} extracted={extracted!r} gold={it.gold!r} "
+                  f"gen_tok={n_gen} {latency / 1000.0:.1f}s", flush=True)
+    summ = pv.finalize(conn, run_id, benchmark=spec.name, metric="acc", note=note)
     print(f"[{spec.name}] n={summ['n']} acc={summ['value']}"
-          f" card={summ['card_value']} Δ={summ['delta']}")
+          f" card={summ['card_value']} Δ={summ['delta']}"
+          f"{'  [' + note + ']' if note else ''}")
     return summ
 
 
@@ -187,6 +306,7 @@ def _run_env(args, benches) -> dict:
         "expert_parallel": True,
         "max_len": args.max_len, "max_new": args.max_new,
         "max_seqs": args.max_seqs, "max_batched_tokens": args.max_batched_tokens,
+        "batch_size": args.batch_size,
         "gmu": args.gmu, "num_gpu_blocks": args.num_gpu_blocks,
         "temperature": 0.0, "eos_ids": EOS_IDS,
         "load_format": "runai_streamer",
@@ -216,6 +336,13 @@ def main():
     ap.add_argument("--max-seqs", type=int, default=8)
     ap.add_argument("--max-batched-tokens", type=int, default=4096,
                     help="chunked-prefill chunk size")
+    ap.add_argument("--batch-size", type=int, default=0,
+                    help="engine runs submit prompts in chunks of this size "
+                         "through ONE llm.generate call each (vLLM schedules "
+                         "up to --max-seqs concurrently); 0 = ALL items in one "
+                         "call. --stub stays sequential (no generate_batch). "
+                         "Per-item latency_ms is NULL in batched runs — the "
+                         "batch wall time is recorded in the summary note.")
     ap.add_argument("--num-gpu-blocks", type=int, default=0,
                     help="num_gpu_blocks_override if >0 (cap the KV pool to free "
                          "HBM for the per-forward program; 0 = auto)")
@@ -241,7 +368,8 @@ def main():
         max_seqs=args.max_seqs, max_batched_tokens=args.max_batched_tokens,
         gmu=args.gmu, num_gpu_blocks=args.num_gpu_blocks)
     for b in benches:
-        run_benchmark(conn, run_id, B.REGISTRY[b], gen, limit=args.limit)
+        run_benchmark(conn, run_id, B.REGISTRY[b], gen, limit=args.limit,
+                      batch_size=args.batch_size)
 
 
 if __name__ == "__main__":

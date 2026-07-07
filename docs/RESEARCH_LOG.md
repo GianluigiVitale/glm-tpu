@@ -202,3 +202,25 @@ what you did, what you validated it against, the exact numbers, and the honest n
   path is Stage-2+ work; DSV4 was the same pre-kernel). GPQA-198 needs batched generation first.
 - Remaining for the Stage-1 gate: batched bench runs (GSM8K n≥32, GPQA-Diamond) vs card within noise,
   3/3 clean pod runs, adversarial review of the bring-up series.
+
+## 2026-07-07 — bench: BATCHED generation in run_bench.py (the GPQA-198 enabler)
+
+- `make_generate()` now also exposes `generate.generate_batch(prompts) -> [(text, n_gen_tokens), ...]`:
+  ONE `llm.generate` call over a list of token-id prompts (same greedy protocol; per-prompt
+  SamplingParams differ only in the room clamp, exactly as the sequential path computed it), so vLLM's
+  scheduler runs up to `--max-seqs` sequences concurrently (~0.95 tok/s single-stream → ×batch aggregate).
+  Outputs are mapped back to items by request order/id (defensive int(request_id) re-sort); over-long
+  prompts keep their slot as ("", 0) — recorded empty + scored wrong, same as the sequential SKIP.
+- `run_benchmark()` auto-uses it when present (`--batch-size N` chunks; 0 = ALL items in one call);
+  `--stub` has no generate_batch and keeps the sequential path byte-for-byte. Per-item provenance is
+  unchanged (verbatim prompt/raw output/extracted/correct/n_gen_tokens); per-item latency is NOT
+  individually measurable inside a batch, so latency_ms is stored NULL (never faked) and the real batch
+  wall time goes into the summary note (`batched:N chunks=C batch_wall_ms=… gen_tok=…`).
+- CPU-validated (JAX_PLATFORMS=cpu, no TPU touched — the pod is owned by another session):
+  `test_bench.py` + a new `test_batched_run` (fake generate_batch: ordering, per-item provenance,
+  chunking [2,1], NULL latency, summary note, sequential fallback) — pytest 17/17 across both suites;
+  `--stub gsm8k,gpqa_diamond --limit 2` records 4 items correctly (run 27), vllm never imported.
+- KV sizing for GPQA-198 at max_len 8192 (block=512 → 16 blocks/seq): MLA latent KV ≈ (512+64)×78×2 B
+  ≈ 87.8 KiB/token per chip (replicated across TP ranks) → 128 blocks = 65,536 KV tokens ≈ 5.4 GiB/chip,
+  the proven smoke sizing inside the 30.75−23.06 = 7.69 GiB/chip free; coverage max_seqs ≤ 128/16 = 8.
+  260k KV tokens (max_seqs 32) needs ~22 GiB/chip — only possible with a sharded latent cache (Stage-2+).

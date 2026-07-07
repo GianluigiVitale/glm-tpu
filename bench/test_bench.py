@@ -120,6 +120,90 @@ def test_db_roundtrip():
     print("  DB round-trip + provenance OK")
 
 
+def test_batched_run():
+    """run_benchmark's BATCHED path on a fake generate_batch (no vllm, no TPU):
+    ordering + provenance. The fake returns canned replies out of a dict keyed
+    by the verbatim prompt, so any order slip inside run_benchmark would pair a
+    reply with the wrong item and flip correct/extracted below."""
+    import run_bench as rb
+
+    # the stub must NOT grow a generate_batch — --stub stays sequential
+    assert not hasattr(rb.stub_generate, "generate_batch")
+
+    items = [B.Item("b0", "1+1?", "PROMPT-ZERO", "2"),
+             B.Item("b1", "2+3?", "PROMPT-ONE", "5"),
+             B.Item("b2", "3+4?", "PROMPT-TWO", "7")]
+    canned = {  # prompt -> (verbatim reply, n_gen_tokens); b1 deliberately wrong
+        "PROMPT-ZERO": (r"<think>t</think> so \boxed{2}", 11),
+        "PROMPT-ONE":  (r"<think>t</think> so \boxed{99}", 22),
+        "PROMPT-TWO":  (r"<think>t</think> so \boxed{7}", 33)}
+    calls = []
+
+    def fake_gen(prompt):
+        raise AssertionError("sequential generate() must NOT be called when "
+                             "generate_batch is exposed")
+
+    def fake_batch(prompts):
+        calls.append(list(prompts))
+        return [canned[p] for p in prompts]
+
+    fake_gen.generate_batch = fake_batch
+
+    orig_load = B.load_items
+    B.load_items = lambda spec, limit=None: list(items[:limit] if limit else items)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            conn = pv.connect(os.path.join(d, "t.db"))
+
+            # ---- batch_size=0: ALL items in ONE generate_batch call
+            rid = pv.start_run(conn, model="FAKE-BATCH", env={}, note="unit")
+            summ = rb.run_benchmark(conn, rid, B.GSM8K, fake_gen, batch_size=0)
+            assert calls == [["PROMPT-ZERO", "PROMPT-ONE", "PROMPT-TWO"]]
+            rows = conn.execute(
+                "SELECT item_id,prompt,gold,raw_output,extracted,correct,"
+                "n_gen_tokens,latency_ms FROM items WHERE run_id=? ORDER BY id",
+                (rid,)).fetchall()
+            assert [r[0] for r in rows] == ["b0", "b1", "b2"]
+            for r, it in zip(rows, items):  # verbatim provenance, per item
+                assert r[1] == it.prompt and r[2] == it.gold
+                assert r[3] == canned[it.prompt][0]
+                assert r[6] == canned[it.prompt][1]
+                assert r[7] is None          # latency never faked in a batch
+            assert rows[0][4:6] == ("2", 1)   # extracted + correct track...
+            assert rows[1][4:6] == ("99", 0)  # ...EACH item's own reply
+            assert rows[2][4:6] == ("7", 1)
+            assert summ["n"] == 3 and abs(summ["value"] - 200.0 / 3) < 1e-9
+            note = conn.execute("SELECT note FROM summary WHERE run_id=?",
+                                (rid,)).fetchone()[0]
+            assert note.startswith("batched:3 chunks=1 batch_wall_ms="), note
+
+            # ---- batch_size=2: chunked [2, 1], order preserved across chunks
+            calls.clear()
+            rid2 = pv.start_run(conn, model="FAKE-BATCH", env={}, note="unit2")
+            rb.run_benchmark(conn, rid2, B.GSM8K, fake_gen, batch_size=2)
+            assert calls == [["PROMPT-ZERO", "PROMPT-ONE"], ["PROMPT-TWO"]]
+            rows2 = conn.execute(
+                "SELECT item_id,extracted,correct FROM items WHERE run_id=?"
+                " ORDER BY id", (rid2,)).fetchall()
+            assert rows2 == [("b0", "2", 1), ("b1", "99", 0), ("b2", "7", 1)]
+            note2 = conn.execute("SELECT note FROM summary WHERE run_id=?",
+                                 (rid2,)).fetchone()[0]
+            assert note2.startswith("batched:3 chunks=2 batch_wall_ms="), note2
+
+            # ---- a generator WITHOUT generate_batch still runs sequentially
+            rid3 = pv.start_run(conn, model="FAKE-SEQ", env={}, note="unit3")
+            rb.run_benchmark(conn, rid3, B.GSM8K,
+                             lambda p: canned[p], batch_size=0)
+            rows3 = conn.execute(
+                "SELECT extracted,correct,latency_ms FROM items WHERE run_id=?"
+                " ORDER BY id", (rid3,)).fetchall()
+            assert [r[:2] for r in rows3] == [("2", 1), ("99", 0), ("7", 1)]
+            assert all(r[2] is not None for r in rows3)  # sequential keeps latency
+    finally:
+        B.load_items = orig_load
+    print("  batched run (ordering + provenance + chunking) OK")
+
+
 def test_item_builders():
     # GPQA: synthetic row → deterministic 4-way MC, gold letter tracks the correct answer
     row = {"Question": "2+2?", "Correct Answer": "4",
@@ -171,5 +255,6 @@ if __name__ == "__main__":
     test_adversarial_extractors()
     test_scorers()
     test_db_roundtrip()
+    test_batched_run()
     test_item_builders()
     print("ALL bench CPU tests passed.")
