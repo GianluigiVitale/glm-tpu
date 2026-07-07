@@ -208,7 +208,7 @@ def test_batched_run():
     fake_gen.generate_batch = fake_batch
 
     orig_load = B.load_items
-    B.load_items = (lambda spec, limit=None, protocol="greedy":
+    B.load_items = (lambda spec, limit=None, protocol="greedy", offset=0:
                     list(items[:limit] if limit else items))
     try:
         with tempfile.TemporaryDirectory() as d:
