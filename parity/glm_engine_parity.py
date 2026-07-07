@@ -13,11 +13,15 @@ The engine runs dense MLA with TPU_DISABLE_DSA_INDEXER=1 (Stage-1 config).
 Identical weights on both sides via a synthetic native-key checkpoint
 (glm_engine_common.write_checkpoint) loaded by each stack's production loader.
 
-Run (from ~/glm-tpu; the TPU_* bounds pin JAX to this host's 4 chips — the
-single-host sub-cube of the 8-host pod, same as every DSV4 parity):
-  TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 TPU_PROCESS_BOUNDS=1,1,1 \
-  TPU_VISIBLE_DEVICES=0,1,2,3 OMP_NUM_THREADS=1 \
+Run (from ~/glm-tpu). SINGLE-CHIP: this harness hand-builds the attention
+metadata for ONE global sequence, which is only consistent with an unsharded
+mesh — multi-chip validation goes through the real runner on the pod (the
+model-axis shard_map would token-shard q/kv against global metadata: the
+PR #2324 cross-shard class). Exits nonzero if the machine gate fails.
+  TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1 TPU_PROCESS_BOUNDS=1,1,1 \
+  TPU_VISIBLE_DEVICES=0 OMP_NUM_THREADS=1 \
   NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_DISABLE_DSA_INDEXER=1 \
+  [DISABLE_WEIGHT_REQUANTIZATION=1] \
   ~/vllm-env/bin/python parity/glm_engine_parity.py [--fp8] [--layers 5] [--T 32]
 """
 from __future__ import annotations
@@ -241,12 +245,19 @@ def main():
     ap.add_argument("--fp8", action="store_true",
                     help="write an FP8 block-quantized checkpoint for the "
                          "ENGINE (HF ref still loads the bf16 twin)")
+    ap.add_argument("--real-dims", action="store_true",
+                    help="GLM-5.2's real per-layer dims (nope 192/v 256/"
+                         "64 heads/2048+512 lora/32x128 indexer, block 128)")
     ap.add_argument("--keep", action="store_true")
     args = ap.parse_args()
+    if args.real_dims:
+        C.use_real_dims()
 
     assert args.T <= C.IDX_TOPK, "index_topk must cover T (tie-free DSA)"
 
-    cfg = C.make_mini_config(n_layers=args.layers, fp8=args.fp8)
+    fp8_block = 128 if args.real_dims else 64
+    cfg = C.make_mini_config(n_layers=args.layers, fp8=args.fp8,
+                             fp8_block=fp8_block)
     w = C.gen_weights(args.seed, cfg)
     rng = np.random.default_rng(100 + args.seed)
     input_ids = rng.integers(0, C.VOCAB, size=args.T).astype(np.int32)
@@ -293,20 +304,44 @@ def main():
 
     print("\n== engine vs HF bf16 (like-for-like) ==")
     _diff("final_hs", hidden_eng, hs16[-1])
+    t1_ok = None
     if logits_eng is not None:
         _diff("logits", logits_eng, logits16)
         # top-1 agreement on next-token prediction (the operative signal)
         t1_eng = logits_eng.argmax(-1)
         t1_32 = logits32.argmax(-1)
         t1_16 = logits16.argmax(-1)
-        print(f"  top1 agree: eng-vs-fp32 {np.mean(t1_eng == t1_32):.3f}, "
+        ref_t1 = float(np.mean(t1_16 == t1_32))
+        eng_t1 = float(np.mean(t1_eng == t1_32))
+        print(f"  top1 agree: eng-vs-fp32 {eng_t1:.3f}, "
               f"eng-vs-bf16 {np.mean(t1_eng == t1_16):.3f}, "
-              f"bf16-vs-fp32 {np.mean(t1_16 == t1_32):.3f}")
+              f"bf16-vs-fp32 {ref_t1:.3f}")
+        # the engine may not agree with fp32 less often than the bf16
+        # reference itself does (allow 1 flip of slack at small T)
+        t1_ok = eng_t1 >= ref_t1 - (1.0 / len(t1_eng))
+
+    # ---- machine gate (exit nonzero on failure) ----
+    floor_hs = np.abs(hs16[-1] - hs32[-1]).max()
+    floor_lg = np.abs(logits16 - logits32).max()
+    d_hs = np.abs(hidden_eng - hs32[-1]).max()
+    d_lg = np.abs(logits_eng - logits32).max() \
+        if logits_eng is not None else None
+    K = 1.5   # engine must sit within 1.5x the bf16 noise floor
+    checks = {
+        "no_nan": not np.isnan(hidden_eng).any(),
+        f"final_hs {d_hs:.4f} <= {K}x floor {floor_hs:.4f}":
+            d_hs <= K * floor_hs,
+        f"logits {d_lg:.4f} <= {K}x floor {floor_lg:.4f}":
+            (d_lg is not None and d_lg <= K * floor_lg),
+        "top1": bool(t1_ok),
+    }
+    failed = [k for k, v in checks.items() if not v]
+    print(f"\n[GATE] {'PASS' if not failed else 'FAIL: ' + '; '.join(failed)}")
 
     if not args.keep:
         import shutil
         shutil.rmtree(tmp, ignore_errors=True)
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

@@ -48,6 +48,19 @@ MAX_POS = 512
 EPS = 1e-5
 
 
+def use_real_dims():
+    """Switch the module to GLM-5.2's REAL per-layer dims (config.json) —
+    the shape/padding class the mini aliases away (nope 192 != v 256,
+    64 heads, q_lora 2048, kv_lora 512, 32x128 indexer, fp8 block 128).
+    Kept small only where it does not change the shape class: n_experts 16
+    (vs 256 — same GMM/topk math at top-8), vocab 4096, 3 layers typical."""
+    g = globals()
+    g.update(H=6144, NH=64, Q_LORA=2048, KV_LORA=512, NOPE=192, ROPE=64,
+             VHD=256, IDX_HD=128, IDX_NH=32, IDX_TOPK=2048, NEXP=16, TOPK=8,
+             NSHARED=1, MOE_INTER=2048, DENSE_INTER=12288, VOCAB=4096,
+             MAX_POS=4096)
+
+
 def make_mini_config(n_layers: int = 5,
                      first_k_dense: int = 1,
                      fp8: bool = False,

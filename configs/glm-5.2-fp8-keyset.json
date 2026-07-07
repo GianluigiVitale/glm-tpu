@@ -1,0 +1,183 @@
+{
+ "repo": "zai-org/GLM-5.2-FP8",
+ "n_params": 118629,
+ "keyset_sha256": "a5a5b3deabca050341807681e17726de14507825c7fcc6dfbf4d9f1cd989b29c",
+ "note": "structural fingerprint of model.safetensors.index.json weight_map; verifies the native key set the loaders map (indexers_proj does NOT exist; indexer.* only on full-schedule layers 0,1,2,6,...,74 + MTP 78).",
+ "layer_classes": [
+  {
+   "layers": [
+    -1
+   ],
+   "keys": [
+    "lm_head.weight",
+    "model.embed_tokens.weight",
+    "model.norm.weight"
+   ]
+  },
+  {
+   "layers": [
+    0,
+    1,
+    2
+   ],
+   "keys": [
+    "input_layernorm.weight",
+    "mlp.down_proj.weight",
+    "mlp.down_proj.weight_scale_inv",
+    "mlp.gate_proj.weight",
+    "mlp.gate_proj.weight_scale_inv",
+    "mlp.up_proj.weight",
+    "mlp.up_proj.weight_scale_inv",
+    "post_attention_layernorm.weight",
+    "self_attn.indexer.k_norm.bias",
+    "self_attn.indexer.k_norm.weight",
+    "self_attn.indexer.weights_proj.weight",
+    "self_attn.indexer.wk.weight",
+    "self_attn.indexer.wk.weight_scale_inv",
+    "self_attn.indexer.wq_b.weight",
+    "self_attn.indexer.wq_b.weight_scale_inv",
+    "self_attn.kv_a_layernorm.weight",
+    "self_attn.kv_a_proj_with_mqa.weight",
+    "self_attn.kv_a_proj_with_mqa.weight_scale_inv",
+    "self_attn.kv_b_proj.weight",
+    "self_attn.kv_b_proj.weight_scale_inv",
+    "self_attn.o_proj.weight",
+    "self_attn.o_proj.weight_scale_inv",
+    "self_attn.q_a_layernorm.weight",
+    "self_attn.q_a_proj.weight",
+    "self_attn.q_a_proj.weight_scale_inv",
+    "self_attn.q_b_proj.weight",
+    "self_attn.q_b_proj.weight_scale_inv"
+   ]
+  },
+  {
+   "layers": [
+    3,
+    "...",
+    77,
+    "(57 layers)"
+   ],
+   "keys": [
+    "input_layernorm.weight",
+    "mlp.experts.N.down_proj.weight",
+    "mlp.experts.N.down_proj.weight_scale_inv",
+    "mlp.experts.N.gate_proj.weight",
+    "mlp.experts.N.gate_proj.weight_scale_inv",
+    "mlp.experts.N.up_proj.weight",
+    "mlp.experts.N.up_proj.weight_scale_inv",
+    "mlp.gate.e_score_correction_bias",
+    "mlp.gate.weight",
+    "mlp.shared_experts.down_proj.weight",
+    "mlp.shared_experts.down_proj.weight_scale_inv",
+    "mlp.shared_experts.gate_proj.weight",
+    "mlp.shared_experts.gate_proj.weight_scale_inv",
+    "mlp.shared_experts.up_proj.weight",
+    "mlp.shared_experts.up_proj.weight_scale_inv",
+    "post_attention_layernorm.weight",
+    "self_attn.kv_a_layernorm.weight",
+    "self_attn.kv_a_proj_with_mqa.weight",
+    "self_attn.kv_a_proj_with_mqa.weight_scale_inv",
+    "self_attn.kv_b_proj.weight",
+    "self_attn.kv_b_proj.weight_scale_inv",
+    "self_attn.o_proj.weight",
+    "self_attn.o_proj.weight_scale_inv",
+    "self_attn.q_a_layernorm.weight",
+    "self_attn.q_a_proj.weight",
+    "self_attn.q_a_proj.weight_scale_inv",
+    "self_attn.q_b_proj.weight",
+    "self_attn.q_b_proj.weight_scale_inv"
+   ]
+  },
+  {
+   "layers": [
+    6,
+    "...",
+    74,
+    "(18 layers)"
+   ],
+   "keys": [
+    "input_layernorm.weight",
+    "mlp.experts.N.down_proj.weight",
+    "mlp.experts.N.down_proj.weight_scale_inv",
+    "mlp.experts.N.gate_proj.weight",
+    "mlp.experts.N.gate_proj.weight_scale_inv",
+    "mlp.experts.N.up_proj.weight",
+    "mlp.experts.N.up_proj.weight_scale_inv",
+    "mlp.gate.e_score_correction_bias",
+    "mlp.gate.weight",
+    "mlp.shared_experts.down_proj.weight",
+    "mlp.shared_experts.down_proj.weight_scale_inv",
+    "mlp.shared_experts.gate_proj.weight",
+    "mlp.shared_experts.gate_proj.weight_scale_inv",
+    "mlp.shared_experts.up_proj.weight",
+    "mlp.shared_experts.up_proj.weight_scale_inv",
+    "post_attention_layernorm.weight",
+    "self_attn.indexer.k_norm.bias",
+    "self_attn.indexer.k_norm.weight",
+    "self_attn.indexer.weights_proj.weight",
+    "self_attn.indexer.wk.weight",
+    "self_attn.indexer.wk.weight_scale_inv",
+    "self_attn.indexer.wq_b.weight",
+    "self_attn.indexer.wq_b.weight_scale_inv",
+    "self_attn.kv_a_layernorm.weight",
+    "self_attn.kv_a_proj_with_mqa.weight",
+    "self_attn.kv_a_proj_with_mqa.weight_scale_inv",
+    "self_attn.kv_b_proj.weight",
+    "self_attn.kv_b_proj.weight_scale_inv",
+    "self_attn.o_proj.weight",
+    "self_attn.o_proj.weight_scale_inv",
+    "self_attn.q_a_layernorm.weight",
+    "self_attn.q_a_proj.weight",
+    "self_attn.q_a_proj.weight_scale_inv",
+    "self_attn.q_b_proj.weight",
+    "self_attn.q_b_proj.weight_scale_inv"
+   ]
+  },
+  {
+   "layers": [
+    78
+   ],
+   "keys": [
+    "eh_proj.weight",
+    "enorm.weight",
+    "hnorm.weight",
+    "input_layernorm.weight",
+    "mlp.experts.N.down_proj.weight",
+    "mlp.experts.N.down_proj.weight_scale_inv",
+    "mlp.experts.N.gate_proj.weight",
+    "mlp.experts.N.gate_proj.weight_scale_inv",
+    "mlp.experts.N.up_proj.weight",
+    "mlp.experts.N.up_proj.weight_scale_inv",
+    "mlp.gate.e_score_correction_bias",
+    "mlp.gate.weight",
+    "mlp.shared_experts.down_proj.weight",
+    "mlp.shared_experts.down_proj.weight_scale_inv",
+    "mlp.shared_experts.gate_proj.weight",
+    "mlp.shared_experts.gate_proj.weight_scale_inv",
+    "mlp.shared_experts.up_proj.weight",
+    "mlp.shared_experts.up_proj.weight_scale_inv",
+    "post_attention_layernorm.weight",
+    "self_attn.indexer.k_norm.bias",
+    "self_attn.indexer.k_norm.weight",
+    "self_attn.indexer.weights_proj.weight",
+    "self_attn.indexer.wk.weight",
+    "self_attn.indexer.wk.weight_scale_inv",
+    "self_attn.indexer.wq_b.weight",
+    "self_attn.indexer.wq_b.weight_scale_inv",
+    "self_attn.kv_a_layernorm.weight",
+    "self_attn.kv_a_proj_with_mqa.weight",
+    "self_attn.kv_a_proj_with_mqa.weight_scale_inv",
+    "self_attn.kv_b_proj.weight",
+    "self_attn.kv_b_proj.weight_scale_inv",
+    "self_attn.o_proj.weight",
+    "self_attn.o_proj.weight_scale_inv",
+    "self_attn.q_a_layernorm.weight",
+    "self_attn.q_a_proj.weight",
+    "self_attn.q_a_proj.weight_scale_inv",
+    "self_attn.q_b_proj.weight",
+    "self_attn.q_b_proj.weight_scale_inv",
+    "shared_head.norm.weight"
+   ]
+  }
+ ]
+}
