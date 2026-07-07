@@ -20,8 +20,18 @@
 #      lines of /tmp/glm_flight_*.jsonl from EVERY pod host (the black box
 #      written by the fork's runner/flight_recorder.py when the run had
 #      GLM_FLIGHT_RECORDER=1) and aligns them: per-host last step, the last
-#      common step, and which host stopped logging EARLIER than its peers —
-#      that host is the diverged/halted one.
+#      common step, and which host stopped logging earlier than its peers.
+#      Round-6 F1 fix (docs/reviews/round6-observability.md): the fetch uses
+#      --output-directory (one file per worker — `gcloud --worker=all` on a
+#      shared stdout INTERLEAVES the 8 ssh streams and misattributes hosts)
+#      AND tags every line with the remote hostname (`FR|<host>|...`), so
+#      attribution never depends on marker/payload adjacency.
+#      Round-6 F4 caveat, printed in the output header: the recorder logs at
+#      DISPATCH — under sync scheduling the last line IS the dying step
+#      (lag 0); under ASYNC (the vLLM default) the halted step is the last
+#      line MINUS 0 or 1 (at a page boundary that is the difference between
+#      the one-page and two-page program). The rule for THIS run is derived
+#      from the log's async_scheduling engine arg when present.
 #
 # Usage:
 #   bash scripts/triage_crash.sh <run_log> [--no-fetch]
@@ -51,7 +61,8 @@ fi
 
 CLEAN="$(mktemp)"
 FLIGHT_RAW="$(mktemp)"
-trap 'rm -f "$CLEAN" "$FLIGHT_RAW" "$FLIGHT_RAW.err"' EXIT
+FLIGHT_DIR="$(mktemp -d)"
+trap 'rm -f "$CLEAN" "$FLIGHT_RAW" "$FLIGHT_RAW.err"; rm -rf "$FLIGHT_DIR"' EXIT
 # Strip ANSI color so every regex below sees plain text.
 sed 's/\x1b\[[0-9;]*m//g' "$LOG" > "$CLEAN"
 
@@ -162,40 +173,71 @@ echo
 
 # ── 6. flight recorder: fetch + cross-host step alignment ────────────────────
 echo "-- flight recorder (GLM_FLIGHT_RECORDER=1 runs; ${FLIGHT_GLOB} on every host) --"
+# Round-6 F4: the recorder hook runs AFTER dispatch, so "last logged step" ==
+# last DISPATCHED step. Sync scheduling blocks on the step's own tokens =>
+# lag 0; ASYNC (the vLLM default) blocks on step N-1 => the halted step is
+# the last line minus 0 OR 1. Recover the mode from the run log's engine args
+# (also recorded in recorder_init events since the round-6 recorder fix).
+# Printed BEFORE the fetch so --no-fetch triage sees the rule too (§3's
+# log-derived last steps need the same reading).
+SCHED_MODE="$(grep -oE "'async_scheduling': (True|False)" "$CLEAN" | head -1 | grep -oE "True|False" || true)"
+echo "  step-attribution rule (the recorder logs at DISPATCH, not completion):"
+echo "    sync  (async_scheduling=False): halted step = last logged step (lag 0)"
+echo "    ASYNC (True/unset = the vLLM DEFAULT): halted step = last logged step - 0..1"
+echo "          (at a page boundary that is the one-page vs two-page program!)"
+case "$SCHED_MODE" in
+  False) echo "    this log: async_scheduling=False -> lag 0 (exact attribution)" ;;
+  True)  echo "    this log: async_scheduling=True -> subtract 0..1 steps" ;;
+  *)     echo "    this log: async_scheduling not found -> assume ASYNC (subtract 0..1)" ;;
+esac
 if [ "$NO_FETCH" -eq 1 ]; then
-  echo "  (skipped: --no-fetch)"
+  echo "  (fetch skipped: --no-fetch)"
   exit 0
 fi
-# shellcheck disable=SC2016  # $(hostname) must expand on the REMOTE host
+# Round-6 F1: fetch into per-worker files (--output-directory writes
+# {WORKER_ID}.log per worker — no shared-stdout interleaving) AND tag every
+# remote line with its hostname so the awk below never attributes a line by
+# adjacency to a marker. Both defenses verified against the installed SDK
+# (threads share stdout without --output-directory).
+# shellcheck disable=SC2016  # $(hostname) + $H must expand on the REMOTE host
 if ! timeout 180 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command='echo "FLIGHT_HOST $(hostname)"; tail -n 100 '"$FLIGHT_GLOB"' 2>/dev/null || echo "NO_FLIGHT_FILES"' \
-    > "$FLIGHT_RAW" 2> "$FLIGHT_RAW.err"; then
+    --output-directory "$FLIGHT_DIR" \
+    --command='H=$(hostname); { echo "FLIGHT_HOST"; tail -n 100 '"$FLIGHT_GLOB"' 2>/dev/null || echo "NO_FLIGHT_FILES"; } | sed "s/^/FR|$H|/"' \
+    > "$FLIGHT_RAW.err" 2>&1; then
   echo "  (fetch FAILED — pod unreachable or gcloud error; rerun with --no-fetch"
   echo "   for the log-only report. stderr tail:)"
   tail -3 "$FLIGHT_RAW.err" 2>/dev/null | sed 's/^/   | /'
   exit 1
 fi
+cat "$FLIGHT_DIR"/*.log > "$FLIGHT_RAW" 2>/dev/null || true
 awk -v halted="$HALTED_IPS" '
   BEGIN { split(halted, hs, " "); for (i in hs) if (hs[i] != "") hset[hs[i]] = 1 }
-  /^FLIGHT_HOST / { host = $2; key = ""; if (!(host in horder)) { horder[host] = ++hn; hosts[hn] = host }; next }
-  /^NO_FLIGHT_FILES/ { if (host != "") nofiles[host] = 1; next }
-  /^==> .* <==$/ { key = host "|" $2; next }
-  /"ev":"step"/ {
-    if (host == "") next
-    k = (key != "") ? key : host "|(only-file)"
-    if (match($0, /"ts":[0-9.]+/))   ts = substr($0, RSTART + 5, RLENGTH - 5) + 0
-    if (match($0, /"step":[0-9]+/))  st = substr($0, RSTART + 7, RLENGTH - 7) + 0
-    else next
-    lastts[k] = ts; laststep[k] = st; lastline[k] = $0; hostof[k] = host
-    next
-  }
-  /"ev":"/ {  # lifecycle events: remember the newest per host|file
-    if (host == "") next
-    k = (key != "") ? key : host "|(only-file)"
-    if (match($0, /"ev":"[a-z_]+"/))
-      lastev[k] = substr($0, RSTART + 6, RLENGTH - 7)
-    hostof[k] = host
-    next
+  {
+    # every trusted line is "FR|<hostname>|<payload>" (remote-tagged, F1)
+    if (substr($0, 1, 3) != "FR|") next
+    rest = substr($0, 4); p = index(rest, "|"); if (p == 0) next
+    host = substr(rest, 1, p - 1); payload = substr(rest, p + 1)
+    if (!(host in horder)) { horder[host] = ++hn; hosts[hn] = host }
+    if (payload == "FLIGHT_HOST") next
+    if (payload == "NO_FLIGHT_FILES") { nofiles[host] = 1; next }
+    if (payload ~ /^==> .* <==$/) {         # tail multi-file section header
+      split(payload, a, " "); fkey[host] = host "|" a[2]; next
+    }
+    k = (host in fkey) ? fkey[host] : host "|(only-file)"
+    ts = -1                                  # F7: never reuse a stale ts
+    if (match(payload, /"ts":[0-9.]+/)) ts = substr(payload, RSTART + 5, RLENGTH - 5) + 0
+    if (payload ~ /"ev":"step"/) {
+      st = -1
+      if (match(payload, /"step":[0-9]+/)) st = substr(payload, RSTART + 7, RLENGTH - 7) + 0
+      if (st < 0) next
+      lastts[k] = ts; laststep[k] = st; lastline[k] = payload; hostof[k] = host
+      next
+    }
+    if (match(payload, /"ev":"[a-z_]+"/)) {  # lifecycle: newest per host|file
+      lastev[k] = substr(payload, RSTART + 6, RLENGTH - 7)
+      lastevts[k] = ts; hostof[k] = host
+      next
+    }
   }
   function field(line, name,    r) {
     r = "\"" name "\":[-0-9]+"
@@ -208,29 +250,46 @@ awk -v halted="$HALTED_IPS" '
     # newest file per host wins (stale files from earlier runs lose on ts)
     for (k in lastts) { h = hostof[k]
       if (!(h in best) || lastts[k] > lastts[best[h]]) best[h] = k }
-    mx = -1; mn = -1; nsteps = 0
+    for (k in lastev) { h = hostof[k]                 # F7: lifecycle fallback
+      if (!(h in bestev) || lastevts[k] > lastevts[bestev[h]]) bestev[h] = k }
+    mx = -1; mn = -1; nsteps = 0; mxts = -1
     for (i = 1; i <= hn; i++) { h = hosts[i]
       if (h in best) { s = laststep[best[h]]; nsteps++
         if (s > mx) mx = s
-        if (mn < 0 || s < mn) mn = s } }
+        if (mn < 0 || s < mn) mn = s
+        if (lastts[best[h]] > mxts) mxts = lastts[best[h]] } }
     for (i = 1; i <= hn; i++) {
       h = hosts[i]
       if (!(h in best)) {
-        printf "  %-24s NO flight data%s\n", h,
-               (h in nofiles) ? " (no files — was GLM_FLIGHT_RECORDER=1 baked into the raylet env?)" : ""
+        if (h in bestev) {                            # F7: crashed in load/warmup?
+          k = bestev[h]
+          printf "  %-24s no step lines; newest event=%s ts=%.3f (crashed in load/warmup? a\n", \
+                 h, lastev[k], lastevts[k]
+          print  "                           fresh post-relaunch file has lifecycle events only)"
+        } else {
+          printf "  %-24s NO flight data%s\n", h,
+                 (h in nofiles) ? " (no files — was GLM_FLIGHT_RECORDER=1 baked into the raylet env?)" : ""
+        }
         continue
       }
       k = best[h]; l = lastline[k]
       mark = ""
-      if (mx >= 0 && laststep[k] < mx) mark = "  <-- stopped " (mx - laststep[k]) " step(s) EARLY (diverged?)"
-      printf "  %-24s last step=%-7d reqs=%-3d real=%-5d padded=%-5d decode_only=%d chunks=%d finished=%d%s\n", \
-             h, laststep[k], field(l, "num_reqs"), field(l, "real_tokens"), \
+      if (mx >= 0 && laststep[k] < mx) mark = "  <-- stopped " (mx - laststep[k]) " step(s) EARLY (diverged? see caveat below)"
+      if (mxts >= 0 && lastts[k] >= 0 && mxts - lastts[k] > 120)   # F2/F3 discrimination
+        mark = mark "  <-- recorder quiet " int(mxts - lastts[k]) "s before cluster-max ts:" \
+               " recorder-death, not worker-death? (grep worker logs for BLACK BOX DEAD /" \
+               " flight recorder DISABLED)"
+      printf "  %-24s last step=%-7d ts=%-14.3f reqs=%-3d real=%-5d padded=%-5d decode_only=%d chunks=%d finished=%d%s\n", \
+             h, laststep[k], lastts[k], field(l, "num_reqs"), field(l, "real_tokens"), \
              field(l, "padded_tokens"), field(l, "decode_only"), \
              field(l, "num_prefill_chunks"), field(l, "finished"), mark
     }
     if (nsteps > 0) {
       printf "  last common step across hosts: %d | cluster max: %d | spread: %d\n", mn, mx, mx - mn
-      print  "  read: the host whose last step is LOWEST stopped logging first — that"
-      print  "  worker diverged/halted; compare its composition line with its peers."
+      print  "  read: apply the step-attribution rule above to the LOWEST last step."
+      print  "  caveat (round-6 F4): a mid-collective halt hangs the peers at the SAME"
+      print  "  step (sync) or +1 (async) — expected spread 0-1, NOT a growing gap; a"
+      print  "  big spread means either a halt that let peers progress, or a host whose"
+      print  "  RECORDER died early (check the ts column / the recorder-death mark)."
     }
   }' "$FLIGHT_RAW"

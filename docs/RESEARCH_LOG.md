@@ -462,3 +462,107 @@ Commit: fork `glm-5.2-v4-r5fix` @ c8a51543 (not pushed, per task); glm-tpu docs 
 - Launcher default flipped to JAX_SHARE_BINARY_BETWEEN_HOSTS=1 (override via env).
 - Wave B (items 16-31) running at TPU_MIN_TOKEN_BUCKET=32 — tests whether sharedbin also fixes the
   small-bucket runs (expected same root cause) AND unlocks the 10-30x decode throughput (docs/03).
+
+## 2026-07-07 — Stage-3 dense-MTP M1 BUILT + CPU parity PASS (fork branch `glm-5.2-v4-mtp`; CPU-only, TPU untouched)
+
+Implemented docs/08 gaps G1-G3 for DENSE MTP (DSA off; index-share/G4 stays M4) in a worktree
+(`~/tpu-inference-mtp`, branch `glm-5.2-v4-mtp` off `origin/glm-5.2-v4`):
+
+- **G1** — `DeepSeekMTPModel` added to `_VLLM_PREFERRED_ARCHITECTURES` (models/common/model_loader.py):
+  draft and target now both resolve `"vllm"`; Eagle3Proposer's impl-equality check passes.
+- **G2** — shared-weight NAME MAP: `glm_mtp/shared_weights.py` gains `build_mtp_shared_params`
+  (draft-name-keyed: embed→embed, layers.78.shared_head.head←lm_head); `Eagle3Proposer.load_model`
+  uses it for `method=="mtp"` + `DeepSeekMTPModel` drafts (all other methods keep the old
+  name-equality set byte-identically). Wrapper sharing factored into `_apply_shared_params` with
+  **must_share_all hard errors** for MTP (shape mismatch / missing draft param / missing target key
+  all raise — no more warn-and-skip garbage-logits risk); sharing now re-registers a fresh Parameter
+  (works for plain-CPU AND torchax draft params; the shared array keeps the target's sharding).
+  V3 closed: `jit_compute_logits_func`'s lm_head probe falls back to the MTP `shared_head.head`
+  (`_mtp_shared_head_weight`) so a vocab-sharded shared head keeps vocab-sharded logits (no 1.77 GiB
+  lm_head all-gather); target probe path unchanged.
+- **G3** — draft-load filters (`glm_mtp/draft_load_filter.py` + RunaiIncrementalModelLoader): FILE-level
+  (safetensors index weight_map → only files carrying `model.layers.78.*`; ~1-2 of 150 files instead of
+  755.7 GB re-streamed; gs:// index pulled via ObjectStorageModel) + NAME-level iterator skip (EP-filter
+  pattern; composes with the EP expert filter — layer 78 carries all 256 experts so coverage verification
+  still passes). Both fail OPEN; target loads byte-identical (`_mtp_spec_layers=None`).
+- **Spec-config wiring verified E2E on CPU**: `--speculative-config '{"method":"mtp","num_speculative_tokens":k}'`
+  → vLLM surgery (arch `DeepSeekMTPModel`, `n_predict=num_nextn_predict_layers=1`) → `use_eagle()` →
+  Eagle3Proposer → draft build. Also fixed a CPU-harness-only artifact: `_free_cpu_storage` in
+  unquantized.py (JAX CPU backend aliases the torch buffer via `jnp.asarray`; freeing must be best-effort).
+
+**Gate M1 (CPU, mini dims, fp32): PASS** — `parity/glm_mtp_parity.py` (new; `glm_engine_common.py` extended
+with MTP-layer weights/config, fp32 checkpoints, eh_proj kept bf16-class under fp8). Candidate = production
+draft build through the wrapper's real jitted `draft_step_fun` + `compute_logits` (GLM_DSA_MODE=xla_ref,
+index_topk>=T ⇒ bit-exact dense; MTP block dense-MLP — the MoE GMM kernel is TPU-only). Reference = COMPOSED
+HF (`GlmMoeDsaDecoderLayer` at the MTP index from a twin config + transcribed enorm/hnorm/eh_proj/
+shared-head glue, incl. the position-0 embed mask). Result: **max rel Δ 3.1e-6 (hidden) / 3.2e-6 (logits),
+~2000x under the bf16 control floor (6.4e-3); top-1 agreement 100%**. Plus: M0-style LOAD AUDIT on the real
+built model (dense AND MoE-MTP minis) — the only params not fed by the checkpoint are exactly
+{embed_tokens, shared_head.head}, then hard-error-shared; V1 confirmed (draft indexer built, topk buffer on
+CPU). **Byte-identity hash test PASS**: target forward sha256 identical with the MTP speculative config
+attached vs speculative off.
+
+CPU suites: mtp `test_glm_mtp_stage3.py` 20/20; DSA `test_glm_dsa_indexer` + kernels 56/56 + suite batch
+43/43; MLA 8/9 (`test_process_weights_after_loading` failure is PRE-EXISTING at pristine HEAD — mesh-axis
+rename drift in the test, reproduced identically on the untouched main checkout).
+
+M2 (pod, owner): greedy spec-decode == non-spec baseline for k∈{1,5}; needs engine-scale checks of V2
+(draft KV grouped with target MLA layers; eagle3 `prepare_inputs` last-group assumption degenerates
+correctly for a single unified group), the G3 file filter against the real gs:// index, FP8 draft load
+(quantized path skips vLLM weights-tracking), and precompile of the draft programs per bucket.
+
+## 2026-07-07 — Round-6 review fixes applied (CPU-only, TPU untouched) + a CORRECTION to the 12:40 entry
+
+Four round-6 adversarial reports committed to `docs/reviews/round6-{dcp,paged-indexer,observability,mtp-card}.md`;
+fixes applied per repo/worktree:
+
+- **CORRECTION (honest-nulls; round6-observability F5).** The 12:40 entry's evidence line "the
+  flight-recorder triage of probeA5 showed the halted host **153 steps behind**" is WRONG twice over:
+  (1) probeA5 (run 11:01) PREDATES the flight recorder (commit 11:45) — zero `flight_recorder` lines in
+  probeA5.log; the number came from §3's `[OBSERVE_COMPILES]` log lines. (2) Those per-host numbers are
+  Ray-dedup artifacts: Ray's canonicalizer strips digit-bearing tokens, so cross-host `step=N` lines
+  dedupe and "per-host last step" measures who last won a ~5 s dedup window — the same triage showed
+  healthy hosts −12/−24/−33/−36, impossible under sync scheduling's ≤1-step skew, so −153 carries no
+  skew meaning (the script itself labels §3 a lower bound). The sharedbin=1 conclusion rests on the
+  waveA2 A/B alone — and "CORE-HALT ROOT CAUSE CLOSED" was OVERBROAD: waveB (12:53, .20) and waveB2
+  (13:15, .18) both crashed WITH sharedbin=1 (the step-417/kv-513 investigation is the follow-up).
+- **Bench HIGH (round6-mtp-card F1): `--protocol card` could never run on the pod** — card mode always
+  set `SamplingParams(seed=...)`; the fork's `TpuPlatform.validate_request` rejects every
+  `RANDOM_SEED` request per request, AFTER the ~45-min engine build (proven live on this stack; the CPU
+  tests checked "seeds reach the generator", never "the engine accepts them"). Fix in `bench/run_bench.py`:
+  `_per_request_seed_support()` probes the platform once at `make_generate` (fail-safe: any probe error
+  = unsupported); `_sp` omits the seed when unsupported + a loud banner; `items.seed` now records THE
+  SEED THE ENGINE GOT (NULL on this backend, and NULL for greedy — F10's cross-protocol ambiguity);
+  summary note gains `seed_passthrough=on/off`; per-sample seeds remain labels (`#sN` ids + base_seed).
+  docs/07 updated (seeds-are-labels §3 note, §6 banner note). New tests: engine-side platform probe in a
+  SUBPROCESS (asserts TpuPlatform rejects seeded + accepts seedless params — keeps test_longctx's
+  "vllm never imported" contract intact) + seed-provenance gating. `pytest bench/` 23 → **25 passed**.
+- **Triage/launcher (round6-observability F1/F4/F7/F8/F3-countermeasure):** `triage_crash.sh` §6 fetch
+  now uses `--output-directory` per-worker files + remote per-line `FR|host|` tags — `gcloud
+  --worker=all` on shared stdout interleaves the 8 streams and the old awk misattributed hosts
+  (reproduced by the review: false "NO flight data" w-4/w-5/w-7 AND a false "diverged" flag); the output
+  header prints the sync/async step-attribution rule (recorder logs at DISPATCH: sync lag 0; async — the
+  vLLM DEFAULT — halted step = last line − 0..1) with the run's own `async_scheduling` grepped from the
+  log; per-host `ts` column + recorder-death mark (quiet ≫ before cluster-max ts → suspect the RECORDER,
+  not the worker); step-less hosts print their newest lifecycle event (crashed-in-load signal) instead of
+  "NO flight data"; stale-ts-reuse bug fixed. Launcher stop phase prunes all but the 8 newest
+  `/tmp/glm_flight_*` per host (F8 — /tmp pressure at crash time fed the recorder's fail-open).
+  shellcheck-clean; §6 awk smoke-tested on synthetic per-worker data; `--no-fetch` re-validated on
+  probeA5.log. docs/10: mode-dependence table, corrected divergence heuristic ("peers keep going" is
+  wrong for mid-collective halts — expected spread 0–1), kv_len_* = total-known-tokens caveat (F6:
+  decode-only lines only; `num_prefill_chunks` will misclassify under Stage-3 MTP).
+- **Fork worktrees (each committed + pushed on its feature branch):**
+  `glm-5.2-v4-r6fix` @ 413db9e1 (NEW, off origin/glm-5.2-v4) — recorder F2 (failed rotation falls back
+  to the original path; every death logs `BLACK BOX DEAD at ts=…`), F3 (3 CONSECUTIVE errors, counter
+  resets on success), F4a (`recorder_init` records `async_scheduling` + `GLM_ASYNC_SCHED`); recorder
+  tests 11 → 15 pass. `glm-5.2-v4-2a2` @ 755b1719 — paged-indexer finding 1 (MEDIUM latent): pad mask no
+  longer opt-in; paged entry points take required `query_start_loc` and derive req-ids + mask internally
+  (`token_request_ids`), per-request block tables only (loud ValueError otherwise), `write_indexer_keys`
+  requires `valid`; DSA/MLA 5-file suite 93 → 95 pass. `glm-5.2-v4-dcp` @ 70aa6825 — F1 claim accuracy:
+  gate-off kernel trace is dataflow-identical (scalar address hoists above paired dma_starts; DMA
+  order/operands unchanged ⇒ outputs bit-identical), NOT byte-identical; byte-identity holds only for
+  the mocked-kernel `mla_attention` trace; comments/docstrings only, 47/47 pass.
+- **Not fixed here (out of scope / other branches):** round6-paged-indexer finding 2 (the S1 DP-guard
+  `set(str)` axis-name bug) lives on `glm-5.2-v4-r5fix`; finding 3 (2a2↔r5fix cross-merge) is the
+  integration step; mtp-card F2–F9 are MTP-gate/extractor hardening items for the M-milestones and the
+  bench extractor backlog (F4–F6 documented in the report, LOW).

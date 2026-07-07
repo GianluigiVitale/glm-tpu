@@ -123,7 +123,13 @@ dry() { printf 'DRY-RUN> %s\n' "$*"; }
 # engine cores / ray workers, unmount any stale gcsfuse mount (no-op if absent).
 # ⚠ These patterns kill ANY vLLM/Ray proc as root on all 8 hosts — including
 # the cohabiting ASPt stack. See the SHARED-POD COLLISION POLICY in the header.
-STOP_CMD="$RAY stop -f >/dev/null 2>&1; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
+# Round-6 F8 (docs/reviews/round6-observability.md): flight-recorder files
+# accumulate across relaunches (per-pid, never pruned; /tmp pressure at crash
+# time is what trips the recorder's fail-open) — prune all but the 8 newest
+# /tmp/glm_flight_* per host. The just-crashed run's files are always the
+# newest, so they survive a relaunch; still fetch (triage_crash.sh) BEFORE
+# relaunching per the docs/10 run-book.
+STOP_CMD="$RAY stop -f >/dev/null 2>&1; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; fusermount -u ~/gcs-models >/dev/null 2>&1; ls -1t /tmp/glm_flight_* 2>/dev/null | tail -n +9 | xargs -r sudo rm -f >/dev/null 2>&1; true"
 
 # Worker join: bake ENVS into the raylet, then join the head. Escaped $(...)
 # and $? run on the REMOTE host, not here.
