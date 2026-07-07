@@ -264,3 +264,25 @@ what you did, what you validated it against, the exact numbers, and the honest n
   "does nothing" cycles — DSV4 burned 5,189); (3) piggyback step-N output on step-N+1's DAG round +
   pre-flatten the params dict + fold positions into the blob. §5 lists what the 20-step profiler trace
   must confirm (the inter-step bubble, 0 backend compiles, instant device_get after copy_to_host_async).
+
+## 2026-07-07 — docs/03: throughput roofline + suspect ranking (READ-ONLY; the FLOP/roofline side docs/04 defers to)
+
+- **`docs/03-throughput-analysis.md` committed.** Baselines re-derived from the logs: single-stream
+  1.087 s/step (0.92 tok/s), batch-8 ≈1.37 s/step (5.85 tok/s aggregate, gsm8k_n32 pass 1); decode steps
+  carry 7–74 real tokens into the single 512-token compiled program (`compile_ranges_endpoints=[512]`,
+  crash-dump `total_num_scheduled_tokens=7`). Roofline floors on v4-64: single-stream ≈4.7–7 ms/step,
+  batch-8 ≈9–12 ms, pessimal read-everything 19.2 ms → we sit **155–230× / ~120× / ~71×** above (not
+  the guessed 1000×). Suspects: (a) TPU_MIN_TOKEN_BUCKET=512 CONFIRMED #1 (real constraint is
+  divisibility by the 32-wide token shard → **bucket 32 is legal**; the ">50% padding garbage" claim
+  is nowhere in code/recon docs); (d) CONFIRMED sleeper — ~504 identical pad rows land in the SAME 8
+  experts every layer (~38 GFLOP per owned expert per layer on 1–4 chips, psum-serialized), while
+  gmm_v2 skips empty groups so the weight READ is only ~F2 (~9–15 ms, NOT all-256); (b) the mla
+  cross-shard gather moves ~3 GB/step/chip at bucket 512 (plus a GSPMD head→token reshard both ways —
+  q is BORN head-sharded from the W_UK_T einsum) but the kernel grid visits only real tokens at decode;
+  (c) host 2–7 ms (docs/04), (e) logits/sampling ~2–5 ms, (f) zero mid-run recompiles — all ruled down.
+  Static budget accounts for ~135–380 ms of 1,370 → honest ×3–8 residual → **probes before fixes**:
+  Probe A bucket-32 A/B (exact launcher+run_bench commands in §6), Probe B 20-step PHASED_PROFILING_DIR
+  xplane capture, Probe C FORCE_MOE_RANDOM_ROUTING. Fix ladder: bucket 32 (~10–30×, env-only) →
+  max_seqs 16 (~2×, KV already covers 16×4096 exactly) → continue_decode (docs/04) → head-sharded
+  attention specs (docs/05 S1) → Stage-2 DSA+DCP. Also flagged: both gsm8k runs died on pass 2 with a
+  device-fatal TPU_EXECUTE_ERROR (reliability item, separate from throughput).
