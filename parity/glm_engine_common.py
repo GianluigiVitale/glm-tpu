@@ -65,12 +65,18 @@ def make_mini_config(n_layers: int = 5,
                      first_k_dense: int = 1,
                      fp8: bool = False,
                      fp8_block: int = 64,
-                     index_topk: int = IDX_TOPK) -> dict:
+                     index_topk: int | None = None) -> dict:
     """A config.json dict consumable by BOTH transformers (GlmMoeDsaConfig) and
     vLLM (deepseek_v2.py GlmMoeDsaForCausalLM). Field set mirrors the real
     config.json; only sizes shrink."""
     # the real schedule formula (HF configuration_glm_moe_dsa.py:142-146 ==
     # vLLM deepseek_v2.py:1023-1032): full iff max(i-offset+1,0) % freq == 0
+    # Late-bind: use_real_dims() rewrites the module global AFTER import,
+    # so an early-bound default would freeze the mini value (128) and make
+    # the HF reference run top-128 SPARSE DSA past position 128 — exactly
+    # the "multi-page divergence" false alarm.
+    if index_topk is None:
+        index_topk = IDX_TOPK
     freq, offset = 4, 3
     indexer_types = [
         "full" if max(i - offset + 1, 0) % freq == 0 else "shared"

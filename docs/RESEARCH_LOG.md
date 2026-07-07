@@ -118,3 +118,24 @@ what you did, what you validated it against, the exact numbers, and the honest n
     both layouts, + gate-S TPU-vs-torch selected sets) still required on the pod once the 2a sparse path
     exists — E1/E2 are score/weight-level, single-layer (0), and cannot see output-level effects at
     ctx > 2048. Layers 1-2 (other shards) can be added to E1 if more evidence is wanted.
+
+## 2026-07-07 (later) — the "T>128 multi-page divergence" was a HARNESS false alarm; engine exonerated; ALL sub-cube gates green
+
+- **Root cause (found by a read-only kernel-analysis agent, empirically confirmed)**: `make_mini_config`'s
+  `index_topk` default bound the module-import value (mini 128); `use_real_dims()` rewrites the global but not
+  the already-bound default → the written checkpoints carried `index_topk: 128` under `--real-dims` → the HF
+  REFERENCE ran top-128 SPARSE DSA past position 128 while the engine ran dense. The 128 cliff == index_topk
+  (== PAGE by coincidence). Explains everything: block-size independence, identical outputs across kernel
+  configs, engine paths agreeing with each other. **The mla.v2 multi-page path was verified correct by hand**
+  (write/attend/mask/page-walk all traced clean; PR #2324's kernel patch touches none of it).
+- Fix: late-bound default + a written-artifact assert (`cfg["index_topk"] >= T`). T=136/256 real-dims fp8 now
+  **PASS** (top-1 vs fp32 0.89/0.91 ≥ the bf16 ref's own 0.88/0.89).
+- **Two-step gate corrected**: bit-exactness across different chunkings is not a sound bar at real dims — a
+  borderline MoE routing decision legitimately flips under a different summation order (scattered positions
+  from pos 3; BOTH paths equally close to HF). Gate is now two_step-vs-HF ≤ 1.5× bf16 floor. T=300 real-dims
+  two-step PASS; mini T=32 remains bit-exact.
+- Round-3 adversarial review (4 lenses) on the parallel-agent deliverables: 2 HIGHs in the passkey harness
+  (token-length targeting −17.2% under the real BPE tokenizer; the `[gMASK]<sop>` add_special_tokens claim is
+  factually wrong), extractor silent-wrong regressions, dataset revision-pinning, doc-truthfulness items —
+  fix batch delegated; none pod-blocking. Reports in docs/reviews/round3-*.
+- **Sub-cube validation is COMPLETE. Next: pod bring-up** (sync workers @ fork a429be54, launch, engine build).

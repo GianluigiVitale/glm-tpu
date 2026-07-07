@@ -350,6 +350,10 @@ def main():
     fp8_block = 128 if args.real_dims else 64
     cfg = C.make_mini_config(n_layers=args.layers, fp8=args.fp8,
                              fp8_block=fp8_block)
+    assert cfg["index_topk"] >= args.T, (
+        f"written config index_topk={cfg['index_topk']} < T={args.T}: the "
+        "HF reference would run SPARSE DSA and the parity diff would be "
+        "meaningless")
     w = C.gen_weights(args.seed, cfg)
     rng = np.random.default_rng(100 + args.seed)
     input_ids = rng.integers(0, C.VOCAB, size=args.T).astype(np.int32)
@@ -364,6 +368,7 @@ def main():
         # the diff isolates the engine's fp8 handling, not quantization error.
         blk = cfg["quantization_config"]["weight_block_size"][0]
         cfg_bf16 = C.make_mini_config(n_layers=args.layers, fp8=False)
+        assert cfg_bf16["index_topk"] == cfg["index_topk"]
         C.write_checkpoint(hf_dir, w, cfg_bf16, fp8=False,
                            roundtrip_fp8_block=blk)
     else:
@@ -388,8 +393,11 @@ def main():
     _diff("logits", logits16, logits32)
 
     if os.environ.get("GLM_DUMP_NPZ"):
+        extra = {}
+        if hidden_ts is not None:
+            extra["eng2"] = hidden_ts
         np.savez(os.environ["GLM_DUMP_NPZ"], eng=hidden_eng, ref32=hs32[-1],
-                 ref16=hs16[-1])
+                 ref16=hs16[-1], **extra)
         print(f"[dump] saved to {os.environ['GLM_DUMP_NPZ']}")
 
     print("\n== engine (bf16 TPU) vs HF fp32 ==")
@@ -419,17 +427,24 @@ def main():
         # reference itself does (allow 1 flip of slack at small T)
         t1_ok = eng_t1 >= ref_t1 - (1.0 / len(t1_eng))
 
-    # two-step vs single full-prefill: same math through the paged cache
-    # modulo bucketing → bf16-exact expected; gate at 1e-2 relative.
-    rel_ts = None
+    # two-step vs single full-prefill (informational) + two-step vs the HF
+    # reference (the GATE). Bit-exactness across different chunkings is NOT
+    # a sound bar at real dims: a borderline MoE routing decision can flip
+    # under a different summation order and legitimately move that token's
+    # output by O(0.1-1) — observed as scattered positions from pos 3 on,
+    # with BOTH paths equally close to HF. The meaningful invariant is that
+    # the chunked path matches the reference within the same noise budget
+    # as the full-prefill path.
+    d_ts_hs = None
     if args.two_step:
-        print("\n== two-step (prefill+decode via the paged KV cache) vs "
-              "single full-prefill ==")
+        print("\n== two-step (prefill+decode via the paged KV cache) ==")
         d_ts = np.abs(hidden_ts - hidden_eng).max()
         rel_ts = float(d_ts / (np.abs(hidden_eng).max() + 1e-9))
         exact_ts = bool(np.array_equal(hidden_ts, hidden_eng))
-        print(f"  two_step      max|Δ|={d_ts:.6f}  rel={rel_ts:.6f}  "
-              f"exact_bit_match={exact_ts}")
+        d_ts_hs = np.abs(hidden_ts - hs32[-1]).max()
+        print(f"  vs full-prefill: max|Δ|={d_ts:.6f} rel={rel_ts:.6f} "
+              f"exact_bit_match={exact_ts} (informational)")
+        print(f"  vs HF fp32:      max|Δ|={d_ts_hs:.6f}")
 
     # ---- machine gate (exit nonzero on failure) ----
     floor_hs = np.abs(hs16[-1] - hs32[-1]).max()
@@ -447,7 +462,8 @@ def main():
         "top1": bool(t1_ok),
     }
     if args.two_step:
-        checks[f"two_step rel {rel_ts:.6f} <= 0.01"] = rel_ts <= 1e-2
+        checks[f"two_step_vs_hf {d_ts_hs:.4f} <= {K}x floor {floor_hs:.4f}"] \
+            = d_ts_hs <= K * floor_hs
     failed = [k for k, v in checks.items() if not v]
     print(f"\n[GATE] {'PASS' if not failed else 'FAIL: ' + '; '.join(failed)}")
 
