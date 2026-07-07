@@ -349,7 +349,7 @@ def test_card_protocol_run():
     orig_load = B.load_items
     seen_protocols = []
 
-    def fake_load(spec, limit=None, protocol="greedy"):
+    def fake_load(spec, limit=None, protocol="greedy", offset=0):
         seen_protocols.append(protocol)
         return list(items)
 
