@@ -177,3 +177,28 @@ what you did, what you validated it against, the exact numbers, and the honest n
     duplicate-work-check + AI-attribution-trailer requirements added to the PR checklist; HANDOFF ENVS list
     corrected to the launcher's 13 envs verbatim and the T>128 item marked RESOLVED.
   - All bench CPU tests green after the batch: `test_bench.py` 5/5 suites, `test_longctx.py` 11/11.
+
+## 2026-07-07 06:40-07:00 UTC — 🎉 STAGE-1 POD MILESTONE: GLM-5.2-FP8 GENERATES CORRECTLY ON 32 v4 CHIPS
+
+- **Engine built in 615.5 s** (run `stage1 pod smoke #16`, ~/glm-run/smoke16.log): 753B FP8 streamed
+  GCS→HBM via runai + the sharding-derived EP filter (32/256 experts/host — mesh-aware non-contiguous
+  chunks), FP8 kept resident (23.06/30.75 GiB per chip), checkpoint-exact block scales
+  (DISABLE_WEIGHT_REQUANTIZATION=1), dense MLA via mla.v2 + cross-shard all-gather, MoE GMM per-tile
+  dequant, KV 65,536 tokens (128 blocks × 512), pure TP-32 mesh (model=32).
+- **GSM8K smoke n=4: acc 75.0** — 3 correct with reasoned CoT (`18`,`3`,`540`), 1 honest truncation
+  miss at the 512-token cap. Config: max_len 4096, mbt 512, max_seqs 4, blocks 128, gmu 0.90. All items
+  verbatim in bench/results.db.
+- **Pod-bring-up bugs fixed en route** (fork commits 4e24a6c6..10efa393 + launcher/bench commits):
+  driver must not import tpu_inference (holds libtpu lockfile against its own EngineCore); leaked
+  1.5-day EngineCore held w-5 accel0 (sudo pkill in launcher now); HEAD_IP derived not hardcoded
+  (pod re-created since DSV4; w-0 = .21); pkill patterns bracket-escaped (self-match killed the ssh
+  carrier); EP expert filter (host CPU-RAM OOM at 376 GB — each host now loads 32/256 experts);
+  full-res-N block scales (TP shard width 64 < quant block 128); selective K-axis scale expansion
+  (16 K-blocks vs 32 shards); vocab-sharded lm_head must keep vocab-sharded logits in BOTH
+  compute_logits variants (the forced token-sharded layout all-gathered the 1.77 GiB lm_head into
+  scratch); get_page_size probes TPU version via metadata not jax.devices() (driver-side TPU init);
+  KV blocks capped (auto-sizer overcommitted HBM).
+- **Perf status (honest)**: ~0.95 tok/s single-stream XLA decode (unoptimized — the Pallas decode
+  path is Stage-2+ work; DSV4 was the same pre-kernel). GPQA-198 needs batched generation first.
+- Remaining for the Stage-1 gate: batched bench runs (GSM8K n≥32, GPQA-Diamond) vs card within noise,
+  3/3 clean pod runs, adversarial review of the bring-up series.
