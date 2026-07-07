@@ -65,6 +65,12 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     extra = {}
     if num_gpu_blocks and num_gpu_blocks > 0:
         extra["num_gpu_blocks_override"] = int(num_gpu_blocks)
+    # GLM_ASYNC_SCHED=0 disables vLLM async scheduling (docs/06 probe P2:
+    # both pod core-halts hit the finish-step under async; sync mode is the
+    # discriminator AND a ~1%-cost mitigation at current step times).
+    # Unset/1 keeps vLLM's default (async on for the Ray TPU executor).
+    if os.environ.get("GLM_ASYNC_SCHED") == "0":
+        extra["async_scheduling"] = False
     llm = LLM(
         model=model,
         trust_remote_code=True,
