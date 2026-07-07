@@ -85,7 +85,7 @@ dry() { printf 'DRY-RUN> %s\n' "$*"; }
 
 # Same stop hygiene as the DSV4 launcher: force-stop ray, kill stray raylets /
 # engine cores / ray workers, unmount any stale gcsfuse mount (no-op if absent).
-STOP_CMD="$RAY stop -f >/dev/null 2>&1; pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; pkill -9 -x raylet >/dev/null 2>&1; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
+STOP_CMD="$RAY stop -f >/dev/null 2>&1; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; fusermount -u ~/gcs-models >/dev/null 2>&1; true"
 
 # Worker join: bake ENVS into the raylet, then join the head. Escaped $(...)
 # and $? run on the REMOTE host, not here.
