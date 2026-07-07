@@ -566,3 +566,19 @@ fixes applied per repo/worktree:
   `set(str)` axis-name bug) lives on `glm-5.2-v4-r5fix`; finding 3 (2a2↔r5fix cross-merge) is the
   integration step; mtp-card F2–F9 are MTP-gate/extractor hardening items for the M-milestones and the
   bench extractor backlog (F4–F6 documented in the report, LOW).
+
+## 2026-07-07 15:05 UTC — OOB KERNEL FIX VALIDATED ON HARDWARE; GSM8K n=32 CLEAN AT 32.9 tok/s; GPQA-198 LAUNCHED
+
+- **The mla.v2 pack_new_kv OOB fix (63427f86, merged 02e44b36) HOLDS on the pod**: GSM8K n=32 batched at
+  TPU_MIN_TOKEN_BUCKET=32, max_seqs 16 — the exact config that previously died 100% of the time at the first
+  512-page crossing — ran CLEAN: **acc 87.5 (n=32, 6 truncated at the 1024 cap)**, 20,280 gen tokens in
+  616.7 s = **32.9 tok/s aggregate (~35x the original 0.92 tok/s single-stream)**. Run `gsm8k_n32_fix`,
+  full provenance.
+- Combined GSM8K evidence: waveA2 (items 0-15) 93.75; n=32 87.5 with 6/32 truncation-misses — the cap, not
+  the model, drives most misses; next GSM8K runs use --max-new 2048.
+- The prior "JAX_SHARE_BINARY_BETWEEN_HOSTS=1 fixed it" claim was CORRECTED in-log (Ray-dedup artifact +
+  composition luck); the real cause was the OOB read (docs/reviews/round7-pg2-oob.md pending).
+- **GPQA-Diamond n=198 flagship run launched** (bucket 32, max_seqs 8, max-new 4096, ~4-5 h ETA).
+- Stage-2 code-complete on branch glm-5.2-v4-2int (118 tests): GLM_DSA_MODE=pallas_decode end-to-end;
+  round-7 adversarial reviews of pg2+2int running; staging merge (glm-5.2-v4-next) + DSA perf follow-ups
+  + dense-MTP M1 in flight.

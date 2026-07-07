@@ -65,10 +65,20 @@ def make_mini_config(n_layers: int = 5,
                      first_k_dense: int = 1,
                      fp8: bool = False,
                      fp8_block: int = 64,
-                     index_topk: int | None = None) -> dict:
+                     index_topk: int | None = None,
+                     num_mtp_layers: int = 0) -> dict:
     """A config.json dict consumable by BOTH transformers (GlmMoeDsaConfig) and
     vLLM (deepseek_v2.py GlmMoeDsaForCausalLM). Field set mirrors the real
-    config.json; only sizes shrink."""
+    config.json; only sizes shrink.
+
+    num_mtp_layers > 0 mirrors the real checkpoint's MTP layer(s): the config
+    advertises ``num_nextn_predict_layers`` and gen_weights ships
+    ``model.layers.{n_layers + i}.*`` MTP weights (enorm/hnorm/eh_proj/
+    shared_head.norm + a full transformer block, NO embed / shared_head.head
+    — those are weight-shared from the target, docs/08 §1.1). Like the real
+    layer 78, the MTP layer's indexer schedule and mlp type fall through the
+    same formulas the target layers use (full iff the offset/freq formula
+    says so; sparse iff ``layer_id >= first_k_dense``)."""
     # the real schedule formula (HF configuration_glm_moe_dsa.py:142-146 ==
     # vLLM deepseek_v2.py:1023-1032): full iff max(i-offset+1,0) % freq == 0
     # Late-bind: use_real_dims() rewrites the module global AFTER import,
@@ -108,8 +118,8 @@ def make_mini_config(n_layers: int = 5,
         "intermediate_size": DENSE_INTER,
         "kv_lora_rank": KV_LORA,
         "max_position_embeddings": MAX_POS,
-        "mlp_layer_types": ["dense"] * first_k_dense +
-                           ["sparse"] * (n_layers - first_k_dense),
+        "mlp_layer_types": ["dense"] * min(first_k_dense, n_layers) +
+                           ["sparse"] * max(n_layers - first_k_dense, 0),
         "moe_intermediate_size": MOE_INTER,
         "moe_layer_freq": 1,
         "moe_router_dtype": "float32",
@@ -121,7 +131,7 @@ def make_mini_config(n_layers: int = 5,
         "num_experts_per_tok": TOPK,
         "num_hidden_layers": n_layers,
         "num_key_value_heads": NH,
-        "num_nextn_predict_layers": 0,
+        "num_nextn_predict_layers": num_mtp_layers,
         "q_lora_rank": Q_LORA,
         "qk_head_dim": NOPE + ROPE,
         "qk_nope_head_dim": NOPE,
@@ -152,9 +162,20 @@ def _full_indexer_layers(cfg: dict) -> list[int]:
     return [i for i, t in enumerate(cfg["indexer_types"]) if t == "full"]
 
 
+def mtp_layer_indexer_is_full(cfg: dict, layer_id: int) -> bool:
+    """The MTP layer's indexer schedule (beyond ``indexer_types``): the same
+    offset/freq fall-through the fork derives (docs/08 §1.2). GLM-5.2:
+    max(78-3+1, 0) % 4 == 0 -> full (checkpoint-confirmed)."""
+    freq = max(cfg.get("index_topk_freq", 1) or 1, 1)
+    offset = cfg.get("index_skip_topk_offset", 2)
+    return max(layer_id - offset + 1, 0) % freq == 0
+
+
 def gen_weights(seed: int, cfg: dict) -> dict:
     """One set of logical fp32 weights keyed by NATIVE checkpoint names
-    (HF [out, in] Linear layout), matching the real index.json key set."""
+    (HF [out, in] Linear layout), matching the real index.json key set.
+    Includes ``num_nextn_predict_layers`` MTP layers at ids >= n_layers,
+    mirroring the real layer 78 (MTP glue + full block; no embed / head)."""
     rng = np.random.default_rng(seed)
     L = cfg["num_hidden_layers"]
 
@@ -170,7 +191,8 @@ def gen_weights(seed: int, cfg: dict) -> dict:
         "lm_head.weight": r(VOCAB, H, s=0.02),
     }
     full_idx = set(_full_indexer_layers(cfg))
-    for i in range(L):
+
+    def gen_layer(i: int, full_indexer: bool, sparse_mlp: bool) -> None:
         p = f"model.layers.{i}."
         w[p + "input_layernorm.weight"] = norm(H)
         w[p + "post_attention_layernorm.weight"] = norm(H)
@@ -184,7 +206,7 @@ def gen_weights(seed: int, cfg: dict) -> dict:
         w[a + "kv_b_proj.weight"] = r(NH * (NOPE + VHD), KV_LORA)
         w[a + "o_proj.weight"] = r(H, NH * VHD)
         # ---- DSA indexer (only on `full` layers, like the real ckpt) ----
-        if i in full_idx:
+        if full_indexer:
             x = a + "indexer."
             w[x + "wq_b.weight"] = r(IDX_NH * IDX_HD, Q_LORA)
             w[x + "wk.weight"] = r(IDX_HD, H)
@@ -192,7 +214,7 @@ def gen_weights(seed: int, cfg: dict) -> dict:
             w[x + "k_norm.bias"] = r(IDX_HD, s=0.02)
             w[x + "weights_proj.weight"] = r(IDX_NH, H)
         # ---- MLP ----
-        if cfg["mlp_layer_types"][i] == "dense":
+        if not sparse_mlp:
             m = p + "mlp."
             w[m + "gate_proj.weight"] = r(DENSE_INTER, H)
             w[m + "up_proj.weight"] = r(DENSE_INTER, H)
@@ -210,13 +232,30 @@ def gen_weights(seed: int, cfg: dict) -> dict:
             w[ps + "gate_proj.weight"] = r(MOE_INTER * NSHARED, H)
             w[ps + "up_proj.weight"] = r(MOE_INTER * NSHARED, H)
             w[ps + "down_proj.weight"] = r(H, MOE_INTER * NSHARED)
+
+    for i in range(L):
+        gen_layer(i, i in full_idx, cfg["mlp_layer_types"][i] == "sparse")
+
+    # ---- MTP layers (real ckpt: layer 78 = glue + full block; NO
+    # embed_tokens / shared_head.head — shared from the target, docs/08) ----
+    for j in range(cfg.get("num_nextn_predict_layers", 0) or 0):
+        li = L + j
+        p = f"model.layers.{li}."
+        w[p + "enorm.weight"] = norm(H)
+        w[p + "hnorm.weight"] = norm(H)
+        w[p + "eh_proj.weight"] = r(H, 2 * H)
+        w[p + "shared_head.norm.weight"] = norm(H)
+        gen_layer(li, mtp_layer_indexer_is_full(cfg, li),
+                  li >= cfg["first_k_dense_replace"])
     return w
 
 
 # Weights kept high-precision in the real FP8 checkpoint (modules_to_not_convert:
-# every norm, mlp.gate + e_score_correction_bias, embed, lm_head, weights_proj).
+# every norm, mlp.gate + e_score_correction_bias, embed, lm_head, weights_proj;
+# the MTP glue eh_proj ships bf16 with NO weight_scale_inv — docs/08 §1.1).
 _FP8_SKIP_SUBSTR = ("layernorm", "k_norm", ".gate.", "e_score_correction",
-                    "embed_tokens", "lm_head", "model.norm", "weights_proj")
+                    "embed_tokens", "lm_head", "model.norm", "weights_proj",
+                    "eh_proj")
 
 
 def _quantize_block_fp8(a: np.ndarray, blk: int):
@@ -243,17 +282,22 @@ def _quantize_block_fp8(a: np.ndarray, blk: int):
 
 
 def write_checkpoint(d: str, w: dict, cfg: dict, fp8: bool = False,
-                     roundtrip_fp8_block: int | None = None) -> None:
+                     roundtrip_fp8_block: int | None = None,
+                     dtype: str = "bfloat16") -> None:
     """Write config.json + model.safetensors (bf16, or fp8+block scale_inv).
 
     roundtrip_fp8_block: for the bf16 TWIN of an fp8 engine checkpoint —
     quantize+dequantize every would-be-fp8 tensor at this block size so the
     reference sees the SAME effective weights as the fp8 engine (the parity
     diff then isolates the engine's dequant math, not quantization error).
+
+    dtype: storage dtype for non-fp8 tensors ("bfloat16" default;
+    "float32" for the fp32 CPU parity harnesses).
     """
     import torch
     from safetensors.torch import save_file
     os.makedirs(d, exist_ok=True)
+    store_dtype = getattr(torch, dtype)
     blk = cfg.get("quantization_config", {}).get("weight_block_size",
                                                  [roundtrip_fp8_block or 64])[0]
     t = {}
@@ -272,9 +316,9 @@ def write_checkpoint(d: str, w: dict, cfg: dict, fp8: bool = False,
                 for bi in range(s_inv.shape[1]):
                     deq[bo * b:(bo + 1) * b, bi * b:(bi + 1) * b] *= \
                         s_inv[bo, bi]
-            t[k] = torch.from_numpy(deq).to(torch.bfloat16)
+            t[k] = torch.from_numpy(deq).to(store_dtype)
         else:
-            t[k] = torch.from_numpy(v).to(torch.bfloat16)
+            t[k] = torch.from_numpy(v).to(store_dtype)
     save_file(t, os.path.join(d, "model.safetensors"))
     json.dump(cfg, open(os.path.join(d, "config.json"), "w"), indent=1)
 
