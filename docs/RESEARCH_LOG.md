@@ -1144,3 +1144,19 @@ position. I built the CPU reproduction and it **exonerates the write path on two
 - Fix target: preserve the DCP-striped kv_caches buffer across chunked-prefill execute_model calls (aliasing/
   donation round-trip of the striped layout). Then dcp=2 128K passkey. Observability-first paid off again:
   the dump pinned write-back-vs-read in one probe after 5 CPU hypotheses were falsified.
+
+## 2026-07-08 21:55 UTC — Independent review caught a MISTARGETED fix (saved a pod cycle); redirected to GLM's real path
+
+- The DCP persistence fix (get_kv_cache_out_sharding in get_flax_model) is mechanistically CORRECT but
+  on the WRONG code path for GLM. Independent adversarial review FINDING 1 (HIGH), verified: GlmMoeDsa is
+  in _VLLM_PREFERRED_ARCHITECTURES (model_loader.py:52-76) → served via get_vllm_model/VllmModelWrapper,
+  NOT get_flax_model. The fix + its CPU test exercise a path GLM never takes → NO-OP for GLM. Reviewer 1
+  said "SHIP" (correct about code quality) but missed the path; reviewer 2 traced the chain of custody and
+  caught it. Without the review we'd have run an ~18-min pod build to "validate" a no-op.
+- REDIRECT: same mechanism (donated striped cache out-sharding mismatch), correct location =
+  VllmModelWrapper.jit_step_func (step_fun_jit + draft_step_fun), whose cache out_shardings=None → XLA
+  picks a layout that won't match P(BATCH,CONTEXT) → same reshard + one-stripe donation drop. Fix: set the
+  vLLM step-fn cache out_sharding to the DCP-striped spec under the gate. Agent redirected; CPU test must
+  exercise the vLLM wrapper step fn, not get_flax_model. The flax fix stays (valid for the flax MLA path).
+- The observability guards (glm-5.2-v4-obsguard, 18 tests) are done and merge-ready alongside the real fix.
+- Discipline held exactly: no merge of an unreviewed aliasing change; the review is a HARD gate and it paid.
