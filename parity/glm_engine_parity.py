@@ -166,6 +166,30 @@ def run_engine(ckpt_dir: str, input_ids_np: np.ndarray,
         attn = vm.model.layers[i].self_attn.mla_attn
         inner = getattr(attn, "mla_attn", attn)
         mapping[inner.layer_name] = i
+    # Stage-2 (GLM_DSA_MODE != off): FULL indexer layers also need their
+    # paged indexer k-cache slot ([pages, page_size, 128] bf16 — the mla.v2
+    # packed layout at head 128) — the real runner registers it via the
+    # Stage-2 KVCacheSpec; this hand-built harness must mirror that or the
+    # wrapper raises 'no kv-cache slot for the indexer k-cache layer'.
+    import os as _os
+    idx_shape = None
+    if _os.environ.get("GLM_DSA_MODE", "off") != "off":
+        # Raw head width, hand-built packed layout: get_kv_cache_shape pads
+        # kv_dim to 128, but the indexer write path scatters [T, IDX_HD] rows
+        # and never pads (real dims have IDX_HD=128 == the pad; the mini's 64
+        # must stay unpadded). Packed layout [pages, S/packing, packing, D]
+        # is row-major-identical to [pages*S, D] for the write helper.
+        from tpu_inference.utils import get_dtype_packing
+        _pk = get_dtype_packing(jnp.bfloat16)
+        idx_shape = (num_pages, PAGE // _pk, _pk, C.IDX_HD)
+        for i in range(n_layers):
+            indexer = getattr(vm.model.layers[i].self_attn, "indexer", None)
+            if indexer is None:
+                continue
+            kv_caches.append(
+                device_array(mesh, np.zeros(idx_shape, np.float32))
+                .astype(jnp.bfloat16))
+            mapping[indexer.k_cache.prefix] = len(kv_caches) - 1
 
     input_ids = device_array(mesh, input_ids_np.astype(np.int32))
     input_positions = device_array(mesh, positions_np.astype(np.int32))
@@ -241,9 +265,14 @@ def run_engine(ckpt_dir: str, input_ids_np: np.ndarray,
         caps_snapshot = {k: (v.copy() if isinstance(v, np.ndarray) else v)
                          for k, v in caps.items()}
         # FRESH zeroed caches, in place (same list object → closure sees
-        # them, and step 2 sees step 1's writes).
-        kv_caches[:] = [device_array(mesh, np.zeros(cache_shape, np.float32))
-                        .astype(jnp.bfloat16) for _ in range(n_layers)]
+        # them, and step 2 sees step 1's writes). Rebuild the FULL list —
+        # including the Stage-2 indexer k-cache slots appended after the
+        # n_layers MLA caches (truncating them breaks the layer mapping).
+        _n_idx = len(kv_caches) - n_layers
+        kv_caches[:] = ([device_array(mesh, np.zeros(cache_shape, np.float32))
+                         .astype(jnp.bfloat16) for _ in range(n_layers)] +
+                        [device_array(mesh, np.zeros(idx_shape, np.float32))
+                         .astype(jnp.bfloat16) for _ in range(_n_idx)])
         # Non-identity (reversed) block table to exercise the paging
         # indirection, exactly like DSV4; GLM_IDENTITY_BT=1 disables.
         if os.environ.get("GLM_IDENTITY_BT"):
@@ -268,8 +297,15 @@ def run_engine(ckpt_dir: str, input_ids_np: np.ndarray,
                     mesh, np.array([total_len_after], np.int32)),
                 query_start_loc=device_array(
                     mesh, np.array([0, n_new], np.int32)),
+                # A 1-token continuation chunk IS a decode step — mark it so
+                # ([num_decode, num_decode, num_reqs] = [1, 1, 1]): the
+                # Stage-2 dispatch (glm_dsa_is_pure_decode) sends pure-decode
+                # steps down the sparse 2c kernel; a [0, 0, 1] distribution
+                # would dense-fallback and silently skip the kernel under
+                # GLM_DSA_MODE=pallas_decode (D0 would trivially pass).
                 request_distribution=device_array(
-                    mesh, np.array([0, 0, 1], np.int32)),
+                    mesh, np.array([1, 1, 1] if n_new == 1 else [0, 0, 1],
+                                   np.int32)),
                 padded_num_reqs=1)
 
         outs = []
