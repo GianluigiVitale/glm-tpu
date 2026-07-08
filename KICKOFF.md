@@ -1,52 +1,52 @@
-# GLM-5.2 → TPU v4 PORT — /goal KICKOFF (≤4k)
+# GLM-5.2 → TPU v4 PORT — /goal (RESUME, ≤4k)
 
-SOLO, FULLY AUTONOMOUS. Port **GLM-5.2 (FP8)** to **TPU v4** the way DeepSeek-V4-Flash was done. Unlimited fleet.
+SOLO, FULLY AUTONOMOUS. Finish porting **GLM-5.2-FP8** to **TPU v4** the DeepSeek-V4-Flash way.
+**DO NOT STOP / ASK / CHECK-IN** until BOTH hold: (1) GLM-5.2-FP8 serves correctly on the pod, (2)
+reproduced HF-card benchmarks match within noise — AND the headline **DSA sparse-MLA kernel** clears
+its gates (passkey ≥95% to ≥128K; FLOP/throughput win at ≥256K). Self-correct through blockers; when
+in doubt pick the option you'd recommend, log it, never ask. Only a real hard block (missing
+credential, owner-gated push) pauses THAT thread — keep every other track moving.
 
-**DO NOT STOP, DO NOT ASK, DO NOT CHECK IN** until BOTH: (1) GLM-5.2-FP8 runs correctly on the pod, AND (2) the
-reproduced benchmarks match the HF card within noise. Never pause at phase boundaries, for reassurance, or on a
-blocker — self-correct, try other approaches, keep going. **When in doubt, automatically pick the option you'd
-recommend to the user and proceed — log it, never ask.** ~10 h from now you must be DONE or still actively
-working; do not stop for ANY reason. Only a genuine hard block (a credential you lack, an owner-gated
-irreversible push) pauses THAT thread — keep working every other track meanwhile.
+## STATE — what's DONE (don't redo)
+- **Stage 1 DONE:** 753B FP8 serves on 32 v4 chips (runai stream, FP8-resident + per-tile dequant, EP
+  filter, pure TP×EP). GSM8K n=32 **96.9%**. Fixed: determinism, the mla.v2 pack_new_kv OOB core-halt,
+  the large-bucket compile-OOM (F1). All provenance in bench/results.db.
+- **Stage 2 kernels SILICON-VALIDATED:** single-chip GATE 2a (Mosaic compile, w-tile fallback) + 2b
+  (selected-set-EXACT vs HF oracle; sparse-MLA 9.5e-7/1.95e-3). Sparse **passkey 100% every depth
+  @8K & 32K**. Sparse decode + prefill + IndexShare built (GLM_DSA_MODE=pallas_decode).
+- **Stage 3 code-complete (CPU):** MTP M1 draft-parity + G4 index-share; dense-MTP knob GLM_SPEC_K.
+- Integrated: fork **`glm-5.2-v4-next`** (all above + DCP + guards). Harness `~/glm-tpu`. PR series g1–g6 drafted.
 
-## Read FIRST, in full (don't reinvent — DSV4 is your base)
-`~/glm-tpu`: `HANDOFF.md`→`CLAUDE.md`→`PLAN.md`→`docs/00-feasibility-memo.md`. Then the DSV4 base you reuse:
-`~/moe-tpu/{CLAUDE.md,HANDOFF.md,docs/09,11,12,13,15,16}` + fork `~/tpu-inference@dsv4-flash-v4`. `CLAUDE.md
-§"What transfers"` maps every reusable piece.
+## ACTIVE FRONTIER — do next, in order
+1. **DCP → 128K:** the DCP cross-step KV-cache persistence fix (pin VllmModelWrapper step-fn + MTP
+   _propose cache `out_sharding` to `P(BATCH,CONTEXT)` under the gate) is MERGED + independently
+   reviewed. VALIDATE on metal: 2-chunk-prefill cache-dump must flip **DIFFER→MATCH**
+   (`GLM_DCP_CACHE_DUMP`), guards silent (`GLM_DCP_ASSERT_SHARDING`/`_CACHE_SANITY`), THEN **dcp=2
+   (dcp=4 if OOM) 128K passkey ≥95%/depth**. 128K NEEDS DCP (1 seq @dcp=1 = 12.2 GiB > free HBM).
+2. **256K throughput** A/B (dsa-sparse vs dense), dcp≥4, `bench/dsa_throughput.py` — 2nd empty gate.
+3. **MTP M2** on-pod: greedy spec-decode == non-spec (`bench/mtp_m2_check.py`, GLM_SPEC_K).
+4. **Full GPQA-198 @16K** (owner-gated "go") + AIME card protocol; retry truncated tail via `--ids`.
 
-## Model + Goal
-`zai-org/GLM-5.2-FP8` (FP8 ~744 GB, fits 1024 GB HBM). `GlmMoeDsaForCausalLM`, 753B/40B, MLA + **DSA**
-(index_topk=2048, 32 indexer heads, IndexShare, interleaved-RoPE), MTP, 1M ctx. Full spec docs/00; HF_TOKEN in
-`~/glm-tpu/.env`. Goal: (1) correct forward vs the HF/GPU reference (dense-MLA first); (2) reproduce the HF-card
-benchmarks within noise, FULL PROVENANCE; (3) **the headline — a DSA lightning-indexer/top-k sparse-MLA Pallas
-kernel** (none exists on TPU; PR #2324 DISABLES the indexer; your DSV4 CSA kernel is the closest — adapt it).
+## HARD RULES
+- **COST:** bucket = **`gs://driftbench-dsv4-uc` (us-central2) ONLY**, NEVER EU `gs://driftbench-storage`.
+  **NEVER create a new machine/VM/TPU** — only the 32 v4 chips / 8 hosts (disk-attach OK). ONE FP8 copy.
+- **METHOD (DSV4's):** FIX root cause, never patch/reward-hack. Every change gated (byte-identical off)
+  + additive + CPU test + **independent adversarial review** + pod 3/3. **Observability-FIRST** (flight
+  recorder, cache-dump, on-metal discriminator probes) before debugging blind. Honest nulls, signed Δ,
+  every number in results.db (raw output verbatim).
+- **AGENTS work in git WORKTREES** — NEVER edit the main `~/tpu-inference` checkout (the live pod
+  imports it). TPU serialized to the main thread (agents set JAX_PLATFORMS=cpu before python). pkill by
+  exact PID, never a pattern that matches your own command.
+- Commit+push both repos often; no force-push; owner submits upstream PRs. HF_TOKEN in ~/glm-tpu/.env (never commit).
 
-## Phases (thresholds PLAN.md; first steps HANDOFF)
-Stage 1 dense-MLA correctness (port PR #2324 registry + v4 MLA workarounds; first benchmark within ~1–2 pts) →
-Stage 2 the DSA kernel (selected-set-exact + bit-faithful; passkey ≥95% to ≥128K) → Stage 3 IndexShare + MTP.
+## READ FIRST (in full)
+`~/glm-tpu`: HANDOFF.md → docs/RESEARCH_LOG.md (dated narrative — incl. the full DCP saga) →
+docs/11-pod-runbook.md (exact pod recipes: kernel gates, DCP debug triad, passkey/throughput/MTP) →
+docs/reviews/ (rounds 1–9). Fork checked out on `glm-5.2-v4-next`.
+Launch: `bash scripts/launch_glm_32chip.sh` — EXTRA_ENVS bakes GLM_* into the raylet env (WORKERS need
+them, not just the driver — a repeated footgun).
 
-## Methodology (EXACTLY DSV4's)
-FIX the root cause, don't patch. Every change gated (byte-identical off) + additive + CPU test + sub-cube
-zero-recompile + pod **3/3**. Correctness before performance — validate each component vs the reference at a tiny
-config, then real dims. **Spawn adversarial reviewers** after each change. Code PR-compatible with
-`vllm-project/tpu-inference` (Googler-maintained AGENTS.md — no code-agent PRs; **owner submits**).
-
-## COST — 2 HARD RULES + prefer-streaming
-Pod `db-v4-64-od`, us-central2-b, 32 v4 chips. **HARD RULES: (1) the bucket MUST be same-region —
-`gs://driftbench-dsv4-uc` (us-central2), NEVER the EU `gs://driftbench-storage` (the bill driver); (2) NEVER
-create/request a new compute machine or any TPU — only these 32 v4 chips / 8 hosts.** ONE FP8 copy (no bf16).
-**Prefer streaming** (stage HF→GCS once via `~/moe-tpu/scripts/stage_base_to_gcs.py`, then runai_streamer
-GCS→HBM; FP8 stays RESIDENT + dequant per-tile in-kernel — NOT load-time bf16, which OOMs 753B). BUT if a
-per-host local copy proves required you ARE authorized to
-**create + attach a ~1000 GB disk to each of the 8 hosts** and copy from the bucket (disks on the existing hosts
-OK; new machines/TPUs NOT). Clean up after.
-
-## Benchmarks + PROVENANCE (machinery pre-built in `bench/`)
-Reproduce the HF-card benchmarks (card: GPQA-Diamond, AIME; + fast sanity gates MMLU-Pro/GSM8K, not on the card
-— all cached; agentic SWE-bench/Terminal-Bench later). The SQLite provenance DB + harness exist — wire the model
-into `bench/run_bench.py::make_generate()`; it stores per item prompt+**raw output verbatim**/gold/extracted/
-correct/timestamp/tokens/latency + run provenance. **Never run anything untraceable.** Honest nulls; signed Δ.
-
-## First task
-Stage 1 per HANDOFF: fork `glm-5.2-v4` off `dsv4-flash-v4`; stage `zai-org/GLM-5.2-FP8` → us-central2; register
-the arch; dense-MLA correctness; wire the bench + reproduce a benchmark. Commit+push often (no force-push).
+## LANDMINES
+GLM routes via **VllmModelWrapper** (the vLLM path), NOT get_flax_model. fp8-KV retired (v4 Mosaic
+arith.cmpi compile bug). DCP failed on **multi-chunk prefill** only (single-chunk was always correct).
+Relaunch the cluster after ANY pod crash before re-running.
