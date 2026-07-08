@@ -23,7 +23,10 @@ vllm or touch TPU code.
 Env knobs: GLM_MODEL (checkpoint), GLM_TP (default 32),
 RUNAI_STREAMER_CONCURRENCY / RUNAI_STREAMER_MEMORY_LIMIT (streaming load),
 GLM_ASYNC_SCHED=0 (sync scheduling), GLM_LOG_STATS=1 (vLLM 10s engine stats:
-tok/s + running/waiting — default off, unchanged behavior).
+tok/s + running/waiting — default off, unchanged behavior), GLM_DCP=N
+(decode context parallelism — shard each sequence's KV cache across N ranks
+at decode; default unset/0 = the kwarg is ABSENT from the engine args,
+byte-identical engine build).
 """
 from __future__ import annotations
 
@@ -39,6 +42,16 @@ DEFAULT_MODEL = os.environ.get("GLM_MODEL",
 # against the real tokenizer 2026-07-07):
 #   154820 = <|endoftext|>   154827 = <|user|>   154829 = <|observation|>
 EOS_IDS = [154820, 154827, 154829]
+
+
+def attention_path() -> str:
+    """The engine's attention path, for run provenance (audit 2026-07-07:
+    record it explicitly so no benchmark number can be misattributed).
+    'dense-mla' = Stage-1 (DSA indexer bypassed); 'dsa-sparse:<mode>' = the
+    Stage-2 kernel path. Derived from the live GLM_DSA_MODE env, not inferred.
+    ONE definition shared by run_bench._run_env and glm_longctx._run_env."""
+    mode = os.environ.get("GLM_DSA_MODE", "off")
+    return "dsa-sparse:" + mode if mode not in ("", "off") else "dense-mla"
 
 
 def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
@@ -81,6 +94,18 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     # side env: no raylet baking needed. Default unset = quiet (unchanged).
     if os.environ.get("GLM_LOG_STATS") == "1":
         extra["disable_log_stats"] = False
+    # GLM_DCP=N sets vLLM's decode_context_parallel_size (DCP: shard each
+    # sequence's KV cache across N ranks at decode — the long-context KV-
+    # capacity knob; tensor_parallel_size must be divisible by N, enforced by
+    # vllm/config/parallel.py). Kwarg name verified against the installed
+    # vLLM: EngineArgs.decode_context_parallel_size (engine/arg_utils.py) ->
+    # ParallelConfig.decode_context_parallel_size, and the engine config dump
+    # echoes `decode_context_parallel_size=1` by default (gpqa198.log).
+    # Default unset (or 0/empty) = the kwarg is ABSENT from the LLM(...) args
+    # entirely — byte-identical engine build to the pre-DCP harness.
+    dcp = int(os.environ.get("GLM_DCP") or 0)
+    if dcp:
+        extra["decode_context_parallel_size"] = dcp
     llm = LLM(
         model=model,
         trust_remote_code=True,
@@ -104,5 +129,6 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     )
     print(f"[bench] engine built in {time.time() - t0:.1f}s "
           f"(model={model}, tp={os.environ.get('GLM_TP', '32')}, ep=on, "
-          f"max_len={max_len}{', ' + log_extra if log_extra else ''})", flush=True)
+          f"max_len={max_len}{f', dcp={dcp}' if dcp else ''}"
+          f"{', ' + log_extra if log_extra else ''})", flush=True)
     return llm

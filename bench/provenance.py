@@ -63,6 +63,12 @@ CARD_TARGETS = {
     # the per-length curve. Per-cell rows are stored as passkey_L{L}_d{d};
     # this key holds the aggregate summary row.
     "longctx_passkey":     {"value": None, "kind": "passkey"},
+    # decode-throughput A/B at long context (dsa_throughput.py) — the >=256K
+    # FLOP/throughput gate. No card value; the gate is the dense-mla vs
+    # dsa-sparse Δ joined by ctx (report_throughput.py). Per-rung rows are
+    # stored as dsa_throughput_ctx{L} (metric decode_tok_s); this key holds
+    # the aggregate summary row.
+    "dsa_throughput":      {"value": None, "kind": "throughput"},
 }
 
 _SCHEMA = """
