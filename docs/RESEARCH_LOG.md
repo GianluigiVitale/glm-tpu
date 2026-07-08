@@ -917,3 +917,17 @@ three run_bench commands + the checker.
 - 128K sparse requires the SPARSE x DCP composition (docs/05 §6 owner-gather) — build launched
   (glm-5.2-v4-sdcp). Meanwhile: DCP dense bring-up (dcp=4, first DCP on hardware) running on the pod;
   dense 128K passkey next.
+
+## 2026-07-08 17:00 UTC — GSM8K n=32 @2048 cap: 96.9%; DCP has a mesh-axis bug (blocks 128K/256K gates)
+
+- **GSM8K n=32, max-new 2048: acc 96.875% (31/32, 1 truncation)** — dense path, truncation-free quality
+  signal at scale. Full provenance.
+- **DCP FAILURE (blocking the 128K passkey + 256K throughput gates):** GLM_DCP=4 (vLLM
+  decode_context_parallel_size=4) + GLM_MLA_DCP=1 serves SHORT contexts correctly (GSM8K smoke acc==dense)
+  but FAILS all passkey lengths 8K-128K (pred=None, haystack-filler outputs = model sees only ~1/4 of
+  context). Root cause hypothesis H-MESH: vLLM stripes the KV block tables for dcp=4 but the fork's mesh
+  stays (…,model=32,dcp=1) — decode_context_parallel_size is NOT wired into the mesh dcp axis, so attention
+  reads the logical stripe as if contiguous. Root-cause+fix agent running (Opus).
+- HBM reality: a single 128K MLA sequence needs ~11.9 GiB/chip of latent KV at dcp=1 (replicated across TP)
+  > ~7.7 GiB free after the 23 GiB model — so 128K genuinely REQUIRES DCP (dcp>=2 → <=5.95 GiB/chip fits).
+  The dcp=1 fast path is ruled out by HBM; DCP must be fixed. Interim: extending sparse evidence to 64K@dcp=1.
