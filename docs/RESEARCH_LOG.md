@@ -931,3 +931,14 @@ three run_bench commands + the checker.
 - HBM reality: a single 128K MLA sequence needs ~11.9 GiB/chip of latent KV at dcp=1 (replicated across TP)
   > ~7.7 GiB free after the 23 GiB model — so 128K genuinely REQUIRES DCP (dcp>=2 → <=5.95 GiB/chip fits).
   The dcp=1 fast path is ruled out by HBM; DCP must be fixed. Interim: extending sparse evidence to 64K@dcp=1.
+
+## 2026-07-08 17:40 UTC — dcp=1 ceiling confirmed at 32K; ≥64K REQUIRES the DCP fix (E1000 at 64K@dcp=1)
+
+- 64K@dcp=1 (max_seqs 1, gmu 0.92, 136 blocks / 69,362-token pool): **CompileTimeHbmOom (E1000)**. The KV
+  pool fits (~6.1 GiB replicated) but the dense-MLA attention program's 64K working buffers exceed the
+  ~2.5 GiB headroom after the 23 GiB model. Lowering gmu trades KV pool for program scratch but can't win
+  at dcp=1 — the design's answer is DCP (shards KV ÷dcp → room for scratch AND longer ctx).
+- **VERIFIED CLEAN-PATH CEILING: 32K@dcp=1, sparse 100% all cells.** The 128K passkey + 256K throughput
+  gates are BOTH hard-blocked on the DCP mesh-axis fix (agent running on Opus). No further dcp=1
+  long-ctx attempts — they cannot reach the >=128K gate.
+- Pod idle until: DCP fix lands (-> 128K passkey), OR owner greenlights the full GPQA-198 @16K (parked).
