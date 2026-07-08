@@ -722,3 +722,11 @@ fixes applied per repo/worktree:
 - Verbatim logs: docs/artifacts/kernelprobe-2a-20260708*.log (REJECT trail + ACCEPT),
   kernelprobe-2b-20260708-metal2.log + .results.txt. CPU regression: 144/144 DSA tests on -next.
 - The audit's steps 1+2 are green. Next: staging switch smoke + GPQA rerun @16K cap; then passkey/throughput.
+
+## 2026-07-08 07:55 UTC — STAGING SWITCH VALIDATED: -next byte-identical to run 26 (4/4 sequential); GPQA rerun @16K launched
+
+- Pod fleet on glm-5.2-v4-next @ 886eaceb. Sequential smoke (matched run-26 config): **raw_output byte-identical
+  4/4 items** — the whole merged Stage-2+3 stack is provably inert with gates off, on hardware. (First smoke
+  compared batched-vs-sequential and differed on 3/4 — a confounded comparison, documented, not a defect:
+  concurrent MoE batching changes summation order.)
+- GPQA-Diamond rerun launched at max-new 16384 (the 4K-cap truncation artifact fix), bucket 32, max_seqs 16.
