@@ -905,3 +905,15 @@ three run_bench commands + the checker.
   (3/4 same items, same miss), deterministic, kernel-level fp32 exactness = the silicon GATE B result.
 - Audit step 2 started: passkey ladder 8K/32K x depths {.25,.5,.75} x 12 trials on the SPARSE path
   (attention_path=dsa-sparse:pallas_decode), gate = every (length,depth) cell >= 95%.
+
+## 2026-07-08 15:30 UTC — PASSKEY 8K/32K: SPARSE 100% ALL CELLS (matches dense); F1 hardware-proven
+
+- **Sparse path (attention_path=dsa-sparse:pallas_decode): 72/72 needles, 100% in every (length, depth)
+  cell at 8K and 32K** — at 32K the DSA kernel attends to only the 2048 indexer-selected positions (16x
+  sparsification) and retrieval is perfect. Dense baseline: also 72/72 (runs recorded back-to-back,
+  same seeds). Report gate: PASS per-cell; coverage verdict honestly exits 2 (<128K — not the gate yet).
+- The F1 static-elision fix is hardware-proven: the 33K sparse engine that E1000-OOM'd at compile now
+  builds and serves (fork d8fddbda). mbt raised 512->2048 for prefill-heavy runs (~4x prefill speedup).
+- 128K sparse requires the SPARSE x DCP composition (docs/05 §6 owner-gather) — build launched
+  (glm-5.2-v4-sdcp). Meanwhile: DCP dense bring-up (dcp=4, first DCP on hardware) running on the pod;
+  dense 128K passkey next.
