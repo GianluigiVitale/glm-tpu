@@ -420,6 +420,9 @@ def _run_env(args, lengths, depths, max_len, max_new) -> dict:
     raw = args.protocol == "raw"
     return {
         "benchmark": "longctx_passkey", "stub": bool(args.stub),
+        # dense-mla vs dsa-sparse:<mode> — the SAME provenance field as
+        # run_bench._run_env (audit 2026-07-07), ONE definition in engine.py:
+        "attention_path": engine.attention_path(),
         "protocol": args.protocol,
         "prompt_mode": _prompt_mode(args),         # see the module docstring
         "prompt_prefix_ids": PROMPT_PREFIX_IDS if raw else "chat_template",

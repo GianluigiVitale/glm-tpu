@@ -160,9 +160,36 @@ def test_parse_lengths():
             pass
 
 
+def test_run_ladder_oracle_scoring():
+    """The HIT path (the stub test only exercises misses): an oracle generate
+    that answers with the embedded key must score 100% — needle embedding,
+    extraction, exact-match and the per-cell grid wiring all agree."""
+    tok = _tok()
+
+    def oracle(ctx):
+        key = re.search(r"passcode is (\d{6})\.", ctx).group(1)  # the needle
+        return f" {key}.", 3, len(tok(ctx)["input_ids"])
+
+    grid, rows, overall = LC.run_ladder(oracle, tok, [512], [0.25, 0.75], 3)
+    assert overall == 100.0
+    assert all(r["correct"] == 1 and r["pred"] == r["true_key"] for r in rows)
+    assert all(c["accuracy"] == 100.0 for c in grid.values())
+
+
 def test_stub_pipeline_records_provenance():
     """End-to-end --stub run (no vllm import): every trial lands in the DB with
     prompt/gold/raw_output/correct; per-cell + aggregate summary rows exist."""
+    # assert the dense-mla default below; save/restore the ambient env (review
+    # finding: pop-without-restore was the one hygiene asymmetry in the diff)
+    _saved_dsa = os.environ.pop("GLM_DSA_MODE", None)
+    try:
+        _stub_pipeline_body()
+    finally:
+        if _saved_dsa is not None:
+            os.environ["GLM_DSA_MODE"] = _saved_dsa
+
+
+def _stub_pipeline_body():
     with tempfile.TemporaryDirectory() as d:
         db = os.path.join(d, "t.db")
         out = os.path.join(d, "res.json")
@@ -185,6 +212,12 @@ def test_stub_pipeline_records_provenance():
         names = {r[0] for r in summ}
         assert names == {"passkey_L256_d0.5", "passkey_L512_d0.5", "longctx_passkey"}
         assert all(r[2] == 0.0 for r in summ)             # stub accuracy 0 everywhere
+        # runs.env_json carries attention_path — the SAME provenance field as
+        # run_bench (dense-mla vs dsa-sparse:<mode>; one definition in engine.py)
+        run_env = json.loads(conn.execute(
+            "SELECT env_json FROM runs").fetchone()[0])
+        assert run_env["attention_path"] == "dense-mla"
+        assert run_env["prompt_mode"] == "stub"
         res = json.load(open(out))
         assert res["overall_accuracy"] == 0.0 and len(res["grid"]) == 2
         assert res["prompt_mode"] == "stub"

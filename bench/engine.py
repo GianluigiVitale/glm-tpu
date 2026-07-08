@@ -104,6 +104,12 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     # Default unset (or 0/empty) = the kwarg is ABSENT from the LLM(...) args
     # entirely — byte-identical engine build to the pre-DCP harness.
     dcp = int(os.environ.get("GLM_DCP") or 0)
+    if dcp < 0:
+        # fail at the harness boundary with a readable message, not a pydantic
+        # ValidationError deep in the engine build (vLLM's tp % dcp == 0 check
+        # would NOT stop a negative — 32 % -2 == 0 in Python; only
+        # ParallelConfig's ge=1 field constraint does — review finding).
+        raise ValueError(f"GLM_DCP must be >= 1 (got {dcp}); unset/0 = off")
     if dcp:
         extra["decode_context_parallel_size"] = dcp
     llm = LLM(

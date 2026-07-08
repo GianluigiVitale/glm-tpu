@@ -652,12 +652,13 @@ def _run_env(args, benches) -> dict:
 
     # AUDIT (2026-07-07): record the ATTENTION PATH explicitly so no benchmark
     # number can be misattributed. dense-mla = Stage-1 (DSA indexer bypassed);
-    # dsa-sparse = Stage-2 kernel path. Derived from the live env, not inferred.
-    _mode = os.environ.get("GLM_DSA_MODE", "off")
-    env["attention_path"] = (
-        "dsa-sparse:" + _mode if _mode not in ("", "off") else "dense-mla")
+    # dsa-sparse = Stage-2 kernel path. Derived from the live env, not
+    # inferred — engine.attention_path(), shared with glm_longctx._run_env.
+    # (Fixed 2026-07-08: this used to assign env["attention_path"] before
+    # `env` existed — a NameError that crashed EVERY run at start_run.)
     return {
         **_launcher_env_provenance(),
+        "attention_path": engine.attention_path(),
         "model": args.model, "stub": bool(args.stub),
         # pinned dataset commit shas (BenchSpec.hf_revision) — reproducibility
         "dataset_revisions": {b: B.REGISTRY[b].hf_revision for b in benches},

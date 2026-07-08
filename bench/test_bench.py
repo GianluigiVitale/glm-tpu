@@ -608,6 +608,108 @@ def test_item_builders():
     print("  item builders OK")
 
 
+def test_dcp_engine_kwarg():
+    """GLM_DCP plumbing (runbook §5 — decode context parallelism): unset (or
+    0/empty) -> decode_context_parallel_size ABSENT from the LLM(...) kwargs,
+    engine args byte-identical to the pre-DCP harness; GLM_DCP=N -> the kwarg
+    present with value N AND recorded in the engine-built log line. The kwarg
+    name is vLLM's EngineArgs.decode_context_parallel_size (verified against
+    ~/vllm-build/vllm/engine/arg_utils.py). Monkeypatched vllm.LLM capture —
+    no real vllm import, no TPU."""
+    import contextlib
+    import io
+    import sys
+    import types
+
+    import engine
+
+    calls = []
+
+    class _CaptureLLM:
+        def __init__(self, **kw):
+            calls.append(kw)
+
+    fake = types.ModuleType("vllm")
+    fake.LLM = _CaptureLLM
+    had_vllm = "vllm" in sys.modules
+    old_mod = sys.modules.get("vllm")
+    old_env = os.environ.pop("GLM_DCP", None)
+    try:
+        sys.modules["vllm"] = fake
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            engine.build_llm("stub-model")
+        assert "decode_context_parallel_size" not in calls[0]  # unset -> absent
+        assert "dcp=" not in out.getvalue()          # log line unchanged too
+
+        os.environ["GLM_DCP"] = "4"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            engine.build_llm("stub-model")
+        assert calls[1]["decode_context_parallel_size"] == 4
+        assert "dcp=4" in out.getvalue()             # engine-built log line
+        # every OTHER engine arg byte-identical to the unset build:
+        assert {k: v for k, v in calls[1].items()
+                if k != "decode_context_parallel_size"} == calls[0]
+
+        os.environ["GLM_DCP"] = "0"                  # 0 = off = absent
+        with contextlib.redirect_stdout(io.StringIO()):
+            engine.build_llm("stub-model")
+        assert "decode_context_parallel_size" not in calls[2]
+
+        os.environ["GLM_DCP"] = "-2"                 # negative: readable
+        try:                                         # harness-boundary error,
+            engine.build_llm("stub-model")           # not a pydantic trace
+            raise AssertionError("GLM_DCP=-2 should have raised")
+        except ValueError as e:
+            assert "GLM_DCP" in str(e)
+        assert len(calls) == 3                       # LLM never constructed
+    finally:
+        if old_env is None:
+            os.environ.pop("GLM_DCP", None)
+        else:
+            os.environ["GLM_DCP"] = old_env
+        if had_vllm:
+            sys.modules["vllm"] = old_mod
+        else:
+            sys.modules.pop("vllm", None)
+    print("  DCP engine kwarg plumbing OK")
+
+
+def test_run_env_provenance_fields():
+    """run_bench._run_env must actually RETURN (2026-07-08 fix: the audit
+    commit assigned env['attention_path'] before `env` existed — a NameError
+    that crashed EVERY run, stub included, at pv.start_run) and must carry
+    attention_path (dense-mla default; dsa-sparse:<mode> under GLM_DSA_MODE)
+    plus the GLM_* os_env sweep — GLM_DCP lands there with no extra code."""
+    import argparse
+
+    import run_bench as rb
+
+    args = argparse.Namespace(
+        model="STUB", stub=True, max_len=8192, max_new=64, max_seqs=8,
+        max_batched_tokens=4096, batch_size=8, gmu=0.94, num_gpu_blocks=0,
+        protocol="greedy", samples=1, seed=1234)
+    saved = {k: os.environ.pop(k, None) for k in ("GLM_DSA_MODE", "GLM_DCP")}
+    try:
+        env = rb._run_env(args, ["gsm8k"])
+        assert env["attention_path"] == "dense-mla"     # default: DSA bypassed
+        assert "GLM_DCP" not in env["os_env"]
+        os.environ["GLM_DCP"] = "4"
+        os.environ["GLM_DSA_MODE"] = "topk2048"
+        env = rb._run_env(args, ["gsm8k"])
+        assert env["attention_path"] == "dsa-sparse:topk2048"
+        assert env["os_env"]["GLM_DCP"] == "4"          # the GLM_* sweep
+        assert env["os_env"]["GLM_DSA_MODE"] == "topk2048"
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    print("  run_env provenance fields (attention_path + GLM_DCP sweep) OK")
+
+
 if __name__ == "__main__":
     test_extractors()
     test_adversarial_extractors()
@@ -620,4 +722,6 @@ if __name__ == "__main__":
     test_seed_provenance_gating()
     test_platform_seed_probe()
     test_item_builders()
+    test_dcp_engine_kwarg()
+    test_run_env_provenance_fields()
     print("ALL bench CPU tests passed.")

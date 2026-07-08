@@ -613,3 +613,39 @@ fixes applied per repo/worktree:
 - Both logs carry a full header (commit rev-parse, interpreter, versions, env vars, wall time, per-file
   P/S/F, claim-check). Committed as durable artifacts. Bottom line: 0 failures on either branch; the
   staging 250/123/0 is reproduced exactly; the Stage-2 "140+" is 124 (all green) — a counting deviation.
+
+## 2026-07-08 — bench: DCP plumbing (runbook §5a) + _run_env NameError FIX + longctx attention_path (CPU-only; TPU untouched)
+
+- **GLM_DCP → `decode_context_parallel_size` landed in `bench/engine.py build_llm`** (docs/11 §5a prereq,
+  bench-owned). Contract: unset/`0`/empty = kwarg ABSENT from the `LLM(...)` args (byte-identical engine
+  build — unit test asserts every OTHER kwarg equal between the two builds); `GLM_DCP=N` = kwarg present
+  with int N + `dcp=N` in the engine-built log line. Kwarg name verified against installed vLLM
+  (`EngineArgs.decode_context_parallel_size`, arg_utils.py; the gpqa198.log config dump echoes
+  `decode_context_parallel_size=1` default). Provenance: `GLM_DCP` is caught by the existing `GLM_*`
+  os_env sweep in BOTH `_run_env`s (asserted in tests; demonstrated live in results.db run 49).
+- **BUG FOUND+FIXED: `run_bench._run_env` crashed EVERY run since the audit commit 3ba7702** —
+  `env["attention_path"] = ...` assigned before `env` existed → NameError at `pv.start_run` (stub and pod
+  runs alike; nothing exercised `_run_env` in the CPU suite, so tests stayed green). Fix: the field now
+  rides in the returned dict via a NEW shared `engine.attention_path()` helper (GLM_DSA_MODE → `dense-mla`
+  / `dsa-sparse:<mode>`, semantics identical to the audit's intent), and `glm_longctx._run_env` records the
+  SAME field (it previously had none). Regression tests: `test_run_env_provenance_fields` (run_bench) +
+  env_json assertions in the longctx stub test. Live proof: results.db run 49 (STUB, gsm8k n=2,
+  attention_path=dense-mla, os_env.GLM_DCP="2").
+- **Passkey/longctx readiness dry-run (CPU `--stub`, 8K/32K/128K × depths .25/.5/.75 × 2):** 18/18 trials
+  recorded to a scratch DB. Prompt lengths on target (ctx ≤ L, within 1%: 8190/32765/131071 + the 2
+  explicit `[gMASK]<sop>` prefix ids); needle depth within ±0.02% at every rung; 8K prompts stored
+  verbatim, 32K/128K as head+tail+sha256 (cap 65536 chars, seed-reconstructible); per-cell + aggregate
+  summary rows present; env_json carries attention_path/stop_ids/prefix. Protocol drift check vs
+  run_bench: NONE — both harnesses share `engine.EOS_IDS`; longctx raw protocol still prepends
+  `[gMASK]<sop>` ids explicitly and stops on EOS+`<|assistant|>` (round-3 fixes intact,
+  `test_raw_prompt_protocol` green). New oracle test covers the HIT path (stub only exercised misses).
+- **Adversarial review (independent agent): PASS on all 4 intents, every claim demonstrated executably** —
+  `LLM.__init__` **kwargs→EngineArgs forwarding read from the installed vLLM (llm.py:305-345); HEAD-vs-diff
+  byte-identity of the unset-GLM_DCP build shown with a capture-fake LLM; the HEAD NameError reproduced;
+  0 drift across 8 GLM_DSA_MODE values; oracle-regex attack refuted over 420 trials; no sys.modules leak
+  under either pytest order or hostile ambient GLM_DCP/GLM_DSA_MODE. Two low findings FIXED post-review:
+  (a) negative GLM_DCP now raises a readable ValueError at the harness boundary + test (vLLM's tp%dcp
+  check passes 32%-2==0 in Python; only pydantic ge=1 caught it, opaquely, deep in the build); (b) the
+  longctx stub test now save/restores GLM_DSA_MODE instead of pop-without-restore. Noted, accepted as-is:
+  Python int underscore/sign forms ("4_0"→40, "+4") parse — pathological inputs; fail-fast covers the rest.
+- Suites green: test_bench (13 fns) + test_longctx 12/12, both direct and pytest (25 passed, both orders).

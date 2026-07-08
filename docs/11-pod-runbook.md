@@ -407,14 +407,14 @@ KV math (docs/05 §4.3, pool = 128-block baseline 65,536 tokens ≈ 6.1 GiB/chip
 So: **8K/32K cells can run at dcp=4; the 128K cell needs dcp=8.** 1M needs dcp≥16 + fp8 KV —
 out of scope here.
 
-**5a. Prereq — plumb the engine arg.** `build_llm` does not yet pass
-`decode_context_parallel_size` (bench/ is owned by the bench session — land it there, or
-apply this exact one-liner at run time in `bench/engine.py`, inside the `extra = {}` block):
-
-```python
-    if os.environ.get("GLM_DCP"):                       # docs/11 step 5: DCP
-        extra["decode_context_parallel_size"] = int(os.environ["GLM_DCP"])
-```
+**5a. Prereq — plumb the engine arg. ✅ LANDED (bench session, 2026-07-08).**
+`bench/engine.py build_llm` now reads `GLM_DCP`: set `GLM_DCP=N` →
+`decode_context_parallel_size=N` in the `LLM(...)` kwargs; unset/`0`/empty → the kwarg is
+ABSENT (engine args byte-identical to the pre-DCP harness — the `0`-off convention matches
+`GLM_ASYNC_SCHED`). The engine-built log line records `dcp=N` when active, and `GLM_DCP`
+lands in `runs.env_json.os_env` via the `GLM_*` provenance sweep in both harnesses
+(run_bench + glm_longctx). Unit-tested with a monkeypatched `vllm.LLM` capture
+(`bench/test_bench.py::test_dcp_engine_kwarg` — present/absent + byte-identity).
 
 (vLLM's `ParallelConfig.decode_context_parallel_size` exists upstream — #2398; dcp must
 divide TP=32. The fork requires `MLA_TRANSPOSE_KV_CACHE=0` — the default — with GLM_MLA_DCP.)
