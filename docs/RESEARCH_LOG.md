@@ -821,6 +821,23 @@ three run_bench commands + the checker.
   step-2 staging engine, and the old 7b GLM_SPEC_CONFIG one-liner is superseded by the landed
   GLM_SPEC_K knob. Branch-map rows in docs/11 + HANDOFF updated to match.
 
+  **Round-9 adversarial review of this prep (fresh reviewer on the staged diff — all claimed vLLM/fork
+  verifications independently re-verified and confirmed): 2 MED + 8 LOW findings, all addressed.**
+  MED-1 (exit-code contract): a typo'd `--db`/`--log` path crashed with exit 1 — indistinguishable from
+  an M2 mismatch — and `sqlite3.connect` silently CREATED the missing DB file; fixed (path checks +
+  sqlite3.Error/OSError → exit 2, no side-effect file; tested). MED-2 (vacuous PASS): two `--stub` runs
+  or an all-SKIP pair passed "identity" over empty outputs; fixed (stub/model=STUB guard + all-empty-
+  output guard → CompareError; tested). LOW: per-position regex now accepts vLLM's all-`nan`
+  num_drafts=0 interval line (byte-exact reconstruction test); garbage `GLM_SPEC_K=abc` now gets the
+  readable knob-naming error; NULL-vs-"" raw_output no longer conflated (a real difference is a
+  mismatch); `run_tok_s` docstring corrected to END-TO-END tok/s (wall incl. prefill; newest-summary-row
+  = single-benchmark runs only); the mal-recovery bias mechanism + the DEBUG-logged final idle flush
+  documented in `parse_spec_log`; missing/unparseable env_json protocol now warns. Not fixed (accepted):
+  reviewer could not verify live `SpecDecoding` emission on this offline-LLM+Ray stack (checker prints a
+  loud hint when zero lines match) nor anything pod-side — that IS the §7 run this preps.
+  [Relocated: the parallel PR-G6 session's append interleaved with this entry's commit, leaving this
+  paragraph under the PR-G6 heading; moved here where it belongs.]
+
 ## 2026-07-08 12:00 UTC — PR-G6 CUT: the DSA kernels (headline contribution) — branch `pr-g6-dsa-kernels` pushed (CPU-only; TPU untouched)
 
 - **Cut from base `97938b62`** in `~/tpu-inference-prs` (same discipline as G1–G5), commit
