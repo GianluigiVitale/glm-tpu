@@ -1058,3 +1058,20 @@ DCP path's kv_packing=32 multi-block bitcast read is where the bug hides (zero t
     --note "passkey dcp2 128K" > ~/glm-run/passkey_dcp2_128k.log 2>&1 &
   ```
   Gate P = ≥95% per depth. Commit: fork `glm-5.2-v4-kvpack` (kernel interpret path + repro test).
+
+## 2026-07-08 19:30 UTC — DCP BUG PINNED (on-metal): MULTI-CHUNK PREFILL, not the kernel; + fp8-KV route confirmed
+
+- **On-metal discriminator (observability-first, suggestions.md):** dcp=2 gate-ON passkey —
+  L=512 ✓, L=1600 ✓ (single prefill chunk); L=3200 ✗ at mbt=2048 (TWO chunks) but ✓ at mbt=6144
+  (SINGLE chunk); L=5000 ✓ single-chunk. **The DCP failure is MULTI-CHUNK PREFILL** — KV written for
+  prefill chunk >=2 (nonzero query_start_loc offset) is misrouted under the P(BATCH,CONTEXT) stripe.
+  Single-chunk prefill under DCP is correct to >=5000 tok / multi-block. Fix target: the owner-scatter
+  write (attention_interface.py:906-922) at nonzero chunk offset — CPU-testable (XLA scatter, not the
+  native bitcast). Five CPU hypotheses (bitcast/position/blocktable/kvlen/combine) were all falsified
+  first on an 8-device CPU dcp mesh — the bug was invisible to CPU because it needs multi-CHUNK prefill.
+- **fp8-KV route (independent, agent-verified):** the fp8 MLA latent path pre-exists + is v4-validated;
+  GLM_KV_CACHE_DTYPE=fp8 knob wired (default bf16 byte-identical). fp8 latent 6.1 GiB + 23 weights =
+  29.15 < 30.75 → 128K@dcp=1 fits WITHOUT DCP (immune to the multi-chunk bug). Needle retrieval survives
+  fp8 (97.5-100%); content precision degrades ~cumulatively (validate generation quality on pod).
+- Two converging paths to 128K passkey: (A) fix DCP multi-chunk-prefill scatter [running]; (B) fp8-KV
+  dense 128K @dcp=1 [pod now]. Sparse-128K gate then needs (A) OR fp8 indexer-cache too under (B).
