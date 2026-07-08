@@ -982,18 +982,53 @@ DCP path's kv_packing=32 multi-block bitcast read is where the bug hides (zero t
   strided-mask implementations (two-step `flash_attention_step1` AND one-step `batch_flash_attention`), and
   production-scale geometry (pack=32, dcp=2, P_l=128, 3 pages). **All pass** — read + stripe + global-position
   mask + LSE combine reproduce full attention exactly. dcp=1 packed read == numpy too (isolates the read).
-- **The real blocker is VMEM, arithmetic-confirmed:** the kernel's per-block KV buffer is
-  `bkvc = 2·decode_batch_size·(page_g/32 + 2)·32·512·2 B`. At **dcp=4** page_g = 512·4 = 2048 →
-  **17,301,504 B = 16.5 MB > v4's 16 MB** (EXACTLY the on-metal `RESOURCE_EXHAUSTED size=17301504`). At
-  **dcp=2** page_g = 1024 → **8.5 MB → FITS**, and 128K@dcp=2 KV ≈ 5.95 GiB/chip fits HBM. So **dcp=2 is the
-  v4 validation config**; the runbook's dcp=4/dcp=8 plan is VMEM-blocked. dcp=4 fixes (on-metal, un-CPU-
-  validatable, follow-up): reduce `decode_batch_size` 4→2 (8.25 MB) OR base block_size 512→256 (page 1024) OR
-  genuine sub-page tiling of bkvc.
-- **Residual on-metal risk (honest):** CPU interpret proves the ALGORITHM (packed read semantics, striping,
-  mask, LSE combine — mesh-collective form validated in the 8-device `test_mla_dcp.py`). The one thing CPU
-  cannot exercise is the real Pallas kernel INSIDE the shard_map (a JAX limitation) and any Mosaic
-  bitcast/relayout divergence between interpreter and real MXU. If dcp=2/128K still truncates on metal, it is
-  a hardware-lowering divergence (interpret-vs-TPU A/B needed), NOT the algorithm — which is now ruled correct.
+- **VMEM is NOT the DCP-kernel blocker (CORRECTION — an earlier draft of this entry overclaimed it; the
+  adversarial reviewer caught it).** The DCP kernel runs INSIDE the `shard_map` (attention_interface.py:985)
+  over the `P(BATCH, CONTEXT)`-sharded cache, so it receives the shard's LOCAL slice: the local page is
+  `block_size` (~512 tokens) at ANY dcp — the scheduler's `block_size *= dcp` and the ÷dcp CONTEXT sharding
+  cancel. So the per-block buffer `bkvc = 2·decode_batch_size·(512/32 + 2)·32·512·2 B ≈ 4.5 MB` fits at dcp=2
+  AND dcp=4. The **16.5 MB `RESOURCE_EXHAUSTED size=17301504`** seen on metal was the **gate-OFF** path
+  (`GLM_MLA_DCP` UNSET → the regular `mla_ragged_paged_attention` on the UN-sharded, gathered 2048-token page
+  = 512·dcp) — a DIFFERENT kernel path, not the DCP kernel. My "VMEM at page 2048" arithmetic used the global
+  page; under DCP the kernel never sees it.
+- **So the honest conclusion is scoped, not closed:** the DCP kernel's kv_packing>1 multi-block LOGIC (packed
+  read semantics, striping, global-position mask, LSE combine) is CORRECT **as modeled by the Mosaic
+  interpreter** (proven; mutation-verified; reviewer-reproduced incl. int8/fp8 + permutation traces), and it
+  FITS VMEM at dcp=2 and dcp=4. What CPU CANNOT certify: the production read lowers to the **native**
+  `tpu.bitcast` (mosaic/lowering.py:4274) + `tpu.memref_bitcast` (:1885), which the interpreter does not run
+  (it substitutes JAX's Python reference model); and the real kernel INSIDE `shard_map` (a JAX limitation).
+  A SILENT 1/dcp truncation is a correctness signature — NOT what a VMEM OOM produces — so if the on-metal
+  symptom is accurate, the true root cause lives precisely where CPU is blind: native-bitcast sublane
+  ordering, the packed-buffer DMA layout, or the runner-side cache-spec/block-table plumbing (is the
+  `P(BATCH,CONTEXT)` sharded local cache actually created? do block tables arrive in P_g-token units?).
+- **THE FALSIFIER (decisive; coordinator's primary ask): the "~1/dcp whole-shard-drop" does NOT reproduce on
+  CPU at kv_packing==1 on a REAL dcp mesh → the metal bug is NOT the CPU-fixable combine/accumulation.**
+  New `test_falsifier_real_mesh_combine_no_shard_drop` (in the kvpack test file): the REAL per-shard kernel
+  `(out, lse)` (kv_packing==1, num_bkv>1 — needle spans ≥2 LOCAL blocks per shard, keys on EVERY shard) fed
+  through the PRODUCTION `_dcp_lse_combine` inside an actual `jax.shard_map` over the 'dcp' axis on 8
+  simulated CPU devices, incl. pod-mirroring **model×dcp** meshes (dcp,model)∈{(2,1),(4,1),(2,4),(4,2)}.
+  **All pass**: combined == replicated full-context numpy reference (and ≠ shard-0-only, so non-vacuous). This
+  targets exactly the two CPU-fixable suspects — (5a) the mesh `pmax/psum` over a "degenerate 'dcp' axis"
+  dropping a shard, and (5b) the num_bkv>1 online-softmax m/l → per-shard lse — and **falsifies both**.
+- **Convergent exoneration of the read:** the bitcast `load_bkv` is SHARED with the WORKING non-DCP dense path
+  (dense GSM8K n=32 @ kv_packing=32/bf16 = 96.9% on metal); `history_only` bypasses only the WRITE, not the
+  READ. So the native packed read is already proven correct on silicon by dense — consistent with the CPU
+  fidelity proof. The residual metal-only DCP bug is therefore NOT the read and NOT the combine/lse; it is
+  localized to the DCP-specific XLA glue that CPU cannot exercise on metal: the owner-scatter WRITE at
+  kv_packing=32 (`attention_interface.py:906-922`, tested on CPU only at pack≤2 in `test_mla_dcp.py`), the
+  runner-side cache-spec/block-table plumbing (is the `P(BATCH,CONTEXT)` sharded local cache actually created;
+  do block tables arrive in P_g-token units), or a metal-only miscompile — **an on-metal dump, not a CPU fix.**
+- **Concrete on-metal instrument added (owner runs on the pod, 1 chip, no serving stack):**
+  `tests/kernels/test_mla_v2_kvpack_bitcast_tpu.py` — runs the EXACT load_bkv `ref.bitcast/pltpu.bitcast`
+  round trip on real silicon with distinct-value data and asserts it equals the C-order layout
+  (`JAX_PLATFORMS=tpu pytest tests/kernels/test_mla_v2_kvpack_bitcast_tpu.py`). Dense working already implies
+  this passes; if it did FAIL, native `tpu.bitcast` ordering would be the root cause. The higher-value metal
+  escalation is a dcp=2 AND dcp=4 / kv_packing=32 multi-page needle run with a per-shard-lse + post-scatter
+  cache dump, compared to the numpy full-context reference, to catch the write-routing/plumbing suspect.
+- **dcp=2 vs dcp=4:** both FIT VMEM (~4.5 MB local-page buffer) and HBM (128K: dcp=2 ≈5.95, dcp=4 ≈2.98
+  GiB/chip). The reported truncation was seen at dcp=4; since the CPU-reproducible logic is correct at BOTH,
+  run dcp=2 first (conservative) but expect the SAME metal behavior — the differentiator is the on-metal glue,
+  not dcp. No config shortcut; escalate to the on-metal dump.
 - **Suites green (CPU, JAX_PLATFORMS=cpu):** DCP suites 86/86 (`test_mla_v2_lse_dcp_cpu` 3 + new kvpack 39 +
   `test_mla_dcp` 44); DSA+MLA 108/108 (`test_dsa_indexer_kernel`, `test_dsa_sparse_mla`, `test_mla_attention`,
   `test_mla_head_sharded`, `test_glm_dsa_pallas_decode`, `test_glm_dsa_mtp_index_share`). ≥ the -next counts
