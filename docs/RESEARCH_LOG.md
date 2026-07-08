@@ -1130,3 +1130,17 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   observability step before any fix.
 - Not reward-hacking / not faking: report_passkey still refuses to call <128K a gate pass; no 128K claim
   until it's real. Proven so far: sparse passkey 100% @32K, kernels silicon-validated, GSM8K n=32 96.9%.
+
+## 2026-07-08 21:10 UTC — DCP ROOT CAUSE CONFIRMED (cache-dump verdict): cross-step striped-cache persistence loss
+
+- The gated cache-dump probe (2-chunk vs 1-chunk prefill, dcp=2, layer 0, all 8 hosts' shards reassembled)
+  returned **DIFFER: max|Δ|=5.44, exactly 1024/2048 rows stale = precisely ONE dcp stripe (half at dcp=2).**
+- **Root cause, empirically confirmed:** chunk-1's writes to the P(BATCH,CONTEXT)-striped MLA KV cache are
+  NOT carried into chunk-2's execute_model step — one dcp shard is lost across the scheduler-step boundary.
+  This is the exact "sees 1/dcp of context" symptom. It is a RUNNER cache-persistence / input_output_aliases
+  issue under DCP striping — NOT the kernel (all kernel/scatter/combine CPU logic already proven correct).
+- Single-chunk prefill has one step → no boundary → correct (matches the on-metal discriminator). This is why
+  every CPU test (single execute_model call) passed and only multi-CHUNK on metal fails.
+- Fix target: preserve the DCP-striped kv_caches buffer across chunked-prefill execute_model calls (aliasing/
+  donation round-trip of the striped layout). Then dcp=2 128K passkey. Observability-first paid off again:
+  the dump pinned write-back-vs-read in one probe after 5 CPU hypotheses were falsified.
