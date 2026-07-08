@@ -141,7 +141,20 @@ def _build_paged_cache(np, jnp, keys_per_req, page_size, seed, dtype,
 
 def _make_reference_case(np, jnp, jax, ref, seed=0):
     """Decode step (last token = query) at real head dims + the reference's own
-    full-map fp32 scores as oracle. Returns kernel inputs + per-req oracle rows."""
+    full-map fp32 scores as oracle. Returns kernel inputs + per-req oracle rows.
+
+    The WHOLE builder runs under matmul precision 'highest': on TPU the
+    default precision computes fp32 einsums via bf16 MXU passes, which put
+    ~4.5e-3 errors in the ORACLE's own scores (the first on-metal A2 run
+    failed on exactly one boundary pair this way — kernel and XLA twin agreed
+    to 4.8e-7 while the oracle was off by 4.5e-3 on the disputed position).
+    The HF reference semantics are fp32-exact; 'highest' restores that on
+    device and is a no-op on CPU."""
+    with jax.default_matmul_precision("highest"):
+        return _make_reference_case_inner(np, jnp, jax, ref, seed)
+
+
+def _make_reference_case_inner(np, jnp, jax, ref, seed=0):
     key = jax.random.PRNGKey(seed)
     wkey, *skeys = jax.random.split(key, len(IDX_SEQ_LENS) + 1)
     ks = jax.random.split(wkey, 5)

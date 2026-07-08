@@ -1,0 +1,62 @@
+WARNING:absl:Tensorflow library not found, tensorflow.io.gfile operations will use native shim calls. GCS paths (i.e. 'gs://...') cannot be accessed.
+INFO 07-08 04:54:22 [importing.py:46] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+INFO 07-08 04:54:22 [importing.py:81] Triton not installed or not compatible; certain GPU-related functions will not be available.
+INFO 07-08 04:54:22 [__init__.py:59] TPU info: node_name=db-v4-64-od | tpu_type=v4-64 | worker_id=0 | num_chips=4 | num_cores_per_chip=2
+Traceback (most recent call last):
+  File "/home/gianl/vllm-env/lib/python3.12/site-packages/jax/_src/pallas/pallas_call.py", line 1330, in wrapped
+    out_flat = pallas_call_p.bind(
+jax._src.source_info_util.JaxStackTraceBeforeTransformation: ValueError: The Pallas TPU lowering currently requires that the last two dimensions of your block shape are divisible by 8 and 128 respectively, or be equal to the respective dimensions of the overall array. Block spec for args[3] in pallas_call _indexer_scores_kernel at /home/gianl/tpu-inference-next/tpu_inference/kernels/dsa/indexer_kernel.py:273 has block shape (Blocked(block_size=1), Blocked(block_size=32)), array shape (2, 32), and index_map { lambda ; a:i32[] b:i32[] c:Ref<smem>{i32[8]} d:Ref<smem>{i32[2]}. let
+    
+  in (a, 0:i32[]) }, in memory space <MemorySpace.DEFAULT: 'default'>.
+See details at https://docs.jax.dev/en/latest/pallas/grid_blockspec.html#pallas-blockspec
+
+The preceding stack trace is the source of the JAX operation that, once transformed by JAX, triggered the following exception.
+
+--------------------
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/gianl/glm-tpu/scripts/kernel_probe/probe_2a_indexer_compile.py", line 145, in main
+    scores = indexer_scores_pallas(q, w, kv_cache, block_tables, kv_lens,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gianl/tpu-inference-next/tpu_inference/kernels/dsa/indexer_kernel.py", line 387, in indexer_scores_pallas
+    return fn(bt_flat, kv_lens_i, q, w_f, kv_cache)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gianl/vllm-env/lib/python3.12/site-packages/jax/_src/pallas/pallas_call.py", line 949, in _pallas_call_lowering
+    return mlir.lower_per_platform(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gianl/vllm-env/lib/python3.12/site-packages/jax/_src/pallas/pallas_call.py", line 899, in tpu_lowering
+    return rule(ctx, *in_nodes, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gianl/vllm-env/lib/python3.12/site-packages/jax/_src/pallas/mosaic/pallas_call_registration.py", line 399, in pallas_call_tpu_lowering_rule
+    mosaic_module = lowering.lower_jaxpr_to_pipelined_module(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gianl/vllm-env/lib/python3.12/site-packages/jax/_src/pallas/mosaic/lowering.py", line 889, in lower_jaxpr_to_pipelined_module
+    lower_jaxpr_into_pipelined_module(
+  File "/home/gianl/vllm-env/lib/python3.12/site-packages/jax/_src/pallas/mosaic/lowering.py", line 945, in lower_jaxpr_into_pipelined_module
+    _check_block_mappings(
+  File "/home/gianl/vllm-env/lib/python3.12/site-packages/jax/_src/pallas/mosaic/lowering.py", line 839, in _check_block_mappings
+    raise ValueError(
+ValueError: The Pallas TPU lowering currently requires that the last two dimensions of your block shape are divisible by 8 and 128 respectively, or be equal to the respective dimensions of the overall array. Block spec for args[3] in pallas_call _indexer_scores_kernel at /home/gianl/tpu-inference-next/tpu_inference/kernels/dsa/indexer_kernel.py:273 has block shape (Blocked(block_size=1), Blocked(block_size=32)), array shape (2, 32), and index_map { lambda ; a:i32[] b:i32[] c:Ref<smem>{i32[8]} d:Ref<smem>{i32[2]}. let
+    
+  in (a, 0:i32[]) }, in memory space <MemorySpace.DEFAULT: 'default'>.
+See details at https://docs.jax.dev/en/latest/pallas/grid_blockspec.html#pallas-blockspec
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+==============================================================================
+GATE 2a — single-chip indexer-kernel Mosaic COMPILE probe
+==============================================================================
+mode              : METAL (real Mosaic gate)
+jax backend       : tpu
+shapes            : R=2 ctx=512 page=128 H=32 D=128 topk=64
+kernel            : indexer_scores_pallas  (interpret=False)
+the one question  : does Mosaic accept the (1,H) w-tile as a matmul LHS?
+------------------------------------------------------------------------------
+kernel raised     : the Mosaic compile / run FAILED
+------------------------------------------------------------------------------
+---- full traceback (verbatim) ----
+---- end traceback ----
+------------------------------------------------------------------------------
+GATE 2a: REJECT — ValueError: The Pallas TPU lowering currently requires that the last two dimensions of your block shape are divisible by 8 and 128 respectively, or be equal to the respective dimensions of the overall array. Block spec for args[3] in pallas_call _indexer_scores_kernel at /home/gianl/tpu-inference-next/tpu_inference/kernels/dsa/indexer_kernel.py:273 has block shape (Blocked(block_size=1), Blocked(b …[truncated]
+FALLBACK (documented, apply on REJECT): replace the (1,H)@[H,P] weighted head-sum matmul in _indexer_scores_kernel with a broadcast-multiply w[0, :, None] * s  ([H,1]*[H,P] -> [H,P])  followed by a sublane reduction jnp.sum(..., axis=0) over the H axis (-> [1,P]).  Refs: docs/01-dsa-kernel-design.md §1.3, indexer_kernel.py _indexer_scores_kernel.

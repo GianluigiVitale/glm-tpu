@@ -1,0 +1,74 @@
+WARNING:absl:Tensorflow library not found, tensorflow.io.gfile operations will use native shim calls. GCS paths (i.e. 'gs://...') cannot be accessed.
+==============================================================================
+§2b — single-chip real-MXU parity probe for the frozen DSA kernels
+==============================================================================
+utc               : 2026-07-08T05:09:34Z
+mode              : METAL (real MXU)
+jax backend       : tpu
+fork branch/commit: glm-5.2-v4 / 02e44b36   (expected: glm-5.2-v4-next)
+results file      : /home/gianl/glm-tpu/docs/artifacts/kernelprobe-2b-20260708-metal2.results.txt
+WARNING           : fork is on 'glm-5.2-v4', not glm-5.2-v4-next — run via run_kernel_gates.sh which enforces the branch.
+/home/gianl/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/multiprocessing/popen_fork.py:66: RuntimeWarning: os.fork() was called. os.fork() is incompatible with multithreaded code, and JAX is multithreaded, so this will likely lead to a deadlock.
+  self.pid = os.fork()
+INFO 07-08 05:09:42 [importing.py:46] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+INFO 07-08 05:09:42 [importing.py:81] Triton not installed or not compatible; certain GPU-related functions will not be available.
+INFO 07-08 05:09:42 [__init__.py:59] TPU info: node_name=db-v4-64-od | tpu_type=v4-64 | worker_id=0 | num_chips=4 | num_cores_per_chip=2
+
+==============================================================================
+GATE A — indexer: pallas-vs-XLA core parity + top-k vs HF oracle
+==============================================================================
+
+[A1] fp32 kernel-vs-XLA score parity (max|s_pal - s_xla| on valid prefix):
+    req0 L= 512: max_abs=2.384e-07   -inf-fill agree=True
+    req1 L= 300: max_abs=2.384e-07   -inf-fill agree=True
+    req2 L= 129: max_abs=1.192e-07   -inf-fill agree=True
+    req3 L= 128: max_abs=2.384e-07   -inf-fill agree=True
+    -> A1 max_abs=2.384e-07  bar<=5e-04  PASS
+
+[A2] S1 fp32 selection vs HF oracle (selected-set EXACT modulo ties):
+    req0 L= 512 k=64: n_valid=64 set-mismatch=0 non-tie-mismatch=0
+    req1 L= 300 k=64: n_valid=64 set-mismatch=0 non-tie-mismatch=0
+    req2 L= 129 k=64: n_valid=64 set-mismatch=0 non-tie-mismatch=0
+    req3 L= 128 k=64: n_valid=64 set-mismatch=0 non-tie-mismatch=0
+    -> A2 non-tie mismatches=0  bar=0  PASS
+
+[A3] S2 bf16 selection vs fp32 oracle (band |s - s_kth| <= 2^-8*scale, eps=3.906e-03):
+    req0 L= 512 k=64: scale=2.296 band=8.969e-03 set-mismatch=2 out-of-band=0 | bf16 score |Δ| med=1.394e-03 p99=5.516e-03 max=6.821e-03
+    req1 L= 300 k=64: scale=4.319 band=1.687e-02 set-mismatch=0 out-of-band=0 | bf16 score |Δ| med=1.859e-03 p99=6.966e-03 max=8.261e-03
+    req2 L= 129 k=64: scale=1.947 band=7.605e-03 set-mismatch=0 out-of-band=0 | bf16 score |Δ| med=1.326e-03 p99=4.849e-03 max=5.696e-03
+    req3 L= 128 k=64: scale=2.028 band=7.923e-03 set-mismatch=0 out-of-band=0 | bf16 score |Δ| med=1.524e-03 p99=5.015e-03 max=6.352e-03
+    -> A3 out-of-band mismatches=0  bar=0  PASS
+
+GATE A: PASS  (A1 score-parity, A2 S1 fp32 exact-mod-ties, A3 S2 bf16 band)
+
+==============================================================================
+GATE B — sparse-MLA decode: dsa_sparse_decode vs dsa_sparse_decode_xla
+==============================================================================
+    fp32: R=4 seg_valid=[17, 128, 1000, 2048] max_abs=9.537e-07  bar<=2.0e-06  PASS
+    bf16: R=4 seg_valid=[17, 128, 1000, 2048] max_abs=1.953e-03  bar<=2.5e-03  PASS
+
+GATE B: PASS
+
+==============================================================================
+GATE C — pack_new_kv OOB geometry at kv_len 511 / 512 / 513 (E0200 class)
+==============================================================================
+    kv_len=511 offset=510 q_end=10 bf16: no-OOB=True byte-identical(kvc=True,kpe=True)  PASS
+    kv_len=511 offset=510 q_end=11 bf16: no-OOB=True byte-identical(kvc=True,kpe=True)  PASS
+    kv_len=512 offset=511 q_end=10 bf16: no-OOB=True byte-identical(kvc=True,kpe=True)  PASS
+    kv_len=512 offset=511 q_end=11 bf16: no-OOB=True byte-identical(kvc=True,kpe=True)  PASS
+    kv_len=513 offset=512 q_end=10 bf16: no-OOB=True byte-identical(kvc=True,kpe=True)  PASS
+    kv_len=513 offset=512 q_end=11 bf16: no-OOB=True byte-identical(kvc=True,kpe=True)  PASS
+
+GATE C: PASS
+
+==============================================================================
+SUMMARY
+==============================================================================
+  GATE A (indexer parity + top-k)  : PASS
+  GATE B (sparse-MLA decode parity): PASS
+  GATE C (pack_new_kv OOB 511/512/513): PASS
+------------------------------------------------------------------------------
+  §2b OVERALL: PASS — parity green on silicon
+==============================================================================
+
+[results written] /home/gianl/glm-tpu/docs/artifacts/kernelprobe-2b-20260708-metal2.results.txt

@@ -706,3 +706,19 @@ fixes applied per repo/worktree:
   54/140 = 38.6% (salvaged partial answers, above the 25% MC floor).
 - Decision: rerun at max-new 16384 on the staging branch AFTER the single-chip kernel gates + byte-identity
   smoke (runbook order). All 198 items with verbatim outputs in results.db run 48.
+
+## 2026-07-08 05:25 UTC — 🎉 STAGE-2 ON-METAL GATES ALL PASS (single v4 chip, kernels silicon-validated)
+
+- **GATE 2a ACCEPT** after three v4 Mosaic lowering fixes (sanctioned freeze-break, all in the w/output
+  BlockSpecs + the documented broadcast-multiply fallback; commit on glm-5.2-v4-next). Round-5's flagged
+  highest-risk spec (the (1,H) w-tile) was indeed rejected — exactly as predicted — and the documented
+  fallback landed.
+- **GATE 2b ALL PASS on real MXU**: A1 pallas-vs-XLA fp32 2.4e-7; **A2 selected-set-EXACT vs the HF-math
+  oracle (0 non-tie mismatches)**; A3 bf16 0 out-of-band (S2 ε=2^-8); GATE B sparse-MLA fp32 9.5e-7 /
+  bf16 1.95e-3; GATE C pack_new_kv OOB geometry no-OOB + byte-identical at kv_len 511/512/513.
+- One probe bug found ON METAL and fixed: the HF oracle itself ran at default MXU precision (bf16 passes,
+  ~4.5e-3 self-error) — the first A2 "failure" was the ORACLE's error, not the kernel's. Oracle now pinned
+  to matmul precision 'highest' (no-op on CPU).
+- Verbatim logs: docs/artifacts/kernelprobe-2a-20260708*.log (REJECT trail + ACCEPT),
+  kernelprobe-2b-20260708-metal2.log + .results.txt. CPU regression: 144/144 DSA tests on -next.
+- The audit's steps 1+2 are green. Next: staging switch smoke + GPQA rerun @16K cap; then passkey/throughput.
