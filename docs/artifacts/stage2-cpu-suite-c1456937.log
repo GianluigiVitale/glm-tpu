@@ -1,0 +1,230 @@
+================================================================================
+INDEPENDENT EVIDENCE ARTIFACT — Stage-2 DSA CPU suite, clean-clone reproduction
+================================================================================
+Date (UTC):          2026-07-07
+Job:                 reproduce the "Stage-2: 140+ CPU tests pass" claim in a clean
+                     environment (fresh clone, no local-tree state, CPU only)
+Repo under test:     fresh `git clone` (NOT a worktree) of /home/gianl/tpu-inference
+Clone path:          /tmp/claude-2001/-home-gianl/8712a40e-7bbe-436d-b0ad-d676cbd502d5/scratchpad/clean-clone
+Branch:              glm-5.2-v4-sparse-prefill
+Commit (rev-parse HEAD): c145693728d46b45e902110405f542f301f2d443
+Working tree:        clean (`git status --porcelain` empty after clone)
+
+Interpreter:         /home/gianl/vllm-env/bin/python
+                     Python 3.12.13 (main, Jun 23 2026, 15:18:55) [Clang 22.1.3]
+Packages:            jax 0.10.1, jaxlib 0.10.1, libtpu 0.0.41 (inert under
+                     JAX_PLATFORMS=cpu), vllm 0.1.dev1+ga30addc75.tpu (editable @
+                     /home/gianl/vllm-build), torch 2.10.0+cpu, flax 0.12.4,
+                     torchax 0.0.11, pytest 9.0.3
+Env vars:            JAX_PLATFORMS=cpu        (exported before python; TPU never touched —
+                                               jax.default_backend() verified 'cpu' pre-run)
+                     PYTHONPATH=<clone root>  (REQUIRED for independence: the venv carries an
+                                               EDITABLE tpu_inference install pointing at
+                                               /home/gianl/tpu-inference; PYTHONPATH forces
+                                               import resolution to the clean clone. Verified
+                                               pre-run: tpu_inference.__file__ ==
+                                               <clone>/tpu_inference/__init__.py)
+                     XLA_FLAGS:               NOT set. Collection succeeded without it; the
+                                              mesh-test file (test_mla_head_sharded.py) appends
+                                              --xla_force_host_platform_device_count=8 itself
+                                              before backend init, and it landed in time
+                                              (all 4 of its tests PASSED, none skipped).
+
+Command (cwd = clone root):
+  python -m pytest \
+    tests/kernels/test_dsa_indexer_kernel.py \
+    tests/kernels/test_dsa_sparse_mla.py \
+    tests/layers/vllm/test_glm_dsa_indexer.py \
+    tests/layers/vllm/test_glm_dsa_pallas_decode.py \
+    tests/layers/vllm/test_glm_dsa_sparse_prefill.py \
+    tests/layers/common/test_mla_head_sharded.py \
+    -v
+
+DEVIATION FROM THE TASKED 7-FILE LIST (finding, recorded as evidence):
+  The tasked list also named tests/kernels/mla_v2_pack_new_kv_oob_test.py. That file
+  DOES NOT EXIST at c1456937 — the first run aborted collection with
+  "ERROR: file or directory not found: tests/kernels/mla_v2_pack_new_kv_oob_test.py".
+  The oob test entered the tree via the pg2 merge 02e44b36, which is NOT an ancestor
+  of c1456937 (the sparse-prefill branch forked at 87abdf53, the obs merge). The run
+  below is the 6 files that exist at the pinned commit.
+
+RESULT:              124 passed, 0 failed, 0 skipped, 19 warnings in 289.19s (pytest)
+Wall time:           2026-07-07T22:12:35Z -> 2026-07-07T22:17:38Z (303 s); exit code 0
+Per-file PASSED:     24  tests/kernels/test_dsa_indexer_kernel.py
+                     42  tests/kernels/test_dsa_sparse_mla.py
+                     32  tests/layers/vllm/test_glm_dsa_indexer.py
+                     10  tests/layers/vllm/test_glm_dsa_pallas_decode.py
+                     12  tests/layers/vllm/test_glm_dsa_sparse_prefill.py
+                      4  tests/layers/common/test_mla_head_sharded.py
+
+CLAIM CHECK:         "140+ CPU tests pass" is NOT reproduced as stated at this commit:
+                     124 tests exist across the runnable suite files and ALL 124 pass
+                     (0 fail, 0 skip). The shortfall vs "140+" is a COUNT deviation,
+                     not a failure: the oob file (absent here) cannot account for ~16
+                     tests; the claim likely referred to a different branch state or
+                     file set. c1456937's own commit message claims "108 passed"
+                     existing + 11 new ~= 119; 124 observed is consistent with that
+                     order, green and clean.
+================================================================================
+VERBATIM `pytest -v` OUTPUT BELOW (unmodified)
+================================================================================
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- /home/gianl/vllm-env/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /tmp/claude-2001/-home-gianl/8712a40e-7bbe-436d-b0ad-d676cbd502d5/scratchpad/clean-clone
+configfile: pyproject.toml
+plugins: mock-3.15.1, anyio-4.13.0, jaxtyping-0.3.10, hypothesis-6.151.9
+collecting ... collected 124 items
+
+tests/kernels/test_dsa_indexer_kernel.py::test_matches_hf_math_reference[xla-small] PASSED [  0%]
+tests/kernels/test_dsa_indexer_kernel.py::test_matches_hf_math_reference[xla-real-heads] PASSED [  1%]
+tests/kernels/test_dsa_indexer_kernel.py::test_matches_hf_math_reference[pallas-interpret-small] PASSED [  2%]
+tests/kernels/test_dsa_indexer_kernel.py::test_matches_hf_math_reference[pallas-interpret-real-heads] PASSED [  3%]
+tests/kernels/test_dsa_indexer_kernel.py::test_pallas_matches_pure_jax[small-f32] PASSED [  4%]
+tests/kernels/test_dsa_indexer_kernel.py::test_pallas_matches_pure_jax[real-8k-topk2048-f32] PASSED [  4%]
+tests/kernels/test_dsa_indexer_kernel.py::test_pallas_matches_pure_jax[real-8k-topk64-f32] PASSED [  5%]
+tests/kernels/test_dsa_indexer_kernel.py::test_pallas_matches_pure_jax[real-8k-topk2048-bf16] PASSED [  6%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-default-topk64] PASSED [  7%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-default-topk2048] PASSED [  8%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-odd100-topk64] PASSED [  8%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-odd100-topk2048] PASSED [  9%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-128-topk64] PASSED [ 10%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-128-topk2048] PASSED [ 11%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-whole-topk64] PASSED [ 12%]
+tests/kernels/test_dsa_indexer_kernel.py::test_exact_vs_flat_topk_and_dense_oracle[mb-whole-topk2048] PASSED [ 12%]
+tests/kernels/test_dsa_indexer_kernel.py::test_short_context_returns_all_valid[xla] PASSED [ 13%]
+tests/kernels/test_dsa_indexer_kernel.py::test_short_context_returns_all_valid[pallas-interpret] PASSED [ 14%]
+tests/kernels/test_dsa_indexer_kernel.py::test_shuffled_page_tables_are_invariant[xla] PASSED [ 15%]
+tests/kernels/test_dsa_indexer_kernel.py::test_shuffled_page_tables_are_invariant[pallas-interpret] PASSED [ 16%]
+tests/kernels/test_dsa_indexer_kernel.py::test_hierarchical_topk_tie_handling PASSED [ 16%]
+tests/kernels/test_dsa_indexer_kernel.py::test_topk_wider_than_map PASSED [ 17%]
+tests/kernels/test_dsa_indexer_kernel.py::test_n_valid_clamped_to_map_width PASSED [ 18%]
+tests/kernels/test_dsa_indexer_kernel.py::test_mixed_dtype_q_cache_contract PASSED [ 19%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[1-17-fp32] PASSED [ 20%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[1-17-bf16] PASSED [ 20%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[1-128-fp32] PASSED [ 21%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[1-128-bf16] PASSED [ 22%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[1-2048-fp32] PASSED [ 23%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[1-2048-bf16] PASSED [ 24%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[4-17-fp32] PASSED [ 25%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[4-17-bf16] PASSED [ 25%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[4-128-fp32] PASSED [ 26%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[4-128-bf16] PASSED [ 27%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[4-2048-fp32] PASSED [ 28%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[4-2048-bf16] PASSED [ 29%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[8-17-fp32] PASSED [ 29%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[8-17-bf16] PASSED [ 30%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[8-128-fp32] PASSED [ 31%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[8-128-bf16] PASSED [ 32%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[8-2048-fp32] PASSED [ 33%]
+tests/kernels/test_dsa_sparse_mla.py::test_kernel_vs_oracle[8-2048-bf16] PASSED [ 33%]
+tests/kernels/test_dsa_sparse_mla.py::test_tile_size_invariance[128] PASSED [ 34%]
+tests/kernels/test_dsa_sparse_mla.py::test_tile_size_invariance[256] PASSED [ 35%]
+tests/kernels/test_dsa_sparse_mla.py::test_tile_size_invariance[512] PASSED [ 36%]
+tests/kernels/test_dsa_sparse_mla.py::test_tile_size_invariance[768] PASSED [ 37%]
+tests/kernels/test_dsa_sparse_mla.py::test_tile_size_invariance[1024] PASSED [ 37%]
+tests/kernels/test_dsa_sparse_mla.py::test_tile_size_invariance[2048] PASSED [ 38%]
+tests/kernels/test_dsa_sparse_mla.py::test_seg_valid_one_is_exact[fp32] PASSED [ 39%]
+tests/kernels/test_dsa_sparse_mla.py::test_seg_valid_one_is_exact[bf16] PASSED [ 40%]
+tests/kernels/test_dsa_sparse_mla.py::test_composition_full_history_equals_dense PASSED [ 41%]
+tests/kernels/test_dsa_sparse_mla.py::test_composition_random_subset PASSED [ 41%]
+tests/kernels/test_dsa_sparse_mla.py::test_gather_rows_and_valid_counts PASSED [ 42%]
+tests/kernels/test_dsa_sparse_mla.py::test_rope_pad_lanes_inert[fp32] PASSED [ 43%]
+tests/kernels/test_dsa_sparse_mla.py::test_rope_pad_lanes_inert[bf16] PASSED [ 44%]
+tests/kernels/test_dsa_sparse_mla.py::test_masked_tail_rows_inert[fp32] PASSED [ 45%]
+tests/kernels/test_dsa_sparse_mla.py::test_masked_tail_rows_inert[bf16] PASSED [ 45%]
+tests/kernels/test_dsa_sparse_mla.py::test_oracle_matches_dense_reference PASSED [ 46%]
+tests/kernels/test_dsa_sparse_mla.py::test_fully_masked_row_is_exactly_zero[fp32] PASSED [ 47%]
+tests/kernels/test_dsa_sparse_mla.py::test_fully_masked_row_is_exactly_zero[bf16] PASSED [ 48%]
+tests/kernels/test_dsa_sparse_mla.py::test_gather_then_kernel_padded_slot_is_zero PASSED [ 49%]
+tests/kernels/test_dsa_sparse_mla.py::test_gather_layout_vs_upstream_v1_writer[2-64] PASSED [ 50%]
+tests/kernels/test_dsa_sparse_mla.py::test_gather_layout_vs_upstream_v1_writer[4-64] PASSED [ 50%]
+tests/kernels/test_dsa_sparse_mla.py::test_gather_layout_vs_upstream_v1_writer[32-64] PASSED [ 51%]
+tests/kernels/test_dsa_sparse_mla.py::test_gather_layout_vs_upstream_v1_writer[32-32] PASSED [ 52%]
+tests/kernels/test_dsa_sparse_mla.py::test_gather_layout_vs_upstream_v1_writer[4-8] PASSED [ 53%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_topk_indices_match_parity_reference[8] PASSED [ 54%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_topk_indices_match_parity_reference[64] PASSED [ 54%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_topk_indices_match_parity_reference[2048] PASSED [ 55%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_params_adapter_orientations_and_fused_split PASSED [ 56%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_params_adapter_dequantizes_fp8_resident_wq_b PASSED [ 57%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_single_chunk_api_rejects_k_cache PASSED [ 58%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_selected_sets_match_torch_topk_modulo_ties[8] PASSED [ 58%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_selected_sets_match_torch_topk_modulo_ties[33] PASSED [ 59%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_xla_ref_attention_equals_dense_when_topk_ge_T PASSED [ 60%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_xla_ref_attention_masked_matches_oracle_when_topk_lt_T PASSED [ 61%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_xla_ref_refuses_non_single_prefill_positions[decode] PASSED [ 62%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_xla_ref_refuses_non_single_prefill_positions[chunked] PASSED [ 62%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_xla_ref_refuses_non_single_prefill_positions[batched-multiseq] PASSED [ 63%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_indexshare_context_carriage PASSED [ 64%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_glm_dsa_mode_env_parsing PASSED [ 65%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_mode_off_no_behavioral_change PASSED [ 66%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_xla_ref_wrapper_forward_full_and_shared PASSED [ 66%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_write_then_score_round_trip_matches_direct_history[12] PASSED [ 67%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_write_then_score_round_trip_matches_direct_history[2048] PASSED [ 68%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_padded_token_writes_are_dropped PASSED [ 69%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_token_request_ids_ragged_and_padded PASSED [ 70%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_decode_step_matches_full_history_reference[12] PASSED [ 70%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_decode_step_matches_full_history_reference[2048] PASSED [ 71%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_multi_request_decode_batch PASSED [ 72%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_multi_chunk_prefill_matches_single_chunk[chunks0] PASSED [ 73%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_multi_chunk_prefill_matches_single_chunk[chunks1] PASSED [ 74%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_multi_chunk_prefill_matches_single_chunk[chunks2] PASSED [ 75%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_bf16_cache_matches_bf16_rounded_reference PASSED [ 75%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_paged_layer_indexshare_carriage PASSED [ 76%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_dsa_indexer_spec_none_when_mode_off PASSED [ 77%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_dsa_indexer_spec_registered_when_dsa_on PASSED [ 78%]
+tests/layers/vllm/test_glm_dsa_indexer.py::test_dsa_indexer_spec_group_formation_checkpoint PASSED [ 79%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_sparse_decode_equals_dense_reference_ctx_le_topk PASSED [ 79%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_sparse_decode_topk_lt_ctx_matches_selected_set PASSED [ 80%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_indexshare_shared_layer_reuses_indices PASSED [ 81%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_mixed_step_falls_back_to_dense PASSED [ 82%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_mode_off_never_routes_pallas_decode PASSED [ 83%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_mode_parsing_accepts_pallas_decode PASSED [ 83%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_missing_indexer_spec_fails_loudly PASSED [ 84%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_outer_jit_traced_metadata[fp32] PASSED [ 85%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_outer_jit_traced_metadata[bf16] PASSED [ 86%]
+tests/layers/vllm/test_glm_dsa_pallas_decode.py::test_dp_mesh_refused PASSED [ 87%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_masked_prefill_attention_matches_per_token_oracle PASSED [ 87%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_prefill_ctx_exceeds_topk_predicate PASSED [ 88%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_prefill_ctx_le_topk_routes_dense PASSED [ 89%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_sparse_prefill_matches_reference_indices_and_selected_set PASSED [ 90%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_sparse_prefill_indices_match_parity_oracle PASSED [ 91%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_multi_chunk_prefill_equals_single_shot PASSED [ 91%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_dense_then_sparse_chunk_interleaving PASSED [ 92%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_mixed_step_ctx_gt_topk_takes_masked_branch PASSED [ 93%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_indexshare_shared_layer_reuses_prefill_indices PASSED [ 94%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_pure_decode_after_sparse_prefill_uses_decode_branch PASSED [ 95%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_outer_jit_sparse_prefill_chunk[fp32] PASSED [ 95%]
+tests/layers/vllm/test_glm_dsa_sparse_prefill.py::test_outer_jit_sparse_prefill_chunk[bf16] PASSED [ 96%]
+tests/layers/common/test_mla_head_sharded.py::test_head_sharded_matches_all_gather_and_reference PASSED [ 97%]
+tests/layers/common/test_mla_head_sharded.py::test_gate_is_noop_at_mesh_product_one PASSED [ 98%]
+tests/layers/common/test_mla_head_sharded.py::test_head_sharded_refuses_dp_mesh PASSED [ 99%]
+tests/layers/common/test_mla_head_sharded.py::test_gate_defers_to_explicit_shardings PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../../../../home/gianl/vllm-env/lib/python3.12/site-packages/tpu_info/device.py:33
+  /home/gianl/vllm-env/lib/python3.12/site-packages/tpu_info/device.py:33: DeprecationWarning: In 3.13 classes created inside an enum will not become a member.  Use the `member` decorator to keep the current behavior.
+    class Info(typing.NamedTuple):
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+../../../../../../home/gianl/vllm-env/lib/python3.12/site-packages/flax/nnx/variablelib.py:324
+  /home/gianl/vllm-env/lib/python3.12/site-packages/flax/nnx/variablelib.py:324: DeprecationWarning: jax.core.Effect is deprecated. Use jax.extend.core.Effect.
+    class VariableEffect(jax.core.Effect): ...
+
+../../../../../../home/gianl/vllm-env/lib/python3.12/site-packages/torch/jit/_script.py:362: 14 warnings
+  /home/gianl/vllm-env/lib/python3.12/site-packages/torch/jit/_script.py:362: DeprecationWarning: `torch.jit.script_method` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/layers/vllm/test_glm_dsa_indexer.py::test_selected_sets_match_torch_topk_modulo_ties[8]
+  /tmp/claude-2001/-home-gianl/8712a40e-7bbe-436d-b0ad-d676cbd502d5/scratchpad/clean-clone/tests/layers/vllm/test_glm_dsa_indexer.py:364: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+    t_vals, t_idx = torch.topk(torch.from_numpy(masked), kk, dim=-1)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 124 passed, 19 warnings in 289.19s (0:04:49) =================
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

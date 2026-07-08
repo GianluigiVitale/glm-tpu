@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 *-env/
 *.log
+!docs/artifacts/*.log
 *.tmp
 # LaTeX build artifacts
 *.aux

@@ -582,3 +582,34 @@ fixes applied per repo/worktree:
 - Stage-2 code-complete on branch glm-5.2-v4-2int (118 tests): GLM_DSA_MODE=pallas_decode end-to-end;
   round-7 adversarial reviews of pg2+2int running; staging merge (glm-5.2-v4-next) + DSA perf follow-ups
   + dense-MTP M1 in flight.
+
+## 2026-07-07 22:3x UTC — INDEPENDENT CLEAN-CLONE REPRODUCTION of the Stage-2 + staging CPU suites (CPU-only; TPU untouched)
+
+- **Method (independence):** two FRESH `git clone`s (not worktrees) of `~/tpu-inference` at the pinned
+  commits, run with `JAX_PLATFORMS=cpu` exported before python and `PYTHONPATH=<clone>` forcing import
+  resolution off the clean tree (the `~/vllm-env` interpreter carries an EDITABLE `tpu_inference` pointing
+  at the working checkout — verified pre-run that `tpu_inference.__file__` resolved into each clone, and
+  `jax.default_backend()=='cpu'`). Interp: Python 3.12.13; jax/jaxlib 0.10.1, vllm 0.1.dev1+ga30addc75.tpu,
+  torch 2.10.0+cpu, pytest 9.0.3. No XLA_FLAGS needed at either commit (the mesh-test files append
+  `--xla_force_host_platform_device_count=8` themselves; the 8-device tests ran, 0 silent skips).
+- **Stage-2 CPU suite @ `c1456937` (glm-5.2-v4-sparse-prefill): 124 passed / 0 failed / 0 skipped** in 289 s
+  → `docs/artifacts/stage2-cpu-suite-c1456937.log`. FINDING: the tasked 7-file list named
+  `tests/kernels/mla_v2_pack_new_kv_oob_test.py`, which DOES NOT EXIST at c1456937 (it entered via the pg2
+  merge 02e44b36, not an ancestor of the sparse-prefill branch — forked at the obs merge 87abdf53); ran the
+  6 files that exist. Per-file P: dsa_indexer_kernel 24, dsa_sparse_mla 42, glm_dsa_indexer 32,
+  glm_dsa_pallas_decode 10, glm_dsa_sparse_prefill 12, mla_head_sharded 4. DEVIATION vs the relayed "140+":
+  124 tests exist across these files and ALL pass — a COUNT shortfall, not a failure (consistent with
+  c1456937's own commit-message "108 existing + 11 new"; the "140+" likely counted a different file set).
+- **Staging cross-suite @ `999f0307` (glm-5.2-v4-next): 250 passed / 123 skipped / 0 failed** in 342 s
+  → `docs/artifacts/next-cross-suite-999f0307.log`. REPRODUCES the merge agent's "250P/123S/0F" EXACTLY.
+  The merge agent's file list was not recorded anywhere, so it was reconstructed: the 8 GLM-touched files
+  (merge-base 02e44b36→999f0307) + the pg2 oob test gave 243P/0S/0F standalone; the missing 123 skips are
+  exactly `mla_v2_test.py` (1P/103S) + `mla_tuned_vs_baseline_test.py` (0P/20S) — TPU-Pallas benches
+  skipped on CPU — and `test_mla_attention.py` adds 6P → the combined 12-file run hits 250/123/0 on the
+  nose. `backends/test_flash_attn_mla.py` is EXCLUDED (5P/5F on CPU: fp8/w8a8 forward paths need TPU), so
+  it was not in the merge agent's 0-failure set either. 999f0307 is itself the commit that fixes the
+  cross-suite mesh-skip ordering, so the 8-device mesh tests PASS here (44P test_mla_dcp + 4P
+  mla_head_sharded), not skip.
+- Both logs carry a full header (commit rev-parse, interpreter, versions, env vars, wall time, per-file
+  P/S/F, claim-check). Committed as durable artifacts. Bottom line: 0 failures on either branch; the
+  staging 250/123/0 is reproduced exactly; the Stage-2 "140+" is 124 (all green) — a counting deviation.
