@@ -71,7 +71,7 @@ with copy-paste commands, expected outcomes and abort criteria. Execute it top t
 | `glm-5.2-v4-2int` / `-2a2` / `-r5fix` / `-r6fix` / `-obs` / `-pg2` / `-dcp` | — | feature branches, all merged into `-next` | no |
 | `glm-5.2-v4-mtp` | `6beacb5d` | dense-MTP M1 — **lacks the OOB fix; merge `02e44b36` before pod use** (runbook §7a) | no |
 | `glm-5.2-v4-sparse-prefill` | `53c5e5ee` | Stage-2 sparse-prefill pointer (work in flight, another session) | no |
-| `pr-g1..4-*` | — | upstream PR series slices (`docs/02` + `docs/pr-descriptions/`; owner submits) | no |
+| `pr-g1..5-*` | — | upstream PR series slices (`docs/02` + `docs/pr-descriptions/`; owner submits; G5 = `pr-g5-mla-pure-tp` @ `132a11f9`, cut 2026-07-08 after the pod validation, pushed) | no |
 
 ## Review-round ledger (adversarial review is part of the loop — every change-set gets one)
 
