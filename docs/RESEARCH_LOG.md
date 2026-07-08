@@ -694,3 +694,15 @@ fixes applied per repo/worktree:
 ## 2026-07-08 — Round-8 finding 1 CLOSED: stranded round-6 fix `755b1719` merged to staging (CPU-only; TPU untouched)
 
 - **`glm-5.2-v4-next` @ `15246fc8`** (pushed) merges `glm-5.2-v4-2a2` @ `755b1719` — paged-indexer hardening (write_indexer_keys `valid` REQUIRED keyword-only; compute_topk_indices_paged / topk_indices_for_layer_paged take required `query_start_loc`, derive the token→request map + pad mask internally, per-request block tables only) now lands on the 2int/sparse-prefill/MTP state; auto-merge textually clean + one semantic-conflict fix (test_glm_dsa_pallas_decode.py history prepopulation now passes an explicit all-ones `valid` — provably unpadded rows); production wiring reconciled per round8-freeze-conformance.md finding 1 (mla_attention.py:1059/:1153 pass `valid=tok_valid` by keyword — untouched, still compatible); frozen kernels untouched; suites (CPU, JAX_PLATFORMS=cpu): indexer 34 / pallas_decode 18 / sparse_prefill 12 / mtp_index_share 14 / dsa_indexer_kernel 24 / dsa_sparse_mla 42 — all ≥ the 32/18/12/14/24/42 gates.
+
+## 2026-07-08 04:20 UTC — GPQA-Diamond n=198 COMPLETE (dense path): raw 52.5 TRUNCATION-DOMINATED; 86.2% on completed items
+
+- Run 48 (~/glm-run/gpqa198.log, 8h52m, 703,918 gen tokens, 22.0 tok/s aggregate, ZERO interrupts —
+  the OOB fix's longest hardware validation yet). attention_path=dense-mla (Stage-1 number; DSA bypassed).
+- **Raw acc 52.5 vs card 91.2 (Δ −38.7) is an ARTIFACT of --max-new 4096**: 140/198 items (71%) truncated
+  mid-reasoning (GLM-5.2 thinks long; the card evaluates at a 163,840-token cap).
+- Honest split: **completed items 50/58 = 86.2%** (within ~1σ of the card for n=58; caveat — the completed
+  subset skews toward easier/short-reasoning items, so this likely OVERSTATES slightly); truncated items
+  54/140 = 38.6% (salvaged partial answers, above the 25% MC floor).
+- Decision: rerun at max-new 16384 on the staging branch AFTER the single-chip kernel gates + byte-identity
+  smoke (runbook order). All 198 items with verbatim outputs in results.db run 48.
