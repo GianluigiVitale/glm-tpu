@@ -942,3 +942,18 @@ three run_bench commands + the checker.
   gates are BOTH hard-blocked on the DCP mesh-axis fix (agent running on Opus). No further dcp=1
   long-ctx attempts — they cannot reach the >=128K gate.
 - Pod idle until: DCP fix lands (-> 128K passkey), OR owner greenlights the full GPQA-198 @16K (parked).
+
+## 2026-07-08 18:20 UTC — DCP unblock ruled out; 128K needs real on-metal DCP-kernel work (VMEM + kv_packing)
+
+- Gate-OFF gather test (GLM_DCP=4, GLM_MLA_DCP unset, 128K): FAILED at compile —
+  `MLA-...-p_2048-... RESOURCE_EXHAUSTED: Allocation (size=17301504) would exceed memory` = 16.5 MB VMEM
+  buffer > v4's 16 MB, because dcp=4 makes the KV page = block_size(512) x dcp(4) = 2048 tokens. Hits
+  the MLA decode kernel regardless of the attention gate. AND gate-off gather re-materializes the full
+  cache (defeats the ÷dcp memory saving) — so it can't reach 128K even if it compiled.
+- Opus root-cause (refuted my H-MESH): mesh split IS correct (model8 x dcp4); the real failures are
+  (1) MLA kernel VMEM at the dcp logical page 2048, (2) the sharded DCP path's kv_packing=32 multi-block
+  bitcast read (zero test coverage — interpret path asserts kv_packing==1). Both are on-metal kernel work.
+- **HONEST FRONTIER:** sub-128K is DONE (32K sparse 100%, GSM8K n=32 96.9%, kernels silicon-validated).
+  128K passkey + 256K throughput require the DCP-kernel fix (VMEM page-tiling + kv_packing correctness) —
+  a genuine ~1-day on-metal effort. No config shortcut exists (fp8-KV would fit 128K@dcp=1 but isn't
+  supported on the sparse path yet). Design agent launched; NO more pod trial-and-error until a concrete fix.
