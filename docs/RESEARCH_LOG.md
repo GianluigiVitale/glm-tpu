@@ -730,3 +730,41 @@ fixes applied per repo/worktree:
   compared batched-vs-sequential and differed on 3/4 — a confounded comparison, documented, not a defect:
   concurrent MoE batching changes summation order.)
 - GPQA-Diamond rerun launched at max-new 16384 (the 4K-cap truncation artifact fix), bucket 32, max_seqs 16.
+
+## 2026-07-08 08:05 UTC — PRECISION AUDIT (the A2-lesson generalization): every matmul/oracle/scoring path in the passkey+throughput+parity instruments audited for the silent bf16-MXU default-precision hazard
+
+- Scope: could `jax.default_matmul_precision` DEFAULT (fp32 dots via bf16 MXU passes, ~4.5e-3 self-error;
+  `preferred_element_type=f32` does NOT prevent it) skew any number the gates rely on — including a
+  FLATTERING wrong number? CPU-only audit; TPU untouched.
+- **IMMUNE (no numeric comparison path at all):** bench/glm_longctx.py (tokenize + greedy generate +
+  string exact-match; numpy only for host RNG/needle placement/means); bench/dsa_throughput.py (tok/s =
+  host wall-clock floats over integer token counts; no device math in the harness);
+  bench/report_throughput.py (A/B join on DB floats; output-identity = integer token-id list equality);
+  gate D0 4a (runbook §step-4: verbatim raw_output string compare via results.db) and 4b (npz
+  bit-compare of the SAME program off-vs-sparse — no oracle). bench/*.py imports no jax/torch outside tests.
+- **ALREADY PINNED (why the on-metal 2b numbers are trustworthy):** the fork oracles pin precision
+  INTERNALLY — indexer_scores_xla (qk dot via _score_precision → HIGHEST for fp32, head-sum einsum
+  explicitly HIGHEST) and dsa_sparse_decode_xla (all three einsums precision=HIGHEST for fp32), matching
+  the kernels' own HIGHEST-fp32 rule; hierarchical_topk/topk_indices contain no matmuls. That is exactly
+  why GATE B measured 9.5e-7 and A1 2.4e-7 on metal: kernel AND twin both ran 3-pass fp32. bf16 rows use
+  DEFAULT on both sides deliberately (bf16×bf16→f32 is single-pass exact given bf16 inputs; Mosaic
+  rejects an fp32 contract precision on bf16 operands). No fork change needed.
+- **SAFE BY PLATFORM:** parity/glm_engine_parity.py (fp32+bf16 controls are HF **torch on CPU**; the
+  logits matmul is host numpy; the TPU side is the DUT, not a reference), parity/glm_mtp_parity.py
+  (JAX_PLATFORMS=cpu + explicit CPU mesh; fp32-vs-fp32 both exact on host),
+  parity/glm_indexer_rope_experiment.py + test_indexer_reference.py (force+assert CPU backend).
+- **FIXED (the one real gap):** parity/glm_indexer_reference.py — the HF-math oracle itself carried NO
+  internal pinning (wq_b/wk/weights_proj matmuls + both einsums at caller-context precision); it was
+  protected only by probe_2b's caller-side 'highest' wrapper, while the fork tests
+  (tests/kernels/test_dsa_indexer_kernel.py, tests/layers/vllm/test_glm_dsa_{indexer,sparse_prefill}.py)
+  import the same module with NO wrapper — a latent on-metal A2 repeat. `indexer_scores` now wraps its
+  whole body in `jax.default_matmul_precision("highest")` (no-op on CPU; idempotent under probe_2b's
+  wrapper), and test_indexer_reference.py gained test (d): lower under a hostile 'bfloat16' caller
+  context and assert all 5 dot_generals carry HIGHEST in the HLO.
+- Tests: parity/test_indexer_reference.py ALL PASS (a-d); probe_2b --interpret ALL GATES PASS
+  (kernelprobe-2b-audit-interpret.results.txt); bench test_longctx+test_dsa_throughput 29/29; fork
+  tests/kernels/test_dsa_indexer_kernel.py 24/24 against the pinned reference.
+- Production note (not a defect): the fork's serving-path scorer
+  (layers/vllm/custom_ops/glm_dsa_indexer.py score_block + projections) runs at DEFAULT precision by
+  design — it is the DUT, never an oracle; D0 is structurally insensitive (topk ≥ ctx) and passkey
+  measures the production system as-is.

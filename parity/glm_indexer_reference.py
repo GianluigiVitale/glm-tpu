@@ -59,7 +59,14 @@ applied identically to q and k, so all q·k scores — the only thing the indexe
 consumes — are identical. The parity test asserts this at the score level.
 
 All math is fp32 (HF computes scores in fp32, modeling.py:246; fp32 score
-accumulation is also the mla.v2 house style — design doc §1.1).
+accumulation is also the mla.v2 house style — design doc §1.1). MATMUL
+PRECISION IS PINNED INTERNALLY (the A2 lesson, kernelprobe-2b on-metal round:
+on TPU the DEFAULT matmul precision computes fp32 dots via bf16 MXU passes,
+~4.5e-3 relative self-error, and `preferred_element_type=f32` does NOT prevent
+it — it only sets the accumulator dtype). `indexer_scores` wraps its whole
+body in `jax.default_matmul_precision("highest")`, so the oracle is fp32-exact
+on ANY backend regardless of the caller's context (a no-op on CPU;
+test_indexer_reference.py asserts the pinning in the lowered HLO).
 
 Weight layout convention: all projection weights are passed in the torch
 nn.Linear layout `[out_features, in_features]` (exactly what the checkpoint
@@ -67,6 +74,7 @@ stores); y = x @ W^T.
 """
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 from jax import lax
 
@@ -161,7 +169,30 @@ def indexer_scores(
     Returns [T, T] fp32 scores; scores[t, s] = Σ_h w[t,h]·relu(q[t,h]·k[s]·D^-0.5)
     (modeling.py:246-251). `w` is a plain linear head and can be NEGATIVE —
     index_scores are signed (design doc §1.1).
+
+    Matmul precision is pinned to 'highest' INTERNALLY (module docstring: the
+    A2 bf16-MXU lesson) — callers need no wrapper of their own.
     """
+    with jax.default_matmul_precision("highest"):
+        return _indexer_scores_pinned(
+            h_TD, q_resid_TQ, wq_b, wk, k_norm_w, k_norm_b, weights_proj,
+            positions, rope_theta, interleaved=interleaved, rope_dim=rope_dim)
+
+
+def _indexer_scores_pinned(
+    h_TD,
+    q_resid_TQ,
+    wq_b,
+    wk,
+    k_norm_w,
+    k_norm_b,
+    weights_proj,
+    positions,
+    rope_theta,
+    *,
+    interleaved: bool,
+    rope_dim: int,
+):
     h = jnp.asarray(h_TD, dtype=jnp.float32)
     q_resid = jnp.asarray(q_resid_TQ, dtype=jnp.float32)
     wq_b = jnp.asarray(wq_b, dtype=jnp.float32)

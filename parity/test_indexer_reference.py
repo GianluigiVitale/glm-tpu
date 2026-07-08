@@ -282,6 +282,35 @@ def test_c_determinism_and_ties():
           f"boundary tie group  PASS")
 
 
+def test_d_precision_pinned():
+    """Precision audit (the A2 lesson, kernelprobe-2b on-metal round): on TPU
+    the DEFAULT matmul precision computes fp32 dots via bf16 MXU passes
+    (~4.5e-3 relative self-error) and `preferred_element_type=f32` does NOT
+    prevent it. The oracle must pin HIGHEST *internally*, never rely on the
+    caller's context. Lower indexer_scores under a HOSTILE caller context
+    ('bfloat16') and assert every dot_general in the HLO carries HIGHEST."""
+    h, q_resid, wq_b, wk, k_norm_w, k_norm_b, weights_proj, positions = \
+        make_inputs()
+
+    def fn(h_, q_):
+        return indexer_scores(h_, q_, wq_b, wk, k_norm_w, k_norm_b,
+                              weights_proj, positions, ROPE_THETA,
+                              interleaved=True)
+
+    with jax.default_matmul_precision("bfloat16"):  # hostile caller context
+        hlo = jax.jit(fn).lower(jnp.asarray(h),
+                                jnp.asarray(q_resid)).as_text()
+    dots = [ln.strip() for ln in hlo.splitlines() if "dot_general" in ln]
+    # 5 matmuls: wq_b proj, wk proj, q·k einsum, weights_proj, head-sum.
+    assert len(dots) >= 5, f"expected >=5 dot_generals, found {len(dots)}"
+    bad = [ln for ln in dots if "HIGHEST" not in ln]
+    assert not bad, (
+        "indexer_scores lowered dot(s) WITHOUT pinned HIGHEST precision (the "
+        f"A2 bf16-MXU hazard would skew the oracle on TPU): {bad}")
+    print(f"  (d) all {len(dots)} dot_generals pinned HIGHEST under a "
+          "hostile 'bfloat16' caller context  PASS")
+
+
 def main():
     assert jax.default_backend() == "cpu", (
         f"backend={jax.default_backend()} — this test must run on CPU only")
@@ -290,6 +319,7 @@ def main():
     pairs = test_a_score_parity()
     test_b_topk_sets(pairs)
     test_c_determinism_and_ties()
+    test_d_precision_pinned()
     print("ALL PASS")
     return 0
 
