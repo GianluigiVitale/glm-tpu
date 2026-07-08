@@ -957,3 +957,69 @@ three run_bench commands + the checker.
   128K passkey + 256K throughput require the DCP-kernel fix (VMEM page-tiling + kv_packing correctness) —
   a genuine ~1-day on-metal effort. No config shortcut exists (fp8-KV would fit 128K@dcp=1 but isn't
   supported on the sparse path yet). Design agent launched; NO more pod trial-and-error until a concrete fix.
+
+## 2026-07-08 (later) — DCP kv_packing>1 SUSPECT REFUTED on CPU: kernel is CORRECT; the real blocker is VMEM (dcp=2 is the config) — branch `glm-5.2-v4-kvpack`
+
+Ran the kv_packing>1 multi-block DCP investigation on CPU (worktree `~/tpu-inference-kvpack`, branch
+`glm-5.2-v4-kvpack` off `origin/glm-5.2-v4-next`; TPU untouched). The 18:20 hypothesis — "the sharded
+DCP path's kv_packing=32 multi-block bitcast read is where the bug hides (zero test coverage)" — is
+**REFUTED**. There is **no kv_packing>1 correctness bug in the MLA v2 decode kernel**; the on-metal
+128K/dcp=4 blocker is **VMEM**, and **dcp=2 is the viable v4 config**.
+
+- **Closed the coverage gap (the fix):** `kernels/mla/v2/kernel.py` `load_bkv` interpret branch dropped its
+  `assert kv_packing == 1` — the packed read is now CPU-executable at kv_packing>1 via the plain C-order
+  reshape `bkvc_x2_ref[sem,b,:bkv_sz_per_kv_packing].reshape(bkv_sz, D)` (logical token t at physical
+  (t//pack, t%pack)). **Proven byte-for-byte equal to the REAL `ref.bitcast(uint32)…pltpu.bitcast` round
+  trip** under the interpreter for kv_packing∈{2,4,8,32}, fp32 AND bf16, incl. the +2 buffer padding and
+  [2,batch] leading dims (independent reviewer reproduced it; the one apparent kv_packing=2 mismatch in an
+  early probe was a bf16 marker-rounding artifact, not a bitcast bug). No-op in production (`_INTERPRET=False`
+  leaves the real bitcast path untouched); byte-identical at kv_packing==1. 1-line semantic change + comment.
+- **The reproduction test (it PASSES):** new `tests/kernels/test_mla_v2_kvpack_dcp_cpu.py` (39 cases) runs the
+  REAL DCP kernel over context-striped packed slices + the production `dcp_lse_merge`, vs a pure-numpy
+  full-context attention **ground truth** (independent of the kernel — a wrong kernel cannot self-certify).
+  Covers: kv_packing∈{4,8,32}, dcp∈{2,4}, deep multi-page decode (needle on the last stripe of the last
+  page), 4-way `decode_batch_size=4` BATCHED_DECODE (the v4 decode path), mixed straddling batches, BOTH
+  strided-mask implementations (two-step `flash_attention_step1` AND one-step `batch_flash_attention`), and
+  production-scale geometry (pack=32, dcp=2, P_l=128, 3 pages). **All pass** — read + stripe + global-position
+  mask + LSE combine reproduce full attention exactly. dcp=1 packed read == numpy too (isolates the read).
+- **The real blocker is VMEM, arithmetic-confirmed:** the kernel's per-block KV buffer is
+  `bkvc = 2·decode_batch_size·(page_g/32 + 2)·32·512·2 B`. At **dcp=4** page_g = 512·4 = 2048 →
+  **17,301,504 B = 16.5 MB > v4's 16 MB** (EXACTLY the on-metal `RESOURCE_EXHAUSTED size=17301504`). At
+  **dcp=2** page_g = 1024 → **8.5 MB → FITS**, and 128K@dcp=2 KV ≈ 5.95 GiB/chip fits HBM. So **dcp=2 is the
+  v4 validation config**; the runbook's dcp=4/dcp=8 plan is VMEM-blocked. dcp=4 fixes (on-metal, un-CPU-
+  validatable, follow-up): reduce `decode_batch_size` 4→2 (8.25 MB) OR base block_size 512→256 (page 1024) OR
+  genuine sub-page tiling of bkvc.
+- **Residual on-metal risk (honest):** CPU interpret proves the ALGORITHM (packed read semantics, striping,
+  mask, LSE combine — mesh-collective form validated in the 8-device `test_mla_dcp.py`). The one thing CPU
+  cannot exercise is the real Pallas kernel INSIDE the shard_map (a JAX limitation) and any Mosaic
+  bitcast/relayout divergence between interpreter and real MXU. If dcp=2/128K still truncates on metal, it is
+  a hardware-lowering divergence (interpret-vs-TPU A/B needed), NOT the algorithm — which is now ruled correct.
+- **Suites green (CPU, JAX_PLATFORMS=cpu):** DCP suites 86/86 (`test_mla_v2_lse_dcp_cpu` 3 + new kvpack 39 +
+  `test_mla_dcp` 44); DSA+MLA 108/108 (`test_dsa_indexer_kernel`, `test_dsa_sparse_mla`, `test_mla_attention`,
+  `test_mla_head_sharded`, `test_glm_dsa_pallas_decode`, `test_glm_dsa_mtp_index_share`). ≥ the -next counts
+  (added a file; the kernel change is a no-op there).
+- **EXACT pod validation (dcp=2, GLM_MLA_DCP=1, 128K passkey), bring-up gate first:**
+  ```bash
+  # relaunch with DCP baked into the raylet env:
+  EXTRA_ENVS="GLM_MLA_DCP=1" GLM_FLIGHT_RECORDER=1 TPU_MIN_TOKEN_BUCKET=32 \
+    bash ~/glm-tpu/scripts/launch_glm_32chip.sh
+  cd ~/glm-tpu/bench && set -a && . ~/glm-tpu/.env && set +a
+  # 5b bring-up: GSM8K n=32 at dcp=2 must reproduce the Stage-1 rows:
+  NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 \
+  HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 \
+  REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 \
+  GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 GLM_FLIGHT_RECORDER=1 GLM_MLA_DCP=1 GLM_DCP=2 \
+  ~/vllm-env/bin/python -u run_bench.py --benchmark gsm8k --limit 32 \
+    --max-len 4096 --max-new 1024 --max-seqs 16 --num-gpu-blocks 0 --gmu 0.90 \
+    --max-batched-tokens 512 --batch-size 0 --note "dcp2 bring-up GSM8K n=32" \
+    > ~/glm-run/dcp2_gsm8k.log 2>&1
+  # 5c the 128K cell at dcp=2 (page_g=1024 -> bkvc ~8.5MB < 16MB; ~5.95 GiB/chip KV, max_seqs 1):
+  NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 \
+  HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 \
+  REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 \
+  GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 GLM_FLIGHT_RECORDER=1 GLM_MLA_DCP=1 GLM_DCP=2 \
+  nohup ~/vllm-env/bin/python -u glm_longctx.py --lengths 131072 \
+    --depths 0.25,0.5,0.75 --trials 8 --max-seqs 1 --gmu 0.90 \
+    --note "passkey dcp2 128K" > ~/glm-run/passkey_dcp2_128k.log 2>&1 &
+  ```
+  Gate P = ≥95% per depth. Commit: fork `glm-5.2-v4-kvpack` (kernel interpret path + repro test).
