@@ -17,6 +17,8 @@
 | **Per-step engine stats** | `bench/engine.py` | `GLM_LOG_STATS=1` (driver env; no raylet baking) | vLLM's periodic stats logger (~10 s): prompt/generation tok/s, running/waiting request counts. Offline `LLM()` force-defaults `disable_log_stats=True`, so without this the only throughput signal is the tqdm bar. |
 | **Serving-compile observer** | fork `tpu_runner.py` (`_observe_serving_compiles`, from the DSV4 port) | `DSV4_OBSERVE_COMPILES=1` (or `trace`) in the raylet env | Logs `[OBSERVE_COMPILES] step=N <label>: k backend compile(s)` per serving half-step — names the exact programs that live-compile at serving time (the launch-group race class). Caveat: these go through Ray's log stream, which **deduplicates across the cluster** → per-host last-step from the log is only a lower bound (the flight recorder is the authoritative per-host record). |
 | **vLLM crash dump** | vLLM `dump_input.py` (upstream, always on) | — | On an engine-core exception, dumps the full engine config + the SchedulerOutput of the dying step (req ids, `num_scheduled_tokens`, finished ids). Engine-side view only — it shows what was *scheduled*, not which *worker* diverged. |
+| **DCP sharding round-trip assert** (Guard 1) | fork `tpu_inference/runner/dcp_guards.py` + hooks in `tpu_runner.py` (branch `glm-5.2-v4-obsguard`) | `GLM_DCP_ASSERT_SHARDING=1` (raylet env if multi-host) | At the runner boundary where `kv_caches` are threaded through the jitted model step (`_execute_model` and the `continue_decode` loop), asserts every cache buffer's **out-sharding EQUALS its in-sharding** — a `P(BATCH, CONTEXT)`-striped DCP cache MUST round-trip with the SAME `NamedSharding`. Host-side `.sharding` metadata only (no device sync), so cheap enough to leave on in debug runs. **Fail-LOUD**: raises `DCPShardingRoundTripError` naming the layer + both specs. This is the exact surface that dropped a stripe — `run_model`'s jitted `out_shardings` pins the cache to a fixed non-striped `P(ATTN_DATA, None, ATTN_HEAD)` (model_loader.py), so a striped input that fails to round-trip is caught on the FIRST step. |
+| **DCP post-prefill cache-sanity assert** (Guard 2) | fork `tpu_inference/runner/dcp_guards.py` + hooks in `tpu_runner.py` (branch `glm-5.2-v4-obsguard`) | `GLM_DCP_ASSERT_CACHE_SANITY=1` (raylet env if multi-host) | After a prefill/mixed step, for the tokens this step wrote (`slot = block_id*block_size + pos%block_size`, reusing the production slot reconstruction), asserts their cache rows **changed vs a pre-step snapshot on EVERY dcp stripe**. A whole-stripe-stale condition (a stripe that owns writes this step but whose freshly-written rows are all unchanged / all-zero) == a dropped dcp stripe → **fail-LOUD** `DCPCacheStaleStripeError` naming the stripe. Bounded to **O(written tokens), not O(cache)**: it gathers only the written rows. The pre-step snapshot is taken BEFORE the (input-cache-donating) model step. A derivation error (bad metadata) degrades to a loud one-time warning + self-disable — a guard bug is not a cache bug — but the stale-stripe assertion itself never fails open. |
 
 ## Run-books
 
@@ -62,6 +64,37 @@ compiles; it is noisier and goes through Ray's deduplicated log stream.)
 cadence, `tail -f /tmp/glm_flight_*.jsonl` on any worker (or worker-0
 locally): the `ts` deltas between step lines ARE the step times; `padded_*`
 fields expose bucket thrash (recompile suspects) without a profiler.
+
+### DCP striped-KV-cache suspected (a stripe silently dropped)
+
+Symptom class: under `GLM_MLA_DCP=1` with a real `dcp` axis (> 1) the MLA KV
+cache is `P(BATCH, CONTEXT)`-striped; a multi-chunk-prefill `execute_model`
+boundary silently LOST one dcp stripe of an earlier chunk's writes (a cache
+dump showed *exactly half the rows stale at dcp=2*). Invisible until a bespoke
+cache-dump diff was built by hand — the two standing guards above make it
+self-announcing on the FIRST bad run.
+
+**The DCP debug triad** — run all three together on a DCP diagnostic run;
+`GLM_DCP_CACHE_DUMP` + `GLM_DCP_ASSERT_SHARDING` + `GLM_DCP_ASSERT_CACHE_SANITY`
+are the DCP debug triad: the cache-dump gives the post-hoc diff, and the two
+asserts flag the fault the moment it happens (naming the layer/stripe) instead
+of after several falsified hypotheses.
+
+```
+GLM_MLA_DCP=1 GLM_DCP_ASSERT_SHARDING=1 GLM_DCP_ASSERT_CACHE_SANITY=1 \
+  GLM_DCP_CACHE_DUMP=1 <serve/bench cmd>   # bake all four into the raylet env on multi-host
+```
+
+- **Guard 1 trips first** if the cache fails to round-trip its sharding
+  (`DCPShardingRoundTripError`, naming the layer + in/out specs) — the model
+  step returned the cache under a different `NamedSharding` than it went in,
+  which is how a stripe gets dropped. Cheap (host-side `.sharding` only); leave
+  it on for any DCP debug run.
+- **Guard 2 trips** if a prefill/mixed step's writes are missing from a whole
+  dcp stripe (`DCPCacheStaleStripeError`, naming the stripe) — the direct
+  "half the rows stale" signature, checked on only the written rows.
+- Then `GLM_DCP_CACHE_DUMP`'s diff confirms/localizes; the asserts have already
+  told you *which layer/stripe* to look at.
 
 ### Flight-file hygiene
 
@@ -114,3 +147,16 @@ per host by timestamp).
   `execute_model_state` is absent.
 - CPU tests: fork `tests/runner/test_flight_recorder.py` (gate-off writes
   nothing, field values, hash stability, rotation, fail-open, cost smoke).
+- **DCP guards are fail-LOUD (assertions), not fail-open telemetry.** Both are
+  regression tripwires: a violation RAISES and takes the step down (that is the
+  point — a silently dropped stripe corrupts every downstream token). Guard 2's
+  *derivation* (mapping written tokens → cache rows) is the one exception:
+  bad/absent metadata self-disables the guard with a loud one-time warning
+  (a guard bug must not crash serving), but the stale-stripe check itself never
+  fails open. Guard 1 has no such fallback — `.sharding` is always available.
+- CPU tests: fork `tests/runner/test_dcp_guards.py` (8-device CPU mesh):
+  a correct `P(BATCH, CONTEXT)` round-trip passes Guard 1 and a dropped/changed
+  sharding trips it; a correct write to every stripe passes Guard 2 and a
+  synthetic whole-stripe-stale cache (the "half the rows stale at dcp=2"
+  signature) trips it, naming the dead stripe — via both change-detection and
+  the all-zero fallback; an empty (unwritten) stripe is not a false positive.
