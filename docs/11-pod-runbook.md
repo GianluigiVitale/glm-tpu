@@ -471,6 +471,83 @@ unoptimized step times; watch the flight recorder cadence, don't kill it for bei
 **Abort:** dcp bring-up (5b) failing acc → stop the ladder; the LSE-combine/striping math is
 wrong on hardware — collect logits evidence at 4K first (docs/05 §7's micro-parity plan).
 
+**5d. DCP multi-chunk debug (the pinned failure: multi-chunk prefill).** The on-metal discriminator
+showed L=3200 FAILS at `--max-batched-tokens 2048` (two prefill chunks) but PASSES at `--max-batched-tokens
+6144` (one chunk). CPU tests prove the owner-scatter WRITE and its metadata are correct
+(`tests/layers/common/test_mla_dcp.py::test_dcp_chunked_prefill_write_matches_single_chunk`), so the surviving
+metal bug is either (i) chunk-1's `P(BATCH,CONTEXT)` scattered cache not surviving into chunk-2's SCHEDULER
+STEP (write-back / persistence / `input_output_aliases`), or (ii) the chunk-2 read. This gated hook
+(`GLM_DCP_CACHE_DUMP`, fork `tpu_inference/runner/dcp_cache_dump.py`, wired in `tpu_runner.execute_model`;
+unset = zero behavioral change) dumps the post-prefill KV cache so an offline diff distinguishes them. Two
+one-shot runs (same prompt, only `--max-batched-tokens` differs), then diff:
+
+```bash
+# Relaunch with DCP baked (same as 5b) BEFORE each run if the engine isn't up:
+EXTRA_ENVS="GLM_MLA_DCP=1" GLM_FLIGHT_RECORDER=1 TPU_MIN_TOKEN_BUCKET=32 \
+  bash ~/glm-tpu/scripts/launch_glm_32chip.sh
+cd ~/glm-tpu/bench && set -a && . ~/glm-tpu/.env && set +a
+_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 \
+HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 \
+REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 \
+GLM_ASYNC_SCHED=0 GLM_MLA_DCP=1 GLM_DCP=2 GLM_DCP_CACHE_DUMP_LAYERS=0"
+
+# (a) TWO-chunk prefill of an N≈3200 prompt: mbt=2048 (< N) -> chunks 2048 + 1152.
+env $_ENVS GLM_DCP_CACHE_DUMP=/tmp/dcp_2chunk.npz \
+  ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
+    --max-seqs 1 --max-batched-tokens 2048 --gmu 0.90 \
+    --note "DCP debug 2-chunk" > ~/glm-run/dcp_dbg_2chunk.log 2>&1
+
+# (b) ONE-chunk prefill of the SAME prompt: mbt=6144 (>= N) -> a single chunk.
+env $_ENVS GLM_DCP_CACHE_DUMP=/tmp/dcp_1chunk.npz \
+  ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
+    --max-seqs 1 --max-batched-tokens 6144 --gmu 0.90 \
+    --note "DCP debug 1-chunk" > ~/glm-run/dcp_dbg_1chunk.log 2>&1
+# (each writes /tmp/dcp_{2,1}chunk.step<NNNN>.proc<P>.npz per prefill step & host;
+#  the HIGHEST-step file per proc is the post-prefill cache — decode steps don't dump.)
+```
+
+Offline diff (numpy only; compares LOGICAL content over the prompt's block-table pages):
+
+```python
+import glob, numpy as np
+def _post_prefill(prefix):                    # newest (highest-step) file per proc
+    best = {}
+    for f in glob.glob(prefix + ".step*.proc*.npz"):
+        proc = int(f.rsplit(".proc", 1)[1].split(".")[0])
+        step = int(f.rsplit(".step", 1)[1].split(".proc")[0])
+        if proc not in best or step > best[proc][0]:
+            best[proc] = (step, f)
+    return [np.load(v[1], allow_pickle=False) for v in best.values()]
+def _full(files):                              # reassemble the global layer-0 array
+    shp = tuple(int(x) for x in files[0]["layer0__shape"])
+    a = np.zeros(shp, np.float32)
+    for d in files:
+        n = int(d["layer0__nshards"])
+        if n == 0: a[...] = d["layer0__full"]; continue
+        for si in range(n):
+            idx = eval(str(d[f"layer0__shard{si}__index"]),
+                       {"slice": slice, "__builtins__": {}})
+            a[idx] = d[f"layer0__shard{si}__data"]
+    return a
+A, B = _post_prefill("/tmp/dcp_2chunk"), _post_prefill("/tmp/dcp_1chunk")
+fa, fb = _full(A), _full(B)
+bt = np.asarray(A[0]["meta__block_tables"]).ravel()
+btb = np.asarray(B[0]["meta__block_tables"]).ravel()
+pages = np.unique(bt[bt > 0])                  # the prompt's physical pages
+if not np.array_equal(np.unique(bt), np.unique(btb)):
+    print("NOTE: block tables differ between runs — comparing per-logical-position instead")
+d = np.abs(fa[pages].astype(np.float64) - fb[pages].astype(np.float64))
+print(f"pages={pages.tolist()} max|Δ|={d.max():.3e} n_diff_rows={(d.max(-1)>1e-3).sum()}")
+print("VERDICT:", "DIFFER -> chunk-1 write-back/persistence lost across the step (metal plumbing)"
+      if d.max() > 1e-3 else "MATCH -> write fine; the bug is the chunk-2 read/decode on metal")
+```
+
+If block tables differ between the two runs, gather by logical position instead: for global position `p`,
+`page = block_table[p // page_g]`, `row = (p % page_g)//kv_packing`, `sub = (p % page_g)%kv_packing`
+(page_g and kv_packing are read from `layer0__shape` = `[pages, page_g/kv_packing, kv_packing, kv_dim]` and the
+DCP `_p_g = (page_g/kv_packing)*kv_packing*dcp`). CPU-covered by
+`tests/runner/test_dcp_cache_dump.py`.
+
 ---
 
 ## Step 6 — AIME-2026 card protocol, n=30 (docs/07 §6; seed fix landed)
