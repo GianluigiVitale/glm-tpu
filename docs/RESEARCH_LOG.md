@@ -768,3 +768,106 @@ fixes applied per repo/worktree:
   (layers/vllm/custom_ops/glm_dsa_indexer.py score_block + projections) runs at DEFAULT precision by
   design — it is the DUT, never an oracle; D0 is structurally insensitive (topk ≥ ctx) and passkey
   measures the production system as-is.
+
+## 2026-07-08 — MTP M2 prep (runbook §7): GLM_SPEC_K knob + mtp_m2_check.py landed, §7 refreshed for zero-turnaround (CPU-only; TPU untouched)
+
+Everything M2 needs on the pod is now committed and CPU-tested — the pod session only runs the
+three run_bench commands + the checker.
+
+- **Engine knob (`bench/engine.py`):** `GLM_SPEC_K=k` → `speculative_config={"method": "mtp",
+  "num_speculative_tokens": k}` in the `LLM(...)` args. Kwarg + dict shape verified against the
+  installed vLLM (`~/vllm-build/vllm/engine/arg_utils.py:616` — `EngineArgs.speculative_config:
+  dict[str, Any] | None`, consumed by `create_speculative_config` → `SpeculativeConfig(**dict)`);
+  `"mtp"` is a valid `SpeculativeMethod` (`config/speculative.py` MTPModelTypes), the glm_moe_dsa
+  surgery maps to `DeepSeekMTPModel`/`n_predict=1`, and k=5 passes the `k % n_predict == 0`
+  module-reuse check (speculative.py:773). Fork routing re-verified: method `"mtp"` →
+  `Eagle3Proposer` (`tpu_runner.py:711` + `eagle3.py` mtp branches). Unset/0/empty = kwarg ABSENT
+  → byte-identical engine args (same contract as GLM_DCP); negative = readable harness-boundary
+  ValueError. Provenance: GLM_SPEC_K is captured by the existing GLM_* os_env sweep in
+  `run_bench._run_env` (verified by test assertion — no new provenance code) and the engine-built
+  line prints `spec=mtp:k=<k>`. Unit test `test_bench.py::test_spec_engine_kwarg` (monkeypatched
+  vllm.LLM): absent/present k=1/k=5/0-off/negative-raise + byte-identity of every other kwarg.
+- **M2 comparison instrument (`bench/mtp_m2_check.py`, stub-tested):** given two run ids (either
+  order — roles ORIENTED from runs.env_json `os_env.GLM_SPEC_K`, never argument position; or
+  `--latest` for the back-to-back §7c pair), asserts per-item exact identity of
+  (raw_output, n_gen_tokens, finish_reason) — the DB's faithful projection of the generated token
+  sequence (identical ids ⇒ identical triple; any triple mismatch ⇒ sequences differ; the
+  converse text-alias gap is documented in the module docstring, honest — raw token-id capture is
+  an M3 instrumentation item). Hard-fails (exit 2) on non-comparable pairs: ambiguous roles,
+  non-greedy protocol/temperature (the M2 theory bar is greedy-only), differing item sets or
+  prompts; WARNS on generation-relevant env drift (max_new/max_len/GLM_DSA_MODE/fork_git/...).
+  Exit 1 on mismatch with per-item first-divergence offset + excerpts (feeds the docs/08 tie-flip
+  protocol). Acceptance stats: `--log <spec run log>` scrapes vLLM's interval `SpecDecoding
+  metrics:` lines (format pinned to `~/vllm-build/vllm/v1/spec_decode/metrics.py`; needs
+  GLM_LOG_STATS=1, already in the §7 BASE env) → per-interval + run-aggregate acceptance
+  (aggregate mean-acceptance-length recovered from the 2-dp interval values — labeled
+  approximate; per-item attribution honestly reported as unavailable until M3). tok/s A/B from
+  the two summary notes (batch_wall_ms/gen_tok). New suite `test_mtp_m2_check.py` (10 tests):
+  identity pass both argument orders + CLI exit 0 + --latest, mismatch detection (text divergence
+  offset + count-only divergence), role/protocol guards, item-set/prompt guards, vacuous-PASS
+  guards (stub/all-empty), NULL-vs-empty mismatch, usage-error exit codes, env-drift warnings,
+  log-scraper parse + aggregates (incl. the all-nan degenerate interval), --log CLI wiring.
+  Tracked bench suites all green (test_bench.py 14 incl. the new engine-kwarg test +
+  test_mtp_m2_check.py 10; full `pytest bench/` green alongside a concurrent session's in-flight
+  --ids/merge_runs/report_passkey work, which is NOT part of this commit).
+- **Runbook §7 refreshed** for the n=8 SEQUENTIAL bring-up pair (--limit 8 --batch-size 1: one
+  request in flight, simplest batch shaping) before the N≥32 batched docs/08 bar: exact command
+  pair = baseline (spec OFF) → `GLM_SPEC_K=1` → `mtp_m2_check.py --latest --log ~/glm-run/m2_k1.log`,
+  then `GLM_SPEC_K=5` vs the SAME baseline (explicit ids). **7a branch-state verification (git
+  merge-base, 2026-07-08): `glm-5.2-v4-mtp-g4` IS merged into `-next` (merge `534cd74d7`) AND the
+  OOB fix `02e44b36` is an ancestor — both coexist on origin/`-next` from `886eaceb4` onward**
+  (local `-next` @ `cda8a707b` adds the det merge, unpushed at prep time — workers pull from
+  origin). The old 7a prereq (merge OOB into `glm-5.2-v4-mtp`) is OBSOLETE — M2 runs from the
+  step-2 staging engine, and the old 7b GLM_SPEC_CONFIG one-liner is superseded by the landed
+  GLM_SPEC_K knob. Branch-map rows in docs/11 + HANDOFF updated to match.
+
+## 2026-07-08 12:00 UTC — PR-G6 CUT: the DSA kernels (headline contribution) — branch `pr-g6-dsa-kernels` pushed (CPU-only; TPU untouched)
+
+- **Cut from base `97938b62`** in `~/tpu-inference-prs` (same discipline as G1–G5), commit
+  `0ac6eb9e4`: 5 new files — `tpu_inference/kernels/dsa/{__init__,indexer_kernel,sparse_mla_kernel}.py`
+  + `tests/kernels/test_dsa_{indexer_kernel,sparse_mla}.py` — taken at the silicon-validated `-next`
+  state (`886eaceb`, identical through head `cda8a707`; the newer round-9 det commits touch the
+  integration layer only, verified by path diff). Kernels import only jax/pallas — fully
+  self-contained against the base (no mla.v2 dependency; checked). **KERNELS ONLY** — serving wiring
+  (indexer module, cache writers, dispatch, IndexShare, sparse prefill) is declared a follow-on PR.
+- **Delta vs -next: yapf 0.43.0 only** (the repo pre-commit pin; -next files weren't yapf-clean),
+  verified **AST-identical per file** (`ast.dump` equality) — the code is semantically exactly what
+  the 2a/2b silicon gates ran. isort/ruff still unavailable locally (owner: `pre-commit run
+  --all-files`).
+- **CPU tests: 66/66** (`JAX_PLATFORMS=cpu`, interpret; 24 indexer + 42 sparse-MLA, ~95 s), rerun
+  post-yapf. Upstream-conditions run (glm-tpu HF-math oracle absent via `GLM_TPU_ROOT=/nonexistent`):
+  **62 pass + 4 graceful skips** — the suite is CI-safe without the harness repo. New-module tests
+  fail structurally on the pristine base (package absent).
+- **Forward-port:** upstream tip re-fetched (`99a662a1`, 2026-07-08); merge-tree trial merge
+  **conflict-free** (all-new files; no `kernels/dsa/` path on tip).
+- **Live duplicate-work sweep (2026-07-08 ~11:45 UTC, GitHub API):** no open PR ships DSA kernels
+  (9 queries + 50-PR title scan + files/diff reads of #2324/#2988/#3073/#3062/#3096); **#2324
+  re-verified to disable the indexer** (`TPU_DISABLE_DSA_INDEXER`, "until a JAX-native DSA lands" —
+  exact lines quoted in pr-g6.md). **Load-bearing counterfinding:** merged main carries
+  `kernels/experimental/deepseek_v4/` (#2903/#2905/#2980, 2026-06-22..24) — a DeepSeek-V4
+  KV-compressor StreamIndex top-k + topk-consuming sparse-MLA Pallas stack. Adjacent mechanism, zero
+  file overlap, but it falsifies an unscoped "first public TPU Pallas indexer/top-k" claim →
+  pr-g6.md scopes the claim to the exact-top-k, uncompressed-latent DSv3.2/GLM (`GlmMoeDsa`) DSA
+  variant and adds a position-don't-compete checklist item.
+- **pr-g6.md written** (G-series template): validation story with artifact paths + exact deltas
+  (2a three-REJECT→ACCEPT trail incl. the archived first-metal A2 oracle-precision failure; 2b metal2
+  A1 2.4e-7 / A2 selected-set-exact 0 non-tie / A3 bf16 0 out-of-band @ ε=2⁻⁸ / B 9.5e-7 fp32,
+  1.95e-3 bf16), honest limits (decode-shaped; prefill masked-XLA in the follow-up; v4-validated
+  block configs, no perf numbers claimed — microbench outstanding; bf16 S2 boundary-band semantics
+  spelled out; k=64 probe-shape caveat; metal results-file branch-header WARNING disclosed), AI
+  disclosure, owner-submits checklist. README table G6 row updated (was "SKIPPED — too fresh").
+
+  **Round-9 adversarial review of this prep (fresh reviewer on the staged diff — all claimed vLLM/fork
+  verifications independently re-verified and confirmed): 2 MED + 8 LOW findings, all addressed.**
+  MED-1 (exit-code contract): a typo'd `--db`/`--log` path crashed with exit 1 — indistinguishable from
+  an M2 mismatch — and `sqlite3.connect` silently CREATED the missing DB file; fixed (path checks +
+  sqlite3.Error/OSError → exit 2, no side-effect file; tested). MED-2 (vacuous PASS): two `--stub` runs
+  or an all-SKIP pair passed "identity" over empty outputs; fixed (stub/model=STUB guard + all-empty-
+  output guard → CompareError; tested). LOW: per-position regex now accepts vLLM's all-`nan`
+  num_drafts=0 interval line (byte-exact reconstruction test); garbage `GLM_SPEC_K=abc` now gets the
+  readable knob-naming error; NULL-vs-"" raw_output no longer conflated (a real difference is a
+  mismatch); `run_tok_s` docstring corrected to END-TO-END tok/s (wall incl. prefill; newest-summary-row
+  = single-benchmark runs only); the mal-recovery bias mechanism + the DEBUG-logged final idle flush
+  documented in `parse_spec_log`; missing/unparseable env_json protocol now warns. Not fixed (accepted):
+  reviewer could not verify live `SpecDecoding` emission on this offline-LLM+Ray stack (checker prints a
+  loud hint when zero lines match) nor anything pod-side — that IS the §7 run this preps.

@@ -676,6 +676,91 @@ def test_dcp_engine_kwarg():
     print("  DCP engine kwarg plumbing OK")
 
 
+def test_spec_engine_kwarg():
+    """GLM_SPEC_K plumbing (runbook §7 — Stage-3 MTP spec-decode, docs/08 §7
+    M2): unset (or 0/empty) -> speculative_config ABSENT from the LLM(...)
+    kwargs, engine args byte-identical to the pre-MTP harness (the M2 gate's
+    'non-spec serving numbers unregressed' precondition); GLM_SPEC_K=k -> the
+    kwarg present as {"method": "mtp", "num_speculative_tokens": k} (shape
+    verified against ~/vllm-build/vllm/engine/arg_utils.py EngineArgs.
+    speculative_config -> SpeculativeConfig(**dict)) AND recorded in the
+    engine-built log line. Monkeypatched vllm.LLM capture — no real vllm
+    import, no TPU."""
+    import contextlib
+    import io
+    import sys
+    import types
+
+    import engine
+
+    calls = []
+
+    class _CaptureLLM:
+        def __init__(self, **kw):
+            calls.append(kw)
+
+    fake = types.ModuleType("vllm")
+    fake.LLM = _CaptureLLM
+    had_vllm = "vllm" in sys.modules
+    old_mod = sys.modules.get("vllm")
+    old_env = os.environ.pop("GLM_SPEC_K", None)
+    try:
+        sys.modules["vllm"] = fake
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            engine.build_llm("stub-model")
+        assert "speculative_config" not in calls[0]   # unset -> absent
+        assert "spec=" not in out.getvalue()          # log line unchanged too
+
+        os.environ["GLM_SPEC_K"] = "1"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            engine.build_llm("stub-model")
+        assert calls[1]["speculative_config"] == {
+            "method": "mtp", "num_speculative_tokens": 1}
+        assert "spec=mtp:k=1" in out.getvalue()       # engine-built log line
+        # every OTHER engine arg byte-identical to the unset build:
+        assert {k: v for k, v in calls[1].items()
+                if k != "speculative_config"} == calls[0]
+
+        os.environ["GLM_SPEC_K"] = "5"                # runbook 7d: k=5
+        with contextlib.redirect_stdout(io.StringIO()):
+            engine.build_llm("stub-model")
+        assert calls[2]["speculative_config"] == {
+            "method": "mtp", "num_speculative_tokens": 5}
+
+        os.environ["GLM_SPEC_K"] = "0"                # 0 = off = absent
+        with contextlib.redirect_stdout(io.StringIO()):
+            engine.build_llm("stub-model")
+        assert "speculative_config" not in calls[3]
+        assert calls[3] == calls[0]                   # byte-identical again
+
+        os.environ["GLM_SPEC_K"] = "-3"               # negative: readable
+        try:                                          # harness-boundary error,
+            engine.build_llm("stub-model")            # not a pydantic trace
+            raise AssertionError("GLM_SPEC_K=-3 should have raised")
+        except ValueError as e:
+            assert "GLM_SPEC_K" in str(e)
+
+        os.environ["GLM_SPEC_K"] = "abc"              # garbage: readable too
+        try:                                          # (round-9 review LOW-4)
+            engine.build_llm("stub-model")
+            raise AssertionError("GLM_SPEC_K=abc should have raised")
+        except ValueError as e:
+            assert "GLM_SPEC_K" in str(e) and "'abc'" in str(e)
+        assert len(calls) == 4                        # LLM never constructed
+    finally:
+        if old_env is None:
+            os.environ.pop("GLM_SPEC_K", None)
+        else:
+            os.environ["GLM_SPEC_K"] = old_env
+        if had_vllm:
+            sys.modules["vllm"] = old_mod
+        else:
+            sys.modules.pop("vllm", None)
+    print("  MTP spec-decode engine kwarg plumbing OK")
+
+
 def test_run_env_provenance_fields():
     """run_bench._run_env must actually RETURN (2026-07-08 fix: the audit
     commit assigned env['attention_path'] before `env` existed — a NameError
@@ -690,17 +775,23 @@ def test_run_env_provenance_fields():
         model="STUB", stub=True, max_len=8192, max_new=64, max_seqs=8,
         max_batched_tokens=4096, batch_size=8, gmu=0.94, num_gpu_blocks=0,
         protocol="greedy", samples=1, seed=1234)
-    saved = {k: os.environ.pop(k, None) for k in ("GLM_DSA_MODE", "GLM_DCP")}
+    saved = {k: os.environ.pop(k, None)
+             for k in ("GLM_DSA_MODE", "GLM_DCP", "GLM_SPEC_K")}
     try:
         env = rb._run_env(args, ["gsm8k"])
         assert env["attention_path"] == "dense-mla"     # default: DSA bypassed
         assert "GLM_DCP" not in env["os_env"]
+        assert "GLM_SPEC_K" not in env["os_env"]
         os.environ["GLM_DCP"] = "4"
         os.environ["GLM_DSA_MODE"] = "topk2048"
+        os.environ["GLM_SPEC_K"] = "5"
         env = rb._run_env(args, ["gsm8k"])
         assert env["attention_path"] == "dsa-sparse:topk2048"
         assert env["os_env"]["GLM_DCP"] == "4"          # the GLM_* sweep
         assert env["os_env"]["GLM_DSA_MODE"] == "topk2048"
+        assert env["os_env"]["GLM_SPEC_K"] == "5"       # runbook §7 (M2) —
+        # the M2 comparison script (mtp_m2_check.py) reads THIS field to
+        # orient which run was spec-on; no extra provenance code needed.
     finally:
         for k, v in saved.items():
             if v is None:
@@ -723,5 +814,6 @@ if __name__ == "__main__":
     test_platform_seed_probe()
     test_item_builders()
     test_dcp_engine_kwarg()
+    test_spec_engine_kwarg()
     test_run_env_provenance_fields()
     print("ALL bench CPU tests passed.")

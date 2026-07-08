@@ -51,7 +51,10 @@ with copy-paste commands, expected outcomes and abort criteria. Execute it top t
   - DCP (`GLM_MLA_DCP=1` + `decode_context_parallel_size`): per-shard kernel + LSE combine +
     strided positions — the 128K-passkey capacity unlock (docs/05; KV table in runbook §5).
   - Dense-MTP M1 (G1–G3): draft parity vs composed-HF reference **max rel Δ 3.1e-6, top-1 100%**;
-    M2 (pod greedy-equivalence) is runbook §7.
+    M2 (pod greedy-equivalence) is runbook §7 — **prepped zero-turnaround 2026-07-08**: bench
+    `GLM_SPEC_K=k` engine knob (unset = byte-identical, unit-tested) + `bench/mtp_m2_check.py`
+    (per-item identity gate + acceptance-stat scrape, stub-tested; exit 0/1/2), §7 carries the
+    exact n=8-sequential command pair (mtp-g4 + OOB fix verified coexisting on `-next`).
 - **Benchmark harness**: batched generation (`--batch-size`), `--protocol card|greedy` (card =
   temp 1.0/top_p 0.95/163,840 cap/byte-pinned Exact-Answer system prompt; per-request seeds
   OMITTED on this backend — the round-6 F1 fix; the loud banner at build is the fix working),
@@ -67,9 +70,9 @@ with copy-paste commands, expected outcomes and abort criteria. Execute it top t
 | branch | tip | what | on origin? |
 |---|---|---|---|
 | `glm-5.2-v4` | `02e44b36` | **mainline** — Stage-1 + obs + OOB fix; the pod runs this NOW | yes |
-| `glm-5.2-v4-next` | `cda23c81` | **staging** — mainline + r5fix + 2a2 + 2int + dcp + r6fix (all gated off) | **no — push before use** |
+| `glm-5.2-v4-next` | `cda8a707` | **staging** — mainline (incl. OOB fix) + r5fix + 2a2 + 2int + dcp + r6fix + sparse-prefill + **mtp-g4 (merge `534cd74d7`)** + det (all gated off) | **origin @ `886eaceb4` already has mtp-g4 + OOB (enough for M2); push before use for det** |
 | `glm-5.2-v4-2int` / `-2a2` / `-r5fix` / `-r6fix` / `-obs` / `-pg2` / `-dcp` | — | feature branches, all merged into `-next` | no |
-| `glm-5.2-v4-mtp` | `6beacb5d` | dense-MTP M1 — **lacks the OOB fix; merge `02e44b36` before pod use** (runbook §7a) | no |
+| `glm-5.2-v4-mtp` | `6beacb5d` | dense-MTP M1 — frozen; **superseded for M2 by the mtp-g4 merge into `-next`** (never run M2 from here: lacks the OOB fix) | no |
 | `glm-5.2-v4-sparse-prefill` | `53c5e5ee` | Stage-2 sparse-prefill pointer (work in flight, another session) | no |
 | `pr-g1..5-*` | — | upstream PR series slices (`docs/02` + `docs/pr-descriptions/`; owner submits; G5 = `pr-g5-mla-pure-tp` @ `132a11f9`, cut 2026-07-08 after the pod validation, pushed) | no |
 

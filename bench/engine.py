@@ -26,7 +26,10 @@ GLM_ASYNC_SCHED=0 (sync scheduling), GLM_LOG_STATS=1 (vLLM 10s engine stats:
 tok/s + running/waiting — default off, unchanged behavior), GLM_DCP=N
 (decode context parallelism — shard each sequence's KV cache across N ranks
 at decode; default unset/0 = the kwarg is ABSENT from the engine args,
-byte-identical engine build).
+byte-identical engine build), GLM_SPEC_K=k (Stage-3 dense-MTP speculative
+decoding, runbook §7 / docs/08 §7 M2: k draft tokens per step via
+speculative_config={"method": "mtp", "num_speculative_tokens": k}; default
+unset/0 = the kwarg is ABSENT, byte-identical engine build).
 """
 from __future__ import annotations
 
@@ -112,6 +115,40 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
         raise ValueError(f"GLM_DCP must be >= 1 (got {dcp}); unset/0 = off")
     if dcp:
         extra["decode_context_parallel_size"] = dcp
+    # GLM_SPEC_K=k enables Stage-3 dense-MTP speculative decoding (docs/08 §7
+    # M2, runbook §7): k draft tokens per step from GLM-5.2's own MTP layer 78.
+    # Kwarg + dict shape verified against the installed vLLM
+    # (~/vllm-build/vllm/engine/arg_utils.py): EngineArgs.speculative_config
+    # is `dict[str, Any] | None` (line 616) and create_speculative_config
+    # builds SpeculativeConfig(**dict); "mtp" is a valid SpeculativeMethod
+    # (config/speculative.py MTPModelTypes), the glm_moe_dsa config surgery
+    # maps it to DeepSeekMTPModel with n_predict=1 (hf_config_override), and
+    # k > 1 passes the MTP-module-reuse check (k % n_predict == 0,
+    # speculative.py ~773 — the draft layer is re-run k times). The fork
+    # routes method "mtp" to Eagle3Proposer (tpu_runner.py:711 + eagle3.py's
+    # method == "mtp" branches). Provenance: GLM_SPEC_K is recorded by the
+    # GLM_* os_env sweep in run_bench._run_env / glm_longctx._run_env, and the
+    # engine-built line below prints spec=mtp:k=<k>. Default unset (or
+    # 0/empty) = the kwarg is ABSENT from the LLM(...) args entirely —
+    # byte-identical engine build (the M1 target-forward hash test's contract:
+    # speculative_config is None => nothing changes).
+    raw_spec = os.environ.get("GLM_SPEC_K")
+    try:
+        spec_k = int(raw_spec or 0)
+    except ValueError:
+        # readable for garbage values too (round-9 review: the bare int()
+        # error names neither the knob nor the rule).
+        raise ValueError(f"GLM_SPEC_K must be an integer >= 1 (got "
+                         f"{raw_spec!r}); unset/0 = off") from None
+    if spec_k < 0:
+        # readable harness-boundary error, not a pydantic ValidationError deep
+        # in the engine build (SpeculativeConfig.num_speculative_tokens is
+        # Field(gt=0) — same rationale as the GLM_DCP guard above).
+        raise ValueError(f"GLM_SPEC_K must be >= 1 (got {spec_k}); "
+                         "unset/0 = off")
+    if spec_k:
+        extra["speculative_config"] = {"method": "mtp",
+                                       "num_speculative_tokens": spec_k}
     llm = LLM(
         model=model,
         trust_remote_code=True,
@@ -136,5 +173,6 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     print(f"[bench] engine built in {time.time() - t0:.1f}s "
           f"(model={model}, tp={os.environ.get('GLM_TP', '32')}, ep=on, "
           f"max_len={max_len}{f', dcp={dcp}' if dcp else ''}"
+          f"{f', spec=mtp:k={spec_k}' if spec_k else ''}"
           f"{', ' + log_extra if log_extra else ''})", flush=True)
     return llm

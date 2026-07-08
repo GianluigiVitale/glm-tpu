@@ -45,10 +45,10 @@ step attribution exact, ~1% cost. `TPU_MIN_TOKEN_BUCKET` is set per step.)
 | branch | tip (2026-07-07) | contents | on origin? |
 |---|---|---|---|
 | `glm-5.2-v4` | `02e44b36` | **mainline** — Stage-1 + obs + OOB fix; what the pod runs NOW | yes |
-| `glm-5.2-v4-next` | `cda23c81` | **staging** — mainline + r5fix + 2a2 + 2int (pallas_decode) + dcp + r6fix, all gated off by default | **NO — push before step 2** |
+| `glm-5.2-v4-next` | `cda8a707` (2026-07-08) | **staging** — mainline (incl. OOB fix `02e44b36`) + r5fix + 2a2 + 2int (pallas_decode) + dcp + r6fix + sparse-prefill + **mtp-g4 (dense-MTP M1, merge `534cd74d7`)** + det, all gated off by default | **partially — origin @ `886eaceb4` already has mtp-g4 + OOB (enough for step 7); push before step 2 for det** |
 | `glm-5.2-v4-2int` | `53c5e5ee` | Stage-2 DSA sparse-decode integration (merged into -next) | no |
 | `glm-5.2-v4-dcp` | `70aa6825` | DCP MLA attention `GLM_MLA_DCP` (merged into -next) | no |
-| `glm-5.2-v4-mtp` | `6beacb5d` | Stage-3 dense-MTP M1 (G1–G3) — **LACKS the OOB fix `02e44b36`** (step 7 merges it) | no |
+| `glm-5.2-v4-mtp` | `6beacb5d` | Stage-3 dense-MTP M1 (G1–G3) — frozen; **SUPERSEDED for step 7 by the mtp-g4 merge into `-next`** (do not run M2 from here: lacks the OOB fix) | no |
 | `glm-5.2-v4-sparse-prefill` | `53c5e5ee` | branch pointer for Stage-2 sparse prefill (work in flight) | no |
 | `pr-g1..4-*` | — | upstream PR series slices (owner submits) | no |
 
@@ -506,35 +506,55 @@ temperature-1.0 single-sample variance — consider `--samples 4` for avg@4, lab
 
 ## Step 7 — MTP M2 (spec-decode greedy == non-spec; k=1 then k=5)
 
-From the M1 report (RESEARCH_LOG 2026-07-07 Stage-3 entry + docs/08 §M2). **Gate M2: for
-N≥32 prompts, generated token sequences EQUAL the non-speculative greedy baseline exactly**
-(argmax-match acceptance ⇒ distribution-identical; exact equality can only break on logit
-ties — the tie-flip protocol in docs/08). M1's engine-scale checklist to verify during
-bring-up: (V2) draft KV grouped with target MLA layers — eagle3 `prepare_inputs`'s last-group
-assumption must degenerate correctly for a single unified group; (G3) the file-level draft
-filter against the REAL gs:// safetensors index (expect ~1–2 of 150 files re-streamed, NOT
-755.7 GB); FP8 draft load (the quantized path skips vLLM weights-tracking); per-bucket
-precompile of the draft programs.
+*(§7 refreshed 2026-07-08 — the GLM_SPEC_K knob + `bench/mtp_m2_check.py` are LANDED and
+CPU-tested; the old 7a merge prereq is OBSOLETE, see below.)*
 
-**7a. Prereq — the MTP branch LACKS the OOB fix** (`6beacb5d` branched pre-`02e44b36`;
-bucket-32 decode would re-hit the fixed core-halt class). Merge + push + sync:
+From the M1 report (RESEARCH_LOG 2026-07-07 Stage-3 entry + docs/08 §M2). **Gate M2 (full
+bar): for N≥32 prompts, generated token sequences EQUAL the non-speculative greedy baseline
+exactly** (argmax-match acceptance ⇒ distribution-identical; exact equality can only break
+on logit ties — the tie-flip protocol in docs/08). This step runs the **n=8 SEQUENTIAL
+bring-up pair first** (`--batch-size 1`: one request in flight — single-sequence decode,
+the simplest batch shaping and the cheapest first signal); scale to the N≥32 batched gate
+only after n=8 is exact. M1's engine-scale checklist to verify during bring-up: (V2) draft
+KV grouped with target MLA layers — eagle3 `prepare_inputs`'s last-group assumption must
+degenerate correctly for a single unified group; (G3) the file-level draft filter against
+the REAL gs:// safetensors index (expect ~1–2 of 150 files re-streamed, NOT 755.7 GB); FP8
+draft load (the quantized path skips vLLM weights-tracking); per-bucket precompile of the
+draft programs.
+
+**7a. Branch state (verified 2026-07-08 via `git merge-base --is-ancestor`):**
+`glm-5.2-v4-mtp-g4` (dense-MTP M1, G1–G4) **IS merged into `glm-5.2-v4-next`** (merge
+commit `534cd74d7`) **and the OOB fix `02e44b36` is also an ancestor of `-next`** — both
+coexist there from origin commit `886eaceb4` onward (local `-next` @ `cda8a707b` adds the
+det determinism merge on top; workers pull from ORIGIN, so push `-next` first — step 2's
+rule). The old 7a prereq ("merge `02e44b36` into `glm-5.2-v4-mtp`") is **OBSOLETE**: do
+NOT run M2 from the frozen `-mtp` branch — use the step-2 staging engine (`-next`). No
+fork-side gate is involved: MTP activates ONLY through vLLM's `speculative_config` (absent
+⇒ byte-identical target path — the M1 forward-hash test's contract).
 
 ```bash
-cd ~/tpu-inference-mtp && git merge --no-edit 02e44b36 && git push origin glm-5.2-v4-mtp
-TPU_INFERENCE_BRANCH=glm-5.2-v4-mtp bash ~/glm-tpu/scripts/sync_workers.sh
+cd ~/tpu-inference && git merge-base --is-ancestor 89e1d5b5a glm-5.2-v4-next \
+  && git merge-base --is-ancestor 02e44b360 glm-5.2-v4-next && echo "M2 prereqs on -next OK"
+# engine still up from step 2 on -next? reuse it for the baseline. Otherwise:
+TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash ~/glm-tpu/scripts/sync_workers.sh
 GLM_FLIGHT_RECORDER=1 TPU_MIN_TOKEN_BUCKET=32 bash ~/glm-tpu/scripts/launch_glm_32chip.sh
 ```
 
-**7b. Prereq — spec-config passthrough in `build_llm`** (bench-owned; exact one-liner, same
-`extra = {}` block as 5a):
+**7b. The spec knob is LANDED in `bench/engine.py` (no code to write on the pod):**
+`GLM_SPEC_K=k` → `speculative_config={"method": "mtp", "num_speculative_tokens": k}` in
+the `LLM(...)` args. Kwarg + dict shape verified against the installed vLLM
+(`~/vllm-build/vllm/engine/arg_utils.py:616` `EngineArgs.speculative_config: dict | None`
+→ `create_speculative_config` → `SpeculativeConfig(**dict)`; `"mtp"` is a valid method,
+glm_moe_dsa config surgery → `DeepSeekMTPModel`/`n_predict=1`, and k=5 passes the
+`k % n_predict == 0` module-reuse check). The fork routes method `"mtp"` →
+`Eagle3Proposer` (`tpu_runner.py:711`). Unset/0 = kwarg ABSENT, engine args byte-identical
+(unit-tested: `test_bench.py::test_spec_engine_kwarg`). GLM_SPEC_K is a DRIVER-side env
+(build_llm reads it in-process — no raylet baking needed) and lands in `runs.env_json`
+via the GLM_* os_env sweep; the engine-built log line prints `spec=mtp:k=<k>`.
 
-```python
-    if os.environ.get("GLM_SPEC_CONFIG"):               # docs/11 step 7: MTP
-        extra["speculative_config"] = json.loads(os.environ["GLM_SPEC_CONFIG"])
-```
-
-**7c. Baseline (spec OFF) then k=1, token-identity compare** (docs/08: start k=1 — single
-trace, simplest batch shaping):
+**7c. Baseline (spec OFF) then k=1 — n=8 sequential, token-identity compare** (docs/08:
+start k=1 — single trace, simplest shaping; `GLM_LOG_STATS=1` in BASE is REQUIRED for the
+acceptance-stats scrape in `mtp_m2_check.py --log`):
 
 ```bash
 cd ~/glm-tpu/bench && set -a && . ~/glm-tpu/.env && set +a
@@ -542,36 +562,45 @@ BASE="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_
 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 \
 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 \
 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 GLM_FLIGHT_RECORDER=1"
-env $BASE ~/vllm-env/bin/python -u run_bench.py --benchmark gsm8k --limit 32 \
-  --max-len 4096 --max-new 1024 --max-seqs 16 --num-gpu-blocks 0 --gmu 0.90 \
-  --max-batched-tokens 512 --batch-size 0 --note "M2 baseline non-spec n=32" \
+env $BASE ~/vllm-env/bin/python -u run_bench.py --benchmark gsm8k --limit 8 \
+  --max-len 4096 --max-new 1024 --max-seqs 8 --num-gpu-blocks 0 --gmu 0.90 \
+  --max-batched-tokens 512 --batch-size 1 --note "M2 baseline non-spec n=8 sequential" \
   > ~/glm-run/m2_baseline.log 2>&1
-env $BASE GLM_SPEC_CONFIG='{"method":"mtp","num_speculative_tokens":1}' \
-  ~/vllm-env/bin/python -u run_bench.py --benchmark gsm8k --limit 32 \
-  --max-len 4096 --max-new 1024 --max-seqs 16 --num-gpu-blocks 0 --gmu 0.90 \
-  --max-batched-tokens 512 --batch-size 0 --note "M2 spec-decode mtp k=1 n=32" \
+env $BASE GLM_SPEC_K=1 ~/vllm-env/bin/python -u run_bench.py --benchmark gsm8k --limit 8 \
+  --max-len 4096 --max-new 1024 --max-seqs 8 --num-gpu-blocks 0 --gmu 0.90 \
+  --max-batched-tokens 512 --batch-size 1 --note "M2 spec-decode mtp k=1 n=8 sequential" \
   > ~/glm-run/m2_k1.log 2>&1
-python3 - <<'PY'
-import sqlite3
-db = sqlite3.connect('/home/gianl/glm-tpu/bench/results.db')
-r2, r1 = [r[0] for r in db.execute("SELECT run_id FROM runs ORDER BY run_id DESC LIMIT 2")]
-a = dict(db.execute("SELECT item_id, raw_output FROM items WHERE run_id=?", (r1,)))
-b = dict(db.execute("SELECT item_id, raw_output FROM items WHERE run_id=?", (r2,)))
-diff = [k for k in a if a.get(k) != b.get(k)]
-print(f"M2 run{r1} (non-spec) vs run{r2} (k=1): {len(diff)}/{len(a)} mismatches {diff[:8]}")
-raise SystemExit(1 if diff else 0)
-PY
+# identity gate — the two newest runs; roles are oriented from env_json GLM_SPEC_K, never
+# from argument order. Exit 0 = PASS, 1 = mismatch (tie-flip protocol), 2 = not comparable.
+~/vllm-env/bin/python mtp_m2_check.py --latest --log ~/glm-run/m2_k1.log
+# (explicit ids instead of --latest:
+#  sqlite3 results.db "SELECT run_id,note FROM runs ORDER BY run_id DESC LIMIT 4")
 ```
 
-KV note: MTP adds a draft KV group — auto-size (`--num-gpu-blocks 0`); expect fewer blocks
-than 128. Draft load: watch for the G3 filter log (only layer-78-bearing files streamed);
-a full 755.7 GB re-stream = G3 failed open → fix before calling M2 (it fails OPEN by design).
+Watch in `m2_k1.log`: the engine-built line must say `spec=mtp:k=1`; the G3 filter log
+(only layer-78-bearing files re-streamed — a full 755.7 GB re-stream = G3 failed open →
+fix before calling M2, it fails OPEN by design). KV note: MTP adds a draft KV group —
+auto-size (`--num-gpu-blocks 0`); expect fewer blocks than 128.
 
-**7d. k=5** (same pair with `"num_speculative_tokens":5`, note "M2 ... k=5") — same identity
-bar, plus record the acceptance stats (M3's ≥~4.5 acceptance-length target starts here;
-`SpecDecodingStats` aggregation is an M3 deliverable — at minimum capture tok/s A/B).
-**Isolated mismatches**: apply the docs/08 tie-flip protocol (a logit tie at the mismatch
-position exonerates spec-decode; anything else is a real bug). **3/3 for the k that passes.**
+**7d. k=5 vs the SAME baseline** (per-run pair; `--latest` no longer applies — pass ids):
+
+```bash
+env $BASE GLM_SPEC_K=5 ~/vllm-env/bin/python -u run_bench.py --benchmark gsm8k --limit 8 \
+  --max-len 4096 --max-new 1024 --max-seqs 8 --num-gpu-blocks 0 --gmu 0.90 \
+  --max-batched-tokens 512 --batch-size 1 --note "M2 spec-decode mtp k=5 n=8 sequential" \
+  > ~/glm-run/m2_k5.log 2>&1
+~/vllm-env/bin/python mtp_m2_check.py <k5_run_id> <baseline_run_id> --log ~/glm-run/m2_k5.log
+```
+
+Same identity bar, plus record the acceptance stats the checker scrapes from the log
+(vLLM's interval `SpecDecoding metrics:` lines — mean acceptance length, per-position
+rates; M3's ≥~4.5 acceptance-length target starts here; exact `SpecDecodingStats`/
+`get_metrics` aggregation into the DB is an M3 deliverable — at minimum capture the tok/s
+A/B the checker prints from the summary notes). **Isolated mismatches**: apply the docs/08
+tie-flip protocol (a logit tie at the mismatch position — top-2 gap below bf16 eps —
+exonerates spec-decode; anything else is a real bug). **3/3 for the k that passes**, then
+scale the passing k to the N≥32 batched gate (`--limit 32 --batch-size 0 --max-seqs 16`,
+same checker) — the docs/08 M2 bar proper.
 
 ---
 
