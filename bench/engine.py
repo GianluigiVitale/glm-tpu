@@ -149,11 +149,24 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     if spec_k:
         extra["speculative_config"] = {"method": "mtp",
                                        "num_speculative_tokens": spec_k}
+    # GLM_KV_CACHE_DTYPE=fp8 stores the MLA latent KV cache in fp8_e4m3
+    # (dequant->bf16 per-tile in the v4 kernel via _upcast_kv_for_v4). Halves
+    # the latent footprint (128K: 12.2->6.1 GiB/chip), which lets a single
+    # 128K sequence + the 23 GiB FP8 weights fit one chip's 30.75 GiB WITHOUT
+    # DCP (6.1+23.06=29.15 < 30.75) — an independent route to the long-ctx
+    # passkey gate that sidesteps the DCP striping path entirely. The fp8 KV
+    # path pre-exists + is v4-validated (flash_attn_mla quantize_kv + kernel
+    # _upcast_kv_for_v4); every fp8 branch is guarded on the sub-16-bit dtype,
+    # so unset/"" = "auto" (bf16) is byte-identical. Retrieval survives fp8
+    # (needle 97.5-100%); CONTENT precision degrades ~layer-cumulatively
+    # (single-op L2 ~3.7% vs bf16 0.23%) -> validate generation quality on the
+    # pod before trusting fp8-KV for non-retrieval benchmarks (docs/RESEARCH_LOG).
+    _kv_dtype = os.environ.get("GLM_KV_CACHE_DTYPE", "").strip() or "auto"
     llm = LLM(
         model=model,
         trust_remote_code=True,
         dtype="bfloat16",
-        kv_cache_dtype="auto",
+        kv_cache_dtype=_kv_dtype,
         max_model_len=max_len,
         max_num_seqs=max_seqs,
         max_num_batched_tokens=max_batched_tokens,   # chunked-prefill chunk size
