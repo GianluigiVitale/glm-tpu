@@ -1075,3 +1075,11 @@ DCP path's kv_packing=32 multi-block bitcast read is where the bug hides (zero t
   fp8 (97.5-100%); content precision degrades ~cumulatively (validate generation quality on pod).
 - Two converging paths to 128K passkey: (A) fix DCP multi-chunk-prefill scatter [running]; (B) fp8-KV
   dense 128K @dcp=1 [pod now]. Sparse-128K gate then needs (A) OR fp8 indexer-cache too under (B).
+
+## 2026-07-08 20:05 UTC — fp8-KV route hits a v4 Mosaic compile bug at 128K; DCP scatter fix is the cleaner path
+
+- fp8-KV dense 128K@dcp=1: engine build FAILED — `Mosaic failed to compile TPU kernel: failed to legalize
+  operation 'arith.cmpi'` in the fp8 dequant read (_upcast_kv_for_v4). The fp8-KV path was validated by the
+  agent only at small v4-8 shapes; it does not compile at GLM's 128K/v4 config here. Checking whether it
+  works at 8K (code-path vs size-specific). fp8-KV is a FALLBACK; the primary is the DCP fix.
+- Primary path = fix the DCP multi-chunk-prefill owner-scatter (CPU-testable, clear target, agent running).
