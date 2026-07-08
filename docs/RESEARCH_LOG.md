@@ -649,3 +649,44 @@ fixes applied per repo/worktree:
   longctx stub test now save/restores GLM_DSA_MODE instead of pop-without-restore. Noted, accepted as-is:
   Python int underscore/sign forms ("4_0"→40, "+4") parse — pathological inputs; fail-fast covers the rest.
 - Suites green: test_bench (13 fns) + test_longctx 12/12, both direct and pytest (25 passed, both orders).
+
+## 2026-07-08 — PR-G5 cut (`pr-g5-mla-pure-tp`): the deferred TP-topology MLA PR, now that pod validation exists (CPU-only; TPU untouched)
+
+- **Branch `pr-g5-mla-pure-tp` @ `132a11f9`** cut off `97938b62` in `~/tpu-inference-prs` and pushed to the
+  fork: squashed re-cut of `cd8eeb6c` + `a429be54` + `7ae390f2` (the #2324 TP-topology port group per
+  docs/02 §G5) — cross-shard all-gather (+post-gather TuningKey), v4 blocks/fp32 scores, v4-gated
+  page-512 via the tpu_info driver-safe probe, EP-head o_proj constraint, MLA-without-DP platform check,
+  TPU_MIN_TOKEN_BUCKET (+Ray propagation). Deferred-until-pod-validated per docs/02; the validation now
+  cited: results.db runs 26/28/47 (GSM8K n=32 clean at 32.9 tok/s aggregate, acc 87.5, pure TP-32) +
+  RESEARCH_LOG 07-07 06:40/12:40/15:05 entries.
+- **Two deliberate deltas vs the dev-branch hunks** (documented in pr-g5.md + the commit message):
+  (a) TPU_MLA_V4_KV_PAGES/QUERIES debug overrides dropped (scaffolding; every pod run used the defaults —
+  verified in the provenance env records); (b) the gather now runs over the token-shard axes whose
+  descriptors are REPLICATED (MLP_TENSOR minus ATTN_DATA, derived from the effective specs) instead of all
+  MLP_TENSOR axes — identical on the validated TP×EP topology (attn-DP axes size 1), but required upstream:
+  gathering over attn_dp would corrupt the pure-DP-attention meshes that are main's ONLY accepted MLA
+  config today (descriptors co-shard there). Unit-tested algebra incl. the hybrid DP×TP (#2988/Kimi) case.
+- **CPU tests**: 17 new (test_mla_cross_shard 6 — mock-kernel spec-algebra, 8-dev mesh;
+  test_flash_attn_mla_page_size 9; test_tpu_runner_min_token_bucket 2) + platform suite 39/39 (1 new test;
+  the pre-existing MLA-check test rewritten to the new contract). Adversarial vs pristine base: 7
+  behavioral failures + a direct probe of the cross-shard bug (8-way vs reference max |diff| 3.91; base
+  TuningKey saw the 1/8-shard shape). Existing suites identical to base (incl. the 5 pre-existing
+  Pallas-needs-TPU fails in test_flash_attn_mla.py). Forward-port to upstream tip `6a837025` (re-fetched
+  2026-07-08): 1 mechanical TuningKey conflict hunk; tip still lacks every piece (verified by reading it).
+- **Duplicate-work re-sweep (live, 2026-07-08)**: #2324 unchanged since 07-04 (head `c2822bd7`, needs
+  rebase) — G5 is a port of 5 of its hunks, disclosed hunk-by-hunk with the axis/gating/test deltas;
+  commit carries `Co-authored-by: yiqiliu2`; owner must run the #2324 conversation before submission.
+  **NEW finding: #2988 is an ALTERNATIVE fix for the same cross-shard bug** (rewrites the mla_attention
+  default token specs MLP_TENSOR→ATTN_DATA; textual+semantic conflict — if it lands first our gather
+  correctly degrades to a no-op; maintainers must pick a default). #2930/#2955/#3056/#2767 adjacent,
+  no overlap.
+- **lm_head vocab-sharded logits guards (761ea755/87ace031/10efa393 heritage) audited, NOT ported**:
+  they guard the DSV4-branch STEP-1 token-sharded-logits machinery, which does not exist at the base or
+  tip — base already keeps vocab-sharded logits for the vocab-sharded lm_head (wrapper out-sharding
+  P(MLP_DATA, MLP_TENSOR) at :660 + lm_head P(MLP_TENSOR, None) in unquantized.py:169). Porting = dead
+  code referencing nonexistent variables. Documented as an audit note in pr-g5.md; the guards belong to
+  the (unsubmitted) DSV4 logits-layout series.
+- Docs: `docs/pr-descriptions/pr-g5.md` written (full PR body draft: description, hunk-level #2324/#2988
+  disclosure, test commands+results, pod evidence with run ids, risk, AI disclosure, submitter
+  checklist); README table + header updated. No S1 head-shard gate, no DCP (follow-on PRs per the task
+  directive).
