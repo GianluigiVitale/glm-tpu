@@ -690,3 +690,7 @@ fixes applied per repo/worktree:
   disclosure, test commands+results, pod evidence with run ids, risk, AI disclosure, submitter
   checklist); README table + header updated. No S1 head-shard gate, no DCP (follow-on PRs per the task
   directive).
+
+## 2026-07-08 — Round-8 finding 1 CLOSED: stranded round-6 fix `755b1719` merged to staging (CPU-only; TPU untouched)
+
+- **`glm-5.2-v4-next` @ `15246fc8`** (pushed) merges `glm-5.2-v4-2a2` @ `755b1719` — paged-indexer hardening (write_indexer_keys `valid` REQUIRED keyword-only; compute_topk_indices_paged / topk_indices_for_layer_paged take required `query_start_loc`, derive the token→request map + pad mask internally, per-request block tables only) now lands on the 2int/sparse-prefill/MTP state; auto-merge textually clean + one semantic-conflict fix (test_glm_dsa_pallas_decode.py history prepopulation now passes an explicit all-ones `valid` — provably unpadded rows); production wiring reconciled per round8-freeze-conformance.md finding 1 (mla_attention.py:1059/:1153 pass `valid=tok_valid` by keyword — untouched, still compatible); frozen kernels untouched; suites (CPU, JAX_PLATFORMS=cpu): indexer 34 / pallas_decode 18 / sparse_prefill 12 / mtp_index_share 14 / dsa_indexer_kernel 24 / dsa_sparse_mla 42 — all ≥ the 32/18/12/14/24/42 gates.
