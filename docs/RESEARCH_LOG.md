@@ -856,18 +856,35 @@ three run_bench commands + the checker.
   block configs, no perf numbers claimed — microbench outstanding; bf16 S2 boundary-band semantics
   spelled out; k=64 probe-shape caveat; metal results-file branch-header WARNING disclosed), AI
   disclosure, owner-submits checklist. README table G6 row updated (was "SKIPPED — too fresh").
+- **Post-cut adversarial review (fresh reviewer, full claims audit vs primary artifacts + independent
+  test/AST/merge re-runs): 0 CRITICAL / 1 HIGH / 3 MED / 5 LOW — all addressed.** HIGH-1: the shipped
+  indexer module docstring still described the PRE-Mosaic-fix kernel ((1,H)-matmul-LHS w tile, [1,P]
+  output block, stale VMEM table) and listed the silicon-validated items under "Remaining for real-TPU
+  validation" — fixed in a second, docstring-only commit `5bf3e5927` (code-AST-identical, verified via
+  docstrings-stripped `ast.dump`; 66/66 re-run; pushed — no force-push, per repo rule), together with
+  the same-class staleness the review pattern exposed (test docstring's "bars MUST be re-measured on
+  TPU before upstreaming" — done on metal 2026-07-08, now recorded; the unscoped "no public JAX/Pallas
+  DSA kernel" sentence; fork-side markers on the `mla/dsv4` references; seg_block sweep list). MED:
+  bf16 churn statistic provenance split (metal k=64: 0 out-of-band, 0–2/64 in-band; CPU round-5:
+  1–2/2048); **chain-of-custody disclosure added — `886eaceb` was committed 05:19 UTC, AFTER the metal
+  runs (2a 05:05, 2b 05:09), the audit rerun @886eaceb is CPU-interpret, so no artifact pins the metal
+  numbers to the commit bytes** (corroboration: 2a try-1 reproduces the pre-fix-only (1,H) BlockSpec
+  reject) → the owner clean re-run from the PR branch is now a REQUIRED checklist item; "approx-shaped
+  StreamIndex" mischaracterization of deepseek_v4 dropped (it's exact streaming top-k at
+  compressed-block granularity — compressor-based is the real differentiator). LOW: stale try4 log
+  banner disclosed; `cda8a707` correctly labeled local/unpushed; README tip-fetch header updated.
+  These fixes exist only on the PR branch — fold-back to `-next` is an owner checklist item.
+- **Log-threading note:** the parallel MTP-M2 session's commit `94b6664` appended its round-9-review
+  paragraph after this entry's heading (concurrent appends); relocated to its own entry above.
 
-  **Round-9 adversarial review of this prep (fresh reviewer on the staged diff — all claimed vLLM/fork
-  verifications independently re-verified and confirmed): 2 MED + 8 LOW findings, all addressed.**
-  MED-1 (exit-code contract): a typo'd `--db`/`--log` path crashed with exit 1 — indistinguishable from
-  an M2 mismatch — and `sqlite3.connect` silently CREATED the missing DB file; fixed (path checks +
-  sqlite3.Error/OSError → exit 2, no side-effect file; tested). MED-2 (vacuous PASS): two `--stub` runs
-  or an all-SKIP pair passed "identity" over empty outputs; fixed (stub/model=STUB guard + all-empty-
-  output guard → CompareError; tested). LOW: per-position regex now accepts vLLM's all-`nan`
-  num_drafts=0 interval line (byte-exact reconstruction test); garbage `GLM_SPEC_K=abc` now gets the
-  readable knob-naming error; NULL-vs-"" raw_output no longer conflated (a real difference is a
-  mismatch); `run_tok_s` docstring corrected to END-TO-END tok/s (wall incl. prefill; newest-summary-row
-  = single-benchmark runs only); the mal-recovery bias mechanism + the DEBUG-logged final idle flush
-  documented in `parse_spec_log`; missing/unparseable env_json protocol now warns. Not fixed (accepted):
-  reviewer could not verify live `SpecDecoding` emission on this offline-LLM+Ray stack (checker prints a
-  loud hint when zero lines match) nor anything pod-side — that IS the §7 run this preps.
+## 2026-07-08 13:10 UTC — D0 CLOSED: sparse path deterministic + correct in the 753B engine; passkey ladder started
+
+- **Across-boot determinism post-fix: 4/4 byte-identical** (runs 56 vs 57, two fresh engine boots,
+  GLM_DSA_MODE=pallas_decode sequential). The round-9 root cause (selection-ORDER summation amplifier:
+  descending-score gather order x fp non-associativity x cross-boot executable skew) is FIXED by the
+  canonical ascending-position gather (fork 215f8ddb, merged cda8a707); same-boot probe had already shown
+  4/4 (graph input-pure). Round-9 adversarial review: fix correct as merged; harness edits sound.
+- D0 gate summary (audit step 1): sparse serves the full 753B correctly — accuracy identical to dense
+  (3/4 same items, same miss), deterministic, kernel-level fp32 exactness = the silicon GATE B result.
+- Audit step 2 started: passkey ladder 8K/32K x depths {.25,.5,.75} x 12 trials on the SPARSE path
+  (attention_path=dsa-sparse:pallas_decode), gate = every (length,depth) cell >= 95%.
