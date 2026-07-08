@@ -1116,3 +1116,17 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   agent only at small v4-8 shapes; it does not compile at GLM's 128K/v4 config here. Checking whether it
   works at 8K (code-path vs size-specific). fp8-KV is a FALLBACK; the primary is the DCP fix.
 - Primary path = fix the DCP multi-chunk-prefill owner-scatter (CPU-testable, clear target, agent running).
+
+## 2026-07-08 20:20 UTC — fp8-KV fails at 8K too (same Mosaic arith.cmpi); DCP is the primary, cache-dump probe next
+
+- fp8-KV 8K: SAME `arith.cmpi` Mosaic-legalize failure as 128K → it's a code-path bug in the fp8 dequant
+  read (_upcast_kv_for_v4) on THIS v4 stack, NOT size-specific. fp8-KV is not a quick fallback (would need
+  its own Mosaic-level kernel fix). Route retired for now.
+- **Primary = DCP.** Its entire CPU logic is proven correct (scatter arithmetic 7 cases incl. mid-block +
+  model>1 all_gather; runner metadata global; combine; bitcast). The multi-chunk-prefill failure is a
+  metal-only multi-CALL effect — chunk-1's striped cache likely not persisting into chunk-2's step
+  (input_output_aliases / P(BATCH,CONTEXT) write-back across scheduler steps). A gated cache-dump hook
+  (2-chunk vs 1-chunk cache diff) is being built to pin write-back-vs-read in one pod run — the disciplined
+  observability step before any fix.
+- Not reward-hacking / not faking: report_passkey still refuses to call <128K a gate pass; no 128K claim
+  until it's real. Proven so far: sparse passkey 100% @32K, kernels silicon-validated, GSM8K n=32 96.9%.
