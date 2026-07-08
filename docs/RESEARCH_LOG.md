@@ -1029,6 +1029,39 @@ DCP path's kv_packing=32 multi-block bitcast read is where the bug hides (zero t
   GiB/chip). The reported truncation was seen at dcp=4; since the CPU-reproducible logic is correct at BOTH,
   run dcp=2 first (conservative) but expect the SAME metal behavior — the differentiator is the on-metal glue,
   not dcp. No config shortcut; escalate to the on-metal dump.
+
+### 2026-07-08 (later still) — on-metal discriminator pinned MULTI-CHUNK PREFILL; CPU write path EXONERATED
+
+The pod discriminator (dcp=2, gate-ON passkey) narrowed the DCP failure precisely: **L=3200 FAILS at
+max_batched_tokens=2048 (two prefill chunks) but PASSES at mbt=6144 (single chunk)**; single-chunk prefill is
+correct to ≥5000 tokens / multi-block per shard. So the bug is specific to MULTI-CHUNK prefill (≥2 chunks) —
+NOT the packed read, NOT decode, NOT the combine (all already CPU-exonerated). The prime suspect was the
+owner-scatter KV write for chunk ≥2 (attention_interface.py:906-922), which starts at a nonzero global
+position. I built the CPU reproduction and it **exonerates the write path on two independent counts**:
+
+- **The owner-scatter arithmetic is CORRECT** (`tests/layers/common/test_mla_dcp.py::
+  test_dcp_chunked_prefill_write_matches_single_chunk`, 7 cases): writing a prompt in TWO chunks via the REAL
+  scatter (P(BATCH,CONTEXT) striped cache, 8 CPU devices) lands EVERY token in the same owner-shard slot as a
+  single-chunk write — across mid-block chunk boundaries (nonzero offset inside a stripe), the token-sharded
+  all_gather path (model>1, like the pod's model=8), unequal chunks, dcp 2/4, pack 1/2. NON-VACUOUS (asserts
+  the scatter writes ≥ total slots). The mechanism the scatter would need to be buggy — a chunk-local index
+  that resets to 0 — is reproduced ONLY when a chunk-local `seq_lens` is force-fed
+  (`test_dcp_scatter_misroutes_iff_seqlen_is_chunk_local`), which is NOT what happens.
+- **The runner feeds CORRECT metadata** (`tpu_runner.py:2531-2533`): attention
+  `seq_lens = num_computed_tokens + num_scheduled_tokens` = the POST-chunk total (3200 for chunk 2), and
+  `positions = num_computed + arange` (:2486) = global. So the scatter's recomputed
+  `pos = seq_lens − q_len + local` = the true global position, and the kernel's causal mask (same `seq_lens`)
+  is right too. No chunk-local value anywhere.
+- **Read path also correct on CPU:** under DCP `chunk_prefill_size` is None, so chunked-prefill tokens route
+  through the kernel's MIXED case (not the skipped PREFILL case) — already covered by the kvpack mixed-batch
+  test (a q_len=9 / kv_len=70 chunk starting at pos 61) which matches the numpy full-context reference.
+- **VERDICT:** the write (scatter + its metadata) and the decode/mixed reads are all CPU-correct for
+  multi-chunk prefill. The real multi-chunk failure is therefore a METAL-ONLY effect in the multi-CALL
+  composition — most likely the sharded-cache write-back/persistence between the two prefill steps (does
+  chunk 1's P(BATCH,CONTEXT) scattered cache survive intact into chunk 2's step on metal?) or a native-op
+  read during chunk-2 prefill — NOT the scatter arithmetic. On-metal disambiguation: dump the DCP cache
+  AFTER the 2-chunk prefill (before decode) and diff against the single-chunk-prefill cache; if they differ,
+  it is write-back/persistence (metal plumbing); if they match, it is the chunk-2 read/decode on metal.
 - **Suites green (CPU, JAX_PLATFORMS=cpu):** DCP suites 86/86 (`test_mla_v2_lse_dcp_cpu` 3 + new kvpack 39 +
   `test_mla_dcp` 44); DSA+MLA 108/108 (`test_dsa_indexer_kernel`, `test_dsa_sparse_mla`, `test_mla_attention`,
   `test_mla_head_sharded`, `test_glm_dsa_pallas_decode`, `test_glm_dsa_mtp_index_share`). ≥ the -next counts
