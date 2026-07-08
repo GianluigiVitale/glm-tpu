@@ -34,6 +34,11 @@ env/flags — pv.start_run + _run_env — and the pod).
     ~/vllm-env/bin/python -u run_bench.py --benchmarks gsm8k,gpqa_diamond \
         --limit 50 --max-new 4096
 
+    # RETRY a truncated tail at a longer cap (--ids = the stored item_ids;
+    # merge back into the base run's numbers with bench/merge_runs.py):
+    ~/vllm-env/bin/python -u run_bench.py --benchmark gpqa_diamond \
+        --ids "gpqa_3,gpqa_17" --max-new 32768 --note "retry truncated tail"
+
 Protocols (--protocol, default greedy): `greedy` is the harness's own protocol
 (temperature=0, \\boxed{} prompts) — byte-identical to the pre-protocol
 harness. `card` runs the HF model card's PUBLISHED protocol (temperature=1.0,
@@ -443,11 +448,16 @@ def _run_items_batched(conn, run_id, spec: B.BenchSpec, generate_batch, items,
 
 
 def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
-                  batch_size=0, protocol="greedy", samples=1, offset=0):
+                  batch_size=0, protocol="greedy", samples=1, offset=0,
+                  ids=None):
     """Run one benchmark under `protocol`:
 
     'greedy' (default) — the pre-protocol harness, byte-identical: greedy
     decode, \\boxed{} prompts, spec.extract, one pass, no per-request seed.
+
+    `ids` (--ids, the retry selector) runs ONLY the named item_ids (full
+    dataset scan, dataset order, unknown ids refused — see B.load_items);
+    refused with limit/offset. Composes with either protocol.
 
     'card' — the HF model card's published protocol (spec.card, refused when
     None): the card's sampling params (temperature/top_p/max generation
@@ -471,7 +481,19 @@ def run_benchmark(conn, run_id, spec: B.BenchSpec, generate, limit=None, seed=0,
     if protocol != "card" and samples != 1:
         raise ValueError("--samples N>1 requires --protocol card "
                          "(greedy resamples are identical by construction)")
-    items = B.load_items(spec, limit=limit, protocol=protocol, offset=offset)
+    if ids is not None:
+        # `is not None`, NOT truthiness: a retry driver that computed an
+        # EMPTY id list must be refused by load_items (below), never silently
+        # fall through to a full-dataset run at the retry's long max_new.
+        if limit is not None or offset:
+            raise ValueError("--ids does not compose with --limit/--offset "
+                             "(the id list IS the selection)")
+        items = B.load_items(spec, protocol=protocol, ids=ids)
+        print(f"[{spec.name}] --ids selection: {len(items)} item(s) "
+              f"{[it.item_id for it in items]}", flush=True)
+    else:
+        items = B.load_items(spec, limit=limit, protocol=protocol,
+                             offset=offset)
     cp = spec.card if protocol == "card" else None
     extract_fn = cp.extract if (cp and cp.extract) else None
     sampling = (None if cp is None else
@@ -668,6 +690,9 @@ def _run_env(args, benches) -> dict:
         "max_len": args.max_len, "max_new": args.max_new,
         "max_seqs": args.max_seqs, "max_batched_tokens": args.max_batched_tokens,
         "batch_size": args.batch_size,
+        # the --ids retry selection (verbatim flag; None = full/sliced run) —
+        # a retry run's provenance must say WHICH items it reran
+        "ids": getattr(args, "ids", None),
         "gmu": args.gmu, "num_gpu_blocks": args.num_gpu_blocks,
         # engine-level sampling defaults; card mode overrides PER REQUEST from
         # card_protocols (temperature/top_p/max_new) + per-sample seeds.
@@ -693,6 +718,16 @@ def main():
     ap.add_argument("--offset", type=int, default=0,
                     help="skip the first N items (wave runs: no waiting queue "
                     "-> avoids the finish+admit core-halt step; docs/09)")
+    ap.add_argument("--ids", default=None,
+                    help="comma-separated item_ids to run, e.g. "
+                         "'gsm8k_3,gsm8k_17' — the RETRY selector for a "
+                         "truncated tail (rerun just those items at a longer "
+                         "--max-new, then merge with bench/merge_runs.py). "
+                         "Loads ONLY those items (full dataset scan, dataset "
+                         "order; an unknown id is refused, never silently "
+                         "skipped). Composes with --protocol; refused with "
+                         "--limit/--offset and with multi-benchmark runs "
+                         "(item ids are benchmark-prefixed).")
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help="checkpoint path/repo (default: GLM_MODEL env or the "
                          "staged us-central2 GCS copy)")
@@ -770,6 +805,16 @@ def main():
     if args.samples > 1 and args.protocol != "card":
         ap.error("--samples N>1 requires --protocol card (greedy resamples "
                  "are identical by construction)")
+    ids = ([s.strip() for s in args.ids.split(",") if s.strip()]
+           if args.ids is not None else None)
+    if args.ids is not None and not ids:
+        ap.error("--ids given but empty")
+    if ids and (args.limit is not None or args.offset):
+        ap.error("--ids does not compose with --limit/--offset — the id list "
+                 "IS the selection")
+    if ids and len(benches) > 1:
+        ap.error("--ids selects items of ONE benchmark (item ids are "
+                 "benchmark-prefixed); drop --benchmarks or pass one name")
     if args.max_new is None and args.protocol == "greedy":
         args.max_new = 2048   # the pre-protocol default, byte-identical
 
@@ -784,7 +829,7 @@ def main():
     for b in benches:
         run_benchmark(conn, run_id, B.REGISTRY[b], gen, limit=args.limit, offset=args.offset,
                       batch_size=args.batch_size, protocol=args.protocol,
-                      samples=args.samples, seed=args.seed)
+                      samples=args.samples, seed=args.seed, ids=ids)
 
 
 if __name__ == "__main__":

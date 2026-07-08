@@ -270,7 +270,8 @@ REGISTRY = {b.name: b for b in (GPQA_DIAMOND, MMLU_PRO, GSM8K, AIME_2026)}
 
 
 def load_items(spec: BenchSpec, limit: int | None = None,
-               protocol: str = "greedy", offset: int = 0) -> list[Item]:
+               protocol: str = "greedy", offset: int = 0,
+               ids: list[str] | set[str] | None = None) -> list[Item]:
     """Load + build items for a benchmark (needs the `datasets` lib + HF_TOKEN).
     Loads the PINNED dataset revision (spec.hf_revision) and stamps it into
     every item's meta so each stored row is traceable to the exact dataset
@@ -279,9 +280,31 @@ def load_items(spec: BenchSpec, limit: int | None = None,
     protocol='greedy' (default) builds items exactly as before (byte-identical
     prompts). protocol='card' builds the HF card's protocol items via
     spec.card.build (falling back to spec.build when the card is silent on the
-    prompt — e.g. GPQA); refuses benchmarks with no card protocol mapped."""
+    prompt — e.g. GPQA); refuses benchmarks with no card protocol mapped.
+
+    `ids` (the --ids retry selector) loads ONLY the items whose item_id is in
+    the given collection (e.g. {'gsm8k_3', 'gsm8k_17'}): the FULL dataset is
+    scanned and items are returned in dataset order. Item ids are INDEX-
+    derived ('gsm8k_{idx}') and stable ONLY under the pinned hf_revision — a
+    revision bump that reorders rows would silently rename the questions, so
+    never retry ids across a revision change (merge_runs' gold-mismatch
+    warning catches scored drift, not a same-gold reorder). Every requested
+    id must exist —
+    a missing id raises instead of silently retrying a partial set. Refused
+    together with limit/offset (both are slices of the same axis; --ids IS
+    the selection). Composes with protocol: the ids name the same items under
+    either builder."""
     if protocol not in ("greedy", "card"):
         raise ValueError(f"unknown protocol {protocol!r} (greedy|card)")
+    wanted: set[str] | None = None
+    if ids is not None:
+        wanted = {str(s).strip() for s in ids if str(s).strip()}
+        if not wanted:
+            raise ValueError("ids given but empty")
+        if limit is not None or offset:
+            raise ValueError(
+                "ids does not compose with limit/offset — the id list IS the "
+                "selection (run a separate slice run instead)")
     build = spec.build
     if protocol == "card":
         if spec.card is None:
@@ -297,11 +320,21 @@ def load_items(spec: BenchSpec, limit: int | None = None,
                       cache_dir=os.environ["HF_DATASETS_CACHE"])
     items = []
     for idx, row in enumerate(ds):
-        if idx < offset:
-            continue
-        if limit and idx >= offset + limit:
-            break
+        if wanted is None:
+            if idx < offset:
+                continue
+            if limit and idx >= offset + limit:
+                break
         it = build(row, idx)
+        if wanted is not None and it.item_id not in wanted:
+            continue
         it.meta["hf_revision"] = spec.hf_revision
         items.append(it)
+    if wanted is not None:
+        missing = sorted(wanted - {it.item_id for it in items})
+        if missing:
+            raise ValueError(
+                f"{spec.name}: requested item id(s) not in the dataset: "
+                f"{missing} (have e.g. {items[0].item_id if items else '?'} — "
+                "ids are the stored items.item_id values)")
     return items
