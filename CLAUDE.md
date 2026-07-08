@@ -53,6 +53,13 @@ patches.** This is the exact methodology that made the DSV4 port land:
 - **Adversarial review is part of the loop.** After a change, spawn perspective-diverse reviewers (correctness
   / numerics / PR-cleanliness / overclaiming) to attack it against the reference before you trust it — exactly
   as the DSV4 port did. "Compiles ≠ works" — only *running* the parity catches decomposition bugs.
+- **Observability-FIRST — build the instrument that makes the failure VISIBLE before you debug it** (the
+  `docs/suggestions.md` lesson, now proven). When a bug reproduces only on metal, do not iterate blind: build
+  the black box first (`docs/10`). The kit: the per-step **flight recorder**, the **DCP debug triad**
+  (`GLM_DCP_CACHE_DUMP` + the two fail-loud guards `GLM_DCP_ASSERT_SHARDING` / `_CACHE_SANITY`), and on-metal
+  discriminator probes. This pinned the fatal core-halt class and the DCP one-stripe-drop (cache-dump: exactly
+  half the rows stale at dcp=2) — each **only after every CPU hypothesis was exhausted/falsified**. A
+  metal-only bug is a signal to instrument, not to guess.
 - **Enumerate before whacking moles.** For the DSA kernel + the serving-region programs, map the whole class
   first (the DSV4 `ExecutableCompileObserver` lesson, `~/moe-tpu/docs/15`) then fix systematically.
 
@@ -263,13 +270,35 @@ glm-tpu/
 
 ## Progress
 
-- [ ] 2026-07-06 — **Repo initialized as the GLM-5.2 porting starting point.** `glm-tpu` scaffolded (this
-  CLAUDE.md + HANDOFF + PLAN + `KICKOFF.md` ≤4k /goal prompt + the feasibility memo in docs/00 + dir structure);
-  `setup.sh --folder=glm-tpu` wired; created on GitHub (`GianluigiVitale/glm-tpu`, private). FP8 target confirmed
-  (`zai-org/GLM-5.2-FP8`, ~744 GB). **The benchmark + provenance machinery is PRE-BUILT (CPU-tested):** `bench/`
-  — the SQLite provenance DB (every question/timestamp/verbatim-reply/pass-fail + run provenance), the benchmark
-  registry (GPQA-Diamond/MMLU-Pro/GSM8K/AIME-2026) + extractors/scorers, and a pluggable harness; datasets
-  cached (GPQA-Diamond/MMLU-Pro/GSM8K/AIME-2026 — all accessible). NOTHING ported yet — Stage 1 is the next
-  chat's first task (see HANDOFF).
+- [x] **2026-07-06 — Repo initialized** as the GLM-5.2 porting harness; `bench/` provenance DB + benchmark
+  registry (GPQA-Diamond/MMLU-Pro/GSM8K/AIME-2026) + extractors/scorers pre-built and CPU-tested, datasets
+  cached. FP8 target confirmed (`zai-org/GLM-5.2-FP8`, ~744 GB). Nothing ported yet at this point.
+- [x] **2026-07-08 — Stage 1 DONE (dense-MLA) on the 32-chip pod.** 753B FP8 serves (runai GCS→HBM,
+  FP8-resident + per-tile dequant, EP filter, pure TP-32). **GSM8K n=32 @ max-new 2048 = 96.9%** (31/32,
+  1 truncation — truncation-free quality signal), full provenance in `bench/results.db`. Fixed en route:
+  determinism (canonical ascending-position gather), the mla.v2 `pack_new_kv` OOB core-halt (the fatal halt
+  class — CLOSED, validated by the 8h52m zero-interrupt GPQA run), the large-bucket compile-OOM (F1).
+- [x] **2026-07-08 — Stage 2 DSA kernels SILICON-VALIDATED** (single v4 chip): GATE 2a (Mosaic compile +
+  documented w-tile fallback) + GATE 2b (**selected-set-EXACT vs the HF-math oracle**; sparse-MLA fp32
+  9.5e-7 / bf16 1.95e-3). **Sparse passkey 100% in every (length,depth) cell @8K & 32K** (== dense).
+  Sparse decode + sparse prefill + IndexShare all built (`GLM_DSA_MODE=pallas_decode`); D0 (sparse==dense)
+  closed in the 753B engine.
+- [x] **2026-07-08 — Stage 3 MTP code-complete (CPU).** M1 dense draft-parity vs composed-HF (max rel Δ
+  3.1e-6, top-1 100%) + G4 IndexShare; dense-MTP engine knob `GLM_SPEC_K` (unset = byte-identical). M2
+  (pod greedy-equivalence) prepped zero-turnaround.
+- [~] **2026-07-08 — 128K via DCP: fix MERGED, on-metal validation IN PROGRESS.** The multi-chunk-prefill
+  KV-cache persistence bug (one dcp stripe dropped across the scheduler-step boundary — cache-dump: exactly
+  half the rows stale at dcp=2) was root-caused observability-first and fixed by pinning the
+  **VllmModelWrapper step-fn + MTP `_propose` cache `out_sharding` to `P(BATCH,CONTEXT)`** under the gate —
+  GLM's real vLLM path (an earlier flax-path fix was a no-op, caught by review). Independently reviewed
+  **SHIP**, merged to `glm-5.2-v4-next`. Next: on-pod cache-dump must flip **DIFFER→MATCH**, then dcp=2
+  128K passkey ≥95%/depth. (fp8-KV route retired — v4 Mosaic `arith.cmpi` bug.)
+- [x] **2026-07-08 — GPQA-Diamond n=198 (dense, DSA bypassed) = truncation-dominated.** Raw 52.5 is an
+  artifact of the 4K gen cap (140/198 truncated mid-reasoning); **completed items 50/58 = 86.2%** (honest
+  caveat: the completed subset skews toward easier/short-reasoning items). Rerun at 16K queued behind the
+  DCP validation.
+- **Branch map:** `glm-5.2-v4` = pod mainline (Stage-1 + OOB fix); **`glm-5.2-v4-next` = integrated staging**
+  (Stage-2 kernels + DCP persistence fix + guards + MTP-g4 + det, all gated off); upstream PR series
+  `pr-g1..g6` drafted (G6 = the DSA kernels — the headline). Detail: `HANDOFF.md` + `docs/RESEARCH_LOG.md`.
 
 > Append dated entries each session. Keep `HANDOFF.md` in sync.
