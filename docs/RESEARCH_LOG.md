@@ -1187,3 +1187,18 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   scatter CPU test missed this exact geometry (2048-tok/2-page chunk).
 - The correctness-diff tool (dcp_cache_diff.py) needs a bf16 cast in reassemble_layer (its tests used
   float32); I ran the diff inline with the cast. Fold the cast into the committed tool.
+
+## 2026-07-09 02:45 UTC — DCP bug LOCKED: the owner-scatter mislowers on TPU (kernel exonerated)
+
+- **GLM_DCP_SCATTER_ONLY probe (kernel SKIPPED, pure owner-scatter output): DIFFER @ page 1** — max|Δ|=5.44,
+  1024/3187 wrong, first_diff=1024, identical to the full-path signature. So with the kernel out entirely,
+  the 2-chunk scatter output is STILL wrong at the 2nd local page. Kernel EXONERATED.
+- Combined with the CPU ground-truth (arithmetic correct, 264 adversarial cases can't reproduce it), the
+  root cause is LOCKED: the owner-scatter `.at[...].set(mode="drop")` (attention_interface.py:915-931)
+  MISLOWERS on TPU when writing into the DONATED, P(BATCH,CONTEXT)-sharded, TILED cache buffer — the 2nd
+  local-page tile isn't committed. A metal-only XLA/GSPMD scatter-into-sharded-donated-buffer interaction.
+- Fix directions handed to the agent: (1) drop the donation for the DCP scatter, (2) per-page
+  dynamic_update_slice, (3) shard_map-LOCAL scatter (each shard scatters its local slice — matches the
+  kernel's per-shard read), (4) mode=promise_in_bounds / segment-sum. On-pod scatter-only diff = the exact
+  DIFFER→MATCH falsifier. Observability chain: multi-chunk → persistence(fixed) → A/B/C(carry ok) →
+  correctness-diff(page 1 write) → scatter-only(scatter EXEC, not kernel). Each probe halved the search.
