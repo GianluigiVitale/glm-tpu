@@ -624,21 +624,28 @@ DONATED, `P(BATCH,CONTEXT)`-sharded, TILED cache** — the 2nd local-page tile i
 selects an alternative that is **bit-identical to the default on CPU** (all four verified) but lowers to a
 DIFFERENT TPU op sequence; run the scatter-only diff under each until one flips **DIFFER→MATCH**:
 
-| value | what it does | targets | reviewer note |
-|---|---|---|---|
-| unset / `scatter` | current 4D indexed scatter (byte-identical) | — | baseline |
-| `flat` | reshape to one `[n_slots, kv_dim]` axis, 1D-index scatter, reshape back → no multi-tile cross-dim scatter | tiling | **strongest bet** — bit-identical unconditionally; genuinely restructures the scatter (still emits a scatter, so confirm XLA doesn't re-tile it identically) |
-| `barrier` | `optimization_barrier` before the scatter | donation/aliasing | cheap, but the barrier is on the scatter *input* — it may NOT stop XLA placing the *output* in-place in the donated buffer; **budget for a no-op** |
-| `onehot` | per-slot one-hot masked write, no scatter primitive at all (small caches only — O(n_slots·T)) | scatter-primitive lowering | **probe only, do not promote** — SUMS colliding writes (only bit-identical under an injective block table) and is a low-precision matmul at metal size; a clean DIFFER→MATCH here strongly implicates the scatter op |
+**On-metal so far: `GLM_DCP_NO_DONATE=1` and `GLM_DCP_SCATTER_IMPL=flat` BOTH still `pred=None`** — so it is NOT
+the donation and NOT the scatter's index form. The corruption is the **cross-tile GSPMD scatter itself**:
+within one `dcp`-shard's local buffer, a single `.at[...].set` over all tokens writes MULTIPLE physical pages
+(dim-0 tiles), and the 2nd page tile is not committed. The remaining candidate targets exactly that:
+
+| value | what it does | reviewer / metal note |
+|---|---|---|
+| unset / `scatter` | current 4D indexed scatter (byte-identical) | baseline |
+| **`shardlocal`** | split the local scatter into **one single-physical-page scatter per logical block** (`fori_loop` over the per-seq block count) so no scatter crosses a dim-0 page-tile boundary | **TOP candidate now** — directly removes the cross-tile scatter that survived `no_donate`+`flat`; bit-identical on CPU (incl. metal tiling + 32-way all_gather) |
+| `flat` | 1D-index scatter on a flattened cache | tried on metal → **still fails** (XLA re-tiles the 1D scatter identically) |
+| `barrier` | `optimization_barrier` before the scatter | likely no-op (barrier on the input, not the donated output) |
+| `onehot` | per-slot one-hot masked write, no scatter primitive at all (small caches only) | **diagnostic probe**: if onehot RETRIEVES → the scatter op is the culprit (shardlocal will work); if onehot ALSO fails → the values are wrong BEFORE the scatter (upstream — the token all_gather ordering or the new-KV latents), NOT the scatter |
+| `GLM_DCP_NO_DONATE=1` | drop the step-fn kv_caches donation | tried on metal → **still fails** (not the donation) |
 
 Plus a separate step-fn lever, `GLM_DCP_NO_DONATE=1` (the genuine option 1 — the scatter-input `barrier` likely does not achieve it): under the DCP gate it **drops the `kv_caches` donation** in `VllmModelWrapper.jit_step_func` so XLA must preserve the input cache buffer and the owner-scatter's OUTPUT can no longer be placed in-place in the donated, sharded, tiled buffer. Costs one transient cache copy/step (measure HBM at 128K; harmless at the L=3200 debug size). Compose it with any `GLM_DCP_SCATTER_IMPL` (or none):
 
 ```bash
 # Try in this order (reviewer ranking). Each entry is the extra env for the two
 # scatter-only dumps + diff. "no_donate" is GLM_DCP_NO_DONATE=1 (no IMPL).
-for LEVER in "GLM_DCP_NO_DONATE=1" "GLM_DCP_SCATTER_IMPL=flat" \
-             "GLM_DCP_SCATTER_IMPL=flat GLM_DCP_NO_DONATE=1" \
-             "GLM_DCP_SCATTER_IMPL=barrier" "GLM_DCP_SCATTER_IMPL=onehot"; do
+for LEVER in "GLM_DCP_SCATTER_IMPL=shardlocal" \
+             "GLM_DCP_SCATTER_IMPL=shardlocal GLM_DCP_NO_DONATE=1" \
+             "GLM_DCP_SCATTER_IMPL=onehot"; do   # onehot = diagnostic (see table)
   TAG=$(echo "$LEVER" | tr -cd 'a-z_')
   env $_ENVS $LEVER GLM_DCP_SCATTER_ONLY=1 GLM_DCP_CACHE_DUMP=/tmp/so2_$TAG.npz \
     ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
