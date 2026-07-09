@@ -624,27 +624,35 @@ DONATED, `P(BATCH,CONTEXT)`-sharded, TILED cache** — the 2nd local-page tile i
 selects an alternative that is **bit-identical to the default on CPU** (all four verified) but lowers to a
 DIFFERENT TPU op sequence; run the scatter-only diff under each until one flips **DIFFER→MATCH**:
 
-| value | what it does | targets |
-|---|---|---|
-| unset / `scatter` | current 4D indexed scatter (byte-identical) | — |
-| `barrier` | `optimization_barrier` before the scatter → breaks the in-place aliasing of the donated buffer (no persistent-cache copy, only the scatter's transient) | donation/aliasing |
-| `flat` | reshape to one `[n_slots, kv_dim]` axis, 1D-index scatter, reshape back → no multi-tile cross-dim scatter | tiling |
-| `onehot` | per-slot one-hot masked write, no scatter primitive at all (small caches only — O(n_slots·T)) | scatter-primitive lowering |
+| value | what it does | targets | reviewer note |
+|---|---|---|---|
+| unset / `scatter` | current 4D indexed scatter (byte-identical) | — | baseline |
+| `flat` | reshape to one `[n_slots, kv_dim]` axis, 1D-index scatter, reshape back → no multi-tile cross-dim scatter | tiling | **strongest bet** — bit-identical unconditionally; genuinely restructures the scatter (still emits a scatter, so confirm XLA doesn't re-tile it identically) |
+| `barrier` | `optimization_barrier` before the scatter | donation/aliasing | cheap, but the barrier is on the scatter *input* — it may NOT stop XLA placing the *output* in-place in the donated buffer; **budget for a no-op** |
+| `onehot` | per-slot one-hot masked write, no scatter primitive at all (small caches only — O(n_slots·T)) | scatter-primitive lowering | **probe only, do not promote** — SUMS colliding writes (only bit-identical under an injective block table) and is a low-precision matmul at metal size; a clean DIFFER→MATCH here strongly implicates the scatter op |
+
+Plus a separate step-fn lever, `GLM_DCP_NO_DONATE=1` (the genuine option 1 — the scatter-input `barrier` likely does not achieve it): under the DCP gate it **drops the `kv_caches` donation** in `VllmModelWrapper.jit_step_func` so XLA must preserve the input cache buffer and the owner-scatter's OUTPUT can no longer be placed in-place in the donated, sharded, tiled buffer. Costs one transient cache copy/step (measure HBM at 128K; harmless at the L=3200 debug size). Compose it with any `GLM_DCP_SCATTER_IMPL` (or none):
 
 ```bash
-for IMPL in barrier flat; do   # (onehot only at small ctx)
-  env $_ENVS GLM_DCP_SCATTER_ONLY=1 GLM_DCP_SCATTER_IMPL=$IMPL GLM_DCP_CACHE_DUMP=/tmp/so2_$IMPL.npz \
+# Try in this order (reviewer ranking). Each entry is the extra env for the two
+# scatter-only dumps + diff. "no_donate" is GLM_DCP_NO_DONATE=1 (no IMPL).
+for LEVER in "GLM_DCP_NO_DONATE=1" "GLM_DCP_SCATTER_IMPL=flat" \
+             "GLM_DCP_SCATTER_IMPL=flat GLM_DCP_NO_DONATE=1" \
+             "GLM_DCP_SCATTER_IMPL=barrier" "GLM_DCP_SCATTER_IMPL=onehot"; do
+  TAG=$(echo "$LEVER" | tr -cd 'a-z_')
+  env $_ENVS $LEVER GLM_DCP_SCATTER_ONLY=1 GLM_DCP_CACHE_DUMP=/tmp/so2_$TAG.npz \
     ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
-      --max-seqs 1 --max-batched-tokens 2048 --gmu 0.90 --note "scatter $IMPL 2chunk"
-  env $_ENVS GLM_DCP_SCATTER_ONLY=1 GLM_DCP_SCATTER_IMPL=$IMPL GLM_DCP_CACHE_DUMP=/tmp/so1_$IMPL.npz \
+      --max-seqs 1 --max-batched-tokens 2048 --gmu 0.90 --note "scatter $TAG 2chunk"
+  env $_ENVS $LEVER GLM_DCP_SCATTER_ONLY=1 GLM_DCP_CACHE_DUMP=/tmp/so1_$TAG.npz \
     ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
-      --max-seqs 1 --max-batched-tokens 6144 --gmu 0.90 --note "scatter $IMPL 1chunk"
-  echo "== $IMPL =="; PYTHONPATH=~/tpu-inference-dcppersist2 ~/vllm-env/bin/python -m \
-    tpu_inference.runner.dcp_cache_diff /tmp/so2_$IMPL /tmp/so1_$IMPL
+      --max-seqs 1 --max-batched-tokens 6144 --gmu 0.90 --note "scatter $TAG 1chunk"
+  echo "== $LEVER =="; PYTHONPATH=~/tpu-inference-dcppersist2 ~/vllm-env/bin/python -m \
+    tpu_inference.runner.dcp_cache_diff /tmp/so2_$TAG /tmp/so1_$TAG
 done
-# The IMPL whose scatter-only diff is MATCH is the fix. Then re-run WITHOUT
-# GLM_DCP_SCATTER_ONLY (full path) at that IMPL -> the 2chunk-vs-1chunk full
+# The LEVER whose scatter-only diff is MATCH is the fix. Then re-run WITHOUT
+# GLM_DCP_SCATTER_ONLY (full path) at that lever -> the 2chunk-vs-1chunk full
 # diff must also MATCH, and the dcp=2 128K passkey must clear >=95%/depth.
+# (onehot: run only if it's cheap enough at L=3200; it's a probe, not a fix.)
 ```
 
 Once an IMPL wins, make it the DEFAULT under the DCP gate (drop the env, keep gate-off byte-identical) and
