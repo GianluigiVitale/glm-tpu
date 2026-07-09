@@ -1543,3 +1543,11 @@ untested fairly); H3 LSE combine (lowest, CPU-clean). Discriminators (all on-pod
 GLM_DCP_NO_DONATE=1 (cheap — if fixes → H2); pack=1 vs pack>=2 (H1, but pack=1 invalid for bf16/fp8);
 SCATTER_ONLY page-0 vs page-1 dump (write vs read). Fix if H1 = read-side pageloop analog in kernel _fetch_bkv
 (unreshaped per-page DMA when dcp>1). Testing NO_DONATE=1 (fair, synced) next — potential cheap unblock.
+
+## 2026-07-09 20:50 — H2 REFUTED fairly: GLM_DCP_NO_DONATE=1 does NOT fix (pred=None @4K single-chunk, synced)
+
+NO_DONATE on all 8 raylets (verified), workers d59626964: DCP=2 4K single-chunk needle still pred=None.
+The donated-tile mis-commit hypothesis is eliminated on a FAIR test. Lead suspect = H1 (packed metal read
+of context-sharded cache, page tiles >=1). Next discriminator: 1-logical-page needle (900 tok < P_g=1024,
+still exercises both dcp shards + LSE combine + strided mask) — PASS ⇒ defect is page>=1 access (H1
+boundary confirmed); FAIL ⇒ DCP broken at any size on metal (combine/mask), H1 also wrong.
