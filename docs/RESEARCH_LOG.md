@@ -1593,3 +1593,19 @@ NO_DONATE-inert (predicted before the theory landed), pageloop-inert, single-chu
 corrupting at exactly L=1025. The DCP read/combine/write machinery is CORRECT — the block-table
 granularity contract was the bug all along. Patch under adversarial review → commit → sync → re-test the
 previously-failing DCP=2 4K single-chunk needle.
+
+## 2026-07-09 22:05 — ✅ DCP FIXED: post-granularity-fix 4K DCP=2 needle CORRECT (was pred=None)
+
+The DIFFER→MATCH moment: bf16 DCP=2, 4K single-chunk (4 logical pages), previously pred=None — with the
+block-granularity fix (1f700c507, all 8 workers synced): **pred='493718' == gold, acc 100%,
+DRIVER_EXIT=0.** Same prompt/gold as the failing run; only the fix changed. The multi-week "DCP
+packed-write metal bug" NEVER EXISTED — it was the engine-vs-TPU block-table granularity contract
+(double ×dcp) end to end. Every prior symptom is explained; the DCP read/combine/scatter machinery was
+correct all along.
+
+**128K plan (updated):** bf16 + DCP=4 now FITS 128K WITHOUT fp8 (22.76 weights + 2.05 overlays + 1.25
+reserved + 12.6/4=3.15 KV ≈ 29.2 < 30.75), decoupling the dense 128K gate from the still-unvalidated-on-
+metal fp8 write path (audit: fp8 has never generated a token). Sequence: (1) 16K multi-chunk DCP=2 bf16
+(validate multi-chunk post-fix); (2) 128K bf16 DCP=4 passkey ladder (THE dense gate); (3) fp8 needle @
+dcp=1 (isolate fp8), then fp8+DCP=2 as the alternative config; (4) DSA sparse at 128K (the SPARSE gate);
+(5) 256K throughput A/B.
