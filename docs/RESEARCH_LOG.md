@@ -1415,3 +1415,18 @@ packed word so semantics are preserved; MUST stay bit-identical for bf16 (shared
 `pack_new_kv_reference` (kv_utils.py:267) gives the numeric oracle. Launching an ultracode workflow:
 parallel fix candidates (bitcast-widen / branchless-mask / uint32-merge), each numeric-parity-verified
 vs the reference (bf16 AND fp8, interpret mode) + adversarially reviewed, before the pod build.
+
+## 2026-07-09 14:25 — bf16 in-place copy-elimination is a DEAD END (definitive); fp8-KV is the robust lever
+
+Backup CPU agent (faithful HLO repro) settled the bf16 route: the KV donation chain is NOT severed — it
+BINDS at the JAX level (outer list-donation → per-element may-alias, 0 copies through nested pjit +
+torchax list getitem/setitem). The torchax boundary was a red herring. Both prior fixes were
+ARCHITECTURALLY inert, provably: (1) L2 inner-jit donate_argnums materializes NOTHING at the outer
+executable boundary (only the OUTERMOST donation counts, already at L1) — CPU-proven; (2) L1 out_shardings
+pins SHARDING not LAYOUT, and at dcp=1 input & output are both replicated so there's no mismatch to fix
+(this is why the same pin WORKED for dcp>1 striped but not dcp=1). The residual 161M is a TPU-only XLA
+buffer-assignment DECLINE of a may-alias (physical layout) — no Python source line. Only untried
+copy-elim lever = end-to-end jax.experimental.layout Format pin (speculative, fragile, metal-only, "long
+shot"). CONCLUSION: the robust 128K bf16 levers are cache-SIZE reduction (fp8-KV / DCP / block_size), NOT
+copy elimination. → Validates the fp8-KV pivot. The GLM_MLA_ALIAS_KV L1+L2 changes stay (gated, byte-id
+off, 8K-correct) as documented no-ops; not the fix. Layout-pin kept as a one-shot last resort only.
