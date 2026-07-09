@@ -14,21 +14,21 @@ pick + log. Only a hard block pauses THAT thread.
 - **Stage 3 code-complete (CPU):** MTP M1 draft-parity + G4 index-share; dense-MTP knob GLM_SPEC_K.
 - Fork **`glm-5.2-v4-next`** = all above + DCP + guards, gated off. PRs g1–g6 drafted.
 
-**2026-07-09 (on-pod, all workers synced): 128K correctness is an HBM wall, root-caused.** **64K passkey
-VERIFIED 6/6=100% @dcp=1/bf16.** bf16 128K fails on a 161M per-layer cache transient (an XLA layout-decline,
-copy-elim proven a DEAD END). fp8-KV halves the KV and its kernel now COMPILES on v4 (see below) but
-dcp=1 still can't reach 128K (overlays+KV+weights > 30.75). Net: **128K needs cache SHARDING (DCP)**.
+**2026-07-09: 64K passkey VERIFIED 6/6=100% @dcp=1/bf16.** 128K@dcp=1 is HBM-STRUCTURAL (overlays 2.05G +
+KV + weights > 30.75; bf16 copy-elim a DEAD END) → **128K needs cache SHARDING (DCP) + fp8-KV**.
 
-## ACTIVE FRONTIER — 128K NEEDS fp8-KV + DCP=2 (crystallized)
-fp8-KV kernel now COMPILES on v4 (pack_new_kv i8 select_n cmpi + mask i8 muli fixed; parity 388/388) +
-serves ~80–96K @dcp=1. But **128K@dcp=1 is HBM-STRUCTURAL**: overlays 2.05G (unrolled 78-layer code, no
-flag) + KV 6.14G + weights 22.76 > 30.75; below 128K the 2.05G overlays fragments. bf16 copy-elim is a
-DEAD END (donation binds; 161M is an XLA layout-decline). So:
-1. **Fix the DCP multi-chunk packed-WRITE bug** (2nd kv_packing=32 tile mis-commit, owner-scatter
-   `attention_interface.py:951-1078`; wired obs: `GLM_DCP_SCATTER_IMPL`=flat/barrier/onehot +
-   `GLM_DCP_DUMP_NEWKV` DIFFER→MATCH falsifier). Then **fp8-KV + GLM_DCP=2** halves per-chip KV (6.14→3.07G,
-   +2.5G margin) → 128K fits → verify needle ≥95%. 64K bf16 already 6/6; fp8 validated to ~80K.
-2. Re-enable **DSA sparse** on the fp8+DCP 128K path for the **128K SPARSE** gate (kernel PASSED silicon @32K).
+## ACTIVE FRONTIER — fix DCP, then fp8-KV + DCP=2 → 128K
+fp8-KV kernel now COMPILES on v4 (pack_new_kv i8 select_n cmpi + i8 muli fixed; parity 388/388; audit
+CLEAN). **DCP bug RE-LOCALIZED (synced workers): FUNDAMENTAL** — single-chunk >1-page (P_g=1024) ALSO
+fails (pred=None); "multi-chunk-only" was a stale-worker artifact. CPU with the REAL kernel proves the
+DCP read/combine/scatter LOGIC correct to ~5e-6 (1–8 pages) → **METAL-ONLY lowering defect in the
+packed/tiled/context-sharded cache access** (interpret can't test kv_packing>1 — kernel.py:2159). The
+write reformulation (pageloop, CPU-bit-identical) was INERT.
+1. Discriminate then fix: **H2** `GLM_DCP_NO_DONATE=1` needle (cheap; never fairly tested) → if fixed,
+   donated-tile commit was the bug. **H1** packed METAL read of local page tiles ≥1 (kernel.py:1242-1276
+   reshaped+bitcast fetch on the dcp-halved dim-1) → read-side per-page fix in _fetch_bkv.
+2. Then **fp8-KV + GLM_DCP=2** (KV 6.14→3.07G) → 128K fits → needle ≥95%; re-enable **DSA sparse** for the
+   **128K SPARSE** gate (kernel PASSED silicon @32K).
 3. **256K throughput** A/B (dsa-sparse vs dense) — also via fp8+DCP.
 
 ## HARD RULES
