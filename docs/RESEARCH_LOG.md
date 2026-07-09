@@ -1375,3 +1375,24 @@ ONLY because Q-activation-quant defaults ON (q_dtype=fp8). Fix: keep Q/output bf
 161→80M win). CRUCIAL: fp8-KV has NEVER been rebuilt on v4 since the branchless read fix merged (8802ebab7)
 → "still 2 cmpi" is unproven; it may already work. This is the clean capacity halving if the donation fix
 proves inert. CPU structural check: 0 surviving f8 float-convert ops in the isolated Mosaic module.
+
+## 2026-07-09 14:00 — Both aliasing fixes INERT on metal → pivot to fp8-KV (concrete robust land)
+
+**bf16 aliasing route exhausted (honest):** L1 out-sharding pin AND L2 donate_argnums=(4,) BOTH inert —
+the 161.25M cache copy persists on metal unchanged (157.50M contiguous). Two carefully source-derived,
+adversarially-reviewed, byte-identical-off fixes, both no-ops for the copy. Classic suggestions.md blind
+spot: source reasoning ≠ the real HLO. Added the GLM_DUMP_STEP_HLO instrument, but the model-forward step
+fn compiles INLINE during warmup (AOT lower skipped for nested-jit bodies) so it bypasses the compile hook
+(only sample/rng/logits helpers dumped). Full model-forward HLO needs the XLA_FLAGS firehose — deferred.
+The L1+L2 donation change is numerically SAFE (8K passkey 1/1 correct with GLM_MLA_ALIAS_KV=1) and
+byte-identical off, so it's kept (gated) as a no-op pending the HLO.
+
+**PIVOT: fp8-KV (Agent 2) — the concrete robust land.** Halves the per-layer cache 161→80M (< the ~114M
+lottery floor → 128K builds). Implemented the Q-bf16 fix (flash_attn_mla.py): on
+DISABLE_MLA_Q_ACTIVATION_QUANTIZATION=1, keep Q/output bf16 (removes the ONLY remaining in-Mosaic fp8
+convert — the output cast) + move q_scale inside the quant branch (q_scale=None when Q unquantized, else
+the kernel over-scales — a latent bug fixed). KV stays fp8. CPU structural check CONFIRMS: Q→bf16 output
+cast = 0 surviving f8 float-converts (vs 1 for the old Q→fp8) → the v4 legalizer never sees the blocker.
+Byte-identical when GLM_KV_CACHE_DTYPE unset. Adversarial numerics review in flight; then 128K fp8 build
+(pool 258, chunk 256, gmu 0.90, DISABLE_MLA_Q_ACTIVATION_QUANTIZATION=1 + GLM_KV_CACHE_DTYPE=fp8). Gate is
+"passkey ≥95% @128K" — fp8-KV retrieval survives (agent: 97.5-100%), a legitimate long-context config.
