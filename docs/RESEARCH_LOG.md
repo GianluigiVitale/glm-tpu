@@ -1502,3 +1502,13 @@ mode=drop)` (attention_interface.py:1077) writes TWO physical pages in one scatt
 mis-commits into the donated/sharded/tiled buffer. Fix #1 = **pageloop**: per-physical-page
 lax.dynamic_update_slice (different XLA op class; one page-tile/op). Implementing + CPU-verifying vs
 test_mla_dcp_scatter_gt.py before pod. THIS is the ≥128K gate blocker.
+
+## 2026-07-09 19:10 — pageloop write-fix INERT on metal → DCP bug is NOT the multi-page scatter write
+
+bf16 DCP=2 16K multi-chunk with GLM_DCP_SCATTER_IMPL=pageloop: needle STILL pred=None correct=False —
+IDENTICAL to the default scatter. pageloop was CPU-verified bit-identical to default across 20+ geometries
+(incl. exact pod tiling, dcp=2/4, bf16+fp8) and uses a genuinely different XLA op class (per-page
+dynamic_update_slice, not multi-tile scatter) — yet metal is unchanged. So the "2nd-page mis-commit via
+multi-tile scatter" hypothesis is FALSIFIED. pred=None (total garbage) points at the read/combine or carry
+path, not the write. Next: the write-vs-value / single-vs-multi-chunk discriminator (E3), which the earlier
+overnight localization (contaminated by stale workers) got wrong. Testing single-chunk DCP=2 first.
