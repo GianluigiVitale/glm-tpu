@@ -1202,3 +1202,16 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   kernel's per-shard read), (4) mode=promise_in_bounds / segment-sum. On-pod scatter-only diff = the exact
   DIFFER→MATCH falsifier. Observability chain: multi-chunk → persistence(fixed) → A/B/C(carry ok) →
   correctness-diff(page 1 write) → scatter-only(scatter EXEC, not kernel). Each probe halved the search.
+
+## 2026-07-09 04:15 UTC — DCP bug is UPSTREAM of the scatter (onehot fails too): the new-KV VALUES are wrong
+
+- Full-path 2-chunk fix attempts ALL fail (pred=None): GLM_DCP_NO_DONATE, GLM_DCP_SCATTER_IMPL=flat, and
+  GLM_DCP_SCATTER_IMPL=onehot. onehot is scatter-primitive-FREE → the WRITE is exonerated. The pre-scatter
+  new-KV VALUES for the 2nd-page tokens (positions 1024..2047) are already corrupt.
+- New root-cause locus: the MLA forward's new-KV (kv_c/k_pe) for a MULTI-PAGE prefill chunk under DCP ×
+  the 32-way token all_gather (MLP_TENSOR cross-shard q/k gather) × dcp — NOT the cache write. All the
+  write-side levers (no_donate/flat/onehot/shardlocal) are dead ends because the data is wrong before them.
+- Next probe: GLM_DCP_DUMP_NEWKV (dump the gathered new-KV feeding the scatter, 2chunk-vs-1chunk logical
+  diff) to confirm page-2 values differ + split all_gather-ordering vs projection/positions. Observability
+  chain: multichunk → persistence(fixed) → A/B/C(carry ok) → correctness(page-1 write) → scatter-only
+  (scatter exec) → onehot(NOT the write) → upstream new-KV values. Each probe eliminated a layer.
