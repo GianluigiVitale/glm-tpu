@@ -583,6 +583,38 @@ the localizer is a real discriminator — the metal probe is what decides which 
 analysis: **A == B on metal too** (the runner does not re-create/re-`device_put`/re-shard the cache between
 steps), which would localize the residual loss to chunk-2's forward read.
 
+**5d(iii). Scatter-vs-kernel isolation (`GLM_DCP_SCATTER_ONLY`) — when the correctness diff says DIFFER.** The
+2chunk-vs-1chunk diff (5d) came back **DIFFER at exactly one logical page** (first_diff at P_g, contiguous
+`[P_g, 2·P_g)` — the 2nd page of a 2-page chunk-1; page 0 and the chunk-2 region correct). That is a WRITE
+corruption of a multi-page chunk's non-first page. **Note the CPU status:** the DCP owner-scatter is
+CPU-correct at this exact geometry — 2-page chunk-1 across pack∈{1,2,4}, model∈{1,2,4}, dcp∈{2,4}, prompt = 4–5
+pages (`test_mla_dcp.py::test_dcp_chunked_prefill_write_matches_single_chunk`, multi-page cases) — and the
+kernel does not write under `history_only` (`kernel.py:2030-2034,2050`). So the corruption is a **metal-only**
+effect. To pin whether it is the XLA owner-scatter *as executed on TPU* or the kernel's cache return, set
+`GLM_DCP_SCATTER_ONLY=1`: the DCP path then returns the cache **straight after the owner-scatter, skipping the
+attention kernel** (attention output is meaningless; debug only, default off → byte-identical). Dump both a
+2-chunk and 1-chunk run under it and diff:
+
+```bash
+# same _ENVS as 5d, plus GLM_DCP_SCATTER_ONLY=1
+env $_ENVS GLM_DCP_SCATTER_ONLY=1 GLM_DCP_CACHE_DUMP=/tmp/dcp_so_2chunk.npz \
+  ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
+    --max-seqs 1 --max-batched-tokens 2048 --gmu 0.90 --note "scatter-only 2chunk"
+env $_ENVS GLM_DCP_SCATTER_ONLY=1 GLM_DCP_CACHE_DUMP=/tmp/dcp_so_1chunk.npz \
+  ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
+    --max-seqs 1 --max-batched-tokens 6144 --gmu 0.90 --note "scatter-only 1chunk"
+PYTHONPATH=~/tpu-inference-dcppersist2 ~/vllm-env/bin/python -m \
+  tpu_inference.runner.dcp_cache_diff /tmp/dcp_so_2chunk /tmp/dcp_so_1chunk
+# DIFFER at page 1  -> the metal owner-scatter itself is wrong (XLA scatter execution
+#                     on TPU for this shape) -> fix attention_interface.py:902-923
+# MATCH             -> scatter is fine; the kernel's history_only cache RETURN corrupts
+#                     the actively-processed boundary page -> fix kernel.py
+```
+
+CPU-covered: `test_mla_dcp.py::test_dcp_scatter_only_probe_returns_post_scatter_cache` asserts the probe returns
+exactly the post-scatter cache (and zeros output); gate-off byte-identity by the existing
+`test_gate_off_traced_jaxpr_byte_identity`.
+
 ---
 
 ## Step 6 — AIME-2026 card protocol, n=30 (docs/07 §6; seed fix landed)
