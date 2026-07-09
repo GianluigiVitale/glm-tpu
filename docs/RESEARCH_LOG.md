@@ -1234,3 +1234,70 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   (23.06/30.75 model, 7.69 free) — the MLA latent cache is replicated per-chip, so 128K = ~12-13 GiB/chip >
   free → needs DCP or fp8. The audit's pod-pool (270 GB) math doesn't apply. Running the explicit
   128K@dcp=1/bf16/batch=1 fit-check to settle it with a real OOM (or a surprise).
+
+## 2026-07-09 09:20 — 128K@dcp=1 fit-check: the wall is FRAGMENTATION, not capacity (KICKOFF premise corrected)
+
+The audit's decoupling hypothesis (128K correctness may not need DCP) was tested with 4 on-pod
+fit-checks. Result overturns a load-bearing KICKOFF claim.
+
+**Runs:**
+- (a) gmu0.95 / override260 / chunk2048: KV pool sized **132,862 tokens** (>=128K → FIT); failed
+  allocating a 162M buffer.
+- (b) gmu0.88 / override256 / chunk2048: rejected — pool 131,072 < max_len 131,840 ("serve one request").
+- (c) gmu0.92 / auto / chunk512: KV pool auto-sized to **1,796,703 tokens** (!); failed allocating 2.15G.
+- The (c) error is definitive: *"Attempting to allocate 2.15G. There are **5.54G free**. The largest
+  contiguous region is **2.09G due to fragmentation**."*
+
+**Corrected accounting (empirical):** the auto-pool held **1.79M tokens** in the free space → 128K
+tokens of MLA latent costs only **~150 MiB/chip**, NOT the 6.2–11.9 GiB the KICKOFF asserted
+("replicated per-chip → 128K needs DCP/fp8"). That premise was WRONG for the correctness (batch=1)
+case. There is **5.54 GiB free** with a 128K prompt — capacity is a non-issue.
+
+**The true blocker for 128K dense@dcp=1:** HBM **fragmentation**. The oversized auto KV pool carves the
+arena so the 2.15 GiB attention compile-scratch can't find a contiguous slot (2.09G largest vs 2.15G
+needed — short by 60 MiB of *contiguity*). Fix = right-size the pool (cap num_gpu_blocks ~300 blocks ≈
+150K tokens) so it stops fragmenting + lower gmu so more physical HBM stays unreserved/contiguous for
+the scratch. Run (d) tests this: gmu0.90 / override300 / chunk512.
+
+**Implication for the gate:** 128K passkey CORRECTNESS decouples from the blocked DCP-write and
+fp8-KV(2×cmpi) paths — it's a fragmentation-tuning problem on the dense path, not a cache-capacity
+wall. DCP/fp8 remain needed only for the *throughput@256K / large-batch* gate (many concurrent seqs),
+which is a genuinely different resource regime. KICKOFF §"Why the cache is the blocker" to be rewritten.
+
+## 2026-07-09 11:15 — 128K fragmentation: tuning table + XLA compile-scheduler flags (the real lever)
+
+Followed the fragmentation diagnosis (prev entry) with a controlled sweep. **The failing buffer is a
+compile-scratch that scales EXACTLY as 0.625 MiB × num_gpu_blocks** (187.5M@300blk, 168.75M@270,
+161.25M@258). 128K needs ≥258 blocks (258×512=132,096 ≥ max_len 131,840), so the buffer floor at 128K
+is ~161M and CANNOT be shrunk by trimming the pool (bounded by max_len). The fix must GROW the largest
+contiguous free region past ~161M.
+
+**Sweep (all dcp=1, bf16, batch=1, dense-MLA, DSA off):**
+| config | contiguous free | buffer | gap |
+|---|---|---|---|
+| gmu0.90 pool270 chunk512, no flags | 118M | 168.75M | −51M |
+| gmu0.80 pool270 chunk512, no flags | 171M (noisy) | 168.75M | ~0..−48M |
+| gmu0.77 pool270 chunk512, no flags | 128M | 168.75M | −41M |
+| gmu0.80 pool270 chunk512, FLIGHTREC off | 120M | 168.75M | −48M |
+| **rerun=5 + rwb_fusion=false, pool258 chunk256** | **147.76M** | **161.25M** | **−13.5M** |
+| scheduler=false + rerun=5 + rwb_fusion=false, pool258 chunk256 | 105M (WORSE) | 161.25M | −56M |
+
+**Findings (empirical, on-pod):**
+1. `gpu_memory_utilization` is mechanically INERT for fragmentation once `num_gpu_blocks_override` is set
+   (0.77 gave more total-free but LESS contiguous than 0.80 → allocation ORDER governs, not total free).
+   Confirmed the research agent's account (gmu is a vLLM KV-budget cap, not an allocator setting).
+2. Flight recorder is NOT the fragmenter (off → slightly worse). Rejected cleanly.
+3. **`LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"` (scheduler ON)
+   is the best lever so far: contiguous 118→147.76M.** Baked into all 8 raylets via EXTRA_ENVS (verified
+   in /proc/<raylet>/environ); env_override.py:22 prepends `--xla_tpu_use_dynamic_smem_negotiation=true`.
+4. **Disabling the latency-hiding scheduler makes it WORSE (147.76→105M)** — rerun=5 needs the scheduler
+   ENABLED to reduce the reservation. Rejected.
+5. Still 13.5M short at the best config. Next decisive lever under investigation: **raise KV block_size**
+   (512→1024) → halves num_blocks → buffer ~80M ≪ 148M contiguous (CPU agent verifying kernel safety).
+
+**Harness robustness fix:** two earlier runs (fit64, fit128g) were SIGTERM'd after engine-build but
+before generation (driver was a child of the tool-shell; teardown killed the process group). Now launch
+the driver via `setsid nohup ... </dev/null` — its own session survives; DRIVER_EXIT is captured.
+NOTE: the "64K PASS" I briefly read earlier was a FALSE grep match on the substring in `hlo_passes.cc`
+log lines, NOT needle results — the 64K engine BUILT clean at dcp=1 (no OOM, confirming the buffer model)
+but the needle was not captured. A proper 64K verify (setsid) is running now.

@@ -15,22 +15,22 @@ pick + log. Only a hard block (credential, owner-gated push) pauses THAT thread.
 - **Stage 3 code-complete (CPU):** MTP M1 draft-parity + G4 index-share; dense-MTP knob GLM_SPEC_K.
 - Fork **`glm-5.2-v4-next`** = all above + DCP + guards, gated off. PRs g1–g6 drafted.
 
-**The 3 remaining blockers are ALL in the KV/CACHE layer — the DSA kernel PASSED.** (1) **DCP multi-chunk
-packed-WRITE** corrupts the 2nd `kv_packing=32` tile on metal — kernel + scatter arithmetic CPU-exonerated;
-only the metal write/new-KV path (CPU-blind) remains. (2) **fp8-KV**: TWO v4 Mosaic `arith.cmpi` legalize
-blockers (read-dequant fixed; a 2nd cmpi in the write path) → **SHELVED** on v4 for now.
-(3) **Stale-stripe persistence** — **FIXED** (VllmModelWrapper step-fn + MTP `_propose` out-sharding).
-
-**Why the cache is the blocker:** MLA latent KV is **replicated per-chip** (P(BATCH), pure-TP) → one 128K
-seq ≈ **11.9 GiB/chip** + 23 GiB/chip FP8 weights **> 30.75 budget** → 128K needs **DCP** or **fp8-KV**.
-Passkey@128K (CORRECTNESS, batch=1) vs throughput@256K (batch/DCP/fp8) = **different gates**, decoupled.
+**CORRECTED 2026-07-09 (8 on-pod fit-checks): 128K batch=1 correctness is NOT a cache-capacity wall — it's
+HBM FRAGMENTATION at compile.** The old "MLA latent replicated → 11.9 GiB/chip → needs DCP/fp8" premise is
+**FALSE for batch=1**: 128K latent ≈ **~150 MiB/chip**, a 128K prompt leaves **>1 GiB free**. Real failure:
+an XLA compile-scratch of **0.625 MiB × num_gpu_blocks** (161M @ the 258-block 128K floor) finds no
+**contiguous** slot (best ~148M). gmu is inert once `num_gpu_blocks_override` is set; the lever is
+**`LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"`** (scheduler ON,
+118→148M). **64K builds clean @ dcp=1** (buffer ~84M). 128K is **~13.5M short** → next lever: raise KV
+**block_size** (512→1024 halves num_blocks → buffer ~80M). **DCP/fp8 are for the throughput/256K gate, NOT
+batch-1 correctness.** Still-true (throughput-scoped): DCP multi-chunk packed-WRITE metal bug; fp8-KV SHELVED
+(2× v4 Mosaic cmpi); stale-stripe persistence FIXED.
 
 ## ACTIVE FRONTIER — do next, in order
-1. **Empirically fit-check 128K passkey at batch=1 / bf16 / DCP-off** (the cache-replication question) — if
-   it fits, correctness@128K decouples from DCP.
-2. **Fix the DCP packed-write OR land the KV-capacity path** for the **128K SPARSE** gate; the on-pod
-   scatter-only/cache-dump diff = the DIFFER→MATCH falsifier.
-3. **256K throughput** A/B (dsa-sparse vs dense) via DCP/fp8 — the 2nd empty gate.
+1. **Land 128K dense passkey @ batch=1/dcp=1** — defeat compile-fragmentation (best flags −13.5M): raise KV
+   block_size (fewer blocks → smaller scratch) or tune scheduler-rerun. 64K builds; verify needle, push to 128K.
+2. Re-enable **DSA sparse** on the working dcp=1 path for the **128K SPARSE** gate (kernel PASSED silicon @32K).
+3. **256K throughput** A/B (dsa-sparse vs dense) — where DCP packed-write / fp8-KV are actually needed.
 
 ## HARD RULES
 - **COST:** bucket = **`gs://driftbench-dsv4-uc` (us-central2) ONLY**, never EU `gs://driftbench-storage`.
