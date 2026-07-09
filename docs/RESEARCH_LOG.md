@@ -1551,3 +1551,35 @@ The donated-tile mis-commit hypothesis is eliminated on a FAIR test. Lead suspec
 of context-sharded cache, page tiles >=1). Next discriminator: 1-logical-page needle (900 tok < P_g=1024,
 still exercises both dcp shards + LSE combine + strided mask) — PASS ⇒ defect is page>=1 access (H1
 boundary confirmed); FAIL ⇒ DCP broken at any size on metal (combine/mask), H1 also wrong.
+
+## 2026-07-09 21:30 — ROOT CAUSE FOUND (DCP): block-granularity DOUBLE-multiplication; + two audit workflows
+
+**THE DCP BUG (H1/H2 both disproven; agent traced the real cause):** `kv_cache_manager.get_kv_cache_spec`
+pre-multiplies block_size by dcp (the "TODO(xiang) hack") AND vLLM's engine core multiplies spec.block_size
+by dcp_world_size AGAIN (single_type_kv_cache_manager.py:66-70) → engine allocates ONE block id per
+512*2*2=2048 tokens while the TPU stack consumes the table at _p_g=1024 tokens/entry → every table entry
+>=1 dereferences an unallocated/stale page. Predicts EVERY symptom: dcp-only, single-chunk, >1024-token
+threshold, pageloop-inert, NO_DONATE-inert (empirically confirmed BEFORE the theory landed — a real
+prediction), CPU-invisible (harness built its own tables). CPU-verified: engine probe 2048→1024 tokens/id
+with the fix; numpy sim corrupts at EXACTLY L=1025 unpatched, round-trips patched; existing tests
+unchanged. Patch (kv_cache_manager spec fix + create_kv_caches *dcp + Guard-2 addressing repair) applied
+to worktree; adversarial review in flight; 1-page (900tok) pod test = live prediction (should PASS).
+
+**Code-audit workflow (29 agents, 8802ebab..HEAD): no BLOCKER/MAJOR.** Confirmed MINORs: (1) the L2
+donate_argnums comment asserts a mechanism JAX structurally precludes (inner-jit donation dropped —
+independently reproduced; comment must be corrected, code is harmless); (2) **fp8-KV has NEVER produced a
+validated on-metal token** (fp8_80k built then died before generating) → MUST run a cheap fp8 needle at
+dcp=1 (<=80K) before trusting the coupled fp8+DCP 128K gate — else an independent fp8 corruption could be
+misattributed to DCP; (3) pageloop is silently expensive (per-layer sort+scan) — debug-only, never default.
+
+**Observability-audit workflow (25 agents): 2 BLOCKER + 6 MAJOR in the tools themselves.** Highlights:
+GLM_DCP_CACHE_DUMP driver-only → silent zero-files (tonight's incident; no loud check);
+**dcp_cache_diff zero-fills missing shards → a partial dump flips DIFFER→MATCH** (the decisive verdict
+could have been WRONG all along); diff breaks silently on short block tables (under the granularity bug
+the diff itself was wrong); bf16/fp8 dumps stored as |V2 void crash every offline reader (tests were
+float32-only); GLM_DCP_DUMP_NEWKV on a host-subset → SPMD divergence w/ silent fail-open import guard;
+GLM_DUMP_STEP_HLO writes helper HLO while silently omitting the step fn; Guard-2 blanket-except fail-open
+persists; guards never announce armed/inert. Gap proposals (worker code-hash cross-check, engine-vs-TPU
+geometry assert, raw-decode-text capture, dump-written assertion, fail-loud guard pattern, HBM probe)
+queued as the observability PR series. suggestions.md vindicated: half of tonight's cost was blindness
+the tools were supposed to prevent — and some tools could actively mislead.
