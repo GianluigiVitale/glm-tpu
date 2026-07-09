@@ -1448,3 +1448,17 @@ dead-end verdict also stands — it's CPU-proven architecture, not the on-pod in
 the SAME hash. Done now: all 8 @ **8a76ae5e3**. Re-running fp8 128K with the pack_new_kv i8-select fix
 actually deployed. This footgun (memory: "cross-host drift causes silent divergence") likely explains
 several "inert" results — re-validate any worker0-only fix that mattered.
+
+## 2026-07-09 16:15 — fp8-KV kernel COMPILES on v4 (i8 cmpi+muli fixed); 128K now HBM-capacity bound
+
+Milestone: with workers synced (0f15e3ad0) the fp8-KV MLA kernel FULLY COMPILES on v4 — the pack_new_kv
+i8 select_n cmpi AND the mask i8 arith.muli are both cleared (KV cache sizes to 131,840). fp8-KV is no
+longer Mosaic-blocked. Remaining: a compile-time HBM OOM at 128K. Breakdown (deepsea_compiler_util):
+arguments **28.90G** (FP8 weights ~23 + fp8 KV pool ~5.9G, in/out shared via donation) + program **2.15G**
+(overlays **2.05G**) + reserved **1.25G** = ~32.3G > 30.75, over by ~0.3–1.5G (varies by program variant).
+fp8 DID halve the KV vs bf16 (bf16 KV would be ~11.8G → weights+KV alone 34.8G, infeasible), but
+program+reserved (3.4G) overhead eats the margin. The 2.05G "overlays" = compiled program code, plausibly
+one variant per token bucket (TPU_MIN_TOKEN_BUCKET=32 → [32,64,128,256]=4 variants). Testing
+TPU_MIN_TOKEN_BUCKET=256 + chunk256 (1 bucket) to cut overlays ~1.5G. If insufficient, 128K@fp8/batch=1 is
+genuinely HBM-bound and needs DCP (fp8+dcp=2 → KV/2 → fits, but the DCP multi-chunk packed-write bug) or a
+smaller footprint. fp8 at a shorter ctx (fits) validates the path + extends the ceiling regardless.
