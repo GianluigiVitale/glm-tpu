@@ -1215,3 +1215,22 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   diff) to confirm page-2 values differ + split all_gather-ordering vs projection/positions. Observability
   chain: multichunk → persistence(fixed) → A/B/C(carry ok) → correctness(page-1 write) → scatter-only
   (scatter exec) → onehot(NOT the write) → upstream new-KV values. Each probe eliminated a layer.
+
+## 2026-07-09 08:35 UTC — DCP write bug is packing-INDEPENDENT + new-KV values CONFIRMED correct; audit's decoupling + 128K fit-check
+
+- **new-KV values are CORRECT (correction to the 04:15 entry):** the warmup-skip probe fix (ONLY_PREFILL)
+  captured the REAL 2048-token chunk-1 (dist=[0,0,1], val.shape=(2048,640), pos 0..2047); the 2chunk-vs-1chunk
+  new-KV `val` diff over all 2048 owned positions = **0 (MATCH)**. So the "values wrong upstream" call (which
+  rested on onehot also failing) was WRONG — onehot failed for another reason. The corruption is the physical
+  WRITE into the kv_packing-packed, CONTEXT-sharded cache's 2nd tile on metal, downstream of correct values.
+- **Packing-INDEPENDENT:** MLA_KV_PACKING_SIZE=2 (min valid for bf16) 2-chunk passkey ALSO fails (pred=None),
+  same as 32. kv_packing=1 rejected (bf16 needs >=2). So it's not a packing-size artifact — it's the
+  fundamental CONTEXT-sharded packed WRITE across the tile boundary on TPU (CPU can't test: interpret asserts
+  kv_packing==1).
+- **Independent audit (adopted):** blockers are ALL in the KV/cache layer, NOT the DSA kernel (which passed
+  silicon). GSM8K n=32 relabeled SMOKE (Wilson ~84-99%, not "scale"). fp8-KV SHELVED (2 v4 Mosaic cmpi =
+  systematic). Passkey@128K (correctness, batch=1) vs throughput@256K (batch/DCP/fp8) = decoupled gates.
+- **Replication CONFIRMED empirically:** the dcp=2 engine sized a 65,536-token KV pool at ~6.5 GiB/CHIP
+  (23.06/30.75 model, 7.69 free) — the MLA latent cache is replicated per-chip, so 128K = ~12-13 GiB/chip >
+  free → needs DCP or fp8. The audit's pod-pool (270 GB) math doesn't apply. Running the explicit
+  128K@dcp=1/bf16/batch=1 fit-check to settle it with a real OOM (or a surprise).
