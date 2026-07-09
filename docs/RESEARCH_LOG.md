@@ -1430,3 +1430,21 @@ copy-elim lever = end-to-end jax.experimental.layout Format pin (speculative, fr
 shot"). CONCLUSION: the robust 128K bf16 levers are cache-SIZE reduction (fp8-KV / DCP / block_size), NOT
 copy elimination. → Validates the fp8-KV pivot. The GLM_MLA_ALIAS_KV L1+L2 changes stay (gated, byte-id
 off, 8K-correct) as documented no-ops; not the fix. Layout-pin kept as a one-shot last resort only.
+
+## 2026-07-09 15:20 — CRITICAL PROCESS BUG: workers were STALE (8802ebab) all night → fix-tests invalid
+
+Discovered via the MLIR loc: fp8 build kept failing at `kv_utils.py:204` even AFTER the pack_new_kv fix —
+but current line 204 is an iota, the fixed select moved to 234. Root cause: the 8 hosts have PER-HOST
+local ~/tpu-inference checkouts (ext4, not shared). Only worker 0 (this VM) had tonight's commits; workers
+1-7 were all stuck at **8802ebab** (verified: `head=8802ebab, _dtype_safe_select count=0`). Compounding:
+my `git push -q` (no args) was NOT updating origin/glm-5.2-v4-next either (origin stuck at 8802ebab until
+an explicit `git push origin glm-5.2-v4-next`). So EVERY on-pod test of a worker0-only fix tonight (L1
+sharding pin, L2 donation, fp8 Q-bf16, kv_utils) actually ran STALE 8802ebab worker code — the fixes never
+executed on the pod. (64K/bf16 results remain VALID — they need no recent commit. The bf16 aliasing
+dead-end verdict also stands — it's CPU-proven architecture, not the on-pod inert runs.)
+
+**FIX + STANDING RULE:** before ANY pod test of a fork change, `git push origin glm-5.2-v4-next` THEN
+`TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash ~/glm-tpu/scripts/sync_workers.sh` and confirm all 8 hosts show
+the SAME hash. Done now: all 8 @ **8a76ae5e3**. Re-running fp8 128K with the pack_new_kv i8-select fix
+actually deployed. This footgun (memory: "cross-host drift causes silent divergence") likely explains
+several "inert" results — re-validate any worker0-only fix that mattered.
