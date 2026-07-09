@@ -1609,3 +1609,10 @@ metal fp8 write path (audit: fp8 has never generated a token). Sequence: (1) 16K
 (validate multi-chunk post-fix); (2) 128K bf16 DCP=4 passkey ladder (THE dense gate); (3) fp8 needle @
 dcp=1 (isolate fp8), then fp8+DCP=2 as the alternative config; (4) DSA sparse at 128K (the SPARSE gate);
 (5) 256K throughput A/B.
+
+## 2026-07-09 22:32 — 16K multi-chunk DCP=2 CORRECT (was pred=None). DCP comprehensively validated → 128K ladder
+
+pred='578768' == gold (the identical gold that failed pre-fix), 8-chunk prefill, acc 100%. Post-fix DCP
+record: 900tok 1-page ✓, 4K single-chunk ✓ (was None), 16K multi-chunk ✓ (was None). Launching THE dense
+gate: 128K passkey ladder, bf16 + GLM_DCP=4 (fits: ~29.2/30.75), pool 68 ids (2048 tok/id at dcp=4),
+chunk 2048, depths .25/.5/.75.
