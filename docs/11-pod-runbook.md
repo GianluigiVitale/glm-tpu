@@ -548,6 +548,55 @@ If block tables differ between the two runs, gather by logical position instead:
 DCP `_p_g = (page_g/kv_packing)*kv_packing*dcp`). CPU-covered by
 `tests/runner/test_dcp_cache_dump.py`.
 
+**5d(ii). Single-run A/B/C localizer (post out-sharding fix — pins WHERE chunk-1 dies).** The out-sharding
+fix landed (step-fn/`_propose` cache now `P(BATCH,CONTEXT)`; `GLM_DCP_ASSERT_SHARDING` stays SILENT — the
+striped cache round-trips with no reshard), but if a 2-chunk passkey still returns `pred=None`, chunk-1 is
+lost by a mechanism BELOW the jit out-sharding. To separate "lost in the RUNNER CARRY between scheduler
+steps" from "lost INSIDE chunk-2's forward (the read / block-table path)" in **one** run, set
+`GLM_DCP_CACHE_DUMP_PREFWD=1` alongside `GLM_DCP_CACHE_DUMP`: the runner then also dumps `self.kv_caches`
+**before** each `model_fn` call (the value carried in from the previous step), labeled `prefwd`, so a
+2-chunk run writes the triple **A = `postfwd.step0001`** (after chunk-1's forward), **B = `prefwd.step0002`**
+(carried into chunk-2's forward), **C = `postfwd.step0002`** (after chunk-2's forward):
+
+```bash
+# ONE 2-chunk run (mbt < prompt); PREFWD adds the pre-forward snapshot.
+env $_ENVS GLM_DCP_CACHE_DUMP=/tmp/dcp_abc.npz GLM_DCP_CACHE_DUMP_PREFWD=1 \
+  ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
+    --max-seqs 1 --max-batched-tokens 2048 --gmu 0.90 \
+    --note "DCP A/B/C localizer" > ~/glm-run/dcp_abc.log 2>&1
+# writes /tmp/dcp_abc.{prefwd,postfwd}.step<NNNN>.proc<P>.npz
+```
+
+```python
+import glob, numpy as np
+def _load(phase, step):                        # reassemble global layer-0 over all procs
+    fs = glob.glob(f"/tmp/dcp_abc.{phase}.step{step:04d}.proc*.npz")
+    ds = [np.load(f) for f in fs]
+    shp = tuple(int(x) for x in ds[0]["layer0__shape"]); a = np.zeros(shp, np.float32)
+    for d in ds:
+        n = int(d["layer0__nshards"])
+        if n == 0: a[...] = d["layer0__full"]; continue
+        for si in range(n):
+            idx = eval(str(d[f"layer0__shard{si}__index"]), {"slice": slice, "__builtins__": {}})
+            a[idx] = d[f"layer0__shard{si}__data"]
+    return a
+A, B, C = _load("postfwd", 1), _load("prefwd", 2), _load("postfwd", 2)
+ab = np.abs(A.astype(np.float64) - B.astype(np.float64)).max()
+print(f"A vs B max|Δ|={ab:.3e}")
+print("VERDICT:",
+      "A != B  -> chunk-1 dies in the RUNNER CARRY (self.kv_caches store-back / "
+      "re-shard / stale ref between execute_model calls) — fix tpu_runner"
+      if ab > 1e-3 else
+      "A == B  -> carry preserves chunk-1; chunk-1 dies INSIDE chunk-2's forward "
+      "(kernel read of chunk-1's blocks or the chunk-2 block-table/slot map) — fix the read path")
+```
+
+CPU note: the runner carry is a plain reference hand-off (`self.kv_caches = model_fn(...)[0]`; the next step
+reads it back), so on CPU **A == B always** (`test_mla_dcp_cache_persistence.py::
+test_runner_carry_preserves_chunk1_ABC`) — the metal probe is what discriminates. Expectation from the CPU
+analysis: **A == B on metal too** (the runner does not re-create/re-`device_put`/re-shard the cache between
+steps), which would localize the residual loss to chunk-2's forward read.
+
 ---
 
 ## Step 6 — AIME-2026 card protocol, n=30 (docs/07 §6; seed fix landed)
