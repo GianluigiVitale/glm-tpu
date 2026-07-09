@@ -506,47 +506,26 @@ env $_ENVS GLM_DCP_CACHE_DUMP=/tmp/dcp_1chunk.npz \
 #  the HIGHEST-step file per proc is the post-prefill cache — decode steps don't dump.)
 ```
 
-Offline diff (numpy only; compares LOGICAL content over the prompt's block-table pages):
+Offline diff — use the committed, CPU-tested tool (`tpu_inference/runner/dcp_cache_diff.py`). It reassembles
+each run's global cache from its per-process shards and compares **by LOGICAL token position** via each run's
+own block table, so it is correct even though the two runs allocate DIFFERENT physical pages (the naive
+per-page diff is not — do not compare `fa[pages]` vs `fb[pages]`):
 
-```python
-import glob, numpy as np
-def _post_prefill(prefix):                    # newest (highest-step) file per proc
-    best = {}
-    for f in glob.glob(prefix + ".step*.proc*.npz"):
-        proc = int(f.rsplit(".proc", 1)[1].split(".")[0])
-        step = int(f.rsplit(".step", 1)[1].split(".proc")[0])
-        if proc not in best or step > best[proc][0]:
-            best[proc] = (step, f)
-    return [np.load(v[1], allow_pickle=False) for v in best.values()]
-def _full(files):                              # reassemble the global layer-0 array
-    shp = tuple(int(x) for x in files[0]["layer0__shape"])
-    a = np.zeros(shp, np.float32)
-    for d in files:
-        n = int(d["layer0__nshards"])
-        if n == 0: a[...] = d["layer0__full"]; continue
-        for si in range(n):
-            idx = eval(str(d[f"layer0__shard{si}__index"]),
-                       {"slice": slice, "__builtins__": {}})
-            a[idx] = d[f"layer0__shard{si}__data"]
-    return a
-A, B = _post_prefill("/tmp/dcp_2chunk"), _post_prefill("/tmp/dcp_1chunk")
-fa, fb = _full(A), _full(B)
-bt = np.asarray(A[0]["meta__block_tables"]).ravel()
-btb = np.asarray(B[0]["meta__block_tables"]).ravel()
-pages = np.unique(bt[bt > 0])                  # the prompt's physical pages
-if not np.array_equal(np.unique(bt), np.unique(btb)):
-    print("NOTE: block tables differ between runs — comparing per-logical-position instead")
-d = np.abs(fa[pages].astype(np.float64) - fb[pages].astype(np.float64))
-print(f"pages={pages.tolist()} max|Δ|={d.max():.3e} n_diff_rows={(d.max(-1)>1e-3).sum()}")
-print("VERDICT:", "DIFFER -> chunk-1 write-back/persistence lost across the step (metal plumbing)"
-      if d.max() > 1e-3 else "MATCH -> write fine; the bug is the chunk-2 read/decode on metal")
+```bash
+~/vllm-env/bin/python -m tpu_inference.runner.dcp_cache_diff /tmp/dcp_2chunk /tmp/dcp_1chunk
+# seq_len=... max|Δ|=... n_diff_positions=... first=[...]
+# VERDICT: DIFFER -> cache CONTENT wrong (chunk-2 write positions / chunk-1
+#          corruption) -> fix the write/scatter
+#      or  MATCH  -> cache CONTENT correct -> the multi-chunk failure is the
+#          READ path (decode block_tables / kv_lens after a multi-chunk prefill)
 ```
 
-If block tables differ between the two runs, gather by logical position instead: for global position `p`,
-`page = block_table[p // page_g]`, `row = (p % page_g)//kv_packing`, `sub = (p % page_g)%kv_packing`
-(page_g and kv_packing are read from `layer0__shape` = `[pages, page_g/kv_packing, kv_packing, kv_dim]` and the
-DCP `_p_g = (page_g/kv_packing)*kv_packing*dcp`). CPU-covered by
-`tests/runner/test_dcp_cache_dump.py`.
+This is the **decisive correctness check** the A/B/C temporal-consistency probe does NOT do (A/B/C only proved
+chunk-1 survives the step boundary; it did not compare against a 1-chunk prefill of the same prompt). Geometry:
+`P_g` (tokens/logical page) `= layer0__shape[1]*layer0__shape[2] = block_size*dcp`; global pos `p` →
+`page = block_table[p // P_g]`, `row = (p % P_g)//kv_packing`, `sub = (p % P_g)%kv_packing`. CPU-covered
+(reassembly-from-shards + logical alignment MATCH across different page maps + DIFFER on wrong write positions)
+by `tests/runner/test_dcp_cache_diff.py`; the dump hook by `tests/runner/test_dcp_cache_dump.py`.
 
 **5d(ii). Single-run A/B/C localizer (post out-sharding fix — pins WHERE chunk-1 dies).** The out-sharding
 fix landed (step-fn/`_propose` cache now `P(BATCH,CONTEXT)`; `GLM_DCP_ASSERT_SHARDING` stays SILENT — the
