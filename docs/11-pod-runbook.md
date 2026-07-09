@@ -615,6 +615,42 @@ CPU-covered: `test_mla_dcp.py::test_dcp_scatter_only_probe_returns_post_scatter_
 exactly the post-scatter cache (and zeros output); gate-off byte-identity by the existing
 `test_gate_off_traced_jaxpr_byte_identity`.
 
+**5d(iv). Fix — owner-scatter reformulations (`GLM_DCP_SCATTER_IMPL`), find the one that lowers correctly.**
+The scatter-only diff (5d(iii)) came back **DIFFER @ page 1** (max|Δ|=5.44, first_diff=1024) with the kernel
+skipped — so the pure owner-scatter output is wrong at the 2nd local page on TPU, while the CPU 264-case
+ground truth (`test_mla_dcp_scatter_gt.py`) proves the arithmetic is correct. Diagnosis: the 4D
+`.at[...].set(mode="drop")` (`attention_interface.py:927-965`) **mislowers on TPU when writing into the
+DONATED, `P(BATCH,CONTEXT)`-sharded, TILED cache** — the 2nd local-page tile is not committed. `GLM_DCP_SCATTER_IMPL`
+selects an alternative that is **bit-identical to the default on CPU** (all four verified) but lowers to a
+DIFFERENT TPU op sequence; run the scatter-only diff under each until one flips **DIFFER→MATCH**:
+
+| value | what it does | targets |
+|---|---|---|
+| unset / `scatter` | current 4D indexed scatter (byte-identical) | — |
+| `barrier` | `optimization_barrier` before the scatter → breaks the in-place aliasing of the donated buffer (no persistent-cache copy, only the scatter's transient) | donation/aliasing |
+| `flat` | reshape to one `[n_slots, kv_dim]` axis, 1D-index scatter, reshape back → no multi-tile cross-dim scatter | tiling |
+| `onehot` | per-slot one-hot masked write, no scatter primitive at all (small caches only — O(n_slots·T)) | scatter-primitive lowering |
+
+```bash
+for IMPL in barrier flat; do   # (onehot only at small ctx)
+  env $_ENVS GLM_DCP_SCATTER_ONLY=1 GLM_DCP_SCATTER_IMPL=$IMPL GLM_DCP_CACHE_DUMP=/tmp/so2_$IMPL.npz \
+    ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
+      --max-seqs 1 --max-batched-tokens 2048 --gmu 0.90 --note "scatter $IMPL 2chunk"
+  env $_ENVS GLM_DCP_SCATTER_ONLY=1 GLM_DCP_SCATTER_IMPL=$IMPL GLM_DCP_CACHE_DUMP=/tmp/so1_$IMPL.npz \
+    ~/vllm-env/bin/python -u glm_longctx.py --lengths 3200 --depths 0.5 --trials 1 \
+      --max-seqs 1 --max-batched-tokens 6144 --gmu 0.90 --note "scatter $IMPL 1chunk"
+  echo "== $IMPL =="; PYTHONPATH=~/tpu-inference-dcppersist2 ~/vllm-env/bin/python -m \
+    tpu_inference.runner.dcp_cache_diff /tmp/so2_$IMPL /tmp/so1_$IMPL
+done
+# The IMPL whose scatter-only diff is MATCH is the fix. Then re-run WITHOUT
+# GLM_DCP_SCATTER_ONLY (full path) at that IMPL -> the 2chunk-vs-1chunk full
+# diff must also MATCH, and the dcp=2 128K passkey must clear >=95%/depth.
+```
+
+Once an IMPL wins, make it the DEFAULT under the DCP gate (drop the env, keep gate-off byte-identical) and
+re-review. CPU-covered: `test_mla_dcp_scatter_gt.py` runs all four impls against the independent ground truth
+(bit-identical); gate-off byte-identity unchanged.
+
 ---
 
 ## Step 6 — AIME-2026 card protocol, n=30 (docs/07 §6; seed fix landed)
