@@ -591,9 +591,16 @@ print("VERDICT:",
       "(kernel read of chunk-1's blocks or the chunk-2 block-table/slot map) — fix the read path")
 ```
 
+Run this probe at **`--max-seqs 1`** (as above): under interleaved multi-seq serving the absolute step
+numbers advance past decode steps, so `stepNNNN` is not simply "the Nth prefill" — `prefwd`/`postfwd` still
+pair *within* a call, but pick the A/B/C files by inspecting each file's `num_scheduled_tokens` rather than
+assuming step 1/2 are the two chunks.
+
 CPU note: the runner carry is a plain reference hand-off (`self.kv_caches = model_fn(...)[0]`; the next step
 reads it back), so on CPU **A == B always** (`test_mla_dcp_cache_persistence.py::
-test_runner_carry_preserves_chunk1_ABC`) — the metal probe is what discriminates. Expectation from the CPU
+test_runner_carry_preserves_chunk1_ABC`); the negative-control
+`test_runner_carry_ABC_detects_broken_carry` proves the A-vs-B diff DOES flag a dropped carry (A != B), so
+the localizer is a real discriminator — the metal probe is what decides which branch fired. Expectation from the CPU
 analysis: **A == B on metal too** (the runner does not re-create/re-`device_put`/re-shard the cache between
 steps), which would localize the residual loss to chunk-2's forward read.
 
