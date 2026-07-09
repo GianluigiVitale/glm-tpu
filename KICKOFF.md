@@ -14,25 +14,22 @@ pick + log. Only a hard block pauses THAT thread.
 - **Stage 3 code-complete (CPU):** MTP M1 draft-parity + G4 index-share; dense-MTP knob GLM_SPEC_K.
 - Fork **`glm-5.2-v4-next`** = all above + DCP + guards, gated off. PRs g1–g6 drafted.
 
-**CORRECTED 2026-07-09 (on-pod): 128K batch=1 correctness = HBM FRAGMENTATION at compile, NOT a
-cache-capacity wall.** 128K latent ≈ ~150 MiB/chip; a 128K prompt leaves >1 GiB free. Failure: a **~161 MB
-transient (=ONE bf16 MLA KV layer, 0.625 MiB×num_blocks) allocated FRESH each step** finds no **contiguous**
-slot (largest-free lottery ~114–157M). block_size INERT; gmu/scheduler can't reach 161M. **64K passkey
-VERIFIED 6/6=100% @dcp=1/bf16**; ~90K = reliable bf16 ceiling.
+**2026-07-09 (on-pod, all workers synced): 128K correctness is an HBM wall, root-caused.** **64K passkey
+VERIFIED 6/6=100% @dcp=1/bf16.** bf16 128K fails on a 161M per-layer cache transient (an XLA layout-decline,
+copy-elim proven a DEAD END). fp8-KV halves the KV and its kernel now COMPILES on v4 (see below) but
+dcp=1 still can't reach 128K (overlays+KV+weights > 30.75). Net: **128K needs cache SHARDING (DCP)**.
 
-**ROOT CAUSE (source agents): a donation-chain gap.** The mla.v2 cache write is meant in-place (L1 step-fn
-donates kv_caches; L3 kernel donates cache_kv; pallas MUST-aliases) but the MIDDLE jit(shard_map)
-(`attention_interface.py:1146`) didn't donate its cache arg → XLA copies 161M/step. **Fix `GLM_MLA_ALIAS_KV=1`**
-(gated, byte-identical off, reviewed): donate L2 index 4 + pin L1 out-sharding → in-place → copy vanishes →
-128K builds. **Backup fp8-KV** (161→80M): the "write cmpi" was MISATTRIBUTED (KV quantize is XLA/cmpi-free;
-only Q-activation-quant's output cast is in-Mosaic fp8 → `DISABLE_MLA_Q_ACTIVATION_QUANTIZATION=1`), never
-rebuilt since the branchless read fix → likely already works. DCP/fp8 = throughput/256K, not batch-1.
-
-## ACTIVE FRONTIER — do next, in order
-1. **Land 128K dense passkey @dcp=1** via `GLM_MLA_ALIAS_KV` (L2 donation): confirm the 161M `copy(` vanishes
-   in the step HLO + it builds → verify needle 3/3. Backup: fp8-KV (Q-bf16). 64K already 6/6.
-2. Re-enable **DSA sparse** on the working dcp=1 path for the **128K SPARSE** gate (kernel PASSED silicon @32K).
-3. **256K throughput** A/B (dsa-sparse vs dense) — where DCP packed-write / fp8-KV are actually needed.
+## ACTIVE FRONTIER — 128K NEEDS fp8-KV + DCP=2 (crystallized)
+fp8-KV kernel now COMPILES on v4 (pack_new_kv i8 select_n cmpi + mask i8 muli fixed; parity 388/388) +
+serves ~80–96K @dcp=1. But **128K@dcp=1 is HBM-STRUCTURAL**: overlays 2.05G (unrolled 78-layer code, no
+flag) + KV 6.14G + weights 22.76 > 30.75; below 128K the 2.05G overlays fragments. bf16 copy-elim is a
+DEAD END (donation binds; 161M is an XLA layout-decline). So:
+1. **Fix the DCP multi-chunk packed-WRITE bug** (2nd kv_packing=32 tile mis-commit, owner-scatter
+   `attention_interface.py:951-1078`; wired obs: `GLM_DCP_SCATTER_IMPL`=flat/barrier/onehot +
+   `GLM_DCP_DUMP_NEWKV` DIFFER→MATCH falsifier). Then **fp8-KV + GLM_DCP=2** halves per-chip KV (6.14→3.07G,
+   +2.5G margin) → 128K fits → verify needle ≥95%. 64K bf16 already 6/6; fp8 validated to ~80K.
+2. Re-enable **DSA sparse** on the fp8+DCP 128K path for the **128K SPARSE** gate (kernel PASSED silicon @32K).
+3. **256K throughput** A/B (dsa-sparse vs dense) — also via fp8+DCP.
 
 ## HARD RULES
 - **COST:** bucket **`gs://driftbench-dsv4-uc` (us-central2) ONLY**, never EU. **NEVER create a machine/VM/TPU**
@@ -48,5 +45,8 @@ rebuilt since the branchless read fix → likely already works. DCP/fp8 = throug
 env (WORKERS need them — a footgun). setsid the driver (it gets SIGTERM'd mid-serve otherwise).
 
 ## LANDMINES
-GLM routes via **VllmModelWrapper** (vLLM path), NOT get_flax_model (mistargeted fix = NO-OP). "PASS" in
-logs may be a grep hit on `hlo_passes.cc` — read real needle lines. Relaunch after ANY pod crash.
+**Workers have PER-HOST checkouts** — after ANY fork commit: `git push origin glm-5.2-v4-next` +
+`TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash scripts/sync_workers.sh` (all 8 = SAME hash) BEFORE the pod test,
+else stale worker code runs SILENTLY (bit me all night). GLM routes via **VllmModelWrapper**, NOT
+get_flax_model. "PASS" in logs may be a grep hit on `hlo_passes.cc` — read real needle lines. Relaunch after
+any pod crash. `setsid` the driver.

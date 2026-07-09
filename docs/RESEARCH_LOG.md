@@ -1462,3 +1462,24 @@ one variant per token bucket (TPU_MIN_TOKEN_BUCKET=32 → [32,64,128,256]=4 vari
 TPU_MIN_TOKEN_BUCKET=256 + chunk256 (1 bucket) to cut overlays ~1.5G. If insufficient, 128K@fp8/batch=1 is
 genuinely HBM-bound and needs DCP (fp8+dcp=2 → KV/2 → fits, but the DCP multi-chunk packed-write bug) or a
 smaller footprint. fp8 at a shorter ctx (fits) validates the path + extends the ceiling regardless.
+
+## 2026-07-09 16:40 — fp8-KV @ dcp=1 ceiling is ~80–122K (overlays fragmentation + capacity); 128K NEEDS fp8+DCP=2
+
+Definitive HBM analysis (agent, byte-reconciled). The fp8-KV MLA kernel compiles + sizes on v4 (i8
+cmpi+muli fixed). Two structural limits cap fp8/dcp=1 below 128K:
+1. **Capacity @128K:** args 28.90G (weights 22.76 + fp8 KV 6.14G @258blk) + overlays 2.05G + reserved
+   1.25G = ~32.3G > 30.75 → over ~316M. The fp8 KV can't shrink below 256 blocks (128K prompt). Weights
+   fixed. **overlays 2.05G = the UNROLLED 78-layer backbone's machine code — NO flag shrinks it** (not
+   per-bucket: TPU_MIN_TOKEN_BUCKET=256 confirmed inert; only a lax.scan model rewrite would, risky).
+   **reserved 1.25G = fixed libtpu carve-out** (no flag). gmu inert w/ num_gpu_blocks_override.
+2. **Overlays-fragmentation below 128K:** @112K (232blk) args 28.28G fits but the 2.05G overlays buffer
+   finds no CONTIGUOUS slot ("2.10G free, largest contiguous 1.5G"). So even <122K fails on overlays
+   fragmentation until the KV pool is small enough (~<175blk / ~87K) to leave 2.05G contiguous. Realistic
+   fp8/dcp=1 ceiling ≈ 80–96K (lottery).
+
+**CONCLUSION — the ≥128K gate REQUIRES fp8 + DCP=2** (or DCP alone): sharding the replicated MLA cache
+halves per-chip KV (6.14→3.07G → args ~26G, +2.5G margin) — fits capacity AND defrags the overlays. It's
+ALSO required for the 256K throughput gate. The blocker is the KNOWN **DCP multi-chunk-prefill packed-WRITE
+bug** (2nd kv_packing tile mis-commit, owner-scatter attention_interface.py:951-1078; observability wired:
+GLM_DCP_SCATTER_IMPL flat/barrier/onehot + GLM_DCP_DUMP_NEWKV DIFFER→MATCH falsifier). This is now THE
+critical path to 128K. fp8-KV kernel fixes (pack_new_kv) are a real standing contribution regardless.
