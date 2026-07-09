@@ -1301,3 +1301,42 @@ the driver via `setsid nohup ... </dev/null` — its own session survives; DRIVE
 NOTE: the "64K PASS" I briefly read earlier was a FALSE grep match on the substring in `hlo_passes.cc`
 log lines, NOT needle results — the 64K engine BUILT clean at dcp=1 (no OOM, confirming the buffer model)
 but the needle was not captured. A proper 64K verify (setsid) is running now.
+
+## 2026-07-09 12:25 — 64K passkey VERIFIED 100% @ dcp=1/bf16 (ceiling 32K→64K); GLM_MLA_ALIAS_KV fix for 128K
+
+**64K dense passkey, dcp=1, bf16, NO DCP/fp8, batch=1** (pool 140 blocks, chunk 256, gmu 0.90, best
+anti-frag flags), run_id=100, setsid-hardened driver ran clean (DRIVER_EXIT=0):
+- depth 0.25: 2/2 (pred 487136/614386 == gold)
+- depth 0.50: 2/2 (pred 669915/971123 == gold)
+- depth 0.75: 2/2 (pred 208080/217556 == gold)
+- **6/6 = 100%**, avg_prompt_tok 65,211. First VERIFIED passkey above 32K. Extends the proven ceiling
+  32K→64K on real hardware; confirms the buffer-scaling model (64K → ~84M scratch < ~148M contiguous).
+
+**128K root-cause candidate — GLM_MLA_ALIAS_KV** (fork a248bd6b0, reviewed SAFE-TO-TEST): the 161 MB
+warmup transient is one bf16 MLA KV layer allocated FRESH because, with the donated replicated cache and
+step-fn `out_shardings=None` (vllm_model_wrapper.py), XLA may pick a cache output layout that can't bind
+the mla.v2 pallas input_output_alias → fresh full-cache output. Gate pins the dcp=1 MLA cache out-sharding
+to P(BATCH) (== replicated at dcp=1, byte-identical; matches mla_attention's dcp-off return). Adversarial
+review: byte-identical off, numerically identical on at dcp=1; refined P(BATCH,CONTEXT)→P(BATCH) to avoid a
+wasteful reshard on a dcp>1/DCP-off mesh. EFFICACY UNPROVEN (out_shardings pins sharding not layout) — the
+metal A/B decides: flags-only FAILED at −13.5M (161.25M buffer vs 147.76M contiguous); if flags+alias now
+BUILDS, the alias eliminated the 161M request. Testing now.
+
+## 2026-07-09 12:50 — GLM_MLA_ALIAS_KV is INERT for the 161M copy (honest null); next robust fixes
+
+128K A/B (same config, only GLM_MLA_ALIAS_KV added): the **161.25M buffer PERSISTS** ("Attempting to
+allocate 161.25M … 157.50M contiguous"). The sharding-pin did NOT eliminate the fresh cache output —
+exactly the reviewer's efficacy caveat (out_shardings pins SHARDING, not physical LAYOUT; donation
+aliasing needs a layout match too). Contiguous rose 147.76→157.50M (allocation-order side effect), so
+still ~3.75M short — but chasing that with fragmentation noise would be a FRAGILE, non-reproducible pass
+(violates 3/3 robustness + no-reward-hacking). NOT claiming the gate. Gate kept (default off,
+byte-identical); it stands as a documented no-op pending the layout escalation.
+
+Robust root-cause options now (the 161M = one bf16 MLA KV layer, irreducible at bf16/128K unless the
+fresh copy is bound or the layer is halved):
+1. **Layout-pin** — bind the donation with jax layout control (Format/DLL on the step-fn output, or
+   jit-level input_output_aliases), so the kernel cache output reuses the donated input → 161M vanishes.
+   The reviewer's named escalation for an inert sharding-pin. (agent investigating)
+2. **fp8-KV** — halves the layer to ~80M → fits with ~70M margin. Shelved on a 2nd v4 Mosaic arith.cmpi
+   in the write/quantize path; re-examining whether it's clearable branchless like the read path. (agent)
+3. Accept 64K as the demonstrated dcp=1 ceiling; 128K via DCP (write bug) for throughput.
