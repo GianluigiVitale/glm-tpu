@@ -1643,3 +1643,29 @@ page at storage_block_size = block_size (NO ×dcp) while vLLM's engine still mul
 **the same mismatch class plausibly lives on upstream/main today** (factor dcp, threshold 512 tok).
 Verification + standalone bug-report draft delegated (owner submits; independently-mergeable credential —
 review-bandwidth lesson from #2324).
+
+## 2026-07-10 00:05 — 128K SMOKE 3/3 GO (first 128K retrievals ever); upstream scooped us by 3h; sparse-DCP design done
+
+**128K SMOKE (bf16+DCP=4, granularity fix): 3/3 needles CORRECT** at 130,420 prompt tokens (d=0.25:
+253647✓, d=0.5: 915875✓, d=0.75: 876150✓, DRIVER_EXIT=0). Recorded as SMOKE (n=3, Wilson LB ~44%) — GO
+for the real gate. Gate = depths {0.0,0.05,0.25,0.5,0.75,0.95,1.0} × 11 = 77 needles (Wilson LB 95.3% @
+77/77). Smoke-2 first: mechanism depths {0.0,0.05,0.95,1.0} × 1.
+
+**Upstream verdict (owner's ask): the bug WAS upstream — and weiyu0824's PR #3129 merged TODAY 12:04 PT
+(3h before our fix) implementing the same two-sided contract.** Shipped broken in v0.20.0–v0.24.0.
+Memo: docs/upstream/dcp-block-granularity-report.md. Reframe 1f700c507 as convergent-with-#3129 (adopt
+upstream structure on next sync). Upstreamable: geometry assert (would have caught 5 releases), 2 residual
+granularity holdouts (routed-experts telemetry, KV-connector), and — the big one — **upstream dcp>1 is NOT
+real context parallelism** (dcp folds into head-TP; kernels see the full cache): our owner-scatter +
+LSE-merge CP attention is fork-only → a genuinely novel feature PR.
+
+**Sparse+DCP distributed top-k: designed + prototyped, 52/52 CPU tests** (Gate-2b-DCP selected-set AND
+tie-order exact at 32K geometry, dcp=2/4; mutation audit: dropping the position-sort → 5529 mismatches
+caught; k/2 local width survives random data but fails the hot-shard case → top-min(k,local_len) is
+load-bearing). Design: per-shard score (striped indexer k-cache is co-resident with latents — the
+enabling invariant) → local top-min(k,S_local) → all-gather (64KiB/tok@dcp=4) → position-sort → top_k =
+elementwise-exact vs single-chip AND gather-order-invariant by construction → owned-subset attention →
+_dcp_lse_combine (dense machinery reused; sparse kernel needs emit_lse — (m,l) currently discarded).
+5-file implementation plan, gated GLM_DSA_DCP; structural conflicts flagged (gather_kv_segment full-cache
+flatten, ATTN_HEAD includes dcp, scatter class). Stage-A implementation next (CPU, parallel to the gate).
+**MTP FROZEN** per owner directive.
