@@ -1616,3 +1616,30 @@ pred='578768' == gold (the identical gold that failed pre-fix), 8-chunk prefill,
 record: 900tok 1-page ✓, 4K single-chunk ✓ (was None), 16K multi-chunk ✓ (was None). Launching THE dense
 gate: 128K passkey ladder, bf16 + GLM_DCP=4 (fits: ~29.2/30.75), pool 68 ids (2048 tok/id at dcp=4),
 chunk 2048, depths .25/.5/.75.
+
+## 2026-07-09 23:10 — Owner review: n=3 ladder = SMOKE not gate; depths corrected; sparse+DCP landmine; MTP frozen
+
+Owner flags (all adopted):
+1. **The running 128K ladder (3 needles) is a GO/NO-GO SMOKE, not the gate.** 3/3 → Wilson LB ~44%. The
+   ≥95% gate needs **n≥73 zero-failure** (~200 to survive one miss). Small-n is the recurring systematic
+   weakness (GSM8K n=32, GPQA truncation, now n=3) — saved as a durable memory + gate definition below.
+2. **Depths 0.25/0.5/0.75 omit the mechanism cells.** Depth ~0.0–0.05 is THE diagnostic for DSA (needle at
+   max range must survive top-2048 selection out of 128K); 0.75 passes nearly by construction. Gate ladder
+   = depths {0.0,0.05,0.25,0.5,0.75,0.95,1.0} × 11 trials = **77 needles** (Wilson LB 95.3% at 77/77),
+   ~17–19h pod (overnight). Smoke-2 first: depths 0.0+1.0 × 1 (~1h) before committing the long run.
+3. **Sparse@128K is NEW DISTRIBUTED CODE, not "32K with a bigger number":** DCP shards context → per-chip
+   indexer scores only its slice → local top-2048 ≠ global top-2048; the sparse gather needs cross-chip
+   rows. Design (owner's, adopted): per-shard top-min(k, shard_len) → all-gather candidates (4×2048,
+   ~64KB/req) → global lax.top_k(2048) — EXACT by the union argument (the indexer docstring's proof extends
+   verbatim) → each shard attends its locally-resident selected rows → cross-shard flash/LSE merge (the
+   dense-DCP _dcp_lse_combine machinery + the kernel's online (m,l,acc) state). FREE regression: the
+   distributed selection at 32K must reproduce the dcp=1 single-chip selection SELECTED-SET-EXACT (Gate-2b
+   standard). Design work runs NOW while the dense ladder bakes.
+4. **MTP FROZEN** (code-complete, pod-validation pending) until the headline gates close. No new surface.
+
+**Upstream check (owner's ask):** the granularity hack came in via upstream PR #2398; upstream/main has
+since removed the spec pre-multiplication (NOTE(weiyu0824) — same diagnosis) BUT allocates the physical
+page at storage_block_size = block_size (NO ×dcp) while vLLM's engine still multiplies ids ×dcp →
+**the same mismatch class plausibly lives on upstream/main today** (factor dcp, threshold 512 tok).
+Verification + standalone bug-report draft delegated (owner submits; independently-mergeable credential —
+review-bandwidth lesson from #2324).
