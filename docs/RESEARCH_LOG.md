@@ -1160,3 +1160,17 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   exercise the vLLM wrapper step fn, not get_flax_model. The flax fix stays (valid for the flax MLA path).
 - The observability guards (glm-5.2-v4-obsguard, 18 tests) are done and merge-ready alongside the real fix.
 - Discipline held exactly: no merge of an unreviewed aliasing change; the review is a HARD gate and it paid.
+
+## 2026-07-09 00:45 UTC — DCP persistence FIXED (A/B/C proves it); retrieval still fails → read/content; fp8-KV re-blocked
+
+- **A/B/C on-metal localizer (dcp=2, 2-chunk):** A(postfwd.step1)==B(prefwd.step2)==C(postfwd.step2),
+  max|Δ|=0, BOTH stripes fully populated (|sum| 25195/25131). → the out-sharding fix (merged) CURED the
+  stale-stripe persistence bug: carry clean, cache temporally consistent. But 2-chunk retrieval STILL
+  fails (pred=None) → remaining bug is NOT persistence. Now distinguishing (1) cache populated-but-WRONG
+  vs (2) READ path, via the logical-position 2chunk-vs-1chunk correctness diff (dcp_cache_diff.py, merged).
+  CPU/write evidence leans MATCH→read-path. 1-chunk reference dump running.
+- **fp8-KV RE-BLOCKED:** after the fp8→f32→bf16 rewrite merged, the engine STILL fails with the identical
+  `arith.cmpi` (%11167) at 8K — so the cmpi is NOT the astype; the fp8→float lowering on v4 emits it
+  regardless of cast form (the CPU Mosaic-routing test wasn't faithful to real v4 libtpu). Deeper Mosaic
+  limitation; fp8-KV deprioritized (future: dump the real failing MLIR to find the true cmpi source, or a
+  manual bitcast dequant). DCP is the closer path.
