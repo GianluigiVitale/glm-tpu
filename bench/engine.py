@@ -76,7 +76,27 @@ _WORKER_SIDE_OBS_ENVS = (
     "GLM_DCP_ASSERT_CACHE_SANITY",
     "GLM_MLA_DCP",
     "GLM_DUMP_STEP_HLO",
+    # Review of 6f45e0944: the remaining worker trace-time reads — including
+    # GLM_EXPECT_CODE_HASH, the env that series itself introduced (verified in
+    # TPUWorker.__init__ on the WORKERS; set driver-only it verifies nothing —
+    # the exact incident class this warning exists for).
+    "GLM_EXPECT_CODE_HASH",
+    "GLM_DCP_SCATTER_IMPL",
+    "GLM_DCP_SCATTER_ONLY",
+    "GLM_DCP_GATHER_POS",
+    "GLM_MLA_HEAD_SHARDED",
+    "GLM_DCP_NO_DONATE",
 )
+
+# Boolean-gated names: an explicit "0"/"false" means DISABLED, not armed — do
+# not flag it (review of 6f45e0944: `GLM_MLA_DCP=0` used to print the full
+# warning paragraph). Value-carrying envs (dump paths/prefixes, layer lists,
+# call caps, hash pins, impl selectors) stay flagged for any non-empty value.
+_VALUE_CARRYING_OBS_ENVS = frozenset({
+    "GLM_DCP_CACHE_DUMP", "GLM_DCP_CACHE_DUMP_LAYERS",
+    "GLM_DCP_DUMP_NEWKV_MAXCALLS", "GLM_EXPECT_CODE_HASH",
+    "GLM_DCP_SCATTER_IMPL",
+})
 
 
 def warn_worker_only_envs() -> list:
@@ -90,7 +110,11 @@ def warn_worker_only_envs() -> list:
     burning a pod run. Warning only (never fatal): the value may legitimately
     ALSO be raylet-baked, which this process cannot see. Default-inert: no
     flagged env, no output. Returns the flagged names (tests)."""
-    flagged = [k for k in _WORKER_SIDE_OBS_ENVS if os.environ.get(k)]
+    flagged = [
+        k for k in _WORKER_SIDE_OBS_ENVS
+        if os.environ.get(k) and (k in _VALUE_CARRYING_OBS_ENVS or os.environ[
+            k].strip().lower() not in ("0", "false"))
+    ]
     for k in flagged:
         print(
             f"[bench] WARNING: {k} is set in the DRIVER environment, but it "
