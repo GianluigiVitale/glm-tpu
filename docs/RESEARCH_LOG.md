@@ -1174,3 +1174,16 @@ position. I built the CPU reproduction and it **exonerates the write path on two
   regardless of cast form (the CPU Mosaic-routing test wasn't faithful to real v4 libtpu). Deeper Mosaic
   limitation; fp8-KV deprioritized (future: dump the real failing MLIR to find the true cmpi source, or a
   manual bitcast dequant). DCP is the closer path.
+
+## 2026-07-09 01:20 UTC — DCP localized to the WRITE: owner-scatter corrupts the 2nd logical page
+
+- Correctness diff (2-chunk vs 1-chunk post-prefill cache, logical-position, bf16-cast fixed): **DIFFER,
+  max|Δ|=5.44, exactly 1024 positions wrong starting at position 1024** (= the 2nd logical page; P_g=1024
+  = block_size 512 × dcp 2). Page 0 (0..1023) correct; chunk-2 region (2048..3186) correct; ONLY 1024..2047
+  wrong. A/B/C showed it's written-wrong-and-stable → the bug is chunk-1's OWN owner-scatter WRITE, not the
+  read or the carry. NOT persistence (that was fixed), NOT read path.
+- Root cause narrowed to the DCP owner-scatter (attention_interface.py:902-922) per-page position/owner
+  arithmetic for a MULTI-PAGE prefill chunk. CPU-reproducible (XLA scatter). Agent fixing; the earlier
+  scatter CPU test missed this exact geometry (2048-tok/2-page chunk).
+- The correctness-diff tool (dcp_cache_diff.py) needs a bf16 cast in reassemble_layer (its tests used
+  float32); I ran the diff inline with the cast. Fold the cast into the committed tool.
