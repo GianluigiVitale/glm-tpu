@@ -1396,3 +1396,22 @@ cast = 0 surviving f8 float-converts (vs 1 for the old Q→fp8) → the v4 legal
 Byte-identical when GLM_KV_CACHE_DTYPE unset. Adversarial numerics review in flight; then 128K fp8 build
 (pool 258, chunk 256, gmu 0.90, DISABLE_MLA_Q_ACTIVATION_QUANTIZATION=1 + GLM_KV_CACHE_DTYPE=fp8). Gate is
 "passkey ≥95% @128K" — fp8-KV retrieval survives (agent: 97.5-100%), a legitimate long-context config.
+
+## 2026-07-09 14:15 — fp8-KV: the REAL write cmpi located via MLIR loc → pack_new_kv i8 lax.select
+
+fp8-KV 128K build FAILED: `Mosaic failed to compile ... failed to legalize 'arith.cmpi'
+(vector<8x128x4xi8>, predicate=ne)`. MLIR source loc is exact:
+`loc(select_n(pack_new_kv.<locals>.merge_loop_body kv_utils.py:204:25))`. So the Q-bf16 fix DID clear
+the output-cast fp8 convert (agent 2 correct), but a DIFFERENT cmpi remains: the `lax.select`s in
+`pack_new_kv`'s merge_loop_body (kv_utils.py 191/199/204/205/213/224) run on the packed registers in
+their NATIVE dtype — for bf16 (16-bit) Mosaic legalizes the select; for fp8 (i8) it emits an i8
+`arith.cmpi ne` the v4 backend can't legalize. THIS is why bf16 built @64K but fp8 didn't — it's a
+`select` on packed fp8 bytes, NOT a float convert. (CPU can't reproduce the v4 cmpi in a toy; agent-2
+caveat holds — verification is numeric-parity + structural + the pod build.)
+
+Fix direction: eliminate sub-16-bit lax.select in pack_new_kv — bitcast the i8 operands to uint32
+(shift_roll already does this internally) for the select, back after; masks are constant within each
+packed word so semantics are preserved; MUST stay bit-identical for bf16 (shared kernel). Reference
+`pack_new_kv_reference` (kv_utils.py:267) gives the numeric oracle. Launching an ultracode workflow:
+parallel fix candidates (bitcast-widen / branchless-mask / uint32-merge), each numeric-parity-verified
+vs the reference (bf16 AND fp8, interpret mode) + adversarially reviewed, before the pod build.
