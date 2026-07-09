@@ -1353,3 +1353,25 @@ a fixed floor. Implications:
   buffer fix: (1) ELIMINATE the fresh 161M cache copy (layout-pin donation aliasing), or (2) HALVE it via
   fp8-KV (161→80M). Both under active CPU investigation. The marginal-tuning route is CLOSED.
 - Verified ceiling stands at **64K (6/6, 100%)**. Solid deliverable independent of the 128K outcome.
+
+## 2026-07-09 13:40 — Two robust 128K fixes designed (source agents); primary = L2 donation-chain
+
+Two independent CPU agents (read-only, no TPU) traced the 161M-copy root cause and a backup:
+
+**PRIMARY — donation-chain gap (attention_interface.py:1146).** The mla.v2 cache write is meant IN-PLACE
+via a 3-link donation chain: L1 step-fn donates kv_caches (vllm_model_wrapper.py:928), L3 kernel wrapper
+donates cache_kv (kernel.py:3085), pallas MUST-aliases operand→output (kernel.py:2883,2933). But the MIDDLE
+jit(shard_map) (L2, attention_interface.py:1146) did NOT donate its cache arg → XLA is forced to COPY the
+161M cache fresh each step to honor L2's preserve-contract. This is why the earlier L1 out-sharding pin was
+inert (it fixed sharding, not the L2 donation). **Fix: gated `donate_argnums=(4,)` at L2** (GLM_MLA_ALIAS_KV,
+dcp-off only). Byte-identity OFF proven on CPU (md5-identical HLO to omitting it). Applied to fork; focused
+adversarial review of donation correctness (index, use-after-donate, MTP/multichunk) in flight before pod.
+
+**BACKUP — fp8-KV, and the shelving was based on an INFERENCE not an observation.** Agent found the "2nd
+write cmpi" was MISATTRIBUTED: the KV bf16→fp8 quantize runs in XLA (quantize_kv clip = max/min, cmpi-free),
+NOT in Mosaic. The only remaining in-Mosaic fp8 convert is the attention OUTPUT cast (kernel.py:2323), fp8
+ONLY because Q-activation-quant defaults ON (q_dtype=fp8). Fix: keep Q/output bf16 on v4 via
+`DISABLE_MLA_Q_ACTIVATION_QUANTIZATION=1` (+ a latent q_scale over-scale bugfix) — KV cache stays fp8 (the
+161→80M win). CRUCIAL: fp8-KV has NEVER been rebuilt on v4 since the branchless read fix merged (8802ebab7)
+→ "still 2 cmpi" is unproven; it may already work. This is the clean capacity halving if the donation fix
+proves inert. CPU structural check: 0 surviving f8 float-convert ops in the isolated Mosaic module.
