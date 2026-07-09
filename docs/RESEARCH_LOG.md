@@ -1483,3 +1483,22 @@ ALSO required for the 256K throughput gate. The blocker is the KNOWN **DCP multi
 bug** (2nd kv_packing tile mis-commit, owner-scatter attention_interface.py:951-1078; observability wired:
 GLM_DCP_SCATTER_IMPL flat/barrier/onehot + GLM_DCP_DUMP_NEWKV DIFFER→MATCH falsifier). This is now THE
 critical path to 128K. fp8-KV kernel fixes (pack_new_kv) are a real standing contribution regardless.
+
+## 2026-07-09 18:25 — DCP multi-chunk bug CONFIRMED REAL on synced workers (E1); pageloop fix next
+
+With all 8 workers CERTIFIED synced (0f15e3ad0), bf16 + GLM_MLA_DCP=1 + GLM_DCP=2 at 16K multi-chunk
+(chunk 256, pool 64) ran to clean DRIVER_EXIT=0 but the needle FAILED: pred=None gold=578768 correct=False
+(garbage — needle at depth 0.5 ≈ pos 8000 lands in the corrupted pos-1024+ region). So the DCP
+multi-chunk owner-scatter bug is GENUINE, not a stale-worker artifact — this is the trustworthy
+re-localization (agent E1) the earlier confounded overnight probes lacked. (DCP=2 32K first attempt OOM'd
+on auto-pool over-sizing 3M tokens → capped pool 64 fixed that.)
+
+DCP agent audit: 8802ebab (07-09 06:54) CONTAINS all DCP code (persistence, SCATTER_IMPL variants, probes
+— all ancestral); the overnight VARIANT sweeps (flat/onehot/barrier) were likely SPMD-confounded (Franken
+mix across hosts) — one conclusion already retracted. The runbook's "top candidate" shardlocal is ORPHANED
+on branch dcppersist2, NOT on glm-5.2-v4-next/workers. Corrected geometry: the corrupt region is the 2nd
+P_g=1024 PAGE (dim-0 tile), NOT a kv_packing=32 tile — `cache.at[_page_safe,_row,_sub,:].set(_val,
+mode=drop)` (attention_interface.py:1077) writes TWO physical pages in one scatter; the 2nd dim-0 page tile
+mis-commits into the donated/sharded/tiled buffer. Fix #1 = **pageloop**: per-physical-page
+lax.dynamic_update_slice (different XLA op class; one page-tile/op). Implementing + CPU-verifying vs
+test_mla_dcp_scatter_gt.py before pod. THIS is the ≥128K gate blocker.
