@@ -1512,3 +1512,15 @@ dynamic_update_slice, not multi-tile scatter) — yet metal is unchanged. So the
 multi-tile scatter" hypothesis is FALSIFIED. pred=None (total garbage) points at the read/combine or carry
 path, not the write. Next: the write-vs-value / single-vs-multi-chunk discriminator (E3), which the earlier
 overnight localization (contaminated by stale workers) got wrong. Testing single-chunk DCP=2 first.
+
+## 2026-07-09 19:40 — DCP=2 fails SINGLE-chunk too → bug is FUNDAMENTAL (read/combine), not multi-chunk write
+
+Observability (not needle-guessing) reframed the DCP bug: bf16 DCP=2 SINGLE-chunk 4K (chunk 4096, one
+prefill; 4080 tok = 4 logical pages at P_g=1024) needle pred=None correct=False — DCP is broken at ANY
+>1-page context, NOT just multi-chunk. The overnight "single-chunk always correct" was a STALE-WORKER
+artifact (those tests likely used <=1-page prompts or confounded SPMD). This EXPLAINS pageloop being inert:
+a per-page WRITE fix can't help a READ/COMBINE bug. Prime suspects now: the per-dcp-shard strided-position
+causal mask, per-shard kv_lens, or the cross-dcp LSE (log-sum-exp) softmax merge (attention_interface.py
+~1099-1155) — all in the DCP READ path, NOT the owner-scatter write. Next (observability-first, correct
+reference = DENSE not 1chunk): cache-dump DCP vs DENSE at a 2-page context — MATCH ⇒ write correct ⇒
+read/combine bug; DIFFER ⇒ write. pageloop kept (CPU-correct, gated) but is NOT the fix.
