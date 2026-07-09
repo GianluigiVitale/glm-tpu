@@ -1524,3 +1524,22 @@ causal mask, per-shard kv_lens, or the cross-dcp LSE (log-sum-exp) softmax merge
 ~1099-1155) — all in the DCP READ path, NOT the owner-scatter write. Next (observability-first, correct
 reference = DENSE not 1chunk): cache-dump DCP vs DENSE at a 2-page context — MATCH ⇒ write correct ⇒
 read/combine bug; DIFFER ⇒ write. pageloop kept (CPU-correct, gated) but is NOT the fix.
+
+## 2026-07-09 20:10 — DCP bug is METAL-ONLY (packed/tiled read of context-sharded cache); CPU logic PROVEN correct
+
+DCP-read agent built 3 CPU harnesses with the REAL mla.v2 kernel (interpret) at the exact failing geometry
+(single-chunk 1/2/4/8 logical pages, dcp=2, prefill+decode): dcp2 == dcp1 == numpy-dense to ~5e-6. So the
+DCP read/combine/scatter LOGIC (strided global-pos mask, per-shard kv_lens, local strided read, LSE merge)
+is PROVEN correct — NOT a logic bug. The corruption is a **metal-only lowering defect in the DCP-specific
+packed/tiled/context-sharded cache access**. Test-coverage gap explains the slip: interpret forbids
+kv_packing>1 (kernel.py:2159 assert) so production packed KV (bf16 pack=2 / fp8 pack=4) reads/writes are
+NEVER CPU-covered; the packed metal read (kernel.py:1242-1276, reshaped_cache + pltpu.bitcast word-shuffle)
+is bypassed by interpret. Context-sharding splits the packed tile dim by dcp → reading tile>=1 of a
+multi-page seq in packed layout is the untested surface.
+
+Ranked (agent): H1 kv_packing>1 packed read of the sharded multi-page cache (highest); H2 donated/tiled
+2nd-tile mis-commit (flat/onehot/no_donate "all failed" — but STALE-WORKER contaminated, so NO_DONATE
+untested fairly); H3 LSE combine (lowest, CPU-clean). Discriminators (all on-pod, CPU can't see):
+GLM_DCP_NO_DONATE=1 (cheap — if fixes → H2); pack=1 vs pack>=2 (H1, but pack=1 invalid for bf16/fp8);
+SCATTER_ONLY page-0 vs page-1 dump (write vs read). Fix if H1 = read-side pageloop analog in kernel _fetch_bkv
+(unreshaped per-page DMA when dcp>1). Testing NO_DONATE=1 (fair, synced) next — potential cheap unblock.
