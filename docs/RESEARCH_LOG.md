@@ -1340,3 +1340,16 @@ fresh copy is bound or the layer is halved):
 2. **fp8-KV** — halves the layer to ~80M → fits with ~70M margin. Shelved on a 2nd v4 Mosaic arith.cmpi
    in the write/quantize path; re-examining whether it's clearable branchless like the read path. (agent)
 3. Accept 64K as the demonstrated dcp=1 ceiling; 128K via DCP (write bug) for throughput.
+
+## 2026-07-09 13:15 — 96K also frag-fails; contiguous-free is a LOTTERY (~114–157M) → 128K needs a robust fix
+
+96K probe (pool 200, chunk 256) confirmed the buffer model EXACTLY: 200 blocks × 0.625 MiB = **125.0M**
+buffer requested. But it FAILED — this run's largest contiguous was only **114M** (vs 147–157M on the 128K
+runs). So the largest-contiguous-free is **run-to-run variable (~114–157M)** — a fragmentation lottery, not
+a fixed floor. Implications:
+- **Reliable dcp=1/bf16 ceiling ≈ buffer < ~114M → <182 blocks → ~88–90K context.** 64K (87.5M buffer)
+  builds reliably; 96K (125M) exceeds the unlucky floor; **128K (161M) is far above even the lucky 157M max.**
+- **128K CANNOT be reached by scheduler/gmu tuning** (161M ≫ best-ever 157M contiguous). It needs a robust
+  buffer fix: (1) ELIMINATE the fresh 161M cache copy (layout-pin donation aliasing), or (2) HALVE it via
+  fp8-KV (161→80M). Both under active CPU investigation. The marginal-tuning route is CLOSED.
+- Verified ceiling stands at **64K (6/6, 100%)**. Solid deliverable independent of the 128K outcome.
