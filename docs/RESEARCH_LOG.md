@@ -1583,3 +1583,13 @@ persists; guards never announce armed/inert. Gap proposals (worker code-hash cro
 geometry assert, raw-decode-text capture, dump-written assertion, fail-loud guard pattern, HBM probe)
 queued as the observability PR series. suggestions.md vindicated: half of tonight's cost was blindness
 the tools were supposed to prevent — and some tools could actively mislead.
+
+## 2026-07-09 21:45 — LIVE PREDICTION CONFIRMED: 1-page DCP=2 needle CORRECT (first DCP retrieval ever on metal)
+
+bf16 DCP=2, 900-token prompt (1 logical page, BOTH dcp shards + LSE combine + strided mask exercised):
+**pred='655242' == gold, acc 100%, DRIVER_EXIT=0.** The granularity theory called this in advance
+(<=1024 tokens → only block-table entry 0 → valid). Five independent confirmations now: 1-page PASS,
+NO_DONATE-inert (predicted before the theory landed), pageloop-inert, single-chunk >1024 FAIL, CPU sim
+corrupting at exactly L=1025. The DCP read/combine/write machinery is CORRECT — the block-table
+granularity contract was the bug all along. Patch under adversarial review → commit → sync → re-test the
+previously-failing DCP=2 4K single-chunk needle.
