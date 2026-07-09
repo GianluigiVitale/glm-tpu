@@ -275,7 +275,8 @@ glm-tpu/
   cached. FP8 target confirmed (`zai-org/GLM-5.2-FP8`, ~744 GB). Nothing ported yet at this point.
 - [x] **2026-07-08 — Stage 1 DONE (dense-MLA) on the 32-chip pod.** 753B FP8 serves (runai GCS→HBM,
   FP8-resident + per-tile dequant, EP filter, pure TP-32). **GSM8K n=32 @ max-new 2048 = 96.9%** (31/32,
-  1 truncation — truncation-free quality signal), full provenance in `bench/results.db`. Fixed en route:
+  1 truncation) — a **SMOKE test (n=32)**, NOT a scale claim (Wilson ~84–99%; needs n≥200 to claim scale),
+  full provenance in `bench/results.db`. Fixed en route:
   determinism (canonical ascending-position gather), the mla.v2 `pack_new_kv` OOB core-halt (the fatal halt
   class — CLOSED, validated by the 8h52m zero-interrupt GPQA run), the large-bucket compile-OOM (F1).
 - [x] **2026-07-08 — Stage 2 DSA kernels SILICON-VALIDATED** (single v4 chip): GATE 2a (Mosaic compile +
@@ -286,13 +287,19 @@ glm-tpu/
 - [x] **2026-07-08 — Stage 3 MTP code-complete (CPU).** M1 dense draft-parity vs composed-HF (max rel Δ
   3.1e-6, top-1 100%) + G4 IndexShare; dense-MTP engine knob `GLM_SPEC_K` (unset = byte-identical). M2
   (pod greedy-equivalence) prepped zero-turnaround.
-- [~] **2026-07-08 — 128K via DCP: fix MERGED, on-metal validation IN PROGRESS.** The multi-chunk-prefill
-  KV-cache persistence bug (one dcp stripe dropped across the scheduler-step boundary — cache-dump: exactly
-  half the rows stale at dcp=2) was root-caused observability-first and fixed by pinning the
-  **VllmModelWrapper step-fn + MTP `_propose` cache `out_sharding` to `P(BATCH,CONTEXT)`** under the gate —
-  GLM's real vLLM path (an earlier flax-path fix was a no-op, caught by review). Independently reviewed
-  **SHIP**, merged to `glm-5.2-v4-next`. Next: on-pod cache-dump must flip **DIFFER→MATCH**, then dcp=2
-  128K passkey ≥95%/depth. (fp8-KV route retired — v4 Mosaic `arith.cmpi` bug.)
+- [~] **2026-07-09 — 128K: persistence FIXED, packed-WRITE bug being bisected on metal. All 3 remaining
+  blockers are in the KV/CACHE layer, NOT the DSA kernel (which PASSED).** (1) The stale-stripe **persistence**
+  bug (one dcp stripe dropped across the scheduler-step boundary — cache-dump: exactly half the rows stale at
+  dcp=2) is **FIXED** by pinning the **VllmModelWrapper step-fn + MTP `_propose` cache `out_sharding` to
+  `P(BATCH,CONTEXT)`** under the gate — GLM's real vLLM path (an earlier flax-path fix was a no-op, caught by
+  review; the A/B/C localizer then proved the carry is clean, `max|Δ|=0`). (2) The remaining DCP failure is
+  localized to the **multi-chunk-prefill WRITE of the 2nd `kv_packing=32` tile** (logical page 2, positions
+  1024–2047): the kernel and the owner-scatter arithmetic are CPU-exonerated (264 adversarial cases pass), so
+  the bug lives on the metal-only write/new-KV path CPU cannot exercise — under observability-first on-metal
+  bisection (cache-dump → A/B/C → correctness-diff → scatter-only → new-KV dump). (3) **fp8-KV SHELVED** — two
+  independent v4 Mosaic `arith.cmpi` legalize blockers (read-dequant fixed branchless; a 2nd cmpi in the
+  write/quantize path). 128K genuinely NEEDS DCP (shard the replicated cache) or fp8-KV (halve it) — **≥128K
+  NOT yet demonstrated.**
 - [x] **2026-07-08 — GPQA-Diamond n=198 (dense, DSA bypassed) = truncation-dominated.** Raw 52.5 is an
   artifact of the 4K gen cap (140/198 truncated mid-reasoning); **completed items 50/58 = 86.2%** (honest
   caveat: the completed subset skews toward easier/short-reasoning items). Rerun at 16K queued behind the
