@@ -57,6 +57,55 @@ def attention_path() -> str:
     return "dsa-sparse:" + mode if mode not in ("", "off") else "dense-mla"
 
 
+# Fork-side observability envs that are read inside the ray WORKER processes.
+# vLLM's Ray executor forwards only VLLM_* + a fixed allow-list to the
+# workers, and GLM_* is NOT on tpu_platform.additional_env_vars -- a value
+# exported only in the DRIVER shell silently never reaches them. That is the
+# 2026-07-09 incident: the runbook's `GLM_DCP_CACHE_DUMP=... python
+# glm_longctx.py` flow completed a full pod run with ZERO dump files and zero
+# errors, because every worker read "" for the gate. (Names only; keep in
+# sync with the fork's dump/guard modules.)
+_WORKER_SIDE_OBS_ENVS = (
+    "GLM_DCP_CACHE_DUMP",
+    "GLM_DCP_CACHE_DUMP_PREFWD",
+    "GLM_DCP_CACHE_DUMP_LAYERS",
+    "GLM_DCP_DUMP_NEWKV",
+    "GLM_DCP_DUMP_NEWKV_MAXCALLS",
+    "GLM_DCP_DUMP_NEWKV_ONLY_PREFILL",
+    "GLM_DCP_ASSERT_SHARDING",
+    "GLM_DCP_ASSERT_CACHE_SANITY",
+    "GLM_MLA_DCP",
+    "GLM_DUMP_STEP_HLO",
+)
+
+
+def warn_worker_only_envs() -> list:
+    """LOUD driver-side warning for worker-consumed envs set in this process.
+
+    Setting these in the driver environment has NO effect unless the SAME
+    value is also baked into every raylet env (relaunch with
+    EXTRA_ENVS="NAME=value" scripts/launch_glm_32chip.sh) -- driver-only, a
+    dump produces zero files and a guard never arms, both silently. Called
+    from build_llm so every harness (run_bench, glm_longctx) warns before
+    burning a pod run. Warning only (never fatal): the value may legitimately
+    ALSO be raylet-baked, which this process cannot see. Default-inert: no
+    flagged env, no output. Returns the flagged names (tests)."""
+    flagged = [k for k in _WORKER_SIDE_OBS_ENVS if os.environ.get(k)]
+    for k in flagged:
+        print(
+            f"[bench] WARNING: {k} is set in the DRIVER environment, but it "
+            "is read inside the ray WORKER processes and does NOT propagate "
+            "driver->worker (vLLM forwards only VLLM_* + an allow-list). "
+            "Driver-only it has NO effect -- the 2026-07-09 incident ran a "
+            "full pod dump that wrote ZERO files this way. Ensure it is "
+            f'raylet-baked: EXTRA_ENVS="{k}=..." '
+            "scripts/launch_glm_32chip.sh, then confirm the worker logs "
+            "show the ARMED line and verify dumps post-run with "
+            "`python -m tpu_inference.runner.dcp_dump_check <prefix>`.",
+            flush=True)
+    return flagged
+
+
 def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
               max_batched_tokens: int = 4096, gmu: float = 0.94,
               num_gpu_blocks: int = 0, log_extra: str = ""):
@@ -67,6 +116,11 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     HBM for the per-forward program — the DSV4 fragmentation-OOM lesson);
     0 = let vLLM auto-size the KV cache to the `gmu` budget ("kv auto").
     """
+    # Worker-consumed observability envs set driver-only are inert: warn
+    # BEFORE building the engine (and before the vllm import) so the
+    # operator can abort instead of burning a pod run on a dump/guard that
+    # will never arm. No flagged env = no output.
+    warn_worker_only_envs()
     # vllm import stays INSIDE build_llm: `import engine` and the --stub paths
     # must work with no vllm/TPU (a module-top import would break them).
     # NOTE (round-4 review finding 3): resolving vllm.platforms here imports
