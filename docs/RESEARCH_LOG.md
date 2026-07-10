@@ -1693,3 +1693,22 @@ Post-granularity-fix note: docs/11's scatter-impl DIFFER→MATCH guidance is lar
 was never the bug — the block table was); flag for a docs cleanup pass.
 Dense gate: 16/16 (depth 0.00 closed 11/11 = 100%). Stage C (masked-prefill LSE, the last bridge to the
 sparse ladder) implementing in parallel.
+
+## 2026-07-10 07:10 — SPARSE-DCP STACK CODE-COMPLETE (Stages A+B+C); dense gate 36/36 and rolling
+
+**Stage C landed (6f8855c3f, rebased onto the reviewer's test extension):** the distributed masked-prefill
+flash scan with LSE combine — the last code bridge to the sparse 128K ladder. Merged suite **24/24 in one
+process** (the Stage-B reviewer's ctx>topk refusal test CONVERTED to assert the real path — finite outputs,
+== dcp=1 gate-off, caches bitwise); prefill e2e at (1,2)/(1,4)/(2,2) with non-page-aligned chunks; zero
+regressions; gate-off jaxpr SHA == HEAD. The suite SIGABRT was proven PRE-EXISTING at HEAD (equal-load
+pure-HEAD control aborts identically — jaxlib per-process XLA-CPU compile-volume threshold; bounded by a
+documented clear-caches fixture). Stage-C adversarial review launched (the method's hard gate before its
+metal ladder).
+
+Dense gate: **36/36 zero failures** — depths 0.00/0.05/0.25 all closed 11/11 (the mechanism cells perfect).
+On-pod ladder once the gate frees the pod (workers sync to 6f8855c3f first): (1) emit_lse unit @dcp=1;
+(2) sparse decode @dcp=2 ≤2048-token prompts vs dcp=1; (3) chunked prefill @dcp=2 ~4-6K + step-HLO honesty
+(expect ONE candidate all-gather pair per full layer + combine pmax/2psum, NO whole-cache collectives);
+(4) 32K selected-set dump dcp=2 vs dcp=1 (Gate-2b on metal); (5) 32K sparse passkey dcp=2/4; (6) 64K;
+(7) **128K SPARSE gate at n>=73** (env: GLM_DSA_DCP=1 GLM_MLA_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop
+GLM_DSA_SCORER=xla, all raylet-baked). MTP stays frozen.
