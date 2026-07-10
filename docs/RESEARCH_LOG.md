@@ -1826,3 +1826,20 @@ prefill through the Stage-C distributed masked scan, DRIVER_EXIT=0, engine 2631s
 evt00 score-blind defect is PRESENT in this run (rung 2 failed); retrieval survives because the other 21
 full layers + IndexShare select correctly. Dumps gathered for post-fix comparison. dcp=1 32K reference
 launching now (independent of the fix — the reference side of rung 4).
+
+## 2026-07-10 15:30 — 32K adjudication data: dcp=1 retroactive check CLEAN; tie-saturation hypothesis rises
+
+On-pod (w-2) set-level analysis of the 32K dumps (2205 events/side): **ascending-identity rows = 0 in BOTH
+dcp=1 and dcp=2** — (a) the owner's retroactive check passes: the dcp=1 silicon validation never carried
+the score-blind signature; (b) the "layer-0 indexer cache reads zeros under DCP" hypothesis is WEAKENED
+(a dead cache would arange at 32K too; 32K evt00 is nearly clean, median symdiff 56). The rung-2 arange
+signature is kv≈2050-SPECIFIC → new leading hypothesis: **ReLU tie-saturation** — the indexer ReLU zeroes
+fully-negative rows; at a weak early layer the k-th boundary sits inside a large exact-0.0 tie class;
+cross-run ulp noise flips tie populations; in the all-tied extreme the merge tie-break emits exact arange.
+The layer-0 cache dump remains the discriminator (dead cache vs saturation).
+ALSO: evt01-20 at 32K show set symdiffs of median 944-3666/4096 — FAR beyond a narrow band → cross-run
+selected-set-exact is UNACHIEVABLE at truncation scale by construction if the tie class is that wide; the
+rung-4 criterion must be the score-band-quantified form (needs the topk_scores dump extension) or a
+paired-input on-line A/B (same-run dual selection compare). The needles (3/3 both configs) are consistent:
+the churn lives in the ~0-score tail that contributes nothing to attention. TRAP pinned per owner: the
+ascending-identity tripwire is a DETECTOR, never a mitigation — no tie-perturbation "fixes".
