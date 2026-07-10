@@ -841,14 +841,17 @@ TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash ~/glm-tpu/scripts/sync_workers.sh
 
 # 1) Relaunch with the sparse-DCP envs raylet-baked (LIBTPU quoting: inner double quotes,
 #    exactly as below — verified in the live raylet /proc environ on the dense gate):
-EXTRA_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DSA_SCORER=xla LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"' \
-# SCATTER IMPLS (2026-07-10 stripe forensics — PER-PATH metal evidence, opposite verdicts):
-#   dense new-KV: GLM_DCP_SCATTER_IMPL, default pageloop (its plain scatter mislowered; pageloop = its fix)
-#   DSA owner-scatter: GLM_DSA_DCP_SCATTER_IMPL, default flat (pageloop's v4 lowering DROPS sublane row-
-#   stripes of the indexer k-cache — never-written holes, scrambler-byte-diff-proven; flat byte-complete).
-#   Set neither unless running an isolation diff; a dense-tuned pageloop bake no longer touches the DSA path.
+EXTRA_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"' \
+# SCATTER IMPLS (2026-07-10 stripe forensics — PER-PATH metal evidence, OPPOSITE verdicts; review of 4f7d9a001):
+#   dense new-KV (attention_interface.py): env GLM_DCP_SCATTER_IMPL, CODE-DEFAULT = plain 4D scatter =
+#   dense's metal-proven-BAD op — pageloop is applied ONLY via this bake, and the dense fallback FIRES
+#   INSIDE SPARSE SERVING (ctx<=topk prefills) ⇒ GLM_DCP_SCATTER_IMPL=pageloop must STAY raylet-baked
+#   on every GLM_MLA_DCP=1 launch.
+#   DSA owner-scatter (mla_attention.py): env GLM_DSA_DCP_SCATTER_IMPL, code-default flat (pageloop's v4
+#   lowering DROPS sublane row-stripes of the indexer k-cache — never-written holes, scrambler-byte-diff
+#   proven; flat byte-complete). Leave UNSET unless running an isolation diff.
   TPU_MIN_TOKEN_BUCKET=32 bash ~/glm-tpu/scripts/launch_glm_32chip.sh
-# GLM_DSA_SCORER=xla and SCATTER_IMPL=pageloop are the Stage-B review's ladder settings
+# GLM_DSA_SCORER=xla is the Stage-B review's ladder setting
 # (pallas scorer + other impls come later, one variable at a time). Optionally add
 # GLM_EXPECT_CODE_HASH=6f8855c3f to EXTRA_ENVS — a mismatched worker then RAISES at init.
 
@@ -856,7 +859,7 @@ EXTRA_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DSA_SCORE
 gcloud compute tpus tpu-vm ssh db-v4-64-od --zone us-central2-b --worker=all --command \
   'P=$(pgrep -f raylet | head -1); tr "\0" "\n" < /proc/$P/environ | \
    grep -E "GLM_MLA_DCP|GLM_DSA_MODE|GLM_DSA_DCP|GLM_DCP_SCATTER_IMPL|GLM_DSA_SCORER|LIBTPU_INIT_ARGS"'
-# ABORT unless every host prints all six, identically. Also read the per-worker
+# ABORT unless every host prints all baked envs above, identically. Also read the per-worker
 # code_fingerprint log lines at TPUWorker init (git hash + GLM_* env names) — 8× identical.
 
 # 3) Driver env: mirror the raylet envs + the standard block; ALWAYS setsid the driver:

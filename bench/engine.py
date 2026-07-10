@@ -82,6 +82,7 @@ _WORKER_SIDE_OBS_ENVS = (
     # the exact incident class this warning exists for).
     "GLM_EXPECT_CODE_HASH",
     "GLM_DCP_SCATTER_IMPL",
+    "GLM_DSA_DCP_SCATTER_IMPL",
     "GLM_DCP_SCATTER_ONLY",
     "GLM_DCP_GATHER_POS",
     "GLM_MLA_HEAD_SHARDED",
