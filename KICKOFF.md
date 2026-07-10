@@ -6,22 +6,19 @@ SOLO, FULLY AUTONOMOUS. Finish porting **GLM-5.2-FP8** to **TPU v4** the DeepSee
 when unsure pick + log. Only a hard block pauses THAT thread.
 
 ## STATE — DONE (don't redo)
-- Stage 1 serves (753B FP8, 32 v4 chips). Stage 2 kernels silicon-validated; Stage 3 MTP code-complete
-  (CPU) and FROZEN until gates close.
+- Stage 1 serves (753B FP8, 32 chips); Stage 2 kernels silicon-validated; MTP code-complete, FROZEN.
 - **✅ DENSE 128K GATE CLOSED: 77/77 (Wilson LB 95.3%), run 124, bf16+GLM_DCP=4** — banked + backed up.
-- DCP granularity double-×dcp FIXED (1f700c507). fp8-KV compiles on v4 (fp8 ceiling ~80–122K structural;
-  bf16+DCP=4 fits 128K without it).
+- DCP granularity double-×dcp FIXED (1f700c507). bf16+DCP=4 fits 128K (fp8 optional, ~80–122K ceiling).
 - **✅ SPARSE RUNG 1 (emit_lse metal unit) + RUNG 2 CLOSED (2026-07-10).** Rung 2's instrument caught a
   REAL silicon defect: pageloop's v4 lowering DROPS sublane row-stripes of the DSA indexer k-cache
   (never-written HBM ⇒ stale-read lottery: evt00-arange / ×¼-stripe / clean-by-luck). Root-caused by
-  scrambler-byte-diff across engine instances; CPU logic exonerated (sentinel suite 16/16).
+  scrambler-byte-diff; CPU logic exonerated (sentinel suite).
   **Fix landed: GLM_DSA_DCP_SCATTER_IMPL, default flat** (4f7d9a001; dense path keeps its own
   GLM_DCP_SCATTER_IMPL=pageloop — MIRROR-IMAGE metal histories, never share the env).
 - **Obs stack (f0c63c302): GLM_DSA_DUMP_TOPK now dumps `topk_scores`; dsa_topk_diff has the SCORE-BLIND
   TRIPWIRE (arange rows ⇒ DIFFER even if runs agree) + `kth_band`.** RUNG CRITERION (owner-ratified):
   selected-set-exact is UNACHIEVABLE cross-run (MoE ulp drift) — the standard is tripwire silent + prefill
-  EQUAL + set-diff kth_band ≲ 2× that event's cross-run drift p95. Needle-only/index-only passes are BLIND
-  to this defect class — never claim selection health without score-armed dumps.
+  EQUAL + set-diff kth_band ≲ 2× that event's cross-run drift p95. NEVER claim selection health without score-armed dumps.
 
 ## ACTIVE FRONTIER (in order)
 1. **Sync workers to the fix tip after the adversarial review verdict** (push origin + sync_workers +
@@ -52,6 +49,5 @@ docs/11 §8. Fork `glm-5.2-v4-next`; verify tip with `git log --oneline -1` (fix
 + bake GLM_EXPECT_CODE_HASH. **The pin fights YOU too:** syncing workers while an engine expecting the
 old hash is queued kills it — re-pin until the run finishes. **setsid in FOREGROUND forks+returns
 instantly** (watch the real child pid). Armed topk dumps land on ONE host (w-2; JAX callback dedupe).
-Cache dumps: raylet-baked envs only (EXTRA_ENVS), per-host /tmp. **"PASS" greps match hlo_passes.cc.**
-GLM_* envs raylet-baked AND on driver. Relaunch after any pod crash. Scrambler-byte-diff = the
-de-lottery protocol for stale-HBM bugs (two identical runs + a different-layout run between).
+Cache dumps: raylet-baked envs only (EXTRA_ENVS), per-host /tmp. **"PASS" greps match hlo_passes.cc.** GLM_* envs raylet-baked AND on driver.
+Scrambler-byte-diff = the de-lottery protocol for stale-HBM bugs.
