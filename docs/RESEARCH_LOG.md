@@ -1949,3 +1949,27 @@ indexer k-caches under either registration mapping), TWO identical dcp=1 runs, b
 prefill compute is deterministic ⇒ written regions identical across runs; regions that VARY across runs
 are NEVER WRITTEN. Correlate hole geometry with the run-A stripe map ({576,832,1600,1856}+[0,128) =
 in-block offsets 64/320 of odd 512-blocks). This decides write-hole vs read-geometry in one pass.
+
+## 2026-07-10 19:40 — WRITE-PATH HOLE NAMED: evt01's indexer k-cache has NEVER-WRITTEN sublane stripes; scrambler experiment confirms both predictions
+
+The de-lotteried probe (runs C/D identical-config cache dumps; run-E dcp=2 as HBM scrambler; run-F dcp=1
+post-scramble) delivered on BOTH registered predictions:
+(1) **run-F scoring striped at evt01** — {512,768,1536,1792}+[0,64): 64-token windows, 256-periodic,
+odd logical blocks (run-A's family; A had offsets 64-191/320-447 at 128 wide — same structure, different
+phase/width per engine instance/executable);
+(2) **F-vs-C byte-diff: layer2 [IDX] — evt01's indexer k-cache and ONLY it — differs on all 8 hosts at
+identical coordinates: i-rows {0,1}∪{8,9} of 16 (= the first 2 sublanes of each 8-sublane tile of the
+(16,32)-token page layout) in two physical blocks; 32732/32768 elements.** Deterministic prefill ⇒
+regions that vary across identical runs were NEVER WRITTEN. C-vs-D "IDENTICAL" is explained: both
+inherited same-layout same-prompt predecessor HBM → stale bytes coincided (the byte-diff pair design's
+blind spot; the scrambler run closes it). The scoring stripes and cache holes agree exactly at in-page
+offsets [0,64)∪[256,320) once the sequential-block-table assumption is dropped (physical blocks {2,4}
+hold logical pages 1,3).
+VERDICT: the DSA indexer k-cache WRITE path (GLM_DSA_DCP gate on, dcp=1 mesh, GLM_DCP_SCATTER_IMPL=
+pageloop) skips sublane stripes of alternating logical pages on ONE cache buffer per instance —
+partial-sublane-tile store, layer/row lottery per executable, invisible whenever stale HBM ≈ fresh keys.
+This unifies every observation to date (original evt00 arange = zeros-flavored stale; A/F ×¼-flavored;
+B/C/D clean-by-luck). CPU-DETERMINISTIC REPRO NOW POSSIBLE: sentinel-initialized cache through the real
+prefill write; assert no sentinel below kv_len — no HBM lottery on CPU, the sentinel IS the stale byte.
+NEXT: read the write path (dsa indexer cache update / owner-scatter / pageloop), sentinel CPU test,
+root-cause fix, adversarial review, land, re-run rung 2.
