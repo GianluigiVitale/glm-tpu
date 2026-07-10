@@ -1843,3 +1843,44 @@ rung-4 criterion must be the score-band-quantified form (needs the topk_scores d
 paired-input on-line A/B (same-run dual selection compare). The needles (3/3 both configs) are consistent:
 the churn lives in the ~0-score tail that contributes nothing to attention. TRAP pinned per owner: the
 ascending-identity tripwire is a DETECTOR, never a mitigation — no tie-perturbation "fixes".
+
+## 2026-07-10 16:10 — evt00 ROOT-CAUSE REPORT: constant-score row PROVEN as the mechanism; 15:30 hypothesis CORRECTED; rung-4b instrument LANDED (f0c63c302)
+
+The bug-hunt agent's final report (full CPU verification: **349 passed, 0 failed**; dcp suite 28/28 incl.
+4 new tests). Mechanism **proven end-to-end**: zeroing ONE layer's indexer weights_proj in the REAL
+forward (positive control) reproduces `arange(min(kv,topk))` + `-1` tail **bit-for-bit** through the real
+DCP merge — ascending identity is the byte-exact output of a CONSTANT score row through both selection
+paths. Exonerated with evidence: (a) event misalignment — 840/840 rung-2 pairs metadata-aligned bitwise;
+(b) DCP merge / kv-cache slot resolution — NEW multilayer test drives 3 full + 1 shared indexer layers
+through the runner-real INTERLEAVED slot map (indexer k_cache registered before attn; layer-0 cache at
+kv_caches[0], the production shape the 1-layer harness couldn't reach): dcp=2 == gate-off ELEMENTWISE at
+every step/layer; (c) worker code skew — hash-pinned, dirty=0.
+
+**CORRECTION to the 15:30 entry** (the record over the narrative, again): a fresh scan of the 32K dcp=2
+dumps shows evt00 **fully healthy** — 57/57 truncated decode rows score-rich (sink + recency heads like
+`[0, 1, 32550, 32588, …]`), zero ascending rows. The "ReLU tie-saturation" framing (k-th boundary inside
+a wide 0.0 tie class) predicted PARTIAL degeneracy and does not match: rung-2b evt00 was TOTAL arange on
+38/38 scored steps while evt01 in the SAME step was healthy, and 32K evt00 is clean. Leading verdict:
+the 2560-shape dcp=2 run's layer-0 score inputs (w·relu(q·k)) were exactly constant — the all-zero class:
+**either the layer-0 striped indexer k-cache read zeros at decode, or that executable's q_idx/w_idx were
+degenerate** — shape/state-specific pod behavior (never-written stripe or buffer-donation aliasing of the
+first cache slot), CPU-blind. Index-only dumps cannot name the zero input; the new instrument can.
+(The 15:30 evt01-20 finding STANDS: 32K cross-run set symdiffs 944–3666/4096 = boundary tie churn →
+selected-set-exact is unachievable cross-run at truncation scale; kth_band is the criterion.)
+
+**Landed as f0c63c302** (applies my adversarial review + byte-identity check vs the agent's validated
+tree; workers synced 8× f0c63c30 dirty=0): merge_topk_candidates(return_values=True) → optional f32
+selected-slot scores (indices math byte-identical); armed-only threading through both selection branches
+(gate-off jaxpr identity re-proven); stash/dump `topk_scores` payload; dsa_topk_diff gains (1) the
+SCORE-BLIND TRIPWIRE — arange rows (kv_len>2) are DIFFER **even when both runs agree elementwise** (two
+degenerate runs must never MATCH green; detector only, never a mitigation), (2) `kth_band` per diff event
+(0.0 = tie churn at the k-th boundary; large = real drop — the rung-4 criterion), (3) topk_scores in the
+cross-proc replication contract. Review note: the tripwire's false-positive risk at 2<kv_len≤topk is
+disproven by the slot-order test (the stash is score-descending; position-argsort is only the tie-break).
+
+NEXT (owner order): (1) rerun the EXACT rung-2 shape (max_seq_len=2560, dcp=2) with GLM_DSA_DUMP_TOPK
+raylet-baked on ALL 8 hosts at f0c63c302 — expect tripwire FAIL + constant-0.0 score rows at evt00, which
+fingerprints the zero input; then the layer-0 indexer k-cache dump names the buffer. Non-repro ⇒
+state-dependent ⇒ flight-recorder + repeated launches. (2) Rung 4 with scores on BOTH sides (existing 32K
+dumps lack topk_scores) — adjudicate via kth_band; tripwire must stay silent. (3) One unarmed metal smoke
+re-confirms gate-off 3/3.
