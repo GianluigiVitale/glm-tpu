@@ -1754,3 +1754,13 @@ retrieval at maximum range). Wilson one-sided 95% lower bound ≈ 95.3% ≥ 95%:
 latencies) + gs://driftbench-dsv4-uc/results/. This stands on the granularity fix (1f700c507) + DCP=4 —
 three days from "128K impossible (HBM wall + DCP corrupts)" to a closed gate. NEXT: the sparse ladder
 (runbook §8) — rungs 4+6 are the cheap discriminators before the ~10-19h SPARSE 128K gate (n≥73).
+
+## 2026-07-10 10:50 — RUNG 1 PASS ON METAL: emit_lse compiles + exact on v4 (top sparse-stack risk retired)
+
+Single-chip probe (probe_lse_unit.py, artifact rung1-lse-unit-metal-rung1-metal.txt): GATE L1
+byte-identity (emit_lse=False == default, BITWISE) PASS; GATE L2 out-invariance (True's out == False's,
+BITWISE) PASS; GATE L3 lse vs XLA oracle max-abs 0.0–1.9e-6 (fp32 bar 5e-5, bf16 bar 1e-2) PASS; empty
+rows (seg_valid=0) below the LSE floor on both PASS. All geometries (R 8/64, sv full/700/1/0, seg_block
+512/768). The [1,H,128] lane-broadcast lse out-block — the #1 Stage-A/C metal risk — lowers fine on v4.
+RUNG 2 next: 2040-token needle, dcp=1 sparse (reference) vs dcp=2 GLM_DSA_DCP (new distributed decode),
+GLM_DSA_DUMP_TOPK armed both sides, GLM_EXPECT_CODE_HASH pinned.
