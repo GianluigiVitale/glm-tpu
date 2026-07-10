@@ -2023,3 +2023,24 @@ review in flight; workers sync + hash re-pin after its verdict. NOTE for the lad
 are pageloop-era — rungs 4-6 re-run under the flat default with scores armed (they double as the fix's
 pod 3/3). Fifty-some pod-runs of forensics, and the instrument that broke the case was the one the owner
 prescribed two days ago: scores in the dump.
+
+## 2026-07-11 00:20 — Review verdict landed (74d8c3225); rung 3 first attempt CONFOUNDED by disk-full; HLO honesty HARD GATE PASSES
+
+**Review of 4f7d9a001: SAFE-TO-SYNC, plus a real catch** — my runbook edit had removed the dense
+pageloop bake and claimed "dense default = pageloop"; in CODE the dense default is the PLAIN scatter
+(dense's metal-proven-bad op) and pageloop only ever came from the bake — and the dense fallback FIRES
+INSIDE SPARSE SERVING (ctx≤topk prefills). Next launch would have silently regressed the dense path.
+Fixed: bake restored + doctrine corrected in docs/11; GLM_DSA_DCP_SCATTER_IMPL added to bench/engine.py's
+driver-only-env warn list; test-header nit fixed (74d8c3225). Workers synced 8× 74d8c3225 dirty=0.
+**Rung 3 attempt 1 (5K chunked prefill, dcp=2, flat, HLO armed): CONFOUNDED, not counted.** d=0.25
+correct; d=0.75 pred=None — but BOTH w-0's and a worker's raylet file-system monitors were throwing
+>95%-full errors during that decode (object-store ops degrade; the run's own HLO dumps + accumulated
+forensics archives filled two hosts). Infra failure, not a sparse-stack verdict. Hygiene done: rung45
+(pageloop-era, void) deleted; rung2fix archives — irreplaceable lottery draws runA+runF backed up to
+gs://driftbench-dsv4-uc/dumps/rung2fix-w2/ (1682 objects) and w-0's shard set to /dumps/rung2fix-w0/ —
+then cleared everywhere; protocol runs B/C/D/E/G/H/H2 are regenerable and their verdicts are logged.
+**HLO honesty (rung 3's other deliverable, valid from the completed compile): HARD GATE PASSES — ZERO
+whole-cache collectives** (no all-gather with any dim ≥4096 in the 2048-token chunk program). Census:
+five shapes ×78 layers (attention-level, incl. the watchlist's predicted replicated-q reshard
+bf16[64,2048,512] — throughput note) + 2 singletons; detailed sparse-branch attribution deferred
+(program archived: scratchpad/rung3_hlo_2048tok.txt.gz). Rung-3 needle rerun in flight on clean disks.
