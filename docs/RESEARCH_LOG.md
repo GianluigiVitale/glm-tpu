@@ -1743,3 +1743,14 @@ Owner points (all adopted):
    the discriminators that decide whether the distributed top-k is right; the 128K n>=73 run only launches
    after they're green.
 Gate at 68/68 (six depths closed 11/11); depth 1.0 in its final trials.
+
+## 2026-07-10 10:30 — ✅✅ THE DENSE 128K PASSKEY GATE: 77/77 = 100%, ZERO FAILURES (Wilson LB ~95.3%)
+
+**GATE CLOSED.** GLM-5.2-FP8 on 32× TPU v4, bf16 + GLM_DCP=4, 130,420-token prompts (run_id 124):
+7 depths {0.0, 0.05, 0.25, 0.5, 0.75, 0.95, 1.0} × 11 trials = **77/77 needles retrieved exactly**,
+DRIVER_EXIT=0, ~470s/needle, ~13.5h wall. Every depth closed 11/11 including the mechanism cells (0.0 =
+retrieval at maximum range). Wilson one-sided 95% lower bound ≈ 95.3% ≥ 95%: the **dense passkey ≥95% to
+≥128K slot is FILLED at a defensible n**. Full provenance: results.db run 124 (raw outputs, seeds,
+latencies) + gs://driftbench-dsv4-uc/results/. This stands on the granularity fix (1f700c507) + DCP=4 —
+three days from "128K impossible (HBM wall + DCP corrupts)" to a closed gate. NEXT: the sparse ladder
+(runbook §8) — rungs 4+6 are the cheap discriminators before the ~10-19h SPARSE 128K gate (n≥73).
