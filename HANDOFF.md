@@ -1,196 +1,212 @@
 # HANDOFF — GLM-5.2 on TPU v4 (read this first, every new chat)
 
-**Updated:** 2026-07-09 — **STAGE 1 DONE on the 32-chip pod** (GLM-5.2-FP8 serves; GSM8K n=32 @ max-new
-2048 = **96.9% (31/32)** — a **SMOKE test (n=32)**, NOT a scale claim (Wilson ~84–99%; needs n≥200); the
-fatal OOB core-halt class CLOSED on hardware) + **STAGE-2 DSA KERNELS SILICON-VALIDATED** (single-chip GATE
-2a/2b, **selected-set-EXACT** vs the HF oracle, sparse-MLA fp32 9.5e-7 / bf16 1.95e-3; **sparse passkey 100%
-every depth @8K & 32K** — 16× sparsification at 32K, the SELECTION works; D0 sparse==dense in the 753B engine)
-+ **STAGE-3 MTP code-complete (CPU)**.
+**Updated:** 2026-07-10 — **THE DCP BUG IS DEAD** (root cause: block-table granularity double-×dcp, fixed
+`1f700c507` — the multi-week "packed-write metal bug" NEVER EXISTED) + **first 128K retrievals ever**
+(smoke 3/3 + mechanism-depth smoke 4/4 at 130,420 prompt tokens, bf16+DCP=4) + **THE DENSE 128K GATE n=77
+IS RUNNING** (run_id 124, **42/77 correct / 0 failures** at 05:53 UTC) + **64K dense 6/6 VERIFIED @dcp=1**
+(run_id 100) + **fp8-KV kernel now COMPILES on v4** (pack_new_kv i8 fixes — but fp8 has NEVER generated a
+validated token on metal) + **sparse-DCP Stages A+B+C CODE-COMPLETE, CPU-certified** (`6f8855c3f` tip) +
+**upstream verdict: the DCP bug WAS upstream's, fixed by #3129 three hours before ours** (convergent).
+**MTP FROZEN** by owner directive until the headline gates close.
 
-**Honest claim line:** *first public DSA kernel on TPU — compiles + runs on v4 silicon, selected-set-exact
-index parity, 100% sparse passkey @8K/32K; **≥128K NOT yet demonstrated.*** The remaining frontier is a
-**KV/CACHE-LAYER problem, NOT the DSA kernel** (the kernel PASSED). Three blockers: (1) the DCP stale-stripe
-**persistence** bug is **FIXED** (VllmModelWrapper step-fn / MTP `_propose` out-sharding, reviewed **SHIP**,
-merged; A/B/C proved the carry is clean); (2) the residual DCP failure is the **multi-chunk-prefill packed-WRITE
-of the 2nd `kv_packing=32` tile** on metal — kernel + scatter arithmetic CPU-exonerated, so the metal
-write/new-KV path (the one CPU can't test) is under on-metal bisection; (3) **fp8-KV SHELVED** (two v4 Mosaic
-`arith.cmpi` blockers). 128K passkey (CORRECTNESS, batch=1) and 256K throughput (needs batch/DCP/fp8) are
-**different gates** — do not conflate. **Exact next work: `docs/11-pod-runbook.md` + "The exact next task" below.**
+**Honest claim line:** *first public DSA kernel on TPU — selected-set-exact on silicon, sparse passkey 100%
+@8K/32K; dense retrieval now proven to 64K (6/6) and 128K-smoked 7/7; the ≥95%@128K DENSE gate is in flight
+at n=77 (small-n is never a gate — n≥73 zero-failure required). The sparse-DCP distributed stack (Stages
+A+B+C) is CPU-CERTIFIED ONLY — zero sparse-DCP tokens have run on metal.* **Exact next work: finish the
+dense gate (watchdog armed), then `docs/11-pod-runbook.md` §8 — the sparse metal ladder.**
 
 **Read, in full, before doing anything:** this file → `CLAUDE.md` (rules) → `docs/11-pod-runbook.md`
-(the next actions) → `docs/RESEARCH_LOG.md` (the dated narrative — incl. the full DCP saga) → `PLAN.md`
-→ the design docs as needed: `docs/01` (DSA kernel), `docs/03` (throughput), `docs/04` (host path),
-`docs/05` (KV/DCP), `docs/06` (pass-boundary crash forensics), `docs/07` (card protocol), `docs/08` (MTP),
-`docs/10` (observability + the DCP debug triad), `docs/reviews/*` (the round-1–9 + DCP-fix review ledger).
-DSV4 base: `~/moe-tpu/{CLAUDE,HANDOFF}.md`.
+(§8 = the next actions; §5d is history) → `docs/RESEARCH_LOG.md` (the dated narrative — the whole
+fragmentation → fp8 → worker-staleness → granularity-root-cause saga is 2026-07-09 09:20 onward) →
+`PLAN.md` → the design docs as needed: `docs/01` (DSA kernel), `docs/03` (throughput), `docs/05` (KV/DCP),
+`docs/10` (observability), `docs/upstream/dcp-block-granularity-report.md` (the #3129 memo),
+`docs/reviews/*`. DSV4 base: `~/moe-tpu/{CLAUDE,HANDOFF}.md`.
 
 ---
 
 ## State — what is DONE and hardware-validated
 
-- **Stage-1 serving WORKS on the pod** (RESEARCH_LOG 07-07 06:40 / 15:05 + 07-08 17:00): 753B FP8 streamed
-  GCS→HBM in ~10 min (runai + the sharding-derived EP filter, 32/256 experts/host), FP8 resident
-  (23.06/30.75 GiB/chip), checkpoint-exact block scales, dense MLA via mla.v2 + cross-shard all-gather,
-  pure TP-32 mesh. **GSM8K n=32 @ max-new 2048 = 96.875% (31/32, 1 truncation)** — a **SMOKE test (n=32)**,
-  NOT a scale claim (Wilson ~84–99%; needs n≥200 to claim scale); the earlier n=32 @1024 was 87.5 (cap-driven
-  misses, not the model). All
-  provenance in `bench/results.db`.
-- **The fatal core-halt class is CLOSED:** the OOB VMEM read in mla.v2 `pack_new_kv` at bkv-block-boundary
-  decode (kv_len % 512 == 0, odd-slot alignment) — fork fix `63427f86`, merged `02e44b36`, validated on
-  hardware (the 8h52m GPQA-198 run: 703,918 gen tokens, ZERO interrupts — the longest hardware validation
-  yet). Forensics `docs/06`; the earlier `JAX_SHARE_BINARY_BETWEEN_HOSTS=1` attribution was CORRECTED in-log
-  (Ray-dedup artifact, not the cause). Determinism also fixed (canonical ascending-position gather, fork
-  `215f8ddb`): across-boot 4/4 byte-identical.
-- **GPQA-Diamond n=198 (dense, DSA bypassed) — truncation-dominated** (run 48; RESEARCH_LOG 07-08 04:20):
-  raw acc 52.5 vs card 91.2 is an ARTIFACT of `--max-new 4096` (140/198 = 71% truncated mid-reasoning; the
-  card evaluates at a 163,840-token cap). Honest split: **completed items 50/58 = 86.2%** (within ~1σ of the
-  card for n=58; caveat — the completed subset skews toward easier/short-reasoning items, so this likely
-  OVERSTATES slightly). Decision: **rerun at `--max-new 16384`** on the staging branch, queued behind the DCP
-  validation. All 198 items with verbatim outputs in results.db run 48.
-- **Stage-2 DSA kernels SILICON-VALIDATED (single v4 chip; RESEARCH_LOG 07-08 05:25):** GATE 2a ACCEPT after
-  three v4 Mosaic lowering fixes + the documented broadcast-multiply w-tile fallback (round-5's flagged
-  highest-risk (1,H) spec was rejected exactly as predicted); GATE 2b ALL PASS on real MXU — A1 fp32 2.4e-7,
-  **A2 selected-set-EXACT vs the HF-math oracle (0 non-tie mismatches)**, A3 bf16 0 out-of-band (S2 ε=2⁻⁸),
-  GATE B sparse-MLA fp32 9.5e-7 / bf16 1.95e-3, GATE C pack_new_kv no-OOB byte-identical @ kv_len 511/512/513.
-  (One probe bug — the oracle running at default bf16 MXU precision — was found ON METAL and fixed, oracle
-  pinned to 'highest'; a follow-up precision audit then pinned every parity/passkey/throughput instrument.)
-- **Stage-2 sparse serving VALIDATED in the 753B engine (RESEARCH_LOG 07-08 13:10 / 15:30):** D0 CLOSED —
-  `GLM_DSA_MODE=pallas_decode` serves the full model correctly, accuracy == dense, deterministic. **Sparse
-  passkey = 100% in every (length,depth) cell at 8K AND 32K** (72/72 needles; at 32K the DSA kernel attends
-  only the 2048 indexer-selected positions — 16× sparsification, retrieval perfect); dense baseline also
-  72/72. Sparse decode + sparse prefill (mbt raised 512→2048; the F1 static-elision fix is hardware-proven)
-  + IndexShare all built. Verified clean-path ceiling at dcp=1 is 32K (64K@dcp=1 OOMs at compile).
-- **128K — persistence FIXED, packed-WRITE bug being bisected on metal (the frontier; RESEARCH_LOG 07-08
-  17:00 → 07-09 04:15 + `docs/reviews/dcp-*`). ALL of this is the KV/CACHE layer, NOT the DSA kernel (which
-  PASSED):**
-  - **(1) Stale-stripe persistence — FIXED.** Chunk-1's writes to the `P(BATCH,CONTEXT)`-striped cache were
-    not carried into chunk-2's `execute_model` step (one dcp stripe dropped across the scheduler-step boundary;
-    cache-dump DIFFER, half the rows stale at dcp=2). Fixed by pinning the **VllmModelWrapper step-fn + the MTP
-    `_propose` cache `out_sharding` to `P(BATCH,CONTEXT)`** under the gate so the donated striped buffer
-    round-trips with no cross-step reshard — GLM's REAL vLLM path (an earlier `get_flax_model` fix was a NO-OP
-    for GLM, caught by review). Reviewed **SHIP** (`docs/reviews/dcp-vllm-fix-{on,off}gate.md`), merged to
-    `glm-5.2-v4-next`; the on-metal **A/B/C localizer proved the carry is now clean** (`max|Δ|=0`, both stripes
-    populated).
-  - **(2) The residual DCP failure = the multi-chunk-prefill packed-WRITE of the 2nd `kv_packing=32` tile.**
-    Correctness-diff + scatter-only probes localize it to **logical page 2 (positions 1024–2047)** of a
-    multi-page prefill chunk. The kernel and the owner-scatter **arithmetic are CPU-exonerated** (264
-    adversarial cases; write levers no_donate/flat/onehot/shard-local all dead ends), so the bug lives on the
-    **metal-only write/new-KV path CPU cannot exercise** — under observability-first on-metal bisection
-    (cache-dump → A/B/C → correctness-diff → scatter-only → new-KV dump; each probe halved the search). Single-
-    chunk prefill is always correct (one step, no boundary).
-  - **(3) fp8-KV — SHELVED.** Two independent v4 Mosaic `arith.cmpi` legalize blockers (the read-dequant was
-    fixed branchless; a **2nd cmpi in the write/quantize path** persists even after the fp8→f32→bf16 rewrite) —
-    systematically unsupported on v4 for now; the CPU Mosaic-routing test was not faithful to real v4 libtpu.
-  - **Why the cache is the bottleneck:** the MLA latent KV cache is **replicated per-chip** (`P(BATCH)` on the
-    pure-TP mesh), so one 128K sequence ≈ **11.9 GiB/chip** which + the 23 GiB/chip FP8 weights **exceeds the
-    30.75 GiB/chip budget** → 128K genuinely NEEDS **DCP** (shard the cache, ÷dcp) or **fp8-KV** (halve it).
-    **Passkey@128K (CORRECTNESS, batch=1) and throughput@256K (needs batch/DCP/fp8) are DIFFERENT gates** with
-    different resource needs — an empirical batch=1/bf16/DCP-off fit-check may show correctness@128K decouples
-    from DCP. **≥128K is NOT yet demonstrated** — `report_passkey` still refuses to call <128K a gate pass.
-- **Stage-3 MTP code-complete (CPU-only so far; TPU untouched by it):** dense M1 draft-parity vs composed-HF
-  (max rel Δ 3.1e-6 / top-1 100%, ~2000× under the bf16 floor) + G4 IndexShare; the engine knob `GLM_SPEC_K=k`
-  (unset = byte-identical, unit-tested) + `bench/mtp_m2_check.py` (per-item identity gate + acceptance-stat
-  scrape). M2 (pod greedy-equivalence, k=1→5) is runbook §7, prepped zero-turnaround (mtp-g4 + OOB fix coexist
-  on `-next`).
-- **Observability toolkit (docs/10):** per-step **flight recorder** (`GLM_FLIGHT_RECORDER=1`, JSON lines to
-  `/tmp/glm_flight_*.jsonl`, ~15 µs/step, SIGKILL-durable), **`triage_crash.sh`** (log parse + 8-host flight
-  fetch + step alignment), `GLM_LOG_STATS=1` (10 s tok/s), `DSV4_OBSERVE_COMPILES`, and the **DCP debug triad**
-  — `GLM_DCP_CACHE_DUMP` (post-hoc 2-chunk cache diff) + the two fail-loud guards `GLM_DCP_ASSERT_SHARDING`
-  (Guard 1: sharding round-trip) and `GLM_DCP_ASSERT_CACHE_SANITY` (Guard 2: post-prefill stale-stripe) — run
-  all three together on any DCP diagnostic run. Read docs/10's field notes before interpreting any crash or DCP run.
-- **Benchmark harness**: batched generation (`--batch-size`), `--protocol card|greedy` (card = temp 1.0 /
-  top_p 0.95 / 163,840 cap / byte-pinned Exact-Answer system prompt; per-request seeds OMITTED on this backend
-  — the round-6 F1 fix, with a loud build banner), pinned dataset revisions, GPQA content-hash shuffle,
-  `glm_longctx.py` passkey ladder to 1M, and the `GLM_DCP` / `GLM_SPEC_K` / `GLM_KV_CACHE_DTYPE` engine knobs
-  (all unset = byte-identical engine args, unit-tested).
+- **Stage-1 serving WORKS on the pod** (unchanged): 753B FP8 streamed GCS→HBM (runai + EP filter), FP8
+  resident (23.06/30.75 GiB/chip), dense MLA via mla.v2, pure TP-32. **GSM8K n=32 @ max-new 2048 = 96.875%
+  (31/32)** — a SMOKE (n=32), NOT a scale claim (needs n≥200). The fatal OOB core-halt class is CLOSED
+  (fork `63427f86`/`02e44b36`, 8h52m zero-interrupt validation). GPQA-198 dense was truncation-dominated
+  (completed 50/58 = 86.2%); the 16K rerun stays queued behind the gates. Provenance: `bench/results.db`.
+- **Stage-2 DSA kernels SILICON-VALIDATED** (single v4 chip, GATE 2a/2b): selected-set-EXACT vs the
+  HF-math oracle, sparse-MLA fp32 9.5e-7 / bf16 1.95e-3. **Sparse passkey 100% every (length,depth) cell
+  @8K & 32K** (72/72; 16× sparsification at 32K); D0 sparse==dense in the 753B engine.
+- **64K dense passkey VERIFIED 6/6 = 100% @ dcp=1/bf16** (run_id 100, avg_prompt_tok 65,211; pool 140
+  blocks / chunk 256 / gmu 0.90 + anti-frag flags; RESEARCH_LOG 07-09 12:25). First verified retrieval
+  above 32K. The ceiling analysis behind it (07-09 09:20→13:15): the 128K@dcp=1 wall is HBM
+  **fragmentation**, not capacity — the attention compile-scratch scales as **0.625 MiB × num_gpu_blocks**
+  (128K ⇒ ≥258 blocks ⇒ ~161M) while the largest-contiguous-free region is a **run-to-run lottery
+  (~114–157M)**. Best anti-frag lever: `LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5
+  --xla_tpu_rwb_fusion=false"` (contiguous 118→148M; disabling the scheduler makes it WORSE). Reliable
+  dcp=1/bf16 ceiling ≈ 88–90K; **128K@dcp=1 is CLOSED to tuning** — it needs cache-size reduction.
+  Both bf16 copy-elimination attempts (`GLM_MLA_ALIAS_KV` L1 out-sharding pin `a248bd6b0` + L2 donation
+  `4eb10e6ad`) are **honest nulls** — CPU-proven architecturally inert; kept as gated no-ops.
+- **fp8-KV kernel COMPILES on v4** (07-09 16:15): the pack_new_kv i8 `select_n arith.cmpi`
+  (`8a76ae5e3` branchless `_dtype_safe_select`) + i8 `arith.muli` (`0f15e3ad0` int32 blend mask) + the
+  Q/output-cast fp8 convert (`65a6bb147` `DISABLE_MLA_Q_ACTIVATION_QUANTIZATION` keeps Q/out bf16 + fixes
+  a latent q_scale over-scale) are ALL cleared — fp8-KV is no longer Mosaic-blocked. BUT: 128K@fp8/dcp=1
+  is genuinely HBM-bound (args 28.90G + program 2.15G incl. 2.05G overlays + reserved 1.25G ≈ 32.3G >
+  30.75; the overlays are the unrolled 78-layer machine code — no flag shrinks them), realistic fp8/dcp=1
+  ceiling ~80–96K. **⚠ fp8-KV has NEVER produced a validated on-metal token** (audit MAJOR) — a cheap fp8
+  needle @dcp=1 MUST pass before any coupled fp8+DCP claim. fp8 is now the ALTERNATIVE 128K config, not
+  the required one (see next).
+- **✅ DCP ROOT CAUSE FOUND AND FIXED — block-granularity double-multiplication (`1f700c507`; 07-09
+  21:30→22:32).** `get_kv_cache_spec` pre-multiplied block_size ×dcp (the #2398 "TODO(xiang) hack") AND
+  vLLM's engine multiplied ×dcp AGAIN → the engine allocated one block id per 512×dcp² tokens while the
+  TPU stack consumed the table at 512×dcp tokens/entry → every table entry ≥1 dereferenced an
+  unallocated/stale page. Explains EVERY symptom (dcp-only, >1024-token threshold at dcp=2,
+  pageloop-inert, NO_DONATE-inert, CPU-invisible). Five independent confirmations incl. a live prediction
+  (900-token 1-page needle PASSED before the fix landed). **Post-fix on metal: 900tok 1-page ✓, 4K
+  single-chunk ✓ (was pred=None), 16K multi-chunk ✓ (was pred=None)** — runs 119–121. The DCP
+  read/combine/scatter machinery was CORRECT all along; the docs/11 §5d scatter-impl hunt is OBSOLETE
+  (banner added). `GLM_DCP_SCATTER_IMPL=pageloop` (`f2effec06`+`d59626964`) is kept — CPU-bit-identical,
+  the default for the sparse indexer-key scatter — but it was never the fix.
+  **Consequence: bf16 + DCP=4 fits 128K WITHOUT fp8** (22.76 weights + 2.05 overlays + 1.25 reserved +
+  12.6/4 ≈ 3.15 KV ≈ 29.2 < 30.75) — the dense gate is decoupled from the unvalidated fp8 write path.
+- **Upstream verdict (`docs/upstream/dcp-block-granularity-report.md` — DO NOT FILE the corruption
+  report):** the same bug WAS live upstream, shipped broken in **v0.20.0–v0.24.0**, and was fixed by
+  **PR #3129** (weiyu0824, merged 2026-07-09 12:04 PT — **3 hours before our fix**; same two-sided
+  contract). Treat `1f700c507` as convergent-with-#3129; adopt upstream's structure on the next sync.
+  Still upstreamable from us: the engine-vs-TPU **geometry assert** (would have caught 5 releases), the
+  2 residual granularity holdouts (routed-experts slot reconstruction, KV-connector insert/extract), and
+  the big one — **upstream dcp>1 is NOT real context parallelism** (it folds into head-TP; kernels see
+  the full cache): our owner-scatter + LSE-merge CP attention is fork-only, a genuinely novel feature PR.
+- **128K SMOKED 7/7 (first 128K retrievals ever):** smoke 3/3 (d=.25/.5/.75, run 122) + smoke-2 4/4 at the
+  MECHANISM depths 0.0/0.05/0.95/1.0 (run 123), all at 130,420 prompt tokens, bf16+DCP=4. Recorded as
+  SMOKE (n=7, Wilson LB ~44% at n=3) — GO for the gate, not the gate.
+- **Observability toolkit REPAIRED (`6f45e0944` + `165c76462`; from the 25-agent obs audit: 2 BLOCKER +
+  6 MAJOR in the tools themselves):** dcp_cache_diff now REFUSES verdicts on partial dumps (a missing
+  shard could silently flip DIFFER→MATCH) + fails loud on short block tables (the silent break that hid
+  the granularity bug); dumps carry a `__dtype` tag (bf16/fp8 dumps used to crash every reader);
+  `dcp_dump_check.py` catches "dump requested, nothing written" (the driver-only-env incident); armed
+  guards RAISE instead of fail-open; `GLM_DUMP_STEP_HLO` (`3b2963082`) says loudly when the step fn
+  compiled inline and was NOT dumped; **`code_fingerprint.py` logs per-worker git-hash at init and
+  `GLM_EXPECT_CODE_HASH=<hash>` makes a mismatched worker RAISE** (the stale-worker night, below);
+  `assert_engine_tpu_block_granularity()` fails at init on the exact contract class just root-caused.
+  74 CPU tests. The 29-agent code audit of 8802ebab7..HEAD found no BLOCKER/MAJOR in the shipped code.
+- **CRITICAL PROCESS LESSON — the stale-worker night (07-09 15:20):** the 8 hosts have PER-HOST local
+  `~/tpu-inference` checkouts; workers 1–7 silently ran `8802ebab` all night while worker 0 had the
+  fixes, AND bare `git push -q` was not updating origin. **Standing rule: before ANY pod test of a fork
+  change — `git push origin glm-5.2-v4-next`, then `TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash
+  ~/glm-tpu/scripts/sync_workers.sh`, and confirm all 8 hosts print the SAME hash** (belt-and-braces:
+  bake `GLM_EXPECT_CODE_HASH` into EXTRA_ENVS). Every worker0-only "inert" result from that night was
+  re-validated after sync.
+- **Sparse-DCP distributed stack (GLM_DSA_DCP) CODE-COMPLETE — Stages A+B+C, CPU-CERTIFIED ONLY (no
+  metal execution yet):** the 128K SPARSE gate is NEW DISTRIBUTED CODE, not "32K with a bigger number"
+  (DCP shards the context → local top-2048 ≠ global top-2048). Design (owner's, 07-10 00:05): per-shard
+  score on the local stripe → local top-min(k, S_local) → all-gather candidates (64 KiB/token @dcp=4) →
+  position-sort → global top_k — **elementwise-exact vs single-chip incl. tie order, gather-order-
+  invariant by construction** → owned-subset attention → `_dcp_lse_combine` (dense machinery reused).
+  - **Stage A** `ed2a021be` — distributed top-k primitives, sparse-decode `emit_lse`, local striped
+    gather; 132/132 CPU tests, byte-identity proven. (Design prototype: 52/52 incl. mutation audit.)
+  - **Stage B** `4f390a61e` (+ reviewer test extension `e7c239c91`) — serving-path distributed sparse
+    decode (shard_map write/select/attend + LSE combine); 14/14 new e2e; **adversarial review: SAFE-FOR-
+    METAL-LADDER** (cross-checkout gate-off jaxpr byte-identity; new selection battery all
+    elementwise-exact; refusal semantics un-bypassable — NaN poison survives swallowed callbacks).
+  - **Stage C** `6f8855c3f` (tip) — distributed masked-prefill flash scan with LSE combine (the last
+    code bridge to the sparse ladder); merged suite 24/24 in one process; prefill e2e at non-page-aligned
+    chunks; gate-off jaxpr SHA == HEAD. **Stage-C adversarial review in flight** — it is the hard gate
+    before the metal ladder.
+- **MTP: FROZEN** (owner directive, 07-09 23:10) — code-complete, pod-validation pending; no new surface
+  until the dense+sparse 128K gates close.
+- **Benchmark harness** (unchanged + hardened): `glm_longctx.py` passkey ladder, `GLM_DCP`/`GLM_SPEC_K`/
+  `GLM_KV_CACHE_DTYPE` knobs, `warn_worker_only_envs()`; **drivers launch via `setsid nohup … </dev/null`**
+  (a tool-shell teardown SIGTERM'd two engine-built runs mid-serve); **never grep bare "PASS"** — it
+  matches `hlo_passes.cc` log lines (a false 64K "pass" was caught this way; read the needle lines).
+
+## RUNNING right now
+
+- **THE DENSE 128K GATE — run_id 124** (`~/glm-run/GATE128K_n77.log`): 128K passkey, **n=77 = 7 depths
+  {0.0,0.05,0.25,0.5,0.75,0.95,1.0} × 11 trials**, bf16 + GLM_DCP=4, granularity fix + Stage-A code
+  (`ed2a021be`) on all 8 workers. Config: pool 68 blocks (2048 tok/id at dcp=4), chunk 2048, gmu 0.90,
+  max-len 131,840, TPU_MIN_TOKEN_BUCKET=32, anti-frag LIBTPU flags baked. Launched 2026-07-10 00:09 UTC,
+  ~19 h ETA (≈8 min/needle). **42/42 correct, zero failures as of 05:53 UTC** — depths 0.00/0.05/0.25
+  closed 11/11 (the mechanism cells perfect), depth 0.50 at t=8. **77/77 ⇒ Wilson LB 95.3% ⇒ the
+  ≥95%@128K dense slot fills with a defensible n; ANY failure ⇒ n must grow (~200 to survive one miss).**
+  A watchdog (5-min poll) fires on the first `correct=False`, driver death, or DRIVER_EXIT.
+
+## What is NEXT (in order)
+
+1. **Close the dense gate** — let run 124 finish; record in results.db + RESEARCH_LOG; backup bundle.
+2. **The sparse metal ladder — `docs/11-pod-runbook.md` §8** (sync workers to `6f8855c3f` + Stage-C
+   review verdict first): emit_lse unit @dcp=1 → sparse decode @dcp=2 ≤2048-tok vs dcp=1 → chunked
+   prefill @dcp=2 4–6K + step-HLO honesty → 32K selected-set dump dcp=2 vs dcp=1 (Gate-2b on metal) →
+   32K sparse passkey dcp=2/4 → 64K → **the 128K SPARSE gate at n≥73**.
+3. **256K throughput A/B** (dsa-sparse vs dense; `bench/dsa_throughput.py`, dcp≥4, fp8-KV after its
+   dcp=1 needle validates) — the second empty headline gate.
+4. **Benchmarks at scale**: GSM8K n≥200 (retire the n=32 smoke), GPQA-198 rerun @ `--max-new 16384`
+   (owner-gated "go"), AIME-2026 card n=30.
+5. **MTP M2** — stays FROZEN until 1–3 close.
 
 ## Fork branch map (`~/tpu-inference`, worktrees at `~/tpu-inference-<tag>`)
 
 | branch | what | on origin? |
 |---|---|---|
-| `glm-5.2-v4` (`02e44b36`) | **pod mainline** — Stage-1 + observability + the OOB fix; the pod runs this for dense-MLA | yes |
-| **`glm-5.2-v4-next`** | **integrated staging** — mainline + Stage-2 kernels (silicon-validated 2a/2b) + 2a2 + 2int + sparse-prefill + DCP + guards + **mtp-g4** (`534cd74d7`) + det + **the DCP persistence fix**, ALL gated off | yes (merge-base `886eaceb4`; latest tip in the log) |
-| `glm-5.2-v4-dcppersist` (`c6da472e5`+`ce51b85ef`) | the DCP multi-chunk-prefill out-sharding fix (VllmModelWrapper step-fns + MTP `_propose`); reviewed **SHIP**; merged into `-next` | — |
-| `glm-5.2-v4-obsguard` | the two DCP guards + the `GLM_DCP_CACHE_DUMP` hook (18 tests); merged into `-next` | — |
-| `glm-5.2-v4-kvpack` | the DCP kv_packing CPU investigation (kernel interpret path + repro test; REFUTED the kv_packing suspect) | — |
-| `glm-5.2-v4-sparse-prefill` / `-sdcp` | Stage-2 sparse-prefill + the sparse×DCP build (another session) | — |
-| `glm-5.2-v4-2int`/`-2a2`/`-r5fix`/`-r6fix`/`-obs`/`-pg2`/`-dcp` | feature branches, all merged into `-next` | some |
-| `glm-5.2-v4-mtp` (`6beacb5d`) | dense-MTP M1 — frozen; superseded for M2 by the mtp-g4 merge (never run M2 here: lacks the OOB fix) | no |
-| `pr-g1..g6` | upstream PR series slices (`docs/02` + `docs/pr-descriptions/`; owner submits). **G5** = `pr-g5-mla-pure-tp` (`132a11f9`, TP-topology MLA). **G6** = `pr-g6-dsa-kernels` (`0ac6eb9e4`→`5bf3e5927`, the DSA kernels — the headline contribution), pushed | on fork |
+| `glm-5.2-v4` (`02e44b36`) | pod mainline — Stage-1 + observability + the OOB fix | yes |
+| **`glm-5.2-v4-next`** (**`6f8855c3f`**) | **integrated staging + what the pod RUNS NOW** — everything above: Stage-2 kernels, DCP + **the granularity fix `1f700c507`**, fp8-KV v4 fixes, obs repairs, **sparse-DCP Stages A+B+C**, mtp-g4, det; all gated off by default | yes — **workers pull from origin: push THEN sync_workers, verify 8× same hash** |
+| `pr-g1..g6` | upstream PR series slices (owner submits); G6 = the DSA kernels | on fork |
+| older feature branches | merged into `-next`; `dcppersist2`'s "shardlocal" was orphaned/never on workers | — |
+
+Commit inventory since `8802ebab7` (all on `-next`): `a248bd6b0`/`4eb10e6ad` (ALIAS_KV no-ops, honest
+nulls) → `3b2963082` (step-HLO dump) → `65a6bb147`/`8a76ae5e3`/`0f15e3ad0` (fp8-KV v4 fixes) →
+`f2effec06`/`d59626964` (pageloop + its test) → **`1f700c507` (THE granularity fix)** →
+`6f45e0944`/`165c76462` (obs repairs) → `ed2a021be` (Stage A) → `4f390a61e`/`e7c239c91` (Stage B + tests)
+→ `6f8855c3f` (Stage C).
 
 ## Review-round ledger (adversarial review is part of the loop — every change-set gets one)
 
-| round | scope | reports | outcome |
-|---|---|---|---|
-| 1 | Stage-1 diff (4 lenses) | `stage1-{a,b,correctness,numerics}.md` | 3 HIGHs fixed (engine-boot kv_cache_spec, default-on indexer, CPU test) |
-| 2 | PR #2324 TP-topology port | (fixes = fork `a429be54`) | gather-before-TuningKey, page-512 v4 gate, TPU_MIN_TOKEN_BUCKET plumbing |
-| 3 | parallel-agent deliverables | `round3-*.md` | 2 HIGHs (BPE length −17.2%, `[gMASK]` claim), revision pinning, extractor fixes |
-| 4 | pod bring-up series | `round4-*.md` | hardening `761ea755` |
-| 5 | Stage-2 kernels | `round5-agent*.md` | fixes on `-r5fix` (`c8a51543`); their on-TPU checklists = runbook §3's expected-failure list |
-| 6 | dcp, paged-indexer, observability, mtp-card, pr-branches | `round6-*.md` | fixes on `-r6fix`/`-dcp`/`-2a2` + bench F1 seed fix; the sharedbin honest-nulls CORRECTION |
-| 7 | pg2 OOB fix + 2int integration | `round7-2int.md`, `round7-pg2-oob.md` | LANDED (108/108 green; F1–F3 = the `pallas_decode` on-TPU gate list, folded into runbook §3) |
-| 8 | staging grafts + freeze-conformance | `round8-{staging-grafts,freeze-conformance}.md` | stranded r6 fix `755b1719` merged to `-next`; kernel-freeze conformance confirmed |
-| 9 | determinism fix + MTP-M2 harness prep | `round9-{detfix,harness}.md` | det root cause (selection-order summation amplifier) fixed `215f8ddb`; M2 harness 2 MED + 8 LOW addressed |
-| DCP | the DCP saga: routes, kv_packing diagnosis, persist-fix correctness/CPU-proxy, vLLM-path fix on/off-gate | `dcp-routes.md`, `dcp-diagnosis-kvpacking.md`, `dcp-persist-fix-{correctness,cpu-proxy}.md`, `dcp-vllm-fix-{on,off}gate.md` | caught the mistargeted flax fix (HIGH) → redirected to VllmModelWrapper; both on/off-gate reviews **SHIP**; validation gated behind an on-pod cache-dump MATCH |
+Rounds 1–9 + the DCP-saga reviews: see the table in git history (`docs/reviews/*`). New since 07-09:
+| scope | outcome |
+|---|---|
+| GLM_MLA_ALIAS_KV L1/L2 | SAFE-TO-TEST, byte-identical off; efficacy caveat CONFIRMED on metal (inert) — kept as documented no-ops |
+| fp8-KV Q-bf16 + pack_new_kv fixes | numeric-parity vs `pack_new_kv_reference` (bf16 AND fp8) + structural 0-f8-converts; v4 COMPILE confirmed on pod |
+| granularity fix `1f700c507` | adversarial review + 5 independent confirmations incl. a live prediction; CPU sim corrupts at exactly L=1025 unpatched |
+| code audit 8802ebab7..HEAD (29 agents) | no BLOCKER/MAJOR; 3 MINORs (L2-donation comment, fp8-never-ran-on-metal, pageloop cost) — all addressed/logged |
+| obs audit (25 agents) | 2 BLOCKER + 6 MAJOR in the TOOLS — all repaired in `6f45e0944` |
+| sparse-DCP Stage B | **SAFE-FOR-METAL-LADDER** (reviewer authored + contributed the mixed-batch/multi-chunk suite `e7c239c91`) |
+| sparse-DCP Stage C | review IN FLIGHT — hard gate before the §8 ladder |
 
 ## Operating landmines (learned the hard way — expect these)
 
-- **GLM serves via `VllmModelWrapper` (the vLLM path), NOT `get_flax_model`.** `GlmMoeDsaForCausalLM` is in
-  `_VLLM_PREFERRED_ARCHITECTURES` → a fix on the flax path is a NO-OP for GLM (the DCP mistargeted-fix
-  landmine, caught only by tracing the chain of custody in review). Verify the code path before trusting a fix.
-- **DCP fails on MULTI-CHUNK PREFILL only** (single-chunk always correct); the kernel/scatter/combine +
-  scatter arithmetic are CPU-exonerated — the residual bug is the metal-only packed-WRITE/new-KV path.
-  fp8-KV is SHELVED (two v4 Mosaic `arith.cmpi` legalize blockers) — it is not a shortcut around DCP.
-- **Worktree policy: agents NEVER edit the main checkout** `~/tpu-inference` — the live pod imports it on
-  every host. All feature work in worktrees on feature branches, merged via `-next`; review agents read-only.
-- **The pkill self-match landmine:** un-escaped `pkill -f` patterns match the pkill/ssh command line itself;
-  every launcher pattern is bracket-escaped. The stop phase also SIGKILLs the cohabiting ASPt stack (see the
-  launcher's SHARED-POD POLICY — coordinate). Prefer exact-PID kills.
-- **TPU access is serialized to the main session.** Helper agents set `JAX_PLATFORMS=cpu` BEFORE python starts.
-- **`GLM_*` envs are trace-time + worker-side** → raylet-baked via the launcher (`EXTRA_ENVS`) AND exported on
-  the driver (workers need them, not just the driver — a repeated footgun). `GLM_DSA_MODE` shapes the
-  KV-cache spec — cross-host divergence = inconsistent cache topology, not just a wrong mode.
-- **Relaunch after any pod crash** (leaked EngineCore / ~1800 s PG timeout) — but fetch flight files FIRST
-  (`triage_crash.sh`); the launcher prunes them and a pod restart wipes /tmp.
-- Flaky FP8-dequant-during-load crash (~60% on DSV4, environmental) → retry; 2 consecutive = full relaunch.
-  `OMP_NUM_THREADS=1` everywhere. No pipeline parallelism. The parity harness is single-chip-only BY DESIGN.
-  Buckets: the real constraint is 32-way divisibility — bucket 32 is legal and validated.
-- **Durable backups**: `scripts/backup_bundle.sh` → `gs://driftbench-dsv4-uc/backups/glm-tpu/<ts>/` (verified
-  bundles, ALL fork branches, results.db snapshot, logs, docs). Run it after every milestone; us-central2 ONLY.
+- **WORKER STALENESS (the #1 footgun):** 8 per-host checkouts + origin not updated by bare `git push -q`.
+  Push explicitly, `sync_workers.sh`, verify 8× the same hash, pin with `GLM_EXPECT_CODE_HASH`. A
+  worker0-only fix "tested" on the pod tests NOTHING.
+- **`setsid nohup … </dev/null` every driver** — tool-shell teardown SIGTERMs the process group.
+- **The grep-"PASS" trap:** `hlo_passes.cc` log lines match; assert on real needle/result lines only.
+- **GLM serves via `VllmModelWrapper`, NOT `get_flax_model`** — verify the code path before trusting a fix.
+- **`GLM_*` envs are trace-time + worker-side** → raylet-baked via `EXTRA_ENVS` AND exported on the
+  driver. `GLM_DSA_MODE`/`GLM_DSA_DCP` shape the KV-cache spec — cross-host divergence = inconsistent
+  cache topology. `warn_worker_only_envs()` + `dcp_dump_check.py` now catch the classic misses.
+- **Small-n is never a gate**: ≥95% needs n≥73 zero-failure (Wilson). Mechanism depths 0.0/0.05 and
+  0.95/1.0 are REQUIRED cells for any DSA claim (0.75 passes nearly by construction).
+- **gmu is inert for fragmentation once `num_gpu_blocks_override` is set**; allocation ORDER governs.
+  Contiguous-free is a lottery — a pass that needs fragmentation luck is NOT a pass (3/3 rule).
+- **Relaunch after any pod crash** (leaked EngineCore / ~1800 s PG timeout); fetch flight files FIRST.
+  TPU access serialized to the main session; agents set `JAX_PLATFORMS=cpu` and work in WORKTREES.
+- **Durable backups**: `scripts/backup_bundle.sh` → `gs://driftbench-dsv4-uc/backups/glm-tpu/<ts>/`
+  (us-central2 ONLY — an agent's EU-bucket violation was caught + purged on 07-10).
 
 ## Target (unchanged)
 
 `zai-org/GLM-5.2-FP8` (753B/40B, 78L, MLA + DSA index_topk=2048/32 heads/IndexShare freq 4, MTP layer 78,
-1M ctx) on the 32-chip v4 pod `db-v4-64-od` ONLY. Weights staged at
-`gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/` (150/150 files, 755.7 GB, verified). Stage-1 gate: card-family
-scores within ~1–2 pts at ≤8K ctx. Stage-2 gate: passkey ≥95% to ≥128K + bounded divergence. Stage-3: MTP
-acceptance ~5.
+1M ctx) on the 32-chip v4 pod `db-v4-64-od` ONLY. Weights at `gs://driftbench-dsv4-uc/models/GLM-5.2-FP8/`.
+Stage-2 gate: passkey ≥95% to ≥128K (dense IN FLIGHT n=77; sparse next at n≥73) + bounded divergence.
+Stage-3: MTP acceptance ~5 (FROZEN).
 
 ## The exact next task
 
-DONE and not to be redone: §0–§4 (GPQA triaged, GSM8K clean, `-next` staging switch byte-identical 4/4 on
-hardware, DSA compile probe + D0 sparse==dense closed); the DCP **persistence** cache-dump has already flipped
-DIFFER→MATCH (A/B/C, `max|Δ|=0`). Remaining, in order (recipes in `docs/11-pod-runbook.md`):
-
-1. **Empirical 128K@dcp=1 fit check (do this FIRST — it may unblock correctness cheaply).** Run 128K passkey
-   at **batch=1 / bf16 / DCP-off** and MEASURE the HBM: the cache-replication arithmetic predicts ~11.9 GiB/chip
-   KV + 23 GiB weights > 30.75 → OOM, but confirm empirically. **If it FITS, correctness@128K decouples from
-   DCP entirely** (batch=1 needs no sharding). Defer to the measured result over the arithmetic.
-2. **Land the KV-capacity path for the 128K SPARSE gate.** Fix the **DCP multi-chunk-prefill packed-WRITE of
-   the 2nd `kv_packing=32` tile** (fix directions: drop the scatter donation / per-page `dynamic_update_slice`
-   / shard-local scatter / correct the upstream new-KV values under the 32-way token all_gather × dcp). The
-   **on-pod scatter-only + new-KV-dump DIFFER→MATCH diff is the exact falsifier** — do NOT trust any passkey
-   until MATCH. Then **dcp=2 (dcp=4 if OOM) 128K passkey ≥95%/depth**, then the 8K/32K/128K ladder.
-3. **256K throughput A/B** (dsa-sparse vs dense) — **needs DCP or fp8-KV** (gated on step 2 landing, since
-   throughput needs batch/sharding); `bench/dsa_throughput.py`, dcp≥4 — the 2nd empty gate.
-4. **§7 — MTP M2** — greedy spec-decode == non-spec (`GLM_SPEC_K=1` then `5`, `bench/mtp_m2_check.py --latest`).
-5. **§6 — AIME-2026 card n=30** + the **full GPQA-198 rerun @ `--max-new 16384`** (owner-gated "go").
-
-Each step: env block, expected outcome, abort criteria, **3/3 rule** (multi-host is probabilistic; one pass ≠
-done — the DSV4 worker-3 race). After each milestone: RESEARCH_LOG + HANDOFF + commit/push + backup bundle.
+The dense gate (run 124) is baking with a watchdog — do not touch the pod until it triggers. Then, in
+order: (1) close/record the gate; (2) **§8 sparse ladder** (`docs/11-pod-runbook.md`) — Stage-C review
+verdict → sync workers to `6f8855c3f` → emit_lse unit → decode parity → prefill+HLO honesty →
+selected-set dump → 32K/64K passkey → 128K sparse gate n≥73; (3) 256K throughput A/B; (4) GSM8K n≥200 +
+GPQA@16K. Each step: env block, expected outcome, abort criteria, 3/3 rule for gates. After each
+milestone: RESEARCH_LOG + HANDOFF + commit/push + backup bundle.
 
 ## Owner-gated (draft, don't do)
 
-Upstream PR submission (`docs/02` + `docs/pr-descriptions/` — the owner submits, AI-assist disclosed;
-coordinate with PR #2324/yiqiliu2), the full GPQA-198 @16K "go", any new machine/VM/TPU (never — only
-same-region bucket + disk-attach to the 8 existing hosts), force-push, external comms.
+Upstream PR submission (incl. the #3129-adjacent geometry-assert/holdout/CP-feature series — the owner
+submits, AI-assist disclosed), the GPQA-198 @16K "go", any new machine/VM/TPU (never — only same-region
+bucket + disk-attach to the 8 existing hosts), force-push, external comms.

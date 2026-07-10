@@ -1,52 +1,55 @@
 # GLM-5.2 → TPU v4 PORT — /goal (RESUME, ≤4k)
 
 SOLO, FULLY AUTONOMOUS. Finish porting **GLM-5.2-FP8** to **TPU v4** the DeepSeek-V4-Flash way.
-**DON'T STOP/ASK** until (1) it serves correctly, (2) HF-card benchmarks match within noise, (3) the **DSA
-sparse-MLA kernel** clears its gates (passkey ≥95% to ≥128K; throughput ≥256K). Self-correct; when unsure
-pick + log. Only a hard block pauses THAT thread.
+**DON'T STOP/ASK** until (1) it serves correctly, (2) HF-card benchmarks match within noise, (3) the
+**DSA sparse-MLA kernel** clears its gates (passkey ≥95% to ≥128K; throughput ≥256K). Self-correct;
+when unsure pick + log. Only a hard block pauses THAT thread.
 
-## STATE — what's DONE (don't redo)
-- **Stage 1 DONE:** 753B FP8 serves on 32 v4 chips (runai stream, FP8-resident, EP filter, pure TP×EP).
-  GSM8K **96.9% (31/32)** = **SMOKE (n=32)**, NOT "at scale" (needs n≥200).
-- **Stage 2 kernels SILICON-VALIDATED (single v4 chip):** GATE 2a (Mosaic compile, 3 fixes + w-tile fallback)
-  + 2b (**selected-set-EXACT** vs HF oracle; fp32 9.5e-7 / bf16 1.95e-3). **Sparse passkey 100% @8K AND 32K**
-  (16× sparsification — the SELECTION works). Sparse decode + prefill + IndexShare built.
-- **Stage 3 code-complete (CPU):** MTP M1 draft-parity + G4 index-share; dense-MTP knob GLM_SPEC_K.
-- Fork **`glm-5.2-v4-next`** = all above + DCP + guards, gated off. PRs g1–g6 drafted.
+## STATE — DONE (don't redo)
+- Stage 1: 753B FP8 serves on 32 v4 chips. Stage 2 kernels silicon-validated (selected-set-EXACT);
+  sparse passkey 100% @8K/32K. Stage 3 MTP code-complete (CPU).
+- **64K dense 6/6 @dcp=1/bf16** (run 100). dcp=1 128K wall = HBM FRAGMENTATION (contiguous-free
+  lottery); ceiling ~88–90K; anti-frag = LIBTPU rerun=5 + rwb_fusion=false.
+- **fp8-KV COMPILES on v4** (pack_new_kv i8 fixes) — but fp8 NEVER generated a metal token; a cheap
+  fp8 needle @dcp=1 is required first.
+- **✅ DCP FIXED (1f700c507): block-table granularity double-×dcp** (engine ids 512·dcp² tok vs TPU
+  512·dcp/entry). The "packed-write metal bug" NEVER EXISTED. Post-fix: 900tok/4K/16K ✓, 128K smoke
+  7/7 (first ever). **bf16+DCP=4 fits 128K without fp8** (~29.2/30.75G). Upstream #3129 fixed the same
+  bug 3h before us (broken v0.20–v0.24) — convergent; do NOT file.
+- **Sparse-DCP Stages A+B+C CODE-COMPLETE, CPU-CERTIFIED ONLY** (tip 6f8855c3f; Stage B reviewed
+  SAFE-FOR-METAL-LADDER; Stage C review in flight; gate-off jaxpr == HEAD). Zero sparse-DCP tokens on
+  metal. Obs kit repaired fail-loud (6f45e0944: partial-dump refusal, GLM_EXPECT_CODE_HASH,
+  granularity assert).
 
-**2026-07-09: 64K passkey VERIFIED 6/6=100% @dcp=1/bf16.** 128K@dcp=1 is HBM-STRUCTURAL (overlays 2.05G +
-KV + weights > 30.75; bf16 copy-elim a DEAD END) → **128K needs cache SHARDING (DCP) + fp8-KV**.
-
-## ACTIVE FRONTIER — fix DCP, then fp8-KV + DCP=2 → 128K
-fp8-KV kernel now COMPILES on v4 (pack_new_kv i8 select_n cmpi + i8 muli fixed; parity 388/388; audit
-CLEAN). **DCP bug RE-LOCALIZED (synced workers): FUNDAMENTAL** — single-chunk >1-page (P_g=1024) ALSO
-fails (pred=None); "multi-chunk-only" was a stale-worker artifact. CPU with the REAL kernel proves the
-DCP read/combine/scatter LOGIC correct to ~5e-6 (1–8 pages) → **METAL-ONLY lowering defect in the
-packed/tiled/context-sharded cache access** (interpret can't test kv_packing>1 — kernel.py:2159). The
-write reformulation (pageloop, CPU-bit-identical) was INERT.
-1. Discriminate then fix: **H2** `GLM_DCP_NO_DONATE=1` needle (cheap; never fairly tested) → if fixed,
-   donated-tile commit was the bug. **H1** packed METAL read of local page tiles ≥1 (kernel.py:1242-1276
-   reshaped+bitcast fetch on the dcp-halved dim-1) → read-side per-page fix in _fetch_bkv.
-2. Then **fp8-KV + GLM_DCP=2** (KV 6.14→3.07G) → 128K fits → needle ≥95%; re-enable **DSA sparse** for the
-   **128K SPARSE** gate (kernel PASSED silicon @32K).
-3. **256K throughput** A/B (dsa-sparse vs dense) — also via fp8+DCP.
+## ACTIVE FRONTIER (in order)
+1. **Finish the DENSE 128K gate n=77 — RUNNING** (run_id 124: 7 depths×11, bf16+GLM_DCP=4, ~19h;
+   42/42 @05:53 07-10; watchdog armed). Record + backup when it closes.
+2. **Sparse metal ladder — docs/11 §8** (after Stage-C verdict + worker sync): emit_lse unit @dcp=1 →
+   sparse decode dcp=2 ≤2048tok vs dcp=1 (logprobs+stash) → chunked prefill 4–6K + step-HLO honesty
+   (ONE candidate all-gather pair/full layer, NO whole-cache collectives) → 32K selected-set dump dcp=2
+   vs dcp=1 → 32K/64K passkey → **128K SPARSE gate n≥73**. Watch: emit_lse Mosaic lowering,
+   ~134MB/layer/chunk candidate all-gather @T=2048/dcp=4, per-shard flash transient.
+3. **256K throughput A/B** (dsa-sparse vs dense, dcp≥4; bench/dsa_throughput.py).
+4. **Benchmarks at scale**: GSM8K n≥200 (retire the n=32 smoke), GPQA-198 @16K (owner-gated).
 
 ## HARD RULES
-- **COST:** bucket **`gs://driftbench-dsv4-uc` (us-central2) ONLY**, never EU. **NEVER create a machine/VM/TPU**
-  — only the 32 v4 chips / 8 hosts (disk-attach OK). ONE FP8 copy.
+- **COST:** bucket `gs://driftbench-dsv4-uc` (us-central2) ONLY, never EU. **NEVER create a
+  machine/VM/TPU** — only the 32 v4 chips / 8 hosts (disk-attach OK). ONE FP8 copy.
 - **METHOD:** FIX root cause, never reward-hack. Every change gated (byte-identical off) + CPU test +
-  **independent adversarial review** + pod 3/3. **Observability-FIRST** — it localized every metal bug. Honest nulls.
-- Agents edit in WORKTREES (JAX_PLATFORMS=cpu); TPU serialized to the main thread. Commit+push often; no
+  independent adversarial review + pod 3/3. Observability-FIRST. Honest nulls.
+- **SMALL-n IS NEVER A GATE:** ≥95% needs **n≥73 zero-failure** (~200 to survive one miss). Mechanism
+  depths 0.0–0.05 AND 0.95–1.0 are REQUIRED cells. SMOKE ≠ GATE — label them.
+- **MTP stays FROZEN** until the 128K dense+sparse and 256K gates close.
+- Agents edit in WORKTREES (JAX_PLATFORMS=cpu); TPU serialized to main thread. Commit+push often; no
   force-push; owner submits upstream PRs. HF_TOKEN in `.env` (never commit).
 
 ## READ FIRST
-`~/glm-tpu`: HANDOFF.md → docs/RESEARCH_LOG.md → docs/11-pod-runbook.md → docs/reviews/. Fork on
-`glm-5.2-v4-next`. Launch: `bash scripts/launch_glm_32chip.sh` — EXTRA_ENVS bakes GLM_* into the raylet
-env (WORKERS need them — a footgun). setsid the driver (it gets SIGTERM'd mid-serve otherwise).
+`~/glm-tpu`: HANDOFF.md → docs/RESEARCH_LOG.md (07-09 09:20 on) → docs/11 §8. Fork
+`glm-5.2-v4-next` @6f8855c3f.
 
 ## LANDMINES
-**Workers have PER-HOST checkouts** — after ANY fork commit: `git push origin glm-5.2-v4-next` +
-`TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash scripts/sync_workers.sh` (all 8 = SAME hash) BEFORE the pod test,
-else stale worker code runs SILENTLY (bit me all night). GLM routes via **VllmModelWrapper**, NOT
-get_flax_model. "PASS" in logs may be a grep hit on `hlo_passes.cc` — read real needle lines. Relaunch after
-any pod crash. `setsid` the driver.
+**WORKER STALENESS:** 8 per-host checkouts; bare `git push -q` didn't update origin — after ANY fork
+commit: push origin + `TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash scripts/sync_workers.sh`, verify all
+8 = SAME hash, bake GLM_EXPECT_CODE_HASH. **setsid nohup** every driver (else SIGTERM'd mid-serve).
+**"PASS" greps match hlo_passes.cc** — read real needle lines. GLM_* envs raylet-baked via EXTRA_ENVS
+AND on driver. GLM routes via VllmModelWrapper. Relaunch after any pod crash.

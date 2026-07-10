@@ -471,6 +471,23 @@ unoptimized step times; watch the flight recorder cadence, don't kill it for bei
 **Abort:** dcp bring-up (5b) failing acc → stop the ladder; the LSE-combine/striping math is
 wrong on hardware — collect logits evidence at 4K first (docs/05 §7's micro-parity plan).
 
+> **⛔ OBSOLETE (2026-07-09 21:30 — kept for history only).** Everything from here through 5d(iv) — the
+> cache-dump DIFFER→MATCH protocol, the A/B/C localizer, the scatter-only probe, and the whole
+> `GLM_DCP_SCATTER_IMPL` DIFFER→MATCH lever hunt — was chasing a bug that DID NOT EXIST in the
+> write/scatter/read machinery. The real root cause was the **block-table granularity contract**: the fork's
+> `get_kv_cache_spec` pre-multiplied block_size ×dcp AND vLLM's engine multiplied ×dcp again, so the engine
+> allocated one block id per `512·dcp²` tokens while the TPU stack consumed the table at `512·dcp`
+> tokens/entry — every table entry ≥1 dereferenced an unallocated/stale page. Fixed in `1f700c507`
+> (convergent with upstream PR #3129, merged 3 h earlier — see
+> `docs/upstream/dcp-block-granularity-report.md`). Post-fix: 900tok/4K/16K needles all correct (runs
+> 119–121), 128K smoked 7/7. The scatter was never the bug: `pageloop`/`flat`/`no_donate` were all
+> correctly-measured INERT (and that inertness was evidence FOR the granularity theory). `pageloop` is
+> retained (CPU-bit-identical, the default for the sparse indexer-key scatter; debug-priced — per-layer
+> sort+scan) and `dcp_cache_diff` now REFUSES partial dumps + asserts block-table coverage (`6f45e0944`),
+> because under the granularity bug the diff itself could return a WRONG verdict. Do not run this section
+> to debug DCP; go to §8. The text below is preserved verbatim as a record of the (wrong but disciplined)
+> localization path.
+
 **5d. DCP multi-chunk debug (the pinned failure: multi-chunk prefill).** The on-metal discriminator
 showed L=3200 FAILS at `--max-batched-tokens 2048` (two prefill chunks) but PASSES at `--max-batched-tokens
 6144` (one chunk). CPU tests prove the owner-scatter WRITE and its metadata are correct
@@ -799,9 +816,130 @@ same checker) — the docs/08 M2 bar proper.
 
 ---
 
+## §8 GLM_DSA_DCP sparse ladder (post-granularity-fix)
+
+*(Added 2026-07-10. This replaces §5's DCP debugging as the active frontier. Prereqs: the DENSE 128K gate
+(run 124, n=77) has finished and is recorded; the Stage-C adversarial review has returned its verdict —
+it is the hard gate before any of this touches metal. The sparse-DCP stack (Stages A `ed2a021be` + B
+`4f390a61e`/`e7c239c91` + C `6f8855c3f`) is **CPU-certified only** — Stage B reviewed SAFE-FOR-METAL-LADDER,
+gate-off jaxpr byte-identical to HEAD, but ZERO sparse-DCP tokens have ever run on metal. This ladder is
+where that changes, one falsifiable rung at a time.)*
+
+**Why a ladder at all:** sparse@128K under DCP is NEW DISTRIBUTED CODE, not "32K with a bigger number".
+DCP shards the context, so a per-chip indexer scores only its stripe — local top-2048 ≠ global top-2048.
+The stack does: per-shard score → local top-min(k, S_local) → all-gather candidates → position-sort →
+global top_k (elementwise-exact vs single-chip incl. tie order, gather-order-invariant by construction) →
+owned-subset attend → `_dcp_lse_combine`. Each rung below isolates one metal surface CPU cannot certify.
+
+**8a. Relaunch env (identical for every rung; only GLM_DCP + harness args vary).**
+
+```bash
+# 0) SYNC FIRST — the stale-worker rule (workers 1-7 ran 8802ebab all night once):
+cd ~/tpu-inference && git push origin glm-5.2-v4-next
+TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash ~/glm-tpu/scripts/sync_workers.sh
+# ABORT unless all 8 lines print tpu-inference @ THE SAME hash (currently 6f8855c3f).
+
+# 1) Relaunch with the sparse-DCP envs raylet-baked (LIBTPU quoting: inner double quotes,
+#    exactly as below — verified in the live raylet /proc environ on the dense gate):
+EXTRA_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"' \
+  TPU_MIN_TOKEN_BUCKET=32 bash ~/glm-tpu/scripts/launch_glm_32chip.sh
+# GLM_DSA_SCORER=xla and SCATTER_IMPL=pageloop are the Stage-B review's ladder settings
+# (pallas scorer + other impls come later, one variable at a time). Optionally add
+# GLM_EXPECT_CODE_HASH=6f8855c3f to EXTRA_ENVS — a mismatched worker then RAISES at init.
+
+# 2) VERIFY the raylets actually carry the envs on ALL 8 hosts (EXTRA_ENVS lesson):
+gcloud compute tpus tpu-vm ssh db-v4-64-od --zone us-central2-b --worker=all --command \
+  'P=$(pgrep -f raylet | head -1); tr "\0" "\n" < /proc/$P/environ | \
+   grep -E "GLM_MLA_DCP|GLM_DSA_MODE|GLM_DSA_DCP|GLM_DCP_SCATTER_IMPL|GLM_DSA_SCORER|LIBTPU_INIT_ARGS"'
+# ABORT unless every host prints all six, identically. Also read the per-worker
+# code_fingerprint log lines at TPUWorker init (git hash + GLM_* env names) — 8× identical.
+
+# 3) Driver env: mirror the raylet envs + the standard block; ALWAYS setsid the driver:
+cd ~/glm-tpu/bench && set -a && . ~/glm-tpu/.env && set +a
+_S8="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 \
+HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 \
+REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 \
+GLM_LOG_STATS=1 GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 \
+GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla"
+# per-run: env $_S8 GLM_DCP=<n> setsid nohup ~/vllm-env/bin/python -u ... </dev/null > log 2>&1 &
+```
+
+House rules for every rung: `GLM_DCP_ASSERT_SHARDING=1 GLM_DCP_ASSERT_CACHE_SANITY=1` on diagnostic runs
+(they now RAISE on internal failure instead of failing open); after any dump run,
+`~/vllm-env/bin/python -m tpu_inference.runner.dcp_dump_check <prefix>` (accepts the .npz-suffixed
+runbook form) — "requested but nothing written" is an ABORT, not a shrug; **never grep bare "PASS"**
+(`hlo_passes.cc` matches — read the `[longctx] ... correct=True/False` lines); results.db rows or it
+didn't happen.
+
+**8b. The ladder — rungs, exact configs, expected outcomes.**
+
+1. **emit_lse unit @ dcp=1, single chip** (pod idle; `TPU_VISIBLE_DEVICES=0`, the §2a/§2b pattern):
+   run the sparse-decode kernel with `emit_lse=True` on real MXU at small shapes.
+   **Expect:** Mosaic ACCEPTS the lse out tile; attention output BITWISE vs the non-lse kernel;
+   lse finite and matching the XLA oracle. **This is the #1 metal risk** (watchlist below) — if Mosaic
+   rejects the `[1,H,128]` lse block, apply the reviewed fallback (widen the m/l scratch to `[H,128]`
+   dsv4-style, or emit m/l separately) BEFORE climbing further. Save the log to `docs/artifacts/`.
+2. **Sparse decode @ dcp=2, prompts ≤2048 tokens, vs dcp=1** (≤ index_topk AND one prefill chunk ⇒
+   only the Stage-B decode path fires — the ctx>topk masked-prefill path stays out of the frame):
+   same prompts at `GLM_DCP=2` and dcp=1 (gate on, both).
+   **Expect:** logprobs match dcp=1 within the D0 tolerance AND the IndexShare stash (selected indices)
+   is IDENTICAL — the distributed selection must reproduce the single-chip selection elementwise.
+   Any divergence here is in select/attend/combine, at the cheapest possible size.
+3. **Chunked prefill @ dcp=2, 4–6K prompt** (mbt 2048 ⇒ 2–3 chunks — Stage C's masked-prefill path fires)
+   **+ the step-HLO honesty check**: run with `GLM_DUMP_STEP_HLO=1` and inspect what IS dumped — the
+   repaired tool now says loudly when a program compiled inline and was NOT dumped (absence must be
+   visible, not assumed). **Expect in the HLO:** exactly ONE candidate all-gather pair (scores+positions)
+   per FULL indexer layer (IndexShare amortizes the other 3), the LSE combine as pmax + 2·psum, and
+   **NO whole-cache collectives** — a `gather_kv_segment`-style full-cache all-gather is the flagged
+   structural conflict and an instant ABORT (it would "work" while silently defeating CP).
+   Needle must be correct (this size was pred=None under the granularity bug — it also re-proves the fix
+   composes with sparse).
+4. **32K selected-set dump, dcp=2 vs dcp=1** — Gate-2b ON METAL: dump the selected sets for identical
+   32K prompts at dcp=2 and dcp=1. **Expect: SELECTED-SET-EXACT (elementwise, tie order included)** —
+   the free regression the union argument guarantees. DIFFER here = the distributed top-k on metal
+   (collective ordering / packed scores), NOT attention — fix before any passkey claim.
+5. **32K sparse passkey @ dcp=2 then dcp=4 (smoke, ~6–9 needles).** **Expect 100%** — dcp=1 sparse
+   already holds 72/72 at 32K; any miss is distributed-stack regression, not capacity.
+6. **64K sparse smoke** (dcp=2/4, few needles across depths incl. 0.0/1.0). **Expect:** clean build
+   (KV/dcp shrinks the pool — the frag lottery is not in play at dcp≥2) + all correct. First sparse
+   retrieval above 32K on any hardware.
+7. **THE 128K SPARSE GATE — n≥73 zero-failure** (the ≥95% Wilson bar; mirror the dense gate: depths
+   {0.0,0.05,0.25,0.5,0.75,0.95,1.0} × 11 = 77 needles, `GLM_DCP=4`, pool 68 blocks, chunk 2048,
+   gmu 0.90, max-len 131840, ~19 h — budget an overnight, arm a watchdog on `correct=False`/driver
+   death). Depths 0.0/0.05 are THE mechanism cells (needle at max range must survive top-2048 selection
+   out of 128K); 0.75 passes nearly by construction. **Smoke the 4 mechanism depths ×1 first** (~1 h)
+   before committing the long run. Record as run rows + summary; SMOKE ≠ GATE.
+
+**8c. Metal-risk watchlist (from the Stage B/C reviews — what CPU certification CANNOT see).**
+
+- **scan-with-lse lowering (rungs 1 & 3):** the decode kernel lane-broadcasts `[H,1]→[H,128]` for the
+  lse out block, and Stage C's masked-prefill flash scan carries (m,l) through the scan — interpret mode
+  hides layout/DMA acceptance entirely. Top risk; reviewed fallback in rung 1.
+- **Candidate all-gather arena (rung 3+):** `[T, dcp·k]` score+position candidates = 64 KiB/token at
+  dcp=4 ⇒ **~134 MB/layer/chunk transient at chunk T=2048** (Stage-B review measured ~50 MB incl. the
+  argsort arena at T=512; scales linearly). IndexShare amortizes it 1-in-4 layers, but watch
+  CompileTimeHbmOom at 128K — if it OOMs, drop mbt/chunk to 1024 before touching anything else.
+- **Per-shard flash transient (rung 3):** each shard's masked-prefill scan materializes its chunk×selected
+  working set post-gather; sized on CPU only structurally. Watch the compile-time HBM breakdown
+  (deepsea_compiler_util lines) on the first 4–6K prefill.
+- **Replicated-q boundary:** q/ql/hidden/positions enter the three shard_map sites replicated `P()` —
+  on metal, GSPMD may insert a reshard/copy at the boundary per step. Not a correctness risk (Guard-1
+  asserts sharding) but a throughput cliff to note in the step timings before the 256K A/B.
+- Scatter-in-cond-in-shard_map (Stage B's flagged composition) + the donated striped caches remain the
+  historically metal-treacherous class — that is WHY the ladder validates caches bitwise at rung 2/4
+  before any long run.
+
+**Abort discipline:** any rung failing → STOP the ladder, instrument (the obs kit is repaired and
+fail-loud now), localize with the smallest discriminator — exactly the method that found the granularity
+bug. Do NOT tune past a failure with fragmentation/lottery luck; 3/3 for every gate claim.
+
+---
+
 ## After the sequence
 
 Log every step in `docs/RESEARCH_LOG.md` (numbers + honest nulls), refresh `HANDOFF.md`,
 commit + push, and run `bash scripts/backup_bundle.sh` again. The next frontier after this
-runbook: sparse-prefill (branch exists), Gate D divergence ladder 4K→128K under
-`pallas_decode`, DSA+DCP composition (docs/05 §6), and the M3 acceptance instrumentation.
+runbook: the §8 sparse ladder → 256K throughput A/B (dsa-sparse vs dense, dcp≥4; fp8-KV
+only after its own dcp=1 needle validates — fp8 has never generated a metal token), then
+benchmarks at scale (GSM8K n≥200, GPQA-198 @16K) and the M3 acceptance instrumentation
+(MTP frozen until the gates close).
