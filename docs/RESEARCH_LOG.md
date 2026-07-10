@@ -1932,3 +1932,20 @@ missed the stripe class; the differ's kth_band caught it — add a within-run bi
 IN FLIGHT: dcp=1 run-B on the SAME ray cluster (determinism probe: stripes stable per launch-state or
 per-config?). NEXT: indexer-cache dump run (GLM_DCP_CACHE_DUMP_LAYERS targeting evt01's slot) to read the
 fp8 payload + scale tiles directly and name the buffer + write path. RUNG 2 remains OPEN (correctly).
+
+## 2026-07-10 17:55 — RUN-B: stripes GONE (same binary/config/session) → per-engine-instance lottery; the stale-HBM read hypothesis now leads
+
+dcp=1 run-B (identical driver, same ray session, back-to-back with run-A): needles 2/2 identical,
+**evt01 CLEAN at steps 20/30 — zero depressed positions** where run-A had the four ×¼ stripes. Same
+executable + same inputs ⇒ the A/B difference can only be MEMORY STATE: HBM is not scrubbed between
+engine instances, so a read-of-unwritten-memory defect expresses whatever the previous occupant left.
+Timeline fits: run-A's engine inherited the dcp=2-armed engine's HBM (DIFFERENT cache layout → stale
+bytes ≠ expected keys → visible ×¼ stripes); run-B inherited run-A's (SAME layout, same prompt → stale
+≈ fresh → invisible). Original evt00-arange run inherited dense-gate-layout HBM (→ zeros/garbage →
+constant scores). CRITICAL IMPLICATION: if the write path skips those cache stripes, the bug is present
+in EVERY run and merely invisible when stale≈fresh — "clean" runs are clean by luck.
+DE-LOTTERIED PROBE (next): GLM_DCP_CACHE_DUMP on the first ~12 kv-cache slots (covers evt00/evt01
+indexer k-caches under either registration mapping), TWO identical dcp=1 runs, byte-diff the dumps:
+prefill compute is deterministic ⇒ written regions identical across runs; regions that VARY across runs
+are NEVER WRITTEN. Correlate hole geometry with the run-A stripe map ({576,832,1600,1856}+[0,128) =
+in-block offsets 64/320 of odd 512-blocks). This decides write-hole vs read-geometry in one pass.
