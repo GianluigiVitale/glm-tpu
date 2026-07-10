@@ -1973,3 +1973,28 @@ B/C/D clean-by-luck). CPU-DETERMINISTIC REPRO NOW POSSIBLE: sentinel-initialized
 prefill write; assert no sentinel below kv_len — no HBM lottery on CPU, the sentinel IS the stale byte.
 NEXT: read the write path (dsa indexer cache update / owner-scatter / pageloop), sentinel CPU test,
 root-cause fix, adversarial review, land, re-run rung 2.
+
+## 2026-07-10 21:10 — CPU logic EXONERATED (56/0); flat-impl runs clean so far; byte-diff pair G2→H2 in flight
+
+CPU sentinel adjudication (agent, scratchpad; landed as e1b666382, test-only): **all four
+GLM_DCP_SCATTER_IMPL formulations × dcp={1,2} meshes give position-exact sentinel-free coverage** of the
+exact pod geometry under the verbatim serving shard_map — the traced write logic is EXONERATED; the metal
+stripes are lowering/allocation-level. Adversarial-read notes (documented, none reachable from the vLLM
+allocator): pageloop clamp-vs-drop divergence on out-of-contract bt ids; the OOB-sentinel-largest
+assumption would break if BATCH ever sharded dim 0 (guarded by the no-DP refusal); at serving num_seqs
+(>=8 via MIN_NUM_SEQS) n_pages_touched saturates total_pages+1 so unique-truncation is dead at this
+shape. Sharpest metal pointer: every pageloop live iteration full-page-stores via
+dynamic_update_index_in_dim after a jnp.where merge into the DONATED striped cache — a wrong
+sublane-granular masked partial store lowers to EXACTLY the observed rows-{0,1}∪{8,9} stripes.
+METAL DISCRIMINATOR (in flight): GLM_DCP_SCATTER_IMPL=flat relaunch; run-G (dcp=2 flat) clean; **run-H
+(dcp=1 flat, post-scramble — run-F's exact situation) evt01 CLEAN at steps 20/30 where pageloop's run-F
+was striped.** One draw ≠ proof → the rigorous readout is byte-diffing two scrambled flat runs
+(G2 scrambler → H2, in flight): H-vs-H2 IDENTICAL everywhere ⇒ flat writes everything ⇒ pageloop v4
+lowering indicted for the indexer path ⇒ fix = flat for the DSA owner-scatter (its own validation ladder:
+CPU bit-identity already test-gated, then dcp=2 selected-set + needles) — NOTE the dense-path history is
+the mirror image (plain scatter mislowered, pageloop was the fix); nothing generalizes across paths
+without metal evidence, measure per path.
+OPERATIONAL NEAR-MISS (logged for the record): landing the test-only commit auto-synced workers to
+e1b666382 while the running ray session pins GLM_EXPECT_CODE_HASH=f0c63c302 — H2 would have died at init.
+Caught before launch; workers re-pinned to f0c63c302 until the probe pair completes. The pin worked as
+designed — against its own operator.
