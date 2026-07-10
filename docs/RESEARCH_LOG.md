@@ -1678,3 +1678,18 @@ distributed top-k, emit_lse, local gather) committed ed2a021be — 132/132 CPU t
 all 8 workers synced. EU-bucket backup violation by an agent caught + objects deleted + re-backed-up to
 gs://driftbench-dsv4-uc. **THE DENSE GATE IS RUNNING: 128K passkey, n=77 (7 depths × 11 trials),
 bf16+DCP=4, ~19h.** 77/77 → Wilson LB 95.3% → the ≥95%@128K dense slot fills with a defensible n.
+
+## 2026-07-10 03:40 — Stage B reviewed SAFE-FOR-METAL-LADDER; gate 16/16; Stage C in flight
+
+Stage B (4f390a61e) adversarial review: **SAFE** — gate-off jaxpr byte-identity independently re-proven
+CROSS-CHECKOUT (fresh processes, non-vacuous); a NEW selection battery (stripe boundaries ±1, hot-shard,
+tie bands straddling stripes, topk>kv_len, dcp 2/4/8, ALL gather permutations) all elementwise-exact;
+owner-scatter algebraically identical to gate-off for every step type; the reviewer BUILT the missing
+mixed-batch + multi-chunk-prefill e2e cases itself (pass; being folded into the suite); refusal semantics
+proven un-bypassable (NaN poison survives even swallowed callbacks — IndexShare can't slip through).
+Non-blocking: export GLM_DCP_SCATTER_IMPL=pageloop on the sparse metal ladder (dense fallback side);
+run the ladder with GLM_DSA_SCORER=xla first; MTP+DCP composition untested (MTP frozen anyway).
+Post-granularity-fix note: docs/11's scatter-impl DIFFER→MATCH guidance is largely OBSOLETE (the scatter
+was never the bug — the block table was); flag for a docs cleanup pass.
+Dense gate: 16/16 (depth 0.00 closed 11/11 = 100%). Stage C (masked-prefill LSE, the last bridge to the
+sparse ladder) implementing in parallel.
