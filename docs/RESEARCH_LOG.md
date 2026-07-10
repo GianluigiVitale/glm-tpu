@@ -1725,3 +1725,21 @@ confirmed obsolete (all remaining refusals are trace-time raises); the clear-cac
 mask a real leak. 3 non-blocking notes (LSE-floor asymmetry theoretical-only; a (j) boundary-power test
 suggestion; a cosmetic count grouping). Both Stage B and C now carry the same verdict. The metal ladder
 (runbook §8) is cleared to start the moment the dense gate frees the pod + workers sync to 6f8855c3f.
+
+## 2026-07-10 12:20 — Owner review: gate arithmetic pinned; ladder rung-4 gap closed; cheap-signal sequencing
+
+Owner points (all adopted):
+1. **The last 11 needles ARE the gate, not a victory lap.** 77/77 → Wilson LB ~95.3% (clears ≥95% by a
+   hair — the one-sided zero-failure margin). A SINGLE miss → 76/77 → LB ~91% → the gate FAILS. If a miss
+   occurs: EXTEND to n≈130 total (129/130 recovers LB >95%) — never round, never re-run-until-green.
+2. **Ladder rung 4 must compare SELECTED INDEX SETS across sharding configs** (32K prompt: dcp=2
+   GLM_DSA_DCP vs dcp=1 gate-off), elementwise incl. tie order — the free regression against the
+   silicon-validated dcp=1 selection. Output-only comparisons can hide a subtly-wrong global merge that
+   still produces plausible passkey hits (the failure mode that passes benchmarks and dies on
+   reproduction). GAP FOUND: no metal dump hook existed for the stashed topk indices (CPU tests read the
+   stash in-process). GLM_DSA_DUMP_TOPK + runner/dsa_topk_diff.py (selected-set differ w/ coverage
+   refusal + cross-shard replication assert) being implemented now — a ladder prerequisite.
+3. **Cheap signal before the ~10h sparse gate:** rungs 4 (selected-set-exact @32K) and 6 (64K smoke) are
+   the discriminators that decide whether the distributed top-k is right; the 128K n>=73 run only launches
+   after they're green.
+Gate at 68/68 (six depths closed 11/11); depth 1.0 in its final trials.

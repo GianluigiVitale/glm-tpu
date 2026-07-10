@@ -897,7 +897,12 @@ didn't happen.
 4. **32K selected-set dump, dcp=2 vs dcp=1** — Gate-2b ON METAL: dump the selected sets for identical
    32K prompts at dcp=2 and dcp=1. **Expect: SELECTED-SET-EXACT (elementwise, tie order included)** —
    the free regression the union argument guarantees. DIFFER here = the distributed top-k on metal
-   (collective ordering / packed scores), NOT attention — fix before any passkey claim.
+   (collective ordering / packed scores), NOT attention — fix before any passkey claim. Tooling:
+   `GLM_DSA_DUMP_TOPK=<prefix>` (raylet-baked, all hosts) dumps the per-step stashed topk indices;
+   `python -m tpu_inference.runner.dsa_topk_diff <prefix_dcp2> <prefix_dcp1>` compares (exit 0 MATCH /
+   1 DIFFER / 2 no-verdict on partial coverage; also asserts cross-shard replication within each run).
+   Rungs 4+6 are the CHEAP DISCRIMINATORS: only launch rung 7 (~10-19 h) after both are green — an
+   output-only pass can hide a subtly-wrong merge that still lands plausible needles.
 5. **32K sparse passkey @ dcp=2 then dcp=4 (smoke, ~6–9 needles).** **Expect 100%** — dcp=1 sparse
    already holds 72/72 at 32K; any miss is distributed-stack regression, not capacity.
 6. **64K sparse smoke** (dcp=2/4, few needles across depths incl. 0.0/1.0). **Expect:** clean build
@@ -907,7 +912,9 @@ didn't happen.
    {0.0,0.05,0.25,0.5,0.75,0.95,1.0} × 11 = 77 needles, `GLM_DCP=4`, pool 68 blocks, chunk 2048,
    gmu 0.90, max-len 131840, ~19 h — budget an overnight, arm a watchdog on `correct=False`/driver
    death). Depths 0.0/0.05 are THE mechanism cells (needle at max range must survive top-2048 selection
-   out of 128K); 0.75 passes nearly by construction. **Smoke the 4 mechanism depths ×1 first** (~1 h)
+   out of 128K); 0.75 passes nearly by construction. **Smoke the 4 mechanism depths ×1 first** (~1 h) **GATE ARITHMETIC (owner-pinned): 77/77 → Wilson LB ~95.3% — clears ≥95% by a hair; a SINGLE
+   miss → 76/77 → LB ~91% → the gate FAILS. On one miss: EXTEND the same run to n≈130 total (129/130
+   recovers the bar) — never round, never rerun-until-green.**
    before committing the long run. Record as run rows + summary; SMOKE ≠ GATE.
 
 **8c. Metal-risk watchlist (from the Stage B/C reviews — what CPU certification CANNOT see).**
