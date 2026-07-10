@@ -1798,3 +1798,23 @@ truncation bites (nc>k)** — adjudication needed: per-shard bf16 score-precisio
 Gate-2b S2 boundary-band class, expected + acceptable) vs a genuine merge bug (unacceptable). The
 identical needle predictions are exactly the "plausible-but-wrong selection passes passkey" failure mode
 the owner flagged — the instrument did its job. RUNG 2 IS NOT PASSED until the 164 are adjudicated.
+
+## 2026-07-10 14:10 — RUNG 2 ADJUDICATED: FAILS on a REAL evt00 defect (first indexer layer score-blind under DCP)
+
+Full forensics (agent, code + data): (1) ORDER diffs = benign cross-config artifact — BOTH paths stash
+score-ordered pre-sort (mla_attention.py:2125-2130; canonical position sorts happen post-stash); two
+independent autoregressive runs diverge by ulps from layer 1 → near-tie order shuffles, SETS preserved;
+the CPU suite passed elementwise legitimately (paired inputs → bitwise-identical scores). Differ criterion
+for cross-config runs → canonicalized-SET comparison. (2) evt01-20 set diffs: textbook S2 boundary band
+(symdiff 2-10 positions = <=0.49% of k, ONLY at kv_len>2048, 57% within 10 ranks of the k-th boundary) —
+final adjudication needs scores in the dump (extension prescribed: topk_scores f32 key + band-width
+report). (3) **evt00 = REAL DEFECT: the dcp2 run's FIRST full indexer layer selects score-blind — exact
+arange(min(kv_len,2048)) on all 38 rows (constant-score signature), at truncation DROPPING the most
+recent d positions that dcp1 ranks #1-15** (e.g. step0039: kv_len 2052, dcp1 head [1,2049,2044,2048...],
+dcp2 = identity). evt01's mid-rank anomaly = cascade contamination from evt00 (prediction: vanishes with
+the fix). Suspects (file:line in report): the layer-0 striped indexer k-cache reading zeros under DCP
+(_dcp_idx_write / _glm_dsa_dcp_owner_scatter / _glm_dsa_indexer_cache_index slot resolution for
+DeepseekV32IndexerCache) vs degenerate q/w in _dcp_score_select. NEW TRIPWIRE adopted: any valid row that
+is an exact ascending identity = automatic FAIL (would have caught evt00 alone, even below truncation).
+The needles passed identically throughout — the exact "plausible-but-wrong selection survives the
+benchmark" trap; the selected-set rung earned its keep. RUNG 2 = FAILED until evt00 is fixed.
