@@ -1998,3 +1998,28 @@ OPERATIONAL NEAR-MISS (logged for the record): landing the test-only commit auto
 e1b666382 while the running ray session pins GLM_EXPECT_CODE_HASH=f0c63c302 — H2 would have died at init.
 Caught before launch; workers re-pinned to f0c63c302 until the probe pair completes. The pin worked as
 designed — against its own operator.
+
+## 2026-07-10 23:30 — RUNG 2 CLOSED; root cause = pageloop v4 lowering; fix landed (flat default, 4f7d9a001)
+
+**The verdict chain, complete:** CPU sentinel suite exonerated all four scatter formulations logically
+(56/0) → metal scrambler-byte-diff protocol indicted pageloop (never-written sublane row-stripes
+{0,1}∪{8,9}-class in the evt01 indexer k-cache, all 8 hosts, F-vs-C) and cleared flat (H-vs-H2
+byte-IDENTICAL everywhere, all 12 dumped slots, each behind its own scrambler) → **the defect is
+pageloop's v4 lowering of the per-page jnp.where merge + full-page dynamic_update_slice RMW into the
+donated striped cache.** The stale-HBM expression lottery (zeros → evt00 arange; foreign-layout garbage
+→ ×¼ stripes; same-layout → invisible) explains every observation since rung 2 first failed. The dense
+path's history is the exact mirror (its scatter mislowered; pageloop is ITS fix) — per-path metal
+evidence, now enforced by SEPARATE envs: dense GLM_DCP_SCATTER_IMPL (default pageloop) vs DSA
+GLM_DSA_DCP_SCATTER_IMPL (default flat) so a dense-tuned bake can't re-break DSA silently.
+**RUNG 2 VERDICT (flat, runs G dcp=2 / H2 dcp=1, both score-armed):** needles 6/6 across G/H/H2; differ:
+tripwire 0 both sides, replication 0, prefill events EQUAL (42), 723 ORDER-ONLY, 75 truncation-only set
+diffs with **band/drift ratio max 2.02, p90 1.17, median 0.21** — pure k-th-boundary churn under
+cross-run MoE drift (the run-A stripe class measured ratio ~500 on the same yardstick). CLOSED under the
+band-quantified criterion; runbook §8 rung 2 updated with the criterion revision + verdict.
+**Fix commit 4f7d9a001** (on top of the sentinel suite e1b666382): flat default + own env + doctrine
+docstrings; CPU 28/28 full DCP suite + 16/16 coverage on the new default; test baselines flipped
+(non-vacuous: scatter/pageloop/barrier each diffed against the flat default). Independent adversarial
+review in flight; workers sync + hash re-pin after its verdict. NOTE for the ladder: the rung45 32K dumps
+are pageloop-era — rungs 4-6 re-run under the flat default with scores armed (they double as the fix's
+pod 3/3). Fifty-some pod-runs of forensics, and the instrument that broke the case was the one the owner
+prescribed two days ago: scores in the dump.

@@ -841,7 +841,12 @@ TPU_INFERENCE_BRANCH=glm-5.2-v4-next bash ~/glm-tpu/scripts/sync_workers.sh
 
 # 1) Relaunch with the sparse-DCP envs raylet-baked (LIBTPU quoting: inner double quotes,
 #    exactly as below — verified in the live raylet /proc environ on the dense gate):
-EXTRA_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"' \
+EXTRA_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DSA_SCORER=xla LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"' \
+# SCATTER IMPLS (2026-07-10 stripe forensics — PER-PATH metal evidence, opposite verdicts):
+#   dense new-KV: GLM_DCP_SCATTER_IMPL, default pageloop (its plain scatter mislowered; pageloop = its fix)
+#   DSA owner-scatter: GLM_DSA_DCP_SCATTER_IMPL, default flat (pageloop's v4 lowering DROPS sublane row-
+#   stripes of the indexer k-cache — never-written holes, scrambler-byte-diff-proven; flat byte-complete).
+#   Set neither unless running an isolation diff; a dense-tuned pageloop bake no longer touches the DSA path.
   TPU_MIN_TOKEN_BUCKET=32 bash ~/glm-tpu/scripts/launch_glm_32chip.sh
 # GLM_DSA_SCORER=xla and SCATTER_IMPL=pageloop are the Stage-B review's ladder settings
 # (pallas scorer + other impls come later, one variable at a time). Optionally add
@@ -879,12 +884,17 @@ didn't happen.
    lse finite and matching the XLA oracle. **This is the #1 metal risk** (watchlist below) — if Mosaic
    rejects the `[1,H,128]` lse block, apply the reviewed fallback (widen the m/l scratch to `[H,128]`
    dsv4-style, or emit m/l separately) BEFORE climbing further. Save the log to `docs/artifacts/`.
-2. **Sparse decode @ dcp=2, prompts ≤2048 tokens, vs dcp=1** (≤ index_topk AND one prefill chunk ⇒
-   only the Stage-B decode path fires — the ctx>topk masked-prefill path stays out of the frame):
-   same prompts at `GLM_DCP=2` and dcp=1 (gate on, both).
-   **Expect:** logprobs match dcp=1 within the D0 tolerance AND the IndexShare stash (selected indices)
-   is IDENTICAL — the distributed selection must reproduce the single-chip selection elementwise.
-   Any divergence here is in select/attend/combine, at the cheapest possible size.
+2. **Sparse decode @ dcp=2, prompts ≤2048 tokens, vs dcp=1** — **CLOSED 2026-07-10** (after the stripe
+   forensics; see RESEARCH_LOG 17:05→22:20). CRITERION REVISED from "selected-set elementwise-IDENTICAL"
+   to **band-quantified**: cross-run comparisons diverge by MoE-routing drift from ulps (selected-set-
+   exact is unachievable across independent runs by construction), so the standard is: tripwire silent
+   BOTH sides + prefill events EQUAL + every set-diff element's kth-score band ≤ O(that event's own
+   cross-run drift p95). Verdict on the flat impl (runs G/H2, 840 events, scores armed): tripwire 0,
+   42 EQUAL + 723 ORDER-ONLY + 75 truncation-only set-diffs, band/drift max 2.02 / p90 1.17 — pure
+   boundary churn. THE DEFECT THIS RUNG CAUGHT: pageloop's v4 lowering drops sublane row-stripes of the
+   indexer k-cache (never-written; stale-HBM lottery ⇒ evt00-arange / ×¼-stripe classes) — fixed by the
+   flat default (GLM_DSA_DCP_SCATTER_IMPL). Any rerun MUST use the topk_scores-armed dumps + dsa_topk_diff
+   (tripwire + kth_band) — an index-only or needle-only pass CANNOT see this defect class.
 3. **Chunked prefill @ dcp=2, 4–6K prompt** (mbt 2048 ⇒ 2–3 chunks — Stage C's masked-prefill path fires)
    **+ the step-HLO honesty check**: run with `GLM_DUMP_STEP_HLO=1` and inspect what IS dumped — the
    repaired tool now says loudly when a program compiled inline and was NOT dumped (absence must be

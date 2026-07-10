@@ -1,0 +1,891 @@
+--- a/tpu_inference/kernels/dsa/indexer_kernel.py	2026-07-10 00:06:25.758889311 +0000
++++ b/tpu_inference/kernels/dsa/indexer_kernel.py
+@@ -547,7 +547,7 @@
+ 
+ 
+ def merge_topk_candidates(cand_scores, cand_positions, kv_lens, *, topk: int,
+-                          s_global: int):
++                          s_global: int, return_values: bool = False):
+     """Exact top-k over the union of per-shard candidates (DCP merge step).
+ 
+     Consumes the all-gathered ``[T, C = dcp * topk]`` candidate pairs from
+@@ -594,6 +594,13 @@
+       by ascending position, ``n_valid = min(kv_len, min(topk, s_global))``,
+       slots ``>= n_valid`` set to ``-1`` (the section-3.1 downstream
+       contract, verbatim from :func:`hierarchical_topk`).
++
++      With ``return_values=True`` (the GLM_DSA_DUMP_TOPK topk_scores
++      observability extension — armed-only, so the default trace is
++      untouched) a third array ``values f32[T, topk]`` is appended: the
++      SELECTED candidates' scores in the same slot order, ``-inf`` in the
++      ``-1``-filled slots. Pure extra outputs of arrays this function
++      already computes — the indices/n_valid math is byte-identical.
+     """
+     _, C = cand_scores.shape
+     topk = int(topk)
+@@ -606,7 +613,12 @@
+     # The hierarchical_topk n_valid / -1-fill contract, verbatim.
+     n_valid = jnp.minimum(kv_lens.astype(jnp.int32), min(topk, int(s_global)))
+     fill = lax.broadcasted_iota(jnp.int32, (1, topk), 1) >= n_valid[:, None]
+-    return jnp.where(fill, jnp.int32(-1), idx), n_valid
++    idx_out = jnp.where(fill, jnp.int32(-1), idx)
++    if return_values:
++        val = jnp.take_along_axis(v_sorted, tj, axis=1)
++        val_out = jnp.where(fill, _NEG_INF, val).astype(jnp.float32)
++        return idx_out, n_valid, val_out
++    return idx_out, n_valid
+ 
+ 
+ # ---------------------------------------------------------------------------
+--- a/tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py	2026-07-10 10:31:56.474592738 +0000
++++ b/tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py
+@@ -998,7 +998,8 @@
+                        valid=None,
+                        req_ids=None,
+                        query_start_loc=None,
+-                       distribution=None) -> None:
++                       distribution=None,
++                       topk_scores=None) -> None:
+     """ARMED-only (GLM_DSA_DUMP_TOPK set): trace a host-side
+     ``jax.debug.callback`` that dumps this stash event — the selection plus
+     the alignment metadata the offline differ (runner/dsa_topk_diff.py)
+@@ -1010,6 +1011,13 @@
+     ``query_start_loc`` lets sites that don't already carry a pad mask
+     derive ``valid``/``req_ids`` HERE, inside the armed branch, so the
+     gate-off trace stays untouched.
++
++    ``topk_scores`` (rung-4b, the score-blind-adjudication extension): the
++    SELECTED slots' scores ``f32[T, topk]`` (``-inf`` in ``-1`` slots), when
++    the stash site threaded them out of its armed-only selection branch. The
++    differ uses them to (a) adjudicate set diffs against the k-th-score tie
++    band and (b) catch score-blind (all-tied/constant) rows that a
++    plausible-looking index dump alone cannot prove.
+     """
+     try:
+         from tpu_inference.runner import dsa_topk_dump
+@@ -1042,6 +1050,9 @@
+     if distribution is not None:
+         keys.append("distribution")
+         args.append(as_jax_i32(distribution))
++    if topk_scores is not None:
++        keys.append("topk_scores")
++        args.append(jnp.asarray(topk_scores, jnp.float32))
+     # Per-step stash-event ordinal (trace-time Python state on the
+     # per-forward wrapper context — full indexer layers in trace order), so
+     # the dump names/aligns events without relying on cross-step host state.
+@@ -1057,14 +1068,16 @@
+                        valid=None,
+                        req_ids=None,
+                        query_start_loc=None,
+-                       distribution=None) -> None:
++                       distribution=None,
++                       topk_scores=None) -> None:
+     """Record a full layer's indices for the next shared layers.
+ 
+     The keyword metadata is OBSERVABILITY-ONLY (GLM_DSA_DUMP_TOPK, ladder
+     rung 4): with the gate unset it is ignored and this function is exactly
+     the historical one-line stash — the traced program is byte-identical.
+     Armed, each stash event also fires the host-side selection dump (see
+-    :func:`_dump_stashed_topk`)."""
++    :func:`_dump_stashed_topk`; ``topk_scores`` is the armed-only selected-
++    scores payload, rung 4b)."""
+     ctx = get_vllm_model_wrapper_context()
+     ctx.dsa_topk_indices[_TOPK_STASH_KEY] = topk_indices
+     if not os.environ.get(GLM_DSA_DUMP_TOPK_ENV, ""):
+@@ -1075,7 +1088,8 @@
+                        valid=valid,
+                        req_ids=req_ids,
+                        query_start_loc=query_start_loc,
+-                       distribution=distribution)
++                       distribution=distribution,
++                       topk_scores=topk_scores)
+ 
+ 
+ def topk_context_preseeded() -> bool:
+--- a/tpu_inference/layers/vllm/custom_ops/mla_attention.py	2026-07-10 10:31:56.474592738 +0000
++++ b/tpu_inference/layers/vllm/custom_ops/mla_attention.py
+@@ -1668,6 +1668,17 @@
+         decode_step_possible = (decode_token_bound is None
+                                 or num_tokens <= decode_token_bound)
+ 
++        # GLM_DSA_DUMP_TOPK topk_scores (rung 4b, armed-only): thread the
++        # SELECTED slots' scores out of the selection cond so the stash dump
++        # can (a) adjudicate selected-set diffs against the k-th-score tie
++        # band and (b) catch score-blind (all-tied/constant) rows — the
++        # ascending-identity signature an index-only dump cannot prove.
++        # Trace-time env read (the stash gate's own idiom): unset => every
++        # use below is Python-dead and the traced program is byte-identical
++        # (the existing jaxpr-hash tests stay green).
++        _dump_topk_scores = (is_full_layer and bool(
++            os.environ.get(glm_dsa_indexer.GLM_DSA_DUMP_TOPK_ENV, "")))
++
+         # --- top-k indices, per token, computed ONCE ----------------------
+         # Paged scoring against the post-write indexer cache (full layers)
+         # or the IndexShare stash (shared layers). One formulation for
+@@ -1739,6 +1750,18 @@
+                                            _dsa_dcp_axes,
+                                            axis=1,
+                                            tiled=True)
++                    if _dump_topk_scores:
++                        # rung 4b: also emit the selected slots' scores —
++                        # extra outputs of arrays the merge already holds;
++                        # the indices math is byte-identical (kernel-gated).
++                        merged, _n_valid, sel_scores = merge_topk_candidates(
++                            v_all,
++                            p_all,
++                            kv_lens_g,
++                            topk=topk,
++                            s_global=bt.shape[1] * p_g,
++                            return_values=True)
++                        return merged.astype(jnp.int32), sel_scores
+                     merged, _n_valid = merge_topk_candidates(
+                         v_all,
+                         p_all,
+@@ -1751,7 +1774,7 @@
+                     _dcp_score_select,
+                     mesh=mesh,
+                     in_specs=(_dcp_cache_spec, P(), P(), P(), P()),
+-                    out_specs=P(),
++                    out_specs=(P(), P()) if _dump_topk_scores else P(),
+                     check_vma=False)(indexer_cache_4d, q_idx, w_idx, bt_tok,
+                                      kv_lens_tok)
+             if use_pallas_scorer:
+@@ -1777,17 +1800,36 @@
+                 scores = glm_dsa_indexer.paged_indexer_scores(
+                     q_idx, w_idx, indexer_cache_3d, bt_tok, kv_lens_tok)
+             indices, _n_valid = hierarchical_topk(scores, kv_lens_tok, topk)
++            if _dump_topk_scores:
++                # rung 4b: the selected slots' scores straight off the score
++                # map (-1 fill slots read a clipped column; mask to -inf).
++                sel_scores = jnp.take_along_axis(
++                    scores, jnp.clip(indices, 0, scores.shape[1] - 1), axis=1)
++                sel_scores = jnp.where(indices >= 0, sel_scores,
++                                       -jnp.inf).astype(jnp.float32)
++                return indices.astype(jnp.int32), sel_scores
+             return indices.astype(jnp.int32)
+ 
+         def _dummy_indices():
+             # Dense-routed steps carry the -1 sentinel (consumed only inside
+             # the equally-untaken sparse branches of shared layers).
+-            return jnp.full((num_tokens, topk), glm_dsa_indexer.INVALID_INDEX,
+-                            jnp.int32)
++            dummy = jnp.full((num_tokens, topk),
++                             glm_dsa_indexer.INVALID_INDEX, jnp.int32)
++            if _dump_topk_scores:
++                return dummy, jnp.full((num_tokens, topk), -jnp.inf,
++                                       jnp.float32)
++            return dummy
+ 
++        dump_topk_scores = None
+         if is_full_layer:
+-            indices = lax.cond(jnp.logical_or(is_decode_step, ctx_gt_topk),
+-                               _score_and_select, _dummy_indices)
++            if _dump_topk_scores:
++                indices, dump_topk_scores = lax.cond(
++                    jnp.logical_or(is_decode_step, ctx_gt_topk),
++                    _score_and_select, _dummy_indices)
++            else:
++                indices = lax.cond(
++                    jnp.logical_or(is_decode_step, ctx_gt_topk),
++                    _score_and_select, _dummy_indices)
+         else:
+             indices = shared_indices.astype(jnp.int32)
+ 
+@@ -2127,7 +2169,8 @@
+                 positions=positions_j,
+                 valid=tok_valid,
+                 req_ids=req_ids,
+-                distribution=md.request_distribution)
++                distribution=md.request_distribution,
++                topk_scores=dump_topk_scores)
+ 
+         # W_UV + output contract [T, H * V]: the dense impl.forward
+         # post-kernel stage, verbatim.
+--- a/tpu_inference/runner/dsa_topk_diff.py	2026-07-10 10:31:56.478592734 +0000
++++ b/tpu_inference/runner/dsa_topk_diff.py
+@@ -28,13 +28,28 @@
+   1  DIFFER  some live selection differs (first diverging step/layer/row/col
+              reported), or the selection is NOT replicated across processes
+              within one run (the shard_map out_specs=P() replication contract
+-             broken — a merge bug in its own right).
++             broken — a merge bug in its own right), or the SCORE-BLIND
++             TRIPWIRE fired: a live row with kv_len > 2 equal to
++             ``arange(min(kv_len, topk))`` — ascending identity, the exact
++             signature of an all-tied/constant score row through the merge's
++             position pre-sort + lowest-index tie break (rung-2 adjudication
++             2026-07-10: byte-reproduced from constant rows at pod geometry).
++             A degenerate selection is a FAIL even when both runs agree on
++             it — two score-blind runs must never MATCH each other green.
+   2  REFUSED no verdict: missing proc files or steps/events, an ERROR
+              sentinel from the armed dump hook, mis-aligned positions/pad
+              masks, or inconsistent geometry. A diff over unexamined or
+              mis-aligned data is not a verdict — never zero-fill, never
+              truncate silently (the dcp_cache_diff incident class).
+ 
++Selected-score adjudication (rung 4b): when both runs carry the armed-only
++``topk_scores`` payload (the stash sites' selected-slot scores), every DIFF
++event additionally reports the k-th-score BAND WIDTH — the maximum distance
++between a set-difference element's own-run score and that run's k-th
++(lowest selected) score. A band of ~0 means the sets differ only inside a
++tie/rounding band at the selection boundary (the S2-band class); a large
++band means a genuinely high-ranked position was dropped (the rung-2 class).
++
+ Alignment: files pair by (step, event) — step numbering starts at the first
+ REAL (non-warmup) scheduler step in both runs (dsa_topk_dump), and the event
+ ordinal is the full indexer layer's stash order within the step. The pairing
+@@ -58,6 +73,9 @@
+ 
+ # Alignment metadata compared across procs (replication) and runs (pairing).
+ _META_KEYS = ("positions", "valid", "req_ids", "distribution")
++# Data payloads that must be bitwise REPLICATED across procs within one run
++# (the shard_map out_specs=P() contract). topk_scores is optional (rung 4b).
++_REPLICATED_KEYS = ("topk_indices", "topk_scores") + _META_KEYS
+ 
+ 
+ class IncompleteTopkDumpError(RuntimeError):
+@@ -169,7 +187,7 @@
+         ref = by_proc[procs[0]]
+         for proc in procs[1:]:
+             d = by_proc[proc]
+-            for key in ("topk_indices", ) + _META_KEYS:
++            for key in _REPLICATED_KEYS:
+                 if key not in ref or key not in d:
+                     if (key in ref) != (key in d):
+                         violations.append(
+@@ -185,6 +203,53 @@
+     return violations
+ 
+ 
++def _tripwire_mask(sel_rows, kv_lens):
++    """Score-blind tripwire (rung-2 adjudication 2026-07-10): True per row
++    iff the row is EXACTLY ``arange(min(kv_len, width))`` followed by the
++    ``-1`` fill, with ``kv_len > 2``.
++
++    Ascending identity is the byte-exact output of an all-tied/constant
++    score row through the DCP merge (position pre-sort + lowest-index tie
++    break) AND through the gate-off ``hierarchical_topk`` (``lax.top_k``
++    lowest-index tie break) — verified bit-for-bit against the rung-2 metal
++    dumps at pod geometry. A real scored selection hits it with probability
++    ~0 for kv_len > 2; kv_len <= 2 rows are exempt (a 1-2 element causal
++    prefix is legitimately [0(,1)])."""
++    sel_rows = np.asarray(sel_rows)
++    kv = np.asarray(kv_lens).astype(np.int64).reshape(-1)
++    width = sel_rows.shape[1]
++    k = np.minimum(kv, width)[:, None]
++    iota = np.arange(width, dtype=sel_rows.dtype)[None, :]
++    want = np.where(iota < k, iota, sel_rows.dtype.type(-1))
++    return (kv > 2) & (sel_rows == want).all(axis=1)
++
++
++def _selected_scores(d, rows):
++    """The rung-4b selected-slot scores for the given live rows, or None
++    when this run's dumps do not carry ``topk_scores``."""
++    if "topk_scores" not in d:
++        return None
++    return _decode(d, "topk_scores").astype(np.float64).reshape(
++        _decode(d, "topk_indices").shape)[rows]
++
++
++def _row_kth_band(idx_a, sc_a, idx_b, sc_b):
++    """Max distance of a set-difference element's own-run score from that
++    run's k-th (lowest selected) score, over both directions of one aligned
++    row pair. 0.0 when the sets are equal (a pure tie-order diff)."""
++    band = 0.0
++    for idx_x, sc_x, idx_y in ((idx_a, sc_a, idx_b), (idx_b, sc_b, idx_a)):
++        mine = idx_x >= 0
++        if not mine.any():
++            continue
++        kth = float(sc_x[mine].min())
++        other = set(int(v) for v in idx_y[idx_y >= 0])
++        for slot in np.flatnonzero(mine):
++            if int(idx_x[slot]) not in other:
++                band = max(band, float(sc_x[slot]) - kth)
++    return band
++
++
+ def _live_rows(d):
+     """(live row indices, valid mask or None) for one payload."""
+     if "valid" in d:
+@@ -268,6 +333,7 @@
+     replication = (check_replication(run_a, what=f"run A ({prefix_a})") +
+                    check_replication(run_b, what=f"run B ({prefix_b})"))
+     diffs = []
++    tripwire = []
+     n_live_rows = 0
+     pad_rows_differ = 0
+     pad_rows_uncomparable = 0
+@@ -285,11 +351,38 @@
+         rows_a, rows_b = _align_or_refuse(da, db, step=step, evt=evt)
+         sa, sb = ia[rows_a], ib[rows_b]
+         n_live_rows += len(rows_a)
++        # Score-blind tripwire, BOTH runs (a degenerate selection must fail
++        # even when the runs agree on it).
++        for run_name, sel_rows, dd, rows in (("A", sa, da, rows_a),
++                                             ("B", sb, db, rows_b)):
++            if "positions" not in dd:
++                continue
++            kv = _decode(dd, "positions").reshape(-1)[rows].astype(
++                np.int64) + 1
++            for r in np.flatnonzero(_tripwire_mask(sel_rows, kv)):
++                tripwire.append({
++                    "run": run_name,
++                    "step": step,
++                    "event": evt,
++                    "live_row": int(r),
++                    "kv_len": int(kv[r]),
++                })
+         neq = sa != sb
+         if neq.any():
+             bad_rows = np.flatnonzero(neq.any(axis=1))
+             r = int(bad_rows[0])
+             c = int(np.flatnonzero(neq[r])[0])
++            # rung 4b: k-th-score band over the diverging rows (None when
++            # either run lacks the armed-only topk_scores payload).
++            band = None
++            va = _selected_scores(da, rows_a)
++            vb = _selected_scores(db, rows_b)
++            if va is not None and vb is not None:
++                band = 0.0
++                for br in bad_rows:
++                    band = max(
++                        band,
++                        _row_kth_band(sa[br], va[br], sb[br], vb[br]))
+             diffs.append({
+                 "step": step,
+                 "event": evt,
+@@ -298,6 +391,7 @@
+                 "first_col": c,
+                 "a": int(sa[r, c]),
+                 "b": int(sb[r, c]),
++                "kth_band": band,
+             })
+         # PAD rows: informational only (never the verdict — see module doc).
+         if ia.shape == ib.shape and len(rows_a) < ia.shape[0]:
+@@ -312,12 +406,23 @@
+                 pad_rows_uncomparable += int(pad.sum())
+         elif ia.shape != ib.shape:
+             pad_rows_uncomparable += int(ia.shape[0] - len(rows_a))
+-    differ = bool(diffs) or bool(replication)
++    differ = bool(diffs) or bool(replication) or bool(tripwire)
+     if replication:
+         verdict = ("DIFFER -> the selection is NOT replicated across "
+                    "processes within a single run: the distributed merge "
+                    "broke its out_specs=P() replication contract — fix the "
+                    "merge/all-gather before comparing runs.")
++    elif tripwire:
++        t0 = tripwire[0]
++        verdict = (
++            "DIFFER -> SCORE-BLIND TRIPWIRE: run "
++            f"{t0['run']} step {t0['step']} event {t0['event']} live row "
++            f"{t0['live_row']} (kv_len {t0['kv_len']}) selected EXACTLY "
++            "arange(min(kv_len, topk)) — ascending identity, the signature "
++            "of an all-tied/constant score row (degenerate q/w/keys or a "
++            "zeroed indexer k-cache stripe), NOT a real scored selection. "
++            f"{len(tripwire)} such row(s) total. Automatic FAIL even if the "
++            "two runs agree elementwise.")
+     elif diffs:
+         d0 = diffs[0]
+         verdict = (
+@@ -342,6 +447,8 @@
+         "n_replication_violations": len(replication),
+         "diffs": diffs[:max_report],
+         "n_diff_events": len(diffs),
++        "tripwire": tripwire[:max_report],
++        "n_tripwire_rows": len(tripwire),
+         "pad_rows_differ": pad_rows_differ,
+         "pad_rows_uncomparable": pad_rows_uncomparable,
+         "verdict": verdict,
+@@ -370,17 +477,24 @@
+         return 2
+     print(f"compared {r['n_compared']} (step, event) selections over "
+           f"{r['n_steps']} steps ({r['n_live_rows']} live rows); "
+-          f"diff events: {r['n_diff_events']}; replication violations: "
++          f"diff events: {r['n_diff_events']}; tripwire rows: "
++          f"{r['n_tripwire_rows']}; replication violations: "
+           f"{r['n_replication_violations']}; pad-row diffs (informational): "
+           f"{r['pad_rows_differ']} "
+           f"(uncomparable pad rows: {r['pad_rows_uncomparable']})")
+     for v in r["replication_violations"]:
+         print(f"  REPLICATION: {v}")
++    for t in r["tripwire"]:
++        print(f"  TRIPWIRE: run {t['run']} step {t['step']} evt "
++              f"{t['event']} live row {t['live_row']} kv_len {t['kv_len']} "
++              "== arange (score-blind selection)")
+     for d in r["diffs"]:
++        band = ("" if d.get("kth_band") is None else
++                f"; kth-score band {d['kth_band']:.6g}")
+         print(f"  DIFF: step {d['step']} evt {d['event']}: "
+               f"{d['n_bad_rows']} live rows differ; first at live row "
+               f"{d['first_live_row']} col {d['first_col']} "
+-              f"(a={d['a']} b={d['b']})")
++              f"(a={d['a']} b={d['b']}){band}")
+     print("VERDICT:", r["verdict"])
+     return 1 if r["differ"] else 0
+ 
+--- a/tests/runner/test_dsa_topk_dump.py	2026-07-10 10:31:56.474592738 +0000
++++ b/tests/runner/test_dsa_topk_dump.py
+@@ -220,6 +220,34 @@
+     assert f"w.step0002.evt00.proc{proc}.npz" in _files(tmp_path)
+ 
+ 
++def test_topk_scores_payload_round_trip(monkeypatch, tmp_path):
++    """rung 4b: a stash that threads ``topk_scores`` (the armed-only
++    selected-slot scores) dumps them alongside the indices — f32, dtype-
++    tagged, bit-exact; a stash WITHOUT them writes no such key (the
++    xla_ref / cache-less stash sites), and the differ treats the payload
++    as optional."""
++    monkeypatch.setenv("GLM_DSA_DUMP_TOPK", str(tmp_path / "s.npz"))
++    pos = jnp.arange(4, dtype=jnp.int32)
++    scores = jnp.asarray(
++        np.linspace(9.0, -3.0, 24, dtype=np.float32).reshape(4, 6))
++    with _ctx():
++        glm_dsa_indexer.stash_topk_indices(_indices(),
++                                           positions=pos,
++                                           topk_scores=scores)
++    with _ctx():
++        glm_dsa_indexer.stash_topk_indices(_indices(), positions=pos)
++    jax.effects_barrier()
++    proc = jax.process_index()
++    d1 = np.load(str(tmp_path / f"s.step0001.evt00.proc{proc}.npz"),
++                 allow_pickle=False)
++    assert d1["topk_scores"].dtype == np.float32
++    assert str(d1["topk_scores__dtype"]) == "float32"
++    np.testing.assert_array_equal(d1["topk_scores"], np.asarray(scores))
++    d2 = np.load(str(tmp_path / f"s.step0002.evt00.proc{proc}.npz"),
++                 allow_pickle=False)
++    assert "topk_scores" not in d2.files
++
++
+ def test_events_filter_writes_subset_without_renumbering(
+         monkeypatch, tmp_path):
+     monkeypatch.setenv("GLM_DSA_DUMP_TOPK", str(tmp_path / "f.npz"))
+--- a/tests/runner/test_dsa_topk_diff.py	2026-07-10 10:31:56.474592738 +0000
++++ b/tests/runner/test_dsa_topk_diff.py
+@@ -26,7 +26,8 @@
+ TOPK = 6
+ 
+ 
+-def _payload(step, evt, proc, nprocs, indices, positions, valid):
++def _payload(step, evt, proc, nprocs, indices, positions, valid,
++             scores=None):
+     out = {
+         "step_index": np.asarray(step, np.int64),
+         "event_index": np.asarray(evt, np.int64),
+@@ -42,12 +43,16 @@
+     if valid is not None:
+         out["valid"] = np.asarray(valid, bool)
+         out["valid__dtype"] = np.asarray("bool")
++    if scores is not None:
++        out["topk_scores"] = np.asarray(scores, np.float32)
++        out["topk_scores__dtype"] = np.asarray("float32")
+     return out
+ 
+ 
+ def _write(prefix, step, evt, proc, nprocs, indices, positions=None,
+-           valid=None, **overrides):
+-    out = _payload(step, evt, proc, nprocs, indices, positions, valid)
++           valid=None, scores=None, **overrides):
++    out = _payload(step, evt, proc, nprocs, indices, positions, valid,
++                   scores)
+     out.update(overrides)
+     path = f"{prefix}.step{step:04d}.evt{evt:02d}.proc{proc}.npz"
+     np.savez(path, **out)
+@@ -60,8 +65,19 @@
+     return (base + 100 * step + 10 * evt) % 97
+ 
+ 
++def _scores_for(sel):
++    """Deterministic descending selected-slot scores for a selection: slot s
++    scores ``TOPK - s`` on live entries, ``-inf`` on ``-1`` fill (the
++    rung-4b payload contract)."""
++    t = sel.shape[0]
++    sc = np.tile(np.arange(TOPK, 0, -1, dtype=np.float32), (t, 1))
++    return np.where(sel >= 0, sc, np.float32(-np.inf))
++
++
+ def _write_run(prefix, *, nprocs=2, steps=(1, 2), events=(0, 1), t_pad=8,
+-               n_live=5, perturb=None, perturb_proc=None, pad_bump=0):
++               n_live=5, perturb=None, perturb_proc=None, pad_bump=0,
++               with_scores=False, perturb_scores=None,
++               perturb_scores_proc=None):
+     """A full synthetic run: identical REPLICATED selections on every proc.
+ 
+     ``t_pad`` (the padded token bucket) may differ between runs — only the
+@@ -69,7 +85,10 @@
+     ``perturb=(step, evt, fn)`` rewrites that event's selection on EVERY
+     proc (replication preserved — a clean cross-run DIFFER);
+     ``perturb_proc=(step, evt, proc, fn)`` rewrites a single proc's copy
+-    (a replication violation)."""
++    (a replication violation). ``with_scores`` adds the rung-4b
++    ``topk_scores`` payload (``_scores_for``); ``perturb_scores=(step, evt,
++    fn)`` rewrites the score payload on every proc,
++    ``perturb_scores_proc=(step, evt, proc, fn)`` on one proc only."""
+     files = []
+     for step in steps:
+         for evt in events:
+@@ -78,6 +97,10 @@
+             sel[n_live:] += pad_bump
+             if perturb and perturb[:2] == (step, evt):
+                 sel = perturb[2](sel.copy())
++            scores = _scores_for(sel) if with_scores else None
++            if scores is not None and perturb_scores and \
++                    perturb_scores[:2] == (step, evt):
++                scores = perturb_scores[2](scores.copy())
+             positions = np.zeros(t_pad, np.int32)
+             positions[:n_live] = np.arange(n_live) + step
+             valid = np.zeros(t_pad, bool)
+@@ -86,9 +109,13 @@
+                 cur = sel
+                 if perturb_proc and perturb_proc[:3] == (step, evt, proc):
+                     cur = perturb_proc[3](sel.copy())
++                cur_scores = scores
++                if scores is not None and perturb_scores_proc and \
++                        perturb_scores_proc[:3] == (step, evt, proc):
++                    cur_scores = perturb_scores_proc[3](scores.copy())
+                 files.append(
+                     _write(prefix, step, evt, proc, nprocs, cur, positions,
+-                           valid))
++                           valid, scores=cur_scores))
+     return files
+ 
+ 
+@@ -177,6 +204,143 @@
+ 
+ 
+ # ---------------------------------------------------------------------------
++# The score-blind TRIPWIRE (rung-2 adjudication 2026-07-10): a live row with
++# kv_len > 2 equal to arange(min(kv_len, topk)) is the byte-exact output of
++# an all-tied/constant score row through both the DCP merge and the gate-off
++# hierarchical_topk tie breaks — automatic FAIL, even when both runs agree.
++# ---------------------------------------------------------------------------
++def _arange_row(sel, row, kv_len):
++    k = min(kv_len, TOPK)
++    sel[row] = -1
++    sel[row, :k] = np.arange(k, dtype=sel.dtype)
++    return sel
++
++
++def test_tripwire_arange_row_fails_even_on_elementwise_match(
++        tmp_path, capsys):
++    """Two runs that AGREE on a score-blind selection must not MATCH: the
++    rung-2 dcp=2 defect (evt00 selecting arange every decode step) would
++    sail through a pure elementwise comparison against an equally broken
++    run — the tripwire is the absolute check."""
++    a, b = str(tmp_path / "a"), str(tmp_path / "b")
++    # Live row 3 at step 1 has position 4 -> kv_len 5 (> 2): poison BOTH
++    # runs identically with arange(5) + the -1 fill.
++    poison = (1, 0, lambda sel: _arange_row(sel, 3, 5))
++    _write_run(a, perturb=poison)
++    _write_run(b, perturb=poison)
++    r = dsa_topk_diff.selection_diff(a, b)
++    assert r["differ"] is True
++    assert r["n_diff_events"] == 0  # elementwise the runs agree...
++    assert r["n_tripwire_rows"] == 2  # ...but BOTH runs are score-blind
++    t = r["tripwire"][0]
++    assert (t["step"], t["event"], t["live_row"], t["kv_len"]) == (1, 0, 3, 5)
++    assert "SCORE-BLIND TRIPWIRE" in r["verdict"]
++    assert dsa_topk_diff._main([a, b]) == 1
++    assert "TRIPWIRE" in capsys.readouterr().out
++
++
++def test_tripwire_flags_single_run(tmp_path):
++    """Run B score-blind, run A healthy: DIFFER carries both the elementwise
++    diff AND the tripwire attribution to run B."""
++    a, b = str(tmp_path / "a"), str(tmp_path / "b")
++    _write_run(a)
++    _write_run(b, perturb=(2, 1, lambda sel: _arange_row(sel, 4, 6)))
++    r = dsa_topk_diff.selection_diff(a, b)
++    assert r["differ"] is True
++    assert r["n_tripwire_rows"] == 1
++    assert r["tripwire"][0]["run"] == "B"
++    assert r["n_diff_events"] == 1
++
++
++def test_tripwire_exempts_kv_len_le_2(tmp_path):
++    """kv_len <= 2 rows are legitimately [0(,1), -1...] — no tripwire, and
++    two healthy runs still MATCH."""
++    a, b = str(tmp_path / "a"), str(tmp_path / "b")
++    # Live row 0 at step 1 has position 1 -> kv_len 2: arange(2) is the
++    # ONLY possible full selection of a 2-token causal prefix.
++    benign = (1, 0, lambda sel: _arange_row(sel, 0, 2))
++    _write_run(a, perturb=benign)
++    _write_run(b, perturb=benign)
++    r = dsa_topk_diff.selection_diff(a, b)
++    assert r["differ"] is False
++    assert r["n_tripwire_rows"] == 0
++    assert r["verdict"].startswith("MATCH")
++
++
++# ---------------------------------------------------------------------------
++# rung 4b: the k-th-score band — set-diff adjudication from the armed-only
++# topk_scores payload.
++# ---------------------------------------------------------------------------
++def test_kth_band_reported_on_set_diff(tmp_path):
++    """A dropped high-ranked position reports a WIDE band; a same-set
++    tie-order swap reports band 0.0 — the boundary-tie discriminator."""
++    a, b = str(tmp_path / "a"), str(tmp_path / "b")
++    _write_run(a, steps=(1, ), events=(0, ), with_scores=True)
++
++    def drop_slot1(sel):
++        # Replace live row 2's slot-1 position (score TOPK-1 = 5.0) with a
++        # position outside run A's set (90 — the fixture rows live in
++        # [0, 97)): a genuinely high-ranked drop, far above the k-th score.
++        sel[2, 1] = 90
++        return sel
++
++    _write_run(b, steps=(1, ), events=(0, ), with_scores=True,
++               perturb=(1, 0, drop_slot1))
++    r = dsa_topk_diff.selection_diff(a, b)
++    assert r["differ"] is True
++    d = r["diffs"][0]
++    # Row 2 is fully live (TOPK slots, scores 6..1): kth = 1.0. A's dropped
++    # element sits at slot 1 (score 5.0) -> band 4.0; B's new element 90
++    # also scores 5.0 in B -> same 4.0. Max = 4.0.
++    assert d["kth_band"] == pytest.approx(4.0)
++
++
++def test_kth_band_zero_for_pure_tie_order_swap(tmp_path):
++    a, b = str(tmp_path / "a"), str(tmp_path / "b")
++    _write_run(a, steps=(1, ), events=(0, ), with_scores=True)
++
++    def swap(sel):
++        sel[1, [0, 1]] = sel[1, [1, 0]]  # same set, swapped order
++        return sel
++
++    _write_run(b, steps=(1, ), events=(0, ), with_scores=True,
++               perturb=(1, 0, swap))
++    r = dsa_topk_diff.selection_diff(a, b)
++    assert r["differ"] is True
++    assert r["diffs"][0]["kth_band"] == pytest.approx(0.0)
++
++
++def test_kth_band_absent_without_scores(tmp_path):
++    a, b = str(tmp_path / "a"), str(tmp_path / "b")
++    _write_run(a, steps=(1, ), events=(0, ))
++
++    def flip(sel):
++        sel[2, 3] += 1
++        return sel
++
++    _write_run(b, steps=(1, ), events=(0, ), perturb=(1, 0, flip))
++    r = dsa_topk_diff.selection_diff(a, b)
++    assert r["differ"] is True
++    assert r["diffs"][0]["kth_band"] is None
++
++
++def test_scores_replication_violation_is_differ(tmp_path):
++    """topk_scores participates in the cross-proc replication contract."""
++    a, b = str(tmp_path / "a"), str(tmp_path / "b")
++    _write_run(a, with_scores=True)
++
++    def bump(sc):
++        sc[1, 0] += 0.5
++        return sc
++
++    _write_run(b, with_scores=True, perturb_scores_proc=(1, 0, 1, bump))
++    r = dsa_topk_diff.selection_diff(a, b)
++    assert r["differ"] is True
++    assert r["n_replication_violations"] >= 1
++    assert any("topk_scores" in v for v in r["replication_violations"])
++
++
++# ---------------------------------------------------------------------------
+ # Refusals (exit 2 — never a verdict).
+ # ---------------------------------------------------------------------------
+ def test_missing_proc_refuses_then_flag_allows(tmp_path, capsys):
+--- a/tests/layers/vllm/test_glm_dsa_dcp_decode_cpu.py	2026-07-10 05:08:47.285348932 +0000
++++ b/tests/layers/vllm/test_glm_dsa_dcp_decode_cpu.py
+@@ -1561,6 +1561,193 @@
+     np.testing.assert_array_equal(idx_dcp, idx_ref)
+ 
+ 
++# ---------------------------------------------------------------------------
++# The rung-2 multi-full-layer / runner-real slot-order class (adjudication
++# 2026-07-10): production GLM-5.2 serves 21 FULL indexer layers whose
++# kv-cache slots INTERLEAVE with the latent caches in vLLM registration
++# order — within each layer the Indexer's k_cache registers BEFORE the attn
++# module, so the FIRST full layer's indexer cache is kv_caches[0]. The
++# 1-layer synthetic map above cannot reach a cross-layer slot-resolution
++# bug; this stream drives THREE full layers (distinct weights) + one shared
++# through the REAL forward with that mapping shape and pins every layer's
++# per-step selection against gate-off, plus the score-blind tripwire.
++# ---------------------------------------------------------------------------
++_ML_TOPK = 12
++_ML_FULL = 3
++
++
++def _multilayer_decode_stream(monkeypatch, mesh, *, dcp_on,
++                              zero_w_layer=None, n_decode=8):
++    """10-token dense prefill (ctx <= topk) + ``n_decode`` decode steps of
++    one request, capturing EACH full layer's stashed selection (live row 0)
++    per decode step: ``[step][layer] -> i32[topk]``.
++
++    ``zero_w_layer``: zero that layer's indexer ``weights_proj`` — every
++    score becomes exactly 0.0 (all-tied), the degenerate-projection control
++    that must reproduce the rung-2 ascending-identity signature."""
++    monkeypatch.setenv("GLM_DSA_MODE", "pallas_decode")
++    if dcp_on:
++        monkeypatch.setenv("GLM_MLA_DCP", "1")
++        monkeypatch.setenv("GLM_DSA_DCP", "1")
++    else:
++        monkeypatch.delenv("GLM_MLA_DCP", raising=False)
++        monkeypatch.delenv("GLM_DSA_DCP", raising=False)
++    wrappers, kv_caches, index_map = [], [], {}
++    for li in range(_ML_FULL):
++        arrs = _indexer_arrays(seed=110 + li)
++        if zero_w_layer == li:
++            arrs["weights_proj"] = np.zeros_like(arrs["weights_proj"])
++        w, _ = _make_wrapper(arrs, _ML_TOPK,
++                             prefix=f"model.layers.{li}.self_attn",
++                             seed=120 + li)
++        wrappers.append(w)
++        # The RUNNER-REAL registration order: indexer.k_cache BEFORE attn.
++        index_map[f"model.layers.{li}.self_attn.indexer.k_cache"] = len(
++            kv_caches)
++        kv_caches.append(_empty_idx_cache())
++        index_map[f"model.layers.{li}.self_attn.attn"] = len(kv_caches)
++        kv_caches.append(_empty_mla_cache())
++    w_sh, _ = _make_wrapper(_indexer_arrays(seed=119), _ML_TOPK,
++                            prefix=f"model.layers.{_ML_FULL}.self_attn",
++                            skip_topk=True, with_indexer=False, seed=129)
++    wrappers.append(w_sh)
++    index_map[f"model.layers.{_ML_FULL}.self_attn.attn"] = len(kv_caches)
++    kv_caches.append(_empty_mla_cache())
++    _marker_dense(monkeypatch)  # ctx <= topk prefill legally routes dense
++    drv = _Driver(monkeypatch, wrappers, kv_caches, index_map, mesh)
++
++    r = _rng(7)
++    pre_rows = [0.1 * r.standard_normal(HIDDEN).astype(np.float32)
++                for _ in range(10)]
++    dec_rows = [0.1 * r.standard_normal(HIDDEN).astype(np.float32)
++                for _ in range(n_decode)]
++    drv.prefill_step(0, pre_rows, list(range(10)))
++    drv.pos[0] = 10
++
++    per_step = []
++    for i in range(n_decode):
++        md, _ = _decode_metadata([0], drv.pos, drv.bt_rows, 4)
++        drv.md_holder["md"] = md
++        hidden = np.zeros((4, HIDDEN), np.float32)
++        hidden[0] = dec_rows[i]
++        positions_t = torch.from_numpy(
++            np.asarray([drv.pos[0], 0, 0, 0], np.int64))
++        layer_rows = []
++        with set_vllm_model_wrapper_context(
++                kv_caches=drv.kv_caches,
++                mesh=drv.mesh,
++                layer_name_to_kvcache_index=drv.index_map):
++            ctx = get_vllm_model_wrapper_context()
++            for w in wrappers:
++                w.forward(positions_t, torch.from_numpy(hidden.copy()))
++                if w.indexer is not None and not w.skip_topk:
++                    layer_rows.append(
++                        np.asarray(
++                            next(iter(
++                                ctx.dsa_topk_indices.values())))[0].copy())
++            drv.kv_caches = ctx.kv_caches
++        per_step.append(layer_rows)
++        drv.pos[0] += 1
++    return per_step
++
++
++def test_multilayer_runner_slot_order_matches_gate_off(
++        monkeypatch, base_sharding, oracle_kernel):
++    """Every full layer's per-step DCP selection == the gate-off selection
++    ELEMENTWISE under the production interleaved idx-cache-first slot map
++    (layer 0's indexer cache at kv_caches[0]), and no layer trips the
++    score-blind tripwire — the rung-2 defect class this suite previously
++    could not reach."""
++    _require_devices(2)
++    from tpu_inference.runner.dsa_topk_diff import _tripwire_mask
++    ref = _multilayer_decode_stream(monkeypatch, _ref_mesh(), dcp_on=False)
++    dcp = _multilayer_decode_stream(monkeypatch, _make_mesh(1, 2),
++                                    dcp_on=True)
++    for si, (rows_ref, rows_dcp) in enumerate(zip(ref, dcp)):
++        kv = 10 + si + 1  # crosses topk=12 mid-stream: real sparsity
++        for li in range(_ML_FULL):
++            np.testing.assert_array_equal(
++                rows_dcp[li], rows_ref[li],
++                err_msg=f"decode step {si} layer {li} (kv_len {kv}): DCP "
++                "selection diverged from gate-off")
++            assert not _tripwire_mask(rows_dcp[li][None, :],
++                                      np.asarray([kv]))[0], (
++                f"decode step {si} layer {li}: score-blind tripwire")
++
++
++def test_score_blind_layer_reproduces_ascending_identity(
++        monkeypatch, base_sharding, oracle_kernel):
++    """POSITIVE CONTROL for the rung-2 evt00 signature: zeroing ONE layer's
++    indexer weights_proj makes that layer's score row exactly constant
++    (0.0), and the REAL DCP merge then selects EXACTLY
++    arange(min(kv_len, topk)) with the -1 tail — byte-identical to the
++    metal dumps' evt00 rows — while the other layers stay score-rich. Pins
++    (a) the constant-score -> ascending-identity mechanism end-to-end and
++    (b) the differ's tripwire against the real forward."""
++    _require_devices(2)
++    from tpu_inference.runner.dsa_topk_diff import _tripwire_mask
++    dcp = _multilayer_decode_stream(monkeypatch, _make_mesh(1, 2),
++                                    dcp_on=True, zero_w_layer=0)
++    for si, rows in enumerate(dcp):
++        kv = 10 + si + 1
++        k = min(kv, _ML_TOPK)
++        row0 = rows[0]
++        np.testing.assert_array_equal(
++            row0[:k], np.arange(k, dtype=row0.dtype),
++            err_msg=f"decode step {si}: degenerate layer 0 must select "
++            "the ascending identity")
++        assert np.all(row0[k:] == -1)
++        assert _tripwire_mask(row0[None, :], np.asarray([kv]))[0]
++        for li in (1, 2):
++            assert not _tripwire_mask(rows[li][None, :],
++                                      np.asarray([kv]))[0], (
++                f"healthy layer {li} must not trip")
++
++
++@pytest.mark.parametrize("dcp_on", [False, True])
++def test_armed_dump_carries_topk_scores(monkeypatch, base_sharding,
++                                        oracle_kernel, tmp_path, dcp_on):
++    """rung 4b end-to-end: an ARMED (GLM_DSA_DUMP_TOPK) stream dumps
++    ``topk_scores`` next to every selection — f32, same shape, -inf exactly
++    on the -1 slots, descending on the live selected slots (top-k order) —
++    the payload the differ's k-th-score band and any score-blindness audit
++    consume. Covers BOTH armed selection branches: the gate-off
++    take_along_axis path (dcp_on=False) and the DCP merge
++    return_values path (dcp_on=True)."""
++    _require_devices(2)
++    import glob as _glob
++
++    from tpu_inference.runner import dsa_topk_dump
++    monkeypatch.setenv("GLM_DSA_DUMP_TOPK", str(tmp_path / "ml.npz"))
++    dsa_topk_dump._reset_state_for_tests()
++    try:
++        mesh = _make_mesh(1, 2) if dcp_on else _ref_mesh()
++        _multilayer_decode_stream(monkeypatch, mesh, dcp_on=dcp_on,
++                                  n_decode=3)
++        jax.effects_barrier()
++    finally:
++        dsa_topk_dump._reset_state_for_tests()
++    files = sorted(_glob.glob(str(tmp_path / "ml.step*.evt*.proc*.npz")))
++    # 1 prefill + 3 decode steps x 3 full layers.
++    assert len(files) == 4 * _ML_FULL
++    saw_scored_decode_row = False
++    for f in files:
++        d = np.load(f, allow_pickle=False)
++        assert "topk_scores" in d.files
++        sc, ti = d["topk_scores"], d["topk_indices"]
++        assert sc.dtype == np.float32 and sc.shape == ti.shape
++        assert str(d["topk_scores__dtype"]) == "float32"
++        assert np.all(np.isneginf(sc[ti < 0]))  # -1 slots carry -inf
++        live = d["valid"].astype(bool)
++        if int(d["step_index"]) >= 2 and live.any():
++            row, srow = ti[live][0], sc[live][0]
++            sel = srow[row >= 0]
++            assert np.isfinite(sel).all()
++            assert np.all(np.diff(sel) <= 0)  # descending-score order
++            saw_scored_decode_row = True
++    assert saw_scored_decode_row
++
++
+ if __name__ == "__main__":
+     import sys
+     sys.exit(pytest.main([__file__, "-v", "-x"]))
