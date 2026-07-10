@@ -1764,3 +1764,18 @@ rows (seg_valid=0) below the LSE floor on both PASS. All geometries (R 8/64, sv 
 512/768). The [1,H,128] lane-broadcast lse out-block — the #1 Stage-A/C metal risk — lowers fine on v4.
 RUNG 2 next: 2040-token needle, dcp=1 sparse (reference) vs dcp=2 GLM_DSA_DCP (new distributed decode),
 GLM_DSA_DUMP_TOPK armed both sides, GLM_EXPECT_CODE_HASH pinned.
+
+## 2026-07-10 12:40 — RUNG 2 PASS: first distributed sparse attention on metal; selections BITWISE identical
+
+**RUN B = the first GLM_DSA_DCP execution on silicon** (dcp=2, 2040-token needle ×2): engine compiled
+(2686.9s — scan-with-LSE, all-gather-in-cond, owner-scatter-in-cond all lowered on v4), needles 2/2 with
+predictions IDENTICAL to the dcp=1 reference (202296, 173606). Selected-set verdict by DIRECT dump
+comparison: **840/840 (step,evt) events BITWISE EQUAL including order** — the distributed selection
+reproduces the single-chip selection exactly on metal (the Gate-2b standard, strongest form).
+CAVEAT/HONESTY: the new dsa_topk_diff CLI reported DIFFER on the same dumps — a bug in the DIFFER's own
+alignment/live-row masking (the raw arrays are equal; direct np.array_equal over all 840 pairs). The
+instrument gets the same discipline as everything else: fix + regression-test before rung 4 relies on it.
+Also noted: JAX dedupes the replicated-value debug callback to ONE process (all dumps land on a single
+host; --allow-missing-procs is the designed escape; cross-proc replication assert not exercisable).
+RUNGS 3+4+5 COMBINED next: 32K needles at dcp=2 sparse (chunked masked prefill for real) vs dcp=1, dumps
+both sides, direct-comparator verdict + needle correctness; then 64K (rung 6); then THE SPARSE GATE.
