@@ -1818,3 +1818,11 @@ DeepseekV32IndexerCache) vs degenerate q/w in _dcp_score_select. NEW TRIPWIRE ad
 is an exact ascending identity = automatic FAIL (would have caught evt00 alone, even below truncation).
 The needles passed identically throughout — the exact "plausible-but-wrong selection survives the
 benchmark" trap; the selected-set rung earned its keep. RUNG 2 = FAILED until evt00 is fixed.
+
+## 2026-07-10 15:40 — 32K dcp=2 SPARSE SMOKE 3/3 (Stage-C masked prefill works end-to-end on metal)
+
+First 32K distributed sparse serving: depths 0.0/0.5/1.0 all correct (249708/731442/108407), 16-chunk
+prefill through the Stage-C distributed masked scan, DRIVER_EXIT=0, engine 2631s. Labeled a SMOKE — the
+evt00 score-blind defect is PRESENT in this run (rung 2 failed); retrieval survives because the other 21
+full layers + IndexShare select correctly. Dumps gathered for post-fix comparison. dcp=1 32K reference
+launching now (independent of the fix — the reference side of rung 4).
