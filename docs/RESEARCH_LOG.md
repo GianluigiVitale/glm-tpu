@@ -1908,3 +1908,27 @@ the ladder proceeds on current code regardless.
 
 RUNG 2 RE-RUN in flight: the dcp=1 armed twin (same shape/protocol, GLM_DCP=1) launched — then
 dsa_topk_diff (tripwire + kth_band armed, scores on BOTH sides) delivers the rung-2 verdict on f0c63c302.
+
+## 2026-07-10 17:05 — THE INSTRUMENT DELIVERS: ×¼ SCORE STRIPES caught at rung-2 re-run (dcp=1 side, evt01) — cache-geometry fingerprint of the evt00 defect class
+
+Rung-2 re-run on f0c63c302, both sides armed, needles identical (110391/865371 both configs). Differ:
+798/840 DIFFER, tripwire 0 both sides. Set-level adjudication: 42 EQUAL / 718 ORDER-ONLY (the benign
+cross-config tie-shuffle) / **80 REAL set diffs, all where truncation bites — but kth_band max = 103.5,
+NOT boundary churn.** Per-position cross-run score join at step 20: evt00 pristine (p95 0.015), evt10-20
+= MoE-routing drift envelope (ulp flips → expert swaps; p95 10-21), and **evt01 = a structural defect:
+positions scoring 36-40 in the dcp=1 run where dcp=2 scores 147-155.** Ratios 3.86-4.09 ≈ **exactly ×4**.
+Band scan at steps 20/30 (clean scale separation): the depressed set is EXACTLY four 128-wide,
+128-aligned windows — **{576, 832, 1600, 1856}+[0,128) = in-block offsets 64 and 320 of the ODD 512-token
+blocks only** — while dcp=2's map is smooth there. Pure cache-geometry structure; magnitude ≈ ×¼ = a
+quantization-scale/exponent class (the DSA indexer k-cache is fp8 with per-tile scales — a wrong/stale
+scale tile yields exactly this signature; all-zero/garbage scales yield the constant-score → arange
+signature of the ORIGINAL evt00). UNIFIED HYPOTHESIS: stripes of the indexer k-cache (payload or scale
+sub-buffer) are written wrong/not-at-all in a launch-state-dependent way; expression depends on prior
+HBM contents — zeros → score-blind arange (original run), ~×¼ garbage → depressed stripes (this run),
+benign memory → clean-looking (the non-repro). Both configs can express it (dcp=2 originally, dcp=1 now).
+An index-only dump could NEVER have caught today's form: needles pass, sets differ by 2-10 at truncation
+only, tripwire silent — **only the score payload exposes it.** (Analyzer gap noted: my constancy check
+missed the stripe class; the differ's kth_band caught it — add a within-run bimodality check.)
+IN FLIGHT: dcp=1 run-B on the SAME ray cluster (determinism probe: stripes stable per launch-state or
+per-config?). NEXT: indexer-cache dump run (GLM_DCP_CACHE_DUMP_LAYERS targeting evt01's slot) to read the
+fp8 payload + scale tiles directly and name the buffer + write path. RUNG 2 remains OPEN (correctly).
