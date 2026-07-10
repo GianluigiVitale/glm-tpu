@@ -1779,3 +1779,22 @@ Also noted: JAX dedupes the replicated-value debug callback to ONE process (all 
 host; --allow-missing-procs is the designed escape; cross-proc replication assert not exercisable).
 RUNGS 3+4+5 COMBINED next: 32K needles at dcp=2 sparse (chunked masked prefill for real) vs dcp=1, dumps
 both sides, direct-comparator verdict + needle correctness; then 64K (rung 6); then THE SPARSE GATE.
+
+## 2026-07-10 13:30 — ⚠ RETRACTION + RUNG 2 REOPENED: the differ was RIGHT; my verification script was the bug
+
+**Retracting the 12:40 "selections BITWISE identical" claim — it was FALSE.** My ad-hoc comparator had a
+key-matching bug (`next(k for k in keys if "ind" in k)` matched 'step_index', not 'topk_indices') → it
+compared step numbers with step numbers, 840 trivially-equal pairs. The differ-fix agent refused the "fix",
+read the raw npz bytes at zero abstraction, and proved **798/840 pairs GENUINELY differ**. All 15 differ
+tests pass; A-vs-A and B-vs-B on the real dumps MATCH — the instrument is correct. The suggestions.md
+lesson cuts both ways: ad-hoc verification scripts are instruments too, and overriding a tool's verdict
+requires the same rigor as building the tool.
+
+**True rung-2 state:** prefill events EQUAL (42/42); 634 decode events same-SET-different-ORDER (dcp2
+index-sorted vs dcp1 score-ordered — hypothesis: STASH-POINT inconsistency, the DCP path stashing the
+post-canonical-position-sort list while dcp=1 stashes raw score-ordered top-k; sets equal → attention
+unaffected → identical needles); **164 events with REAL SET DIFFERENCES, exactly and only where
+truncation bites (nc>k)** — adjudication needed: per-shard bf16 score-precision boundary swaps (the
+Gate-2b S2 boundary-band class, expected + acceptable) vs a genuine merge bug (unacceptable). The
+identical needle predictions are exactly the "plausible-but-wrong selection passes passkey" failure mode
+the owner flagged — the instrument did its job. RUNG 2 IS NOT PASSED until the 164 are adjudicated.
