@@ -17,7 +17,7 @@ when unsure pick + log. Only a hard block pauses THAT thread.
   7/7 (first ever). **bf16+DCP=4 fits 128K without fp8** (~29.2/30.75G). Upstream #3129 fixed the same
   bug 3h before us (broken v0.20–v0.24) — convergent; do NOT file.
 - **Sparse-DCP Stages A+B+C CODE-COMPLETE, CPU-CERTIFIED ONLY** (tip 6f8855c3f; Stage B reviewed
-  SAFE-FOR-METAL-LADDER; Stage C review in flight; gate-off jaxpr == HEAD). Zero sparse-DCP tokens on
+  SAFE-FOR-METAL-LADDER; Stage C reviewed SAFE-FOR-METAL-LADDER; gate-off jaxpr == HEAD). Zero sparse-DCP tokens on
   metal. Obs kit repaired fail-loud (6f45e0944: partial-dump refusal, GLM_EXPECT_CODE_HASH,
   granularity assert).
 

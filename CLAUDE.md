@@ -345,7 +345,7 @@ glm-tpu/
   (per-shard top-min(k,S_local) → all-gather → position-sort → top_k, elementwise-exact incl. tie order)
   + serving-path distributed sparse decode + distributed masked-prefill with LSE combine
   (`ed2a021be` / `4f390a61e`+`e7c239c91` / `6f8855c3f`). **CPU-CERTIFIED ONLY** (132/132 + 14/14 + 24/24;
-  Stage B adversarially reviewed SAFE-FOR-METAL-LADDER; Stage C review in flight; gate-off jaxpr
+  Stages B AND C adversarially reviewed SAFE-FOR-METAL-LADDER; gate-off jaxpr
   byte-identical to HEAD). Zero sparse-DCP tokens on metal yet — runbook §8 is the ladder.
 - **Branch map:** `glm-5.2-v4` = pod mainline (Stage-1 + OOB fix); **`glm-5.2-v4-next` = integrated staging
   + what the pod runs** (tip `6f8855c3f`: Stage-2 kernels + the granularity fix + fp8-KV v4 fixes + obs

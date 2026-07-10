@@ -1712,3 +1712,16 @@ On-pod ladder once the gate frees the pod (workers sync to 6f8855c3f first): (1)
 (4) 32K selected-set dump dcp=2 vs dcp=1 (Gate-2b on metal); (5) 32K sparse passkey dcp=2/4; (6) 64K;
 (7) **128K SPARSE gate at n>=73** (env: GLM_DSA_DCP=1 GLM_MLA_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop
 GLM_DSA_SCORER=xla, all raylet-baked). MTP stays frozen.
+
+## 2026-07-10 08:30 — Stage C reviewed SAFE-FOR-METAL-LADDER: the sparse-DCP stack is FULLY certified
+
+Independent adversarial review of 6f8855c3f: **SAFE** — per-shard masked scan proven bitwise/exact on
+fresh experiments (empty-shard lse exactly -inf; l=1 → lse==m bitwise; one-hot sweep over EVERY global
+position at dcp 2/4/8; float64 oracle ≤2.4e-7; poison probes clean); causal boundary proven correct with
+MUTATION-POWER checks (kv±1 / wrong-owner / dropped-block-term all caught, maxdiff 1.15-2.57); gate-off
+jaxpr SHA re-proven cross-checkout; prefill owner-scatter bitwise at P_g and P_g+1 boundary chunks; the
+converted test PROVEN to execute the new branch (NaN-poison monkeypatch); the swallowed-callback drill
+confirmed obsolete (all remaining refusals are trace-time raises); the clear-caches fixture proven not to
+mask a real leak. 3 non-blocking notes (LSE-floor asymmetry theoretical-only; a (j) boundary-power test
+suggestion; a cosmetic count grouping). Both Stage B and C now carry the same verdict. The metal ladder
+(runbook §8) is cleared to start the moment the dense gate frees the pod + workers sync to 6f8855c3f.
