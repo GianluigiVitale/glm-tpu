@@ -1856,7 +1856,8 @@ through the runner-real INTERLEAVED slot map (indexer k_cache registered before 
 kv_caches[0], the production shape the 1-layer harness couldn't reach): dcp=2 == gate-off ELEMENTWISE at
 every step/layer; (c) worker code skew — hash-pinned, dirty=0.
 
-**CORRECTION to the 15:30 entry** (the record over the narrative, again): a fresh scan of the 32K dcp=2
+**CORRECTION to the 15:40 and 15:30 entries** (the record over the narrative, again): the 15:40 claim
+"the evt00 score-blind defect is PRESENT in this run" is DISPROVEN — a fresh scan of the 32K dcp=2
 dumps shows evt00 **fully healthy** — 57/57 truncated decode rows score-rich (sink + recency heads like
 `[0, 1, 32550, 32588, …]`), zero ascending rows. The "ReLU tie-saturation" framing (k-th boundary inside
 a wide 0.0 tie class) predicted PARTIAL degeneracy and does not match: rung-2b evt00 was TOTAL arange on
