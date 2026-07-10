@@ -1669,3 +1669,12 @@ _dcp_lse_combine (dense machinery reused; sparse kernel needs emit_lse — (m,l)
 5-file implementation plan, gated GLM_DSA_DCP; structural conflicts flagged (gather_kv_segment full-cache
 flatten, ATTN_HEAD includes dcp, scatter class). Stage-A implementation next (CPU, parallel to the gate).
 **MTP FROZEN** per owner directive.
+
+## 2026-07-10 00:55 — SMOKE-2 4/4 (mechanism depths 0.0/0.05/0.95/1.0 ALL correct); GATE n=77 LAUNCHED
+
+Smoke-2: depth 0.0 (911889✓), 0.05 (505695✓), 0.95 (638503✓), 1.00 (610927✓) — full-range retrieval at
+130,420 prompt tokens works. Combined smokes 7/7 over all 7 depths. Stage A (GLM_DSA_DCP primitives:
+distributed top-k, emit_lse, local gather) committed ed2a021be — 132/132 CPU tests, byte-identity proven,
+all 8 workers synced. EU-bucket backup violation by an agent caught + objects deleted + re-backed-up to
+gs://driftbench-dsv4-uc. **THE DENSE GATE IS RUNNING: 128K passkey, n=77 (7 depths × 11 trials),
+bf16+DCP=4, ~19h.** 77/77 → Wilson LB 95.3% → the ≥95%@128K dense slot fills with a defensible n.
