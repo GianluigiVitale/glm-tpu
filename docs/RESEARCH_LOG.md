@@ -1885,3 +1885,26 @@ fingerprints the zero input; then the layer-0 indexer k-cache dump names the buf
 state-dependent ⇒ flight-recorder + repeated launches. (2) Rung 4 with scores on BOTH sides (existing 32K
 dumps lack topk_scores) — adjudicate via kth_band; tripwire must stay silent. (3) One unarmed metal smoke
 re-confirms gate-off 3/3.
+
+## 2026-07-10 16:20 — ARMED RERUN (2560-shape, dcp=2, f0c63c302): evt00 NON-REPRO — honest null with a caveat
+
+The instrumented rerun of the exact rung-2b shape (2040-tok needles ×2, max_len 2560, blocks 8, mbt 2048,
+dcp=2; GLM_DSA_DUMP_TOPK + GLM_EXPECT_CODE_HASH raylet-baked and verified in /proc on all 8 hosts;
+fingerprints 8× f0c63c30240d dirty=0): needles 2/2 (110391/865371), 840 dump events on w-2 WITH the new
+topk_scores payload. Analyzer verdict (validated first against the old dumps: old dcp=2 → SCORE-BLIND
+detected at evt00; old dcp=1 → clean): **all 21 events score-rich — arange rows 0, constant-score rows 0,
+all-zero rows 0, on 4098 live rows/event.** The evt00 defect did NOT reproduce on this launch.
+
+CAVEAT (the reason this is a bound, not an exoneration): this run's traced program differs from the bad
+run's in three ways — (1) the armed dump code now threads scores (merge return_values + tuple cond),
+(2) GLM_DCP_ASSERT_SHARDING/CACHE_SANITY=1 were on, (3) the binary is f0c63c302 vs 33384c16a. A
+buffer-donation/layout-lottery bug can vanish under ANY of those perturbations. Classification firms up
+as **state/program-dependent zero-input at cache slot 0** — the class the forensics predicted
+(never-written stripe or donation aliasing), NOT a deterministic property of the shape. Detection is the
+durable mitigation: the score-blind tripwire now fails ANY dump run that carries the signature (even two
+agreeing runs), and armed topk_scores runs fingerprint the input directly. A forensic repro attempt at
+the OLD binary (33384c16a, asserts off) is queued as a separate thread — worth one run for the record;
+the ladder proceeds on current code regardless.
+
+RUNG 2 RE-RUN in flight: the dcp=1 armed twin (same shape/protocol, GLM_DCP=1) launched — then
+dsa_topk_diff (tripwire + kth_band armed, scores on BOTH sides) delivers the rung-2 verdict on f0c63c302.
