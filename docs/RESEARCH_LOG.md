@@ -2070,3 +2070,20 @@ side). Note for the record: the 2.5K-era "prefill EQUAL" clause of the criterion
 exactly as the union argument demands. Throughput note for the 256K A/B: dcp=2 needles ran ~715s vs
 dcp=1 ~73s at 32K — the replicated-q reshard + selection collectives cost is real; correctness first,
 perf stage later. NEXT: rung 6 (64K smoke) → 128K mechanism-depth smoke → THE GATE (n>=73).
+
+## 2026-07-11 09:55 — RUNG 6 CLOSED: 64K sparse 3/3 (first sparse retrieval above 32K on any hardware)
+
+Take 1 hit the WATCHLIST'S OWN prediction — CompileTimeHbmOom by 98MB (bf16[2048,512,256] chunk
+transient) — and the runbook's prescription (chunk 1024) fixed it on the first try. Take 2: 3/3 EXACT
+(205323 / 189158 / 860638) at depths 0.0/0.5/1.0 incl. both mechanism cells, dcp=2, flat default,
+64K max-len. Needle time ~2715s (63 chunks × ~43s — the dcp≥2 prefill collective cost; see below).
+OWNER DIRECTIVES ACCEPTED (from review): (1) permanent metal WRITE-PROBE guard at engine init
+(sentinel scratch cache through the compiled owner-scatter, refuse startup on any hole) — build+review
+after the gate launches; (2) upstream report for the pageloop-v4 sublane-store defect staged under
+docs/upstream/ for OWNER submission (bug #2 after the granularity bug); (3) 256K A/B must be dense-vs-
+sparse at IDENTICAL dcp so the O(L·k) win is measured THROUGH the reshard/collective penalty.
+GATE-FEASIBILITY FLAG: at 64K/dcp=2 pace, a 128K needle could cost ~90min ⇒ n=77 ≈ 5 days — NOT viable
+if it holds at dcp=4. The 128K mechanism smoke (dense-gate geometry: dcp=4, chunk 2048, pool 68,
+max-len 131840) measures the true per-needle cost and decides: gate as-is vs the head-split perf stage
+FIRST (the replicated-q reshard ×78 layers ×chunks is the suspected dominator — bf16[64,T,512]
+all-gathers in the HLO census).
