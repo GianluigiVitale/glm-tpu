@@ -2087,3 +2087,20 @@ if it holds at dcp=4. The 128K mechanism smoke (dense-gate geometry: dcp=4, chun
 max-len 131840) measures the true per-needle cost and decides: gate as-is vs the head-split perf stage
 FIRST (the replicated-q reshard ×78 layers ×chunks is the suspected dominator — bf16[64,T,512]
 all-gathers in the HLO census).
+
+## 2026-07-11 11:20 — 128K sparse: chunk 1024 MANDATORY (CompileTimeHbmOom at 2048 for BOTH dcp=2@64K and dcp=4@128K); w-2 disk mystery solved; smoke take-3 in flight
+
+Two CompileTimeHbmOoms establish: the sparse chunk transient (bf16[T,512,256]-class per layer) caps
+max_num_batched_tokens at 1024 for >=64K regardless of dcp — the dense gate's chunk-2048 geometry does
+NOT carry over to sparse. Gate plan must use chunk 1024 (prefill = 128 chunks/needle at 128K).
+DISK ROOT CAUSE (three incidents today): the ORIGINAL pageloop-era dump sets (topk_r345 2x2205 files
+~17G + old partials) sat in w-2:/tmp the whole time — individually small files invisible to top-N size
+listings; found via sudo du -xsh + prefix counting. Purged (decisive sets in GCS: dumps/rung2fix-w2 A+F,
+dumps/rung2fix-w0, dumps/rung4 dcp1+dcp2; w-0 ~/dumps/rung2 originals intact). w-2 now 52G free; the
+7/8-node join failure was the full disk. RULE ADOPTED: gate-class runs are UNARMED (a 128K armed gate
+would write ~230GB); the selection instrument's job ended with rungs 2-6, all closed.
+IN FLIGHT: 128K mechanism smoke take-3 (depths 0.0/0.05/0.95/1.0 ×1, dcp=4, chunk 1024, pool 68,
+UNARMED). Its per-needle time decides: ~15-20min → gate (n=77) tonight ~19-26h; ~90min → the head-split
+perf stage (compose ('model','expert') head sharding back into the dcp bodies — the replicated-q reshard
+×78 layers is the suspected dominator) comes FIRST, else the gate costs ~5 days. Post-smoke sequence
+regardless: RESULTS ROW + backup, then gate-or-perf per the measurement.
