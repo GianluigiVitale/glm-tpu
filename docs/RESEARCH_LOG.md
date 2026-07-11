@@ -2168,3 +2168,15 @@ the OFF dumps + HLO census (bf16[64,T,512] all-gather class GONE; if step time d
 emit_lse kernel at H_local=4 BEFORE blaming collectives — reviewer item 3) → 128K mech smoke (compile
 time = pivot success metric; chunk 1024, pool 68, dcp=4, UNARMED) → THE GATE. MTP unfreeze checklist
 now includes the reviewer's preseeded-trace test battery (hash/equivalence/refusal/tolerance).
+
+## 2026-07-11 21:10 — HEADSPLIT A/B at dcp=2 FAILED (0/3 pred=None); kernel EXONERATED at H=4 and H=8 on metal; deciding shape = dcp=4
+
+A/B ON-side (32K, dcp=2, H_local=4): 3/3 pred=None at ~521s/needle — clean serving, garbage output; no
+disk/mosaic errors. The ladder caught it pre-gate. Single-chip metal units: probe_lse_unit PASS at H=8
+AND at H=4 (artifacts rung1-lse-unit-metal-headsplit-h{8,4}.txt) → the sparse-decode/emit_lse kernel is
+NOT the defect; the fault is in the head-sharded shard_map composition on metal at H_local=4 (spec
+slicing/reassembly under GSPMD — CPU-blind, reviewer risk 1). HEADSPLIT is gated default-OFF: production
+unaffected. DECISION: the gate runs at dcp=4 = H_local=8, a DIFFERENT shape — test it directly via the
+128K mechanism smoke with HEADSPLIT=1 (also the compile-time metric). If dcp=4 passes needles+compile →
+add a trace-time refusal for H_local<8 (known-broken shape) and proceed to THE GATE; if it also fails →
+headsplit OFF everywhere, hunt the composition defect before any gate (compile infeasibility stands).
