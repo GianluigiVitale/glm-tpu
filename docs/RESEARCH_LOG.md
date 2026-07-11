@@ -2180,3 +2180,21 @@ unaffected. DECISION: the gate runs at dcp=4 = H_local=8, a DIFFERENT shape — 
 128K mechanism smoke with HEADSPLIT=1 (also the compile-time metric). If dcp=4 passes needles+compile →
 add a trace-time refusal for H_local<8 (known-broken shape) and proceed to THE GATE; if it also fails →
 headsplit OFF everywhere, hunt the composition defect before any gate (compile infeasibility stands).
+
+## 2026-07-11 23:55 — 128K smoke (headsplit, dcp=4): needles 1-2 EXACT incl. both hard mechanism cells; pace verdict = GATE INFEASIBLE AS-IS
+
+d=0.0 → 705269 ✓, d=0.05 → 824794 ✓ (the two cells where the needle must survive top-2048 selection out
+of 128K at max distance) — headsplit at H_local=8 (dcp=4) is CORRECT on metal; the dcp=2 H_local=4
+failure is shape-specific (kernel exonerated at H=4 AND H=8 by single-chip units; the fault is the
+GSPMD composition at that shape — refusal to be added, hunt deferred). BUT: needle 2 took 7512.9s ≈
+needle 1's 7514.9s ⇒ ~125 min/needle STEADY STATE ⇒ n=77 ≈ 160h. INFEASIBLE.
+DOMINATOR NAMED: prefill at 17 tok/s (vs ~140 tok/s dense at 128K; decode 1.1 tok/s but only ~20
+tok/needle) — 99.7% of needle time is sparse PREFILL: the per-chunk distributed-selection cost (the
+[T, dcp·k] candidate score+position all-gather per FULL indexer layer per chunk ≈64MB at dcp=4/T=1024,
+×21 layers ×125 chunks, + merge + per-shard segment gather). The attend-side headsplit worked; the
+selection arena is the next wall. PLAN: (1) smoke-5 finishes needles 3-4 (banked regardless); (2) perf
+stage 2 design delegated — the candidate-arena diet (bf16 scores on the wire w/ tie-band analysis vs the
+rung-4 criterion, fused score+position packing, chunk-2048 retry now that headsplit shrank the attend
+transient, gather formulation review vs the 32K A/B HLO); (3) gate DEFERRED until ≤~30min/needle
+(n=77 ≈ 38h) is in reach. Honesty: the sparse stack is CORRECT to 128K on the mechanism cells; what
+remains is making its prefill cheap enough to afford the statistics.
