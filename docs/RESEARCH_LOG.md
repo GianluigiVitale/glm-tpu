@@ -2054,3 +2054,19 @@ after the wedged engine's SIGTERM; the launcher's stop-hygiene relaunch cleared 
 default on a NEW shape. Rung 3 = CLOSED (needles + step-HLO honesty: no whole-cache collectives; census
 archived). NEXT: rung 4 — 32K selected-set, dcp=2 vs dcp=1, topk_scores armed both sides, tripwire +
 kth_band criterion; then the 32K/64K smokes; then the 128K sparse gate.
+
+## 2026-07-11 05:30 — RUNGS 4+5 CLOSED at 32K (flat default); the criterion held in every part
+
+Rung-4 protocol (events-filtered dumps 0,1,2,10,19,20 after the 32K prefill events blew w-2's disk —
+ENOSPC even fingered the earlier d=0.5 pred=None, which passed exactly on the clean rerun): dcp=2 3/3
+(422181/663295/648060), dcp=1 twin 3/3 IDENTICAL predictions. Adjudication (vectorized, w-4): tripwire 0
+both sides; replication 0; **first-chunk rows EXACTLY equal 36864/36864** (the kv<=topk region — set-
+equality by construction holds ELEMENTWISE on metal); past truncation the sets churn by cross-run MoE
+drift (band/drift max 3.26 where defined — the drift envelope at 32K is itself large, p95 up to ~41
+score units over 105 compounding steps); **structured-band stripe detector: 0/285 decode events** (the
+within-run check the drift cannot fake — contiguous >=32-position runs at 10x median diff: none, either
+side). Note for the record: the 2.5K-era "prefill EQUAL" clause of the criterion generalizes at 32K to
+"the un-truncated region exactly equal" — chunks 2+ truncate and churn like decode; first chunks match
+exactly as the union argument demands. Throughput note for the 256K A/B: dcp=2 needles ran ~715s vs
+dcp=1 ~73s at 32K — the replicated-q reshard + selection collectives cost is real; correctness first,
+perf stage later. NEXT: rung 6 (64K smoke) → 128K mechanism-depth smoke → THE GATE (n>=73).
