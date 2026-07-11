@@ -2104,3 +2104,19 @@ UNARMED). Its per-needle time decides: ~15-20min → gate (n=77) tonight ~19-26h
 perf stage (compose ('model','expert') head sharding back into the dcp bodies — the replicated-q reshard
 ×78 layers is the suspected dominator) comes FIRST, else the gate costs ~5 days. Post-smoke sequence
 regardless: RESULTS ROW + backup, then gate-or-perf per the measurement.
+
+## 2026-07-11 14:45 — 128K smoke take-4: the COMPILE itself is the story so far (2h+ single-pass, still burning)
+
+Take-3 stalled during w-0 disk pressure (killed; possibly prematurely — lesson: the stall discriminator
+is the compile worker's TIME+ growth, not driver-log quiet). Take-4 (clean disks, 8/8 nodes): the w-1
+compile worker has burned 2h+ CPU single-threaded on the sparse 128K/chunk-1024 jit_step — vs ~45min for
+every prior program incl. the dense 128K gate. Whatever pass is exploding (suspect: the candidate-arena/
+masked-prefill structures at 128 chunks) is ITSELF evidence for the head-split perf stage: that change
+shrinks the per-shard program. DECISION RULE armed in the watcher: summary → read pace, decide gate-vs-
+perf; error → diagnose; compile-idle-without-output → hung, kill+pivot to perf stage. If total compile
+exceeds ~3h, pivot regardless — the gate cannot ride a program this fragile.
+STATE SNAPSHOT for continuity: rungs 1-6 CLOSED; fix tip 74d8c3225 synced 8×; upstream package staged
+(docs/upstream/, owner files); dumps archived in GCS (rung2fix-w2 A+F, rung2fix-w0, rung4 dcp1+dcp2,
+rung2-originals); gate protocol: UNARMED, chunk 1024, pool 68, dcp=4, depths {0.0,0.05,0.25,0.5,0.75,
+0.95,1.0}×11, watchdog, extend-to-n≈130 on one miss. Pending after gate: 256K A/B same-dcp both sides;
+GSM8K n≥200; GPQA (owner-gated); write-probe guard (owner directive); MTP unfreeze last.
