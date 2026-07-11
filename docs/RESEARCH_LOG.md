@@ -2134,3 +2134,25 @@ needles + selected-set sanity) → re-try the 128K mechanism smoke (expect sane 
 (unarmed, chunk 1024, pool 68, dcp=4, 7 depths × 11, extend-to-n≈130 on one miss) → 256K A/B same-dcp
 → GSM8K n≥200 → GPQA (owner-gated) → write-probe guard → MTP unfreeze. Dense 128K gate (77/77, run 124)
 and sparse-to-64K (rungs 1-6) remain BANKED and pushed.
+
+## 2026-07-11 17:40 — HEAD-SPLIT DELIVERED (scratchpad 0ed33e3e on 74d8c3225); adversarial review in flight
+
+Implementation: GLM_DSA_DCP_HEADSPLIT=1 (trace-time, default OFF) head-shards ONLY the two attend
+shard_map bodies (_dcp_decode Stage-B, _dcp_prefill Stage-C) via P(None,('model','expert'),None) in /
+P(('model','expert'),None,None) out; _dcp_lse_combine untouched (elementwise in heads); indexer/scoring
+DELIBERATELY unsplit (score-map psum would cost more than the replicated boundary saves — indexer params
+are replicated P() — and head-partial fp32 summation would reorder near-ties, breaking the rung-4
+elementwise criterion); owner-scatter/selection/dense untouched. Arithmetic: dcp=2 per layer/chunk —
+replicated-q 65MB+8MB → 2.4MB (~30×), LSE psum 134MB → 8.4MB (16×), attend FLOPs/chip ÷16; per-shard
+head extent 64→4 (the suspected compile feeder). Tests 54/0: dcp suite 28 (incl. extended jaxpr-hash),
+NEW headsplit suite 10 (byte-identity off; on-vs-off bitwise at (2,1)/(2,2)/(4,2) decode + Stage-C +
+mixed, selections/caches bitwise everywhere; outputs rtol 2e-5 ONLY at the H_local=1 CPU cells —
+XLA-CPU single-head contraction-order artifact, production never reaches H_local=1), coverage 16.
+Diff: scratchpad/headsplit.diff. REVIEW IN FLIGHT (attack list incl. independent reproduction of the
+H_local=1 artifact, sharding-axis-set equality vs sharding.py, preseeded-path safety).
+ON SAFE-TO-LAND: apply+byte-check vs scratchpad tree → fast suites → commit+push → sync+pin 8× → add
+GLM_DSA_DCP_HEADSPLIT to bench/engine.py warn lists (implementer couldn't, outside checkout) → POD:
+32K A/B on/off (step time expect ~715s→~100s; needles exact; scores-armed selected-set sanity; HLO
+census: bf16[64,T,512] all-gather class GONE) → 128K mech smoke (compile time = the pivot's success
+metric) → THE GATE (unarmed, chunk 1024, pool 68, dcp=4, 7 depths×11). MTP note: preseeded+headsplit
+must be CPU-tested when MTP unfreezes.
