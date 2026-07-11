@@ -2120,3 +2120,17 @@ STATE SNAPSHOT for continuity: rungs 1-6 CLOSED; fix tip 74d8c3225 synced 8×; u
 rung2-originals); gate protocol: UNARMED, chunk 1024, pool 68, dcp=4, depths {0.0,0.05,0.25,0.5,0.75,
 0.95,1.0}×11, watchdog, extend-to-n≈130 on one miss. Pending after gate: 256K A/B same-dcp both sides;
 GSM8K n≥200; GPQA (owner-gated); write-probe guard (owner directive); MTP unfreeze last.
+
+## 2026-07-11 15:50 — PIVOT EXECUTED: 128K smoke take-4 killed at 3.7h compile (rule fired); head-split perf stage delegated
+
+w-1's XLA compile of the sparse 128K/chunk-1024 jit_step reached 223 CPU-minutes at 100% with no end in
+sight — the 3h pivot rule (14:45 entry) fired. Take-4 killed; pod idle. THE GATE IS DEFERRED behind the
+head-split perf stage, which attacks all three symptoms at once: the ×78-layer bf16[64,T,512]
+replicated-q all-gathers (HLO census), the ~10× dcp step cost (32K: 715s vs 73s/needle), and the
+super-linear compile. Perf-stage agent briefed and running (scratchpad; gated GLM_DSA_DCP_HEADSPLIT,
+byte-identical off, CPU equivalence at dcp=1/2, full suites; diff + local commit as deliverable).
+SEQUENCE ON ITS RETURN: adversarial review → land → sync+pin → 32K A/B (headsplit on/off: step time +
+needles + selected-set sanity) → re-try the 128K mechanism smoke (expect sane compile) → THE GATE
+(unarmed, chunk 1024, pool 68, dcp=4, 7 depths × 11, extend-to-n≈130 on one miss) → 256K A/B same-dcp
+→ GSM8K n≥200 → GPQA (owner-gated) → write-probe guard → MTP unfreeze. Dense 128K gate (77/77, run 124)
+and sparse-to-64K (rungs 1-6) remain BANKED and pushed.
