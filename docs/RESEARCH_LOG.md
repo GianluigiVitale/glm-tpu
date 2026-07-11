@@ -2156,3 +2156,15 @@ GLM_DSA_DCP_HEADSPLIT to bench/engine.py warn lists (implementer couldn't, outsi
 census: bf16[64,T,512] all-gather class GONE) → 128K mech smoke (compile time = the pivot's success
 metric) → THE GATE (unarmed, chunk 1024, pool 68, dcp=4, 7 depths×11). MTP note: preseeded+headsplit
 must be CPU-tested when MTP unfreezes.
+
+## 2026-07-11 19:05 — HEAD-SPLIT LANDED: edc7d726b, reviewed SAFE-TO-LAND (all attacks verified incl. independent H_local=1 repro), synced 8×
+
+Byte-identity vs the reviewed scratchpad tree confirmed on all 3 files; 54/54 twice (implementer +
+reviewer independently). GLM_DSA_DCP_HEADSPLIT added to bench/engine.py warn lists. NEW PIN: edc7d726b.
+NEXT POD SEQUENCE: relaunch with HEADSPLIT=1 + scores armed (events filter) + GLM_DUMP_STEP_HLO → 32K
+dcp=2 run = the A/B ON side (OFF baseline = rung-4 take-2: 715s/needle, needles exact, dumps in GCS
+dumps/rung4/dcp2): criteria = needles exact + step time (expect ~715s→~100s) + selected-set sanity vs
+the OFF dumps + HLO census (bf16[64,T,512] all-gather class GONE; if step time disappoints, profile the
+emit_lse kernel at H_local=4 BEFORE blaming collectives — reviewer item 3) → 128K mech smoke (compile
+time = pivot success metric; chunk 1024, pool 68, dcp=4, UNARMED) → THE GATE. MTP unfreeze checklist
+now includes the reviewer's preseeded-trace test battery (hash/equivalence/refusal/tolerance).
