@@ -2044,3 +2044,13 @@ whole-cache collectives** (no all-gather with any dim ≥4096 in the 2048-token 
 five shapes ×78 layers (attention-level, incl. the watchlist's predicted replicated-q reshard
 bf16[64,2048,512] — throughput note) + 2 singletons; detailed sparse-branch attribution deferred
 (program archived: scratchpad/rung3_hlo_2048tok.txt.gz). Rung-3 needle rerun in flight on clean disks.
+
+## 2026-07-11 01:10 — RUNG 3 CLOSED: 5K chunked prefill 2/2 @dcp=2/flat + HLO hard gate (zero whole-cache collectives)
+
+Attempt 3 (post-relaunch, clean disks): both needles exact (843616, 773976) — the d=0.75 miss of attempt
+1 confirmed as the disk-full confound (attempt 2 died separately at TPU init: stale SliceBuilder grpc
+after the wedged engine's SIGTERM; the launcher's stop-hygiene relaunch cleared it — the runbook's
+"relaunch after any pod crash" rule, again). Stage-C masked prefill at 3 chunks + decode under the flat
+default on a NEW shape. Rung 3 = CLOSED (needles + step-HLO honesty: no whole-cache collectives; census
+archived). NEXT: rung 4 — 32K selected-set, dcp=2 vs dcp=1, topk_scores armed both sides, tripwire +
+kth_band criterion; then the 32K/64K smokes; then the 128K sparse gate.
