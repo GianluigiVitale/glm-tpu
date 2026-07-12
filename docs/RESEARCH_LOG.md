@@ -2365,3 +2365,22 @@ the audit's adversarially-verified top candidate was mis-sized; only the instrum
 suggestions.md discipline, again. Residual: trace-predicted 128K step ≈17s vs measured 25.4s — ~8s still
 unattributed at 128K (128K-specific trace queued). Decode trace missing (prefill_only phase captured).
 RETARGET: the campaign's prize is the GATHER machinery (~62% → the reorder-gather class first).
+
+## 2026-07-13 01:00 — GATHER DOMINATOR DELIVERED (39087f8f): scalar-gather pathology root-caused; 3 gated bitwise-exact fixes, 1.9-2.3× projected
+
+ROOT CAUSE of the 0.5 GB/s gathers: slice_sizes=(1,1) lane-dimension scalar gathers — XLA:TPU emits
+sequential per-element gather_custom_fusion (the 440 GB/s neighbor fetches contiguous 640-wide rows;
+slice width IS the whole pathology). FIXES (each env-gated, default byte-identical, trace-time refusal):
+GLM_DSA_MERGE_IMPL=v2 — merge as ONE stable two-key lax.sort (u32 sign-flip value key + position key;
+bitwise == v1 incl. tie order + concat-invariance), 3 gathers + top_k + sort → 1 sort;
+GLM_DSA_OWNED_SEG_IMPL=v2 — sort the key directly (0 gathers); GLM_DSA_SEG_GATHER_IMPL=v2 — page-id
+one-hot reduce with exact OOB semantics (only the fast payload gather remains). Projection bounded by
+the measured class: −5.0…−5.9s of the 10.36s step ⇒ ~4.5-5.4s/chunk (1.9-2.3×), S-INDEPENDENT, composes
+with W2.1 (67749faa, its own review finishing). 62 new adversarial tests + batteries green (the ~250-test
+single-process abort classified pre-existing compile-volume class, subdivided runs green both trees).
+SIDE HYPOTHESIS registered: the segment request-boundary bug may live in the v4 lowering of the s32
+index gather — SEG_GATHER v2 may change its signature (observe in cycle A). NOTE: the two agents collided
+in the shared scratchpad tree (worktree isolation saved both; W2.1 on branch w21-btwidth-shared, gather on
+gather-dominator; both apply cleanly to 29305e185 — integration check is in the gather review's scope).
+COMBINED PROJECTION if both land + chunk-2048: 32K chunk 10.4→~4.5s and 128K step composing W2.1's width
+cut ⇒ prefill ~200+ tok/s territory — the gate in ~half a day. Reviews in flight; pod cycle A next.
