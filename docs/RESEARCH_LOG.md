@@ -2237,3 +2237,19 @@ call (the masked whole-stripe walk) confirmed by the fix working. S2 (pallas sco
 the target. Projection at 128K: ~21min/needle ⇒ n=77 ≈ 27h. NEXT: 128K mech smoke under segment (4
 needles ×1, correctness+pace at gate length) → THE GATE (unarmed, chunk 1024, pool 68, dcp=4,
 segment+headsplit, 7 depths×11=77, extend-to-n≈130 on one miss).
+
+## 2026-07-12 08:00 — SEGMENT AT 128K: request-boundary defect — req 1 EXACT, reqs 2-3 pred=None; the smoke did its job
+
+seg_128k_smoke: needle 1 (d=0.0) EXACT (705269, cross-impl answer stability) at 3225.7s (~54min steady
+⇒ segment gate ≈ 69h — the 32K 104 tok/s does NOT hold at 128K; the O(S) scoring term grows — noted,
+secondary). THEN needles 2 (d=0.05) and 3 (d=0.95) pred=None — same engine, sequential requests, no
+disk/raylet errors (w-0 was at the monitor edge 5.0G, freed to 6.7G — cannot fully exclude, but the
+1-good-then-bad pattern is structural, not pressure-shaped). MASKED at the identical geometry was 4/4
+across the same sequential-reuse pattern ⇒ the defect is segment-specific and request-boundary-shaped:
+128K pool = 68 blocks, request 2 reuses request 1's freed blocks in allocator order — hypothesis: a
+gather step in the segment chain addresses pages arithmetically (pos//page_size) instead of through the
+block table, correct only on the fresh-pool identity layout. 32K 3/3 doesn't contradict (small pool may
+re-allocate identically). CPU repro agent launched (adversarial permuted block tables, 2 sequential
+requests, segment-vs-masked bitwise). Needle 4 left running (sharpens the signature free). FALLBACK IS
+REAL: masked = correct 4/4 at ~125min/needle (gate ~160h — the ugly backstop). GATE BLOCKED pending the
+fix; the ladder's cheap-rung discipline caught this BEFORE 77 needles were burned.
