@@ -2218,3 +2218,12 @@ causal semantics vs the walk, byte-identity off, tile invariance, headsplit comp
 ON SAFE-TO-LAND: land+sync+pin → 32K A/B at dcp=4 (NEVER dcp=2/H_local=4) → 128K mech smoke (segment+
 headsplit; ≥50 tok/s target) → xprof residual → THE GATE. Smoke-5 needles 3-4 (d=0.95/1.0) still in
 flight on the OLD config — they complete the 4-cell correctness picture regardless.
+
+## 2026-07-12 04:05 — 128K MECHANISM SMOKE 4/4 EXACT (sparse, dcp=4, headsplit) — correctness at the gate geometry BANKED
+
+d=0.0→705269 ✓, 0.05→824794 ✓, 0.95→289958 ✓, 1.0→891482 ✓ — all exact, ~7513s each (masked prefill,
+the S1-superseded config). The four cells that test the mechanism hardest are green at 128K. SMOKE ≠
+GATE — but correctness at the gate geometry is now established twice over (dcp=4+headsplit, flat
+scatter, chunk 1024). S1 (segment prefill, 29305e185) landed+reviewed while it ran; engine now free.
+NEXT: sync+pin 29305e185 → relaunch segment+headsplit → 32K dcp=4 segment sanity (needles + tok/s)
+→ 128K mech smoke under segment (≥50 tok/s target = gate ~32-38h) → THE GATE.
