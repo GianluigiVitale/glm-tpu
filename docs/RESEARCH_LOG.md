@@ -2297,3 +2297,15 @@ armed protocol + upstream report #3). Plan: on D2(ii) 3/3 → RESULTS row + docs
 sequential per-depth runs (11 trials each, ~10h/run — crash-resilient checkpoints, same statistics,
 77 cells total, extend-to-n≈130 on any miss). During the gate (pod busy): CPU threads — upstream #3
 evidence staging, the write-probe guard, the composition hunt.
+
+## 2026-07-12 14:10 — 🚀 THE 128K SPARSE GATE IS RUNNING (n=77)
+
+D2(ii) closed 3/3 EXACT (705269/824794/289958) — the gate config validated end-to-end. LAUNCHED:
+~/glm-run/gate_sparse128k.sh (setsid orchestrator, pid logged) — 7 sequential depth runs × 11 trials
+(mechanism cells 0.0/0.05/0.95/1.0 FIRST, then 0.25/0.5/0.75), dcp=4 + segment + NO headsplit + flat
+scatter + chunk 1024 + pool 68 + pin 29305e185, UNARMED. ~10h/depth ⇒ ~69h total. Retry policy: one
+infra retry per depth after ray relaunch (no-SUMMARY only); a needle MISS is a recorded result — the
+77/77 → Wilson LB 95.3% bar, ONE miss ⇒ extend to n≈130, never rerun-until-green. results.db backed up
+to GCS after each depth. Watchdog armed (completion / miss / orchestrator-death). During the gate:
+CPU-side threads queue — upstream #3 (headsplit×segment composition) evidence, the write-probe guard,
+MTP-unfreeze test battery prep.
