@@ -84,6 +84,8 @@ _WORKER_SIDE_OBS_ENVS = (
     "GLM_DCP_SCATTER_IMPL",
     "GLM_DSA_DCP_SCATTER_IMPL",
     "GLM_DSA_DCP_HEADSPLIT",
+    "GLM_DSA_DCP_PREFILL_ATTN",
+    "GLM_DSA_DCP_PREFILL_SEG_TBLOCK",
     "GLM_DCP_SCATTER_ONLY",
     "GLM_DCP_GATHER_POS",
     "GLM_MLA_HEAD_SHARDED",
@@ -95,6 +97,8 @@ _WORKER_SIDE_OBS_ENVS = (
 # warning paragraph). Value-carrying envs (dump paths/prefixes, layer lists,
 # call caps, hash pins, impl selectors) stay flagged for any non-empty value.
 _VALUE_CARRYING_OBS_ENVS = frozenset({
+    "GLM_DSA_DCP_SCATTER_IMPL", "GLM_DSA_DCP_HEADSPLIT",
+    "GLM_DSA_DCP_PREFILL_ATTN", "GLM_DSA_DCP_PREFILL_SEG_TBLOCK",
     "GLM_DCP_CACHE_DUMP", "GLM_DCP_CACHE_DUMP_LAYERS",
     "GLM_DCP_DUMP_NEWKV_MAXCALLS", "GLM_EXPECT_CODE_HASH",
     "GLM_DCP_SCATTER_IMPL",
