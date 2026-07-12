@@ -2324,3 +2324,18 @@ Map ×4 readers / Ideas ×5 lenses / adversarial Verify ×14 / Synthesize → sc
 unknown). xprof measurement run LAUNCHED (PHASED_PROFILING_DIR, single-device traces, 32K needle, current
 config) to confirm op-level. Correctness state preserved: everything to date (dense 77/77, sparse 4/4+3/3
 at 128K, rungs 1-6) stands; the campaign is gated+verified per the standing method.
+
+## 2026-07-12 20:45 — AUDIT DELIVERED (38 candidates, 14 adversarially verified) + P0.a ADJUDICATED: the 258-wide block table IS the O(S) monster
+
+Workflow verdict (24 agents; full plan scratchpad/eff_campaign_plan.md): the top finding was a
+DISCOVERY, not a tune — the vLLM block table is cdiv(max_model_len, spec block_size 512)=258 entries
+wide while the engine allocates ids at 512·dcp granularity (65 live at dcp=4). P0.a jaxpr dump PROVES
+the DSA path pays the padded width: paged_indexer_scores' lax.map = 258 SERIALIZED page-steps/layer/chunk
+(×21 layers — the measured ~21s O(S) residual), hierarchical_topk = 33 groups over 132,096 cols vs 9
+over 33,280 (top_k itself is already hierarchical — the monolithic-sort hypothesis dies; the SERIALIZED
+page loop is the killer). W2.1 (owned-width slice, exact semantics — dead tail is zero-id + kv_len-
+masked) projects chunk 25.4→~9.5s ⇒ ~107 tok/s @128K (2.7×) + decode 2-3×; gate 69h→~26h. Implementation
+agent launched (gated GLM_DSA_BT_WIDTH, default full/byte-identical; bitwise CPU proof; pod protocol incl.
+armed selections-bitwise + 2-request + 4-depth smoke). Wave-1 quick wins queued (launcher bucket default
+fix, compile-cache verification). Wave-3 owner decisions flagged: chunk-2048, APC (protocol-changing),
+dcp=8 probe. xprof 32K run still in flight (P0.b confirms op-level + decode classes).
