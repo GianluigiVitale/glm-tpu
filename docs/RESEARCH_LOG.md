@@ -2339,3 +2339,14 @@ agent launched (gated GLM_DSA_BT_WIDTH, default full/byte-identical; bitwise CPU
 armed selections-bitwise + 2-request + 4-depth smoke). Wave-1 quick wins queued (launcher bucket default
 fix, compile-cache verification). Wave-3 owner decisions flagged: chunk-2048, APC (protocol-changing),
 dcp=8 probe. xprof 32K run still in flight (P0.b confirms op-level + decode classes).
+
+## 2026-07-12 21:30 — OWNER RATIFIED the Wave-3 decisions (recorded in auto-memory + here)
+
+(1) CHUNK 2048: ADOPT (option a) — pending one compile probe + a 128K smoke; the 5 banked chunk-1024
+gate needles are DISCARDED by consequence; the gate runs at 2048 if the probe passes, else 1024.
+(2) APC: option c — OFF for the gate (write-path coverage stays whole; 2 of 3 silicon bugs lived
+there); ADOPT post-gate for benchmarks after its own cache-hit-under-DSA validation.
+(3) dcp=8: DEFER (option b) to the 256K stage.
+SEQUENCING LOCKED: W2.1 lands+reviews → sync+pin → pod cycle A (32K armed A/B, W2.1 on/off, chunk 1024
+— single variable) → pod cycle B (chunk-2048 compile probe + combined W2.1+2048 128K 4-depth smoke) →
+THE GATE (dcp=4, segment, owned width, chunk per probe, APC off, n=77 fresh).
