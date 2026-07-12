@@ -2350,3 +2350,18 @@ there); ADOPT post-gate for benchmarks after its own cache-hit-under-DSA validat
 SEQUENCING LOCKED: W2.1 lands+reviews → sync+pin → pod cycle A (32K armed A/B, W2.1 on/off, chunk 1024
 — single variable) → pod cycle B (chunk-2048 compile probe + combined W2.1+2048 128K 4-depth smoke) →
 THE GATE (dcp=4, segment, owned width, chunk per probe, APC off, n=77 fresh).
+
+## 2026-07-12 22:15 — P0.b XPROF VERDICT: the plan's top candidate REFUTED by measurement — GATHERS are 61.9% of the step
+
+Op-level trace (mid prefill step, 10.36s, device 99.7% busy, no host gaps): (d) GATHERS 61.9% — the
+post-top_k REORDER gathers (indexer_kernel.py:609-612, [1024,8192] outputs, 21×4/step) = 3465ms/33.4%
+at ~2 GB/s effective (the KV payload gather nearby runs 440 GB/s — a ~200× layout/lowering pathology);
+per-layer selected-index gather (mla_attention.py:766, ×78) = 1322ms/12.8%; segment KV s32 INDEX gather
+(sparse_mla_kernel.py:534) 2.3× the payload it addresses. (c) collectives 11.4%; (b) top_k 8.9%
+(f32[1024,32768], S-dependent → ~2.8s at 128K); (a) the serialized scoring loop I indicted = 3.8%.
+The 32K trace ran at table width 64 (width scales with max_model_len) — W2.1 remains EXACT + worthwhile
+(kills the width-scaled ~14% at 128K + the 258-anomaly) but its 2.7× projection is DEAD. Honest note:
+the audit's adversarially-verified top candidate was mis-sized; only the instrument caught it —
+suggestions.md discipline, again. Residual: trace-predicted 128K step ≈17s vs measured 25.4s — ~8s still
+unattributed at 128K (128K-specific trace queued). Decode trace missing (prefill_only phase captured).
+RETARGET: the campaign's prize is the GATHER machinery (~62% → the reorder-gather class first).
