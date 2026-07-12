@@ -2309,3 +2309,18 @@ infra retry per depth after ray relaunch (no-SUMMARY only); a needle MISS is a r
 to GCS after each depth. Watchdog armed (completion / miss / orchestrator-death). During the gate:
 CPU-side threads queue — upstream #3 (headsplit×segment composition) evidence, the write-probe guard,
 MTP-unfreeze test battery prep.
+
+## 2026-07-12 20:30 — OWNER PIVOT: gate STOPPED (5/5 banked); state FROZEN; EFFICIENCY CAMPAIGN opened
+
+Owner directive: 54min/needle is unacceptable — maximize efficiency (no bottlenecks, max throughput, min
+latency), audit + ideas + adversarial review first, then apply + verify; observability-first per
+docs/suggestions.md. EXECUTED: (1) gate orchestrator + drivers stopped — 5/5 depth-0.0 needles banked in
+results.db (valid data, resumable); (2) FROZEN: tag freeze-correct-128k-20260712 on BOTH repos (fork
+29305e185) + results.db + partial gate logs → GCS; (3) the efficiency-audit WORKFLOW launched (4 phases:
+Map ×4 readers / Ideas ×5 lenses / adversarial Verify ×14 / Synthesize → scratchpad/eff_campaign_plan.md);
+(4) MEASUREMENT-FIRST: free two-point analysis of existing logs — 32K 9.6s/chunk vs 128K 25.8s/chunk ⇒
+~4s fixed + ~0.34s/1K-fill: THE O(S) TERM IS 84% OF CHUNK TIME AT 128K; scoring flops explain only ~0.6s
+⇒ lax.top_k full-sort over [1024,S_local]×21 layers is the prime suspect (the cost model's flagged
+unknown). xprof measurement run LAUNCHED (PHASED_PROFILING_DIR, single-device traces, 32K needle, current
+config) to confirm op-level. Correctness state preserved: everything to date (dense 77/77, sparse 4/4+3/3
+at 128K, rungs 1-6) stands; the campaign is gated+verified per the standing method.
