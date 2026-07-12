@@ -2384,3 +2384,16 @@ in the shared scratchpad tree (worktree isolation saved both; W2.1 on branch w21
 gather-dominator; both apply cleanly to 29305e185 — integration check is in the gather review's scope).
 COMBINED PROJECTION if both land + chunk-2048: 32K chunk 10.4→~4.5s and 128K step composing W2.1's width
 cut ⇒ prefill ~200+ tok/s territory — the gate in ~half a day. Reviews in flight; pod cycle A next.
+
+## 2026-07-13 04:30 — BOTH EFFICIENCY DIFFS LANDED (5c6e1f0c8 W2.1 + a98c77c9c gather dominator), reviews SAFE ×2, synced 8× a98c77c9
+
+Gather review highlights: NaN-class bit-probes bitwise; jax-source proof that FILL_OR_DROP is an HLO
+mask+select (backend-independent — the CPU/TPU OOB trap does NOT apply); both cherry-pick orders clean;
+integrated cross-product (owned + all-v2) 16/16; the reused-permutation decode site correctly left v1.
+block-perm test file committed (was untracked, load-bearing). POD CYCLE A: arm A0 = baseline (defaults,
+armed dumps, 2 sequential 32K requests, step times); arm A1 = GLM_DSA_BT_WIDTH=owned + MERGE/OWNED_SEG/
+SEG_GATHER=v2 (the combined config) — GATES: selections BITWISE == A0 (all four changes exact; any
+v2-only diff ⇒ per-gate flip-back, G1 first = TPU TopK tie-order residual), needles exact, chunk
+10.4→expect ~4.5-5.5s (32K), scan-trip census as the owned positive control. LATER: the 3-arm request-
+boundary observation (default / seg-gather-v2-only / all-v2 — diagnostic for the OPEN segment bug, never
+a fix), xprof re-capture (one-hot fusion + sort cost), 128K smoke, chunk-2048 probe (ratified), fresh gate.
