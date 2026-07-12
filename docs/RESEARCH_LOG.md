@@ -2280,3 +2280,20 @@ corruption expressing at token 0: the needle is likely RETRIEVED but the decode 
 layout-lottery damage (request # and TBLOCK both shift layouts). D2(ii) IN FLIGHT: segment+HEADSPLIT=0
 (a pass = working fast config immediately; a fail = the slab lowering alone suffices). Then D1 armed
 pair for byte-level localization if needed. The evidence chain for upstream report #3 is accumulating.
+
+## 2026-07-12 14:00 — D2(ii) VERDICT: headsplit×segment METAL COMPOSITION is the defect; segment-alone is CORRECT at 128K (reqs 1-2 exact) — GATE CONFIG FOUND
+
+segment + HEADSPLIT=0: requests 1 and 2 both EXACT (705269/824794), needle 3 in flight — the request-
+boundary failure is GONE with headsplit off. Combined with D2(i) (TBLOCK behavior-changing on metal,
+CPU-bitwise-invariant): the defect = the head-sharded shard_map specs wrapping the segment attend's
+lax.map/flat-gather — mislowers on v4, layout-lottery expression (request # and tile size both shift
+layouts; the third member of the pageloop defect family). CPU cannot see it (59/59 incl. the bitwise
+composition cell). Cost check: headsplit adds NOTHING under segment at 128K (3228s vs 3225s/needle —
+segment already removed the big attend; the O(S) scoring/top_k terms dominate the residual) ⇒ dropping
+it is FREE. **GATE CONFIG: dcp=4, GLM_DSA_DCP_PREFILL_ATTN=segment, HEADSPLIT unset (off), flat scatter,
+chunk 1024, pool 68 — ~54min/needle ⇒ n=77 ≈ 69h (~3 days).** Doctrine: headsplit stays default-OFF with
+a known-broken-composition note (its solo win was at 32K decode-side; revisit post-gate with the D1
+armed protocol + upstream report #3). Plan: on D2(ii) 3/3 → RESULTS row + docs → LAUNCH THE GATE as 7
+sequential per-depth runs (11 trials each, ~10h/run — crash-resilient checkpoints, same statistics,
+77 cells total, extend-to-n≈130 on any miss). During the gate (pod busy): CPU threads — upstream #3
+evidence staging, the write-probe guard, the composition hunt.
