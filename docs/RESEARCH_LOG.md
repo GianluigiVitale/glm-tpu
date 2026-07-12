@@ -2198,3 +2198,23 @@ rung-4 criterion, fused score+position packing, chunk-2048 retry now that headsp
 transient, gather formulation review vs the 32K A/B HLO); (3) gate DEFERRED until ≤~30min/needle
 (n=77 ≈ 38h) is in reach. Honesty: the sparse stack is CORRECT to 128K on the mechanism cells; what
 remains is making its prefill cheap enough to afford the statistics.
+
+## 2026-07-12 00:40 — PERF STAGE 2 DESIGNED + S1 IMPLEMENTED (scratchpad ba8aeb31); the cost model REFUTED both prior hypotheses
+
+Cost model (numbers in scratchpad/perf2_design.md, validated: predicts 20-22s/chunk at dcp=2/32K vs
+22.3s measured): collectives ≈0.1-0.5s and scoring einsum ≈1-2s per chunk CANNOT explain 60s — the brief's
+5.4e14 scoring-flop figure was off ~10³ (owner note: my arithmetic, refuted by the agent — logged as the
+honest correction). THE DOMINATOR: the Stage-C masked attend walks the WHOLE local stripe every chunk —
+per-token page-gather duplication + unconditional f32 materialization ≈319 GB HBM/layer/chip + f32 dots
+over all 68 blocks (hence the flat 60s pace regardless of kv fill). Indexer-scoring head-split re-examined
+QUANTITATIVELY and rejected (≤1.2s saved vs ~3GB psum — the win isn't there; supersedes the earlier
+qualitative verdict).
+S1 IMPLEMENTED: GLM_DSA_DCP_PREFILL_ATTN=segment (default masked = jaxpr byte-identical) — Stage-C attend
+over the SELECTED top-k segment (O(T·topk)), reusing the metal-validated Stage-B decode pipeline;
+SEG_TBLOCK=512 lax.map tiling (bitwise tile-invariant). Expected 3-4.5×; composing S2 (existing
+GLM_DSA_SCORER=pallas, zero code, needs metal validation + S2-band check) → 4.5-6× ⇒ 75-100 tok/s ⇒
+needle ≤25-30min ⇒ GATE ≈ 32-38h. 62/62 CPU green. ADVERSARIAL REVIEW IN FLIGHT (attack list: in-chunk
+causal semantics vs the walk, byte-identity off, tile invariance, headsplit composition, full battery).
+ON SAFE-TO-LAND: land+sync+pin → 32K A/B at dcp=4 (NEVER dcp=2/H_local=4) → 128K mech smoke (segment+
+headsplit; ≥50 tok/s target) → xprof residual → THE GATE. Smoke-5 needles 3-4 (d=0.95/1.0) still in
+flight on the OLD config — they complete the 4-cell correctness picture regardless.
