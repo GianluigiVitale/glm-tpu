@@ -2269,3 +2269,14 @@ headsplit×segment Mosaic composition at these shapes. DISCRIMINATOR LADDER RUNN
 (flips ⇒ the slab/gather lowering — and a working config); next D2(ii) HEADSPLIT=0+segment; then D1
 armed seg-vs-masked pair (write-side vs attend-side localization). Each 128K probe ≈3.5h. Masked
 backstop stands (4/4 correct, ~160h gate).
+
+## 2026-07-12 12:40 — D2(i) VERDICT: TBLOCK is BEHAVIOR-CHANGING on metal (CPU-bitwise-invariant) — the lax.map slab/gather lowering indicted; failure re-framed as DECODE-STREAM death
+
+TBLOCK=256: request 1 went EXACT→TRUNCATED ('70526' = first 5 digits of 705269 — retrieval CORRECT,
+generation died mid-answer); request 2 pred=None again. Two conclusions: (1) a CPU-bitwise-invariant
+tile size changes metal behavior ⇒ the segment slab/gather lowering (lax.map + flat 1-D gather against
+the DONATED cache) is the defect class — the pageloop family, third sighting; (2) pred=None ≈ the same
+corruption expressing at token 0: the needle is likely RETRIEVED but the decode stream dies — cumulative
+layout-lottery damage (request # and TBLOCK both shift layouts). D2(ii) IN FLIGHT: segment+HEADSPLIT=0
+(a pass = working fast config immediately; a fail = the slab lowering alone suffices). Then D1 armed
+pair for byte-level localization if needed. The evidence chain for upstream report #3 is accumulating.
