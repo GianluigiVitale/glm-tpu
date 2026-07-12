@@ -2227,3 +2227,13 @@ GATE — but correctness at the gate geometry is now established twice over (dcp
 scatter, chunk 1024). S1 (segment prefill, 29305e185) landed+reviewed while it ran; engine now free.
 NEXT: sync+pin 29305e185 → relaunch segment+headsplit → 32K dcp=4 segment sanity (needles + tok/s)
 → 128K mech smoke under segment (≥50 tok/s target = gate ~32-38h) → THE GATE.
+
+## 2026-07-12 05:20 — S1 ON METAL: 6.1× — 104.1 tok/s prefill, needles exact; GATE ARITHMETIC RESTORED
+
+32K dcp=4 segment+headsplit (pin 29305e185): 3/3 EXACT with the SAME passkeys as every prior config
+(422181/663295/648060 — cross-config answer stability now spans dcp=1/dcp=2-masked/dcp=4-masked/
+dcp=4-segment), ~306s/needle, **prefill 104.1 tok/s vs 17 masked (6.1×)** — the cost model's dominator
+call (the masked whole-stripe walk) confirmed by the fix working. S2 (pallas scorer) not even needed for
+the target. Projection at 128K: ~21min/needle ⇒ n=77 ≈ 27h. NEXT: 128K mech smoke under segment (4
+needles ×1, correctness+pace at gate length) → THE GATE (unarmed, chunk 1024, pool 68, dcp=4,
+segment+headsplit, 7 depths×11=77, extend-to-n≈130 on one miss).
