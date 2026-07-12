@@ -2253,3 +2253,19 @@ re-allocate identically). CPU repro agent launched (adversarial permuted block t
 requests, segment-vs-masked bitwise). Needle 4 left running (sharpens the signature free). FALLBACK IS
 REAL: masked = correct 4/4 at ~125min/needle (gate ~160h — the ugly backstop). GATE BLOCKED pending the
 fix; the ladder's cheap-rung discipline caught this BEFORE 77 needles were burned.
+
+## 2026-07-12 09:10 — CPU EXONERATED with a mutation canary (59/59); D0 kills the APC suspect; D2(i) TBLOCK=256 in flight
+
+Repro agent verdict: NOT-REPRODUCED — the segment chain resolves every page THROUGH the block table
+(code-read: gather_kv_segment_local sparse_mla_kernel.py:534-541; owner-scatter mla_attention.py:675),
+and an 8-test adversarial battery (reversed/rotated block reuse over STALE data, pool-permutation
+bitwise-invariance, APC-hit shape, headsplit composition) passes — non-vacuously: a mutation canary
+planting EXACTLY the hypothesized arithmetic-page-map bug is caught grossly by the same fixture.
+59/59; tests staged (scratchpad 42c3649c, perf2_adv_tests.diff) for landing with the eventual fix.
+Smoke final: 1 exact + 3 pred=None (d=0.05/0.95/1.0) — request-boundary signature cemented. D0 (free):
+enable_prefix_caching=False, 0 hits ⇒ APC suspect DEAD. Remaining suspects (metal-only): (1) the
+donated-cache RMW→flat-1D-gather interplay inside lax.map (the pageloop-class precedent), (2) the
+headsplit×segment Mosaic composition at these shapes. DISCRIMINATOR LADDER RUNNING: D2(i) TBLOCK=256
+(flips ⇒ the slab/gather lowering — and a working config); next D2(ii) HEADSPLIT=0+segment; then D1
+armed seg-vs-masked pair (write-side vs attend-side localization). Each 128K probe ≈3.5h. Masked
+backstop stands (4/4 correct, ~160h gate).
