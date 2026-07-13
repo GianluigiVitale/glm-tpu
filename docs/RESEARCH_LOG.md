@@ -2397,3 +2397,14 @@ v2-only diff ⇒ per-gate flip-back, G1 first = TPU TopK tie-order residual), ne
 10.4→expect ~4.5-5.5s (32K), scan-trip census as the owned positive control. LATER: the 3-arm request-
 boundary observation (default / seg-gather-v2-only / all-v2 — diagnostic for the OPEN segment bug, never
 a fix), xprof re-capture (one-hot fusion + sort cost), 128K smoke, chunk-2048 probe (ratified), fresh gate.
+
+## 2026-07-13 07:20 — CYCLE A: PASS — the combined config (owned + all-v2) is 2.7× on metal with selection health intact
+
+A0 (baseline, armed): 2/2 exact, ~350s/needle. A1 (BT_WIDTH=owned + MERGE/OWNED_SEG/SEG_GATHER=v2,
+armed): 2/2 exact SAME passkeys, ~130s/needle — **2.7× wall at 32K armed**. Selections A1-vs-A0:
+tripwire 0, replication 0; shallow events near-clean (evt00/01: 3+3 set-diff rows, ALL in request-2 late
+decode, band/drift 0.02–1.32 = boundary-tie churn); deep evt20 diffs = the cross-program drift envelope
+(ratio p90 4.8, max 12.5 — A0/A1 are DIFFERENT programs; the bitwise expectation only binds same-program
+pairs — criterion applied is the owner-ratified band-quantified standard). All four gates HOLD on metal.
+CYCLE B LAUNCHING: chunk-2048 compile probe at the winning config (ratified) + 128K 4-depth smoke;
+fallback chunk 1024. Then THE FRESH GATE at the final config.
