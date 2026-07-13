@@ -2419,3 +2419,23 @@ campaign's promise delivered: measure → find (scalar gathers + dead width + se
 walk) → fix exactly → verify on metal. FRESH GATE: n=77, 7 depths×11, chunk 2048, APC off (ratified),
 pin a98c77c9c, mechanism depths first, per-depth GCS checkpoints, extend-to-n≈130 on one miss.
 ETA ≈ 12.7h.
+
+## 2026-07-13 09:00 — HOLISTIC AUDIT (20 agents, 44 findings, 12 confirmed) + GATE2 IS DEAD: d=0.95 = 11/11 MISSES, new signature
+
+AUDIT VERDICT (full report scratchpad/eff_audit_report.md): the four transforms are REAL and CPU-exact
+(12.6× measured; all five semantic claims independently re-derived; 127 shipped + 6 new combo tests
+green) — but NOT PR-ready and the gate is NOT passing. CONFIRMED: F1 BLOCKER gate2 dead — d=0.95 went
+0/11 with a NEW signature (fluent-filler retrieval, NOT the D2 decode-death pred=None... the driver
+reports pred=None but outputs are fluent filler = the needle NOT RETRIEVED), Wilson-unrecoverable;
+F2 recurrence UNATTRIBUTED (gate moved 3 variables at once vs cycle B; standing suspect: the
+donated-cache payload gather in the attend lax.map, sparse_mla_kernel.py:610); F4 orchestrator RELAUNCH
+env-dropout = false provenance on retry (verified not-fired in gate2); F6 headsplit×segment known-broken
+combo armable with no refusal + overclaiming docstrings; F7 masked backstop has ZERO metal tokens on the
+owned/v2 program it would actually run; F8 armed bitwise metal coverage only at T=1024 (gate ran T=2048).
+EXECUTED NOW: d=1.0 first-trials harvested as the free depth-vs-engine discriminator, then orchestrator
+KILL; disks cleaned (w-2 50G). NEXT (audit top-3, owner-aligned): F3 attribution ladder BEFORE any code
+change (10-min same-instance d=0.0/d=0.95 interleave + re-issue cycle B's exact passing prompt + the two
+skipped bisect arms + xla_dump compile diff; NEVER lead with armed probes — trace-time env = different
+program); then the safety/truth commit (headsplit refusals, docstring corrections, combo-matrix test
+port, RELAUNCH fix, miss-abort watchdog); then re-gate with one armed T=2048 cell + a masked-backstop
+smoke first. The campaign's perf stands; its correctness debt is now the whole job.
