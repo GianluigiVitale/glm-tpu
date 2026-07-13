@@ -2408,3 +2408,14 @@ decode, band/drift 0.02–1.32 = boundary-tie churn); deep evt20 diffs = the cro
 pairs — criterion applied is the owner-ratified band-quantified standard). All four gates HOLD on metal.
 CYCLE B LAUNCHING: chunk-2048 compile probe at the winning config (ratified) + 128K 4-depth smoke;
 fallback chunk 1024. Then THE FRESH GATE at the final config.
+
+## 2026-07-13 10:30 — CYCLE B: 4/4 EXACT at 595s/needle — 12.6× END-TO-END; chunk-2048 compiled; 🚀 THE FRESH GATE LAUNCHES
+
+Chunk 2048 at the winning config (owned + all-v2 + segment, dcp=4): COMPILED (the pre-campaign OOM
+buffer was the masked walk's — segment removed it, exactly as the re-analysis predicted). 128K smoke
+4/4 EXACT (705269/824794/289958/891482 — the same passkeys across now FIVE configs), 595s/needle vs
+7513s pre-campaign = **12.6×**; prefill ≈220 tok/s at 128K — SPARSE NOW BEATS DENSE (140 tok/s). The
+campaign's promise delivered: measure → find (scalar gathers + dead width + serialized walk + masked
+walk) → fix exactly → verify on metal. FRESH GATE: n=77, 7 depths×11, chunk 2048, APC off (ratified),
+pin a98c77c9c, mechanism depths first, per-depth GCS checkpoints, extend-to-n≈130 on one miss.
+ETA ≈ 12.7h.
