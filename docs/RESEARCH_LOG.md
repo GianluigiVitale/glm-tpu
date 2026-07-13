@@ -2439,3 +2439,16 @@ skipped bisect arms + xla_dump compile diff; NEVER lead with armed probes — tr
 program); then the safety/truth commit (headsplit refusals, docstring corrections, combo-matrix test
 port, RELAUNCH fix, miss-abort watchdog); then re-gate with one armed T=2048 cell + a masked-backstop
 smoke first. The campaign's perf stands; its correctness debt is now the whole job.
+
+## 2026-07-13 09:40 — d=1.0 DISCRIMINATOR: 2/2 EXACT on the very next engine ⇒ WHOLE-ENGINE-INSTANCE LOTTERY (rate ~1/7); gate killed; probe loop hunting
+
+The dead d=0.95 engine (0/11, fluent-filler) sits between two perfect engines (d=0.05 11/11 before,
+d=1.0 2/2 after) ⇒ per-ENGINE-INSTANCE expression, depth incidental, cumulative-degradation dead. Rate
+estimate 1/7 engine draws ⇒ every 7-engine gate expects ≥1 dead depth — NO GATE PASSES UNTIL FIXED.
+Gate2 killed (22 exact needles + the 0/11 + 2/2 all recorded in results.db — honest rows). ATTRIBUTION
+PROBE LOOP running: 14 × single-needle 128K engines at the full config, GLM_DCP_CACHE_DUMP armed
+(host-side — the traced program is UNCHANGED, respecting the audit's F3 warning about armed-topk
+program perturbation), per-probe dump archival; a caught bad engine gets byte-diffed against a good
+one (deterministic prefill ⇒ byte-equal unless the WRITE side corrupts) — the pageloop protocol,
+adapted. ~2.5h for ~2 expected bad draws. THEN: write-side vs read-side verdict → the F3 bisect arms
+on the guilty side → fix → safety/truth commit → masked-backstop smoke + armed T=2048 cell → re-gate.
