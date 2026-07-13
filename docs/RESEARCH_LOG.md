@@ -2452,3 +2452,16 @@ program perturbation), per-probe dump archival; a caught bad engine gets byte-di
 one (deterministic prefill ⇒ byte-equal unless the WRITE side corrupts) — the pageloop protocol,
 adapted. ~2.5h for ~2 expected bad draws. THEN: write-side vs read-side verdict → the F3 bisect arms
 on the guilty side → fix → safety/truth commit → masked-backstop smoke + armed T=2048 cell → re-gate.
+
+## 2026-07-13 15:40 — POSTMORTEM: 4h of probe INFRA-FAILs = w-4 disk at 0 (raylet died on every join, 7/8 nodes) — and this CONFOUNDS the lottery hypothesis itself
+
+w-4 held 55G of parked dump archives (rung4 + relics; my own parking decisions) → 0 free → its raylet
+died on every one of 14 relaunches → every probe INFRA-FAILED (the fixed loop correctly classified them,
+the watcher's grep pattern didn't — repaired). CRITICAL REFRAME: w-4's disk was degrading through the
+EXACT window of gate2's d=0.95 0/11 AND probe-1 (the "bad engine" specimen) — the engine-instance-lottery
+hypothesis is now CONFOUNDED by disk-pressure-degraded engines (the same class as every prior pred=None).
+The clean experiment runs NOW with all 8 disks healthy (w-0 23G / w-2 ~40G / w-4 23G / rest 50G+):
+14 fixed-seed probes — bad engines recur ⇒ real lottery (specimen p1 stands); 14/14 good ⇒ the "lottery"
+was operational all along and the fixes are disk quotas + engine health-probe + the write-probe guard,
+NOT kernel code. OPS DEBT NOW UNDENIABLE (4 disk incidents this campaign): a disk-watchdog hook + quota'd
+dump archiver join the safety commit. Dumps parked across workers were a self-inflicted wound.
