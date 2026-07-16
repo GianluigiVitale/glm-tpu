@@ -2465,3 +2465,35 @@ The clean experiment runs NOW with all 8 disks healthy (w-0 23G / w-2 ~40G / w-4
 was operational all along and the fixes are disk quotas + engine health-probe + the write-probe guard,
 NOT kernel code. OPS DEBT NOW UNDENIABLE (4 disk incidents this campaign): a disk-watchdog hook + quota'd
 dump archiver join the safety commit. Dumps parked across workers were a self-inflicted wound.
+
+## 2026-07-16 23:55 — VM LOST + FULL RECOVERY: pod recreated (all 8 disks wiped); everything COMMITTED survived; the 14-probe experiment must restart
+
+The worker-0 VM — and the whole pod (new hostnames t1v-n-6c15e171-w-*) — was recreated between 07-13 and
+07-16; all 8 host disks wiped. The glm-tpu bucket mirror turned out to be EMPTY (gs://driftbench-storage/
+repos/glm-tpu/ never existed): setup.sh [6/7] `source ~/.local/bin/env` aborts under `set -e` whenever the
+uv installer skips writing that file (PATH already carries ~/.local/bin) — so [7/7], the 5-min sync cron,
+silently never ran on the old VM either. FIXED in the bucket setup.sh (fallback PATH export;
+setup.sh.bak-20260716 kept). **GIT PUSH DISCIPLINE HELD:** a 26-agent recovery audit confirms
+origin/glm-5.2-v4-next @ a98c77c9 is the newest commit on all 39 fork refs (git log --all since 07-12
+23:19 over every ref: empty; no dangling commits), pr-g1..g6 intact at their 07-07/08 cuts, tag
+freeze-correct-128k-20260712 → 29305e185 verified on the live remote.
+RESTORED today: glm-tpu @ fdb6e7f + fork @ a98c77c9 (fresh clones, editable install); vLLM@LKG a30addc7
+rebuilt into ~/vllm-build (moe-tpu build_vllm_lkg.sh); venv from the bucket tarball; **workers 1-7
+provisioned 7/7 OK @ a98c77c9** (new scripts/provision_worker_glm.sh; bulk artifacts now mirrored
+same-region at gs://driftbench-dsv4-uc/artifacts/); ~/glm-tpu/.env (HF token); sync cron re-armed and
+verified; results.db restored from the 08:31:37Z GCS copy — its LAST row is run 165's aggregate (gate2
+d=0.95 0/11): the per-depth GCS checkpoint discipline captured the gate's death seconds after it landed.
+LOST (never committed — rebuild/rerun): the d=1.0 discriminator rows (2/2 exact; survives only as the
+07-13 09:40 log entry), the 14-probe fixed-seed experiment (zero rows — it was starting at the last
+entry), the safety/truth commit (F6 headsplit×segment refusal, docstring corrections, combo-matrix test
+port, F4 RELAUNCH env fix, miss-abort watchdog), the write-probe guard (owner directive; spec survives in
+docs/upstream/pageloop-v4-sublane-drop-REPORT.md), the disk-watchdog + quota'd dump archiver,
+scratchpad/eff_audit_report.md (F1-F8 detail; the 07-13 09:00 summary above survives), all XLA caches
+(first engines recompile from scratch) and the ~/glm-run orchestrators.
+SILVER LINING: all 8 disks now sit at ~83G free — the clean-disk precondition of the 14-probe experiment
+holds by construction. NEXT (unchanged in substance from 07-13 15:40): (1) re-run the 14 fixed-seed
+single-needle 128K probes (full gate config, cache-dump armed host-side) — bad engines recur ⇒ real
+lottery; 14/14 good ⇒ the "lottery" was disk-pressure all along; (2) verdict → write-side hunt vs
+ops-fixes-only; (3) the safety/truth commit + disk-watchdog + dump quota land BEFORE dumps re-accumulate;
+(4) masked-backstop smoke + one armed T=2048 cell (audit F7/F8); (5) re-gate n=77 (chunk 2048, per-depth
+checkpoints, extend-to-n≈130 on one miss).

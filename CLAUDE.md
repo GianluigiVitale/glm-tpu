@@ -348,8 +348,20 @@ glm-tpu/
   Stages B AND C adversarially reviewed SAFE-FOR-METAL-LADDER; gate-off jaxpr
   byte-identical to HEAD). Zero sparse-DCP tokens on metal yet — runbook §8 is the ladder.
 - **Branch map:** `glm-5.2-v4` = pod mainline (Stage-1 + OOB fix); **`glm-5.2-v4-next` = integrated staging
-  + what the pod runs** (tip `6f8855c3f`: Stage-2 kernels + the granularity fix + fp8-KV v4 fixes + obs
-  repairs + sparse-DCP A/B/C + MTP-g4 + det, all gated off); upstream PR series
-  `pr-g1..g6` drafted (G6 = the DSA kernels — the headline). Detail: `HANDOFF.md` + `docs/RESEARCH_LOG.md`.
+  + what the pod runs** (tip `a98c77c9`: Stage-2 kernels + the granularity fix + fp8-KV v4 fixes + obs
+  repairs + sparse-DCP A/B/C + scatter-flat + headsplit + segment S1 + W2.1 + gather-dominator + MTP-g4 +
+  det, all gated off); upstream PR series `pr-g1..g6` drafted (G6 = the DSA kernels — the headline;
+  cuts predate the efficiency campaign). Detail: `HANDOFF.md` + `docs/RESEARCH_LOG.md`.
+- [x] **2026-07-11/13 — Sparse ladder rungs 1–6 CLOSED** (64K sparse 3/3 — first above 32K anywhere);
+  128K mechanism smoke 4/4 EXACT twice; **efficiency campaign 12.6× end-to-end at 128K** (segment
+  prefill + owned block-table width + gather-dominator v2s + chunk 2048; sparse prefill ~220 tok/s now
+  beats dense); **gate2 (sparse 128K n=77) DIED at d=0.95 0/11** (fluent-filler signature) after 22/22 —
+  engine-instance-lottery hypothesis CONFOUNDED by the w-4 disk-at-0 incident; the 14-probe fixed-seed
+  discriminator is the next pod action. MTP still FROZEN.
+- [x] **2026-07-16 — VM LOST + FULLY RECOVERED** (pod recreated, 8 disks wiped; nothing committed was
+  lost — recovery audit in RESEARCH_LOG). Workers 1–7 re-provisioned 7/7 @ a98c77c9
+  (`scripts/provision_worker_glm.sh`); results.db restored to the run-165 (gate2 0/11) checkpoint;
+  setup.sh cron-abort bug fixed in the bucket. Lost forever: the safety/truth commit, write-probe guard,
+  disk-watchdog (never committed — rebuild), d=1.0 discriminator db rows, XLA caches.
 
 > Append dated entries each session. Keep `HANDOFF.md` in sync.
