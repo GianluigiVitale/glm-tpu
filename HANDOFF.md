@@ -1,13 +1,16 @@
 # HANDOFF — GLM-5.2 on TPU v4 (read this first, every new chat)
 
-**Updated:** 2026-07-16 — **THE VM WAS LOST AND FULLY RECOVERED** (pod recreated ~07-14, all 8 host disks
-wiped; everything committed survived on GitHub — recovery audit + accounting in RESEARCH_LOG 07-16). State
-below is the true 07-13 state plus the recovery. Headlines since the last handoff: **the EFFICIENCY
-CAMPAIGN delivered 12.6× end-to-end at 128K** (sparse prefill ~220 tok/s now BEATS dense 140), **the
-sparse 128K gate (gate2) DIED at d=0.95 (0/11, fluent-filler signature)**, the "engine-instance lottery"
-hypothesis (~1/7) that followed is **CONFOUNDED by the w-4 disk-at-0 incident**, and the deciding
-experiment — **14 fixed-seed single-needle probes on clean disks — was starting when the VM died and must
-be re-run.** **MTP stays FROZEN** (owner directive) until the headline gates close.
+**Updated:** 2026-07-17 — **THE SAFETY/OPS-DEBT COMMIT IS LANDED** (fork tip **845f4ffeb**, synced 8×,
+adversarially reviewed — 6 lenses, 2 BLOCKER + 8 MAJOR fixed; RESEARCH_LOG 07-17 04:15): F6 headsplit
+refusals + docstring truth, the GLM_WRITE_PROBE startup sentinel (both row widths), the permanent
+combo-matrix suite (F8 closed), dense scatter-impl loud refusal, and the in-repo ops kit
+(disk_watchdog / dump_archiver / probe_lottery / gate_sparse128k — F4 single-env-source + miss-abort +
+depth-INFRA taint + per-depth checkpoints). **The discriminator was REDESIGNED by its own review**:
+20 SCRAMBLED draws (scrambler engine before each counted probe — identical back-to-back engines mask
+the never-written class via stale≈fresh HBM), disk-tainted misses never counted, dumps over all 21
+indexer k-cache slots. **Next pod action: `bash ~/glm-tpu/scripts/probe_lottery.sh`.** Prior context
+(07-16): VM lost + fully recovered; gate2 died at d=0.95 0/11, lottery hypothesis confounded by the
+w-4 disk incident — UNRESOLVED, the probe run decides. **MTP stays FROZEN.**
 
 **Honest claim line:** *first public DSA kernel on TPU — selected-set-exact on silicon; dense 128K gate
 CLOSED 77/77 (run 124, Wilson LB 95.3%); sparse correct at 128K on the mechanism cells (4/4 exact, twice:
@@ -87,32 +90,30 @@ the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-r
 
 ## What is NEXT (in order)
 
-1. **THE 14-PROBE DISCRIMINATOR (the decision experiment — re-run from scratch):** 14 × single-needle
-   128K engines, FIXED SEED, full gate config (dcp=4, segment, headsplit off, flat scatter, chunk 2048,
-   owned+v2, APC off, pin a98c77c9), GLM_DCP_CACHE_DUMP armed HOST-SIDE only (traced program unchanged —
-   the F3 warning), per-probe dump archival with quotas. Bad engines recur ⇒ real lottery ⇒ byte-diff
-   bad-vs-good prefill (deterministic ⇒ byte-equal unless the WRITE side corrupts — the pageloop
-   protocol) → F3 bisect on the guilty side. 14/14 good ⇒ the "lottery" was operational all along ⇒
-   fixes are disk quotas + engine health-probe + write-probe guard, not kernel code.
-2. **The safety/truth commit + ops debt** (land BEFORE or WITH the probe loop): F6 headsplit×segment
-   trace-time refusal, docstring corrections, combo-matrix test port, F4 orchestrator RELAUNCH env fix,
-   miss-abort watchdog, disk-watchdog hook + quota'd dump archiver, write-probe guard at engine init.
-3. **Pre-gate validation cells** (audit F7/F8): one masked-backstop smoke on the owned/v2 program + one
-   armed bitwise cell at T=2048.
-4. **RE-GATE: the 128K sparse gate n=77** (7 depths × 11, mechanism depths first, per-depth GCS
-   checkpoints, extend-to-n≈130 on ONE miss, never rerun-until-green). ~12.7h at cycle-B pace.
+1. ~~The safety/ops-debt commit~~ **DONE 07-17** (fork 845f4ffeb synced 8×; ops kit in scripts/).
+2. **RUN THE DISCRIMINATOR: `bash ~/glm-tpu/scripts/probe_lottery.sh`** (self-contained: pre-flight,
+   scrambler-interleaved 20 valid draws at the gate2-verbatim config pinned 845f4ffeb, fixed seed =
+   gate2's first d=0.95 needle, host-side dumps over all indexer k-cache slots, per-probe GCS archival,
+   INFRA-vs-verdict classification, decision rule printed). First engine pays the cold XLA compile
+   (~45min+); expect ~10-16h total. ANY MISS ⇒ lottery REAL ⇒ byte-diff the archived caches
+   (dcp_cache_diff) bad-vs-good → F3 bisect on the guilty side. 20/20 ⇒ rejects a ≥1/7 lottery at ~95%
+   ⇒ operational ⇒ proceed.
+3. **Pre-gate validation cells** (audit F7): one masked-backstop smoke on the owned/v2 program (F8's
+   armed-T=2048 cell is now CPU-closed by the combo suite; a metal armed cell remains optional).
+4. **RE-GATE: `bash ~/glm-tpu/scripts/gate_sparse128k.sh`** (n=77, mechanism depths first, miss-abort
+   at 2, per-depth GCS checkpoints, GLM_WRITE_PROBE armed, extend-to-n≈130 on ONE miss). ~12.7h.
 5. **256K throughput A/B** (dsa-sparse vs dense at IDENTICAL dcp; `bench/dsa_throughput.py`); fp8-KV
    only after its own dcp=1 needle validates (fp8 has still NEVER produced a validated metal token).
 6. **Benchmarks at scale:** GSM8K n≥200, GPQA-198 rerun @ 16K (owner-gated), AIME-2026 n=30.
-7. **MTP M2** — stays FROZEN until 1–5 close. Then the PR-series re-cut (pr-g1..g6 predate the
-   campaign; none of the 24 post-8802ebab commits are re-cut — future work, audit says NOT PR-ready).
+7. **MTP M2** — stays FROZEN until 2–5 close. Then the PR-series re-cut (pr-g1..g6 predate the
+   campaign; none of the 24+5 post-8802ebab commits are re-cut — future work, audit says NOT PR-ready).
 
 ## Fork branch map (`~/tpu-inference`)
 
 | branch | what | on origin? |
 |---|---|---|
 | `glm-5.2-v4` (`02e44b36`) | pod mainline — Stage-1 + obs + OOB fix | yes |
-| **`glm-5.2-v4-next`** (**`a98c77c9`**) | **integrated staging + what the pod RUNS** — everything through the efficiency campaign (granularity fix, fp8-KV v4 fixes, obs stack, sparse-DCP A/B/C, scatter-flat, headsplit [known-broken combos], segment S1, W2.1, gather-dominator v2s), all gated off by default | yes — newest commit on the entire remote |
+| **`glm-5.2-v4-next`** (**`845f4ffeb`**) | **integrated staging + what the pod RUNS** — the campaign stack (granularity fix, fp8-KV v4 fixes, obs, sparse-DCP A/B/C, scatter-flat, segment S1, W2.1, gather-dominator v2s) + the 07-17 safety commit (F6 refusals [headsplit combos now REFUSE at trace time], GLM_WRITE_PROBE, combo suite, dense-impl refusal), all gated off by default | yes — synced 8× dirty=0 |
 | `pr-g1..g6` | upstream PR series (07-07/08 cuts — predate the campaign; owner submits) | yes |
 | `dsv4-flash-v4` | the DSV4 base (LKG pin source) | yes |
 

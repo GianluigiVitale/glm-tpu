@@ -761,6 +761,44 @@ def test_spec_engine_kwarg():
     print("  MTP spec-decode engine kwarg plumbing OK")
 
 
+def test_warn_worker_only_envs_classification():
+    """The warn list's boolean-vs-value-carrying classification (review of the
+    2026-07-17 safety commit: the list had needed two review-fix cycles with
+    zero coverage). Boolean-gated names at '0'/'false' must NOT warn; armed
+    booleans and any non-empty value-carrying value MUST; the two new names
+    are worker-side booleans."""
+    import engine as eng
+    saved = {k: os.environ.pop(k, None) for k in eng._WORKER_SIDE_OBS_ENVS}
+    try:
+        assert eng.warn_worker_only_envs() == []
+        assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" in eng._WORKER_SIDE_OBS_ENVS
+        assert "GLM_WRITE_PROBE" in eng._WORKER_SIDE_OBS_ENVS
+        assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" not in eng._VALUE_CARRYING_OBS_ENVS
+        assert "GLM_WRITE_PROBE" not in eng._VALUE_CARRYING_OBS_ENVS
+        # boolean-gated: explicit-off never warns, armed warns
+        os.environ["GLM_WRITE_PROBE"] = "0"
+        os.environ["GLM_DSA_DCP_HEADSPLIT_UNSAFE"] = "false"
+        assert eng.warn_worker_only_envs() == []
+        os.environ["GLM_WRITE_PROBE"] = "1"
+        os.environ["GLM_DSA_DCP_HEADSPLIT_UNSAFE"] = "1"
+        flagged = eng.warn_worker_only_envs()
+        assert "GLM_WRITE_PROBE" in flagged
+        assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" in flagged
+        # value-carrying: ANY non-empty value warns, including "0"
+        for k in ("GLM_WRITE_PROBE", "GLM_DSA_DCP_HEADSPLIT_UNSAFE"):
+            del os.environ[k]
+        os.environ["GLM_DCP_CACHE_DUMP"] = "0"
+        assert "GLM_DCP_CACHE_DUMP" in eng.warn_worker_only_envs()
+        del os.environ["GLM_DCP_CACHE_DUMP"]
+    finally:
+        for k in eng._WORKER_SIDE_OBS_ENVS:
+            os.environ.pop(k, None)
+        for k, v in saved.items():
+            if v is not None:
+                os.environ[k] = v
+    print("warn_worker_only_envs classification OK")
+
+
 def test_run_env_provenance_fields():
     """run_bench._run_env must actually RETURN (2026-07-08 fix: the audit
     commit assigned env['attention_path'] before `env` existed — a NameError
@@ -816,4 +854,5 @@ if __name__ == "__main__":
     test_dcp_engine_kwarg()
     test_spec_engine_kwarg()
     test_run_env_provenance_fields()
+    test_warn_worker_only_envs_classification()
     print("ALL bench CPU tests passed.")

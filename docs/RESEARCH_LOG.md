@@ -2497,3 +2497,40 @@ lottery; 14/14 good ⇒ the "lottery" was disk-pressure all along; (2) verdict �
 ops-fixes-only; (3) the safety/truth commit + disk-watchdog + dump quota land BEFORE dumps re-accumulate;
 (4) masked-backstop smoke + one armed T=2048 cell (audit F7/F8); (5) re-gate n=77 (chunk 2048, per-depth
 checkpoints, extend-to-n≈130 on one miss).
+
+## 2026-07-17 04:15 — THE SAFETY/OPS-DEBT COMMIT LANDED (fork a98c77c9→845f4ffeb, synced 8×) + the discriminator REDESIGNED by its own review
+
+The queued-then-lost safety commit is rebuilt, adversarially reviewed (6 lenses, 2 BLOCKER + 8 MAJOR
+found and fixed), and landed. Fork commits: **c9d87919** — F6 metal-verdict refusals
+(`_glm_dsa_dcp_headsplit_axes` now refuses H_local<8 AND headsplit×segment at trace time, evidence
+cited; `GLM_DSA_DCP_HEADSPLIT_UNSAFE=1` = the documented isolation-diff override; docstrings
+de-overclaimed) + the dense `GLM_DCP_SCATTER_IMPL` unknown-value loud refusal (the silent else-fallback
+was the metal-BAD plain scatter — gap exposed by the write-probe work); **fd0bf456** —
+`GLM_WRITE_PROBE` startup sentinel through the REAL owner-scatters at KV-cache init (dcp_guards idiom;
+refuse-to-serve on any never-written/wrong-value/clobbered coordinate; mutation canaries prove
+detection); **1152db21** — the permanent combo-matrix suite (full gate config owned+all-v2+segment
+bitwise-selections/caches vs defaults, F8 T=2048 cell closed; the lost scratchpad combos rebuilt);
+**fb5000ba** — review fix: the DSA probe leg covers BOTH row widths (128 indexer + 640 latent — the
+width-specific defect class) + the dense typo-refusal test; **845f4ffeb** — strip hygiene + hook
+exception attribution. Suites: headsplit 12/12, segment 12/12, decode 28/28, block-perm 8/8,
+scatter-gt 41P/4S, write-probe 25/25, combo 8/8, bench 15/15.
+REVIEW HIGHLIGHTS (docs/suggestions.md vindicated again): (1) BLOCKER — the original 14-probe design
+COULD NOT answer its own question: identical back-to-back fixed-seed engines inherit stale≈fresh HBM
+(the C-vs-D blind spot) and mask the never-written class ⇒ **scrambler interleave** added (each counted
+draw preceded by a different-content/-layout 32K engine); (2) BLOCKER ×4 — a disk-tainted MISS still
+flipped the headline verdict ⇒ taint-ordering fixed (INFRA misses never counted); (3) N=14 had an 11.6%
+false-negative vs a 1/7 lottery ⇒ **N=20 valid draws** (95% power), honest confidence wording; (4) dump
+coverage 0,1,2 = ~3% of the defect-class buffer family ⇒ all 21 indexer k-cache slots + mla0;
+(5) dump_archiver could purge unarchived bytes on a mid-stream tar failure ⇒ pipefail + upload verify;
+(6) gate orchestrator folded tainted misses into the Wilson counter ⇒ depth-INFRA abort semantics.
+PROCESS NOTE: a reviewer's mutation audit transiently broke the shared tree under other reviewers'
+concurrent suites (combo 4/8, pair 10/20 at 01:22) — clean simultaneous repro fully green (8/8, 20/20);
+adjudicated NO-DEFECT; standing rule: mutation audits run in isolated worktrees.
+OPS SCRIPTS (in-repo now, never ~/glm-run-only again): disk_watchdog.sh (check + watch + alert flag),
+dump_archiver.sh (GCS-or-delete, quota'd, --last-step-only), **probe_lottery.sh** (the redesigned
+discriminator: 20 scrambled draws, gate2-verbatim config from run-165 env_json, fixed seed = gate2's
+first d=0.95 needle, INFRA-vs-verdict classification, per-probe GCS archival),
+gate_sparse128k.sh (F4 single env source, live miss-abort at 2, depth-INFRA taint, per-depth
+checkpoints, GLM_WRITE_PROBE armed). Workers synced 8× 845f4ffeb dirty=0; default-trace byte-identity
+of the whole stack confirmed by the review (SAFE-TO-LAND on that lens). NEXT: launch probe_lottery.sh
+(first engine pays the cold XLA compile), then per its verdict → F7/F8 cells → RE-GATE.

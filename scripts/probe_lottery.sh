@@ -44,7 +44,7 @@ N_PROBES=20
 MAX_PROBES=27
 NEEDLE_TIMEOUT_S="${NEEDLE_TIMEOUT_S:-10800}"    # probe 1 pays the cold XLA compile
 SCRAMBLE_TIMEOUT_S="${SCRAMBLE_TIMEOUT_S:-7200}"
-PIN=a98c77c9c
+PIN=845f4ffeb
 DUMP_PREFIX=/tmp/dcp_probe                        # per-host; archived+purged per probe
 GCS_RUN=gs://driftbench-dsv4-uc/dumps/$(basename "$RUN_DIR")
 # All 21 DSA indexer k-cache slots + slot 1 (first MLA latent cache) under

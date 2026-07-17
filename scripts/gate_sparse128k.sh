@@ -32,7 +32,7 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=a98c77c9c
+PIN=845f4ffeb
 TAG=gate128k_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
 GCS_CKPT=gs://driftbench-dsv4-uc/results/$TAG
@@ -43,7 +43,13 @@ DEPTH_TIMEOUT_S="${DEPTH_TIMEOUT_S:-21600}"  # 11 needles ~110min + cold-compile
 # ── THE env blocks (single source of truth — F4). Identical to
 # probe_lottery.sh minus the cache dump (gate-class runs are UNARMED:
 # an armed 128K gate writes ~230GB — the 2026-07-11 rule).
-RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+# GLM_WRITE_PROBE=1: the standing startup sentinel (write-probe through the
+# real owner-scatters at engine init — refuses to serve a bad-write engine
+# BEFORE it burns a 10h depth run). Gate engines are fresh experiments, so
+# arming the guard here is exactly its purpose. (probe_lottery.sh deliberately
+# does NOT arm it: its draws must stay maximally gate2-faithful in init-time
+# HBM behavior; the scrambler handles layout variance there.)
+RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
