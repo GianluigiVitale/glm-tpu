@@ -2614,3 +2614,14 @@ draw with per-host --xla_dump_to for buffer-assignment diffs (fingerprints don't
 OPERATIONAL UNBLOCKER (gate path, mechanism-independent): the ENGINE HEALTH PROBE — 2-chunk
 mini-needle at init + NaN scan of the layer-1 idx cache (~1 min) ⇒ detect-and-relaunch bad engines
 before any depth burns. The loop continues (rate + host histogram; every draw is now warm-cache).
+
+## 2026-07-17 09:50 — Draw-3 INFRA: the pin guard caught MY OWN forensics agent racing an engine init (new landmine flavor)
+
+Draw 3 probe INFRA'd at init: w2's code_fingerprint read git=UNAVAILABLE — a stale 0-byte
+.git/index.lock at exactly 07:38, left by the log-forensics agent's host inspection racing the
+engine's own fingerprint git calls (a killed git process abandons the lock). The guard refused
+unattributable init (correct), the orchestrator classified INFRA (correct), the loop continued.
+Lock removed; w2 clean @ 845f4ffeb. **Landmine addendum: "the pin fights YOU" now has a second
+flavor — never run git against worker checkouts while an engine may be initializing; agents
+inspecting hosts must avoid git entirely (read files, not repos).** Also banked this hour:
+draw-3's scrambler MISS (32K expression) and the health-probe landing (b07b2b4).
