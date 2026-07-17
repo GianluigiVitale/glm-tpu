@@ -40,16 +40,18 @@ DEPTHS="0.0,0.05,0.95,1.0,0.25,0.5,0.75"   # mechanism cells FIRST
 TRIALS=11
 DEPTH_TIMEOUT_S="${DEPTH_TIMEOUT_S:-21600}"  # 11 needles ~110min + cold-compile headroom
 
-# ── THE env blocks (single source of truth — F4). Identical to
-# probe_lottery.sh minus the cache dump (gate-class runs are UNARMED:
-# an armed 128K gate writes ~230GB — the 2026-07-11 rule).
+# ── THE env blocks (single source of truth — F4).
 # GLM_WRITE_PROBE=1: the standing startup sentinel (write-probe through the
 # real owner-scatters at engine init — refuses to serve a bad-write engine
-# BEFORE it burns a 10h depth run). Gate engines are fresh experiments, so
-# arming the guard here is exactly its purpose. (probe_lottery.sh deliberately
-# does NOT arm it: its draws must stay maximally gate2-faithful in init-time
-# HBM behavior; the scrambler handles layout variance there.)
-RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+# BEFORE it burns a 10h depth run).
+# GLM_DCP_CACHE_DUMP at LAYERS=2 ONLY (revision of the "gates are UNARMED"
+# rule after the 2026-07-17 lottery forensics): the layer-1 indexer k-cache
+# (slot 2) is THE buffer the engine-lottery NaN-poisons, host-side dumps are
+# trace-inert (F3-safe), and slot-2-only volume is ~4.5MB/step/proc (~3GB/
+# host/depth, purged per depth) — nothing like the 230GB all-slot figure.
+# The dump feeds the per-depth ENGINE HEALTH PROBE below: a poisoned engine
+# is detected in ~2 min and relaunched instead of burning a 2h depth run.
+RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_DCP_CACHE_DUMP=/tmp/dcp_gatehealth GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -93,18 +95,76 @@ ALERT_FILE="$ALERT_FILE" INTERVAL_S=120 setsid nohup \
 WATCH_PID=$!
 trap 'kill "$WATCH_PID" 2>/dev/null' EXIT
 
+# ── ENGINE HEALTH PROBE (the 2026-07-17 lottery mitigation): after a fresh
+# launch, serve one ~5K mini-needle (3 chunks — chunk 1 is the ctx<=topk
+# dense fallback, chunks 2-3 exercise the SPARSE path that the lottery
+# poisons), then NaN-scan the layer-2 (layer-1 indexer k-cache) dumps on all
+# 8 hosts. Any NaN ⇒ the engine drew the bad state ⇒ relaunch. bf16 NaN on
+# the uint16-bitcast dump = exponent all-ones + mantissa nonzero.
+health_check_engine() {
+  local hlog="$1"
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command='rm -f /tmp/dcp_gatehealth*.npz' >/dev/null 2>&1
+  (
+    cd ~/glm-tpu/bench || exit 1
+    # shellcheck disable=SC1090
+    set -a; . ~/glm-tpu/.env; set +a
+    # shellcheck disable=SC2086
+    env $DRIVER_ENVS setsid --wait nohup ~/vllm-env/bin/python -u glm_longctx.py \
+      --lengths 5000 --depths 0.5 --trials 1 --max-seqs 1 --gmu 0.90 \
+      --max-batched-tokens 2048 --num-gpu-blocks 68 --max-len 131840 \
+      --note "gate health-check ($TAG)" </dev/null > "$hlog" 2>&1
+  )
+  grep -q "correct=True" "$hlog" || { echo "SICK:needle"; return; }
+  local scan
+  scan=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command='
+    ~/vllm-env/bin/python - <<PY
+import numpy as np, glob, sys
+fs = sorted(glob.glob("/tmp/dcp_gatehealth*.npz"))
+if not fs: print("NOFILE"); sys.exit(0)
+d = np.load(fs[-1], allow_pickle=True)
+bad = 0
+for k in d.files:
+    if k.endswith("__data"):
+        u = d[k].view(np.uint16)
+        bad += int((((u & 0x7F80) == 0x7F80) & ((u & 0x007F) != 0)).sum())
+print("NAN" if bad else "CLEAN", bad)
+PY' 2>/dev/null)
+  local n_clean n_nofile
+  n_clean=$(echo "$scan" | grep -c "^CLEAN" || true)
+  n_nofile=$(echo "$scan" | grep -c "^NOFILE" || true)
+  if echo "$scan" | grep -q "^NAN"; then echo "SICK:nan_$(echo "$scan" | grep -c '^NAN')hosts"
+  elif [ "${n_nofile:-0}" -gt 0 ]; then echo "SICK:dumps_missing_${n_nofile}"
+  elif [ "${n_clean:-0}" -eq 8 ]; then echo "HEALTHY"
+  else echo "SICK:scan_${n_clean:-0}of8"; fi
+}
+
 TOTAL_MISS=0
+HEALTH_RETRIES="${HEALTH_RETRIES:-5}"
 IFS=',' read -ra DEPTH_ARR <<< "$DEPTHS"
 for d in "${DEPTH_ARR[@]}"; do
   LOG="$RUN_DIR/depth_${d}.log"
   say "── depth $d ($TRIALS trials) ──"
   ALERT_BEFORE=$(wc -l < "$ALERT_FILE" 2>/dev/null || echo 0)
 
-  # fresh engine per depth (the gate2 protocol), F4-proof single env source
-  EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
-    bash ~/glm-tpu/scripts/launch_glm_32chip.sh > "$RUN_DIR/launch_${d}.log" 2>&1
-  NODES=$(~/vllm-env/bin/ray status 2>/dev/null | grep -cE '^ 1 node_' || true)
-  [ "$NODES" -eq 8 ] || { say "ABORT depth $d: ray nodes $NODES/8 (INFRA)"; exit 1; }
+  # fresh engine per depth (the gate2 protocol), F4-proof single env source,
+  # health-probed: relaunch until the engine draw is clean (lottery mitigation)
+  HEALTH=""; TRY=0
+  while [ "$TRY" -lt "$HEALTH_RETRIES" ]; do
+    TRY=$((TRY + 1))
+    EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
+      bash ~/glm-tpu/scripts/launch_glm_32chip.sh > "$RUN_DIR/launch_${d}_try${TRY}.log" 2>&1
+    NODES=$(~/vllm-env/bin/ray status 2>/dev/null | grep -cE '^ 1 node_' || true)
+    [ "${NODES:-0}" -eq 8 ] || { say "depth $d try $TRY: ray nodes ${NODES:-0}/8 — relaunching"; continue; }
+    HEALTH=$(health_check_engine "$RUN_DIR/health_${d}_try${TRY}.log" | tail -1)
+    say "depth $d try $TRY: engine health = $HEALTH"
+    [ "$HEALTH" = "HEALTHY" ] && break
+  done
+  if [ "$HEALTH" != "HEALTHY" ]; then
+    say "ABORT depth $d: no healthy engine in $HEALTH_RETRIES draws (last: $HEALTH) — the"
+    say "lottery rate is worse than planned; investigate before burning more pod time."
+    exit 1
+  fi
 
   (
     cd ~/glm-tpu/bench || exit 1
@@ -174,6 +234,15 @@ PY
   gcloud storage cp "$LOG" "$GCS_CKPT/" >/dev/null 2>&1
   N_OK=$(grep -c "correct=True" "$LOG" 2>/dev/null || true)
   say "depth $d done: ${N_OK:-0}/$TRIALS correct, $DEPTH_MISS miss — checkpointed to $GCS_CKPT"
+  # per-depth dump hygiene: on a MISS the depth's layer-2 dumps are the
+  # specimen — archive them; otherwise purge (the disk doctrine).
+  if [ "$DEPTH_MISS" -gt 0 ]; then
+    SRC_GLOB="/tmp/dcp_gatehealth*.npz" bash ~/glm-tpu/scripts/dump_archiver.sh \
+      archive "$TAG/depth_${d}_MISS" --last-step-only >> "$RUN_DIR/orchestrator.log" 2>&1
+  else
+    SRC_GLOB="/tmp/dcp_gatehealth*.npz" bash ~/glm-tpu/scripts/dump_archiver.sh \
+      purge >> "$RUN_DIR/orchestrator.log" 2>&1
+  fi
 
   if [ "$TOTAL_MISS" -ge 2 ]; then
     say "════ GATE ABORTED at 2 misses. Record honestly; investigate before any re-gate. ════"
