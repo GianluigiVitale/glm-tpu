@@ -2548,3 +2548,42 @@ re-point this rule** — it is now part of the recreation checklist alongside re
 orchestrator's INFRA-vs-verdict classifier caught the condition in-protocol (no verdict pollution,
 draw not counted) — the postmortem fix doing its job on its first live incident. Loop self-heals on
 the next draw.
+
+## 2026-07-17 08:20 — 🎯 THE LOTTERY IS REAL AND CAUGHT ON CAMERA: per-HOST NaN poisoning of ONE buffer (layer-1 indexer k-cache), byte-deterministic bad program, per-instance host set
+
+**Discriminator (probe_lottery run 035115Z, pin 845f4ffeb): draw 1 CORRECT, draw 2 MISS** — same
+fixed-seed needle (gate2's first d=0.95 cell, prompt_tok=127363 identical), scrambler-interleaved,
+disks clean, all-green infra. MISS signature = gate2's exactly: pred=None, fluent-filler
+("The grass is the sun...") — run 171; probe1 answered '289958' crisply (run 169). The bad engine was
+also 2.6× slower (3690s vs 1394s/needle).
+
+**BYTE-DIFF FORENSICS (probe1 CORRECT vs probe2 MISS, all 22 dumped slots × 8 hosts × 4 shards):**
+- slots layer0 (idx0) + layer1 (mla0): byte-EQUAL everywhere. Slots ≥4: massive FINITE divergence
+  (50-90% of elements, all hosts) = downstream cascade, no NaN anywhere.
+- **THE SOURCE: slot layer2 = model-layer-1's DSA indexer k-cache.** NaN census: probe1 → host w4
+  poisoned (all 4 chips, 92%); probe2 → hosts w3, w4, w7 poisoned (91-92%). **The poison unit is a
+  whole HOST; the per-instance lottery is WHICH hosts.** 1 bad host → retrieval survives (7/8 model
+  replicas' attention contributions dominate the o_proj psum); 3 bad hosts → fluent filler. Gate2's
+  engine-lottery, mechanism in hand.
+- **Geometry:** within a poisoned replica: page 0 CLEAN, pages 1-63 100% NaN, pages 64-67 (beyond
+  fill) clean zeros. At dcp=4 each 2048-token chunk writes exactly one logical page, and **chunk 0
+  runs the ctx≤topk DENSE FALLBACK while chunks ≥1 run the sparse path** — the poison is the SPARSE
+  path's layer-1 indexer-k value computation, whole-chunk, from chunk 1 onward. Uniform across all
+  sublanes/packs/128 cols. NOT the pageloop sublane-stripe class; NOT stale HBM (fill = canonical
+  quiet-NaN 0x7fc0, 4.1M elements, single bit pattern).
+- **Determinism:** w4's poison is byte-IDENTICAL across the two engines; probe2's w3 and w7 poison is
+  byte-IDENTICAL on shared stripes. Device placement identical across engines (dump device metadata).
+  ⇒ exactly TWO program behaviors exist — good and ONE deterministic bad — and each host draws one
+  per engine instance. Prime suspect class: **per-host compilation split** (JAX_SHARE_BINARY broadcast
+  vs local compile, or a compile-time autotuning/HBM-pressure-dependent choice) yielding a v4
+  MISCOMPILE of one fused op in the sparse-path layer-1 indexer-k chain — the 07-07 per-host-binary
+  core-halt family, now expressing as numerics. Driver-log fingerprint attribution is Ray-dedup-
+  poisoned (known artifact) — per-host log forensics is the next instrument.
+- NO deliberate NaN writer exists in the DSA path (grepped) — the NaN is computed+written faithfully.
+
+**Consequences:** (1) gate2's death, the d=1.0 2/2 recovery, and probe1-with-w4-poisoned-yet-correct
+are all the SAME mechanism at different draw counts; (2) an ENGINE HEALTH PROBE at init (2-chunk
+mini-prefill + NaN check on the layer-1 idx cache — ~1 min) can DETECT a bad engine before any gate
+depth burns → detect-and-relaunch unblocks the gate operationally while the compiler bug is hunted;
+(3) the loop continues collecting draws (rate + host histogram). Dumps banked:
+gs://driftbench-dsv4-uc/dumps/probe_lottery_20260717T035115Z/probe{1,2}/ (3.7 GiB each, 8 hosts).
