@@ -101,10 +101,18 @@ run_engine_needle() {
   nodes=$(~/vllm-env/bin/ray status 2>/dev/null | grep -cE '^ 1 node_' || true)
   if [ "${nodes:-0}" -ne 8 ]; then echo "INFRA:ray_nodes_${nodes:-0}"; return; fi
   if [ "$kind" = "probe" ]; then
-    local envok
-    envok=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-      --command='P=$(pgrep -x raylet | head -1); tr "\0" "\n" < /proc/$P/environ | grep -c "GLM_DCP_CACHE_DUMP='"$DUMP_PREFIX"'"' \
-      2>/dev/null | grep -c "^1" || true)
+    # Count hosts whose raylet carries the dump env AT LEAST once — a
+    # duplicated environ entry (execve permits them; observed live: one
+    # host printed 2) is semantically fine, and a single ssh flake gets
+    # one retry before the draw is burned as INFRA.
+    local envok attempt
+    for attempt in 1 2; do
+      envok=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+        --command='P=$(pgrep -x raylet | head -1); tr "\0" "\n" < /proc/$P/environ | grep -c "GLM_DCP_CACHE_DUMP='"$DUMP_PREFIX"'"' \
+        2>/dev/null | grep -cE "^[1-9]" || true)
+      [ "${envok:-0}" -eq 8 ] && break
+      sleep 30
+    done
     if [ "${envok:-0}" -ne 8 ]; then echo "INFRA:raylet_env_${envok:-0}"; return; fi
   fi
   (
