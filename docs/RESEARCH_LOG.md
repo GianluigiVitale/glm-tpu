@@ -2587,3 +2587,30 @@ mini-prefill + NaN check on the layer-1 idx cache — ~1 min) can DETECT a bad e
 depth burns → detect-and-relaunch unblocks the gate operationally while the compiler bug is hunted;
 (3) the loop continues collecting draws (rate + host histogram). Dumps banked:
 gs://driftbench-dsv4-uc/dumps/probe_lottery_20260717T035115Z/probe{1,2}/ (3.7 GiB each, 8 hosts).
+
+## 2026-07-17 08:55 — F3 log forensics: the per-host BINARY-split hypothesis is REFUTED (ground-truth fingerprints); the discriminator is per-host RUNTIME STATE
+
+Per-host libtpu logs (no Ray dedup; /tmp/tpu_logs, both engine sessions, copied to ~/glm-run/hostlogs/
++ evidence bundle): **probe1 = 8× concurrent LOCAL compile of all 7 jit_step_fun_impl variants with
+BYTE-IDENTICAL executable fingerprints (code AND data segments) on every host — poisoned w4 ==
+clean w2 for every serving program.** probe2 = pure persistent-cache-hit run (zero compiles; init
+293s vs probe1's 1761s) — poisoning occurred in BOTH modes. JAX_SHARE_BINARY_BETWEEN_HOSTS=1 produced
+ZERO observable behavior in any log (flag may be a no-op in this stack — the 07-07 core-halt
+attribution deserves a re-look; the persistent XLA cache at ~/.cache/vllm/xla_cache is what actually
+uniformizes warm engines). Cache-state divergence exists but is tiny and non-correlating ({w1,w4}
+extra compute_logits entry ≠ poison sets).
+**KILLER FACT: w4 computed its byte-identical NaN poison while provably executing the same
+executables as the clean hosts.** ⇒ the split is per-host RUNTIME STATE consumed by the sparse-path
+layer-1 indexer-k chain. NaN is ABSORBING (canonical 0x7fc0), so byte-identical poison across engines
+is consistent with varying per-host garbage inputs collapsing to NaN. Pages 64-67 = clean zeros on
+the same replica ⇒ the buffer was zero-initialized and pages 1-63 were WRITTEN with computed-NaN
+values (not never-written).
+Free extra datum: draw-3's SCRAMBLER (32K, chunk 1024, different seed) also MISSED — the class
+expresses at 32K too.
+NEXT INSTRUMENTS (the forensics agent's prescription): (1) dump the layer-1 indexer-k chain INPUTS
+(hidden, wk, scales) on the first sparse chunk of a poisoned host — input-borne vs computed; (2) one
+draw with per-host --xla_dump_to for buffer-assignment diffs (fingerprints don't cover allocation);
+(3) one draw with VLLM_DISABLE_COMPILE_CACHE=1 to fingerprint what cache-hit engines actually load.
+OPERATIONAL UNBLOCKER (gate path, mechanism-independent): the ENGINE HEALTH PROBE — 2-chunk
+mini-needle at init + NaN scan of the layer-1 idx cache (~1 min) ⇒ detect-and-relaunch bad engines
+before any depth burns. The loop continues (rate + host histogram; every draw is now warm-cache).
