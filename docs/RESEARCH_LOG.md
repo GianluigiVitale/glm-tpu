@@ -2625,3 +2625,34 @@ Lock removed; w2 clean @ 845f4ffeb. **Landmine addendum: "the pin fights YOU" no
 flavor — never run git against worker checkouts while an engine may be initializing; agents
 inspecting hosts must avoid git entirely (read files, not repos).** Also banked this hour:
 draw-3's scrambler MISS (32K expression) and the health-probe landing (b07b2b4).
+
+## 2026-07-17 16:50 — DISCRIMINATOR STOPPED EARLY (rate established): 6 valid draws, 4 MISS; the poison histogram + a SECOND failure expression
+
+Loop stopped after draw 8 (early-stop rule: rate unambiguous). **Tally: 6 valid scrambled draws — 2
+CORRECT, 4 MISS (67%; Wilson 95% ≈ 30-90%); 2 INFRA (firewall tag, git race — both explained, fixed,
+logged); 2 of 8 scramblers ALSO missed at 32K.** Far above gate2's 1/7 engine-level estimate —
+consistent with the scramblers maximizing inherited-state diversity by design. Draw-4 note: w-0 hit
+the disk alert mid-window (my 22G byte-diff scratch + 13 stale ray sessions lowered its baseline
+under the ~29G/draw dump transient; cleaned, fleet-uniform 81G after).
+
+**Per-host layer-2 NaN histogram (all archived specimens):** p1 CORRECT {w4}; p2 MISS {w3,w4,w7};
+p4 CORRECT-tainted {}; p5 MISS **{}**; p6 CORRECT {}; p7 MISS {w4}; p8 MISS {w1, partial archive}.
+Signature gradient in the raw outputs (results.db runs 169-183): crisp answer (p1/p4/p6) → coherent
+haystack filler (p5) → semi-degraded filler (p2) → heavy babble (p7/p8).
+
+**TWO FINDINGS THAT RESHAPE THE HUNT:**
+1. **w4-only poison is NOT deterministic in outcome:** p1 (w4 poisoned) retrieved; p7 (w4 poisoned)
+   babbled. Poison extent/severity varies per instance even on the same host.
+2. **p5 MISSED WITH ALL 22 DUMPED SLOTS CLEAN on all 8 hosts** (full-slot NaN scan) and produced
+   COHERENT filler — either a genuine selection-quality miss at d=0.95 (which would threaten the
+   ≥95% gate independently of the lottery) or corruption in an UNDUMPED buffer (77 of 78 mla caches,
+   the topk stash, q-side state). n=1 — needs its own discriminator before any re-gate: the p5-class
+   rate decides whether the gate is even winnable at n=77 once engines are health-probed.
+
+IN FLIGHT: the PWAL/precompute-params NaN-check instrument (agent building; hypothesis: sparse-path
+chunks use a per-host precomputed copy of the layer-1 indexer params that the dense-fallback chunk 0
+does not — matching page-0-clean exactly). NEXT (order): (1) PWAL check on one engine; (2) if
+negative, the input-dump + xla_dump instruments (RESEARCH_LOG 08:55); (3) a p5-class discriminator
+(clean-engine d=0.95 repeats with full-slot dumps + armed topk scores); (4) only then re-gate.
+Specimens: gs://driftbench-dsv4-uc/dumps/probe_lottery_20260717T035115Z/ (keep p1/p2/p5/p6/p7;
+p3/p4/p8-partial purgeable).
