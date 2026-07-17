@@ -58,7 +58,11 @@ case "$MODE" in
     # dump filename convention is <prefix>.step<NNNN>.proc<P>.npz
     # (dcp_cache_dump.py) — the last-step filter groups on everything but
     # the step number.
-    CMD='set -u
+    # set -o pipefail is LOAD-BEARING (review MAJOR): without it a mid-stream
+    # tar failure (EIO on a pressured disk — the exact incident class) still
+    # exits 0 through gcloud, uploads a TRUNCATED archive, and the success
+    # branch purges local files whose bytes never reached GCS.
+    CMD='set -u -o pipefail
 H=$(hostname)
 FILES=$(ls '"$SRC_GLOB"' 2>/dev/null || true)
 [ -z "$FILES" ] && { echo "$H: nothing to archive"; exit 0; }
@@ -74,10 +78,15 @@ if [ -n "'"$LAST_ONLY"'" ]; then
   FILES=$(printf "%s\n%s\n" "$KEEP" "$NONSTEP" | sed "/^$/d")
 fi
 N=$(echo "$FILES" | wc -l)
-echo "$FILES" | tar czf - -T - 2>/dev/null \
-  | gcloud storage cp - "'"$BUCKET/$TAG"'/$H.tar.gz" >/dev/null 2>&1 \
-  && { echo "$FILES" | xargs -r rm -f; echo "$H: archived $N files -> '"$BUCKET/$TAG"'/$H.tar.gz + purged"; } \
-  || echo "$H: ARCHIVE FAILED — local files KEPT (do not purge blind)"'
+if echo "$FILES" | tar czf - -T - \
+     | gcloud storage cp - "'"$BUCKET/$TAG"'/$H.tar.gz" >/dev/null \
+   && gcloud storage ls -l "'"$BUCKET/$TAG"'/$H.tar.gz" 2>/dev/null \
+        | awk "{exit !(\$1 > 0)}"; then
+  echo "$FILES" | xargs -r rm -f
+  echo "$H: archived $N files -> '"$BUCKET/$TAG"'/$H.tar.gz + purged"
+else
+  echo "$H: ARCHIVE FAILED — local files KEPT (do not purge blind)"
+fi'
     remote "$CMD" | grep -E "^t1v-" | sort
     ;;
   *)

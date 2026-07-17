@@ -114,10 +114,27 @@ for d in "${DEPTH_ARR[@]}"; do
   ) &
   WRAPPER=$!
 
-  # live miss-abort watchdog over the streaming needle lines
-  WAITED=0; DEPTH_MISS=0
+  # live miss-abort watchdog over the streaming needle lines.
+  # INFRA taint semantics (review MAJOR): a disk alert or timeout during a
+  # depth run makes the depth INFRA — its misses are NOT results, and the
+  # whole gate ABORTS (the header doctrine; never launch the next depth on
+  # a breached pod).
+  WAITED=0; DEPTH_MISS=0; DEPTH_INFRA=""
   while kill -0 "$WRAPPER" 2>/dev/null; do
     sleep 60; WAITED=$((WAITED + 60))
+    ALERT_NOW=$(wc -l < "$ALERT_FILE" 2>/dev/null || echo 0)
+    if [ "${ALERT_NOW:-0}" -gt "${ALERT_BEFORE:-0}" ]; then
+      DEPTH_INFRA="disk_alert"
+      say "ABORT depth $d: DISK ALERT during the run — depth is INFRA (its misses are NOT results). Killing."
+      pkill -f "SPARSE 128K GATE depth=$d .*$TAG" 2>/dev/null
+      break
+    fi
+    if [ "$WAITED" -ge "$DEPTH_TIMEOUT_S" ]; then
+      DEPTH_INFRA="timeout"
+      say "ABORT depth $d: timeout ${DEPTH_TIMEOUT_S}s — depth is INFRA. Killing."
+      pkill -f "SPARSE 128K GATE depth=$d .*$TAG" 2>/dev/null
+      break
+    fi
     MISSES=$(grep -c "correct=False" "$LOG" 2>/dev/null || true)
     if [ "${MISSES:-0}" -gt "$DEPTH_MISS" ]; then
       DEPTH_MISS=$MISSES
@@ -128,19 +145,14 @@ for d in "${DEPTH_ARR[@]}"; do
         break
       fi
     fi
-    ALERT_NOW=$(wc -l < "$ALERT_FILE" 2>/dev/null || echo 0)
-    if [ "$ALERT_NOW" -gt "$ALERT_BEFORE" ]; then
-      say "ABORT depth $d: DISK ALERT during the run — verdicts tainted (INFRA). Killing."
-      pkill -f "SPARSE 128K GATE depth=$d .*$TAG" 2>/dev/null
-      break
-    fi
-    if [ "$WAITED" -ge "$DEPTH_TIMEOUT_S" ]; then
-      say "ABORT depth $d: timeout ${DEPTH_TIMEOUT_S}s. Killing."
-      pkill -f "SPARSE 128K GATE depth=$d .*$TAG" 2>/dev/null
-      break
-    fi
   done
   wait "$WRAPPER" 2>/dev/null
+  if [ -n "$DEPTH_INFRA" ]; then
+    say "════ GATE ABORTED: depth $d INFRA ($DEPTH_INFRA). Tainted misses ($DEPTH_MISS) NOT counted."
+    say "Fix the infrastructure, verify disks on ALL 8 hosts, then resume with"
+    say "  --depths \"<remaining incl. $d>\" (results.db keeps the clean depths)."
+    exit 1
+  fi
   TOTAL_MISS=$((TOTAL_MISS + DEPTH_MISS))
 
   # per-depth GCS checkpoint (results.db via the sqlite backup API — safe
