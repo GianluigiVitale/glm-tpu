@@ -2681,3 +2681,30 @@ last step) until a bad engine draws (~67% rate ⇒ 1-2 draws): the per-step NaN 
 decides **born-NaN at its own write step (input-borne) vs clean-then-clobbered at a later step
 (arena aliasing)** — the single fork in the road. Run PWAL-check armed on the same engines (rules
 out the born-bad-copy leg simultaneously).
+
+## 2026-07-17 19:10 — 🎯🎯 ROOT-CAUSE CLASS IN HAND: the per-host LOTTERY IS THE WEIGHT LOAD — indexer wk arrives NaN/Inf at engine init (PWAL check, first armed engine that missed)
+
+Timeline run (probe_timeline_20260717T165934Z, pin 34d2eef37): pairs 1-2 fully CORRECT; pair-3 probe
+MISSED — and the armed GLM_PWAL_NAN_CHECK had ALREADY flagged, at 18:47 during INIT:
+  host=w-0 layer=0 wk orig=NaN:640,Inf:640 (precomp identical)
+  host=w-0 layer=1 wk orig=NaN:1331,Inf:205  [repeated 2x across cluster = 2 more hosts]
+  attribution=UPSTREAM(source arrays non-finite BEFORE the PWAL copy — checkpoint/load/adapter)
+**The LOADED weights themselves are non-finite, per-host, per-instance, before any serving step.**
+The "engine-instance lottery" = the per-host weight-load path (runai GCS streaming ×
+RUNAI_STREAMER_CONCURRENCY=32 + fp8→bf16 adapter) silently delivering corrupt tensors on some hosts
+some launches. Reconciles: per-host granularity (independent per-host streams), per-instance
+variation (fresh stream per engine), the runtime-state forensics verdict (binaries identical), NaN
+absorption (partially-NaN wk ⇒ canonical-NaN k rows ⇒ byte-identical cache poison across engines
+despite different underlying corruption), and the CLAUDE.md-era "flaky dequant crash (DSV4 hit it
+too)" — the same loader flakiness class, silent instead of crashing. fp8 e4m3fn HAS NaN codes —
+corrupt bytes decode straight to NaN. The p5-class clean-engine miss remains a separate open
+question (possibly corrupt weights in a non-indexer, undumped tensor — SAME load mechanism, wider
+blast radius: the check currently scans ONLY indexer params).
+IMMEDIATE ACTIONS: (1) harden GLM_PWAL_NAN_CHECK to RAISE on UPSTREAM non-finite too (armed engines
+must refuse corrupt loads — detection at init costs seconds, a depth costs 2h); (2) widen the scan to
+ALL loaded weights at init (the p5 blast-radius question); (3) the load-path fix hunt: reload-and-
+compare a flagged tensor, streamer integrity/retry settings, adapter race audit; (4) per-step
+specimen archive (probe3_MISS, full timeline) banked in GCS for the page-0 reconciliation.
+The instrument chain that got here, for the record: scrambled discriminator → byte-diff → NaN census
+→ slot localization → host-log fingerprint forensics (binaries exonerated) → code-path map (PWAL
+copies exonerated) → init-time param scan = the load path. Observability-first, six instruments deep.
