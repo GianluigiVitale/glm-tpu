@@ -2656,3 +2656,28 @@ negative, the input-dump + xla_dump instruments (RESEARCH_LOG 08:55); (3) a p5-c
 (clean-engine d=0.95 repeats with full-slot dumps + armed topk scores); (4) only then re-gate.
 Specimens: gs://driftbench-dsv4-uc/dumps/probe_lottery_20260717T035115Z/ (keep p1/p2/p5/p6/p7;
 p3/p4/p8-partial purgeable).
+
+## 2026-07-17 17:40 — PWAL-copy hypothesis REFUTED at code level; the surviving class is a RUNTIME CLOBBER; the decisive instrument needs no code
+
+Code map (agent, worktree glm-pwal-check @ b9d751b0): `compute_indexer_keys` — the write that produced
+BOTH the clean page 0 and the NaN pages 1-63 — is STRAIGHT-LINE code upstream of the dense/sparse
+lax.cond dispatch, executing the SAME stored params (`glm_dsa_adapted_*`, one device_put per array,
+resolved once per layer call) on EVERY chunk. No second materialization exists; no rope tables exist
+(cos/sin computed in-graph). The cond selects only attention + latent-cache write. What chunks ≥1 add:
+the sparse branches' large arenas (score-walk shard_map, all-gathers, merge, owner-scatter, masked
+LSE) — and the fresh k-write lands BEFORE the cond executes. Surviving suspect classes: (a) garbage
+INPUT (params/hidden — the born-bad leg, checkable at init), (b) **runtime CLOBBER: a sparse-branch
+arena temp landing over the freshly-written k-cache pages** (fits page-0-clean exactly: chunk 0 never
+runs those branches). Note the fingerprints covered executables incl. data segments — identical across
+hosts — so an in-program aliasing bug would hit all hosts; the per-host element must be the RUNTIME
+allocation interaction (per-host HBM arena history), the allocation-lottery family at the runtime
+allocator level.
+INSTRUMENT LANDED (not yet on origin): GLM_PWAL_NAN_CHECK (b9d751b0) — init-time per-host NaN scan of
+orig + precomputed indexer params, raise on copy-born-bad, attribution=UPSTREAM for load-path NaN.
+10/10 + 34/34 + 25/25 CPU.
+**THE DECISIVE NEXT EXPERIMENT (no code changes):** probe draws with GLM_DCP_CACHE_DUMP_LAYERS=2 and
+ALL per-step dumps kept (4.5MB×63 steps×8 procs ≈ 2.3GB/host — the earlier archives kept only the
+last step) until a bad engine draws (~67% rate ⇒ 1-2 draws): the per-step NaN timeline for page 1
+decides **born-NaN at its own write step (input-borne) vs clean-then-clobbered at a later step
+(arena aliasing)** — the single fork in the road. Run PWAL-check armed on the same engines (rules
+out the born-bad-copy leg simultaneously).
