@@ -2534,3 +2534,17 @@ gate_sparse128k.sh (F4 single env source, live miss-abort at 2, depth-INFRA tain
 checkpoints, GLM_WRITE_PROBE armed). Workers synced 8× 845f4ffeb dirty=0; default-trace byte-identity
 of the whole stack confirmed by the review (SAFE-TO-LAND on that lens). NEXT: launch probe_lottery.sh
 (first engine pays the cold XLA compile), then per its verdict → F7/F8 cells → RE-GATE.
+
+## 2026-07-17 03:15 — Draw-1 INFRA: pod recreation had orphaned the Ray firewall rule (fixed; the classifier worked)
+
+probe_lottery draw 1 came back INFRA:ray_nodes_1 (both scrambler and probe): workers 1-7 joined rc=0
+but never appeared — /tmp/rayjoin.log: "Failed to connect to GCS at 192.168.0.29:6379". Root cause:
+`allow-ray-pod-internal` carries a PER-POD-INSTANCE target tag, and the 07-16 recreation minted a new
+tag (tpu-t1v-n-6c15e171-w-5201142156555843955) — the rule matched nothing, so the private-fabric Ray
+ports were closed. Fixed with `gcloud compute firewall-rules update allow-ray-pod-internal
+--target-tags=<current tag>` (tag read from the metadata server:
+`curl -H "Metadata-Flavor: Google" .../instance/tags`). **STANDING RULE: after ANY pod recreation,
+re-point this rule** — it is now part of the recreation checklist alongside reprovisioning. The
+orchestrator's INFRA-vs-verdict classifier caught the condition in-protocol (no verdict pollution,
+draw not counted) — the postmortem fix doing its job on its first live incident. Loop self-heals on
+the next draw.
