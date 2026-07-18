@@ -2725,3 +2725,29 @@ severity (few corrupt bytes, massive blast radius) and possibly generation-A's w
 poison (a corrupt scale in a hotter tensor). The widened GLM_LOAD_NAN_CHECK scans scale tensors
 explicitly + dumps offenders on refusal for byte-level analysis (streamer-chunk-boundary vs
 dequant-math discrimination).
+
+## 2026-07-18 07:30 — TIMELINE VERDICT: static load-corrupt wk, FULL STOP; the "page-0-clean" narrative was an off-by-one (null block); CORRECTION to 08:20; the finite-corruption implication
+
+Per-step specimen analysis (probe3_MISS, all 63 steps × 8 hosts; predicted-vs-measured for all four
+hypotheses): **(a) static corrupt wk from the weight load — MATCH on all six predictions; (b) dynamic
+growth, (c) second corruption instance, (d) runtime clobber — all REFUTED.**
+**CORRECTION (the record over the narrative): the 07-17 08:20 entry's "page 0 CLEAN ⇒ sparse-path-only
+poison" was an OFF-BY-ONE block-table misread — physical page 0 is vLLM's NULL BLOCK (never written;
+logical chunk k → physical page k+1). There was never a clean chunk: chunk 0 (dense fallback) is 100%
+NaN at its own write step too.** Whole-INPUT-ROW wk corruption ⇒ every k element (Σ over all input
+dims) NaN ⇒ 100%-NaN pages, quiet-NaN 0x7fc0, Inf absorbed — exactly as measured (8060 fully-NaN
+page-instances, 0 partial, 0 clobbered; NaN front == write front on both poisoned hosts w-0/w-3;
+generation-A re-measured: byte-class-IDENTICAL to B). Load fingerprint: whole rows = CONTIGUOUS byte
+ranges in the row-major tensor = corrupt streamed chunks. Ops gems: poisoned dump tars compress
+~150:1 (instant triage); Ray log dedup destroyed the third PWAL flag's identity — forensic runs need
+RAY_DEDUP_LOGS=0 or per-host logs.
+**THE FINITE-CORRUPTION IMPLICATION (reframes the gate plan):** corrupt fp8 bytes only SOMETIMES
+decode to NaN — most garbage decodes to random FINITE values, invisible to any non-finite scan and
+degrading quality silently. **p5's clean-engine coherent-filler miss is exactly this signature.** ⇒
+NaN-refusal is necessary but NOT sufficient; the loader must be actually FIXED before the gate.
+**FIX HUNT, next experiment (cheap, decisive): the CONCURRENCY A/B** — the leading mechanical suspect
+is a race at RUNAI_STREAMER_CONCURRENCY=32; N engine-INITS per arm (32 vs 8, PWAL+LOAD checks armed,
+no serving needed — corruption rate ~2/3 gives signal at n≈8/arm, ~5-7min/init ⇒ ~1.5h total). If
+lowering concurrency zeroes the flag rate ⇒ ship the safe setting + keep the refusal guards; if not,
+next: adapter race audit, then per-tensor byte-integrity manifest (GCS CRC32C is whole-object only —
+no help for ranged reads).
