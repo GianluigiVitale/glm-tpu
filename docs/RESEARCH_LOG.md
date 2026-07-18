@@ -3071,3 +3071,19 @@ the shell's OWN eval line (self-kill, exit 144) — use pkill -f with a pattern 
 first. NEXT: (1) miss-dump triage (compression + structure); (2) CORPUS RE-READ under the
 engine-state/stripe-order lens (docs/15, docs/10, docs/05, discriminator-era log entries, suggestions);
 (3) instrument decision AFTER the re-read; (4) fresh gate only when sick engines are DETECTABLE pre-depth.
+
+## 2026-07-18 20:50 — MISS-DUMP FORENSICS: process-index permutation REFUTED as discriminator (stable + shared); corpus re-read begins
+
+Dump tars: normal entropy (NOT the 150:1 poisoned signature — valid numbers, wrong behavior). The npz
+process_index metadata + the one dedup-surviving ARMED line per engine log give host↔proc mappings:
+BOTH sick engines (d=0.05-try1 specimen npzs + d=1.0 tars) carry the IDENTICAL permutation
+w0→1 w1→6 w2→0 w3→7 w4→2 w5→4 w6→3 w7→5, and ALL five healthy-engine fragments (w5→4 ×2, w3→7 ×2,
+w6→3, w4→2) are consistent with the SAME fixed permutation ⇒ host↔jax.process_index mapping is
+launch-stable, shared by sick and healthy — NOT the per-draw variable. (Ray dedup ate 7/8 ARMED lines
+per engine — gates run without RAY_DEDUP_LOGS=0 by design; the npz metadata carried the evidence
+instead.) REMAINING per-launch-variance candidates: vLLM TP-rank↔actor assignment order (Ray actor
+creation order CAN vary per launch even when process_index doesn't — a rank/mesh assumption mismatch
+would corrupt exactly the long-context stripe reads), XLA autotune/program draw, HBM layout. DOMAIN
+SHIFT confirmed ⇒ OWNER RULE: corpus re-read under the engine-state/rank-order lens BEFORE instruments
+(docs/15 worker-race mechanism + its fix; docs/05 dcp rank/process/device-order assumptions; docs/10
+toolkit; discriminator-era entries incl. probe LENGTHS + p5; suggestions.md method).
