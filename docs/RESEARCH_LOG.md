@@ -2947,3 +2947,21 @@ CPU suite (corrupt-after-hash must raise); env-gated, off = byte-identical. Then
 beats both reviewer alternatives (20 matched NaN-proxy draws bound the wrong quantity; local-disk load
 swaps the source path but leaves H2D staging unverified). HEALTH_RETRIES also raised 5→8 (CI-upper
 robustness: P(exhaust 8) <2% even at 44%). xprof needle unaffected, still in flight.
+
+## 2026-07-18 09:25 — ADVERSARIAL REVIEW 3/3 (CPU stage-splitter): SAFE as diagnostic; automated verdict has a coverage hole (M1)
+
+Verdict on 04507ba1d: non-invasive, provably non-mutating, gate-off byte-identical, grep contract exact,
+fp8 NaN detection verified empirically, 11/11 tests. M1 (MAJOR): the CPU scan is NOT a superset of the
+device scan — e_score_correction_bias + hash_indices_table are t2j'd inside _shard_module_to_tpu BEFORE
+the catch-all (then skipped as torchax), and flash_attn sinks are covered by no hook ⇒ "CPU clean +
+device flagged ⇒ H2D" can be a FALSE verdict if the streamer corrupts one of those. Mitigation noted:
+the campaign's primary specimen (indexer wk) IS covered, and dev_verdict.txt names the offender for
+manual reconciliation. m1: float8_e8m0fnu missing from _NO_INF_DTYPES (its planted NaN reports as a
+self-check failure — invisible to attribution). m2/m3: perf-claim nits.
+DISPOSITION: the GLM_LOAD_CHECKSUM build (in flight) SUBSUMES M1 for H2D attribution — hooked inside t2j
+itself it hashes EVERY t2j-bound tensor incl. the three bypassers, and per-tensor cpu-vs-device sum is a
+categorical stage splitter (mismatch ⇒ H2D; match + device-NaN ⇒ arrived corrupt from the CPU stage) —
+strictly better than the grep-based split. m1 (e8m0) folded into the same landing; sibling-site copy
+fixes (review 1/3 MAJOR-1/2 — weight_utils/gpt_oss/multimodal_manager, none on the GLM path) stay queued
+post-gate. Gate script HEALTH_RETRIES 5→8 landed. SEQUENCE: land checksum commits → sync 8× new PIN →
+3-4 instrumented draws (false-positive proof + first TRUE rate incl. finite) → re-arm gate envs → launch.
