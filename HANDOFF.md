@@ -94,17 +94,19 @@ the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-r
 ## What is NEXT (in order)
 
 1. ~~The safety/ops-debt commit~~ **DONE 07-17** (fork 845f4ffeb synced 8×; ops kit in scripts/).
-2. **RUN THE DISCRIMINATOR: `bash ~/glm-tpu/scripts/probe_lottery.sh`** (self-contained: pre-flight,
-   scrambler-interleaved 20 valid draws at the gate2-verbatim config pinned 845f4ffeb, fixed seed =
-   gate2's first d=0.95 needle, host-side dumps over all indexer k-cache slots, per-probe GCS archival,
-   INFRA-vs-verdict classification, decision rule printed). First engine pays the cold XLA compile
-   (~45min+); expect ~10-16h total. ANY MISS ⇒ lottery REAL ⇒ byte-diff the archived caches
-   (dcp_cache_diff) bad-vs-good → F3 bisect on the guilty side. 20/20 ⇒ rejects a ≥1/7 lottery at ~95%
-   ⇒ operational ⇒ proceed.
-3. **Pre-gate validation cells** (audit F7): one masked-backstop smoke on the owned/v2 program (F8's
-   armed-T=2048 cell is now CPU-closed by the combo suite; a metal armed cell remains optional).
-4. **RE-GATE: `bash ~/glm-tpu/scripts/gate_sparse128k.sh`** (n=77, mechanism depths first, miss-abort
-   at 2, per-depth GCS checkpoints, GLM_WRITE_PROBE armed, extend-to-n≈130 on ONE miss). ~12.7h.
+2. ~~The discriminator~~ **DONE 07-17/18 — the lottery is SOLVED: silent per-host WEIGHT-LOAD
+   corruption** (~56-60% of engine inits; RESEARCH_LOG 07-17 08:20 → 07-18 06:35 is the full
+   six-instrument + corpus arc). Root-cause candidate with fix in flight: the **t2j alias race**
+   (zero-copy numpy view of torch storage × resize_(0) eager free × async H2D staging) — unifies
+   DSV4's "flaky dequant crash". Refuted en route: per-host binaries, PWAL copies, runtime clobber,
+   scale-as-primary, streamer concurrency (A/B), F8_E8M0 gating.
+3. **Land the t2j fix** (worktree glm-t2j-fix; deterministic must-fail-first test is the proof) →
+   review → sync 8× → **VALIDATION: ~10 init-only draws, both checks armed — corruption must
+   collapse 56%→0**; any residual ⇒ the dissection specimen (PWAL unarmed so the LOAD reject dumps
+   fire; 3-way diff corrupt/clean-host/GCS).
+4. **RE-GATE: `bash ~/glm-tpu/scripts/gate_sparse128k.sh`** — update PIN to the fix tip + add
+   GLM_LOAD_NAN_CHECK=1 to its RAYLET_ENVS (health probe + refusing loads + fixed loader = triple
+   protection). n=77, mechanism depths first, miss-abort at 2, per-depth ckpts, ONE miss ⇒ n≈130.
 5. **256K throughput A/B** (dsa-sparse vs dense at IDENTICAL dcp; `bench/dsa_throughput.py`); fp8-KV
    only after its own dcp=1 needle validates (fp8 has still NEVER produced a validated metal token).
 6. **Benchmarks at scale:** GSM8K n≥200, GPQA-198 rerun @ 16K (owner-gated), AIME-2026 n=30.
@@ -116,7 +118,7 @@ the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-r
 | branch | what | on origin? |
 |---|---|---|
 | `glm-5.2-v4` (`02e44b36`) | pod mainline — Stage-1 + obs + OOB fix | yes |
-| **`glm-5.2-v4-next`** (**`845f4ffeb`**) | **integrated staging + what the pod RUNS** — the campaign stack (granularity fix, fp8-KV v4 fixes, obs, sparse-DCP A/B/C, scatter-flat, segment S1, W2.1, gather-dominator v2s) + the 07-17 safety commit (F6 refusals [headsplit combos now REFUSE at trace time], GLM_WRITE_PROBE, combo suite, dense-impl refusal), all gated off by default | yes — synced 8× dirty=0 |
+| **`glm-5.2-v4-next`** (**`c68794241`**) | **integrated staging + what the pod RUNS** — the campaign stack (granularity fix, fp8-KV v4 fixes, obs, sparse-DCP A/B/C, scatter-flat, segment S1, W2.1, gather-dominator v2s) + the 07-17 safety commit (F6 refusals, GLM_WRITE_PROBE, combo suite, dense-impl refusal) + the 07-17/18 integrity layer (GLM_PWAL_NAN_CHECK raises; GLM_LOAD_NAN_CHECK full-weight init scan + reject dumps), all gated off by default | yes — synced 8× dirty=0 |
 | `pr-g1..g6` | upstream PR series (07-07/08 cuts — predate the campaign; owner submits) | yes |
 | `dsv4-flash-v4` | the DSV4 base (LKG pin source) | yes |
 
@@ -159,11 +161,11 @@ zero-failure + bounded divergence. Stage-3: MTP acceptance ~5 (FROZEN).
 
 ## The exact next task
 
-Re-run the **14-probe fixed-seed discriminator** (item 1 above) on the freshly-provisioned pod — but
-land the **disk-watchdog + dump quotas + the safety/truth commit** first (they are one session of CPU
-work and every past gate death traces to their absence). Expect the first engine to recompile the XLA
-caches (~45min+). Then follow the NEXT list in order. After each milestone: RESEARCH_LOG + this file +
-commit/push + `backup_bundle.sh`.
+Land the **t2j alias-race fix** (item 3 above: must-fail-first proof, review, sync 8×), then the
+**validation draws** (corruption 56%→0 or the dissection specimen decides), then the **re-gate**.
+The owner-enforced corpus-first rule applies to every new domain: re-read the core docs under the
+new lens before building instruments. After each milestone: RESEARCH_LOG + this file + commit/push +
+`backup_bundle.sh`.
 
 ## Owner-gated (draft, don't do)
 

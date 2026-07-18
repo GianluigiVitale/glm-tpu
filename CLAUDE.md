@@ -363,5 +363,21 @@ glm-tpu/
   (`scripts/provision_worker_glm.sh`); results.db restored to the run-165 (gate2 0/11) checkpoint;
   setup.sh cron-abort bug fixed in the bucket. Lost forever: the safety/truth commit, write-probe guard,
   disk-watchdog (never committed — rebuild), d=1.0 discriminator db rows, XLA caches.
+- [x] **2026-07-17 — Safety/ops-debt commit LANDED** (fork a98c77c9→845f4ffeb, 6-lens adversarial
+  review, 2 BLOCKER + 8 MAJOR fixed pre-land): F6 headsplit refusals + docstring truth,
+  GLM_WRITE_PROBE scatter sentinel (both widths), permanent combo suite (F8 closed), dense-impl
+  refusal, in-repo ops kit (disk watchdog, dump archiver, orchestrators). The scrambled
+  discriminator then PROVED the lottery (4/6 valid draws MISS) and byte-diff forensics localized it:
+  per-HOST quiet-NaN poisoning of the layer-1 indexer k-cache; binaries exonerated by per-host
+  fingerprints; caught AT INIT by GLM_PWAL_NAN_CHECK — **the LOADED weights arrive corrupt**.
+- [x] **2026-07-18 — ROOT-CAUSE CANDIDATE + integrity layer.** Owner-enforced corpus-first re-read
+  found it: the **t2j ALIAS RACE** (zero-copy numpy view of torch storage × `resize_(0)` eager free ×
+  async H2D immutable-until-transfer staging) — unifies DSV4's never-root-caused "flaky dequant
+  crash" (~60%/build there, ~56-60% of GLM inits here; crash = page unmapped, silent = page reused).
+  Landed: GLM_LOAD_NAN_CHECK (full-weight on-device init scan + reject dumps; tip c68794241 synced
+  8×). Refuted: PWAL copies, runtime clobber, scale-as-primary, streamer concurrency (A/B),
+  F8_E8M0. Fix in flight (must-fail-first proof test); then validation draws (56%→0) → re-gate.
+  **Standing owner rule: on any domain shift, RE-READ the core docs under the new lens BEFORE
+  building instruments — the corpus is the first instrument.**
 
 > Append dated entries each session. Keep `HANDOFF.md` in sync.
