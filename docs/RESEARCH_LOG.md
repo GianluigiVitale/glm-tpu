@@ -3087,3 +3087,21 @@ would corrupt exactly the long-context stripe reads), XLA autotune/program draw,
 SHIFT confirmed ⇒ OWNER RULE: corpus re-read under the engine-state/rank-order lens BEFORE instruments
 (docs/15 worker-race mechanism + its fix; docs/05 dcp rank/process/device-order assumptions; docs/10
 toolkit; discriminator-era entries incl. probe LENGTHS + p5; suggestions.md method).
+
+## 2026-07-18 21:05 — HYPOTHESIS SHARPENED: deterministic unwritten-slot READ × uninitialized-HBM lottery
+
+Order candidates collapsing: vLLM parallel_state runs world_size=1 rank=0 PER WORKER (JAX mesh from
+topology + the stable process_index does the sharding — vLLM rank machinery not in the path); compile
+markers identical sick-vs-healthy (both warm). LEADING HYPOTHESIS: a DETERMINISTIC boundary/tail defect
+in the DSA selection/read path (candidates: owned-width dead-tail zero-id masking at PARTIAL final
+chunks — both misses had prompt_tok 127363/127362 ⇒ final chunk = 387 tokens, and the d=1.0 needle
+LIVES in that partial chunk; index_skip_topk_offset handling; kv_len off-by-one ⇒ reads of page 0 =
+the null block, echoing the timeline-forensics "page-0" breadcrumb) whose CONSEQUENCE depends on
+UNINITIALIZED-HBM contents ⇒ per-ENGINE expression (each launch draws different garbage; some benign,
+some catastrophic), length/depth-dependent, weights byte-clean, dumps NaN-clean (the WRITTEN cache is
+fine — the READ strays), fluent-filler (attention diluted by garbage keys), health-probe blind (5K
+geometry never hits the boundary). Explains gate2 22/22→0/11@0.95 AND today 33/33 then 0/2@1.0 with
+d=0.95 clean (different garbage draw). NEXT: corpus re-read verdict (agent in flight: docs/15, docs/05,
+docs/01/W2.1 dead-tail design + its CPU-proof coverage at partial final chunks, discriminator entries)
+→ then a CPU test at the EXACT miss geometry (prompt_tok=127363, d=1.0, chunk 2048, owned+v2s, dcp=4)
+hunting the deterministic defect — a CPU repro would decide WITHOUT burning a single pod draw.
