@@ -380,4 +380,15 @@ glm-tpu/
   **Standing owner rule: on any domain shift, RE-READ the core docs under the new lens BEFORE
   building instruments — the corpus is the first instrument.**
 
+- [~] **2026-07-18 (later) — CHECKSUM ERA + THE GATE RUNS.** Adversarial reviews 3/3 on the integrity
+  stack: t2j fix SAFE on the GLM path (sibling sites parked on ~/wt-sibling-alias); the stats review
+  REFUTED "gate path open" (pooled-detector confound; NaN-only protections) ⇒ **GLM_LOAD_CHECKSUM**
+  landed (a225d16b4): categorical cpu-vs-device byte-verify of every t2j-staged tensor, raises on
+  mismatch, catches FINITE corruption; validation 4/4 clean. Xprof 128K: no ≥40% dominator (S2 not
+  justified); per-chunk cost dominates prefill. **THE SPARSE 128K GATE LAUNCHED 11:05 UTC** — 33/33
+  through d=0.0/0.05/0.95 (gate2's 0/11 death cell cleared 11/11 ⇒ gate2 died to the lottery, not the
+  kernel). RESIDUAL SPECIMEN: one sick draw, byte-verified clean everywhere, fluent-filler miss ⇒
+  residual is NOT H2D weight corruption (CPU-side-finite or engine-STATE; db run 193). Verdict ETA
+  ~05-07 UTC 07-19; then 256K.
+
 > Append dated entries each session. Keep `HANDOFF.md` in sync.
