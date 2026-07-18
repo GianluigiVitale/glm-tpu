@@ -2810,3 +2810,28 @@ FAILS TODAY deterministically (CPU aliases per our own note): mutate the torch t
 assert the jax array is unchanged. Fix build delegated; validation = N init draws with checks armed
 (corruption rate must collapse to 0), then the dissection specimen doubles as confirmation (corrupt
 bytes should be reused-heap-shaped). Waiting sweep results may add confirming citations.
+
+## 2026-07-18 06:10 — Prior-art sweep (6 searchers): the DSV4 crash story RECOVERED and it unifies — same ~60% rate, same per-host affinity, never root-caused, retry-mitigated, zero verification
+
+The corpus sweep (breadcrumb followed to its source — NOTE: ~/bucket/repos/moe-tpu is STALE at Jun-13;
+the story lived only on the GitHub origin, recovered by fresh clone):
+- **DSV4, 2026-06-19 (moe-tpu RESEARCH_LOG "FLAKY DEQUANT CRASH"): intermittent ~60% SILENT crash per
+  engine build** during the fp8 dequant phase of the runai load ("connection error code 2/EOF", no
+  flushed error — "a hard SIGSEGV or HBM fault", "host 0 usually"). Never root-caused ("environmental").
+  Mitigations shipped: RETRY LOOPS (up to 5 tries; runbook + prompt.md + the published serving recipe
+  all carry it) and head-TP freeing ~8 GiB/chip ("more reliable", not eliminated). **DSV4 had NO
+  post-load weight verification — a build that survived dequant was trusted**; the silent-corruption
+  form would have sailed through undetected (implication for DSV4-era numbers noted honestly).
+- **UNIFICATION with the t2j-alias-race candidate: ONE mechanism, two manifestations.** Freed host
+  page UNMAPPED when the async H2D reads it → SIGSEGV (DSV4's crash form); freed page still mapped but
+  REUSED → silent garbage on device (GLM's corruption form, visible only because we added the init
+  scans). Rate match (~60%/~60%), per-host affinity match, knob-insensitivity match (DSV4: streamer
+  settings didn't help; GLM: concurrency A/B flat). The HBM-headroom sensitivity (head-TP helping) fits
+  as a timing shift, not a fix.
+- Also recovered: TWO prior DETERMINISTIC load corruptions, both fixed (the ignored_layers mis-routing
+  that fp8-corrupted bf16-stored tensors; the F8_E8M0 runai dtype-map gap) — and
+  **docs/recon/fork-layout.md:20 warns the F8_E8M0 patch is ARCH-GATED on DSV4 and GLM needs it
+  re-gated — standing re-audit item.** OPS NOTE: the moe-tpu bucket mirror is dead-stale (its sync
+  cron died with the old VM) — corpus searches must use the GitHub origin.
+The t2j fix build (deterministic must-fail-first test) is in flight; on land: sync 8× → init-draw
+validation (rate must collapse ~60%→0) → dissection specimen as byte confirmation → re-gate.
