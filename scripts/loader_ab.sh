@@ -81,8 +81,12 @@ for i in $(seq 1 "$N_PER_ARM"); do
       env $DRIVER_ENVS RUNAI_STREAMER_CONCURRENCY=$arm setsid --wait nohup \
         ~/vllm-env/bin/python -u -c "
 import engine
-llm = engine.build_llm(engine.DEFAULT_MODEL, max_len=4096, max_seqs=1,
-                       gmu=0.90, max_batched_tokens=2048, num_gpu_blocks=16,
+# EXACT gate geometry — its programs are already in every host's warm XLA
+# cache (a novel geometry forces a ~30-45min cold compile; init-1 of run
+# 002557Z timed out exactly that way). The stream-under-test is geometry-
+# independent; the cheap init is the CACHED one.
+llm = engine.build_llm(engine.DEFAULT_MODEL, max_len=131840, max_seqs=1,
+                       gmu=0.90, max_batched_tokens=2048, num_gpu_blocks=68,
                        log_extra='loader-ab init')
 print('INIT_OK')
 " </dev/null > "$LOG" 2>&1
