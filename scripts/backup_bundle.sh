@@ -34,7 +34,7 @@ DEST="${BUCKET}/backups/glm-tpu/${STAMP}"
 
 GLM_TPU="${GLM_TPU_DIR:-$HOME/glm-tpu}"
 FORK="${TPU_INFERENCE_DIR:-$HOME/tpu-inference}"
-FORK_BRANCH="${FORK_BRANCH:-glm-5.2-v4}"
+FORK_BRANCH="${FORK_BRANCH:-glm-5.2-v4-next}"
 LOG_DIR="${GLM_RUN_DIR:-$HOME/glm-run}"
 RESULTS_DB="$GLM_TPU/bench/results.db"
 
