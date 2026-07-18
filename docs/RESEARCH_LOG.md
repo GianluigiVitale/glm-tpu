@@ -2965,3 +2965,19 @@ strictly better than the grep-based split. m1 (e8m0) folded into the same landin
 fixes (review 1/3 MAJOR-1/2 — weight_utils/gpt_oss/multimodal_manager, none on the GLM path) stay queued
 post-gate. Gate script HEALTH_RETRIES 5→8 landed. SEQUENCE: land checksum commits → sync 8× new PIN →
 3-4 instrumented draws (false-positive proof + first TRUE rate incl. finite) → re-arm gate envs → launch.
+
+## 2026-07-18 09:40 — XPROF 128K NEEDLE VERDICT: no S2 action — the gate proceeds; prefill is per-chunk-cost dominated
+
+Needle CORRECT on try 1 (clean draw, both refusing checks armed). PREFILL_ONLY trace captured 3 steps:
+step0 (dense-fallback chunk) 3.58s; steps 1-2 (sparse) 9.33/9.39s at kv≈2-6K. SELF-TIME breakdown of
+the first full sparse chunk (nesting-corrected — 'conditional'/'while' are parents; naive inclusive
+aggregation double-counts): top_k 21.8%, gather_custom_fusion 16.0%, collectives ≈24% (all-reduce 9.0 +
+psum 8.7 + all-gather 5.9 + all-to-all 0.4), broadcast_select_fusion 9.1%, dsa_sparse_decode (pallas)
+8.7%, MoE gmm_v2 7.7%, sort 4.5%. DECISION per the pre-committed rule: NO ≥40% single dominator whose
+fix is the S2 pallas scorer (scoring self-time isn't even visible — consistent with P0.b's 3.8% at 32K)
+⇒ NO pre-gate optimization; LAUNCH THE GATE once GLM_LOAD_CHECKSUM lands. New fact: chunk cost is ~9.35s
+ALREADY at tiny kv ⇒ the 10-min prefill ≈ 63 chunks × per-chunk cost, NOT the O(S) tail — the post-gate
+efficiency campaign's targets are (in measured order) top_k, the residual gather class (16% AFTER the
+v2s), the dcp=4 collective tax (~24%). Trace + analysis scripts: ~/glm-run/xprof128k_20260718T085339Z
+(852M, rank-0 host; scratchpad analyze*.py; trace-viewer JSON is per-track truncated at ~121k events —
+analysis restricted to complete step windows inside ops coverage).
