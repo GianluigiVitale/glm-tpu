@@ -1,54 +1,54 @@
 # GLM-5.2 → TPU v4 — /goal RESUME
 
-SOLO, FULLY AUTONOMOUS. Finish **GLM-5.2-FP8** on TPU v4. DON'T STOP/ASK until (1) it serves
-correctly, (2) HF-card benchmarks within noise, (3) the **DSA sparse kernel** clears its gates
-(passkey ≥95%@128K n≥73; throughput ≥256K). Self-correct; when unsure pick + log.
+SOLO, FULLY AUTONOMOUS. Finish **GLM-5.2-FP8** on TPU v4. DON'T STOP/ASK until (1) it serves correctly,
+(2) HF-card benchmarks within noise, (3) the **DSA sparse kernel** clears its gates (passkey ≥95%@128K
+n≥73; throughput ≥256K). Self-correct; when unsure pick + log.
 
-## STATE (root-cause hunt; RESEARCH_LOG 07-17 08:20 → 07-18 06:35)
-- Stage 1 serves; kernels silicon-validated; ✅ DENSE 128K GATE CLOSED 77/77; 12.6× campaign; safety
-  commit + ops kit landed; MTP FROZEN. Fork tip **c68794241**, synced 8×.
-- **THE ENGINE LOTTERY = SILENT WEIGHT-LOAD CORRUPTION**, ~56-60% of engine inits, per-host,
-  per-launch, contiguous-granule, NaN/Inf-or-FINITE garbage. Detection landed:
-  GLM_PWAL_NAN_CHECK (indexer params, RAISES) + **GLM_LOAD_NAN_CHECK** (full-weight on-device scan
-  at load_model tail, reject byte-dumps). ⚠ NaN-refusal is necessary NOT
-  sufficient — finite garbage is invisible (the p5 miss).
-- **ROOT-CAUSE CANDIDATE (fix in flight): the t2j ALIAS RACE** — utils.py t2j bitcast branch makes a
-  ZERO-COPY numpy view of the torch storage; JAX H2D staging is immutable-until-transfer-completes;
-  `_free_cpu_storage`/cleanup_sharding `resize_(0)` frees it mid-flight ⇒ freed/reused heap lands on
-  device. UNIFIES DSV4's never-root-caused "flaky dequant
-  crash" (~60%/build, retry-mitigated, unverified): unmapped ⇒ SIGSEGV; reused ⇒ silent garbage.
-- REFUTED: per-host binaries (fingerprints identical), PWAL copies (code map), runtime clobber
-  (timeline: born-NaN at write; "page-0" was the null block), scale-as-primary ([128,128]
-  arithmetic), streamer concurrency (A/B: 3/8 vs 6/8 — lower WORSE), F8_E8M0 (GLM ckpt has none).
-- **OWNER RULE: on any domain shift RE-READ CLAUDE.md/HANDOFF/RESEARCH_LOG/suggestions.md under the
-  new lens BEFORE building instruments** — the corpus held this root cause while six instruments
-  circled it. And dump1090: dissect ONE specimen vs reference before rate experiments.
-- DOC DEBT: HANDOFF body + CLAUDE.md Progress tail stale — pay next docs pass.
+## STATE (2026-07-18 19:30 UTC; RESEARCH_LOG 07-18 09:05→19:15)
+- Fork tip **a225d16b4** synced 8×: t2j alias fix (lottery root cause; 3/3 adversarial reviews banked)
+  + PWAL/LOAD NaN refusals + CPU stage-splitter + **GLM_LOAD_CHECKSUM** (categorical per-load byte-verify
+  cpu-vs-device at the t2j boundary — catches FINITE corruption; validation 4/4 clean, live 8 hosts,
+  verified=1882/host, 312 benign 0-d skips).
+- **THE SPARSE 128K GATE IS RUNNING**: ~/glm-run/gate128k_20260718T110127Z, n=77, PIN a225d16b4,
+  **33/33 through d=0.0/0.05/0.95** — the gate2 killer cell CLEARED (gate2's 0/11 = the lottery, not the
+  kernel). ETA ~05-07 UTC 07-19. Per-depth GCS ckpts; miss-abort at 2; HEALTH_RETRIES=8.
+  **CHECK ITS STATE FIRST (orchestrator.log + results.db) — NEVER launch pod work while it runs.**
+- **RESIDUAL SPECIMEN (hypothesis REVISED)**: d=0.05 try-1 sick engine was byte-verified CLEAN on every
+  surface (H2D checksums, PWAL/LOAD, cache dumps 0-NaN) yet FLUENT-FILLER missed a 5K needle ⇒ residual
+  ≈14%/draw is NOT H2D weight corruption. Candidates: (a) CPU-side finite corruption pre-t2j (needs GCS
+  reference-checksum manifest vs pre-t2j bytes), (b) engine-instance STATE (XLA program draw, device
+  order, KV/selection). Specimen banked: db run 193 + specimen_d005_try1/. Health probe caught it in
+  2 min (gate2 burned 10 h on the same class).
+- Xprof 128K: NO single dominator (S2 not justified); chunk ≈9.35 s at tiny kv ⇒ per-chunk cost
+  dominates prefill. Efficiency targets (post-gate): top_k 21.8%, gathers 16%, collectives ~24%.
+- Ready to land post-gate: **~/wt-sibling-alias** (4 commits: weight_utils/gpt_oss/multimodal alias
+  fixes + 0-d checksum coverage; 38 tests green). Backup bundle in GCS 07-18.
 
 ## FRONTIER (in order)
-1. **Land the t2j fix** (worktree glm-t2j-fix; its test must FAIL on pristine then PASS — the
-   proof) → adversarial review → sync 8×.
-2. **VALIDATION: ~10 init-only draws, both checks armed — corruption must collapse 56%→0.** Any residual ⇒
-   dissection specimen decides (PWAL unarmed so LOAD dumps fire; 3-way diff corrupt/clean/GCS).
-3. **RE-GATE: gate_sparse128k.sh** — update PIN to the fix tip + add GLM_LOAD_NAN_CHECK=1 to its
-   RAYLET_ENVS (health probe + refusing loads + fixed loader = triple protection). n=77, mechanism
-   depths first, miss-abort at 2, per-depth ckpts, ONE miss ⇒ extend n≈130.
-4. 256K A/B at IDENTICAL dcp; fp8-KV after its dcp=1 needle. 5. GSM8K n≥200; GPQA@16K (owner-gated); MTP
-   unfreezes; PR re-cut (+ upstream the t2j fix — bites every tpu-inference user).
+1. **Gate verdict**: PASS 77/77 ⇒ bank + DSA 128K gate CLOSED (update all docs). ONE miss ⇒ extend
+   n≈130. 2-miss abort ⇒ forensics from the armed instruments + the specimen, never rate experiments.
+2. **256K**: fit/geometry probe (dcp=8 deferred to this stage; novel geometry = cold compile ~40 min),
+   correctness needles, then sparse-vs-dense throughput A/B at IDENTICAL dcp.
+3. Land sibling-alias; draft the t2j-fix upstream PR (owner submits).
+4. Residual hunt FROM THE SPECIMEN: (a) CPU reference checksums or (b) engine-state instruments.
+5. Benchmarks: GSM8K n≥200, GPQA-198@16K (owner-gated), fp8-KV dcp=1 needle, MTP unfreeze, PR re-cut.
 
 ## HARD RULES
-COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach pre-authorized (§COST)
-if local weights become the fix. METHOD: observability-first; fix root cause; gated + CPU test +
-adversarial review + pod validation; honest nulls. SMALL-n never a gate. COMMIT+PUSH every
-milestone. Agents: worktrees, JAX_PLATFORMS=cpu, never git on worker checkouts. Owner submits PRs.
+COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach to the 8 hosts
+pre-authorized. METHOD: observability-first; **corpus-first re-read on any domain shift**; fix root
+cause; gated + CPU test + adversarial review + pod validation; honest nulls; small-n never a gate.
+COMMIT+PUSH every milestone. Agents: worktrees, JAX_PLATFORMS=cpu, read-only on the fork. Serialize TPU
+access. Owner submits PRs; no force-push (follow-up commits only).
 
 ## READ FIRST
-HANDOFF.md → RESEARCH_LOG 07-17 08:20 on → docs/11 §8. Verify 8× fork tip on all hosts.
+HANDOFF.md → RESEARCH_LOG 07-18 09:05 on → the gate orchestrator.log. Verify 8× a225d16b4.
 
 ## LANDMINES
-Sync verify 8× ALWAYS (partial syncs ×2 — clear stale index.lock + re-pull). moe-tpu bucket mirror is
-DEAD-STALE — corpus searches use the GitHub origin. RAY_DEDUP_LOGS=0 on forensic runs (dedup destroys
-digit-bearing evidence). Armed PWAL raise PREEMPTS the LOAD census+dumps. Poisoned dump tars compress
-~150:1 (instant triage). Firewall tag orphans on pod recreation. Disk: w-0 baseline incl. scratch.
-Scatter bakes per-path (dense pageloop STAYS; DSA flat unset). GLM_* raylet-baked AND driver-exported.
-setsid --wait. "PASS" greps match hlo_passes.cc. Init geometry must match the warm XLA cache.
+**THIS VM IS POD WORKER-0** — a `--worker=all` git command mutates the LOCAL checkout too. `ls -td
+~/glm-run/gate128k_*` races gate128k_outer.log — use the explicit run-dir name. Sync verify 8× ALWAYS
+(stale index.lock ⇒ rm + re-pull). RAY_DEDUP_LOGS=0 on forensics. Armed PWAL raise preempts LOAD
+census. Init geometry must match the warm XLA cache (novel = ~40 min compile). setsid --wait; pkill
+patterns paren-free. "PASS" greps match hlo_passes.cc. GLM_* raylet-baked AND driver-exported. Scatter
+bakes per-path (dense pageloop STAYS; DSA flat unset). Disk: w-0 baseline includes scratch; archive+purge
+per draw. Poisoned dump tars compress ~150:1. Firewall tag orphans on pod recreation (memory:
+glm-pod-worker0-vm-identity).
