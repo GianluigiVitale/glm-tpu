@@ -10,15 +10,13 @@ n≥73; throughput ≥256K). Self-correct; when unsure pick + log.
   cpu-vs-device at the t2j boundary — catches FINITE corruption; validation 4/4 clean, live 8 hosts,
   verified=1882/host, 312 benign 0-d skips).
 - **THE SPARSE 128K GATE IS RUNNING**: ~/glm-run/gate128k_20260718T110127Z, n=77, PIN a225d16b4,
-  **33/33 through d=0.0/0.05/0.95** — the gate2 killer cell CLEARED (gate2's 0/11 = the lottery, not the
-  kernel). ETA ~05-07 UTC 07-19. Per-depth GCS ckpts; miss-abort at 2; HEALTH_RETRIES=8.
+  **33/33 through d=0.0/0.05/0.95** — the gate2 killer cell CLEARED (gate2's 0/11 WAS the lottery). ETA ~05-07 UTC 07-19. Per-depth GCS ckpts; miss-abort at 2; HEALTH_RETRIES=8.
   **CHECK ITS STATE FIRST (orchestrator.log + results.db) — NEVER launch pod work while it runs.**
 - **RESIDUAL SPECIMEN (hypothesis REVISED)**: d=0.05 try-1 sick engine was byte-verified CLEAN on every
   surface (H2D checksums, PWAL/LOAD, cache dumps 0-NaN) yet FLUENT-FILLER missed a 5K needle ⇒ residual
   ≈14%/draw is NOT H2D weight corruption. Candidates: (a) CPU-side finite corruption pre-t2j (needs GCS
   reference-checksum manifest vs pre-t2j bytes), (b) engine-instance STATE (XLA program draw, device
-  order, KV/selection). Specimen banked: db run 193 + specimen_d005_try1/. Health probe caught it in
-  2 min (gate2 burned 10 h on the same class).
+  order, KV/selection). Specimen banked: db run 193 + specimen_d005_try1/. Health probe caught it in 2 min.
 - Xprof 128K: NO single dominator (S2 not justified); chunk ≈9.35 s at tiny kv ⇒ per-chunk cost
   dominates prefill. Efficiency targets (post-gate): top_k 21.8%, gathers 16%, collectives ~24%.
 - Ready to land post-gate: **~/wt-sibling-alias** (4 commits: weight_utils/gpt_oss/multimodal alias
@@ -50,5 +48,4 @@ HANDOFF.md → RESEARCH_LOG 07-18 09:05 on → the gate orchestrator.log. Verify
 census. Init geometry must match the warm XLA cache (novel = ~40 min compile). setsid --wait; pkill
 patterns paren-free. "PASS" greps match hlo_passes.cc. GLM_* raylet-baked AND driver-exported. Scatter
 bakes per-path (dense pageloop STAYS; DSA flat unset). Disk: w-0 baseline includes scratch; archive+purge
-per draw. Poisoned dump tars compress ~150:1. Firewall tag orphans on pod recreation (memory:
-glm-pod-worker0-vm-identity).
+per draw. Dump tars compress ~150:1. Firewall tag orphans on pod recreation.
