@@ -2997,3 +2997,14 @@ branch pointer was checked out; no loss — both pointers same commit; -next re-
 flight; 4/4 CLEAN ⇒ LAUNCH THE GATE (a false-positive-free instrument + per-engine categorical
 byte-verification answers review 2/3's blocker: every gate engine is PROVEN byte-clean at load, so a
 miss is attributable to the model).
+
+## 2026-07-18 11:05 — VALIDATION 4/4 CLEAN (full stack armed) ⇒ THE SPARSE 128K GATE LAUNCHES
+
+loader_ab 4 inits, all CLEAN: PWAL + LOAD NaN + GLM_LOAD_CHECKSUM armed; every draw 8×
+"SUMMARY verified=1882 mismatches=0 skipped=312" (the benign 0-d-scalar class). Zero false positives in
+~60K verified tensor-checksums/draw ×4; zero corruption of ANY class (NaN or finite) in 4 draws
+(~23 min/draw — the checksum adds ~load-pass cost, acceptable). The gate no longer leans on a rate
+estimate: each depth's engine is individually PROVEN byte-clean at load (categorical), retries absorb
+whatever the true rate is (8 available). LAUNCHING gate_sparse128k.sh @ PIN a225d16b4: n=77 (7 depths ×
+11 trials), mechanism depths first, miss-abort at 2, per-depth GCS checkpoints, health probe + triple
+refusing checks per engine. Expected ~15-17h (~9.4s/chunk × 63 chunks prefill + 11 needles per depth).
