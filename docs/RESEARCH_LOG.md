@@ -2871,3 +2871,18 @@ rate, the corruption is PRE-t2j (streamer writing the CPU tensor wrong) — then
 specimen + the §COST-pre-authorized local-disk fallback are the path.** Formal adversarial review of
 the fix is queued BEFORE the re-gate (validation-first is the stronger test; noted as a deliberate
 sequencing call). Validation: loader_ab.sh single-arm, 10 draws, both checks armed, PIN 629c20e84.
+
+## 2026-07-18 08:50 — VALIDATION VERDICT: the t2j fix did NOT collapse the rate (draw 3/3 CORRUPT at tip 629c20e84) ⇒ the corruption is PRE-t2j
+
+Post-fix validation (10 planned, stopped at 3 — verdict in hand): CLEAN, CLEAN, CORRUPT (PWAL flag,
+engine refused). A zero-rate fix cannot produce a corrupt draw ⇒ **the t2j alias race was NOT the
+(only) mechanism — corruption enters BEFORE the JAX handoff**, exactly the fix agent's adversarial
+fallback ("pre-t2j: the streamer writing the CPU param itself; no t2j copy can fix that"). The t2j
+fix STAYS (alias contract = correct hygiene; its 3-fail→10-pass proof stands). Honest ledger: the
+race hypothesis moves to REFUTED-AS-PRIMARY.
+NEXT (the stage-splitter, then dump1090): GLM_CPU_LOAD_NAN_CHECK (agent building) — scan the torch
+CPU tensor pre-handoff, non-raising, alongside the armed device-side LOAD check in ONE engine:
+CPU-flagged + device-flagged ⇒ streamer/CPU-stage guilty ⇒ **the §COST-pre-authorized local-disk
+fallback becomes the fix** (copy once verified, load locally, delete the streamer from the path);
+CPU-clean + device-flagged ⇒ H2D/staging or device-side ⇒ dissection byte-dumps decide. One corrupt
+draw with both instruments = the definitive stage verdict.
