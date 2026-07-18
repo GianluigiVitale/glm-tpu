@@ -2835,3 +2835,14 @@ the story lived only on the GitHub origin, recovered by fresh clone):
   cron died with the old VM) — corpus searches must use the GitHub origin.
 The t2j fix build (deterministic must-fail-first test) is in flight; on land: sync 8× → init-draw
 validation (rate must collapse ~60%→0) → dissection specimen as byte confirmation → re-gate.
+
+## 2026-07-18 06:35 — A/B COMPLETE: concurrency EXONERATED (c=32: 3/8 corrupt; c=8: 6/8 corrupt — lower is WORSE, n.s. at n=8/arm)
+
+16 alternating init-only draws, both integrity checks armed: overall 9/16 corrupt (56% — matches
+DSV4's historical ~60%). RUNAI_STREAMER_CONCURRENCY is not a fix lever; the inverse trend (longer
+low-concurrency loads corrupt MORE) is mildly consistent with the t2j alias-race candidate (longer
+transfer windows = wider race exposure). The streamer-race hypothesis joins the refuted pile
+(binaries, PWAL copies, scale-locus-as-primary, runtime clobber, concurrency). Standing candidate:
+the t2j zero-copy alias × resize_(0) × async-H2D race (05:30 entry) — fix build in flight with the
+deterministic must-fail-first test. F8_E8M0 audit item CLOSED as non-issue (patch DSV4-gated but the
+GLM checkpoint carries only BF16/F8_E4M3/F32 — no E8M0 tensors exist to mis-map).
