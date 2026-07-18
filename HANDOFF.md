@@ -8,9 +8,12 @@ combo-matrix suite (F8 closed), dense scatter-impl loud refusal, and the in-repo
 depth-INFRA taint + per-depth checkpoints). **The discriminator was REDESIGNED by its own review**:
 20 SCRAMBLED draws (scrambler engine before each counted probe — identical back-to-back engines mask
 the never-written class via stale≈fresh HBM), disk-tainted misses never counted, dumps over all 21
-indexer k-cache slots. **Next pod action: `bash ~/glm-tpu/scripts/probe_lottery.sh`.** Prior context
-(07-16): VM lost + fully recovered; gate2 died at d=0.95 0/11, lottery hypothesis confounded by the
-w-4 disk incident — UNRESOLVED, the probe run decides. **MTP stays FROZEN.**
+indexer k-cache slots. **UPDATE 07-17 19:10: the discriminator RAN and the lottery is SOLVED-IN-CLASS** — 4/6 scrambled
+draws missed; six instruments later the root cause class is the PER-HOST WEIGHT LOAD (runai stream +
+fp8 dequant silently delivering NaN/Inf tensors, caught at engine init by GLM_PWAL_NAN_CHECK on a
+missing engine; fork tip 34d2eef37 synced 8×). Full arc: RESEARCH_LOG 07-17 08:20→19:10. **Next:
+make armed engines REFUSE corrupt loads + widen the init scan to all weights → loader fix hunt →
+re-gate via gate_sparse128k.sh (health probe + refusing loads). MTP stays FROZEN.**
 
 **Honest claim line:** *first public DSA kernel on TPU — selected-set-exact on silicon; dense 128K gate
 CLOSED 77/77 (run 124, Wilson LB 95.3%); sparse correct at 128K on the mechanism cells (4/4 exact, twice:
