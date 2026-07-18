@@ -27,7 +27,7 @@ TAG=hunt_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
 GCS_DUMPS=gs://driftbench-dsv4-uc/dumps/$TAG
 MAX_DRAWS="${MAX_DRAWS:-10}"
-LADDER_TIMEOUT_S="${LADDER_TIMEOUT_S:-7200}"
+LADDER_TIMEOUT_S="${LADDER_TIMEOUT_S:-12600}"  # 32K-at-gate-geometry cold compile can eat >1h on the first serving draw
 DUMP_PREFIX=/tmp/dcp_hunt
 DUMP_LAYERS="0,1,2,4,9,14,19,24,29,34,39,44,49,54,59,64,69,74,79,84,89,94"
 
