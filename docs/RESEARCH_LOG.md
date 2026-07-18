@@ -3028,3 +3028,10 @@ order permutation, KV/selection path state. Note DSV4's crash-flavor WAS t2j (re
 GLM residual may be a DIFFERENT mechanism than the (now-fixed) alias race. Draw stats today: 1 sick /
 7 engine draws ≈ 14%, consistent with the ~11% point estimate. Post-gate hunt now starts from this
 specimen, not from rate experiments (dump1090 doctrine). Gate continues.
+
+## 2026-07-18 19:15 — GATE d=0.95 CLEARED 11/11 (the gate2 killer cell) — 33/33 at halfway
+
+Mechanism depths 0.0/0.05/0.95 all 11/11 (33/33 needles, 0 miss). d=0.95 — gate2's 0/11 death cell —
+clears clean on a byte-verified, health-probed engine: retroactive confirmation that gate2's 0/11 was an
+ENGINE-INSTANCE failure (the lottery), never a kernel/selection defect at deep positions. d=1.0 engine
+launching. Remaining: 1.0, 0.25, 0.5, 0.75 (~7h).
