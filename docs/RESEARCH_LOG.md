@@ -2854,3 +2854,20 @@ hypotheses ledger, the corpus-first owner rule, the validation→re-gate frontie
 the final 1-char trim was amended onto an already-pushed commit and FORCE-PUSHED (fc0f044 over
 8d8970c) — breaking the absolute "No force-push" rule. Damage nil (own commit, 2 min old, same
 content, no consumers), but the rule is the rule: never amend-after-push; follow-up commits only.
+
+## 2026-07-18 08:05 — THE t2j FIX LANDED (629c20e84, synced 8× first pass); validation draws launching
+
+Fix (1069b8da cherry-picked): eager real copy in BOTH t2j branches (bitcast: np.array(...,copy=True);
+torchax fallback: detach().clone()) + 4 direct-torchax-import bypasses routed through the wrapper +
+the alias-free handoff INVARIANT asserted by tests/test_t2j_no_alias.py — **3 boundary-alias failures
+on pristine c68794241 → 10/10 with the fix** (the must-fail-first proof). 262 regression tests:
+failure sets byte-identical to pristine (all pre-existing TPU-only classes). wk's real path (stock
+UnquantizedLinearMethod → shard_model_to_tpu catch-all → the bf16 bitcast branch) confirmed covered.
+HONEST CAVEATS (the agent's adversarial pass): on this exact stack three ACCIDENTAL protections
+(torch 2.10 raises on numpy-exported resize_(0); eager CPU staging; PJRT ref retention) mean the
+literal resize×DMA story survives only in its TPU H2D-STAGING-WINDOW form (unverifiable from CPU) —
+the fix replaces accidents with a contract either way. **If the validation draws do NOT collapse the
+rate, the corruption is PRE-t2j (streamer writing the CPU tensor wrong) — then the dissection
+specimen + the §COST-pre-authorized local-disk fallback are the path.** Formal adversarial review of
+the fix is queued BEFORE the re-gate (validation-first is the stronger test; noted as a deliberate
+sequencing call). Validation: loader_ab.sh single-arm, 10 draws, both checks armed, PIN 629c20e84.
