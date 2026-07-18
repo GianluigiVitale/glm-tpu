@@ -3035,3 +3035,15 @@ Mechanism depths 0.0/0.05/0.95 all 11/11 (33/33 needles, 0 miss). d=0.95 — gat
 clears clean on a byte-verified, health-probed engine: retroactive confirmation that gate2's 0/11 was an
 ENGINE-INSTANCE failure (the lottery), never a kernel/selection defect at deep positions. d=1.0 engine
 launching. Remaining: 1.0, 0.25, 0.5, 0.75 (~7h).
+
+## 2026-07-18 20:15 — GATE MISS #1 (d=1.0 t=0): the state-class signature, mid-depth, on a health-probed engine
+
+d=1.0 trial 0: pred=None, 20 gen tokens, RAW = " 0.0'm I. The grass is green. The sky is blue. The
+sun is" (db run 199) — garbled-start-then-FLUENT-FILLER, the same signature as the banked specimen
+(db 193) and gate2's d=0.95 deaths. This engine passed its health probe (5K needle + 8× NaN scan) at
+19:39, ~30 min before the miss; its load was byte-verified (checksum armed). Gate protocol: continue;
+abort at miss #2. DIAGNOSTIC FORK (next ~20 min): t=1 miss ⇒ engine-level expression (gate2's 0/11
+pattern) — gate aborts with TWO same-class specimens and the hunt begins with the gate needles as
+evidence; t=1+ pass ⇒ INTERMITTENT PER-REQUEST expression — a NEW signature pointing at request-level
+state (scheduler/KV-block reuse; APC is off). Both specimens so far were the FIRST post-probe request
+of their engine. Per-needle monitor armed on depth_1.0.log.
