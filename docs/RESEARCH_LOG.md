@@ -2886,3 +2886,20 @@ CPU-flagged + device-flagged ⇒ streamer/CPU-stage guilty ⇒ **the §COST-pre-
 fallback becomes the fix** (copy once verified, load locally, delete the streamer from the path);
 CPU-clean + device-flagged ⇒ H2D/staging or device-side ⇒ dissection byte-dumps decide. One corrupt
 draw with both instruments = the definitive stage verdict.
+
+## 2026-07-18 09:00 — REVISED VERDICT: the t2j fix collapsed MOST of the corruption (post-fix 1/9 corrupt vs pre-fix 9/16; p≈0.04); a ~10% residual remains; GATE PATH IS OPEN
+
+Dissection loop: 6/6 CLEAN (CPU-side pre-t2j scan flagged NOTHING — the CPU tensors were clean on
+every draw). Aggregate at the fix tip across validation+dissection: **8 clean / 1 corrupt (11%) vs
+9/16 (56%) pre-fix — Fisher p≈0.036.** My draw-3 "fix did not work" call was the pre-registered
+must-be-zero rule doing its job, but the fuller data says: **the t2j alias race WAS a real mechanism
+(most of the rate); a residual (~10%) second mechanism remains** (possibly PWAL-armed timing in the
+validation config, possibly a rarer race elsewhere in the load chain). CPU-side clean on all
+instrumented draws also means the residual is NOT streamer-writes-bad-CPU-bytes on these draws.
+DECISION (goal-aligned): the gate's protections absorb a 10% bad-engine rate trivially (health probe
++ refusing checks ⇒ E[retries/depth]≈0.1; no corrupt engine can serve a needle). PROCEED TO THE GATE:
+(1) xprof measurement needle first (~40 min, owner-prompted decision-by-profile: act only on a ≥40%
+single dominator whose fix is the already-written S2 pallas scorer); (2) gate_sparse128k.sh with PIN
+04507ba1d + GLM_LOAD_NAN_CHECK=1 + GLM_PWAL_NAN_CHECK=1 added to its RAYLET_ENVS (quadruple
+protection: probe + both refusing checks + mostly-fixed loader). Residual-mechanism hunt + the
+zero-cost gcsfuse Plan A (legacy ~/gcs-models precedent) queue BEHIND the gate.
