@@ -3047,3 +3047,27 @@ pattern) — gate aborts with TWO same-class specimens and the hunt begins with 
 evidence; t=1+ pass ⇒ INTERMITTENT PER-REQUEST expression — a NEW signature pointing at request-level
 state (scheduler/KV-block reuse; APC is off). Both specimens so far were the FIRST post-probe request
 of their engine. Per-needle monitor armed on depth_1.0.log.
+
+## 2026-07-18 20:30 — ❌ GATE3 DEAD AT 33/35: d=1.0 0/2 then miss-abort — THE RESIDUAL IS AN ENGINE-STATE CLASS (weights categorically exonerated)
+
+VERDICT (honest, no laundering): gate128k_20260718T110127Z aborted at miss #2 per the pre-committed
+protocol. 33 correct / 2 miss / 42 unrun. Depths 0.0, 0.05, 0.95 = 33/33; d=1.0 = 0/2 on ONE engine
+(t0 gold=891482, t1 gold=208797, both pred=None, ~20 gen tokens, garbled-start+fluent-filler; db runs
+199). THE DECISIVE FACT: that engine's load was BYTE-VERIFIED (GLM_LOAD_CHECKSUM 8×, PWAL/LOAD clean)
+and it PASSED its 5K health probe + NaN cache scan 30 min before failing 128K 2/2 ⇒ the failure class
+is per-ENGINE-INSTANCE, weight-independent, LENGTH-DEPENDENT (5K good, 128K bad), depth-agnostic-deep
+(gate2 died at 0.95, gate3 at 1.0, sibling engines aced both).
+LEADING HYPOTHESIS (to be tested corpus-first, NOT instrument-first): a dcp STRIPE/DEVICE-ORDER fault
+drawn at engine init — a wrong device/mesh order on ≥1 host corrupts contexts long enough to read that
+host's KV stripe (128K touches all stripes; a 5K probe may never touch the bad one) — the DSV4
+worker-race family (docs/15), which would also explain the health probe's blindness, clean NaN scans
+(valid numbers from WRONG positions), and gate2's 22/22→0/11 arc. Miss dumps archived:
+gs://driftbench-dsv4-uc/dumps/gate128k_20260718T110127Z/depth_1.0_MISS/ (healthy depths purged
+unarchived — no healthy baseline dump; fix the archiver to archive healthy FINAL depth dumps too).
+SPECIMEN LOSS LESSON: the sick engine died with the depth driver at abort (engine lives in the driver
+process tree) — the next gate's abort path should FREEZE the engine (kill -STOP the driver) for live
+forensics instead of killing it. pkill landmine variant: pkill -f from the interactive shell matches
+the shell's OWN eval line (self-kill, exit 144) — use pkill -f with a pattern excluding self or pgrep
+first. NEXT: (1) miss-dump triage (compression + structure); (2) CORPUS RE-READ under the
+engine-state/stripe-order lens (docs/15, docs/10, docs/05, discriminator-era log entries, suggestions);
+(3) instrument decision AFTER the re-read; (4) fresh gate only when sick engines are DETECTABLE pre-depth.
