@@ -2768,3 +2768,21 @@ routing around the indexer never matches.
 LAUNCHING: scripts/loader_ab.sh (concurrency 32-vs-8, n=8/arm, init-only, both checks armed,
 RAY_DEDUP_LOGS=0) — the streamer-race discriminator. NOTE the scan's honest limit: finite corruption
 is invisible; a clean scan is a NON-FINITE-integrity pass only.
+
+## 2026-07-18 04:20 — Owner course-correction: re-read suggestions.md IN FULL — the dump1090 lesson jumps the queue (per-failure dissection > rate experiments)
+
+Owner pushback (deserved): we cited the doctrine while under-using two of its limbs. (1) READ THE
+CORPUS FIRST — the "flaky dequant crash (DSV4 hit it too)" breadcrumb sat in CLAUDE.md before six
+instruments were built; a 6-searcher prior-art sweep is now running (incl. the indexers_proj
+config-name-mismatch lead: quant routing resolved by a name that does not exist in the weight map —
+possibly a wrong load path ONLY indexer tensors take, which would explain wk's over-representation).
+(2) THE dump1090 MOVE — when a packet fails, dump THAT packet and dissect it against the known-good
+baseline. We measured RATES (the A/B: concurrency exonerated, ~60% of inits corrupt at BOTH arms)
+without ever byte-comparing ONE corrupt tensor to its truth. The reference is free: the same tensor
+clean on sibling hosts of the SAME engine + the immutable GCS bytes.
+**PLAN CHANGE — next pod action = THE DISSECTION RUN:** one corrupt draw with PWAL deferred (so the
+full census + reject byte-dumps fire), then immediately collect (i) the corrupt tensor's device-state
+bytes from the flagged host, (ii) its twin from a clean host, (iii) the corresponding GCS byte range;
+three-way diff. Outcome decides the component in ONE specimen: stream-range garbage (contiguous
+mismatch vs GCS) / dequant-ruined (codes match GCS, output wrong) / host-device-stage stomp (host
+copy clean, device copy corrupt) — with offset/alignment as the component fingerprint.
