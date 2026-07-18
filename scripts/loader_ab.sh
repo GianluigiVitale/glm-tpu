@@ -24,9 +24,9 @@ RUN_DIR=~/glm-run/loader_ab_$(date -u +%Y%m%dT%H%M%SZ)
 N_PER_ARM=8
 ARMS="32,8"
 INIT_TIMEOUT_S="${INIT_TIMEOUT_S:-1800}"
-PIN="${PIN:-629c20e84}"   # override after the load-check lands
+PIN="${PIN:-a225d16b4}"
 
-BASE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 RAY_DEDUP_LOGS=0 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+BASE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 RAY_DEDUP_LOGS=0 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -35,7 +35,7 @@ GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 \
 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla \
 GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned \
 GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 \
-GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_EXPECT_CODE_HASH=$PIN"
+GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_EXPECT_CODE_HASH=$PIN"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -98,8 +98,8 @@ print('INIT_OK')
       [ "$waited" -ge "$INIT_TIMEOUT_S" ] && { pkill -f "loader-ab init" 2>/dev/null; break; }
     done
     wait "$W" 2>/dev/null
-    FLAGS=$(grep -cE "GLM_PWAL_NAN_CHECK.*(NaN|Inf)|GLM_LOAD_NAN_CHECK.*(NaN|Inf|non-finite)" "$LOG" || true)
-    if [ "${FLAGS:-0}" -gt 0 ] || grep -qE "PwalNanCheckError|LoadNanCheckError" "$LOG"; then
+    FLAGS=$(grep -cE "GLM_PWAL_NAN_CHECK.*(NaN|Inf)|GLM_LOAD_NAN_CHECK.*(NaN|Inf|non-finite)|GLM_LOAD_CHECKSUM.*diverged" "$LOG" || true)
+    if [ "${FLAGS:-0}" -gt 0 ] || grep -qE "PwalNanCheckError|LoadNanCheckError|LoadChecksumError" "$LOG"; then
       V=CORRUPT
     elif grep -q "INIT_OK" "$LOG"; then V=CLEAN
     elif [ "$waited" -ge "$INIT_TIMEOUT_S" ]; then V=INFRA; FLAGS=timeout
