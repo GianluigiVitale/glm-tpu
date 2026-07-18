@@ -2903,3 +2903,20 @@ single dominator whose fix is the already-written S2 pallas scorer); (2) gate_sp
 04507ba1d + GLM_LOAD_NAN_CHECK=1 + GLM_PWAL_NAN_CHECK=1 added to its RAYLET_ENVS (quadruple
 protection: probe + both refusing checks + mostly-fixed loader). Residual-mechanism hunt + the
 zero-cost gcsfuse Plan A (legacy ~/gcs-models precedent) queue BEHIND the gate.
+
+## 2026-07-18 09:05 — ADVERSARIAL REVIEW 1/3 (t2j fix): SAFE-FOR-GATE on the GLM path; scope claim REFUTED
+
+Reviewer verdict on 629c20e84: the GLM-5.2 vLLM load chain is genuinely severed (np.array copy=True
+correct — asarray would NOT copy; fallback clone private; all 4 import-bypasses rerouted and verified;
+bit-exact incl. fp8 round-trip; no OOM/latency regression; the handoff-alias test is genuine proof —
+monkeypatched jnp ingress + pointer-span overlap vs the pre-captured torch storage span; 10/10 pass).
+REFUTED: "whole class closed at its single source" — 4+ sibling staging sites still alias: models/jax/
+utils/weight_utils.py:132 convert_torch_to_jax_with_view (the DSV4/llama4 NATIVE-JAX loader — honest
+correction: DSV4's flaky-dequant crash would live THERE, not in t2j itself; same class, different site),
+gpt_oss.py:496/500, runner/multimodal_manager.py:23/66 (raw torchax t2j survives — the commit fixed the
+OTHER multimodal helper), Pathways fp32 device_put branches (unquantized.py:150, cleanup_sharding.py:129).
+NONE are on the GLM-5.2 text-only vLLM path ⇒ PIN 04507ba1d stands for the gate. MINOR: isort violation
+flash_attn.py:19 (would bounce upstream lint). QUEUED post-gate: copy-discipline for weight_utils/
+gpt_oss/multimodal_manager + isort fix, then the upstream PR cut. Implication for the ~10% residual: the
+reviewer found OUR path fully severed ⇒ the residual mechanism is NOT an unfixed sibling site on this
+path — the residual hunt (queued behind the gate) still lacks a candidate.
