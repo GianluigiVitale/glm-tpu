@@ -140,7 +140,7 @@ PY' 2>/dev/null)
 }
 
 TOTAL_MISS=0
-HEALTH_RETRIES="${HEALTH_RETRIES:-5}"
+HEALTH_RETRIES="${HEALTH_RETRIES:-8}"
 IFS=',' read -ra DEPTH_ARR <<< "$DEPTHS"
 for d in "${DEPTH_ARR[@]}"; do
   LOG="$RUN_DIR/depth_${d}.log"
