@@ -2708,3 +2708,20 @@ specimen archive (probe3_MISS, full timeline) banked in GCS for the page-0 recon
 The instrument chain that got here, for the record: scrambled discriminator → byte-diff → NaN census
 → slot localization → host-log fingerprint forensics (binaries exonerated) → code-path map (PWAL
 copies exonerated) → init-time param scan = the load path. Observability-first, six instruments deep.
+
+## 2026-07-18 06:40 — Loader-fix recon: the streamer has NO integrity layer; the NaN counts are 128-MULTIPLES ⇒ corrupt SCALE tensors amplified by dequant
+
+Two findings while the refuse-corrupt-loads build runs:
+(1) **runai_model_streamer has ZERO integrity machinery** — no checksum/CRC/verify/retry anywhere in
+the installed library (env surface: DIST*/LOG_LEVEL/MEMORY_LIMIT/PARTITION_POLICY only). Silent
+corruption passes straight through ⇒ the fork-side init scan + refuse is effectively THE integrity
+layer; the "loader fix" is detect→refuse→relaunch (plus possibly per-tensor reload) — there is no
+upstream knob to turn.
+(2) **The PWAL NaN/Inf counts are exact multiples of 128** (layer0 wk: 640+640=1280 = 10 blocks;
+layer1: 1331+205=1536 = 12 blocks) — the fp8 block-128 dequant amplifies ONE corrupt f32 scale
+element into a whole 128-block of non-finite weights. The corrupt loaded bytes are most likely in
+the TINY weight_scale_inv tensors, not the big fp8 code tensors — which also explains rarity ×
+severity (few corrupt bytes, massive blast radius) and possibly generation-A's whole-buffer
+poison (a corrupt scale in a hotter tensor). The widened GLM_LOAD_NAN_CHECK scans scale tensors
+explicitly + dumps offenders on refusal for byte-level analysis (streamer-chunk-boundary vs
+dequant-math discrimination).
