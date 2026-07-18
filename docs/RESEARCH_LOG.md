@@ -3105,3 +3105,24 @@ d=0.95 clean (different garbage draw). NEXT: corpus re-read verdict (agent in fl
 docs/01/W2.1 dead-tail design + its CPU-proof coverage at partial final chunks, discriminator entries)
 → then a CPU test at the EXACT miss geometry (prompt_tok=127363, d=1.0, chunk 2048, owned+v2s, dcp=4)
 hunting the deterministic defect — a CPU repro would decide WITHOUT burning a single pod draw.
+
+## 2026-07-18 21:35 — CORPUS VERDICT (agent, full report banked): H1 = pageloop-family READ-side lowering fault; hunt orchestrator built
+
+Corpus re-read verdict: docs/15's worker-race is a HALT class — poor fit, DOWNGRADED. The direct hit is
+docs/upstream/pageloop-v4-sublane-drop-REPORT.md — near-ISOMORPHIC to the residual (per-executable,
+silent, byte-clean, NaN-clean, holes=inherited HBM, "run A striped run B clean — only difference is
+inherited HBM state", accuracy-check-invisible, identical coords all 8 hosts ⇒ no replica rescue). Its
+own caveat: only the primary WRITE owner-scatter got the flat+scrambler validation; the DSA READ-side
+donated dcp-striped ops never did — F2 suspect sparse_mla_kernel.py:610 (donated-cache payload gather in
+the attend lax.map) named 07-13, never metal-isolated. H2 (actor-order mesh mismatch) second: round4-
+ep-filter.md:40 "all 8 hosts construct identical global meshes … unproven"; GLM_DCP_ASSERT_SHARDING
+(Guard 1) is the free tripwire and was NEVER armed in any gate. H3 (true selection-quality miss)
+near-refuted (siblings 11/11 at the same depths). Corpus gaps: no scrambler byte-diff nor content-dump
+comparison has EVER run against the byte-clean residual; no healthy-baseline dump exists.
+BUILT: scripts/hunt_residual.sh — each draw = one engine serving the 5K/32K/128K × d0.5/1.0 ladder
+(fixed seed ⇒ byte-diffable across engines) with 22-slot content dumps + Guard1+Guard2 + full integrity
+stack armed; NO health probe (sick engines must SERVE), NO scrambler (gate3 drew sick without one —
+launches differ in HBM history naturally); dumps archived EVERY draw incl. healthy baselines; early-stop
+at ≥1 sick + ≥1 healthy. Classifier: guard trip ⇒ H2 signature; clean-guards miss ⇒ H1; ladder profile
+gives per-engine length-dependence. Offline decider: runner/dcp_cache_diff.py sick-vs-healthy at matched
+cells — differing coords at never-written pages ⇒ H1 confirmed + localized.
