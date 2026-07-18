@@ -1,28 +1,30 @@
 # HANDOFF — GLM-5.2 on TPU v4 (read this first, every new chat)
 
-**Updated:** 2026-07-17 — **THE SAFETY/OPS-DEBT COMMIT IS LANDED** (fork tip **845f4ffeb**, synced 8×,
-adversarially reviewed — 6 lenses, 2 BLOCKER + 8 MAJOR fixed; RESEARCH_LOG 07-17 04:15): F6 headsplit
-refusals + docstring truth, the GLM_WRITE_PROBE startup sentinel (both row widths), the permanent
-combo-matrix suite (F8 closed), dense scatter-impl loud refusal, and the in-repo ops kit
-(disk_watchdog / dump_archiver / probe_lottery / gate_sparse128k — F4 single-env-source + miss-abort +
-depth-INFRA taint + per-depth checkpoints). **The discriminator was REDESIGNED by its own review**:
-20 SCRAMBLED draws (scrambler engine before each counted probe — identical back-to-back engines mask
-the never-written class via stale≈fresh HBM), disk-tainted misses never counted, dumps over all 21
-indexer k-cache slots. **UPDATE 07-17 19:10: the discriminator RAN and the lottery is SOLVED-IN-CLASS** — 4/6 scrambled
-draws missed; six instruments later the root cause class is the PER-HOST WEIGHT LOAD (runai stream +
-fp8 dequant silently delivering NaN/Inf tensors, caught at engine init by GLM_PWAL_NAN_CHECK on a
-missing engine; fork tip 34d2eef37 synced 8×). Full arc: RESEARCH_LOG 07-17 08:20→19:10. **Next:
-make armed engines REFUSE corrupt loads + widen the init scan to all weights → loader fix hunt →
-re-gate via gate_sparse128k.sh (health probe + refusing loads). MTP stays FROZEN.**
+**Updated:** 2026-07-18 19:45 UTC — **THE SPARSE 128K GATE IS RUNNING AND WINNING** (run dir
+`~/glm-run/gate128k_20260718T110127Z`, n=77, PIN **a225d16b4**, **33/33 through d=0.0/0.05/0.95** — the
+gate2 killer cell CLEARED 11/11; verdict ETA ~05-07 UTC 07-19). **CHECK ITS STATE FIRST (its
+orchestrator.log + results.db); NEVER launch pod work while it runs.** The full 07-18 arc
+(RESEARCH_LOG 09:05→19:15): t2j alias fix adversarially reviewed 3/3 (SAFE on the GLM path; scope
+claim refuted — sibling sites parked on `~/wt-sibling-alias`, 4 commits, 38 tests green, land
+post-gate); the stats review REFUTED the "~10% residual, gate open" claim (pooled-detector confound;
+all protections were NaN-only) ⇒ built **GLM_LOAD_CHECKSUM** (categorical cpu-vs-device byte-verify of
+every t2j-staged tensor at load tail, raises on mismatch — catches FINITE corruption; validation 4/4
+clean, live on 8 hosts, verified=1882/host, 312 benign 0-d skips); xprof 128K needle: NO ≥40% dominator
+(S2 pallas scorer NOT justified; chunk ≈9.35s at tiny kv ⇒ per-chunk cost dominates prefill; post-gate
+efficiency targets: top_k 21.8% / gathers 16% / collectives ~24%). **RESIDUAL SPECIMEN (hypothesis
+revised):** the one sick gate draw (d=0.05 try-1) was byte-verified CLEAN on every surface yet
+fluent-filler-missed a 5K needle ⇒ the ~14%/draw residual is NOT H2D weight corruption — candidates:
+CPU-side finite corruption pre-t2j, or engine-instance STATE (XLA program draw / device order /
+KV-selection state). Specimen: db run 193 + specimen_d005_try1/. MTP stays FROZEN.
 
 **Honest claim line:** *first public DSA kernel on TPU — selected-set-exact on silicon; dense 128K gate
-CLOSED 77/77 (run 124, Wilson LB 95.3%); sparse correct at 128K on the mechanism cells (4/4 exact, twice:
-runs 153 & 162) and 12.6× faster than pre-campaign; but the sparse ≥95%@128K gate is NOT closed — gate2
-went 22/22 then 0/11 at d=0.95, cause unresolved (engine-instance lottery vs disk-pressure artifact —
-the discriminator experiment is the very next pod action).*
+CLOSED 77/77 (run 124, Wilson LB 95.3%); 12.6× efficiency campaign; the sparse ≥95%@128K gate is IN
+FLIGHT at 33/33 with zero misses — d=0.95 (gate2's 0/11 death cell) cleared 11/11 on a byte-verified
+engine, retroactively attributing gate2's death to the engine lottery, not the kernel. Not yet closed
+until 77/77 banks.*
 
 **Read, in full, before doing anything:** this file → `CLAUDE.md` (rules) → `docs/RESEARCH_LOG.md`
-**2026-07-12 20:30 onward** (the efficiency campaign → gate2 death → lottery → confound → recovery arc;
+**2026-07-17 08:20 onward** (lottery→root-cause→checksum→gate arc; efficiency campaign is 07-12 20:30 on) (the efficiency campaign → gate2 death → lottery → confound → recovery arc;
 the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-runbook.md` §8 →
 `PLAN.md` → design docs as needed (`docs/01` DSA kernel, `docs/03` throughput, `docs/05` KV/DCP,
 `docs/10` observability, `docs/upstream/*` the two silicon-bug reports). DSV4 base:
@@ -100,13 +102,12 @@ the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-r
    (zero-copy numpy view of torch storage × resize_(0) eager free × async H2D staging) — unifies
    DSV4's "flaky dequant crash". Refuted en route: per-host binaries, PWAL copies, runtime clobber,
    scale-as-primary, streamer concurrency (A/B), F8_E8M0 gating.
-3. **Land the t2j fix** (worktree glm-t2j-fix; deterministic must-fail-first test is the proof) →
-   review → sync 8× → **VALIDATION: ~10 init-only draws, both checks armed — corruption must
-   collapse 56%→0**; any residual ⇒ the dissection specimen (PWAL unarmed so the LOAD reject dumps
-   fire; 3-way diff corrupt/clean-host/GCS).
-4. **RE-GATE: `bash ~/glm-tpu/scripts/gate_sparse128k.sh`** — update PIN to the fix tip + add
-   GLM_LOAD_NAN_CHECK=1 to its RAYLET_ENVS (health probe + refusing loads + fixed loader = triple
-   protection). n=77, mechanism depths first, miss-abort at 2, per-depth ckpts, ONE miss ⇒ n≈130.
+3. ~~Land the t2j fix + validation~~ **DONE 07-18** (629c20e84, reviews 3/3; GLM_LOAD_CHECKSUM
+   a225d16b4 landed after the stats review demanded a categorical finite-corruption instrument;
+   validation 4/4 clean with the full stack armed).
+4. **THE RE-GATE IS RUNNING** (gate128k_20260718T110127Z, 33/33 through the first three mechanism
+   depths). On PASS 77/77 ⇒ bank + close; ONE miss ⇒ extend n≈130; 2-miss abort ⇒ forensics FROM THE
+   SPECIMEN (armed instruments), never rate experiments.
 5. **256K throughput A/B** (dsa-sparse vs dense at IDENTICAL dcp; `bench/dsa_throughput.py`); fp8-KV
    only after its own dcp=1 needle validates (fp8 has still NEVER produced a validated metal token).
 6. **Benchmarks at scale:** GSM8K n≥200, GPQA-198 rerun @ 16K (owner-gated), AIME-2026 n=30.
@@ -118,7 +119,7 @@ the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-r
 | branch | what | on origin? |
 |---|---|---|
 | `glm-5.2-v4` (`02e44b36`) | pod mainline — Stage-1 + obs + OOB fix | yes |
-| **`glm-5.2-v4-next`** (**`c68794241`**) | **integrated staging + what the pod RUNS** — the campaign stack (granularity fix, fp8-KV v4 fixes, obs, sparse-DCP A/B/C, scatter-flat, segment S1, W2.1, gather-dominator v2s) + the 07-17 safety commit (F6 refusals, GLM_WRITE_PROBE, combo suite, dense-impl refusal) + the 07-17/18 integrity layer (GLM_PWAL_NAN_CHECK raises; GLM_LOAD_NAN_CHECK full-weight init scan + reject dumps), all gated off by default | yes — synced 8× dirty=0 |
+| **`glm-5.2-v4-next`** (**`a225d16b4`**) | **integrated staging + what the pod RUNS** — the campaign stack (granularity fix, fp8-KV v4 fixes, obs, sparse-DCP A/B/C, scatter-flat, segment S1, W2.1, gather-dominator v2s) + the 07-17 safety commit (F6 refusals, GLM_WRITE_PROBE, combo suite, dense-impl refusal) + the 07-17/18 integrity layer (GLM_PWAL_NAN_CHECK raises; GLM_LOAD_NAN_CHECK full-weight init scan + reject dumps; 629c20e84 t2j alias fix; 04507ba1d CPU stage-splitter; a225d16b4 GLM_LOAD_CHECKSUM byte-verify), all gated off by default | yes — synced 8× dirty=0 |
 | `pr-g1..g6` | upstream PR series (07-07/08 cuts — predate the campaign; owner submits) | yes |
 | `dsv4-flash-v4` | the DSV4 base (LKG pin source) | yes |
 
@@ -129,6 +130,10 @@ segment S1** (= tag freeze-correct-128k-20260712) → **5c6e1f0c8 W2.1** → **a
 
 ## Operating landmines (learned the hard way — expect these)
 
+- **THIS VM IS POD WORKER-0** (`t1v-n-6c15e171-w-0`): a `--worker=all` git/ssh command mutates the
+  LOCAL dev checkout too (a sync reset ran here mid-session; both branch pointers happened to match —
+  check `git branch -vv` after any pod-wide git). And `ls -td ~/glm-run/gate128k_*` races the
+  `gate128k_outer.log` FILE — always use the explicit run-dir name.
 - **WORKER STALENESS (#1 footgun):** push origin explicitly → `sync_workers.sh` → verify 8× same hash →
   pin `GLM_EXPECT_CODE_HASH` (re-pin collides with a mid-flight engine — wait for it).
 - **DISK PRESSURE is a first-class failure mode** (4 incidents; it killed gate-class runs and confounded
@@ -161,11 +166,12 @@ zero-failure + bounded divergence. Stage-3: MTP acceptance ~5 (FROZEN).
 
 ## The exact next task
 
-Land the **t2j alias-race fix** (item 3 above: must-fail-first proof, review, sync 8×), then the
-**validation draws** (corruption 56%→0 or the dissection specimen decides), then the **re-gate**.
-The owner-enforced corpus-first rule applies to every new domain: re-read the core docs under the
-new lens before building instruments. After each milestone: RESEARCH_LOG + this file + commit/push +
-`backup_bundle.sh`.
+**Watch the running gate to verdict** (persistent monitor on `~/glm-run/gate128k_outer.log`; per-depth
+GCS checkpoints are automatic). On PASS: bank in RESEARCH_LOG + docs refresh + `backup_bundle.sh`, then
+**256K** (fit/geometry probe — dcp=8 was deferred to this stage; novel geometry = ~40 min cold compile —
+then needles, then the sparse-vs-dense throughput A/B at IDENTICAL dcp), then land `~/wt-sibling-alias`
++ draft the t2j upstream PR. The residual hunt starts FROM THE SPECIMEN (db run 193). The corpus-first
+rule applies to every new domain.
 
 ## Owner-gated (draft, don't do)
 
