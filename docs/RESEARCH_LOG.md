@@ -2920,3 +2920,30 @@ flash_attn.py:19 (would bounce upstream lint). QUEUED post-gate: copy-discipline
 gpt_oss/multimodal_manager + isort fix, then the upstream PR cut. Implication for the ~10% residual: the
 reviewer found OUR path fully severed ⇒ the residual mechanism is NOT an unfixed sibling site on this
 path — the residual hunt (queued behind the gate) still lacks a candidate.
+
+## 2026-07-18 09:15 — ADVERSARIAL REVIEW 2/3 (stats/overclaiming): "GATE PATH OPEN" OVERCLAIMED — gate launch deferred for a categorical instrument
+
+The reviewer's attack LANDS; the 08:55 REVISED VERDICT is hereby corrected, not defended:
+(1) POOLING CONFOUND: the 6 dissection draws ran PWAL=0 (deliberate — so LOAD dumps fire); only the 3
+loader_ab draws are instrument-matched to the pre-fix 9/16 pool. Matched-only comparison 9/16 vs 1/3:
+one-sided p=0.46 — NOT significant. The pooled p≈0.034 exists only via the unmatched draws. (Honest
+nuance the reviewer under-weights: LOAD's coverage is a strict superset of PWAL's — indexer params ⊂
+full scan — so "weaker detector" is arguable; but the PWAL-TIMING hypothesis cuts the other way: if
+arming PWAL perturbs load timing and INDUCES corruption, the PWAL-off pool has a genuinely lower true
+rate and pooling is still invalid. Either way: not one sample.)
+(2) RESIDUAL CI: post-fix 1/9 ⇒ Wilson 95% [2.0%, 43.5%]. "~10% residual" was a point estimate dressed
+as a truth. Could be 30%+.
+(3) FINITE-GARBAGE: the gate's four protections (write-probe, PWAL, LOAD, health probe) are ALL
+NaN-class. Corrupt fp8 bytes mostly decode FINITE (the p5 specimen: coherent-filler MISS, zero NaN).
+At finite-taint rate q per draw, P(≥1 of 7 gate engines tainted) = 30%/52%/73% at q=5%/10%/17% ⇒ a
+0-miss gate result would be UN-ATTRIBUTABLE. This is the gate2 death, still unguarded.
+DECISION (supersedes "proceed to the gate" from 08:55): BUILD GLM_LOAD_CHECKSUM first — end-to-end H2D
+byte-integrity: uint32 wraparound sum of the tensor's bytes on CPU at the t2j boundary (the post-copy
+pristine buffer; both branches), the same sum computed ON DEVICE (async, no pipeline stall; integer sum
+is reduction-order-independent), compared at the load-model tail (where LOAD already hooks); mismatch ⇒
+raise, listing seq/shape/dtype. Catches NaN AND finite corruption categorically; positive control in the
+CPU suite (corrupt-after-hash must raise); env-gated, off = byte-identical. Then: 3-4 instrumented draws
+(false-positive proof + first TRUE corruption rate incl. finite) → re-arm gate with it → launch. This
+beats both reviewer alternatives (20 matched NaN-proxy draws bound the wrong quantity; local-disk load
+swaps the source path but leaves H2D staging unverified). HEALTH_RETRIES also raised 5→8 (CI-upper
+robustness: P(exhaust 8) <2% even at 44%). xprof needle unaffected, still in flight.
