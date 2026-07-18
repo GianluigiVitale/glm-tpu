@@ -3008,3 +3008,23 @@ estimate: each depth's engine is individually PROVEN byte-clean at load (categor
 whatever the true rate is (8 available). LAUNCHING gate_sparse128k.sh @ PIN a225d16b4: n=77 (7 depths ×
 11 trials), mechanism depths first, miss-abort at 2, per-depth GCS checkpoints, health probe + triple
 refusing checks per engine. Expected ~15-17h (~9.4s/chunk × 63 chunks prefill + 11 needles per depth).
+
+## 2026-07-18 14:35 — GATE d=0.05 try-1 SICK: THE RESIDUAL SPECIMEN — byte-verified-clean engine, fluent-filler miss (MECHANISM HYPOTHESIS REVISED)
+
+Depth 0.0 closed 11/11. Depth 0.05 try 1 drew SICK:needle — the health probe caught it in ~2 min and
+try 2 (HEALTHY) proceeded: the detect-and-relaunch design did exactly what gate2 died for lack of.
+THE SPECIMEN (db run 193, health_0.05_try1.log, 8 dumps banked in the run dir specimen_d005_try1/):
+- GLM_LOAD_CHECKSUM: no mismatch on any host (H2D leg byte-verified; log shows 2/8 SUMMARY lines before
+  Ray log-pump truncation at driver exit — no raise from any of 8).
+- PWAL + LOAD NaN scans: clean. Layer-2 indexer k-cache dumps: 0 NaN / 17.8M elems × 8 hosts.
+- Behavior: 5K needle d=0.5 (a ~100% cell), gold=952687 → emitted " 7." then FLUENT-FILLER
+  ("There and back again. The grass is"), pred=None, 20 gen tokens. The gate2-d0.95/p5 signature.
+IMPLICATION: the residual lottery specimen carries ZERO detectable numerical corruption on every
+instrumented surface — H2D weight corruption is CATEGORICALLY EXCLUDED for this draw. Residual
+candidates narrow to (a) CPU-side finite corruption BEFORE t2j (unexcluded — needs reference checksums
+of the GCS truth vs the pre-t2j torch bytes; manifest-vs-fused-tensor mapping is the build cost) or
+(b) NOT-WEIGHT-CORRUPTION: engine-instance state — warm-XLA-cache program draw, device/collective
+order permutation, KV/selection path state. Note DSV4's crash-flavor WAS t2j (review 1/3) but the
+GLM residual may be a DIFFERENT mechanism than the (now-fixed) alias race. Draw stats today: 1 sick /
+7 engine draws ≈ 14%, consistent with the ~11% point estimate. Post-gate hunt now starts from this
+specimen, not from rate experiments (dump1090 doctrine). Gate continues.
