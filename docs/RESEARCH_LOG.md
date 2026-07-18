@@ -3126,3 +3126,25 @@ launches differ in HBM history naturally); dumps archived EVERY draw incl. healt
 at ≥1 sick + ≥1 healthy. Classifier: guard trip ⇒ H2 signature; clean-guards miss ⇒ H1; ladder profile
 gives per-engine length-dependence. Offline decider: runner/dcp_cache_diff.py sick-vs-healthy at matched
 cells — differing coords at never-written pages ⇒ H1 confirmed + localized.
+
+## 2026-07-18 22:15 — CPU AUDIT AT THE MISS GEOMETRY: boundary math EXONERATED; the defect is metal-only; hunt draw 1 = LOAD_REFUSED (PWAL NaN w-4)
+
+CPU audit (agent, full report banked) at prompt_tok 127362/127363, d=1.0, partial final block 62
+(387/2048 tokens), dcp=4, both impl sets, kv_len 127361..127383: EVERY falsification attempt passed —
+selection emits only [0,kv_len)∪{-1} (score maps exactly -inf at ≥kv_len, the boundary lands EXACTLY at
+the needle/first-unwritten split), owned-width W=65 retains block 62, owned-seg/gather arithmetic clean,
+segment defense mask kills leaked indices, skip_topk_offset is a LAYER-schedule param (no positional
+window — concern was a category error), dense-fallback keys on kv_len not chunk (always sparse here).
+STRUCTURAL FACT: the gather is UNGUARDED (jnp.take reads whatever it is handed; T7: a leaked kv_len
+index reads poison) — correctness rests wholly on the selection invariant ⇒ any metal-side VALUE
+divergence feeds straight through. Existing-test gap confirmed: all suites run p_g=8-class toys; none
+ever ran the production partial-final-block geometry (the audit scripts fill it: scratchpad cpu_audit/).
+VERDICT: deterministic-index-math sub-hypothesis DEAD. H1 sharpened to a metal-only LOWERING divergence
+at production shape in the enumerated residue: gather_kv_segment_local's take, MERGE/OWNED_SEG v2
+lax.sorts, SEG_GATHER v2 one-hot select-reduce, flat owner-scatter into the donated striped cache,
+Mosaic dsa_sparse_decode compile — the pageloop family, exactly. The hunt's sick-vs-healthy byte-diff
+localizes WHICH. Hunt v1 draw 1 = LOAD_REFUSED (PwalNanCheckError w-4 indexer wk NaN — the load class
+LIVES post-t2j-fix, ~1/12 ≈ 8%; armed PWAL preempted attribution ⇒ hunt v2 runs the dissect pattern:
+PWAL=0 + CPU scan + LOAD/CHECKSUM refusing at tail). Hunt v2 relaunched with LOAD_REFUSED as its own
+verdict class (not the diff-pair member). pkill self-match landmine hit TWICE — bracket-pattern
+(pgrep -f "name[.]sh") is now the standing form.
