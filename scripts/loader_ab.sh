@@ -24,7 +24,7 @@ RUN_DIR=~/glm-run/loader_ab_$(date -u +%Y%m%dT%H%M%SZ)
 N_PER_ARM=8
 ARMS="32,8"
 INIT_TIMEOUT_S="${INIT_TIMEOUT_S:-1800}"
-PIN="${PIN:-34d2eef37}"   # override after the load-check lands
+PIN="${PIN:-c68794241}"   # override after the load-check lands
 
 BASE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 RAY_DEDUP_LOGS=0 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \

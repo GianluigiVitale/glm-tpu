@@ -2751,3 +2751,20 @@ no serving needed — corruption rate ~2/3 gives signal at n≈8/arm, ~5-7min/in
 lowering concurrency zeroes the flag rate ⇒ ship the safe setting + keep the refusal guards; if not,
 next: adapter race audit, then per-tensor byte-integrity manifest (GCS CRC32C is whole-object only —
 no help for ranged reads).
+
+## 2026-07-18 08:50 — GLM_LOAD_NAN_CHECK landed (c68794241, synced 8× first pass); geometry CORRECTION refines the corruption locus; the A/B fires
+
+Widened integrity landed: full-weight ON-DEVICE non-finite scan at load_model tail (118k tensors,
+local shards only, ~5-15s/host armed, category split scale/fp8/other, reject-dumps on refusal) +
+PWAL hardened to RAISE on UPSTREAM. 22 new/updated CPU tests green.
+**CORRECTION to 06:40 (the record over the narrative): weight_block_size is [128,128]** — a corrupt
+SCALE element wipes 16384 elements, not 128; and pure fp8-code corruption yields NaN only (e4m3fn
+has no Inf). The observed 1280/1536-with-Inf counts refute BOTH ⇒ the only consistent locus is
+**128-element-aligned (256-byte) GRANULE corruption in a ≥16-bit stage** — the bf16 materialization
+or a per-row dequant slice reading garbage — DMA/page-granule-shaped, post- or intra-dequant. The
+reject dumps adjudicate offline. BONUS LEAD: config `modules_to_not_convert` names
+`self_attn.indexers_proj`, which does NOT exist in the weight map (keyset) — any name-matched quant
+routing around the indexer never matches.
+LAUNCHING: scripts/loader_ab.sh (concurrency 32-vs-8, n=8/arm, init-only, both checks armed,
+RAY_DEDUP_LOGS=0) — the streamer-race discriminator. NOTE the scan's honest limit: finite corruption
+is invisible; a clean scan is a NON-FINITE-integrity pass only.
