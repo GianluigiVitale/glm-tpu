@@ -2981,3 +2981,19 @@ efficiency campaign's targets are (in measured order) top_k, the residual gather
 v2s), the dcp=4 collective tax (~24%). Trace + analysis scripts: ~/glm-run/xprof128k_20260718T085339Z
 (852M, rank-0 host; scratchpad analyze*.py; trace-viewer JSON is per-track truncated at ~121k events —
 analysis restricted to complete step windows inside ops coverage).
+
+## 2026-07-18 09:55 — GLM_LOAD_CHECKSUM LANDED + LIVE: 8×8 host SUMMARY, draw 1 CLEAN (verified=1882/host, mismatches=0)
+
+Landed a225d16b4 (3 commits: isort fix, e8m0 _NO_INF_DTYPES fix +test, GLM_LOAD_CHECKSUM +9 tests incl.
+the corrupt-byte positive control; 42/42 CPU green, integrator re-ran). Synced 8× verified. Armed in
+gate/loader_ab/dissect (PIN bumped; loader_ab CORRUPT greps extended to LoadChecksumError/diverged).
+LIVENESS PROVEN on the first instrumented draw: all 8 hosts emit SUMMARY verified=1882 mismatches=0
+skipped=312. The 312 skips are ONE benign class — 0-d fp32 scalars (78 layers × 4; fallback-branch
+view(uint8) rejects dim-0) ≈1.2KB total surface, still device-NaN-scanned; all dim≥1 weights incl. the
+indexer wk specimens are checksum-verified. Queued one-liner (reshape(1) pre-view) for the next fork
+commit — NOT worth a PIN bump now. Ops landmine RECORDED: this VM IS t1v-n-6c15e171-w-0 — a --worker=all
+git command mutates the LOCAL dev checkout too (today's sync reset ran here while a stale glm-5.2-v4
+branch pointer was checked out; no loss — both pointers same commit; -next re-checked-out). Draws 2-4 in
+flight; 4/4 CLEAN ⇒ LAUNCH THE GATE (a false-positive-free instrument + per-engine categorical
+byte-verification answers review 2/3's blocker: every gate engine is PROVEN byte-clean at load, so a
+miss is attributable to the model).
