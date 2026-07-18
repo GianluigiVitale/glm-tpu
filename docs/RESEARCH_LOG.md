@@ -2786,3 +2786,27 @@ bytes from the flagged host, (ii) its twin from a clean host, (iii) the correspo
 three-way diff. Outcome decides the component in ONE specimen: stream-range garbage (contiguous
 mismatch vs GCS) / dequant-ruined (codes match GCS, output wrong) / host-device-stage stomp (host
 copy clean, device copy corrupt) — with offset/alignment as the component fingerprint.
+
+## 2026-07-18 05:30 — 🎯🎯🎯 ROOT-CAUSE CANDIDATE FOUND BY READING (owner's corpus-first push): the t2j alias × eager host-storage free × async H2D race
+
+The owner forced a genuine full re-read of the core docs; the trail it opened:
+(1) docs/05 (07-07) recorded "PR #2324's NaN-under-EP + streaming-loader conflict" and the recon
+(docs/recon/pr2324-diff.md) shows the PR adding `jax.block_until_ready` BEFORE RETURN in its weight
+processing and `_free_cpu_parameter_storage` (resize_(0)) in its loader — sync-before-free was a
+known needed pattern there. (2) Our own 07-07 M1 entry: "_free_cpu_storage in unquantized.py (JAX
+CPU backend ALIASES the torch buffer via jnp.asarray; freeing must be best-effort)" — the hazard was
+SEEN and classified CPU-harness-only. (3) THE CODE (utils.py t2j, bit-cast branch):
+`bytes = t.cpu().view(torch.uint8).detach().numpy()` — a ZERO-COPY numpy view aliasing the torch
+storage — then `jnp.array(bytes)`. JAX's PJRT host-buffer staging for numpy is
+immutable-until-transfer-completes: the HOST BUFFER MUST OUTLIVE THE ASYNC H2D DMA. Then
+`_free_cpu_storage`/cleanup_sharding `resize_(0)` FREES that storage — refcounts do not protect a
+storage mutated in place. Lose the race ⇒ the DMA reads freed/reused heap ⇒ **per-host, per-launch,
+contiguous-granule, NaN/Inf-mixed garbage on device — every measured property of the corruption,
+including streamer-concurrency independence (the A/B: both arms corrupt — the streamer was never the
+component)** and the DSV4 "flaky dequant crash" (same race, crashing flavor).
+FIX CLASS (one line at the alias source): sever the alias — copy the bytes eagerly in t2j's bitcast
+branch (np.array(..., copy=True)) — or block_until_ready before every host-storage free. Test that
+FAILS TODAY deterministically (CPU aliases per our own note): mutate the torch tensor after t2j and
+assert the jax array is unchanged. Fix build delegated; validation = N init draws with checks armed
+(corruption rate must collapse to 0), then the dissection specimen doubles as confirmation (corrupt
+bytes should be reused-heap-shaped). Waiting sweep results may add confirming citations.
