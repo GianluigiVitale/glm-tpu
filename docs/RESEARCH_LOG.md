@@ -3300,3 +3300,15 @@ BARRIER=1 — one semantics-free barrier op before the payload take; discriminat
 take-lowering class). If B draws stay sick, the remaining discriminator for the Mosaic kernel is a
 pure-XLA sparse-decode attend fallback (moderate build — the xla_ref math reading the cache at decode;
 also a potential mitigation in itself).
+
+## 2026-07-19 16:50 — GLM_DSA_DECODE_ATTEND=xla LANDED (5bfcc5116 on -next, pushed; workers NOT yet synced — barrier arm mid-flight)
+
+The XLA decode-attend gate is in: the Gate-K-tested oracle dsa_sparse_decode_xla already existed —
+the commit adds the trace-time call-site gate (both decode sites; DCP LSE-combine untouched; jaxpr
+byte-inert when unset — the gated-trace hash suites still pass; 20 new + 200 existing tests green).
+Documented tolerances vs the kernel (accumulation order: fp32 ≤9.5e-7, bf16 ≤3.9e-3); cost = SAME
+FLOPs (~0.29 GFLOP/tok/layer), ~1MB score transient vs the kernel's 0.13MB online tiles — fully
+serving-viable. Worker sync DEFERRED until the barrier arm completes (mid-arm sync breaks draw
+provenance; GLM_EXPECT_CODE_HASH would refuse loudly anyway). DECISION TREE: barrier arm clean ⇒
+read-aliasing convicted, gate4 behind GLM_DSA_ATTEND_GATHER_BARRIER; barrier arm sick ⇒ XLA-attend
+arm next (kernel-bypass discriminator + mitigation in one).
