@@ -3324,3 +3324,16 @@ transient, no interpreter) is now THE kernel-bypass discriminator AND candidate 
 synced 8× to 5bfcc5112; xla-attend arm launching (4 draws): clean ⇒ Mosaic dsa_sparse_decode convicted
 + gate4 runs with DECODE_ATTEND=xla; sick ⇒ the fault is upstream of the attend (the gather/selection
 consumed by BOTH paths — then the selection-output dump instrument is next).
+
+## 2026-07-19 19:45 — THREE armed arms, three identical init deaths — CONTROL DRAW launched to split the confound
+
+xattend draw 1: INFRA at init, same signature (worker SYSTEM_ERROR "connection error code 2" — process
+death, NO RESOURCE_EXHAUSTED ⇒ crash-class not clean-OOM). Pattern: interpret (1b481911d), rbarrier
+(1b481911d), xattend (5bfcc5112) ALL die at engine init ~2h in; every SERVED draw ran at a225d16b4
+with no probe env. CONFOUND: armed-variant compiles crashing the v4 compiler (three novel program
+shapes — the compiler the pageloop family lives in), vs the probe COMMITS breaking base metal init
+despite CPU jaxpr-identity. CONTROL DRAW: PIN 5bfcc5112, ALL probe envs unset, full ladder, 1 draw —
+init success (warm-cache hit expected if TPU jaxpr identity holds) exonerates the commits; death
+convicts them ⇒ bisect/revert. FALLBACK if control is clean but armed 128K compiles keep crashing:
+run the xattend DISCRIMINATOR AT 32K GEOMETRY (sickness expresses at 32K — flat draws 1-2 proved;
+smaller compile dodges the 128K-shape issue; conviction logic identical).
