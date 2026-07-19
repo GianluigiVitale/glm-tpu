@@ -3278,3 +3278,14 @@ math; ~seconds/token × ~20 gen tokens = viable even as a gate mitigation); (B)
 GLM_DSA_ATTEND_GATHER_BARRIER=1 — optimization_barrier on the local cache before the flat take
 (breaks read-side donation aliasing). Interpret-arm draws discriminate: never-sick ⇒ Mosaic kernel
 convicted; still-sick ⇒ the take/lowering class (then arm B discriminates further).
+
+## 2026-07-19 13:20 — READ-PROBES LANDED (1b481911d, synced 8×); INTERPRET ARM RUNNING
+
+Landed 2 commits (agent build, integrator-merged): GLM_DSA_DECODE_INTERPRET (decode-SCOPED — the agent
+found segment-prefill reuses dsa_sparse_decode, so a naive OR would have covered prefill too; a
+separate decode_interpret threads only the 2 decode sites) + GLM_DSA_ATTEND_GATHER_BARRIER (both
+gather_kv_segment variants). Default-off byte-identity proven at the JAXPR level (the gated-trace hash
+suite); 74+36+62 tests green. Hunt PIN env-overridable (default 1b481911d). INTERPRET ARM launched
+(ARM_ENVS=GLM_DSA_DECODE_INTERPRET=1, 4 draws, ladder budget 16000s — interpreted decode is slow):
+zero sick draws ⇒ the Mosaic dsa_sparse_decode kernel is CONVICTED (and interpret becomes the interim
+gate mitigation); sick draws persist ⇒ arm B (gather barrier) discriminates next.
