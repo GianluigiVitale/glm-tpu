@@ -3337,3 +3337,22 @@ init success (warm-cache hit expected if TPU jaxpr identity holds) exonerates th
 convicts them ⇒ bisect/revert. FALLBACK if control is clean but armed 128K compiles keep crashing:
 run the xattend DISCRIMINATOR AT 32K GEOMETRY (sickness expresses at 32K — flat draws 1-2 proved;
 smaller compile dodges the 128K-shape issue; conviction logic identical).
+
+## 2026-07-19 20:30 — PR-PLAYBOOK AUDIT (vs docs/13 + PLAYBOOK_1 + upstream CONTRIBUTING/AGENTS): stack NOT submission-ready; the gaps are enumerated
+
+Checklist audit (agent, full report in session transcript) of a98c77c9c..5bfcc5112 (15 commits) +
+sibling-alias (4): STRONGEST AREA — the gated+additive+byte-identical discipline (D11 PASS, nearly
+every commit env-gated default-off with identity tests). RANKED FAILS: (1) NO PR packaging exists for
+the new stack (no decomposition, no PR bodies/disclosure/tests-run sections); (2) base is 189 commits
+above origin/main — nothing is cut as an isolatable unit; (3) the t2j fix's own on-metal proof is
+still open (the corruption-collapse number the commit body itself demands — currently entangled with
+the residual hunt); (4) DCO Signed-off-by MISSING ON ALL 19 commits (the repo's own pre-commit hook +
+6338-signoff history = hard CI gate; fix = rebase --signoff at re-cut); (5) ~14 of 15 commits are
+deliberately NON-upstreamable debug/validation scaffolding — needs an explicit de-scope decision, not
+PRs; (6) 6 commits missing the Co-authored-by trailer; (7) fixup/style commits to squash at re-cut
+(7c505a4c4, fb5000baa, 845f4ffeb, f9409a94d); (8) duplicate-work search not run for the new stack;
+(9) local isort/ruff/mypy never run (env lacks them — install into vllm-env at re-cut time).
+pr-g1..g6 VERDICT: salvageable, zero file-overlap with the new campaign; need forward-porting + a NEW
+standalone t2j PR added to the series (with the sibling-alias class-completion folded in) + the
+de-scope decision. The 3 highest-leverage t2j-PR actions banked verbatim in the audit report. NOTE:
+these are RE-CUT-TIME actions (owner submits); nothing blocks the current metal campaign.
