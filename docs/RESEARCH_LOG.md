@@ -3356,3 +3356,23 @@ pr-g1..g6 VERDICT: salvageable, zero file-overlap with the new campaign; need fo
 standalone t2j PR added to the series (with the sibling-alias class-completion folded in) + the
 de-scope decision. The 3 highest-leverage t2j-PR actions banked verbatim in the audit report. NOTE:
 these are RE-CUT-TIME actions (owner submits); nothing blocks the current metal campaign.
+
+## 2026-07-19 21:10 — WORKFLOW AUDIT: 48/51 findings adversarially confirmed; 2 gate the LIVE campaign
+
+Five-lens workflow (57 agents; full report in the session transcript + banked summary): verdict NOT
+PR-ready; exactly ONE upstream unit exists (the t2j family — squash 629c20e84+f9409a94d + cherry-pick
+3 sibling-alias fixes onto CURRENT main; cherry-pick-only, never tip-diff, else the checksum hooks leak
+into the PR; cite torchax's own TODO(gxd3) — the maintainers are circling the same function).
+CAMPAIGN-CRITICAL SUBSET (fix in the fork NOW — these gate the meaning of the on-metal A/Bs):
+BLOCKER — DECODE_INTERPRET plumb untestable on CPU (interpret already True; dead plumb passes all
+tests ⇒ needs a spy test with mocked tpu backend); M5 — DECODE_ATTEND dispatcher wiring untested (a
+severed dispatcher ⇒ the xla arm silently measures pallas-vs-pallas; needs a jaxpr-liveness assert:
+no pallas_call under env=xla on the REAL wrapper); M6 — checksum fallback leg has NO positive control
+(blinded record_fallback passes 9/9 — and fallback carries every fp32 tensor); M7 — fp8/unquantized
+pre-t2j hook integration untested (dropped hooks would FLIP the streamer-vs-H2D verdict; empirically
+the hook DID fire live on 07-19 00:55 — wiring proven operative once, test still required); M8 — F8
+production-geometry cell lacks its gate-off anchor. CLAIMS M9-M12: four stale/overclaiming docstrings
+to reword (utils.py:105 class-closure, cpu_load_nan_check coverage, owner-scatter H/H2 geometry
+qualifier, tpu_runner checksum call-site). Empirical note FOR the xattend wiring being live: its armed
+init death implies the program DID change (dead plumb ⇒ warm-cache hit ⇒ served). Fix-now batch goes
+into one fork commit before the discriminator rerun.
