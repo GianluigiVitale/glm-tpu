@@ -3198,3 +3198,27 @@ losing its k-cache stripe poisons 4 layers' selection). NEXT: (1) hunt continues
 baseline (targeted byte-diff: stripe-1 rows of the slot-2 dump); (2) localize the indexer k_cache write
 site in the fork + apply the flat-treatment pattern (the proven fix class) + CPU tests + land; (3)
 re-gate with Guard 2 armed + a 32K health needle (5K is blind to this class — proven).
+
+## 2026-07-19 07:15 — LOCALIZATION COMPLETE: the DSA owner-scatter (impl=flat) drops stripes at GATE geometry — the validated-formulation premise was geometry-local
+
+The failing op: mla_attention.py::_glm_dsa_dcp_owner_scatter (shard_map, donated striped 4-D cache,
+serves BOTH the indexer-key and latent writes). GLM_DSA_DCP_SCATTER_IMPL default=flat BECAUSE the
+07-10 rung-2 forensics proved pageloop drops sublane stripes on THIS buffer and flat was byte-complete
+"across scrambled instances on all hosts (runs H/H2)" — but that validation ran at PRE-CAMPAIGN
+geometry (chunk 1024, pre-owned-width). Tonight Guard 2 caught FLAT dropping stripe 1 wholesale
+(layer-0 indexer k_cache, 512/512 owned rows unchanged) at chunk-2048/owned/128K serving — the
+pageloop report's own law ("no formulation safe by inspection; validation is per-buffer AND
+per-geometry") biting its own validated case. Open sub-question the byte-diff decides: writes DROPPED
+vs landed in the WRONG stripe (Guard 2 can't distinguish; duplicated-content elsewhere would say
+misroute). Latent-cache status on sick engines unknown (the raise stops at the first bad cache —
+layer-0 indexer is checked first; same op writes latent ⇒ suspect).
+FIX PLAN (the proven pattern): (1) healthy baseline from hunt draw 2 (in flight) → offline byte-diff at
+matched cells (stripe-1 rows, slot-2). (2) Zero-code metal probe: the existing impl=barrier
+(optimization_barrier breaks the donated aliasing before the plain scatter — the report fingered
+"donated sharded tiled buffers"; cost = a per-step cache copy, ~180MB/shard, acceptable). Hunt draws
+with SCATTER_IMPL=barrier: evidence = per-draw BYTE-COMPLETENESS at the full ladder geometry (the
+H/H2 protocol — deterministic per draw, NOT rate-based; the rate argument needs ~20 draws, the
+byte-diff needs ~2-3). (3) If barrier is byte-complete: gate with barrier armed while a cheaper
+formulation (one-hot select-reduce write / flat-on-barriered-buffer) is engineered + CPU-bitwise-tested
++ same metal validation. (4) Re-gate with Guard 2 + a 32K health needle (5K proven blind). F3 note:
+impl changes change the traced program — fine for fix-validation (not attribution).
