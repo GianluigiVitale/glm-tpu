@@ -3312,3 +3312,15 @@ serving-viable. Worker sync DEFERRED until the barrier arm completes (mid-arm sy
 provenance; GLM_EXPECT_CODE_HASH would refuse loudly anyway). DECISION TREE: barrier arm clean ⇒
 read-aliasing convicted, gate4 behind GLM_DSA_ATTEND_GATHER_BARRIER; barrier arm sick ⇒ XLA-attend
 arm next (kernel-bypass discriminator + mitigation in one).
+
+## 2026-07-19 17:50 — Gather-barrier arm ALSO init-dies (device-OOM class: the barrier forces a full cache-slice copy at ~29G/chip) — the XLA-ATTEND ARM is the discriminator
+
+rbarrier draw 1: INFRA at engine-core init (actor death after ~104 compiles / 2.3h — same shape as the
+interpret arm). Mechanism (attributed, not proven): optimization_barrier on the WHOLE local cache
+slice breaks donation ⇒ XLA materializes a full cache copy inside the step program ⇒ device OOM at
+init (the write-side barrier arm survived earlier — read-side empirically does not). BOTH cheap probes
+are non-viable at production shape; the pre-built GLM_DSA_DECODE_ATTEND=xla arm (no cache copy, ~1MB
+transient, no interpreter) is now THE kernel-bypass discriminator AND candidate mitigation. Workers
+synced 8× to 5bfcc5112; xla-attend arm launching (4 draws): clean ⇒ Mosaic dsa_sparse_decode convicted
++ gate4 runs with DECODE_ATTEND=xla; sick ⇒ the fault is upstream of the attend (the gather/selection
+consumed by BOTH paths — then the selection-output dump instrument is next).
