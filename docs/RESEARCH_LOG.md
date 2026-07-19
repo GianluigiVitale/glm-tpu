@@ -3376,3 +3376,18 @@ to reword (utils.py:105 class-closure, cpu_load_nan_check coverage, owner-scatte
 qualifier, tpu_runner checksum call-site). Empirical note FOR the xattend wiring being live: its armed
 init death implies the program DID change (dead plumb ⇒ warm-cache hit ⇒ served). Fix-now batch goes
 into one fork commit before the discriminator rerun.
+
+## 2026-07-19 22:30 — CONTROL SPLITS THE CONFOUND: base init at the probe PIN is HEALTHY — the three init deaths were VARIANT compiles; audit fixes landed (a10d2a426)
+
+Control draw (PIN 5bfcc5112, envs unset): engine initialized and is serving (5K cells 2/2 correct,
+~95s — no guard cost visible at 5K; ladder continuing). The probe COMMITS are exonerated for base
+init ⇒ each armed arm died on its OWN program's build at the 128K ENGINE geometry (engines precompile
+at max_len regardless of request length — so a 32K-request ladder on a 131840-max_len engine still
+compiles the 128K-shape programs; the earlier "run at 32K" fallback therefore means a 32K-GEOMETRY
+ENGINE: max_len ~33280). Audit-fix commit a10d2a426 landed on -next (tests only + 4 docstring truth
+fixes; zero executable-line changes; jaxpr identity held 62/62; the M5 liveness test PROVES env=xla
+strips every pallas_call from the real wrapper trace — the dispatcher is CI-proven live, on top of
+the empirical init-death evidence). NEXT: control verdict → sync 8× a10d2a426 → hunt geometry
+overrides (lengths 5000,32000 / max_len 33280 / blocks ~20) → the 32K-geometry xattend discriminator
+overnight (~6 draws): clean ⇒ Mosaic decode kernel convicted at least at 32K + mitigation
+demonstrated; sick ⇒ upstream selection/gather next.
