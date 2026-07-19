@@ -3177,3 +3177,24 @@ trimmed to 0,1,2,4 (the victim slot + neighbors — all the byte-diff needs), mi
 (<15G ⇒ INFRA kill). With programs cached a clean ladder ≈ 1h/draw. Engine-draw tally tonight: 2
 LOAD_REFUSED (both layer-1-region NaN; one CPU-attributed ⇒ streamer), 0 state-sick yet, 0 completed
 healthy — the state-class ~1/7 rate needs more draws.
+
+## 2026-07-19 06:55 — ⭐⭐ THE STATE CLASS IS CAUGHT AND NAMED: DCP stripe write-LOSS on the layer-0 indexer k_cache (Guard 2 trip, live, hunt v4 draw 1)
+
+DCPCacheStaleStripeError [GLM_DCP_ASSERT_CACHE_SANITY] execute_model write: cache
+'model.layers.0.self_attn.indexer.k_cache' dcp stripe 1/4 owns 512 freshly-written rows this step, ALL
+unchanged from the pre-step snapshot ⇒ chunk writes to stripe 1 LOST (draw1.log:420846, 06:45:45,
+during cell 6 = 128K d=1.0 — the raise killed the engine mid-cell; cells 3-5 missed WITHOUT a trip,
+consistent with doc10's known Guard-2 limitation: only WHOLE-stripe-stale is visible; sub-stripe/
+sublane drops are not). LADDER PROFILE of the sick engine (first ever measured): 5K d=0.5/1.0 CORRECT;
+32K both depths MISS; 128K d=0.5 MISS at 1670s (~2.7× slow — matches the 07-17 "sick engines ~2.6×
+slower" signature); 128K d=1.0 killed by the trip. Guard 1 (SHARDING) clean ⇒ mesh/rank order fine —
+H2 REFUTED on this specimen. VERDICT: the residual state class = the PAGELOOP FAMILY on the INDEXER
+K-CACHE WRITE PATH — a scatter/store site that never got the flat-treatment validation (the primary
+MLA owner-scatter did; the layer-0 indexer k_cache write is a DIFFERENT site), expressing per-engine
+via inherited HBM state exactly per the pageloop report ("same executable, back-to-back: A striped, B
+clean"). This also retro-explains gate2/gate3 deaths, the health probe's 5K blindness (threshold ∈
+(5K,32K]), and IndexShare amplification (layer-0 is the FULL indexer layer feeding 3 shared layers —
+losing its k-cache stripe poisons 4 layers' selection). NEXT: (1) hunt continues for the healthy
+baseline (targeted byte-diff: stripe-1 rows of the slot-2 dump); (2) localize the indexer k_cache write
+site in the fork + apply the flat-treatment pattern (the proven fix class) + CPU tests + land; (3)
+re-gate with Guard 2 armed + a 32K health needle (5K is blind to this class — proven).
