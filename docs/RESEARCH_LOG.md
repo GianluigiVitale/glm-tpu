@@ -3148,3 +3148,22 @@ LIVES post-t2j-fix, ~1/12 ≈ 8%; armed PWAL preempted attribution ⇒ hunt v2 r
 PWAL=0 + CPU scan + LOAD/CHECKSUM refusing at tail). Hunt v2 relaunched with LOAD_REFUSED as its own
 verdict class (not the diff-pair member). pkill self-match landmine hit TWICE — bracket-pattern
 (pgrep -f "name[.]sh") is now the standing form.
+
+## 2026-07-19 00:55 — ⭐ LOAD-CLASS ATTRIBUTED: CPU-SIDE, BEFORE t2j — the STREAMER STAGE is guilty (the dissect verdict, finally obtained)
+
+Hunt v3 draw 1 = LOAD_REFUSED with the dissect pattern armed (PWAL=0, CPU scan on, LOAD+CHECKSUM
+refusing): LoadNanCheckError host=w-7, 2 non-finite tensors (class other:2 — bf16, layers.1.self_att*,
+the indexer region AGAIN), and **GLM_CPU_LOAD_NAN_CHECK flagged BEFORE t2j (1 hit)** ⇒ the corruption
+exists in the torch tensor PRE-conversion ⇒ the runai-streamer/CPU decode stage delivers corrupt bytes;
+H2D is faithful (checksum passes corrupt-in ⇒ corrupt-out unflagged, by design). Per the dissect_load.sh
+pre-registered decision rule: **CPU flagged + device flagged ⇒ streamer/CPU stage guilty ⇒ the
+§COST-pre-authorized GCS-streaming elimination is the fix** (gcsfuse Plan A at $0 first, local-disk
+attach fallback). (1-of-2 tensors CPU-flagged — consistent with the known M1 hook-coverage asymmetry;
+one provable pre-t2j hit decides the stage.) Tonight's picture: TWO distinct residual classes, both now
+pinned: (1) LOAD class = CPU-side streamer NaN, ~10-15%/init, auto-refused by the armed stack (costs a
+relaunch retry, never a bad gate depth); (2) STATE class = metal-only lowering divergence in the DSA
+read path (CPU-exonerated at the miss geometry), per-engine, 128K-expressed — the gate killer, hunt v3
+continuing for its sick/healthy diff pair. Layer-1 indexer tensors are the recurring victim of BOTH
+classes — likely because they are the first/largest early tensors in stream order, not a shared cause.
+NOTE: draw-1 duration 6563s — the load-refusal path burned most of the ladder budget before dying;
+acceptable (attribution >> time), draws continue.
