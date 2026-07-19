@@ -3391,3 +3391,17 @@ the empirical init-death evidence). NEXT: control verdict → sync 8× a10d2a426
 overrides (lengths 5000,32000 / max_len 33280 / blocks ~20) → the 32K-geometry xattend discriminator
 overnight (~6 draws): clean ⇒ Mosaic decode kernel convicted at least at 32K + mitigation
 demonstrated; sick ⇒ upstream selection/gather next.
+
+## 2026-07-19 23:00 — X32 DISCRIMINATOR RUNNING (8 draws overnight) + the interpretation rule pre-registered
+
+Control final: HEALTHY through 32K (4/4 cells, disk-killed at its 128K cells — the init answer and the
+32K-serving baseline stand). Workers synced 8× a10d2a426. X32 arm: GLM_DSA_DECODE_ATTEND=xla at 32K
+ENGINE GEOMETRY (max_len 33280, blocks 18, lengths 5000+32000 — small programs dodge the 128K-shape
+compile failure; disk-safe ~5× smaller dumps). PRE-REGISTERED INTERPRETATION RULE (against morning
+overclaim): every prior sick draw was a 128K-GEOMETRY engine; the base sick rate at 32K geometry is
+UNMEASURED. Clean X32 draws alone are therefore AMBIGUOUS (could mean 32K-geometry engines are never
+sick regardless of attend path). The discriminator is only decided against a SAME-GEOMETRY pallas
+control arm (runs immediately after, morning 07-20): sick(pallas-32K) > 0 AND sick(xla-32K) = 0 ⇒
+kernel convicted at 32K; both clean ⇒ the fault needs 128K-shape programs — different experiment
+(and the xattend-at-128K compile failure becomes the priority bug: the mitigation path needs it fixed
+or the Mosaic kernel repaired). Any sick xla draw ⇒ fault upstream of the attend (selection/gather).
