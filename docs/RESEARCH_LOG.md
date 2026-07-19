@@ -3222,3 +3222,19 @@ byte-diff needs ~2-3). (3) If barrier is byte-complete: gate with barrier armed 
 formulation (one-hot select-reduce write / flat-on-barriered-buffer) is engineered + CPU-bitwise-tested
 + same metal validation. (4) Re-gate with Guard 2 + a 32K health needle (5K proven blind). F3 note:
 impl changes change the traced program — fine for fix-validation (not attribution).
+
+## 2026-07-19 09:45 — Hunt flat-arm verdict: 2/2 SICK (intermittent per-request); BARRIER ARM LAUNCHED; stripe forensics agent on the dumps
+
+Draw 2 (flat): SICK, guard trip on w-2 this time (draw 1: stripe 1; per-draw host varies) — profile
+INTERMITTENT PER-REQUEST: 5K d1.0 MISS but 32K d1.0 + 128K d0.5 CORRECT (and pred='1234567890' on the
+32K d0.5 miss — a FABRICATED needle answer). Draw 1's clean-below-32K "threshold" was coincidence; the
+drop is per-step/per-request on sick engines. Slowness re-examined: gate3's sick needles ran ~626s
+(same as healthy) — the hunt's 2.7× is GUARD-2 SNAPSHOT COST (paid by all hunt draws), NOT a sickness
+signature; retracted. Compile-count comparison confounded by ladder shape (208 vs 47 lines — more
+cells = more shapes). OPEN: flat-arm sick rate 2/2 vs the gate's ~1/5 (small-n, or guard/dump timing
+perturbs the inherited-HBM lottery, or the mixed-length ladder triggers it — unresolved, doesn't block
+the fix probe). NOW RUNNING: the BARRIER ARM (SCATTER_IMPL=barrier ×6 draws — optimization_barrier
+breaks the donated aliasing before a plain scatter; zero new code; its first draw pays a one-time
+compile for the new formulation). Evidence per draw: needle verdicts + guard trips (+ dumps archived).
+Parallel: stripe-forensics agent on draw1/draw2_SICK dumps (dropped-vs-misrouted; latent-cache status;
+cross-draw stripe/host consistency).
