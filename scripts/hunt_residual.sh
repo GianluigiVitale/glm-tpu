@@ -22,7 +22,7 @@
 set -u
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=a225d16b4
+PIN="${PIN:-1b481911d}"
 TAG=hunt_${ARM_TAG:-${SCATTER_IMPL:-flat}}_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
 GCS_DUMPS=gs://driftbench-dsv4-uc/dumps/$TAG
