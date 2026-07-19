@@ -3167,3 +3167,13 @@ continuing for its sick/healthy diff pair. Layer-1 indexer tensors are the recur
 classes — likely because they are the first/largest early tensors in stream order, not a shared cause.
 NOTE: draw-1 duration 6563s — the load-refusal path burned most of the ladder budget before dying;
 acceptable (attribution >> time), draws continue.
+
+## 2026-07-19 04:15 — Hunt draws 2-3: ENOSPC (22-slot 128K dumps) → v4 with 4 slots + disk guard; 32K programs now cached
+
+Draw 2 (v3): 4/6 correct (both 5K + both 32K cells PASS — the 32K gate-geometry programs compiled+cached,
+~8 min/cell warm) then ENOSPC mid-128K: 22-slot step files accumulate across 63 chunks (~GBs/step-file)
+— transient, cleaned by the next launch purge; disks verified 59-80G free after. Hunt v4: DUMP_LAYERS
+trimmed to 0,1,2,4 (the victim slot + neighbors — all the byte-diff needs), mid-ladder local disk guard
+(<15G ⇒ INFRA kill). With programs cached a clean ladder ≈ 1h/draw. Engine-draw tally tonight: 2
+LOAD_REFUSED (both layer-1-region NaN; one CPU-attributed ⇒ streamer), 0 state-sick yet, 0 completed
+healthy — the state-class ~1/7 rate needs more draws.
