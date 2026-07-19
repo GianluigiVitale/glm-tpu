@@ -3238,3 +3238,25 @@ breaks the donated aliasing before a plain scatter; zero new code; its first dra
 compile for the new formulation). Evidence per draw: needle verdicts + guard trips (+ dumps archived).
 Parallel: stripe-forensics agent on draw1/draw2_SICK dumps (dropped-vs-misrouted; latent-cache status;
 cross-draw stripe/host consistency).
+
+## 2026-07-19 10:40 — ⚠ CORRECTION: the caches are CLEAN — Guard-2's trip is a REPLAY/PAGE-REUSE FALSE POSITIVE; the miss mechanism shifts to the DECODE READ path
+
+Stripe forensics (agent, full report banked; scratchpad stripe_forensics/): across draw1_SICK's 106
+captured steps ×8 hosts — NO drop, NO misroute, anywhere: stripe-1 rows are valid RoPE-structured keys
+(norms ≈20.0 == other stripes, 24576/24576 unique rows), all 8 replicas of each stripe BIT-IDENTICAL
+over the full timeline, latent + layers 0/4 equally clean, deterministic-replay cross-verified
+(logical page 4 byte-identical across runs on different physical pages). AND the exact guard signature
+was reproduced BENIGNLY at steps 200→201 (= the trip window): the ladder's deterministic cells recycle
+physical pages whose stale bytes already EQUAL the freshly-computed keys ⇒ the write is a byte-level
+no-op ⇒ "512 owned rows unchanged" ⇒ FALSE POSITIVE. My 06:55 "state class named" was premature —
+RETRACTED as to the write path; the flat owner-scatter stands UN-convicted. (Caveats: only slots
+0/1/2/4 dumped — the disk-trim traded away 17 indexer layers; un-captured-step transients not
+excluded; draw2_SICK tar MISSING in GCS — archive step failed, check archive2.log.) THE MISSES REMAIN
+REAL (pred=None ×5 across 2 draws, fabricated '1234567890') ⇒ with writes exonerated at captured
+steps, the mechanism moves to the corpus's F2 suspect: the DECODE-side donated-cache payload gather in
+the attend lax.map (sparse_mla_kernel.py:610) / the Mosaic decode kernel — a READ fault is invisible
+to cache dumps by construction, engine-sticky via the buffer-address/layout lottery (reads of donated
+buffers, the report's class, read-side flavor). BARRIER ARM re-purposed as FALSIFICATION: if writes
+were never guilty, barrier draws stay sick (misses persist; page-reuse trips persist too — they are
+formulation-independent). Guard-2 hardening queued (zero-on-free or expected-value compare). NEXT:
+decode-read-path formulation A/B (enumerate GLM_DSA_MODE / decode gather variants).
