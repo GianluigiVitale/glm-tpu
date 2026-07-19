@@ -3260,3 +3260,21 @@ buffers, the report's class, read-side flavor). BARRIER ARM re-purposed as FALSI
 were never guilty, barrier draws stay sick (misses persist; page-reuse trips persist too — they are
 formulation-independent). Guard-2 hardening queued (zero-on-free or expected-value compare). NEXT:
 decode-read-path formulation A/B (enumerate GLM_DSA_MODE / decode gather variants).
+
+## 2026-07-19 12:45 — BARRIER ARM VERDICT: STILL SICK (2 miss, ZERO guard trips) — the WRITE PATH IS EXONERATED BY A/B; the decode READ side stands alone
+
+Barrier draw 1 (SCATTER_IMPL=barrier — donation broken before the write): 2/6 correct, 2 MISS, guard
+clean, before a disk-guard kill late in the ladder. Combined with the stripe forensics (caches clean,
+trips = replay/reuse false positives), the write side is now DOUBLE-exonerated: different write
+formulation ⇒ same sickness. Sick rate at ladder config now 3/3 serving draws. THE SURVIVING
+HYPOTHESIS SET is decode-READ-side only: (1) the Mosaic dsa_sparse_decode kernel's seg_kv DMA/VMEM
+tiling at production shape (CPU-audit metal residue #1 — a kernel ADDRESSING fault reads wrong HBM
+with a byte-clean cache and a clean host-side view, engine-sticky via the buffer-address draw);
+(2) the jnp.take payload gather lowering (sparse_mla_kernel.py:610-class). DISK LESSON CORRECTED:
+dump step-files ACCUMULATE (273MB/step at 4 slots on w-0) — the guard worked as designed; purged all
+hosts (79G, w-0 33G). NEXT BUILD (fork, env-gated, default-off): (A) GLM_DSA_DECODE_INTERPRET=1 —
+force the Pallas INTERPRETER for dsa_sparse_decode on TPU (bypasses Mosaic compilation, identical
+math; ~seconds/token × ~20 gen tokens = viable even as a gate mitigation); (B)
+GLM_DSA_ATTEND_GATHER_BARRIER=1 — optimization_barrier on the local cache before the flat take
+(breaks read-side donation aliasing). Interpret-arm draws discriminate: never-sick ⇒ Mosaic kernel
+convicted; still-sick ⇒ the take/lowering class (then arm B discriminates further).
