@@ -29,7 +29,7 @@ GCS_DUMPS=gs://driftbench-dsv4-uc/dumps/$TAG
 MAX_DRAWS="${MAX_DRAWS:-10}"
 LADDER_TIMEOUT_S="${LADDER_TIMEOUT_S:-12600}"  # 32K-at-gate-geometry cold compile can eat >1h on the first serving draw
 DUMP_PREFIX=/tmp/dcp_hunt
-DUMP_LAYERS="0,1,2,4,9,14,19,24,29,34,39,44,49,54,59,64,69,74,79,84,89,94"
+DUMP_LAYERS="0,1,2,4"  # 22 slots at 128K filled the disk (step files accumulate across 63 chunks); the victim slot (layer-2 = layer-1 indexer k-cache) + neighbors suffice for the diff
 
 RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=0 GLM_CPU_LOAD_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_DCP_ASSERT_SHARDING=1 GLM_DCP_ASSERT_CACHE_SANITY=1 RAY_DEDUP_LOGS=0 GLM_DCP_CACHE_DUMP='"$DUMP_PREFIX"' GLM_DCP_CACHE_DUMP_LAYERS='"$DUMP_LAYERS"' GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
@@ -82,6 +82,8 @@ for i in $(seq 1 "$MAX_DRAWS"); do
   W=$!; waited=0
   while kill -0 "$W" 2>/dev/null; do
     sleep 30; waited=$((waited + 30))
+    FREE_G=$(df --output=avail -BG / | tail -1 | tr -dc 0-9)
+    [ "${FREE_G:-99}" -lt 15 ] && { say "draw $i: local disk <15G — killing ladder (INFRA)"; pkill -f "residual hunt draw $i "; break; }
     [ "$waited" -ge "$LADDER_TIMEOUT_S" ] && { pkill -f "residual hunt draw $i "; break; }
   done
   wait "$W" 2>/dev/null
