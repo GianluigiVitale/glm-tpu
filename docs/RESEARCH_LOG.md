@@ -3289,3 +3289,14 @@ suite); 74+36+62 tests green. Hunt PIN env-overridable (default 1b481911d). INTE
 (ARM_ENVS=GLM_DSA_DECODE_INTERPRET=1, 4 draws, ladder budget 16000s — interpreted decode is slow):
 zero sick draws ⇒ the Mosaic dsa_sparse_decode kernel is CONVICTED (and interpret becomes the interim
 gate mitigation); sick draws persist ⇒ arm B (gather barrier) discriminates next.
+
+## 2026-07-19 15:30 — Interpret arm: NOT VIABLE (engine-init OOM/SIGSEGV — the interpreter can't trace the decode kernel at production shape); pivoting to the gather-barrier arm
+
+Interpret draw 1: INFRA at engine-core init (Ray actor died — OOM-killer/SIGSEGV class — after ~2h of
+grinding; the Pallas interpreter unrolls dsa_sparse_decode into an enormous XLA graph at top-2048×640
+production shape). HONEST STATUS: the Mosaic-kernel hypothesis is UNTESTED by this arm (inconclusive-
+by-infra, not exonerated). Arm stopped after 1 draw. Probe B arm launching (GLM_DSA_ATTEND_GATHER_
+BARRIER=1 — one semantics-free barrier op before the payload take; discriminates the read-aliasing/
+take-lowering class). If B draws stay sick, the remaining discriminator for the Mosaic kernel is a
+pure-XLA sparse-decode attend fallback (moderate build — the xla_ref math reading the cache at decode;
+also a potential mitigation in itself).
