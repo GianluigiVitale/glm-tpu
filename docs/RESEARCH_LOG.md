@@ -3435,3 +3435,19 @@ without Guard 2 could mean amplifier-removed, not v1-fixed. So the sequence is: 
 (pallas attend, v2 selection, NO sanity) 3 draws — must stay SICK for the A/B to discriminate; then
 (a) v1sel-no-sanity 6 draws. Both at 32K geometry. If (b) goes clean, the amplifier was Guard 2 and
 the repro collapses back to rare — a different (slower) campaign.
+
+## 2026-07-20 09:15 — OVERNIGHT VERDICTS: v2-control (no Guard 2) = 1 SICK / 2 HEALTHY in 3 draws — the repro survives Guard-2 removal; a MANGLED-NEEDLE specimen; v1 arm launching
+
+v2ctrl corrected tally (draws 1,3 were HEALTHY 4/4 — the classifier's hardcoded 6-cell check
+mislabeled short ladders INFRA; fixed): v2-selection at 32K geometry WITHOUT Guard 2: draw 2 SICK with
+3 REAL misses incl. the best specimen yet — 5K d1.0 pred='7657' vs gold='797567': the model retrieved
+a MANGLED needle (middle digits missing — partial corruption of the needle's KV/selection, not
+retrieval failure); 32K both depths pred=None. Draws 1/3: 8/8 cells correct. IMPLICATIONS:
+(1) the repro persists WITHOUT Guard 2 ⇒ the amplifier is not (only) Guard 2 — rate at this config
+~1/3 vs ~5/5 with it armed (small-n; Guard-2 timing may still amplify); (2) needles are ~4× FASTER
+without Guard 2 (5K 22-26s vs ~95s; 32K 121s vs ~460s) — Guard 2 was the ladder slowdown, confirmed;
+(3) NO load-refusals in 3 draws. A/B STATE at 32K-geometry/no-Guard2: v2 = 1 sick/3 draws (real
+misses); v1 = teased clean earlier (3/3 pre-trip, WITH Guard 2) but unmeasured in this config ⇒
+v1 ARM NOW (6 draws, ~30 min each at the faster cadence): v1 0-sick vs v2's rate ⇒ the efficiency-
+campaign v2 transforms convicted ⇒ bisect MERGE/OWNED_SEG/SEG_GATHER; v1 sick ⇒ shared selection
+machinery. (Overnight also: CC session process restarted — setsid runs survived, monitors re-armed.)
