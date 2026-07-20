@@ -3422,3 +3422,16 @@ cycle-A selections-bitwise at 32K pre-owned-width) vs their v1 defaults. v1sel a
 6 draws, explicit v1 envs (accepted values, loud refusal; ARM_ENVS moved to raylet tail = last-wins
 override of the baked v2s). v1 clean ⇒ bisect the three; v1 sick ⇒ shared machinery (scorer/topk/
 block-tables/dcp-select) — instrument the selection outputs next.
+
+## 2026-07-20 03:15 — v1sel draw 1: 3/3 needles CORRECT before a benign sanity trip; Guard-2 disarmed for A/B arms + the amplifier confound handled
+
+v1sel draw 1 (override VERIFIED in worker environ: all three IMPL=v1): 3/3 needles CORRECT (the cells
+where v2 arms missed), then the known-benign page-reuse SANITY false-positive killed the engine
+mid-cell-4 — classified SICK by the guard grep alone, 0 real misses. ADJUSTMENTS: (1) Guard 2 raises
+now destroy draws for zero information (its write-side question is settled; the false-positive
+mechanism is proven) — disarmed via ARM_ENVS last-wins for all further A/B arms (Guard 1 stays);
+(2) CONFOUND: Guard 2's per-step snapshots are themselves an amplifier suspect — a v1-clean result
+without Guard 2 could mean amplifier-removed, not v1-fixed. So the sequence is: (b) v2-CONTROL arm
+(pallas attend, v2 selection, NO sanity) 3 draws — must stay SICK for the A/B to discriminate; then
+(a) v1sel-no-sanity 6 draws. Both at 32K geometry. If (b) goes clean, the amplifier was Guard 2 and
+the repro collapses back to rare — a different (slower) campaign.
