@@ -70,7 +70,7 @@ for i in $(seq 1 "$MAX_DRAWS"); do
   LOG="$RUN_DIR/draw${i}.log"
   say "── draw $i (sick $N_SICK / healthy $N_HEALTHY) ──"
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command="rm -f ${DUMP_PREFIX}*.npz" >/dev/null 2>&1
+    --command="rm -f ${DUMP_PREFIX}*.npz /tmp/dsa_topk*" >/dev/null 2>&1
   EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
     bash ~/glm-tpu/scripts/launch_glm_32chip.sh > "$RUN_DIR/launch${i}.log" 2>&1
   NODES=$(~/vllm-env/bin/ray status 2>/dev/null | grep -cE '^ 1 node_' || true)
@@ -111,10 +111,10 @@ for i in $(seq 1 "$MAX_DRAWS"); do
   grep -E "correct=(True|False)" "$LOG" | sed 's/^/  /' | tee -a "$RUN_DIR/orchestrator.log"
   # archive EVERY draw's dumps (healthy baselines included — the gate3 gap)
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command='
-    H=$(hostname); if ls '"$DUMP_PREFIX"'*.npz >/dev/null 2>&1; then
-      tar czf /tmp/hunt_d'"$i"'_$H.tar.gz '"$DUMP_PREFIX"'*.npz &&
+    H=$(hostname); if ls '"$DUMP_PREFIX"'*.npz /tmp/dsa_topk* >/dev/null 2>&1; then
+      tar czf /tmp/hunt_d'"$i"'_$H.tar.gz $(ls '"$DUMP_PREFIX"'*.npz /tmp/dsa_topk* 2>/dev/null) &&
       gcloud storage cp /tmp/hunt_d'"$i"'_$H.tar.gz '"$GCS_DUMPS"'/draw'"$i"'_'"$V"'/ &&
-      rm -f /tmp/hunt_d'"$i"'_$H.tar.gz '"$DUMP_PREFIX"'*.npz; fi' \
+      rm -f /tmp/hunt_d'"$i"'_$H.tar.gz '"$DUMP_PREFIX"'*.npz /tmp/dsa_topk*; fi' \
     >> "$RUN_DIR/archive${i}.log" 2>&1
   if [ "$N_SICK" -ge 1 ] && [ "$N_HEALTHY" -ge 1 ]; then
     say "════ DIFF PAIR BANKED (sick $N_SICK, healthy $N_HEALTHY in $i draws) — stopping early ════"
