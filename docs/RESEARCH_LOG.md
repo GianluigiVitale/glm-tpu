@@ -3451,3 +3451,19 @@ misses); v1 = teased clean earlier (3/3 pre-trip, WITH Guard 2) but unmeasured i
 v1 ARM NOW (6 draws, ~30 min each at the faster cadence): v1 0-sick vs v2's rate ⇒ the efficiency-
 campaign v2 transforms convicted ⇒ bisect MERGE/OWNED_SEG/SEG_GATHER; v1 sick ⇒ shared selection
 machinery. (Overnight also: CC session process restarted — setsid runs survived, monitors re-armed.)
+
+## 2026-07-20 14:10 — v1 SELECTION IS SICK TOO (draw 2: 2 miss incl. a SECOND mangled-digit specimen) — the three v2s exonerated as sole cause; FULL PRE-CAMPAIGN-REVERT ARM launched
+
+v1b: draw 1 HEALTHY 4/4, draw 2 SICK (5K d0.5 pred=None; 32K d1.0 pred='665060' vs gold='648060' —
+mangled digits again). v1 rate 1/2 ≈ v2's 1/3 ⇒ MERGE/OWNED_SEG/SEG_GATHER v2 are NOT the (sole)
+fault. TWO mangled-needle specimens now ('7657'/'797567', '665060'/'648060'): structure-preserving
+near-miss retrievals ⇒ reads as per-engine SELECTION DEGRADATION (needle positions mostly-but-not-
+fully selected / slightly-wrong scores), consistent with clean-cache forensics — not content
+corruption. Un-reverted campaign knobs shared by both arms: GLM_DSA_BT_WIDTH=owned (W2.1),
+GLM_DSA_DCP_PREFILL_ATTN=segment (S1), chunk 2048. PRECAMP ARM (launched): all three reverted
+(full/masked/mbt-1024) + v1 selection + no Guard-2 = the historically-clean pre-campaign config at
+32K geometry, 5 draws (~1-1.5h each — masked prefill is the slow pre-S1 path; that cost IS the
+experiment). STILL SICK ⇒ the fault PREDATES the campaign (base sparse-DCP machinery: distributed
+topk/LSE/scorer — and the pre-t2j-era sickness data gets re-read under that lens). CLEAN over 5 ⇒
+bisect {owned, segment, chunk}. v1 draws also re-compiled every draw (208 compile lines on draw 2 —
+warm-cache miss per draw, cause unknown, noted not chased).
