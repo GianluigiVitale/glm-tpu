@@ -61,6 +61,8 @@ HASHES=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
 bash ~/glm-tpu/scripts/disk_watchdog.sh check >> "$RUN_DIR/orchestrator.log" 2>&1 || {
   say "ABORT: disk pre-flight"; exit 1; }
 
+N_CELLS=$(( $(echo "$LADDER_LENGTHS" | tr -cd , | wc -c) + 1 ))
+N_CELLS=$(( N_CELLS * 2 ))   # x2 depths
 N_SICK=0; N_HEALTHY=0
 for i in $(seq 1 "$MAX_DRAWS"); do
   T0=$(date +%s)
@@ -100,11 +102,11 @@ for i in $(seq 1 "$MAX_DRAWS"); do
   grep -qE "PwalNanCheckError|LoadNanCheckError|LoadChecksumError" "$LOG" && GUARD="${GUARD}+LOADCLASS"
   if echo "$GUARD" | grep -q LOADCLASS; then V=LOAD_REFUSED
   elif [ "${NM:-0}" -gt 0 ] || [ "$GUARD" != "-" ]; then V=SICK; N_SICK=$((N_SICK+1))
-  elif [ "${NC:-0}" -eq 6 ]; then V=HEALTHY; N_HEALTHY=$((N_HEALTHY+1))
+  elif [ "${NC:-0}" -eq "$N_CELLS" ]; then V=HEALTHY; N_HEALTHY=$((N_HEALTHY+1))
   else V=INFRA; fi
   DUR=$(( $(date +%s) - T0 ))
-  echo -e "$i\t$V\t${NC:-0}/6\t$GUARD\t$DUR" >> "$MANIFEST"
-  say "draw $i: $V (${NC:-0}/6 correct, ${NM:-0} miss, guard=$GUARD, ${DUR}s)"
+  echo -e "$i\t$V\t${NC:-0}/$N_CELLS\t$GUARD\t$DUR" >> "$MANIFEST"
+  say "draw $i: $V (${NC:-0}/$N_CELLS correct, ${NM:-0} miss, guard=$GUARD, ${DUR}s)"
   grep -E "correct=(True|False)" "$LOG" | sed 's/^/  /' | tee -a "$RUN_DIR/orchestrator.log"
   # archive EVERY draw's dumps (healthy baselines included — the gate3 gap)
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command='
