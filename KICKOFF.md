@@ -2,50 +2,54 @@
 
 SOLO, FULLY AUTONOMOUS. Finish **GLM-5.2-FP8** on TPU v4. DON'T STOP/ASK until (1) it serves correctly,
 (2) HF-card benchmarks within noise, (3) the **DSA sparse kernel** clears its gates (passkey ≥95%@128K
-n≥73; throughput ≥256K). Self-correct; when unsure pick + log.
+n≥73; throughput ≥256K). **OWNER RULE: NO SHORTCUTS — root cause properly fixed + validated before any
+re-gate; no workaround gating.** Self-correct; when unsure pick + log.
 
-## STATE (2026-07-18 19:30 UTC; RESEARCH_LOG 07-18 09:05→19:15)
-- Fork tip **a225d16b4** synced 8×: t2j alias fix (lottery root cause; 3/3 adversarial reviews banked)
-  + PWAL/LOAD NaN refusals + CPU stage-splitter + **GLM_LOAD_CHECKSUM** (categorical per-load byte-verify
-  cpu-vs-device at the t2j boundary — catches FINITE corruption; validation 4/4 clean, live 8 hosts,
-  verified=1882/host, 312 benign 0-d skips).
-- **THE SPARSE 128K GATE IS RUNNING**: ~/glm-run/gate128k_20260718T110127Z, n=77, PIN a225d16b4,
-  **33/33 through d=0.0/0.05/0.95** — the gate2 killer cell CLEARED (gate2's 0/11 WAS the lottery). ETA ~05-07 UTC 07-19. Per-depth GCS ckpts; miss-abort at 2; HEALTH_RETRIES=8.
-  **CHECK ITS STATE FIRST (orchestrator.log + results.db) — NEVER launch pod work while it runs.**
-- **RESIDUAL SPECIMEN (hypothesis REVISED)**: d=0.05 try-1 sick engine was byte-verified CLEAN on every
-  surface (H2D checksums, PWAL/LOAD, cache dumps 0-NaN) yet FLUENT-FILLER missed a 5K needle ⇒ residual
-  ≈14%/draw is NOT H2D weight corruption. Candidates: (a) CPU-side finite corruption pre-t2j (needs GCS
-  reference-checksum manifest vs pre-t2j bytes), (b) engine-instance STATE (XLA program draw, device
-  order, KV/selection). Specimen banked: db run 193 + specimen_d005_try1/. Health probe caught it in 2 min.
-- Xprof 128K: NO single dominator (S2 not justified); chunk ≈9.35 s at tiny kv ⇒ per-chunk cost
-  dominates prefill. Efficiency targets (post-gate): top_k 21.8%, gathers 16%, collectives ~24%.
-- Ready to land post-gate: **~/wt-sibling-alias** (4 commits: weight_utils/gpt_oss/multimodal alias
-  fixes + 0-d checksum coverage; 38 tests green). Backup bundle in GCS 07-18.
+## STATE (2026-07-20 17:00 UTC; RESEARCH_LOG 07-19 21:10 → 07-20 14:10)
+- Fork tip **a10d2a426** synced 8× (t2j fix, NaN/checksum integrity stack, read probes, xla-attend
+  gate, audit fixes). Dense 128K gate CLOSED 77/77. GATE3 (sparse) died 33/35 honestly.
+- **THE RESIDUAL = per-engine SELECTION DEGRADATION** (2 mangled-digit specimens: pred '7657' vs gold
+  '797567', '665060' vs '648060' — needle positions mostly-but-not-fully selected). ELIMINATED, each
+  instrument-proven: weights (byte-checksum), caches (bit forensics; Guard-2 trips = page-reuse FALSE
+  POSITIVES), write path (barrier A/B), Mosaic decode attend (xla-bypass A/B, wiring CI-proven),
+  proc/mesh order, v2 gather transforms as sole cause (v1 arm sick too).
+- **RUNNING: the precamp arm** — FULL campaign revert (BT_WIDTH=full, PREFILL_ATTN=masked, mbt 1024,
+  v1 selection, no Guard-2) ×5 draws, 32K geometry (~1-1.5h/draw). CLEAN ⇒ bisect {owned-width,
+  segment-prefill, chunk-2048} one at a time. SICK ⇒ fault PREDATES the campaign ⇒ arm
+  **GLM_DSA_DUMP_TOPK** (exists, zero code) on fixed-seed sick+healthy draws and diff selections.
+- LOAD CLASS (separate): streamer delivers corrupt bytes CPU-side (CPU-scan-attributed); ~20% of
+  draws auto-refused (costs a retry). Fix = gcsfuse/local-disk (§COST pre-authorized) — land RIGHT
+  BEFORE gate4, never mid-hunt (one variable at a time).
+- Amplified repro: `hunt_residual.sh` + ARM_ENVS/ARM_TAG/PIN/GEO_MAX_LEN/GEO_BLOCKS/GEO_MBT/
+  LADDER_LENGTHS overrides (ARM_ENVS = raylet-tail last-wins; verify via worker /proc environ).
+- 128K-shape armed variants (interpret/read-barrier/xla-attend) die at engine-init compile — probe at
+  32K geometry; the 128K mitigation-compile issue is post-fix work.
+- Ready: stage256k.sh (update PIN+envs at launch), ~/wt-sibling-alias (4 commits, land post-gate),
+  PR audits banked (re-cut actions listed; DCO = owner-side), GCS backups current.
 
 ## FRONTIER (in order)
-1. **Gate verdict**: PASS 77/77 ⇒ bank + DSA 128K gate CLOSED (update all docs). ONE miss ⇒ extend
-   n≈130. 2-miss abort ⇒ forensics from the armed instruments + the specimen, never rate experiments.
-2. **256K**: fit/geometry probe (dcp=8 deferred to this stage; novel geometry = cold compile ~40 min),
-   correctness needles, then sparse-vs-dense throughput A/B at IDENTICAL dcp.
-3. Land sibling-alias; draft the t2j-fix upstream PR (owner submits).
-4. Residual hunt FROM THE SPECIMEN: (a) CPU reference checksums or (b) engine-state instruments.
-5. Benchmarks: GSM8K n≥200, GPQA-198@16K (owner-gated), fp8-KV dcp=1 needle, MTP unfreeze, PR re-cut.
+1. Precamp verdict → branch per above (bisect vs selection-dump dissection).
+2. ROOT-CAUSE the guilty component (jaxpr/HLO comparison, pageloop-report methodology) → proper fix →
+   CPU-bitwise proof → adversarial review → metal validation on the 30-90min repro cycle.
+3. Streamer fix (gcsfuse Plan A, disk fallback) + validate loads clean.
+4. **GATE4** n=77 @128K: fixed config, full integrity stack, 32K health needle (5K proven blind),
+   Guard-1 on / Guard-2 OFF (false-positive class). Miss-abort 2; per-depth ckpts.
+5. 256K stage (stage256k.sh). 6. GSM8K n≥200, GPQA@16K (owner-gated), MTP unfreeze, PR re-cut.
 
 ## HARD RULES
-COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach to the 8 hosts
-pre-authorized. METHOD: observability-first; **corpus-first re-read on any domain shift**; fix root
-cause; gated + CPU test + adversarial review + pod validation; honest nulls; small-n never a gate.
-COMMIT+PUSH every milestone. Agents: worktrees, JAX_PLATFORMS=cpu, read-only on the fork. Serialize TPU
-access. Owner submits PRs; no force-push (follow-up commits only).
+COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach pre-authorized. METHOD:
+observability-first; corpus-first re-read on domain shift; ONE VARIABLE AT A TIME; wiring must be
+falsifiable (spy/liveness tests, environ checks); honest nulls; small-n never a gate. COMMIT+PUSH
+every step. Agents: worktrees, JAX_PLATFORMS=cpu. Serialize TPU. Owner submits PRs; no force-push.
 
 ## READ FIRST
-HANDOFF.md → RESEARCH_LOG 07-18 09:05 on → the gate orchestrator.log. Verify 8× a225d16b4.
+HANDOFF.md → RESEARCH_LOG **2026-07-19 21:10 onward** → the running arm's outer log in ~/glm-run/.
+Check pgrep -f "hunt_residual[.]sh" BEFORE any pod action.
 
 ## LANDMINES
-**THIS VM IS POD WORKER-0** — a `--worker=all` git command mutates the LOCAL checkout too. `ls -td
-~/glm-run/gate128k_*` races gate128k_outer.log — use the explicit run-dir name. Sync verify 8× ALWAYS
-(stale index.lock ⇒ rm + re-pull). RAY_DEDUP_LOGS=0 on forensics. Armed PWAL raise preempts LOAD
-census. Init geometry must match the warm XLA cache (novel = ~40 min compile). setsid --wait; pkill
-patterns paren-free. "PASS" greps match hlo_passes.cc. GLM_* raylet-baked AND driver-exported. Scatter
-bakes per-path (dense pageloop STAYS; DSA flat unset). Disk: w-0 baseline includes scratch; archive+purge
-per draw. Dump tars compress ~150:1. Firewall tag orphans on pod recreation.
+THIS VM IS POD WORKER-0 (--worker=all git mutates the local checkout). pkill/pgrep -f SELF-MATCHES the
+shell's eval line — bracket the pattern ("name[.]sh"). `ls -td` globs race outer-log FILES — use
+explicit dirs. NEVER edit a script bash is executing. Dump step-files ACCUMULATE (~273MB/step @128K —
+disk guard at <15G is armed). Don't sync workers mid-arm (breaks provenance). Load-refusals ≈20% of
+draws — classifier handles them (LOAD_REFUSED ≠ the diff-pair sick). Armed-variant cold compiles can
+exceed 1h — LADDER_TIMEOUT_S. setsid --wait; RAY_DEDUP_LOGS=0 on forensics; GLM_* raylet AND driver.
