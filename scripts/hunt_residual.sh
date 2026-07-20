@@ -33,7 +33,8 @@ SCATTER_IMPL="${SCATTER_IMPL:-}"
 ARM_ENVS="${ARM_ENVS:-}"
 LADDER_LENGTHS="${LADDER_LENGTHS:-5000,32000,128000}"
 GEO_MAX_LEN="${GEO_MAX_LEN:-131840}"
-GEO_BLOCKS="${GEO_BLOCKS:-68}"        # extra space-separated KEY=VAL envs for this arm (raylet + driver)   # empty = flat (default); "barrier" = the donation-breaking probe arm
+GEO_BLOCKS="${GEO_BLOCKS:-68}"
+GEO_MBT="${GEO_MBT:-2048}"        # extra space-separated KEY=VAL envs for this arm (raylet + driver)   # empty = flat (default); "barrier" = the donation-breaking probe arm
 DUMP_LAYERS="0,1,2,4"  # 22 slots at 128K filled the disk (step files accumulate across 63 chunks); the victim slot (layer-2 = layer-1 indexer k-cache) + neighbors suffice for the diff
 
 RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_DSA_DCP_SCATTER_IMPL='"$SCATTER_IMPL"' GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=0 GLM_CPU_LOAD_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_DCP_ASSERT_SHARDING=1 GLM_DCP_ASSERT_CACHE_SANITY=1 RAY_DEDUP_LOGS=0 GLM_DCP_CACHE_DUMP='"$DUMP_PREFIX"' GLM_DCP_CACHE_DUMP_LAYERS='"$DUMP_LAYERS"' GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'' '"$ARM_ENVS"
@@ -82,7 +83,7 @@ for i in $(seq 1 "$MAX_DRAWS"); do
     # shellcheck disable=SC2086
     env $DRIVER_ENVS setsid --wait nohup ~/vllm-env/bin/python -u glm_longctx.py \
       --lengths "$LADDER_LENGTHS" --depths 0.5,1.0 --trials 1 --max-seqs 1 \
-      --gmu 0.90 --max-batched-tokens 2048 --num-gpu-blocks "$GEO_BLOCKS" --max-len "$GEO_MAX_LEN" \
+      --gmu 0.90 --max-batched-tokens "$GEO_MBT" --num-gpu-blocks "$GEO_BLOCKS" --max-len "$GEO_MAX_LEN" \
       --note "residual hunt draw $i ($TAG)" </dev/null > "$LOG" 2>&1
     echo "DRIVER_EXIT=$?" >> "$LOG"
   ) &
