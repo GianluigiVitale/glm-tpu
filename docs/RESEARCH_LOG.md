@@ -3467,3 +3467,24 @@ experiment). STILL SICK ⇒ the fault PREDATES the campaign (base sparse-DCP mac
 topk/LSE/scorer — and the pre-t2j-era sickness data gets re-read under that lens). CLEAN over 5 ⇒
 bisect {owned, segment, chunk}. v1 draws also re-compiled every draw (208 compile lines on draw 2 —
 warm-cache miss per draw, cause unknown, noted not chased).
+
+## 2026-07-20 17:40 — FINGERPRINTS: sick and healthy draws ran IDENTICAL executables — compile variance refuted; SELECTION-DUMP ARM launched (the decisive instrument)
+
+Executable-fingerprint set comparison across v2ctrl draws (same arm, same envs): healthy1 193 /
+sick2 192 / healthy3 192 unique fingerprints; pairwise diffs ≤1 line; sick-only = 0 ⇒ compilation is
+DETERMINISTIC across launches (no persistent jax cache configured — "cache hit rate 0.0%" — yet the
+fingerprints match: recompiles reproduce the same executables; a persistent cache would only save
+compile TIME). ⇒ per-launch program variance REFUTED as the per-engine mechanism. Same program + same
+logical inputs + different behavior ⇒ the nondeterminism enters at RUNTIME STATE — lead suspect:
+physical block-table page assignment feeding any page/position-keyed ordering in the selection chain
+(a fixed executable tie-breaks identically on identical VALUES, but physical page ids ARE
+engine-history-dependent values). External-conversation input (owner): the top-k TIE-BREAK hypothesis
+(FP8-grid scores ⇒ tie classes ⇒ instance-divergent selection) + the needle-spans-block-boundary
+hypothesis — both fold into the same measurement. PRECAMP ARM retired mid-run (draw 1 LOAD_REFUSED,
+draw 2 unfinished — the dump-diff supersedes rate arms). TOPKDUMP ARM launched: base v2 config,
+GLM_DSA_DUMP_TOPK armed (traced-in callback — both diff draws identically armed, F3-consistent),
+32K geometry, early-stop at a sick+healthy pair; archiver extended to capture /tmp/dsa_topk*. Offline
+decider: byte-diff selected indices (fixed seed ⇒ identical logical inputs): selections differ ⇒
+nondeterminism proven + localized (ties vs boundary blocks visible directly); selections identical on
+a sick draw ⇒ degradation downstream of selection (would contradict the xla-attend-sick datum —
+strong-inference either way. ETA: pair likely within 3-5 draws (~2-4h incl. the armed-program compile).
