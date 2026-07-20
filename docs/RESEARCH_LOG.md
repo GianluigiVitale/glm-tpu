@@ -3405,3 +3405,20 @@ control arm (runs immediately after, morning 07-20): sick(pallas-32K) > 0 AND si
 kernel convicted at 32K; both clean ⇒ the fault needs 128K-shape programs — different experiment
 (and the xattend-at-128K compile failure becomes the priority bug: the mitigation path needs it fixed
 or the Mosaic kernel repaired). Any sick xla draw ⇒ fault upstream of the attend (selection/gather).
+
+## 2026-07-20 00:40 — ⭐ X32 DRAW 1: SICK WITH THE XLA ATTEND — the Mosaic decode kernel is EXONERATED; the fault is UPSTREAM (selection/gather); v1-SELECTION ARM launched
+
+X32 draw 1 (32K geometry, GLM_DSA_DECODE_ATTEND=xla, dispatcher liveness CI-proven): 0/6, 3 miss,
++SANITY trip (page-reuse false-positive class applies equally here). THREE verdicts in one draw:
+(1) the Mosaic dsa_sparse_decode attend is NOT the fault (sick without it); (2) 32K-GEOMETRY engines
+CAN be sick — the pre-registered ambiguity branch is dead; (3) the ladder config now reproduces at
+~5/5 serving draws (vs the gate's ~1/5) — an AMPLIFIED REPRO (whatever amplifies it — Guard-2 per-step
+snapshots, per-step dumps, or the mixed-length request churn — it is now a 25-min repro instead of a
+14h lottery; amplifier identification deferred, exploitation first). SURVIVING SUSPECTS: the selection
+chain (scorer walk → hierarchical topk → dcp merge) and the shared payload gather. SHARPEST CUT: the
+three efficiency-campaign v2 transforms (GLM_DSA_MERGE_IMPL / OWNED_SEG / SEG_GATHER — landed 07-13,
+sit EXACTLY in the surviving region, adversarially reviewed as CPU-bitwise but metal-validated only by
+cycle-A selections-bitwise at 32K pre-owned-width) vs their v1 defaults. v1sel arm: 32K geometry,
+6 draws, explicit v1 envs (accepted values, loud refusal; ARM_ENVS moved to raylet tail = last-wins
+override of the baked v2s). v1 clean ⇒ bisect the three; v1 sick ⇒ shared machinery (scorer/topk/
+block-tables/dcp-select) — instrument the selection outputs next.
