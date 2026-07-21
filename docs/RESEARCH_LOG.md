@@ -3574,3 +3574,17 @@ zero-row, both -inf post-mask, divergent only for an impossible live-OOB id) doc
 VALIDATION ARM (fixval): 4 draws, base config + onehot + topk dumps; the CATEGORICAL criterion: all
 ladders clean AND cross-engine selection/score dumps BIT-IDENTICAL across every draw pair (the
 measured healthy signature — determinism restored = defect removed at root; no rate statistics).
+
+## 2026-07-21 17:20 — Fix review: SAFE-FOR-VALIDATION (2 MAJOR caveats, neither in the gate regime); validation draw 1 in flight
+
+Adversarial review of 473904510: gather elimination + hoisting verified (cache_flat reshape at top
+level, ~8.9MB/shard, ~10ms/chunk ≈ <0.1%); bf16 bit-exactness airtight for finite payloads (300
+adversarial trials byte-equal; MXU semantics argued); OOB invariant verified across ALL three caller
+sites; mutation check: a broken onehot fails 13/15 tests. MAJOR-1: 0×Inf/NaN pool-page poison —
+DORMANT in the gate config (zero-init caches + NaN-refusing load stack) but a robustness regression vs
+take; fix = the codebase's own H4 mask-to-zero pattern. MAJOR-2: num_pages = the FULL pool — at gate
+config (max_seqs=1, blocks=68) pool ≈ per-request = exactly the characterized regime; multi-request
+production needs the guard + re-characterization. MINOR: two docstring overclaims (signed-zero flip;
+f32-on-TPU precision). SEQUENCING: current validation completes untouched → land the H4 guard +
+docstring fixes as a follow-up (finite-input bitwise-provable, zero behavior change in the gate
+regime) → GATE4 at the follow-up tip.
