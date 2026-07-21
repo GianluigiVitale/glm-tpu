@@ -3523,3 +3523,20 @@ measurement): make the scorer's page mapping/accumulation layout-independent; ti
 pointless. DECISIVE CODE-LEVEL TEST: the block-permutation invariance probe ON METAL — same logical
 content, permuted physical layout ⇒ scores must be invariant; the CPU block-perm suite exists
 (test_adv_segment_block_permutation_cpu.py), the metal twin is the localizer.
+
+## 2026-07-21 12:30 — LOCALIZATION: CPU logic exonerated by falsification; the defect = metal sublane-stripe access on the donated striped indexer k-cache; WRITE-vs-READ decided OFFLINE next
+
+Localization agent (full report banked): the entire scorer chain is PROVABLY layout-independent on CPU
+(falsification tests: permuted physical layouts with foreign-key-seeded free pages, ragged pads,
+partial pages, dcp=4 shard_map — max|Δscore|=0, selection set- and order-equal) ⇒ the corruption is a
+v4 LOWERING defect, not scorer math. RANKED SITES: (1) the scorer gather k_cache[page_ids]
+(glm_dsa_indexer.py:991) — the one deref of engine-init page ids into the fp32 score accumulation;
+sublane-stripe misread explains partial-block 3/42; (2) its dcp=4 shard_map wrapping
+(_dcp_score_select, mla_attention.py:2360) on the donated striped local slice — the write-side
+pageloop defect's exact buffer/geometry; (3) residual WRITE stale-stripes at gate width (flat was
+never H/H2-validated at owned-width — the docstring admits it). IndexShare can only propagate, never
+create. THE REMAINING FORK — WRITE-residual vs READ-gather — decides the fix target, and the
+discriminator runs OFFLINE on data already in GCS: the topkdump draws archived BOTH the indexer cache
+dumps AND the scores for 4 healthy + 1 sick engine at matched steps. Cache byte-identical + scores
+divergent ⇒ READ; cache divergent on owned-below-kv_len slots ⇒ WRITE. Agent launched. (The
+sentinel-seed metal probe remains the backup if the offline data is inconclusive.)
