@@ -3540,3 +3540,24 @@ discriminator runs OFFLINE on data already in GCS: the topkdump draws archived B
 dumps AND the scores for 4 healthy + 1 sick engine at matched steps. Cache byte-identical + scores
 divergent ⇒ READ; cache divergent on owned-below-kv_len slots ⇒ WRITE. Agent launched. (The
 sentinel-seed metal probe remains the backup if the offline data is inconclusive.)
+
+## 2026-07-21 14:50 — ⭐ WRITE EXONERATED / READ CONVICTED: byte-identical caches AND block tables across engines, divergent scores — the scorer's multi-page gather is the defect; FIX BUILD LAUNCHED
+
+Offline discriminator (agent, full report banked; scratchpad/write_vs_read/): written-region byte
+compare across d1/d3(healthy)/d6(sick) — 290,530 key-vectors, ZERO diffs (all dumped layers; the
+predicted sublane {0,1,8,9} rows specifically: 72,704 vectors, 0 diffs); block_tables IDENTICAL across
+draws; replica integrity intact. Scores diverge ON THIS IDENTICAL INPUT (control d1-vs-d3: 16/21
+events; sick d6 cell-C needle 3.2/42 reading a cache byte-identical to healthy's; deltas to ±67).
+Divergence begins EXACTLY when the read spans >1 physical page (first single-page chunk of every cell:
+identical scores; block 2 onward: divergent) — the multi-page paged-gather read signature. REFINED
+MECHANISM: with executables, cache bytes, AND page tables all identical, the engine-fixed hidden
+variable is the BUFFER ADDRESS NEIGHBORHOOD drawn at init — the lowered gather's addressing pulls
+out-of-buffer/neighbor bytes (the pageloop class, READ flavor: "whatever the previous occupant left
+in HBM"), fixed per instance ⇒ discrete states; identical-allocation engines (d1≡d2) coincide.
+(Caveats honored: proc0 covers dcp shards 0,1 — the 5K-cell needle IS in the visible half and gives a
+direct conviction; decode convicted via append-only reads of the proven-identical prefill cache.)
+FIX: reformulate the scorer page fetch — GLM_DSA_SCORER_GATHER=onehot (one-hot matmul page fetch:
+[T,num_pages] @ [num_pages, P*D] — num_pages ≤68, bandwidth-trivial; the SEG_GATHER-v2 trick applied
+to the scorer), env-gated default-off, CPU-bitwise vs take-based, both plain and dcp paths. VALIDATION
+CRITERION (categorical, no rate stats): with the fix armed, two engines' full selection+score dumps
+must be BIT-IDENTICAL (the measured healthy signature) AND ladders clean — 2-3 draw pairs decide.
