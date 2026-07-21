@@ -3588,3 +3588,22 @@ production needs the guard + re-characterization. MINOR: two docstring overclaim
 f32-on-TPU precision). SEQUENCING: current validation completes untouched → land the H4 guard +
 docstring fixes as a follow-up (finite-input bitwise-provable, zero behavior change in the gate
 regime) → GATE4 at the follow-up tip.
+
+## 2026-07-21 21:20 — ❌ HONEST NULL: onehot did NOT restore determinism (1930 vs baseline 1925 divergent keys) — the gather is exonerated; the DONATION of the indexer cache is the surviving suspect; un-donate fix launching
+
+Fixval verdict (agent, verbatim numbers banked): draw2-vs-draw3 with onehot armed — 1930/2310 nonempty
+keys diverge on BOTH index and score CRCs (baseline 1925); positions/valid identical (inputs same);
+direct array spot-checks confirm real score-value divergence. WIRING CONFIRMED indirectly-but-strongly:
+the same ARM_ENVS string's sibling env produced the 15GB topk dumps ⇒ the mechanism delivered onehot to
+the raylet. REFUTED: the scorer's page gather as the divergence source (zero-gather program, unchanged
+divergence). SURVIVING MECHANISM (and it was the report's own phrase all along): the DONATED striped
+buffer's IN-PROGRAM access — host reads (device_get, the dumps) see true bytes; in-program reads
+through the donated aliasing see instance-dependent bytes REGARDLESS of read formulation (gather or
+matmul); per-instance-fixed via the allocation/aliasing draw; single-page reads escape (aligned
+window). FIX CANDIDATE (principled — targets the documented enabling condition): UN-DONATE the indexer
+k-caches — exclude the indexer cache group from the step-fn donation (find donate_argnums/donation
+config in the runner/wrapper); cost = double-buffering ONLY the indexer caches ≈ 21 × 34MB ≈ ~700MB/
+shard (affordable at 29/30.75GB; the latent caches STAY donated — un-donating those would OOM).
+Env-gated GLM_DSA_IDX_CACHE_NO_DONATE=1, default off, gate-off byte-identical, CPU tests + the same
+categorical validation criterion. TIMELINE: the pre-declared +1-day slip branch is now real — 128K
+gate ~07-24, 256K ~07-25 if the un-donate candidate validates overnight 07-22→23.
