@@ -3499,3 +3499,27 @@ executables. Analysis agent launched (polls for the draw-6 upload): (1) healthy-
 control — the single most important number; (2) sick-diff characterization (tie-boundary flips vs
 score divergence vs missing needle blocks, scores included in the dumps); (3) needle-region membership
 per missed cell. This measurement decides the fix design.
+
+## 2026-07-21 11:45 — ⭐⭐⭐ THE MECHANISM, MEASURED: per-engine-DISCRETE INDEXER SCORE STATES (~120-pt swings), upstream of top-k — layout-leak into the paged score accumulation
+
+Selection-dump forensics (agent, full report banked; artifacts scratchpad/topk_diff/):
+DETERMINISM CONTROL: draw1≡draw2 (two distinct engines) BIT-IDENTICAL selections AND scores (0/2310
+mismatches); draw3 (HEALTHY, all cells correct) differs from them on 1925/2310 keys; draw6 (SICK)
+another distinct state ⇒ engines fall into DISCRETE PER-INSTANCE-FIXED score states — not per-forward
+randomness, not FP epsilon. SICK DIFF: 1562/1562 differing decode keys are SCORE-DIVERGENCE (0 tie
+flips — the tie-break hypothesis is REFUTED); |Δscore| up to ~107-122 on a −115..+82 range; k-th
+boundary swings e.g. −91.2→+5.7; drops span the whole rank range incl. rank-0. NEEDLE (cell C, 32K
+d0.5, the clean smoking gun): healthy selects 41/42 needle-block positions per decode query; SICK
+3.2/42 (122/285 queries select ZERO needle positions). Cells B/D (needle at end): needle RETAINED,
+failure via global ~24% selection scramble. Cell A survives on budget (5K ⇒ 41% of positions selected
+vs 32K ⇒ 6% — the fragile sparse regime). MECHANISM: the fault is UPSTREAM of top-k in the indexer/
+scorer — per-engine-fixed, huge-magnitude score corruption whose discreteness tracks ENGINE-INIT STATE:
+the strongest inference is PHYSICAL PAGE/BLOCK-TABLE LAYOUT leaking into the paged score accumulation
+(wrong/differently-ordered page reads in the scorer walk; cache CONTENT proven clean — the scoring
+READ is mis-mapped). Explains: v1 AND v2 sick (scorer shared), xla-attend sick (upstream), byte-clean
+caches, budget-dependent length profile, health-probe blindness, mangled digits (partial needle-block
+selection), gate2/gate3 deaths, draw1≡draw2 (same layout draw ⇒ same scores). FIX DESIGN (per the
+measurement): make the scorer's page mapping/accumulation layout-independent; tie-break work is
+pointless. DECISIVE CODE-LEVEL TEST: the block-permutation invariance probe ON METAL — same logical
+content, permuted physical layout ⇒ scores must be invariant; the CPU block-perm suite exists
+(test_adv_segment_block_permutation_cpu.py), the metal twin is the localizer.
