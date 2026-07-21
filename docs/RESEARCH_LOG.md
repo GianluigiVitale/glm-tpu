@@ -3607,3 +3607,16 @@ shard (affordable at 29/30.75GB; the latent caches STAY donated — un-donating 
 Env-gated GLM_DSA_IDX_CACHE_NO_DONATE=1, default off, gate-off byte-identical, CPU tests + the same
 categorical validation criterion. TIMELINE: the pre-declared +1-day slip branch is now real — 128K
 gate ~07-24, 256K ~07-25 if the un-donate candidate validates overnight 07-22→23.
+
+## 2026-07-21 23:55 — UN-DONATE FIX LANDED (d7ad7963b, synced 8×): indexer caches excluded from step-fn donation; overnight categorical validation launching
+
+GLM_DSA_IDX_CACHE_NO_DONATE=1: kv_caches split at the jit boundary (donate_argnums=(0,) on the latent
+list; indexer caches threaded fresh — JAX donates whole args, so per-cache = arg-split), covering BOTH
+wrapper jit sites (draft_step_fun + step_fun partial ⇒ all three GLM step fns). Verified: behavioral
+donation on CPU (donated inputs deleted, indexer inputs alive, outputs bitwise-equal) + compiled
+input_output_alias introspection + gate-off byte-identity (88-test hash suites). 148 tests green; 10
+failures proven pre-existing (memory_stats-on-CPU class, stash-reverted identical). DECLARED GAP: the
+off-by-default continue_decode fused loop re-donates at its own carry boundary — documented, not the
+measured hazard path. Validation arm (fixval2): 4 draws, 32K geometry, onehot LEFT ARMED TOO (both
+fixes stack — onehot is independently harmless and gather-free) + DUMP_TOPK; criterion unchanged:
+clean ladders + cross-engine bit-identity.
