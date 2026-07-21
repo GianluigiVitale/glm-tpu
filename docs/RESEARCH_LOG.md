@@ -3488,3 +3488,14 @@ decider: byte-diff selected indices (fixed seed ⇒ identical logical inputs): s
 nondeterminism proven + localized (ties vs boundary blocks visible directly); selections identical on
 a sick draw ⇒ degradation downstream of selection (would contradict the xla-attend-sick datum —
 strong-inference either way. ETA: pair likely within 3-5 draws (~2-4h incl. the armed-program compile).
+
+## 2026-07-21 09:25 — ⭐ THE DIFF PAIR IS COMPLETE: draw 6 SICK (3 miss) WITH selection dumps armed — observer-effect refuted; the decisive diff running
+
+Topkdump arm final: draws 1-4 HEALTHY (4×, all cells), draw 5 LOAD_REFUSED (streamer), draw 6 SICK
+(5K d1.0 + 32K both depths pred=None; 5K d0.5 correct) — the sickness EXPRESSES under the armed dump
+callbacks (the suppression worry after 4/4 healthy dies at p-level; the streak was luck). WE NOW HOLD
+fixed-seed selection dumps from 4 healthy + 1 sick engine on identical inputs and proven-identical
+executables. Analysis agent launched (polls for the draw-6 upload): (1) healthy-vs-healthy determinism
+control — the single most important number; (2) sick-diff characterization (tie-boundary flips vs
+score divergence vs missing needle blocks, scores included in the dumps); (3) needle-region membership
+per missed cell. This measurement decides the fix design.
