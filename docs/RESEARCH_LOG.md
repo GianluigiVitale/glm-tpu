@@ -3620,3 +3620,11 @@ off-by-default continue_decode fused loop re-donates at its own carry boundary �
 measured hazard path. Validation arm (fixval2): 4 draws, 32K geometry, onehot LEFT ARMED TOO (both
 fixes stack — onehot is independently harmless and gather-free) + DUMP_TOPK; criterion unchanged:
 clean ladders + cross-engine bit-identity.
+
+## 2026-07-22 00:20 — Ops note: fixval2 launched while fixval draw-4 was mid-ladder (my sequencing error) — draw 4 INFRA by ray-restart collision; no data lost
+
+The old arm exited at MAX_DRAWS seconds later; its archive-purge ran before fixval2 had dumps on disk
+(4s window, engine still launching) ⇒ no loss. Old-arm final: 0 sick / 2 healthy / 1 LOAD_REFUSED /
+1 INFRA(collision) — its verdict (the onehot null) was already extracted from draws 2-3. LANDMINE
+(standing): ALWAYS verify `pgrep hunt_residual[.]sh` empty before launching an arm — the launcher's
+ray restart kills any serving engine.
