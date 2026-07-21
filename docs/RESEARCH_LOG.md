@@ -3561,3 +3561,16 @@ FIX: reformulate the scorer page fetch — GLM_DSA_SCORER_GATHER=onehot (one-hot
 to the scorer), env-gated default-off, CPU-bitwise vs take-based, both plain and dcp paths. VALIDATION
 CRITERION (categorical, no rate stats): with the fix armed, two engines' full selection+score dumps
 must be BIT-IDENTICAL (the measured healthy signature) AND ladders clean — 2-3 draw pairs decide.
+
+## 2026-07-21 16:10 — THE FIX LANDED (473904510, synced 8×): GLM_DSA_SCORER_GATHER=onehot — zero-gather scorer page fetch; categorical validation arm launching
+
+One gated branch in paged_indexer_scores (covers dcp + non-dcp — both call the helper): the one-hot
+matmul page fetch replaces k_cache[page_ids] — bit-exact BY CONSTRUCTION (single-1.0 contraction in
+the payload dtype, preferred_element_type=f32; no summation ⇒ no rounding; verified byte-equal fp32 +
+bf16), jaxpr on the fixed path has ZERO gathers (take: 1 gather/2 dots ⇒ onehot: 0 gathers/3 dots —
+the mislowered op class is REMOVED, not patched around). Gate-off byte-identical (hash suite 62/62);
+139 tests green incl. the falsification scenarios as pytest; the one OOB corner (clip-to-last-page vs
+zero-row, both -inf post-mask, divergent only for an impossible live-OOB id) documented + pinned.
+VALIDATION ARM (fixval): 4 draws, base config + onehot + topk dumps; the CATEGORICAL criterion: all
+ladders clean AND cross-engine selection/score dumps BIT-IDENTICAL across every draw pair (the
+measured healthy signature — determinism restored = defect removed at root; no rate statistics).
