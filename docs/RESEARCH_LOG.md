@@ -3644,3 +3644,21 @@ LAYERSCAN ARM — 2 draws, GLM_DCP_CACHE_DUMP_LAYERS=13-21 (the entry window; th
 per layer ARE per-layer hidden-state hashes) + topk dumps; offline per-layer byte-compare across the
 pair ⇒ the first divergent layer names the site to ±1; then read that layer's specifics (evt→layer
 map from the indexer_types schedule to be confirmed against the dump names).
+
+## 2026-07-22 21:15 — ⭐⭐⭐ ENTRY BRACKETED: hidden identical entering L15, divergent entering L17; POSITION-GATED (only pos≥2048 = the sparse-path tokens); small onset (0.16) amplifying (5.2)
+
+lscan3 verdict (agent, full report banked; both instruments agree point-for-point): k-caches L13/L15
+IDENTICAL (34/34 steps), L17/L19/L21 DIVERGENT (32/34; the 2 identical = kv=2048 first-chunk steps);
+topk evt00-03 identical / evt04+ divergent; inferred evt_j = layer 2j+9 (indexer on odd layers 9..49;
+anchor evt04↔L17 robust under both mappings). THE THREE CLUES: (1) entry at L16-or-17 (stride-2 gap;
+one stride-1 L16 dump refines); (2) POSITION-GATING at 2048 = the dense-fallback/sparse boundary —
+dense-path tokens stay CLEAN through the divergent layers; (3) small-onset-amplifying ⇒ a tiny
+per-layer perturbation compounding. INTERSECTION (sparse-only × one-layer × instance-constant ×
+invisible to all input-side checks) ⇒ NEW PRIME SUSPECT: the DERIVED ON-DEVICE STATE (absorbed
+weights w_uk_t/w_uv / per-layer prepped buffers — computed at INIT, AFTER the load checksum's t2j
+coverage; a per-instance-corrupted derived tensor at one layer is instance-FIXED, explains
+discreteness, and if the corrupt fragment sits in sparse-path-only prep, explains the gating).
+NEXT (cheap, decisive): GLM_STATE_HASH — extend the load-checksum machinery to log a uint32 sum per
+FINAL model-state leaf (the LOAD_NAN_CHECK leaf walker) at init; 2 init-only draws (~15 min each);
+offline leaf-sum diff across engines ⇒ names the corrupted tensor OR exonerates derived state (then
+the fault is the layer COMPUTE on identical state — per-op bisect next). Build launching.
