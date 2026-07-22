@@ -3662,3 +3662,17 @@ NEXT (cheap, decisive): GLM_STATE_HASH — extend the load-checksum machinery to
 FINAL model-state leaf (the LOAD_NAN_CHECK leaf walker) at init; 2 init-only draws (~15 min each);
 offline leaf-sum diff across engines ⇒ names the corrupted tensor OR exonerates derived state (then
 the fault is the layer COMPUTE on identical state — per-op bisect next). Build launching.
+
+## 2026-07-22 23:25 — State-hash pair: 19,640/19,640 leaf sums IDENTICAL — derived state exonerated PROVISIONALLY (design leak: score-states unmeasured); combined arm launching
+
+GLM_STATE_HASH landed (8448b738c, synced; the walker PROVABLY covers the absorbed W_UK_T/W_UV and the
+adapted indexer params — verified in-tree). Two init-only draws: every (host,leaf) sum identical.
+HONEST CAVEAT (caught post-hoc): engines can coincide in the same lottery state (the draw1≡draw2
+precedent, ~1/3-1/2 odds) and init-only draws don't reveal their state ⇒ this null is leaky as
+designed. RIGOROUS RERUN launching: 3 serving draws with STATE_HASH + topk dumps + the 32K ladder —
+pair each engine's leaf fingerprints WITH its measured score-state; diff leaves BETWEEN different-state
+engines. If leaves stay identical across states ⇒ the divergence is created by the COMPUTE on fully
+identical stored state ⇒ the address/scheduling-dependence class stands alone — next levers: the
+LIBTPU_INIT_ARGS bisect arm (the two standing flags incl. latency_hiding_scheduler_rerun=5 alter op
+SCHEDULING — instance-fixed schedule interactions are exactly the remaining class) and the
+sentinel/HLO-level probe.
