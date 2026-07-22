@@ -3628,3 +3628,19 @@ The old arm exited at MAX_DRAWS seconds later; its archive-purge ran before fixv
 1 INFRA(collision) — its verdict (the onehot null) was already extracted from draws 2-3. LANDMINE
 (standing): ALWAYS verify `pgrep hunt_residual[.]sh` empty before launching an arm — the launcher's
 ray restart kills any serving engine.
+
+## 2026-07-22 09:50 — ⭐⭐ THE ENTRY LAYER: prefill scores IDENTICAL for evt00-03, DIVERGENT for evt04-20 — the fault is in the TRANSFORMER LAYER COMPUTE at a fixed depth (~L13-17); the indexer was only the instrument
+
+Second null banked first: GLM_DSA_IDX_CACHE_NO_DONATE did NOT restore determinism (2030/2310 divergent
+— unchanged; ladder-level 0 sick/0 miss in the arm is n≈3, not significant). THEN the per-event
+histogram on the same artifacts: PREFILL keys match 34/34 at evt00,01,02,03 and diverge 0/110 from
+evt04 through evt20 (decode keys diverge everywhere — selection→attend→hidden feedback). ⇒ hidden
+states are instance-IDENTICAL through ~layer 13-16 and instance-DIVERGENT from ~layer 17 on: a
+FIXED-DEPTH entry point in the LAYER COMPUTE (attend over donated latent caches / MoE GMM / absorbed
+weights at that depth), NOT in the indexer/selection machinery (which faithfully measured it). All
+prior evidence coheres: the byte-identical cache dumps covered only layers 0/1/2/4 (early window);
+both nulled fixes targeted the indexer path (downstream of the real entry). NEXT (zero new code): the
+LAYERSCAN ARM — 2 draws, GLM_DCP_CACHE_DUMP_LAYERS=13-21 (the entry window; the written indexer keys
+per layer ARE per-layer hidden-state hashes) + topk dumps; offline per-layer byte-compare across the
+pair ⇒ the first divergent layer names the site to ±1; then read that layer's specifics (evt→layer
+map from the indexer_types schedule to be confirmed against the dump names).
