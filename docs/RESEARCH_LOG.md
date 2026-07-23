@@ -3777,3 +3777,14 @@ hardening: gate4 launch must assert GLM_STATE_HASH_WRITE unset AND require the m
 Rides: drafter-state hash (before MTP unfreeze), sharded-sum coverage, lint sweep. UPSTREAM: one PR =
 state-hash + manifest refusal (generalized, neutral names); the streamer bug report NOT filable until
 the gcsfuse read-vs-dequant discriminator + a minimal standalone repro + base rate from validation.
+
+## 2026-07-23 14:20 — ⭐ THE MANIFEST REFUSAL WORKS, PROVEN LIVE: draw 1 VERIFIED 8/8 → 4/4 correct; draw 2 corrupt → REFUSED (0 tokens served)
+
+refval draws (REF=/tmp/golden.json armed): draw 1 — every host logged manifest VERIFIED, engine served
+the full ladder 4/4. Draw 2 — the engine drew corrupt weights and was REFUSED on 4 hosts
+(StateHashMismatchError; VERIFIED=0, served nothing): the FIRST stop-at-the-door catch of the finite
+corruption class in the project's history. Zero false positives. Strike rate consistent with the
+frequent-victim census (1 of 2 draws). Draws 3-4 continuing. The engine-lottery era ends here:
+corrupt engines can no longer serve. Remaining before GATE4: pregate-fixes land+sync → refval
+completes → gcsfuse switch (the read-vs-dequant discriminator; also expected to REDUCE the refusal
+rate if the read path is the culprit) → launch.
