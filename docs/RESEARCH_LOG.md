@@ -3760,3 +3760,20 @@ kv_a_layernorm single-host). Golden at gs://driftbench-dsv4-uc/manifests/golden_
 371110325). Leaf sums are RANK-INVARIANT ⇒ one file serves all ranks. NEXT: REF validation draw
 (fail-closed; a refused corrupt draw is a SUCCESS of the protection), review-workflow verdict → fixes,
 gcsfuse switch, GATE4.
+
+## 2026-07-23 13:30 — PRE-GATE4 REVIEW VERDICT (45 findings adversarially confirmed): NO-GO as-is → GO after 5 hours-scale items, all guarding the guardian
+
+Workflow verdict (full report in transcript): suites 145/0 green; the blockers all concern the
+manifest-refusal path or the freeze: (1) WRITE+REF both-set FAILS OPEN and can overwrite the golden
+from a corrupt live engine — refuse on both-set; (2) the WRITE docstring's "run once on a healthy
+engine" doctrine is proven unsafe (the first bootstrap engine was corrupt; on rank0 the corrupt value
+WON the majority) — document the real protocol; (3) ground_truth_sum.py was scratchpad-only —
+committed to scripts/ NOW (+ assemble_golden_manifest.py); (4) REVERT d7ad7963b (no-donate: ~230 lines
+of refuted-hypothesis machinery in THE serving file; conflict-free window open) + ONE truth-fix commit
+rewording the falsified "measured defect" narratives across 6 carriers (onehot KEPT as instrument,
+conditional on the rewording + the 0×Inf hazard note); (5) wiring-spy + fail-closed tests for the
+manifest guard (a mutant can flip refuse-to-serve to fail-open with all tests green). Plus harness
+hardening: gate4 launch must assert GLM_STATE_HASH_WRITE unset AND require the manifest-VERIFIED line.
+Rides: drafter-state hash (before MTP unfreeze), sharded-sum coverage, lint sweep. UPSTREAM: one PR =
+state-hash + manifest refusal (generalized, neutral names); the streamer bug report NOT filable until
+the gcsfuse read-vs-dequant discriminator + a minimal standalone repro + base rate from validation.
