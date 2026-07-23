@@ -3676,3 +3676,26 @@ identical stored state ⇒ the address/scheduling-dependence class stands alone 
 LIBTPU_INIT_ARGS bisect arm (the two standing flags incl. latency_hiding_scheduler_rerun=5 alter op
 SCHEDULING — instance-fixed schedule interactions are exactly the remaining class) and the
 sentinel/HLO-level probe.
+
+## 2026-07-23 08:10 — ⭐⭐⭐⭐ ROOT CAUSE, NAMED AND MEASURED: STREAMER FINITE-CORRUPTION OF LOADED WEIGHTS — the load class and the state class were ONE BUG
+
+statepair verdict: sick d3 differs from healthy d1 on EXACTLY 16 (host,leaf) entries = 2 tensors × 8
+hosts, ALL at layers.10.self_attn.indexer: wk_weights_proj.weight (LOADED bf16 weight — different
+bytes: sum 239851472 vs 48387836, replicated identically on all 8 hosts) and its derived
+glm_dsa_adapted_wk (sum=0 — the adaptation of the corrupt source ZEROED). AND the healthy pair d1-vs-d2
+differ on 3 leaves too (benign-range corruption — every engine carries a few corrupt-loaded tensors;
+location/severity decides sickness). THE UNIFIED MECHANISM: the runai streamer delivers
+corrupt-but-FINITE bytes for ~a few random tensors per launch (NaN flavor ⇒ caught by the armed
+checks = the "load class"; finite flavor ⇒ invisible to NaN scans AND to the H2D checksum
+(corrupt-in→corrupt-out by design) = the "state class"). When a victim tensor is an indexer weight,
+that layer's SELECTIONS degrade ⇒ per-instance-fixed score states, position-gated ≥2048 (chunk-1
+dense-fallback ignores selections), small-onset-amplifying, entry at the victim layer (per-draw
+location — lscan's victim was ≥L15, statepair's at L10 — why every cache-dump window missed it).
+EVERY observation of the 5-day hunt is now explained by one mechanism. FIX (pre-authorized since day
+1): eliminate GCS streaming — gcsfuse Plan A / local-disk. DETECTOR (categorical, closes the gate):
+GLM_STATE_HASH vs a REFERENCE MANIFEST (bank a known-good leaf-sum manifest, verify each engine at
+init, refuse on mismatch — catches the finite class the whole instrument stack could not).
+Cross-host note: corruption identical on all 8 hosts ⇒ single upstream read (or broadcast) — supports
+the streamer-source attribution. NEXT: (1) build the manifest + GLM_STATE_HASH_REF refusal (small);
+(2) gcsfuse mount + load-path switch; (3) validation draws (state-hash all-identical-to-manifest ×N);
+(4) GATE4.
