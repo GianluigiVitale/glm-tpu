@@ -3713,3 +3713,17 @@ draw → golden manifest → GCS; (2) gcsfuse Plan A load-path switch; (3) N val
 manifest-clean (baseline: ~2-3 corrupt leaves/launch on the streamer); (4) GATE4 with REF armed;
 (5) 256K; (6) benchmarks + the upstream streamer bug report (deterministic corrupt bytes = filable
 repro). Fork tip 696adb9ca synced 8×; all docs/logs pushed.
+
+## 2026-07-23 10:40 — Bootstrap engine ITSELF corrupt at layer-10 (sum 48387836 again) — the manifest needs majority-of-3 + SAFETENSORS GROUND TRUTH for frequent victims
+
+The first WRITE-mode engine carries the SAME corrupt layer-10 wk bytes (deterministic wrong value,
+third sighting: d3 8/8 hosts, d2 1/8, bootstrap rank0) ⇒ some tensors are FREQUENT victims (their
+byte ranges systematically vulnerable in the streamer read pattern — also why indexer-region tensors
+kept surfacing all week). CONSEQUENCE: naive majority-vote could enshrine the corrupt value for
+frequent victims. GOLDEN-MANIFEST PROTOCOL (refined): (1) 3 WRITE-mode engines (draws 2-3 launched);
+(2) per-leaf majority; (3) for ANY leaf disagreeing across the 3 (or matching a known-corrupt sum):
+compute the GROUND-TRUTH sum offline from the GCS safetensors via ranged reads (replicated leaves like
+wk_weights_proj [160,6144] bf16 sum directly; sharded leaves need the shard transform — do only the
+disputed ones); (4) assemble golden = majority + ground-truth overrides → GCS; (5) REF-mode validation
+draw must VERIFY. Then gcsfuse switch → N clean draws → GATE4. KICKOFF updated next session if needed —
+this entry is the authoritative protocol.
