@@ -51,7 +51,7 @@ DEPTH_TIMEOUT_S="${DEPTH_TIMEOUT_S:-21600}"  # 11 needles ~110min + cold-compile
 # host/depth, purged per depth) — nothing like the 230GB all-slot figure.
 # The dump feeds the per-depth ENGINE HEALTH PROBE below: a poisoned engine
 # is detected in ~2 min and relaunched instead of burning a 2h depth run.
-RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_DCP_CACHE_DUMP=/tmp/dcp_gatehealth GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_DCP_CACHE_DUMP=/tmp/dcp_gatehealth GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -60,7 +60,7 @@ GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 \
 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla \
 GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned \
 GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 \
-GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_EXPECT_CODE_HASH=$PIN"
+GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH=$PIN"
 
 DRY=0
 while [ $# -gt 0 ]; do
@@ -82,6 +82,12 @@ if (( DRY )); then
 fi
 
 # 0) pre-flight: 8x pin + disks + background watch
+if [ -n "${GLM_STATE_HASH_WRITE:-}" ]; then
+  say "ABORT: GLM_STATE_HASH_WRITE is set — WRITE mode must NEVER be armed at a gate (it can poison the golden manifest)"; exit 1
+fi
+GOLDEN_OK=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command='ls /tmp/golden.json >/dev/null 2>&1 && echo OK' 2>/dev/null | grep -c OK)
+[ "${GOLDEN_OK:-0}" -eq 8 ] || { say "ABORT: golden manifest missing on ${GOLDEN_OK:-0}/8 hosts (distribute gs://driftbench-dsv4-uc/manifests/golden_v1/)"; exit 1; }
 HASHES=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command='cd ~/tpu-inference && echo "$(hostname) $(git rev-parse --short=9 HEAD)"' \
   2>/dev/null | grep -E "^t1v-")
@@ -115,6 +121,7 @@ health_check_engine() {
       --max-batched-tokens 2048 --num-gpu-blocks 68 --max-len 131840 \
       --note "gate health-check ($TAG)" </dev/null > "$hlog" 2>&1
   )
+  grep -q "manifest VERIFIED" "$hlog" || { echo "SICK:manifest_not_verified"; return; }
   grep -q "correct=True" "$hlog" || { echo "SICK:needle"; return; }
   local scan
   scan=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command='
