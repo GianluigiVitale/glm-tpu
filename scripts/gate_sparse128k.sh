@@ -32,7 +32,10 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=2f6a80c09
+PIN=4b6e1a3bf
+# The wk-oob PWAL guard's repair source: the gcsfuse ro mirror of the checkpoint
+# (docs/17 §5.5). Must be MOUNTED on all 8 hosts — preflight + per-launch remount below.
+OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=gate128k_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
 GCS_CKPT=gs://driftbench-dsv4-uc/results/$TAG
@@ -51,7 +54,7 @@ DEPTH_TIMEOUT_S="${DEPTH_TIMEOUT_S:-21600}"  # 11 needles ~110min + cold-compile
 # host/depth, purged per depth) — nothing like the 230GB all-slot figure.
 # The dump feeds the per-depth ENGINE HEALTH PROBE below: a poisoned engine
 # is detected in ~2 min and relaunched instead of burning a 2h depth run.
-RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_DCP_CACHE_DUMP=/tmp/dcp_gatehealth GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_DCP_CACHE_DUMP=/tmp/dcp_gatehealth GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' GLM_WK_OOB_DIR='"$OOB_DIR"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -60,7 +63,7 @@ GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 \
 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla \
 GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned \
 GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 \
-GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH=$PIN"
+GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH=$PIN GLM_WK_OOB_DIR=$OOB_DIR"
 
 DRY=0
 while [ $# -gt 0 ]; do
@@ -88,6 +91,14 @@ fi
 GOLDEN_OK=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command='ls /tmp/golden.json >/dev/null 2>&1 && echo OK' 2>/dev/null | grep -c OK)
 [ "${GOLDEN_OK:-0}" -eq 8 ] || { say "ABORT: golden manifest missing on ${GOLDEN_OK:-0}/8 hosts (distribute gs://driftbench-dsv4-uc/manifests/golden_v1/)"; exit 1; }
+# the wk-oob repair source must resolve on every host (mount + a readable index)
+ensure_oob_mounts() {
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command='mountpoint -q ~/gcs-models || gcsfuse --implicit-dirs -o ro --stat-cache-ttl 1h --type-cache-ttl 1h driftbench-dsv4-uc ~/gcs-models >/dev/null 2>&1; test -r '"$OOB_DIR"'/model.safetensors.index.json && echo OOB_OK' \
+    2>/dev/null | grep -c OOB_OK
+}
+OOB_OK=$(ensure_oob_mounts)
+[ "${OOB_OK:-0}" -eq 8 ] || { say "ABORT: wk-oob gcsfuse mirror unreadable on $((8 - ${OOB_OK:-0}))/8 hosts ($OOB_DIR)"; exit 1; }
 HASHES=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command='cd ~/tpu-inference && echo "$(hostname) $(git rev-parse --short=9 HEAD)"' \
   2>/dev/null | grep -E "^t1v-")
@@ -163,6 +174,9 @@ for d in "${DEPTH_ARR[@]}"; do
     TRY=$((TRY + 1))
     EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
       bash ~/glm-tpu/scripts/launch_glm_32chip.sh > "$RUN_DIR/launch_${d}_try${TRY}.log" 2>&1
+    # relaunch can drop the fuse mounts — re-ensure the wk-oob repair source
+    OOB_OK=$(ensure_oob_mounts)
+    [ "${OOB_OK:-0}" -eq 8 ] || { say "depth $d try $TRY: oob mirror ${OOB_OK:-0}/8 — relaunching"; continue; }
     NODES=$(~/vllm-env/bin/ray status 2>/dev/null | grep -cE '^ 1 node_' || true)
     [ "${NODES:-0}" -eq 8 ] || { say "depth $d try $TRY: ray nodes ${NODES:-0}/8 — relaunching"; continue; }
     HEALTH=$(health_check_engine "$RUN_DIR/health_${d}_try${TRY}.log" | tail -1)
