@@ -3699,3 +3699,17 @@ Cross-host note: corruption identical on all 8 hosts ⇒ single upstream read (o
 the streamer-source attribution. NEXT: (1) build the manifest + GLM_STATE_HASH_REF refusal (small);
 (2) gcsfuse mount + load-path switch; (3) validation draws (state-hash all-identical-to-manifest ×N);
 (4) GATE4.
+
+## 2026-07-23 09:40 — Manifest refusal LANDED (696adb9ca, synced 8×); golden-manifest bootstrap = WRITE-mode draw (the offline consensus was parse-lossy — preliminary only)
+
+GLM_STATE_HASH_REF/WRITE landed: fail-closed manifest verification at load tail (mismatch ⇒
+StateHashMismatchError, refuse-to-serve; state-only/manifest-only leaves are mismatches; WRITE mode =
+atomic per-rank bootstrap). 14 tests green + siblings unaffected. Offline consensus attempt from the
+statepair logs captured only 859/~2455 leaves (log-line regex lossy on keystr names) — banked to
+gs://driftbench-dsv4-uc/manifests/glm52_fp8_state_manifest_v1.json as PRELIMINARY ONLY; the golden
+manifest MUST come from a GLM_STATE_HASH_WRITE draw (exact names), cross-checked against a second
+engine + the statepair sums before promotion. THE ENDGAME SEQUENCE (KICKOFF carries it): (1) WRITE-mode
+draw → golden manifest → GCS; (2) gcsfuse Plan A load-path switch; (3) N validation draws ALL
+manifest-clean (baseline: ~2-3 corrupt leaves/launch on the streamer); (4) GATE4 with REF armed;
+(5) 256K; (6) benchmarks + the upstream streamer bug report (deterministic corrupt bytes = filable
+repro). Fork tip 696adb9ca synced 8×; all docs/logs pushed.
