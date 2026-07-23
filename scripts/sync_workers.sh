@@ -46,5 +46,20 @@ if ! gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   FAILED=1
 fi
 
-echo "sync done — verify all 8 hashes above match per repo."
+echo "[3/3] verify: every host's tpu-inference HEAD must equal origin/$TPU_INFERENCE_BRANCH"
+# 2026-07-23: a stale .git/index.lock on worker 6 made its reset fail while the
+# other 7 synced; the eyeball-the-8-lines check was skipped and the drift was
+# only caught at launch by GLM_EXPECT_CODE_HASH. Machine-enforce it instead.
+TARGET=$(git ls-remote "git@github.com:GianluigiVitale/tpu-inference.git" "refs/heads/$TPU_INFERENCE_BRANCH" | cut -c1-12)
+HASHES=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="echo \"\$(hostname) \$(cd ~/tpu-inference && git rev-parse HEAD | cut -c1-12) lock=\$([ -f ~/tpu-inference/.git/index.lock ] && echo STALE || echo no)\"" 2>/dev/null | grep '^t1v-')
+echo "$HASHES"
+DRIFT=$(echo "$HASHES" | awk -v t="$TARGET" '$2 != t || $3 != "lock=no"')
+if [ "$(echo "$HASHES" | wc -l)" -ne 8 ] || [ -n "$DRIFT" ]; then
+  echo "SYNC DRIFT — target origin/$TPU_INFERENCE_BRANCH=$TARGET; offending hosts:" >&2
+  echo "${DRIFT:-<fewer than 8 hosts responded>}" >&2
+  echo "If lock=STALE and no git process is running on that host, remove ~/tpu-inference/.git/index.lock there and re-run." >&2
+  exit 2
+fi
+echo "sync VERIFIED — all 8 hosts at $TARGET"
 exit "$FAILED"
