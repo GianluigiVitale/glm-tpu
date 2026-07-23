@@ -3727,3 +3727,22 @@ wk_weights_proj [160,6144] bf16 sum directly; sharded leaves need the shard tran
 disputed ones); (4) assemble golden = majority + ground-truth overrides → GCS; (5) REF-mode validation
 draw must VERIFY. Then gcsfuse switch → N clean draws → GATE4. KICKOFF updated next session if needed —
 this entry is the authoritative protocol.
+
+## 2026-07-23 11:30 — GROUND TRUTH ADJUDICATED: healthy sum CONFIRMED from the checkpoint (bit-exact incl. offline fp8-dequant replication); THE CORRUPTION = THE DEQUANTIZED-WK HALF ZEROED
+
+ground_truth_sum.py verdict: TRUE sum of layers.10 wk_weights_proj = 239851472 (the fused leaf =
+dequant_bf16(fp8 wk [128,6144], block scales) ++ raw bf16 weights_proj [32,6144]; per-half sums
+191463636 + 48387836; replication cross-validated BITWISE against vllm's own scaled_dequantize). AND
+the corrupt value 48387836 == the weights_proj half ALONE ⇒ corrupt launches deliver the WK HALF AS
+ALL-ZERO BYTES — a deterministic zero-fill of the fp8-wk range in the fused-load/dequant path
+(_try_load_fp8_indexer_wk, vllm deepseek_v2.py:746-791). THE DSV4 "FLAKY DEQUANT CRASH" LOOP CLOSES:
+same family, weight-dequant-at-load. OPEN DISCRIMINATION (the gcsfuse switch answers it): zeros from
+the GCS READ vs from the DEQUANT COMPUTE — if corruption persists on gcsfuse ⇒ fix the loader
+(per-tensor verify+retry vs the manifest). EITHER WAY the manifest refusal protects the gate
+(load-path-independent categorical check; refused loads = a relaunch retry). Tool banked
+(scratchpad/ground_truth/ground_truth_sum.py + name-mapping rules incl. fused/stacked reversal).
+NEXT-SESSION SEQUENCE: (1) bootstrap-3 completes → per-leaf majority-of-3 + ground-truth overrides for
+any leaf matching a known-corrupt sum → golden manifest → GCS; (2) REF validation draw must VERIFY;
+(3) gcsfuse switch + N clean draws (also the read-vs-dequant discriminator); (4) GATE4 with REF armed;
+(5) 256K; (6) upstream reports: the streamer/dequant zero-fill (filable — deterministic repro) + the
+t2j PR.
