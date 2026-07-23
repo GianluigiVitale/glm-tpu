@@ -150,6 +150,8 @@ TOTAL_MISS=0
 HEALTH_RETRIES="${HEALTH_RETRIES:-8}"
 IFS=',' read -ra DEPTH_ARR <<< "$DEPTHS"
 for d in "${DEPTH_ARR[@]}"; do
+  DEPTH_ATTEMPT=1; DEPTH_ATTEMPTS_MAX=4
+  while true; do
   LOG="$RUN_DIR/depth_${d}.log"
   say "── depth $d ($TRIALS trials) ──"
   ALERT_BEFORE=$(wc -l < "$ALERT_FILE" 2>/dev/null || echo 0)
@@ -226,6 +228,17 @@ for d in "${DEPTH_ARR[@]}"; do
     say "  --depths \"<remaining incl. $d>\" (results.db keeps the clean depths)."
     exit 1
   fi
+  DEPTH_LINES=$(grep -cE "correct=(True|False)" "$LOG" || true)
+  if [ "${DEPTH_LINES:-0}" -eq 0 ]; then
+    if grep -q "StateHashMismatchError" "$LOG"; then
+      say "depth $d: depth engine REFUSED by the manifest guard (0 needles) — retry $DEPTH_ATTEMPT/$DEPTH_ATTEMPTS_MAX"
+    else
+      say "depth $d: EMPTY (0 needle lines, driver died) — retry $DEPTH_ATTEMPT/$DEPTH_ATTEMPTS_MAX"
+    fi
+    DEPTH_ATTEMPT=$((DEPTH_ATTEMPT + 1))
+    if [ "$DEPTH_ATTEMPT" -le "$DEPTH_ATTEMPTS_MAX" ]; then continue; fi
+    say "ABORT: depth $d produced no results in $DEPTH_ATTEMPTS_MAX attempts"; exit 1
+  fi
   TOTAL_MISS=$((TOTAL_MISS + DEPTH_MISS))
 
   # per-depth GCS checkpoint (results.db via the sqlite backup API — safe
@@ -240,6 +253,8 @@ PY
   gcloud storage cp "$RUN_DIR/results_ckpt.db" "$GCS_CKPT/results-after-d${d}.db" >/dev/null 2>&1
   gcloud storage cp "$LOG" "$GCS_CKPT/" >/dev/null 2>&1
   N_OK=$(grep -c "correct=True" "$LOG" 2>/dev/null || true)
+  break
+  done
   say "depth $d done: ${N_OK:-0}/$TRIALS correct, $DEPTH_MISS miss — checkpointed to $GCS_CKPT"
   # per-depth dump hygiene: on a MISS the depth's layer-2 dumps are the
   # specimen — archive them; otherwise purge (the disk doctrine).
