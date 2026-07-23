@@ -3863,3 +3863,14 @@ FIX BUILDING (fork-side, better than patching vllm): PWAL-time verify+repair —
 (the indexer PWAL that derives glm_dsa_adapted_*), check the param halves for impossible all-zeros;
 repair from the OOB gcsfuse mirror (env GLM_WK_OOB_DIR); fail loud if unrepairable. The manifest guard
 remains the categorical backstop for rare victims. Then GATE4 v3.
+
+## 2026-07-23 21:40 — PWAL-time OOB guard LANDED (0d144de55, synced 8×; 333 tests green); guard validation draws running
+
+The guard sits at the window's closing edge (first read in precompute_indexer_params): armed via
+GLM_WK_OOB_DIR, checks both param halves for impossible all-zeros, repairs bitwise from the gcsfuse
+mirror (dequant proven bitwise == vllm's scaled_dequantize), three prefix fallbacks, fail-loud on
+unrepairable/underivable. oobval final tally (pre-guard): 1 clean / 3 refused — strike rate ~75%
+tonight. VALIDATION (gval draws, REF + OOB armed): PASS = "zero-fill repaired at PWAL" firing on
+strike draws AND manifest VERIFIED=8 after repair. If refusals STILL persist with the guard firing ⇒
+the zeroing lands in the final PWAL→t2j sliver ⇒ the _free_cpu_storage ordering audit becomes
+mandatory before the gate. If VERIFIED ⇒ GATE4 v3 launches with REF+OOB armed.
