@@ -3888,3 +3888,20 @@ sync_workers.sh hardened (1490acb): machine-enforced [3/3] verify — every host
 origin/<branch> tip and no index.lock may exist, else exit 2 listing offenders (no more eyeball
 checks). Whether DisableTorchFunction fixes the torchax UntypedStorage crash is STILL UNTESTED —
 the relaunched gval arm (draw 1 up 23:11) answers it.
+
+## 2026-07-23 23:55 — The torchax escape ROOT-CAUSED and FIXED (dc0443a43): the DISPATCH mode was still intercepting; CPU repro now exact
+
+gval draw 1 at 4b6e1a3bf reached PWAL and the guard WORKED up to the read: a strike on w2 (.25) was
+DETECTED (zeroed wk half), the OOB repair was attempted — and crashed in safetensors get_tensor with
+the same "could not determine the shape of ... UntypedStorage", INSIDE DisableTorchFunction(). Root
+cause: torchax runs TWO modes (XLAFunctionMode AND XLADispatchMode); DisableTorchFunction disables
+function modes only — the dispatch mode kept intercepting the aten calls under safetensors' tensor
+construction. torchax's own internal idiom (tensor.py:186) is the pair:
+`with mode_utils.no_dispatch(), torch._C.DisableTorchFunction()`. Fix landed (dc0443a43) + the test
+fidelity hole closed: the CPU suite never ran the guard under torchax modes — a new test runs the
+full repair under torchax.default_env() (both modes), and a mutation check CONFIRMS the old escape
+reproduces the EXACT metal error on CPU (this bug was CPU-catchable all along; the harness just
+never modeled the metal execution context — future-catch rule: unit-test env-sensitive code under
+the PRODUCTION interception stack, not bare CPU). Synced 8×8 via the hardened sync (verify pass:
+all 8 @ dc0443a43, no locks). gval arm relaunched 23:52. Positive datum en route: the guard's
+DETECTION works on metal (zero-half found on exactly the struck host).
