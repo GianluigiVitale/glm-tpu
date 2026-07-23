@@ -3874,3 +3874,17 @@ tonight. VALIDATION (gval draws, REF + OOB armed): PASS = "zero-fill repaired at
 strike draws AND manifest VERIFIED=8 after repair. If refusals STILL persist with the guard firing ⇒
 the zeroing lands in the final PWAL→t2j sliver ⇒ the _free_cpu_storage ordering audit becomes
 mandatory before the gate. If VERIFIED ⇒ GATE4 v3 launches with REF+OOB armed.
+
+## 2026-07-23 23:15 — gval false start: 4/4 fast-fails were the CODE-FINGERPRINT GUARD catching a stale worker (w6 index.lock) — not the torchax fix; arm relaunched
+
+gval v4 (PIN 4b6e1a3bf, the DisableTorchFunction torchax escape) burned 4 draws in ~75s each,
+"init_worker" errors. Root exception extracted: CodeFingerprintMismatchError — worker 192.168.0.26
+(w6) imported tpu_inference at 82d0778f3 vs pin 4b6e1a3bf. NOT a guard bug: w6's sync had failed on a
+STALE .git/index.lock (reset errored, output was discarded, the eyeball-the-8-hashes check was
+skipped). So the 07-09 stale-worker failure mode recurred and this time the fingerprint guard caught
+it at the door in 75s instead of poisoning a night of data — the instrumentation stack paying rent.
+FIXES: (a) removed the stale lock, w6 reset to 4b6e1a3bf, verified all 8 hosts at pin; (b)
+sync_workers.sh hardened (1490acb): machine-enforced [3/3] verify — every host HEAD must equal
+origin/<branch> tip and no index.lock may exist, else exit 2 listing offenders (no more eyeball
+checks). Whether DisableTorchFunction fixes the torchax UntypedStorage crash is STILL UNTESTED —
+the relaunched gval arm (draw 1 up 23:11) answers it.
