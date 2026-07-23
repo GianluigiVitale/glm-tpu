@@ -3850,3 +3850,16 @@ determinism, and the single-victim concentration (the ONLY buffered-across-yield
 clone() at buffering time (weight AND scale) — applied to ~/vllm-build on ALL 8 HOSTS; patch banked at
 patches/vllm-fused-indexer-wk-clone.patch (upstream-vLLM PR material). VALIDATION: REF-armed draws
 running — the refusal rate must collapse ~100%→~0. Then GATE4 v3.
+
+## 2026-07-23 20:30 — The zeroing window NARROWED: after dequant, before t2j (the dequant-time OOB check saw good values; the device got zeros) — PWAL-time guard building
+
+oobval: draw 1 fully clean (VERIFIED=8, 4/4); draw 2 REFUSED with OOBFIX=0 — same victim leaf, but the
+dequant-time zero-check did NOT fire ⇒ at that point the values were GOOD; the wk-half is zeroed later,
+in the param's CPU storage between the fused load and t2j (the H2D checksum then faithfully ships
+zeros — all instruments consistent). MECHANISM CANDIDATE for the zeroing (to audit for the upstream
+report): the load-path's CPU-storage free machinery (_free_cpu_storage resize_(0) class) hitting the
+fused param out of order — freed-then-reread = zeros; would also explain the rare other-tensor victims.
+FIX BUILDING (fork-side, better than patching vllm): PWAL-time verify+repair — at the LAST CPU touch
+(the indexer PWAL that derives glm_dsa_adapted_*), check the param halves for impossible all-zeros;
+repair from the OOB gcsfuse mirror (env GLM_WK_OOB_DIR); fail loud if unrepairable. The manifest guard
+remains the categorical backstop for rare victims. Then GATE4 v3.
