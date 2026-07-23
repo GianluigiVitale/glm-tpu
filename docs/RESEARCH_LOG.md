@@ -3834,3 +3834,19 @@ engine are SEPARATE DRIVER PROCESSES = separate draws — the probe never valida
 refusal armed the depth engine now self-validates at load, and the retry loop handles its refusals —
 the probe remains launch-sanity only. Gate4 v2 relaunching. (Ops: three pkill self-matches in one
 hour — "SPARSE 128K GATE"/glm_longctx patterns; brackets applied.)
+
+## 2026-07-23 18:40 — ⭐ THE FINAL ROOT CAUSE, ONE LEVEL DEEPER: the vLLM fused-indexer loader BUFFERS A STREAMED-TENSOR REFERENCE across iterations — the t2j class in _try_load_fp8_indexer_wk; CLONE FIX applied to all 8 hosts
+
+Gate4 v2 starved: 3/3 health draws refused, all the SAME victim (layers.10 wk zeroed half, ~4 hosts/
+draw ⇒ P(clean engine)≈0 — the per-host strike rate on THIS tensor is ~50%, so ≥1-host-corrupt is
+near-certain; earlier "sick engine" rarity was the multi-replica severity threshold, not a low strike
+rate). MECHANISM READ FROM THE CODE: _try_load_fp8_indexer_wk (vllm deepseek_v2.py:746-791) buffers
+`entry[...] = tensor` — a REFERENCE to the runai-streamer-yielded tensor — until the fp8 weight and
+its scale both arrive, THEN dequantizes. The streamer's yielded tensors are backed by a recycled
+staging pool (memory_limit=32G): holding the reference across iterations and reading later = reading
+reused/zeroed pool memory. THE SAME DEFECT CLASS AS t2j (a view held across an async boundary), one
+loader upstream — and it explains the ~50%/host rate (pool-recycling timing), the zeros, the
+determinism, and the single-victim concentration (the ONLY buffered-across-yields tensor). FIX:
+clone() at buffering time (weight AND scale) — applied to ~/vllm-build on ALL 8 HOSTS; patch banked at
+patches/vllm-fused-indexer-wk-clone.patch (upstream-vLLM PR material). VALIDATION: REF-armed draws
+running — the refusal rate must collapse ~100%→~0. Then GATE4 v3.

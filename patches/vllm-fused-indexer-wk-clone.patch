@@ -1,0 +1,18 @@
+diff --git a/vllm/model_executor/models/deepseek_v2.py b/vllm/model_executor/models/deepseek_v2.py
+index 80d518dac..c2b7381b8 100644
+--- a/vllm/model_executor/models/deepseek_v2.py
++++ b/vllm/model_executor/models/deepseek_v2.py
+@@ -768,7 +768,12 @@ def _try_load_fp8_indexer_wk(
+     ):
+         return True
+     entry = buf.setdefault(layer_prefix, {})
+-    entry["weight" if is_weight else "scale"] = tensor
++    # CLONE at buffering time: with streamed loading (runai_streamer), the
++    # yielded tensor is backed by a recycled staging pool — holding a
++    # reference across iterations and dequantizing later can read reused/
++    # zeroed memory (observed: the dequantized-wk half arriving all-zero on
++    # ~50% of hosts per launch). A private copy is immune.
++    entry["weight" if is_weight else "scale"] = tensor.clone()
+     if "weight" not in entry or "scale" not in entry:
+         return True  # still waiting for the other param
+ 
