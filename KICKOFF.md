@@ -5,36 +5,32 @@ SOLO, FULLY AUTONOMOUS. Finish **GLM-5.2-FP8** on TPU v4. DON'T STOP/ASK until (
 n≥73; throughput ≥256K). **OWNER RULE: NO SHORTCUTS — root cause properly fixed + validated before any
 re-gate; no workaround gating.** Self-correct; when unsure pick + log.
 
-## STATE (2026-07-20 17:00 UTC; RESEARCH_LOG 07-19 21:10 → 07-20 14:10)
-- Fork tip **a10d2a426** synced 8× (t2j fix, NaN/checksum integrity stack, read probes, xla-attend
-  gate, audit fixes). Dense 128K gate CLOSED 77/77. GATE3 (sparse) died 33/35 honestly.
-- **THE RESIDUAL = per-engine SELECTION DEGRADATION** (mangled-digit specimens '7657'/'797567',
-  '665060'/'648060' — needle positions mostly-but-not-fully selected). ELIMINATED, each
-  instrument-proven: weights (byte-checksum), caches (bit forensics; Guard-2 trips = page-reuse FALSE
-  POSITIVES), write path (barrier A/B), Mosaic decode attend (xla-bypass A/B, wiring CI-proven),
-  proc/mesh order, v2 gather transforms as sole cause (v1 arm sick too).
-- **RUNNING: the precamp arm** — FULL campaign revert (BT_WIDTH=full, PREFILL_ATTN=masked, mbt 1024,
-  v1 selection, no Guard-2) ×5 draws, 32K geometry (~1-1.5h/draw). CLEAN ⇒ bisect {owned-width,
-  segment-prefill, chunk-2048} one at a time. SICK ⇒ fault PREDATES the campaign ⇒ arm
-  **GLM_DSA_DUMP_TOPK** (exists, zero code) on fixed-seed sick+healthy draws and diff selections.
-- LOAD CLASS (separate): streamer delivers corrupt bytes CPU-side (CPU-scan-attributed); ~20% of
-  draws auto-refused. Fix = gcsfuse/local-disk (pre-authorized) — land RIGHT BEFORE
-  gate4, never mid-hunt.
-- Amplified repro: `hunt_residual.sh` + ARM_ENVS/ARM_TAG/PIN/GEO_MAX_LEN/GEO_BLOCKS/GEO_MBT/
-  LADDER_LENGTHS overrides (ARM_ENVS = raylet-tail last-wins; verify via worker /proc environ).
-- 128K-shape armed variants (interpret/read-barrier/xla-attend) die at engine-init compile — probe at
-  32K geometry; the 128K mitigation-compile issue is post-fix work.
-- Ready: stage256k.sh, ~/wt-sibling-alias (land post-gate), PR audits banked, GCS backups current.
-
+## STATE (2026-07-23 08:30 UTC; RESEARCH_LOG 07-22 21:15 → 07-23 08:10)
+- ⭐ **ROOT CAUSE FOUND AND MEASURED (5-day hunt closed): STREAMER FINITE-CORRUPTION of loaded
+  weights.** The runai streamer probabilistically delivers corrupt-but-FINITE bytes for ~a few random
+  tensors per host per launch (deterministic wrong bytes when it strikes; e.g. layers.10 indexer
+  wk_weights_proj sum 48387836 vs true 239851472, its adapted derivative ZEROED). NaN scans + the H2D
+  checksum are blind to the finite flavor BY DESIGN. Victim = an indexer weight ⇒ that layer's
+  selections degrade ⇒ the whole "state class" (per-instance score states, pos≥2048 gating, entry-layer
+  variation, mangled digits, gate2/3 deaths). Severity = how many host replicas share the victim
+  (1/8 ⇒ healthy-divergent; 8/8 ⇒ sick). The "load class" (NaN) and "state class" (finite) were ONE BUG.
+- PROOF CHAIN (all banked): entry bracketed L15/L17 → GLM_STATE_HASH (8448b738c, fingerprints all
+  19,640 leaves incl. derived) → statepair arm: sick engine differs on EXACTLY the 2 layer-10 leaves ×8
+  hosts; healthy pair differs on 3 single-host leaves (benign carriers).
+- Fork tip **8448b738c** synced 8×. In flight: GLM_STATE_HASH_REF manifest-refusal build (agent).
+- Instruments proven en route: onehot scorer (harmless, keep), idx-no-donate (harmless), checksum/NaN
+  stack, the 30-90min ladder repro (hunt_residual.sh + overrides).
 ## FRONTIER (in order)
-1. Precamp verdict → branch per above (bisect vs selection-dump dissection).
-2. ROOT-CAUSE the guilty component (jaxpr/HLO diff, pageloop methodology) → proper fix →
-   CPU-bitwise proof → adversarial review → metal validation on the 30-90min repro cycle.
-3. Streamer fix (gcsfuse Plan A, disk fallback) + validate loads clean.
-4. **GATE4** n=77 @128K: fixed config, full integrity stack, 32K health needle (5K proven blind),
-   Guard-1 on / Guard-2 OFF (false-positive class). Miss-abort 2; per-depth ckpts.
-5. 256K stage (stage256k.sh). 6. GSM8K n≥200, GPQA@16K (owner-gated), MTP unfreeze, PR re-cut.
-
+1. Land GLM_STATE_HASH_REF (manifest refusal — the categorical finite-class detector): bootstrap the
+   golden manifest from a verified engine (GLM_STATE_HASH_WRITE), cross-check vs the banked healthy
+   sums, commit manifest to gs://driftbench-dsv4-uc/manifests/.
+2. **THE STREAMER FIX**: gcsfuse Plan A (mount gs://driftbench-dsv4-uc/models on all 8 hosts, switch
+   GLM_MODEL/load path; $0) — else the pre-authorized local-disk attach. Validate: N init draws, ALL
+   manifest-clean (vs the ~2-3 corrupt-leaf/launch baseline).
+3. **GATE4** n=77 @128K: fixed load path + manifest refusal + full stack + 32K health needle.
+4. 256K (stage256k.sh — update PIN/envs). 5. Benchmarks (GSM8K n≥200, GPQA@16K owner-gated), MTP,
+   sibling-alias landing, PR re-cut (incl. the STREAMER BUG REPORT upstream — deterministic-bytes
+   repro makes it filable).
 ## HARD RULES
 COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach pre-authorized. METHOD:
 observability-first; corpus-first re-read on domain shift; ONE VARIABLE AT A TIME; wiring must be
