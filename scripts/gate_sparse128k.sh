@@ -32,7 +32,7 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=a225d16b4
+PIN=2f6a80c09
 TAG=gate128k_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
 GCS_CKPT=gs://driftbench-dsv4-uc/results/$TAG

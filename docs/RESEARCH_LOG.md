@@ -3788,3 +3788,17 @@ frequent-victim census (1 of 2 draws). Draws 3-4 continuing. The engine-lottery 
 corrupt engines can no longer serve. Remaining before GATE4: pregate-fixes land+sync → refval
 completes → gcsfuse switch (the read-vs-dequant discriminator; also expected to REDUCE the refusal
 rate if the read path is the culprit) → launch.
+
+## 2026-07-23 15:50 — PRE-GATE4 FIX BATCH LANDED (2f6a80c09, synced 8×); refval complete: 2-for-2 catches, 0 false positives; gate PIN updated
+
+Five commits merged: the d7ad7963b revert (conflict-free; -511 lines of refuted machinery), the
+manifest-guard hardening (WRITE+REF ⇒ StateHashConfigError before any device work; the bootstrap
+doctrine rewritten to majority+ground-truth citing docs/17), fail-closed + wiring tests (REF-missing/
+malformed/compute-failure all propagate; load_model invocation + mismatch-kills-start proven), the
+truth-fix (6 files, AST-proven zero executable change; 0×Inf hazard documented; Guard-2 false-positive
+class recorded), and the lint sweep (isort 15/15 clean; yapf honestly scoped). All batteries green
+(162+63+8); pre-existing failure set unchanged (3 continue_decode flight-recorder fails, not
+memory_stats as the review misnamed). REFVAL FINAL: draw1 VERIFIED 8/8 + 4/4 correct; draws 2-3
+corrupt → REFUSED (0 tokens); draw 4 infra (never reached load). Gate PIN → 2f6a80c09. REMAINING
+BEFORE GATE4: the gcsfuse switch (mount + load-path + its own validation draws — ALSO the
+read-vs-dequant discriminator and expected to cut the ~50-66% refusal-tax) — then LAUNCH.
