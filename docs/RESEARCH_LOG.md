@@ -3821,3 +3821,16 @@ The fourth sparse 128K gate: doubly-adversarially-reviewed code, the golden mani
 engine start (WRITE-mode locked out, VERIFIED line required by the health probe), full integrity stack,
 miss-abort at 2, ONE-miss ⇒ extend n≈130, per-depth GCS checkpoints, HEALTH_RETRIES=8 absorbing the
 refused-draw tax. For the first time in this project, a corrupt engine CANNOT serve a needle.
+
+## 2026-07-23 17:40 — Gate4 v1 killed at depth 0.05: TWO orchestrator holes found+fixed — empty depths counted as done; health engine ≠ depth engine (a hole since gate2, retro-explains gate3's d=1.0)
+
+Gate4 v1 depth 0.0: the depth driver's FRESH engine drew corrupt weights → the manifest guard REFUSED
+(correct!) → 0 needles → the orchestrator counted "0/11 correct, 0 miss — done" and MOVED ON (the
+miss-abort watchdog only fires on misses; an empty depth slipped through). FIX LANDED: per-depth retry
+loop — 0 needle lines (refusal or driver death) ⇒ relaunch the depth (max 4 attempts) and NEVER count.
+DESIGN-HOLE DISCOVERY (present since the gate2 rebuild): the health probe's engine and the depth's
+engine are SEPARATE DRIVER PROCESSES = separate draws — the probe never validated the serving engine
+(retro-explains gate3's d=1.0 dying after a HEALTHY probe: different engines!). With the manifest
+refusal armed the depth engine now self-validates at load, and the retry loop handles its refusals —
+the probe remains launch-sanity only. Gate4 v2 relaunching. (Ops: three pkill self-matches in one
+hour — "SPARSE 128K GATE"/glm_longctx patterns; brackets applied.)
