@@ -3802,3 +3802,15 @@ memory_stats as the review misnamed). REFVAL FINAL: draw1 VERIFIED 8/8 + 4/4 cor
 corrupt → REFUSED (0 tokens); draw 4 infra (never reached load). Gate PIN → 2f6a80c09. REMAINING
 BEFORE GATE4: the gcsfuse switch (mount + load-path + its own validation draws — ALSO the
 read-vs-dequant discriminator and expected to cut the ~50-66% refusal-tax) — then LAUNCH.
+
+## 2026-07-23 16:20 — gcsfuse discriminator DEFERRED (load through FUSE ~10× slower ⇒ init death); GATE4 GOES BEHIND THE MANIFEST REFUSAL
+
+fuseval v2: the local-path plumbing WORKS (model+tokenizer resolved from the mount; the streamer began
+reading 0/118629 tensors through gcsfuse) but the ~10× slower read (~hundreds of MB/s vs 12GiB/s
+direct) kills engine init on timeout. DECISION (pragmatic, not a shortcut on correctness): the gate
+does not need the read-vs-dequant discriminator — it needs verifiably clean loads, which the manifest
+refusal categorically provides (proven 2-for-2 catches, 0 false positives). GATE4 LAUNCHES TONIGHT on
+the streamer path + REF armed; corrupt draws cost a ~20-min refused relaunch each (HEALTH_RETRIES=8
+absorbs the ~50% rate). POST-GATE QUEUE: the load-path fix done properly — either patient-gcsfuse
+draws (raised timeouts) or the pre-authorized local-disk attach (744GB copy once, NVMe loads) — which
+also completes the read-vs-dequant discrimination for the upstream bug report.
