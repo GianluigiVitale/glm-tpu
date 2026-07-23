@@ -3814,3 +3814,10 @@ the streamer path + REF armed; corrupt draws cost a ~20-min refused relaunch eac
 absorbs the ~50% rate). POST-GATE QUEUE: the load-path fix done properly — either patient-gcsfuse
 draws (raised timeouts) or the pre-authorized local-disk attach (744GB copy once, NVMe loads) — which
 also completes the read-vs-dequant discrimination for the upstream bug report.
+
+## 2026-07-23 16:35 — 🚀 GATE4 LAUNCHED — PIN 2f6a80c09, manifest refusal armed+required, n=77
+
+The fourth sparse 128K gate: doubly-adversarially-reviewed code, the golden manifest guarding every
+engine start (WRITE-mode locked out, VERIFIED line required by the health probe), full integrity stack,
+miss-abort at 2, ONE-miss ⇒ extend n≈130, per-depth GCS checkpoints, HEALTH_RETRIES=8 absorbing the
+refused-draw tax. For the first time in this project, a corrupt engine CANNOT serve a needle.
