@@ -24,7 +24,9 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=a225d16b4
+PIN=4b6e1a3bf
+# wk-oob repair source (docs/17 §5.5) — gcsfuse ro mirror; preflight + per-launch remount
+OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=stage256k_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
 GCS_CKPT=gs://driftbench-dsv4-uc/results/$TAG
@@ -36,14 +38,15 @@ STAGE_TIMEOUT_S="${STAGE_TIMEOUT_S:-14400}"   # 256K prefill ~25min/needle + col
 
 # ── env blocks: the gate config verbatim EXCEPT GLM_DCP=8 (F4: one source,
 # every launch identical). Dense arm strips the three DSA-mode envs only.
-SPARSE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
-DENSE_RAYLET='GLM_MLA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+SPARSE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+DENSE_RAYLET='GLM_MLA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 COMMON_DRIVER="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
 TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 \
 GLM_MLA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop \
 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 \
+GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR=$OOB_DIR \
 GLM_EXPECT_CODE_HASH=$PIN"
 SPARSE_DRIVER="$COMMON_DRIVER GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 \
 GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned \
@@ -61,9 +64,22 @@ if [ "${1:-}" = "--dry-run" ]; then
 fi
 
 # 0) pre-flight: THE GATE MUST NOT BE RUNNING (serialized TPU access)
-if pgrep -f "gate_sparse128k.sh" >/dev/null 2>&1; then
+if pgrep -f "gate_sparse128k[.]sh" >/dev/null 2>&1; then
   say "ABORT: gate_sparse128k.sh is still running — 256K never runs concurrently."; exit 1
 fi
+if [ -n "${GLM_STATE_HASH_WRITE:-}" ]; then
+  say "ABORT: GLM_STATE_HASH_WRITE is set — WRITE mode must NEVER be armed at a stage run"; exit 1
+fi
+GOLDEN_OK=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command='ls /tmp/golden.json >/dev/null 2>&1 && echo OK' 2>/dev/null | grep -c OK)
+[ "${GOLDEN_OK:-0}" -eq 8 ] || { say "ABORT: golden manifest missing on $((8 - ${GOLDEN_OK:-0}))/8 hosts"; exit 1; }
+ensure_oob_mounts() {
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command='mountpoint -q ~/gcs-models || gcsfuse --implicit-dirs -o ro --stat-cache-ttl 1h --type-cache-ttl 1h driftbench-dsv4-uc ~/gcs-models >/dev/null 2>&1; test -r '"$OOB_DIR"'/model.safetensors.index.json && echo OOB_OK' \
+    2>/dev/null | grep -c OOB_OK
+}
+OOB_OK=$(ensure_oob_mounts)
+[ "${OOB_OK:-0}" -eq 8 ] || { say "ABORT: wk-oob gcsfuse mirror unreadable on $((8 - ${OOB_OK:-0}))/8 hosts ($OOB_DIR)"; exit 1; }
 HASHES=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command='cd ~/tpu-inference && git rev-parse --short=9 HEAD' 2>/dev/null | grep -c "$PIN")
 [ "${HASHES:-0}" -eq 8 ] || { say "ABORT: ${HASHES:-0}/8 @ $PIN"; exit 1; }
@@ -85,6 +101,10 @@ launch_healthy() {  # $1=RAYLET envs  $2=DRIVER envs  $3=label
       --command='rm -f /tmp/dcp_256health*.npz' >/dev/null 2>&1
     EXTRA_ENVS="$renv" TPU_MIN_TOKEN_BUCKET=32 \
       bash ~/glm-tpu/scripts/launch_glm_32chip.sh > "$RUN_DIR/launch_${label}_t${try}.log" 2>&1
+    # relaunch can drop the fuse mounts — re-ensure the wk-oob repair source
+    local oob_ok
+    oob_ok=$(ensure_oob_mounts)
+    [ "${oob_ok:-0}" -eq 8 ] || { say "$label try $try: oob mirror ${oob_ok:-0}/8 — relaunch"; continue; }
     local nodes
     nodes=$(~/vllm-env/bin/ray status 2>/dev/null | grep -cE '^ 1 node_' || true)
     [ "${nodes:-0}" -eq 8 ] || { say "$label try $try: ray ${nodes:-0}/8 — relaunch"; continue; }
@@ -99,6 +119,7 @@ launch_healthy() {  # $1=RAYLET envs  $2=DRIVER envs  $3=label
         --max-batched-tokens 2048 --num-gpu-blocks "$BLOCKS" --max-len "$MAX_LEN" \
         --note "256K health ($label $TAG)" </dev/null > "$hlog" 2>&1
     )
+    if ! grep -q "manifest VERIFIED" "$hlog"; then say "$label try $try: SICK:manifest_not_verified — relaunch"; continue; fi
     if ! grep -q "correct=True" "$hlog"; then say "$label try $try: SICK:needle — relaunch"; continue; fi
     local scan
     scan=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command='
