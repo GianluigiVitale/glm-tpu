@@ -32,7 +32,7 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=4b6e1a3bf
+PIN=dc0443a43
 # The wk-oob PWAL guard's repair source: the gcsfuse ro mirror of the checkpoint
 # (docs/17 §5.5). Must be MOUNTED on all 8 hosts — preflight + per-launch remount below.
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8

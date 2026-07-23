@@ -24,7 +24,7 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=4b6e1a3bf
+PIN=dc0443a43
 # wk-oob repair source (docs/17 §5.5) — gcsfuse ro mirror; preflight + per-launch remount
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=stage256k_$(date -u +%Y%m%dT%H%M%SZ)
