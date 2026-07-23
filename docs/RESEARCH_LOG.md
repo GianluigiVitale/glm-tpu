@@ -3746,3 +3746,17 @@ any leaf matching a known-corrupt sum → golden manifest → GCS; (2) REF valid
 (3) gcsfuse switch + N clean draws (also the read-vs-dequant discriminator); (4) GATE4 with REF armed;
 (5) 256K; (6) upstream reports: the streamer/dequant zero-fill (filable — deterministic repro) + the
 t2j PR.
+
+## 2026-07-23 12:40 — GOLDEN MANIFEST PROMOTED (golden_v1, 8 ranks, 2455 leaves) — the corrupt value WON the naive vote on rank0 (ground-truth override saved it); REF validation draw next
+
+Assembly verdict: ranks 1/2/4/6 unanimous 2455/2455; ranks 3/5/7 majority-correct (ground-truth
+confirmed); rank0 = THE VINDICATION — engines 1 AND 3 both struck on layers.10 wk_weights_proj ⇒ the
+corrupt 48387836 won 2-to-1 and ONLY the checkpoint adjudication (true 239851472) prevented golden-izing
+the corruption; its derived adapted_wk (majority 0!) overridden to the 19-way healthy consensus
+191463636 (documented deviation: 0 must not win for a corruption-derived value). CENSUS (streamer-bug
+evidence): ONE weight leaf ever struck across 3 bootstrap engines — 5 strikes, identical wrong sum,
+rank0/w-2 affinity ×2 (other victims exist but rarer — statepair saw layers.7 gate + layers.61
+kv_a_layernorm single-host). Golden at gs://driftbench-dsv4-uc/manifests/golden_v1/ (combined
+371110325). Leaf sums are RANK-INVARIANT ⇒ one file serves all ranks. NEXT: REF validation draw
+(fail-closed; a refused corrupt draw is a SUCCESS of the protection), review-workflow verdict → fixes,
+gcsfuse switch, GATE4.
