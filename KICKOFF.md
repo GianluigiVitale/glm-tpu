@@ -48,6 +48,5 @@ THIS VM IS POD WORKER-0 (--worker=all git mutates the local checkout). pkill/pgr
 bracket the pattern ("name[.]sh"). NEVER edit a script bash is executing. `ls -td` races outer-log
 FILES — use explicit run dirs. Dump step-files ACCUMULATE (~273MB/step @128K; disk watchdog armed —
 gate-class runs UNARMED except LAYERS=2 health dumps, purged per depth). Don't sync workers mid-arm.
-setsid --wait nohup </dev/null every driver; RAY_DEDUP_LOGS=0; GLM_* raylet AND driver. Armed cold
-compiles can exceed 1h. gcsfuse mounts drop on relaunch — orchestrators re-ensure them (preflight
-does it; manual launches must too).
+setsid --wait nohup </dev/null every driver; RAY_DEDUP_LOGS=0; GLM_* raylet AND driver. gcsfuse
+mounts drop on relaunch — orchestrators re-ensure them; manual launches must too.
