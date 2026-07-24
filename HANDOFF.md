@@ -1,27 +1,23 @@
 # HANDOFF — GLM-5.2 on TPU v4 (read this first, every new chat)
 
-**Updated:** 2026-07-18 19:45 UTC — **THE SPARSE 128K GATE IS RUNNING AND WINNING** (run dir
-`~/glm-run/gate128k_20260718T110127Z`, n=77, PIN **a225d16b4**, **33/33 through d=0.0/0.05/0.95** — the
-gate2 killer cell CLEARED 11/11; verdict ETA ~05-07 UTC 07-19). **CHECK ITS STATE FIRST (its
-orchestrator.log + results.db); NEVER launch pod work while it runs.** The full 07-18 arc
-(RESEARCH_LOG 09:05→19:15): t2j alias fix adversarially reviewed 3/3 (SAFE on the GLM path; scope
-claim refuted — sibling sites parked on `~/wt-sibling-alias`, 4 commits, 38 tests green, land
-post-gate); the stats review REFUTED the "~10% residual, gate open" claim (pooled-detector confound;
-all protections were NaN-only) ⇒ built **GLM_LOAD_CHECKSUM** (categorical cpu-vs-device byte-verify of
-every t2j-staged tensor at load tail, raises on mismatch — catches FINITE corruption; validation 4/4
-clean, live on 8 hosts, verified=1882/host, 312 benign 0-d skips); xprof 128K needle: NO ≥40% dominator
-(S2 pallas scorer NOT justified; chunk ≈9.35s at tiny kv ⇒ per-chunk cost dominates prefill; post-gate
-efficiency targets: top_k 21.8% / gathers 16% / collectives ~24%). **RESIDUAL SPECIMEN (hypothesis
-revised):** the one sick gate draw (d=0.05 try-1) was byte-verified CLEAN on every surface yet
-fluent-filler-missed a 5K needle ⇒ the ~14%/draw residual is NOT H2D weight corruption — candidates:
-CPU-side finite corruption pre-t2j, or engine-instance STATE (XLA program draw / device order /
-KV-selection state). Specimen: db run 193 + specimen_d005_try1/. MTP stays FROZEN.
+**Updated:** 2026-07-24 01:30 UTC — **THE ENGINE LOTTERY IS SOLVED END-TO-END AND GATE4 v3 IS
+RUNNING** (run dir from `~/glm-run/gate128k_20260724T*`, n=77, PIN **dc0443a43**, launched 01:25 —
+**CHECK ITS STATE FIRST; NEVER launch pod work while it runs**). The 6-day hunt closed 07-23/24:
+root cause = the runai-streamer load path delivers corrupt-but-finite bytes for ~0-3 tensors per
+host per launch (frequent victim: the fused indexer `wk_weights_proj`, its dequantized-wk half
+ZEROED); window narrowed to **post-dequant/pre-t2j CPU storage** (a dequant-time check saw good
+values). THE FIX, validated on metal (gval 07-23/24, 4 draws): **the self-healing load** —
+`GLM_WK_OOB_DIR` PWAL-time zero-fill repair from the gcsfuse mirror (5/5 strikes repaired bitwise)
+→ `GLM_STATE_HASH_REF` golden-manifest refusal (every serving engine VERIFIED 8/8 byte-exact;
+12/12 needles) → NaN-scan refusal for the non-finite flavor (1/1 refused fail-closed). Defense in
+depth: repair → refuse → relaunch. **Full story: `docs/17-engine-lottery-postmortem.md`** (Phase J
+= the loader window hunt; §6 = the future-catch rules). MTP stays FROZEN until the gates close.
 
 **Honest claim line:** *first public DSA kernel on TPU — selected-set-exact on silicon; dense 128K gate
-CLOSED 77/77 (run 124, Wilson LB 95.3%); 12.6× efficiency campaign; the sparse ≥95%@128K gate is IN
-FLIGHT at 33/33 with zero misses — d=0.95 (gate2's 0/11 death cell) cleared 11/11 on a byte-verified
-engine, retroactively attributing gate2's death to the engine lottery, not the kernel. Not yet closed
-until 77/77 banks.*
+CLOSED 77/77 (run 124, Wilson LB 95.3%); 12.6× efficiency campaign; gate2 AND gate3's deaths root-caused
+to a weight-load corruption bug (docs/17) that is now fixed with a validated self-healing load; the
+sparse ≥95%@128K gate (GATE4 v3) is IN FLIGHT on the protected stack. Not yet closed until 77/77
+banks — two prior gates died at 22/22 and 33/35, so no claim before the verdict.*
 
 **Read, in full, before doing anything:** this file → `CLAUDE.md` (rules) → `docs/RESEARCH_LOG.md`
 **2026-07-17 08:20 onward** (lottery→root-cause→checksum→gate arc; efficiency campaign is 07-12 20:30 on) (the efficiency campaign → gate2 death → lottery → confound → recovery arc;
@@ -105,9 +101,14 @@ the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-r
 3. ~~Land the t2j fix + validation~~ **DONE 07-18** (629c20e84, reviews 3/3; GLM_LOAD_CHECKSUM
    a225d16b4 landed after the stats review demanded a categorical finite-corruption instrument;
    validation 4/4 clean with the full stack armed).
-4. **THE RE-GATE IS RUNNING** (gate128k_20260718T110127Z, 33/33 through the first three mechanism
-   depths). On PASS 77/77 ⇒ bank + close; ONE miss ⇒ extend n≈130; 2-miss abort ⇒ forensics FROM THE
-   SPECIMEN (armed instruments), never rate experiments.
+4. ~~gate3~~ **DEAD 07-18 at 33/35** — root-caused (with gate2) to the engine lottery. The full
+   07-19→07-24 arc: the residual hunt (docs/17 Phases E-I) → ROOT CAUSE (statepair: the streamer
+   finite-corruption, layers.10 zeroed-wk specimen, ground-truth-adjudicated) → golden manifest +
+   `GLM_STATE_HASH_REF` refusal (proven live) → the loader window narrowed post-dequant/pre-t2j →
+   **the self-healing load (`GLM_WK_OOB_DIR` PWAL repair, dc0443a43) VALIDATED on metal 4/4 draws**
+   → **GATE4 v3 LAUNCHED 07-24 01:25** on the full protected stack (REF+OOB armed, hardened
+   orchestrator: health probe, empty-depth retry, oob-mount preflight, miss-abort at 2). On PASS
+   77/77 ⇒ bank + close; ONE miss ⇒ extend n≈130; 2-miss abort ⇒ forensics FROM THE SPECIMEN.
 5. **256K throughput A/B** (dsa-sparse vs dense at IDENTICAL dcp; `bench/dsa_throughput.py`); fp8-KV
    only after its own dcp=1 needle validates (fp8 has still NEVER produced a validated metal token).
 6. **Benchmarks at scale:** GSM8K n≥200, GPQA-198 rerun @ 16K (owner-gated), AIME-2026 n=30.
@@ -119,7 +120,7 @@ the sparse-ladder/stripe-forensics arc is 07-10 16:10 onward) → `docs/11-pod-r
 | branch | what | on origin? |
 |---|---|---|
 | `glm-5.2-v4` (`02e44b36`) | pod mainline — Stage-1 + obs + OOB fix | yes |
-| **`glm-5.2-v4-next`** (**`a225d16b4`**) | **integrated staging + what the pod RUNS** — the campaign stack (granularity fix, fp8-KV v4 fixes, obs, sparse-DCP A/B/C, scatter-flat, segment S1, W2.1, gather-dominator v2s) + the 07-17 safety commit (F6 refusals, GLM_WRITE_PROBE, combo suite, dense-impl refusal) + the 07-17/18 integrity layer (GLM_PWAL_NAN_CHECK raises; GLM_LOAD_NAN_CHECK full-weight init scan + reject dumps; 629c20e84 t2j alias fix; 04507ba1d CPU stage-splitter; a225d16b4 GLM_LOAD_CHECKSUM byte-verify), all gated off by default | yes — synced 8× dirty=0 |
+| **`glm-5.2-v4-next`** (**`dc0443a43`**) | **integrated staging + what the pod RUNS** — the campaign stack (granularity fix, fp8-KV v4 fixes, obs, sparse-DCP A/B/C, scatter-flat, segment S1, W2.1, gather-dominator v2s) + the 07-17 safety commit + the integrity layer (GLM_PWAL_NAN_CHECK, GLM_LOAD_NAN_CHECK, 629c20e84 t2j alias fix, GLM_LOAD_CHECKSUM) + the 07-22/24 lottery-kill layer (**GLM_STATE_HASH / _REF golden-manifest refusal; GLM_WK_OOB_DIR PWAL-time self-healing repair** — validated, docs/17 §5), all gated off by default | yes — synced 8× dirty=0, machine-verified by sync_workers.sh [3/3] |
 | `pr-g1..g6` | upstream PR series (07-07/08 cuts — predate the campaign; owner submits) | yes |
 | `dsv4-flash-v4` | the DSV4 base (LKG pin source) | yes |
 
@@ -134,8 +135,14 @@ segment S1** (= tag freeze-correct-128k-20260712) → **5c6e1f0c8 W2.1** → **a
   LOCAL dev checkout too (a sync reset ran here mid-session; both branch pointers happened to match —
   check `git branch -vv` after any pod-wide git). And `ls -td ~/glm-run/gate128k_*` races the
   `gate128k_outer.log` FILE — always use the explicit run-dir name.
-- **WORKER STALENESS (#1 footgun):** push origin explicitly → `sync_workers.sh` → verify 8× same hash →
-  pin `GLM_EXPECT_CODE_HASH` (re-pin collides with a mid-flight engine — wait for it).
+- **WORKER STALENESS (#1 footgun):** push origin explicitly → `sync_workers.sh` (its [3/3] pass now
+  MACHINE-ENFORCES 8-host HEAD==origin + no `.git/index.lock`, exit 2 on drift — a stale lock silently
+  ate a reset on w6, 07-23) → pin `GLM_EXPECT_CODE_HASH` (re-pin collides with a mid-flight engine —
+  wait for it). The fingerprint guard catches what slips through, in ~75 s.
+- **Unit-test env-sensitive code under torchax's BOTH modes** (`torchax.default_env()` in the test):
+  the metal PWAL path runs under XLAFunctionMode AND XLADispatchMode; the only working escape is the
+  pair `mode_utils.no_dispatch(), torch._C.DisableTorchFunction()`. Bare-CPU tests passed while metal
+  crashed twice (docs/17 §6(g)).
 - **DISK PRESSURE is a first-class failure mode** (4 incidents; it killed gate-class runs and confounded
   the lottery): gate-class runs are UNARMED (a 128K armed gate writes ~230GB); dumps get quotas and GCS
   archival + purge; check `df` on ALL 8 hosts before any long run. The postmortem rule: a probe watcher
@@ -166,12 +173,15 @@ zero-failure + bounded divergence. Stage-3: MTP acceptance ~5 (FROZEN).
 
 ## The exact next task
 
-**Watch the running gate to verdict** (persistent monitor on `~/glm-run/gate128k_outer.log`; per-depth
-GCS checkpoints are automatic). On PASS: bank in RESEARCH_LOG + docs refresh + `backup_bundle.sh`, then
-**256K** (fit/geometry probe — dcp=8 was deferred to this stage; novel geometry = ~40 min cold compile —
-then needles, then the sparse-vs-dense throughput A/B at IDENTICAL dcp), then land `~/wt-sibling-alias`
-+ draft the t2j upstream PR. The residual hunt starts FROM THE SPECIMEN (db run 193). The corpus-first
-rule applies to every new domain.
+**Watch GATE4 v3 to verdict** (its run dir `~/glm-run/gate128k_20260724T*`; orchestrator.log +
+per-depth GCS checkpoints are automatic; expected wall ~14-20 h incl. engine relaunches on refusals
+— a refused/repaired engine is NORMAL now, only the health probe's verdicts matter). On PASS 77/77:
+bank in RESEARCH_LOG + `backup_bundle.sh`, then **256K** (`stage256k.sh` — already pinned to
+dc0443a43 with REF+OOB armed; dcp=8 bring-up → 32K sanity → 256K smoke → the sparse-vs-dense
+throughput A/B at IDENTICAL dcp), then benchmarks (GSM8K n≥200 → AIME-2026 → GPQA-198@16K
+owner-gated), then MTP unfreeze (M2), then land `~/wt-sibling-alias` + the PR series re-cut + the
+streamer upstream bug report (the `_free_cpu_storage` ordering audit feeds it). Banked optional:
+extend the wk-oob guard to repair non-finite halves (converts NaN-refusals into serves).
 
 ## Owner-gated (draft, don't do)
 

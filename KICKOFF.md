@@ -5,46 +5,49 @@ SOLO, FULLY AUTONOMOUS. Finish **GLM-5.2-FP8** on TPU v4. DON'T STOP/ASK until (
 n≥73; throughput ≥256K). **OWNER RULE: NO SHORTCUTS — root cause properly fixed + validated before any
 re-gate; no workaround gating.** Self-correct; when unsure pick + log.
 
-## STATE (2026-07-23 08:30 UTC; RESEARCH_LOG 07-22 21:15 → 07-23 08:10)
-- ⭐ **ROOT CAUSE FOUND AND MEASURED (5-day hunt closed): STREAMER FINITE-CORRUPTION of loaded
-  weights.** The runai streamer probabilistically delivers corrupt-but-FINITE bytes for ~a few random
-  tensors per host per launch (deterministic wrong bytes when it strikes; e.g. layers.10 indexer
-  wk_weights_proj sum 48387836 vs true 239851472, its adapted derivative ZEROED). NaN scans + the H2D
-  checksum are blind to the finite flavor BY DESIGN. Victim = an indexer weight ⇒ that layer's
-  selections degrade ⇒ the whole "state class" (per-instance score states, pos≥2048 gating, entry-layer
-  variation, mangled digits, gate2/3 deaths). Severity = how many host replicas share the victim
-  (1/8 ⇒ healthy-divergent; 8/8 ⇒ sick). The "load class" (NaN) and "state class" (finite) were ONE BUG.
-- PROOF CHAIN (all banked): entry bracketed L15/L17 → GLM_STATE_HASH (8448b738c, fingerprints all
-  19,640 leaves incl. derived) → statepair arm: sick engine differs on EXACTLY the 2 layer-10 leaves ×8
-  hosts; healthy pair differs on 3 single-host leaves (benign carriers).
-- Fork tip **8448b738c** synced 8×. In flight: GLM_STATE_HASH_REF manifest-refusal build (agent).
-- Instruments proven en route: onehot scorer (harmless, keep), idx-no-donate (harmless), checksum/NaN
-  stack, the 30-90min ladder repro (hunt_residual.sh + overrides).
+## STATE (2026-07-24 01:30 UTC; RESEARCH_LOG 07-23 21:40 → 07-24 01:20)
+- ⭐ **THE ENGINE LOTTERY IS SOLVED END-TO-END** (6-day hunt; full story docs/17 incl. Phase J).
+  Streamer delivers corrupt-but-finite bytes ~0-3 tensors/host/launch; window narrowed
+  **post-dequant/pre-t2j CPU storage** (dequant-time check saw GOOD values; suspect
+  _free_cpu_storage resize_(0) ordering — upstream-report audit material). THE FIX, **VALIDATED on
+  metal** (gval 4 draws, PIN dc0443a43): the SELF-HEALING LOAD — GLM_WK_OOB_DIR PWAL-time zero-fill
+  repair from the gcsfuse mirror (5/5 strikes repaired bitwise, layers.10 ×4 + layers.1) →
+  GLM_STATE_HASH_REF golden-manifest refusal (every serving engine VERIFIED 8/8; 12/12 needles) →
+  NaN-scan refusal (1/1 fail-closed). Repair → refuse → relaunch. Zero unverified serves.
+- **GATE4 v3 (sparse 128K, n=77) LAUNCHED 07-24 01:25** — gate_sparse128k.sh @ dc0443a43, REF+OOB
+  armed, hardened (health probe, empty-depth retry, oob-mount preflight+remount, miss-abort at 2).
+  Run dir ~/glm-run/gate128k_20260724T*. Refused/repaired engines are NORMAL — relaunch handles them.
+- Fork tip **dc0443a43** synced 8× (sync_workers.sh now MACHINE-VERIFIES 8×HEAD==origin + no
+  index.lock — a stale lock silently ate w6's reset 07-23; the fingerprint guard caught it in 75 s).
+- Torchax lesson (docs/17 §6(g)): PWAL runs under BOTH torchax modes; escape = the PAIR
+  `no_dispatch(), DisableTorchFunction()`; CPU tests must run under torchax.default_env().
+
 ## FRONTIER (in order)
-1. Land GLM_STATE_HASH_REF (manifest refusal — the categorical finite-class detector): bootstrap the
-   golden manifest from a verified engine (GLM_STATE_HASH_WRITE), cross-check vs the banked healthy
-   sums, commit manifest to gs://driftbench-dsv4-uc/manifests/.
-2. **THE STREAMER FIX**: gcsfuse Plan A (mount gs://driftbench-dsv4-uc/models on all 8 hosts, switch
-   GLM_MODEL/load path; $0) — else the pre-authorized local-disk attach. Validate: N init draws, ALL
-   manifest-clean (vs the ~2-3 corrupt-leaf/launch baseline).
-3. **GATE4** n=77 @128K: fixed load path + manifest refusal + full stack + 32K health needle.
-4. 256K (stage256k.sh — update PIN/envs). 5. Benchmarks (GSM8K n≥200, GPQA@16K owner-gated), MTP,
-   sibling-alias landing, PR re-cut (incl. the STREAMER BUG REPORT upstream — deterministic-bytes
-   repro makes it filable).
+1. **GATE4 v3 to verdict** (~14-20 h): PASS 77/77 ⇒ bank + backup_bundle.sh. ONE miss ⇒ extend
+   n≈130; 2-miss abort ⇒ forensics FROM THE SPECIMEN (never rate experiments).
+2. **256K**: stage256k.sh (READY @ dc0443a43, REF+OOB armed) — dcp=8 bring-up → 32K sanity ×2 →
+   256K mechanism smoke → sparse-vs-dense throughput A/B at IDENTICAL dcp=8.
+3. **Benchmarks**: GSM8K n≥200 → AIME-2026 n=30 → GPQA-198@16K (owner-gated go).
+4. **MTP M2 unfreeze** (after gates). 5. Land ~/wt-sibling-alias; PR series re-cut; the STREAMER
+   upstream bug report (deterministic zero-fill + the window + _free_cpu_storage audit). Banked
+   optional: wk-oob guard NaN-half repair (converts NaN-refusals into serves).
+
 ## HARD RULES
 COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach pre-authorized. METHOD:
-observability-first; corpus-first re-read on domain shift; ONE VARIABLE AT A TIME; wiring must be
-falsifiable (spy/liveness tests, environ checks); honest nulls; small-n never a gate. COMMIT+PUSH
+observability-first; corpus-first re-read on domain shift; ONE VARIABLE AT A TIME; falsifiable wiring;
+honest nulls; small-n never a gate (n≥73; mechanism depths 0.0/0.05/0.95/1.0 REQUIRED). COMMIT+PUSH
 every step. Agents: worktrees, JAX_PLATFORMS=cpu. Serialize TPU. Owner submits PRs; no force-push.
 
 ## READ FIRST
-HANDOFF.md → RESEARCH_LOG **2026-07-19 21:10 onward** → the running arm's outer log in ~/glm-run/.
-Check pgrep -f "hunt_residual[.]sh" BEFORE any pod action.
+HANDOFF.md (07-24 header) → docs/17 (the post-mortem — §5 protections, §6 rules) → RESEARCH_LOG
+**07-23 21:40 onward** → the running gate's orchestrator.log. Check
+pgrep -f "gate_sparse128k[.]sh" BEFORE any pod action.
 
 ## LANDMINES
-THIS VM IS POD WORKER-0 (--worker=all git mutates the local checkout). pkill/pgrep -f SELF-MATCHES the
-shell's eval line — bracket the pattern ("name[.]sh"). `ls -td` globs race outer-log FILES — use
-explicit dirs. NEVER edit a script bash is executing. Dump step-files ACCUMULATE (~273MB/step @128K —
-disk guard at <15G is armed). Don't sync workers mid-arm (breaks provenance). Load-refusals ≈20% of
-draws — classifier handles them (LOAD_REFUSED ≠ the diff-pair sick). Armed cold compiles can exceed
-1h (LADDER_TIMEOUT_S). setsid --wait; RAY_DEDUP_LOGS=0 forensics; GLM_* raylet AND driver.
+THIS VM IS POD WORKER-0 (--worker=all git mutates the local checkout). pkill/pgrep -f SELF-MATCHES —
+bracket the pattern ("name[.]sh"). NEVER edit a script bash is executing. `ls -td` races outer-log
+FILES — use explicit run dirs. Dump step-files ACCUMULATE (~273MB/step @128K; disk watchdog armed —
+gate-class runs UNARMED except LAYERS=2 health dumps, purged per depth). Don't sync workers mid-arm.
+setsid --wait nohup </dev/null every driver; RAY_DEDUP_LOGS=0; GLM_* raylet AND driver. Armed cold
+compiles can exceed 1h. gcsfuse mounts drop on relaunch — orchestrators re-ensure them (preflight
+does it; manual launches must too).
