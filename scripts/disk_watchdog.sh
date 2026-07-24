@@ -76,15 +76,39 @@ case "$MODE" in
     ;;
   watch)
     mkdir -p "$(dirname "$ALERT_FILE")"
-    echo "disk watch: every ${INTERVAL_S}s; alert -> $ALERT_FILE (min ${MIN_FREE_GB}G)"
+    # 2026-07-24: an ssh/control-plane transient made three consecutive
+    # polls reach 0/8 hosts; the old loop wrote BREACH lines immediately
+    # and a healthy gate depth was aborted as INFRA on a false alarm
+    # (every host had >50G free). A failed POLL is not a disk verdict:
+    # only a host that ANSWERS with low disk breaches immediately;
+    # unreachability escalates only after UNREACH_MAX consecutive misses
+    # (default 5 = ~10 min sustained — a genuinely dead host still trips).
+    UNREACH_MAX="${UNREACH_MAX:-5}"
+    unreach=0
+    echo "disk watch: every ${INTERVAL_S}s; alert -> $ALERT_FILE (min ${MIN_FREE_GB}G; unreach escalates at ${UNREACH_MAX} consecutive)"
     while true; do
-      out=$(poll_once | classify) || {
-        {
-          echo "=== DISK_ALERT $(date -u +%FT%TZ) ==="
-          echo "$out" | grep -E "^BREACH"
-        } >> "$ALERT_FILE"
-        echo "$out" | grep -E "^BREACH" >&2
-      }
+      raw=$(poll_once)
+      n=$(echo "$raw" | grep -c "^t1v-" || true)
+      if [ "${n:-0}" -lt 8 ]; then
+        unreach=$((unreach + 1))
+        echo "disk watch: poll reached only ${n:-0}/8 hosts (${unreach}/${UNREACH_MAX} consecutive) — ssh transient, NOT a disk verdict" >&2
+        if [ "$unreach" -ge "$UNREACH_MAX" ]; then
+          {
+            echo "=== DISK_ALERT $(date -u +%FT%TZ) ==="
+            echo "BREACH pod unreachable for ${unreach} consecutive polls (~$((unreach * INTERVAL_S / 60)) min sustained)"
+          } >> "$ALERT_FILE"
+          unreach=0
+        fi
+      else
+        unreach=0
+        out=$(echo "$raw" | classify) || {
+          {
+            echo "=== DISK_ALERT $(date -u +%FT%TZ) ==="
+            echo "$out" | grep -E "^BREACH"
+          } >> "$ALERT_FILE"
+          echo "$out" | grep -E "^BREACH" >&2
+        }
+      fi
       sleep "$INTERVAL_S"
     done
     ;;

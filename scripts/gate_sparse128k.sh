@@ -132,6 +132,12 @@ health_check_engine() {
       --max-batched-tokens 2048 --num-gpu-blocks 68 --max-len 131840 \
       --note "gate health-check ($TAG)" </dev/null > "$hlog" 2>&1
   )
+  # refusal-marker detection FIRST: ray log-dedup collapses per-host lines
+  # (a healthy log shows ~2 "manifest VERIFIED", not 8), so classification
+  # keys on the refusal exceptions, never on line counts.
+  local refusal
+  refusal=$(grep -aoEm1 "StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|CodeFingerprintMismatchError" "$hlog" || true)
+  if [ -n "$refusal" ]; then echo "SICK:refused_${refusal}"; return; fi
   grep -q "manifest VERIFIED" "$hlog" || { echo "SICK:manifest_not_verified"; return; }
   grep -q "correct=True" "$hlog" || { echo "SICK:needle"; return; }
   local scan
@@ -163,9 +169,10 @@ IFS=',' read -ra DEPTH_ARR <<< "$DEPTHS"
 for d in "${DEPTH_ARR[@]}"; do
   DEPTH_ATTEMPT=1; DEPTH_ATTEMPTS_MAX=4
   while true; do
-  LOG="$RUN_DIR/depth_${d}.log"
-  say "── depth $d ($TRIALS trials) ──"
-  ALERT_BEFORE=$(wc -l < "$ALERT_FILE" 2>/dev/null || echo 0)
+  # per-attempt log name: a retried depth must not truncate the dead
+  # attempt's log (the 07-24 d=0.95 retry destroyed its own forensics)
+  LOG="$RUN_DIR/depth_${d}_a${DEPTH_ATTEMPT}.log"
+  say "── depth $d ($TRIALS trials, attempt $DEPTH_ATTEMPT) ──"
 
   # fresh engine per depth (the gate2 protocol), F4-proof single env source,
   # health-probed: relaunch until the engine draw is clean (lottery mitigation)
@@ -189,6 +196,12 @@ for d in "${DEPTH_ARR[@]}"; do
     exit 1
   fi
 
+  # snapshot the alert count HERE, not at depth start: alerts written
+  # during launch/health-probe are pre-serving history (the 07-24 false
+  # abort fired on stale lines from an ssh transient during the launch
+  # window). The brace group silences the shell's own redirect error when
+  # no alert file exists yet.
+  ALERT_BEFORE=$({ wc -l < "$ALERT_FILE"; } 2>/dev/null || echo 0)
   (
     cd ~/glm-tpu/bench || exit 1
     # shellcheck disable=SC1090
@@ -211,7 +224,7 @@ for d in "${DEPTH_ARR[@]}"; do
   WAITED=0; DEPTH_MISS=0; DEPTH_INFRA=""
   while kill -0 "$WRAPPER" 2>/dev/null; do
     sleep 60; WAITED=$((WAITED + 60))
-    ALERT_NOW=$(wc -l < "$ALERT_FILE" 2>/dev/null || echo 0)
+    ALERT_NOW=$({ wc -l < "$ALERT_FILE"; } 2>/dev/null || echo 0)
     if [ "${ALERT_NOW:-0}" -gt "${ALERT_BEFORE:-0}" ]; then
       DEPTH_INFRA="disk_alert"
       say "ABORT depth $d: DISK ALERT during the run — depth is INFRA (its misses are NOT results). Killing."
