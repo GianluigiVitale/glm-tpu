@@ -3905,3 +3905,19 @@ never modeled the metal execution context — future-catch rule: unit-test env-s
 the PRODUCTION interception stack, not bare CPU). Synced 8×8 via the hardened sync (verify pass:
 all 8 @ dc0443a43, no locks). gval arm relaunched 23:33. Positive datum en route: the guard's
 DETECTION works on metal (zero-half found on exactly the struck host).
+
+## 2026-07-24 01:20 — ✅ THE SELF-HEALING LOAD VALIDATED (gval 4/4 per design) — docs/17 Phase J landed; GATE4 v3 next
+
+gval_20260723T233335Z (PIN dc0443a43, REF+OOB armed): d1 zero-fill L10@w3 -> REPAIRED -> VERIFIED=8
+-> 4/4; d2 clean -> VERIFIED=8 -> 4/4; d3 TRIPLE strike (L1 + L10 x2 hosts) -> 3 repairs ->
+VERIFIED=8 -> 4/4; d4 zero-fill L10@w4 repaired + NaN-flavor L1@w5 -> LoadNanCheckError fail-closed
+refusal. Five zero-fill repairs across 3 draws, layers.10 struck 4x on 4 DIFFERENT hosts (per-host
+independence now directly observed — post-mortem Appendix C item 3 resolved), 12/12 needles on
+serving engines, ZERO unverified serves. The protection stack behaves exactly per design: repair
+(zero-fill signature) -> refuse (everything else: NaN scan, manifest) -> relaunch. Banked optional
+extension (NOT before the gate): repair non-finite halves too, converting d4-type refusals into
+serves. docs/17 updated: Phase J chapter, §2.1 window resolution, §5.3 demotion (fuse load ~10x too
+slow -> repair source), §5.4 read-vs-dequant RESOLVED (neither — post-dequant CPU-storage window),
+new §5.5 (the self-healing load), §6 rule (g) (test under the production interception stack) + (b)
+addendum (the fingerprint save), Appendix B gval rows, Appendix C item-3 resolution. NEXT: GATE4 v3
+(gate_sparse128k.sh @ dc0443a43, REF+OOB armed, n=77).

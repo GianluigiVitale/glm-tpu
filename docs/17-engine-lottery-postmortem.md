@@ -1,13 +1,16 @@
 # 17 — The Engine Lottery: post-mortem of the streamer/dequant finite-corruption hunt
 
-**Window covered:** 2026-07-17 03:15 UTC → 2026-07-23 11:30 UTC (with pre-history back to gate2's death,
+**Window covered:** 2026-07-17 03:15 UTC → 2026-07-24 01:15 UTC (with pre-history back to gate2's death,
 2026-07-12/13, which this bug caused).
 **Authoritative sources:** `docs/RESEARCH_LOG.md` (2026-07-17 04:15 → 2026-07-23 11:30 — every claim here
 traces to a dated entry), `CLAUDE.md` §Progress, `HANDOFF.md`, `docs/suggestions.md` (the method doctrine),
 `docs/upstream/pageloop-v4-sublane-drop-REPORT.md` (the sibling defect class).
-**Status at writing:** root cause named, measured, and ground-truth-adjudicated; manifest refusal landed
-(fork `696adb9ca`, synced 8×); golden-manifest bootstrap in progress; the gcsfuse read-vs-dequant
-discrimination and GATE4 are still ahead.
+**Status at writing (updated 07-24):** root cause named, measured, and ground-truth-adjudicated;
+manifest refusal landed and proven live; the corruption window narrowed to post-dequant/pre-t2j CPU
+storage (Phase J); the PWAL-time self-healing repair (`GLM_WK_OOB_DIR`, fork `dc0443a43`) **validated
+on metal** — 4-draw arm 07-23/24: 5 zero-fill strikes repaired across 3 draws, every serving engine
+manifest-VERIFIED 8/8, 12/12 needles, the one NaN-flavor strike refused fail-closed. GATE4 launches
+on this stack.
 
 A note on the log itself: the RESEARCH_LOG's 2026-07-18 timestamps are internally inconsistent (see
 Appendix C, item 1). This document uses **file order** as the authoritative sequence, per the log's own
@@ -37,9 +40,12 @@ that validated null, and a gate schedule slip of ~5 days (128K gate from ~07-19 
 **The fix.** (1) A categorical detector that closes the gate path: `GLM_STATE_HASH` per-leaf uint32
 sums of the **final** model state verified at init against a **golden reference manifest**
 (`GLM_STATE_HASH_REF`, fail-closed refusal; manifest built by majority-of-3 boot engines plus offline
-safetensors ground truth for frequent-victim tensors). (2) Elimination of the guilty load path (gcsfuse
-Plan A / local-disk copy — pre-authorized under CLAUDE.md §COST since day 1), which also doubles as the
-still-pending discriminator between "GCS read returns zeros" and "dequant compute writes zeros". A real
+safetensors ground truth for frequent-victim tensors). (2) A **self-healing repair at the corruption
+window's closing edge** (Phase J): the zeroing was localized to the fused leaf's CPU storage *after*
+dequant and *before* t2j, so a PWAL-time guard (`GLM_WK_OOB_DIR`) detects the impossible all-zero half
+and rewrites it bitwise from a gcsfuse checkpoint mirror — validated on metal 07-23/24 (§5.5). The
+originally planned load-path replacement (gcsfuse Plan A as the *load* path) measured ~10× too slow
+for init and was demoted to the repair source. Defense in depth: repair → refuse → relaunch. A real
 second bug — the t2j zero-copy alias race — was found and fixed en route (fork `629c20e84`) and is
 independently upstreamable, but it was **not** this bug.
 
@@ -57,9 +63,14 @@ tensors (the `glm_dsa_adapted_*` indexer params, the absorbed `w_uk_t`/`w_uv`) c
 
 On some launches, for a small number of tensors (~2-3 corrupt leaves per launch even on "healthy"
 engines — measured 07-23 08:10), the bytes that reach the device are wrong. The final measured specimen
-is deterministic: **the fp8-wk byte range arrives (or dequants to) all zeros**. Whether the zeros come
-from the GCS **read** or from the **dequant compute** is the one discrimination still open; the gcsfuse
-load-path switch answers it (07-23 11:30).
+is deterministic: **the fp8-wk byte range arrives (or dequants to) all zeros**. Whether the zeros came
+from the GCS **read** or from the **dequant compute** was the discrimination still open at root-cause
+time; Phase J closed it with a third answer — **neither**. A dequant-time zero-check observed GOOD
+values on launches whose device state was later corrupt, so the zeroing happens **after the dequant
+completes, in the fused leaf's CPU storage, before/at t2j conversion** (§5.4). The leading mechanism
+candidate is the load path's CPU-storage free machinery (`_free_cpu_storage`-class `resize_(0)`)
+releasing the buffered fused param's storage out of order — the same held-reference-across-an-async-
+boundary family as the t2j alias race (§2.7).
 
 ### 2.2 The two flavors
 
@@ -418,6 +429,68 @@ from the checkpoint and identified the corruption as **the dequantized-wk half z
 **Cost:** ~26 h from histogram to adjudicated ground truth — the cheapest phase of the hunt, run
 almost entirely on already-banked artifacts plus five short draws.
 
+### Phase J — The loader window hunt and the self-healing load (07-23 11:30 → 07-24 01:15)
+
+Root cause in hand, the owner rule ("no workaround gating — root cause properly fixed + validated
+before any re-gate") forbade re-gating behind the refusal guard alone: refusal makes bad engines
+visible, not rare (the pre-guard oobval arm refused 3/4 draws — a gate would starve). The load path
+itself had to be fixed. Four candidate mechanisms fell in sequence:
+
+**gcsfuse as the load path (deferred, not falsified):** Plan A — replacing streamer reads with a
+gcsfuse mount — would have discriminated read-vs-dequant, but a FUSE-backed full load measured ~10×
+too slow for engine init on this pod. Kept as the *repair* source, not the load path (below).
+
+**The buffering-clone hypothesis (disproven):** `_try_load_fp8_indexer_wk` buffers the wk/scale
+tensors across loader-iterator yields; if the streamer recycled those buffers, the fused leaf would
+read freed memory. A `.clone()` at buffering time was applied on all 8 hosts — and changed nothing:
+the runai iterator already yields `tensor.clone()` (`weight_utils.py:1076`). Banked as a null; the
+patch (`patches/vllm-fused-indexer-wk-clone.patch`) is kept only as upstream-report context.
+
+**The dequant-time window (excluded by instrument):** an OOB verify at the end of the fused
+load/dequant (re-read + re-dequant if the wk half sums to zero) **never fired** on strike launches —
+at that point the values are still good. This is the decisive narrowing: the zeroing lands in the
+window **post-dequant / pre-t2j**, while the fused leaf sits in CPU storage awaiting conversion.
+Leading candidate: `_free_cpu_storage`-class `resize_(0)` ordering (audit material for the upstream
+report; the family matches the t2j alias race — a reference held across an async boundary).
+
+**The fix that landed — repair at the window's closing edge:** since the corruption strikes while
+the leaf is parked in CPU storage, the last CPU touch is where a repair is total:
+`precompute_indexer_params` (PWAL), where the adapted indexer tensors are derived. The wk-oob guard
+(`glm_dsa_indexer.py`, env `GLM_WK_OOB_DIR`, default-off) checks both halves of every fused indexer
+leaf for the impossible all-zero signature and repairs bitwise from the gcsfuse checkpoint mirror
+(offline dequant proven bit-exact vs vllm's `scaled_dequantize`), failing loud if unrepairable.
+
+Two implementation traps worth recording. (1) The PWAL hook runs under BOTH of torchax's
+interception modes (`XLAFunctionMode` and `XLADispatchMode`), and each alone breaks the safetensors
+read's tensor construction: `DisableTorchFunctionSubclass()` failed on metal, then
+`DisableTorchFunction()` failed on metal too — the dispatch mode still intercepts aten calls (one
+wasted draw each). The working escape is torchax's own internal idiom, the PAIR
+`mode_utils.no_dispatch(), torch._C.DisableTorchFunction()`. The deeper lesson: the CPU suite
+passed 12/12 throughout because it never ran the guard under torchax's modes — once a test runs the
+repair under `torchax.default_env()`, the old escape reproduces the *exact* metal error on CPU
+(mutation-verified). Env-sensitive code must be unit-tested under the production interception
+stack, not bare CPU. (2) The first validation arm burned 4 draws in ~75 s each — the
+code-fingerprint guard (`GLM_EXPECT_CODE_HASH`) refusing init because worker 6's checkout was one
+commit stale: its sync had failed on a stale `.git/index.lock` and the failure was eyeball-checked
+past. The 07-09 stale-worker night took 8 hours to notice; the guard caught the recurrence in 75
+seconds (`sync_workers.sh` now machine-enforces 8-host HEAD==origin, exit 2 on drift).
+
+**Validation (gval_20260723T233335Z, PIN `dc0443a43`, REF + OOB armed, 4 draws):**
+
+| draw | strike | outcome |
+|---|---|---|
+| 1 | zero-fill ×1 (layers.10, w3) | repaired → VERIFIED=8 → 4/4 needles |
+| 2 | none | VERIFIED=8 → 4/4 needles |
+| 3 | zero-fill ×3 (layers.1 ×1 + layers.10 ×2) | all repaired → VERIFIED=8 → 4/4 needles |
+| 4 | zero-fill ×1 (layers.10, w4) + NaN ×1 (layers.1, w5) | repair fired; NaN half → `LoadNanCheckError` fail-closed refusal |
+
+Five zero-fill strikes repaired across three draws (layers.10 — the frequent victim — struck four
+times on four different hosts; per-host independence now observed directly), every serving engine
+manifest-VERIFIED 8/8 byte-exact, 12/12 needles, zero unverified serves. The NaN-flavor draw is the
+refuse path working as designed — the guard repairs the deterministic all-zero signature only; the
+manifest and NaN scans keep everything else fail-closed.
+**Cost:** ~14 h from adjudicated ground truth to a validated self-healing load.
+
 ---
 
 ## 4. Why it took 6 days — the honest analysis
@@ -551,21 +624,35 @@ majority-vote can enshrine corruption:
 The offline consensus scraped from statepair logs (859/~2455 leaves; log-line regex lossy) is banked as
 PRELIMINARY ONLY.
 
-### 5.3 The load-path elimination (pre-authorized; in progress)
+### 5.3 The load-path elimination (attempted; demoted to repair source)
 
-Eliminate GCS streaming from the serving load: gcsfuse Plan A at $0 first, per-host local-disk copy as
-the fallback (both explicitly pre-authorized in CLAUDE.md §COST). Baseline to beat: ~2-3 corrupt leaves
-per launch on the streamer. N validation draws must be manifest-clean.
+The plan was to eliminate GCS streaming from the serving load: gcsfuse Plan A at $0 first, per-host
+local-disk copy as the fallback (both pre-authorized in CLAUDE.md §COST). Outcome (Phase J): a
+FUSE-backed full load measured ~10× too slow for engine init, so gcsfuse serves instead as the
+**out-of-band repair source** for §5.5; the streamer remains the load path, wrapped in the
+repair+refuse stack. The local-disk fallback remains available if the strike rate ever outgrows the
+stack.
 
-### 5.4 The still-open discrimination
+### 5.4 The read-vs-dequant discrimination — resolved (Phase J)
 
-**Read vs dequant:** zeros from the GCS read path vs zeros produced by the dequant compute. The gcsfuse
-switch is the discriminator — if corruption persists on gcsfuse, the loader/dequant is guilty and the
-fix becomes per-tensor verify+retry against the manifest. Either way the manifest refusal protects the
-gate (it is load-path-independent). Also open: the exact mechanism of the NaN-flavor's 128-granule
-pattern, and how much of the pre-fix 56% NaN rate the t2j fix truly removed (the pooling confound was
-never resolved; the question is now moot for the gate path but matters for the upstream t2j PR's
-claims).
+**Neither.** A dequant-time zero-check saw good values on strike launches; the zeroing lands
+post-dequant / pre-t2j in the fused leaf's CPU storage. The gcsfuse load-path discriminator became
+moot for the gate (too slow to serve as the load path, and the window is now localized on the
+consumer side). Still open for the upstream report: the exact free/ordering mechanism
+(`_free_cpu_storage`-class `resize_(0)` audit), the NaN-flavor's 128-granule pattern, and how much
+of the pre-fix 56% NaN rate the t2j fix truly removed (the pooling confound was never resolved;
+moot for the gate path but material to the upstream t2j PR's claims).
+
+### 5.5 The self-healing load: PWAL-time verify+repair (landed `dc0443a43`, synced 8×; validated)
+
+At the last CPU touch of the fused indexer leaves (`precompute_indexer_params`), with
+`GLM_WK_OOB_DIR` set, each leaf's halves are checked for the impossible all-zero signature and
+repaired bitwise from the gcsfuse checkpoint mirror; unrepairable ⇒ raise (fail-closed, never
+serve-and-hope). Byte-identical behavior when unset. Validated on metal (Phase J table): 5/5
+zero-fill strikes repaired, every repaired engine then manifest-VERIFIED 8/8 and needle-perfect.
+Defense in depth is: **repair (5.5) → refuse (5.1) → relaunch (orchestrator retry)**, in that
+order. Known optional extension: also repairing non-finite (NaN-flavor) halves would convert those
+refusals into serves; deliberately not done before GATE4 (no new code between validation and gate).
 
 ---
 
@@ -586,7 +673,11 @@ reduction-order-independent, costs seconds per host, needs no reference to be us
 cross-instance, cross-time diffs), and becomes categorical the moment a reference exists.
 GLM_LOAD_CHECKSUM and GLM_STATE_HASH are ~small additions to an existing leaf walker. They should exist
 from day 1 of any model-loading stack and be armed in every long campaign — the marginal cost measured
-here was ~load-pass time (~23 min draws including everything).
+here was ~load-pass time (~23 min draws including everything). Addendum (07-23): the equipment pays
+rent beyond its target bug — the code-fingerprint guard turned a recurrence of the 07-09
+stale-worker night (a silent one-host sync failure) from an 8-hour data-poisoning event into a
+75-second refusal. Standing guards catch the failure classes you did NOT predict; that is the
+argument for leaving them armed, not merely buildable.
 
 **(c) Cross-instance determinism as a first-class health check.** Two independently launched engines
 given identical inputs must agree **bitwise** on selections, scores, and state sums. This is the single
@@ -620,6 +711,15 @@ sibling kernel-class defect existed — but the asymmetry stands: *silent per-in
 behavior should rank "the bytes are wrong" above "the compute is wrong" until the bytes are verified
 against truth.* DSV4's flaky dequant crash was the same loader family, retry-mitigated and never
 verified; the GLM port inherited both the bug and the blind spot.
+
+**(g) Unit-test env-sensitive code under the PRODUCTION interception stack.** The wk-oob guard's CPU
+suite passed 12/12 while the guard crashed on metal twice, because the tests ran bare-CPU and the
+metal path runs under torchax's function AND dispatch modes, which rewrite tensor construction
+inside third-party libraries (safetensors). Once one test entered `torchax.default_env()`, the bug
+reproduced on CPU *exactly* (mutation-verified against both broken escapes). The rule: if code runs
+under an interception/override regime in production — torch function/dispatch modes, custom device
+contexts, import hooks — at least one unit test must run the full path inside that regime. "Passes
+on CPU" is an overclaim when production CPU is not bare CPU.
 
 ---
 
@@ -794,8 +894,13 @@ classified by the orchestrators. Durations approximate where the log gives them.
 | state-hash init pair | 07-22 | 2 init draws (~15 min each) | ~1 h | leaky null (caught) |
 | statepair (serving + hashes) | 07-22/23 | 3 draws: 2 healthy, 1 SICK | overnight | THE ROOT CAUSE (16-leaf diff at layers.10) |
 | manifest bootstrap | 07-23 | 3 WRITE-mode draws (1 done — itself corrupt; 2 launched) | in progress | frequent-victim discovery; golden protocol |
+| oobval (REF armed, pre-guard) | 07-23 | 4 draws: 1 clean-VERIFIED (4/4), 3 refused | ~1.5 h | strike rate ~75% that night; dequant-time check never fired = the window-narrowing datum |
+| gval false-start #1 (Subclass escape) | 07-23 | 1 draw: PWAL crash (UntypedStorage) | ~20 min | DisableTorchFunctionSubclass insufficient |
+| gval false-start #2 (stale w6) | 07-23 22:28 | 4 draws: 4× CodeFingerprintMismatch in ~75 s | ~5 min | the fingerprint guard catching the index.lock sync failure |
+| gval false-start #3 (function-only escape) | 07-23 23:11 | 1 draw: guard DETECTED strike, OOB read crashed (dispatch mode) | ~17 min | DisableTorchFunction alone insufficient; detection proven on metal |
+| **gval (the validation)** | 07-23 23:33 → 07-24 01:15 | 4 draws: 3 serving (5 zero-fill repairs, VERIFIED=8, 12/12 needles), 1 NaN-refused | ~1.7 h | **the self-healing load validated; per-host independence observed directly** |
 
-Total: ~100 engine launches, ~152 h wall clock 07-17 03:15 → 07-23 11:30, plus two killed n=77 gates
+Total: ~115 engine launches, ~166 h wall clock 07-17 03:15 → 07-24 01:15, plus two killed n=77 gates
 (gate2 pre-window, gate3 in-window) attributable to the same bug.
 
 ## Appendix C — Record discrepancies and open items (flagged, not smoothed over)
@@ -812,8 +917,11 @@ Total: ~100 engine launches, ~152 h wall clock 07-17 03:15 → 07-23 11:30, plus
    broadcast)" from the corruption being identical on all 8 hosts — but 10:40 records the same corrupt
    value on 1/8 hosts (statepair d2), and the NaN-flavor host sets were clearly independent. Since the
    corrupt value is deterministic (zero-fill), independent per-host events would also produce identical
-   bytes wherever they hit. The broadcast inference is therefore weaker than the entry implies; the
-   per-host-vs-broadcast question is genuinely open pending the gcsfuse discriminator.
+   bytes wherever they hit. The broadcast inference is therefore weaker than the entry implies.
+   **Resolved 07-24:** the gval validation arm observed strikes on single distinct hosts per draw
+   (w3; w4+w5; two hosts in draw 3) with the identical deterministic value — per-host independent
+   events, not a broadcast; the 07-23 08:10 8/8 case was all hosts drawing the same deterministic
+   corruption in one launch.
 4. **The t2j fix's true contribution.** 56% (9/16) pre-fix vs ~10-15% post-fix NaN-refusal rates were
    never instrument-matched (review 2/3: matched-only p=0.46). With the streamer zero-fill now known to
    exist independently, how much of the drop the t2j fix caused is unresolved. Relevant to the upstream
