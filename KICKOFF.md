@@ -40,9 +40,8 @@ honest nulls; small-n never a gate (n≥73; mechanism depths 0.0/0.05/0.95/1.0 R
 every step. Agents: worktrees, JAX_PLATFORMS=cpu. Serialize TPU. Owner submits PRs; no force-push.
 
 ## READ FIRST
-HANDOFF.md (07-24 header) → docs/17 (§5 protections, §6 rules) → RESEARCH_LOG **07-23 21:40
-onward** → the running gate's orchestrator.log. Check pgrep -f "gate_sparse128k[.]sh" BEFORE any
-pod action.
+HANDOFF.md → docs/17 (§5, §6) → RESEARCH_LOG **07-23 21:40 onward** → the running gate's
+orchestrator.log. pgrep -f "gate_sparse128k[.]sh" BEFORE any pod action.
 
 ## LANDMINES
 THIS VM IS POD WORKER-0 (--worker=all git mutates the local checkout). pkill/pgrep -f SELF-MATCHES —
