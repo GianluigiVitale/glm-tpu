@@ -30,8 +30,8 @@ re-gate; no workaround gating.** Self-correct; when unsure pick + log.
    256K mechanism smoke → sparse-vs-dense throughput A/B at IDENTICAL dcp=8.
 3. **Benchmarks**: GSM8K n≥200 → AIME-2026 n=30 → GPQA-198@16K (owner-gated go).
 4. **MTP M2 unfreeze** (after gates). 5. Land ~/wt-sibling-alias; PR series re-cut; the STREAMER
-   upstream bug report. Post-gate cleanups: health-classifier VERIFIED count (grep -q → require 8),
-   gate line-168 ALERT_BEFORE redirect noise, wk-oob NaN-half repair extension.
+   upstream bug report. Post-gate cleanups: health-classifier VERIFIED count (require 8),
+   line-168 noise, wk-oob NaN-half repair ext.
 
 ## HARD RULES
 COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach pre-authorized. METHOD:
