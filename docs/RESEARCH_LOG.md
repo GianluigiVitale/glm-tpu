@@ -3966,3 +3966,21 @@ fixed: byte-sum permutation blindness (inherited, shared with the REF gate; none
 flavors is a permutation). 25 CPU tests, 5x-stable, incl. under torchax.default_env(). LANDING RULE
 UNCHANGED: only if a gate depth starves on retries, or post-gate. Gate meanwhile: depth 0.0 drew
 HEALTHY on try 1 (13:34), needles in flight.
+
+## 2026-07-24 20:10 — GATE4 v3 abort #2 was a FALSE disk alarm (ssh transient); watchdog+gate hardened (18edf50); gate RESUMED on the remaining 5 depths
+
+The 19:39 "DISK ALERT" abort of depth 0.95 was FALSE: all 8 hosts had 52-76G free. The alert lines
+(19:14/18/22) were "only 0/8 hosts answered the disk poll" — a ~8min ssh/control-plane transient
+during the depth-retry launch window; the pod had already recovered by serving time (the 19:38 health
+probe PASSED through the same ssh path) but the STALE lines tripped the depth-taint check 1min into
+serving. Score so far: both gate aborts INFRA (scratchpad debris; ssh transient), ZERO model misses.
+FIXES (18edf50, scripts only — the model path is untouched at PIN dc0443a43): (a) watchdog: a failed
+POLL is not a disk verdict — per-host BREACH stays immediate, unreachability escalates only after 5
+consecutive polls (~10min sustained; a dead host still trips); transients never touch ALERT_FILE;
+(b) the gate snapshots the alert count at SERVING start, not depth start (no more stale-line taints);
+(c) per-attempt depth logs (the 19:04 retry truncated the dead attempt's log — forensics now survive;
+the d=0.95 first-attempt driver death cause is lost, likely a load refusal); (d) health classifier
+keys on refusal exceptions, not VERIFIED line counts (ray dedup collapses per-host lines — a
+require-8 would false-SICK everything; measured 2 lines on a healthy log). RESUMED 20:0x with
+--depths "0.95,1.0,0.25,0.5,0.75" per the orchestrator's own resume protocol — depths 0.0/0.05 are
+BANKED 22/22 (GCS ckpts + results.db). Final 77-tally will aggregate the two runs by provenance.
