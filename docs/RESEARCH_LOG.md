@@ -3949,3 +3949,20 @@ era; durable artifacts were GCS-banked at the time, docs/17 is the record). Dele
 the disk watchdog only guards during runs; scratchpad debris accumulates BETWEEN runs — purge
 closed-campaign scratch dirs at each campaign close (added to the campaign-close habit). Gate
 relaunched 03:5x; strike-tally footnote: attempt-1 depth 0.0 saw 2 refusals + 1 healthy in 3 draws.
+
+## 2026-07-24 14:20 — Starve-contingency BUILT + ADVERSARIALLY REVIEWED: manifest-driven PWAL repair (branch oob-manifest-repair, d9c942cda) — NOT landed (gate running)
+
+While GATE4 v3 runs, the banked guard extension was built in a worktree off dc0443a43:
+GLM_WK_OOB_GOLDEN verifies the fused leaf's uint32 byte-sum vs the golden manifest AT PWAL (CPU sum
+test-proven == load_state_hash's on-device jax sum) and repairs BOTH halves from the mirror on ANY
+mismatch — covering zero-fill + NaN + finite-garbage; post-repair sum must equal golden else raise.
+4-lens adversarial review (17 agents): 13 findings CONFIRMED, 0 refuted — headline: GOLDEN-without-
+DIR was a SILENT no-op (3 lenses independently; now raises — never half-armed); manifest cache never
+invalidated under ray worker reuse (now content-CRC keyed — an (mtime,size) key was empirically
+FLAKY: mtime granularity is the kernel tick, caught by the new rotation test); unattributed crash on
+unloadable manifest (now attributed fail-closed); entry shape/dtype now validated (wrong-revision
+manifest -> warn-once fallback, transpose accepted); a validated raise-text restored. Recorded, not
+fixed: byte-sum permutation blindness (inherited, shared with the REF gate; none of the 3 measured
+flavors is a permutation). 25 CPU tests, 5x-stable, incl. under torchax.default_env(). LANDING RULE
+UNCHANGED: only if a gate depth starves on retries, or post-gate. Gate meanwhile: depth 0.0 drew
+HEALTHY on try 1 (13:34), needles in flight.
