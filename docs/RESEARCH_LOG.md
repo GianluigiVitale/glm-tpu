@@ -3936,3 +3936,16 @@ repair — verify the fused leaf's sum against /tmp/golden.json at PWAL and repa
 ANY mismatch (zero/NaN/garbage) — converts every wk-family strike into a serve; non-wk victims stay
 refusal-covered. Land ONLY if the gate starves on retries (HEALTH_RETRIES=8/depth) or post-gate.
 Strike tally tonight: gate 0-serve/2; pooled with gval 3-serve/6 launches.
+
+## 2026-07-24 04:00 — GATE4 v3 attempt 1 ABORTED (INFRA, correctly): w-0 disk breach = the SESSION'S OWN 35G scratchpad debris; cleaned, gate relaunched
+
+Depth 0.0 had drawn a HEALTHY engine on try 3 (after 2 correct refusals: the garbage-flavor w-5 +
+the NaN w-6) and was running needles when the disk watchdog fired: w-0 at 14G (<15G floor). The
+abort discipline worked as designed — depth tainted INFRA, 0 misses counted, gate killed. Cause:
+NOT the gate's dumps — 35G of CLOSED-hunt analysis intermediates in the assistant session scratchpad
+(/tmp/claude-2001/.../stripe_forensics 25G + write_vs_read 8.1G + fixval/topk_diff leftovers, 07-19/20
+era; durable artifacts were GCS-banked at the time, docs/17 is the record). Deleted those + dead
+/tmp/dcp_gatehealth+dcp_hunt step files on all 8 hosts → w-0 53G, others 63-77G free. LESSON (ops):
+the disk watchdog only guards during runs; scratchpad debris accumulates BETWEEN runs — purge
+closed-campaign scratch dirs at each campaign close (added to the campaign-close habit). Gate
+relaunched 03:5x; strike-tally footnote: attempt-1 depth 0.0 saw 2 refusals + 1 healthy in 3 draws.
