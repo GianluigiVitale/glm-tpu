@@ -3921,3 +3921,18 @@ slow -> repair source), §5.4 read-vs-dequant RESOLVED (neither — post-dequant
 new §5.5 (the self-healing load), §6 rule (g) (test under the production interception stack) + (b)
 addendum (the fingerprint save), Appendix B gval rows, Appendix C item-3 resolution. NEXT: GATE4 v3
 (gate_sparse128k.sh @ dc0443a43, REF+OOB armed, n=77).
+
+## 2026-07-24 02:50 — GATE4 v3 early: refusals working; NEW SPECIMEN — the finite-NONZERO flavor (third corruption presentation, first clean measurement)
+
+Depth 0.0 try1 REFUSED by manifest (w-5): layers.1 wk_weights_proj expected sum=239780972, actual=
+48776186 — and its adapted_wk actual=738963 ≠ 0 ⇒ the wk half was NOT all-zero (adaptation of zeros
+is 0): this is corrupt-but-FINITE-NONZERO garbage. Third flavor measured (zero-fill: repairable +
+5/5 repaired in gval; NaN: refused; garbage: refused — only the manifest catches it). try2 REFUSED
+(w-6): PWAL NaN, layers.1 wk NaN:1 — the NaN flavor's 2nd sighting tonight. Both refusals correct;
+health-classifier cosmetic bug noted (try1 read SICK:needle because ONE host logged VERIFIED before
+the refusal killed init — grep -q presence vs 8-host count; post-gate cleanup, script running).
+IMPLICATION banked (NOT acted on mid-gate): the principled guard extension is MANIFEST-DRIVEN PWAL
+repair — verify the fused leaf's sum against /tmp/golden.json at PWAL and repair from the mirror on
+ANY mismatch (zero/NaN/garbage) — converts every wk-family strike into a serve; non-wk victims stay
+refusal-covered. Land ONLY if the gate starves on retries (HEALTH_RETRIES=8/depth) or post-gate.
+Strike tally tonight: gate 0-serve/2; pooled with gval 3-serve/6 launches.
