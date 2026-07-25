@@ -3984,3 +3984,18 @@ keys on refusal exceptions, not VERIFIED line counts (ray dedup collapses per-ho
 require-8 would false-SICK everything; measured 2 lines on a healthy log). RESUMED 20:0x with
 --depths "0.95,1.0,0.25,0.5,0.75" per the orchestrator's own resume protocol — depths 0.0/0.05 are
 BANKED 22/22 (GCS ckpts + results.db). Final 77-tally will aggregate the two runs by provenance.
+
+## 2026-07-25 10:25 — ⭐⭐ THE SPARSE ≥95%@128K GATE IS CLOSED: 77/77, ZERO MISSES (Wilson LB ≈95.3%) — goal condition (3a) DONE
+
+GATE4 v3 final tally, provenance-verified from results.db (7 runs, one per depth, ALL at fork
+dc0443a43, 11/11 each): run 293 d=0.0, 295 d=0.05, 302 d=0.95 (GATE2'S 0/11 KILLER CELL), 304 d=1.0
+(gate3's death cell), 309 d=0.25, 311 d=0.5, 314 d=0.75. AGGREGATE 77/77 correct, 0 miss — across
+two orchestrator runs (gate128k_20260724T131056Z: d=0.0+0.05; gate128k_20260724T194201Z: the rest;
+the split was an ssh-transient FALSE disk alarm, both aborts INFRA with zero misses, per-depth GCS
+checkpoints throughout). Engine-draw ledger for the whole gate: ~11 draws for 7 depths — 4 NaN-flavor
+refusals (all PwalNanCheckError, all caught at the door) + 2 driver-death empty-depth retries + zero
+misses served; the protection stack (repair -> refuse -> relaunch) converted a bug that killed two
+gates into ~20min relaunch blips. THE KERNEL WAS NEVER THE PROBLEM: the same DSA sparse stack that
+died 0/11 at d=0.95 in gate2 clears it 11/11 on verified engines. What remains for the /goal: (3b)
+throughput >=256K (stage256k.sh NEXT), (2) benchmarks within noise, then MTP/PR series. Launching
+256K now.
