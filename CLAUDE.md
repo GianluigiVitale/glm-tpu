@@ -391,4 +391,20 @@ glm-tpu/
   residual is NOT H2D weight corruption (CPU-side-finite or engine-STATE; db run 193). Verdict ETA
   ~05-07 UTC 07-19; then 256K.
 
+- [x] **2026-07-19→23 — THE ENGINE-LOTTERY HUNT CLOSED (docs/17 — the full post-mortem).** Six days,
+  ~115 launches: the runai-streamer load path delivers corrupt bytes for ~0-3 tensors/host/launch in
+  THREE flavors (zero-fill / NaN / finite-garbage; the NaN "load class" and finite "state class" were
+  ONE bug — it killed gate2 AND gate3). Window narrowed to post-dequant/pre-t2j CPU storage. Landed +
+  metal-validated: **the self-healing load** — GLM_WK_OOB_DIR PWAL-time bitwise repair (zero-fill),
+  GLM_STATE_HASH/\_REF golden-manifest refusal (categorical; majority-of-3 + checkpoint ground-truth
+  adjudication), NaN-scan refusal; repair → refuse → relaunch, zero unverified serves possible. A
+  reviewed manifest-driven repair covering ALL flavors is parked on `oob-manifest-repair`. Byproducts:
+  hardened sync (machine-verified 8×HEAD), code-fingerprint guard (caught a stale-worker recurrence in
+  75 s), torchax dual-mode escape idiom + §6(g) test-under-production-interception rule.
+- [x] **2026-07-25 — ⭐ THE SPARSE ≥95%@128K GATE CLOSED: 77/77, ZERO MISSES** (Wilson LB ≈95.3%;
+  results.db runs 293-314, 7 depths × 11, all at fork dc0443a43; d=0.95 — gate2's 0/11 killer cell —
+  and d=1.0 — gate3's death cell — both 11/11). The kernel was never the problem. Goal (3a) DONE.
+  256K stage launched (stage256k.sh: dcp=8 bring-up → 32K sanity → 256K smoke → sparse-vs-dense
+  throughput A/B at identical dcp=8).
+
 > Append dated entries each session. Keep `HANDOFF.md` in sync.

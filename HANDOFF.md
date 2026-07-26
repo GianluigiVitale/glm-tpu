@@ -1,17 +1,18 @@
 # HANDOFF — GLM-5.2 on TPU v4 (read this first, every new chat)
 
-**Updated:** 2026-07-24 01:30 UTC — **THE ENGINE LOTTERY IS SOLVED END-TO-END AND GATE4 v3 IS
-RUNNING** (run dir from `~/glm-run/gate128k_20260724T*`, n=77, PIN **dc0443a43**, launched 01:25 —
-**CHECK ITS STATE FIRST; NEVER launch pod work while it runs**). The 6-day hunt closed 07-23/24:
-root cause = the runai-streamer load path delivers corrupt-but-finite bytes for ~0-3 tensors per
-host per launch (frequent victim: the fused indexer `wk_weights_proj`, its dequantized-wk half
-ZEROED); window narrowed to **post-dequant/pre-t2j CPU storage** (a dequant-time check saw good
-values). THE FIX, validated on metal (gval 07-23/24, 4 draws): **the self-healing load** —
-`GLM_WK_OOB_DIR` PWAL-time zero-fill repair from the gcsfuse mirror (5/5 strikes repaired bitwise)
-→ `GLM_STATE_HASH_REF` golden-manifest refusal (every serving engine VERIFIED 8/8 byte-exact;
-12/12 needles) → NaN-scan refusal for the non-finite flavor (1/1 refused fail-closed). Defense in
-depth: repair → refuse → relaunch. **Full story: `docs/17-engine-lottery-postmortem.md`** (Phase J
-= the loader window hunt; §6 = the future-catch rules). MTP stays FROZEN until the gates close.
+**Updated:** 2026-07-25 10:45 UTC — ⭐ **THE SPARSE ≥95%@128K GATE IS CLOSED: 77/77, ZERO MISSES**
+(Wilson LB ≈95.3%; results.db runs 293-314, one per depth, ALL at PIN **dc0443a43** — d=0.95
+gate2's killer cell AND d=1.0 gate3's death cell both cleared 11/11). **THE 256K STAGE IS RUNNING**
+(stage256k.sh launched 10:4x — **CHECK ITS STATE FIRST; NEVER launch pod work while it runs**).
+Behind the gate: the 6-day engine-lottery hunt closed 07-23/24 — streamer delivers corrupt bytes in
+THREE measured flavors; **the self-healing load** (`GLM_WK_OOB_DIR` PWAL zero-fill repair) +
+`GLM_STATE_HASH_REF` golden-manifest refusal + NaN-scan refusal = repair → refuse → relaunch, ZERO
+unverified serves possible (validated on metal; the whole gate ran on it: 4 NaN strikes refused, 2
+driver deaths retried, zero tainted results; both gate aborts were INFRA false alarms, both fixed —
+watchdog unreach≠breach, serving-window alert snapshot, per-attempt depth logs, refusal-keyed
+health classifier). **Full story: `docs/17-engine-lottery-postmortem.md`.** A reviewed
+manifest-driven repair extension (covers ALL flavors) sits UNLANDED on branch `oob-manifest-repair`
+(d9c942cda) — land in the post-gate window. MTP stays FROZEN until 256K closes.
 
 **Honest claim line:** *first public DSA kernel on TPU — selected-set-exact on silicon; dense 128K gate
 CLOSED 77/77 (run 124, Wilson LB 95.3%); 12.6× efficiency campaign; gate2 AND gate3's deaths root-caused
