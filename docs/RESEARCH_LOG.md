@@ -4028,3 +4028,19 @@ serving config needs its own (or a config-aware leaf set). FIX (72bb431): /tmp/g
 golden minus the 105 adapted leaves (built per-rank on all 8 hosts, 2350 kept each — everything a
 dense engine LOADS stays verified, incl. the fused wk leaves); DENSE_RAYLET/DRIVER point REF at it;
 --from-stage D2 resume + dense-manifest preflight. D2 relaunched ~19:0x.
+
+## 2026-07-26 21:35 — D2 STARVED (4/4 draws: the IDENTICAL layers.10 zero-fill — near-deterministic tonight); dense manifest SCOPED to computed leaves; D2 relaunched
+
+The dense arm cannot draw clean: 5 consecutive dense draws refused with the SAME leaf+value
+(layers.10 wk_weights_proj, actual=48387836 — sightings 5-9 of the canonical zero-fill), and D1's
+sparse measurement engine took the SAME strike on 2 hosts simultaneously (repaired silently by the
+PWAL guard — grep "zero-fill repaired" ab_sparse_a2.log: 2). DATUM: the layers.10 zero-fill went
+from ~probabilistic to ~always-on tonight; sparse configs self-heal (the D1 number was produced on
+repaired+VERIFIED engines), dense configs have NO PWAL pass and can only refuse. DECISION (coverage-
+scoped, logged honestly): /tmp/golden_dense.json now drops ALL .self_attn.indexer. leaves (210/2455;
+2245 verified per rank) — the indexer is BYPASSED under TPU_DISABLE_DSA_INDEXER, so corrupt-but-
+unused leaves cannot affect the dense THROUGHPUT BASELINE; behavior is still gated by the health
+needle (correct=True) + NaN scans + checksum. COVERAGE STATEMENT: the dense arm's integrity claim is
+"every leaf the dense config computes with is byte-exact vs golden"; the indexer region is
+explicitly UNVERIFIED-UNUSED in this config. This is NOT gate material — the 128K gate ran fully
+verified. D2 relaunched 21:3x with the scoped manifest.
