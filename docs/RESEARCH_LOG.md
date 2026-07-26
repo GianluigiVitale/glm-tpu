@@ -4013,3 +4013,18 @@ refusal exception gets a fresh draw (x4, per-attempt logs); non-refusal failures
 starvation names the parked manifest-driven repair as the escalation. Plus --from-stage C|D resume
 (brings up its own engine). Stage D RESUMED ~14:3x from D1. Banked so far toward goal (3b): sanity +
 smoke; the criterion itself is the D1-vs-D2 decode-throughput comparison.
+
+## 2026-07-26 19:00 — D1 SPARSE ARM BANKED (2.19 tok/s decode @262K); dense arm was refused BY CONFIGURATION (sparse manifest vs a dense engine) — dense-config manifest built; D2 resumed
+
+D1 (attempt 2, after a correctly-retried NaN refusal — the new run_driver_retry's first live save):
+sparse decode @ ctx=262144, dcp=8: **2.19 tok/s agg (455.9 ms/step), prefill 1345.78s** (~195 tok/s
+prefill), 65 blocks ~3.05 GiB/chip vs pool 66. THEN D2 refused 2/2 draws with StateHashMismatchError
+— NOT corruption: 105 mismatching leaves, ALL glm_dsa_adapted_* with actual=<absent>. A dense engine
+(TPU_DISABLE_DSA_INDEXER, no GLM_DSA_MODE) never derives the DSA-adapted tensors; the golden manifest
+was bootstrapped from SPARSE engines, and the fail-closed manifest-only-leaf rule refuses every dense
+draw BY CONSTRUCTION. The guard did exactly what it was told — with the wrong reference for the
+config. LESSON (docs/17 §6(e) coverage-map family): a golden manifest is CONFIG-SCOPED; every
+serving config needs its own (or a config-aware leaf set). FIX (72bb431): /tmp/golden_dense.json =
+golden minus the 105 adapted leaves (built per-rank on all 8 hosts, 2350 kept each — everything a
+dense engine LOADS stays verified, incl. the fused wk leaves); DENSE_RAYLET/DRIVER point REF at it;
+--from-stage D2 resume + dense-manifest preflight. D2 relaunched ~19:0x.
