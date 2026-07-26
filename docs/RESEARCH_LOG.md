@@ -4044,3 +4044,21 @@ needle (correct=True) + NaN scans + checksum. COVERAGE STATEMENT: the dense arm'
 "every leaf the dense config computes with is byte-exact vs golden"; the indexer region is
 explicitly UNVERIFIED-UNUSED in this config. This is NOT gate material — the 128K gate ran fully
 verified. D2 relaunched 21:3x with the scoped manifest.
+
+## 2026-07-26 23:20 — Manifest-scoping is IMPOSSIBLE BY DESIGN (state-only refusals): the CHECK needs the scope, not the manifest; twin ignore-envs being built; D2 loop killed (deterministic failure ahead)
+
+Scoped-manifest D2 retry decoded: tries 1,2,4,5 = NaN strikes on indexer leaves (LoadNanCheckError —
+the whole-model scan has no config scoping); try 3 survived the NaN scan and was then refused with
+**105 mismatches ALL expected=<absent>** — the STATE-ONLY direction of the fail-closed REF rule: the
+dense engine still LOADS the 105 indexer leaves I dropped from the manifest. Editing the manifest
+can never scope a config (drop leaves -> state-only refusals; keep them -> genuine-strike refusals
+on unused tensors — tonight near-deterministic on layers.10). The scope belongs in the CHECKS:
+GLM_LOAD_NAN_CHECK_IGNORE (built, 574e70e88 on nan-check-scope: byte-identical unset, loud IGNORED
+logging, <3-char patterns refused, 16 tests + old-vs-new differential harness) + the twin
+GLM_STATE_HASH_REF_IGNORE (in build — excluded from all 3 mismatch classes, "manifest VERIFIED"
+preserved on all-ignored pass). Bonus: with check-side scoping the dense arm verifies against THE
+original /tmp/golden.json — no per-config manifest files. Killed the D2 loop at try 5/8 (every
+remaining try = guaranteed refusal). Landing plan on agent completion: quick diff review -> ff-merge
+to -next -> hardened sync (pod idle) -> stage256k dense envs get REF=/tmp/golden.json + both
+IGNORE=.self_attn.indexer. + new PIN -> relaunch --from-stage D2. Both envs stay UNSET on every
+correctness-gated config — this scoping exists ONLY for the dense throughput baseline.
