@@ -3999,3 +3999,17 @@ gates into ~20min relaunch blips. THE KERNEL WAS NEVER THE PROBLEM: the same DSA
 died 0/11 at d=0.95 in gate2 clears it 11/11 on verified engines. What remains for the /goal: (3b)
 throughput >=256K (stage256k.sh NEXT), (2) benchmarks within noise, then MTP/PR series. Launching
 256K now.
+
+## 2026-07-26 14:30 — 256K: sanity 2/2 + SMOKE 4/4 (first 256K retrievals EVER, dcp=8 first metal tokens); D1 aborted on a REFUSED draw (orchestrator gap, fixed 07-26); Stage D resumed
+
+stage256k run 1 (stage256k_20260726T105307Z): dcp=8 sparse engine HEALTHY on try 1 (~52min incl.
+cold compile) -> 32K sanity 2/2 (sparse-DCP's FIRST metal tokens at dcp=8) -> 256K mechanism smoke
+4/4 zero miss (depths 0.0/0.5/0.95/1.0 — the first 256K retrievals on this stack, ~25min prefill
+each). D1 (sparse A/B arm) then ABORTED: the arm's fresh engine draw hit a NaN strike (w-5 layers.0,
+NaN:2005+Inf:51 — the biggest specimen yet) and was CORRECTLY refused, but run_driver treated any
+driver failure as a stage failure — the same class of hole as gate4-v1's empty-depth (a protection
+event misread as a verdict). FIX (committed): run_driver_retry — a driver failure whose log shows a
+refusal exception gets a fresh draw (x4, per-attempt logs); non-refusal failures still abort; 4x
+starvation names the parked manifest-driven repair as the escalation. Plus --from-stage C|D resume
+(brings up its own engine). Stage D RESUMED ~14:3x from D1. Banked so far toward goal (3b): sanity +
+smoke; the criterion itself is the D1-vs-D2 decode-throughput comparison.
