@@ -24,7 +24,7 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=dc0443a43
+PIN=4647a8fbc
 # wk-oob repair source (docs/17 §5.5) — gcsfuse ro mirror; preflight + per-launch remount
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=stage256k_$(date -u +%Y%m%dT%H%M%SZ)
@@ -39,11 +39,13 @@ STAGE_TIMEOUT_S="${STAGE_TIMEOUT_S:-14400}"   # 256K prefill ~25min/needle + col
 # ── env blocks: the gate config verbatim EXCEPT GLM_DCP=8 (F4: one source,
 # every launch identical). Dense arm strips the three DSA-mode envs only.
 SPARSE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
-# Dense verifies against the DENSE-config manifest: a dense engine derives
-# no glm_dsa_adapted_* leaves, so the sparse manifest refuses it by
-# construction (105 manifest-only leaves — measured 07-26). golden_dense =
-# golden minus the adapted leaves; everything dense LOADS stays verified.
-DENSE_RAYLET='GLM_MLA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden_dense.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+# Dense verifies against THE golden manifest with CHECK-SIDE scoping
+# (GLM_*_IGNORE=.self_attn.indexer.): the indexer is bypassed under
+# TPU_DISABLE_DSA_INDEXER, and manifest editing cannot scope a config (the
+# state-only rule flips the refusal — measured 07-26). Both ignore envs are
+# UNSET on every correctness-gated config; the dense arm is a throughput
+# baseline whose behavior is still gated by the health needle.
+DENSE_RAYLET='GLM_MLA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_NAN_CHECK_IGNORE=.self_attn.indexer. GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_STATE_HASH_REF_IGNORE=.self_attn.indexer. GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 COMMON_DRIVER="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -55,7 +57,7 @@ GLM_EXPECT_CODE_HASH=$PIN"
 SPARSE_DRIVER="$COMMON_DRIVER GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 \
 GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned \
 GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2"
-DENSE_DRIVER="$COMMON_DRIVER GLM_STATE_HASH_REF=/tmp/golden_dense.json"  # last env wins
+DENSE_DRIVER="$COMMON_DRIVER GLM_STATE_HASH_REF=/tmp/golden.json GLM_STATE_HASH_REF_IGNORE=.self_attn.indexer. GLM_LOAD_NAN_CHECK_IGNORE=.self_attn.indexer."  # last env wins
 
 mkdir -p "$RUN_DIR"
 ALERT_FILE="$RUN_DIR/DISK_ALERT"
@@ -247,9 +249,6 @@ ckpt
 fi
 
 # ── D2: dense arm (FRESH engine — one variable: the DSA mode) ──
-DENSE_GOLDEN_OK=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command='ls /tmp/golden_dense.json >/dev/null 2>&1 && echo OK' 2>/dev/null | grep -c OK)
-[ "${DENSE_GOLDEN_OK:-0}" -eq 8 ] || { say "ABORT: dense-config manifest missing on $((8 - ${DENSE_GOLDEN_OK:-0}))/8 hosts (/tmp/golden_dense.json)"; exit 1; }
 say "════ STAGE D2: dense arm (fresh engine, identical dcp=8) ════"
 launch_healthy "$DENSE_RAYLET" "$DENSE_DRIVER" dense || exit 1
 run_driver_retry "$DENSE_DRIVER" "256K A/B dense ($TAG)" "$RUN_DIR/ab_dense.log" \
