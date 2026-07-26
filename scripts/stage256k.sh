@@ -57,11 +57,17 @@ mkdir -p "$RUN_DIR"
 ALERT_FILE="$RUN_DIR/DISK_ALERT"
 say() { echo "[stage256k $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"; }
 
-if [ "${1:-}" = "--dry-run" ]; then
-  say "DRY RUN — sparse EXTRA_ENVS=$SPARSE_RAYLET"
-  say "DRY RUN — dense  EXTRA_ENVS=$DENSE_RAYLET"
-  exit 0
-fi
+FROM_STAGE="A"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run)
+      say "DRY RUN — sparse EXTRA_ENVS=$SPARSE_RAYLET"
+      say "DRY RUN — dense  EXTRA_ENVS=$DENSE_RAYLET"
+      exit 0 ;;
+    --from-stage) FROM_STAGE="$2"; shift 2 ;;  # A (default) | C | D
+    *) echo "unknown arg $1" >&2; exit 2 ;;
+  esac
+done
 
 # 0) pre-flight: THE GATE MUST NOT BE RUNNING (serialized TPU access)
 if pgrep -f "gate_sparse128k[.]sh" >/dev/null 2>&1; then
@@ -141,6 +147,31 @@ PY' 2>/dev/null)
   say "ABORT: $label — no healthy engine in $HEALTH_RETRIES draws"; return 1
 }
 
+# A refused engine draw is a PROTECTION event, not a stage failure: the
+# 07-26 D1 abort was a NaN-flavor refusal (PwalNanCheckError) killing the
+# whole stage. Drivers spin their own engine (a fresh lottery draw), so
+# every driver run needs the same retry the health loop has.
+REFUSAL_RE="StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|CodeFingerprintMismatchError"
+run_driver_retry() {  # same args as run_driver; retries REFUSED draws x4
+  local denv="$1" note="$2" log="$3"; shift 3
+  local a alog
+  for a in 1 2 3 4; do
+    alog="${log%.log}_a${a}.log"
+    if run_driver "$denv" "$note" "$alog" "$@"; then
+      cp "$alog" "$log" 2>/dev/null || true
+      return 0
+    fi
+    if grep -aqE "$REFUSAL_RE" "$alog"; then
+      say "'$note' attempt $a: engine draw REFUSED ($(grep -aoEm1 "$REFUSAL_RE" "$alog")) — fresh draw"
+      continue
+    fi
+    say "'$note' attempt $a: NON-refusal failure — aborting (see $alog)"
+    return 1
+  done
+  say "'$note': no clean draw in 4 attempts — STARVED; land the manifest-driven repair (oob-manifest-repair) + revalidate"
+  return 1
+}
+
 run_driver() {  # $1=DRIVER envs  $2=note  $3=log  $4...=args
   local denv="$1" note="$2" log="$3"; shift 3
   (
@@ -174,27 +205,36 @@ PY
 }
 
 # ── A+B: sparse dcp=8 bring-up + 32K sanity ──
+if [ "$FROM_STAGE" = "A" ]; then
 say "════ STAGE A/B: sparse dcp=8 engine + 32K sanity x2 ════"
 launch_healthy "$SPARSE_RAYLET" "$SPARSE_DRIVER" sparse || exit 1
-run_driver "$SPARSE_DRIVER" "256K-stage 32K sanity ($TAG)" "$RUN_DIR/sanity32k.log" \
+run_driver_retry "$SPARSE_DRIVER" "256K-stage 32K sanity ($TAG)" "$RUN_DIR/sanity32k.log" \
   glm_longctx.py --lengths 32768 --depths 0.5 --trials 2 --max-seqs 1 --gmu 0.90 \
   --max-batched-tokens 2048 --num-gpu-blocks "$BLOCKS" --max-len "$MAX_LEN" || exit 1
 S32=$(grep -c "correct=True" "$RUN_DIR/sanity32k.log" || true)
 [ "${S32:-0}" -eq 2 ] || { say "ABORT: 32K sanity ${S32:-0}/2 at dcp=8 — striping/LSE suspect, instrument before 256K"; exit 1; }
 say "32K sanity 2/2"; ckpt
+fi
 
-# ── C: 256K passkey smoke (same engine — geometry already compiled) ──
+# ── C: 256K passkey smoke ──
+if [ "$FROM_STAGE" = "A" ] || [ "$FROM_STAGE" = "C" ]; then
+[ "$FROM_STAGE" = "C" ] && { launch_healthy "$SPARSE_RAYLET" "$SPARSE_DRIVER" sparse || exit 1; }
 say "════ STAGE C: 256K smoke, mechanism depths x1 ════"
-run_driver "$SPARSE_DRIVER" "256K smoke ($TAG)" "$RUN_DIR/smoke256k.log" \
+run_driver_retry "$SPARSE_DRIVER" "256K smoke ($TAG)" "$RUN_DIR/smoke256k.log" \
   glm_longctx.py --lengths 256000 --depths 0.0,0.5,0.95,1.0 --trials 1 --max-seqs 1 --gmu 0.90 \
   --max-batched-tokens 2048 --num-gpu-blocks "$BLOCKS" --max-len "$MAX_LEN" || exit 1
 SM=$(grep -c "correct=True" "$RUN_DIR/smoke256k.log" || true)
 say "256K smoke: ${SM:-0}/4 ($(grep -c 'correct=False' "$RUN_DIR/smoke256k.log" || true) miss)"; ckpt
 [ "${SM:-0}" -ge 3 ] || { say "ABORT: 256K smoke <3/4 — not interpretable for throughput; instrument first"; exit 1; }
+fi
 
-# ── D1: sparse throughput arm (same engine) ──
+# ── D1: sparse throughput arm ──
+if [ "$FROM_STAGE" = "D" ]; then
+  say "── resume at STAGE D: bringing up a fresh sparse engine ──"
+  launch_healthy "$SPARSE_RAYLET" "$SPARSE_DRIVER" sparse || exit 1
+fi
 say "════ STAGE D1: sparse decode-throughput A/B arm, L=262144 ════"
-run_driver "$SPARSE_DRIVER" "256K A/B sparse ($TAG)" "$RUN_DIR/ab_sparse.log" \
+run_driver_retry "$SPARSE_DRIVER" "256K A/B sparse ($TAG)" "$RUN_DIR/ab_sparse.log" \
   dsa_throughput.py --ctxs 262144 --num-seqs 1 --measure-tokens "$MEASURE_TOKENS" \
   --gmu 0.90 --max-batched-tokens 2048 --num-gpu-blocks "$BLOCKS" \
   --max-len "$MAX_LEN" || exit 1
@@ -203,7 +243,7 @@ ckpt
 # ── D2: dense arm (FRESH engine — one variable: the DSA mode) ──
 say "════ STAGE D2: dense arm (fresh engine, identical dcp=8) ════"
 launch_healthy "$DENSE_RAYLET" "$DENSE_DRIVER" dense || exit 1
-run_driver "$DENSE_DRIVER" "256K A/B dense ($TAG)" "$RUN_DIR/ab_dense.log" \
+run_driver_retry "$DENSE_DRIVER" "256K A/B dense ($TAG)" "$RUN_DIR/ab_dense.log" \
   dsa_throughput.py --ctxs 262144 --num-seqs 1 --measure-tokens "$MEASURE_TOKENS" \
   --gmu 0.90 --max-batched-tokens 2048 --num-gpu-blocks "$BLOCKS" \
   --max-len "$MAX_LEN" || exit 1
