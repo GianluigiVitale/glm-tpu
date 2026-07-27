@@ -4076,3 +4076,17 @@ METHODOLOGY NOTE for the A/B verdict: D1's sparse 2.19 tok/s was measured WITH t
 (host-side 166MB/step fetch+write riding each step), D2 runs dump-less. Decision rule: if
 handicapped-sparse still beats clean-dense, 3b closes conservatively (a fortiori); if close, re-run
 the sparse arm dump-less for an instrumentation-identical A/B. D2 relaunched 01:0x.
+
+## 2026-07-27 02:15 — 256K A/B as-measured: DENSE WON (3.83 vs 2.19 tok/s decode; 983 vs 1346s prefill) — NOT instrumentation-identical; PARITY RERUN launched (pre-registered rule)
+
+D2 dense (dump-less, try-1 HEALTHY): decode 3.83 tok/s (260.82 ms/step), prefill 983.31s @262144,
+dcp=8. vs D1 sparse (dump ARMED — 166MB/step host fetch+write riding every step): 2.19 tok/s
+(455.9 ms/step), prefill 1345.78s. AS MEASURED dense wins both — REPORTED HONESTLY, but the arms
+differ in instrumentation and the pre-registered rule fires: sparse rerun DUMP-LESS
+(SPARSE_DUMPLESS=1 --from-stage D1, launched 02:1x). If parity still shows dense ahead, the finding
+is real and important: at dcp=8 dense shards KV to 32K keys/rank (cheap per-rank attention) while
+sparse pays GLOBAL top-2048 selection + cross-rank coordination per step — the xprof 128K profile
+already showed top_k 21.8% + gathers 16% + collectives ~24% (the deciding-what-to-read-dominates
+pattern). The Stage-3 threshold ("measurable FLOP/throughput gain at >=256K") would then need the
+efficiency levers (chunked top-k, approx_max_k, collective overlap — banked xprof candidates) or an
+honest null. Parity verdict first.
