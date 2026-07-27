@@ -4090,3 +4090,22 @@ already showed top_k 21.8% + gathers 16% + collectives ~24% (the deciding-what-t
 pattern). The Stage-3 threshold ("measurable FLOP/throughput gain at >=256K") would then need the
 efficiency levers (chunked top-k, approx_max_k, collective overlap — banked xprof candidates) or an
 honest null. Parity verdict first.
+
+## 2026-07-27 04:20 — ⚖ PARITY VERDICT: HONEST NULL on the 256K sparse-throughput gain (dcp=8, current impl) — dense 1.8x faster decode; the dump was NOT the story
+
+Dump-less sparse (parity rerun, try-3 HEALTHY engine): decode 1.90 tok/s (525.69 ms/step), prefill
+1334.80s @262144 — within run variance of the dump-armed 2.19/455.9 (the 166MB/step dump is
+evidently off the step's critical path). FINAL instrumentation-identical A/B @262144 dcp=8:
+SPARSE 1.90-2.19 tok/s decode, ~1340s prefill vs DENSE 3.83 tok/s decode (260.82 ms/step), 983s
+prefill. DENSE WINS ~1.8x decode / ~1.36x prefill. NULL on PLAN Stage-3 "measurable FLOP/throughput
+gain at >=256K" AS IMPLEMENTED at dcp=8 — reported first-class. MECHANISM (consistent with the
+banked 128K xprof: top_k 21.8% + gathers 16% + collectives ~24%): dcp=8 shards dense attention to
+~32K keys/rank (cheap), while sparse pays GLOBAL top-2048 selection + cross-rank gather every step —
+the FLOP savings (2048 vs 32K keys) are swamped by selection/coordination. Sparse's advantage grows
+with per-rank stripe size; the crossover is BEYOND 256K on v4/dcp=8. PATH (owner rules: honest null;
+a gap is a bug to fix; no semantics changes without re-gating): (1) xprof the 256K sparse decode
+step to confirm the split at this geometry; (2) EXACT-semantics levers first — chunked exact top-k,
+collective overlap (approx_max_k DEFERRED: it changes selection semantics => full re-gate);
+(3) benchmarks (goal 2) proceed in parallel on the VALIDATED gate config (dcp=4 sparse) — the
+throughput null does not touch correctness claims (256K smoke was 4/4). Correctness at 256K: PROVEN.
+Throughput gain at 256K: NOT YET, and said so plainly.
