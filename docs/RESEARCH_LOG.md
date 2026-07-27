@@ -4109,3 +4109,14 @@ collective overlap (approx_max_k DEFERRED: it changes selection semantics => ful
 (3) benchmarks (goal 2) proceed in parallel on the VALIDATED gate config (dcp=4 sparse) — the
 throughput null does not touch correctness claims (256K smoke was 4/4). Correctness at 256K: PROVEN.
 Throughput gain at 256K: NOT YET, and said so plainly.
+
+## 2026-07-27 08:25 — GSM8K n=200 = 94.0% raw (188/200, run 342) — 11/12 misses are 2048-cap TRUNCATIONS (completed-item 188/189 = 99.5%); truncation-retry launched (the documented merge protocol)
+
+First goal-2 scale benchmark, on the validated gate config (dcp=4 sparse, full protections; engine
+HEALTHY try 1; single clean attempt, ~3h11m for 200 items @ max_new 2048, max_seqs 8). Raw 94.0%
+(Wilson [89.9, 96.5]). Miss forensics: 11/12 misses generated exactly 2048 tokens (cut mid-reasoning,
+extractor grabbed an intermediate number — the GPQA-198 lesson repeating at n=200 scale); ONE genuine
+miss (gsm8k_93: completed at 1683 tok, answered 400/11 vs gold 36). Truncation-retry launched
+(--ids x11 @ max-new 8192, MAX_LEN=16384; merge via bench/merge_runs.py per the documented protocol —
+run 342 stays immutable, the merge is a separate derived record). Projected honest final: ~195-199/200
+depending on retry outcomes. Sparse-serving quality at bench scale looks HEALTHY.
