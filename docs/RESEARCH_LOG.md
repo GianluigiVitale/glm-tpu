@@ -4062,3 +4062,17 @@ remaining try = guaranteed refusal). Landing plan on agent completion: quick dif
 to -next -> hardened sync (pod idle) -> stage256k dense envs get REF=/tmp/golden.json + both
 IGNORE=.self_attn.indexer. + new PIN -> relaunch --from-stage D2. Both envs stay UNSET on every
 correctness-gated config — this scoping exists ONLY for the dense throughput baseline.
+
+## 2026-07-27 01:05 — D2 attempt 2 died to a REAL disk breach: the health-dump instrument at dense-262K = 166MB/STEP (~34G/host over the measurement); dense arm now dump-less; A/B instrumentation note
+
+Check-side scoping WORKED: dense try 1 HEALTHY on the FIRST draw (vs 9 consecutive refusals before).
+The measurement then filled every host: GLM_DCP_CACHE_DUMP (the health-probe NaN-scan instrument)
+stays armed through the raylet env, and at dense-262K each step file is 166MB (vs 35MB at the 128K
+gate geometry); 203 steps = ~34G/host; w-0 breached 15G; the watchdog aborted CORRECTLY (real
+per-host breach — yesterday's unreach!=breach fix did not misfire). FIX (bd87d3a): the dense arm
+drops the dump entirely — it exists to scan the layer-1 indexer k-cache, WHICH DENSE NEVER WRITES;
+launch_healthy skips the dump scan for dump-less arms. Dumps purged 8x (hosts back to 46-74G).
+METHODOLOGY NOTE for the A/B verdict: D1's sparse 2.19 tok/s was measured WITH the dump armed
+(host-side 166MB/step fetch+write riding each step), D2 runs dump-less. Decision rule: if
+handicapped-sparse still beats clean-dense, 3b closes conservatively (a fortiori); if close, re-run
+the sparse arm dump-less for an instrumentation-identical A/B. D2 relaunched 01:0x.
