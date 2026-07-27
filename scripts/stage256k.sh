@@ -38,7 +38,11 @@ STAGE_TIMEOUT_S="${STAGE_TIMEOUT_S:-14400}"   # 256K prefill ~25min/needle + col
 
 # ── env blocks: the gate config verbatim EXCEPT GLM_DCP=8 (F4: one source,
 # every launch identical). Dense arm strips the three DSA-mode envs only.
-SPARSE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+# SPARSE_DUMPLESS=1 strips the cache-dump instrument from the sparse arm
+# (166MB/step at 262K — the A/B parity rerun runs BOTH arms dump-less).
+SPARSE_DUMP='GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 '
+[ "${SPARSE_DUMPLESS:-0}" = "1" ] && SPARSE_DUMP=''
+SPARSE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' '"$SPARSE_DUMP"'GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 # Dense verifies against THE golden manifest with CHECK-SIDE scoping
 # (GLM_*_IGNORE=.self_attn.indexer.): the indexer is bypassed under
 # TPU_DISABLE_DSA_INDEXER, and manifest editing cannot scope a config (the
@@ -243,7 +247,7 @@ fi
 
 # ── D1: sparse throughput arm ──
 if [ "$FROM_STAGE" != "D2" ]; then
-if [ "$FROM_STAGE" = "D" ]; then
+if [ "$FROM_STAGE" = "D" ] || [ "$FROM_STAGE" = "D1" ]; then
   say "── resume at STAGE D: bringing up a fresh sparse engine ──"
   launch_healthy "$SPARSE_RAYLET" "$SPARSE_DRIVER" sparse || exit 1
 fi
@@ -254,6 +258,8 @@ run_driver_retry "$SPARSE_DRIVER" "256K A/B sparse ($TAG)" "$RUN_DIR/ab_sparse.l
   --max-len "$MAX_LEN" || exit 1
 ckpt
 fi
+
+[ "$FROM_STAGE" = "D1" ] && { say "════ D1-only run COMPLETE (parity rerun) ════"; ckpt; exit 0; }
 
 # ── D2: dense arm (FRESH engine — one variable: the DSA mode) ──
 say "════ STAGE D2: dense arm (fresh engine, identical dcp=8) ════"
