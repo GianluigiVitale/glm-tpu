@@ -45,7 +45,12 @@ SPARSE_RAYLET='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 
 # state-only rule flips the refusal — measured 07-26). Both ignore envs are
 # UNSET on every correctness-gated config; the dense arm is a throughput
 # baseline whose behavior is still gated by the health needle.
-DENSE_RAYLET='GLM_MLA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_NAN_CHECK_IGNORE=.self_attn.indexer. GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_STATE_HASH_REF_IGNORE=.self_attn.indexer. GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_DCP_CACHE_DUMP=/tmp/dcp_256health GLM_DCP_CACHE_DUMP_LAYERS=2 GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+# NOTE: NO GLM_DCP_CACHE_DUMP on the dense arm — the dump exists to
+# NaN-scan the layer-1 indexer k-cache, which dense mode never writes; at
+# dense-262K it is 166MB/STEP and filled every host (~34G) during the
+# 07-27 00:41 measurement run (real disk abort). launch_healthy skips the
+# dump scan when the arm's raylet env carries no dump var.
+DENSE_RAYLET='GLM_MLA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_NAN_CHECK_IGNORE=.self_attn.indexer. GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_STATE_HASH_REF_IGNORE=.self_attn.indexer. GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 COMMON_DRIVER="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -133,6 +138,8 @@ launch_healthy() {  # $1=RAYLET envs  $2=DRIVER envs  $3=label
     )
     if ! grep -q "manifest VERIFIED" "$hlog"; then say "$label try $try: SICK:manifest_not_verified — relaunch"; continue; fi
     if ! grep -q "correct=True" "$hlog"; then say "$label try $try: SICK:needle — relaunch"; continue; fi
+    # no dump env on this arm => no dump scan (the dense arm carries none)
+    case "$renv" in *GLM_DCP_CACHE_DUMP*) : ;; *) say "$label try $try: HEALTHY"; return 0 ;; esac
     local scan
     scan=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command='
       ~/vllm-env/bin/python - <<PY
