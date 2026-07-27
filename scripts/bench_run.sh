@@ -104,6 +104,10 @@ launch_healthy() {
   say "ABORT: no healthy engine in $HEALTH_RETRIES draws"; return 1
 }
 
+# --ids in the extra args IS the selection (run_bench refuses --ids+--limit)
+SELECTOR="--limit $LIMIT"
+case " $* " in *" --ids "*) SELECTOR="" ;; esac
+
 say "════ BENCH $BENCH n=$LIMIT max_new=$MAX_NEW on the gate config (dcp=4 sparse) ════"
 launch_healthy || exit 1
 
@@ -115,7 +119,7 @@ for a in 1 2 3 4; do
     set -a; . ~/glm-tpu/.env; set +a
     # shellcheck disable=SC2086
     env $DRIVER_ENVS setsid --wait nohup ~/vllm-env/bin/python -u run_bench.py \
-      --benchmark "$BENCH" --limit "$LIMIT" --max-new "$MAX_NEW" \
+      --benchmark "$BENCH" $SELECTOR --max-new "$MAX_NEW" \
       --max-len "$MAX_LEN" --max-seqs "$MAX_SEQS" --max-batched-tokens 2048 \
       --num-gpu-blocks "$BLOCKS" --gmu 0.90 --protocol greedy \
       --note "$BENCH n=$LIMIT ($TAG)" "$@" </dev/null > "$LOG" 2>&1
