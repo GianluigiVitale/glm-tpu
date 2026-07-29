@@ -4120,3 +4120,14 @@ miss (gsm8k_93: completed at 1683 tok, answered 400/11 vs gold 36). Truncation-r
 (--ids x11 @ max-new 8192, MAX_LEN=16384; merge via bench/merge_runs.py per the documented protocol —
 run 342 stays immutable, the merge is a separate derived record). Projected honest final: ~195-199/200
 depending on retry outcomes. Sparse-serving quality at bench scale looks HEALTHY.
+
+## 2026-07-29 15:40 — ⭐ GSM8K n=200 FINAL: 196/200 = 98.0% (merged 342+345+347) — goal-2 benchmark #1 BANKED; the evening chain (E0 xprof -> GPQA-198@16K, owner GO) is running detached
+
+Escalation run 347 (max_new 16384): gsm8k_2 and gsm8k_87 completed correct (4417/3497 tok); gsm8k_119
+still generation-loops at 16K — honest miss. FINAL merged (merge_runs.py per the documented
+truncation protocol; base immutable): 196/200 = 98.0%, Wilson [95.0, 99.2]. The 4 misses: 3 genuine
+wrong answers (gsm8k_93 x400/11, gsm8k_12 off-by-one 12v13, gsm8k_45) + 1 unrecoverable looper.
+Sparse serving quality at scale: AT/ABOVE the frontier band. Chain (setsid-detached,
+chain_evening_0729.log): E0 decode xprof of both 256K arms started 15:34 (decode-only capture via
+PHASED_PROFILER_DECODE_ONLY_KV_LEN_THRESHOLD=200000 — the prefill_only trap defeated) -> GPQA-198
+@16K overnight. docs/18 ladder (19 kept / 12 rejected, code-verified) awaits the xprof ranking.
