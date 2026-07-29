@@ -4131,3 +4131,21 @@ Sparse serving quality at scale: AT/ABOVE the frontier band. Chain (setsid-detac
 chain_evening_0729.log): E0 decode xprof of both 256K arms started 15:34 (decode-only capture via
 PHASED_PROFILER_DECODE_ONLY_KV_LEN_THRESHOLD=200000 — the prefill_only trap defeated) -> GPQA-198
 @16K overnight. docs/18 ladder (19 kept / 12 rejected, code-verified) awaits the xprof ranking.
+
+## 2026-07-29 17:30 — E0 first attempt: the prefill_only trap SURVIVED the threshold fix — the phase hook never sees decode steps; switching to jax-profiler-server manual capture (rerun tomorrow AM)
+
+Sparse arm profiled (try 2 after 1 NaN refusal) but the capture is prefill_only AGAIN: batch stats
+show the 20-step budget consumed at prefill batches 2-21, and the log has ZERO "Skipping
+decode-only" lines AND zero decode_only starts — so the phase machinery never even CLASSIFIED a
+decode step (the threshold was never consulted; its propagation is moot). The hook lives in
+_prepare_inputs (tpu_runner.py:2815); prime suspect: the pure-decode path bypasses the python
+input-prep (AOT/compiled fast path — VLLM_USE_AOT_COMPILE is set in the driver env), the same
+mechanism as the P0.b prefill_only failure. NOT worth more source-diving: docs/03's documented
+alternative is USE_JAX_PROFILER_SERVER=1 + a manually-TIMED remote capture during the decode window
+— bypasses phase classification entirely. PLAN (tomorrow AM, pod free after GPQA): rerun both arms
+with the profiler server; trigger a ~15s capture from w0 once the driver log shows prefill done +
+decode underway. The dense arm (running now) will also yield prefill_only — accepted; both arms'
+DRIVER timings remain valid. Chain proceeds to GPQA-198@16K tonight as planned. Meanwhile the
+top xprof-independent ladder rung (scorer-walk lax.map->scan unroll, docs/18 E5, exact-semantics,
+judge-verified premise) gets BUILT overnight in a worktree — gated, tested, UNLANDED until its
+metal A/B slot.
