@@ -343,6 +343,11 @@ def run_rung(gen, ctx: int, num_seqs: int, measure_tokens: int,
     t_as, t_bs, outs_a, outs_b = [], [], None, None
     for _ in range(reps):
         oa, ta = gen(prompts, 1)
+        # Greppable markers for external profiler triggering (the E0 decode
+        # capture): pass B's decode window opens ~T_A seconds after this
+        # line (its prefill re-runs, then N decode steps follow).
+        print(f"[thrpt] PASSA ctx={ctx} wall={ta:.1f}s", flush=True)
+        print(f"[thrpt] PASSB-START ctx={ctx}", flush=True)
         ob, tb = gen(prompts, measure_tokens)
         t_as.append(ta)
         t_bs.append(tb)
