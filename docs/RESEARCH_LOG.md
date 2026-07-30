@@ -4149,3 +4149,19 @@ DRIVER timings remain valid. Chain proceeds to GPQA-198@16K tonight as planned. 
 top xprof-independent ladder rung (scorer-walk lax.map->scan unroll, docs/18 E5, exact-semantics,
 judge-verified premise) gets BUILT overnight in a worktree — gated, tested, UNLANDED until its
 metal A/B slot.
+
+## 2026-07-30 05:30 — E0 capture root cause #3 (the REAL one): jax shuts the profiler server down when its UNREFERENCED handle is GC'd — one-line fork fix (ecdcec6b2); overnight chain forensics
+
+Overnight: chain2's dense captures refused (2x), chain3's sparse arms died to a WEDGED TPU
+(SliceBuilder grpc — the leaked-engine landmine after chain2's messy t3 death), AIME aborted on its
+own preflight seeing the t3 zombie. Morning arm: a VIRGIN server still refused at decode time —
+killing the one-session theory. The pattern that survived every test: connect WORKS early in load,
+REFUSED by decode. Root cause found in the fork: tpu_worker.py:159 called
+jax.profiler.start_server(port) and DISCARDED the handle — jax closes the server when the handle is
+GC'd; the long 256K prefill's allocation churn collects it before decode every time (my one
+successful 3s test at 20:32 landed inside the pre-GC window — which is also why the earlier
+"one-session" theory fit). FIX: keep self._jax_profiler_server (ecdcec6b2, pushed, synced 8x,
+verified) — an UPSTREAMABLE one-liner. Pod fully reset (ray force-stop 8x, mounts remounted+verified
+8x, pins updated). Sparse capture rerunning now; then dense; then AIME. Chain-script hygiene items
+for the cleanup list: index-verified mounts everywhere, arm-level retry on non-refusal driver
+failures, bench preflight should not count a dying zombie as "another workload".
