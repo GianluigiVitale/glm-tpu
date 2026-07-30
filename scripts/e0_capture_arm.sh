@@ -32,7 +32,7 @@ TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 \
 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_WK_OOB_DIR=$OOB_DIR GLM_EXPECT_CODE_HASH=$PIN $DEXTRA"
 REFUSAL_RE="StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|CodeFingerprintMismatchError"
 
-for try in 1 2 3; do
+for try in 1 2 3 4 5 6; do
   # after a crashed try: full ray reset + settle, else the next launch hits
   # the SliceBuilder wedge (leaked-engine landmine)
   if [ "$try" -gt 1 ]; then
@@ -72,5 +72,5 @@ for try in 1 2 3; do
   if grep -aqE "$REFUSAL_RE" "$LOG"; then say "try $try: draw REFUSED — redraw"; continue; fi
   say "try $try: driver_ok=$(grep -c 'DRIVER_EXIT=0' "$LOG") traces=$N — relaunching (fresh server)"
 done
-say "FAILED in 3 tries"
+say "FAILED in 6 tries"
 exit 1
