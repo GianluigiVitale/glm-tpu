@@ -33,6 +33,13 @@ GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_WK_OOB_DIR=$OO
 REFUSAL_RE="StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|CodeFingerprintMismatchError"
 
 for try in 1 2 3; do
+  # after a crashed try: full ray reset + settle, else the next launch hits
+  # the SliceBuilder wedge (leaked-engine landmine)
+  if [ "$try" -gt 1 ]; then
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+      --command='~/vllm-env/bin/ray stop --force >/dev/null 2>&1' >/dev/null 2>&1
+    sleep 45
+  fi
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command='test -r ~/gcs-models/models/GLM-5.2-FP8/model.safetensors.index.json || { fusermount -u ~/gcs-models 2>/dev/null; sleep 1; gcsfuse --implicit-dirs -o ro driftbench-dsv4-uc ~/gcs-models >/dev/null 2>&1; }' >/dev/null 2>&1
   EXTRA_ENVS="$RENV $SRV $LIBTPU" TPU_MIN_TOKEN_BUCKET=32 \
