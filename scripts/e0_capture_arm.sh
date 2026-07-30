@@ -9,7 +9,7 @@ set -u
 ARM="${1:?sparse|dense}"
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=fc8669c78
+PIN=54afaa0d7
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
