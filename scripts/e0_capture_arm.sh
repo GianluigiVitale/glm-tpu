@@ -9,14 +9,14 @@ set -u
 ARM="${1:?sparse|dense}"
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=54afaa0d7
+PIN=ab57f0791
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=~/glm-run/$TAG
 mkdir -p "$RUN_DIR"
 say() { echo "[e0cap-$ARM $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"; }
 
-TRC='GLM_JAX_TRACE_DIR=/tmp/glm-jaxtrace GLM_JAX_TRACE_SKIP=4 GLM_JAX_TRACE_STEPS=15'
+TRC='GLM_JAX_TRACE_DIR=/tmp/glm-jaxtrace GLM_FLIGHT_RECORDER=1 GLM_JAX_TRACE_SKIP=4 GLM_JAX_TRACE_STEPS=15'
 LIBTPU='LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
 if [ "$ARM" = "sparse" ]; then
   RENV='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_EXPECT_CODE_HASH='"$PIN"
