@@ -13,7 +13,7 @@ set -u
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=4647a8fbc
+PIN=ecdcec6b2
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 BENCH="${1:?usage: bench_run.sh <benchmark> <limit> <max_new> [extra args]}"
 LIMIT="${2:?limit}"
