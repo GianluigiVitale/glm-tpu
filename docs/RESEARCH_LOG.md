@@ -4183,3 +4183,21 @@ manifests (the evening's cascade). Instruments now standing: GLM_JAX_TRACE (7 CP
 mount+manifest keepers, flight recorder re-armed. Dense arm capturing now; sparse trace analysis
 agent running; ladder re-rank next. oob-manifest-repair merged to tip + 71/71 — LANDS after the
 dense arm (no sync mid-arm).
+
+## 2026-07-31 05:10 — ⭐⭐ E0 MEASURED: sparse 256K decode is COLLECTIVE-LATENCY BOUND (45.6%; all-reduce 131ms/step @ 232 launches) — the ladder re-ranks; top_k was OVERESTIMATED 2.4x
+
+Full breakdown banked (docs/artifacts/e0-sparse-decode-breakdown.md; parser scripts/analysis/
+parse_xplane.py; <1% agreement vs xprof C++ hlo_stats; 64 cores, 15 steps, step-cycle 402.5ms):
+collectives 183.7ms (45.6% — all-reduce alone 131ms = 232 x ~0.55ms single-token TP-32 latency
+floor), gathers 66.1ms (16.4% — nine ~3.6ms selected-KV gathers/step, sparse_mla_kernel.py:635),
+MoE gmm 46.4ms (11.5%), sort/top-k 35.6ms (8.8% — the prefill guess said 21.8%), sparse attend
+12.7ms (3.1%): THE SELECTION PIPELINE COSTS ~8x THE ATTEND IT FEEDS. Devices 96.2% busy, no
+stragglers, ~32,300 device ops/step (fragmentation note). LADDER CONSEQUENCES: (a) top_k rungs
+(E4/E6/E8 threshold-selection, judged 4-6) DEMOTE — ceiling ~35ms; (b) scorer-walk unroll E5:
+the walk is inside "compute 5.7% + control-flow 1.2%" — ceiling SMALL, demote (built anyway,
+cheap A/B); (c) all-reduce COUNT/latency reduction PROMOTES to #1 (131ms target; 232/step over
+78 layers ≈ 3/layer — fusion/reassociation candidates incl. the judged-rejected launch-fusion
+ideas whose premises were attacked on PREFILL data — re-examine with decode evidence);
+(d) selected-KV gather layout rungs (two-phase compact / page-aligned) stay top-3 (66ms target);
+(e) the dense differential (dense also pays the same TP-32 all-reduce floor) will show how much
+of the 45.6% is common-mode vs sparse-specific — dense trace capturing now, same parser applies.
