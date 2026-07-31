@@ -4165,3 +4165,21 @@ verified) — an UPSTREAMABLE one-liner. Pod fully reset (ray force-stop 8x, mou
 8x, pins updated). Sparse capture rerunning now; then dense; then AIME. Chain-script hygiene items
 for the cleanup list: index-verified mounts everywhere, arm-level retry on non-refusal driver
 failures, bench preflight should not count a dying zombie as "another workload".
+
+## 2026-07-31 04:45 — ⭐ E0 SPARSE DECODE TRACE CAPTURED (8 hosts x 15 steps, 5.5G) — the 2-day capture saga CLOSED; final villain = /tmp/golden.json AGED OUT of /tmp
+
+The in-worker tracer (GLM_JAX_TRACE, runner-hooked, flight-recorder-rule decode test) worked
+FIRST TRY once the real blocker fell: /tmp/golden.json had been tmpfiles-cleaned on some hosts
+(distributed 07-23; ~7-day age-out) — workers with no manifest crashed at load, surviving hosts'
+TPU init timed out on the dead peers = the recurring "SliceBuilder wedge" was DOWNSTREAM of one
+missing file all evening. Restored rank-matched from GCS on all 8 + the mount keeper now touches
+both manifests every 10s cycle (never ages out again). Capture: all 8 hosts synchronized
+(01:00:22-23), skip-4-then-15 decode steps each, correct prefill/decode classification per the
+signature log. SAGA LEDGER (docs/17-family instrument lessons, 6 root causes over 2 days): phase
+profiler cannot see decode (compiled-DAG path) -> profiler-server handle GC'd (one-line fork fix,
+upstreamable) -> server fd accept-then-reset after fork -> hook on the wrong method (worker vs
+runner execute_model) -> None-attach crash (runner not yet constructed) -> AGED-OUT golden
+manifests (the evening's cascade). Instruments now standing: GLM_JAX_TRACE (7 CPU tests),
+mount+manifest keepers, flight recorder re-armed. Dense arm capturing now; sparse trace analysis
+agent running; ladder re-rank next. oob-manifest-repair merged to tip + 71/71 — LANDS after the
+dense arm (no sync mid-arm).
