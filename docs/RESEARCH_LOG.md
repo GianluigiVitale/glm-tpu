@@ -4201,3 +4201,27 @@ ideas whose premises were attacked on PREFILL data — re-examine with decode ev
 (d) selected-KV gather layout rungs (two-phase compact / page-aligned) stay top-3 (66ms target);
 (e) the dense differential (dense also pays the same TP-32 all-reduce floor) will show how much
 of the 45.6% is common-mode vs sparse-specific — dense trace capturing now, same parser applies.
+
+## 2026-07-31 06:00 — ⭐⭐⭐ THE 256K DIFFERENTIAL (measured, both arms): the sparse-dense decode gap is 78% SELECTION MACHINERY; the all-reduce floor is EXACTLY common-mode; and sparse decode's win ceiling at dcp-scaled geometry is BOUNDED BY DENSE'S 8.8ms ATTEND
+
+Differential banked (docs/artifacts/: DENSE_DECODE_BREAKDOWN + SPARSE_VS_DENSE_DIFFERENTIAL; same
+parser, <1% xprof C++ agreement). Device steps: sparse 389.4ms vs dense 269.3ms (+120.0 busy delta).
+FACTS: (1) all-reduce 232 invocations/step IDENTICAL both arms (~0.55ms each ≈ 127ms — the TP-32
+single-token ICI latency floor; 64% of the DENSE step); all-to-all 312/312, psum 81/81 identical;
+sparse runs 36 FEWER total collectives than dense (1217 vs 1253) — ZERO extra selection collectives.
+(2) The +120ms decomposes: selection gathers +37.1 (net), top-k/sort +34.7, selection glue +22.4,
+collective CONTENTION (same calls, slower under sparse DMA load) +12.6, gmm contention +9.3, attend
+swap net +3.9. (3) DENSE'S FULL-262K ATTEND IS 8.8ms/STEP under dcp=8 — context parallelism has
+already made the cost sparsity targets nearly free at this geometry. STRUCTURAL VERDICT: perfect
+exact-semantics selection fixes (~110ms recoverable incl. contention) bring sparse to ≈ dense, never
+past it — the decode-throughput win condition CANNOT be met at dcp-scaled 256K on v4 by ANY exact
+optimization; the bound is dense's 8.8ms attend vs any nonzero selection cost. Sparse's demonstrated
+value stands elsewhere: 256K correctness (4/4), the 128K-gate-closing selection quality, prefill
+efficiency at 128K, and 16x attend-FLOP reduction. DECISION POINT FOR THE OWNER (scope/criteria per
+operating rules): (a) accept the honest null on decode throughput @256K with this measured writeup
+as the deliverable; (b) build the two big selection fixes (fused gather-into-kernel + fused partial
+top-k, days of Pallas) to demonstrate PARITY + the FLOP story; (c) probe a fixed-dcp larger-L
+geometry for a crossover (dense attend grows linearly with stripe; est. crossover far beyond 1M at
+these numbers). Recommendation: (a), with the writeup positioned as the honest headline finding —
+"context parallelism obviates sparse-attention DECODE gains on latency-floor-dominated TPU pods" —
+alongside the fused-reduction lever (helps BOTH arms ~equally) as future work.
