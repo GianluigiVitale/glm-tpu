@@ -4225,3 +4225,14 @@ geometry for a crossover (dense attend grows linearly with stripe; est. crossove
 these numbers). Recommendation: (a), with the writeup positioned as the honest headline finding —
 "context parallelism obviates sparse-attention DECODE gains on latency-floor-dominated TPU pods" —
 alongside the fused-reduction lever (helps BOTH arms ~equally) as future work.
+
+## 2026-07-31 18:15 — AIME-2026 raw 19/30 (63.3%) — ALL 11 misses are 16K-cap TRUNCATIONS, ZERO completed-wrong (completed-item 19/19 = 100%); GPQA relaunched BATCHED; retry chain armed
+
+Run 363 (16K max-new, greedy, dcp=4 sparse, healthy engine try 1 — the manifest-driven repair era's
+first bench): 19 correct, 11 truncated at exactly 16384, 0 completed-and-wrong. The model has not
+missed a single completed AIME-2026 item. Card protocol (99.2) uses sampled/thinking with much
+larger budgets — the truncation-retry protocol applies (11 ids @ 32K, queued). OPS: the AIME run
+took 12.3h at 4 seqs (8.9 tok/s agg — the TP-32 collective floor per step amortizes over batch;
+saved from the 12h wrapper timeout mid-run by SIGSTOPping the wrapper, thawing on driver exit).
+GPQA at that config would be ~37h: killed the fresh attempt, relaunched BATCHED (8 seqs, max_len
+20480, 80 blocks, 24h timeout) ≈ 19h; AIME retry chains after. Goal-2 close ETA: tomorrow evening.
