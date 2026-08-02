@@ -4236,3 +4236,15 @@ took 12.3h at 4 seqs (8.9 tok/s agg — the TP-32 collective floor per step amor
 saved from the 12h wrapper timeout mid-run by SIGSTOPping the wrapper, thawing on driver exit).
 GPQA at that config would be ~37h: killed the fresh attempt, relaunched BATCHED (8 seqs, max_len
 20480, 80 blocks, 24h timeout) ≈ 19h; AIME retry chains after. Goal-2 close ETA: tomorrow evening.
+
+## 2026-08-02 12:20 — GPQA-198@16K BANKED: 125/198 = 63.1% raw (49 truncations; completed-item 125/149 = 83.9% vs card 91.2 — greedy@16K is a LOWER BOUND vs the card's thinking/sampling protocol); resequenced: AIME-retry -> MTP M2 -> GPQA-49@32K retry
+
+Run 366 (batched 8-seq config, healthy first draw, 41.6h wall incl. the frozen-timeout save — the
+end-commit harness would have lost everything at the 24h kill; the SIGSTOP defuse is now standing
+procedure pending a harness incremental-commit fix). Miss split: 49 truncated at exactly 16384, 24
+completed-wrong. Completed-item 83.9% [Wilson ~77-89] — consistent with the 07-08 4K-cap run's 86.2%
+on its 58-item completed subset; signed delta vs card = -7.3 on completed items with the protocol
+caveat (greedy, 16K, no thinking budget, no sampling/consensus). Truncation-retry protocol applies:
+49 ids @ 32K (banked to scratchpad), fit-limited to 4 seqs x 40K (pool ~79/80 blocks at dcp=4) ≈
+~39h — QUEUED BEHIND MTP M2 (hours, pod) so Stage-3's remaining item lands sooner. AIME 32K retry
+running now (11 ids, ETA ~16:30). Goal-2 final numbers land after the GPQA retry (~08-04).
