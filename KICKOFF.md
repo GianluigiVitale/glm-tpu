@@ -44,9 +44,8 @@ NaN scans (NEVER disarmed on correctness runs); fingerprint pin GLM_EXPECT_CODE_
 94b746433); hardened sync_workers (machine-verified 8×).
 
 ## HARD RULES + LANDMINES (unchanged, condensed)
-gs://driftbench-dsv4-uc only; NEVER create machines/TPUs. ONE VARIABLE AT A TIME; commit+push every
+gs://driftbench-dsv4-uc only; NEVER create machines/TPUs. ONE VARIABLE AT A TIME; commit+push each
 step; agents in worktrees JAX_PLATFORMS=cpu; serialize TPU; owner submits PRs. WORKER-0 = this VM;
-bracket pkill patterns ("x[.]sh"); never edit a running script; setsid nohup </dev/null drivers;
-GLM_* raylet AND driver; chunked bench commits (--batch-size); ray stop lies — verify pgrep raylet
-+ dashboards; /tmp ages out — keepers touch golden files; purge closed-campaign scratch; detached
-chains for pod pipelines (zero-gap); freeze-the-wrapper (SIGSTOP) defuses timeouts without loss.
+bracket pkill patterns; never edit a running script; setsid nohup drivers; GLM_* raylet AND driver;
+chunked bench commits; ray stop lies — pgrep raylet+dashboards; keepers touch /tmp/golden*; purge
+closed scratch; detached zero-gap chains; SIGSTOP-the-wrapper defuses timeouts losslessly.
