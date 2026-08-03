@@ -6,11 +6,17 @@ set -uo pipefail
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=94b746433
+PIN="${E0_PIN:-94b746433}"
+LIVE_ROWS_PSUM="${E0_LIVE_ROWS_PSUM:-0}"
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=resume_health_$(date -u +%Y%m%dT%H%M%S%NZ)
 RUN_DIR=$HOME/glm-run/$TAG
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-7200}"
+case "$LIVE_ROWS_PSUM" in
+  0|1) ;;
+  *) echo "E0_LIVE_ROWS_PSUM must be 0 or 1" >&2; exit 2 ;;
+esac
+EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM"
 # Exact PID matcher used by this installed Ray CLI's `ray stop`: import its
 # live RAY_PROCESSES corpus and apply the same name-vs-cmdline semantics. The
 # enumerator excludes itself/ancestors and the nonce-marked local gcloud
@@ -45,6 +51,7 @@ strict_census() {
 }
 
 RAYLET_ENVS='GLM_HEALTH_TAG='"$TAG"' GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
+RAYLET_ENVS="$RAYLET_ENVS $EXPERIMENT_ENV"
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -56,6 +63,7 @@ GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 \
 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 \
 GLM_HEALTH_TAG=$TAG GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR=$OOB_DIR \
 GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_EXPECT_CODE_HASH=$PIN"
+DRIVER_ENVS="$DRIVER_ENVS $EXPERIMENT_ENV"
 
 if pgrep -af 'gate_sparse128k[.]sh|stage256k[.]sh|bench_run[.]sh|e0_capture_arm[.]sh|glm_longctx[.]py|dsa_throughput[.]py|run_bench[.]py' \
     > "$RUN_DIR/census_local.txt" 2>&1; then
@@ -104,7 +112,7 @@ ownership_census() {
   local out=$RUN_DIR/ownership_${label}.txt
   # Every process affected by ray stop must carry this draw's live unique tag.
   # shellcheck disable=SC2016
-  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?; vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); pids=$(printf "%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " "); bad=""; for p in $pids; do f=/proc/$p/environ; if [ ! -r "$f" ] || ! tr "\0" "\n" < "$f" | grep -qx "GLM_HEALTH_TAG='"$TAG"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DCP=4" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_MODE=pallas_decode"; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "OWNER_BAD $(hostname) bad=$bad"; elif [ -n "$pids" ]; then echo "OWNER_OK $(hostname) state=OWNED pids=$pids"; else echo "OWNER_OK $(hostname) state=EMPTY"; fi'
+  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?; vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); pids=$(printf "%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " "); bad=""; for p in $pids; do f=/proc/$p/environ; if [ ! -r "$f" ] || ! tr "\0" "\n" < "$f" | grep -qx "GLM_HEALTH_TAG='"$TAG"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DCP=4" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_MODE=pallas_decode" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'"; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "OWNER_BAD $(hostname) bad=$bad"; elif [ -n "$pids" ]; then echo "OWNER_OK $(hostname) state=OWNED pids=$pids"; else echo "OWNER_OK $(hostname) state=EMPTY"; fi'
   GLM_CENSUS_CARRIER="$TAG" gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || return 1
   has_8_unique_markers "$out" OWNER_OK
@@ -157,7 +165,7 @@ has_8_unique_markers "$RUN_DIR/oob_postlaunch.txt" OOB_OK || {
 
 # Exact live values, not merely variable names, from every raylet.
 # shellcheck disable=SC2016
-ENV_CMD='P=$(pgrep -x raylet | head -1); f=/tmp/resume_health_env_$$; [ -n "$P" ] && tr "\0" "\n" < /proc/$P/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$TAG"'" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_DCP=4" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f"; then echo "HEALTH_ENV_OK $(hostname) GLM_HEALTH_TAG='"$TAG"' GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH='"$PIN"' GLM_DCP=4 GLM_DSA_MODE=pallas_decode"; else echo "HEALTH_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+ENV_CMD='P=$(pgrep -x raylet | head -1); f=/tmp/resume_health_env_$$; [ -n "$P" ] && tr "\0" "\n" < /proc/$P/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$TAG"'" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_DCP=4" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f" && grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$f"; then echo "HEALTH_ENV_OK $(hostname) GLM_HEALTH_TAG='"$TAG"' GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH='"$PIN"' GLM_DCP=4 GLM_DSA_MODE=pallas_decode GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'"; else echo "HEALTH_ENV_BAD $(hostname)"; fi; rm -f "$f"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$ENV_CMD" > "$RUN_DIR/health_raylet_envs.txt" 2>&1 || true
 has_8_unique_markers "$RUN_DIR/health_raylet_envs.txt" HEALTH_ENV_OK || {

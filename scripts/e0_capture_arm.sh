@@ -13,7 +13,8 @@ esac
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN=94b746433
+PIN="${E0_PIN:-94b746433}"
+LIVE_ROWS_PSUM="${E0_LIVE_ROWS_PSUM:-0}"
 TRACE_STEPS=20
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%S%NZ)
@@ -24,6 +25,11 @@ HEALTH_RAYLET_ENVS="${HEALTH_RAYLET_ENVS:?set HEALTH_RAYLET_ENVS to its 8-host e
 HEALTH_RESULTS_DB="${HEALTH_RESULTS_DB:-$HOME/glm-tpu/bench/results.db}"
 HEALTH_MAX_AGE_S="${HEALTH_MAX_AGE_S:-1800}"
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-7200}"
+case "$LIVE_ROWS_PSUM" in
+  0|1) ;;
+  *) echo "E0_LIVE_ROWS_PSUM must be 0 or 1" >&2; exit 2 ;;
+esac
+EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM"
 # Exact PID matcher used by this installed Ray CLI's `ray stop`: import its
 # live RAY_PROCESSES corpus and apply the same name-vs-cmdline semantics. The
 # enumerator excludes itself/ancestors and the nonce-marked local gcloud
@@ -56,6 +62,11 @@ else
   # shellcheck disable=SC2016
   RAYLET_ARM_CHECK='! grep -q "^GLM_DSA_MODE=" "$env_file"'
 fi
+RENV="$RENV $EXPERIMENT_ENV"
+DEXTRA="$DEXTRA $EXPERIMENT_ENV"
+# Expanded only after injection into the remote command.
+# shellcheck disable=SC2016
+RAYLET_EXPERIMENT_CHECK='grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$env_file"'
 DRIVER="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -94,7 +105,7 @@ retry_ownership_census() {
   local try="$1"
   local out=$RUN_DIR/census_retry_owner_t${try}.txt
   # shellcheck disable=SC2016
-  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?; vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true); workload_pids=$(pgrep -f "[g]lm_longctx[.]py|[d]sa_throughput[.]py|[r]un_bench[.]py|[g]ate_sparse128k[.]sh|[s]tage256k[.]sh|[b]ench_run[.]sh" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); pids=$(printf "%s\n%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$workload_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " "); bad=""; for p in $pids; do env_file=/proc/$p/environ; if [ ! -r "$env_file" ] || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" || ! '"$RAYLET_ARM_CHECK"'; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "RETRY_OWNER_BAD $(hostname) bad_pids=$bad"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; elif [ -n "$pids" ]; then echo "RETRY_OWNER_OK $(hostname) state=OWNED pids=$pids"; else echo "RETRY_OWNER_OK $(hostname) state=EMPTY"; fi'
+  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?; vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true); workload_pids=$(pgrep -f "[g]lm_longctx[.]py|[d]sa_throughput[.]py|[r]un_bench[.]py|[g]ate_sparse128k[.]sh|[s]tage256k[.]sh|[b]ench_run[.]sh" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); pids=$(printf "%s\n%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$workload_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " "); bad=""; for p in $pids; do env_file=/proc/$p/environ; if [ ! -r "$env_file" ] || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" || ! '"$RAYLET_ARM_CHECK"' || ! '"$RAYLET_EXPERIMENT_CHECK"'; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "RETRY_OWNER_BAD $(hostname) bad_pids=$bad"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; elif [ -n "$pids" ]; then echo "RETRY_OWNER_OK $(hostname) state=OWNED pids=$pids"; else echo "RETRY_OWNER_OK $(hostname) state=EMPTY"; fi'
   GLM_CENSUS_CARRIER="$TAG" gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || { tee -a "$RUN_DIR/orchestrator.log" < "$out"; return 1; }
   tee -a "$RUN_DIR/orchestrator.log" < "$out"
@@ -140,7 +151,7 @@ static_preflight() {
 verify_raylet_envs() {
   local out=$RUN_DIR/raylet_env_t${1}.txt
   # shellcheck disable=SC2016
-  local cmd='P=$(pgrep -x raylet | head -1); env_file=/tmp/e0_raylet_env_check_$$; [ -n "$P" ] && tr "\0" "\n" < "/proc/$P/environ" > "$env_file" && grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" "$env_file" && grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" "$env_file" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$env_file" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$env_file" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$env_file" && grep -qx "GLM_DCP=8" "$env_file" && '"$RAYLET_ARM_CHECK"' && echo "RAYLET_ENV_OK $(hostname)"; rc=$?; rm -f "$env_file"; exit "$rc"'
+  local cmd='P=$(pgrep -x raylet | head -1); env_file=/tmp/e0_raylet_env_check_$$; [ -n "$P" ] && tr "\0" "\n" < "/proc/$P/environ" > "$env_file" && grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" "$env_file" && grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" "$env_file" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$env_file" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$env_file" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$env_file" && grep -qx "GLM_DCP=8" "$env_file" && '"$RAYLET_ARM_CHECK"' && '"$RAYLET_EXPERIMENT_CHECK"' && echo "RAYLET_ENV_OK $(hostname)"; rc=$?; rm -f "$env_file"; exit "$rc"'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || true
   tee -a "$RUN_DIR/orchestrator.log" < "$out"
@@ -172,8 +183,8 @@ PY
 
 mkdir -p "$RUN_DIR"
 if ! {
-  printf 'tag=%s\narm=%s\npin=%s\ntrace_steps=%s\noob_dir=%s\ngcs_run=%s\n' \
-    "$TAG" "$ARM" "$PIN" "$TRACE_STEPS" "$OOB_DIR" "$GCS_RUN"
+  printf 'tag=%s\narm=%s\npin=%s\nlive_rows_psum=%s\ntrace_steps=%s\noob_dir=%s\ngcs_run=%s\n' \
+    "$TAG" "$ARM" "$PIN" "$LIVE_ROWS_PSUM" "$TRACE_STEPS" "$OOB_DIR" "$GCS_RUN"
   printf 'raylet_envs=%s %s GLM_JAX_TRACE_DIR=<per-try-nonce> %s\ndriver_envs=%s\n' \
     "$RENV" "$TRC_BASE" "$LIBTPU" "$DRIVER"
   printf 'glm_tpu_head=%s\nglm_tpu_dirty=%s\ntpu_inference_head=%s\ntpu_inference_dirty=%s\n' \
@@ -205,7 +216,8 @@ fi
 HEALTH_LINK=$RUN_DIR/health_link.json
 if ! "$HOME/vllm-env/bin/python" - "$HEALTH_RESULTS_DB" "$HEALTH_PROOF_LOG" \
     "$HEALTH_RAYLET_ENVS" \
-    "$HEALTH_LINK" "$PIN" "$OOB_DIR" "$HEALTH_MAX_AGE_S" <<'PY'
+    "$HEALTH_LINK" "$PIN" "$OOB_DIR" "$HEALTH_MAX_AGE_S" \
+    "$LIVE_ROWS_PSUM" <<'PY'
 import datetime
 import json
 import pathlib
@@ -213,7 +225,7 @@ import re
 import sqlite3
 import sys
 
-db, log_path, raylet_path, out, pin, oob, max_age = sys.argv[1:]
+db, log_path, raylet_path, out, pin, oob, max_age, live_rows = sys.argv[1:]
 text = pathlib.Path(log_path).read_text(errors="replace")
 run_ids = {int(value) for value in re.findall(r"\[longctx\] run_id=(\d+)", text)}
 assert len(run_ids) == 1, run_ids
@@ -242,6 +254,7 @@ expected = {
     "GLM_EXPECT_CODE_HASH": pin,
     "GLM_DCP": "4",
     "GLM_DSA_MODE": "pallas_decode",
+    "GLM_DECODE_LIVE_ROWS_PSUM": live_rows,
 }
 assert {key: os_env.get(key) for key in expected} == expected
 raylet_lines = [line for line in pathlib.Path(raylet_path).read_text().splitlines()
@@ -251,7 +264,8 @@ hosts = set()
 suffix = (f"GLM_HEALTH_TAG={tag} GLM_WK_OOB_DIR={oob} "
           "GLM_WK_OOB_GOLDEN=/tmp/golden.json "
           "GLM_STATE_HASH_REF=/tmp/golden.json "
-          f"GLM_EXPECT_CODE_HASH={pin} GLM_DCP=4 GLM_DSA_MODE=pallas_decode")
+          f"GLM_EXPECT_CODE_HASH={pin} GLM_DCP=4 GLM_DSA_MODE=pallas_decode "
+          f"GLM_DECODE_LIVE_ROWS_PSUM={live_rows}")
 for line in raylet_lines:
     _, host, values = line.split(maxsplit=2)
     assert values == suffix, (values, suffix)
@@ -492,13 +506,13 @@ PY
     if ! "$HOME/vllm-env/bin/python" - \
       "$HOME/glm-tpu/bench/results.db" "$RUN_DIR/results_ckpt.db" \
       "$RUN_LINK" "$TAG" "$ARM" "$PIN" "$HARNESS_SHORT" \
-      "$TRACE_REMOTE" "$TRY_START_EPOCH" "$try" <<'PY'
+      "$TRACE_REMOTE" "$TRY_START_EPOCH" "$try" "$LIVE_ROWS_PSUM" <<'PY'
 import datetime
 import json
 import sqlite3
 import sys
 
-db, snapshot, out, tag, arm, pin, harness, trace_dir, started, attempt = sys.argv[1:]
+db, snapshot, out, tag, arm, pin, harness, trace_dir, started, attempt, live_rows = sys.argv[1:]
 src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 src.row_factory = sqlite3.Row
 rows = src.execute(
@@ -518,6 +532,7 @@ os_env = env["os_env"]
 assert os_env["GLM_JAX_TRACE_DIR"] == trace_dir
 assert os_env["GLM_JAX_TRACE_STEPS"] == "20"
 assert os_env["GLM_EXPECT_CODE_HASH"] == pin
+assert os_env["GLM_DECODE_LIVE_ROWS_PSUM"] == live_rows
 created = datetime.datetime.fromisoformat(run["created_utc"]).timestamp()
 assert created >= float(started) - 5, (created, started)
 summary = [dict(r) for r in src.execute(
