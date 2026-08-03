@@ -16,7 +16,7 @@ POD=db-v4-64-od
 PIN=94b746433
 TRACE_STEPS=20
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
-TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%SZ)
+TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%S%NZ)
 RUN_DIR=$HOME/glm-run/$TAG
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
 HEALTH_PROOF_LOG="${HEALTH_PROOF_LOG:?set HEALTH_PROOF_LOG to a fresh protected 5K health log}"
@@ -24,13 +24,17 @@ HEALTH_RAYLET_ENVS="${HEALTH_RAYLET_ENVS:?set HEALTH_RAYLET_ENVS to its 8-host e
 HEALTH_RESULTS_DB="${HEALTH_RESULTS_DB:-$HOME/glm-tpu/bench/results.db}"
 HEALTH_MAX_AGE_S="${HEALTH_MAX_AGE_S:-1800}"
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-7200}"
+[ "$HEALTH_MAX_AGE_S" -le 1800 ] 2>/dev/null || {
+  echo "HEALTH_MAX_AGE_S must be an integer <= 1800" >&2
+  exit 2
+}
 ALERT_FILE=$RUN_DIR/DISK_ALERT
 mkdir -p "$RUN_DIR"
 say() { echo "[e0cap-$ARM $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"; }
 
-# Prevent two copies of this wrapper from racing before either has a driver.
-exec 9>"$HOME/glm-run/.e0_capture.lock"
-flock -n 9 || { say "ABORT: another E0 capture wrapper holds the lock"; exit 1; }
+# Common local lease for every protected resume-health/E0 pod workflow.
+exec 9>"$HOME/glm-run/.glm_pod_workload.lock"
+flock -n 9 || { say "ABORT: another protected pod workflow holds the lock"; exit 1; }
 
 TRC_BASE="GLM_FLIGHT_RECORDER=1 GLM_JAX_TRACE_SKIP=4 GLM_JAX_TRACE_STEPS=$TRACE_STEPS"
 LIBTPU='LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
@@ -185,7 +189,6 @@ initial_pod_census || { say "ABORT: shared-pod collision or incomplete census"; 
 static_preflight || exit 1
 if [ ! -r "$HEALTH_PROOF_LOG" ] || [ ! -r "$HEALTH_RAYLET_ENVS" ] ||
     ! has_8_unique_markers "$HEALTH_RAYLET_ENVS" HEALTH_ENV_OK ||
-    [ "$(grep -Ec "^HEALTH_ENV_OK [^ ]+ GLM_WK_OOB_DIR=$OOB_DIR GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH=$PIN GLM_DCP=4 GLM_DSA_MODE=pallas_decode$" "$HEALTH_RAYLET_ENVS" || true)" -ne 8 ] ||
     ! grep -q "GLM_CODE_FINGERPRINT: git=$PIN.*dirty=0.*GLM_WK_OOB_DIR.*GLM_WK_OOB_GOLDEN" "$HEALTH_PROOF_LOG" ||
     ! grep -q 'manifest VERIFIED.*repeated 7x across cluster' "$HEALTH_PROOF_LOG" ||
     ! grep -q '\[longctx\] L=5000 .*correct=True' "$HEALTH_PROOF_LOG"; then
@@ -194,6 +197,7 @@ if [ ! -r "$HEALTH_PROOF_LOG" ] || [ ! -r "$HEALTH_RAYLET_ENVS" ] ||
 fi
 HEALTH_LINK=$RUN_DIR/health_link.json
 if ! "$HOME/vllm-env/bin/python" - "$HEALTH_RESULTS_DB" "$HEALTH_PROOF_LOG" \
+    "$HEALTH_RAYLET_ENVS" \
     "$HEALTH_LINK" "$PIN" "$OOB_DIR" "$HEALTH_MAX_AGE_S" <<'PY'
 import datetime
 import json
@@ -202,7 +206,7 @@ import re
 import sqlite3
 import sys
 
-db, log_path, out, pin, oob, max_age = sys.argv[1:]
+db, log_path, raylet_path, out, pin, oob, max_age = sys.argv[1:]
 text = pathlib.Path(log_path).read_text(errors="replace")
 run_ids = {int(value) for value in re.findall(r"\[longctx\] run_id=(\d+)", text)}
 assert len(run_ids) == 1, run_ids
@@ -217,6 +221,9 @@ created = datetime.datetime.fromisoformat(run["created_utc"]).timestamp()
 age = datetime.datetime.now(datetime.timezone.utc).timestamp() - created
 assert 0 <= age <= int(max_age), (age, max_age)
 assert run["fork_git"] == pin
+tag_match = re.fullmatch(r"resume health proof \((resume_health_[0-9TZ]+)\)", run["note"])
+assert tag_match, run["note"]
+tag = tag_match.group(1)
 assert env["attention_path"] == "dsa-sparse:pallas_decode"
 assert env["lengths"] == [5000] and env["depths"] == [0.5] and env["trials"] == 1
 os_env = env["os_env"]
@@ -229,6 +236,19 @@ expected = {
     "GLM_DSA_MODE": "pallas_decode",
 }
 assert {key: os_env.get(key) for key in expected} == expected
+raylet_lines = [line for line in pathlib.Path(raylet_path).read_text().splitlines()
+                if line.startswith("HEALTH_ENV_OK ")]
+assert len(raylet_lines) == 8
+hosts = set()
+suffix = (f"HEALTH_TAG={tag} GLM_WK_OOB_DIR={oob} "
+          "GLM_WK_OOB_GOLDEN=/tmp/golden.json "
+          "GLM_STATE_HASH_REF=/tmp/golden.json "
+          f"GLM_EXPECT_CODE_HASH={pin} GLM_DCP=4 GLM_DSA_MODE=pallas_decode")
+for line in raylet_lines:
+    _, host, values = line.split(maxsplit=2)
+    assert values == suffix, (values, suffix)
+    hosts.add(host)
+assert len(hosts) == 8, hosts
 items = [dict(item) for item in conn.execute(
     "SELECT benchmark,item_id,correct,n_prompt_tokens,n_gen_tokens "
     "FROM items WHERE run_id = ?", (run_id,)
@@ -247,7 +267,7 @@ assert summary == [
 ], summary
 conn.close()
 with open(out, "w") as f:
-    json.dump({"age_s": age, "run": run, "env": env,
+    json.dump({"age_s": age, "health_tag": tag, "run": run, "env": env,
                "items": items, "summary": summary}, f, indent=2)
 print("HEALTH_LINK_VALID", run_id, f"age_s={age:.1f}")
 PY
