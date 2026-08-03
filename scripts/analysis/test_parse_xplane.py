@@ -23,6 +23,7 @@ def fake_core(host, plane, *, steps=20, sparse=True):
                 "self_ps": 100_000_000_000,
                 "count": 232,
                 "category": "collectives",
+                "hlo_category": "all-reduce",
             }
         }
         if sparse:
@@ -88,7 +89,16 @@ class FleetIntegrityTest(unittest.TestCase):
             summary, n_files=8, n_cores=64, n_hosts=8,
             cores_per_host=8, steps_per_core=20, arm="sparse",
             dsa_invocations_per_step=78,
-            all_reduce_invocations_per_step=232)
+            all_reduce_invocations_per_step=232,
+            hlo_all_reduce_invocations_per_step=232)
+
+    def test_hlo_all_reduce_signature_rejects_renamed_launches(self):
+        summary = self.aggregate()
+        with self.assertRaisesRegex(ValueError, "HLO all-reduce"):
+            parse_xplane.validate_fleet_expectations(
+                summary, n_files=8, n_cores=64, n_hosts=8,
+                cores_per_host=8, steps_per_core=20, arm="sparse",
+                hlo_all_reduce_invocations_per_step=157)
 
     def test_duplicate_host_rejected(self):
         last = str(self.root / "host7.xplane.pb")

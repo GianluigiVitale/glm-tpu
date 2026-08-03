@@ -159,25 +159,34 @@ verify_raylet_envs() {
 }
 
 validate_analysis() {
-  "$HOME/vllm-env/bin/python" - "$1" "$ARM" \
+  "$HOME/vllm-env/bin/python" - "$1" "$ARM" "$LIVE_ROWS_PSUM" \
     "$HOME/glm-tpu/scripts/analysis" <<'PY'
 import json
 import sys
 
-path, arm, parser_dir = sys.argv[1:]
+path, arm, live_rows, parser_dir = sys.argv[1:]
 sys.path.insert(0, parser_dir)
 import parse_xplane
 
 with open(path) as f:
     d = json.load(f)
+if arm == "sparse" and live_rows == "1":
+    expected_named_all_reduce = 157
+    expected_hlo_all_reduce = 466
+else:
+    expected_named_all_reduce = 232
+    expected_hlo_all_reduce = 391 if arm == "sparse" else None
 parse_xplane.validate_fleet_expectations(
     d, n_files=8, n_cores=64, n_hosts=8, cores_per_host=8,
     steps_per_core=20, arm=arm, dsa_invocations_per_step=78,
-    all_reduce_invocations_per_step=232)
+    all_reduce_invocations_per_step=expected_named_all_reduce,
+    hlo_all_reduce_invocations_per_step=expected_hlo_all_reduce)
 assert d["device_step_ms"] > 0
 assert d["busy_ms_per_step"] > 0
 assert d["ops"].get("all-reduce", {}).get("invocations_per_step", 0) > 0
-print("ANALYSIS_VALID", arm, d["n_files"], d["n_cores"], d["steps_per_core"])
+print("ANALYSIS_VALID", arm, d["n_files"], d["n_cores"],
+      d["steps_per_core"], "named_all_reduce", expected_named_all_reduce,
+      "hlo_all_reduce", expected_hlo_all_reduce)
 PY
 }
 

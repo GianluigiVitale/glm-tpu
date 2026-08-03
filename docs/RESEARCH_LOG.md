@@ -4291,3 +4291,22 @@ OWNER OPERATING DIRECTIVE (standing, including after context compaction): Codex 
 and full access for all in-scope campaign work and must proceed solo and autonomously without asking
 the owner for permission. Use already-approved scoped execution rules where the platform sandbox
 requires them; a platform-enforced escalation is not a request to revisit the owner's authorization.
+
+## 2026-08-03 16:02 — LIVE-ROW PSUM E0: 390.95 -> 372.77 ms (+4.9% tok/s), but REJECT standalone — 232 -> 157 is a name illusion; physical HLO reductions REGRESS 391 -> 466
+
+Protected 256K trace `e0cap_sparse_20260803T140415172444668Z`, fork `606f19ac8`, run 379:
+8 hosts/64 cores/exactly 20 selected steps per core, DSA 78/step, driver/manifest/DB link valid.
+Device latency improves 18.18 ms (4.65%), from 390.9477 to 372.7700 ms; device rate is 2.558 ->
+2.683 tok/s (+4.87%). MoE GMM falls 46.46 -> 32.47 ms and collectives 184.08 -> 177.63 ms;
+gathers 66.58 ms, top-k/sort 35.66 ms, and sparse attention 12.65 ms are unchanged.
+
+ADJUDICATION CAUGHT A PROFILER-NAME TRAP: the summary's named `all-reduce` count falls 232 -> 157,
+but gate-on separately reports 231 `psum` events. A hardened parser now records profiler HLO
+categories per selected step: total HLO-category all-reduce events are exact and uniform at 466 on
+all 1,280 core-steps, versus baseline 391. Source/shape inspection explains the +75: baseline fuses
+75 pairs of bf16 `[32,6144]` hidden reductions into tuple all-reduces; live-row lowering emits 75
+routed plus 156 linear bf16 `[1,6144]` psums separately. Thus the payload/GMM change buys 4.9%, but
+the explicit no-launch-regression gate FAILS. Keep the lever default-off and do not spend the 128K
+smoke on it alone. Immediate corrective candidate is the default-off routed/shared MoE psum fusion;
+its stacked trace must remove the 75 split launches before correctness-smoke acceptance. Validator
+tests are 10/10 and the pod was clean on all eight hosts after the capture session was stopped.

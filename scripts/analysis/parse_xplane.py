@@ -302,7 +302,8 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
         md_cat[mid] = (hc, categorize(nm, hc))
 
     per_op = collections.defaultdict(lambda: [0, 0, 0])  # base -> [self, total, count]
-    base_cat = {}  # base name -> hlo-informed category
+    base_cat = {}  # base name -> decode-oriented category
+    base_hlo_cat = {}  # base name -> profiler HLO category
     per_cat = collections.defaultdict(lambda: [0, 0])    # cat  -> [self, count]
     per_hlo_cat = collections.defaultdict(int)
     # Per-step self-time. Fleet summaries use only these selected module
@@ -324,6 +325,7 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
         base = md_name[mid][1]
         hc, cat = md_cat[mid]
         base_cat.setdefault(base, cat)
+        base_hlo_cat.setdefault(base, hc)
         acc = per_op[base]
         acc[0] += sp; acc[1] += dur; acc[2] += 1
         per_cat[cat][0] += sp; per_cat[cat][1] += 1
@@ -362,7 +364,8 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
         "t_min_ps": t_min, "t_max_ps": t_max,
         "busy_ps": busy_ps,
         "per_op": {k: {"self_ps": v[0], "total_ps": v[1], "count": v[2],
-                       "category": base_cat[k]}
+                       "category": base_cat[k],
+                       "hlo_category": base_hlo_cat[k]}
                    for k, v in per_op.items()},
         "per_category": {k: {"self_ps": v[0], "count": v[1]}
                          for k, v in per_cat.items()},
@@ -372,7 +375,8 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
                    "per_category_ps": dict(step_cat[i]),
                    "per_op": {
                        name: {"self_ps": values[0], "count": values[1],
-                              "category": base_cat[name]}
+                              "category": base_cat[name],
+                              "hlo_category": base_hlo_cat[name]}
                        for name, values in step_op[i].items()
                    }}
                   for i, (a, b) in enumerate(step_bounds)],
@@ -512,6 +516,7 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
                 for c in cores
             ]),
             "category": present["category"],
+            "hlo_category": present.get("hlo_category"),
         }
 
     all_step_ms = [s["duration_ps"] / 1e9 for c in cores for s in c["steps"]]
@@ -544,6 +549,11 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         s["per_op"].get("all-reduce", {}).get("count", 0)
         for c in cores for s in c["steps"]
     ]
+    hlo_all_reduce_invocations_per_step = [
+        sum(op["count"] for op in s["per_op"].values()
+            if op.get("hlo_category") == "all-reduce")
+        for c in cores for s in c["steps"]
+    ]
     for values in categories.values():
         values["pct_busy"] = 100 * values["ms_per_step"] / busy_ms
         values["pct_step_cycle"] = 100 * values["ms_per_step"] / cycle_ms
@@ -568,6 +578,8 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         "sparse_dsa_steps_per_core": sparse_dsa_steps_per_core,
         "sparse_dsa_invocations_per_step": sparse_dsa_invocations_per_step,
         "all_reduce_invocations_per_step": all_reduce_invocations_per_step,
+        "hlo_all_reduce_invocations_per_step":
+            hlo_all_reduce_invocations_per_step,
         "categories": categories,
         "ops": ops,
     }
@@ -576,7 +588,8 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
 def validate_fleet_expectations(summary, *, n_files, n_cores, n_hosts,
                                 cores_per_host, steps_per_core, arm=None,
                                 dsa_invocations_per_step=None,
-                                all_reduce_invocations_per_step=None):
+                                all_reduce_invocations_per_step=None,
+                                hlo_all_reduce_invocations_per_step=None):
     """Reject a parsed fleet that does not match an experiment's topology.
 
     ``aggregate_fleet`` is reusable for smaller TPU slices, so campaign-sized
@@ -632,6 +645,13 @@ def validate_fleet_expectations(summary, *, n_files, n_cores, n_hosts,
             raise ValueError(
                 f"all-reduce invocation signature mismatch: "
                 f"{collections.Counter(observed_ar)}")
+    if hlo_all_reduce_invocations_per_step is not None:
+        observed_hlo_ar = summary["hlo_all_reduce_invocations_per_step"]
+        if any(count != hlo_all_reduce_invocations_per_step
+               for count in observed_hlo_ar):
+            raise ValueError(
+                f"HLO all-reduce invocation signature mismatch: "
+                f"{collections.Counter(observed_hlo_ar)}")
     return summary
 
 
