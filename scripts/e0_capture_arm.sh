@@ -24,6 +24,12 @@ HEALTH_RAYLET_ENVS="${HEALTH_RAYLET_ENVS:?set HEALTH_RAYLET_ENVS to its 8-host e
 HEALTH_RESULTS_DB="${HEALTH_RESULTS_DB:-$HOME/glm-tpu/bench/results.db}"
 HEALTH_MAX_AGE_S="${HEALTH_MAX_AGE_S:-1800}"
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-7200}"
+# Exact PID matcher used by this installed Ray CLI's `ray stop`: import its
+# live RAY_PROCESSES corpus and apply the same name-vs-cmdline semantics. The
+# enumerator excludes itself/ancestors and the nonce-marked local gcloud
+# controller because their command lines carry this code.
+# shellcheck disable=SC2016
+RAY_ENUM='GLM_CENSUS_CARRIER='"$TAG"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
 [ "$HEALTH_MAX_AGE_S" -le 1800 ] 2>/dev/null || {
   echo "HEALTH_MAX_AGE_S must be an integer <= 1800" >&2
   exit 2
@@ -73,22 +79,23 @@ initial_pod_census() {
   local out=$RUN_DIR/census_${label}.txt
   # This is a literal remote program; expansion must happen on each worker.
   # shellcheck disable=SC2016
-  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[r]aylet|[g]lm_longctx[.]py|[d]sa_throughput[.]py|[r]un_bench[.]py|[g]ate_sparse128k[.]sh|[s]tage256k[.]sh|[b]ench_run[.]sh" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[d]sa_throughput[.]py|[r]un_bench[.]py|[g]ate_sparse128k[.]sh|[s]tage256k[.]sh|[b]ench_run[.]sh" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
+  GLM_CENSUS_CARRIER="$TAG" gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || { tee -a "$RUN_DIR/orchestrator.log" < "$out"; return 1; }
   tee -a "$RUN_DIR/orchestrator.log" < "$out"
   has_8_unique_markers "$out" CENSUS_OK
 }
 
 # After the initial zero-work census, Ray processes belong to this capture.
-# Before a retry reset, still refuse if an ASPt-specific process/container has
-# appeared; also preserve a full process/lock census in the run bundle.
+# Before a retry reset, authenticate every process the installed Ray CLI would
+# kill, plus vLLM/workload processes and libtpu holders. A host with no such
+# process is explicitly EMPTY; every nonempty host must be positively OWNED.
 retry_ownership_census() {
   local try="$1"
   local out=$RUN_DIR/census_retry_owner_t${try}.txt
   # shellcheck disable=SC2016
-  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[r]aylet" 2>/dev/null || true); holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); bad=""; for p in $pids $holders; do env_file=/proc/$p/environ; if [ ! -r "$env_file" ] || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" || ! '"$RAYLET_ARM_CHECK"'; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "RETRY_OWNER_BAD $(hostname) bad_pids=$bad"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "RETRY_OWNER_OK $(hostname)"; [ -n "$pids" ] && ps -o pid,args -p $(echo "$pids" | tr "\n" " "); [ -n "$holders" ] && echo "libtpu holders: $holders"; fi'
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?; vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true); workload_pids=$(pgrep -f "[g]lm_longctx[.]py|[d]sa_throughput[.]py|[r]un_bench[.]py|[g]ate_sparse128k[.]sh|[s]tage256k[.]sh|[b]ench_run[.]sh" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); pids=$(printf "%s\n%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$workload_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " "); bad=""; for p in $pids; do env_file=/proc/$p/environ; if [ ! -r "$env_file" ] || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" || ! '"$RAYLET_ARM_CHECK"'; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "RETRY_OWNER_BAD $(hostname) bad_pids=$bad"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; elif [ -n "$pids" ]; then echo "RETRY_OWNER_OK $(hostname) state=OWNED pids=$pids"; else echo "RETRY_OWNER_OK $(hostname) state=EMPTY"; fi'
+  GLM_CENSUS_CARRIER="$TAG" gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || { tee -a "$RUN_DIR/orchestrator.log" < "$out"; return 1; }
   tee -a "$RUN_DIR/orchestrator.log" < "$out"
   has_8_unique_markers "$out" RETRY_OWNER_OK
@@ -228,6 +235,7 @@ assert env["attention_path"] == "dsa-sparse:pallas_decode"
 assert env["lengths"] == [5000] and env["depths"] == [0.5] and env["trials"] == 1
 os_env = env["os_env"]
 expected = {
+    "GLM_HEALTH_TAG": tag,
     "GLM_WK_OOB_DIR": oob,
     "GLM_WK_OOB_GOLDEN": "/tmp/golden.json",
     "GLM_STATE_HASH_REF": "/tmp/golden.json",
@@ -240,7 +248,7 @@ raylet_lines = [line for line in pathlib.Path(raylet_path).read_text().splitline
                 if line.startswith("HEALTH_ENV_OK ")]
 assert len(raylet_lines) == 8
 hosts = set()
-suffix = (f"HEALTH_TAG={tag} GLM_WK_OOB_DIR={oob} "
+suffix = (f"GLM_HEALTH_TAG={tag} GLM_WK_OOB_DIR={oob} "
           "GLM_WK_OOB_GOLDEN=/tmp/golden.json "
           "GLM_STATE_HASH_REF=/tmp/golden.json "
           f"GLM_EXPECT_CODE_HASH={pin} GLM_DCP=4 GLM_DSA_MODE=pallas_decode")
@@ -312,10 +320,18 @@ trap 'exit 130' HUP INT TERM
 for try in 1 2 3 4 5 6; do
   if [ "$try" -gt 1 ]; then
     retry_ownership_census "$try" || { say "ABORT: retry processes are not positively capture-owned"; exit 1; }
-    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-      --command='~/vllm-env/bin/ray stop --force >/dev/null 2>&1' >/dev/null 2>&1 || {
-        say "ABORT: retry Ray reset failed"; exit 1; }
-    sleep 45
+    OWNED_HOSTS=$(grep -c ' state=OWNED ' "$RUN_DIR/census_retry_owner_t${try}.txt" || true)
+    if [ "$OWNED_HOSTS" -gt 0 ]; then
+      say "try $try: stopping positively-owned Ray cluster ($OWNED_HOSTS nonempty hosts)"
+      gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+        --command='~/vllm-env/bin/ray stop --force >/dev/null 2>&1' >/dev/null 2>&1 || {
+          say "ABORT: retry Ray reset failed"; exit 1; }
+      sleep 45
+    else
+      say "try $try: ownership census is EMPTY on all hosts; Ray reset skipped"
+    fi
+    initial_pod_census "postreset_t${try}" || {
+      say "ABORT: retry reset did not produce a proven zero-work pod"; exit 1; }
   fi
   bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check | tee -a "$RUN_DIR/orchestrator.log" || {
     say "ABORT: disk preflight failed before try $try"; exit 1; }
