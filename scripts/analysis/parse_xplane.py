@@ -20,12 +20,15 @@ Key facts learned from JAX TPU v4 traces (verified on e0cap_sparse):
 Usage:
   parse_xplane.py inspect   <xplane.pb>              # dump planes/lines/stat schema
   parse_xplane.py aggregate <xplane.pb> [out.json]   # nested-aware per-op/per-step aggregation
+  parse_xplane.py fleet     <trace_dir> [out.json]   # aggregate every host/core + tables
 """
 from __future__ import annotations
 
 import collections
 import json
+import pathlib
 import re
+import statistics
 import sys
 
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
@@ -382,6 +385,92 @@ def aggregate_host(path, step_module_re=r"jit_step_fun_impl"):
     return out
 
 
+def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
+    """Aggregate every xplane.pb below ``trace_dir`` into fleet means.
+
+    Per-step quantities are normalized on each core before averaging, so a
+    partial or duplicated host trace cannot silently overweight the result.
+    A mixed step count is rejected because campaign A/Bs require identical
+    trace windows on every core.
+    """
+    paths = sorted(pathlib.Path(trace_dir).rglob("*.xplane.pb"))
+    if not paths:
+        raise ValueError(f"no *.xplane.pb files below {trace_dir}")
+
+    cores = []
+    for path in paths:
+        for core in aggregate_host(str(path), step_module_re):
+            core["source_file"] = str(path)
+            cores.append(core)
+    if not cores:
+        raise ValueError(f"no TPU device planes below {trace_dir}")
+
+    step_counts = {len(c["steps"]) for c in cores}
+    if 0 in step_counts or len(step_counts) != 1:
+        raise ValueError(
+            f"inconsistent decode-step counts across cores: {sorted(step_counts)}")
+    n_steps = next(iter(step_counts))
+
+    def mean(values):
+        return statistics.fmean(values)
+
+    def per_step(core, ps):
+        return ps / len(core["steps"]) / 1e9
+
+    category_names = sorted({name for c in cores for name in c["per_category"]})
+    categories = {}
+    for name in category_names:
+        categories[name] = {
+            "ms_per_step": mean([
+                per_step(c, c["per_category"].get(name, {}).get("self_ps", 0))
+                for c in cores
+            ]),
+            "invocations_per_step": mean([
+                c["per_category"].get(name, {}).get("count", 0) / len(c["steps"])
+                for c in cores
+            ]),
+        }
+
+    op_names = sorted({name for c in cores for name in c["per_op"]})
+    ops = {}
+    for name in op_names:
+        present = next(c["per_op"][name] for c in cores if name in c["per_op"])
+        ops[name] = {
+            "ms_per_step": mean([
+                per_step(c, c["per_op"].get(name, {}).get("self_ps", 0))
+                for c in cores
+            ]),
+            "invocations_per_step": mean([
+                c["per_op"].get(name, {}).get("count", 0) / len(c["steps"])
+                for c in cores
+            ]),
+            "category": present["category"],
+        }
+
+    all_step_ms = [s["duration_ps"] / 1e9 for c in cores for s in c["steps"]]
+    busy_ms = mean([per_step(c, c["busy_ps"]) for c in cores])
+    cycle_ms = mean([per_step(c, c["window_ps"]) for c in cores])
+    for values in categories.values():
+        values["pct_busy"] = 100 * values["ms_per_step"] / busy_ms
+        values["pct_step_cycle"] = 100 * values["ms_per_step"] / cycle_ms
+
+    return {
+        "trace_dir": str(pathlib.Path(trace_dir).resolve()),
+        "source_files": [str(p) for p in paths],
+        "n_files": len(paths),
+        "n_cores": len(cores),
+        "steps_per_core": n_steps,
+        "device_step_ms": mean(all_step_ms),
+        "device_step_min_ms": min(all_step_ms),
+        "device_step_max_ms": max(all_step_ms),
+        "busy_ms_per_step": busy_ms,
+        "step_cycle_ms": cycle_ms,
+        "idle_pct": 100 * (1 - busy_ms / cycle_ms),
+        "categories": categories,
+        "ops": ops,
+    }
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -414,6 +503,40 @@ def cmd_aggregate(path, out_json=None):
         print(f"wrote {out_json}")
 
 
+def cmd_fleet(trace_dir, out_json=None):
+    summary = aggregate_fleet(trace_dir)
+    print(f"files={summary['n_files']} cores={summary['n_cores']} "
+          f"steps/core={summary['steps_per_core']}")
+    print(f"device_step={summary['device_step_ms']:.2f}ms "
+          f"(min={summary['device_step_min_ms']:.2f}, "
+          f"max={summary['device_step_max_ms']:.2f}) "
+          f"busy={summary['busy_ms_per_step']:.2f}ms "
+          f"step_cycle={summary['step_cycle_ms']:.2f}ms "
+          f"idle={summary['idle_pct']:.2f}%")
+
+    print("\n| category | ms/step | % busy | % step-cycle |")
+    print("|---|---:|---:|---:|")
+    for name, values in sorted(
+            summary["categories"].items(),
+            key=lambda item: item[1]["ms_per_step"], reverse=True):
+        print(f"| {name} | {values['ms_per_step']:.2f} | "
+              f"{values['pct_busy']:.1f}% | "
+              f"{values['pct_step_cycle']:.1f}% |")
+
+    print("\n| op | ms/step | invocations/step | category |")
+    print("|---|---:|---:|---|")
+    for name, values in sorted(
+            summary["ops"].items(),
+            key=lambda item: item[1]["ms_per_step"], reverse=True)[:25]:
+        print(f"| `{name}` | {values['ms_per_step']:.2f} | "
+              f"{values['invocations_per_step']:.1f} | {values['category']} |")
+
+    if out_json:
+        with open(out_json, "w") as f:
+            json.dump(summary, f, indent=2)
+        print(f"\nwrote {out_json}")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print(__doc__)
@@ -423,6 +546,8 @@ if __name__ == "__main__":
         cmd_inspect(path)
     elif cmd == "aggregate":
         cmd_aggregate(path, sys.argv[3] if len(sys.argv) > 3 else None)
+    elif cmd == "fleet":
+        cmd_fleet(path, sys.argv[3] if len(sys.argv) > 3 else None)
     else:
         print(__doc__)
         sys.exit(1)
