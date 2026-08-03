@@ -305,9 +305,13 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
     base_cat = {}  # base name -> hlo-informed category
     per_cat = collections.defaultdict(lambda: [0, 0])    # cat  -> [self, count]
     per_hlo_cat = collections.defaultdict(int)
-    # per step x category self-time
+    # Per-step self-time. Fleet summaries use only these selected module
+    # windows; whole-trace totals above remain available to ``aggregate`` for
+    # profiler debugging, but profiler warmup/tail events cannot skew an A/B.
     n_steps = len(step_bounds)
     step_cat = [collections.defaultdict(int) for _ in range(n_steps)]
+    step_op = [collections.defaultdict(lambda: [0, 0])
+               for _ in range(n_steps)]  # base -> [self, count]
     step_busy = [0] * n_steps
     outside_step_self = 0
 
@@ -335,6 +339,8 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
             si += 1
         if si < n_steps and step_bounds[si][0] <= mid_t < step_bounds[si][1]:
             step_cat[si][cat] += sp
+            step_op[si][base][0] += sp
+            step_op[si][base][1] += 1
             step_busy[si] += sp
         else:
             outside_step_self += sp
@@ -363,7 +369,12 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
         "per_hlo_category": dict(per_hlo_cat),
         "steps": [{"offset_ps": a, "end_ps": b, "duration_ps": b - a,
                    "busy_ps": step_busy[i],
-                   "per_category_ps": dict(step_cat[i])}
+                   "per_category_ps": dict(step_cat[i]),
+                   "per_op": {
+                       name: {"self_ps": values[0], "count": values[1],
+                              "category": base_cat[name]}
+                       for name, values in step_op[i].items()
+                   }}
                   for i, (a, b) in enumerate(step_bounds)],
         "outside_step_self_ps": outside_step_self,
         "modules": modules,
@@ -375,35 +386,76 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
 def aggregate_host(path, step_module_re=r"jit_step_fun_impl"):
     """Aggregate all TPU device planes in one xplane.pb. Returns per-core list."""
     xs = load_xspace(path)
-    host = xs.hostnames[0] if xs.hostnames else path
+    hosts = [name for name in xs.hostnames if name]
+    if len(hosts) != 1:
+        raise ValueError(
+            f"expected exactly one nonempty XSpace hostname in {path}, got {hosts}")
+    host = hosts[0]
     out = []
     for plane in xs.planes:
         if is_device_plane(plane):
             r = aggregate_device_plane(plane, step_module_re)
             r["host"] = host
             out.append(r)
+    plane_names = [r["plane"] for r in out]
+    if len(set(plane_names)) != len(plane_names):
+        duplicates = sorted(
+            name for name, count in collections.Counter(plane_names).items()
+            if count > 1)
+        raise ValueError(f"duplicate TPU device planes for {host}: {duplicates}")
     return out
 
 
 def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
     """Aggregate every xplane.pb below ``trace_dir`` into fleet means.
 
-    Per-step quantities are normalized on each core before averaging, so a
-    partial or duplicated host trace cannot silently overweight the result.
-    A mixed step count is rejected because campaign A/Bs require identical
-    trace windows on every core.
+    Only operations whose midpoint falls in a selected decode-step module are
+    included in fleet category/op/busy totals. Host and device-plane identities
+    must be unique, every host must contain the same plane set, and mixed step
+    counts are rejected. Campaign-specific expected counts are intentionally a
+    caller gate (the E0 capture requires 8 files, 64 cores, and 20 steps/core).
     """
     paths = sorted(pathlib.Path(trace_dir).rglob("*.xplane.pb"))
     if not paths:
         raise ValueError(f"no *.xplane.pb files below {trace_dir}")
 
     cores = []
+    file_hosts = {}
     for path in paths:
-        for core in aggregate_host(str(path), step_module_re):
+        file_cores = aggregate_host(str(path), step_module_re)
+        hosts = {core["host"] for core in file_cores}
+        if len(hosts) != 1:
+            raise ValueError(
+                f"expected one host per xplane, got {sorted(hosts)} in {path}")
+        file_hosts[str(path)] = next(iter(hosts))
+        for core in file_cores:
             core["source_file"] = str(path)
             cores.append(core)
     if not cores:
         raise ValueError(f"no TPU device planes below {trace_dir}")
+
+    hosts = sorted(file_hosts.values())
+    if len(set(hosts)) != len(hosts):
+        duplicates = sorted(
+            host for host, count in collections.Counter(hosts).items()
+            if count > 1)
+        raise ValueError(f"duplicate host xplanes: {duplicates}")
+    cores_per_host = collections.Counter(c["host"] for c in cores)
+    if len(set(cores_per_host.values())) != 1:
+        raise ValueError(
+            f"inconsistent TPU-plane counts by host: {dict(cores_per_host)}")
+    planes_per_host = {
+        host: sorted(c["plane"] for c in cores if c["host"] == host)
+        for host in hosts
+    }
+    expected_planes = next(iter(planes_per_host.values()))
+    inconsistent_planes = {
+        host: planes for host, planes in planes_per_host.items()
+        if planes != expected_planes
+    }
+    if inconsistent_planes:
+        raise ValueError(
+            f"inconsistent TPU-plane identities by host: {inconsistent_planes}")
 
     step_counts = {len(c["steps"]) for c in cores}
     if 0 in step_counts or len(step_counts) != 1:
@@ -414,42 +466,84 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
     def mean(values):
         return statistics.fmean(values)
 
-    def per_step(core, ps):
-        return ps / len(core["steps"]) / 1e9
+    def selected_category(core, name, field):
+        if field == "self_ps":
+            return sum(s["per_category_ps"].get(name, 0)
+                       for s in core["steps"])
+        return sum(op["count"] for s in core["steps"]
+                   for op in s["per_op"].values()
+                   if op["category"] == name)
 
-    category_names = sorted({name for c in cores for name in c["per_category"]})
+    def selected_op(core, name, field):
+        return sum(s["per_op"].get(name, {}).get(field, 0)
+                   for s in core["steps"])
+
+    category_names = sorted({
+        name for c in cores for s in c["steps"]
+        for name in s["per_category_ps"]
+    })
     categories = {}
     for name in category_names:
         categories[name] = {
             "ms_per_step": mean([
-                per_step(c, c["per_category"].get(name, {}).get("self_ps", 0))
+                selected_category(c, name, "self_ps") / n_steps / 1e9
                 for c in cores
             ]),
             "invocations_per_step": mean([
-                c["per_category"].get(name, {}).get("count", 0) / len(c["steps"])
+                selected_category(c, name, "count") / n_steps
                 for c in cores
             ]),
         }
 
-    op_names = sorted({name for c in cores for name in c["per_op"]})
+    op_names = sorted({
+        name for c in cores for s in c["steps"] for name in s["per_op"]
+    })
     ops = {}
     for name in op_names:
-        present = next(c["per_op"][name] for c in cores if name in c["per_op"])
+        present = next(s["per_op"][name] for c in cores for s in c["steps"]
+                       if name in s["per_op"])
         ops[name] = {
             "ms_per_step": mean([
-                per_step(c, c["per_op"].get(name, {}).get("self_ps", 0))
+                selected_op(c, name, "self_ps") / n_steps / 1e9
                 for c in cores
             ]),
             "invocations_per_step": mean([
-                c["per_op"].get(name, {}).get("count", 0) / len(c["steps"])
+                selected_op(c, name, "count") / n_steps
                 for c in cores
             ]),
             "category": present["category"],
         }
 
     all_step_ms = [s["duration_ps"] / 1e9 for c in cores for s in c["steps"]]
-    busy_ms = mean([per_step(c, c["busy_ps"]) for c in cores])
-    cycle_ms = mean([per_step(c, c["window_ps"]) for c in cores])
+    busy_ms = mean([
+        sum(s["busy_ps"] for s in c["steps"]) / n_steps / 1e9
+        for c in cores
+    ])
+    cycle_samples_ms = [
+        (right["offset_ps"] - left["offset_ps"]) / 1e9
+        for c in cores for left, right in zip(c["steps"], c["steps"][1:])
+    ]
+    if not cycle_samples_ms or min(cycle_samples_ms) <= 0:
+        raise ValueError("decode-step starts are not strictly increasing")
+    cycle_ms = mean(cycle_samples_ms)
+    outside_ms = mean([
+        c["outside_step_self_ps"] / n_steps / 1e9 for c in cores
+    ])
+    sparse_dsa_category = "pallas: dsa_sparse_decode (sparse MLA attend)"
+    sparse_dsa_steps_per_core = [
+        sum(s["per_category_ps"].get(sparse_dsa_category, 0) > 0
+            for s in c["steps"])
+        for c in cores
+    ]
+    sparse_dsa_cores = sum(count > 0 for count in sparse_dsa_steps_per_core)
+    sparse_dsa_invocations_per_step = [
+        s["per_op"].get("dsa_sparse_decode", {}).get("count", 0)
+        for c in cores for s in c["steps"]
+    ]
+    all_reduce_invocations_per_step = [
+        s["per_op"].get("all-reduce", {}).get("count", 0)
+        for c in cores for s in c["steps"]
+    ]
     for values in categories.values():
         values["pct_busy"] = 100 * values["ms_per_step"] / busy_ms
         values["pct_step_cycle"] = 100 * values["ms_per_step"] / cycle_ms
@@ -459,6 +553,9 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         "source_files": [str(p) for p in paths],
         "n_files": len(paths),
         "n_cores": len(cores),
+        "hosts": hosts,
+        "cores_per_host": dict(sorted(cores_per_host.items())),
+        "planes_per_host": planes_per_host,
         "steps_per_core": n_steps,
         "device_step_ms": mean(all_step_ms),
         "device_step_min_ms": min(all_step_ms),
@@ -466,9 +563,76 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         "busy_ms_per_step": busy_ms,
         "step_cycle_ms": cycle_ms,
         "idle_pct": 100 * (1 - busy_ms / cycle_ms),
+        "outside_selected_steps_ms_per_step": outside_ms,
+        "sparse_dsa_cores": sparse_dsa_cores,
+        "sparse_dsa_steps_per_core": sparse_dsa_steps_per_core,
+        "sparse_dsa_invocations_per_step": sparse_dsa_invocations_per_step,
+        "all_reduce_invocations_per_step": all_reduce_invocations_per_step,
         "categories": categories,
         "ops": ops,
     }
+
+
+def validate_fleet_expectations(summary, *, n_files, n_cores, n_hosts,
+                                cores_per_host, steps_per_core, arm=None,
+                                dsa_invocations_per_step=None,
+                                all_reduce_invocations_per_step=None):
+    """Reject a parsed fleet that does not match an experiment's topology.
+
+    ``aggregate_fleet`` is reusable for smaller TPU slices, so campaign-sized
+    expectations belong in an explicit caller gate rather than hidden global
+    constants. ``arm`` additionally prevents a same-step sparse/dense mixture
+    from being mislabeled in E0 evidence.
+    """
+    observed = {
+        "n_files": summary["n_files"],
+        "n_cores": summary["n_cores"],
+        "n_hosts": len(summary["hosts"]),
+        "cores_per_host": sorted(summary["cores_per_host"].values()),
+        "steps_per_core": summary["steps_per_core"],
+    }
+    expected = {
+        "n_files": n_files,
+        "n_cores": n_cores,
+        "n_hosts": n_hosts,
+        "cores_per_host": [cores_per_host] * n_hosts,
+        "steps_per_core": steps_per_core,
+    }
+    if observed != expected:
+        raise ValueError(
+            f"fleet topology mismatch: observed={observed} expected={expected}")
+
+    plane_sets = {tuple(v) for v in summary["planes_per_host"].values()}
+    canonical_planes = tuple(
+        sorted(f"/device:TPU:{i}" for i in range(cores_per_host)))
+    if plane_sets != {canonical_planes}:
+        raise ValueError(
+            f"device-plane topology mismatch: observed={plane_sets} "
+            f"expected={canonical_planes}")
+
+    dsa_steps = summary["sparse_dsa_steps_per_core"]
+    if arm == "sparse" and any(count != steps_per_core for count in dsa_steps):
+        raise ValueError(
+            f"sparse arm DSA step coverage is not {steps_per_core}/{steps_per_core} "
+            f"on every core: {collections.Counter(dsa_steps)}")
+    if arm == "sparse" and dsa_invocations_per_step is not None:
+        observed_dsa = summary["sparse_dsa_invocations_per_step"]
+        if any(count != dsa_invocations_per_step for count in observed_dsa):
+            raise ValueError(
+                f"sparse DSA invocation signature mismatch: "
+                f"{collections.Counter(observed_dsa)}")
+    if arm == "dense" and any(dsa_steps):
+        raise ValueError(
+            f"dense arm contains sparse DSA steps: {collections.Counter(dsa_steps)}")
+    if arm not in (None, "sparse", "dense"):
+        raise ValueError(f"unknown arm expectation: {arm}")
+    if all_reduce_invocations_per_step is not None:
+        observed_ar = summary["all_reduce_invocations_per_step"]
+        if any(count != all_reduce_invocations_per_step for count in observed_ar):
+            raise ValueError(
+                f"all-reduce invocation signature mismatch: "
+                f"{collections.Counter(observed_ar)}")
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -505,6 +669,7 @@ def cmd_aggregate(path, out_json=None):
 
 def cmd_fleet(trace_dir, out_json=None):
     summary = aggregate_fleet(trace_dir)
+    print("UNVALIDATED FLEET SUMMARY — apply explicit experiment topology/arm gates")
     print(f"files={summary['n_files']} cores={summary['n_cores']} "
           f"steps/core={summary['steps_per_core']}")
     print(f"device_step={summary['device_step_ms']:.2f}ms "
@@ -512,7 +677,8 @@ def cmd_fleet(trace_dir, out_json=None):
           f"max={summary['device_step_max_ms']:.2f}) "
           f"busy={summary['busy_ms_per_step']:.2f}ms "
           f"step_cycle={summary['step_cycle_ms']:.2f}ms "
-          f"idle={summary['idle_pct']:.2f}%")
+          f"idle={summary['idle_pct']:.2f}% "
+          f"outside_selected={summary['outside_selected_steps_ms_per_step']:.2f}ms/step")
 
     print("\n| category | ms/step | % busy | % step-cycle |")
     print("|---|---:|---:|---:|")
