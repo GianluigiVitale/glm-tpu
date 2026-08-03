@@ -1,52 +1,53 @@
 # GLM-5.2 → TPU v4 — /goal RESUME
 
-SOLO, FULLY AUTONOMOUS. Finish **GLM-5.2-FP8** on TPU v4. DON'T STOP/ASK until (1) it serves correctly,
-(2) HF-card benchmarks within noise, (3) the **DSA sparse kernel** clears its gates (passkey ≥95%@128K
-n≥73; throughput ≥256K). **OWNER RULE: NO SHORTCUTS — root cause properly fixed + validated before any
-re-gate; no workaround gating.** Self-correct; when unsure pick + log.
+SOLO, FULLY AUTONOMOUS. Finish **GLM-5.2-FP8** on TPU v4 — and it DOES NOT SHIP at today's decode
+speed. **OWNER RULING 2026-08-03: the throughput null is REVOKED as an endpoint.** ~2.2 tok/s/seq
+single-stream decode (397-526 ms/step) on 32 chips is wrong-by-inspection; the measured causes are
+IN OUR STACK and must be ENGINEERED AWAY: (1) the TP-32 all-reduce floor — 232 launches ≈127 ms/step,
+common-mode, 64% of even the DENSE step; (2) sparse selection machinery ~94 ms/step (gathers 66 +
+top-k/sort 36) feeding an attend that costs 12.7 ms. **GOAL: cut the sparse decode step ≥2× (≤~200
+ms/step, ≥4.5 tok/s/seq single-stream; stretch ≥3×) with EXACT semantics (selected-set bitwise;
+re-gate smoke after each landed lever), and sparse must BEAT dense at 256K.** No workaround gating;
+root cause fixed + validated; honest nulls only after the levers are genuinely exhausted.
 
-## STATE (2026-07-24 13:15 UTC; RESEARCH_LOG 07-23 21:40 → 07-24 04:00)
-- ⭐ **ENGINE LOTTERY SOLVED + VALIDATED; docs/17 COMPLETE (incl. Phase J) — the record.** Streamer
-  delivers corrupt bytes ~0-3 tensors/host/launch in THREE flavors, all measured: **zero-fill**
-  (AUTO-REPAIRED — GLM_WK_OOB_DIR PWAL-time bitwise repair from the gcsfuse mirror; 5/5 in gval),
-  **NaN** + **finite-garbage** (REFUSED — NaN scans + GLM_STATE_HASH_REF golden manifest; garbage
-  specimen layers.1 banked 07-24 02:50). Stack = repair → refuse → relaunch; ZERO unverified serves
-  possible. Root-of-root (streamer/_free_cpu_storage ordering) = upstream-report material, NOT a blocker.
-- **GATE4 v3 RUNNING** (relaunched 13:10 UTC, ~/glm-run/gate128k_20260724T131056Z, n=77, PIN
-  dc0443a43, REF+OOB armed). Attempt-1 aborted INFRA (disk watchdog; 0 misses counted): 35G of
-  closed-hunt scratchpad debris on w-0 — cleaned (hosts 53-77G free), lesson logged. Attempt-1
-  depth 0.0 drew HEALTHY on try 3 (after 2 CORRECT refusals) — the stack works at gate geometry.
-- Fork tip **dc0443a43** synced 8× (sync_workers.sh MACHINE-VERIFIES 8×HEAD==origin + no index.lock).
-- Torchax: PWAL escapes need the PAIR `no_dispatch(), DisableTorchFunction()`; CPU tests must run
-  under torchax.default_env() (docs/17 §6(g)).
+## RESUME PROOF RULE (mandatory first ~30 min)
+Trust NOTHING from this file until DIRECTLY OBSERVED: (a) pgrep pod work BEFORE any action; (b) one
+health serve (bench_run health probe or 5K needle) proves the stack: manifest VERIFIED + repair
+armed + correct=True; (c) re-derive the step baseline from a fresh 20-step GLM_JAX_TRACE capture —
+the parser is scripts/analysis/parse_xplane.py; docs/artifacts/*BREAKDOWN* are the reference
+numbers. Claims without a fresh observation are hypotheses.
 
-## FRONTIER (in order)
-1. **GATE4 v3 to verdict** (~15-20 h from 13:10): PASS 77/77 ⇒ bank + backup_bundle.sh. ONE miss ⇒
-   extend n≈130; 2-miss abort ⇒ forensics FROM THE SPECIMEN (never rate experiments).
-   Refused/repaired engines are NORMAL (HEALTH_RETRIES=8/depth). If a depth STARVES on retries ⇒
-   land the banked MANIFEST-DRIVEN PWAL repair (verify the fused leaf vs /tmp/golden.json at PWAL,
-   repair from mirror on ANY mismatch) + short revalidation arm, then re-gate.
-2. **256K**: stage256k.sh (READY @ dc0443a43, REF+OOB armed) — dcp=8 bring-up → 32K sanity ×2 →
-   256K mechanism smoke → sparse-vs-dense throughput A/B at IDENTICAL dcp=8.
-3. **Benchmarks**: GSM8K n≥200 → AIME-2026 n=30 → GPQA-198@16K (owner-gated go).
-4. **MTP M2 unfreeze** (after gates). 5. Land ~/wt-sibling-alias; PR series re-cut; the STREAMER
-   upstream bug report. Post-gate cleanups: health-classifier VERIFIED count (require 8),
-   line-168 noise, wk-oob NaN-half repair ext.
+## THE CAMPAIGN (docs/19 levers → now the critical path; docs/18 ladder = design bank)
+1. **All-reduce floor** (~127 ms target, helps every config): fuse/reassociate the ~3/layer
+   reductions (78 layers); reduce-scatter+all-gather restructuring; combiner/threshold XLA flags
+   ladder (env-only first — cheapest A/B); count MUST drop from 232 — verify by trace.
+2. **Selection machinery** (~94 ms): fold the selected-KV gather into the dsa_sparse_decode Pallas
+   kernel (index-driven DMA — kills the 66 ms materialized gathers, sparse_mla_kernel.py:635);
+   fused partial top-2048 (replaces XLA top_k + full position-sort, 36 ms).
+3. Each lever: gated env + CPU-exact tests (bitwise selected-set; jaxpr gate-off identity) →
+   single-variable metal A/B with a fresh trace (before/after per-category table) → 128K smoke
+   (4 mechanism depths) before the next lever. Adversarial review before each land.
+BASELINES (fresh-verify per the proof rule): sparse 389.4 ms device / dense 269.3; all-reduce
+232/step both arms; per-category tables in docs/artifacts/.
 
-## HARD RULES
-COST: gs://driftbench-dsv4-uc only; NEVER create machines/TPUs; disk-attach pre-authorized. METHOD:
-observability-first; corpus-first re-read on domain shift; ONE VARIABLE AT A TIME; falsifiable wiring;
-honest nulls; small-n never a gate (n≥73; mechanism depths 0.0/0.05/0.95/1.0 REQUIRED). COMMIT+PUSH
-every step. Agents: worktrees, JAX_PLATFORMS=cpu. Serialize TPU. Owner submits PRs; no force-push.
+## STATE (2026-08-03; all in RESEARCH_LOG + results.db)
+DONE: engine-lottery solved+validated (repair→refuse→relaunch; docs/17); 128K sparse gate CLOSED
+77/77; 256K correctness 4/4; GSM8K 196/200=98.0%; AIME 19/19 completed-correct (32K retry was
+mid-run when the owner stopped pod work — 1 chunk committed); GPQA 83.9% completed-item (49-trunc
+retry PARKED); MTP M2 PARKED. Benchmarks resume AFTER the throughput campaign (same levers make
+them ~2× cheaper). E0 traces: both arms, 8 hosts × 15 steps, banked + parsed.
 
-## READ FIRST
-HANDOFF.md → docs/17 (§5, §6) → RESEARCH_LOG **07-23 21:40 onward** → the running gate's
-orchestrator.log. pgrep -f "gate_sparse128k[.]sh" BEFORE any pod action.
+## OBSERVABILITY (standing kit — USE it, docs/10 + suggestions.md doctrine)
+GLM_JAX_TRACE (in-worker decode tracing; flight-recorder decode rule request_distribution[0]==
+num_reqs); GLM_FLIGHT_RECORDER; parse_xplane.py; mount+manifest keepers (10 s self-heal, touch
+/tmp/golden*.json); protection stack GLM_STATE_HASH_REF + GLM_WK_OOB_DIR + GLM_WK_OOB_GOLDEN +
+NaN scans (NEVER disarmed on correctness runs); fingerprint pin GLM_EXPECT_CODE_HASH (tip
+94b746433); hardened sync_workers (machine-verified 8×).
 
-## LANDMINES
-THIS VM IS POD WORKER-0 (--worker=all git mutates the local checkout). pkill/pgrep -f SELF-MATCHES —
-bracket the pattern ("name[.]sh"). NEVER edit a script bash is executing. `ls -td` races outer-log
-FILES — use explicit run dirs. Dumps + SESSION SCRATCHPAD accumulate — purge closed-campaign scratch
-at campaign close (35G of it caused the attempt-1 abort); disk watchdog floors at 15G. Don't sync
-workers mid-arm. setsid --wait nohup </dev/null every driver; RAY_DEDUP_LOGS=0; GLM_* raylet AND
-driver. gcsfuse mounts drop on relaunch — orchestrators re-ensure them; manual launches must too.
+## HARD RULES + LANDMINES (unchanged, condensed)
+gs://driftbench-dsv4-uc only; NEVER create machines/TPUs. ONE VARIABLE AT A TIME; commit+push every
+step; agents in worktrees JAX_PLATFORMS=cpu; serialize TPU; owner submits PRs. WORKER-0 = this VM;
+bracket pkill patterns ("x[.]sh"); never edit a running script; setsid nohup </dev/null drivers;
+GLM_* raylet AND driver; chunked bench commits (--batch-size); ray stop lies — verify pgrep raylet
++ dashboards; /tmp ages out — keepers touch golden files; purge closed-campaign scratch; detached
+chains for pod pipelines (zero-gap); freeze-the-wrapper (SIGSTOP) defuses timeouts without loss.
