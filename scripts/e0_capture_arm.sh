@@ -20,7 +20,9 @@ TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR=$HOME/glm-run/$TAG
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
 HEALTH_PROOF_LOG="${HEALTH_PROOF_LOG:?set HEALTH_PROOF_LOG to a fresh protected 5K health log}"
-HEALTH_MAX_AGE_S="${HEALTH_MAX_AGE_S:-21600}"
+HEALTH_RAYLET_ENVS="${HEALTH_RAYLET_ENVS:?set HEALTH_RAYLET_ENVS to its 8-host exact env census}"
+HEALTH_RESULTS_DB="${HEALTH_RESULTS_DB:-$HOME/glm-tpu/bench/results.db}"
+HEALTH_MAX_AGE_S="${HEALTH_MAX_AGE_S:-1800}"
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-7200}"
 ALERT_FILE=$RUN_DIR/DISK_ALERT
 mkdir -p "$RUN_DIR"
@@ -63,7 +65,8 @@ has_8_unique_markers() {
 # The first census is strict: the launcher's reset is broad, so no Ray/vLLM,
 # known benchmark, ASPt process/container, or libtpu holder may exist anywhere.
 initial_pod_census() {
-  local label="${1:-initial}" out=$RUN_DIR/census_${label}.txt
+  local label="${1:-initial}"
+  local out=$RUN_DIR/census_${label}.txt
   # This is a literal remote program; expansion must happen on each worker.
   # shellcheck disable=SC2016
   local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[r]aylet|[g]lm_longctx[.]py|[d]sa_throughput[.]py|[r]un_bench[.]py|[g]ate_sparse128k[.]sh|[s]tage256k[.]sh|[b]ench_run[.]sh" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
@@ -77,7 +80,8 @@ initial_pod_census() {
 # Before a retry reset, still refuse if an ASPt-specific process/container has
 # appeared; also preserve a full process/lock census in the run bundle.
 retry_ownership_census() {
-  local try="$1" out=$RUN_DIR/census_retry_owner_t${try}.txt
+  local try="$1"
+  local out=$RUN_DIR/census_retry_owner_t${try}.txt
   # shellcheck disable=SC2016
   local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[r]aylet" 2>/dev/null || true); holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); bad=""; for p in $pids $holders; do env_file=/proc/$p/environ; if [ ! -r "$env_file" ] || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" || ! tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" || ! '"$RAYLET_ARM_CHECK"'; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "RETRY_OWNER_BAD $(hostname) bad_pids=$bad"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "RETRY_OWNER_OK $(hostname)"; [ -n "$pids" ] && ps -o pid,args -p $(echo "$pids" | tr "\n" " "); [ -n "$holders" ] && echo "libtpu holders: $holders"; fi'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
@@ -125,7 +129,7 @@ static_preflight() {
 verify_raylet_envs() {
   local out=$RUN_DIR/raylet_env_t${1}.txt
   # shellcheck disable=SC2016
-  local cmd='P=$(pgrep -x raylet | head -1); env_file=/tmp/e0_raylet_env_check_$$; [ -n "$P" ] && tr "\0" "\n" < "/proc/$P/environ" > "$env_file" && grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" "$env_file" && grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" "$env_file" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$env_file" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$env_file" && grep -qx "GLM_DCP=8" "$env_file" && '"$RAYLET_ARM_CHECK"' && echo "RAYLET_ENV_OK $(hostname)"; rc=$?; rm -f "$env_file"; exit "$rc"'
+  local cmd='P=$(pgrep -x raylet | head -1); env_file=/tmp/e0_raylet_env_check_$$; [ -n "$P" ] && tr "\0" "\n" < "/proc/$P/environ" > "$env_file" && grep -qx "GLM_JAX_TRACE_STEPS='"$TRACE_STEPS"'" "$env_file" && grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" "$env_file" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$env_file" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$env_file" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$env_file" && grep -qx "GLM_DCP=8" "$env_file" && '"$RAYLET_ARM_CHECK"' && echo "RAYLET_ENV_OK $(hostname)"; rc=$?; rm -f "$env_file"; exit "$rc"'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || true
   tee -a "$RUN_DIR/orchestrator.log" < "$out"
@@ -179,23 +183,86 @@ fi
 say "mandatory zero-work pod census before any launch action"
 initial_pod_census || { say "ABORT: shared-pod collision or incomplete census"; exit 1; }
 static_preflight || exit 1
-HEALTH_NOW=$(date +%s)
-HEALTH_MTIME=$(stat -c %Y "$HEALTH_PROOF_LOG" 2>/dev/null || echo 0)
-HEALTH_AGE=$((HEALTH_NOW - HEALTH_MTIME))
-if [ ! -r "$HEALTH_PROOF_LOG" ] || [ "$HEALTH_AGE" -lt 0 ] ||
-    [ "$HEALTH_AGE" -gt "$HEALTH_MAX_AGE_S" ] ||
+if [ ! -r "$HEALTH_PROOF_LOG" ] || [ ! -r "$HEALTH_RAYLET_ENVS" ] ||
+    ! has_8_unique_markers "$HEALTH_RAYLET_ENVS" HEALTH_ENV_OK ||
+    [ "$(grep -Ec "^HEALTH_ENV_OK [^ ]+ GLM_WK_OOB_DIR=$OOB_DIR GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH=$PIN GLM_DCP=4 GLM_DSA_MODE=pallas_decode$" "$HEALTH_RAYLET_ENVS" || true)" -ne 8 ] ||
     ! grep -q "GLM_CODE_FINGERPRINT: git=$PIN.*dirty=0.*GLM_WK_OOB_DIR.*GLM_WK_OOB_GOLDEN" "$HEALTH_PROOF_LOG" ||
     ! grep -q 'manifest VERIFIED.*repeated 7x across cluster' "$HEALTH_PROOF_LOG" ||
     ! grep -q '\[longctx\] L=5000 .*correct=True' "$HEALTH_PROOF_LOG"; then
-  say "ABORT: health proof is stale/wrong-pin or lacks 8-host VERIFIED + repair-armed + 5K correct=True"
+  say "ABORT: health proof lacks exact 8-host repair envs + pinned VERIFIED + 5K correct=True"
+  exit 1
+fi
+HEALTH_LINK=$RUN_DIR/health_link.json
+if ! "$HOME/vllm-env/bin/python" - "$HEALTH_RESULTS_DB" "$HEALTH_PROOF_LOG" \
+    "$HEALTH_LINK" "$PIN" "$OOB_DIR" "$HEALTH_MAX_AGE_S" <<'PY'
+import datetime
+import json
+import pathlib
+import re
+import sqlite3
+import sys
+
+db, log_path, out, pin, oob, max_age = sys.argv[1:]
+text = pathlib.Path(log_path).read_text(errors="replace")
+run_ids = {int(value) for value in re.findall(r"\[longctx\] run_id=(\d+)", text)}
+assert len(run_ids) == 1, run_ids
+run_id = next(iter(run_ids))
+conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+conn.row_factory = sqlite3.Row
+row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+assert row is not None
+run = dict(row)
+env = json.loads(run["env_json"])
+created = datetime.datetime.fromisoformat(run["created_utc"]).timestamp()
+age = datetime.datetime.now(datetime.timezone.utc).timestamp() - created
+assert 0 <= age <= int(max_age), (age, max_age)
+assert run["fork_git"] == pin
+assert env["attention_path"] == "dsa-sparse:pallas_decode"
+assert env["lengths"] == [5000] and env["depths"] == [0.5] and env["trials"] == 1
+os_env = env["os_env"]
+expected = {
+    "GLM_WK_OOB_DIR": oob,
+    "GLM_WK_OOB_GOLDEN": "/tmp/golden.json",
+    "GLM_STATE_HASH_REF": "/tmp/golden.json",
+    "GLM_EXPECT_CODE_HASH": pin,
+    "GLM_DCP": "4",
+    "GLM_DSA_MODE": "pallas_decode",
+}
+assert {key: os_env.get(key) for key in expected} == expected
+items = [dict(item) for item in conn.execute(
+    "SELECT benchmark,item_id,correct,n_prompt_tokens,n_gen_tokens "
+    "FROM items WHERE run_id = ?", (run_id,)
+)]
+assert items == [{
+    "benchmark": "passkey_L5000_d0.5", "item_id": "t0", "correct": 1,
+    "n_prompt_tokens": 4977, "n_gen_tokens": 20,
+}], items
+summary = [dict(item) for item in conn.execute(
+    "SELECT benchmark,n,metric,value FROM summary WHERE run_id = ? ORDER BY benchmark",
+    (run_id,)
+)]
+assert summary == [
+    {"benchmark": "longctx_passkey", "n": 0, "metric": "acc", "value": 100.0},
+    {"benchmark": "passkey_L5000_d0.5", "n": 1, "metric": "acc", "value": 100.0},
+], summary
+conn.close()
+with open(out, "w") as f:
+    json.dump({"age_s": age, "run": run, "env": env,
+               "items": items, "summary": summary}, f, indent=2)
+print("HEALTH_LINK_VALID", run_id, f"age_s={age:.1f}")
+PY
+then
+  say "ABORT: embedded health run is stale, wrong-pin/config, or not exact 5K success"
   exit 1
 fi
 if ! cp "$HEALTH_PROOF_LOG" "$RUN_DIR/health_proof.log" ||
-    ! sha256sum "$RUN_DIR/health_proof.log" > "$RUN_DIR/health_proof.sha256"; then
+    ! cp "$HEALTH_RAYLET_ENVS" "$RUN_DIR/health_raylet_envs.txt" ||
+    ! sha256sum "$RUN_DIR/health_proof.log" "$RUN_DIR/health_raylet_envs.txt" \
+      > "$RUN_DIR/health_proof.sha256"; then
   say "ABORT: could not stage health proof"
   exit 1
 fi
-say "health proof attached: age=${HEALTH_AGE}s pin=$PIN repair armed, 8-host manifest VERIFIED, 5K correct=True"
+say "health proof attached: embedded run <=${HEALTH_MAX_AGE_S}s pin=$PIN exact repair envs, 8-host manifest VERIFIED, 5K correct=True"
 
 ALERT_FILE="$ALERT_FILE" INTERVAL_S=120 setsid nohup \
   bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" watch </dev/null \
@@ -424,9 +491,16 @@ items = [dict(r) for r in src.execute(
     "SELECT id,run_id,benchmark,item_id,n_prompt_tokens,n_gen_tokens,latency_ms,finish_reason "
     "FROM items WHERE run_id = ? ORDER BY id", (run["run_id"],)
 )]
-assert any(r["benchmark"] == "dsa_throughput_ctx262144" for r in summary)
-assert any(r["benchmark"] == "dsa_throughput" for r in summary)
-assert items and all(r["n_gen_tokens"] == 256 for r in items), items
+assert len(summary) == 2, summary
+by_benchmark = {r["benchmark"]: r for r in summary}
+assert set(by_benchmark) == {"dsa_throughput", "dsa_throughput_ctx262144"}
+assert by_benchmark["dsa_throughput_ctx262144"]["metric"] == "decode_tok_s"
+assert by_benchmark["dsa_throughput_ctx262144"]["value"] > 0
+assert len(items) == 1, items
+item = items[0]
+assert item["benchmark"] == "dsa_throughput_ctx262144"
+assert item["item_id"] == "seq0" and item["n_prompt_tokens"] == 262144
+assert item["n_gen_tokens"] == 256, item
 
 dst = sqlite3.connect(snapshot)
 src.backup(dst)
