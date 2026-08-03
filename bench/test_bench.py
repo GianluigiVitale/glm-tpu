@@ -773,6 +773,7 @@ def test_warn_worker_only_envs_classification():
         assert eng.warn_worker_only_envs() == []
         assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" in eng._WORKER_SIDE_OBS_ENVS
         assert "GLM_WRITE_PROBE" in eng._WORKER_SIDE_OBS_ENVS
+        assert "GLM_DECODE_LIVE_ROWS_PSUM" in eng._WORKER_SIDE_OBS_ENVS
         assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" not in eng._VALUE_CARRYING_OBS_ENVS
         assert "GLM_WRITE_PROBE" not in eng._VALUE_CARRYING_OBS_ENVS
         # boolean-gated: explicit-off never warns, armed warns

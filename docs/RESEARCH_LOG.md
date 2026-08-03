@@ -4248,3 +4248,29 @@ caveat (greedy, 16K, no thinking budget, no sampling/consensus). Truncation-retr
 49 ids @ 32K (banked to scratchpad), fit-limited to 4 seqs x 40K (pool ~79/80 blocks at dcp=4) ≈
 ~39h — QUEUED BEHIND MTP M2 (hours, pod) so Stage-3's remaining item lands sooner. AIME 32K retry
 running now (11 ids, ETA ~16:30). Goal-2 final numbers land after the GPQA retry (~08-04).
+
+## 2026-08-03 10:01 — FRESH 256K E0 REPRODUCES THE FLOOR: 390.95 ms device step (2.56 tok/s), 184.08 ms collectives / 131.47 ms all-reduce; first exact lever built but NOT YET metal-accepted
+
+Fresh protected capture at fork `94b746433` / harness `feeb4d1`, sparse dcp=8, 256K, one
+sequence: 8 hosts, 64 cores, exactly 20 selected decode steps/core, durably archived at
+`gs://driftbench-dsv4-uc/results/e0cap_sparse_20260803T083052607714673Z`. Device step is
+390.95 ms (382.66-398.54), reproducing the 07-31 result: collectives 184.08 ms (47.5% busy),
+all-reduce 131.47 ms / 232 launches; gathers 66.10 ms; MoE GMM 46.46 ms; sort/top-k 35.60 ms;
+sparse attend only 12.65 ms. The throughput JSON's 1.079 tok/s is NOT a clean decode-rate datum:
+its wall interval includes the multi-host profiler-arm pause; the trace device rate is 2.56 tok/s
+and post-capture serving logs report 2.5 tok/s.
+
+Reverse source/shape mapping of all 232 reductions found the actionable payload mismatch: the
+decode executable carries a 32-row token bucket although `max_num_seqs=1`. The dominant hidden
+reductions are bf16 `[32,6144]`: attention o-projection plus shared/dense down-projections, and the
+routed-expert EP GMM output. A default-off `GLM_DECODE_LIVE_ROWS_PSUM` candidate now keeps all
+matmul/GMM work unchanged but, only on a dynamically proven pure-decode step and pure attention-DP
+geometry, reduces the trace-static live request prefix and zero-restores the dead suffix. The
+implementation explicitly covers BOTH operands of the historical shared+routed tuple and the
+actual served EP path (the first draft missed routed EP; adversarial review caught it before metal).
+CPU: focused suite 10/10, env suite 17/17, glm worker-env warning 1/1; forced 32-device CPU proxies
+pass for both the real MLP_TENSOR tuple axis and EXPERT-axis routed reduction, with live-row bitwise
+identity. NOT ACCEPTED YET: changing collective shape/fusion can change TPU reduction association
+or split the historical tuple. Required next evidence is gate-off/on metal selected-set+token
+bitwise equality on live rows, followed by a trace proving executed `[1,6144]` payloads without a
+launch-count regression. No speedup is claimed before those gates.
