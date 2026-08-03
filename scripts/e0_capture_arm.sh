@@ -237,8 +237,16 @@ assert row is not None
 run = dict(row)
 env = json.loads(run["env_json"])
 created = datetime.datetime.fromisoformat(run["created_utc"]).timestamp()
-age = datetime.datetime.now(datetime.timezone.utc).timestamp() - created
-assert 0 <= age <= int(max_age), (age, max_age)
+now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+created_age = now - created
+# Run creation precedes model streaming and compilation, which can exceed the
+# proof-freshness window on a cold 64-chip draw.  Freshness starts when the
+# successful driver finishes writing its proof log, not when it opens the DB
+# row before compilation.
+proof_age = now - pathlib.Path(log_path).stat().st_mtime
+assert created_age >= 0, created_age
+assert 0 <= proof_age <= int(max_age), (proof_age, max_age)
+assert "DRIVER_EXIT=0" in text
 assert run["fork_git"] == pin
 tag_match = re.fullmatch(r"resume health proof \((resume_health_[0-9TZ]+)\)", run["note"])
 assert tag_match, run["note"]
@@ -289,9 +297,11 @@ assert summary == [
 ], summary
 conn.close()
 with open(out, "w") as f:
-    json.dump({"age_s": age, "health_tag": tag, "run": run, "env": env,
+    json.dump({"age_s": proof_age, "run_created_age_s": created_age,
+               "health_tag": tag, "run": run, "env": env,
                "items": items, "summary": summary}, f, indent=2)
-print("HEALTH_LINK_VALID", run_id, f"age_s={age:.1f}")
+print("HEALTH_LINK_VALID", run_id, f"age_s={proof_age:.1f}",
+      f"run_created_age_s={created_age:.1f}")
 PY
 then
   say "ABORT: embedded health run is stale, wrong-pin/config, or not exact 5K success"
