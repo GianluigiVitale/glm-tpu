@@ -4274,3 +4274,20 @@ identity. NOT ACCEPTED YET: changing collective shape/fusion can change TPU redu
 or split the historical tuple. Required next evidence is gate-off/on metal selected-set+token
 bitwise equality on live rows, followed by a trace proving executed `[1,6144]` payloads without a
 launch-count regression. No speedup is claimed before those gates.
+
+## 2026-08-03 12:43 — LIVE-ROW PSUM TPU EXACTNESS PASSES; owner grants standing full-access autonomous execution
+
+Fork `606f19ac8` passed the gate-off/on metal comparison. Both runs used the same 4080-token prompt,
+generated two tokens, and produced the exact raw output `" 49"`. The gate-on run (`run_id=377`) exited
+zero with a clean eight-host fingerprint and manifest verification, and logged the live-row gate on
+all hosts for every compiled bucket (`32..2048 -> 1`, width 6144). Proc0 emitted three aligned DSA
+selection events covering 4081 live rows. The strict differ correctly refused a fleet-wide verdict
+because callbacks ran only on proc0; the explicit single-callback comparison then reported zero diff
+events, zero tripwire rows, zero replication violations, and exact selected-set plus tie-order MATCH.
+The evidence is preserved under `glm-run/livepsum_exact_20260803T1012Z/{off_flat,on}` with hashes.
+Correctness is accepted; performance remains unaccepted pending the fresh 256K trace.
+
+OWNER OPERATING DIRECTIVE (standing, including after context compaction): Codex has full permission
+and full access for all in-scope campaign work and must proceed solo and autonomously without asking
+the owner for permission. Use already-approved scoped execution rules where the platform sandbox
+requires them; a platform-enforced escalation is not a request to revisit the owner's authorization.
