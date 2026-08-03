@@ -4310,3 +4310,31 @@ the explicit no-launch-regression gate FAILS. Keep the lever default-off and do 
 smoke on it alone. Immediate corrective candidate is the default-off routed/shared MoE psum fusion;
 its stacked trace must remove the 75 split launches before correctness-smoke acceptance. Validator
 tests are 10/10 and the pod was clean on all eight hosts after the capture session was stopped.
+
+## 2026-08-03 19:51 — CORRECTIVE MOE PSUM FUSION PASSES METAL EXACTNESS: 4,081 live selection rows and raw tokens identical; health + 256K trace next
+
+Fork `83915fe74` adds default-off `GLM_MOE_PSUM_FUSION`, stacking on live-row psums and packing the
+shared and routed MoE outputs into one reduction before splitting them at their historical
+scale/add points. The protected A/B under
+`glm-run/moepsum_exact_20260803T163357Z` completed with exact pin/env/manifest/write-probe guards,
+clean eight-host ownership and cleanup, and successful compilation of every backbone bucket
+(`32..2048`) on all hosts. Gate-off run 380 and gate-on run 381 used the same 4,080-token prompt and
+both generated exactly two tokens with raw output `" 49"`.
+
+The DSA differ compared three aligned events spanning 4,081 live rows: zero diff events, zero
+tripwire rows, zero replication violations, zero pad-row diffs; selected expert set AND tie order
+MATCH. `token_exactness.json`, all six event dumps, the differ verdict, and their SHA-256 evidence
+manifest validate cleanly; `SUCCESS` is present. This accepts semantic correctness but does NOT yet
+claim performance. The source-backed physical-count hypothesis is 466 -> 391 reductions/step by
+removing the 75 split routed launches (back to, not yet below, the original baseline count). Required
+next gates are protected health proof, then a fresh 256K trace and physical HLO-count adjudication.
+
+NEXT STRUCTURAL LEVER (durably pre-reviewed, do not confuse with the current fusion): pure-decode
+DCP attention still performs owned-segment compaction, selected-KV gathers and Pallas attention on
+the full 32-row token bucket although production has one static request slot. A default-off path can
+retain the full-shape owner scatter/cache write, narrow q/selection/block-table work to the static
+`num_seqs` prefix, perform gather/attention/DCP combine on that prefix, then zero-pad before o-proj.
+This targets the measured 66.58 ms gather + part of 35.66 ms sort + 12.65 ms attend payload. Keep the
+scorer/select full-shape initially to preserve selected sets by construction. Existing staggered
+CPU tests (`NUM_SEQS=3`, one/two live rows, token bucket four) are the correct parity/cache gate;
+production `max_num_seqs=1` makes the expected compiled narrowing 32 -> 1.
