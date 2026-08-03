@@ -774,19 +774,24 @@ def test_warn_worker_only_envs_classification():
         assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" in eng._WORKER_SIDE_OBS_ENVS
         assert "GLM_WRITE_PROBE" in eng._WORKER_SIDE_OBS_ENVS
         assert "GLM_DECODE_LIVE_ROWS_PSUM" in eng._WORKER_SIDE_OBS_ENVS
+        assert "GLM_MOE_PSUM_FUSION" in eng._WORKER_SIDE_OBS_ENVS
         assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" not in eng._VALUE_CARRYING_OBS_ENVS
         assert "GLM_WRITE_PROBE" not in eng._VALUE_CARRYING_OBS_ENVS
         # boolean-gated: explicit-off never warns, armed warns
         os.environ["GLM_WRITE_PROBE"] = "0"
         os.environ["GLM_DSA_DCP_HEADSPLIT_UNSAFE"] = "false"
+        os.environ["GLM_MOE_PSUM_FUSION"] = "0"
         assert eng.warn_worker_only_envs() == []
         os.environ["GLM_WRITE_PROBE"] = "1"
         os.environ["GLM_DSA_DCP_HEADSPLIT_UNSAFE"] = "1"
+        os.environ["GLM_MOE_PSUM_FUSION"] = "1"
         flagged = eng.warn_worker_only_envs()
         assert "GLM_WRITE_PROBE" in flagged
         assert "GLM_DSA_DCP_HEADSPLIT_UNSAFE" in flagged
+        assert "GLM_MOE_PSUM_FUSION" in flagged
         # value-carrying: ANY non-empty value warns, including "0"
-        for k in ("GLM_WRITE_PROBE", "GLM_DSA_DCP_HEADSPLIT_UNSAFE"):
+        for k in ("GLM_WRITE_PROBE", "GLM_DSA_DCP_HEADSPLIT_UNSAFE",
+                  "GLM_MOE_PSUM_FUSION"):
             del os.environ[k]
         os.environ["GLM_DCP_CACHE_DUMP"] = "0"
         assert "GLM_DCP_CACHE_DUMP" in eng.warn_worker_only_envs()

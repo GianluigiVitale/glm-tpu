@@ -15,6 +15,7 @@ ZONE=us-central2-b
 POD=db-v4-64-od
 PIN="${E0_PIN:-94b746433}"
 LIVE_ROWS_PSUM="${E0_LIVE_ROWS_PSUM:-0}"
+MOE_PSUM_FUSION="${E0_MOE_PSUM_FUSION:-0}"
 TRACE_STEPS=20
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%S%NZ)
@@ -29,7 +30,16 @@ case "$LIVE_ROWS_PSUM" in
   0|1) ;;
   *) echo "E0_LIVE_ROWS_PSUM must be 0 or 1" >&2; exit 2 ;;
 esac
-EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM"
+case "$MOE_PSUM_FUSION" in
+  0|1) ;;
+  *) echo "E0_MOE_PSUM_FUSION must be 0 or 1" >&2; exit 2 ;;
+esac
+if [ "$MOE_PSUM_FUSION" = 1 ] &&
+    { [ "$ARM" != sparse ] || [ "$LIVE_ROWS_PSUM" != 1 ]; }; then
+  echo "E0_MOE_PSUM_FUSION=1 is validated only for sparse + E0_LIVE_ROWS_PSUM=1" >&2
+  exit 2
+fi
+EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM GLM_MOE_PSUM_FUSION=$MOE_PSUM_FUSION"
 # Exact PID matcher used by this installed Ray CLI's `ray stop`: import its
 # live RAY_PROCESSES corpus and apply the same name-vs-cmdline semantics. The
 # enumerator excludes itself/ancestors and the nonce-marked local gcloud
@@ -66,7 +76,7 @@ RENV="$RENV $EXPERIMENT_ENV"
 DEXTRA="$DEXTRA $EXPERIMENT_ENV"
 # Expanded only after injection into the remote command.
 # shellcheck disable=SC2016
-RAYLET_EXPERIMENT_CHECK='grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$env_file"'
+RAYLET_EXPERIMENT_CHECK='grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$env_file" && grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'" "$env_file"'
 DRIVER="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -160,11 +170,12 @@ verify_raylet_envs() {
 
 validate_analysis() {
   "$HOME/vllm-env/bin/python" - "$1" "$ARM" "$LIVE_ROWS_PSUM" \
+    "$MOE_PSUM_FUSION" \
     "$HOME/glm-tpu/scripts/analysis" <<'PY'
 import json
 import sys
 
-path, arm, live_rows, parser_dir = sys.argv[1:]
+path, arm, live_rows, moe_fusion, parser_dir = sys.argv[1:]
 sys.path.insert(0, parser_dir)
 import parse_xplane
 
@@ -172,7 +183,7 @@ with open(path) as f:
     d = json.load(f)
 if arm == "sparse" and live_rows == "1":
     expected_named_all_reduce = 157
-    expected_hlo_all_reduce = 466
+    expected_hlo_all_reduce = 391 if moe_fusion == "1" else 466
 else:
     expected_named_all_reduce = 232
     expected_hlo_all_reduce = 391 if arm == "sparse" else None
@@ -192,8 +203,9 @@ PY
 
 mkdir -p "$RUN_DIR"
 if ! {
-  printf 'tag=%s\narm=%s\npin=%s\nlive_rows_psum=%s\ntrace_steps=%s\noob_dir=%s\ngcs_run=%s\n' \
-    "$TAG" "$ARM" "$PIN" "$LIVE_ROWS_PSUM" "$TRACE_STEPS" "$OOB_DIR" "$GCS_RUN"
+  printf 'tag=%s\narm=%s\npin=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ntrace_steps=%s\noob_dir=%s\ngcs_run=%s\n' \
+    "$TAG" "$ARM" "$PIN" "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" \
+    "$TRACE_STEPS" "$OOB_DIR" "$GCS_RUN"
   printf 'raylet_envs=%s %s GLM_JAX_TRACE_DIR=<per-try-nonce> %s\ndriver_envs=%s\n' \
     "$RENV" "$TRC_BASE" "$LIBTPU" "$DRIVER"
   printf 'glm_tpu_head=%s\nglm_tpu_dirty=%s\ntpu_inference_head=%s\ntpu_inference_dirty=%s\n' \
@@ -226,7 +238,7 @@ HEALTH_LINK=$RUN_DIR/health_link.json
 if ! "$HOME/vllm-env/bin/python" - "$HEALTH_RESULTS_DB" "$HEALTH_PROOF_LOG" \
     "$HEALTH_RAYLET_ENVS" \
     "$HEALTH_LINK" "$PIN" "$OOB_DIR" "$HEALTH_MAX_AGE_S" \
-    "$LIVE_ROWS_PSUM" <<'PY'
+    "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" <<'PY'
 import datetime
 import json
 import pathlib
@@ -234,7 +246,7 @@ import re
 import sqlite3
 import sys
 
-db, log_path, raylet_path, out, pin, oob, max_age, live_rows = sys.argv[1:]
+db, log_path, raylet_path, out, pin, oob, max_age, live_rows, moe_fusion = sys.argv[1:]
 text = pathlib.Path(log_path).read_text(errors="replace")
 run_ids = {int(value) for value in re.findall(r"\[longctx\] run_id=(\d+)", text)}
 assert len(run_ids) == 1, run_ids
@@ -272,6 +284,7 @@ expected = {
     "GLM_DCP": "4",
     "GLM_DSA_MODE": "pallas_decode",
     "GLM_DECODE_LIVE_ROWS_PSUM": live_rows,
+    "GLM_MOE_PSUM_FUSION": moe_fusion,
 }
 assert {key: os_env.get(key) for key in expected} == expected
 raylet_lines = [line for line in pathlib.Path(raylet_path).read_text().splitlines()
@@ -282,7 +295,8 @@ suffix = (f"GLM_HEALTH_TAG={tag} GLM_WK_OOB_DIR={oob} "
           "GLM_WK_OOB_GOLDEN=/tmp/golden.json "
           "GLM_STATE_HASH_REF=/tmp/golden.json "
           f"GLM_EXPECT_CODE_HASH={pin} GLM_DCP=4 GLM_DSA_MODE=pallas_decode "
-          f"GLM_DECODE_LIVE_ROWS_PSUM={live_rows}")
+          f"GLM_DECODE_LIVE_ROWS_PSUM={live_rows} "
+          f"GLM_MOE_PSUM_FUSION={moe_fusion}")
 for line in raylet_lines:
     _, host, values = line.split(maxsplit=2)
     assert values == suffix, (values, suffix)
@@ -525,13 +539,14 @@ PY
     if ! "$HOME/vllm-env/bin/python" - \
       "$HOME/glm-tpu/bench/results.db" "$RUN_DIR/results_ckpt.db" \
       "$RUN_LINK" "$TAG" "$ARM" "$PIN" "$HARNESS_SHORT" \
-      "$TRACE_REMOTE" "$TRY_START_EPOCH" "$try" "$LIVE_ROWS_PSUM" <<'PY'
+      "$TRACE_REMOTE" "$TRY_START_EPOCH" "$try" "$LIVE_ROWS_PSUM" \
+      "$MOE_PSUM_FUSION" <<'PY'
 import datetime
 import json
 import sqlite3
 import sys
 
-db, snapshot, out, tag, arm, pin, harness, trace_dir, started, attempt, live_rows = sys.argv[1:]
+db, snapshot, out, tag, arm, pin, harness, trace_dir, started, attempt, live_rows, moe_fusion = sys.argv[1:]
 src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 src.row_factory = sqlite3.Row
 rows = src.execute(
@@ -552,6 +567,7 @@ assert os_env["GLM_JAX_TRACE_DIR"] == trace_dir
 assert os_env["GLM_JAX_TRACE_STEPS"] == "20"
 assert os_env["GLM_EXPECT_CODE_HASH"] == pin
 assert os_env["GLM_DECODE_LIVE_ROWS_PSUM"] == live_rows
+assert os_env["GLM_MOE_PSUM_FUSION"] == moe_fusion
 created = datetime.datetime.fromisoformat(run["created_utc"]).timestamp()
 assert created >= float(started) - 5, (created, started)
 summary = [dict(r) for r in src.execute(
