@@ -31,11 +31,10 @@ BASELINES (fresh-verify per the proof rule): sparse 389.4 ms device / dense 269.
 232/step both arms; per-category tables in docs/artifacts/.
 
 ## STATE (2026-08-03; all in RESEARCH_LOG + results.db)
-DONE: engine-lottery solved+validated (repair→refuse→relaunch; docs/17); 128K sparse gate CLOSED
-77/77; 256K correctness 4/4; GSM8K 196/200=98.0%; AIME 19/19 completed-correct (32K retry was
-mid-run when the owner stopped pod work — 1 chunk committed); GPQA 83.9% completed-item (49-trunc
-retry PARKED); MTP M2 PARKED. Benchmarks resume AFTER the throughput campaign (same levers make
-them ~2× cheaper). E0 traces: both arms, 8 hosts × 15 steps, banked + parsed.
+DONE: engine-lottery solved+validated (docs/17); 128K gate CLOSED 77/77; 256K correctness 4/4;
+GSM8K 98.0%; AIME 19/19 completed-correct (32K retry stopped mid-run, 1 chunk committed); GPQA
+83.9% completed-item (49-trunc retry PARKED); MTP M2 PARKED. Benchmarks resume AFTER the campaign
+(the levers make them ~2× cheaper). E0 traces both arms banked + parsed.
 
 ## OBSERVABILITY (standing kit — USE it, docs/10 + suggestions.md doctrine)
 GLM_JAX_TRACE (in-worker decode tracing; flight-recorder decode rule request_distribution[0]==
