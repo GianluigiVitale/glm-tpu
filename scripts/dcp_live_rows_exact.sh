@@ -131,7 +131,8 @@ owned_aux_agent() {
   name=$(cat "/proc/$p/comm" 2>/dev/null) || return 1
   arg0=$(tr "\0" "\n" < "/proc/$p/cmdline" 2>/dev/null | head -n 1) || return 1
   if ! { [ "$name" = "ray::DashboardA" ] && [ "$arg0" = "ray::DashboardAgent" ]; } &&
-     ! { [ "$name" = "ray::RuntimeEnv" ] && [ "$arg0" = "ray::RuntimeEnvAgent" ]; }; then
+     ! { [ "$name" = "ray::RuntimeEnv" ] && [ "$arg0" = "ray::RuntimeEnvAgent" ]; } &&
+     ! { [ "$name" = "ray::RayWorkerW" ] && [ "$arg0" = "ray::RayWorkerWrapper" ]; }; then
     return 1
   fi
   pp=$(grep "^PPid:" "/proc/$p/status" 2>/dev/null | tr -dc "0-9") || return 1

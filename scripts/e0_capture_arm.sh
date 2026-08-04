@@ -142,15 +142,17 @@ owned_env() {
     tr "\0" "\n" < "$env_file" | grep -qx "GLM_JAX_TRACE_DIR='"$TRACE_REMOTE"'" &&
     '"$RAYLET_ARM_CHECK"' && '"$RAYLET_EXPERIMENT_CHECK"'
 }
-# Ray strips the job env from these two title-rewritten helpers. Admit only
-# their exact Linux comm/argv pair and only through a direct exact-owned
-# raylet parent; every other env-less process remains foreign.
+# Ray strips the job env from title-rewritten helpers and can leave an idle
+# RayWorkerWrapper alive briefly after the driver exits. Admit only their
+# exact Linux comm/argv pair and only through a direct exact-owned raylet
+# parent; every other env-less process remains foreign.
 owned_aux_agent() {
   local p="$1" name arg0 pp
   name=$(cat "/proc/$p/comm" 2>/dev/null) || return 1
   arg0=$(tr "\0" "\n" < "/proc/$p/cmdline" 2>/dev/null | head -n 1) || return 1
   if ! { [ "$name" = "ray::DashboardA" ] && [ "$arg0" = "ray::DashboardAgent" ]; } &&
-     ! { [ "$name" = "ray::RuntimeEnv" ] && [ "$arg0" = "ray::RuntimeEnvAgent" ]; }; then
+     ! { [ "$name" = "ray::RuntimeEnv" ] && [ "$arg0" = "ray::RuntimeEnvAgent" ]; } &&
+     ! { [ "$name" = "ray::RayWorkerW" ] && [ "$arg0" = "ray::RayWorkerWrapper" ]; }; then
     return 1
   fi
   pp=$(grep "^PPid:" "/proc/$p/status" 2>/dev/null | tr -dc "0-9") || return 1
