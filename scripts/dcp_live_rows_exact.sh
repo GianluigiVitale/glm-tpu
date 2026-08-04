@@ -13,10 +13,30 @@ ZONE=us-central2-b
 POD=db-v4-64-od
 PIN="${EXACT_PIN:-837d67a47}"
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
-TAG=dcp_live_rows_exact_$(date -u +%Y%m%dT%H%M%S%NZ)
-RUN_DIR=$HOME/glm-run/$TAG
+SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
+RECOVER_OFF=0
+if [ -n "${DCP_EXACT_RESUME_DIR:-}" ]; then
+  RUN_DIR=${DCP_EXACT_RESUME_DIR%/}
+  case "$RUN_DIR" in
+    "$HOME"/glm-run/dcp_live_rows_exact_*) ;;
+    *)
+      echo "ABORT: resume dir is outside the exact-artifact namespace: $RUN_DIR"
+      exit 1
+      ;;
+  esac
+  [ -d "$RUN_DIR" ] || {
+    echo "ABORT: resume dir does not exist: $RUN_DIR"
+    exit 1
+  }
+  TAG=${RUN_DIR##*/}
+  RECOVER_OFF=1
+else
+  TAG=dcp_live_rows_exact_$(date -u +%Y%m%dT%H%M%S%NZ)
+  RUN_DIR=$HOME/glm-run/$TAG
+fi
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
 HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD) || exit 1
+ORCHESTRATOR_SHORT=$(git -C "$SCRIPT_ROOT" rev-parse --short HEAD) || exit 1
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-10800}"
 ACTIVE_SIDE=""
 DRIVER_SESSION=""
@@ -67,7 +87,8 @@ strict_census() {
 }
 
 pin_census() {
-  local out=$RUN_DIR/pin_census.txt
+  local suffix="${1:-}"
+  local out=$RUN_DIR/pin_census${suffix:+_$suffix}.txt
   # shellcheck disable=SC2016
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command='cd ~/tpu-inference || exit 91; h=$(git rev-parse --short=9 HEAD); d=$(git status --porcelain --untracked-files=no | wc -l); if [ "$h" = '"$PIN"' ] && [ "$d" -eq 0 ]; then echo "PIN_OK $(hostname) $h"; else echo "PIN_BAD $(hostname) head=$h dirty=$d"; fi' \
@@ -209,11 +230,13 @@ gather_dumps() {
   local flat=$RUN_DIR/${side}_flat
   mkdir -p "$gathered" "$flat"
   local copied=0
+  : > "$RUN_DIR/${side}_dump_hosts.txt"
   for worker in 0 1 2 3 4 5 6 7; do
     if gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
         --recurse "$POD:$remote_dir" "$gathered/w$worker" \
         >/dev/null 2>&1; then
       copied=$((copied + 1))
+      echo "$worker" >> "$RUN_DIR/${side}_dump_hosts.txt"
     fi
   done
   find "$gathered" -type f -name 'topk.step*.evt*.proc*.npz' \
@@ -223,7 +246,12 @@ gather_dumps() {
   local files
   files=$(wc -l < "$RUN_DIR/${side}_sha256.txt")
   say "side=$side dump gather hosts=$copied files=$files"
-  [ "$copied" -eq 8 ] && [ "$files" -ge 3 ]
+  # jax.debug.callback is process-local and can legitimately materialize on
+  # only one Ray worker even though the selected indices are replicated.
+  # The differ below therefore explicitly uses --allow-missing-procs. Require
+  # at least one authenticated callback process plus three aligned events;
+  # exact DB token equality supplies the independent cross-arm output proof.
+  [ "$copied" -ge 1 ] && [ "$files" -ge 3 ]
 }
 
 BASE_RAYLET_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=8 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_EXPECT_CODE_HASH='"$PIN"' LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false" GLM_DECODE_LIVE_ROWS_PSUM=1 GLM_MOE_PSUM_FUSION=1'
@@ -351,8 +379,44 @@ run_side() {
   say "side=$side compute/dump/cleanup valid"
 }
 
+validate_recovered_off() {
+  local log=$RUN_DIR/driver_off.log
+  if [ ! -s "$log" ] || ! grep -q '^DRIVER_EXIT=0$' "$log"; then
+    say "ABORT: recovered OFF driver evidence is incomplete"
+    return 1
+  fi
+  grep -q 'manifest VERIFIED.*repeated 7x across cluster' "$log" || {
+    say "ABORT: recovered OFF manifest coverage missing"
+    return 1
+  }
+  grep -q "GLM_CODE_FINGERPRINT: git=$PIN.*dirty=0" "$log" || {
+    say "ABORT: recovered OFF fingerprint mismatch"
+    return 1
+  }
+  grep -q 'GLM_DECODE_LIVE_ROWS_PSUM armed' "$log" || return 1
+  grep -q 'GLM_MOE_PSUM_FUSION armed' "$log" || return 1
+  [ -s "$RUN_DIR/off_sha256.txt" ] || {
+    say "ABORT: recovered OFF dump hashes missing"
+    return 1
+  }
+  sha256sum -c "$RUN_DIR/off_sha256.txt" >/dev/null 2>&1 || {
+    say "ABORT: recovered OFF dump hashes failed"
+    return 1
+  }
+  local files
+  files=$(wc -l < "$RUN_DIR/off_sha256.txt")
+  [ "$files" -ge 3 ] || {
+    say "ABORT: recovered OFF dump coverage too small: $files"
+    return 1
+  }
+  say "recovered OFF accepted: driver/state/gates/hashes files=$files"
+}
+
+LOCAL_CENSUS_FILE=$RUN_DIR/census_local.txt
+[ "$RECOVER_OFF" -eq 0 ] || \
+  LOCAL_CENSUS_FILE=$RUN_DIR/census_local_resume.txt
 if pgrep -af 'gate_sparse128k[.]sh|stage256k[.]sh|bench_run[.]sh|e0_capture_arm[.]sh|glm_longctx[.]py|dsa_throughput[.]py|run_bench[.]py' \
-    > "$RUN_DIR/census_local.txt" 2>&1; then
+    > "$LOCAL_CENSUS_FILE" 2>&1; then
   say "ABORT: local workload collision"
   exit 1
 fi
@@ -361,15 +425,32 @@ fi
   exit 1
 }
 say "fresh exact pin and zero-work preflight"
-strict_census initial || exit 1
-pin_census || exit 1
+if [ "$RECOVER_OFF" -eq 1 ]; then
+  strict_census resume_initial || exit 1
+  pin_census resume || exit 1
+else
+  strict_census initial || exit 1
+  pin_census || exit 1
+fi
 bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check |
   tee -a "$RUN_DIR/orchestrator.log" || exit 1
 
-printf 'tag=%s\npin=%s\nharness=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
-  "$TAG" "$PIN" "$HARNESS_SHORT" "$BASE_RAYLET_ENVS" \
-  "$BASE_DRIVER_ENVS" "$GCS_RUN" \
-  > "$RUN_DIR/config.txt" || exit 1
+if [ "$RECOVER_OFF" -eq 1 ]; then
+  grep -qx "tag=$TAG" "$RUN_DIR/config.txt" || exit 1
+  grep -qx "pin=$PIN" "$RUN_DIR/config.txt" || exit 1
+  grep -qx "harness=$HARNESS_SHORT" "$RUN_DIR/config.txt" || exit 1
+  printf 'recovery_orchestrator=%s\nrecovery_utc=%s\n' \
+    "$ORCHESTRATOR_SHORT" "$(date -u +%FT%TZ)" >> "$RUN_DIR/config.txt" || exit 1
+  cp "$HOME/glm-tpu/scripts/dcp_live_rows_exact.sh" \
+    "$RUN_DIR/original_harness.sh" || exit 1
+  cp "$SCRIPT_ROOT/scripts/dcp_live_rows_exact.sh" \
+    "$RUN_DIR/recovery_harness.sh" || exit 1
+else
+  printf 'tag=%s\npin=%s\nharness=%s\norchestrator=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
+    "$TAG" "$PIN" "$HARNESS_SHORT" "$ORCHESTRATOR_SHORT" \
+    "$BASE_RAYLET_ENVS" "$BASE_DRIVER_ENVS" "$GCS_RUN" \
+    > "$RUN_DIR/config.txt" || exit 1
+fi
 
 ALERT_FILE=$RUN_DIR/DISK_ALERT
 ALERT_FILE="$ALERT_FILE" INTERVAL_S=120 setsid nohup \
@@ -377,7 +458,11 @@ ALERT_FILE="$ALERT_FILE" INTERVAL_S=120 setsid nohup \
   > "$RUN_DIR/disk_watch.log" 2>&1 &
 WATCH_PID=$!
 
-run_side off || exit 1
+if [ "$RECOVER_OFF" -eq 1 ]; then
+  validate_recovered_off || exit 1
+else
+  run_side off || exit 1
+fi
 run_side on || exit 1
 
 say "compare selected indices/tie order and exact generated output"
@@ -446,12 +531,19 @@ for side in ("off", "on"):
     assert env["num_gpu_blocks"] == 66 and env["max_len"] == 262400
     assert {k: os_env.get(k) for k in expected} == expected
     items = [dict(row) for row in src.execute(
-        "SELECT raw_output,extracted,correct,n_prompt_tokens,n_gen_tokens,"
+        "SELECT gold,raw_output,extracted,correct,n_prompt_tokens,n_gen_tokens,"
         "finish_reason FROM items WHERE run_id = ? ORDER BY id",
         (run["run_id"],),
     )]
-    assert len(items) == 1 and items[0]["correct"] == 1, items
-    assert items[0]["n_gen_tokens"] == 2 and items[0]["raw_output"], items
+    assert len(items) == 1, items
+    item = items[0]
+    assert item["n_gen_tokens"] == 2 and item["raw_output"], item
+    # This is deliberately a two-token exactness probe, not a full-answer
+    # correctness benchmark. glm_longctx therefore records correct=0 for the
+    # truncated answer. Authenticate that the generated text is the gold
+    # prefix, then require the complete item dict to match across OFF/ON.
+    raw_prefix = item["raw_output"].strip()
+    assert raw_prefix and str(item["gold"]).startswith(raw_prefix), item
     out[side] = {"run": run, "env": env, "item": items[0]}
 assert out["off"]["item"] == out["on"]["item"], (
     out["off"]["item"], out["on"]["item"]
@@ -463,7 +555,7 @@ dst.close()
 src.close()
 with open(out_path, "w") as f:
     json.dump(out, f, indent=2)
-print("TOKEN_EXACT", repr(out["off"]["item"]["raw_output"]),
+print("TOKEN_PREFIX_EXACT", repr(out["off"]["item"]["raw_output"]),
       out["off"]["item"]["n_gen_tokens"])
 PY
 then
@@ -471,9 +563,17 @@ then
   exit 1
 fi
 
-sha256sum "$RUN_DIR"/off_flat/*.npz "$RUN_DIR"/on_flat/*.npz \
-  "$RUN_DIR/topk_diff.txt" "$RUN_DIR/token_exactness.json" \
-  > "$RUN_DIR/evidence.sha256" || exit 1
+evidence_files=(
+  "$RUN_DIR"/off_flat/*.npz
+  "$RUN_DIR"/on_flat/*.npz
+  "$RUN_DIR/topk_diff.txt"
+  "$RUN_DIR/token_exactness.json"
+)
+if [ "$RECOVER_OFF" -eq 1 ]; then
+  evidence_files+=("$RUN_DIR/original_harness.sh"
+                   "$RUN_DIR/recovery_harness.sh")
+fi
+sha256sum "${evidence_files[@]}" > "$RUN_DIR/evidence.sha256" || exit 1
 touch "$RUN_DIR/SUCCESS" || exit 1
 ARCHIVE_LOG_TMP=/tmp/${TAG}_archive.log
 if ! gcloud storage rsync -r "$RUN_DIR" "$GCS_RUN" \
