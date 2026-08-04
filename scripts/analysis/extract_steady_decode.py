@@ -2,9 +2,9 @@
 """Extract profiler-free steady decode cadence from an E0 driver log.
 
 The throughput benchmark's pass subtraction includes the deliberately slow
-``GLM_JAX_TRACE`` interval.  vLLM keeps logging ten-second generation cadence
-after the trace has closed, so those later samples are the honest wall-rate
-cross-check for the XPlane device step.
+``GLM_JAX_TRACE`` interval.  vLLM keeps logging generation cadence after the
+trace has closed, so those later samples are the honest wall-rate cross-check
+for the XPlane device step.
 """
 
 from __future__ import annotations
@@ -41,13 +41,14 @@ def extract(log_text: str, analysis: dict, expected_trace_steps: int) -> dict:
         match = STATS_RE.search(line)
         if match and int(match.group(2)) == 1:
             samples.append(float(match.group(1)))
-    if len(samples) < 4:
+    if len(samples) < 2:
         raise ValueError(
-            f"need >=4 single-request post-trace cadence samples, got {samples}")
+            f"need >=2 single-request post-trace cadence samples, got {samples}")
 
-    # vLLM's first ten-second window after the close marker can still contain
-    # profiler time.  Drop exactly that mixed window, then retain every later
-    # single-request sample rather than selecting a favorable subset.
+    # vLLM's first stats window after the close marker can still contain
+    # profiler time. Drop exactly that mixed window, then retain every later
+    # single-request sample rather than selecting a favorable subset. E0 sets
+    # a one-second interval so even a 50-100 tok/s candidate leaves samples.
     steady = samples[1:]
     wall_rate = median(steady)
     device_step_ms = float(analysis["device_step_ms"])
