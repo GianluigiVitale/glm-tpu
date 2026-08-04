@@ -24,6 +24,7 @@ def test_all_guards_admit_only_exact_title_pairs() -> None:
         ("ray::DashboardA", "ray::DashboardAgent"),
         ("ray::RuntimeEnv", "ray::RuntimeEnvAgent"),
         ("ray::RayWorkerW", "ray::RayWorkerWrapper"),
+        ("ray::IDLE", "ray::IDLE"),
     )
     for path in SCRIPTS:
         body = _owned_aux_body(path)
@@ -42,3 +43,5 @@ def test_ray_worker_wrapper_identity_is_not_broadened() -> None:
         assert "RayWorker*" not in body
         assert "*RayWorker" not in body
         assert "ray::RayWorkerWrapper*" not in body
+        assert body.count('"ray::IDLE"') == 2
+        assert "ray::IDLE*" not in body

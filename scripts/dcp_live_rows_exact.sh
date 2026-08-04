@@ -16,7 +16,7 @@ POD=db-v4-64-od
 EXACT_LEVER="${EXACT_LEVER:-dcp_live_rows}"
 case "$EXACT_LEVER" in
   dcp_live_rows)
-    DEFAULT_PIN=837d67a47
+    DEFAULT_PIN=979f818e0
     TAG_PREFIX=dcp_live_rows_exact
     NOTE_PREFIX="DCP live rows exact"
     CANDIDATE_ARMED_LOG="GLM_DSA_DCP_DECODE_LIVE_ROWS armed"
@@ -172,7 +172,8 @@ owned_aux_agent() {
   arg0=$(tr "\0" "\n" < "/proc/$p/cmdline" 2>/dev/null | head -n 1) || return 1
   if ! { [ "$name" = "ray::DashboardA" ] && [ "$arg0" = "ray::DashboardAgent" ]; } &&
      ! { [ "$name" = "ray::RuntimeEnv" ] && [ "$arg0" = "ray::RuntimeEnvAgent" ]; } &&
-     ! { [ "$name" = "ray::RayWorkerW" ] && [ "$arg0" = "ray::RayWorkerWrapper" ]; }; then
+     ! { [ "$name" = "ray::RayWorkerW" ] && [ "$arg0" = "ray::RayWorkerWrapper" ]; } &&
+     ! { [ "$name" = "ray::IDLE" ] && [ "$arg0" = "ray::IDLE" ]; }; then
     return 1
   fi
   pp=$(grep "^PPid:" "/proc/$p/status" 2>/dev/null | tr -dc "0-9") || return 1

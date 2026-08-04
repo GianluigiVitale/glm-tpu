@@ -154,7 +154,8 @@ owned_env() {
     '"$RAYLET_ARM_CHECK"' && '"$RAYLET_EXPERIMENT_CHECK"'
 }
 # Ray strips the job env from title-rewritten helpers and can leave an idle
-# RayWorkerWrapper alive briefly after the driver exits. Admit only their
+# RayWorkerWrapper (reported as its class title or ``ray::IDLE``) alive
+# briefly after the driver exits. Admit only their
 # exact Linux comm/argv pair and only through a direct exact-owned raylet
 # parent; every other env-less process remains foreign.
 owned_aux_agent() {
@@ -163,7 +164,8 @@ owned_aux_agent() {
   arg0=$(tr "\0" "\n" < "/proc/$p/cmdline" 2>/dev/null | head -n 1) || return 1
   if ! { [ "$name" = "ray::DashboardA" ] && [ "$arg0" = "ray::DashboardAgent" ]; } &&
      ! { [ "$name" = "ray::RuntimeEnv" ] && [ "$arg0" = "ray::RuntimeEnvAgent" ]; } &&
-     ! { [ "$name" = "ray::RayWorkerW" ] && [ "$arg0" = "ray::RayWorkerWrapper" ]; }; then
+     ! { [ "$name" = "ray::RayWorkerW" ] && [ "$arg0" = "ray::RayWorkerWrapper" ]; } &&
+     ! { [ "$name" = "ray::IDLE" ] && [ "$arg0" = "ray::IDLE" ]; }; then
     return 1
   fi
   pp=$(grep "^PPid:" "/proc/$p/status" 2>/dev/null | tr -dc "0-9") || return 1
