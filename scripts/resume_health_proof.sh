@@ -49,6 +49,7 @@ esac
 TAG=${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)
 RUN_DIR=$HOME/glm-run/$TAG
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
+HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD) || exit 1
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-$DRIVER_TIMEOUT_DEFAULT}"
 case "$LIVE_ROWS_PSUM" in
   0|1) ;;
@@ -133,10 +134,10 @@ if ! has_8_unique_markers "$RUN_DIR/preflight.txt" GOLDEN_OK ||
   exit 1
 fi
 
-printf 'tag=%s\nproof_mode=%s\nlengths=%s\ndepths=%s\ntrials=%s\nnum_gpu_blocks=%s\nmax_len=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\npin=%s\nraylet_envs=%s\ndriver_envs=%s\ngcs_run=%s\n' \
+printf 'tag=%s\nproof_mode=%s\nlengths=%s\ndepths=%s\ntrials=%s\nnum_gpu_blocks=%s\nmax_len=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\npin=%s\nharness=%s\nraylet_envs=%s\ndriver_envs=%s\ngcs_run=%s\n' \
   "$TAG" "$PROOF_MODE" "$PROOF_LENGTHS" "$PROOF_DEPTHS" "$PROOF_TRIALS" \
   "$PROOF_NUM_GPU_BLOCKS" "$PROOF_MAX_LEN" "$PROOF_MIN_TOKEN_BUCKET" \
-  "$PROOF_COMPILATION_SIZES" "$PIN" "$RAYLET_ENVS" \
+  "$PROOF_COMPILATION_SIZES" "$PIN" "$HARNESS_SHORT" "$RAYLET_ENVS" \
   "$DRIVER_ENVS" "$GCS_RUN" > "$RUN_DIR/config.txt" || exit 1
 
 # This is the last command before the broad-reset launcher.
@@ -341,7 +342,6 @@ if grep -vF 'Prepared token paddings: [32, 2048]' \
   exit 1
 fi
 
-HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD)
 if ! "$HOME/vllm-env/bin/python" - "$HOME/glm-tpu/bench/results.db" \
   "$RUN_DIR/results_ckpt.db" "$RUN_DIR/run_link.json" \
   "$PROOF_NOTE_PREFIX ($TAG)" "$TAG" "$PROOF_MODE" "$PIN" \

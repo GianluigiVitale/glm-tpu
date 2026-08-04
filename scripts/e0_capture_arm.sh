@@ -26,6 +26,7 @@ OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%S%NZ)
 RUN_DIR=$HOME/glm-run/$TAG
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
+HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD) || exit 1
 HEALTH_PROOF_LOG="${HEALTH_PROOF_LOG:?set HEALTH_PROOF_LOG to a fresh protected 5K health log}"
 HEALTH_RAYLET_ENVS="${HEALTH_RAYLET_ENVS:?set HEALTH_RAYLET_ENVS to its 8-host exact env census}"
 HEALTH_RESULTS_DB="${HEALTH_RESULTS_DB:-$HOME/glm-tpu/bench/results.db}"
@@ -254,8 +255,8 @@ PY
 
 mkdir -p "$RUN_DIR"
 if ! {
-  printf 'tag=%s\narm=%s\npin=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ntrace_steps=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\noob_dir=%s\ngcs_run=%s\n' \
-    "$TAG" "$ARM" "$PIN" "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" \
+  printf 'tag=%s\narm=%s\npin=%s\nharness=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ntrace_steps=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\noob_dir=%s\ngcs_run=%s\n' \
+    "$TAG" "$ARM" "$PIN" "$HARNESS_SHORT" "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" \
     "$TRACE_STEPS" "$E0_MIN_TOKEN_BUCKET" "$E0_COMPILATION_SIZES" \
     "$OOB_DIR" "$GCS_RUN"
   printf 'raylet_envs=%s %s GLM_JAX_TRACE_DIR=<per-try-nonce> %s\ndriver_envs=%s\n' \
@@ -599,7 +600,6 @@ PY
   if grep -q 'DRIVER_EXIT=0' "$LOG" && grep -q 'manifest VERIFIED' "$LOG" &&
       [ "$BUCKETS_OK" -eq 1 ] && [ "$PARSE_OK" -eq 1 ]; then
     RUN_LINK=$RUN_DIR/run_link_t${try}.json
-    HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD)
     if ! "$HOME/vllm-env/bin/python" - \
       "$HOME/glm-tpu/bench/results.db" "$RUN_DIR/results_ckpt.db" \
       "$RUN_LINK" "$TAG" "$ARM" "$PIN" "$HARNESS_SHORT" \
