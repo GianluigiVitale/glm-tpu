@@ -164,6 +164,44 @@ def event_stats(event, stat_md):
             for s in event.stats}
 
 
+RESOURCE_STAT_NAMES = (
+    "bytes_accessed",
+    "raw_bytes_accessed",
+    "flops",
+    "model_flops",
+    "% util",
+    "shape_with_layout",
+    "source",
+    "source_stack",
+    "tf_op",
+    "program_id",
+)
+
+
+def metadata_stats(metadata, stat_md):
+    """Decode selected XEventMetadata stats by their schema names."""
+    return {
+        stat_md.get(stat.metadata_id, str(stat.metadata_id)): stat_value(stat)
+        for stat in metadata.stats
+    }
+
+
+def numeric_stat(stats, name):
+    """Return a numeric profiler stat, treating absent/unusable values as 0."""
+    value = stats.get(name, 0)
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def signature_key(base, source, shape):
+    """Stable JSON-safe identity for one lowered op call-site and shape."""
+    return json.dumps((base, source or "", shape or ""), separators=(",", ":"))
+
+
 # ---------------------------------------------------------------------------
 # Categorization (decode-workload oriented)
 # ---------------------------------------------------------------------------
@@ -288,10 +326,12 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
 
     md_name = {}
     md_cat = {}
+    md_resource = {}
     for mid in {t[2] for t in raw}:
         md = ev_md.get(mid)
         nm = (md.display_name or md.name) if md else str(mid)
         hc = None
+        stats = metadata_stats(md, st_md) if md is not None else {}
         if md is not None:
             for s in md.stats:
                 if st_md.get(s.metadata_id) == "hlo_category":
@@ -300,12 +340,24 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
         base = re.sub(r"\.\d+$", "", nm)
         md_name[mid] = (nm, base)
         md_cat[mid] = (hc, categorize(nm, hc))
+        md_resource[mid] = {
+            name: stats.get(name) for name in RESOURCE_STAT_NAMES
+            if stats.get(name) not in (None, "")
+        }
 
     per_op = collections.defaultdict(lambda: [0, 0, 0])  # base -> [self, total, count]
     base_cat = {}  # base name -> decode-oriented category
     base_hlo_cat = {}  # base name -> profiler HLO category
     per_cat = collections.defaultdict(lambda: [0, 0])    # cat  -> [self, count]
     per_hlo_cat = collections.defaultdict(int)
+    # Op names alone collapse many unrelated fusions.  Keep a second view
+    # keyed by lowered name + Python source call-site + physical shape so the
+    # profiler can answer which exact call and payload dominate.
+    per_signature = collections.defaultdict(
+        lambda: {"self_ps": 0, "total_ps": 0, "count": 0,
+                 "bytes_accessed": 0, "raw_bytes_accessed": 0,
+                 "flops": 0, "model_flops": 0})
+    signature_info = {}
     # Per-step self-time. Fleet summaries use only these selected module
     # windows; whole-trace totals above remain available to ``aggregate`` for
     # profiler debugging, but profiler warmup/tail events cannot skew an A/B.
@@ -313,6 +365,10 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
     step_cat = [collections.defaultdict(int) for _ in range(n_steps)]
     step_op = [collections.defaultdict(lambda: [0, 0])
                for _ in range(n_steps)]  # base -> [self, count]
+    step_signature = [collections.defaultdict(
+        lambda: {"self_ps": 0, "count": 0, "bytes_accessed": 0,
+                 "raw_bytes_accessed": 0, "flops": 0, "model_flops": 0})
+                      for _ in range(n_steps)]
     step_busy = [0] * n_steps
     outside_step_self = 0
 
@@ -324,12 +380,34 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
         sp = self_ps[i]
         base = md_name[mid][1]
         hc, cat = md_cat[mid]
+        resource = md_resource[mid]
+        source = resource.get("source", "")
+        shape = resource.get("shape_with_layout", "")
+        sig = signature_key(base, source, shape)
+        signature_info.setdefault(sig, {
+            "op": base,
+            "source": source,
+            "source_stack": resource.get("source_stack", ""),
+            "shape_with_layout": shape,
+            "tf_op": resource.get("tf_op", ""),
+            "program_id": resource.get("program_id"),
+            "util_pct": resource.get("% util"),
+            "category": cat,
+            "hlo_category": hc,
+        })
         base_cat.setdefault(base, cat)
         base_hlo_cat.setdefault(base, hc)
         acc = per_op[base]
         acc[0] += sp; acc[1] += dur; acc[2] += 1
         per_cat[cat][0] += sp; per_cat[cat][1] += 1
         per_hlo_cat[hc or "?"] += sp
+        sig_acc = per_signature[sig]
+        sig_acc["self_ps"] += sp
+        sig_acc["total_ps"] += dur
+        sig_acc["count"] += 1
+        for stat_name in ("bytes_accessed", "raw_bytes_accessed", "flops",
+                          "model_flops"):
+            sig_acc[stat_name] += numeric_stat(resource, stat_name)
         if top[i]:
             busy_ps += dur
         end = off + dur
@@ -343,6 +421,12 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
             step_cat[si][cat] += sp
             step_op[si][base][0] += sp
             step_op[si][base][1] += 1
+            step_sig_acc = step_signature[si][sig]
+            step_sig_acc["self_ps"] += sp
+            step_sig_acc["count"] += 1
+            for stat_name in ("bytes_accessed", "raw_bytes_accessed", "flops",
+                              "model_flops"):
+                step_sig_acc[stat_name] += numeric_stat(resource, stat_name)
             step_busy[si] += sp
         else:
             outside_step_self += sp
@@ -370,6 +454,10 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
         "per_category": {k: {"self_ps": v[0], "count": v[1]}
                          for k, v in per_cat.items()},
         "per_hlo_category": dict(per_hlo_cat),
+        "per_signature": {
+            key: {**signature_info[key], **values}
+            for key, values in per_signature.items()
+        },
         "steps": [{"offset_ps": a, "end_ps": b, "duration_ps": b - a,
                    "busy_ps": step_busy[i],
                    "per_category_ps": dict(step_cat[i]),
@@ -378,6 +466,10 @@ def aggregate_device_plane(plane, step_module_re=r"jit_step_fun_impl"):
                               "category": base_cat[name],
                               "hlo_category": base_hlo_cat[name]}
                        for name, values in step_op[i].items()
+                   },
+                   "per_signature": {
+                       key: {**signature_info[key], **values}
+                       for key, values in step_signature[i].items()
                    }}
                   for i, (a, b) in enumerate(step_bounds)],
         "outside_step_self_ps": outside_step_self,
@@ -482,6 +574,10 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         return sum(s["per_op"].get(name, {}).get(field, 0)
                    for s in core["steps"])
 
+    def selected_signature(core, key, field):
+        return sum(s.get("per_signature", {}).get(key, {}).get(field, 0)
+                   for s in core["steps"])
+
     category_names = sorted({
         name for c in cores for s in c["steps"]
         for name in s["per_category_ps"]
@@ -518,6 +614,51 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
             "category": present["category"],
             "hlo_category": present.get("hlo_category"),
         }
+
+    signature_keys = sorted({
+        key for core in cores for step in core["steps"]
+        for key in step.get("per_signature", {})
+    })
+    signatures = {}
+    for key in signature_keys:
+        present = next(
+            step["per_signature"][key]
+            for core in cores for step in core["steps"]
+            if key in step.get("per_signature", {}))
+        ms_per_step = mean([
+            selected_signature(core, key, "self_ps") / n_steps / 1e9
+            for core in cores
+        ])
+        values = {
+            "op": present["op"],
+            "source": present.get("source", ""),
+            "source_stack": present.get("source_stack", ""),
+            "shape_with_layout": present.get("shape_with_layout", ""),
+            "tf_op": present.get("tf_op", ""),
+            "program_id": present.get("program_id"),
+            "util_pct": present.get("util_pct"),
+            "category": present.get("category"),
+            "hlo_category": present.get("hlo_category"),
+            "ms_per_step": ms_per_step,
+            "invocations_per_step": mean([
+                selected_signature(core, key, "count") / n_steps
+                for core in cores
+            ]),
+        }
+        for stat_name in ("bytes_accessed", "raw_bytes_accessed", "flops",
+                          "model_flops"):
+            values[f"{stat_name}_per_step"] = mean([
+                selected_signature(core, key, stat_name) / n_steps
+                for core in cores
+            ])
+        seconds_per_step = ms_per_step / 1000
+        values["effective_gbytes_per_s"] = (
+            values["bytes_accessed_per_step"] / seconds_per_step / 1e9
+            if seconds_per_step > 0 else 0)
+        values["effective_tflops_per_s"] = (
+            values["flops_per_step"] / seconds_per_step / 1e12
+            if seconds_per_step > 0 else 0)
+        signatures[key] = values
 
     all_step_ms = [s["duration_ps"] / 1e9 for c in cores for s in c["steps"]]
     busy_ms = mean([
@@ -582,6 +723,7 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
             hlo_all_reduce_invocations_per_step,
         "categories": categories,
         "ops": ops,
+        "signatures": signatures,
     }
 
 
@@ -716,6 +858,20 @@ def cmd_fleet(trace_dir, out_json=None):
             key=lambda item: item[1]["ms_per_step"], reverse=True)[:25]:
         print(f"| `{name}` | {values['ms_per_step']:.2f} | "
               f"{values['invocations_per_step']:.1f} | {values['category']} |")
+
+    if summary["signatures"]:
+        print("\n| source/shape signature | ms/step | calls/step | GB/s | TFLOP/s |")
+        print("|---|---:|---:|---:|---:|")
+        for values in sorted(
+                summary["signatures"].values(),
+                key=lambda item: item["ms_per_step"], reverse=True)[:30]:
+            source = values["source"] or "<unknown>"
+            shape = values["shape_with_layout"] or "<unknown>"
+            label = f"`{values['op']}` {source} `{shape}`"
+            print(f"| {label} | {values['ms_per_step']:.2f} | "
+                  f"{values['invocations_per_step']:.1f} | "
+                  f"{values['effective_gbytes_per_s']:.2f} | "
+                  f"{values['effective_tflops_per_s']:.2f} |")
 
     if out_json:
         with open(out_json, "w") as f:
