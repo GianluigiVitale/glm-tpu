@@ -1,5 +1,7 @@
 #!/bin/bash
-# Protected single-variable TPU A/B for GLM_DSA_DCP_DECODE_LIVE_ROWS.
+# Protected single-variable TPU A/B for a selected decode lever. The default
+# remains GLM_DSA_DCP_DECODE_LIVE_ROWS; scripts/moe_allgather_exact.sh selects
+# GLM_MOE_DECODE_ALL_GATHER while keeping the parent live-attention gate fixed.
 # Both sides use the accepted live-row-psum + MoE-psum-fusion stack and the
 # production DCP8/256K cache geometry. max_batched_tokens=32 deliberately
 # compiles only the production pure-decode bucket changed by this lever; dump
@@ -11,14 +13,34 @@ set -uo pipefail
 
 ZONE=us-central2-b
 POD=db-v4-64-od
-PIN="${EXACT_PIN:-837d67a47}"
+EXACT_LEVER="${EXACT_LEVER:-dcp_live_rows}"
+case "$EXACT_LEVER" in
+  dcp_live_rows)
+    DEFAULT_PIN=837d67a47
+    TAG_PREFIX=dcp_live_rows_exact
+    NOTE_PREFIX="DCP live rows exact"
+    CANDIDATE_ARMED_LOG="GLM_DSA_DCP_DECODE_LIVE_ROWS armed"
+    ;;
+  moe_allgather)
+    DEFAULT_PIN=5967dffa4
+    TAG_PREFIX=moe_allgather_exact
+    NOTE_PREFIX="MoE decode all-gather exact"
+    CANDIDATE_ARMED_LOG="GLM_MOE_DECODE_ALL_GATHER armed"
+    ;;
+  *)
+    echo "EXACT_LEVER must be dcp_live_rows or moe_allgather" >&2
+    exit 2
+    ;;
+esac
+PIN="${EXACT_PIN:-$DEFAULT_PIN}"
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
 RECOVER_OFF=0
-if [ -n "${DCP_EXACT_RESUME_DIR:-}" ]; then
-  RUN_DIR=${DCP_EXACT_RESUME_DIR%/}
+RESUME_DIR="${EXACT_RESUME_DIR:-${DCP_EXACT_RESUME_DIR:-}}"
+if [ -n "$RESUME_DIR" ]; then
+  RUN_DIR=${RESUME_DIR%/}
   case "$RUN_DIR" in
-    "$HOME"/glm-run/dcp_live_rows_exact_*) ;;
+    "$HOME"/glm-run/${TAG_PREFIX}_*) ;;
     *)
       echo "ABORT: resume dir is outside the exact-artifact namespace: $RUN_DIR"
       exit 1
@@ -31,7 +53,7 @@ if [ -n "${DCP_EXACT_RESUME_DIR:-}" ]; then
   TAG=${RUN_DIR##*/}
   RECOVER_OFF=1
 else
-  TAG=dcp_live_rows_exact_$(date -u +%Y%m%dT%H%M%S%NZ)
+  TAG=${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)
   RUN_DIR=$HOME/glm-run/$TAG
 fi
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
@@ -44,7 +66,7 @@ LAUNCHED=0
 
 mkdir -p "$RUN_DIR"
 say() {
-  echo "[dcp-live-rows-exact $(date -u +%H:%M:%S)] $*" |
+  echo "[$EXACT_LEVER-exact $(date -u +%H:%M:%S)] $*" |
     tee -a "$RUN_DIR/orchestrator.log"
 }
 say "RUN_DIR=$RUN_DIR"
@@ -63,12 +85,28 @@ has_8_unique_markers() {
   [ "$lines" -eq 8 ] && [ "$unique" -eq 8 ]
 }
 
-gate_for_side() {
+side_gate() {
   case "$1" in
     off) echo 0 ;;
     on) echo 1 ;;
     *) return 1 ;;
   esac
+}
+
+dcp_gate_for_side() {
+  if [ "$EXACT_LEVER" = dcp_live_rows ]; then
+    side_gate "$1"
+  else
+    echo 1
+  fi
+}
+
+moe_allgather_gate_for_side() {
+  if [ "$EXACT_LEVER" = moe_allgather ]; then
+    side_gate "$1"
+  else
+    echo 0
+  fi
 }
 
 # Import the exact process-name corpus used by this Ray installation. The
@@ -108,8 +146,9 @@ ensure_oob() {
 
 ownership_census() {
   local side="$1" label="$2"
-  local gate
-  gate=$(gate_for_side "$side") || return 1
+  local dcp_gate moe_allgather_gate
+  dcp_gate=$(dcp_gate_for_side "$side") || return 1
+  moe_allgather_gate=$(moe_allgather_gate_for_side "$side") || return 1
   local expected=${TAG}_${side}
   local out=$RUN_DIR/ownership_${side}_${label}.txt
   # shellcheck disable=SC2016
@@ -124,7 +163,8 @@ owned_env() {
     tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_MODE=pallas_decode" &&
     tr "\0" "\n" < "$f" | grep -qx "GLM_DECODE_LIVE_ROWS_PSUM=1" &&
     tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_PSUM_FUSION=1" &&
-    tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$gate"'"
+    tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$dcp_gate"'" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$moe_allgather_gate"'"
 }
 owned_aux_agent() {
   local p="$1" name arg0 pp
@@ -213,12 +253,13 @@ trap cleanup EXIT
 trap 'exit 130' HUP INT TERM
 
 verify_raylet_envs() {
-  local side="$1" prefix="$2" gate
-  gate=$(gate_for_side "$side") || return 1
+  local side="$1" prefix="$2" dcp_gate moe_allgather_gate
+  dcp_gate=$(dcp_gate_for_side "$side") || return 1
+  moe_allgather_gate=$(moe_allgather_gate_for_side "$side") || return 1
   local expected=${TAG}_${side}
   local out=$RUN_DIR/raylet_env_${side}.txt
   # shellcheck disable=SC2016
-  local cmd='p=$(pgrep -x raylet | head -1); f=/tmp/dcp_live_rows_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$expected"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_MLA_DCP=1" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f" && grep -qx "GLM_DSA_DCP=1" "$f" && grep -qx "GLM_DCP=8" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_SCORER=xla" "$f" && grep -qx "GLM_DSA_DCP_PREFILL_ATTN=segment" "$f" && grep -qx "GLM_DSA_BT_WIDTH=owned" "$f" && grep -qx "GLM_DSA_MERGE_IMPL=v2" "$f" && grep -qx "GLM_DSA_OWNED_SEG_IMPL=v2" "$f" && grep -qx "GLM_DSA_SEG_GATHER_IMPL=v2" "$f" && grep -qx "GLM_WRITE_PROBE=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_DECODE_LIVE_ROWS_PSUM=1" "$f" && grep -qx "GLM_MOE_PSUM_FUSION=1" "$f" && grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$gate"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$prefix"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=0" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "RAYLET_ENV_OK $(hostname)"; else echo "RAYLET_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  local cmd='p=$(pgrep -x raylet | head -1); f=/tmp/decode_lever_exact_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$expected"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_MLA_DCP=1" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f" && grep -qx "GLM_DSA_DCP=1" "$f" && grep -qx "GLM_DCP=8" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_SCORER=xla" "$f" && grep -qx "GLM_DSA_DCP_PREFILL_ATTN=segment" "$f" && grep -qx "GLM_DSA_BT_WIDTH=owned" "$f" && grep -qx "GLM_DSA_MERGE_IMPL=v2" "$f" && grep -qx "GLM_DSA_OWNED_SEG_IMPL=v2" "$f" && grep -qx "GLM_DSA_SEG_GATHER_IMPL=v2" "$f" && grep -qx "GLM_WRITE_PROBE=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_DECODE_LIVE_ROWS_PSUM=1" "$f" && grep -qx "GLM_MOE_PSUM_FUSION=1" "$f" && grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$dcp_gate"'" "$f" && grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$moe_allgather_gate"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$prefix"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=0" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "RAYLET_ENV_OK $(hostname)"; else echo "RAYLET_ENV_BAD $(hostname)"; fi; rm -f "$f"'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || return 1
   has_8_unique_markers "$out" RAYLET_ENV_OK
@@ -271,21 +312,23 @@ GLM_EXPECT_CODE_HASH=$PIN GLM_DECODE_LIVE_ROWS_PSUM=1 GLM_MOE_PSUM_FUSION=1"
 
 run_side() {
   local side="$1"
-  local gate
-  gate=$(gate_for_side "$side") || return 1
+  local dcp_gate moe_allgather_gate candidate_gate
+  dcp_gate=$(dcp_gate_for_side "$side") || return 1
+  moe_allgather_gate=$(moe_allgather_gate_for_side "$side") || return 1
+  candidate_gate=$(side_gate "$side") || return 1
   local prefix=/tmp/${TAG}_${side}/topk.npz
   local expected=${TAG}_${side}
-  local experiment="GLM_HEALTH_TAG=$expected GLM_DSA_DCP_DECODE_LIVE_ROWS=$gate GLM_DSA_DUMP_TOPK=$prefix GLM_DSA_DUMP_TOPK_EVENTS=0"
+  local experiment="GLM_HEALTH_TAG=$expected GLM_DSA_DCP_DECODE_LIVE_ROWS=$dcp_gate GLM_MOE_DECODE_ALL_GATHER=$moe_allgather_gate GLM_DSA_DUMP_TOPK=$prefix GLM_DSA_DUMP_TOPK_EVENTS=0"
   local raylet_envs="$BASE_RAYLET_ENVS $experiment"
   local driver_envs="$BASE_DRIVER_ENVS $experiment"
   local log=$RUN_DIR/driver_${side}.log
-  local note="DCP live rows exact $side ($TAG)"
+  local note="$NOTE_PREFIX $side ($TAG)"
 
   strict_census "prelaunch_${side}" || {
     say "ABORT: dirty pod before side=$side"
     return 1
   }
-  say "launch protected production-shape side=$side gate=$gate"
+  say "launch protected production-shape lever=$EXACT_LEVER side=$side candidate_gate=$candidate_gate dcp_gate=$dcp_gate moe_allgather_gate=$moe_allgather_gate"
   ACTIVE_SIDE="$side"
   LAUNCHED=1
   EXTRA_ENVS="$raylet_envs" TPU_MIN_TOKEN_BUCKET=32 \
@@ -367,6 +410,15 @@ run_side() {
     say "ABORT: accepted MoE psum fusion not armed side=$side"
     return 1
   }
+  if [ "$candidate_gate" = 1 ]; then
+    grep -q "$CANDIDATE_ARMED_LOG" "$log" || {
+      say "ABORT: candidate armed log missing side=$side lever=$EXACT_LEVER"
+      return 1
+    }
+  elif grep -q "$CANDIDATE_ARMED_LOG" "$log"; then
+    say "ABORT: candidate unexpectedly armed on control side lever=$EXACT_LEVER"
+    return 1
+  fi
   gather_dumps "$side" "$prefix" || {
     say "ABORT: dump coverage missing side=$side"
     return 1
@@ -440,6 +492,12 @@ if [ "$RECOVER_OFF" -eq 1 ]; then
   grep -qx "tag=$TAG" "$RUN_DIR/config.txt" || exit 1
   grep -qx "pin=$PIN" "$RUN_DIR/config.txt" || exit 1
   grep -qx "harness=$HARNESS_SHORT" "$RUN_DIR/config.txt" || exit 1
+  if ! grep -qx "exact_lever=$EXACT_LEVER" "$RUN_DIR/config.txt"; then
+    # Artifacts created by the original single-purpose harness predate the
+    # selector line; only its historical DCP mode may resume without it.
+    [ "$EXACT_LEVER" = dcp_live_rows ] || exit 1
+    ! grep -q '^exact_lever=' "$RUN_DIR/config.txt" || exit 1
+  fi
   printf 'recovery_orchestrator=%s\nrecovery_utc=%s\n' \
     "$ORCHESTRATOR_SHORT" "$(date -u +%FT%TZ)" >> "$RUN_DIR/config.txt" || exit 1
   cp "$HOME/glm-tpu/scripts/dcp_live_rows_exact.sh" \
@@ -447,8 +505,8 @@ if [ "$RECOVER_OFF" -eq 1 ]; then
   cp "$SCRIPT_ROOT/scripts/dcp_live_rows_exact.sh" \
     "$RUN_DIR/recovery_harness.sh" || exit 1
 else
-  printf 'tag=%s\npin=%s\nharness=%s\norchestrator=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
-    "$TAG" "$PIN" "$HARNESS_SHORT" "$ORCHESTRATOR_SHORT" \
+  printf 'tag=%s\nexact_lever=%s\npin=%s\nharness=%s\norchestrator=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
+    "$TAG" "$EXACT_LEVER" "$PIN" "$HARNESS_SHORT" "$ORCHESTRATOR_SHORT" \
     "$BASE_RAYLET_ENVS" "$BASE_DRIVER_ENVS" "$GCS_RUN" \
     > "$RUN_DIR/config.txt" || exit 1
 fi
@@ -480,18 +538,24 @@ echo "DIFF_EXIT=$DIFF_RC" >> "$RUN_DIR/topk_diff.txt"
 
 if ! "$HOME/vllm-env/bin/python" - "$HOME/glm-tpu/bench/results.db" \
     "$RUN_DIR/results_ckpt.db" "$RUN_DIR/token_exactness.json" \
-    "$TAG" "$PIN" "$HARNESS_SHORT" "$OOB_DIR" <<'PY'
+    "$TAG" "$PIN" "$HARNESS_SHORT" "$OOB_DIR" "$EXACT_LEVER" \
+    "$NOTE_PREFIX" <<'PY'
 import json
 import sqlite3
 import sys
 
-db, snapshot, out_path, tag, pin, harness, oob_dir = sys.argv[1:]
+(
+    db, snapshot, out_path, tag, pin, harness, oob_dir, exact_lever,
+    note_prefix,
+) = sys.argv[1:]
 src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 src.row_factory = sqlite3.Row
 out = {}
 for side in ("off", "on"):
-    gate = "0" if side == "off" else "1"
-    note = f"DCP live rows exact {side} ({tag})"
+    side_gate = "0" if side == "off" else "1"
+    dcp_gate = side_gate if exact_lever == "dcp_live_rows" else "1"
+    moe_allgather_gate = side_gate if exact_lever == "moe_allgather" else "0"
+    note = f"{note_prefix} {side} ({tag})"
     rows = src.execute("SELECT * FROM runs WHERE note = ?", (note,)).fetchall()
     assert len(rows) == 1, (side, len(rows))
     run = dict(rows[0])
@@ -511,7 +575,8 @@ for side in ("off", "on"):
         "GLM_DSA_MERGE_IMPL": "v2",
         "GLM_DSA_OWNED_SEG_IMPL": "v2",
         "GLM_DSA_SEG_GATHER_IMPL": "v2",
-        "GLM_DSA_DCP_DECODE_LIVE_ROWS": gate,
+        "GLM_DSA_DCP_DECODE_LIVE_ROWS": dcp_gate,
+        "GLM_MOE_DECODE_ALL_GATHER": moe_allgather_gate,
         "GLM_DSA_DUMP_TOPK": f"/tmp/{tag}_{side}/topk.npz",
         "GLM_DSA_DUMP_TOPK_EVENTS": "0",
         "GLM_DECODE_LIVE_ROWS_PSUM": "1",
@@ -524,6 +589,11 @@ for side in ("off", "on"):
         "GLM_WK_OOB_DIR": oob_dir,
         "GLM_WK_OOB_GOLDEN": "/tmp/golden.json",
     }
+    if (exact_lever == "dcp_live_rows" and
+            "GLM_MOE_DECODE_ALL_GATHER" not in os_env):
+        # Backward-compatible recovery of a pre-selector DCP exact artifact;
+        # the pinned fork did not yet contain this gate, so absence is OFF.
+        expected.pop("GLM_MOE_DECODE_ALL_GATHER")
     assert run["fork_git"] == pin, (run["fork_git"], pin)
     assert run["harness_git"] == harness, (run["harness_git"], harness)
     assert env["lengths"] == [4096] and env["depths"] == [0.5]
