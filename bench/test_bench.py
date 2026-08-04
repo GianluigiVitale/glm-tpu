@@ -676,6 +676,70 @@ def test_dcp_engine_kwarg():
     print("  DCP engine kwarg plumbing OK")
 
 
+def test_compilation_sizes_engine_kwarg():
+    """Default-off sparse AOT bucket plumbing is exact and fail-loud."""
+    import contextlib
+    import io
+    import sys
+    import types
+
+    import engine
+
+    calls = []
+
+    class _CaptureLLM:
+        def __init__(self, **kw):
+            calls.append(kw)
+
+    fake = types.ModuleType("vllm")
+    fake.LLM = _CaptureLLM
+    had_vllm = "vllm" in sys.modules
+    old_mod = sys.modules.get("vllm")
+    old_env = os.environ.pop("GLM_COMPILATION_SIZES", None)
+    try:
+        sys.modules["vllm"] = fake
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            engine.build_llm("stub-model", max_batched_tokens=2048)
+        assert "additional_config" not in calls[0]
+        assert "compile_sizes=" not in out.getvalue()
+
+        os.environ["GLM_COMPILATION_SIZES"] = "512,32,512"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            engine.build_llm("stub-model", max_batched_tokens=2048)
+        assert calls[1]["additional_config"] == {
+            "compilation_sizes": [32, 512],
+        }
+        assert "compile_sizes=[32, 512]" in out.getvalue()
+        assert {k: v for k, v in calls[1].items()
+                if k != "additional_config"} == calls[0]
+
+        for bad in ("abc", "0", "33", "4096", ",,,"):
+            os.environ["GLM_COMPILATION_SIZES"] = bad
+            try:
+                engine.build_llm("stub-model", max_batched_tokens=2048)
+                raise AssertionError(f"{bad!r} should have raised")
+            except ValueError as exc:
+                assert "GLM_COMPILATION_SIZES" in str(exc)
+        assert len(calls) == 2
+
+        os.environ["GLM_COMPILATION_SIZES"] = ""
+        with contextlib.redirect_stdout(io.StringIO()):
+            engine.build_llm("stub-model", max_batched_tokens=2048)
+        assert "additional_config" not in calls[2]
+    finally:
+        if old_env is None:
+            os.environ.pop("GLM_COMPILATION_SIZES", None)
+        else:
+            os.environ["GLM_COMPILATION_SIZES"] = old_env
+        if had_vllm:
+            sys.modules["vllm"] = old_mod
+        else:
+            sys.modules.pop("vllm", None)
+    print("  sparse compilation-size plumbing OK")
+
+
 def test_spec_engine_kwarg():
     """GLM_SPEC_K plumbing (runbook §7 — Stage-3 MTP spec-decode, docs/08 §7
     M2): unset (or 0/empty) -> speculative_config ABSENT from the LLM(...)
@@ -820,7 +884,8 @@ def test_run_env_provenance_fields():
         max_batched_tokens=4096, batch_size=8, gmu=0.94, num_gpu_blocks=0,
         protocol="greedy", samples=1, seed=1234)
     saved = {k: os.environ.pop(k, None)
-             for k in ("GLM_DSA_MODE", "GLM_DCP", "GLM_SPEC_K")}
+             for k in ("GLM_DSA_MODE", "GLM_DCP", "GLM_SPEC_K",
+                       "GLM_COMPILATION_SIZES")}
     try:
         env = rb._run_env(args, ["gsm8k"])
         assert env["attention_path"] == "dense-mla"     # default: DSA bypassed
@@ -829,11 +894,13 @@ def test_run_env_provenance_fields():
         os.environ["GLM_DCP"] = "4"
         os.environ["GLM_DSA_MODE"] = "topk2048"
         os.environ["GLM_SPEC_K"] = "5"
+        os.environ["GLM_COMPILATION_SIZES"] = "32,512"
         env = rb._run_env(args, ["gsm8k"])
         assert env["attention_path"] == "dsa-sparse:topk2048"
         assert env["os_env"]["GLM_DCP"] == "4"          # the GLM_* sweep
         assert env["os_env"]["GLM_DSA_MODE"] == "topk2048"
         assert env["os_env"]["GLM_SPEC_K"] == "5"       # runbook §7 (M2) —
+        assert env["os_env"]["GLM_COMPILATION_SIZES"] == "32,512"
         # the M2 comparison script (mtp_m2_check.py) reads THIS field to
         # orient which run was spec-on; no extra provenance code needed.
     finally:
@@ -858,6 +925,7 @@ if __name__ == "__main__":
     test_platform_seed_probe()
     test_item_builders()
     test_dcp_engine_kwarg()
+    test_compilation_sizes_engine_kwarg()
     test_spec_engine_kwarg()
     test_run_env_provenance_fields()
     test_warn_worker_only_envs_classification()

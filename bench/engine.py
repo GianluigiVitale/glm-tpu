@@ -185,6 +185,39 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
     # side env: no raylet baking needed. Default unset = quiet (unchanged).
     if os.environ.get("GLM_LOG_STATS") == "1":
         extra["disable_log_stats"] = False
+    # Fixed-shape protected runs do not need the entire power-of-two AOT
+    # ladder. The TPU runner always compiles its base ladder from
+    # TPU_MIN_TOKEN_BUCKET through max_num_batched_tokens, then adds these
+    # explicit sizes. For example, a 128K passkey smoke can set
+    # TPU_MIN_TOKEN_BUCKET=2048 and GLM_COMPILATION_SIZES=32,512 to compile
+    # exactly the decode bucket, prompt tail, and full prefill chunk.
+    # Unset/empty keeps the additional_config kwarg ABSENT so ordinary runs
+    # remain byte-identical. Fail early instead of burning a cold pod build
+    # on an invalid or uncovered shape.
+    raw_compile_sizes = os.environ.get("GLM_COMPILATION_SIZES", "").strip()
+    compile_sizes: list[int] = []
+    if raw_compile_sizes:
+        try:
+            compile_sizes = sorted({
+                int(part.strip())
+                for part in raw_compile_sizes.split(",")
+                if part.strip()
+            })
+        except ValueError:
+            raise ValueError(
+                "GLM_COMPILATION_SIZES must be comma-separated power-of-two "
+                f"integers in [16, {max_batched_tokens}] (got "
+                f"{raw_compile_sizes!r})") from None
+        if not compile_sizes or any(
+                size < 16 or size > max_batched_tokens or
+                size & (size - 1) for size in compile_sizes):
+            raise ValueError(
+                "GLM_COMPILATION_SIZES must be comma-separated power-of-two "
+                f"integers in [16, {max_batched_tokens}] (got "
+                f"{raw_compile_sizes!r})")
+        extra["additional_config"] = {
+            "compilation_sizes": compile_sizes,
+        }
     # GLM_DCP=N sets vLLM's decode_context_parallel_size (DCP: shard each
     # sequence's KV cache across N ranks at decode — the long-context KV-
     # capacity knob; tensor_parallel_size must be divisible by N, enforced by
@@ -275,5 +308,6 @@ def build_llm(model: str, *, max_len: int = 8192, max_seqs: int = 8,
           f"(model={model}, tp={os.environ.get('GLM_TP', '32')}, ep=on, "
           f"max_len={max_len}{f', dcp={dcp}' if dcp else ''}"
           f"{f', spec=mtp:k={spec_k}' if spec_k else ''}"
+          f"{f', compile_sizes={compile_sizes}' if compile_sizes else ''}"
           f"{', ' + log_extra if log_extra else ''})", flush=True)
     return llm
