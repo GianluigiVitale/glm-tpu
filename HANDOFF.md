@@ -1,6 +1,6 @@
 # HANDOFF — GLM-5.2-FP8 on TPU v4
 
-**Updated:** 2026-08-04 23:27 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
+**Updated:** 2026-08-04 23:42 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
 `PLAN.md`, `docs/suggestions.md`, and the relevant recent entries in `docs/RESEARCH_LOG.md`.
 
 ## Project goal — do not narrow it
@@ -78,7 +78,10 @@ token executes 391 physical reductions across 78 sequential layers.
 TPU v4 is not intrinsically limited to this speed. Published PaLM-540B reached 28.5 ms/token on 64
 v4 chips using batch 64, 2K context, int8 weights, and a decode-specific 2D weight-stationary
 layout. That is not comparable to this batch-1/32-chip/256K run. Official vLLM TPU currently marks
-v4 experimental and leaves GLM-5, MLA, MoE, and multi-host TP/EP performance unvalidated.
+v4 experimental; its support matrix leaves multi-host TP/EP, CP/SP, MLA, and fused MoE unvalidated.
+The current upstream GLM-5.2 performance sprint independently targets replacing MoE all-reduce with
+reduce-scatter plus sequence parallelism. That corroborates this trace diagnosis and the all-gather/
+feature-sharding direction, but it is not evidence that the local candidate is fast or exact.
 
 ## Sole active TPU workflow — do not launch another
 

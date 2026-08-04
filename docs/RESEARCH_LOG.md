@@ -4338,3 +4338,27 @@ This targets the measured 66.58 ms gather + part of 35.66 ms sort + 12.65 ms att
 scorer/select full-shape initially to preserve selected sets by construction. Existing staggered
 CPU tests (`NUM_SEQS=3`, one/two live rows, token bucket four) are the correct parity/cache gate;
 production `max_num_seqs=1` makes the expected compiled narrowing 32 -> 1.
+
+## 2026-08-04 23:42 — PRIMARY-SOURCE TPU/vLLM AUDIT CONFIRMS THE BOTTLENECK CLASS; 30–50 tok/s comparisons are not apples-to-apples
+
+The owner's question about models larger than one chip's HBM was checked against current primary
+sources. A v4-64 is 32 chips in a 2x4x4 mesh, each with 32 GiB HBM and 1,200 GB/s bandwidth; the
+pod is distributed memory, not a coherent 1 TiB device. Large models fit by sharding weights and
+experts across chips, while activations/partial sums cross the ICI. Thus capacity scales with chip
+count, but single-token latency can get worse when a TP-32 mapping introduces collectives in every
+sequential layer.
+
+The strongest published v4 comparison remains Pope et al., *Efficiently Scaling Transformer
+Inference* (https://arxiv.org/abs/2211.05102): PaLM-540B reaches 28.5 ms/token with int8 weights on
+64 v4 chips at **batch 64 and 2K context**, using an analytically chosen multi-axis/2D partitioning
+layout; bf16 is 36.9 ms/token. This proves v4 can serve a 500B+ model in the 30 tok/s latency class,
+but does not predict batch-1 GLM-5.2 at 256K on half as many chips.
+
+Current vLLM TPU documentation (https://docs.vllm.ai/projects/tpu/en/stable/) labels v4
+experimental. Its support matrix leaves multi-host TP/EP, CP/SP, MLA, and fused MoE unvalidated.
+Most importantly, the active upstream GLM-5.2 optimization sprint
+(https://github.com/vllm-project/vllm/issues/46654) explicitly includes replacing MoE all-reduce
+with reduce-scatter and adding sequence parallelism. That independently corroborates the local E0
+finding: 75 tiny MoE combines consume 106.50 ms/token and are the immediate structural defect. It
+does not validate the local all-gather candidate; exactness, physical HLO counts, device latency,
+and profiler-free wall speed remain mandatory.
