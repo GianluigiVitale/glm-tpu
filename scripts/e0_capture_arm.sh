@@ -17,6 +17,11 @@ PIN="${E0_PIN:-94b746433}"
 LIVE_ROWS_PSUM="${E0_LIVE_ROWS_PSUM:-0}"
 MOE_PSUM_FUSION="${E0_MOE_PSUM_FUSION:-0}"
 TRACE_STEPS=20
+# E0 uses exact 2048-token prefill chunks and a 32-token decode bucket. Skip
+# the five unused intermediate AOT shapes; the per-try log gate proves this
+# exact set before a capture can be accepted.
+E0_MIN_TOKEN_BUCKET=2048
+E0_COMPILATION_SIZES=32
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%S%NZ)
 RUN_DIR=$HOME/glm-run/$TAG
@@ -80,7 +85,8 @@ RAYLET_EXPERIMENT_CHECK='grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'
 DRIVER="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
-TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 \
+TPU_MIN_TOKEN_BUCKET=$E0_MIN_TOKEN_BUCKET GLM_COMPILATION_SIZES=$E0_COMPILATION_SIZES \
+GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 \
 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 \
 GLM_WK_OOB_DIR=$OOB_DIR GLM_WK_OOB_GOLDEN=/tmp/golden.json \
 GLM_EXPECT_CODE_HASH=$PIN $DEXTRA"
@@ -248,9 +254,10 @@ PY
 
 mkdir -p "$RUN_DIR"
 if ! {
-  printf 'tag=%s\narm=%s\npin=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ntrace_steps=%s\noob_dir=%s\ngcs_run=%s\n' \
+  printf 'tag=%s\narm=%s\npin=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ntrace_steps=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\noob_dir=%s\ngcs_run=%s\n' \
     "$TAG" "$ARM" "$PIN" "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" \
-    "$TRACE_STEPS" "$OOB_DIR" "$GCS_RUN"
+    "$TRACE_STEPS" "$E0_MIN_TOKEN_BUCKET" "$E0_COMPILATION_SIZES" \
+    "$OOB_DIR" "$GCS_RUN"
   printf 'raylet_envs=%s %s GLM_JAX_TRACE_DIR=<per-try-nonce> %s\ndriver_envs=%s\n' \
     "$RENV" "$TRC_BASE" "$LIBTPU" "$DRIVER"
   printf 'glm_tpu_head=%s\nglm_tpu_dirty=%s\ntpu_inference_head=%s\ntpu_inference_dirty=%s\n' \
@@ -330,6 +337,7 @@ expected = {
     "GLM_DSA_MODE": "pallas_decode",
     "GLM_DECODE_LIVE_ROWS_PSUM": live_rows,
     "GLM_MOE_PSUM_FUSION": moe_fusion,
+    "GLM_COMPILATION_SIZES": "32",
 }
 assert {key: os_env.get(key) for key in expected} == expected
 raylet_lines = [line for line in pathlib.Path(raylet_path).read_text().splitlines()
@@ -449,7 +457,7 @@ for try in 1 2 3 4 5 6; do
     exit 1
   }
   say "try $try: launching protected $ARM engine"
-  if ! EXTRA_ENVS="$RENV $TRC $LIBTPU" TPU_MIN_TOKEN_BUCKET=32 \
+  if ! EXTRA_ENVS="$RENV $TRC $LIBTPU" TPU_MIN_TOKEN_BUCKET="$E0_MIN_TOKEN_BUCKET" \
       bash "$HOME/glm-tpu/scripts/launch_glm_32chip.sh" \
       > "$RUN_DIR/launch_t${try}.log" 2>&1; then
     say "try $try: launcher failed"; continue
@@ -512,6 +520,17 @@ for try in 1 2 3 4 5 6; do
   DRIVER_RC=$?
   DRIVER_SESSION=""
   echo "DRIVER_EXIT=$DRIVER_RC" >> "$LOG"
+
+  COMPILE_BUCKETS=$RUN_DIR/compile_buckets_t${try}.txt
+  BUCKETS_OK=0
+  if sed -E 's/\x1B\[[0-9;]*[mK]//g' "$LOG" |
+      grep 'Prepared token paddings:' > "$COMPILE_BUCKETS" &&
+      ! grep -vF 'Prepared token paddings: [32, 2048]' \
+        "$COMPILE_BUCKETS" >/dev/null; then
+    BUCKETS_OK=1
+  else
+    say "try $try: missing or unexpected token-bucket ladder"
+  fi
 
   TRACE_META=$RUN_DIR/remote_trace_meta_t${try}.txt
   # shellcheck disable=SC2016
@@ -578,7 +597,7 @@ PY
   fi
 
   if grep -q 'DRIVER_EXIT=0' "$LOG" && grep -q 'manifest VERIFIED' "$LOG" &&
-      [ "$PARSE_OK" -eq 1 ]; then
+      [ "$BUCKETS_OK" -eq 1 ] && [ "$PARSE_OK" -eq 1 ]; then
     RUN_LINK=$RUN_DIR/run_link_t${try}.json
     HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD)
     if ! "$HOME/vllm-env/bin/python" - \
@@ -613,6 +632,7 @@ assert os_env["GLM_JAX_TRACE_STEPS"] == "20"
 assert os_env["GLM_EXPECT_CODE_HASH"] == pin
 assert os_env["GLM_DECODE_LIVE_ROWS_PSUM"] == live_rows
 assert os_env["GLM_MOE_PSUM_FUSION"] == moe_fusion
+assert os_env["GLM_COMPILATION_SIZES"] == "32"
 created = datetime.datetime.fromisoformat(run["created_utc"]).timestamp()
 assert created >= float(started) - 5, (created, started)
 summary = [dict(r) for r in src.execute(
@@ -678,7 +698,7 @@ PY
   if grep -aqE "$REFUSAL_RE" "$LOG"; then
     say "try $try: draw REFUSED — redraw"
   else
-    say "try $try: incomplete driver=$(grep -c 'DRIVER_EXIT=0' "$LOG" || true) manifest=$(grep -c 'manifest VERIFIED' "$LOG" || true) scp=$SCP_OK/8 parse=$PARSE_OK"
+    say "try $try: incomplete driver=$(grep -c 'DRIVER_EXIT=0' "$LOG" || true) manifest=$(grep -c 'manifest VERIFIED' "$LOG" || true) buckets=$BUCKETS_OK scp=$SCP_OK/8 parse=$PARSE_OK"
   fi
 done
 say "FAILED in 6 tries"
