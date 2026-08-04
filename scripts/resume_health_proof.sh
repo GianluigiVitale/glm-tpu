@@ -419,7 +419,13 @@ assert len(items) == expected_cells, (len(items), expected_cells)
 assert all(r["correct"] == 1 for r in items), items
 assert all(r["benchmark"].startswith(f"passkey_L{lengths[0]}_d")
            for r in items), items
-assert all(abs(r["n_prompt_tokens"] - lengths[0]) <= 128 for r in items), items
+# glm_longctx's documented construction contract is at most the requested
+# target and within 1%; BPE boundary merges make a fixed 128-token tolerance
+# invalid at 128K (the canonical prompt is about 127.36K). Retain a 128-token
+# floor for the 5K health proof while scaling correctly for long contexts.
+prompt_delta = max(128, (lengths[0] + 99) // 100)
+assert all(lengths[0] - prompt_delta <= r["n_prompt_tokens"] <= lengths[0]
+           for r in items), items
 assert all(r["n_gen_tokens"] > 0 and r["raw_output"] for r in items), items
 
 summary = [dict(r) for r in src.execute(
