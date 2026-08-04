@@ -10,6 +10,7 @@ POD=db-v4-64-od
 PIN="${E0_PIN:-94b746433}"
 LIVE_ROWS_PSUM="${E0_LIVE_ROWS_PSUM:-0}"
 MOE_PSUM_FUSION="${E0_MOE_PSUM_FUSION:-0}"
+DCP_DECODE_LIVE_ROWS="${E0_DSA_DCP_DECODE_LIVE_ROWS:-0}"
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 PROOF_MODE="${PROOF_MODE:-health5k}"
 # Protected proofs have max_num_batched_tokens=2048 and can safely pad every
@@ -59,11 +60,20 @@ case "$MOE_PSUM_FUSION" in
   0|1) ;;
   *) echo "E0_MOE_PSUM_FUSION must be 0 or 1" >&2; exit 2 ;;
 esac
+case "$DCP_DECODE_LIVE_ROWS" in
+  0|1) ;;
+  *) echo "E0_DSA_DCP_DECODE_LIVE_ROWS must be 0 or 1" >&2; exit 2 ;;
+esac
 if [ "$MOE_PSUM_FUSION" = 1 ] && [ "$LIVE_ROWS_PSUM" != 1 ]; then
   echo "E0_MOE_PSUM_FUSION=1 requires E0_LIVE_ROWS_PSUM=1 for this proof" >&2
   exit 2
 fi
-EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM GLM_MOE_PSUM_FUSION=$MOE_PSUM_FUSION"
+if [ "$DCP_DECODE_LIVE_ROWS" = 1 ] &&
+    { [ "$LIVE_ROWS_PSUM" != 1 ] || [ "$MOE_PSUM_FUSION" != 1 ]; }; then
+  echo "E0_DSA_DCP_DECODE_LIVE_ROWS=1 requires the accepted psum stack" >&2
+  exit 2
+fi
+EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM GLM_MOE_PSUM_FUSION=$MOE_PSUM_FUSION GLM_DSA_DCP_DECODE_LIVE_ROWS=$DCP_DECODE_LIVE_ROWS"
 # Exact PID matcher used by this installed Ray CLI's `ray stop`: import its
 # live RAY_PROCESSES corpus and apply the same name-vs-cmdline semantics. The
 # enumerator excludes itself/ancestors and the nonce-marked local gcloud
@@ -173,7 +183,8 @@ owned_env() {
     tr "\0" "\n" < "$f" | grep -qx "GLM_DCP=4" &&
     tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_MODE=pallas_decode" &&
     tr "\0" "\n" < "$f" | grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" &&
-    tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'"
+    tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$DCP_DECODE_LIVE_ROWS"'"
 }
 # Ray strips the job env from these two title-rewritten helpers. Admit only
 # their exact Linux comm/argv pair and only through a direct exact-owned
@@ -272,7 +283,7 @@ has_8_unique_markers "$RUN_DIR/oob_postlaunch.txt" OOB_OK || {
 
 # Exact live values, not merely variable names, from every raylet.
 # shellcheck disable=SC2016
-ENV_CMD='P=$(pgrep -x raylet | head -1); f=/tmp/resume_health_env_$$; [ -n "$P" ] && tr "\0" "\n" < /proc/$P/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$TAG"'" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_DCP=4" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f" && grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$f" && grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'" "$f"; then echo "HEALTH_ENV_OK $(hostname) GLM_HEALTH_TAG='"$TAG"' GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH='"$PIN"' GLM_DCP=4 GLM_DSA_MODE=pallas_decode GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"' GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'"; else echo "HEALTH_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+ENV_CMD='P=$(pgrep -x raylet | head -1); f=/tmp/resume_health_env_$$; [ -n "$P" ] && tr "\0" "\n" < /proc/$P/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$TAG"'" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_DCP=4" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f" && grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$f" && grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'" "$f" && grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$DCP_DECODE_LIVE_ROWS"'" "$f"; then echo "HEALTH_ENV_OK $(hostname) GLM_HEALTH_TAG='"$TAG"' GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_STATE_HASH_REF=/tmp/golden.json GLM_EXPECT_CODE_HASH='"$PIN"' GLM_DCP=4 GLM_DSA_MODE=pallas_decode GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"' GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"' GLM_DSA_DCP_DECODE_LIVE_ROWS='"$DCP_DECODE_LIVE_ROWS"'"; else echo "HEALTH_ENV_BAD $(hostname)"; fi; rm -f "$f"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$ENV_CMD" > "$RUN_DIR/health_raylet_envs.txt" 2>&1 || true
 has_8_unique_markers "$RUN_DIR/health_raylet_envs.txt" HEALTH_ENV_OK || {
@@ -347,7 +358,8 @@ if ! "$HOME/vllm-env/bin/python" - "$HOME/glm-tpu/bench/results.db" \
   "$PROOF_NOTE_PREFIX ($TAG)" "$TAG" "$PROOF_MODE" "$PIN" \
   "$HARNESS_SHORT" "$PROOF_LENGTHS" "$PROOF_DEPTHS" "$PROOF_TRIALS" \
   "$PROOF_NUM_GPU_BLOCKS" "$PROOF_MAX_LEN" "$PROOF_START_EPOCH" \
-  "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" "$OOB_DIR" <<'PY'
+  "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" "$DCP_DECODE_LIVE_ROWS" \
+  "$OOB_DIR" <<'PY'
 import datetime
 import json
 import sqlite3
@@ -356,7 +368,7 @@ import sys
 (
     db, snapshot, out, note, tag, mode, pin, harness, lengths_raw,
     depths_raw, trials_raw, blocks_raw, max_len_raw, started_raw, live_rows,
-    moe_fusion, oob_dir,
+    moe_fusion, dcp_decode_live_rows, oob_dir,
 ) = sys.argv[1:]
 lengths = [int(x) for x in lengths_raw.split(",")]
 depths = [float(x) for x in depths_raw.split(",")]
@@ -400,6 +412,7 @@ expected_os = {
     "GLM_DSA_SEG_GATHER_IMPL": "v2",
     "GLM_DECODE_LIVE_ROWS_PSUM": live_rows,
     "GLM_MOE_PSUM_FUSION": moe_fusion,
+    "GLM_DSA_DCP_DECODE_LIVE_ROWS": dcp_decode_live_rows,
     "GLM_COMPILATION_SIZES": "32",
     "GLM_PWAL_NAN_CHECK": "1",
     "GLM_LOAD_NAN_CHECK": "1",
