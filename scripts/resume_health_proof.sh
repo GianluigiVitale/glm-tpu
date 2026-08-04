@@ -245,9 +245,16 @@ fi'
 }
 stop_owned_ray() {
   local label="$1"
-  ownership_census "prestop_${label}" || return 1
-  local owned
-  owned=$(grep -c ' state=OWNED ' "$RUN_DIR/ownership_prestop_${label}.txt" || true)
+  local attempt=1 census_label="prestop_${label}" out owned
+  while ! ownership_census "$census_label"; do
+    [ "$attempt" -lt 3 ] || return 1
+    say "ownership census transient/refused ($label attempt=$attempt); waiting for Ray worker title/exit transition"
+    sleep 10
+    attempt=$((attempt + 1))
+    census_label="prestop_${label}_retry${attempt}"
+  done
+  out=$RUN_DIR/ownership_${census_label}.txt
+  owned=$(grep -c ' state=OWNED ' "$out" || true)
   if [ "$owned" -eq 0 ]; then
     say "no Ray-stop candidates after ownership census ($label)"
     strict_census "nostop_${label}"

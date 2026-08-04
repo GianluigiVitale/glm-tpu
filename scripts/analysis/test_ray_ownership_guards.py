@@ -58,3 +58,15 @@ def test_wrapper_discovery_does_not_self_match_controller_commands() -> None:
         ), path
         assert '"$engine_pids"' in text, path
         assert "vllm_pids" not in text, path
+
+
+def test_post_driver_cleanup_retries_transient_wrapper_titles() -> None:
+    for path in (
+        "scripts/resume_health_proof.sh",
+        "scripts/dcp_live_rows_exact.sh",
+    ):
+        text = (ROOT / path).read_text()
+        assert 'while ! ownership_census ' in text, path
+        assert '[ "$attempt" -lt 3 ] || return 1' in text, path
+        assert 'sleep 10' in text, path
+        assert 'census_label="prestop_${label}_retry${attempt}"' in text, path
