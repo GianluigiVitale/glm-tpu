@@ -611,11 +611,16 @@ PY
 
   ANALYSIS_JSON=$RUN_DIR/analysis_t${try}.json
   ANALYSIS_MD=$RUN_DIR/analysis_t${try}.md
+  STEADY_JSON=$RUN_DIR/steady_decode_t${try}.json
   PARSE_OK=0
   if [ "$SCP_OK" -eq 8 ] && [ "$TRACE_MANIFEST_OK" -eq 1 ] &&
       "$HOME/vllm-env/bin/python" "$HOME/glm-tpu/scripts/analysis/parse_xplane.py" \
         fleet "$TRY_TRACE" "$ANALYSIS_JSON" > "$ANALYSIS_MD" 2>&1 &&
-      validate_analysis "$ANALYSIS_JSON" >> "$ANALYSIS_MD" 2>&1; then
+      validate_analysis "$ANALYSIS_JSON" >> "$ANALYSIS_MD" 2>&1 &&
+      "$HOME/vllm-env/bin/python" \
+        "$HOME/glm-tpu/scripts/analysis/extract_steady_decode.py" \
+        "$LOG" "$ANALYSIS_JSON" "$STEADY_JSON" \
+        --trace-steps "$TRACE_STEPS" >> "$ANALYSIS_MD" 2>&1; then
     PARSE_OK=1
   fi
 
@@ -692,7 +697,8 @@ PY
       continue
     fi
     if [ ! -s "$RUN_LINK" ] || [ ! -s "$RUN_DIR/results_ckpt.db" ] ||
-        [ ! -s "$RUN_DIR/throughput_t${try}.json" ]; then
+        [ ! -s "$RUN_DIR/throughput_t${try}.json" ] ||
+        [ ! -s "$STEADY_JSON" ]; then
       say "try $try: required DB artifacts missing"
       continue
     fi
