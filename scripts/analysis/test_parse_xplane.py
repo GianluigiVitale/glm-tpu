@@ -16,6 +16,8 @@ DSA_CAT = "pallas: dsa_sparse_decode (sparse MLA attend)"
 
 def fake_core(host, plane, *, steps=20, sparse=True):
     selected = []
+    all_reduce_signature = parse_xplane.signature_key(
+        "all-reduce", "/src/linear.py:193", "bf16[32,6144]")
     for i in range(steps):
         categories = {"collectives": 100_000_000_000}
         ops = {
@@ -40,6 +42,25 @@ def fake_core(host, plane, *, steps=20, sparse=True):
             "busy_ps": sum(categories.values()),
             "per_category_ps": categories,
             "per_op": ops,
+            "per_signature": {
+                all_reduce_signature: {
+                    "op": "all-reduce",
+                    "source": "/src/linear.py:193",
+                    "source_stack": "/src/linear.py:193:21",
+                    "shape_with_layout": "bf16[32,6144]",
+                    "tf_op": "jit(step)/psum",
+                    "program_id": 7,
+                    "util_pct": None,
+                    "category": "collectives",
+                    "hlo_category": "all-reduce",
+                    "self_ps": 100_000_000_000,
+                    "count": 232,
+                    "bytes_accessed": 393_216 * 232,
+                    "raw_bytes_accessed": 786_432 * 232,
+                    "flops": 98_304 * 232,
+                    "model_flops": 98_304 * 232,
+                }
+            },
         })
     return {
         "host": host,
@@ -85,6 +106,13 @@ class FleetIntegrityTest(unittest.TestCase):
         self.assertAlmostEqual(summary["busy_ms_per_step"], 110.0)
         self.assertAlmostEqual(summary["step_cycle_ms"], 210.0)
         self.assertEqual(summary["sparse_dsa_cores"], 64)
+        self.assertEqual(len(summary["signatures"]), 1)
+        signature = next(iter(summary["signatures"].values()))
+        self.assertEqual(signature["source"], "/src/linear.py:193")
+        self.assertEqual(signature["invocations_per_step"], 232)
+        self.assertAlmostEqual(signature["bytes_accessed_per_step"],
+                               393_216 * 232)
+        self.assertGreater(signature["effective_gbytes_per_s"], 0)
         parse_xplane.validate_fleet_expectations(
             summary, n_files=8, n_cores=64, n_hosts=8,
             cores_per_host=8, steps_per_core=20, arm="sparse",
