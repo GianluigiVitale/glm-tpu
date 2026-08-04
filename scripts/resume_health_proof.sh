@@ -12,6 +12,13 @@ LIVE_ROWS_PSUM="${E0_LIVE_ROWS_PSUM:-0}"
 MOE_PSUM_FUSION="${E0_MOE_PSUM_FUSION:-0}"
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 PROOF_MODE="${PROOF_MODE:-health5k}"
+# Protected proofs have max_num_batched_tokens=2048 and can safely pad every
+# non-decode prefill remainder to that already-required bucket. Compile only
+# T=32 decode plus T=2048 prefill instead of the seven-size default ladder.
+# The driver-side GLM knob is provenance-recorded; TPU_MIN_TOKEN_BUCKET shapes
+# the worker base ladder. The post-run log gate below proves the actual set.
+PROOF_MIN_TOKEN_BUCKET=2048
+PROOF_COMPILATION_SIZES=32
 case "$PROOF_MODE" in
   health5k)
     TAG_PREFIX=resume_health
@@ -94,7 +101,8 @@ RAYLET_ENVS="$RAYLET_ENVS $EXPERIMENT_ENV"
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
-TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 \
+TPU_MIN_TOKEN_BUCKET=$PROOF_MIN_TOKEN_BUCKET GLM_COMPILATION_SIZES=$PROOF_COMPILATION_SIZES \
+GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 \
 GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=4 \
 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_SCORER=xla \
 GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned \
@@ -125,9 +133,10 @@ if ! has_8_unique_markers "$RUN_DIR/preflight.txt" GOLDEN_OK ||
   exit 1
 fi
 
-printf 'tag=%s\nproof_mode=%s\nlengths=%s\ndepths=%s\ntrials=%s\nnum_gpu_blocks=%s\nmax_len=%s\npin=%s\nraylet_envs=%s\ndriver_envs=%s\ngcs_run=%s\n' \
+printf 'tag=%s\nproof_mode=%s\nlengths=%s\ndepths=%s\ntrials=%s\nnum_gpu_blocks=%s\nmax_len=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\npin=%s\nraylet_envs=%s\ndriver_envs=%s\ngcs_run=%s\n' \
   "$TAG" "$PROOF_MODE" "$PROOF_LENGTHS" "$PROOF_DEPTHS" "$PROOF_TRIALS" \
-  "$PROOF_NUM_GPU_BLOCKS" "$PROOF_MAX_LEN" "$PIN" "$RAYLET_ENVS" \
+  "$PROOF_NUM_GPU_BLOCKS" "$PROOF_MAX_LEN" "$PROOF_MIN_TOKEN_BUCKET" \
+  "$PROOF_COMPILATION_SIZES" "$PIN" "$RAYLET_ENVS" \
   "$DRIVER_ENVS" "$GCS_RUN" > "$RUN_DIR/config.txt" || exit 1
 
 # This is the last command before the broad-reset launcher.
@@ -246,7 +255,7 @@ WATCH_PID=$!
 
 say "launch protected DCP4 $PROOF_MODE Ray cluster"
 LAUNCHED=1
-EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
+EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET="$PROOF_MIN_TOKEN_BUCKET" \
   bash "$HOME/glm-tpu/scripts/launch_glm_32chip.sh" \
   > "$RUN_DIR/launch_${PROOF_MODE}.log" 2>&1 || exit 1
 
@@ -320,6 +329,18 @@ if [ "$DRIVER_RC" -ne 0 ] ||
   exit 1
 fi
 
+# Strip Ray/ANSI decoration and require every emitted token-bucket table to
+# be exactly the protected sparse set. This is executable evidence that the
+# optimization armed, not merely an environment/config claim.
+sed -E 's/\x1B\[[0-9;]*[mK]//g' "$LOG" |
+  grep 'Prepared token paddings:' > "$RUN_DIR/compile_buckets.txt" || {
+    say "ABORT: no compiled token-bucket evidence"; exit 1; }
+if grep -vF 'Prepared token paddings: [32, 2048]' \
+    "$RUN_DIR/compile_buckets.txt" >/dev/null; then
+  say "ABORT: unexpected token-bucket ladder"
+  exit 1
+fi
+
 HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD)
 if ! "$HOME/vllm-env/bin/python" - "$HOME/glm-tpu/bench/results.db" \
   "$RUN_DIR/results_ckpt.db" "$RUN_DIR/run_link.json" \
@@ -379,6 +400,7 @@ expected_os = {
     "GLM_DSA_SEG_GATHER_IMPL": "v2",
     "GLM_DECODE_LIVE_ROWS_PSUM": live_rows,
     "GLM_MOE_PSUM_FUSION": moe_fusion,
+    "GLM_COMPILATION_SIZES": "32",
     "GLM_PWAL_NAN_CHECK": "1",
     "GLM_LOAD_NAN_CHECK": "1",
     "GLM_LOAD_CHECKSUM": "1",
