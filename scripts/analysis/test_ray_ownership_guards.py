@@ -45,3 +45,16 @@ def test_ray_worker_wrapper_identity_is_not_broadened() -> None:
         assert "ray::RayWorkerWrapper*" not in body
         assert body.count('"ray::IDLE"') == 2
         assert "ray::IDLE*" not in body
+
+
+def test_wrapper_discovery_does_not_self_match_controller_commands() -> None:
+    for path in SCRIPTS:
+        text = (ROOT / path).read_text()
+        assert not re.search(
+            r"^.*pgrep.*RayWorkerWrapper.*$", text, re.MULTILINE
+        ), path
+        assert (
+            'engine_pids=$(pgrep -f "VLLM::[E]ngineCore"' in text
+        ), path
+        assert '"$engine_pids"' in text, path
+        assert "vllm_pids" not in text, path

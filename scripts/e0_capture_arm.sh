@@ -177,11 +177,14 @@ command -v pgrep >/dev/null 2>&1 || tools_ok=0
 command -v fuser >/dev/null 2>&1 || tools_ok=0
 sudo -n true >/dev/null 2>&1 || tools_ok=0
 ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?
-vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true)
+# RAY_ENUM already includes the title-rewritten worker wrapper. Searching for
+# that title again self-matches this command because owned_aux_agent has the
+# literal, making the census classify its own controller shell as foreign.
+engine_pids=$(pgrep -f "VLLM::[E]ngineCore" 2>/dev/null || true)
 workload_pids=$(pgrep -f "[g]lm_longctx[.]py|[d]sa_throughput[.]py|[r]un_bench[.]py|[g]ate_sparse128k[.]sh|[s]tage256k[.]sh|[b]ench_run[.]sh" 2>/dev/null || true)
 containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?
 holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true)
-pids=$(printf "%s\n%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$workload_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " ")
+pids=$(printf "%s\n%s\n%s\n%s\n" "$ray_pids" "$engine_pids" "$workload_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " ")
 bad=""
 for p in $pids; do
   if ! owned_env "/proc/$p/environ" && ! owned_aux_agent "$p"; then bad="$bad $p"; fi

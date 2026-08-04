@@ -19,7 +19,10 @@ case "$EXACT_LEVER" in
     DEFAULT_PIN=979f818e0
     TAG_PREFIX=dcp_live_rows_exact
     NOTE_PREFIX="DCP live rows exact"
-    CANDIDATE_ARMED_LOG="GLM_DSA_DCP_DECODE_LIVE_ROWS armed"
+    # This gate predates the generalized exactness harness and has no
+    # source-side armed log. Its all-host env provenance and distinct compiled
+    # step fingerprint are authenticated below instead.
+    CANDIDATE_ARMED_LOG=""
     ;;
   moe_allgather)
     DEFAULT_PIN=5967dffa4
@@ -36,6 +39,14 @@ PIN="${EXACT_PIN:-$DEFAULT_PIN}"
 OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
 RECOVER_OFF=0
+RECOVER_ON="${EXACT_RECOVER_ON:-0}"
+case "$RECOVER_ON" in
+  0 | 1) ;;
+  *)
+    echo "EXACT_RECOVER_ON must be 0 or 1" >&2
+    exit 2
+    ;;
+esac
 RESUME_DIR="${EXACT_RESUME_DIR:-${DCP_EXACT_RESUME_DIR:-}}"
 if [ -n "$RESUME_DIR" ]; then
   RUN_DIR=${RESUME_DIR%/}
@@ -53,6 +64,10 @@ if [ -n "$RESUME_DIR" ]; then
   TAG=${RUN_DIR##*/}
   RECOVER_OFF=1
 else
+  [ "$RECOVER_ON" -eq 0 ] || {
+    echo "EXACT_RECOVER_ON=1 requires EXACT_RESUME_DIR" >&2
+    exit 2
+  }
   TAG=${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)
   RUN_DIR=$HOME/glm-run/$TAG
 fi
@@ -185,10 +200,13 @@ command -v pgrep >/dev/null 2>&1 || tools_ok=0
 command -v fuser >/dev/null 2>&1 || tools_ok=0
 sudo -n true >/dev/null 2>&1 || tools_ok=0
 ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?
-vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true)
+# RAY_ENUM already includes the title-rewritten worker wrapper. Searching for
+# that title again self-matches this command because owned_aux_agent has the
+# literal, making the census classify its own controller shell as foreign.
+engine_pids=$(pgrep -f "VLLM::[E]ngineCore" 2>/dev/null || true)
 containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?
 holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true)
-pids=$(printf "%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " ")
+pids=$(printf "%s\n%s\n%s\n" "$ray_pids" "$engine_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " ")
 bad=""
 for p in $pids; do
   if ! owned_env "/proc/$p/environ" && ! owned_aux_agent "$p"; then bad="$bad $p"; fi
@@ -411,12 +429,13 @@ run_side() {
     say "ABORT: accepted MoE psum fusion not armed side=$side"
     return 1
   }
-  if [ "$candidate_gate" = 1 ]; then
+  if [ "$candidate_gate" = 1 ] && [ -n "$CANDIDATE_ARMED_LOG" ]; then
     grep -q "$CANDIDATE_ARMED_LOG" "$log" || {
       say "ABORT: candidate armed log missing side=$side lever=$EXACT_LEVER"
       return 1
     }
-  elif grep -q "$CANDIDATE_ARMED_LOG" "$log"; then
+  elif [ "$candidate_gate" = 0 ] && [ -n "$CANDIDATE_ARMED_LOG" ] &&
+      grep -q "$CANDIDATE_ARMED_LOG" "$log"; then
     say "ABORT: candidate unexpectedly armed on control side lever=$EXACT_LEVER"
     return 1
   fi
@@ -466,6 +485,52 @@ validate_recovered_off() {
   say "recovered OFF accepted: driver/state/gates/hashes files=$files"
 }
 
+validate_recovered_on() {
+  local log=$RUN_DIR/driver_on.log
+  if [ ! -s "$log" ] || ! grep -q '^DRIVER_EXIT=0$' "$log"; then
+    say "ABORT: recovered ON driver evidence is incomplete"
+    return 1
+  fi
+  grep -q 'manifest VERIFIED.*repeated 7x across cluster' "$log" || {
+    say "ABORT: recovered ON manifest coverage missing"
+    return 1
+  }
+  grep -q "GLM_CODE_FINGERPRINT: git=$PIN.*dirty=0" "$log" || {
+    say "ABORT: recovered ON fingerprint mismatch"
+    return 1
+  }
+  grep -q 'GLM_DECODE_LIVE_ROWS_PSUM armed' "$log" || return 1
+  grep -q 'GLM_MOE_PSUM_FUSION armed' "$log" || return 1
+  if [ -n "$CANDIDATE_ARMED_LOG" ]; then
+    grep -q "$CANDIDATE_ARMED_LOG" "$log" || {
+      say "ABORT: recovered ON candidate armed log missing lever=$EXACT_LEVER"
+      return 1
+    }
+  fi
+  has_8_unique_markers "$RUN_DIR/raylet_env_on.txt" RAYLET_ENV_OK || {
+    say "ABORT: recovered ON all-host raylet env evidence missing"
+    return 1
+  }
+  if [ -s "$RUN_DIR/on_sha256.txt" ]; then
+    sha256sum -c "$RUN_DIR/on_sha256.txt" >/dev/null 2>&1 || {
+      say "ABORT: recovered ON dump hashes failed"
+      return 1
+    }
+  else
+    gather_dumps on "/tmp/${TAG}_on/topk.npz" || {
+      say "ABORT: recovered ON dump coverage missing"
+      return 1
+    }
+  fi
+  local files
+  files=$(wc -l < "$RUN_DIR/on_sha256.txt")
+  [ "$files" -ge 3 ] || {
+    say "ABORT: recovered ON dump coverage too small: $files"
+    return 1
+  }
+  say "recovered ON accepted: driver/state/gates/env/hashes files=$files"
+}
+
 LOCAL_CENSUS_FILE=$RUN_DIR/census_local.txt
 [ "$RECOVER_OFF" -eq 0 ] || \
   LOCAL_CENSUS_FILE=$RUN_DIR/census_local_resume.txt
@@ -501,10 +566,17 @@ if [ "$RECOVER_OFF" -eq 1 ]; then
   fi
   printf 'recovery_orchestrator=%s\nrecovery_utc=%s\n' \
     "$ORCHESTRATOR_SHORT" "$(date -u +%FT%TZ)" >> "$RUN_DIR/config.txt" || exit 1
-  cp "$HOME/glm-tpu/scripts/dcp_live_rows_exact.sh" \
-    "$RUN_DIR/original_harness.sh" || exit 1
-  cp "$SCRIPT_ROOT/scripts/dcp_live_rows_exact.sh" \
-    "$RUN_DIR/recovery_harness.sh" || exit 1
+  if [ ! -e "$RUN_DIR/original_harness.sh" ]; then
+    cp "$HOME/glm-tpu/scripts/dcp_live_rows_exact.sh" \
+      "$RUN_DIR/original_harness.sh" || exit 1
+  fi
+  if [ "$RECOVER_ON" -eq 1 ]; then
+    cp "$SCRIPT_ROOT/scripts/dcp_live_rows_exact.sh" \
+      "$RUN_DIR/posthoc_harness.sh" || exit 1
+  else
+    cp "$SCRIPT_ROOT/scripts/dcp_live_rows_exact.sh" \
+      "$RUN_DIR/recovery_harness.sh" || exit 1
+  fi
 else
   printf 'tag=%s\nexact_lever=%s\npin=%s\nharness=%s\norchestrator=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
     "$TAG" "$EXACT_LEVER" "$PIN" "$HARNESS_SHORT" "$ORCHESTRATOR_SHORT" \
@@ -523,7 +595,37 @@ if [ "$RECOVER_OFF" -eq 1 ]; then
 else
   run_side off || exit 1
 fi
-run_side on || exit 1
+if [ "$RECOVER_ON" -eq 1 ]; then
+  validate_recovered_on || exit 1
+else
+  run_side on || exit 1
+fi
+
+if ! "$HOME/vllm-env/bin/python" - "$RUN_DIR/driver_off.log" \
+    "$RUN_DIR/driver_on.log" "$RUN_DIR/step_fingerprints.json" <<'PY'
+import json
+import re
+import sys
+
+off_log, on_log, out_path = sys.argv[1:]
+pattern = re.compile(
+    r"\(HLO module jit_step_fun_impl\): Executable fingerprint:([0-9a-f]{64})"
+)
+out = {}
+for side, path in (("off", off_log), ("on", on_log)):
+    with open(path, errors="replace") as f:
+        values = sorted(set(pattern.findall(f.read())))
+    assert len(values) == 1, (side, values)
+    out[side] = values[0]
+assert out["off"] != out["on"], out
+with open(out_path, "w") as f:
+    json.dump(out, f, indent=2)
+print("STEP_FINGERPRINTS_DISTINCT", out["off"], out["on"])
+PY
+then
+  say "ABORT: OFF/ON compiled step fingerprint validation failed"
+  exit 1
+fi
 
 say "compare selected indices/tie order and exact generated output"
 (
@@ -640,11 +742,14 @@ evidence_files=(
   "$RUN_DIR"/on_flat/*.npz
   "$RUN_DIR/topk_diff.txt"
   "$RUN_DIR/token_exactness.json"
+  "$RUN_DIR/step_fingerprints.json"
 )
 if [ "$RECOVER_OFF" -eq 1 ]; then
-  evidence_files+=("$RUN_DIR/original_harness.sh"
-                   "$RUN_DIR/recovery_harness.sh")
+  evidence_files+=("$RUN_DIR/original_harness.sh")
 fi
+for snapshot in recovery_harness.sh posthoc_harness.sh; do
+  [ ! -e "$RUN_DIR/$snapshot" ] || evidence_files+=("$RUN_DIR/$snapshot")
+done
 sha256sum "${evidence_files[@]}" > "$RUN_DIR/evidence.sha256" || exit 1
 touch "$RUN_DIR/SUCCESS" || exit 1
 ARCHIVE_LOG_TMP=/tmp/${TAG}_archive.log
