@@ -121,7 +121,53 @@ ownership_census() {
   local out=$RUN_DIR/ownership_${label}.txt
   # Every process affected by ray stop must carry this draw's live unique tag.
   # shellcheck disable=SC2016
-  local cmd='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?; vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); pids=$(printf "%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " "); bad=""; for p in $pids; do f=/proc/$p/environ; if [ ! -r "$f" ] || ! tr "\0" "\n" < "$f" | grep -qx "GLM_HEALTH_TAG='"$TAG"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DCP=4" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_MODE=pallas_decode" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" || ! tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'"; then bad="$bad $p"; fi; done; if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "OWNER_BAD $(hostname) bad=$bad"; elif [ -n "$pids" ]; then echo "OWNER_OK $(hostname) state=OWNED pids=$pids"; else echo "OWNER_OK $(hostname) state=EMPTY"; fi'
+  local cmd='
+owned_env() {
+  local f="$1"
+  [ -r "$f" ] &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_HEALTH_TAG='"$TAG"'" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_DCP=4" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_MODE=pallas_decode" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'"
+}
+# Ray strips the job env from these two title-rewritten helpers. Admit only
+# their exact Linux comm/argv pair and only through a direct exact-owned
+# raylet parent; every other env-less process remains foreign.
+owned_aux_agent() {
+  local p="$1" name arg0 pp
+  name=$(cat "/proc/$p/comm" 2>/dev/null) || return 1
+  arg0=$(tr "\0" "\n" < "/proc/$p/cmdline" 2>/dev/null | head -n 1) || return 1
+  if ! { [ "$name" = "ray::DashboardA" ] && [ "$arg0" = "ray::DashboardAgent" ]; } &&
+     ! { [ "$name" = "ray::RuntimeEnv" ] && [ "$arg0" = "ray::RuntimeEnvAgent" ]; }; then
+    return 1
+  fi
+  pp=$(grep "^PPid:" "/proc/$p/status" 2>/dev/null | tr -dc "0-9") || return 1
+  [ -n "$pp" ] && [ "$(cat "/proc/$pp/comm" 2>/dev/null)" = "raylet" ] &&
+    owned_env "/proc/$pp/environ"
+}
+tools_ok=1
+command -v pgrep >/dev/null 2>&1 || tools_ok=0
+command -v fuser >/dev/null 2>&1 || tools_ok=0
+sudo -n true >/dev/null 2>&1 || tools_ok=0
+ray_pids=$('"$RAY_ENUM"' 2>/dev/null); ray_rc=$?
+vllm_pids=$(pgrep -f "VLLM::[E]ngineCore|[R]ayWorkerWrapper" 2>/dev/null || true)
+containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?
+holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true)
+pids=$(printf "%s\n%s\n%s\n" "$ray_pids" "$vllm_pids" "$holders" | tr " " "\n" | grep -E "^[0-9]+$" | sort -un | tr "\n" " ")
+bad=""
+for p in $pids; do
+  if ! owned_env "/proc/$p/environ" && ! owned_aux_agent "$p"; then bad="$bad $p"; fi
+done
+if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ] || [ -n "$bad" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then
+  echo "OWNER_BAD $(hostname) bad=$bad"
+elif [ -n "$pids" ]; then
+  echo "OWNER_OK $(hostname) state=OWNED pids=$pids"
+else
+  echo "OWNER_OK $(hostname) state=EMPTY"
+fi'
   GLM_CENSUS_CARRIER="$TAG" gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || return 1
   has_8_unique_markers "$out" OWNER_OK
