@@ -1,9 +1,12 @@
 #!/bin/bash
 # Protected single-variable TPU A/B for GLM_DSA_DCP_DECODE_LIVE_ROWS.
 # Both sides use the accepted live-row-psum + MoE-psum-fusion stack and the
-# production DCP8/256K engine shape, so the ON compile can be reused by the
-# subsequent E0 trace. Acceptance requires exact selected indices/tie order,
-# exact generated tokens/raw output, guarded model state, and clean ownership.
+# production DCP8/256K cache geometry. max_batched_tokens=32 deliberately
+# compiles only the production pure-decode bucket changed by this lever; dump
+# instrumentation makes this a distinct debug HLO anyway, so compiling unused
+# prefill buckets through 2048 would buy no E0 cache reuse. Acceptance requires
+# exact selected indices/tie order, exact generated tokens/raw output, guarded
+# model state, and clean ownership.
 set -uo pipefail
 
 ZONE=us-central2-b
@@ -286,7 +289,7 @@ run_side() {
   ' protected-exact "$HOME/glm-tpu/bench" "$HOME/glm-tpu/.env" \
     env $driver_envs "$HOME/vllm-env/bin/python" -u glm_longctx.py \
     --lengths 4096 --depths 0.5 --trials 1 --max-seqs 1 --gmu 0.90 \
-    --max-batched-tokens 2048 --num-gpu-blocks 66 --max-len 262400 \
+    --max-batched-tokens 32 --num-gpu-blocks 66 --max-len 262400 \
     --max-new 2 --note "$note" </dev/null > "$log" 2>&1 &
   local worker=$!
   DRIVER_SESSION=$worker
@@ -362,7 +365,7 @@ pin_census || exit 1
 bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check |
   tee -a "$RUN_DIR/orchestrator.log" || exit 1
 
-printf 'tag=%s\npin=%s\nshape=dcp8 blocks66 max_len262400\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
+printf 'tag=%s\npin=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
   "$TAG" "$PIN" "$BASE_RAYLET_ENVS" "$BASE_DRIVER_ENVS" "$GCS_RUN" \
   > "$RUN_DIR/config.txt" || exit 1
 
@@ -438,7 +441,7 @@ for side in ("off", "on"):
     assert run["harness_git"] == harness, (run["harness_git"], harness)
     assert env["lengths"] == [4096] and env["depths"] == [0.5]
     assert env["trials"] == 1 and env["max_new"] == 2
-    assert env["max_seqs"] == 1 and env["max_batched_tokens"] == 2048
+    assert env["max_seqs"] == 1 and env["max_batched_tokens"] == 32
     assert env["num_gpu_blocks"] == 66 and env["max_len"] == 262400
     assert {k: os_env.get(k) for k in expected} == expected
     items = [dict(row) for row in src.execute(
