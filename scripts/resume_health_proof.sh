@@ -341,15 +341,32 @@ if [ "$DRIVER_RC" -ne 0 ] ||
   exit 1
 fi
 
-# Strip Ray/ANSI decoration and require every emitted token-bucket table to
-# be exactly the protected sparse set. This is executable evidence that the
-# optimization armed, not merely an environment/config claim.
+# get_token_paddings logs the base ladder before TPU runner appends
+# additional_config.compilation_sizes. Require the exact base, the exact
+# driver-side addition, and the resulting backbone precompile shapes. The
+# three independent observations prove the final runner table [32, 2048]
+# without pretending the pre-append logger emitted it.
 sed -E 's/\x1B\[[0-9;]*[mK]//g' "$LOG" |
   grep 'Prepared token paddings:' > "$RUN_DIR/compile_buckets.txt" || {
     say "ABORT: no compiled token-bucket evidence"; exit 1; }
-if grep -vF 'Prepared token paddings: [32, 2048]' \
+if grep -vF 'Prepared token paddings: [2048]' \
     "$RUN_DIR/compile_buckets.txt" >/dev/null; then
-  say "ABORT: unexpected token-bucket ladder"
+  say "ABORT: unexpected base token-bucket ladder"
+  exit 1
+fi
+if ! grep -Fq "'additional_config': {'compilation_sizes': [32]}" "$LOG"; then
+  say "ABORT: decode compilation-size addition absent"
+  exit 1
+fi
+sed -E 's/\x1B\[[0-9;]*[mK]//g' "$LOG" |
+  grep "Precompile worker0 backbone --> {'num_tokens':" |
+  sed -E "s/.*'num_tokens': ([0-9]+).*/\1/" | sort -nu \
+    > "$RUN_DIR/compile_backbone_buckets.txt" || {
+      say "ABORT: no backbone compile-bucket evidence"; exit 1; }
+if ! printf '32\n2048\n' | diff -u - \
+    "$RUN_DIR/compile_backbone_buckets.txt" > \
+    "$RUN_DIR/compile_backbone_buckets.diff"; then
+  say "ABORT: unexpected final backbone compile-bucket set"
   exit 1
 fi
 

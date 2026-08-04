@@ -537,14 +537,22 @@ for try in 1 2 3 4 5 6; do
   echo "DRIVER_EXIT=$DRIVER_RC" >> "$LOG"
 
   COMPILE_BUCKETS=$RUN_DIR/compile_buckets_t${try}.txt
+  BACKBONE_BUCKETS=$RUN_DIR/compile_backbone_buckets_t${try}.txt
   BUCKETS_OK=0
   if sed -E 's/\x1B\[[0-9;]*[mK]//g' "$LOG" |
       grep 'Prepared token paddings:' > "$COMPILE_BUCKETS" &&
-      ! grep -vF 'Prepared token paddings: [32, 2048]' \
-        "$COMPILE_BUCKETS" >/dev/null; then
+      ! grep -vF 'Prepared token paddings: [2048]' \
+        "$COMPILE_BUCKETS" >/dev/null &&
+      grep -Fq "'additional_config': {'compilation_sizes': [32]}" "$LOG" &&
+      sed -E 's/\x1B\[[0-9;]*[mK]//g' "$LOG" |
+        grep "Precompile worker0 backbone --> {'num_tokens':" |
+        sed -E "s/.*'num_tokens': ([0-9]+).*/\1/" | sort -nu \
+          > "$BACKBONE_BUCKETS" &&
+      printf '32\n2048\n' | diff -u - "$BACKBONE_BUCKETS" \
+        > "$RUN_DIR/compile_backbone_buckets_t${try}.diff"; then
     BUCKETS_OK=1
   else
-    say "try $try: missing or unexpected token-bucket ladder"
+    say "try $try: missing or unexpected base/addition/backbone bucket evidence"
   fi
 
   TRACE_META=$RUN_DIR/remote_trace_meta_t${try}.txt
