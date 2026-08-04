@@ -16,6 +16,7 @@ OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=dcp_live_rows_exact_$(date -u +%Y%m%dT%H%M%S%NZ)
 RUN_DIR=$HOME/glm-run/$TAG
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
+HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD) || exit 1
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-10800}"
 ACTIVE_SIDE=""
 DRIVER_SESSION=""
@@ -365,8 +366,9 @@ pin_census || exit 1
 bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check |
   tee -a "$RUN_DIR/orchestrator.log" || exit 1
 
-printf 'tag=%s\npin=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
-  "$TAG" "$PIN" "$BASE_RAYLET_ENVS" "$BASE_DRIVER_ENVS" "$GCS_RUN" \
+printf 'tag=%s\npin=%s\nharness=%s\nshape=dcp8 blocks66 max_len262400 max_batched_tokens32\nbase_raylet_envs=%s\nbase_driver_envs=%s\ngcs_run=%s\n' \
+  "$TAG" "$PIN" "$HARNESS_SHORT" "$BASE_RAYLET_ENVS" \
+  "$BASE_DRIVER_ENVS" "$GCS_RUN" \
   > "$RUN_DIR/config.txt" || exit 1
 
 ALERT_FILE=$RUN_DIR/DISK_ALERT
@@ -390,7 +392,6 @@ DIFF_RC=$?
 echo "DIFF_EXIT=$DIFF_RC" >> "$RUN_DIR/topk_diff.txt"
 [ "$DIFF_RC" -eq 0 ] || exit 1
 
-HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD)
 if ! "$HOME/vllm-env/bin/python" - "$HOME/glm-tpu/bench/results.db" \
     "$RUN_DIR/results_ckpt.db" "$RUN_DIR/token_exactness.json" \
     "$TAG" "$PIN" "$HARNESS_SHORT" "$OOB_DIR" <<'PY'
