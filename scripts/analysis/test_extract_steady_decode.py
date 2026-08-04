@@ -31,7 +31,7 @@ class ExtractSteadyDecodeTest(unittest.TestCase):
             "[GLM_JAX_TRACE] traced 20 decode steps",
             "Avg generation throughput: 2.7 tokens/s, Running: 1 reqs",
         ])
-        with self.assertRaisesRegex(ValueError, "need >=4"):
+        with self.assertRaisesRegex(ValueError, "need >=2"):
             extract(short, analysis, 20)
 
     def test_refuses_wall_device_disagreement(self):
