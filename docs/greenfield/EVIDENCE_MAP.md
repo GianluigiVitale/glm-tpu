@@ -16,9 +16,11 @@ fleet agreement, and eight-host clean pre/post census.
 | 410 | `greenfield_collectives_20260805T135644529157649Z` | dominant-payload ppermute/all-to-all/fused tuple matrix |
 | 411 | `greenfield_collectives_20260805T135850389312854Z` | supported `bf16[1,6144]` six-operation matrix |
 | 412 | `greenfield_collectives_20260805T140125151247631Z` | supported `bf16[1,2048]` six-operation matrix |
+| 413 | `greenfield_collectives_20260805T141114991474088Z` | supported `f32[1,6144]` six-operation matrix |
+| 414 | `greenfield_collectives_20260805T141333601664455Z` | `int32[1,2048]` routing-metadata five-operation matrix |
 
-Topology code is `75c8bb14...`. The current collective matrix code is
-`fcd8426735119fee34ab8adc9e8c14b762adc2f8`. Topology hash is `294e777...559`, PP8 group hash
+Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
+`b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
 `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
 Superseded or failed diagnostics are preserved but not promotion evidence. DB 404 used a first

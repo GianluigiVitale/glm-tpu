@@ -31,6 +31,12 @@ The supported six-operation matrices also completed at code
 - DB 411 / `greenfield_collectives_20260805T135850389312854Z`: `bf16[1,6144]`, 24 cases.
 - DB 412 / `greenfield_collectives_20260805T140125151247631Z`: `bf16[1,2048]`, 24 cases.
 
+The final required payloads completed at `b12af9633c8b14648db8d2a2ccd9a3c577a04817`:
+
+- DB 413 / `greenfield_collectives_20260805T141114991474088Z`: `f32[1,6144]`, 24 cases.
+- DB 414 / `greenfield_collectives_20260805T141333601664455Z`: `int32[1,2048]` routing metadata,
+  20 cases (tuple reduction is intentionally undefined for integer metadata).
+
 Representative fleet-max p50s for 75 operations:
 
 | payload | operation | g2 | g4 | g8 | g32 |
@@ -39,8 +45,15 @@ Representative fleet-max p50s for 75 operations:
 | `bf16[1,6144]` | collective-permute | 0.705 | 0.704 | 0.721 | 0.844 ms |
 | `bf16[1,2048]` | all-reduce | 0.713 | 0.841 | 1.081 | 3.948 ms |
 | `bf16[1,2048]` | collective-permute | 0.637 | 0.650 | 0.653 | 0.782 ms |
+| `f32[1,6144]` | all-reduce | 0.819 | 1.078 | 1.479 | 3.920 ms |
+| `f32[1,6144]` | collective-permute | 0.634 | 0.646 | 0.650 | 0.779 ms |
+| `int32[1,2048]` | all-reduce | 0.696 | 0.840 | 1.060 | 3.931 ms |
+| `int32[1,2048]` | collective-permute | 0.617 | 0.641 | 0.640 | 0.768 ms |
 
 Full p50/p90/p95/p99 distributions and all 1,000 samples per case are retained in each artifact.
+FP8 is not a numerically relevant live-residual, metadata, reduction, or stage-transfer dtype in
+the declared engine contract; it is checkpoint weight storage with bf16/f32 dequantized arithmetic.
+No synthetic FP8 transport number is substituted for that contract.
 
 ### Reduce-scatter support boundary
 

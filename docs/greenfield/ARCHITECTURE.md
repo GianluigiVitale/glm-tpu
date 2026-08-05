@@ -51,8 +51,11 @@ XLA rewrites it to all-reduce, while the other supported operations preserve the
 ## Still unimplemented
 
 No transport executable, model layer, checkpoint packer/loader, decoder, or serving path exists.
-Protected TPU dependent-chain matrices now cover the dominant payload and required bf16 live-
-residual/intermediate shapes. They show that 75 full-pod all-reduces have a `3.941 ms` fleet-max
+Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
+residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
+weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
+the numerical contract uses bf16/f32 for those paths. The matrices show that 75 full-pod
+all-reduces have a `3.941 ms` fleet-max
 p50 and 75 full-ring nearest-neighbor permutes `0.791 ms`, versus `106.495 ms/token` attributed to
 the legacy MoE combine region. This isolates legacy arrival/layout/barrier behavior rather than raw
 small-payload ICI as the dominant loss. It is mechanism evidence, not model throughput. The next
