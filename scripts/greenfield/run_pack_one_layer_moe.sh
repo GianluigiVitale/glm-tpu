@@ -100,7 +100,7 @@ say "packing exact layer-3 ownership; complete model construction is forbidden"
 started=$(date +%s)
 (
   cd "$WORKTREE"
-  /home/gianl/vllm-env/bin/python scripts/greenfield/pack_one_layer_moe.py \
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python scripts/greenfield/pack_one_layer_moe.py \
     --source-root "$SOURCE_ROOT" \
     --source-uri "$SOURCE_URI" \
     --source-revision "$source_revision" \
