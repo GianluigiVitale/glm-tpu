@@ -92,6 +92,19 @@ def test_e0_reserves_trace_headroom_above_runtime_disk_floor() -> None:
     assert "e0_preflight_min_free_gb=%s" in text
 
 
+def test_e0_freezes_harness_checkout_and_analysis_tools() -> None:
+    text = (ROOT / "scripts/e0_capture_arm.sh").read_text()
+    assert 'HARNESS_FULL=$(git -C "$HOME/glm-tpu" rev-parse HEAD)' in text
+    assert "harness_checkout_matches()" in text
+    assert 'current=$(git -C "$HOME/glm-tpu" rev-parse HEAD' in text
+    assert 'status --porcelain --untracked-files=no' in text
+    assert "while kill -0 \"$W\"" in text
+    assert "during driver" in text
+    assert '"$RUN_DIR/parse_xplane.py"' in text
+    assert '"$RUN_DIR/extract_steady_decode.py"' in text
+    assert text.count("harness_checkout_matches") >= 6
+
+
 def test_disk_watchdog_compares_byte_exact_free_space() -> None:
     text = (ROOT / "scripts/disk_watchdog.sh").read_text()
     assert 'df -B1 --output=avail /' in text
