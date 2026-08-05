@@ -32,6 +32,13 @@ from .layer_assigner import (
     build_layer_footprints,
     build_pipeline_plan,
 )
+from .manifest import (
+    ARTIFACT_KIND as LAYOUT_ARTIFACT_KIND,
+    build_layout_manifest,
+    inspect_layout_manifest,
+    validate_layout_manifest,
+    write_layout_manifest,
+)
 
 __all__ = [
     "SourceFile",
@@ -55,6 +62,11 @@ __all__ = [
     "StageMemoryEstimate",
     "build_layer_footprints",
     "build_pipeline_plan",
+    "LAYOUT_ARTIFACT_KIND",
+    "build_layout_manifest",
+    "inspect_layout_manifest",
+    "validate_layout_manifest",
+    "write_layout_manifest",
     "inspect_source_inventory",
     "read_source_inventory",
     "write_source_inventory",
