@@ -119,6 +119,22 @@ def test_compute_rows_exactness_selector_is_single_variable() -> None:
     )
 
 
+def test_score_rows_exactness_selector_is_single_variable() -> None:
+    shared = (ROOT / "scripts/dcp_live_rows_exact.sh").read_text()
+    wrapper = (ROOT / "scripts/dcp_score_rows_exact.sh").read_text()
+    assert "export EXACT_LEVER=dcp_score_rows" in wrapper
+    assert 'export EXACT_PIN="${EXACT_PIN:-13bfbca3a}"' in wrapper
+    assert 'GLM_DSA_DCP_DECODE_LIVE_ROWS=$dcp_gate' in shared
+    assert 'GLM_DSA_DCP_DECODE_LIVE_SCORE_ROWS=$dcp_score_gate' in shared
+    assert 'GLM_MOE_DECODE_ALL_GATHER=$moe_allgather_gate' in shared
+    assert 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS=$moe_compute_gate' in shared
+    assert 'if [ "$EXACT_LEVER" = dcp_score_rows ]; then' in shared
+    assert (
+        'dcp_score_gate = side_gate if exact_lever == "dcp_score_rows" else "0"'
+        in shared
+    )
+
+
 def test_compute_rows_gate_reaches_health_and_e0_provenance() -> None:
     for path in (
         "scripts/resume_health_proof.sh",
