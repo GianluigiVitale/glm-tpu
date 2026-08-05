@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from ..errors import TopologyValidationError
 from ..types import PhysicalDevice, PhysicalTopology
@@ -20,14 +20,19 @@ def _attribute(device: object, name: str) -> Any:
 
 
 def discover_physical_topology(
-    devices: Sequence[object], *, slice_name: str
+    devices: Sequence[object],
+    *,
+    slice_name: str,
+    observed_local_order: Mapping[int, int] | None = None,
 ) -> PhysicalTopology:
     """Capture only observed metadata; never infer placement from list order.
 
     TPU discovery requires ``coords`` and ``core_on_chip``.  CPU devices and
     incomplete mocks are rejected because they cannot prove physical groups.
-    ``local_hardware_id`` is the runtime's local device ordering and is also
-    required rather than reconstructed from global ids.
+    ``local_hardware_id`` is used when present. TPU v4 currently reports it as
+    ``None``; in that case callers must supply ``observed_local_order`` built
+    from a fleet gather of each process's actual ``jax.local_devices()`` list.
+    It is never reconstructed from global ids.
     """
 
     if not devices:
@@ -35,12 +40,36 @@ def discover_physical_topology(
 
     captured = []
     for device in devices:
+        device_id = int(_attribute(device, "id"))
+        runtime_local_id = _attribute(device, "local_hardware_id")
+        observed_local_id = (
+            None
+            if observed_local_order is None
+            else observed_local_order.get(device_id)
+        )
+        if runtime_local_id is None and observed_local_id is None:
+            raise TopologyValidationError(
+                f"runtime device {device_id} has no local_hardware_id and no "
+                "observed local-device ordering"
+            )
+        if runtime_local_id is not None:
+            local_device_id = int(runtime_local_id)
+            if (
+                observed_local_id is not None
+                and local_device_id != observed_local_id
+            ):
+                raise TopologyValidationError(
+                    f"runtime and observed local ids disagree for device {device_id}: "
+                    f"{local_device_id} != {observed_local_id}"
+                )
+        else:
+            local_device_id = int(observed_local_id)
         coordinates = tuple(_attribute(device, "coords"))
         captured.append(
             PhysicalDevice(
-                device_id=int(_attribute(device, "id")),
+                device_id=device_id,
                 process_index=int(_attribute(device, "process_index")),
-                local_device_id=int(_attribute(device, "local_hardware_id")),
+                local_device_id=local_device_id,
                 coordinates=coordinates,
                 core_on_chip=int(_attribute(device, "core_on_chip")),
                 platform=str(_attribute(device, "platform")),

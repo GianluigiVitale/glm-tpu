@@ -68,6 +68,34 @@ def test_discovery_refuses_missing_physical_coordinates() -> None:
         discover_physical_topology([CpuDevice()], slice_name="not-a-tpu")
 
 
+def test_discovery_uses_explicit_observed_order_when_runtime_id_is_none() -> None:
+    devices = [
+        replace(device, local_hardware_id=None) for device in runtime_devices()
+    ]
+    observed = {
+        device.id: local_id
+        for process in range(8)
+        for local_id, device in enumerate(
+            sorted(
+                (device for device in devices if device.process_index == process),
+                key=lambda item: item.coords,
+            )
+        )
+    }
+    topology = discover_physical_topology(
+        devices,
+        slice_name="db-v4-64-od",
+        observed_local_order=observed,
+    )
+    validate_target_v4_64(topology)
+
+
+def test_discovery_refuses_unobserved_local_order() -> None:
+    device = replace(runtime_devices()[0], local_hardware_id=None)
+    with pytest.raises(TopologyValidationError, match="observed local-device"):
+        discover_physical_topology([device], slice_name="db-v4-64-od")
+
+
 def test_target_refuses_wrong_device_kind() -> None:
     devices = [replace(device, device_kind="TPU v5p") for device in runtime_devices()]
     topology = discover_physical_topology(devices, slice_name="db-v4-64-od")

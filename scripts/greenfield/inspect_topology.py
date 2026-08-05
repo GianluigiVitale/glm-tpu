@@ -94,10 +94,42 @@ def main() -> int:
         # TPU JAX may topology-order processes differently from TPU-VM worker
         # suffixes. Preserve both identities; never assume they are equal.
         jax_process_index = jax.process_index()
+        local_ids_in_runtime_order = np.asarray(
+            [device.id for device in jax.local_devices()], dtype=np.int32
+        )
+        fleet_local_ids = np.asarray(
+            multihost_utils.process_allgather(local_ids_in_runtime_order)
+        ).reshape(args.num_processes, jax.local_device_count())
+        flattened_ids = fleet_local_ids.reshape(-1).tolist()
+        if len(flattened_ids) != len(set(flattened_ids)):
+            raise RuntimeError(
+                f"fleet local-device lists contain duplicate ids: {flattened_ids}"
+            )
+        observed_local_order = {
+            int(device_id): local_id
+            for process_row in fleet_local_ids
+            for local_id, device_id in enumerate(process_row.tolist())
+        }
         topology = discover_physical_topology(
-            jax.devices(), slice_name=args.slice_name
+            jax.devices(),
+            slice_name=args.slice_name,
+            observed_local_order=observed_local_order,
         )
         validate_target_v4_64(topology)
+        devices_by_process = {
+            process: {
+                device.device_id
+                for device in topology.devices
+                if device.process_index == process
+            }
+            for process in range(args.num_processes)
+        }
+        for process, row in enumerate(fleet_local_ids.tolist()):
+            if set(row) != devices_by_process[process]:
+                raise RuntimeError(
+                    f"process {process} gathered local ids {row} disagree with "
+                    f"global device ownership {sorted(devices_by_process[process])}"
+                )
         pp8_groups = build_pp8_lp4_groups(topology)
         pp16_groups = build_pp16_lp2_groups(topology)
 
@@ -142,6 +174,7 @@ def main() -> int:
             "fleet_contract_hashes": [
                 row.tobytes().hex() for row in fleet_digests
             ],
+            "fleet_local_device_ids_in_runtime_order": fleet_local_ids.tolist(),
             "hostname": socket.gethostname(),
             "jax_device_count": jax.device_count(),
             "jax_local_device_count": jax.local_device_count(),
