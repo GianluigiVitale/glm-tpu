@@ -16,6 +16,7 @@ import gc
 import json
 from pathlib import Path
 import resource
+import socket
 from typing import Any, Mapping, Sequence
 
 from .one_layer import inspect_one_layer_artifact
@@ -193,6 +194,105 @@ def resolve_pp8_stage_devices(
             raise ValueError("unexpected TPU core_on_chip for v4 physical chip")
         runtime_by_coordinate[coordinate] = device
     runtime_coordinates = frozenset(runtime_by_coordinate)
+    captured_hostname = capture.get("hostname")
+    captured_process = capture.get("jax_process_index")
+    fleet_runtime_order = capture.get(
+        "fleet_local_device_ids_in_runtime_order"
+    )
+    if (
+        isinstance(captured_hostname, str)
+        and isinstance(captured_process, int)
+        and isinstance(fleet_runtime_order, list)
+    ):
+        if socket.gethostname() != captured_hostname:
+            raise ValueError(
+                "topology host record does not belong to this runtime: "
+                f"capture={captured_hostname} runtime={socket.gethostname()}"
+            )
+        try:
+            captured_runtime_ids = tuple(
+                int(value) for value in fleet_runtime_order[captured_process]
+            )
+        except (IndexError, TypeError, ValueError) as error:
+            raise ValueError(
+                "topology capture has invalid host runtime device order"
+            ) from error
+        if len(captured_runtime_ids) != len(devices):
+            raise ValueError(
+                "captured/runtime local device counts differ: "
+                f"capture={captured_runtime_ids} runtime={len(devices)}"
+            )
+        host_groups = [
+            group
+            for group in groups
+            if group.process_index == captured_process
+        ]
+        if len(host_groups) != 1:
+            raise ValueError(
+                "captured PP8 process does not own exactly one stage: "
+                f"process={captured_process} groups={len(host_groups)}"
+            )
+        group = host_groups[0]
+        runtime_by_captured_id = dict(
+            zip(captured_runtime_ids, devices, strict=True)
+        )
+        if set(runtime_by_captured_id) != set(group.device_ids):
+            raise ValueError(
+                "captured runtime ids disagree with PP8 group: "
+                f"runtime={captured_runtime_ids} group={group.device_ids}"
+            )
+        topology_by_id = {
+            device.device_id: device for device in topology.devices
+        }
+        captured_runtime_coordinates = tuple(
+            topology_by_id[device_id].coordinates
+            for device_id in captured_runtime_ids
+        )
+
+        def normalize(
+            coordinates: Sequence[tuple[int, ...]],
+        ) -> tuple[tuple[int, ...], ...]:
+            minima = tuple(
+                min(item[axis] for item in coordinates)
+                for axis in range(len(coordinates[0]))
+            )
+            return tuple(
+                tuple(
+                    value - minima[axis]
+                    for axis, value in enumerate(item)
+                )
+                for item in coordinates
+            )
+
+        runtime_in_runtime_order = tuple(
+            tuple(
+                int(value)
+                for value in _runtime_attribute(device, "coords")
+            )
+            for device in devices
+        )
+        if runtime_in_runtime_order not in (
+            captured_runtime_coordinates,
+            normalize(captured_runtime_coordinates),
+        ):
+            raise ValueError(
+                "runtime coordinates are neither physical nor the exact "
+                "local-subcube normalization: "
+                f"runtime={runtime_in_runtime_order} "
+                f"physical={captured_runtime_coordinates}"
+            )
+        ordered_coordinates = tuple(tuple(item) for item in group.coordinates)
+        return StageDeviceResolution(
+            devices=tuple(
+                runtime_by_captured_id[device_id]
+                for device_id in group.device_ids
+            ),
+            coordinates=ordered_coordinates,
+            captured_device_ids=tuple(group.device_ids),
+            captured_process_index=int(group.process_index),
+            stage_id=int(group.stage_id),
+        )
+
     matching = [
         group
         for group in groups

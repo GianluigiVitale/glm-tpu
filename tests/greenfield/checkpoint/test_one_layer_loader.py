@@ -100,8 +100,9 @@ def test_resolution_uses_physical_group_order_not_runtime_order() -> None:
         "topology_hash": contract["topology_hash"],
         "plan_group_hash": contract["pp8_lp4_hash"],
     }
-    # Runtime local order for captured process zero is ids [0,1,2,3], while
-    # physical PP8 order is [0,2,1,3].
+    # This host capture is JAX process 1: runtime ids [4,5,6,7], while the
+    # physical PP8 order is [4,6,5,7]. The local-subcube coordinates below
+    # are the exact normalized form of its global physical coordinates.
     runtime = [
         _FakeDevice((0, 0, 0), "runtime-0"),
         _FakeDevice((1, 0, 0), "runtime-1"),
@@ -119,7 +120,8 @@ def test_resolution_uses_physical_group_order_not_runtime_order() -> None:
         "runtime-1",
         "runtime-3",
     ]
-    assert resolved.captured_device_ids == (0, 2, 1, 3)
+    assert resolved.captured_device_ids == (4, 6, 5, 7)
+    assert resolved.stage_id == 7
 
 
 def _run_forced_cpu_loader(artifact: Path) -> None:

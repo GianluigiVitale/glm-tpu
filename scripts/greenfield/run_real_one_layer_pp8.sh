@@ -115,7 +115,11 @@ say "running direct device-load and exact four-chip layer"
 started=$(date +%s)
 (
   cd "$WORKTREE"
-  JAX_PLATFORMS=tpu PYTHONPATH="$WORKTREE" \
+  JAX_PLATFORMS=tpu \
+    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+    TPU_PROCESS_BOUNDS=1,1,1 \
+    TPU_VISIBLE_DEVICES=0,1,2,3 \
+    PYTHONPATH="$WORKTREE" \
     /home/gianl/vllm-env/bin/python scripts/greenfield/run_real_one_layer.py \
       --artifact-dir "$PACK_RUN/packed" \
       --oracle-dir "$ORACLE_RUN/oracle" \
