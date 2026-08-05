@@ -9,6 +9,8 @@ from .groups import (
     group_manifest_hash,
     groups_to_dict,
     physical_device_ring,
+    stage_transfer_lanes,
+    stage_transfer_pairs,
     validate_local_groups,
 )
 
@@ -21,6 +23,8 @@ __all__ = [
     "group_manifest_hash",
     "groups_to_dict",
     "physical_device_ring",
+    "stage_transfer_lanes",
+    "stage_transfer_pairs",
     "validate_local_groups",
     "validate_target_v4_64",
 ]

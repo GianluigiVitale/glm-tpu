@@ -189,7 +189,7 @@ def _percentile(values: Sequence[float], quantile: float) -> float:
     return ordered[lower] * (1.0 - fraction) + ordered[upper] * fraction
 
 
-def _distribution(samples_ms: Iterable[float]) -> LatencyDistribution:
+def latency_distribution(samples_ms: Iterable[float]) -> LatencyDistribution:
     samples = tuple(float(value) for value in samples_ms)
     if not samples or any(not math.isfinite(value) or value <= 0 for value in samples):
         raise BenchmarkValidationError(
@@ -286,7 +286,7 @@ def collective_chain_hlo_policy(
     )
 
 
-def _jax_dtype(name: str) -> Any:
+def jax_dtype(name: str) -> Any:
     import jax.numpy as jnp
 
     return {
@@ -511,7 +511,7 @@ def build_collective_chain(
     ).reshape(len(canonical_groups) * config.rows, config.width)
     if config.dtype == "int32":
         host = np.arange(host.size, dtype=np.int32).reshape(host.shape) % 251
-    input_value = jax.device_put(host.astype(_jax_dtype(config.dtype)), input_sharding)
+    input_value = jax.device_put(host.astype(jax_dtype(config.dtype)), input_sharding)
     started = time.perf_counter()
     compiled = executable.lower(input_value).compile()
     compile_seconds = time.perf_counter() - started
@@ -533,7 +533,7 @@ def build_collective_chain(
     )
 
 
-def _addressable_checksum(value: Any) -> str:
+def addressable_checksum(value: Any) -> str:
     import jax
     import numpy as np
 
@@ -558,7 +558,7 @@ def benchmark_collective_chain(compiled: CompiledCollectiveChain) -> dict[str, A
 
     first = compiled.compiled(compiled.input_value)
     jax.block_until_ready(first)
-    first_checksum = _addressable_checksum(first)
+    first_checksum = addressable_checksum(first)
     for _ in range(compiled.config.warmup_iterations - 1):
         warmed = compiled.compiled(compiled.input_value)
         jax.block_until_ready(warmed)
@@ -570,12 +570,12 @@ def benchmark_collective_chain(compiled: CompiledCollectiveChain) -> dict[str, A
         last = compiled.compiled(compiled.input_value)
         jax.block_until_ready(last)
         samples_ms.append((time.perf_counter_ns() - started_ns) / 1_000_000.0)
-    last_checksum = _addressable_checksum(last)
+    last_checksum = addressable_checksum(last)
     if first_checksum != last_checksum:
         raise BenchmarkValidationError(
             "identical collective-chain invocations produced different output bytes"
         )
-    distribution = _distribution(samples_ms)
+    distribution = latency_distribution(samples_ms)
     return {
         "compile_seconds": compiled.compile_seconds,
         "compiler_options": dict(compiled.compiler_options),

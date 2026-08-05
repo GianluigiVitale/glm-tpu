@@ -11,6 +11,8 @@ from glm_tpu.greenfield.topology.groups import (
     build_pp8_lp4_groups,
     collective_groups_for_size,
     group_manifest_hash,
+    stage_transfer_lanes,
+    stage_transfer_pairs,
     validate_local_groups,
 )
 from glm_tpu.greenfield.types import PlanName
@@ -135,6 +137,33 @@ def test_collective_benchmark_groups_partition_physical_rings() -> None:
                     )
                 ]
                 assert sum(distances) == 1
+
+
+@pytest.mark.parametrize(
+    ("builder", "stage_count", "lane_count"),
+    ((build_pp8_lp4_groups, 8, 4), (build_pp16_lp2_groups, 16, 2)),
+)
+def test_stage_transfer_lanes_are_closed_physical_rings(
+    builder, stage_count: int, lane_count: int
+) -> None:
+    topo = topology()
+    lanes = stage_transfer_lanes(topo, builder(topo))
+    pairs = stage_transfer_pairs(topo, builder(topo))
+    by_id = {device.device_id: device for device in topo.devices}
+    assert len(lanes) == lane_count
+    assert {len(lane) for lane in lanes} == {stage_count}
+    assert sorted(device for lane in lanes for device in lane) == list(range(32))
+    assert len(pairs) == 32
+    assert {source for source, _ in pairs} == set(range(32))
+    assert {target for _, target in pairs} == set(range(32))
+    for source, target in pairs:
+        left = by_id[source].coordinates
+        right = by_id[target].coordinates
+        distances = [
+            min(abs(a - b), size - abs(a - b))
+            for a, b, size in zip(left, right, topo.topology_shape)
+        ]
+        assert sum(distances) == 1
 
 
 def test_validator_refuses_cross_host_group() -> None:

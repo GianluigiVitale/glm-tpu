@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-from itertools import combinations
+from itertools import combinations, permutations
 from typing import Any, Iterable
 
 from ..errors import TopologyValidationError
@@ -377,6 +377,97 @@ def group_manifest_hash(
         sort_keys=True,
     ).encode("utf-8")
     return sha256(encoded).hexdigest()
+
+
+def stage_transfer_lanes(
+    topology: PhysicalTopology,
+    groups: tuple[LocalReplicaGroup, ...],
+) -> tuple[tuple[int, ...], ...]:
+    """Resolve one closed topology-adjacent device ring per local lane.
+
+    Pairwise stage adjacency alone does not prove that lane identities can be
+    carried through every boundary and return to the same device in stage
+    zero.  This deterministic search orders each stage so lane ``i`` is a
+    physical neighbor of lane ``i`` in the next stage, including the final
+    token-return boundary.  The resulting lanes are the physical
+    source/target contract for the device-resident pipeline skeleton.
+    """
+
+    if len(groups) not in (8, 16) or not groups:
+        raise TopologyValidationError(
+            "stage transfer lanes require an eight- or sixteen-stage plan"
+        )
+    if tuple(group.stage_id for group in groups) != tuple(range(len(groups))):
+        raise TopologyValidationError(
+            "stage transfer groups must have contiguous stage ids"
+        )
+    lane_count = len(groups[0].device_ids)
+    if lane_count not in (2, 4) or any(
+        len(group.device_ids) != lane_count for group in groups
+    ):
+        raise TopologyValidationError(
+            "stage transfer groups must have a uniform two or four lanes"
+        )
+    all_ids = [device for group in groups for device in group.device_ids]
+    topology_ids = {device.device_id for device in topology.devices}
+    if len(all_ids) != len(set(all_ids)) or set(all_ids) != topology_ids:
+        raise TopologyValidationError(
+            "stage transfer groups must partition the physical topology"
+        )
+
+    by_id = {device.device_id: device for device in topology.devices}
+    first = tuple(sorted(groups[0].device_ids, key=lambda item: _device_key(by_id[item])))
+
+    def candidates(
+        previous: tuple[int, ...], group: LocalReplicaGroup
+    ) -> tuple[tuple[int, ...], ...]:
+        ordered = sorted(group.device_ids, key=lambda item: _device_key(by_id[item]))
+        return tuple(
+            candidate
+            for candidate in permutations(ordered)
+            if all(
+                _physical_neighbors(by_id[source], by_id[target], topology)
+                for source, target in zip(previous, candidate)
+            )
+        )
+
+    def search(
+        stage_orders: tuple[tuple[int, ...], ...],
+    ) -> tuple[tuple[int, ...], ...] | None:
+        stage = len(stage_orders)
+        if stage == len(groups):
+            return stage_orders if all(
+                _physical_neighbors(by_id[source], by_id[target], topology)
+                for source, target in zip(stage_orders[-1], first)
+            ) else None
+        for candidate in candidates(stage_orders[-1], groups[stage]):
+            result = search(stage_orders + (candidate,))
+            if result is not None:
+                return result
+        return None
+
+    orders = search((first,))
+    if orders is None:
+        raise TopologyValidationError(
+            "stage groups have no closed topology-adjacent lane assignment"
+        )
+    return tuple(
+        tuple(stage[lane] for stage in orders) for lane in range(lane_count)
+    )
+
+
+def stage_transfer_pairs(
+    topology: PhysicalTopology,
+    groups: tuple[LocalReplicaGroup, ...],
+) -> tuple[tuple[int, int], ...]:
+    """Return the exact physical next-stage permutation for all devices."""
+
+    lanes = stage_transfer_lanes(topology, groups)
+    return tuple(
+        (lane[stage], lane[(stage + 1) % len(lane)])
+        for lane in lanes
+        for stage in range(len(lane))
+    )
 
 
 def _physical_neighbors(
