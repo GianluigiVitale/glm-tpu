@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 import resource
 import socket
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Protocol, Sequence
 
 from .one_layer import inspect_one_layer_artifact
 
@@ -99,6 +99,17 @@ class LoadedOneLayer:
         )
 
 
+class StageLoadExpectation(Protocol):
+    """Minimal physical identities accepted by the shared stage resolver."""
+
+    plan_id: str
+    topology_hash: str
+    plan_group_hash: str
+
+    @property
+    def stage_size(self) -> int: ...
+
+
 def _runtime_attribute(device: object, name: str) -> Any:
     try:
         value = getattr(device, name)
@@ -144,7 +155,7 @@ def verify_one_layer_load_contract(
 def resolve_stage_devices(
     runtime_devices: Sequence[object],
     topology_capture: Path | Mapping[str, Any],
-    expectation: OneLayerLoadExpectation,
+    expectation: StageLoadExpectation,
     *,
     stage_id: int | None = None,
     visible_device_indices: Sequence[int] | None = None,

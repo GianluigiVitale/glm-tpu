@@ -1,5 +1,13 @@
 """Plan-aware greenfield checkpoint formats and loaders."""
 
+from .full_loader import (
+    FullCheckpointLoadExpectation,
+    LoadedFinalLayoutStage,
+    LoadedFinalLeaf,
+    VerifiedPackedCheckpoint,
+    load_final_layout_stage,
+    verify_full_packed_checkpoint,
+)
 from .one_layer import (
     OneLayerPackConfig,
     inspect_one_layer_artifact,
@@ -28,6 +36,9 @@ from .stream_pack import (
 )
 
 __all__ = (
+    "FullCheckpointLoadExpectation",
+    "LoadedFinalLayoutStage",
+    "LoadedFinalLeaf",
     "LoadedOneLayer",
     "OneLayerLoadExpectation",
     "OneLayerPackConfig",
@@ -45,7 +56,10 @@ __all__ = (
     "DestinationFilePlan",
     "DestinationTensorPlan",
     "StreamedFileEvidence",
+    "VerifiedPackedCheckpoint",
     "build_destination_file_plans",
     "destination_groups",
+    "load_final_layout_stage",
     "stream_pack_group",
+    "verify_full_packed_checkpoint",
 )
