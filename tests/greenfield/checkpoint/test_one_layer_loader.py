@@ -14,6 +14,7 @@ from glm_tpu.greenfield.checkpoint.one_layer import pack_one_layer_moe
 from glm_tpu.greenfield.checkpoint.one_layer_loader import (
     OneLayerLoadExpectation,
     StageDeviceResolution,
+    _fp8_e4m3fn_lookup,
     dequantize_packed_fp8,
     load_pp8_one_layer,
     resolve_pp8_stage_devices,
@@ -62,6 +63,18 @@ def test_chunked_dequant_folds_rank_three_blocks() -> None:
     expected = (weight.float() * expanded).to(torch.bfloat16)
     assert got.dtype == torch.bfloat16
     assert torch.equal(got, expected)
+
+
+def test_device_lookup_is_bit_exact_for_every_finite_e4m3fn_value() -> None:
+    import torch
+
+    bits = torch.arange(256, dtype=torch.uint8)
+    reference = bits.view(torch.float8_e4m3fn).float().numpy()
+    observed = np.asarray(_fp8_e4m3fn_lookup(), dtype=np.float32)
+    finite = np.isfinite(reference)
+    np.testing.assert_array_equal(observed[finite], reference[finite])
+    assert np.flatnonzero(~finite).tolist() == [127, 255]
+    assert np.flatnonzero(~np.isfinite(observed)).tolist() == [127, 255]
 
 
 class _FakeDevice:
@@ -145,7 +158,9 @@ def _run_forced_cpu_loader(artifact: Path) -> None:
         np.asarray(loaded.correction_bias), np.arange(8, dtype=np.float32)
     )
     assert loaded.load_record["host_global_concatenations"] == 0
-    assert loaded.load_record["direct_single_device_transfers"] == 32
+    assert loaded.load_record["packed_single_device_transfers"] == 56
+    assert loaded.load_record["device_dequantizations"] == 24
+    assert loaded.load_record["host_fp8_dequantizations"] == 0
 
 
 def test_full_loader_directly_builds_global_arrays_from_local_shards(

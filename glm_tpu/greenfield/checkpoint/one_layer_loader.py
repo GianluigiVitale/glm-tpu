@@ -11,6 +11,7 @@ ever assembled in host memory.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import gc
 import json
 from pathlib import Path
@@ -241,6 +242,89 @@ def _torch_bfloat16_numpy(tensor: Any) -> Any:
     return contiguous.view(torch.uint16).numpy().view(ml_dtypes.bfloat16)
 
 
+def _torch_float8_bits_numpy(tensor: Any) -> Any:
+    import torch
+
+    if tensor.dtype != torch.float8_e4m3fn or tensor.device.type != "cpu":
+        raise ValueError("direct FP8 transfer requires CPU E4M3FN tensor")
+    return tensor.contiguous().view(torch.uint8).numpy()
+
+
+def _validate_finite_float8_bits(tensor: Any, chunk_size: int) -> None:
+    """Reject the two E4M3FN NaN encodings without a full-size temporary."""
+
+    import torch
+
+    bits = tensor.view(torch.uint8)
+    leading = 1 if bits.ndim == 2 else bits.shape[0]
+    for start in range(0, leading, chunk_size):
+        part = bits if bits.ndim == 2 else bits[start : start + chunk_size]
+        if bool(torch.any((part == 0x7F) | (part == 0xFF))):
+            raise ValueError("packed FP8 weight contains non-finite values")
+
+
+def _fp8_e4m3fn_lookup() -> tuple[float, ...]:
+    values = []
+    for bits in range(256):
+        sign = -1.0 if bits & 0x80 else 1.0
+        exponent = (bits >> 3) & 0x0F
+        mantissa = bits & 0x07
+        if exponent == 0:
+            value = (mantissa / 8.0) * (2.0**-6)
+        elif exponent == 15 and mantissa == 7:
+            value = float("nan")
+        else:
+            value = (1.0 + mantissa / 8.0) * (2.0 ** (exponent - 7))
+        values.append(sign * value)
+    return tuple(values)
+
+
+@lru_cache(maxsize=4)
+def _device_dequantizer(block_shape: tuple[int, int]) -> Any:
+    import jax
+    import jax.numpy as jnp
+
+    lookup_values = _fp8_e4m3fn_lookup()
+
+    @jax.jit
+    def dequantize(weight_bits: Any, scale: Any) -> Any:
+        # Keep the lookup a compile-time literal instead of a closed-over JAX
+        # array committed to whichever physical device initialized the cache.
+        lookup = jnp.asarray(lookup_values, dtype=jnp.float32)
+        out_blocks = jnp.arange(weight_bits.shape[-2]) // block_shape[0]
+        in_blocks = jnp.arange(weight_bits.shape[-1]) // block_shape[1]
+        expanded_scale = scale[..., out_blocks[:, None], in_blocks[None, :]]
+        weight = lookup[weight_bits.astype(jnp.int32)]
+        return (weight * expanded_scale).astype(jnp.bfloat16)
+
+    return dequantize
+
+
+def _device_put_dequantized(
+    jax: Any,
+    weight: Any,
+    scale: Any,
+    device: object,
+    *,
+    block_shape: tuple[int, int],
+    expert_chunk_size: int,
+) -> Any:
+    import torch
+
+    if scale.dtype != torch.float32:
+        raise ValueError("packed FP8 scale must be float32")
+    if not bool(torch.isfinite(scale).all()):
+        raise ValueError("packed FP8 scale contains non-finite values")
+    _validate_finite_float8_bits(weight, expert_chunk_size)
+    weight_array = jax.device_put(_torch_float8_bits_numpy(weight), device)
+    scale_array = jax.device_put(scale.numpy(), device)
+    result = _device_dequantizer(block_shape)(weight_array, scale_array)
+    result.block_until_ready()
+    weight_array.delete()
+    scale_array.delete()
+    return result
+
+
 def dequantize_packed_fp8(
     weight: Any,
     scale: Any,
@@ -407,15 +491,15 @@ def load_pp8_one_layer(
             ):
                 weight = handle.get_tensor(name)
                 scale = handle.get_tensor(f"{name}_scale")
-                dequantized = dequantize_packed_fp8(
+                dequantized = _device_put_dequantized(
+                    jax,
                     weight,
                     scale,
+                    device,
                     block_shape=block_shape,
                     expert_chunk_size=expert_chunk_size,
                 )
-                local[name].append(
-                    _device_put_torch_bfloat16(jax, dequantized, device)
-                )
+                local[name].append(dequantized)
                 del weight, scale, dequantized
                 gc.collect()
             for name in ("router_weight", "correction_bias"):
@@ -502,17 +586,19 @@ def load_pp8_one_layer(
         "coordinates_in_slot_order": [
             list(item) for item in resolution.coordinates
         ],
-        "direct_single_device_transfers": 4 * 8,
+        "device_dequantizations": 4 * 6,
         "device_memory_after": device_after,
         "device_memory_before": device_before,
         "device_slot_count": 4,
         "expert_chunk_size": expert_chunk_size,
         "host_global_concatenations": 0,
+        "host_fp8_dequantizations": 0,
         "host_peak_rss_after_bytes": _rss_peak_bytes(),
         "host_peak_rss_before_bytes": host_rss_before,
         "local_experts_per_device": local_experts,
         "local_shared_intermediate_per_device": local_intermediate,
         "packed_manifest_sha256": manifest["manifest_sha256"],
+        "packed_single_device_transfers": 4 * 14,
         "stage_id": resolution.stage_id,
     }
     return LoadedOneLayer(
