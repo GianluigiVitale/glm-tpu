@@ -4524,3 +4524,41 @@ depth with structural sharding; 50 tok/s is more credible as effective throughpu
 than as current batch-1 base decode, and 100 tok/s at 256K has no supporting local or published
 evidence. The present accepted answer speed remains 3.476 device tok/s / about 3.3 steady wall until
 the compute-row E0 produces protected contrary evidence.
+
+## 2026-08-05 10:45 — COMPUTE-ROW E0 REPEATS A SMALL WIN: 280.65 ms / 3.563 device tok/s, 3.395 clean wall; mandatory smoke next
+
+Protected artifact `e0cap_sparse_20260805T071818146401337Z` closes the compute-row performance
+rung. Retry 1 measured 281.777277 ms/device token (3.548902 tok/s) and a 3.401754 tok/s clean wall
+mean, with the exact 391-reduction/470-all-gather contract and both routed GMM signatures at m=16.
+It is repeat performance evidence only: DB 401 recorded harness `371ad1d` after a documentation
+commit changed live HEAD, rather than captured launch pin `6032f14`. The protected harness rejected
+that provenance mismatch and automatically ran retry 2.
+
+For retry 2 the harness checkout was frozen at `6032f14` before DB creation. DB 402 records that
+exact harness pin and fork `b3c25df47`; all raylet/driver gates are exact. The fully valid result is
+**280.646481 ms/device token = 3.563202 device tok/s**, with profiler-free steady-wall mean
+**3.394737 tok/s** and median 3.4. Versus accepted 287.666063 ms / 3.324561 wall mean this is
+-2.44% device latency, +2.50% device rate, and +2.11% wall mean. The two candidate device latencies
+differ by 0.40%; both retries clear the pre-registered >=1.5% device-latency and wall-mean rules.
+
+Retry 2 validates eight fresh XPlanes, 64 cores, exactly 20 selected steps/core, DSA 78/step, named
+all-reduces 157, physical reductions 391, all-gathers 470, and both routed GMM m=16 signatures at
+75 calls/step. Categories are collectives 158.68, sort/top-k 34.60, GMM 31.67, gather/scatter 14.07,
+compute 17.41, movement 16.34, and sparse attention 0.48 ms/token. The important negative result is
+that a 16x routed-row reduction saves only about 0.88 ms of GMM time. Minimum tiles, weight traffic,
+and launch cost dominate. The 75 global MoE combines still cost 104.01 ms/token, so the structural
+4x8/reduce-scatter direction remains the real ceiling path.
+
+The complete run, DB snapshot/link, hashes, both traces, and analysis were archived as 83 objects /
+about 14.0 GB at
+`gs://driftbench-dsv4-uc/results/e0cap_sparse_20260805T071818146401337Z`. A late 14 GiB free-space
+alert occurred after the driver while local traces were being parsed; it did not truncate evidence.
+Remote count/size were verified before exact local/remote trace cleanup. The surviving Ray cluster
+was authenticated by the exact retry-2 pin, trace nonce, DCP8 and experiment gates on all eight
+raylets, stopped, and followed by 8/8 `CENSUS_OK`. The local filesystem returned to 30 GiB free.
+
+Verdict: the E0 repeatability rule passes, but the candidate is not promoted yet. Run the mandatory
+four-depth 128K smoke with compute rows ON and all-gather OFF. The accepted parent remains
+`979f818e0` / 287.666063 ms until that smoke closes. Harness commit `d42883c` integrates the separate
+provenance-freeze fix so future E0 runs refuse any harness mutation during the driver and execute
+captured parser/extractor copies.

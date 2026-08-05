@@ -1,6 +1,6 @@
 # GLM-5.2-FP8 on TPU v4: Low-Throughput Deep-Research Brief
 
-**Status timestamp:** 2026-08-05 07:50 UTC
+**Status timestamp:** 2026-08-05 10:45 UTC
 
 **Purpose:** self-contained technical brief for researching why single-stream GLM-5.2-FP8 decode is only about 3.3 tokens/s on a 32-chip TPU v4 pod, what has already been measured and tried, and what a credible fix must change.
 
@@ -22,6 +22,7 @@ The verified progression is:
 |---|---:|---:|---:|---|
 | Original protected sparse baseline | 390.947743 ms/token | 2.558 tok/s | about 2.5 tok/s | Baseline |
 | Current accepted corrected stack | 287.666063 ms/token | 3.476253 tok/s | about 3.3 tok/s | Accepted |
+| MoE compute-row candidate, repeat 2 | 280.646481 ms/token | 3.563202 tok/s | 3.394737 mean / 3.4 median | E0 valid; smoke pending |
 | MoE all-gather replacement | 290.762936 ms/token | 3.439228 tok/s | not rerun after device regression | Rejected |
 
 The accepted work improved device throughput by **35.90%**, but the result is still unusably slow and does not meet the project gate.
@@ -37,7 +38,7 @@ The immediate target is at least:
 
 The accepted 287.666 ms step must lose at least **65.44 ms** to reach 4.5 tok/s (`222.22 ms/token`) and **87.67 ms** to reach the stricter 200 ms/token condition. Small payload reductions alone cannot reach the desired ceiling. The high-ceiling fix must remove or subgroup the repeated global synchronization and carry a compatible sharded residual layout through the full transformer.
 
-At this timestamp, a protected 256K trace of a new MoE compute-row candidate is active. Its semantic exactness and protected health already passed. It narrows routed GMM rows from `256 -> 16` globally (`32 -> 2` routed rows per host-visible local formulation) during pure decode, but it does not remove the 75 global combines. Its throughput result is not yet known and must not be treated as achieved.
+A new MoE compute-row candidate has now passed semantic exactness, protected health, and two repeat 256K performance measurements. It narrows routed GMM rows from `256 -> 16` globally (`32 -> 2` routed rows per host-visible local formulation) during pure decode, but it does not remove the 75 global combines. The provenance-valid repeat reached **280.646481 ms/device token = 3.563202 device tok/s**, with **3.394737 tok/s clean wall mean** and 3.4 median. This is a real but small 2.44% latency / 2.11% wall improvement over the accepted stack. It passed the pre-registered E0 repeatability rule and therefore requires the four-depth smoke before promotion; it is not yet the accepted parent and does not materially change the structural diagnosis.
 
 ## 2. Exact workload and hardware being measured
 
@@ -251,9 +252,9 @@ The two routed GMM signatures total **32.55 ms/token** across the 75 MoE layers:
 - first routed GMM / gated activation: about 22.02 ms;
 - second routed GMM: about 10.53 ms;
 - accepted trace uses routed row dimension `m=256` (32 token rows x top-8);
-- the active compute-row candidate is expected to lower these signatures to `m=16` for one live sequence.
+- the E0-valid compute-row candidate lowers both signatures to `m=16` for one live sequence, but total GMM time only falls to **31.67 ms/token**.
 
-The kernel has minimum tiles and launch overhead, so a 16x row reduction cannot be assumed to yield a 16x latency reduction.
+The measured 16x row reduction saves only about 0.88 ms of GMM time. Minimum tiles, weight reads, and launch overhead dominate these tiny decode GMMs, so row count and latency do not scale proportionally.
 
 ### 6.4 DCP LSE combine
 
@@ -342,7 +343,7 @@ Recovered E0 trace:
 
 **Verdict:** rejected for performance. No smoke rerun was justified after a protected device regression.
 
-### Attempt E: pure-decode MoE compute rows (active at this timestamp)
+### Attempt E: pure-decode MoE compute rows (E0 valid; smoke pending)
 
 Candidate pin: `b3c25df47ac98783912dc658878181ec0a8ae16d`
 Gate: `GLM_MOE_DECODE_COMPUTE_LIVE_ROWS`
@@ -376,15 +377,22 @@ Protected health:
 - T32/T2048 compiled;
 - authenticated cleanup passed.
 
-Active E0:
+Protected E0:
 
 - `/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z`;
 - 256K, DCP8, one sequence, 256 measured tokens;
 - trace 20 steps/core;
-- expected routed GMM signatures: `m=16`, 75 calls for each of the two routed GMM shapes;
-- performance and final trace verdict: **pending at this timestamp**.
+- retry 1: 281.777277 ms/device token = 3.548902 device tok/s; clean wall mean 3.401754 and median 3.4 tok/s;
+- retry 1 is performance evidence but not promotable evidence because DB 401 recorded a live harness HEAD changed by a documentation commit instead of the captured launch pin;
+- provenance-valid retry 2, DB 402: **280.646481 ms/device token = 3.563202 device tok/s**; clean wall mean **3.394737** and median 3.4 tok/s;
+- retry 2 versus the accepted stack: 2.44% lower device latency, 2.50% higher device rate, and 2.11% higher clean wall mean;
+- the two candidate device latencies differ by only 0.40%; both independently exceeded the pre-registered 1.5% device and wall thresholds;
+- both traces contain 8 fresh XPlanes, 64 cores, exactly 20 steps/core, 78 DSA calls/step, 391 physical reductions, 470 all-gathers, and both routed GMM `m=16` signatures at 75 calls/step;
+- retry 2 categories: collectives 158.68 ms, sort/top-k 34.60 ms, GMM 31.67 ms, gather/scatter 14.07 ms, compute 17.41 ms, movement 16.34 ms;
+- the 75 MoE combines still cost 104.01 ms/token. GMM improved by only about 0.88 ms versus the accepted trace; much of the net 7.02 ms gain came from secondary gather/collective changes, which shows that smaller routed row counts do not make these tiny GMMs proportionally faster;
+- exact DB linkage, state manifest, compile buckets, archive, and authenticated eight-host cleanup passed. The durable archive contains 83 objects / about 14.0 GB at `gs://driftbench-dsv4-uc/results/e0cap_sparse_20260805T071818146401337Z`.
 
-This candidate attacks the 32.55 ms GMM category, not the 106.50 ms MoE collective category. Even eliminating all GMM time would leave about 255 ms/token, so it cannot independently reach the project gate.
+This candidate attacks the 32.55 ms GMM category, not the 106.50 ms MoE collective category. Even eliminating all GMM time would leave about 255 ms/token, so it cannot independently reach the project gate. The protected result confirms that warning: it is worth retaining if the smoke passes, but it is not the throughput fix.
 
 ### Prepared but not yet performance-adjudicated candidates
 
@@ -508,8 +516,8 @@ The 20–50 tok/s class may be more plausible as verified **effective** throughp
 
 ## 13. Proposed experimental sequence
 
-1. **Finish the active compute-row E0.** Require driver success, exact provenance, eight fresh XPlanes/64 cores/exactly 20 steps, routed GMM `m=16` signatures with 75 calls each, unchanged collective contract, device latency, steady wall speed, archive, and clean census.
-2. **If it wins materially, run the four-depth 128K smoke.** Otherwise reject it without spending another long model run.
+1. **Run the mandatory four-depth 128K compute-row smoke.** The repeatable 256K E0 cleared the pre-registered 1.5% device and wall thresholds. Promotion still requires all four mechanism depths, exact outputs, state/write protections, provenance, archive, and zero-work cleanup.
+2. **If the smoke passes, promote compute rows as the new parent.** If it fails, keep the 287.666063 ms corrected stack as accepted and diagnose the correctness failure before any performance stacking.
 3. **Transplant and protect scorer-row narrowing** on the resulting accepted parent. This is the largest remaining immediate non-structural category.
 4. **Run the no-model subgroup collective microbenchmark** after the pod is clean. Use it to decide whether 8-way or 4-way subgrouping has enough latency leverage to justify the full 2D layout.
 5. **Prototype 2D MoE weight specs and local math on CPU/Jaxpr/StableHLO**, including FP8 scales and loader/filter ownership. Do not stream the 753B model until shapes, local ownership, HLO collectives, and memory arithmetic are explicit.
@@ -565,11 +573,14 @@ Sources:
 - Recovered E0: `/home/gianl/glm-run/e0cap_sparse_20260805T024622713442900Z`
 - Decisive local analysis: `ADJUDICATION.md` in that E0 directory
 
-### Active compute-row candidate
+### E0-valid compute-row candidate
 
 - Exactness: `/home/gianl/glm-run/moe_compute_rows_exact_20260805T044718436789636Z`
 - Health: `/home/gianl/glm-run/resume_health_20260805T062919033726354Z`
-- Active E0: `/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z`
+- Repeatable protected E0: `/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z`
+- Valid trace summary: `/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z/analysis_t2.md`
+- Clean wall extraction: `/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z/steady_decode_t2.json`
+- Exact DB/env linkage: `/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z/run_link_t2.json`
 - Inference worktree: `/home/gianl/tpu-inference-moe-compute-live-corrected`
 - Candidate pin: `b3c25df47ac98783912dc658878181ec0a8ae16d`
 
@@ -598,4 +609,4 @@ Success requires, on the existing 8-host/32-chip pod:
 - all evidence is linked to `bench/results.db` and archived in the approved same-region bucket;
 - any 20–50 tok/s claim is made only from protected local single-stream evidence, with base versus effective/MTP throughput clearly separated.
 
-Until those conditions hold, the honest status is: **correct and substantially improved, but still too slow; the remaining dominant problem is repeated cross-chip synchronization caused by the current weight/activation layout.**
+Until those conditions hold, the honest status is: **correct and substantially improved, with a small repeatable compute-row gain awaiting smoke, but still far too slow; the remaining dominant problem is repeated cross-chip synchronization caused by the current weight/activation layout.**

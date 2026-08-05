@@ -1,6 +1,6 @@
 # HANDOFF — GLM-5.2-FP8 on TPU v4
 
-**Updated:** 2026-08-05 06:32 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
+**Updated:** 2026-08-05 10:45 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
 `PLAN.md`, `docs/suggestions.md`, and the relevant recent entries in `docs/RESEARCH_LOG.md`.
 
 ## Project goal — do not narrow it
@@ -98,6 +98,40 @@ experimental; its support matrix leaves multi-host TP/EP, CP/SP, MLA, and fused 
 The current upstream GLM-5.2 sprint independently targets MoE reduce-scatter plus sequence
 parallelism. Those sources corroborate the structural direction, but only local protected device
 and steady-wall measurements can establish this model's single-stream ceiling.
+
+## Latest compute-row E0 — repeatable small win; smoke required; pod released
+
+The default-off `GLM_MOE_DECODE_COMPUTE_LIVE_ROWS` candidate at fork `b3c25df47` has now completed
+exactness, health, and two fresh 256K traces:
+
+- Exactness `/home/gianl/glm-run/moe_compute_rows_exact_20260805T044718436789636Z`, DB 398/399:
+  raw prefix `" 49"` identical; 129 events/4,081 rows; exact selected set/tie order; routed token
+  rows `32 -> 2`; state/write/cleanup protections all passed.
+- Health `/home/gianl/glm-run/resume_health_20260805T062919033726354Z`, DB 400: protected 5K
+  passkey predicted/gold `952687`, correct=True.
+- E0 `/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z`. Retry 1 measured
+  281.777277 ms / 3.548902 device tok/s and 3.401754 clean wall mean, but DB 401 captured a live
+  harness HEAD changed by a documentation commit instead of launch pin `6032f14`; it is repeat
+  performance evidence only. The harness correctly retried.
+- Provenance-valid retry 2, DB 402: **280.646481 ms/device token = 3.563202 device tok/s**;
+  profiler-free wall mean **3.394737 tok/s**, median 3.4. Versus the accepted parent this is
+  -2.44% device latency / +2.50% device rate / +2.11% clean wall mean. The two candidate device
+  latencies differ by 0.40%, so both repeats clear the pre-registered 1.5% device and wall rules.
+- Retry 2 validates 8 fresh XPlanes, 64 cores, 20 steps/core, DSA 78/step, named reductions 157,
+  physical reductions 391, all-gathers 470, and both routed GMM `m=16` signatures at 75 calls/step.
+  Categories are collectives 158.68, sort/top-k 34.60, GMM 31.67, gather/scatter 14.07,
+  compute 17.41, movement 16.34, sparse attention 0.48 ms/token.
+- The result is instructive but not structural: a 16x GMM row reduction saves only about 0.88 ms
+  of GMM time; the 75 tiny global MoE combines still cost 104.01 ms/token. The full net gain is
+  only 7.02 ms/token and cannot approach 4.5 tok/s alone.
+- DB linkage, trace hashes, analysis, and the 83-object/~14.0 GB archive validate at
+  `gs://driftbench-dsv4-uc/results/e0cap_sparse_20260805T071818146401337Z`. A late disk-floor alert
+  occurred only after the driver while local fleet traces were being parsed; all traces were
+  complete and archived. The exact run-owned Ray cluster was authenticated and stopped, all eight
+  hosts ended `CENSUS_OK`, and local/remote trace replicas were purged only after archive checks.
+
+This clears E0 only. The accepted parent remains `979f818e0` / 287.666063 ms until the mandatory
+four-depth 128K smoke passes with the compute-row gate ON.
 
 ## Latest completed proof — pod released
 
@@ -205,12 +239,13 @@ No TPU workflow is active. Always rerun the strict eight-host census before laun
 
 ## Exact next sequence
 
-1. Run protected health on corrected branch `b3c25df47` with compute-row ON and all-gather OFF, then
-   a fresh 256K E0. Accept only exact health plus a real device and profiler-free steady-wall gain;
-   parse the routed GMM row shapes and preserve the physical 157 named reductions / 391 reductions /
-   470 all-gathers contract.
-2. If E0 wins materially, run the four-depth 128K smoke before promoting the lever.
-3. Then validate scorer-row narrowing and the lower-value DCP-LSE candidate through the same ladder.
+1. Run the mandatory four-depth 128K smoke on `b3c25df47` with live-row psum, MoE fusion, DCP live
+   attention, and compute-row ON; rejected all-gather OFF. Require 4/4 exact outputs, state/write
+   protections, DB provenance, archive, authenticated cleanup, and zero census before promotion.
+2. If smoke passes, promote compute rows as the new accepted parent. If it fails, retain
+   `979f818e0` and diagnose the correctness failure before stacking another lever.
+3. Then validate corrected scorer-row narrowing and the lower-value DCP-LSE candidate through the
+   same ladder.
 4. For the higher ceiling, implement end-to-end 4x8 tensor/expert feature sharding: model-sharded
    residual and RMSNorm, subgroup attention projections, and expert-by-feature MoE. Then repair the
    sparse multi-token classification before enabling MTP/speculative decode. Never claim 20–50
@@ -226,13 +261,16 @@ No TPU workflow is active. Always rerun the strict eight-host census before laun
   evidence passes 13/13 plus env 17/17; Jaxpr and reduced StableHLO confirm the intended narrow/full
   specialization and restoration. Protected production DCP8 exactness is accepted as DB 398/399;
   health and E0 are next.
-- Scorer live rows: `ebf12e8e4`; CPU DCP 32/32. Needs corrected-parent transplant later.
+- Scorer live rows corrected transplant: `/home/gianl/tpu-inference-dcp-score-live-corrected`, pin
+  `13bfbca3a`, pushed/clean; substantive forced-CPU DCP suite 32/32 plus environment 17/17. Protected
+  exactness must run on the accepted post-smoke parent, with the compute gate fixed to that parent.
 - DCP LSE all-gather: `422e9e31f`; CPU DCP 30/30 plus DCP2/4/8 stress. Lower priority.
 - 2D f32 reduction prerequisite: `/home/gianl/tpu-inference-decode-2d-f32`, `dab2db7b3`, clean and
   pushed. It is only a numerical primitive; RMSNorm/attention/GMM end-to-end work remains.
-- Harness repository `main` is clean and pushed with the recovery record, disk/watchdog fixes, and
-  ownership tests. The owner's untracked `AGENTS.md` remains untouched; resolve the current main pin
-  with `git rev-parse HEAD` instead of copying a self-invalidating documentation hash.
+- Harness provenance hardening is integrated: `e0_capture_arm.sh` now freezes the full launch hash,
+  checks checkout/track cleanliness before launch, during the driver, and before analysis, and runs
+  captured parser/extractor copies. The owner's untracked `AGENTS.md` remains untouched; resolve the
+  current main pin with `git rev-parse HEAD` immediately before a protected launch.
 
 ## Proof and observability rules
 
