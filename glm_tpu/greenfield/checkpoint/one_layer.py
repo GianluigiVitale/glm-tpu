@@ -110,9 +110,15 @@ class OneLayerPackConfig:
             raise ValueError("source_uri must use the approved driftbench-dsv4-uc bucket")
         if not self.source_revision.strip():
             raise ValueError("source_revision must be non-empty")
-        for name in ("code_hash", "topology_hash", "plan_group_hash"):
+        if len(self.code_hash) not in (40, 64) or any(
+            character not in "0123456789abcdef" for character in self.code_hash
+        ):
+            raise ValueError("code_hash must be a lowercase Git object id")
+        for name in ("topology_hash", "plan_group_hash"):
             value = getattr(self, name)
-            if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+            if len(value) != 64 or any(
+                character not in "0123456789abcdef" for character in value
+            ):
                 raise ValueError(f"{name} must be a lowercase SHA-256 digest")
 
     @property

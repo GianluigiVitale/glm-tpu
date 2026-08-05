@@ -14,7 +14,7 @@ from glm_tpu.greenfield.checkpoint.one_layer import (
 )
 
 
-HASH = "a" * 64
+HASH = "a" * 40
 
 
 def tiny_config(source_root: Path, output_dir: Path) -> OneLayerPackConfig:
@@ -160,3 +160,5 @@ def test_config_refuses_wrong_bucket_or_nondivisible_layout(tmp_path: Path) -> N
         replace(config, source_uri="gs://wrong-bucket/model")
     with pytest.raises(ValueError, match="divide evenly"):
         replace(config, num_experts=7)
+    with pytest.raises(ValueError, match="Git object"):
+        replace(config, code_hash="not-a-commit")
