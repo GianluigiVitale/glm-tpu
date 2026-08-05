@@ -12,6 +12,14 @@ from .state import (
     StageStateLayout,
     build_decoder_state_layout,
 )
+from .weights import (
+    DecoderRuntimeWeightLayout,
+    DeviceRuntimeTensor,
+    DeviceRuntimeWeightLayout,
+    RuntimeSourceLeaf,
+    RuntimeTensorSpec,
+    build_decoder_runtime_weight_layout,
+)
 
 __all__ = [
     "IndexShareTransfer",
@@ -22,4 +30,10 @@ __all__ = [
     "DecoderStateLayout",
     "StageStateLayout",
     "build_decoder_state_layout",
+    "DecoderRuntimeWeightLayout",
+    "DeviceRuntimeTensor",
+    "DeviceRuntimeWeightLayout",
+    "RuntimeSourceLeaf",
+    "RuntimeTensorSpec",
+    "build_decoder_runtime_weight_layout",
 ]

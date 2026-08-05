@@ -40,6 +40,15 @@ from .one_layer_loader import (
     resolve_stage_devices,
     verify_one_layer_load_contract,
 )
+from .runtime_pack import (
+    RuntimeDestinationFilePlan,
+    RuntimeDestinationTensorPlan,
+    RuntimeTensorEvidence,
+    StreamedRuntimeFileEvidence,
+    build_runtime_destination_file_plans,
+    stream_runtime_weight_file,
+    verify_source_file_sha256,
+)
 from .stream_pack import (
     DestinationFilePlan,
     DestinationTensorPlan,
@@ -58,7 +67,11 @@ __all__ = (
     "LoadedOneLayer",
     "OneLayerLoadExpectation",
     "OneLayerPackConfig",
+    "RuntimeDestinationFilePlan",
+    "RuntimeDestinationTensorPlan",
+    "RuntimeTensorEvidence",
     "StageDeviceResolution",
+    "StreamedRuntimeFileEvidence",
     "build_gate_c_layout",
     "dequantize_packed_fp8",
     "inspect_gate_c_checkpoint",
@@ -78,12 +91,15 @@ __all__ = (
     "StreamedFileEvidence",
     "VerifiedPackedCheckpoint",
     "build_destination_file_plans",
+    "build_runtime_destination_file_plans",
     "destination_groups",
     "load_final_layout_stage",
     "load_gate_c_checkpoint",
     "stream_pack_group",
+    "stream_runtime_weight_file",
     "validate_gate_c_layout",
     "validate_gate_c_layout_bindings",
     "verify_gate_c_load_contract",
     "verify_full_packed_checkpoint",
+    "verify_source_file_sha256",
 )
