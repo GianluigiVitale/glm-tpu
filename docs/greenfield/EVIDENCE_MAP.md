@@ -21,6 +21,7 @@ fleet agreement, and eight-host clean pre/post census.
 | 415 | `greenfield_transport_20260805T142953361259007Z` | PP8/PP16 four-payload transport distributions and exact HLO |
 | 416 | `greenfield_transport_trace_20260805T143832942547470Z` | fresh PP8/PP16 8-file/64-core/20-step XPlane proof |
 | 417 | `greenfield_real_layer_pp8_20260805T165737737514245Z` | exact real layer-3 PP8 correctness/HLO/HBM/wall/XPlane proof |
+| 418 | `greenfield_real_layer_pp16_20260805T172807177182695Z` | exact real layer-3 PP16 correctness/HLO/HBM/wall/XPlane proof |
 
 Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
 `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
@@ -68,6 +69,35 @@ physical `psum` per step. Evidence hashes, DB snapshot/integrity, same-tag appro
 local/remote `SUCCESS`, and eight-host pre/post clean census pass. This proves the PP8 real sparse
 layer prerequisite only; it is not a full Gate-C pass and is not model token throughput.
 
+## Final-layout PP16 layer artifact and protected proof
+
+`greenfield_one_layer_pack_pp16_20260805T172003732526347Z` is the two-chip final-ownership
+artifact at pack code `51d1df96...e60b`. It uses the same immutable source revision and writes
+two 4,855,045,080-byte files: 128 complete experts and shared-intermediate width 1024 per owner.
+Source payload `9,706,940,416` and packed payload `9,710,087,168` bytes reconcile,
+including declared router replication. Manifest SHA-256 is
+`385737230d593d6b2daa46911d1ac31973d9b79a7d43c3353cedf6d9779fe454`; both file hashes and
+local/remote `SUCCESS` pass. This remains bounded layout evidence, not full Gate B.
+
+DB 418 / `greenfield_real_layer_pp16_20260805T172807177182695Z` is the mandatory protected
+two-chip challenger at exact code `6751a935...f820`. It binds captured stage 10, global ids
+`[4,5]`, and physical coordinates `[(0,2,0),(1,2,0)]`. Normal/concentrated p50 over
+1,000 profiler-free samples is `0.900610/1.075795 ms`. Route ids are exact; normal output
+max/p99/mean error is `0.015625/0.0078125/0.002121`, and concentrated is
+`0.03125/0.0078125/0.002140`.
+
+Optimized HLO SHA `f9a97fbb56fafc6cf17446da23bd2550e7d41c59f2d8633b40e2c0ea83f8d051`
+contains exactly one `bf16[2,1,6144]` two-rank all-reduce and no other collective. Peak HBM
+is `11,276,493,312` bytes/chip. A fresh post-timing 4-core/20-step XPlane has exactly one
+physical all-reduce on every core-step. Evidence hashes, DB integrity/snapshot, approved archive,
+local/remote `SUCCESS`, and eight-host clean pre/post census all pass.
+
+Rejected diagnostic `greenfield_real_layer_pp16_20260805T172345348528631Z` has no DB/status
+claim. libtpu rejected a standalone local `2x1x1` slice for visible devices `0,1` with
+duplicate coordinate assignment. Archived driver logs preserve the cause. The accepted run
+initializes the proven four-chip host subcube but places the PP16 arrays/executable only on adjacent
+devices `0,1`; its HLO and XPlane prove only the two-chip stage executes.
+
 ## Reusable tools, not execution dependencies
 
 - Optimized-HLO contract: `glm_tpu/greenfield/sharding/hlo_contract.py` and
@@ -89,5 +119,5 @@ layer prerequisite only; it is not a full Gate-C pass and is not model token thr
 
 Accepted legacy parent: `287.666063 ms/device token`, `3.476` device tok/s, about `3.3` wall tok/s.
 Its 75 sequential physical 32-chip MoE combine regions cost `106.495 ms/token`. The greenfield
-collective floor and PP8 real layer show this is not a raw 12 KiB ICI or sparse-layer compute floor,
-but no greenfield full-decoder token-speed result exists yet.
+collective floor and both real-layer plans show this is not a raw 12 KiB ICI or sparse-layer compute
+floor, but no greenfield full-decoder token-speed result exists yet.

@@ -47,3 +47,7 @@ the topology rewrite intentionally changes reduction association; route ids rema
 Protected PP8 DB 417 passes this contract. Normal and single-chip-concentrated route ids are exact;
 both final-output comparisons have max absolute error `0.03125`, p99 `0.01171875`, and mean below
 `0.00236`. The same oracle and tolerances bind the mandatory PP16 challenger.
+
+Protected PP16 DB 418 also passes. Routes are exact; normal output max/p99/mean error is
+`0.015625/0.0078125/0.002121`, and concentrated output is
+`0.03125/0.0078125/0.002140`. Its physical combine is exactly one BF16 two-rank reduction.

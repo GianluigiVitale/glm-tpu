@@ -31,10 +31,8 @@ case "$PLAN_ID" in
     ;;
   PP16_LP2)
     PLAN_SLUG=pp16
-    : "${GLM_GREENFIELD_PP16_PACK_RUN:?set the protected PP16 pack run}"
-    : "${GLM_GREENFIELD_PP16_PACK_MANIFEST_SHA:?set the PP16 pack manifest hash}"
-    PACK_RUN=$GLM_GREENFIELD_PP16_PACK_RUN
-    PACK_MANIFEST_SHA=$GLM_GREENFIELD_PP16_PACK_MANIFEST_SHA
+    PACK_RUN=${GLM_GREENFIELD_PP16_PACK_RUN:-/home/gianl/glm-run/greenfield_one_layer_pack_pp16_20260805T172003732526347Z}
+    PACK_MANIFEST_SHA=${GLM_GREENFIELD_PP16_PACK_MANIFEST_SHA:-385737230d593d6b2daa46911d1ac31973d9b79a7d43c3353cedf6d9779fe454}
     PLAN_GROUP_HASH=$PP16_GROUP_HASH
     # libtpu cannot construct a standalone 2x1x1 slice from local devices
     # 0,1 (duplicate coordinate assignment). Initialize the proven 2x2 host

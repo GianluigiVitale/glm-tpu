@@ -40,3 +40,11 @@ maps captured physical slots to the isolated four-chip runtime subcube, transfer
 arrays, and performs 24 FP8 table/scale conversions on device. It records zero host FP8
 dequantizations, zero host global concatenations, and peak host/device memory. This validates the
 bounded PP8 load mechanism only; the complete plan-aware Gate-B format remains pending.
+
+The corresponding final-layout PP16 artifact is
+`greenfield_one_layer_pack_pp16_20260805T172003732526347Z`, manifest
+`385737230d593d6b2daa46911d1ac31973d9b79a7d43c3353cedf6d9779fe454`. Its two independently
+hashed 4,855,045,080-byte files own experts `0:128`/`128:256` and shared-intermediate
+width `0:1024`/`1024:2048`. DB 418 directly loads those two owners with 28 transfers,
+12 on-device dequantizations, zero host dequant/global concat, and no runtime repartition. This also
+remains bounded mechanism evidence; Gate B requires the complete checkpoint.

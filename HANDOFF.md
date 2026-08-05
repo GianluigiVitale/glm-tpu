@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 17:02 UTC
+**Updated:** 2026-08-05 17:38 UTC
 
 ## Authority and isolation
 
@@ -55,9 +55,21 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `4,860,038,656` bytes/chip with `5,639,681,536` measured peak against `33,014,413,312` available.
   A fresh 20-step/8-core XPlane observes exactly one physical `psum` per step. All hashes, DB
   integrity, approved archive, remote `SUCCESS`, and authenticated 8/8 post-census pass.
-- Greenfield tests last passed 79/79. The PP8 exact sparse-layer prerequisite is proven. PP16,
-  representative dense/DSA/IndexShare layers, full checkpoint/decoder, serving, and genuine token
-  throughput remain unimplemented.
+- Final-layout PP16 artifact `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes
+  two independently hashed 4,855,045,080-byte files at pack code `51d1df9`: experts
+  `0:128/128:256`, shared intermediate `0:1024/1024:2048`, manifest
+  `38573723...e454`, the same immutable source revision, exact source/payload reconciliation,
+  and approved-bucket `SUCCESS`.
+- Protected PP16 DB 418 / `greenfield_real_layer_pp16_20260805T172807177182695Z` passed at
+  `6751a93`. Normal/concentrated p50 is `0.900610/1.075795 ms`; routes are exact and
+  output max/p99/mean errors are at most `0.03125/0.0078125/0.002141`. HLO SHA
+  `f9a97fbb...d051` contains exactly one `bf16[2,1,6144]` all-reduce over
+  `{{0,1}}`. Peak HBM is `11,276,493,312` bytes/chip; the fresh 4-core/20-step XPlane
+  has exactly one physical all-reduce on all 80 core-steps. DB, archive, hashes, and 8/8 pre/post
+  census pass.
+- Greenfield tests last passed 86/86. Both PP8 and PP16 exact sparse-layer prerequisites are proven.
+  Representative dense/DSA/IndexShare layers, full Gate-B checkpoint/loader, decoder, serving, and
+  genuine token throughput remain unimplemented.
 
 ## Protected evidence
 
@@ -98,6 +110,25 @@ Real layer DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z` passed
 - Exact routes, bounded tensor comparison, one local four-rank HLO collective, per-chip HBM, a fresh
   post-timing XPlane, append-only DB/archive, checksums, and 8/8 clean pre/post census all pass.
 
+Real layer DB 418 / `greenfield_real_layer_pp16_20260805T172807177182695Z` passed at
+`6751a93`:
+
+- The two-chip stage is captured physical stage 10, global ids `[4,5]`, coordinates
+  `[(0,2,0),(1,2,0)]`. Final-owner load performs 28 direct transfers, 12 device
+  dequantizations, zero host dequant/global concat, and owns 128 complete experts plus shared width
+  1024 per chip.
+- Normal p50/p90/p95/p99 is `0.900610/0.919235/0.925838/0.949264 ms`; concentrated is
+  `1.075795/1.093593/1.101284/1.156754 ms`. Exactly one local two-rank combine is present.
+- HBM after timing is `9,710,615,552` bytes/chip; measured peak is `11,276,493,312` of
+  `33,014,413,312`. Correctness, HLO, wall, fresh trace, DB/archive, and cleanup all pass.
+
+Rejected diagnostic `greenfield_real_layer_pp16_20260805T172345348528631Z` proved that
+libtpu cannot initialize local devices `0,1` as a standalone `2x1x1` slice: the driver
+reports duplicate coordinate assignment. Its driver logs are archived and it has no DB/performance
+claim. A protected subset diagnostic then proved the correct runtime: initialize the known-good
+`2x2` host subcube while placing arrays/executable only on adjacent devices `0,1`; DB
+418 uses that exact mechanism.
+
 Rejected diagnostic `...T143608529930365Z` has no DB/status claim: valid distinct rank traces were
 downloaded into worker-0's original local trace tree, causing a duplicate-host parser refusal. The
 fixed proof uses an isolated canonical fleet directory; it did not reinterpret the failed result.
@@ -112,12 +143,15 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Implement and protect the mandatory PP16 two-chip form against the same real pack/source and
-   independent oracle. It must own 128 complete experts/chip, split the shared intermediate
-   1024/chip, emit exactly one `bf16[2,1,6144]` two-rank combine, and pass the same correctness,
-   HBM, wall, XPlane, DB/archive, and cleanup contract.
-2. Adjudicate the exact PP8/PP16 one-layer evidence without treating either as token speed.
-3. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
-   topology, transport, and exact topology-local MoE prerequisites all pass.
+1. Begin Gate B for PP8: implement the complete byte-balanced stage assignment, memory budget, and
+   plan-aware final-layout manifest before writing checkpoint payloads. Preserve IndexShare groups
+   where feasible and account for weights/scales/KV/overlays/temporaries per chip.
+2. Extend the bounded pack/direct-loader contracts to the complete checkpoint only after the
+   manifest reconciles every source leaf and all 32 final owners. Fail closed on corruption,
+   incompleteness, non-finite values, stale plan/code, or unmeasured HBM margin.
+3. Continue Gates C–H in binding order. The one-layer comparison provisionally favors PP8 for
+   normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
+   (`1.076` vs `1.134 ms`); only complete protected decoder evidence may choose the
+   final plan.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.

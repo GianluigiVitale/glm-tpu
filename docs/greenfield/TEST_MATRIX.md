@@ -15,14 +15,17 @@
 | Gate A overall | Topology, collective floor, PP8/PP16 transport, trace, provenance, cleanup | Pass |
 | L0 MoE numerical contract | Block dequant, sigmoid/noaux_tc bias semantics, ties, normalization | Pass |
 | L1 four-device PP8 MoE reference | Distributed routes + all-top-4-on-one-chip; bounded output equivalence | Pass (synthetic) |
-| L2 MoE combine HLO | DB 417: one `bf16[2,1,6144]` four-rank AR; no other collective or dead `[32,6144]` tensor | Pass on TPU (PP8) |
+| L2 MoE combine HLO | DB 417/418: one `bf16[2,1,6144]` exact four-/two-rank AR; no other collective or dead `[32,6144]` tensor | Pass on TPU (PP8/PP16) |
 | One-layer pack format | Exact source leaf set, ownership, byte/hash round trip, corruption refusals | Pass on tiny fixture and real artifact |
 | Real layer-3 pack | 1,544 leaves / 9,706,940,416 unique bytes / only shards 38–40; four final PP8 files; manifest `68ef8201...f938`; remote `SUCCESS` | Pass (layout mechanism; not Gate B) |
 | Real layer-3 oracle | Raw-source PyTorch; 104 pinned tensors; normal all-slot routes; all-eight-on-slot-2 adversary; manifest `c63ffa19...ebff`; remote `SUCCESS` | Pass (correctness artifact) |
 | Exact real PP8 local MoE layer | DB 417: exact routes, bounded normal/concentrated tensors, direct load, HBM, wall, XPlane, DB/archive/cleanup | Pass |
-| Exact real PP16 local MoE layer | Same oracle; two-chip ownership/HLO/measurement required | In progress |
-| Gate C overall | Sparse PP8 passes; dense, DSA, IndexShare, PP16 sparse representatives remain | In progress |
-| Gates B/D–H | Prohibited until earlier gates authorize them | Missing |
+| Real layer-3 PP16 pack | Two final-owner files; 128 experts + shared width 1024/chip; manifest `38573723...e454`; remote `SUCCESS` | Pass (layout mechanism; not Gate B) |
+| Exact real PP16 local MoE layer | DB 418: exact routes, bounded tensors, two-rank HLO, HBM, wall, XPlane, DB/archive/cleanup | Pass |
+| Gate B | Complete plan-aware checkpoint manifest/packer/direct loader | In progress |
+| Gate C overall | Sparse PP8/PP16 prerequisite evidence exists; dense, DSA, and IndexShare representatives await Gate B | Pending |
+| Gates D–H | Await earlier gates | Missing |
 
-Last verified greenfield suite: 79/79. CPU/HLO and synthetic TPU chains prove mechanism only. DB
-417 proves one real PP8 sparse layer, not full-model correctness, token latency, or wall throughput.
+Last verified greenfield suite: 86/86. CPU/HLO and synthetic TPU chains prove mechanism only. DB
+417/418 prove one real sparse layer under both required local plans, not full-model correctness,
+token latency, or wall throughput.

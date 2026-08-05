@@ -32,6 +32,34 @@ This establishes that real topology-local sparse-layer compute is sub-millisecon
 case and that the legacy `2.7–3.3 tok/s` result is not an inherent per-layer TPU floor. It does not
 predict or claim 78-layer latency, 256K attention latency, serving wall rate, or token throughput.
 
+## 2026-08-05 — protected exact PP16 challenger and layer adjudication
+
+DB 418 / `greenfield_real_layer_pp16_20260805T172807177182695Z` executes the same real layer,
+source revision, input, router cases, independent oracle, warmup/sample counts, wall methodology,
+and protection contract on captured two-chip stage 10. Its final layout owns 128 complete routed
+experts and shared-intermediate width 1024 on each chip.
+
+| plan/case | p50 | p90 | p95 | p99 | mean | max |
+|---|---:|---:|---:|---:|---:|---:|
+| PP8 normal | 0.696215 | 0.716489 | 0.722115 | 0.742864 | 0.697678 | 1.527490 ms |
+| PP16 normal | 0.900610 | 0.919235 | 0.925838 | 0.949264 | 0.902438 | 1.275810 ms |
+| PP8 concentrated | 1.134090 | 1.155466 | 1.163958 | 1.195100 | 1.177258 | 40.141347 ms |
+| PP16 concentrated | 1.075795 | 1.093593 | 1.101284 | 1.156754 | 1.084054 | 7.424879 ms |
+
+PP16 lowers the trace-observed local combine from `0.325282` to `0.260664 ms/step`, but
+doubles owner-local weights and normal-route compute. Consequently PP16 normal p50 is
+`0.204395 ms` (`29.36%`) slower, while its concentrated adversary is `0.058295 ms`
+(`5.14%`) faster. PP8 also has eight fewer pipeline boundaries. This one-layer evidence
+provisionally keeps PP8 as the leading base plan; it does not replace complete-decoder protected
+adjudication.
+
+PP16 route ids are exact. Normal output max/p99/mean error is
+`0.015625/0.0078125/0.002121`; concentrated is `0.03125/0.0078125/0.002140`.
+Optimized HLO has exactly one `bf16[2,1,6144]` all-reduce over `{{0,1}}`. Post-timing
+HBM is `9.711 GB/chip` with `11.276 GB` measured peak. The fresh four-core XPlane has
+20 steps/core and one physical all-reduce on all 80 core-steps. DB/archive/hashes and 8/8 cleanup
+pass. These remain per-layer measurements, not tokens/second.
+
 ## 2026-08-05 — protected PP8/PP16 device-resident transport
 
 DB 415 / `greenfield_transport_20260805T142953361259007Z` measures one complete closed stage ring

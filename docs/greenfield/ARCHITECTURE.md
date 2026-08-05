@@ -65,20 +65,25 @@ correction-bias selection-only semantics, lowest-expert-id ties, top-8 normaliza
 ownership, shared-expert sharding, and post-reduction routed scale. Forced four-device CPU tests
 prove distributed and adversarial single-chip expert concentration against the unsharded fallback.
 The optimized CPU HLO has one four-rank stacked routed/shared all-reduce and no other collective.
-Protected PP8 DB 417 now proves the required `bf16[2,1,6144]` physical payload, exact four-rank
-group, no other collective, real checkpoint load, exact routes, bounded tensors, and per-chip HBM.
+Protected PP8 DB 417 and PP16 DB 418 prove the required `bf16[2,1,6144]` payload over exact
+four-/two-rank groups, no other collective, real checkpoint load, exact routes, bounded tensors,
+and per-chip HBM. PP16 initializes the known-good four-chip host subcube but arrays/executable live
+only on its selected adjacent pair; its two-partition HLO and four active XPlane cores prove this.
 
 A versioned one-layer-only packer now validates the exact layer-3 source leaf set and writes final
-PP8 identity ownership with byte/hash reconciliation. Its tiny-fixture tests pass and real source
-artifact `greenfield_one_layer_pack_20260805T151828912346032Z` proves 1,544 leaves /
+PP8 or PP16 identity ownership with byte/hash reconciliation. Its tiny-fixture tests pass. Real
+PP8 artifact `greenfield_one_layer_pack_20260805T151828912346032Z` proves 1,544 leaves /
 9,706,940,416 unique payload bytes across only shards 38–40, four independently hashed final files,
-exact manifest reconciliation, and approved-bucket `SUCCESS`. The bounded artifact is not Gate B.
+exact manifest reconciliation, and approved-bucket `SUCCESS`. PP16 artifact
+`greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes two independently hashed final
+files with the same source reconciliation and remote `SUCCESS`. These bounded artifacts are not
+Gate B.
 A separate raw-source PyTorch oracle now captures normal routes spanning all four PP8 slots and a
 bias-forced all-eight-on-slot-2 case. It records decomposed expert, routed, shared, and final outputs
 plus exact source/legacy hashes without importing greenfield JAX, packed weights, a model class, or
 legacy execution.
 
-No PP16 real-layer proof, full checkpoint packer/loader, decoder, or serving path exists yet.
+No full checkpoint packer/loader, decoder, or serving path exists yet.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
@@ -88,5 +93,8 @@ p50 and 75 full-ring nearest-neighbor permutes `0.791 ms`, versus `106.495 ms/to
 the legacy MoE combine region. PP8 DB 417 additionally measures the exact normal real sparse layer
 at `0.696 ms` p50 and a single-chip-concentrated adversary at `1.134 ms` p50. This isolates legacy
 arrival/layout/barrier behavior rather than raw small-payload ICI or local sparse compute as the
-dominant loss. It is one-layer evidence, not token throughput. The immediate prerequisite is the
-mandatory two-chip PP16 version against the same oracle; the complete model remains prohibited.
+dominant loss. It is one-layer evidence, not token throughput. Both mandatory local-layer forms
+now pass. PP8 normal p50 is `0.696 ms` versus PP16
+`0.901 ms`; PP16 concentrated p50 is `1.076 ms` versus PP8 `1.134 ms`.
+PP8 therefore remains the provisional leader. The mandatory local-layer prerequisite is complete;
+full-checkpoint work is now authorized only through Gate B's ordered plan/manifest/pack/load gates.
