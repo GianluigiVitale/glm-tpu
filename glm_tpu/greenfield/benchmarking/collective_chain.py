@@ -390,7 +390,27 @@ def _chain_function(config: CollectiveChainConfig) -> Any:
                 elif config.kind is CollectiveKind.ALL_REDUCE:
                     transformed = lax.psum(state, "member")
                 elif config.kind is CollectiveKind.REDUCE_SCATTER:
-                    expanded = jnp.tile(state, (config.group_size, 1))
+                    # Every destination segment is distinct and every source
+                    # rank already has distinct state.  A duplicated tile lets
+                    # TPU XLA replace reduce-scatter with all-reduce + slice,
+                    # which is a different operation and must fail this arm.
+                    if config.dtype == "int32":
+                        segment_bias = (
+                            jnp.arange(config.group_size, dtype=jnp.int32)
+                            .reshape(config.group_size, 1, 1)
+                            * jnp.asarray(257, jnp.int32)
+                        )
+                    else:
+                        segment_bias = (
+                            jnp.arange(config.group_size, dtype=jnp.float32)
+                            .reshape(config.group_size, 1, 1)
+                            / jnp.asarray(128.0, jnp.float32)
+                        ).astype(state.dtype)
+                    expanded = (state[jnp.newaxis, :, :] + segment_bias).reshape(
+                        config.group_size * config.rows,
+                        config.width,
+                    )
+                    expanded = lax.optimization_barrier(expanded)
                     transformed = lax.psum_scatter(
                         expanded,
                         "member",
