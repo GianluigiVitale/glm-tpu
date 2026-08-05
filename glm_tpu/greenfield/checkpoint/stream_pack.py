@@ -130,10 +130,13 @@ def _header_bytes(
 
 def build_destination_file_plans(
     layout: Mapping[str, Any],
+    *,
+    validate_layout_contract: bool = True,
 ) -> tuple[DestinationFilePlan, ...]:
     """Precompute exact safetensors headers and final file sizes."""
 
-    validate_layout_manifest(layout)
+    if validate_layout_contract:
+        validate_layout_manifest(layout)
     by_file: dict[str, list[tuple[str, str, tuple[int, ...], int]]] = {}
     file_records = {
         record["filename"]: record for record in layout["destination_files"]
@@ -213,6 +216,7 @@ def _copy_range(
     byte_count: int,
     writers: Sequence[_HashingWriter],
     chunk_bytes: int,
+    source_digest: Any | None = None,
 ) -> None:
     source.seek(offset)
     remaining = byte_count
@@ -222,6 +226,8 @@ def _copy_range(
             raise CheckpointValidationError(
                 f"source range truncated with {remaining} bytes remaining"
             )
+        if source_digest is not None:
+            source_digest.update(value)
         for writer in writers:
             writer.write(value)
         remaining -= len(value)
@@ -262,6 +268,7 @@ def _copy_axis_shards(
     destinations: Sequence[Mapping[str, Any]],
     writers: Mapping[str, _HashingWriter],
     chunk_bytes: int,
+    source_digest: Any | None = None,
 ) -> None:
     axes = {destination.get("axis") for destination in destinations}
     if len(axes) != 1 or None in axes:
@@ -289,6 +296,7 @@ def _copy_axis_shards(
                 byte_count=destination["byte_count"],
                 writers=(writers[destination["filename"]],),
                 chunk_bytes=chunk_bytes,
+                source_digest=source_digest,
             )
         return
 
@@ -305,6 +313,8 @@ def _copy_axis_shards(
             raise CheckpointValidationError(
                 "source tensor truncated during strided axis split"
             )
+        if source_digest is not None:
+            source_digest.update(raw)
         for destination in ordered:
             begin = destination["axis_start"] * inner_bytes
             width = (
@@ -328,6 +338,7 @@ def stream_pack_group(
     outputs: Mapping[str, BinaryIO],
     chunk_bytes: int = 8 * 1024 * 1024,
     validate_layout_contract: bool = True,
+    expected_source_sha256: Mapping[str, str] | None = None,
 ) -> tuple[StreamedFileEvidence, ...]:
     """Write one complete local stage group with bounded host memory."""
 
@@ -347,6 +358,41 @@ def stream_pack_group(
         )
     if validate_layout_contract:
         validate_layout_manifest(layout)
+    expected_hashes = dict(expected_source_sha256 or {})
+    if expected_source_sha256 is not None:
+        relevant = {
+            placement["source"]["name"]
+            for placement in layout["placements"]
+            if any(
+                destination["filename"] in filenames
+                for destination in placement["destinations"]
+            )
+        }
+        if set(expected_hashes) != relevant:
+            raise CheckpointValidationError(
+                "expected source SHA-256 keys must match the exact streamed leaf set"
+            )
+        for placement in layout["placements"]:
+            destinations = placement["destinations"]
+            selected = [
+                destination
+                for destination in destinations
+                if destination["filename"] in filenames
+            ]
+            if selected and len(selected) != len(destinations):
+                raise CheckpointValidationError(
+                    "source SHA-256 validation requires every destination shard "
+                    "for each streamed leaf"
+                )
+        for name, digest in expected_hashes.items():
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+            ):
+                raise CheckpointValidationError(
+                    f"expected source SHA-256 is invalid for {name!r}"
+                )
     writers = {name: _HashingWriter(stream) for name, stream in outputs.items()}
     for plan in plans:
         writers[plan.filename].write(plan.header)
@@ -368,6 +414,8 @@ def stream_pack_group(
             if not destinations:
                 continue
             source_record = placement["source"]
+            source_name = source_record["name"]
+            source_digest = sha256() if expected_source_sha256 is not None else None
             filename = source_record["filename"]
             file_record = source_files.get(filename)
             if file_record is None:
@@ -396,6 +444,7 @@ def stream_pack_group(
                     destinations=destinations,
                     writers=writers,
                     chunk_bytes=chunk_bytes,
+                    source_digest=source_digest,
                 )
             elif layout_kind in ("replicated", "expert_identity"):
                 if any(destination.get("axis") is not None for destination in destinations):
@@ -411,10 +460,18 @@ def stream_pack_group(
                         for destination in destinations
                     ),
                     chunk_bytes=chunk_bytes,
+                    source_digest=source_digest,
                 )
             else:
                 raise CheckpointValidationError(
                     f"unsupported streaming layout {layout_kind!r}"
+                )
+            if (
+                source_digest is not None
+                and source_digest.hexdigest() != expected_hashes[source_name]
+            ):
+                raise CheckpointValidationError(
+                    f"source tensor SHA-256 mismatch for {source_name!r}"
                 )
     finally:
         for handle in handles.values():

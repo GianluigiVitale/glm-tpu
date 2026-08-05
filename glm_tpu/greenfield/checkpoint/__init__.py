@@ -1,5 +1,13 @@
 """Plan-aware greenfield checkpoint formats and loaders."""
 
+from .gate_c import (
+    build_gate_c_layout,
+    inspect_gate_c_checkpoint,
+    pack_gate_c_checkpoint,
+    read_gate_c_layout,
+    validate_gate_c_layout,
+    validate_gate_c_layout_bindings,
+)
 from .full_loader import (
     FullCheckpointLoadExpectation,
     LoadedFinalLayoutStage,
@@ -43,12 +51,16 @@ __all__ = (
     "OneLayerLoadExpectation",
     "OneLayerPackConfig",
     "StageDeviceResolution",
+    "build_gate_c_layout",
     "dequantize_packed_fp8",
+    "inspect_gate_c_checkpoint",
     "inspect_one_layer_artifact",
     "load_one_layer",
     "load_pp16_one_layer",
     "load_pp8_one_layer",
+    "pack_gate_c_checkpoint",
     "pack_one_layer_moe",
+    "read_gate_c_layout",
     "resolve_pp16_stage_devices",
     "resolve_pp8_stage_devices",
     "resolve_stage_devices",
@@ -61,5 +73,7 @@ __all__ = (
     "destination_groups",
     "load_final_layout_stage",
     "stream_pack_group",
+    "validate_gate_c_layout",
+    "validate_gate_c_layout_bindings",
     "verify_full_packed_checkpoint",
 )

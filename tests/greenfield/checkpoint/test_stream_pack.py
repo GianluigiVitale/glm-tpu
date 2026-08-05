@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
 
@@ -334,3 +335,75 @@ def test_stream_pack_can_resume_one_missing_axis_shard(tmp_path: Path) -> None:
         actual = handle.get_tensor("model.layers.0.synthetic.weight")
     expected = torch.arange(32, dtype=torch.float32).reshape(4, 8)[:, 4:6]
     assert torch.equal(actual, expected)
+
+
+def test_stream_pack_validates_exact_raw_source_tensor_hashes(
+    tmp_path: Path,
+) -> None:
+    from safetensors import safe_open
+
+    source_root, layout = fixture(tmp_path)
+    plans = build_destination_file_plans(layout)
+    group = destination_groups(plans)[0]
+    filenames = {plan.filename for plan in group}
+    names = {
+        placement["source"]["name"]
+        for placement in layout["placements"]
+        if any(
+            destination["filename"] in filenames
+            for destination in placement["destinations"]
+        )
+    }
+    with safe_open(
+        source_root / "model.safetensors", framework="pt", device="cpu"
+    ) as handle:
+        expected_hashes = {
+            name: sha256(handle.get_tensor(name).numpy().tobytes()).hexdigest()
+            for name in names
+        }
+    outputs = {plan.filename: BytesIO() for plan in group}
+    evidence = stream_pack_group(
+        layout=layout,
+        plans=group,
+        source_root=source_root,
+        outputs=outputs,
+        chunk_bytes=64,
+        expected_source_sha256=expected_hashes,
+    )
+    assert len(evidence) == len(group)
+
+    bad_hashes = dict(expected_hashes)
+    bad_hashes[sorted(bad_hashes)[0]] = "0" * 64
+    with pytest.raises(CheckpointValidationError, match="source tensor SHA-256"):
+        stream_pack_group(
+            layout=layout,
+            plans=group,
+            source_root=source_root,
+            outputs={plan.filename: BytesIO() for plan in group},
+            chunk_bytes=64,
+            expected_source_sha256=bad_hashes,
+        )
+
+
+def test_stream_pack_hash_validation_requires_complete_owners(
+    tmp_path: Path,
+) -> None:
+    source_root, layout = fixture(tmp_path)
+    plans = build_destination_file_plans(layout)
+    target = destination_groups(plans)[0][0]
+    names = {
+        placement["source"]["name"]
+        for placement in layout["placements"]
+        if any(
+            destination["filename"] == target.filename
+            for destination in placement["destinations"]
+        )
+    }
+    with pytest.raises(CheckpointValidationError, match="every destination shard"):
+        stream_pack_group(
+            layout=layout,
+            plans=(target,),
+            source_root=source_root,
+            outputs={target.filename: BytesIO()},
+            expected_source_sha256={name: "0" * 64 for name in names},
+        )
