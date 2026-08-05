@@ -91,10 +91,9 @@ def main() -> int:
         process_id=args.process_id,
     )
     try:
-        if jax.process_index() != args.process_id:
-            raise RuntimeError(
-                f"JAX process index {jax.process_index()} != requested {args.process_id}"
-            )
+        # TPU JAX may topology-order processes differently from TPU-VM worker
+        # suffixes. Preserve both identities; never assume they are equal.
+        jax_process_index = jax.process_index()
         topology = discover_physical_topology(
             jax.devices(), slice_name=args.slice_name
         )
@@ -106,7 +105,7 @@ def main() -> int:
         local_recorded = {
             device.device_id
             for device in topology.devices
-            if device.process_index == args.process_id
+            if device.process_index == jax_process_index
         }
         if local_observed != local_recorded:
             raise RuntimeError(
@@ -147,15 +146,17 @@ def main() -> int:
             "jax_device_count": jax.device_count(),
             "jax_local_device_count": jax.local_device_count(),
             "jax_process_count": jax.process_count(),
-            "jax_process_index": jax.process_index(),
+            "jax_process_index": jax_process_index,
             "jax_version": jax.__version__,
+            "launch_process_id": args.process_id,
             "local_device_ids": sorted(local_observed),
             "schema_version": 1,
         }
         _atomic_write(args.output, record)
         print(
             "GREENFIELD_TOPOLOGY_OK "
-            f"process={args.process_id} host={record['hostname']} "
+            f"launch_process={args.process_id} jax_process={jax_process_index} "
+            f"host={record['hostname']} "
             f"devices={jax.device_count()} local={jax.local_device_count()} "
             f"contract={contract_hash} output={args.output}",
             flush=True,

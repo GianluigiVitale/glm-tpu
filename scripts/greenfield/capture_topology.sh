@@ -124,6 +124,8 @@ if len(records) != 8:
     raise SystemExit(f"expected 8 host records, got {len(records)}")
 if {record["jax_process_index"] for record in records} != set(range(8)):
     raise SystemExit("host records do not cover process indices 0..7 exactly")
+if {record["launch_process_id"] for record in records} != set(range(8)):
+    raise SystemExit("host records do not cover launch process ids 0..7 exactly")
 if len({record["hostname"] for record in records}) != 8:
     raise SystemExit("host records do not contain eight distinct hostnames")
 contract_hashes = {record["contract_hash"] for record in records}
@@ -144,6 +146,10 @@ summary = {
     "code_hash": pin,
     "contract_hash": contract_hash,
     "hostnames": sorted(record["hostname"] for record in records),
+    "launch_to_jax_process": {
+        str(record["launch_process_id"]): record["jax_process_index"]
+        for record in sorted(records, key=lambda item: item["launch_process_id"])
+    },
     "oracle_code_hash": oracle_pin,
     "pp16_lp2_hash": contract["pp16_lp2_hash"],
     "pp8_lp4_hash": contract["pp8_lp4_hash"],
