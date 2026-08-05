@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import jax
 from jax import lax
@@ -774,17 +774,48 @@ def validate_gate_c_hlo(
                 "DSA Gate C lost a query/score/position gather domain"
             )
     else:
-        if len(all_reduces) != 1 or not 2 <= len(all_gathers) <= 4:
-            violations.append(
-                "IndexShare Gate C requires one local output all-reduce and "
-                "two-to-four local all-gather instructions"
+        def collective_has_shape(
+            collective: Any, dtype: str, dimensions: tuple[int, ...]
+        ) -> bool:
+            shapes = collective.operand_shapes + collective.result_shapes
+            return any(
+                shape.dtype.lower() == dtype
+                and shape.dimensions == dimensions
+                for shape in shapes
             )
-        gathered_domains = sum(
-            max(1, len(item.operand_shapes)) for item in all_gathers
+
+        output_reduces = [
+            item
+            for item in all_reduces
+            if any(
+                collective_has_shape(item, dtype, (1, hidden_size))
+                for dtype in ("bf16", "f32")
+            )
+        ]
+        reference_variant = len(all_gathers) == 4 and len(all_reduces) == 1
+        tpu_rewrite_variant = (
+            len(all_gathers) == 2
+            and len(all_reduces) == 3
+            and len(output_reduces) == 1
+            and any(
+                collective_has_shape(item, "f32", (stage_size * 64,))
+                for item in all_reduces
+            )
+            and any(
+                collective_has_shape(item, "u32", (1, 1, 128))
+                for item in all_reduces
+            )
         )
-        if gathered_domains < 4:
+        if not reference_variant and not tpu_rewrite_variant:
             violations.append(
-                "IndexShare Gate C lost a query/output/LSE/validity gather domain"
+                "IndexShare Gate C requires either four local gathers plus "
+                "one output reduction, or the exact TPU two-gather/three-"
+                "reduction LSE+validity rewrite"
+            )
+        if len(output_reduces) != 1:
+            violations.append(
+                "IndexShare Gate C requires exactly one bf16[1,hidden] output "
+                "all-reduce (f32 promotion is allowed on CPU)"
             )
     forbidden_shapes = []
     for instruction in module.instructions:
@@ -816,6 +847,15 @@ def validate_gate_c_hlo(
         "module_name": module.name,
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
+        "index_share_lowering": (
+            "tpu_lse_validity_reductions"
+            if case == "index_share"
+            and len(all_gathers) == 2
+            and len(all_reduces) == 3
+            else "reference_gathers"
+            if case == "index_share"
+            else None
+        ),
         "passed": not violations,
         "violations": violations,
     }

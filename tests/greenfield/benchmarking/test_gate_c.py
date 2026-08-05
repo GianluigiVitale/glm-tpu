@@ -461,3 +461,27 @@ ENTRY main {
 '''
     result = validate_gate_c_hlo(hlo, case="dsa")
     assert result["passed"], result
+
+
+def test_gate_c_index_hlo_accepts_exact_tpu_lse_validity_rewrite() -> None:
+    from glm_tpu.greenfield.benchmarking import validate_gate_c_hlo
+
+    hlo = r'''HloModule jit_index_share_step, replica_count=1, num_partitions=4
+
+ENTRY main {
+  query = bf16[1,16,576]{2,1,0} parameter(0)
+  partial = bf16[1,1,64,512]{3,2,1,0} parameter(1)
+  lse = f32[256]{0} parameter(2)
+  update = bf16[1,6144]{1,0} parameter(3)
+  validity = u32[1,1,128]{2,1,0} parameter(4)
+  gathered_query = bf16[4,16,576]{2,1,0} all-gather(query), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  gathered_partial = bf16[4,1,64,512]{3,2,1,0} all-gather(partial), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  reduced_lse = f32[256]{0} all-reduce(lse), replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  reduced_update = bf16[1,6144]{1,0} all-reduce(update), replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  reduced_validity = u32[1,1,128]{2,1,0} all-reduce(validity), replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  ROOT result = (bf16[4,16,576]{2,1,0}, bf16[4,1,64,512]{3,2,1,0}, f32[256]{0}, bf16[1,6144]{1,0}, u32[1,1,128]{2,1,0}) tuple(gathered_query, gathered_partial, reduced_lse, reduced_update, reduced_validity)
+}
+'''
+    result = validate_gate_c_hlo(hlo, case="index_share")
+    assert result["passed"], result
+    assert result["index_share_lowering"] == "tpu_lse_validity_reductions"
