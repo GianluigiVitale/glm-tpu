@@ -124,7 +124,9 @@ def _chain_body(kind: str) -> Callable[[jax.Array], jax.Array]:
     def chain(value: jax.Array) -> jax.Array:
         model_rank = lax.axis_index("model").astype(jnp.bfloat16)
         dcp_rank = lax.axis_index("dcp").astype(jnp.bfloat16)
-        epsilon = jnp.asarray(1.0 / 4096.0, dtype=jnp.bfloat16)
+        # Keep the rank-dependent term large enough that bf16 rounding cannot
+        # make the 4-way and 8-way recurrences observationally identical.
+        epsilon = jnp.asarray(1.0 / 256.0, dtype=jnp.bfloat16)
         current = value
         for layer in range(_LAYERS):
             if kind == "full32":

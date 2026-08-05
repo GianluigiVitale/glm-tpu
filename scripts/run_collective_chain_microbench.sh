@@ -114,6 +114,7 @@ for kind in sorted(expected_kinds):
             for process_id in range(8)
         })),
     }
+assert len({row["output_first"] for row in fleet.values()}) == 4, fleet
 with open(output, "w") as handle:
     json.dump({
         "hosts_by_process_id": hosts,
