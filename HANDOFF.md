@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 15:30 UTC
+**Updated:** 2026-08-05 16:05 UTC
 
 ## Authority and isolation
 
@@ -29,7 +29,12 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   scale, 64 complete experts/chip, and intermediate-sharded shared expert. Routed/shared partials
   share one four-chip combine without mixing value domains. Forced four-device distributed and
   all-top-4-on-one-chip cases pass bounded tensor equivalence; routing is elementwise exact.
-- Greenfield tests last passed 61/61. No real checkpoint layer/capture, checkpoint loader, decoder,
+- One-layer format/packer validates every source leaf and writes four final PP8 identity-owned
+  files with complete expert ownership, shared-intermediate shards, replicated router state,
+  payload/file/manifest checksums, finite checks, and append-only refusal. Tiny roundtrip/corruption
+  tests pass. Real layer-3 metadata validates 1,544 leaves / 9,706,940,416 bytes across only source
+  shards 38–40; no tensor payload has been packed yet.
+- Greenfield tests last passed 65/65. No real checkpoint layer/capture, checkpoint loader, decoder,
   serving path, or greenfield model-throughput result exists yet.
 
 ## Protected evidence
@@ -76,14 +81,15 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Build a one-layer-only artifact from checkpoint layer 3 without loading the full model. Source
-   leaves occupy safetensor shards 38–40: router/correction/shared tensors and 256 routed experts.
-   Stream directly into four final identity-owned shards and produce a standalone oracle capture.
-2. Run the exact real layer on one four-chip PP8 stage: normal routing and adversarial eight experts
+1. Commit/push the bounded packer, record immutable GCS source-object generations/checksums, then
+   create/upload the real layer-3 artifact from shards 38–40. Do not load or open the other shards.
+2. Produce the standalone legacy-oracle input/output capture for that artifact without constructing
+   the full model.
+3. Run the exact real layer on one four-chip PP8 stage: normal routing and adversarial eight experts
    on one chip, bounded tensor comparison, exact `bf16[2,1,6144]` four-rank HLO, HBM/latency,
    DB/archive, and authenticated fleet cleanup.
-3. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
-4. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
+4. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
+5. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
    topology, transport, and exact topology-local MoE prerequisites all pass.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.

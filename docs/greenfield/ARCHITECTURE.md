@@ -68,8 +68,12 @@ The optimized CPU HLO has one four-rank stacked routed/shared all-reduce and no 
 CPU XLA promotes that reduction to f32; protected TPU HLO must instead prove the required
 `bf16[2,1,6144]` physical payload.
 
-No real checkpoint layer, captured layer oracle, checkpoint packer/loader, decoder, or serving path
-exists yet.
+A versioned one-layer-only packer now validates the exact layer-3 source leaf set and writes final
+PP8 identity ownership with byte/hash reconciliation. Its tiny-fixture tests pass and real source
+metadata validation proves 1,544 leaves / 9,706,940,416 unique payload bytes across only shards
+38–40. No real packed artifact or capture exists yet, and the bounded packer is not Gate B.
+
+No captured layer oracle, full checkpoint packer/loader, decoder, or serving path exists yet.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
