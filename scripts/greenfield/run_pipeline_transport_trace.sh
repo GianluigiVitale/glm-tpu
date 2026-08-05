@@ -28,7 +28,7 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "protected transport trace requires warmup>=20 and exactly 20 steps" >&2
   exit 2
 }
-mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/traces"
+mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/traces" "$RUN_DIR/fleet_traces"
 
 say() {
   echo "[transport-trace $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
@@ -110,7 +110,7 @@ has_eight_unique_markers "$RUN_DIR/capture.txt" TRACE_UPLOAD_OK || {
 
 gcloud storage cp "$REMOTE_PREFIX/host_records/trace.rank*.json" \
   "$RUN_DIR/host_records/" >/dev/null
-gcloud storage rsync --recursive "$REMOTE_PREFIX/traces" "$RUN_DIR/traces" >/dev/null
+gcloud storage rsync --recursive "$REMOTE_PREFIX/traces" "$RUN_DIR/fleet_traces" >/dev/null
 say "validating fresh XPlanes and appending provenance DB rows"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" <<'PY'
@@ -165,7 +165,7 @@ for record in records:
             raise SystemExit("trace HLO/step contract failed")
         rank = record["launch_process_id"]
         plan = trace["config"]["plan"].lower()
-        local = run_dir / "traces" / plan / f"trace.rank{rank}.xplane.pb"
+        local = run_dir / "fleet_traces" / plan / f"trace.rank{rank}.xplane.pb"
         digest = file_sha256(local)
         if digest != trace["xplane"]["sha256"]:
             raise SystemExit(f"downloaded XPlane hash mismatch: {local}")
@@ -176,7 +176,7 @@ import parse_xplane
 fleet = {}
 for plan, expected_hops in (("pp8_lp4", 8), ("pp16_lp2", 16)):
     result = parse_xplane.aggregate_fleet(
-        run_dir / "traces" / plan,
+        run_dir / "fleet_traces" / plan,
         step_module_re=r"jit_transport",
     )
     if (
@@ -193,21 +193,33 @@ for plan, expected_hops in (("pp8_lp4", 8), ("pp16_lp2", 16)):
     forbidden = sum(
         values["invocations_per_step"]
         for values in result["ops"].values()
-        if values.get("hlo_category") in {
-            "all-gather", "all-reduce", "all-to-all", "reduce-scatter"
-        }
+        if any(
+            str(values.get("hlo_category", "")).startswith(prefix)
+            for prefix in ("all-gather", "all-reduce", "all-to-all", "reduce-scatter")
+        )
     )
-    permutes = sum(
+    permute_starts = sum(
         values["invocations_per_step"]
         for values in result["ops"].values()
-        if values.get("hlo_category") == "collective-permute"
+        if values.get("hlo_category") == "collective-permute-start"
     )
-    if forbidden != 0 or permutes <= 0:
+    permute_dones = sum(
+        values["invocations_per_step"]
+        for values in result["ops"].values()
+        if values.get("hlo_category") == "collective-permute-done"
+    )
+    if (
+        forbidden != 0
+        or permute_starts != expected_hops
+        or permute_dones != expected_hops
+    ):
         raise SystemExit(
             f"{plan} physical trace collective contract failed: "
-            f"permutes={permutes} forbidden={forbidden} expected_hops={expected_hops}"
+            f"starts={permute_starts} dones={permute_dones} "
+            f"forbidden={forbidden} expected_hops={expected_hops}"
         )
-    result["observed_collective_permute_invocations_per_step"] = permutes
+    result["observed_collective_permute_starts_per_step"] = permute_starts
+    result["observed_collective_permute_dones_per_step"] = permute_dones
     result["expected_hops_per_step"] = expected_hops
     fleet[plan] = result
 
@@ -246,7 +258,7 @@ for plan, result in fleet.items():
         prompt="Capture twenty full device-resident transport invocations on all hosts.",
         gold="8 fresh XPlanes, 64 cores, exact point-to-point-only transport.",
         raw_output=json.dumps(result, sort_keys=True),
-        extracted=str(result["observed_collective_permute_invocations_per_step"]),
+        extracted=str(result["observed_collective_permute_starts_per_step"]),
         correct=True,
         score=None,
     )
@@ -277,7 +289,7 @@ if check != "ok":
 print(f"TRANSPORT_TRACE_PROOF_VALID plans={len(fleet)} db_run={run_id}")
 PY
 
-(cd "$RUN_DIR" && find host_records traces -type f -print0 | sort -z | \
+(cd "$RUN_DIR" && find host_records fleet_traces -type f -print0 | sort -z | \
   xargs -0 sha256sum >evidence.sha256)
 sha256sum "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db" \
   >>"$RUN_DIR/evidence.sha256"
