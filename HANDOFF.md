@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 16:14 UTC
+**Updated:** 2026-08-05 16:24 UTC
 
 ## Authority and isolation
 
@@ -37,8 +37,14 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   hashed 2,429,096,640-byte files. The 9,716,380,672-byte packed payload reconciles exactly,
   including intentional router replication. Manifest `68ef8201...f938`, approved-bucket upload,
   and local/remote `SUCCESS` pass at code `1969d925...f3d4`; this is layout evidence, not Gate B.
-- Greenfield tests last passed 65/65. No real layer execution/oracle capture, checkpoint loader,
-  decoder, serving path, or greenfield model-throughput result exists yet.
+- Independent raw-source PyTorch oracle capture never imports the greenfield JAX kernels, packed
+  checkpoint, model class, or legacy execution. Real artifact
+  `greenfield_one_layer_oracle_20260805T162210370718434Z` pins 104 exact source tensors and accepted
+  legacy/vLLM source hashes. Normal routes `[161,217,206,240,186,180,37,81]` span all four PP8
+  slots; the adversarial routes are all experts 128–135 on slot 2. Manifest `c63ffa19...ebff`,
+  274,944-byte safetensor SHA `4aa7910b...784b`, and local/remote `SUCCESS` pass at `27ebdec`.
+- Greenfield tests last passed 69/69. No real layer TPU execution, checkpoint loader, decoder,
+  serving path, or greenfield model-throughput result exists yet.
 
 ## Protected evidence
 
@@ -84,13 +90,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Produce the standalone legacy-oracle input/output capture for the real layer-3 artifact without
-   constructing the full model.
-2. Run the exact real layer on one four-chip PP8 stage: normal routing and adversarial eight experts
+1. Run the exact real layer on one four-chip PP8 stage: normal routing and adversarial eight experts
    on one chip, bounded tensor comparison, exact `bf16[2,1,6144]` four-rank HLO, HBM/latency,
    DB/archive, and authenticated fleet cleanup.
-3. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
-4. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
+2. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
+3. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
    topology, transport, and exact topology-local MoE prerequisites all pass.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.

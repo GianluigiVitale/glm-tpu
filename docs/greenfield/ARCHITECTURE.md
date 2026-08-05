@@ -72,10 +72,13 @@ A versioned one-layer-only packer now validates the exact layer-3 source leaf se
 PP8 identity ownership with byte/hash reconciliation. Its tiny-fixture tests pass and real source
 artifact `greenfield_one_layer_pack_20260805T151828912346032Z` proves 1,544 leaves /
 9,706,940,416 unique payload bytes across only shards 38–40, four independently hashed final files,
-exact manifest reconciliation, and approved-bucket `SUCCESS`. No oracle capture exists yet, and the
-bounded artifact is not Gate B.
+exact manifest reconciliation, and approved-bucket `SUCCESS`. The bounded artifact is not Gate B.
+A separate raw-source PyTorch oracle now captures normal routes spanning all four PP8 slots and a
+bias-forced all-eight-on-slot-2 case. It records decomposed expert, routed, shared, and final outputs
+plus exact source/legacy hashes without importing greenfield JAX, packed weights, a model class, or
+legacy execution.
 
-No captured layer oracle, full checkpoint packer/loader, decoder, or serving path exists yet.
+No real layer TPU execution, full checkpoint packer/loader, decoder, or serving path exists yet.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;

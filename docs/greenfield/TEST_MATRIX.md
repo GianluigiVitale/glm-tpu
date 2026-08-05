@@ -18,8 +18,9 @@
 | L2 MoE combine HLO | One stacked routed/shared four-rank AR; no other collective | Pass on CPU; TPU proof missing |
 | One-layer pack format | Exact source leaf set, ownership, byte/hash round trip, corruption refusals | Pass on tiny fixture and real artifact |
 | Real layer-3 pack | 1,544 leaves / 9,706,940,416 unique bytes / only shards 38–40; four final PP8 files; manifest `68ef8201...f938`; remote `SUCCESS` | Pass (layout mechanism; not Gate B) |
-| Gate C exact real local MoE layer | Reference exists; real weights/oracle/protected TPU evidence missing | In progress |
+| Real layer-3 oracle | Raw-source PyTorch; 104 pinned tensors; normal all-slot routes; all-eight-on-slot-2 adversary; manifest `c63ffa19...ebff`; remote `SUCCESS` | Pass (correctness artifact) |
+| Gate C exact real local MoE layer | Reference, packed weights, and oracle exist; protected TPU comparison missing | In progress |
 | Gates B/D–H | Prohibited until earlier gates authorize them | Missing |
 
-Last verified greenfield suite: 65/65. CPU/HLO and synthetic TPU chains prove mechanism only; they
+Last verified greenfield suite: 69/69. CPU/HLO and synthetic TPU chains prove mechanism only; they
 do not establish model correctness, token latency, or wall throughput.

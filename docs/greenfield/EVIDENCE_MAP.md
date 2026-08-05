@@ -43,6 +43,14 @@ shards 38–40 and wrote four final PP8 files of 2,429,096,640 bytes each. Packe
 `SUCCESS` exist. This is checkpoint-layout mechanism evidence, not a DB-linked TPU performance run
 and not Gate B for the complete model.
 
+`greenfield_one_layer_oracle_20260805T162210370718434Z` is the independent correctness artifact at
+code `27ebdec`. It reads 104 exact raw-source tensors at the same immutable source revision as the
+pack, never constructs a model, and records accepted legacy/vLLM file hashes. Normal routes
+`[161,217,206,240,186,180,37,81]` span all four PP8 slots; the adversarial case selects only experts
+128–135 on slot 2. Manifest is `c63ffa19820d5c2c39865ac8611fb313ffc6ebcd2f893c3507745a356bfdebff`;
+the 274,944-byte safetensor SHA-256 is `4aa7910b...784b`; local/remote `SUCCESS` exist. This is not
+TPU performance evidence.
+
 ## Reusable tools, not execution dependencies
 
 - Optimized-HLO contract: `glm_tpu/greenfield/sharding/hlo_contract.py` and

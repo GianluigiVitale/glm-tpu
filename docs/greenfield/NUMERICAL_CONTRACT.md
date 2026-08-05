@@ -34,3 +34,10 @@ fixtures. Real checkpoint layer output uses a recorded bounded-error contract
 against the captured legacy oracle because the topology rewrite changes the
 replica reduction association. Raw-token exactness remains mandatory at the
 full-decoder gates.
+
+The real layer-3 oracle is a standalone raw-checkpoint PyTorch CPU transcription, not a greenfield
+JAX fallback. It stores the deterministic BF16 input, FP32 router logits/weights, exact route ids,
+per-expert BF16 outputs, routed/shared decompositions, and final BF16 output for normal distributed
+routing and an all-eight-on-one-chip adversary. Its source revision and accepted legacy/vLLM source
+file hashes are part of the manifest. Real TPU layer output uses bounded tensor comparison because
+the topology rewrite intentionally changes reduction association; route ids remain exact.
