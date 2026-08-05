@@ -104,6 +104,82 @@ def _connected(
     return len(reached) == len(devices)
 
 
+def _groups_have_adjacent_perfect_matching(
+    left: tuple[PhysicalDevice, ...],
+    right: tuple[PhysicalDevice, ...],
+    topology: PhysicalTopology,
+) -> bool:
+    """Whether every transfer lane can use one distinct physical neighbor."""
+
+    if len(left) != len(right):
+        return False
+
+    def search(index: int, available: frozenset[int]) -> bool:
+        if index == len(left):
+            return True
+        candidates = sorted(
+            (
+                right_index
+                for right_index in available
+                if _differing_axis(left[index], right[right_index], topology)
+                is not None
+            ),
+            key=lambda right_index: _device_key(right[right_index]),
+        )
+        return any(
+            search(index + 1, available - {right_index})
+            for right_index in candidates
+        )
+
+    return search(0, frozenset(range(len(right))))
+
+
+def _topology_ring(
+    entries: tuple[tuple[int, tuple[PhysicalDevice, ...]], ...],
+    topology: PhysicalTopology,
+    *,
+    label: str,
+) -> tuple[tuple[int, tuple[PhysicalDevice, ...]], ...]:
+    """Find a deterministic Hamiltonian ring over physical transfer groups."""
+
+    ordered = tuple(
+        sorted(entries, key=lambda entry: min(_device_key(d) for d in entry[1]))
+    )
+    if len(ordered) < 2:
+        return ordered
+    neighbors = {
+        index: tuple(
+            candidate
+            for candidate in range(len(ordered))
+            if candidate != index
+            and _groups_have_adjacent_perfect_matching(
+                ordered[index][1], ordered[candidate][1], topology
+            )
+        )
+        for index in range(len(ordered))
+    }
+
+    def search(path: tuple[int, ...], remaining: frozenset[int]) -> tuple[int, ...] | None:
+        if not remaining:
+            return path if path[0] in neighbors[path[-1]] else None
+        candidates = sorted(
+            remaining.intersection(neighbors[path[-1]]),
+            key=lambda index: min(_device_key(d) for d in ordered[index][1]),
+        )
+        for candidate in candidates:
+            result = search(path + (candidate,), remaining - {candidate})
+            if result is not None:
+                return result
+        return None
+
+    indices = search((0,), frozenset(range(1, len(ordered))))
+    if indices is None:
+        raise TopologyValidationError(
+            f"{label} groups have no all-lane topology-adjacent stage ring"
+        )
+    return tuple(ordered[index] for index in indices)
+
+
 def _make_group(
     stage_id: int, process: int, devices: Iterable[PhysicalDevice]
 ) -> LocalReplicaGroup:
@@ -126,9 +202,10 @@ def build_pp8_lp4_groups(
         raise TopologyValidationError(
             "PP8_LP4 requires exactly eight hosts with four devices each"
         )
+    stage_ring = _topology_ring(process_groups, topology, label="PP8_LP4")
     groups = tuple(
         _make_group(stage, process, devices)
-        for stage, (process, devices) in enumerate(process_groups)
+        for stage, (process, devices) in enumerate(stage_ring)
     )
     validate_local_groups(topology, PlanName.PP8_LP4, groups)
     return groups
@@ -177,7 +254,7 @@ def build_pp16_lp2_groups(
         raise TopologyValidationError(
             "PP16_LP2 requires exactly eight hosts with four devices each"
         )
-    result = []
+    pairs = []
     for process, devices in process_groups:
         candidates = []
         for matching in _perfect_matchings(devices):
@@ -189,12 +266,13 @@ def build_pp16_lp2_groups(
                 f"process {process} has no topology-adjacent two-chip perfect matching"
             )
         _, selected = min(candidates, key=lambda candidate: candidate[0])
-        selected = tuple(
-            sorted(selected, key=lambda pair: min(_device_key(device) for device in pair))
-        )
         for pair in selected:
-            result.append(_make_group(len(result), process, pair))
-    groups = tuple(result)
+            pairs.append((process, tuple(pair)))
+    stage_ring = _topology_ring(tuple(pairs), topology, label="PP16_LP2")
+    groups = tuple(
+        _make_group(stage, process, devices)
+        for stage, (process, devices) in enumerate(stage_ring)
+    )
     validate_local_groups(topology, PlanName.PP16_LP2, groups)
     return groups
 
@@ -265,6 +343,18 @@ def validate_local_groups(
         raise TopologyValidationError(
             f"{plan.value} requires {groups_per_process} group(s) on every process"
         )
+    group_devices = [
+        tuple(devices_by_id[device_id] for device_id in group.device_ids)
+        for group in groups
+    ]
+    for stage, (left, right) in enumerate(
+        zip(group_devices, group_devices[1:] + group_devices[:1])
+    ):
+        if not _groups_have_adjacent_perfect_matching(left, right, topology):
+            raise TopologyValidationError(
+                f"stage boundary {stage}->{(stage + 1) % len(groups)} lacks an "
+                "all-lane topology-adjacent transfer matching"
+            )
 
 
 def groups_to_dict(

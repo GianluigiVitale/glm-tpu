@@ -23,11 +23,43 @@ def topology():
     )
 
 
+def assert_stage_ring_is_all_lane_adjacent(topo, groups) -> None:
+    devices = {device.device_id: device for device in topo.devices}
+    shape = topo.topology_shape
+    for left_group, right_group in zip(groups, groups[1:] + groups[:1]):
+        left = [devices[device_id] for device_id in left_group.device_ids]
+        right = [devices[device_id] for device_id in right_group.device_ids]
+        adjacency = {
+            item.device_id: {
+                candidate.device_id
+                for candidate in right
+                if sum(
+                    min(abs(a - b), size - abs(a - b)) != 0
+                    for a, b, size in zip(
+                        item.coordinates, candidate.coordinates, shape
+                    )
+                )
+                == 1
+                and sum(
+                    min(abs(a - b), size - abs(a - b))
+                    for a, b, size in zip(
+                        item.coordinates, candidate.coordinates, shape
+                    )
+                )
+                == 1
+            }
+            for item in left
+        }
+        assert all(adjacency.values())
+        assert len(set().union(*adjacency.values())) == len(right)
+
+
 def test_pp8_groups_are_host_aligned_and_physically_ordered() -> None:
     groups = build_pp8_lp4_groups(topology())
     assert len(groups) == 8
     assert {len(group.device_ids) for group in groups} == {4}
-    assert tuple(group.process_index for group in groups) == tuple(range(8))
+    assert {group.process_index for group in groups} == set(range(8))
+    assert_stage_ring_is_all_lane_adjacent(topology(), groups)
     assert len(group_manifest_hash(PlanName.PP8_LP4, groups)) == 64
 
 
@@ -37,14 +69,21 @@ def test_stage_order_uses_host_coordinates_not_process_index() -> None:
         for device in runtime_devices()
     ]
     topo = discover_physical_topology(devices, slice_name="db-v4-64-od")
+    original = build_pp8_lp4_groups(topology())
     groups = build_pp8_lp4_groups(topo)
-    assert tuple(group.process_index for group in groups) == tuple(reversed(range(8)))
+    assert tuple(group.coordinates for group in groups) == tuple(
+        group.coordinates for group in original
+    )
+    assert tuple(group.process_index for group in groups) == tuple(
+        7 - group.process_index for group in original
+    )
 
 
 def test_pp16_prefers_adjacent_length_two_axis() -> None:
     groups = build_pp16_lp2_groups(topology())
     assert len(groups) == 16
     assert {len(group.device_ids) for group in groups} == {2}
+    assert_stage_ring_is_all_lane_adjacent(topology(), groups)
     for group in groups:
         left, right = group.coordinates
         differences = [axis for axis, (a, b) in enumerate(zip(left, right)) if a != b]
