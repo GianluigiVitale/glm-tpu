@@ -202,9 +202,8 @@ No TPU workflow is active. Always rerun the strict eight-host census before laun
 - DCP LSE all-gather: `422e9e31f`; CPU DCP 30/30 plus DCP2/4/8 stress. Lower priority.
 - 2D f32 reduction prerequisite: `/home/gianl/tpu-inference-decode-2d-f32`, `dab2db7b3`, clean and
   pushed. It is only a numerical primitive; RMSNorm/attention/GMM end-to-end work remains.
-- Harness repository durable parent is `030d656`. The current intended edits are this handoff,
-  `docs/RESEARCH_LOG.md`, the disk/watchdog fixes, and their ownership tests. The owner's untracked
-  `AGENTS.md` remains untouched. Commit and push the harness update before the next TPU workflow.
+- Harness repository durable `main` is `39c827c`; the recovery record, disk/watchdog fixes, and
+  ownership tests are committed and pushed. The owner's untracked `AGENTS.md` remains untouched.
 
 ## Proof and observability rules
 
