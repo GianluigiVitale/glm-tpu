@@ -52,7 +52,12 @@ def write_tiny_source(config: OneLayerPackConfig) -> None:
                 dtype=torch.float8_e4m3fn,
             )
             tensors[f"{base}.weight_scale_inv"] = torch.full(
-                (2, 4), float(expert + 1), dtype=torch.float32
+                (
+                    config.intermediate_size // config.fp8_block_shape[0],
+                    config.hidden_size // config.fp8_block_shape[1],
+                ),
+                float(expert + 1),
+                dtype=torch.float32,
             )
         base = f"{prefix}.experts.{expert}.down_proj"
         tensors[f"{base}.weight"] = torch.full(
@@ -61,7 +66,12 @@ def write_tiny_source(config: OneLayerPackConfig) -> None:
             dtype=torch.float8_e4m3fn,
         )
         tensors[f"{base}.weight_scale_inv"] = torch.full(
-            (4, 2), float(expert + 1), dtype=torch.float32
+            (
+                config.hidden_size // config.fp8_block_shape[0],
+                config.intermediate_size // config.fp8_block_shape[1],
+            ),
+            float(expert + 1),
+            dtype=torch.float32,
         )
     tensors[f"{prefix}.gate.weight"] = torch.arange(
         config.num_experts * config.hidden_size, dtype=torch.bfloat16
@@ -78,8 +88,17 @@ def write_tiny_source(config: OneLayerPackConfig) -> None:
             torch.float8_e4m3fn
         )
         tensors[f"{base}.weight_scale_inv"] = torch.arange(
-            8, dtype=torch.float32
-        ).reshape(2, 4)
+            (
+                config.intermediate_size
+                // config.fp8_block_shape[0]
+                * config.hidden_size
+                // config.fp8_block_shape[1]
+            ),
+            dtype=torch.float32,
+        ).reshape(
+            config.intermediate_size // config.fp8_block_shape[0],
+            config.hidden_size // config.fp8_block_shape[1],
+        )
     base = f"{prefix}.shared_experts.down_proj"
     tensors[f"{base}.weight"] = torch.arange(
         config.hidden_size * config.intermediate_size,
@@ -88,8 +107,17 @@ def write_tiny_source(config: OneLayerPackConfig) -> None:
         torch.float8_e4m3fn
     )
     tensors[f"{base}.weight_scale_inv"] = torch.arange(
-        8, dtype=torch.float32
-    ).reshape(4, 2)
+        (
+            config.hidden_size
+            // config.fp8_block_shape[0]
+            * config.intermediate_size
+            // config.fp8_block_shape[1]
+        ),
+        dtype=torch.float32,
+    ).reshape(
+        config.hidden_size // config.fp8_block_shape[0],
+        config.intermediate_size // config.fp8_block_shape[1],
+    )
 
     names = sorted(tensors)
     first = {name: tensors[name] for index, name in enumerate(names) if index % 2 == 0}
