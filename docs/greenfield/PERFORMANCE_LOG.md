@@ -3,6 +3,45 @@
 No greenfield model-performance measurement exists yet. Results below are protected synthetic TPU
 mechanism measurements; they do not report token speed.
 
+## 2026-08-05 — protected PP8/PP16 device-resident transport
+
+DB 415 / `greenfield_transport_20260805T142953361259007Z` measures one complete closed stage ring
+per invocation at code `577aa4bf706976f3d25f552526d0b6eaa5d4920e`. PP8 uses four physical
+eight-stage lanes; PP16 uses two physical sixteen-stage lanes. Each case has 200 warmups, 2,000
+samples, deterministic checksums, exact physical pair/shape/count HLO, eight-host agreement,
+approved archive, and clean pre/post census.
+
+Fleet-maximum-host profiler-free results:
+
+| plan | payload | control p50 | transport p50 | net p50 | p90 | p99 |
+|---|---|---:|---:|---:|---:|---:|
+| PP8 | `bf16[1,6144]` | 0.300895 | 0.331145 | 0.030250 ms | 0.359551 | 0.521339 ms |
+| PP8 | `bf16[2,6144]` | 0.302515 | 0.330270 | 0.027755 ms | 0.357699 | 0.427286 ms |
+| PP8 | `bf16[1,2048]` | 0.303800 | 0.327900 | 0.024100 ms | 0.353567 | 0.426943 ms |
+| PP8 | `int32[1,2048]` | 0.305175 | 0.329265 | 0.024091 ms | 0.356155 | 0.469542 ms |
+| PP16 | `bf16[1,6144]` | 0.331230 | 0.407385 | 0.076155 ms | 0.436538 | 0.566279 ms |
+| PP16 | `bf16[2,6144]` | 0.324830 | 0.401925 | 0.077095 ms | 0.432748 | 0.541938 ms |
+| PP16 | `bf16[1,2048]` | 0.327400 | 0.399780 | 0.072381 ms | 0.429788 | 0.575288 ms |
+| PP16 | `int32[1,2048]` | 0.327875 | 0.399570 | 0.071695 ms | 0.428250 | 0.470942 ms |
+
+Each optimized program contains exactly 8 PP8 or 16 PP16 `collective-permute` operations over the
+captured topology-neighbor pairs and exact payload dtype/shape. There is no other collective,
+full-pod synchronization, host transfer, Ray/Python stage dispatch, or model-equivalent compute.
+
+DB 416 / `greenfield_transport_trace_20260805T143832942547470Z` is the separate trace proof at
+`8aee3351a61f89141762dda237f582b8deed3a1c`. Both plans have eight fresh XPlanes, 64 TPU cores,
+and 20 selected invocations/core. PP8 has exactly 8 physical permute starts and dones per step;
+PP16 has exactly 16; forbidden collective count is zero. Trace-contaminated device/cycle values are
+not substituted for DB 415 profiler-free latency.
+
+Diagnostic `...T143608529930365Z` was rejected before DB insertion because the parser tree included
+both worker-0's original file and its downloaded canonical copy. The fixed proof isolated canonical
+fleet files and re-ran at a new exact pin.
+
+Transport is therefore not a plausible large bottleneck: even the full PP16 live-residual ring adds
+less than `0.08 ms` over matched control. The remaining ceiling depends on stage-local model
+compute/layout and elimination of legacy per-layer global arrival barriers.
+
 ## 2026-08-05 — protected dependent collective floor
 
 All accepted runs used 75 genuinely dependent operations, 200 warmups, 1,000 measured samples,

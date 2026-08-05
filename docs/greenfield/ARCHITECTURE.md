@@ -48,9 +48,18 @@ checksums, and optimized-HLO count assertions prevent elision. Protected configs
 optimized HLO is authoritative: small decode reduce-scatter currently fails closed because TPU-v4
 XLA rewrites it to all-reduce, while the other supported operations preserve the exact contract.
 
+## Transport mechanism
+
+The model-free executable maps PP8 into four closed eight-stage physical lanes and PP16 into two
+closed sixteen-stage lanes. One compiled global `shard_map` advances the rank-dependent payload
+with exact neighbor `ppermute` pairs once per stage and returns it to its origin. Protected HLO and
+fresh 64-core XPlanes prove exact 8/16 operations and no other collective, host/Ray/Python stage
+dispatch, or model-equivalent compute. For `bf16[1,6144]`, the whole ring is `0.030 ms` PP8 and
+`0.076 ms` PP16 above matched control at fleet-max p50.
+
 ## Still unimplemented
 
-No transport executable, model layer, checkpoint packer/loader, decoder, or serving path exists.
+No model layer, checkpoint packer/loader, decoder, or serving path exists.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
@@ -59,4 +68,4 @@ all-reduces have a `3.941 ms` fleet-max
 p50 and 75 full-ring nearest-neighbor permutes `0.791 ms`, versus `106.495 ms/token` attributed to
 the legacy MoE combine region. This isolates legacy arrival/layout/barrier behavior rather than raw
 small-payload ICI as the dominant loss. It is mechanism evidence, not model throughput. The next
-executable is the synthetic device-resident PP8/PP16 stage chain—not a model port.
+prerequisite is one exact real topology-local MoE layer—not a full-model port.

@@ -1,77 +1,81 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 14:16 UTC
+**Updated:** 2026-08-05 14:40 UTC
 
 ## Authority and isolation
 
 - Branch/worktree: `rewrite/topology-first-decode` at
   `/home/gianl/glm-tpu-topology-rewrite`.
-- Collective implementation/result pins: `fcd8426735119fee34ab8adc9e8c14b762adc2f8`
-  through documentation pin `b12af9633c8b14648db8d2a2ccd9a3c577a04817`.
 - Starting harness pin: `a4a17ac4e90b15f1994bd8b26917ef62daa52660`.
 - Legacy oracle pin: `b3c25df47ac98783912dc658878181ec0a8ae16d`.
-- Read `AGENTS.md`, `goal.md`, and `docs/glm-tpu-revolution.md` before this file.
+- Collective result pins: `fcd8426735...` and `b12af9633...`.
+- Transport latency pin: `577aa4bf706976f3d25f552526d0b6eaa5d4920e`; trace pin:
+  `8aee3351a61f89141762dda237f582b8deed3a1c`.
+- Read `AGENTS.md`, `goal.md`, and `docs/glm-tpu-revolution.md` before this status file.
 
-Those tracked branch-local files are authoritative. `HANDOFF.md` is status only. The main checkout,
-old worktrees, inherited campaign documents, and legacy `AGENTS.md`/`CLAUDE.md`/`HANDOFF.md` files
-have no authority here. The old incremental TP32 sequence and pipeline-parallelism ban are
-superseded. Never edit or delete the owner's untracked main-checkout files.
+Those tracked branch-local files are authoritative. Main checkout, old worktree, campaign, and
+legacy `AGENTS.md`/`CLAUDE.md`/`HANDOFF.md` files have no authority here. The incremental TP32 plan
+and pipeline-parallelism ban are superseded. Never edit/delete the owner's untracked main files.
 
 ## Implemented and verified
 
 - Frozen, hashed geometry/topology/plan types; runtime physical discovery; deterministic PP8/PP16
-  physical rings; optimized-HLO contract with partition-id-to-physical-device mapping.
-- Dependent 75-operation benchmark for control, all-reduce, reduce-scatter, all-gather,
-  collective-permute, all-to-all, and fused tuple all-reduce over physical 2/4/8/32-chip groups.
-- Rank-dependent nonlinear recurrence, exact HLO counts/groups/pairs/shapes, bitwise checksums,
-  200 warmups, 1,000 samples, eight-host fleet agreement, append-only DB/archive, and strict cleanup.
-- Greenfield tests last passed 49/49. No model path, checkpoint loader, transport executable, or
+  groups/rings; exact optimized-HLO parser with executable-partition-to-physical-device mapping.
+- Complete protected 75-operation collective floor over physical 2/4/8/32-chip groups.
+- Device-resident PP8/PP16 transport: closed physical lanes, exact point-to-point HLO, one compiled
+  global program, deterministic checksums, warmed distributions, and fresh fleet XPlanes.
+- Greenfield tests last passed 54/54. No model layer, checkpoint loader, decoder, serving path, or
   greenfield model-throughput result exists yet.
 
 ## Protected evidence
 
 Topology DB 405 / `greenfield_topology_20260805T125842425591441Z` proved 32 v4 chips in `2x4x4`,
-eight processes, actual local ordering, topology hash `294e777...559`, PP8 hash `d5943ab8...c14`,
-PP16 hash `6383e57c...f21`, remote `SUCCESS`, and 8/8 clean census.
+actual local ordering, topology hash `294e777...559`, PP8 `d5943ab8...c14`, PP16
+`6383e57c...f21`, remote `SUCCESS`, and 8/8 clean census.
 
-Protected collective runs DB 406–414 all archived to the approved bucket and ended 8/8 clean:
+Collective DB 406–414 all have approved archives and clean census. Dominant `bf16[2,6144]` p50 for
+75 all-reduces is g2/g4/g8/g32 `0.836/1.083/1.471/3.941 ms`; 75 full-ring permutes are `0.791 ms`.
+The matrix covers required bf16 shapes, `f32[1,6144]`, and `int32[1,2048]` metadata. Small decode
+reduce-scatter is not falsely timed: TPU XLA rewrites it to all-reduce, and three diagnostics fail
+closed with saved HLO.
 
-- DB 406 `...T133905344573798Z`: dominant `bf16[2,6144]` control/all-reduce, all group sizes.
-  Fleet-max p50 for 75 all-reduces: g2 `0.836`, g4 `1.083`, g8 `1.471`, g32 `3.941` ms.
-- DB 407 `...T134254891049866Z`: dominant-payload all-gather, g2/g4/g8/g32 p50
-  `0.798/1.012/1.475/4.503` ms.
-- DB 408 and 409: protected exact-HLO validation of collective-permute and fused tuple reduction.
-- DB 410 `...T135644529157649Z`: dominant-payload collective-permute, all-to-all, and fused tuple
-  matrices. Collective-permute p50 is `0.651/0.653/0.653/0.791` ms for 75 operations.
-- DB 411 `...T135850389312854Z`: supported six-operation `bf16[1,6144]` matrix.
-- DB 412 `...T140125151247631Z`: supported six-operation `bf16[1,2048]` matrix.
-- DB 413 `...T141114991474088Z`: supported six-operation `f32[1,6144]` matrix; all-reduce
-  g2/g4/g8/g32 p50 `0.819/1.078/1.479/3.920` ms.
-- DB 414 `...T141333601664455Z`: five-operation `int32[1,2048]` routing-metadata matrix;
-  collective-permute p50 `0.617/0.641/0.640/0.768` ms.
+Transport DB 415 / `greenfield_transport_20260805T142953361259007Z` passed 16 cases at `577aa4b`:
 
-Small decode reduce-scatter is deliberately **not** reported as measured. TPU-v4 optimized XLA
-rewrote 75 requested reduce-scatters to 75 all-reduces even after disabling the decomposition flag
-and making result segments non-equivalent. Diagnostics `...T134618415607642Z`,
-`...T135045281384327Z`, and `...T135140118884391Z` failed closed before timing and preserve HLO.
+- One invocation carries every rank-dependent payload through every stage and back to its exact
+  lane origin. HLO contains exactly 8 PP8 or 16 PP16 neighbor `collective-permute` operations with
+  exact bf16/int32 shapes and pairs. It contains no all-reduce/gather/to-all/reduce-scatter, host
+  staging, Ray/Python stage dispatch, or model-equivalent compute.
+- `bf16[1,6144]` fleet-max profiler-free p50: PP8 `0.331145 ms` vs `0.300895` control
+  (`0.030250 ms` net); PP16 `0.407385` vs `0.331230` (`0.076155 ms` net). Other payloads are
+  approximately `0.024–0.077 ms` net. This is synthetic mechanism latency, not token speed.
+- Approved archive `SUCCESS`, DB linkage, full distributions, provenance, and 8/8 cleanup pass.
 
-## Interpretation and current boundary
+Trace DB 416 / `greenfield_transport_trace_20260805T143832942547470Z` passed at `8aee335`:
 
-The legacy 75 full-pod MoE combines cost `106.495 ms/token` (`1.420 ms` attributed per layer), but
-an exact dependent chain of 75 full-pod all-reduces costs only `3.941 ms` p50; 75 nearest-neighbor
-permutes cost `0.791 ms`. Therefore 12 KiB ICI payload bandwidth is not the legacy floor. Most of
-the old time is arrival skew, layout/reshard, barrier waiting, and legacy decomposition around each
-collective. Replacing only the collective primitive cannot recover 100 ms; the stage-local layout
-and device-resident pipeline are the structural fix. These are synthetic mechanism results, not
-token speed.
+- Both plans have 8 fresh XPlanes, 64 TPU cores, and exactly 20 selected steps/core.
+- Every PP8 core reports exactly 8 permute starts + 8 dones/step; PP16 reports 16 + 16;
+  forbidden collective count is zero. Trace-contaminated timing is excluded from latency claims.
+- Archive, hashes, DB snapshot, authenticated pre/post zero census, and remote `SUCCESS` pass.
+
+Rejected diagnostic `...T143608529930365Z` has no DB/status claim: valid distinct rank traces were
+downloaded into worker-0's original local trace tree, causing a duplicate-host parser refusal. The
+fixed proof uses an isolated canonical fleet directory; it did not reinterpret the failed result.
+
+## Interpretation
+
+Legacy attributes `106.495 ms/token` to 75 full-pod MoE combines (`1.420 ms/layer`), while exact
+75-op full-pod all-reduce needs `3.941 ms` and an entire PP8 residual ring costs only `0.331 ms`.
+The old loss is therefore arrival skew, reshard/layout work, barrier waiting, and surrounding
+decomposition—not raw 12 KiB ICI or stage-transfer bandwidth. Primitive replacement alone is not
+enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Implement and protect the PP8 then PP16 device-resident stage-transfer chain: exact point-to-
-   point HLO, no host/Ray/Python dispatch, no inactive-stage model-equivalent compute, warmed full
-   distributions, fresh traces, DB/archive, and clean fleet.
-2. Prove one exact real MoE layer whose combine remains inside its 4/2-chip stage.
-3. Continue Gates B–H in the binding specification; do not load the full 753B checkpoint before
-   the three architectural prerequisites pass.
+1. Prove one exact real GLM MoE layer whose routed/shared combine remains inside its four-chip PP8
+   stage: captured legacy-oracle inputs/outputs, exact router/expert ownership, adversarial expert
+   concentration, numerical contract, physical HLO, TPU result, DB/archive, and clean fleet.
+2. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
+3. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
+   topology, transport, and exact topology-local MoE prerequisites all pass.
 
-The pod was rechecked at this update and all eight hosts reported `CENSUS_OK`.
+The pod ended the latest proof with all eight hosts `CENSUS_OK`.

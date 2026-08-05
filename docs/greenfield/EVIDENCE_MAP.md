@@ -18,6 +18,8 @@ fleet agreement, and eight-host clean pre/post census.
 | 412 | `greenfield_collectives_20260805T140125151247631Z` | supported `bf16[1,2048]` six-operation matrix |
 | 413 | `greenfield_collectives_20260805T141114991474088Z` | supported `f32[1,6144]` six-operation matrix |
 | 414 | `greenfield_collectives_20260805T141333601664455Z` | `int32[1,2048]` routing-metadata five-operation matrix |
+| 415 | `greenfield_transport_20260805T142953361259007Z` | PP8/PP16 four-payload transport distributions and exact HLO |
+| 416 | `greenfield_transport_trace_20260805T143832942547470Z` | fresh PP8/PP16 8-file/64-core/20-step XPlane proof |
 
 Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
 `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
@@ -27,6 +29,9 @@ Superseded or failed diagnostics are preserved but not promotion evidence. DB 40
 non-neighbor PP8 ordering. Reduce-scatter diagnostics `...T134618415607642Z`,
 `...T135045281384327Z`, and `...T135140118884391Z` prove XLA rewrite-to-all-reduce and contain no
 accepted latency. Earlier ppermute/tuple diagnostics led to the async-HLO and dtype fixes.
+Transport trace `...T143608529930365Z` failed validation because worker-0's original XPlane and its
+canonical downloaded copy occupied the same parser tree; it has no DB row or accepted status. DB
+416 uses an isolated fleet directory and proves eight distinct embedded hostnames per plan.
 
 ## Reusable tools, not execution dependencies
 
@@ -36,6 +41,9 @@ accepted latency. Earlier ppermute/tuple diagnostics led to the async-HLO and dt
   `scripts/greenfield/microbench_collectives.py`.
 - Protected launcher: `scripts/greenfield/run_collective_chain.sh` (exact pin, lease, census,
   fleet HLO/checksum agreement, DB, archive, cleanup).
+- Transport implementation/proof: `benchmarking/transport_chain.py`,
+  `microbench_pipeline_transport.py`, `run_pipeline_transport.sh`, and the separate profiler-
+  contaminated trace script/launcher.
 - XPlane/wall truth: `scripts/analysis/parse_xplane.py` and `extract_steady_decode.py`.
 - Append-only provenance: `bench/provenance.py`; greenfield hashes reside in `env_json` pending a
   dedicated schema field.
