@@ -312,10 +312,32 @@ if arm == "sparse" and live_rows == "1" and moe_fusion == "1":
         "invocations_per_step", 0)
     assert actual_all_gather == expected_all_gather, (
         actual_all_gather, expected_all_gather)
+expected_moe_rows = 16 if moe_compute == "1" else 256
+routed_gmms = [
+    values for values in d["signatures"].values()
+    if values["op"].startswith("gmm_v2-g_8-m_")
+    and "/kernels/megablox/gmm_v2.py:" in values.get("source", "")
+]
+expected_routed_gmms = (
+    (f"gmm_v2-g_8-m_{expected_moe_rows}-k_2048-act_None-n_6144-",
+     f"bf16[{expected_moe_rows},6144]"),
+    (f"gmm_v2-g_8-m_{expected_moe_rows}-k_6144-act_silu-n_4096-",
+     f"bf16[{expected_moe_rows},2048]"),
+)
+assert len(routed_gmms) == len(expected_routed_gmms), routed_gmms
+for op_prefix, shape_prefix in expected_routed_gmms:
+    matches = [
+        values for values in routed_gmms
+        if values["op"].startswith(op_prefix)
+        and values["shape_with_layout"].startswith(shape_prefix)
+    ]
+    assert len(matches) == 1, (op_prefix, shape_prefix, routed_gmms)
+    assert matches[0]["invocations_per_step"] == 75, matches[0]
 print("ANALYSIS_VALID", arm, d["n_files"], d["n_cores"],
       d["steps_per_core"], "named_all_reduce", expected_named_all_reduce,
       "hlo_all_reduce", expected_hlo_all_reduce, "all_gather",
-      expected_all_gather, "moe_compute", moe_compute)
+      expected_all_gather, "moe_compute", moe_compute, "moe_gmm_rows",
+      expected_moe_rows)
 PY
 }
 

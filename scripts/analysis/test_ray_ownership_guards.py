@@ -129,3 +129,12 @@ def test_compute_rows_gate_reaches_health_and_e0_provenance() -> None:
         assert 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS=$MOE_DECODE_COMPUTE_LIVE_ROWS' in text
         assert 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS armed' in text
         assert '"GLM_MOE_DECODE_COMPUTE_LIVE_ROWS": moe_decode_compute_live_rows' in text
+
+
+def test_e0_requires_the_executed_routed_gmm_row_shape() -> None:
+    text = (ROOT / "scripts/e0_capture_arm.sh").read_text()
+    assert 'expected_moe_rows = 16 if moe_compute == "1" else 256' in text
+    assert 'values["op"].startswith("gmm_v2-g_8-m_")' in text
+    assert 'f"bf16[{expected_moe_rows},6144]"' in text
+    assert 'f"bf16[{expected_moe_rows},2048]"' in text
+    assert 'matches[0]["invocations_per_step"] == 75' in text
