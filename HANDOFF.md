@@ -1,6 +1,6 @@
 # HANDOFF — GLM-5.2-FP8 on TPU v4
 
-**Updated:** 2026-08-04 23:42 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
+**Updated:** 2026-08-05 00:04 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
 `PLAN.md`, `docs/suggestions.md`, and the relevant recent entries in `docs/RESEARCH_LOG.md`.
 
 ## Project goal — do not narrow it
@@ -94,11 +94,12 @@ Mandatory corrected-parent four-depth smoke:
 - Gates: live-row psum=1, MoE fusion=1, DCP live attention=1, MoE all-gather=0
 - Depths `0.0,0.05,0.95,1.0`, one trial each
 
-As of 23:27 UTC: all eight hosts passed 2,455-leaf state hash `371110325`, zero-nonfinite load
-scan/checksum, and byte-exact dense-MLA/indexer-K/DSA-MLA donated-cache write probes. T32 compile
-completed far enough for all hosts to enter T2048 backbone compile. No traceback, OOM, compiler
-fatal, protection refusal, or disk alert. Preserve through 4/4 correct answers, immutable DB
-provenance, authenticated cleanup, `SUCCESS`, and allowed-bucket archive.
+As of 00:04 UTC: all eight hosts passed the 2,455-leaf state hash `371110325`, zero-nonfinite load
+scan/checksum, and byte-exact dense-MLA/indexer-K/DSA-MLA donated-cache write probes. T32/T2048
+compiled on all hosts. DB 393 is 3/4 correct: d=0.0 `705269`, d=0.05 `824794`, and d=0.95
+`289958`, each predicted exactly and committed as an item row; d=1.0 is active on the same engine.
+No traceback, OOM, compiler fatal, protection refusal, or disk alert. Preserve through 4/4,
+immutable DB provenance, authenticated cleanup, `SUCCESS`, and allowed-bucket archive.
 
 ## Exact next sequence
 
@@ -122,7 +123,12 @@ provenance, authenticated cleanup, `SUCCESS`, and allowed-bucket archive.
 - Corrected accepted parent: `/home/gianl/tpu-inference-dcp-live-rows`, `979f818e0`, pushed/clean.
 - MoE all-gather: `/home/gianl/tpu-inference-moe-live-allgather`, old pushed `5967dffa4` plus the
   corrected parent's staged `mla_attention.py`. Before metal: create a clean corrected-parent
-  commit and rerun helper 8/8, fusion 7/7, env 17/17, 100-case bf16 stress, and StableHLO checks.
+  commit and rerun helper 8/8, fusion 7/7, env 17/17, exact-value stress, and StableHLO checks.
+  Fresh CPU audit: the real 32-rank EXPERT topology is 100/100 exact for exactly representable
+  values; StableHLO has one 32-way all-gather, one barrier, and the runtime-prefill psum branch.
+  Generic bf16 values are not bitwise-identical because local reduction order differs from psum;
+  do not overclaim CPU bitwise equivalence. Protected real-model token/selection exactness and the
+  four-depth smoke are mandatory before acceptance.
 - MoE compute rows: `/home/gianl/tpu-inference-moe-compute-live`, old `90431db22`; CPU 21/21.
   Transplant only after the all-gather lever is decided.
 - Scorer live rows: `ebf12e8e4`; CPU DCP 32/32. Needs corrected-parent transplant later.
