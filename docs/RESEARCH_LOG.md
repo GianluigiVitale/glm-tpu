@@ -4451,3 +4451,26 @@ the corrected all-gather code parent as pushed branch/worktree
 6/6 focused plus 17/17 env tests. The candidate narrows pure-decode token rows 32 -> 2 and routed
 GMM rows 256 -> 16, then restores the dead suffix; default-off and non-decode fallbacks retain the
 accepted program. Next: HLO review, protected OFF/ON exactness, then health/E0 only if exact.
+
+## 2026-08-05 04:46 — COMPUTE-ROW PRE-METAL REVIEW CLOSED; PROTECTED SINGLE-VARIABLE EXACTNESS HARNESS READY
+
+The corrected compute-row branch remains pushed and clean at `b3c25df47`. The focused test was
+rerun with four forced CPU devices: compute-row plus accepted MoE-fusion coverage passes 13/13, and
+the separately scoped environment suite passes 17/17. The gate-off public Jaxpr equals the legacy
+entrypoint after only normalizing the wrapper function name. With the gate on, tracing observes the
+production relation: 32 token rows narrow to 2, so top-8 routed GMM input narrows 256 -> 16 rows;
+the full program is also present as the non-decode fallback. The candidate's live output is bitwise
+equal to the full CPU control and its dead suffix is restored to zero.
+
+A reduced StableHLO lowering of the actual wrapper confirms one runtime conditional, both
+`tensor<32x4xbf16>` and `tensor<2x4xbf16>` programs, and one padding restoration. This is proof of
+the specialization scaffold, not a substitute for production metal HLO: the real GMM shape and
+executable fingerprint remain mandatory in the protected run.
+
+Harness commit `23f296c` adds `scripts/moe_compute_rows_exact.sh` and generalizes the existing DCP8
+OFF/ON exactness workflow without weakening it. Both arms fix accepted live-row psum, MoE psum
+fusion, and DCP live attention ON; both fix the performance-rejected all-gather OFF; only
+`GLM_MOE_DECODE_COMPUTE_LIVE_ROWS` changes 0 -> 1. Ownership, raylet env, DB provenance, selected-set
+and tie-order dumps, raw two-token output, state manifest, write probes, distinct step fingerprints,
+archive, and authenticated cleanup are required. The inherited exactness watchdog now closes flock
+FD 9 and cleanup terminates its complete setsid process group. Syntax plus static guards pass 8/8.

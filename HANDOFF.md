@@ -1,6 +1,6 @@
 # HANDOFF — GLM-5.2-FP8 on TPU v4
 
-**Updated:** 2026-08-05 04:36 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
+**Updated:** 2026-08-05 04:46 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
 `PLAN.md`, `docs/suggestions.md`, and the relevant recent entries in `docs/RESEARCH_LOG.md`.
 
 ## Project goal — do not narrow it
@@ -167,25 +167,28 @@ and worker 0 has 30+ GiB free. Three older local trace replicas (16.5 GiB) were 
 their exact GCS archives were verified. The current recovered traces and Ray session were purged
 from all hosts only after the 5.71 GiB recovery archive completed.
 
-The interruption exposed and fixed two harness defects in the working tree: watchdog descendants
+The interruption exposed and fixed two harness defects: watchdog descendants
 now close flock FD 9 and cleanup kills the whole setsid group; disk free space is byte-exact and E0
 requires 17 GiB preflight headroom while retaining the 15 GiB runtime floor. Static/syntax tests are
-7/7 and the live disk check passes 8/8. Commit/push these harness changes with this handoff update.
+8/8 and the live disk check passes 8/8. The shared protected exactness harness now carries the same
+watchdog fix and has a strict compute-row selector which fixes DCP live attention ON and rejected
+MoE all-gather OFF while varying only `GLM_MOE_DECODE_COMPUTE_LIVE_ROWS`.
 
 No TPU workflow is active. Always rerun the strict eight-host census before launching another.
 
 ## Exact next sequence
 
-1. On corrected branch `b3c25df47`, finish CPU/Jaxpr/HLO review of MoE compute-row specialization
-   with all-gather fixed OFF. Expected pure-decode shapes are token rows `32 -> 2` and routed GMM
-   rows `256 -> 16`, while the fallback/default-off programs remain unchanged.
-2. Run protected same-pin OFF/ON exactness at production DCP8, varying only
+1. Run protected same-pin OFF/ON exactness at production DCP8 on corrected branch `b3c25df47`,
+   varying only
    `GLM_MOE_DECODE_COMPUTE_LIVE_ROWS`; require exact raw tokens, selected set/tie order, state, and
-   write probes.
-3. If exact, run protected health and a fresh 256K E0. Accept only a real device plus profiler-free
+   write probes. Pre-metal evidence is complete: focused forced-four-CPU tests pass 13/13, env tests
+   pass 17/17, gate-off Jaxpr matches the legacy entrypoint, the candidate traces token rows
+   `32 -> 2` and routed GMM rows `256 -> 16`, and reduced StableHLO contains the distinct narrow/full
+   conditional plus zero-padding restoration.
+2. If exact, run protected health and a fresh 256K E0. Accept only a real device plus profiler-free
    steady-wall gain. If it wins, run the four-depth 128K smoke before the next lever.
-4. Then validate scorer-row narrowing and the lower-value DCP-LSE candidate through the same ladder.
-5. For the higher ceiling, implement end-to-end 4x8 tensor/expert feature sharding: model-sharded
+3. Then validate scorer-row narrowing and the lower-value DCP-LSE candidate through the same ladder.
+4. For the higher ceiling, implement end-to-end 4x8 tensor/expert feature sharding: model-sharded
    residual and RMSNorm, subgroup attention projections, and expert-by-feature MoE. Then repair the
    sparse multi-token classification before enabling MTP/speculative decode. Never claim 20–50
    tok/s before protected local wall/device evidence.
@@ -196,8 +199,9 @@ No TPU workflow is active. Always rerun the strict eight-host census before laun
 - MoE all-gather: corrected pin `aa608543b73921a330f48271d8263d4ec2ca14a4`, pushed and exact, but
   **performance-rejected** by the recovered fleet trace above. Keep the gate OFF for subsequent work.
 - MoE compute rows: `/home/gianl/tpu-inference-moe-compute-live-corrected`, corrected pin
-  `b3c25df47`, pushed atop `aa608543b`; all-gather remains default-off. Corrected-parent CPU tests
-  pass 6/6 plus env 17/17. Protected HLO and metal exactness are next.
+  `b3c25df47`, pushed atop `aa608543b`; all-gather remains default-off. Focused forced-four-CPU
+  evidence passes 13/13 plus env 17/17; Jaxpr and reduced StableHLO confirm the intended narrow/full
+  specialization and restoration. Protected metal exactness is next.
 - Scorer live rows: `ebf12e8e4`; CPU DCP 32/32. Needs corrected-parent transplant later.
 - DCP LSE all-gather: `422e9e31f`; CPU DCP 30/30 plus DCP2/4/8 stress. Lower priority.
 - 2D f32 reduction prerequisite: `/home/gianl/tpu-inference-decode-2d-f32`, `dab2db7b3`, clean and
