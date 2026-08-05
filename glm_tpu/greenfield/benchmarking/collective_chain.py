@@ -433,6 +433,7 @@ def build_collective_chain(
     groups: Sequence[Sequence[int]],
     *,
     devices: Sequence[Any] | None = None,
+    enforce_hlo_contract: bool = True,
 ) -> CompiledCollectiveChain:
     """Compile one chain and reject it unless optimized HLO is exact."""
 
@@ -485,7 +486,8 @@ def build_collective_chain(
         config, canonical_groups, total_devices=len(runtime_devices)
     )
     report = lint_hlo(parse_hlo_module(optimized_hlo), policy)
-    report.raise_for_violations()
+    if enforce_hlo_contract:
+        report.raise_for_violations()
     return CompiledCollectiveChain(
         config=config,
         compiled=compiled,

@@ -224,6 +224,7 @@ def main() -> int:
                     config,
                     groups,
                     devices=jax.devices(),
+                    enforce_hlo_contract=False,
                 )
                 hlo_sha256 = sha256(compiled.optimized_hlo.encode()).hexdigest()
                 fleet_hlo_hashes = _fleet_digest(
@@ -231,15 +232,6 @@ def main() -> int:
                     hlo_sha256,
                     num_processes=args.num_processes,
                 )
-                measured = benchmark_collective_chain(compiled)
-                measured.update(
-                    {
-                        "collective_groups": [list(group) for group in groups],
-                        "fleet_hlo_hashes": fleet_hlo_hashes,
-                        "optimized_hlo_sha256": hlo_sha256,
-                    }
-                )
-                matrix.append(measured)
                 if jax.process_index() == 0:
                     artifact_dir = args.output.parent / "hlo"
                     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -250,6 +242,35 @@ def main() -> int:
                         artifact_dir / f"{label}.hlo_contract.json",
                         compiled.hlo_report.to_dict(),
                     )
+                if not compiled.hlo_report.valid:
+                    print(
+                        "GREENFIELD_COLLECTIVE_HLO_REJECTED "
+                        + json.dumps(
+                            {
+                                "case": label,
+                                "collective_counts": compiled.hlo_report.to_dict()[
+                                    "collective_counts"
+                                ],
+                                "hlo_sha256": hlo_sha256,
+                                "violations": [
+                                    violation.to_dict()
+                                    for violation in compiled.hlo_report.violations
+                                ],
+                            },
+                            sort_keys=True,
+                        ),
+                        flush=True,
+                    )
+                    compiled.hlo_report.raise_for_violations()
+                measured = benchmark_collective_chain(compiled)
+                measured.update(
+                    {
+                        "collective_groups": [list(group) for group in groups],
+                        "fleet_hlo_hashes": fleet_hlo_hashes,
+                        "optimized_hlo_sha256": hlo_sha256,
+                    }
+                )
+                matrix.append(measured)
                 print(
                     "GREENFIELD_COLLECTIVE_CASE_OK "
                     f"launch_process={args.process_id} "

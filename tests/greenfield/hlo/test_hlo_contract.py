@@ -77,6 +77,23 @@ def test_parser_extracts_physical_collective_contract() -> None:
     assert permute.source_target_pairs[0] == (0, 4)
 
 
+def test_async_collective_start_counts_once_and_done_is_not_double_counted() -> None:
+    async_hlo = GOOD_HLO.replace(
+        "all-reduce(x)", "all-reduce-start(x)"
+    ).replace(
+        "  routed = bf16[1,2048]{1,0} slice(local),",
+        "  completed = bf16[1,6144]{1,0} all-reduce-done(local)\n"
+        "  routed = bf16[1,2048]{1,0} slice(completed),",
+    )
+    module = parse_hlo_module(async_hlo)
+    report = lint_hlo(module, good_policy())
+    assert report.valid, report.violations
+    reduction = module.collectives[0]
+    assert reduction.opcode == "all-reduce"
+    assert reduction.raw_opcode == "all-reduce-start"
+    assert report.to_dict()["collective_counts"]["all-reduce"] == 1
+
+
 def test_valid_local_contract_passes() -> None:
     report = lint_hlo(parse_hlo_module(GOOD_HLO), good_policy())
     assert report.valid, report.violations

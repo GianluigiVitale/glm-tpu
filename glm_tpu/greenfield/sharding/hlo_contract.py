@@ -55,6 +55,7 @@ class HloInstruction:
     index: int
     computation: str
     name: str
+    raw_opcode: str
     opcode: str
     result_shapes: tuple[HloShape, ...]
     operand_names: tuple[str, ...]
@@ -93,6 +94,7 @@ class HloInstruction:
             "operand_names": list(self.operand_names),
             "operand_shapes": [shape.to_dict() for shape in self.operand_shapes],
             "raw_line": self.raw_line,
+            "raw_opcode": self.raw_opcode,
             "replica_groups": [list(group) for group in self.replica_groups],
             "result_shapes": [shape.to_dict() for shape in self.result_shapes],
             "source_file": self.source_file,
@@ -223,6 +225,7 @@ class _PendingInstruction:
     index: int
     computation: str
     name: str
+    raw_opcode: str
     opcode: str
     result_shapes: tuple[HloShape, ...]
     operand_names: tuple[str, ...]
@@ -261,7 +264,12 @@ def parse_hlo_module(text: str) -> HloModule:
         opcode_match = _OPCODE_RE.search(rhs)
         if opcode_match is None:
             continue
-        opcode = opcode_match.group(1)
+        raw_opcode = opcode_match.group(1)
+        opcode = raw_opcode
+        if raw_opcode.endswith("-start"):
+            candidate = raw_opcode[: -len("-start")]
+            if candidate in COLLECTIVE_OPCODES:
+                opcode = candidate
         call_open = opcode_match.end() - 1
         call_end = _balanced_call_end(rhs, call_open)
         pending.append(
@@ -269,6 +277,7 @@ def parse_hlo_module(text: str) -> HloModule:
                 index=len(pending),
                 computation=computation,
                 name=instruction_name,
+                raw_opcode=raw_opcode,
                 opcode=opcode,
                 result_shapes=_parse_shapes(rhs[: opcode_match.start()]),
                 operand_names=_split_operands(rhs[call_open + 1 : call_end]),
@@ -305,6 +314,7 @@ def parse_hlo_module(text: str) -> HloModule:
                 index=instruction.index,
                 computation=instruction.computation,
                 name=instruction.name,
+                raw_opcode=instruction.raw_opcode,
                 opcode=instruction.opcode,
                 result_shapes=instruction.result_shapes,
                 operand_names=instruction.operand_names,
