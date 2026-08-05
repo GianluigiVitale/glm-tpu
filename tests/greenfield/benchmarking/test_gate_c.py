@@ -443,3 +443,21 @@ def test_gate_c_stage_local_kernels_on_four_forced_devices() -> None:
         timeout=180,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_gate_c_dsa_hlo_distinguishes_head_weight_from_dead_rows() -> None:
+    from glm_tpu.greenfield.benchmarking import validate_gate_c_hlo
+
+    hlo = r'''HloModule jit_dsa_step, replica_count=1, num_partitions=4
+
+ENTRY main {
+  weight = bf16[32,6144]{1,0} parameter(0)
+  query = f32[1,8]{1,0} parameter(1)
+  gathered_query = f32[4,1,8]{2,1,0} all-gather(query), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  gathered_scores = f32[4,1,8]{2,1,0} all-gather(query), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  gathered_positions = f32[4,1,8]{2,1,0} all-gather(query), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  ROOT result = (bf16[32,6144]{1,0}, f32[4,1,8]{2,1,0}, f32[4,1,8]{2,1,0}, f32[4,1,8]{2,1,0}) tuple(weight, gathered_query, gathered_scores, gathered_positions)
+}
+'''
+    result = validate_gate_c_hlo(hlo, case="dsa")
+    assert result["passed"], result

@@ -789,7 +789,13 @@ def validate_gate_c_hlo(
     forbidden_shapes = []
     for instruction in module.instructions:
         for shape in instruction.operand_shapes + instruction.result_shapes:
-            if shape.dimensions in ((32, hidden_size), (32, 1, hidden_size)):
+            # DSA legitimately owns a [32 indexer heads, hidden] projection
+            # weight.  Its public API independently fixes the only live
+            # residual/query row to one, so this weight is not a dead batch.
+            forbidden_dimensions = {(32, 1, hidden_size)}
+            if case != "dsa":
+                forbidden_dimensions.add((32, hidden_size))
+            if shape.dimensions in forbidden_dimensions:
                 forbidden_shapes.append(
                     {"instruction": instruction.name, "shape": shape.to_dict()}
                 )
