@@ -23,3 +23,11 @@ class HloContractViolationError(RuntimeError):
 
 class BenchmarkValidationError(GreenfieldConfigError):
     """A synthetic benchmark does not satisfy its declared proof contract."""
+
+
+class CheckpointValidationError(GreenfieldConfigError):
+    """Checkpoint metadata, ownership, or byte reconciliation is invalid."""
+
+
+class PartitioningValidationError(GreenfieldConfigError):
+    """A layer or memory partition cannot satisfy the declared plan."""
