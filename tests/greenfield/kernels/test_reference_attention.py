@@ -206,6 +206,25 @@ def test_owner_subsets_are_disjoint_and_local_gather_matches_logical_rows() -> N
         np.testing.assert_array_equal(np.asarray(segment.contract_valid), [True])
 
 
+def test_owner_subset_accepts_jitted_scalar_stage_index() -> None:
+    layout = small_layout()
+    selected = SelectedPositions(
+        jnp.asarray([[7, 2, 0, 5]], dtype=jnp.int32),
+        jnp.asarray([4], dtype=jnp.int32),
+    )
+    mapped = jax.jit(
+        lambda owner: selected_positions_for_owner(
+            selected,
+            layout=layout,
+            owner_index=owner,
+        ).selection.positions
+    )
+    np.testing.assert_array_equal(
+        np.asarray(mapped(jnp.asarray(1, dtype=jnp.int32))),
+        np.asarray([[2, 7, -1, -1]], dtype=np.int32),
+    )
+
+
 def test_sparse_mla_matches_direct_fp32_selected_attention() -> None:
     contract = small_contract()
     values = jnp.asarray(

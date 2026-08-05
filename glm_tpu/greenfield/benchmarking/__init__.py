@@ -11,6 +11,15 @@ from .collective_chain import (
     jax_dtype,
     latency_distribution,
 )
+from .gate_c import (
+    GateCDenseResult,
+    GateCDsaResult,
+    GateCIndexShareResult,
+    stage_local_dense_gate_c,
+    stage_local_dsa_gate_c,
+    stage_local_index_share_gate_c,
+    validate_gate_c_hlo,
+)
 from .transport_chain import (
     TransportChainConfig,
     TransportKind,
@@ -31,6 +40,9 @@ from .one_layer import (
 __all__ = [
     "CollectiveChainConfig",
     "CollectiveKind",
+    "GateCDenseResult",
+    "GateCDsaResult",
+    "GateCIndexShareResult",
     "LatencyDistribution",
     "REAL_LAYER_OUTPUT_TOLERANCE",
     "ROUTE_WEIGHT_TOLERANCE",
@@ -42,6 +54,10 @@ __all__ = [
     "compare_bounded_tensor",
     "jax_dtype",
     "latency_distribution",
+    "stage_local_dense_gate_c",
+    "stage_local_dsa_gate_c",
+    "stage_local_index_share_gate_c",
+    "validate_gate_c_hlo",
     "TransportChainConfig",
     "TransportKind",
     "benchmark_transport_chain",

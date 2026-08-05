@@ -32,6 +32,7 @@ class MlaNumericalContract:
     qk_nope_head_dim: int = 192
     qk_rope_head_dim: int = 64
     qk_head_dim: int = 256
+    v_head_dim: int = 256
     packed_cache_width: int = 640
     top_k: int = 2048
     score_dtype: str = "float32"
@@ -45,6 +46,7 @@ class MlaNumericalContract:
             "qk_nope_head_dim",
             "qk_rope_head_dim",
             "qk_head_dim",
+            "v_head_dim",
             "packed_cache_width",
             "top_k",
         ):
@@ -243,16 +245,19 @@ def selected_positions_for_owner(
     selected: SelectedPositions,
     *,
     layout: StageLocalKvLayout,
-    owner_index: int,
+    owner_index: int | jax.Array,
 ) -> CanonicalSelectedPositions:
     """Return one owner's ascending subset with a fixed-width ``-1`` tail."""
 
-    if (
-        not isinstance(owner_index, int)
-        or isinstance(owner_index, bool)
-        or not 0 <= owner_index < layout.local_parallel_size
+    if isinstance(owner_index, int) and not isinstance(owner_index, bool):
+        if not 0 <= owner_index < layout.local_parallel_size:
+            raise ValueError("owner_index is outside the local stage group")
+    elif (
+        not hasattr(owner_index, "shape")
+        or owner_index.shape != ()
+        or not jnp.issubdtype(owner_index.dtype, jnp.integer)
     ):
-        raise ValueError("owner_index is outside the local stage group")
+        raise ValueError("owner_index must be an integer scalar")
     canonical = canonicalize_selected_positions(selected)
     positions = canonical.selection.positions
     counts = canonical.selection.valid_counts
@@ -279,7 +284,7 @@ def gather_stage_local_selected_kv(
     context_lengths: jax.Array,
     *,
     layout: StageLocalKvLayout,
-    owner_index: int,
+    owner_index: int | jax.Array,
 ) -> SelectedKvSegment:
     """Gather one chip's owned subset from its context-striped local cache."""
 
