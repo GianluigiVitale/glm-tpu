@@ -4,6 +4,24 @@ This document records the arithmetic boundary required before any optimized
 kernel may replace the native-JAX reference. The legacy repository is an
 artifact-producing oracle only; it is not imported by the greenfield engine.
 
+## Core decoder primitives
+
+- RMSNorm converts activations to FP32 for square/mean/rsqrt, rounds the
+  normalized value back to the activation dtype, then multiplies the norm
+  weight in that dtype. Transformer/final norm use epsilon `1e-5`; attention
+  LoRA norms use the model's `1e-6` default.
+- Linear weights retain checkpoint orientation `[out_features, in_features]`.
+  Dequantized BF16 activations/weights produce an explicit BF16 result; FP32
+  router/indexer projections request FP32 explicitly. Bias and leading-shape
+  broadcasting are validated rather than inferred.
+- Dense layers use BF16 gate/up/down projections and SwiGLU, followed by an
+  exact-shape, exact-dtype residual add. Vocabulary logits are not silently
+  upcast.
+- Main MLA and indexer RoPE use dimension 64 and theta `8,000,000`, with
+  sine/cosine angles derived in FP32. The accepted interleaved layout pairs
+  `(0,1), (2,3), ...` and re-interleaves the result. Half-split pairing remains
+  an explicit reference option; it is never selected implicitly.
+
 ## GLM-5.2 sparse MoE
 
 - Storage: routed/shared expert weights are FP8 E4M3 with FP32 inverse scales
