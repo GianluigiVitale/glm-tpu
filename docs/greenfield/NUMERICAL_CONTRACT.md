@@ -36,6 +36,11 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   `min(2048, local_context)` candidate width per local context owner, restores
   ascending global-position order before the final exact merge, and is thus
   invariant to collective concatenation order.
+- Exactness is defined against the FP32 score row produced by the executing device program: the
+  distributed merge must equal a canonical global top-k of that same row, including lowest-global-
+  position ties. Independent cross-backend score tensors use bounded comparison because CPU
+  PyTorch and TPU XLA need not share dot/reduction association. Raw CPU positions are retained as
+  a diagnostic and may never replace, seed, or relax runtime selection.
 - Compact selected state is `positions int32[rows,2048]` plus
   `valid_counts int32[rows]`; invalid tail slots are exactly `-1`. IndexShare
   reuses the score-ordered positions unchanged. Only the positions array is
@@ -109,3 +114,10 @@ both final-output comparisons have max absolute error `0.03125`, p99 `0.01171875
 Protected PP16 DB 418 also passes. Routes are exact; normal output max/p99/mean error is
 `0.015625/0.0078125/0.002121`, and concentrated output is
 `0.03125/0.0078125/0.002140`. Its physical combine is exactly one BF16 two-rank reduction.
+
+Protected Gate C DB 421 passes the device-score contract for real dense/full-DSA/IndexShare TPU
+layers. Distributed selection and tie order have zero mismatches against a canonical top-k of the
+actual TPU score row, and the exact resulting state is consumed by IndexShare. The independent
+PyTorch CPU row has bounded score error but swaps two of 2,048 members at the cutoff (2,046 set
+overlap), so raw cross-backend position identity is explicitly false. No tolerance is applied to
+the runtime selection assertion, and the CPU positions are not used as runtime state.

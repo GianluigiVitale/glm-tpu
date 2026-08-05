@@ -23,6 +23,7 @@ fleet agreement, and eight-host clean pre/post census.
 | 417 | `greenfield_real_layer_pp8_20260805T165737737514245Z` | exact real layer-3 PP8 correctness/HLO/HBM/wall/XPlane proof |
 | 418 | `greenfield_real_layer_pp16_20260805T172807177182695Z` | exact real layer-3 PP16 correctness/HLO/HBM/wall/XPlane proof |
 | 420 | `greenfield_full_checkpoint_load_pp8_20260805T201317772639405Z` | complete PP8 base-decoder final-owner direct-load/integrity/HBM proof |
+| 421 | `greenfield_gate_c_pp8_20260805T224645828157364Z` | real PP8 dense/full-DSA/IndexShare correctness/HLO/HBM/XPlane proof; no performance claim |
 
 Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
 `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
@@ -73,6 +74,35 @@ the four stage-0 owners has 31 leaves and a 125,611,520-byte payload. Subset lay
 `cdbea04f...c678`; packed manifest is `3c5c48da...2a8a`. The local evidence ledger and all payload
 hashes pass; approved-bucket size/generation/CRC32C and local/remote `SUCCESS` pass. It is bounded
 checkpoint-layout evidence only, not a protected TPU/DB/performance result.
+
+## Protected Gate C dense, DSA, and IndexShare proof
+
+DB 421 / `greenfield_gate_c_pp8_20260805T224645828157364Z` runs on captured physical PP8 stage 0
+at exact code `dc20b3fea3089dd3fbedd2a6cc19e86b0416f60f`. The direct loader binds packed manifest
+`3c5c48da...2a8a`, layout `cdbea04f...c678`, and independent oracle `54262529...4a9f`; it transfers
+502,446,080 final-owner bytes, performs 44 device dequantizations, and records zero host FP8
+dequantizations, host global concatenations, or runtime checkpoint reshards.
+
+Dense, full 2,304-position DSA, and IndexShare all pass their documented tensor contracts. Dense
+output max error is `0.00390625`; DSA score max/mean error is `0.003605/0.000965`; IndexShare
+output max/mean error is `0.0078125/0.000167`. The distributed top-k and lowest-position tie order
+are elementwise exact for the actual TPU FP32 score row. The resulting score-ordered
+`int32[1,2048]` state is fed directly into IndexShare and remains bitwise unchanged; private
+attention order, selected cache, write-before-attend, live cache, and health state all pass.
+
+The raw PyTorch CPU scorer differs slightly from the TPU FP32 scorer and changes two cutoff
+members (2,046/2,048 set overlap). This cross-framework difference is retained as a failing
+elementwise diagnostic, never used as runtime state, and never hidden by a tolerance. Internal
+scores and final outputs remain inside the recorded bounded-error contract. Thus DB 421 proves
+exact selection semantics for actual device scores, not raw cross-backend position identity.
+
+Optimized HLO SHA-256 values are dense `643efea4...fc7c`, DSA `a6cf14bb...0af5`, and IndexShare
+`302a6ece...ab70`. Their local collective counts are respectively `0AG/1AR`, `3AG/0AR`, and
+TPU-rewritten `2AG/3AR`, always over `{{0,1,2,3}}`; no full-pod group or dead batch-32 tensor is
+present. The fresh XPlane has 20 invocations/case on all eight TPU cores and matches the exact
+HLO-derived physical counts. Peak bounded-proof HBM is 280,745,984 bytes/chip. The sealed hash
+ledger, SQLite integrity, same-tag approved archive/remote `SUCCESS`, and 8/8 pre/post census pass.
+This artifact deliberately contains no latency or token-throughput claim.
 
 ## Protected exact PP8 real layer
 

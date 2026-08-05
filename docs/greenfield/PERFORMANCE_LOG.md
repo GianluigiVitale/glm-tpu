@@ -4,6 +4,23 @@ No greenfield full-decoder model-performance measurement exists yet. The real-la
 checkpoint-backed model compute; all other results are protected synthetic TPU mechanisms. None
 reports token speed.
 
+## 2026-08-05 — protected Gate C correctness, not performance
+
+DB 421 / `greenfield_gate_c_pp8_20260805T224645828157364Z` executes real dense, full-DSA, and
+IndexShare layers on physical PP8 stage 0 at code `dc20b3f`. It passes direct final-owner loading,
+bounded raw-oracle tensor comparisons, exact selection/tie order for actual TPU scores, exact
+8,192-byte IndexShare state reuse, cache integrity, local HLO, fresh XPlane, HBM, DB/archive, and
+clean-fleet checks. Dense/DSA/IndexShare optimized HLO contains `0AG/1AR`, `3AG/0AR`, and
+`2AG/3AR`, respectively, over only the four-chip stage. Peak HBM for the bounded proof is
+0.281 GB/chip.
+
+The raw PyTorch CPU and TPU FP32 scorers have bounded numerical drift, causing two different
+members at the 2,048-of-2,304 cutoff. This is an explicit diagnostic: the TPU distributed top-k is
+elementwise exact against the canonical ordering of its actual score row, but raw cross-backend
+position identity is not claimed. The run intentionally collected no profiler-free latency
+distribution and sets `performance_claim=false`; its XPlane is evidence of physical execution,
+not a token-speed measurement.
+
 ## 2026-08-05 — complete checkpoint load integrity, not performance
 
 DB 420 / `greenfield_full_checkpoint_load_pp8_20260805T201317772639405Z` proves that the complete

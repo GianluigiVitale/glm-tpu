@@ -97,8 +97,12 @@ sparse MLA/LSE-merge references now exist. Full-width FP32/BF16 outputs match th
 oracle exactly. Independent raw-source Gate C artifact `54262529...4a9f` captures real layer-2
 dense/full-DSA and layer-3 IndexShare-reuse inputs/outputs. Exact parent-layout subset
 `cdbea04f...c678` / packed manifest `3c5c48da...2a8a` provides only those 31 leaves as four bounded
-stage-0 owners while checking every raw oracle hash. Protected TPU equivalence proofs, decoder, and
-serving remain.
+stage-0 owners while checking every raw oracle hash. Protected DB 421 now directly loads that
+bounded pack and passes dense/full-DSA/IndexShare on physical PP8 stage 0. All optimized
+collectives remain inside the four-chip group; the exact device-score selection/state contract
+passes. Raw PyTorch CPU scores differ enough at the 2,048-of-2,304 boundary to swap two members,
+which is preserved as a cross-framework diagnostic rather than used as runtime state. The complete
+decoder and serving path remain.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;

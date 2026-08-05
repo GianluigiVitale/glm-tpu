@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 21:47 UTC
+**Updated:** 2026-08-05 22:55 UTC
 
 ## Authority and isolation
 
@@ -81,9 +81,9 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   DSA scorer, exact lowest-global-position ties, distributed exact top-k, stage-local striped KV
   lookup, sparse MLA/LSE merge, and compact IndexShare carriage are implemented at `10e5097`.
   Full-width FP32 and BF16 comparisons against the pinned legacy sparse-attention oracle are
-  elementwise exact, including the four-owner BF16 merge; greenfield tests pass 168/168 on forced
-  CPU. These prove semantics only. Protected real dense/full-DSA/IndexShare TPU evidence remains;
-  no decoder, serving, decoder-HBM, or genuine token-throughput result exists.
+  elementwise exact, including the four-owner BF16 merge. These reference tests prove semantics
+  only; the protected real TPU result is recorded below. No decoder, serving, decoder-HBM, or
+  genuine token-throughput result exists.
 - Independent raw-source Gate C oracle
   `greenfield_gate_c_oracle_20260805T212801776974822Z` passed at `602d42f`. It consumes 31 exact
   layer-2/3 tensors from source shards 20/38/40, never imports JAX/model/legacy execution, and
@@ -102,6 +102,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   packed manifest is `3c5c48da...2a8a`. All four file hashes, the sealed local ledger, remote
   size/generation/CRC32C, approved-bucket archive, and local/remote `SUCCESS` pass. This removes
   the need to load ~92 GB of complete stage-0 owner files for Gate C but is not a TPU result.
+- Protected DB 421 / `greenfield_gate_c_pp8_20260805T224645828157364Z` passed real dense,
+  full-DSA, and IndexShare TPU execution at exact code `dc20b3f` on physical PP8 stage 0
+  (worker 2). It directly loads 502,446,080 packed bytes with 124 final-owner transfers, 44
+  device FP8 dequantizations, and zero host dequant/global concat/runtime reshard. Dense output
+  max error is `0.00390625`; DSA score max/mean is `0.003605/0.000965`; IndexShare output max/mean
+  is `0.0078125/0.000167`. DSA selection and lowest-position tie order are elementwise exact for
+  the actual TPU FP32 score row, the 8,192-byte score-ordered state is fed directly to IndexShare,
+  and cache/state integrity is exact. Optimized HLO is strictly four-chip local: dense `0AG/1AR`,
+  DSA `3AG/0AR`, and TPU-rewritten IndexShare `2AG/3AR`, all over `{{0,1,2,3}}`. A fresh trace has
+  20 invocations/case on eight cores and matches the HLO-derived physical collective counts.
+  Peak HBM is 280,745,984 bytes/chip for this bounded layer proof. DB integrity, sealed ledger,
+  approved archive/SUCCESS, and 8/8 pre/post census pass. This is correctness/mechanism evidence,
+  not latency or tok/s evidence.
+- The independent PyTorch CPU oracle and TPU scorer are not bitwise-identical: bounded FP32 score
+  drift changes two members of the 2,048-of-2,304 cutoff set (2,046 overlap) and therefore many
+  score-order positions. This is preserved as an explicit non-relaxed diagnostic. The runtime does
+  not use CPU positions: it selects exactly from actual TPU scores and carries that exact state.
+  Do not claim raw cross-framework position identity from DB 421.
 
 ## Protected evidence
 
@@ -165,6 +183,18 @@ Full load DB 420 / `greenfield_full_checkpoint_load_pp8_20260805T201317772639405
 - This is load integrity, not decode. `promotion_memory_proven=false`: the 8.173 GB minimum free is
   before KV, DSA state, executables/overlays, and decoder temporaries. It has no tok/s claim.
 
+Gate C DB 421 / `greenfield_gate_c_pp8_20260805T224645828157364Z` passed at `dc20b3f`:
+
+- The direct bounded load binds packed manifest `3c5c48da...2a8a`, layout
+  `cdbea04f...c678`, and independent oracle `54262529...4a9f`; all load fast-path counters pass.
+- Dense/full-DSA/IndexShare outputs are bounded against the raw oracle. Exact device-score top-k,
+  tie order, 8,192-byte IndexShare carriage, write-before-attend, selected KV, live cache, and
+  state reuse pass. Raw CPU-oracle selection has 2,046/2,048 set overlap because the two
+  FP32 implementations differ near the cutoff; it is diagnostic only and is not silently relaxed.
+- HLO and fresh XPlane prove only local four-rank collectives with exact per-case counts. Maximum
+  bounded-proof peak HBM is 280,745,984 bytes/chip. DB/archive/ledger and 8/8 cleanup pass.
+- This is Gate C layer correctness/mechanism evidence, not a full decoder or token-speed result.
+
 Rejected DB 419 / `greenfield_full_checkpoint_load_pp8_20260805T194526167625636Z` is preserved but
 never promotable: its first harness appended to `orchestrator.log` after hashing it, so its local
 ledger failed. DB 420 is a fresh run using the corrected seal-before-success harness.
@@ -190,12 +220,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Direct-load bounded pack `3c5c48da...2a8a` on the captured PP8 stage, then run protected
-   dense/full-DSA/IndexShare TPU equivalence/HLO/HBM proofs against oracle `54262529...4a9f`.
-   Keep selected sets/tie order exact, preserve the 8,192-byte IndexShare state, and keep every
-   repeated collective inside the four-chip stage.
-2. Only after Gate C, build the complete short-context decoder for Gate D and measure real wall
-   token speed plus full memory headroom. Continue Gates E–H in binding order. The one-layer
+1. Build the complete 2K/8K short-context decoder for Gate D. Integrate the proven final-owner
+   loader and stage-local dense/DSA/IndexShare/MoE kernels into one device-resident PP8 pipeline;
+   prove raw tokens, exact runtime DSA selection/ties, cache/state integrity, no repeated 32-chip
+   layer collective, decoder peak HBM, fresh trace, and profiler-free steady wall.
+2. Continue Gates E–H in binding order. The one-layer
    comparison provisionally favors PP8 for
    normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
    (`1.076` vs `1.134 ms`); only complete protected decoder evidence may choose the
