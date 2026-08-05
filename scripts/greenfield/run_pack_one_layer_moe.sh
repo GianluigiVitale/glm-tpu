@@ -56,14 +56,43 @@ objects=(
   model-00039-of-00141.safetensors
   model-00040-of-00141.safetensors
 )
-for object in "${objects[@]}"; do
-  gcloud storage objects describe "$SOURCE_URI/$object" --format=json
-done | jq -s '{objects: sort_by(.name)}' >"$RUN_DIR/source_objects.json"
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$SOURCE_URI" "$RUN_DIR/source_objects.json" "${objects[@]}" <<'PY'
+from __future__ import annotations
 
-[[ $(jq '.objects | length' "$RUN_DIR/source_objects.json") -eq 5 ]] || {
-  say "ABORT: source object provenance is incomplete"
-  exit 1
-}
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+source_uri, output, *objects = sys.argv[1:]
+records = []
+for object_name in objects:
+    completed = subprocess.run(
+        [
+            "gcloud",
+            "storage",
+            "objects",
+            "describe",
+            f"{source_uri}/{object_name}",
+            "--format=json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    record = json.loads(completed.stdout)
+    if record.get("name") != f"models/GLM-5.2-FP8/{object_name}":
+        raise SystemExit(f"wrong source object identity for {object_name}")
+    if not record.get("generation") or not record.get("size"):
+        raise SystemExit(f"incomplete source object metadata for {object_name}")
+    records.append(record)
+Path(output).write_text(
+    json.dumps({"objects": sorted(records, key=lambda item: item["name"])},
+               indent=2,
+               sort_keys=True) + "\n"
+)
+PY
 source_revision=gcs-object-set-$(sha256sum "$RUN_DIR/source_objects.json" | awk '{print $1}')
 say "SOURCE_REVISION=$source_revision"
 
@@ -107,7 +136,13 @@ say "writing evidence checksums without rereading packed payloads"
 (
   cd "$RUN_DIR"
   sha256sum source_objects.json pack.log inspection.json packed/manifest.json
-  jq -r '.files[] | "\(.sha256)  packed/\(.filename)"' packed/manifest.json
+  /home/gianl/vllm-env/bin/python - <<'PY'
+import json
+
+manifest = json.load(open("packed/manifest.json"))
+for record in manifest["files"]:
+    print(f"{record['sha256']}  packed/{record['filename']}")
+PY
 ) >"$RUN_DIR/evidence.sha256"
 
 say "uploading append-only artifact to approved bucket"
@@ -127,7 +162,10 @@ remote_files=$(gcloud storage ls "$REMOTE_PREFIX/packed/device_slot_*.safetensor
   exit 1
 }
 
-say "SUCCESS manifest=$(jq -r .manifest_sha256 "$PACK_DIR/manifest.json")"
+manifest_hash=$(/home/gianl/vllm-env/bin/python -c \
+  'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
+  "$PACK_DIR/manifest.json")
+say "SUCCESS manifest=$manifest_hash"
 say "No TPU/model-performance claim: this is a checkpoint-layout artifact only."
 touch "$RUN_DIR/SUCCESS"
 gcloud storage cp --no-clobber "$RUN_DIR/orchestrator.log" \
