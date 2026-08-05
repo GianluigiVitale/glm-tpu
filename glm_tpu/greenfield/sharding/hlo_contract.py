@@ -379,6 +379,7 @@ class HloContractPolicy:
     residual_width: int = 6144
     require_global_device_ids: bool = True
     require_repeated_region: bool = True
+    allow_full_pod_repeated_collectives: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -466,6 +467,7 @@ class HloContractPolicy:
                 list(pair) for pair in self.forbidden_row_width_pairs
             ],
             "maximum_repeated_collective_group_size": self.maximum_repeated_collective_group_size,
+            "allow_full_pod_repeated_collectives": self.allow_full_pod_repeated_collectives,
             "name": self.name,
             "repeated_region_patterns": list(self.repeated_region_patterns),
             "require_global_device_ids": self.require_global_device_ids,
@@ -625,7 +627,10 @@ def lint_hlo(module: HloModule, policy: HloContractPolicy) -> HloLintReport:
                     instruction,
                 )
             )
-        if instruction.maximum_group_size >= policy.total_devices:
+        if (
+            instruction.maximum_group_size >= policy.total_devices
+            and not policy.allow_full_pod_repeated_collectives
+        ):
             violations.append(
                 _violation(
                     "FULL_POD_REPEATED_COLLECTIVE",

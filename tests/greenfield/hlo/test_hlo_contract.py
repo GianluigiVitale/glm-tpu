@@ -105,6 +105,27 @@ def test_full_pod_repeated_residual_is_rejected() -> None:
         report.raise_for_violations()
 
 
+def test_full_pod_diagnostic_policy_can_measure_without_promoting() -> None:
+    full_pod = GOOD_HLO.replace(
+        "{{0,1,2,3},{4,5,6,7}}", "{{0,1,2,3,4,5,6,7}}"
+    )
+    policy = HloContractPolicy(
+        name="explicit diagnostic comparator",
+        total_devices=8,
+        repeated_region_patterns=("decode",),
+        maximum_repeated_collective_group_size=8,
+        expected_repeated_replica_groups=((0, 1, 2, 3, 4, 5, 6, 7),),
+        expected_collectives=(
+            CollectiveExpectation("all-reduce", 1),
+            CollectiveExpectation("collective-permute", 1),
+        ),
+        expected_collective_permute_pairs=good_policy().expected_collective_permute_pairs,
+        allow_full_pod_repeated_collectives=True,
+    )
+    report = lint_hlo(parse_hlo_module(full_pod), policy)
+    assert report.valid, report.violations
+
+
 def test_missing_declared_local_group_is_rejected() -> None:
     bad = GOOD_HLO.replace(
         "{{0,1,2,3},{4,5,6,7}}", "{{0,1,2,3}}"
