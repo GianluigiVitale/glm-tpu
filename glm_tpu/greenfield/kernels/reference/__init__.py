@@ -1,5 +1,19 @@
 """Readable exactness-first JAX reference kernels."""
 
+from .attention import (
+    CanonicalSelectedPositions,
+    MlaNumericalContract,
+    SelectedKvSegment,
+    SparseAttentionResult,
+    StageLocalKvLayout,
+    canonicalize_selected_positions,
+    combine_stage_local_attention,
+    gather_paged_selected_kv,
+    gather_stage_local_selected_kv,
+    selected_positions_for_owner,
+    sparse_mla_attention,
+    stage_local_sparse_mla_reference,
+)
 from .dsa import (
     DsaNumericalContract,
     SelectedPositions,
@@ -19,6 +33,15 @@ from .linear import (
     silu,
     vocabulary_logits,
 )
+from .index_share import (
+    IndexShareSchedule,
+    IndexShareState,
+    pack_index_share_transfer,
+    produce_index_share_state,
+    resolve_index_share_layer,
+    restore_index_share_transfer,
+    validate_index_share_state_host,
+)
 from .moe import (
     GlmMoeNumericalContract,
     dequantize_fp8_block_weight,
@@ -32,10 +55,19 @@ from .rmsnorm import final_norm, rms_norm
 from .rotary import apply_rotary, rotary_cos_sin
 
 __all__ = (
+    "CanonicalSelectedPositions",
     "DsaNumericalContract",
     "GlmMoeNumericalContract",
+    "IndexShareSchedule",
+    "IndexShareState",
+    "MlaNumericalContract",
+    "SelectedKvSegment",
     "SelectedPositions",
+    "SparseAttentionResult",
+    "StageLocalKvLayout",
     "apply_rotary",
+    "canonicalize_selected_positions",
+    "combine_stage_local_attention",
     "dequantize_fp8_block_weight",
     "dense_swiglu",
     "distributed_exact_topk_reference",
@@ -45,17 +77,27 @@ __all__ = (
     "embedding_lookup",
     "exact_topk",
     "final_norm",
+    "gather_paged_selected_kv",
+    "gather_stage_local_selected_kv",
     "linear",
     "local_topk_candidates",
     "merge_topk_candidates",
+    "pack_index_share_transfer",
+    "produce_index_share_state",
     "reference_moe_from_routes",
     "residual_add",
+    "resolve_index_share_layer",
+    "restore_index_share_transfer",
     "rms_norm",
     "rotary_cos_sin",
     "route_glm_noaux_tc",
     "route_glm_noaux_tc_logits",
+    "selected_positions_for_owner",
     "silu",
     "stage_local_moe",
     "stage_local_moe_from_routes",
+    "sparse_mla_attention",
+    "stage_local_sparse_mla_reference",
+    "validate_index_share_state_host",
     "vocabulary_logits",
 )

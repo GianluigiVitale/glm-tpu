@@ -37,8 +37,30 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   ascending global-position order before the final exact merge, and is thus
   invariant to collective concatenation order.
 - Compact selected state is `positions int32[rows,2048]` plus
-  `valid_counts int32[rows]`; invalid tail slots are exactly `-1`. This is the
-  only state IndexShare may reuse or transfer across a stage boundary.
+  `valid_counts int32[rows]`; invalid tail slots are exactly `-1`. IndexShare
+  reuses the score-ordered positions unchanged. Only the positions array is
+  transferred across a stage boundary: valid counts are derived from the
+  exact `-1` suffix, producer layer is compile-time schedule metadata, and
+  event position already travels with the residual. No KV row is transferred.
+
+## Stage-local KV and sparse MLA
+
+- The packed latent-cache row is BF16 width 640: normalized latent width 512,
+  rotated key width 64, then 64 inert padding lanes. A logical 512-token page
+  is striped in-page over only the plan's two- or four-chip local stage group.
+- DSA/IndexShare state remains descending-score ordered. Attention makes a
+  private ascending-global-position copy, with `-1` tail preserved, so its
+  reduction order is a deterministic function of the selected set. Duplicate,
+  stale, non-causal, out-of-page, or malformed-tail state sets a device health
+  predicate false; it never causes an out-of-range cache read.
+- Each local owner gathers and attends only its disjoint selected subset.
+  Queries are absorbed latent `[rows,64,512]` plus rotated `[rows,64,64]`;
+  scores and softmax are FP32 and scale by `256**-0.5`. Max-shifted,
+  unnormalized softmax weights round to the cache dtype before the latent PV
+  dot; normalization by the FP32 sum occurs afterward, matching the TPU path.
+- Owner partials emit normalized latent plus FP32 log-sum-exp. The exact
+  stage-local merge weights each partial by its LSE; an empty owner contributes
+  zero and an all-empty row returns zero. No stage/pod axis participates.
 
 ## GLM-5.2 sparse MoE
 
