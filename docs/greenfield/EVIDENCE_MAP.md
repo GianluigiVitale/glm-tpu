@@ -54,6 +54,17 @@ pack, never constructs a model, and records accepted legacy/vLLM file hashes. No
 the 274,944-byte safetensor SHA-256 is `4aa7910b...784b`; local/remote `SUCCESS` exist. This is not
 TPU performance evidence.
 
+`greenfield_gate_c_oracle_20260805T212801776974822Z` is the independent layer-2/3 Gate C
+correctness artifact at code `602d42f`. It reads 31 raw tensors from source shards 20/38/40 at the
+protected full-pack source revision and constructs no JAX/model/legacy execution. Its real
+2,304-position full DSA scorer selects 2,048 unique positions including current position 2,303;
+the layer-3 consumer carries the identical score-ordered `int32[1,2048]` payload (8,192 bytes),
+sorts a private attention copy, and captures write-before-attend sparse MLA plus a real dense
+layer-2 case. Manifest SHA-256 is `54262529bd561c57f0833a993e0ac6cdbec20b9e270a0f6f1726d0049d9c4a9f`;
+the 36,060,088-byte safetensor SHA-256 is
+`a8927db679ed74b9adc38d516fab4c4985acc5dc7489d6379e28b2ba52270364`; local/remote `SUCCESS` and
+the local evidence ledger pass. This is correctness input, not TPU or performance evidence.
+
 ## Protected exact PP8 real layer
 
 DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z` is the first real checkpoint-backed

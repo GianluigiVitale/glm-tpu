@@ -26,10 +26,11 @@
 | Complete PP8 direct load | DB 420: all 32 chips / 8 stages, 750,122,559,744 bytes, exact identities, device round trip, peak weights-only HBM, archive/cleanup | Pass |
 | Gate B | Complete plan-aware checkpoint manifest/packer/direct loader and fail-closed corruption handling | Pass |
 | Gate C reference kernels | Dense/norm/RoPE, FP32 DSA/top-k, compact IndexShare, stage-local KV, sparse MLA and LSE merge; full-width FP32/BF16 legacy comparisons exact | Pass on CPU/reference |
-| Gate C overall | Sparse PP8/PP16 protected prerequisite and all ordered references exist; protected real dense/full-DSA/IndexShare representatives remain | In progress |
+| Real Gate C oracle | 31 raw layer-2/3 tensors; 2,304-token full scorer; 2,048 exact positions; 8,192-byte IndexShare; dense/sparse-attention outputs; manifest `54262529...4a9f` | Pass (correctness artifact) |
+| Gate C overall | Sparse PP8/PP16 protected prerequisite, ordered references, and independent oracle exist; protected real dense/full-DSA/IndexShare TPU proof remains | In progress |
 | Gates D–H | Await earlier gates | Missing |
 
-Last verified greenfield suite: 168/168 on forced CPU. CPU/HLO reference tests prove
+Last verified greenfield suite: 173/173 on forced CPU. CPU/HLO reference tests prove
 semantics/mechanisms only.
 DB 417/418 prove one real sparse layer under both required local plans; DB 420 proves complete
 checkpoint integrity/direct loading. None proves full-model correctness, decoder HBM, token latency,

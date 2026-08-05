@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 21:07 UTC
+**Updated:** 2026-08-05 21:29 UTC
 
 ## Authority and isolation
 
@@ -82,8 +82,17 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   lookup, sparse MLA/LSE merge, and compact IndexShare carriage are implemented at `10e5097`.
   Full-width FP32 and BF16 comparisons against the pinned legacy sparse-attention oracle are
   elementwise exact, including the four-owner BF16 merge; greenfield tests pass 168/168 on forced
-  CPU. These prove semantics only. Protected real dense/full-DSA/IndexShare evidence remains; no
-  decoder, serving, decoder-HBM, or genuine token-throughput result exists.
+  CPU. These prove semantics only. Protected real dense/full-DSA/IndexShare TPU evidence remains;
+  no decoder, serving, decoder-HBM, or genuine token-throughput result exists.
+- Independent raw-source Gate C oracle
+  `greenfield_gate_c_oracle_20260805T212801776974822Z` passed at `602d42f`. It consumes 31 exact
+  layer-2/3 tensors from source shards 20/38/40, never imports JAX/model/legacy execution, and
+  captures real dense, full-DSA, and IndexShare-reuse cases. The 2,304-position full scorer selects
+  exactly 2,048 unique positions including current position 2,303; layer 3 reuses the identical
+  score-ordered `int32[1,2048]` state (8,192 bytes), privately sorts only for attention, and proves
+  write-before-attend. The 36,060,088-byte safetensor is `a8927db...0364`; manifest is
+  `54262529...4a9f`; local/remote `SUCCESS` and the local evidence ledger pass. This is an
+  independent correctness artifact, not TPU or performance proof.
 
 ## Protected evidence
 
@@ -172,9 +181,9 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Capture independent raw-source real dense/full-DSA/IndexShare oracle artifacts, then run protected
-   PP8 TPU equivalence/HLO/HBM proofs. Keep DSA selected sets/tie order exact and all repeated
-   collectives stage-local.
+1. Pack/load the bounded real layer-2/3 Gate C weights in final PP8 ownership, then run protected
+   dense/full-DSA/IndexShare TPU equivalence/HLO/HBM proofs against manifest `54262529...4a9f`.
+   Keep selected sets/tie order exact and all repeated collectives stage-local.
 2. Only after Gate C, build the complete short-context decoder for Gate D and measure real wall
    token speed plus full memory headroom. Continue Gates E–H in binding order. The one-layer
    comparison provisionally favors PP8 for
