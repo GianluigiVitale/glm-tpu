@@ -29,7 +29,8 @@ OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 TAG=e0cap_${ARM}_$(date -u +%Y%m%dT%H%M%S%NZ)
 RUN_DIR=$HOME/glm-run/$TAG
 GCS_RUN=gs://driftbench-dsv4-uc/results/$TAG
-HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short HEAD) || exit 1
+HARNESS_FULL=$(git -C "$HOME/glm-tpu" rev-parse HEAD) || exit 1
+HARNESS_SHORT=$(git -C "$HOME/glm-tpu" rev-parse --short "$HARNESS_FULL") || exit 1
 HEALTH_PROOF_LOG="${HEALTH_PROOF_LOG:?set HEALTH_PROOF_LOG to a fresh protected 5K health log}"
 HEALTH_RAYLET_ENVS="${HEALTH_RAYLET_ENVS:?set HEALTH_RAYLET_ENVS to its 8-host exact env census}"
 HEALTH_RESULTS_DB="${HEALTH_RESULTS_DB:-$HOME/glm-tpu/bench/results.db}"
@@ -106,9 +107,25 @@ ALERT_FILE=$RUN_DIR/DISK_ALERT
 mkdir -p "$RUN_DIR"
 say() { echo "[e0cap-$ARM $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"; }
 
+# The throughput DB resolves glm-tpu HEAD only after the distributed engine
+# has finished loading.  Freeze that provenance for the entire workflow: a
+# tracked edit or checkout drift must stop the owned driver instead of wasting
+# a full 256K capture whose DB row cannot match the launch configuration.
+harness_checkout_matches() {
+  local current dirty
+  current=$(git -C "$HOME/glm-tpu" rev-parse HEAD 2>/dev/null) || return 1
+  dirty=$(git -C "$HOME/glm-tpu" status --porcelain --untracked-files=no |
+    wc -l) || return 1
+  [ "$current" = "$HARNESS_FULL" ] && [ "$dirty" -eq 0 ]
+}
+
 # Common local lease for every protected resume-health/E0 pod workflow.
 exec 9>"$HOME/glm-run/.glm_pod_workload.lock"
 flock -n 9 || { say "ABORT: another protected pod workflow holds the lock"; exit 1; }
+harness_checkout_matches || {
+  say "ABORT: glm-tpu checkout differs from captured harness $HARNESS_SHORT"
+  exit 1
+}
 
 TRC_BASE="GLM_FLIGHT_RECORDER=1 GLM_JAX_TRACE_SKIP=4 GLM_JAX_TRACE_STEPS=$TRACE_STEPS"
 LIBTPU='LIBTPU_INIT_ARGS="--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false"'
@@ -361,7 +378,9 @@ if ! {
   exit 1
 fi
 if ! cp "$HOME/glm-tpu/scripts/e0_capture_arm.sh" "$RUN_DIR/e0_capture_arm.sh" ||
-    ! cp "$HOME/glm-tpu/scripts/analysis/parse_xplane.py" "$RUN_DIR/parse_xplane.py"; then
+    ! cp "$HOME/glm-tpu/scripts/analysis/parse_xplane.py" "$RUN_DIR/parse_xplane.py" ||
+    ! cp "$HOME/glm-tpu/scripts/analysis/extract_steady_decode.py" \
+      "$RUN_DIR/extract_steady_decode.py"; then
   say "ABORT: could not snapshot capture tooling"
   exit 1
 fi
@@ -569,6 +588,10 @@ for try in 1 2 3 4 5 6; do
     say "ABORT: zero-work census failed immediately before launcher"
     exit 1
   }
+  harness_checkout_matches || {
+    say "ABORT: glm-tpu checkout drifted before launcher"
+    exit 1
+  }
   say "try $try: launching protected $ARM engine"
   if ! EXTRA_ENVS="$RENV $TRC $LIBTPU" TPU_MIN_TOKEN_BUCKET="$E0_MIN_TOKEN_BUCKET" \
       bash "$HOME/glm-tpu/scripts/launch_glm_32chip.sh" \
@@ -580,6 +603,10 @@ for try in 1 2 3 4 5 6; do
   NODES=$("$HOME/vllm-env/bin/ray" status 2>/dev/null | grep -cE '^ 1 node_' || true)
   [ "${NODES:-0}" -eq 8 ] || { say "try $try: Ray nodes ${NODES:-0}/8"; continue; }
   verify_raylet_envs "$try" || { say "try $try: raylet env verification failed"; continue; }
+  harness_checkout_matches || {
+    say "ABORT: glm-tpu checkout drifted before driver"
+    exit 1
+  }
 
   LOG=$RUN_DIR/driver_t${try}.log
   # The background PID is the new session leader. EXIT/signal/disk/timeout
@@ -616,6 +643,13 @@ for try in 1 2 3 4 5 6; do
   while kill -0 "$W" 2>/dev/null; do
     sleep 30
     WAITED=$((WAITED + 30))
+    if ! harness_checkout_matches; then
+      say "ABORT: glm-tpu checkout drifted from captured harness" \
+        "$HARNESS_SHORT during driver"
+      stop_driver_session
+      wait "$W" 2>/dev/null || true
+      exit 1
+    fi
     if [ -s "$ALERT_FILE" ]; then
       say "ABORT: disk watcher alert during driver"
       stop_driver_session
@@ -737,12 +771,16 @@ PY
   ANALYSIS_MD=$RUN_DIR/analysis_t${try}.md
   STEADY_JSON=$RUN_DIR/steady_decode_t${try}.json
   PARSE_OK=0
+  harness_checkout_matches || {
+    say "ABORT: glm-tpu checkout drifted before captured analysis"
+    exit 1
+  }
   if [ "$SCP_OK" -eq 8 ] && [ "$TRACE_MANIFEST_OK" -eq 1 ] &&
-      "$HOME/vllm-env/bin/python" "$HOME/glm-tpu/scripts/analysis/parse_xplane.py" \
+      "$HOME/vllm-env/bin/python" "$RUN_DIR/parse_xplane.py" \
         fleet "$TRY_TRACE" "$ANALYSIS_JSON" > "$ANALYSIS_MD" 2>&1 &&
       validate_analysis "$ANALYSIS_JSON" >> "$ANALYSIS_MD" 2>&1 &&
       "$HOME/vllm-env/bin/python" \
-        "$HOME/glm-tpu/scripts/analysis/extract_steady_decode.py" \
+        "$RUN_DIR/extract_steady_decode.py" \
         "$LOG" "$ANALYSIS_JSON" "$STEADY_JSON" \
         --trace-steps "$TRACE_STEPS" >> "$ANALYSIS_MD" 2>&1; then
     PARSE_OK=1
