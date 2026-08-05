@@ -36,8 +36,11 @@ case "$PLAN_ID" in
     PACK_RUN=$GLM_GREENFIELD_PP16_PACK_RUN
     PACK_MANIFEST_SHA=$GLM_GREENFIELD_PP16_PACK_MANIFEST_SHA
     PLAN_GROUP_HASH=$PP16_GROUP_HASH
-    TPU_BOUNDS=2,1,1
-    TPU_VISIBLE=0,1
+    # libtpu cannot construct a standalone 2x1x1 slice from local devices
+    # 0,1 (duplicate coordinate assignment). Initialize the proven 2x2 host
+    # subcube and place the executable/arrays only on adjacent devices 0,1.
+    TPU_BOUNDS=2,2,1
+    TPU_VISIBLE=0,1,2,3
     STAGE_ARGS=(--stage-id 10)
     EXPECTED_TRACE_CORES=4
     ;;

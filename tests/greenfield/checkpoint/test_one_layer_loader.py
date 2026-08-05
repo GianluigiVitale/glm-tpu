@@ -161,6 +161,40 @@ def test_pp16_resolution_selects_explicit_adjacent_pair() -> None:
     assert resolved.stage_id == 10
 
 
+@pytest.mark.skipif(
+    not TOPOLOGY_CAPTURE.is_file(),
+    reason="protected topology capture is not present",
+)
+def test_pp16_resolution_selects_pair_from_full_host_runtime() -> None:
+    capture = json.loads(TOPOLOGY_CAPTURE.read_text())
+    contract = capture["contract"]
+    manifest = {
+        "manifest_sha256": "a" * 64,
+        "source_revision": "fixture",
+        "topology_hash": contract["topology_hash"],
+        "plan_group_hash": contract["pp16_lp2_hash"],
+        "plan_id": "PP16_LP2",
+    }
+    runtime = [
+        _FakeDevice((0, 0, 0), "runtime-0"),
+        _FakeDevice((1, 0, 0), "runtime-1"),
+        _FakeDevice((0, 1, 0), "runtime-2"),
+        _FakeDevice((1, 1, 0), "runtime-3"),
+    ]
+    resolved = resolve_pp16_stage_devices(
+        runtime,
+        capture,
+        _expectation(manifest),
+        stage_id=10,
+        visible_device_indices=(0, 1, 2, 3),
+    )
+    assert [device.label for device in resolved.devices] == [
+        "runtime-0",
+        "runtime-1",
+    ]
+    assert resolved.captured_device_ids == (4, 5)
+
+
 def _run_forced_cpu_loader(artifact: Path) -> None:
     import jax
 

@@ -356,16 +356,19 @@ def main() -> int:
     import jax.numpy as jnp
 
     local_devices = tuple(jax.local_devices())
-    expected_stage_size = {"PP8_LP4": 4, "PP16_LP2": 2}[args.plan_id]
+    # TPU v4 libtpu rejects a standalone local 2x1x1 slice for devices 0,1.
+    # PP16 therefore initializes the proven four-chip host subcube but places
+    # all arrays and the executable on the selected adjacent two-chip mesh.
+    expected_runtime_size = 4
     if (
         jax.default_backend() != "tpu"
-        or len(local_devices) != expected_stage_size
-        or jax.device_count() != expected_stage_size
+        or len(local_devices) != expected_runtime_size
+        or jax.device_count() != expected_runtime_size
         or jax.process_count() != 1
     ):
         raise RuntimeError(
-            f"protected {args.plan_id} runner requires a standalone "
-            f"{expected_stage_size}-chip TPU v4 stage"
+            f"protected {args.plan_id} runner requires the standalone "
+            "four-chip TPU v4 host subcube"
         )
     visible_raw = os.environ.get("TPU_VISIBLE_DEVICES", "")
     try:
@@ -376,9 +379,9 @@ def main() -> int:
         raise ValueError(
             f"invalid TPU_VISIBLE_DEVICES={visible_raw!r}"
         ) from error
-    if len(visible_device_indices) != expected_stage_size:
+    if len(visible_device_indices) != expected_runtime_size:
         raise ValueError(
-            f"TPU_VISIBLE_DEVICES must identify {expected_stage_size} captured "
+            f"TPU_VISIBLE_DEVICES must identify {expected_runtime_size} captured "
             f"host-local chips, got {visible_device_indices}"
         )
     expectation = OneLayerLoadExpectation(
