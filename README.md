@@ -1,19 +1,17 @@
-# glm-tpu — GLM-5.2 (DeepSeek-sparse-attention family) porting harness for TPU v4
+# glm-tpu — topology-first GLM-5.2 TPU-v4 rewrite
 
-Harness repo for bringing **GLM-5.2** up on **TPU v4** via the vLLM `tpu-inference`
-(torchax) path — the GLM analogue of `moe-tpu` (which did DeepSeek-V4-Flash).
+This branch contains an isolated, default-off native-JAX inference engine for
+`zai-org/GLM-5.2-FP8` on the existing 8-host/32-chip TPU-v4 pod. Its primary objective is minimum
+protected batch-one latency at 256K context.
 
-- **Model / kernel / quant code** lives in the fork
-  `GianluigiVitale/tpu-inference` (a GLM working branch), building on the DSV4-Flash
-  work (the DSA lightning-indexer / top-k Pallas paged-decode kernel).
-- **This repo** holds everything around it: configs, parity harnesses, eval/bench
-  scripts, and docs.
+The implementation starts with `PP8_LP4`, must challenge it with `PP16_LP2`, and must protectively
+measure or evidence-reject `WS32_2D`. Repeated layer communication stays in the smallest useful
+topology-local group; only the live residual and compact metadata cross pipeline stages.
 
-GLM-5.2's DSA differs from DSV4-Flash's (`index_topk=2048`, 32 indexer heads,
-interleaved-RoPE indexer, IndexShare — one `full` layer per 4-layer block — and
-MTP), so the DSV4 cores are a starting point, not a copy.
+Read [AGENTS.md](AGENTS.md), [goal.md](goal.md), and
+[docs/glm-tpu-revolution.md](docs/glm-tpu-revolution.md) before changing code. Current evidence and
+the next action are in [HANDOFF.md](HANDOFF.md).
 
-## Setup
-```bash
-bash ~/setup.sh --folder=glm-tpu   # clone + bucket restore + venv + 5-min sync cron
-```
+The inherited `tpu-inference` implementation is a correctness and measurement oracle only. This
+branch does not extend or import its model-execution path. Historical files under `docs/` remain
+available as evidence; they do not override the greenfield contract.

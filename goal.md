@@ -2,7 +2,7 @@
 
 FULL ACCESS: work autonomously until done; do not ask permission in scope. Keep this file below
 4,000 characters. After every start/compaction, read it, then read
-`/home/gianl/glm-tpu/docs/glm-tpu-revolution.md` **in full**; it is authoritative. Inspect live
+`/home/gianl/glm-tpu-topology-rewrite/docs/glm-tpu-revolution.md` **in full**; it is authoritative. Inspect live
 code/processes and relevant handoff/research evidence before acting.
 
 ## Scope and precedence
@@ -62,4 +62,3 @@ checkpoint, has local repeated collectives/no full-pod hidden reconstruction, an
 quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
 DB/archive, and clean-fleet gates. Continue until every item in
 section 18 of `glm-tpu-revolution.md` has direct evidence.
-

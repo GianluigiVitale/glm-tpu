@@ -1,23 +1,29 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 13:01 UTC
+**Updated:** 2026-08-05 13:21 UTC
 
 ## Authority and location
 
 - Branch: `rewrite/topology-first-decode`
 - Worktree: `/home/gianl/glm-tpu-topology-rewrite`
 - Starting harness commit: `a4a17ac4e90b15f1994bd8b26917ef62daa52660`
+- Legacy oracle starting/current pin: `b3c25df47ac98783912dc658878181ec0a8ae16d`
+- Branch operating file: `AGENTS.md`
 - Compact contract: `goal.md`
 - Full contract: `docs/glm-tpu-revolution.md`
 
 Those two contract files supersede the inherited incremental TP32 instructions and old ban on
 pipeline parallelism. Legacy execution code and evidence remain intact on `main` and in Git history.
+Files in the main checkout or any other worktree have no authority over this branch.
 
 ## Current state
 
 The isolated engine foundation now exists. Immutable model/physical-topology/stage-plan contracts
 serialize canonically and carry SHA-256 geometry/topology/plan hashes. Runtime discovery refuses
-guessed topology or local ordering. Synthetic L0 topology/type coverage passes 28/28.
+guessed topology or local ordering. The optimized-HLO contract parser now proves physical replica
+groups, collective counts/pairs/shapes, global-id semantics, repeated-region policy, and explicit
+diagnostic-only handling of full-pod repeated collectives. Focused HLO coverage passes 12/12.
+The complete greenfield L0/HLO suite passes 40/40.
 
 Protected Gate-A topology capture passed at code `75c8bb14cbd290930ff024937310f3aec6175090`:
 
@@ -37,14 +43,12 @@ throughput evidence. No greenfield performance claim exists. Legacy execution re
 
 ## Exact next sequence
 
-1. Implement the StableHLO/HLO contract parser: physical replica groups/counts/shapes, repeated-region
-   classification, no full-pod repeated collective, one live row, and expected transfer count.
-2. Implement the genuinely dependent 75-operation collective benchmark with anti-elision checksum,
+1. Implement the genuinely dependent 75-operation collective benchmark with anti-elision checksum,
    exact HLO count, group sizes 2/4/8/32, required shapes/dtypes, and warmed distributions.
-3. Prove device-resident PP8 and PP16 stage-transfer skeletons with no host/Ray/Python stage dispatch,
+2. Prove device-resident PP8 and PP16 stage-transfer skeletons with no host/Ray/Python stage dispatch,
    no inactive-stage model-equivalent compute, exact point-to-point HLO, and fresh traces.
-4. Prove one exact real MoE layer whose combine is confined to its 2/4-chip stage.
-5. Continue through Gates B–H exactly as specified. Do not pack/load the full 753B model before the
+3. Prove one exact real MoE layer whose combine is confined to its 2/4-chip stage.
+4. Continue through Gates B–H exactly as specified. Do not pack/load the full 753B model before the
    first three architectural proofs pass.
 
 Every result requires exact code/plan provenance. Update this file with current evidence and next
