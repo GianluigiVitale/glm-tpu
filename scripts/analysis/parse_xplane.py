@@ -695,6 +695,11 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
             if op.get("hlo_category") == "all-reduce")
         for c in cores for s in c["steps"]
     ]
+    hlo_all_gather_invocations_per_step = [
+        sum(op["count"] for op in s["per_op"].values()
+            if op.get("hlo_category") == "all-gather")
+        for c in cores for s in c["steps"]
+    ]
     for values in categories.values():
         values["pct_busy"] = 100 * values["ms_per_step"] / busy_ms
         values["pct_step_cycle"] = 100 * values["ms_per_step"] / cycle_ms
@@ -721,6 +726,8 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         "all_reduce_invocations_per_step": all_reduce_invocations_per_step,
         "hlo_all_reduce_invocations_per_step":
             hlo_all_reduce_invocations_per_step,
+        "hlo_all_gather_invocations_per_step":
+            hlo_all_gather_invocations_per_step,
         "categories": categories,
         "ops": ops,
         "signatures": signatures,

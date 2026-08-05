@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 
 import numpy as np
 import pytest
@@ -15,6 +16,7 @@ SCRIPT = (
     / "greenfield"
     / "run_gate_c_equivalence.py"
 )
+WRAPPER = SCRIPT.with_name("run_gate_c_equivalence_pp8.sh")
 
 
 def _load_script():
@@ -120,3 +122,30 @@ def test_gate_c_runner_canonical_selection_and_observed_gather() -> None:
     np.testing.assert_array_equal(
         observed_values, [[[0, 10], [3, 30], [4, 40]]]
     )
+
+
+def test_gate_c_protected_wrapper_is_serialized_and_fail_closed() -> None:
+    source = WRAPPER.read_text()
+    for required in (
+        ".glm_pod_workload.lock",
+        "strict_census pre",
+        "strict_census post",
+        "TPU_VISIBLE_DEVICES=0,1,2,3",
+        "jit_dense_step",
+        "jit_dsa_step",
+        "jit_index_share_step",
+        "hlo_all_gather_invocations_per_step",
+        "results_db_run_id",
+        "orchestrator.sealed.log",
+        "sha256sum -c evidence.sha256",
+        "--no-clobber",
+        "remote_success",
+    ):
+        assert required in source
+    completed = subprocess.run(
+        ["bash", "-n", str(WRAPPER)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr

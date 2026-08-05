@@ -642,10 +642,12 @@ def main() -> int:
         weights[f"{producer}.mlp.up_proj.weight"],
         weights[f"{producer}.mlp.down_proj.weight"],
     )
+
+    def dense_step(*values: Any) -> Any:
+        return stage_local_dense_gate_c(*values, mesh=loaded.mesh)
+
     compile_started = time.perf_counter()
-    dense_compiled = jax.jit(
-        lambda *values: stage_local_dense_gate_c(*values, mesh=loaded.mesh)
-    ).lower(*dense_inputs).compile()
+    dense_compiled = jax.jit(dense_step).lower(*dense_inputs).compile()
     dense_compile_seconds = time.perf_counter() - compile_started
     dense_hlo_sha, dense_hlo, dense_hlo_path = _save_hlo(
         dense_compiled, case="dense", hlo_dir=args.hlo_dir
@@ -706,12 +708,14 @@ def main() -> int:
         weights[f"{producer}.self_attn.indexer.k_norm.bias"],
         weights[f"{producer}.self_attn.indexer.weights_proj.weight"],
     )
-    compile_started = time.perf_counter()
-    dsa_compiled = jax.jit(
-        lambda *values: stage_local_dsa_gate_c(
+
+    def dsa_step(*values: Any) -> Any:
+        return stage_local_dsa_gate_c(
             *values, mesh=loaded.mesh, contract=dsa_contract
         )
-    ).lower(*dsa_inputs).compile()
+
+    compile_started = time.perf_counter()
+    dsa_compiled = jax.jit(dsa_step).lower(*dsa_inputs).compile()
     dsa_compile_seconds = time.perf_counter() - compile_started
     dsa_hlo_sha, dsa_hlo, dsa_hlo_path = _save_hlo(
         dsa_compiled, case="dsa", hlo_dir=args.hlo_dir
@@ -828,9 +832,9 @@ def main() -> int:
         weights[f"{consumer}.self_attn.kv_b_proj.weight"],
         weights[f"{consumer}.self_attn.o_proj.weight"],
     )
-    compile_started = time.perf_counter()
-    index_compiled = jax.jit(
-        lambda *values: stage_local_index_share_gate_c(
+
+    def index_share_step(*values: Any) -> Any:
+        return stage_local_index_share_gate_c(
             *values,
             mesh=loaded.mesh,
             contract=mla_contract,
@@ -839,7 +843,9 @@ def main() -> int:
                 oracle_manifest["numerical_contract"]["rope_theta"]
             ),
         )
-    ).lower(*index_inputs).compile()
+
+    compile_started = time.perf_counter()
+    index_compiled = jax.jit(index_share_step).lower(*index_inputs).compile()
     index_compile_seconds = time.perf_counter() - compile_started
     index_hlo_sha, index_hlo, index_hlo_path = _save_hlo(
         index_compiled, case="index_share", hlo_dir=args.hlo_dir
