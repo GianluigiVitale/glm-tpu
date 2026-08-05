@@ -4,12 +4,12 @@ This module restates the model contract directly in JAX.  It imports no
 legacy model or TPU-inference code.  The accepted engine is only an oracle for
 captured tensors and numerical comparisons.
 
-The PP8 form owns all 256 routed experts inside one four-chip pipeline stage:
-64 complete experts per chip.  The shared expert is tensor-sharded over its
-intermediate dimension.  Routed and shared partials are stacked before one
-stage-local ``psum``; the two value domains remain separate and routed scale
-2.5 is applied only after reduction.  Consequently the only collective in the
-kernel is the combine over the four-chip ``expert`` axis.
+The PP8/PP16 forms own all 256 routed experts inside one topology-local stage:
+64 complete experts per PP8 chip or 128 per PP16 chip. The shared expert is
+tensor-sharded over its intermediate dimension. Routed and shared partials
+are stacked before one stage-local psum; the two value domains remain
+separate and routed scale 2.5 is applied only after reduction. Consequently
+the only collective is the combine over the two- or four-chip expert axis.
 
 The implementation deliberately targets a true batch-one decode row.  It is
 a readable fallback and correctness oracle; optimized GMM/Pallas kernels may

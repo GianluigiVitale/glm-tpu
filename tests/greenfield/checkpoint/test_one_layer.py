@@ -160,6 +160,32 @@ def test_tiny_one_layer_pack_reconciles_and_shards(tmp_path: Path) -> None:
         assert expert_gate[:, 0, 0].tolist() == [5.0, 6.0]
 
 
+def test_tiny_pp16_pack_writes_two_final_owner_files(tmp_path: Path) -> None:
+    from safetensors import safe_open
+
+    config = replace(
+        tiny_config(tmp_path / "source", tmp_path / "packed"),
+        plan_id="PP16_LP2",
+        stage_size=2,
+    )
+    write_tiny_source(config)
+    manifest = pack_one_layer_moe(config)
+    assert manifest["plan_id"] == "PP16_LP2"
+    assert manifest["geometry"]["stage_size"] == 2
+    assert len(manifest["files"]) == 2
+    assert inspect_one_layer_artifact(config.output_dir) == manifest
+    with safe_open(
+        config.output_dir / "device_slot_01.safetensors",
+        framework="pt",
+        device="cpu",
+    ) as handle:
+        assert handle.get_slice("expert_gate").get_shape() == [4, 4, 8]
+        assert handle.get_slice("shared_gate").get_shape() == [2, 8]
+        assert handle.get_slice("shared_down").get_shape() == [8, 2]
+        expert_gate = handle.get_tensor("expert_gate").float()
+        assert expert_gate[:, 0, 0].tolist() == [5.0, 6.0, 7.0, 8.0]
+
+
 def test_pack_refuses_incomplete_source_leaf_set(tmp_path: Path) -> None:
     config = tiny_config(tmp_path / "source", tmp_path / "packed")
     write_tiny_source(config)
@@ -190,3 +216,5 @@ def test_config_refuses_wrong_bucket_or_nondivisible_layout(tmp_path: Path) -> N
         replace(config, num_experts=7)
     with pytest.raises(ValueError, match="Git object"):
         replace(config, code_hash="not-a-commit")
+    with pytest.raises(ValueError, match="requires stage_size=2"):
+        replace(config, plan_id="PP16_LP2")

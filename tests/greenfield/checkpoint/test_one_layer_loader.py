@@ -16,7 +16,9 @@ from glm_tpu.greenfield.checkpoint.one_layer_loader import (
     StageDeviceResolution,
     _fp8_e4m3fn_lookup,
     dequantize_packed_fp8,
+    load_one_layer,
     load_pp8_one_layer,
+    resolve_pp16_stage_devices,
     resolve_pp8_stage_devices,
     verify_one_layer_load_contract,
 )
@@ -38,6 +40,7 @@ def _expectation(manifest: dict[str, object]) -> OneLayerLoadExpectation:
         source_revision=str(manifest["source_revision"]),
         topology_hash=str(manifest["topology_hash"]),
         plan_group_hash=str(manifest["plan_group_hash"]),
+        plan_id=str(manifest.get("plan_id", "PP8_LP4")),
     )
 
 
@@ -124,6 +127,40 @@ def test_resolution_uses_physical_group_order_not_runtime_order() -> None:
     assert resolved.stage_id == 7
 
 
+@pytest.mark.skipif(
+    not TOPOLOGY_CAPTURE.is_file(),
+    reason="protected topology capture is not present",
+)
+def test_pp16_resolution_selects_explicit_adjacent_pair() -> None:
+    capture = json.loads(TOPOLOGY_CAPTURE.read_text())
+    contract = capture["contract"]
+    manifest = {
+        "manifest_sha256": "a" * 64,
+        "source_revision": "fixture",
+        "topology_hash": contract["topology_hash"],
+        "plan_group_hash": contract["pp16_lp2_hash"],
+        "plan_id": "PP16_LP2",
+    }
+    runtime = [
+        _FakeDevice((0, 0, 0), "runtime-0"),
+        _FakeDevice((1, 0, 0), "runtime-1"),
+    ]
+    resolved = resolve_pp16_stage_devices(
+        runtime,
+        capture,
+        _expectation(manifest),
+        stage_id=10,
+        visible_device_indices=(0, 1),
+    )
+    assert [device.label for device in resolved.devices] == [
+        "runtime-0",
+        "runtime-1",
+    ]
+    assert resolved.captured_device_ids == (4, 5)
+    assert resolved.coordinates == ((0, 2, 0), (1, 2, 0))
+    assert resolved.stage_id == 10
+
+
 def _run_forced_cpu_loader(artifact: Path) -> None:
     import jax
 
@@ -188,6 +225,76 @@ def test_full_loader_directly_builds_global_arrays_from_local_shards(
         "from tests.greenfield.checkpoint.test_one_layer_loader import "
         "_run_forced_cpu_loader; "
         f"_run_forced_cpu_loader(Path({str(config.output_dir)!r}))"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def _run_forced_cpu_pp16_loader(artifact: Path) -> None:
+    import jax
+
+    if len(jax.devices()) != 2:
+        raise AssertionError(f"expected two CPU devices, got {jax.devices()}")
+    manifest = json.loads((artifact / "manifest.json").read_text())
+    devices = tuple(jax.devices())
+    resolution = StageDeviceResolution(
+        devices=devices,
+        coordinates=((0,), (1,)),
+        captured_device_ids=(4, 5),
+        captured_process_index=1,
+        stage_id=10,
+    )
+    loaded = load_one_layer(
+        artifact,
+        _expectation(manifest),
+        resolution,
+        expert_chunk_size=1,
+    )
+    assert loaded.mesh.devices.size == 2
+    assert loaded.expert_gate.shape == (8, 8, 8)
+    assert loaded.shared_gate.shape == (8, 8)
+    gate = np.asarray(loaded.expert_gate, dtype=np.float32)
+    assert gate[0, 0, 0] == 1.0
+    assert gate[4, 0, 0] == 25.0
+    assert gate[7, 0, 0] == 64.0
+    assert loaded.load_record["local_experts_per_device"] == 4
+    assert loaded.load_record["local_shared_intermediate_per_device"] == 4
+    assert loaded.load_record["packed_single_device_transfers"] == 28
+    assert loaded.load_record["device_dequantizations"] == 12
+    assert loaded.load_record["host_global_concatenations"] == 0
+    assert loaded.load_record["host_fp8_dequantizations"] == 0
+
+
+def test_pp16_loader_consumes_final_two_file_layout(tmp_path: Path) -> None:
+    config = replace(
+        tiny_config(tmp_path / "source", tmp_path / "packed"),
+        intermediate_size=8,
+        plan_id="PP16_LP2",
+        stage_size=2,
+    )
+    write_tiny_source(config)
+    manifest = pack_one_layer_moe(config)
+    assert verify_one_layer_load_contract(
+        config.output_dir, _expectation(manifest)
+    ) == manifest
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    existing = env.get("XLA_FLAGS", "").strip()
+    env["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=2".strip()
+    )
+    code = (
+        "from pathlib import Path; "
+        "from tests.greenfield.checkpoint.test_one_layer_loader import "
+        "_run_forced_cpu_pp16_loader; "
+        f"_run_forced_cpu_pp16_loader(Path({str(config.output_dir)!r}))"
     )
     completed = subprocess.run(
         [sys.executable, "-c", code],

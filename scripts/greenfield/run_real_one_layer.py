@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Protected one-host PP8 execution of one real GLM-5.2 sparse layer."""
+"""Protected one-host PP8/PP16 execution of one real GLM sparse layer."""
 
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
 )
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     OneLayerLoadExpectation,
-    load_pp8_one_layer,
-    resolve_pp8_stage_devices,
+    load_one_layer,
+    resolve_stage_devices,
 )
 from glm_tpu.greenfield.kernels.reference import (  # noqa: E402
     GlmMoeNumericalContract,
@@ -58,6 +58,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--topology-sha256", required=True)
     parser.add_argument("--plan-group-sha256", required=True)
+    parser.add_argument(
+        "--plan-id", choices=("PP8_LP4", "PP16_LP2"), default="PP8_LP4"
+    )
+    parser.add_argument("--stage-id", type=int)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-output", type=Path, required=True)
     parser.add_argument("--trace-root", type=Path, required=True)
@@ -186,7 +190,6 @@ def _load_oracle(
         "hidden_size",
         "intermediate_size",
         "num_experts",
-        "stage_size",
         "top_k",
     ):
         if manifest["geometry"].get(name) != pack_geometry.get(name):
@@ -335,6 +338,10 @@ def main() -> int:
             "protected layer requires warmup>=200, iterations>=1000, "
             "trace_steps=20, and a positive loader chunk"
         )
+    if args.plan_id == "PP16_LP2" and args.stage_id is None:
+        raise ValueError("protected PP16 layer requires an explicit stage id")
+    if args.plan_id == "PP8_LP4" and args.stage_id is not None:
+        raise ValueError("protected PP8 layer derives its sole local stage")
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(
@@ -349,29 +356,47 @@ def main() -> int:
     import jax.numpy as jnp
 
     local_devices = tuple(jax.local_devices())
+    expected_stage_size = {"PP8_LP4": 4, "PP16_LP2": 2}[args.plan_id]
     if (
         jax.default_backend() != "tpu"
-        or len(local_devices) != 4
-        or jax.device_count() != 4
+        or len(local_devices) != expected_stage_size
+        or jax.device_count() != expected_stage_size
         or jax.process_count() != 1
     ):
         raise RuntimeError(
-            "protected one-layer runner requires standalone one-host TPU v4-8 "
-            "visibility (1 process, 4 chips)"
+            f"protected {args.plan_id} runner requires a standalone "
+            f"{expected_stage_size}-chip TPU v4 stage"
+        )
+    visible_raw = os.environ.get("TPU_VISIBLE_DEVICES", "")
+    try:
+        visible_device_indices = tuple(
+            int(value) for value in visible_raw.split(",") if value != ""
+        )
+    except ValueError as error:
+        raise ValueError(
+            f"invalid TPU_VISIBLE_DEVICES={visible_raw!r}"
+        ) from error
+    if len(visible_device_indices) != expected_stage_size:
+        raise ValueError(
+            f"TPU_VISIBLE_DEVICES must identify {expected_stage_size} captured "
+            f"host-local chips, got {visible_device_indices}"
         )
     expectation = OneLayerLoadExpectation(
         manifest_sha256=args.packed_manifest_sha256,
         source_revision=args.source_revision,
         topology_hash=args.topology_sha256,
         plan_group_hash=args.plan_group_sha256,
+        plan_id=args.plan_id,
     )
-    resolution = resolve_pp8_stage_devices(
+    resolution = resolve_stage_devices(
         local_devices,
         args.topology_capture,
         expectation,
+        stage_id=args.stage_id,
+        visible_device_indices=visible_device_indices,
     )
     load_started = time.perf_counter()
-    loaded = load_pp8_one_layer(
+    loaded = load_one_layer(
         args.artifact_dir,
         expectation,
         resolution,
@@ -594,6 +619,7 @@ def main() -> int:
                 _device_record(device) for device in resolution.devices
             ],
             "process_count": jax.process_count(),
+            "visible_device_indices": list(visible_device_indices),
             "version": jax.__version__,
         },
         "load": {**loaded.load_record, "seconds": load_seconds},
@@ -609,7 +635,7 @@ def main() -> int:
             ],
         },
         "plan_group_sha256": args.plan_group_sha256,
-        "plan_id": "PP8_LP4",
+        "plan_id": args.plan_id,
         "profiler_free_timing": True,
         "schema_version": 1,
         "source_revision": args.source_revision,
@@ -621,6 +647,7 @@ def main() -> int:
     _atomic_write(args.output, record)
     print(
         "GREENFIELD_REAL_ONE_LAYER_OK "
+        f"plan={args.plan_id} "
         f"host={record['hostname']} stage={resolution.stage_id} "
         f"normal_p50_ms={timing['normal']['latency']['p50_ms']:.6f} "
         "concentrated_p50_ms="

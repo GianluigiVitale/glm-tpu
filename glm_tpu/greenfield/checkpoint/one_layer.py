@@ -1,4 +1,4 @@
-"""One-layer-only GLM MoE checkpoint artifact.
+"""One-layer-only plan-aware GLM MoE checkpoint artifact.
 
 This is the bounded precursor to the full plan-aware checkpoint format.  It
 reads only the source safetensor files containing one sparse layer, assigns
@@ -26,7 +26,7 @@ from typing import Any, Mapping, Sequence
 FORMAT_VERSION = 1
 ARTIFACT_KIND = "greenfield_one_layer_moe"
 MODEL_ID = "zai-org/GLM-5.2-FP8"
-PLAN_ID = "PP8_LP4"
+PLAN_STAGE_SIZES = {"PP8_LP4": 4, "PP16_LP2": 2}
 
 
 def _sha256_file(path: Path) -> str:
@@ -67,6 +67,7 @@ class OneLayerPackConfig:
     code_hash: str
     topology_hash: str
     plan_group_hash: str
+    plan_id: str = "PP8_LP4"
     layer: int = 3
     hidden_size: int = 6144
     intermediate_size: int = 2048
@@ -95,6 +96,16 @@ class OneLayerPackConfig:
             raise ValueError("intermediate_size must divide evenly over the stage")
         if self.top_k > self.num_experts:
             raise ValueError("top_k cannot exceed num_experts")
+        expected_stage_size = PLAN_STAGE_SIZES.get(self.plan_id)
+        if expected_stage_size is None:
+            raise ValueError(
+                f"unsupported bounded one-layer plan {self.plan_id!r}"
+            )
+        if self.stage_size != expected_stage_size:
+            raise ValueError(
+                f"{self.plan_id} requires stage_size={expected_stage_size}, "
+                f"got {self.stage_size}"
+            )
         if len(self.fp8_block_shape) != 2 or any(
             not isinstance(item, int) or isinstance(item, bool) or item <= 0
             for item in self.fp8_block_shape
@@ -439,7 +450,7 @@ def _pack_slot(
             "format_version": str(FORMAT_VERSION),
             "layer": str(config.layer),
             "model_id": MODEL_ID,
-            "plan_id": PLAN_ID,
+            "plan_id": config.plan_id,
             "source_index_sha256": source_index_sha256,
         },
     )
@@ -459,7 +470,7 @@ def _pack_slot(
 
 
 def pack_one_layer_moe(config: OneLayerPackConfig) -> dict[str, Any]:
-    """Write and fully inspect one real layer in final PP8 stage ownership."""
+    """Write and inspect one layer in final PP8 or PP16 ownership."""
 
     if config.output_dir.exists():
         raise FileExistsError(
@@ -508,7 +519,7 @@ def pack_one_layer_moe(config: OneLayerPackConfig) -> dict[str, Any]:
             file_record["payload_byte_count"] for file_record in files
         ),
         "plan_group_hash": config.plan_group_hash,
-        "plan_id": PLAN_ID,
+        "plan_id": config.plan_id,
         "source_index_sha256": source_index_sha256,
         "source_leaves": source_leaves,
         "source_payload_byte_count": source_payload_bytes,

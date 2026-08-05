@@ -51,6 +51,15 @@ def test_real_layer_hlo_requires_one_exact_local_bf16_combine() -> None:
     assert record["collective_count"] == 1
 
 
+def test_real_layer_hlo_accepts_exact_two_rank_pp16_combine() -> None:
+    hlo = GOOD_HLO.replace(
+        "num_partitions=4", "num_partitions=2"
+    ).replace("{{0,1,2,3}}", "{{0,1}}")
+    record = validate_real_layer_hlo(hlo, stage_size=2)
+    assert record["passed"], record
+    assert record["collectives"][0]["replica_groups"] == [[0, 1]]
+
+
 def test_real_layer_hlo_rejects_promoted_or_extra_collectives() -> None:
     promoted = GOOD_HLO.replace("bf16[2,1,6144]", "f32[2,1,6144]")
     record = validate_real_layer_hlo(promoted)

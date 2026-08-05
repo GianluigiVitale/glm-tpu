@@ -1,11 +1,10 @@
-"""Fail-closed direct loader for the bounded PP8 real-layer artifact.
+"""Fail-closed direct loader for bounded PP8/PP16 real-layer artifacts.
 
 The loader verifies the append-only artifact before importing JAX, resolves
-the four runtime devices from the protected physical-topology capture, and
-maps packed device slots in physical group order. FP8 block scales are folded
-on the host in small chunks and each complete local shard is transferred
-directly to its owning device. No global expert or shared-expert tensor is
-ever assembled in host memory.
+the runtime stage from the protected physical-topology capture, and maps
+packed device slots in physical group order. Raw FP8 bits and scales transfer
+directly to the final owner; lookup and scale folding occur on device. No
+global expert or shared-expert tensor is ever assembled in host memory.
 """
 
 from __future__ import annotations
@@ -47,15 +46,21 @@ class OneLayerLoadExpectation:
                 raise ValueError(f"{name} must be a lowercase SHA-256 digest")
         if not self.source_revision.strip():
             raise ValueError("source_revision must be non-empty")
-        if self.plan_id != "PP8_LP4":
-            raise ValueError("bounded one-layer loader supports only PP8_LP4")
+        if self.plan_id not in ("PP8_LP4", "PP16_LP2"):
+            raise ValueError(
+                "bounded one-layer loader supports PP8_LP4 and PP16_LP2"
+            )
         if self.model_id != "zai-org/GLM-5.2-FP8" or self.layer != 3:
             raise ValueError("bounded loader supports only GLM-5.2-FP8 layer 3")
+
+    @property
+    def stage_size(self) -> int:
+        return {"PP8_LP4": 4, "PP16_LP2": 2}[self.plan_id]
 
 
 @dataclass(frozen=True, slots=True)
 class StageDeviceResolution:
-    """Runtime devices ordered exactly like the captured PP8 stage group."""
+    """Runtime devices ordered exactly like the captured local stage group."""
 
     devices: tuple[Any, ...]
     coordinates: tuple[tuple[int, ...], ...]
@@ -126,9 +131,9 @@ def verify_one_layer_load_contract(
         if manifest.get(name) != value
     }
     geometry = manifest.get("geometry", {})
-    if geometry.get("stage_size") != 4:
+    if geometry.get("stage_size") != expectation.stage_size:
         mismatches["geometry.stage_size"] = {
-            "expected": 4,
+            "expected": expectation.stage_size,
             "observed": geometry.get("stage_size"),
         }
     if mismatches:
@@ -136,19 +141,28 @@ def verify_one_layer_load_contract(
     return manifest
 
 
-def resolve_pp8_stage_devices(
+def resolve_stage_devices(
     runtime_devices: Sequence[object],
     topology_capture: Path | Mapping[str, Any],
     expectation: OneLayerLoadExpectation,
+    *,
+    stage_id: int | None = None,
+    visible_device_indices: Sequence[int] | None = None,
 ) -> StageDeviceResolution:
-    """Match one local four-chip runtime to an authenticated captured group.
+    """Resolve one authenticated PP8/PP16 group from the local TPU runtime.
 
     Device ids and runtime list order are deliberately ignored for matching:
     standalone JAX initialization may renumber ids, while physical coordinates
-    remain authoritative. Returned order follows the PP8 group contract.
+    remain authoritative. A full four-chip host runtime may select either of
+    its two PP16 pairs; that selection is explicit through stage_id.
+    Returned order follows the captured physical group contract.
     """
 
-    from ..topology import build_pp8_lp4_groups, group_manifest_hash
+    from ..topology import (
+        build_pp16_lp2_groups,
+        build_pp8_lp4_groups,
+        group_manifest_hash,
+    )
     from ..types import PhysicalTopology, PlanName
 
     if isinstance(topology_capture, Mapping):
@@ -166,18 +180,26 @@ def resolve_pp8_stage_devices(
             f"expected={expectation.topology_hash} "
             f"observed={topology.topology_hash}"
         )
-    groups = build_pp8_lp4_groups(topology)
-    observed_group_hash = group_manifest_hash(PlanName.PP8_LP4, groups)
+    plan = PlanName(expectation.plan_id)
+    if plan is PlanName.PP8_LP4:
+        groups = build_pp8_lp4_groups(topology)
+    elif plan is PlanName.PP16_LP2:
+        groups = build_pp16_lp2_groups(topology)
+    else:  # pragma: no cover - expectation rejects this first.
+        raise ValueError(f"unsupported real-layer plan {plan.value}")
+    observed_group_hash = group_manifest_hash(plan, groups)
     if observed_group_hash != expectation.plan_group_hash:
         raise ValueError(
-            "captured PP8 group hash mismatch: "
+            f"captured {plan.value} group hash mismatch: "
             f"expected={expectation.plan_group_hash} "
             f"observed={observed_group_hash}"
         )
     devices = tuple(runtime_devices)
-    if len(devices) != 4:
+    if len(devices) not in (expectation.stage_size, 4):
         raise ValueError(
-            f"PP8 real-layer run requires four local devices, got {len(devices)}"
+            f"{plan.value} resolution requires either its "
+            f"{expectation.stage_size}-chip stage or the full four-chip host, "
+            f"got {len(devices)} devices"
         )
     runtime_by_coordinate: dict[tuple[int, ...], object] = {}
     for device in devices:
@@ -210,35 +232,61 @@ def resolve_pp8_stage_devices(
                 f"capture={captured_hostname} runtime={socket.gethostname()}"
             )
         try:
-            captured_runtime_ids = tuple(
+            captured_host_runtime_ids = tuple(
                 int(value) for value in fleet_runtime_order[captured_process]
             )
         except (IndexError, TypeError, ValueError) as error:
             raise ValueError(
                 "topology capture has invalid host runtime device order"
             ) from error
-        if len(captured_runtime_ids) != len(devices):
-            raise ValueError(
-                "captured/runtime local device counts differ: "
-                f"capture={captured_runtime_ids} runtime={len(devices)}"
-            )
         host_groups = [
             group
             for group in groups
             if group.process_index == captured_process
         ]
+        if stage_id is not None:
+            host_groups = [
+                group for group in host_groups if group.stage_id == stage_id
+            ]
         if len(host_groups) != 1:
             raise ValueError(
-                "captured PP8 process does not own exactly one stage: "
-                f"process={captured_process} groups={len(host_groups)}"
+                f"captured {plan.value} process/stage selection is ambiguous: "
+                f"process={captured_process} stage_id={stage_id} "
+                f"groups={[group.stage_id for group in host_groups]}"
             )
         group = host_groups[0]
+        if len(captured_host_runtime_ids) == len(devices):
+            captured_runtime_ids = captured_host_runtime_ids
+        elif (
+            len(devices) == expectation.stage_size
+            and visible_device_indices is not None
+        ):
+            visible = tuple(int(value) for value in visible_device_indices)
+            if (
+                len(visible) != len(devices)
+                or len(set(visible)) != len(visible)
+                or min(visible, default=-1) < 0
+                or max(visible, default=0) >= len(captured_host_runtime_ids)
+            ):
+                raise ValueError(
+                    f"invalid visible-device indices {visible} for captured "
+                    f"runtime order {captured_host_runtime_ids}"
+                )
+            captured_runtime_ids = tuple(
+                captured_host_runtime_ids[index] for index in visible
+            )
+        else:
+            raise ValueError(
+                "captured/runtime local device counts differ without an "
+                "explicit authenticated visible-device subset: "
+                f"capture={captured_host_runtime_ids} runtime={len(devices)}"
+            )
         runtime_by_captured_id = dict(
             zip(captured_runtime_ids, devices, strict=True)
         )
-        if set(runtime_by_captured_id) != set(group.device_ids):
+        if not set(group.device_ids).issubset(runtime_by_captured_id):
             raise ValueError(
-                "captured runtime ids disagree with PP8 group: "
+                f"captured runtime ids do not contain {plan.value} group: "
                 f"runtime={captured_runtime_ids} group={group.device_ids}"
             )
         topology_by_id = {
@@ -297,11 +345,13 @@ def resolve_pp8_stage_devices(
         group
         for group in groups
         if frozenset(group.coordinates) == runtime_coordinates
+        and (stage_id is None or group.stage_id == stage_id)
     ]
     if len(matching) != 1:
         raise ValueError(
-            "runtime devices do not match exactly one protected PP8 stage: "
-            f"coordinates={sorted(runtime_coordinates)} matches={len(matching)}"
+            f"runtime devices do not match exactly one protected {plan.value} "
+            f"stage: coordinates={sorted(runtime_coordinates)} "
+            f"stage_id={stage_id} matches={len(matching)}"
         )
     group = matching[0]
     ordered_coordinates = tuple(tuple(item) for item in group.coordinates)
@@ -313,6 +363,41 @@ def resolve_pp8_stage_devices(
         captured_device_ids=tuple(group.device_ids),
         captured_process_index=int(group.process_index),
         stage_id=int(group.stage_id),
+    )
+
+
+def resolve_pp8_stage_devices(
+    runtime_devices: Sequence[object],
+    topology_capture: Path | Mapping[str, Any],
+    expectation: OneLayerLoadExpectation,
+) -> StageDeviceResolution:
+    """Compatibility entry point for the four-chip PP8 stage."""
+
+    if expectation.plan_id != "PP8_LP4":
+        raise ValueError("PP8 resolver requires a PP8_LP4 expectation")
+    return resolve_stage_devices(
+        runtime_devices, topology_capture, expectation
+    )
+
+
+def resolve_pp16_stage_devices(
+    runtime_devices: Sequence[object],
+    topology_capture: Path | Mapping[str, Any],
+    expectation: OneLayerLoadExpectation,
+    *,
+    stage_id: int,
+    visible_device_indices: Sequence[int] | None = None,
+) -> StageDeviceResolution:
+    """Resolve one explicit topology-adjacent PP16 pair on the local host."""
+
+    if expectation.plan_id != "PP16_LP2":
+        raise ValueError("PP16 resolver requires a PP16_LP2 expectation")
+    return resolve_stage_devices(
+        runtime_devices,
+        topology_capture,
+        expectation,
+        stage_id=stage_id,
+        visible_device_indices=visible_device_indices,
     )
 
 
@@ -520,18 +605,21 @@ def _assemble_global(
     )
 
 
-def load_pp8_one_layer(
+def load_one_layer(
     artifact_dir: Path,
     expectation: OneLayerLoadExpectation,
     resolution: StageDeviceResolution,
     *,
     expert_chunk_size: int = 2,
 ) -> LoadedOneLayer:
-    """Verify, dequantize, and directly place one PP8 layer on four devices."""
+    """Verify and directly place one plan-final layer on its local devices."""
 
     manifest = verify_one_layer_load_contract(artifact_dir, expectation)
-    if len(resolution.devices) != 4:
-        raise ValueError("resolved PP8 stage must contain four devices")
+    if len(resolution.devices) != expectation.stage_size:
+        raise ValueError(
+            f"resolved {expectation.plan_id} stage must contain "
+            f"{expectation.stage_size} devices"
+        )
 
     import jax
     import numpy as np
@@ -686,10 +774,10 @@ def load_pp8_one_layer(
         "coordinates_in_slot_order": [
             list(item) for item in resolution.coordinates
         ],
-        "device_dequantizations": 4 * 6,
+        "device_dequantizations": stage_size * 6,
         "device_memory_after": device_after,
         "device_memory_before": device_before,
-        "device_slot_count": 4,
+        "device_slot_count": stage_size,
         "expert_chunk_size": expert_chunk_size,
         "host_global_concatenations": 0,
         "host_fp8_dequantizations": 0,
@@ -698,7 +786,7 @@ def load_pp8_one_layer(
         "local_experts_per_device": local_experts,
         "local_shared_intermediate_per_device": local_intermediate,
         "packed_manifest_sha256": manifest["manifest_sha256"],
-        "packed_single_device_transfers": 4 * 14,
+        "packed_single_device_transfers": stage_size * 14,
         "stage_id": resolution.stage_id,
     }
     return LoadedOneLayer(
@@ -713,4 +801,42 @@ def load_pp8_one_layer(
         correction_bias=correction_bias,
         manifest=manifest,
         load_record=load_record,
+    )
+
+
+def load_pp8_one_layer(
+    artifact_dir: Path,
+    expectation: OneLayerLoadExpectation,
+    resolution: StageDeviceResolution,
+    *,
+    expert_chunk_size: int = 2,
+) -> LoadedOneLayer:
+    """Compatibility entry point for a final four-chip PP8 layer."""
+
+    if expectation.plan_id != "PP8_LP4":
+        raise ValueError("PP8 loader requires a PP8_LP4 expectation")
+    return load_one_layer(
+        artifact_dir,
+        expectation,
+        resolution,
+        expert_chunk_size=expert_chunk_size,
+    )
+
+
+def load_pp16_one_layer(
+    artifact_dir: Path,
+    expectation: OneLayerLoadExpectation,
+    resolution: StageDeviceResolution,
+    *,
+    expert_chunk_size: int = 2,
+) -> LoadedOneLayer:
+    """Load a final two-chip PP16 layer without runtime repartitioning."""
+
+    if expectation.plan_id != "PP16_LP2":
+        raise ValueError("PP16 loader requires a PP16_LP2 expectation")
+    return load_one_layer(
+        artifact_dir,
+        expectation,
+        resolution,
+        expert_chunk_size=expert_chunk_size,
     )

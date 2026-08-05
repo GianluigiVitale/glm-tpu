@@ -102,7 +102,7 @@ def validate_real_layer_hlo(
     hidden_size: int = 6144,
     stage_size: int = 4,
 ) -> dict[str, Any]:
-    """Require one BF16 stacked combine over exactly four local ranks."""
+    """Require one BF16 stacked combine over the exact local stage ranks."""
 
     module = parse_hlo_module(optimized_hlo)
     violations = []

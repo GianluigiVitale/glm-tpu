@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack one GLM sparse layer into final PP8 stage ownership."""
+"""Pack one GLM sparse layer into final PP8 or PP16 stage ownership."""
 
 from __future__ import annotations
 
@@ -28,6 +28,10 @@ def main() -> None:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--topology-hash", required=True)
     parser.add_argument("--plan-group-hash", required=True)
+    parser.add_argument(
+        "--plan-id", choices=("PP8_LP4", "PP16_LP2"), default="PP8_LP4"
+    )
+    parser.add_argument("--stage-size", type=int, default=4)
     args = parser.parse_args()
     manifest = pack_one_layer_moe(
         OneLayerPackConfig(
@@ -38,6 +42,8 @@ def main() -> None:
             code_hash=args.expected_code_hash,
             topology_hash=args.topology_hash,
             plan_group_hash=args.plan_group_hash,
+            plan_id=args.plan_id,
+            stage_size=args.stage_size,
             layer=args.layer,
         )
     )

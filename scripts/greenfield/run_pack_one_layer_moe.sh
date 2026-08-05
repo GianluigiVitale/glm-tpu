@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Append-only real layer-3 PP8 pack. This opens only source shards 38-40.
+# Append-only real layer-3 PP8/PP16 pack. Opens only source shards 38-40.
 set -euo pipefail
 
 readonly BRANCH=rewrite/topology-first-decode
@@ -9,12 +9,32 @@ readonly SOURCE_URI=gs://driftbench-dsv4-uc/models/GLM-5.2-FP8
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly TOPOLOGY_HASH=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
 readonly PP8_GROUP_HASH=d5943ab8d7a074677d82f8e823c8bc983847f8df1deefdee1fbda8da98923c14
+readonly PP16_GROUP_HASH=6383e57c81478ac0d6de4525a4675f2a0d7cbc7aa73bd67bc662dc4e05840f21
+
+PLAN_ID=${GLM_GREENFIELD_ONE_LAYER_PLAN:-PP8_LP4}
+case "$PLAN_ID" in
+  PP8_LP4)
+    PLAN_SLUG=pp8
+    STAGE_SIZE=4
+    PLAN_GROUP_HASH=$PP8_GROUP_HASH
+    ;;
+  PP16_LP2)
+    PLAN_SLUG=pp16
+    STAGE_SIZE=2
+    PLAN_GROUP_HASH=$PP16_GROUP_HASH
+    ;;
+  *)
+    echo "unsupported bounded pack plan: $PLAN_ID" >&2
+    exit 2
+    ;;
+esac
+readonly PLAN_ID PLAN_SLUG STAGE_SIZE PLAN_GROUP_HASH
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_ONE_LAYER_PACK_TAG:-greenfield_one_layer_pack_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_ONE_LAYER_PACK_TAG:-greenfield_one_layer_pack_${PLAN_SLUG}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 PACK_DIR=$RUN_DIR/packed
-REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/PP8_LP4/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/$PLAN_ID/$TAG
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing pack outside $BRANCH" >&2
@@ -41,7 +61,7 @@ flock -n 9 || {
 }
 
 say() {
-  echo "[one-layer-pack $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
+  echo "[one-layer-pack-$PLAN_SLUG $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
 }
 
 say "RUN_DIR=$RUN_DIR"
@@ -108,7 +128,9 @@ started=$(date +%s)
     --layer 3 \
     --expected-code-hash "$PIN" \
     --topology-hash "$TOPOLOGY_HASH" \
-    --plan-group-hash "$PP8_GROUP_HASH"
+    --plan-group-hash "$PLAN_GROUP_HASH" \
+    --plan-id "$PLAN_ID" \
+    --stage-size "$STAGE_SIZE"
 ) >"$RUN_DIR/pack.log" 2>&1
 elapsed=$(( $(date +%s) - started ))
 say "pack completed in ${elapsed}s"
@@ -157,8 +179,8 @@ gcloud storage cp --no-clobber "$PACK_DIR"/device_slot_*.safetensors \
   "$REMOTE_PREFIX/packed/" >/dev/null
 
 remote_files=$(gcloud storage ls "$REMOTE_PREFIX/packed/device_slot_*.safetensors" | wc -l)
-[[ $remote_files -eq 4 ]] || {
-  say "ABORT: remote artifact has $remote_files/4 device files"
+[[ $remote_files -eq $STAGE_SIZE ]] || {
+  say "ABORT: remote artifact has $remote_files/$STAGE_SIZE device files"
   exit 1
 }
 

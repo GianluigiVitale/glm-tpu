@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from dataclasses import replace
 
 import jax
 import jax.numpy as jnp
@@ -116,11 +117,15 @@ def test_router_ties_choose_lowest_expert_ids() -> None:
     )
 
 
-def _run_forced_cpu_case(concentrated: bool) -> None:
-    if len(jax.devices()) != 4:
-        raise AssertionError(f"expected four forced CPU devices, got {jax.devices()}")
-    contract = small_contract()
-    mesh = jax.make_mesh((4,), ("expert",), devices=np.asarray(jax.devices()))
+def _run_forced_cpu_case(concentrated: bool, stage_size: int = 4) -> None:
+    if len(jax.devices()) != stage_size:
+        raise AssertionError(
+            f"expected {stage_size} forced CPU devices, got {jax.devices()}"
+        )
+    contract = replace(small_contract(), stage_size=stage_size)
+    mesh = jax.make_mesh(
+        (stage_size,), ("expert",), devices=np.asarray(jax.devices())
+    )
     hidden = jnp.asarray(
         [[0.5, -0.25, 0.75, 1.0, -1.0, 0.125, 0.25, -0.5]],
         dtype=jnp.bfloat16,
@@ -177,7 +182,10 @@ def _run_forced_cpu_case(concentrated: bool) -> None:
         np.asarray(got, dtype=np.float32),
         np.asarray(expected, dtype=np.float32),
         rtol=0,
-        atol=2**-14,
+        # Two-way and four-way shared-intermediate reductions have different
+        # legal BF16 association. This narrow synthetic fixture differs by at
+        # most one/two local ULPs; the real protected tensor bars are unchanged.
+        atol=2**-13 if stage_size == 2 else 2**-14,
     )
 
     hlo = compiled.lower(*sharded_args).compile().as_text()
@@ -189,7 +197,10 @@ def _run_forced_cpu_case(concentrated: bool) -> None:
     ]
     assert len(collective_lines) == 1, "\n".join(collective_lines)
     assert "all-reduce(" in collective_lines[0]
-    assert "replica_groups={{0,1,2,3}}" in collective_lines[0]
+    expected_group = ",".join(str(rank) for rank in range(stage_size))
+    assert (
+        "replica_groups={{" + expected_group + "}}" in collective_lines[0]
+    )
     # CPU XLA promotes bfloat16 psum to f32; the protected TPU contract will
     # separately require bf16[2,1,6144]. The logical payload and group are
     # already fixed here.
@@ -218,6 +229,32 @@ def test_stage_local_exactness_and_hlo_in_forced_cpu_subprocess(
         "from tests.greenfield.kernels.test_reference_moe import "
         "_run_forced_cpu_case; import os; "
         "_run_forced_cpu_case(os.environ['GLM_GREENFIELD_MOE_CONCENTRATED']=='1')"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+@pytest.mark.parametrize("concentrated", [False, True])
+def test_pp16_stage_local_exactness_and_hlo_in_forced_cpu_subprocess(
+    concentrated: bool,
+) -> None:
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    existing = env.get("XLA_FLAGS", "").strip()
+    env["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=2".strip()
+    )
+    code = (
+        "from tests.greenfield.kernels.test_reference_moe import "
+        "_run_forced_cpu_case; "
+        f"_run_forced_cpu_case({concentrated!r}, 2)"
     )
     completed = subprocess.run(
         [sys.executable, "-c", code],

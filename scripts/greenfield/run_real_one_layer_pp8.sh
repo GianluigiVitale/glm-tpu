@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Protected real layer-3 PP8 correctness/HLO/HBM/latency/XPlane capture.
+# Protected real layer-3 PP8/PP16 correctness/HLO/HBM/latency/XPlane capture.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -9,18 +9,49 @@ readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly ORACLE_REPO=/home/gianl/tpu-inference
-readonly PACK_RUN=/home/gianl/glm-run/greenfield_one_layer_pack_20260805T151828912346032Z
 readonly ORACLE_RUN=/home/gianl/glm-run/greenfield_one_layer_oracle_20260805T162210370718434Z
 readonly TOPOLOGY_CAPTURE=/home/gianl/glm-run/greenfield_topology_20260805T125842425591441Z/topology.rank0.json
-readonly PACK_MANIFEST_SHA=68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938
 readonly ORACLE_MANIFEST_SHA=c63ffa19820d5c2c39865ac8611fb313ffc6ebcd2f893c3507745a356bfdebff
 readonly SOURCE_REVISION=gcs-object-set-830fd1bf7d8d6b6242895cfd50f5978e5cc5749da42246c19391855e586e9658
 readonly TOPOLOGY_HASH=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
 readonly PP8_GROUP_HASH=d5943ab8d7a074677d82f8e823c8bc983847f8df1deefdee1fbda8da98923c14
+readonly PP16_GROUP_HASH=6383e57c81478ac0d6de4525a4675f2a0d7cbc7aa73bd67bc662dc4e05840f21
+
+PLAN_ID=${GLM_GREENFIELD_REAL_LAYER_PLAN:-PP8_LP4}
+case "$PLAN_ID" in
+  PP8_LP4)
+    PLAN_SLUG=pp8
+    PACK_RUN=/home/gianl/glm-run/greenfield_one_layer_pack_20260805T151828912346032Z
+    PACK_MANIFEST_SHA=68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938
+    PLAN_GROUP_HASH=$PP8_GROUP_HASH
+    TPU_BOUNDS=2,2,1
+    TPU_VISIBLE=0,1,2,3
+    STAGE_ARGS=()
+    EXPECTED_TRACE_CORES=8
+    ;;
+  PP16_LP2)
+    PLAN_SLUG=pp16
+    : "${GLM_GREENFIELD_PP16_PACK_RUN:?set the protected PP16 pack run}"
+    : "${GLM_GREENFIELD_PP16_PACK_MANIFEST_SHA:?set the PP16 pack manifest hash}"
+    PACK_RUN=$GLM_GREENFIELD_PP16_PACK_RUN
+    PACK_MANIFEST_SHA=$GLM_GREENFIELD_PP16_PACK_MANIFEST_SHA
+    PLAN_GROUP_HASH=$PP16_GROUP_HASH
+    TPU_BOUNDS=2,1,1
+    TPU_VISIBLE=0,1
+    STAGE_ARGS=(--stage-id 10)
+    EXPECTED_TRACE_CORES=4
+    ;;
+  *)
+    echo "unsupported real-layer plan: $PLAN_ID" >&2
+    exit 2
+    ;;
+esac
+readonly PLAN_ID PLAN_SLUG PACK_RUN PACK_MANIFEST_SHA PLAN_GROUP_HASH
+readonly TPU_BOUNDS TPU_VISIBLE EXPECTED_TRACE_CORES
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_REAL_LAYER_TAG:-greenfield_real_layer_pp8_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_REAL_LAYER_TAG:-greenfield_real_layer_${PLAN_SLUG}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_REAL_LAYER_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_REAL_LAYER_ITERATIONS:-1000}
 RUN_DIR=/home/gianl/glm-run/$TAG
@@ -57,7 +88,7 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 mkdir -p "$RUN_DIR/hlo"
 
 say() {
-  echo "[real-layer-pp8 $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
+  echo "[real-layer-$PLAN_SLUG $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
 }
 
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
@@ -111,14 +142,14 @@ strict_census pre || {
   exit 1
 }
 
-say "running direct device-load and exact four-chip layer"
+say "running direct device-load and exact $PLAN_ID layer"
 started=$(date +%s)
 (
   cd "$WORKTREE"
   JAX_PLATFORMS=tpu \
-    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+    TPU_CHIPS_PER_PROCESS_BOUNDS="$TPU_BOUNDS" \
     TPU_PROCESS_BOUNDS=1,1,1 \
-    TPU_VISIBLE_DEVICES=0,1,2,3 \
+    TPU_VISIBLE_DEVICES="$TPU_VISIBLE" \
     PYTHONPATH="$WORKTREE" \
     /home/gianl/vllm-env/bin/python scripts/greenfield/run_real_one_layer.py \
       --artifact-dir "$PACK_RUN/packed" \
@@ -129,7 +160,9 @@ started=$(date +%s)
       --oracle-manifest-sha256 "$ORACLE_MANIFEST_SHA" \
       --source-revision "$SOURCE_REVISION" \
       --topology-sha256 "$TOPOLOGY_HASH" \
-      --plan-group-sha256 "$PP8_GROUP_HASH" \
+      --plan-group-sha256 "$PLAN_GROUP_HASH" \
+      --plan-id "$PLAN_ID" \
+      "${STAGE_ARGS[@]}" \
       --output "$RUN_DIR/runner.json" \
       --hlo-output "$RUN_DIR/hlo/layer.optimized_hlo.txt" \
       --trace-root "$RUN_DIR/trace" \
@@ -143,6 +176,7 @@ say "runner completed in ${elapsed}s"
 say "parsing XPlane, linking DB, and building independent summary"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$ORACLE_PIN" "$RESULTS_DB" "$WORKTREE" \
+  "$EXPECTED_TRACE_CORES" \
   "$ORACLE_REPO" <<'PY'
 from __future__ import annotations
 
@@ -151,9 +185,16 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, oracle_pin, db_path, repo, oracle_repo = sys.argv[1:]
+run_dir, pin, oracle_pin, db_path, repo, expected_trace_cores, oracle_repo = sys.argv[1:]
+expected_trace_cores = int(expected_trace_cores)
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
+plan_id = runner.get("plan_id")
+plan_slugs = {"PP8_LP4": "pp8", "PP16_LP2": "pp16"}
+if plan_id not in plan_slugs:
+    raise SystemExit(f"unsupported runner plan identity: {plan_id}")
+plan_slug = plan_slugs[plan_id]
+benchmark = f"greenfield_real_layer_{plan_slug}"
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("runner status/code identity failed")
 if not runner["hlo"]["contract"]["passed"]:
@@ -171,7 +212,7 @@ xplane = parse_xplane.aggregate_fleet(
 )
 if (
     xplane["n_files"] != 1
-    or xplane["n_cores"] != 8
+    or xplane["n_cores"] != expected_trace_cores
     or len(xplane["hosts"]) != 1
     or xplane["steps_per_core"] != 20
 ):
@@ -191,6 +232,16 @@ for name, values in collective_ops.items():
     identity = f"{name} {values.get('hlo_category', '')}".lower()
     if "all-reduce" not in identity and "all_reduce" not in identity:
         raise SystemExit(f"XPlane contains a non-all-reduce collective: {identity}")
+physical_counts = xplane["hlo_all_reduce_invocations_per_step"]
+if (
+    len(physical_counts) != expected_trace_cores * 20
+    or set(physical_counts) != {1}
+):
+    raise SystemExit(
+        "XPlane does not contain exactly one physical all-reduce on every "
+        f"selected core/step: count={len(physical_counts)} "
+        f"values={sorted(set(physical_counts))}"
+    )
 xplane["physical_collective_ops"] = collective_ops
 
 sys.path.insert(0, str(Path(repo) / "bench"))
@@ -202,7 +253,7 @@ run_id = pv.start_run(
     model="zai-org/GLM-5.2-FP8:greenfield-real-layer3",
     revision=runner["source_revision"],
     env={
-        "GLM_ENGINE": "greenfield_real_layer_pp8",
+        "GLM_ENGINE": benchmark,
         "greenfield_code_hash": pin,
         "legacy_oracle_code_hash": oracle_pin,
         "hlo_sha256": runner["hlo"]["sha256"],
@@ -211,7 +262,10 @@ run_id = pv.start_run(
         "plan_group_sha256": runner["plan_group_sha256"],
         "topology_sha256": runner["topology_sha256"],
     },
-    note="Protected exact real layer-3 PP8 normal/concentrated metal proof",
+    note=(
+        f"Protected exact real layer-3 {plan_id} "
+        "normal/concentrated metal proof"
+    ),
     harness_repo=repo,
     fork_repo=oracle_repo,
 )
@@ -221,9 +275,12 @@ for case in ("normal", "concentrated"):
     pv.record_item(
         conn,
         run_id,
-        benchmark="greenfield_real_layer_pp8",
+        benchmark=benchmark,
         item_id=case,
-        prompt="Execute one real batch-one GLM-5.2 layer-3 MoE on one PP8 stage.",
+        prompt=(
+            "Execute one real batch-one GLM-5.2 layer-3 MoE on one "
+            f"{plan_id} stage."
+        ),
         gold="Exact routes, bounded BF16 output, one local stacked all-reduce.",
         raw_output=json.dumps(
             {"correctness": correctness, "timing": timing["latency"]},
@@ -237,7 +294,7 @@ for case in ("normal", "concentrated"):
 pv.finalize(
     conn,
     run_id,
-    benchmark="greenfield_real_layer_pp8",
+    benchmark=benchmark,
     metric="contract_valid",
     value=1.0,
     note="Profiler-free p50 is per one real sparse layer, not token throughput.",
@@ -265,7 +322,7 @@ check = sqlite3.connect(run_dir / "results_ckpt.db").execute(
 ).fetchone()[0]
 if check != "ok":
     raise SystemExit(f"results DB snapshot integrity failed: {check}")
-print(f"REAL_LAYER_PP8_PROOF_VALID db_run={run_id}")
+print(f"REAL_LAYER_{plan_slug.upper()}_PROOF_VALID db_run={run_id}")
 PY
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR/summary.json" "$elapsed" <<'PY'
