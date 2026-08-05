@@ -18,6 +18,7 @@ LIVE_ROWS_PSUM="${E0_LIVE_ROWS_PSUM:-0}"
 MOE_PSUM_FUSION="${E0_MOE_PSUM_FUSION:-0}"
 DCP_DECODE_LIVE_ROWS="${E0_DSA_DCP_DECODE_LIVE_ROWS:-0}"
 MOE_DECODE_ALL_GATHER="${E0_MOE_DECODE_ALL_GATHER:-0}"
+MOE_DECODE_COMPUTE_LIVE_ROWS="${E0_MOE_DECODE_COMPUTE_LIVE_ROWS:-0}"
 TRACE_STEPS=20
 # E0 uses exact 2048-token prefill chunks and a 32-token decode bucket. Skip
 # the five unused intermediate AOT shapes; the per-try log gate proves this
@@ -63,6 +64,10 @@ case "$MOE_DECODE_ALL_GATHER" in
   0|1) ;;
   *) echo "E0_MOE_DECODE_ALL_GATHER must be 0 or 1" >&2; exit 2 ;;
 esac
+case "$MOE_DECODE_COMPUTE_LIVE_ROWS" in
+  0|1) ;;
+  *) echo "E0_MOE_DECODE_COMPUTE_LIVE_ROWS must be 0 or 1" >&2; exit 2 ;;
+esac
 if [ "$MOE_PSUM_FUSION" = 1 ] &&
     { [ "$ARM" != sparse ] || [ "$LIVE_ROWS_PSUM" != 1 ]; }; then
   echo "E0_MOE_PSUM_FUSION=1 is validated only for sparse + E0_LIVE_ROWS_PSUM=1" >&2
@@ -80,7 +85,13 @@ if [ "$MOE_DECODE_ALL_GATHER" = 1 ] &&
   echo "E0_MOE_DECODE_ALL_GATHER=1 requires sparse + the accepted psum stack" >&2
   exit 2
 fi
-EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM GLM_MOE_PSUM_FUSION=$MOE_PSUM_FUSION GLM_DSA_DCP_DECODE_LIVE_ROWS=$DCP_DECODE_LIVE_ROWS GLM_MOE_DECODE_ALL_GATHER=$MOE_DECODE_ALL_GATHER"
+if [ "$MOE_DECODE_COMPUTE_LIVE_ROWS" = 1 ] &&
+    { [ "$ARM" != sparse ] || [ "$LIVE_ROWS_PSUM" != 1 ] ||
+      [ "$MOE_PSUM_FUSION" != 1 ] || [ "$MOE_DECODE_ALL_GATHER" != 0 ]; }; then
+  echo "E0_MOE_DECODE_COMPUTE_LIVE_ROWS=1 requires sparse + the accepted psum stack and all-gather off" >&2
+  exit 2
+fi
+EXPERIMENT_ENV="GLM_DECODE_LIVE_ROWS_PSUM=$LIVE_ROWS_PSUM GLM_MOE_PSUM_FUSION=$MOE_PSUM_FUSION GLM_DSA_DCP_DECODE_LIVE_ROWS=$DCP_DECODE_LIVE_ROWS GLM_MOE_DECODE_ALL_GATHER=$MOE_DECODE_ALL_GATHER GLM_MOE_DECODE_COMPUTE_LIVE_ROWS=$MOE_DECODE_COMPUTE_LIVE_ROWS"
 # Exact PID matcher used by this installed Ray CLI's `ray stop`: import its
 # live RAY_PROCESSES corpus and apply the same name-vs-cmdline semantics. The
 # enumerator excludes itself/ancestors and the nonce-marked local gcloud
@@ -117,7 +128,7 @@ RENV="$RENV $EXPERIMENT_ENV"
 DEXTRA="$DEXTRA $EXPERIMENT_ENV"
 # Expanded only after injection into the remote command.
 # shellcheck disable=SC2016
-RAYLET_EXPERIMENT_CHECK='grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$env_file" && grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'" "$env_file" && grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$DCP_DECODE_LIVE_ROWS"'" "$env_file" && grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$MOE_DECODE_ALL_GATHER"'" "$env_file"'
+RAYLET_EXPERIMENT_CHECK='grep -qx "GLM_DECODE_LIVE_ROWS_PSUM='"$LIVE_ROWS_PSUM"'" "$env_file" && grep -qx "GLM_MOE_PSUM_FUSION='"$MOE_PSUM_FUSION"'" "$env_file" && grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$DCP_DECODE_LIVE_ROWS"'" "$env_file" && grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$MOE_DECODE_ALL_GATHER"'" "$env_file" && grep -qx "GLM_MOE_DECODE_COMPUTE_LIVE_ROWS='"$MOE_DECODE_COMPUTE_LIVE_ROWS"'" "$env_file"'
 DRIVER="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray \
 OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 \
 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn \
@@ -267,11 +278,12 @@ verify_raylet_envs() {
 validate_analysis() {
   "$HOME/vllm-env/bin/python" - "$1" "$ARM" "$LIVE_ROWS_PSUM" \
     "$MOE_PSUM_FUSION" "$MOE_DECODE_ALL_GATHER" \
+    "$MOE_DECODE_COMPUTE_LIVE_ROWS" \
     "$HOME/glm-tpu/scripts/analysis" <<'PY'
 import json
 import sys
 
-path, arm, live_rows, moe_fusion, moe_allgather, parser_dir = sys.argv[1:]
+path, arm, live_rows, moe_fusion, moe_allgather, moe_compute, parser_dir = sys.argv[1:]
 sys.path.insert(0, parser_dir)
 import parse_xplane
 
@@ -303,15 +315,16 @@ if arm == "sparse" and live_rows == "1" and moe_fusion == "1":
 print("ANALYSIS_VALID", arm, d["n_files"], d["n_cores"],
       d["steps_per_core"], "named_all_reduce", expected_named_all_reduce,
       "hlo_all_reduce", expected_hlo_all_reduce, "all_gather",
-      expected_all_gather)
+      expected_all_gather, "moe_compute", moe_compute)
 PY
 }
 
 mkdir -p "$RUN_DIR"
 if ! {
-  printf 'tag=%s\narm=%s\npin=%s\nharness=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ndcp_decode_live_rows=%s\nmoe_decode_all_gather=%s\ntrace_steps=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\ne0_preflight_min_free_gb=%s\noob_dir=%s\ngcs_run=%s\n' \
+  printf 'tag=%s\narm=%s\npin=%s\nharness=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ndcp_decode_live_rows=%s\nmoe_decode_all_gather=%s\nmoe_decode_compute_live_rows=%s\ntrace_steps=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\ne0_preflight_min_free_gb=%s\noob_dir=%s\ngcs_run=%s\n' \
     "$TAG" "$ARM" "$PIN" "$HARNESS_SHORT" "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" \
     "$DCP_DECODE_LIVE_ROWS" "$MOE_DECODE_ALL_GATHER" \
+    "$MOE_DECODE_COMPUTE_LIVE_ROWS" \
     "$TRACE_STEPS" "$E0_MIN_TOKEN_BUCKET" "$E0_COMPILATION_SIZES" \
     "$E0_PREFLIGHT_MIN_FREE_GB" "$OOB_DIR" "$GCS_RUN"
   printf 'raylet_envs=%s %s GLM_JAX_TRACE_DIR=<per-try-nonce> %s\ndriver_envs=%s\n' \
@@ -347,7 +360,7 @@ if ! "$HOME/vllm-env/bin/python" - "$HEALTH_RESULTS_DB" "$HEALTH_PROOF_LOG" \
     "$HEALTH_RAYLET_ENVS" \
     "$HEALTH_LINK" "$PIN" "$OOB_DIR" "$HEALTH_MAX_AGE_S" \
     "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" "$DCP_DECODE_LIVE_ROWS" \
-    "$MOE_DECODE_ALL_GATHER" <<'PY'
+    "$MOE_DECODE_ALL_GATHER" "$MOE_DECODE_COMPUTE_LIVE_ROWS" <<'PY'
 import datetime
 import json
 import pathlib
@@ -357,7 +370,7 @@ import sys
 
 (
     db, log_path, raylet_path, out, pin, oob, max_age, live_rows, moe_fusion,
-    dcp_decode_live_rows, moe_decode_all_gather,
+    dcp_decode_live_rows, moe_decode_all_gather, moe_decode_compute_live_rows,
 ) = sys.argv[1:]
 text = pathlib.Path(log_path).read_text(errors="replace")
 run_ids = {int(value) for value in re.findall(r"\[longctx\] run_id=(\d+)", text)}
@@ -399,6 +412,7 @@ expected = {
     "GLM_MOE_PSUM_FUSION": moe_fusion,
     "GLM_DSA_DCP_DECODE_LIVE_ROWS": dcp_decode_live_rows,
     "GLM_MOE_DECODE_ALL_GATHER": moe_decode_all_gather,
+    "GLM_MOE_DECODE_COMPUTE_LIVE_ROWS": moe_decode_compute_live_rows,
     "GLM_COMPILATION_SIZES": "32",
 }
 assert {key: os_env.get(key) for key in expected} == expected
@@ -413,7 +427,8 @@ suffix = (f"GLM_HEALTH_TAG={tag} GLM_WK_OOB_DIR={oob} "
           f"GLM_DECODE_LIVE_ROWS_PSUM={live_rows} "
           f"GLM_MOE_PSUM_FUSION={moe_fusion} "
           f"GLM_DSA_DCP_DECODE_LIVE_ROWS={dcp_decode_live_rows} "
-          f"GLM_MOE_DECODE_ALL_GATHER={moe_decode_all_gather}")
+          f"GLM_MOE_DECODE_ALL_GATHER={moe_decode_all_gather} "
+          f"GLM_MOE_DECODE_COMPUTE_LIVE_ROWS={moe_decode_compute_live_rows}")
 for line in raylet_lines:
     _, host, values = line.split(maxsplit=2)
     assert values == suffix, (values, suffix)
@@ -610,6 +625,19 @@ for try in 1 2 3 4 5 6; do
     say "try $try: MoE decode all-gather unexpectedly armed with gate=0"
   fi
 
+  MOE_COMPUTE_LOG_OK=0
+  if [ "$MOE_DECODE_COMPUTE_LIVE_ROWS" = 1 ]; then
+    if grep -q 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS armed' "$LOG"; then
+      MOE_COMPUTE_LOG_OK=1
+    else
+      say "try $try: MoE decode compute-row armed log missing"
+    fi
+  elif ! grep -q 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS armed' "$LOG"; then
+    MOE_COMPUTE_LOG_OK=1
+  else
+    say "try $try: MoE decode compute-row unexpectedly armed with gate=0"
+  fi
+
   COMPILE_BUCKETS=$RUN_DIR/compile_buckets_t${try}.txt
   BACKBONE_BUCKETS=$RUN_DIR/compile_backbone_buckets_t${try}.txt
   BUCKETS_OK=0
@@ -699,7 +727,8 @@ PY
   fi
 
   if grep -q 'DRIVER_EXIT=0' "$LOG" && grep -q 'manifest VERIFIED' "$LOG" &&
-      [ "$MOE_ALLGATHER_LOG_OK" -eq 1 ] && [ "$BUCKETS_OK" -eq 1 ] &&
+      [ "$MOE_ALLGATHER_LOG_OK" -eq 1 ] && [ "$MOE_COMPUTE_LOG_OK" -eq 1 ] &&
+      [ "$BUCKETS_OK" -eq 1 ] &&
       [ "$PARSE_OK" -eq 1 ]; then
     RUN_LINK=$RUN_DIR/run_link_t${try}.json
     if ! "$HOME/vllm-env/bin/python" - \
@@ -707,7 +736,7 @@ PY
       "$RUN_LINK" "$TAG" "$ARM" "$PIN" "$HARNESS_SHORT" \
       "$TRACE_REMOTE" "$TRY_START_EPOCH" "$try" "$LIVE_ROWS_PSUM" \
       "$MOE_PSUM_FUSION" "$DCP_DECODE_LIVE_ROWS" \
-      "$MOE_DECODE_ALL_GATHER" <<'PY'
+      "$MOE_DECODE_ALL_GATHER" "$MOE_DECODE_COMPUTE_LIVE_ROWS" <<'PY'
 import datetime
 import json
 import sqlite3
@@ -716,6 +745,7 @@ import sys
 (
     db, snapshot, out, tag, arm, pin, harness, trace_dir, started, attempt,
     live_rows, moe_fusion, dcp_decode_live_rows, moe_decode_all_gather,
+    moe_decode_compute_live_rows,
 ) = sys.argv[1:]
 src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 src.row_factory = sqlite3.Row
@@ -740,6 +770,7 @@ assert os_env["GLM_DECODE_LIVE_ROWS_PSUM"] == live_rows
 assert os_env["GLM_MOE_PSUM_FUSION"] == moe_fusion
 assert os_env["GLM_DSA_DCP_DECODE_LIVE_ROWS"] == dcp_decode_live_rows
 assert os_env["GLM_MOE_DECODE_ALL_GATHER"] == moe_decode_all_gather
+assert os_env["GLM_MOE_DECODE_COMPUTE_LIVE_ROWS"] == moe_decode_compute_live_rows
 assert os_env["GLM_COMPILATION_SIZES"] == "32"
 created = datetime.datetime.fromisoformat(run["created_utc"]).timestamp()
 assert created >= float(started) - 5, (created, started)

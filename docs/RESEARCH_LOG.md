@@ -4474,3 +4474,53 @@ fusion, and DCP live attention ON; both fix the performance-rejected all-gather 
 and tie-order dumps, raw two-token output, state manifest, write probes, distinct step fingerprints,
 archive, and authenticated cleanup are required. The inherited exactness watchdog now closes flock
 FD 9 and cleanup terminates its complete setsid process group. Syntax plus static guards pass 8/8.
+
+## 2026-08-05 06:32 — COMPUTE-ROW PRODUCTION EXACTNESS PASSES; SOURCE AUDIT DISAMBIGUATES THE 60 TOK/S CLAIM
+
+Protected exactness run `moe_compute_rows_exact_20260805T044718436789636Z` completed at fork
+`b3c25df47` with the same harness pin `020e1e9` in both arms. The DCP8 production-shaped arms fixed
+the accepted live-row psum, MoE fusion, and DCP live-attention gates ON, fixed the rejected MoE
+all-gather OFF, and varied only `GLM_MOE_DECODE_COMPUTE_LIVE_ROWS=0 -> 1`. DB 398 and 399 both
+generated the exact raw prefix `" 49"` from the same 4,080-token prompt. The differ aligned 129 DSA
+selection events over 4,081 live rows and found zero diff events, tripwire rows, replication
+violations, or pad-row differences: selected set and tie order are elementwise exact.
+
+The ON gate armed on all eight hosts with `routed MoE rows 32 -> 2 (max live 1)`. Production HLO is
+not a gate-off alias: step instructions changed from 100,839 initial / 127,851 optimizing to 101,198
+/ 128,167, and the executable fingerprints are distinct (`c8aab389...` OFF versus `5c337f40...`
+ON). Both arms passed the 2,455-leaf state manifest, clean pin/env checks, real donated-cache write
+probes, evidence SHA-256, positively owned Ray cleanup, and an eight-host `CENSUS_OK` post-stop.
+Local and remote `SUCCESS` exist at
+`gs://driftbench-dsv4-uc/results/moe_compute_rows_exact_20260805T044718436789636Z`. This proves
+semantic correctness, not throughput. The health/E0 harness now propagates and validates the gate
+through raylets, driver provenance, logs, DB linkage, and protected capture analysis; health then a
+fresh 256K trace are the next metal actions.
+
+The primary-source performance comparison was tightened before setting the ceiling target:
+
+- Google documents TPU v4 as 32 GiB HBM per chip with 1,200 GB/s HBM bandwidth and a 3D mesh; v4-64
+  is 32 distributed chips in a 2x4x4 topology. This explains how the 753B FP8 model fits by sharding,
+  while disproving the idea that the aggregate 1 TiB behaves as coherent local RAM:
+  https://docs.cloud.google.com/tpu/docs/v4
+- Pope et al. report PaLM-540B at 28.5 ms/decode step on 64 v4 chips with int8 weights, batch 64,
+  2K context, and a 2D weight-stationary layout. Their analysis says 2D partitioning becomes best
+  beyond 16 chips, batch 64 materially raises decode utilization, communication/compute overlap
+  gave 1.4x over the simple compiler strategy, and parallel attention/FFN removes one reduction per
+  layer. This is strong evidence for a multi-axis 4x8 redesign, not a batch-1 GLM speed prediction:
+  https://proceedings.mlsys.org/paper_files/paper/2023/file/c4be71ab8d24cdfb45e3d06dbfca2780-Paper-mlsys2023.pdf
+- vLLM PR #46635's quoted `~60 tok/s` benchmark used 128 concurrent prompts, 8,192 input tokens,
+  exactly one output token per prompt, and reports aggregate output throughput. With only one output,
+  TPOT/ITL is absent; it is not a single-stream answer-speed result:
+  https://github.com/vllm-project/vllm/pull/46635
+- Current vLLM TPU support calls v4 experimental and leaves the local stack's decisive multi-host
+  TP/EP, CP/SP, MLA, and fused-MoE combinations unvalidated. The active GLM-5.2 sprint separately
+  targets MoE reduce-scatter and sequence parallelism, corroborating the local 75-combine diagnosis
+  without proving a local speedup:
+  https://docs.vllm.ai/projects/tpu/en/stable/recommended_models_features/
+  and https://github.com/vllm-project/vllm/issues/46654
+
+Therefore 20 tok/s remains physically plausible only after removing the measured synchronization
+depth with structural sharding; 50 tok/s is more credible as effective throughput after correct MTP
+than as current batch-1 base decode, and 100 tok/s at 256K has no supporting local or published
+evidence. The present accepted answer speed remains 3.476 device tok/s / about 3.3 steady wall until
+the compute-row E0 produces protected contrary evidence.

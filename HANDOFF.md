@@ -1,6 +1,6 @@
 # HANDOFF — GLM-5.2-FP8 on TPU v4
 
-**Updated:** 2026-08-05 04:46 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
+**Updated:** 2026-08-05 06:32 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
 `PLAN.md`, `docs/suggestions.md`, and the relevant recent entries in `docs/RESEARCH_LOG.md`.
 
 ## Project goal — do not narrow it
@@ -87,13 +87,17 @@ roughly 25.1 GiB of non-routed state across the eight DCP ranks, adding about 5.
 exhausting the KV/overlay margin. The ceiling layout must genuinely tile weights in two dimensions
 over the 4×8 mesh while separating feature/tensor work from context/expert communication.
 
-TPU v4 is not intrinsically limited to this speed. Published PaLM-540B reached 28.5 ms/token on 64
-v4 chips using batch 64, 2K context, int8 weights, and a decode-specific 2D weight-stationary
-layout. That is not comparable to this batch-1/32-chip/256K run. Official vLLM TPU currently marks
-v4 experimental; its support matrix leaves multi-host TP/EP, CP/SP, MLA, and fused MoE unvalidated.
-The current upstream GLM-5.2 performance sprint independently targets replacing MoE all-reduce with
-reduce-scatter plus sequence parallelism. That corroborates this trace diagnosis and the all-gather/
-feature-sharding direction, but it is not evidence that the local candidate is fast or exact.
+TPU v4 is not intrinsically limited to this speed. Pope et al. report PaLM-540B at 28.5 ms/decode
+step on 64 v4 chips using batch 64, 2K context, int8 weights, and a decode-specific 2D
+weight-stationary layout. Their layout analysis and batch-64 utilization result are not comparable
+to this batch-1/32-chip/256K run, but they directly support the planned 4x8 multi-axis redesign.
+The widely quoted GLM-5.2 vLLM `~60 tok/s` result is also not answer speed: its disclosed command
+used 128 concurrent prompts with 8,192 input tokens and exactly one output token, so 60 tok/s is
+aggregate output throughput and TPOT/ITL is undefined. Official vLLM TPU currently marks v4
+experimental; its support matrix leaves multi-host TP/EP, CP/SP, MLA, and fused MoE unvalidated.
+The current upstream GLM-5.2 sprint independently targets MoE reduce-scatter plus sequence
+parallelism. Those sources corroborate the structural direction, but only local protected device
+and steady-wall measurements can establish this model's single-stream ceiling.
 
 ## Latest completed proof — pod released
 
@@ -134,6 +138,29 @@ Protected MoE decode all-gather exactness A/B:
   `gs://driftbench-dsv4-uc/results/moe_allgather_exact_20260805T002126894390635Z`.
 
 Exactness is accepted, but the performance trace below rejects this implementation.
+
+## Latest compute-row exactness — accepted; pod released
+
+Protected same-pin MoE compute-row OFF/ON exactness completed successfully:
+
+- Run `/home/gianl/glm-run/moe_compute_rows_exact_20260805T044718436789636Z`; DB 398 OFF / 399 ON;
+  fork `b3c25df47`, identical harness launch pin `020e1e9`, production DCP8, 4,080-token prompt,
+  two generated tokens.
+- Accepted psum, MoE fusion, and DCP live-attention gates were fixed ON; rejected all-gather was
+  fixed OFF; only `GLM_MOE_DECODE_COMPUTE_LIVE_ROWS` changed 0 -> 1.
+- Both arms generated the exact raw prefix `" 49"`. The strict differ compared 129 aligned events
+  over 4,081 live rows with zero selected-set, tie-order, tripwire, replication, or pad-row diffs.
+- ON armed on all eight hosts with routed token rows `32 -> 2` (max live one). Production step HLO
+  changed from 100,839/127,851 to 101,198/128,167 initial/optimizing instructions, and the executable
+  fingerprint changed from `c8aab389...` to `5c337f40...`, proving the candidate program executed.
+- Both arms passed the 2,455-leaf state manifest, real donated-cache write probes, exact env/code
+  census, evidence hashes, authenticated cleanup, and eight-host zero-work post-stop census.
+  Local and remote `SUCCESS` exist at
+  `gs://driftbench-dsv4-uc/results/moe_compute_rows_exact_20260805T044718436789636Z`.
+
+This accepts semantic correctness only. Protected health and a fresh 256K trace must now prove
+whether the intended routed GMM row reduction (`256 -> 16`) survives production lowering and saves
+device plus steady-wall time.
 
 ## Latest health and recovered E0 — pod released; all-gather rejected
 
@@ -178,15 +205,11 @@ No TPU workflow is active. Always rerun the strict eight-host census before laun
 
 ## Exact next sequence
 
-1. Run protected same-pin OFF/ON exactness at production DCP8 on corrected branch `b3c25df47`,
-   varying only
-   `GLM_MOE_DECODE_COMPUTE_LIVE_ROWS`; require exact raw tokens, selected set/tie order, state, and
-   write probes. Pre-metal evidence is complete: focused forced-four-CPU tests pass 13/13, env tests
-   pass 17/17, gate-off Jaxpr matches the legacy entrypoint, the candidate traces token rows
-   `32 -> 2` and routed GMM rows `256 -> 16`, and reduced StableHLO contains the distinct narrow/full
-   conditional plus zero-padding restoration.
-2. If exact, run protected health and a fresh 256K E0. Accept only a real device plus profiler-free
-   steady-wall gain. If it wins, run the four-depth 128K smoke before the next lever.
+1. Run protected health on corrected branch `b3c25df47` with compute-row ON and all-gather OFF, then
+   a fresh 256K E0. Accept only exact health plus a real device and profiler-free steady-wall gain;
+   parse the routed GMM row shapes and preserve the physical 157 named reductions / 391 reductions /
+   470 all-gathers contract.
+2. If E0 wins materially, run the four-depth 128K smoke before promoting the lever.
 3. Then validate scorer-row narrowing and the lower-value DCP-LSE candidate through the same ladder.
 4. For the higher ceiling, implement end-to-end 4x8 tensor/expert feature sharding: model-sharded
    residual and RMSNorm, subgroup attention projections, and expert-by-feature MoE. Then repair the
@@ -201,7 +224,8 @@ No TPU workflow is active. Always rerun the strict eight-host census before laun
 - MoE compute rows: `/home/gianl/tpu-inference-moe-compute-live-corrected`, corrected pin
   `b3c25df47`, pushed atop `aa608543b`; all-gather remains default-off. Focused forced-four-CPU
   evidence passes 13/13 plus env 17/17; Jaxpr and reduced StableHLO confirm the intended narrow/full
-  specialization and restoration. Protected metal exactness is next.
+  specialization and restoration. Protected production DCP8 exactness is accepted as DB 398/399;
+  health and E0 are next.
 - Scorer live rows: `ebf12e8e4`; CPU DCP 32/32. Needs corrected-parent transplant later.
 - DCP LSE all-gather: `422e9e31f`; CPU DCP 30/30 plus DCP2/4/8 stress. Lower priority.
 - 2D f32 reduction prerequisite: `/home/gianl/tpu-inference-decode-2d-f32`, `dab2db7b3`, clean and

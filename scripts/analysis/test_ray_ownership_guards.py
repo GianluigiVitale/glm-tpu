@@ -117,3 +117,15 @@ def test_compute_rows_exactness_selector_is_single_variable() -> None:
         'moe_compute_gate = side_gate if exact_lever == "moe_compute_rows" else "0"'
         in shared
     )
+
+
+def test_compute_rows_gate_reaches_health_and_e0_provenance() -> None:
+    for path in (
+        "scripts/resume_health_proof.sh",
+        "scripts/e0_capture_arm.sh",
+    ):
+        text = (ROOT / path).read_text()
+        assert 'MOE_DECODE_COMPUTE_LIVE_ROWS="${E0_MOE_DECODE_COMPUTE_LIVE_ROWS:-0}"' in text
+        assert 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS=$MOE_DECODE_COMPUTE_LIVE_ROWS' in text
+        assert 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS armed' in text
+        assert '"GLM_MOE_DECODE_COMPUTE_LIVE_ROWS": moe_decode_compute_live_rows' in text
