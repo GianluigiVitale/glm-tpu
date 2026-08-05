@@ -1,6 +1,6 @@
 # HANDOFF — GLM-5.2-FP8 on TPU v4
 
-**Updated:** 2026-08-05 00:20 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
+**Updated:** 2026-08-05 00:23 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
 `PLAN.md`, `docs/suggestions.md`, and the relevant recent entries in `docs/RESEARCH_LOG.md`.
 
 ## Project goal — do not narrow it
@@ -99,7 +99,23 @@ hosts. DB 393 is 4/4 correct: d=0.0 `705269`, d=0.05 `824794`, d=0.95 `289958`, 
 `891482`; all four rows have 127,363 prompt tokens and 20 generated tokens. The DB snapshot passed
 integrity check, authenticated cleanup ended with eight `CENSUS_OK` hosts, and local plus remote
 `SUCCESS` are present at `gs://driftbench-dsv4-uc/results/lever_smoke128k_20260804T224754220401229Z`.
-No TPU workflow is active.
+That proof closed with the pod at zero work before the exactness A/B below began.
+
+## Sole active TPU workflow — do not launch another
+
+Protected MoE decode all-gather exactness A/B:
+
+- Run `/home/gianl/glm-run/moe_allgather_exact_20260805T002126894390635Z`
+- Launcher `/home/gianl/glm-run/moe_allgather_exact_launcher_20260805T0021Z.log`
+- Outer PID 4097862; corrected pin `aa608543b`; harness launch pin `70f684a`
+- Production-shape DCP8, 4,096-token prompt, two generated tokens; accepted live-row psum,
+  MoE fusion, and DCP live-attention gates fixed on in both arms
+- OFF is active with `GLM_MOE_DECODE_ALL_GATHER=0`; ON will vary only that gate
+
+The fresh zero-work census, eight-host pin census, disk check, raylet env census, and OFF code
+fingerprints passed. Do not launch another TPU job. Require exact raw tokens, DSA selected-set and
+tie-order identity, state/write protection, authenticated cleanup, `SUCCESS`, and allowed-bucket
+archive before advancing to health/E0.
 
 ## Exact next sequence
 
