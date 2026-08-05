@@ -15,3 +15,7 @@ class TopologyValidationError(GreenfieldConfigError):
 
 class PlanValidationError(GreenfieldConfigError):
     """An execution plan violates an explicit layout invariant."""
+
+
+class HloContractViolationError(RuntimeError):
+    """Lowered HLO violates an explicit physical execution contract."""
