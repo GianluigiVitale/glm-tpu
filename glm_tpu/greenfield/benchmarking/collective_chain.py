@@ -360,7 +360,10 @@ def _chain_function(config: CollectiveChainConfig) -> Any:
                 ) / jnp.asarray(256.0, initial.dtype)
 
             if config.kind is CollectiveKind.FUSED_TUPLE_ALL_REDUCE:
-                auxiliary = state.astype(jnp.float32) * jnp.asarray(0.5, jnp.float32)
+                # Keep both tuple leaves at the payload dtype.  TPU v4 splits
+                # mixed bf16/f32 tuple reductions into two physical
+                # all-reduces, which is not the fused operation being tested.
+                auxiliary = state * jnp.asarray(0.5, state.dtype)
                 for iteration in range(config.chain_length):
                     state, auxiliary = lax.psum((state, auxiliary), "member")
                     primary_anchor = state.reshape(-1)[
@@ -368,7 +371,7 @@ def _chain_function(config: CollectiveChainConfig) -> Any:
                     ].astype(jnp.float32)
                     auxiliary_anchor = auxiliary.reshape(-1)[
                         (iteration + 1) % auxiliary.size
-                    ]
+                    ].astype(jnp.float32)
                     cross = primary_anchor + auxiliary_anchor
                     feedback = cross / (jnp.asarray(1.0) + jnp.abs(cross))
                     feedback += member.astype(jnp.float32) / jnp.asarray(256.0)
