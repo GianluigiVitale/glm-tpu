@@ -14,6 +14,7 @@ from .attention import (
     sparse_mla_attention,
     stage_local_sparse_mla_reference,
 )
+from .fp8 import dequantize_fp8_bits_block_weight, fp8_e4m3fn_lookup
 from .dsa import (
     DsaNumericalContract,
     SelectedPositions,
@@ -68,6 +69,8 @@ __all__ = (
     "apply_rotary",
     "canonicalize_selected_positions",
     "combine_stage_local_attention",
+    "dequantize_fp8_bits_block_weight",
+    "fp8_e4m3fn_lookup",
     "dequantize_fp8_block_weight",
     "dense_swiglu",
     "distributed_exact_topk_reference",
