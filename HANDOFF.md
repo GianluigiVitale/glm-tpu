@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 16:24 UTC
+**Updated:** 2026-08-05 17:02 UTC
 
 ## Authority and isolation
 
@@ -43,8 +43,21 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   legacy/vLLM source hashes. Normal routes `[161,217,206,240,186,180,37,81]` span all four PP8
   slots; the adversarial routes are all experts 128–135 on slot 2. Manifest `c63ffa19...ebff`,
   274,944-byte safetensor SHA `4aa7910b...784b`, and local/remote `SUCCESS` pass at `27ebdec`.
-- Greenfield tests last passed 69/69. No real layer TPU execution, checkpoint loader, decoder,
-  serving path, or greenfield model-throughput result exists yet.
+- Direct PP8 loader validates every packed identity/hash, maps captured physical stage slots to the
+  isolated runtime subcube, transfers 56 already-owned shards, and performs all 24 FP8 lookup/scale
+  conversions on device. It performs zero host FP8 dequantizations and zero host global concats.
+- Protected PP8 layer-3 metal proof DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z`
+  passed both oracle cases at code `db19893`. Normal/concentrated p50 wall is `0.696215/1.134090 ms`
+  over 1,000 profiler-free samples after 200 warmups. Routes are elementwise exact; both output
+  comparisons have max `0.03125`, p99 `0.01171875`, and mean below `0.00236` BF16 absolute error.
+  Optimized HLO SHA `950b5eb2...977d` contains exactly one
+  `bf16[2,1,6144]` all-reduce over `{{0,1,2,3}}` and no other collective. HBM after timing is
+  `4,860,038,656` bytes/chip with `5,639,681,536` measured peak against `33,014,413,312` available.
+  A fresh 20-step/8-core XPlane observes exactly one physical `psum` per step. All hashes, DB
+  integrity, approved archive, remote `SUCCESS`, and authenticated 8/8 post-census pass.
+- Greenfield tests last passed 79/79. The PP8 exact sparse-layer prerequisite is proven. PP16,
+  representative dense/DSA/IndexShare layers, full checkpoint/decoder, serving, and genuine token
+  throughput remain unimplemented.
 
 ## Protected evidence
 
@@ -76,6 +89,15 @@ Trace DB 416 / `greenfield_transport_trace_20260805T143832942547470Z` passed at 
   forbidden collective count is zero. Trace-contaminated timing is excluded from latency claims.
 - Archive, hashes, DB snapshot, authenticated pre/post zero census, and remote `SUCCESS` pass.
 
+Real layer DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z` passed at `db19893`:
+
+- The loader consumes the bounded final-ownership PP8 pack directly; no host dequant/global concat.
+- Normal p50/p90/p95/p99 is `0.696215/0.716489/0.722115/0.742864 ms`; concentrated is
+  `1.134090/1.155466/1.163958/1.195100 ms`. These are profiler-free one-layer wall distributions,
+  not token throughput. The concentrated distribution has one retained `40.141 ms` host outlier.
+- Exact routes, bounded tensor comparison, one local four-rank HLO collective, per-chip HBM, a fresh
+  post-timing XPlane, append-only DB/archive, checksums, and 8/8 clean pre/post census all pass.
+
 Rejected diagnostic `...T143608529930365Z` has no DB/status claim: valid distinct rank traces were
 downloaded into worker-0's original local trace tree, causing a duplicate-host parser refusal. The
 fixed proof uses an isolated canonical fleet directory; it did not reinterpret the failed result.
@@ -90,10 +112,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Run the exact real layer on one four-chip PP8 stage: normal routing and adversarial eight experts
-   on one chip, bounded tensor comparison, exact `bf16[2,1,6144]` four-rank HLO, HBM/latency,
-   DB/archive, and authenticated fleet cleanup.
-2. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
+1. Implement and protect the mandatory PP16 two-chip form against the same real pack/source and
+   independent oracle. It must own 128 complete experts/chip, split the shared intermediate
+   1024/chip, emit exactly one `bf16[2,1,6144]` two-rank combine, and pass the same correctness,
+   HBM, wall, XPlane, DB/archive, and cleanup contract.
+2. Adjudicate the exact PP8/PP16 one-layer evidence without treating either as token speed.
 3. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
    topology, transport, and exact topology-local MoE prerequisites all pass.
 

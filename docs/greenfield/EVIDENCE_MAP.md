@@ -20,6 +20,7 @@ fleet agreement, and eight-host clean pre/post census.
 | 414 | `greenfield_collectives_20260805T141333601664455Z` | `int32[1,2048]` routing-metadata five-operation matrix |
 | 415 | `greenfield_transport_20260805T142953361259007Z` | PP8/PP16 four-payload transport distributions and exact HLO |
 | 416 | `greenfield_transport_trace_20260805T143832942547470Z` | fresh PP8/PP16 8-file/64-core/20-step XPlane proof |
+| 417 | `greenfield_real_layer_pp8_20260805T165737737514245Z` | exact real layer-3 PP8 correctness/HLO/HBM/wall/XPlane proof |
 
 Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
 `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
@@ -51,6 +52,22 @@ pack, never constructs a model, and records accepted legacy/vLLM file hashes. No
 the 274,944-byte safetensor SHA-256 is `4aa7910b...784b`; local/remote `SUCCESS` exist. This is not
 TPU performance evidence.
 
+## Protected exact PP8 real layer
+
+DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z` is the first real checkpoint-backed
+greenfield TPU layer result. At exact code `db19893aa8241cc3559f1f174400f9094b69fc78`, the direct
+loader verifies pack/oracle/source identities, transfers final-owner shards, and dequantizes on
+device with no host FP8 dequantization or global tensor concatenation. Normal and adversarial
+concentrated routing are exact. Output max/p99 error is `0.03125/0.01171875` in both cases.
+
+Profiler-free p50 over 1,000 samples is `0.696215 ms` normal and `1.134090 ms` concentrated. HLO SHA
+`950b5eb2eaccf64341cb2d90e749365795c3f5cba2aee10cae929c1a1866977d` has exactly one local
+`bf16[2,1,6144]` four-rank all-reduce and no other collective. Peak HBM is `5,639,681,536` bytes on
+every participating chip. A fresh post-timing XPlane has 20 steps on all eight TPU cores and one
+physical `psum` per step. Evidence hashes, DB snapshot/integrity, same-tag approved archive,
+local/remote `SUCCESS`, and eight-host pre/post clean census pass. This proves the PP8 real sparse
+layer prerequisite only; it is not a full Gate-C pass and is not model token throughput.
+
 ## Reusable tools, not execution dependencies
 
 - Optimized-HLO contract: `glm_tpu/greenfield/sharding/hlo_contract.py` and
@@ -72,5 +89,5 @@ TPU performance evidence.
 
 Accepted legacy parent: `287.666063 ms/device token`, `3.476` device tok/s, about `3.3` wall tok/s.
 Its 75 sequential physical 32-chip MoE combine regions cost `106.495 ms/token`. The greenfield
-collective floor shows this is not raw 12 KiB ICI latency, but no greenfield token-speed result
-exists yet.
+collective floor and PP8 real layer show this is not a raw 12 KiB ICI or sparse-layer compute floor,
+but no greenfield full-decoder token-speed result exists yet.

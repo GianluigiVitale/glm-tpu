@@ -1,7 +1,36 @@
 # Greenfield performance and mechanism log
 
-No greenfield model-performance measurement exists yet. Results below are protected synthetic TPU
-mechanism measurements; they do not report token speed.
+No greenfield full-decoder model-performance measurement exists yet. The real-layer result below is
+checkpoint-backed model compute; all other results are protected synthetic TPU mechanisms. None
+reports token speed.
+
+## 2026-08-05 — protected exact PP8 real sparse layer
+
+DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z` executes real GLM layer-3 FP8 MoE
+weights on one isolated physical four-chip PP8 stage at code `db19893aa...fc78`. The direct loader
+verifies the bounded pack and oracle identities, sends only final-owner shards, performs 24 device
+dequantizations, and performs zero host FP8 dequantizations or global tensor concatenations.
+
+Profiler-free wall after 200 warmups, 1,000 samples/case:
+
+| case | p50 | p90 | p95 | p99 | mean | max |
+|---|---:|---:|---:|---:|---:|---:|
+| normal, routes span all 4 chips | 0.696215 | 0.716489 | 0.722115 | 0.742864 | 0.697678 | 1.527490 ms |
+| all 8 routes on one chip | 1.134090 | 1.155466 | 1.163958 | 1.195100 | 1.177258 | 40.141347 ms |
+
+The retained concentrated maximum is one host-wall outlier; p50–p99 remain tight. Exact route IDs
+pass. Both cases have output max/p99 error `0.03125/0.01171875`; means are `0.002329/0.002352`, well
+inside the documented BF16 reduction-association contract.
+
+Optimized HLO contains exactly one `bf16[2,1,6144]` all-reduce over `{{0,1,2,3}}`, no other
+collective, and no `[32,6144]` tensor. Measured peak HBM is `5.640 GB/chip` and post-timing live HBM
+is `4.860 GB/chip` versus `33.014 GB` available. The separate fresh 20-step XPlane, collected only
+after wall timing, reports one physical `psum`/step, `0.579 ms` mean device step, and `0.325 ms` in
+the collective. All evidence hashes, DB 417 integrity, approved archive, and 8/8 cleanup pass.
+
+This establishes that real topology-local sparse-layer compute is sub-millisecond in the normal
+case and that the legacy `2.7–3.3 tok/s` result is not an inherent per-layer TPU floor. It does not
+predict or claim 78-layer latency, 256K attention latency, serving wall rate, or token throughput.
 
 ## 2026-08-05 — protected PP8/PP16 device-resident transport
 

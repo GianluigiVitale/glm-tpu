@@ -24,8 +24,10 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
 - PP8 ownership: experts 0–63, 64–127, 128–191, and 192–255 are complete on
   the four respective stage chips. The shared intermediate dimension is
   split 512 ways per chip.
+- PP16 ownership: experts 0–127 and 128–255 are complete on the two respective
+  stage chips. The shared intermediate dimension is split 1024 ways per chip.
 - Combine: local routed and shared partials are stacked as independent value
-  domains, reduced once over exactly the four-chip stage, split, then routed
+  domains, reduced once over exactly the plan's two- or four-chip stage, split, then routed
   output is multiplied by BF16 2.5 and added to the shared output. The live
   decode shape is exactly `[1,6144]`.
 
@@ -41,3 +43,7 @@ per-expert BF16 outputs, routed/shared decompositions, and final BF16 output for
 routing and an all-eight-on-one-chip adversary. Its source revision and accepted legacy/vLLM source
 file hashes are part of the manifest. Real TPU layer output uses bounded tensor comparison because
 the topology rewrite intentionally changes reduction association; route ids remain exact.
+
+Protected PP8 DB 417 passes this contract. Normal and single-chip-concentrated route ids are exact;
+both final-output comparisons have max absolute error `0.03125`, p99 `0.01171875`, and mean below
+`0.00236`. The same oracle and tolerances bind the mandatory PP16 challenger.

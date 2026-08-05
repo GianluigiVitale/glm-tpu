@@ -34,3 +34,9 @@ bytes; the increase is the declared replication of the router weight and bias.
 All four files are 2,429,096,640 bytes. Manifest SHA-256 is
 `68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938`.
 The approved-bucket artifact has a remote `SUCCESS` marker.
+
+The direct PP8 one-layer loader at protected DB 417 validates every packed file and tensor identity,
+maps captured physical slots to the isolated four-chip runtime subcube, transfers 56 final-owner
+arrays, and performs 24 FP8 table/scale conversions on device. It records zero host FP8
+dequantizations, zero host global concatenations, and peak host/device memory. This validates the
+bounded PP8 load mechanism only; the complete plan-aware Gate-B format remains pending.

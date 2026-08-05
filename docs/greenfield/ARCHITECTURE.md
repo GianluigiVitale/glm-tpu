@@ -57,7 +57,7 @@ fresh 64-core XPlanes prove exact 8/16 operations and no other collective, host/
 dispatch, or model-equivalent compute. For `bf16[1,6144]`, the whole ring is `0.030 ms` PP8 and
 `0.076 ms` PP16 above matched control at fleet-max p50.
 
-## Still unimplemented
+## Exact sparse-layer implementation
 
 An independent exactness-first batch-one MoE reference now exists under
 `kernels/reference/moe.py`. It pins FP8 block dequantization, FP32 sigmoid/noaux_tc routing,
@@ -65,8 +65,8 @@ correction-bias selection-only semantics, lowest-expert-id ties, top-8 normaliza
 ownership, shared-expert sharding, and post-reduction routed scale. Forced four-device CPU tests
 prove distributed and adversarial single-chip expert concentration against the unsharded fallback.
 The optimized CPU HLO has one four-rank stacked routed/shared all-reduce and no other collective.
-CPU XLA promotes that reduction to f32; protected TPU HLO must instead prove the required
-`bf16[2,1,6144]` physical payload.
+Protected PP8 DB 417 now proves the required `bf16[2,1,6144]` physical payload, exact four-rank
+group, no other collective, real checkpoint load, exact routes, bounded tensors, and per-chip HBM.
 
 A versioned one-layer-only packer now validates the exact layer-3 source leaf set and writes final
 PP8 identity ownership with byte/hash reconciliation. Its tiny-fixture tests pass and real source
@@ -78,14 +78,15 @@ bias-forced all-eight-on-slot-2 case. It records decomposed expert, routed, shar
 plus exact source/legacy hashes without importing greenfield JAX, packed weights, a model class, or
 legacy execution.
 
-No real layer TPU execution, full checkpoint packer/loader, decoder, or serving path exists yet.
+No PP16 real-layer proof, full checkpoint packer/loader, decoder, or serving path exists yet.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
 the numerical contract uses bf16/f32 for those paths. The matrices show that 75 full-pod
 all-reduces have a `3.941 ms` fleet-max
 p50 and 75 full-ring nearest-neighbor permutes `0.791 ms`, versus `106.495 ms/token` attributed to
-the legacy MoE combine region. This isolates legacy arrival/layout/barrier behavior rather than raw
-small-payload ICI as the dominant loss. It is mechanism evidence, not model throughput. The next
-prerequisite remains one exact real topology-local MoE layer—not a full-model port. The immediate
-work is a one-layer-only checkpoint/capture artifact; it must not load the complete model.
+the legacy MoE combine region. PP8 DB 417 additionally measures the exact normal real sparse layer
+at `0.696 ms` p50 and a single-chip-concentrated adversary at `1.134 ms` p50. This isolates legacy
+arrival/layout/barrier behavior rather than raw small-payload ICI or local sparse compute as the
+dominant loss. It is one-layer evidence, not token throughput. The immediate prerequisite is the
+mandatory two-chip PP16 version against the same oracle; the complete model remains prohibited.
