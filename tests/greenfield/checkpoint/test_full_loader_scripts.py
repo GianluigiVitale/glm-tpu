@@ -43,8 +43,12 @@ def test_fleet_runner_probes_then_covers_and_cleans_all_hosts() -> None:
         "loaded_files != {plan.filename for plan in base_plans}",
         "results_db_run_id",
         "remote_success",
+        "sealing append-only evidence",
+        "sha256sum -c evidence.sha256",
     ):
         assert required in source
+    assert 'say "SUCCESS DB=' not in source
+    assert "Do not append to any sealed evidence file" in source
     completed = subprocess.run(
         ["bash", "-n", str(FLEET_RUNNER)],
         text=True,

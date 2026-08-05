@@ -435,6 +435,11 @@ print(
 )
 PY
 
+db_id=$(/home/gianl/vllm-env/bin/python -c \
+  'import json,sys; print(json.load(open(sys.argv[1]))["results_db_run_id"])' \
+  "$RUN_DIR/summary.json")
+say "VALIDATED DB=$db_id; sealing append-only evidence"
+
 (cd "$RUN_DIR" && find probe host_records -type f -print0 | sort -z | \
   xargs -0 sha256sum >evidence.sha256)
 sha256sum "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db" \
@@ -442,6 +447,7 @@ sha256sum "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db" \
   "$RUN_DIR/load.txt" "$RUN_DIR/census_pre.txt" \
   "$RUN_DIR/census_post_probe.txt" "$RUN_DIR/census_post.txt" \
   >>"$RUN_DIR/evidence.sha256"
+(cd "$RUN_DIR" && sha256sum -c evidence.sha256 >/dev/null)
 
 touch "$RUN_DIR/SUCCESS"
 gcloud storage cp --no-clobber "$RUN_DIR/summary.json" \
@@ -455,4 +461,6 @@ remote_success=$(gcloud storage ls "$REMOTE_PREFIX/SUCCESS" 2>/dev/null || true)
   say "ABORT: remote SUCCESS marker did not verify"
   exit 1
 }
-say "SUCCESS DB=$(/home/gianl/vllm-env/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["results_db_run_id"])' "$RUN_DIR/summary.json")"
+(cd "$RUN_DIR" && sha256sum -c evidence.sha256 >/dev/null)
+# Do not append to any sealed evidence file after the final checksum audit.
+echo "[full-load-pp8 $(date -u +%H:%M:%S)] SUCCESS DB=$db_id"
