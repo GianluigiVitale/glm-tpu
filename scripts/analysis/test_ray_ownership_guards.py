@@ -76,6 +76,7 @@ def test_protected_watchdogs_cannot_retain_the_global_lease() -> None:
     for path in (
         "scripts/e0_capture_arm.sh",
         "scripts/resume_health_proof.sh",
+        "scripts/dcp_live_rows_exact.sh",
     ):
         text = (ROOT / path).read_text()
         assert '2>&1 9>&- &' in text, path
@@ -97,3 +98,22 @@ def test_disk_watchdog_compares_byte_exact_free_space() -> None:
     assert 'df -B1G --output=avail /' not in text
     assert 'min_free_bytes=$((MIN_FREE_GB * gib))' in text
     assert 'if [ "$free_bytes" -lt "$min_free_bytes" ]' in text
+
+
+def test_compute_rows_exactness_selector_is_single_variable() -> None:
+    shared = (ROOT / "scripts/dcp_live_rows_exact.sh").read_text()
+    wrapper = (ROOT / "scripts/moe_compute_rows_exact.sh").read_text()
+    assert "export EXACT_LEVER=moe_compute_rows" in wrapper
+    assert 'export EXACT_PIN="${EXACT_PIN:-b3c25df47}"' in wrapper
+    assert 'GLM_DSA_DCP_DECODE_LIVE_ROWS=$dcp_gate' in shared
+    assert 'GLM_MOE_DECODE_ALL_GATHER=$moe_allgather_gate' in shared
+    assert 'GLM_MOE_DECODE_COMPUTE_LIVE_ROWS=$moe_compute_gate' in shared
+    assert 'if [ "$EXACT_LEVER" = moe_compute_rows ]; then' in shared
+    assert (
+        'moe_allgather_gate = side_gate if exact_lever == "moe_allgather" else "0"'
+        in shared
+    )
+    assert (
+        'moe_compute_gate = side_gate if exact_lever == "moe_compute_rows" else "0"'
+        in shared
+    )

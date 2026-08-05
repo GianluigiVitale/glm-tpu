@@ -1,7 +1,7 @@
 #!/bin/bash
 # Protected single-variable TPU A/B for a selected decode lever. The default
-# remains GLM_DSA_DCP_DECODE_LIVE_ROWS; scripts/moe_allgather_exact.sh selects
-# GLM_MOE_DECODE_ALL_GATHER while keeping the parent live-attention gate fixed.
+# remains GLM_DSA_DCP_DECODE_LIVE_ROWS; the small selector wrappers choose the
+# MoE all-gather or MoE compute-row gate while fixing every other lever.
 # Both sides use the accepted live-row-psum + MoE-psum-fusion stack and the
 # production DCP8/256K cache geometry. max_batched_tokens=32 deliberately
 # compiles only the production pure-decode bucket changed by this lever; dump
@@ -30,8 +30,14 @@ case "$EXACT_LEVER" in
     NOTE_PREFIX="MoE decode all-gather exact"
     CANDIDATE_ARMED_LOG="GLM_MOE_DECODE_ALL_GATHER armed"
     ;;
+  moe_compute_rows)
+    DEFAULT_PIN=b3c25df47
+    TAG_PREFIX=moe_compute_rows_exact
+    NOTE_PREFIX="MoE decode compute rows exact"
+    CANDIDATE_ARMED_LOG="GLM_MOE_DECODE_COMPUTE_LIVE_ROWS armed"
+    ;;
   *)
-    echo "EXACT_LEVER must be dcp_live_rows or moe_allgather" >&2
+    echo "EXACT_LEVER must be dcp_live_rows, moe_allgather, or moe_compute_rows" >&2
     exit 2
     ;;
 esac
@@ -124,6 +130,14 @@ moe_allgather_gate_for_side() {
   fi
 }
 
+moe_compute_gate_for_side() {
+  if [ "$EXACT_LEVER" = moe_compute_rows ]; then
+    side_gate "$1"
+  else
+    echo 0
+  fi
+}
+
 # Import the exact process-name corpus used by this Ray installation. The
 # carrier marker excludes this census's own local/SSH controller processes.
 # shellcheck disable=SC2016
@@ -161,9 +175,10 @@ ensure_oob() {
 
 ownership_census() {
   local side="$1" label="$2"
-  local dcp_gate moe_allgather_gate
+  local dcp_gate moe_allgather_gate moe_compute_gate
   dcp_gate=$(dcp_gate_for_side "$side") || return 1
   moe_allgather_gate=$(moe_allgather_gate_for_side "$side") || return 1
+  moe_compute_gate=$(moe_compute_gate_for_side "$side") || return 1
   local expected=${TAG}_${side}
   local out=$RUN_DIR/ownership_${side}_${label}.txt
   # shellcheck disable=SC2016
@@ -179,7 +194,8 @@ owned_env() {
     tr "\0" "\n" < "$f" | grep -qx "GLM_DECODE_LIVE_ROWS_PSUM=1" &&
     tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_PSUM_FUSION=1" &&
     tr "\0" "\n" < "$f" | grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$dcp_gate"'" &&
-    tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$moe_allgather_gate"'"
+    tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$moe_allgather_gate"'" &&
+    tr "\0" "\n" < "$f" | grep -qx "GLM_MOE_DECODE_COMPUTE_LIVE_ROWS='"$moe_compute_gate"'"
 }
 owned_aux_agent() {
   local p="$1" name arg0 pp
@@ -264,7 +280,12 @@ stop_driver_session() {
 cleanup() {
   stop_driver_session
   if [[ "${WATCH_PID:-}" =~ ^[0-9]+$ ]]; then
-    kill "$WATCH_PID" 2>/dev/null || true
+    kill -TERM -- "-$WATCH_PID" 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+      kill -0 -- "-$WATCH_PID" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL -- "-$WATCH_PID" 2>/dev/null || true
     WATCH_PID=""
   fi
   if [ "$LAUNCHED" -eq 1 ] && [ -n "$ACTIVE_SIDE" ]; then
@@ -279,13 +300,14 @@ trap cleanup EXIT
 trap 'exit 130' HUP INT TERM
 
 verify_raylet_envs() {
-  local side="$1" prefix="$2" dcp_gate moe_allgather_gate
+  local side="$1" prefix="$2" dcp_gate moe_allgather_gate moe_compute_gate
   dcp_gate=$(dcp_gate_for_side "$side") || return 1
   moe_allgather_gate=$(moe_allgather_gate_for_side "$side") || return 1
+  moe_compute_gate=$(moe_compute_gate_for_side "$side") || return 1
   local expected=${TAG}_${side}
   local out=$RUN_DIR/raylet_env_${side}.txt
   # shellcheck disable=SC2016
-  local cmd='p=$(pgrep -x raylet | head -1); f=/tmp/decode_lever_exact_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$expected"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_MLA_DCP=1" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f" && grep -qx "GLM_DSA_DCP=1" "$f" && grep -qx "GLM_DCP=8" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_SCORER=xla" "$f" && grep -qx "GLM_DSA_DCP_PREFILL_ATTN=segment" "$f" && grep -qx "GLM_DSA_BT_WIDTH=owned" "$f" && grep -qx "GLM_DSA_MERGE_IMPL=v2" "$f" && grep -qx "GLM_DSA_OWNED_SEG_IMPL=v2" "$f" && grep -qx "GLM_DSA_SEG_GATHER_IMPL=v2" "$f" && grep -qx "GLM_WRITE_PROBE=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_DECODE_LIVE_ROWS_PSUM=1" "$f" && grep -qx "GLM_MOE_PSUM_FUSION=1" "$f" && grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$dcp_gate"'" "$f" && grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$moe_allgather_gate"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$prefix"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=0" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "RAYLET_ENV_OK $(hostname)"; else echo "RAYLET_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  local cmd='p=$(pgrep -x raylet | head -1); f=/tmp/decode_lever_exact_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_HEALTH_TAG='"$expected"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$PIN"'" "$f" && grep -qx "GLM_MLA_DCP=1" "$f" && grep -qx "GLM_DSA_MODE=pallas_decode" "$f" && grep -qx "GLM_DSA_DCP=1" "$f" && grep -qx "GLM_DCP=8" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_SCORER=xla" "$f" && grep -qx "GLM_DSA_DCP_PREFILL_ATTN=segment" "$f" && grep -qx "GLM_DSA_BT_WIDTH=owned" "$f" && grep -qx "GLM_DSA_MERGE_IMPL=v2" "$f" && grep -qx "GLM_DSA_OWNED_SEG_IMPL=v2" "$f" && grep -qx "GLM_DSA_SEG_GATHER_IMPL=v2" "$f" && grep -qx "GLM_WRITE_PROBE=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_DECODE_LIVE_ROWS_PSUM=1" "$f" && grep -qx "GLM_MOE_PSUM_FUSION=1" "$f" && grep -qx "GLM_DSA_DCP_DECODE_LIVE_ROWS='"$dcp_gate"'" "$f" && grep -qx "GLM_MOE_DECODE_ALL_GATHER='"$moe_allgather_gate"'" "$f" && grep -qx "GLM_MOE_DECODE_COMPUTE_LIVE_ROWS='"$moe_compute_gate"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$prefix"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=0" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "RAYLET_ENV_OK $(hostname)"; else echo "RAYLET_ENV_BAD $(hostname)"; fi; rm -f "$f"'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cmd" > "$out" 2>&1 || return 1
   has_8_unique_markers "$out" RAYLET_ENV_OK
@@ -338,13 +360,14 @@ GLM_EXPECT_CODE_HASH=$PIN GLM_DECODE_LIVE_ROWS_PSUM=1 GLM_MOE_PSUM_FUSION=1"
 
 run_side() {
   local side="$1"
-  local dcp_gate moe_allgather_gate candidate_gate
+  local dcp_gate moe_allgather_gate moe_compute_gate candidate_gate
   dcp_gate=$(dcp_gate_for_side "$side") || return 1
   moe_allgather_gate=$(moe_allgather_gate_for_side "$side") || return 1
+  moe_compute_gate=$(moe_compute_gate_for_side "$side") || return 1
   candidate_gate=$(side_gate "$side") || return 1
   local prefix=/tmp/${TAG}_${side}/topk.npz
   local expected=${TAG}_${side}
-  local experiment="GLM_HEALTH_TAG=$expected GLM_DSA_DCP_DECODE_LIVE_ROWS=$dcp_gate GLM_MOE_DECODE_ALL_GATHER=$moe_allgather_gate GLM_DSA_DUMP_TOPK=$prefix GLM_DSA_DUMP_TOPK_EVENTS=0"
+  local experiment="GLM_HEALTH_TAG=$expected GLM_DSA_DCP_DECODE_LIVE_ROWS=$dcp_gate GLM_MOE_DECODE_ALL_GATHER=$moe_allgather_gate GLM_MOE_DECODE_COMPUTE_LIVE_ROWS=$moe_compute_gate GLM_DSA_DUMP_TOPK=$prefix GLM_DSA_DUMP_TOPK_EVENTS=0"
   local raylet_envs="$BASE_RAYLET_ENVS $experiment"
   local driver_envs="$BASE_DRIVER_ENVS $experiment"
   local log=$RUN_DIR/driver_${side}.log
@@ -354,7 +377,7 @@ run_side() {
     say "ABORT: dirty pod before side=$side"
     return 1
   }
-  say "launch protected production-shape lever=$EXACT_LEVER side=$side candidate_gate=$candidate_gate dcp_gate=$dcp_gate moe_allgather_gate=$moe_allgather_gate"
+  say "launch protected production-shape lever=$EXACT_LEVER side=$side candidate_gate=$candidate_gate dcp_gate=$dcp_gate moe_allgather_gate=$moe_allgather_gate moe_compute_gate=$moe_compute_gate"
   ACTIVE_SIDE="$side"
   LAUNCHED=1
   EXTRA_ENVS="$raylet_envs" TPU_MIN_TOKEN_BUCKET=32 \
@@ -594,7 +617,7 @@ fi
 ALERT_FILE=$RUN_DIR/DISK_ALERT
 ALERT_FILE="$ALERT_FILE" INTERVAL_S=120 setsid nohup \
   bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" watch </dev/null \
-  > "$RUN_DIR/disk_watch.log" 2>&1 &
+  > "$RUN_DIR/disk_watch.log" 2>&1 9>&- &
 WATCH_PID=$!
 
 if [ "$RECOVER_OFF" -eq 1 ]; then
@@ -665,6 +688,7 @@ for side in ("off", "on"):
     side_gate = "0" if side == "off" else "1"
     dcp_gate = side_gate if exact_lever == "dcp_live_rows" else "1"
     moe_allgather_gate = side_gate if exact_lever == "moe_allgather" else "0"
+    moe_compute_gate = side_gate if exact_lever == "moe_compute_rows" else "0"
     note = f"{note_prefix} {side} ({tag})"
     rows = src.execute("SELECT * FROM runs WHERE note = ?", (note,)).fetchall()
     assert len(rows) == 1, (side, len(rows))
@@ -687,6 +711,7 @@ for side in ("off", "on"):
         "GLM_DSA_SEG_GATHER_IMPL": "v2",
         "GLM_DSA_DCP_DECODE_LIVE_ROWS": dcp_gate,
         "GLM_MOE_DECODE_ALL_GATHER": moe_allgather_gate,
+        "GLM_MOE_DECODE_COMPUTE_LIVE_ROWS": moe_compute_gate,
         "GLM_DSA_DUMP_TOPK": f"/tmp/{tag}_{side}/topk.npz",
         "GLM_DSA_DUMP_TOPK_EVENTS": "0",
         "GLM_DECODE_LIVE_ROWS_PSUM": "1",
@@ -704,6 +729,11 @@ for side in ("off", "on"):
         # Backward-compatible recovery of a pre-selector DCP exact artifact;
         # the pinned fork did not yet contain this gate, so absence is OFF.
         expected.pop("GLM_MOE_DECODE_ALL_GATHER")
+    if (exact_lever != "moe_compute_rows" and
+            "GLM_MOE_DECODE_COMPUTE_LIVE_ROWS" not in os_env):
+        # Backward-compatible recovery of artifacts whose pinned fork
+        # predates the compute-row experiment; absence is the OFF setting.
+        expected.pop("GLM_MOE_DECODE_COMPUTE_LIVE_ROWS")
     assert run["fork_git"] == pin, (run["fork_git"], pin)
     assert run["harness_git"] == harness, (run["harness_git"], harness)
     assert env["lengths"] == [4096] and env["depths"] == [0.5]
