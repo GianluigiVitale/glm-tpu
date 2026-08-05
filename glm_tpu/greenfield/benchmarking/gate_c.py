@@ -61,6 +61,9 @@ class GateCIndexShareResult(NamedTuple):
     q_absorbed: jax.Array
     current_cache_row: jax.Array
     cache_by_owner: jax.Array
+    selected_cache_by_owner: jax.Array
+    selected_cache_positions_by_owner: jax.Array
+    selected_cache_counts_by_owner: jax.Array
     attention_positions: jax.Array
     attended_latent: jax.Array
     attention_lse: jax.Array
@@ -647,6 +650,9 @@ def stage_local_index_share_gate_c(
             q_absorbed,
             current_cache_row,
             local_cache[None, ...],
+            segment.values[None, ...],
+            segment.positions[None, ...],
+            segment.valid_counts[None, ...],
             attention_positions,
             combined.output,
             combined.logsumexp,
@@ -685,6 +691,9 @@ def stage_local_index_share_gate_c(
             P(),
             P(),
             P(axis_name, None, None, None),
+            P(axis_name, None, None, None),
+            P(axis_name, None, None),
+            P(axis_name, None),
             P(),
             P(),
             P(),

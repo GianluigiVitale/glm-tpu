@@ -374,6 +374,30 @@ def _run_forced_cpu_gate_c_kernels() -> None:
     np.testing.assert_array_equal(
         np.asarray(index_result.cache_by_owner), updated_cache
     )
+    gathered_positions = []
+    gathered_values = []
+    for owner in range(4):
+        count = int(index_result.selected_cache_counts_by_owner[owner, 0])
+        gathered_positions.append(
+            np.asarray(
+                index_result.selected_cache_positions_by_owner[owner, 0, :count]
+            )
+        )
+        gathered_values.append(
+            np.asarray(index_result.selected_cache_by_owner[owner, 0, :count])
+        )
+    gathered_positions_host = np.concatenate(gathered_positions)
+    gathered_values_host = np.concatenate(gathered_values)
+    gather_order = np.argsort(gathered_positions_host, stable=True)
+    np.testing.assert_array_equal(
+        gathered_positions_host[gather_order], np.sort(selected_host[0])
+    )
+    full_updated_cache = np.array(full_cache, copy=True)
+    full_updated_cache[context - 1] = np.asarray(current_row)
+    np.testing.assert_array_equal(
+        gathered_values_host[gather_order],
+        full_updated_cache[np.sort(selected_host[0])],
+    )
     np.testing.assert_allclose(
         np.asarray(index_result.attended_latent, dtype=np.float32),
         np.asarray(attention.output, dtype=np.float32),
