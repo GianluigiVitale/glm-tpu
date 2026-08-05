@@ -8,6 +8,12 @@ from .gate_c import (
     validate_gate_c_layout,
     validate_gate_c_layout_bindings,
 )
+from .gate_c_loader import (
+    GateCLoadExpectation,
+    LoadedGateCCheckpoint,
+    load_gate_c_checkpoint,
+    verify_gate_c_load_contract,
+)
 from .full_loader import (
     FullCheckpointLoadExpectation,
     LoadedFinalLayoutStage,
@@ -45,8 +51,10 @@ from .stream_pack import (
 
 __all__ = (
     "FullCheckpointLoadExpectation",
+    "GateCLoadExpectation",
     "LoadedFinalLayoutStage",
     "LoadedFinalLeaf",
+    "LoadedGateCCheckpoint",
     "LoadedOneLayer",
     "OneLayerLoadExpectation",
     "OneLayerPackConfig",
@@ -72,8 +80,10 @@ __all__ = (
     "build_destination_file_plans",
     "destination_groups",
     "load_final_layout_stage",
+    "load_gate_c_checkpoint",
     "stream_pack_group",
     "validate_gate_c_layout",
     "validate_gate_c_layout_bindings",
+    "verify_gate_c_load_contract",
     "verify_full_packed_checkpoint",
 )
