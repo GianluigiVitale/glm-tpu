@@ -270,7 +270,15 @@ stop_owned_ray() {
 cleanup() {
   stop_driver_session
   if [[ "${WATCH_PID:-}" =~ ^[0-9]+$ ]]; then
-    kill "$WATCH_PID" 2>/dev/null || true
+    # The watcher is a setsid leader.  Stop its whole group so an in-flight
+    # `sleep` cannot survive the shell and become an orphan.  FD 9 is also
+    # closed at launch, so no watchdog descendant can retain the pod lease.
+    kill -TERM -- "-$WATCH_PID" 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+      kill -0 -- "-$WATCH_PID" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL -- "-$WATCH_PID" 2>/dev/null || true
     WATCH_PID=""
   fi
   if [ "$LAUNCHED" -eq 1 ]; then
@@ -287,7 +295,7 @@ trap 'exit 130' HUP INT TERM
 ALERT_FILE=$RUN_DIR/DISK_ALERT
 ALERT_FILE="$ALERT_FILE" INTERVAL_S=120 setsid nohup \
   bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" watch </dev/null \
-  > "$RUN_DIR/disk_watch.log" 2>&1 &
+  > "$RUN_DIR/disk_watch.log" 2>&1 9>&- &
 WATCH_PID=$!
 
 say "launch protected DCP4 $PROOF_MODE Ray cluster"

@@ -70,3 +70,30 @@ def test_post_driver_cleanup_retries_transient_wrapper_titles() -> None:
         assert '[ "$attempt" -lt 3 ] || return 1' in text, path
         assert 'sleep 10' in text, path
         assert 'census_label="prestop_${label}_retry${attempt}"' in text, path
+
+
+def test_protected_watchdogs_cannot_retain_the_global_lease() -> None:
+    for path in (
+        "scripts/e0_capture_arm.sh",
+        "scripts/resume_health_proof.sh",
+    ):
+        text = (ROOT / path).read_text()
+        assert '2>&1 9>&- &' in text, path
+        assert 'kill -TERM -- "-$WATCH_PID"' in text, path
+        assert 'kill -KILL -- "-$WATCH_PID"' in text, path
+
+
+def test_e0_reserves_trace_headroom_above_runtime_disk_floor() -> None:
+    text = (ROOT / "scripts/e0_capture_arm.sh").read_text()
+    assert 'E0_PREFLIGHT_MIN_FREE_GB="${E0_PREFLIGHT_MIN_FREE_GB:-17}"' in text
+    assert 'if [ "$E0_PREFLIGHT_MIN_FREE_GB" -lt 17 ]' in text
+    assert text.count('MIN_FREE_GB="$E0_PREFLIGHT_MIN_FREE_GB"') == 2
+    assert "e0_preflight_min_free_gb=%s" in text
+
+
+def test_disk_watchdog_compares_byte_exact_free_space() -> None:
+    text = (ROOT / "scripts/disk_watchdog.sh").read_text()
+    assert 'df -B1 --output=avail /' in text
+    assert 'df -B1G --output=avail /' not in text
+    assert 'min_free_bytes=$((MIN_FREE_GB * gib))' in text
+    assert 'if [ "$free_bytes" -lt "$min_free_bytes" ]' in text

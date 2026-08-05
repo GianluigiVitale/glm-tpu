@@ -31,30 +31,48 @@ WARN_FREE_GB="${WARN_FREE_GB:-25}"
 INTERVAL_S="${INTERVAL_S:-120}"
 ALERT_FILE="${ALERT_FILE:-$HOME/glm-run/DISK_ALERT}"
 
+case "$MIN_FREE_GB:$WARN_FREE_GB" in
+  *[!0-9:]*|:*)
+    echo "MIN_FREE_GB and WARN_FREE_GB must be non-negative integers" >&2
+    exit 2
+    ;;
+esac
+if [ "$WARN_FREE_GB" -lt "$MIN_FREE_GB" ]; then
+  echo "WARN_FREE_GB must be greater than or equal to MIN_FREE_GB" >&2
+  exit 2
+fi
+
 MODE="${1:-check}"
 
 poll_once() {
-  # One line per host: "<hostname> <free-GB>". gcloud runs the 8 ssh
+  # One line per host: "<hostname> <free-bytes>".  Keep the remote value
+  # byte-exact: `df -B1G` rounds to whole blocks and previously admitted a
+  # host with less than the advertised reserve.  gcloud runs the 8 ssh
   # sessions; a host that cannot even answer is itself an alert.
   timeout 120 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
     --worker=all \
-    --command='echo "$(hostname) $(df -B1G --output=avail / | tail -1 | tr -d " ")"' \
+    --command='echo "$(hostname) $(df -B1 --output=avail / | tail -1 | tr -d " ")"' \
     2>/dev/null | grep -E "^t1v-" | sort
 }
 
 classify() {
   # stdin: poll_once lines. Prints per-host status; returns 1 on any BREACH.
-  local rc=0 host free
+  local rc=0 host free_bytes free_gb
+  local gib=$((1024 * 1024 * 1024))
+  local min_free_bytes=$((MIN_FREE_GB * gib))
+  local warn_free_bytes=$((WARN_FREE_GB * gib))
   local n=0
-  while read -r host free; do
+  while read -r host free_bytes; do
     n=$((n + 1))
-    if [ "${free:-0}" -lt "$MIN_FREE_GB" ]; then
-      echo "BREACH $host ${free}G free (< ${MIN_FREE_GB}G)"
+    free_bytes="${free_bytes:-0}"
+    free_gb=$((free_bytes / gib))
+    if [ "$free_bytes" -lt "$min_free_bytes" ]; then
+      echo "BREACH $host ${free_gb}G free (< ${MIN_FREE_GB}G)"
       rc=1
-    elif [ "$free" -lt "$WARN_FREE_GB" ]; then
-      echo "WARN   $host ${free}G free (< ${WARN_FREE_GB}G)"
+    elif [ "$free_bytes" -lt "$warn_free_bytes" ]; then
+      echo "WARN   $host ${free_gb}G free (< ${WARN_FREE_GB}G)"
     else
-      echo "OK     $host ${free}G free"
+      echo "OK     $host ${free_gb}G free"
     fi
   done
   if [ "$n" -lt 8 ]; then

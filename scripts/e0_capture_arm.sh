@@ -34,6 +34,19 @@ HEALTH_RAYLET_ENVS="${HEALTH_RAYLET_ENVS:?set HEALTH_RAYLET_ENVS to its 8-host e
 HEALTH_RESULTS_DB="${HEALTH_RESULTS_DB:-$HOME/glm-tpu/bench/results.db}"
 HEALTH_MAX_AGE_S="${HEALTH_MAX_AGE_S:-1800}"
 DRIVER_TIMEOUT_S="${DRIVER_TIMEOUT_S:-7200}"
+# Each fleet XPlane is currently about 0.8 GiB per host.  Preserve the 15 GiB
+# runtime floor by requiring two additional GiB before an E0 trace starts.
+E0_PREFLIGHT_MIN_FREE_GB="${E0_PREFLIGHT_MIN_FREE_GB:-17}"
+case "$E0_PREFLIGHT_MIN_FREE_GB" in
+  ''|*[!0-9]*)
+    echo "E0_PREFLIGHT_MIN_FREE_GB must be an integer >= 17" >&2
+    exit 2
+    ;;
+esac
+if [ "$E0_PREFLIGHT_MIN_FREE_GB" -lt 17 ]; then
+  echo "E0_PREFLIGHT_MIN_FREE_GB must be >= 17" >&2
+  exit 2
+fi
 case "$LIVE_ROWS_PSUM" in
   0|1) ;;
   *) echo "E0_LIVE_ROWS_PSUM must be 0 or 1" >&2; exit 2 ;;
@@ -236,7 +249,9 @@ static_preflight() {
     say "ABORT: clean fork pin not proven on 8 unique hosts @ $PIN"; return 1; }
   ensure_oob_mounts "$RUN_DIR/oob_preflight.txt" || {
     say "ABORT: OOB mirror not proven on 8 unique hosts"; return 1; }
-  bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check | tee -a "$RUN_DIR/orchestrator.log"
+  MIN_FREE_GB="$E0_PREFLIGHT_MIN_FREE_GB" \
+    bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check | \
+    tee -a "$RUN_DIR/orchestrator.log"
 }
 
 verify_raylet_envs() {
@@ -294,11 +309,11 @@ PY
 
 mkdir -p "$RUN_DIR"
 if ! {
-  printf 'tag=%s\narm=%s\npin=%s\nharness=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ndcp_decode_live_rows=%s\nmoe_decode_all_gather=%s\ntrace_steps=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\noob_dir=%s\ngcs_run=%s\n' \
+  printf 'tag=%s\narm=%s\npin=%s\nharness=%s\nlive_rows_psum=%s\nmoe_psum_fusion=%s\ndcp_decode_live_rows=%s\nmoe_decode_all_gather=%s\ntrace_steps=%s\nmin_token_bucket=%s\ncompilation_sizes=%s\ne0_preflight_min_free_gb=%s\noob_dir=%s\ngcs_run=%s\n' \
     "$TAG" "$ARM" "$PIN" "$HARNESS_SHORT" "$LIVE_ROWS_PSUM" "$MOE_PSUM_FUSION" \
     "$DCP_DECODE_LIVE_ROWS" "$MOE_DECODE_ALL_GATHER" \
     "$TRACE_STEPS" "$E0_MIN_TOKEN_BUCKET" "$E0_COMPILATION_SIZES" \
-    "$OOB_DIR" "$GCS_RUN"
+    "$E0_PREFLIGHT_MIN_FREE_GB" "$OOB_DIR" "$GCS_RUN"
   printf 'raylet_envs=%s %s GLM_JAX_TRACE_DIR=<per-try-nonce> %s\ndriver_envs=%s\n' \
     "$RENV" "$TRC_BASE" "$LIBTPU" "$DRIVER"
   printf 'glm_tpu_head=%s\nglm_tpu_dirty=%s\ntpu_inference_head=%s\ntpu_inference_dirty=%s\n' \
@@ -443,7 +458,7 @@ say "health proof attached: embedded run <=${HEALTH_MAX_AGE_S}s pin=$PIN exact r
 
 ALERT_FILE="$ALERT_FILE" INTERVAL_S=120 setsid nohup \
   bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" watch </dev/null \
-  > "$RUN_DIR/disk_watch.log" 2>&1 &
+  > "$RUN_DIR/disk_watch.log" 2>&1 9>&- &
 WATCH_PID=$!
 DRIVER_SESSION=""
 stop_driver_session() {
@@ -461,7 +476,17 @@ stop_driver_session() {
 }
 cleanup() {
   stop_driver_session
-  kill "$WATCH_PID" 2>/dev/null || true
+  if [[ "${WATCH_PID:-}" =~ ^[0-9]+$ ]]; then
+    # The watcher is a setsid leader.  Stop its whole group so an in-flight
+    # `sleep` cannot survive the shell and become an orphan.
+    kill -TERM -- "-$WATCH_PID" 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+      kill -0 -- "-$WATCH_PID" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL -- "-$WATCH_PID" 2>/dev/null || true
+    WATCH_PID=""
+  fi
 }
 trap cleanup EXIT
 trap 'exit 130' HUP INT TERM
@@ -482,7 +507,9 @@ for try in 1 2 3 4 5 6; do
     initial_pod_census "postreset_t${try}" || {
       say "ABORT: retry reset did not produce a proven zero-work pod"; exit 1; }
   fi
-  bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check | tee -a "$RUN_DIR/orchestrator.log" || {
+  MIN_FREE_GB="$E0_PREFLIGHT_MIN_FREE_GB" \
+    bash "$HOME/glm-tpu/scripts/disk_watchdog.sh" check | \
+    tee -a "$RUN_DIR/orchestrator.log" || {
     say "ABORT: disk preflight failed before try $try"; exit 1; }
   [ ! -s "$ALERT_FILE" ] || { say "ABORT: disk watcher alert"; exit 1; }
 

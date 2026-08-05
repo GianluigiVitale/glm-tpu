@@ -4391,3 +4391,63 @@ different association. This is not being disguised as universal bitwise parity. 
 now state the numerical contract explicitly. The candidate remains unaccepted until protected
 real-model OFF/ON proves exact raw tokens and DSA selected-set/tie order, followed by health,
 physical HLO counts, device latency, steady wall speed, and the four-depth smoke if performance wins.
+
+## 2026-08-05 04:36 — MOE ALL-GATHER REJECTED: exact HLO change, but 290.76 ms / 3.439 tok/s regresses; interrupted trace recovered fleet-wide
+
+The protected ladder first closed correctness and health. Exactness run
+`moe_allgather_exact_20260805T002126894390635Z` (DB 394 OFF / 395 ON) produced identical raw
+prefix `" 49"` and zero selected-set/tie-order differences across 129 aligned events and 4,081
+rows. Protected health `resume_health_20260805T015811605234062Z` then completed as DB 396 with
+predicted/gold `952687`, all eight 2,455-leaf manifests equal to `371110325`, exact code/env
+fingerprints, write probes, T32/T2048 compiles, and clean post-stop census.
+
+E0 `e0cap_sparse_20260805T024622713442900Z` reached the fleet trace window but its watchdog saw
+worker 0 cross below 15 GiB while XPlane files were being finalized. The outer script stopped the
+driver before throughput JSON, output completion, steady wall, or normal trace recovery. DB 397
+therefore intentionally remains an incomplete run with zero items and zero summary rows. This is
+not an accepted throughput proof.
+
+Recovery preserved all eight fresh XPlanes before cleanup. Each was about 765.46 MB; all eight
+were uploaded directly from their host to the approved same-region archive, then downloaded into
+`/dev/shm` to avoid further root-disk pressure. SHA-256 covers eight distinct files. The standard
+parser validates 8 files, 8 hosts, 64 canonical cores, and exactly 20 selected DSA decode steps/core.
+The complete recovery archive has 45 objects / 5.71 GiB at
+`gs://driftbench-dsv4-uc/results/e0cap_sparse_20260805T024622713442900Z`; the decisive comparison
+is `ADJUDICATION.md`.
+
+The candidate produces exactly the predicted structural signature: named all-reduce remains 157,
+physical HLO reductions fall 391 -> 316, and all-gathers rise 470 -> 545. Performance nevertheless
+regresses:
+
+| metric | accepted corrected parent | MoE all-gather | delta |
+|---|---:|---:|---:|
+| device ms/token | 287.666063 | 290.762936 | +3.096873 (+1.08%) |
+| device tok/s | 3.476253 | 3.439228 | -0.037025 (-1.07%) |
+| collectives ms/token | 161.349548 | 162.929848 | +1.580300 |
+| 75 MoE combines | 106.495016 psum | 107.145102 all-gather | +0.650086 |
+
+The replacement signature is `bf16[32,2,6144]` at `live_rows_psum.py:101`: each call costs about
+1.429 ms. The experiment removed 75 reductions only by adding 75 gathers with the same sequential
+32-way synchronization depth and a larger materialized result. The source/HLO hypothesis was real;
+the latency hypothesis was false. The lever is **rejected for performance**. A fresh two-hour rerun,
+steady-wall measurement, and four-depth smoke would not rescue a protected device regression, so
+they are deliberately skipped.
+
+The incident also exposed two harness bugs. Both protected scripts launched a setsid watchdog after
+taking flock FD 9; descendants inherited the FD, and killing only the watcher shell left its
+`sleep 120` child holding the global lease. Health/E0 now close FD 9 in the watcher child and stop
+the entire setsid process group. The disk poll now compares byte-exact free space rather than
+rounded `df -B1G`, and E0 requires 17 GiB before launch to reserve its ~0.8 GiB trace while keeping
+the 15 GiB runtime floor. Syntax/static ownership tests pass 7/7; a live disk check passes 8/8.
+Three already-archived local E0 trace replicas totaling 16.5 GiB were removed, bringing worker 0 to
+30+ GiB free. The recovered remote traces and exact Ray session were removed from all hosts only
+after archive and parse; final census is 8/8 zero work. Two stale run-specific watchdogs orphaned
+since July 31/August 3 were also stopped by their exact process groups.
+
+The next lever is now prepared without spending TPU time. Commit `90431db22` was transplanted onto
+the corrected all-gather code parent as pushed branch/worktree
+`glm-moe-compute-live-corrected` / `/home/gianl/tpu-inference-moe-compute-live-corrected`, pin
+`b3c25df47`. Subsequent runs keep `GLM_MOE_DECODE_ALL_GATHER=0`. Corrected-parent CPU evidence is
+6/6 focused plus 17/17 env tests. The candidate narrows pure-decode token rows 32 -> 2 and routed
+GMM rows 256 -> 16, then restores the dead suffix; default-off and non-decode fallbacks retain the
+accepted program. Next: HLO review, protected OFF/ON exactness, then health/E0 only if exact.
