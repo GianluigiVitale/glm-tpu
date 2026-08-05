@@ -4362,3 +4362,32 @@ with reduce-scatter and adding sequence parallelism. That independently corrobor
 finding: 75 tiny MoE combines consume 106.50 ms/token and are the immediate structural defect. It
 does not validate the local all-gather candidate; exactness, physical HLO counts, device latency,
 and profiler-free wall speed remain mandatory.
+
+## 2026-08-05 00:14 — CORRECTED PARENT FOUR-DEPTH SMOKE CLOSES 4/4 AND ARCHIVES CLEANLY
+
+The accepted corrected stack `979f818e0` completed its mandatory protected DCP4 smoke under
+`glm-run/lever_smoke128k_20260804T224754220401229Z`, DB 393. At 128K, d=0.0/0.05/0.95/1.0
+predicted `705269`/`824794`/`289958`/`891482` exactly; each item has 127,363 prompt tokens, 20
+generated tokens, and about 600–603 seconds latency. All eight state manifests and donated-cache
+write probes passed before compute. The snapshot SQLite integrity check is `ok`, provenance is
+harness `52e0d00` plus fork `979f818e0`, and the cleanup retry correctly waited through Ray's
+worker-title transition before positively owning and stopping all hosts. Post-stop is eight
+`CENSUS_OK`; local and remote `SUCCESS` exist at
+`gs://driftbench-dsv4-uc/results/lever_smoke128k_20260804T224754220401229Z` (21 objects).
+
+## 2026-08-05 00:20 — CORRECTED-PARENT MOE ALL-GATHER PIN BUILT; CPU TOPOLOGY PASSES, GENERIC BF16 IS HONESTLY NOT BITWISE
+
+The old `5967dffa4` experiment was transplanted without conflict onto accepted parent `979f818e0`
+and committed/pushed as `aa608543b73921a330f48271d8263d4ec2ca14a4` on
+`glm-moe-live-allgather-corrected`. Exactly four files differ: the helper test, env test, env gate,
+and `live_rows_psum.py`; corrected DCP attention is inherited byte-for-byte from the parent.
+Focused CPU evidence on the corrected worktree: helper 8/8, fusion 7/7, env 17/17; the actual
+32-rank six-axis EXPERT group passes 100/100 exactly representable topology cases; StableHLO has
+one 32-way all-gather, one optimization barrier, and the prefill/full psum branch.
+
+A stronger adversarial check caught a limitation hidden by the original small-integer test:
+arbitrary bf16 values can differ bitwise because the local gathered reduction and psum use
+different association. This is not being disguised as universal bitwise parity. The code and test
+now state the numerical contract explicitly. The candidate remains unaccepted until protected
+real-model OFF/ON proves exact raw tokens and DSA selected-set/tie order, followed by health,
+physical HLO counts, device latency, steady wall speed, and the four-depth smoke if performance wins.

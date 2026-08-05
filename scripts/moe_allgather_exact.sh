@@ -6,7 +6,7 @@ set -uo pipefail
 
 SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
 export EXACT_LEVER=moe_allgather
-export EXACT_PIN="${EXACT_PIN:-5967dffa4}"
+export EXACT_PIN="${EXACT_PIN:-aa608543b}"
 if [ -n "${MOE_ALLGATHER_EXACT_RESUME_DIR:-}" ]; then
   export EXACT_RESUME_DIR="$MOE_ALLGATHER_EXACT_RESUME_DIR"
 fi

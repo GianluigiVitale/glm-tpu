@@ -1,6 +1,6 @@
 # HANDOFF — GLM-5.2-FP8 on TPU v4
 
-**Updated:** 2026-08-05 00:04 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
+**Updated:** 2026-08-05 00:20 UTC. Read this file first, then `AGENTS.md`, `KICKOFF.md`,
 `PLAN.md`, `docs/suggestions.md`, and the relevant recent entries in `docs/RESEARCH_LOG.md`.
 
 ## Project goal — do not narrow it
@@ -83,37 +83,35 @@ The current upstream GLM-5.2 performance sprint independently targets replacing 
 reduce-scatter plus sequence parallelism. That corroborates this trace diagnosis and the all-gather/
 feature-sharding direction, but it is not evidence that the local candidate is fast or exact.
 
-## Sole active TPU workflow — do not launch another
+## Latest completed proof — pod released
 
-Mandatory corrected-parent four-depth smoke:
+Mandatory corrected-parent four-depth smoke completed and archived:
 
 - Run `/home/gianl/glm-run/lever_smoke128k_20260804T224754220401229Z`
 - Launcher `/home/gianl/glm-run/corrected_parent_smoke_launcher_20260804T2247Z.log`
-- Outer PID 3893688; driver 3896755; EngineCore 3896805
 - Fork `979f818e0`; harness launch pin `52e0d00`; DCP4
 - Gates: live-row psum=1, MoE fusion=1, DCP live attention=1, MoE all-gather=0
 - Depths `0.0,0.05,0.95,1.0`, one trial each
 
-As of 00:04 UTC: all eight hosts passed the 2,455-leaf state hash `371110325`, zero-nonfinite load
-scan/checksum, and byte-exact dense-MLA/indexer-K/DSA-MLA donated-cache write probes. T32/T2048
-compiled on all hosts. DB 393 is 3/4 correct: d=0.0 `705269`, d=0.05 `824794`, and d=0.95
-`289958`, each predicted exactly and committed as an item row; d=1.0 is active on the same engine.
-No traceback, OOM, compiler fatal, protection refusal, or disk alert. Preserve through 4/4,
-immutable DB provenance, authenticated cleanup, `SUCCESS`, and allowed-bucket archive.
+All eight hosts passed the 2,455-leaf state hash `371110325`, zero-nonfinite load scan/checksum,
+and byte-exact dense-MLA/indexer-K/DSA-MLA donated-cache write probes. T32/T2048 compiled on all
+hosts. DB 393 is 4/4 correct: d=0.0 `705269`, d=0.05 `824794`, d=0.95 `289958`, and d=1.0
+`891482`; all four rows have 127,363 prompt tokens and 20 generated tokens. The DB snapshot passed
+integrity check, authenticated cleanup ended with eight `CENSUS_OK` hosts, and local plus remote
+`SUCCESS` are present at `gs://driftbench-dsv4-uc/results/lever_smoke128k_20260804T224754220401229Z`.
+No TPU workflow is active.
 
 ## Exact next sequence
 
-1. Finish and archive the active corrected-parent 128K smoke. Do not promote on partial compute.
-2. Correct the MoE all-gather branch onto parent `979f818e0`, commit/push a clean pin, then rerun
-   focused CPU/Jaxpr/StableHLO tests.
-3. Run protected same-pin OFF/ON exactness with only `GLM_MOE_DECODE_ALL_GATHER` varying.
-4. If exact, run protected health and fresh 256K E0. Required HLO signature:
+1. Run protected same-pin OFF/ON exactness at corrected pin `aa608543b`, with only
+   `GLM_MOE_DECODE_ALL_GATHER` varying.
+2. If exact, run protected health and fresh 256K E0. Required HLO signature:
    reductions `391 -> 316`, all-gathers `470 -> 545`, named all-reduce remains 157. Accept only a
    real device+steady-wall gain with exact output/selection evidence.
-5. If accepted, run the same four-depth 128K smoke before the next lever.
-6. Validate MoE compute-row specialization (T32 -> T2, GMM m256 -> m16), then scorer-row narrowing
+3. If accepted, run the same four-depth 128K smoke before the next lever.
+4. Validate MoE compute-row specialization (T32 -> T2, GMM m256 -> m16), then scorer-row narrowing
    and the lower-value DCP-LSE one-all-gather candidate, each through the same proof ladder.
-7. For the higher ceiling, implement end-to-end 4x8 tensor/expert feature sharding: model-sharded
+5. For the higher ceiling, implement end-to-end 4x8 tensor/expert feature sharding: model-sharded
    residual and RMSNorm, subgroup attention projections, and expert-by-feature MoE. Then repair the
    sparse multi-token classification before enabling MTP/speculative decode. Never claim 20–50
    tok/s before protected local wall/device evidence.
@@ -121,11 +119,11 @@ immutable DB provenance, authenticated cleanup, `SUCCESS`, and allowed-bucket ar
 ## Prepared branches/worktrees
 
 - Corrected accepted parent: `/home/gianl/tpu-inference-dcp-live-rows`, `979f818e0`, pushed/clean.
-- MoE all-gather: `/home/gianl/tpu-inference-moe-live-allgather`, old pushed `5967dffa4` plus the
-  corrected parent's staged `mla_attention.py`. Before metal: create a clean corrected-parent
-  commit and rerun helper 8/8, fusion 7/7, env 17/17, exact-value stress, and StableHLO checks.
-  Fresh CPU audit: the real 32-rank EXPERT topology is 100/100 exact for exactly representable
-  values; StableHLO has one 32-way all-gather, one barrier, and the runtime-prefill psum branch.
+- MoE all-gather: `/home/gianl/tpu-inference-moe-live-allgather-corrected`, corrected pin
+  `aa608543b73921a330f48271d8263d4ec2ca14a4`, pushed/clean directly atop `979f818e0`; exactly four
+  files differ. CPU helper 8/8, fusion 7/7, env 17/17. The real 32-rank EXPERT topology is 100/100
+  exact for exactly representable values; StableHLO has one 32-way all-gather, one barrier, and the
+  runtime-prefill psum branch.
   Generic bf16 values are not bitwise-identical because local reduction order differs from psum;
   do not overclaim CPU bitwise equivalence. Protected real-model token/selection exactness and the
   four-depth smoke are mandatory before acceptance.
