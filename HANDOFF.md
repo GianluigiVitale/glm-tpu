@@ -175,5 +175,7 @@ archive before advancing to health/E0.
 - MTP remains parked until the single-token sparse performance campaign and multi-token sparse
   classification are correct.
 
-The attachment resume file is intentionally only a short pointer. Durable detailed state belongs
-here and in `docs/RESEARCH_LOG.md`, not in an ever-growing chat attachment.
+The attachment resume file is a stable pointer hard-capped below 4,000 characters. Never duplicate
+volatile workflow/PID state there; current state belongs here and detailed evidence belongs in
+`docs/RESEARCH_LOG.md`. This prevents stale attachment text from reviving an obsolete workflow after
+context compaction.
