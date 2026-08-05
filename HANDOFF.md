@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 20:34 UTC
+**Updated:** 2026-08-05 21:07 UTC
 
 ## Authority and isolation
 
@@ -78,9 +78,12 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   bytes/chip with at least 8,173,454,848 free. Ledger, DB integrity, three 8/8 censuses, approved
   archive, and an independent byte-for-byte download of all 47 files pass. Gate B is complete.
 - Exact reference RMSNorm/final norm, dense/SwiGLU/residual/embedding/logits, accepted RoPE, FP32
-  DSA scorer, exact lowest-global-position ties, and distributed exact top-k are implemented.
-  Greenfield tests pass 149/149. IndexShare and protected real dense/full-DSA/IndexShare evidence
-  remain; no decoder, serving, decoder-HBM, or genuine token-throughput result exists.
+  DSA scorer, exact lowest-global-position ties, distributed exact top-k, stage-local striped KV
+  lookup, sparse MLA/LSE merge, and compact IndexShare carriage are implemented at `10e5097`.
+  Full-width FP32 and BF16 comparisons against the pinned legacy sparse-attention oracle are
+  elementwise exact, including the four-owner BF16 merge; greenfield tests pass 168/168 on forced
+  CPU. These prove semantics only. Protected real dense/full-DSA/IndexShare evidence remains; no
+  decoder, serving, decoder-HBM, or genuine token-throughput result exists.
 
 ## Protected evidence
 
@@ -169,12 +172,10 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Finish Gate C reference mechanisms: selected KV/page lookup, sparse attention, and compact
-   IndexShare state (`int32[1,2048]` positions plus valid count), without selected-KV materialization.
-2. Capture independent raw-source real dense/full-DSA/IndexShare oracle artifacts, then run protected
+1. Capture independent raw-source real dense/full-DSA/IndexShare oracle artifacts, then run protected
    PP8 TPU equivalence/HLO/HBM proofs. Keep DSA selected sets/tie order exact and all repeated
    collectives stage-local.
-3. Only after Gate C, build the complete short-context decoder for Gate D and measure real wall
+2. Only after Gate C, build the complete short-context decoder for Gate D and measure real wall
    token speed plus full memory headroom. Continue Gates E–H in binding order. The one-layer
    comparison provisionally favors PP8 for
    normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
