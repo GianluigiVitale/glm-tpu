@@ -4,6 +4,19 @@ No greenfield full-decoder model-performance measurement exists yet. The real-la
 checkpoint-backed model compute; all other results are protected synthetic TPU mechanisms. None
 reports token speed.
 
+## 2026-08-05 — complete checkpoint load integrity, not performance
+
+DB 420 / `greenfield_full_checkpoint_load_pp8_20260805T201317772639405Z` proves that the complete
+PP8 base-decoder final layout loads directly on all 32 chips. It validates 750,122,559,744 payload
+bytes / 122,640 final shards with device round trips and no host FP8 dequantization, global concat,
+or runtime checkpoint reshard. Maximum weights-only peak HBM is 24.841 GB/chip, leaving at least
+8.173 GB of the runtime-reported 33.014 GB. Local checksums, DB integrity, all three 8/8 censuses,
+and all 47 byte-identical remote archive files pass.
+
+Load duration is checkpoint initialization and is not decode latency. This run did not compile or
+execute a decoder, measure KV/DSA/executable/overlay HBM, or produce a token. It therefore provides
+no tok/s estimate and cannot be used to claim that 2.7 tok/s has improved.
+
 ## 2026-08-05 — protected exact PP8 real sparse layer
 
 DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z` executes real GLM layer-3 FP8 MoE

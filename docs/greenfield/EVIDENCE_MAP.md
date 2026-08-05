@@ -22,6 +22,7 @@ fleet agreement, and eight-host clean pre/post census.
 | 416 | `greenfield_transport_trace_20260805T143832942547470Z` | fresh PP8/PP16 8-file/64-core/20-step XPlane proof |
 | 417 | `greenfield_real_layer_pp8_20260805T165737737514245Z` | exact real layer-3 PP8 correctness/HLO/HBM/wall/XPlane proof |
 | 418 | `greenfield_real_layer_pp16_20260805T172807177182695Z` | exact real layer-3 PP16 correctness/HLO/HBM/wall/XPlane proof |
+| 420 | `greenfield_full_checkpoint_load_pp8_20260805T201317772639405Z` | complete PP8 base-decoder final-owner direct-load/integrity/HBM proof |
 
 Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
 `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
@@ -97,6 +98,34 @@ claim. libtpu rejected a standalone local `2x1x1` slice for visible devices `0,1
 duplicate coordinate assignment. Archived driver logs preserve the cause. The accepted run
 initializes the proven four-chip host subcube but places the PP16 arrays/executable only on adjacent
 devices `0,1`; its HLO and XPlane prove only the two-chip stage executes.
+
+## Complete PP8 checkpoint and protected direct load
+
+The complete inventory/plan/layout chain covers 141 source files, 118,629 leaves, and
+755,617,140,416 source payload bytes. Inventory, plan, execution, and layout hashes are
+`a388627c...2fc4`, `c5bfacc3...c4ed`, `23fd23f8...5c89`, and `aca0eb6d...6a0`.
+The real packed artifact `greenfield_full_pack_pp8_20260805T182222755355852Z` contains 32 base and
+four MTP final-owner files, 760,215,571,712 payload bytes, and packed manifest
+`0869493164a3a63797ea61d88c575f35bea8aa50790c46aa21ce6f0f7c4c78f1`. Its approved checkpoint
+prefix has `SUCCESS`.
+
+DB 420 / `greenfield_full_checkpoint_load_pp8_20260805T201317772639405Z` at exact code
+`91a8c4704c4b435e58c654e48d112e5b2a5b4885` directly loads the 32 base owners on eight hosts / 32
+chips. All 122,640 final tensor shards and 750,122,559,744 bytes pass identities, finite checks,
+device round trips, stage/physical-owner checks, and zero host FP8 dequant/global concat/runtime
+reshard assertions. Maximum weights-only peak HBM is 24,840,958,464 bytes/chip; minimum reported
+free space is 8,173,454,848 bytes. The checksum ledger passes after completion, SQLite integrity is
+`ok`, three censuses contain exactly eight authenticated hosts, and a fresh download of all 47
+remote files is byte-identical to local evidence.
+
+This passes Gate B's checkpoint criteria, not decoder-memory or performance gates. KV/cache,
+executable, overlay, and decoder-temporary HBM are not included; `promotion_memory_proven=false`.
+No token/s or model-latency claim is attached to DB 420.
+
+DB 419 / `greenfield_full_checkpoint_load_pp8_20260805T194526167625636Z` is explicitly rejected as
+promotion evidence. Its mechanical load completed, but the first harness appended a success line to
+`orchestrator.log` after hashing it, so the local `evidence.sha256` ledger did not seal. Historical
+files and DB row remain untouched; the corrected fresh proof is DB 420.
 
 ## Reusable tools, not execution dependencies
 

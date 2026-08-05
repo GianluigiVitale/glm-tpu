@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 17:38 UTC
+**Updated:** 2026-08-05 20:34 UTC
 
 ## Authority and isolation
 
@@ -67,9 +67,20 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `{{0,1}}`. Peak HBM is `11,276,493,312` bytes/chip; the fresh 4-core/20-step XPlane
   has exactly one physical all-reduce on all 80 core-steps. DB, archive, hashes, and 8/8 pre/post
   census pass.
-- Greenfield tests last passed 86/86. Both PP8 and PP16 exact sparse-layer prerequisites are proven.
-  Representative dense/DSA/IndexShare layers, full Gate-B checkpoint/loader, decoder, serving, and
-  genuine token throughput remain unimplemented.
+- Complete inventory/plan/layout maps all 118,629 source leaves / 755,617,140,416 bytes to 32 PP8
+  base owners plus four MTP owners. Full pack `greenfield_full_pack_pp8_20260805T182222755355852Z`
+  contains 760,215,571,712 payload bytes; packed manifest is `08694931...78f1` and the approved
+  checkpoint prefix has `SUCCESS`.
+- Protected DB 420 / `greenfield_full_checkpoint_load_pp8_20260805T201317772639405Z` directly
+  loaded all 32 base owners / 750,122,559,744 bytes on all 32 chips at `91a8c47`. All 122,640 final
+  shards pass identity, finite, physical ownership, and device-roundtrip checks; host FP8 dequant,
+  global concat, and runtime reshard counts are zero. Maximum weights-only HBM is 24,840,958,464
+  bytes/chip with at least 8,173,454,848 free. Ledger, DB integrity, three 8/8 censuses, approved
+  archive, and an independent byte-for-byte download of all 47 files pass. Gate B is complete.
+- Exact reference RMSNorm/final norm, dense/SwiGLU/residual/embedding/logits, accepted RoPE, FP32
+  DSA scorer, exact lowest-global-position ties, and distributed exact top-k are implemented.
+  Greenfield tests pass 149/149. IndexShare and protected real dense/full-DSA/IndexShare evidence
+  remain; no decoder, serving, decoder-HBM, or genuine token-throughput result exists.
 
 ## Protected evidence
 
@@ -122,6 +133,21 @@ Real layer DB 418 / `greenfield_real_layer_pp16_20260805T172807177182695Z` passe
 - HBM after timing is `9,710,615,552` bytes/chip; measured peak is `11,276,493,312` of
   `33,014,413,312`. Correctness, HLO, wall, fresh trace, DB/archive, and cleanup all pass.
 
+Full load DB 420 / `greenfield_full_checkpoint_load_pp8_20260805T201317772639405Z` passed at
+`91a8c47`:
+
+- All eight standalone stages resolved from captured topology and loaded all 32 final base owners.
+  Stage payloads are 89.393–99.323 GB; per-chip peak is 22.357–24.841 GB.
+- Raw FP8 U8 plus local FP32 scales remain in final ownership. File/tensor SHA, finite checks,
+  byte totals, device round trips, state manifests, DB integrity, archive, and three 8/8 censuses
+  pass. The independently downloaded 47-file archive is byte-identical to local evidence.
+- This is load integrity, not decode. `promotion_memory_proven=false`: the 8.173 GB minimum free is
+  before KV, DSA state, executables/overlays, and decoder temporaries. It has no tok/s claim.
+
+Rejected DB 419 / `greenfield_full_checkpoint_load_pp8_20260805T194526167625636Z` is preserved but
+never promotable: its first harness appended to `orchestrator.log` after hashing it, so its local
+ledger failed. DB 420 is a fresh run using the corrected seal-before-success harness.
+
 Rejected diagnostic `greenfield_real_layer_pp16_20260805T172345348528631Z` proved that
 libtpu cannot initialize local devices `0,1` as a standalone `2x1x1` slice: the driver
 reports duplicate coordinate assignment. Its driver logs are archived and it has no DB/performance
@@ -143,13 +169,14 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Begin Gate B for PP8: implement the complete byte-balanced stage assignment, memory budget, and
-   plan-aware final-layout manifest before writing checkpoint payloads. Preserve IndexShare groups
-   where feasible and account for weights/scales/KV/overlays/temporaries per chip.
-2. Extend the bounded pack/direct-loader contracts to the complete checkpoint only after the
-   manifest reconciles every source leaf and all 32 final owners. Fail closed on corruption,
-   incompleteness, non-finite values, stale plan/code, or unmeasured HBM margin.
-3. Continue Gates C–H in binding order. The one-layer comparison provisionally favors PP8 for
+1. Finish Gate C reference mechanisms: selected KV/page lookup, sparse attention, and compact
+   IndexShare state (`int32[1,2048]` positions plus valid count), without selected-KV materialization.
+2. Capture independent raw-source real dense/full-DSA/IndexShare oracle artifacts, then run protected
+   PP8 TPU equivalence/HLO/HBM proofs. Keep DSA selected sets/tie order exact and all repeated
+   collectives stage-local.
+3. Only after Gate C, build the complete short-context decoder for Gate D and measure real wall
+   token speed plus full memory headroom. Continue Gates E–H in binding order. The one-layer
+   comparison provisionally favors PP8 for
    normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
    (`1.076` vs `1.134 ms`); only complete protected decoder evidence may choose the
    final plan.

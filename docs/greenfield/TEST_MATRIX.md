@@ -22,10 +22,14 @@
 | Exact real PP8 local MoE layer | DB 417: exact routes, bounded normal/concentrated tensors, direct load, HBM, wall, XPlane, DB/archive/cleanup | Pass |
 | Real layer-3 PP16 pack | Two final-owner files; 128 experts + shared width 1024/chip; manifest `38573723...e454`; remote `SUCCESS` | Pass (layout mechanism; not Gate B) |
 | Exact real PP16 local MoE layer | DB 418: exact routes, bounded tensors, two-rank HLO, HBM, wall, XPlane, DB/archive/cleanup | Pass |
-| Gate B | Complete plan-aware checkpoint manifest/packer/direct loader | In progress |
-| Gate C overall | Sparse PP8/PP16 prerequisite evidence exists; dense, DSA, and IndexShare representatives await Gate B | Pending |
+| Complete PP8 plan/layout/pack | 118,629 source leaves; 32 base + 4 MTP owners; exact byte/hash reconciliation; manifest `08694931...78f1` | Pass |
+| Complete PP8 direct load | DB 420: all 32 chips / 8 stages, 750,122,559,744 bytes, exact identities, device round trip, peak weights-only HBM, archive/cleanup | Pass |
+| Gate B | Complete plan-aware checkpoint manifest/packer/direct loader and fail-closed corruption handling | Pass |
+| Gate C reference kernels | RMSNorm/final norm, dense/SwiGLU/residual/embedding/logits, RoPE, FP32 DSA scorer, exact distributed top-k | Pass on CPU/reference |
+| Gate C overall | Sparse PP8/PP16 protected prerequisite exists; IndexShare and protected real dense/full-DSA/IndexShare representatives remain | In progress |
 | Gates D–H | Await earlier gates | Missing |
 
-Last verified greenfield suite: 86/86. CPU/HLO and synthetic TPU chains prove mechanism only. DB
-417/418 prove one real sparse layer under both required local plans, not full-model correctness,
-token latency, or wall throughput.
+Last verified greenfield suite: 149/149. CPU/HLO reference tests prove semantics/mechanisms only.
+DB 417/418 prove one real sparse layer under both required local plans; DB 420 proves complete
+checkpoint integrity/direct loading. None proves full-model correctness, decoder HBM, token latency,
+or wall throughput.

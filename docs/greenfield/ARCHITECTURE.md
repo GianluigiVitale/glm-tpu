@@ -70,20 +70,30 @@ four-/two-rank groups, no other collective, real checkpoint load, exact routes, 
 and per-chip HBM. PP16 initializes the known-good four-chip host subcube but arrays/executable live
 only on its selected adjacent pair; its two-partition HLO and four active XPlane cores prove this.
 
-A versioned one-layer-only packer now validates the exact layer-3 source leaf set and writes final
-PP8 or PP16 identity ownership with byte/hash reconciliation. Its tiny-fixture tests pass. Real
+A versioned bounded packer validates the exact layer-3 source leaf set and writes final PP8 or PP16
+identity ownership with byte/hash reconciliation. Its tiny-fixture tests pass. Real
 PP8 artifact `greenfield_one_layer_pack_20260805T151828912346032Z` proves 1,544 leaves /
 9,706,940,416 unique payload bytes across only shards 38–40, four independently hashed final files,
 exact manifest reconciliation, and approved-bucket `SUCCESS`. PP16 artifact
 `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes two independently hashed final
 files with the same source reconciliation and remote `SUCCESS`. These bounded artifacts are not
-Gate B.
+the complete Gate-B evidence.
 A separate raw-source PyTorch oracle now captures normal routes spanning all four PP8 slots and a
 bias-forced all-eight-on-slot-2 case. It records decomposed expert, routed, shared, and final outputs
 plus exact source/legacy hashes without importing greenfield JAX, packed weights, a model class, or
 legacy execution.
 
-No full checkpoint packer/loader, decoder, or serving path exists yet.
+A complete PP8 inventory/byte-balanced plan/layout now maps all 118,629 source leaves to 32 base and
+four MTP final owners. Artifact `greenfield_full_pack_pp8_20260805T182222755355852Z` reconciles
+760,215,571,712 packed payload bytes with manifest `08694931...78f1`. Protected DB 420 directly
+loads all 32 base owners / 750,122,559,744 bytes on all chips with exact hashes, finite checks,
+device round trips, zero host FP8 dequant/global concat/runtime reshard, and maximum weights-only
+HBM 24,840,958,464 bytes/chip. Gate B is passed. Full-decoder HBM remains unproven because KV,
+DSA, executable/overlay, and temporary memory are not present in this load proof.
+
+Readable exact RMSNorm/final norm, dense/SwiGLU/residual/embedding/logit, accepted RoPE, FP32 DSA
+scoring, and exact distributed top-k references now exist. IndexShare, selected KV/page lookup,
+sparse attention, protected real dense/full-DSA/IndexShare proofs, decoder, and serving remain.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
