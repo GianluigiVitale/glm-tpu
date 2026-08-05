@@ -44,11 +44,16 @@ The dependent collective benchmark supports control, all-reduce, reduce-scatter,
 collective-permute, all-to-all, and fused tuple all-reduce over physical groups of 2/4/8/32 chips.
 Rank-dependent state, nonlinear cross-iteration feedback, optimization barriers, bitwise output
 checksums, and optimized-HLO count assertions prevent elision. Protected configs require a chain of
-75, at least 200 warmups, at least 1,000 measured samples, and report complete distributions.
+75, at least 200 warmups, at least 1,000 measured samples, and report complete distributions. TPU
+optimized HLO is authoritative: small decode reduce-scatter currently fails closed because TPU-v4
+XLA rewrites it to all-reduce, while the other supported operations preserve the exact contract.
 
 ## Still unimplemented
 
 No transport executable, model layer, checkpoint packer/loader, decoder, or serving path exists.
-The collective benchmark has CPU/HLO mechanism proof but no protected TPU distribution yet. After
-that protected run, the next executable is the synthetic device-resident PP8/PP16 stage chain—not a
-model port.
+Protected TPU dependent-chain matrices now cover the dominant payload and required bf16 live-
+residual/intermediate shapes. They show that 75 full-pod all-reduces have a `3.941 ms` fleet-max
+p50 and 75 full-ring nearest-neighbor permutes `0.791 ms`, versus `106.495 ms/token` attributed to
+the legacy MoE combine region. This isolates legacy arrival/layout/barrier behavior rather than raw
+small-payload ICI as the dominant loss. It is mechanism evidence, not model throughput. The next
+executable is the synthetic device-resident PP8/PP16 stage chain—not a model port.

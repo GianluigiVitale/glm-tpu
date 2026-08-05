@@ -1,61 +1,74 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 13:38 UTC
+**Updated:** 2026-08-05 14:08 UTC
 
-## Authority and location
+## Authority and isolation
 
-- Branch: `rewrite/topology-first-decode`
-- Worktree: `/home/gianl/glm-tpu-topology-rewrite`
-- Starting harness commit: `a4a17ac4e90b15f1994bd8b26917ef62daa52660`
-- Legacy oracle starting/current pin: `b3c25df47ac98783912dc658878181ec0a8ae16d`
-- Branch operating file: `AGENTS.md`
-- Compact contract: `goal.md`
-- Full contract: `docs/glm-tpu-revolution.md`
+- Branch/worktree: `rewrite/topology-first-decode` at
+  `/home/gianl/glm-tpu-topology-rewrite`.
+- Collective implementation/result pin: `fcd8426735119fee34ab8adc9e8c14b762adc2f8`.
+- Starting harness pin: `a4a17ac4e90b15f1994bd8b26917ef62daa52660`.
+- Legacy oracle pin: `b3c25df47ac98783912dc658878181ec0a8ae16d`.
+- Read `AGENTS.md`, `goal.md`, and `docs/glm-tpu-revolution.md` before this file.
 
-Those two contract files supersede the inherited incremental TP32 instructions and old ban on
-pipeline parallelism. Legacy execution code and evidence remain intact on `main` and in Git history.
-Files in the main checkout or any other worktree have no authority over this branch.
+Those tracked branch-local files are authoritative. `HANDOFF.md` is status only. The main checkout,
+old worktrees, inherited campaign documents, and legacy `AGENTS.md`/`CLAUDE.md`/`HANDOFF.md` files
+have no authority here. The old incremental TP32 sequence and pipeline-parallelism ban are
+superseded. Never edit or delete the owner's untracked main-checkout files.
 
-## Current state
+## Implemented and verified
 
-The isolated engine foundation now exists. Immutable model/physical-topology/stage-plan contracts
-serialize canonically and carry SHA-256 geometry/topology/plan hashes. Runtime discovery refuses
-guessed topology or local ordering. The optimized-HLO contract parser now proves physical replica
-groups, collective counts/pairs/shapes, global-id semantics, repeated-region policy, and explicit
-diagnostic-only handling of full-pod repeated collectives. Focused HLO coverage passes 12/12.
-The dependent-chain benchmark now implements control, all-reduce, reduce-scatter, all-gather,
-collective-permute, all-to-all, and fused tuple reduction over physical 2/4/8/32-chip rings. Its
-nonlinear rank-dependent recurrence, barriers, exact optimized-HLO count/group/pair checks,
-partition-to-physical-device mapping, and bitwise checksums pass forced-device CPU coverage. Exact
-75-operation all-reduce lowering passes at every required group size. The complete greenfield suite
-passes 48/48. No TPU latency result exists yet.
+- Frozen, hashed geometry/topology/plan types; runtime physical discovery; deterministic PP8/PP16
+  physical rings; optimized-HLO contract with partition-id-to-physical-device mapping.
+- Dependent 75-operation benchmark for control, all-reduce, reduce-scatter, all-gather,
+  collective-permute, all-to-all, and fused tuple all-reduce over physical 2/4/8/32-chip groups.
+- Rank-dependent nonlinear recurrence, exact HLO counts/groups/pairs/shapes, bitwise checksums,
+  200 warmups, 1,000 samples, eight-host fleet agreement, append-only DB/archive, and strict cleanup.
+- Greenfield tests last passed 49/49. No model path, checkpoint loader, transport executable, or
+  greenfield model-throughput result exists yet.
 
-Protected Gate-A topology capture passed at code `75c8bb14cbd290930ff024937310f3aec6175090`:
+## Protected evidence
 
-- run `/home/gianl/glm-run/greenfield_topology_20260805T125842425591441Z`;
-- archive `gs://driftbench-dsv4-uc/results/greenfield_topology_20260805T125842425591441Z`;
-- DB 405, exact topology contract `07ccfc470a079e66177497036c5fac2a928067c96d392d0e117d45f2e5986f99`;
-- observed `2x4x4`, 32 JAX-visible v4 chips, 8 processes, 4 local chips/process;
-- topology hash `294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559`;
-- PP8 ring process order `[0,2,4,6,7,5,3,1]`, group hash `d5943ab8...23c14`;
-- PP16 all-lane-adjacent ring, group hash `6383e57c...40f21`;
-- TPU-VM suffixes are not JAX ranks: launch-to-JAX is
-  `{0:1,1:6,2:0,3:7,4:2,5:4,6:3,7:5}`;
-- eight fleet records agreed on-device; pre/post census was 8/8 `CENSUS_OK`; remote `SUCCESS` exists.
+Topology DB 405 / `greenfield_topology_20260805T125842425591441Z` proved 32 v4 chips in `2x4x4`,
+eight processes, actual local ordering, topology hash `294e777...559`, PP8 hash `d5943ab8...c14`,
+PP16 hash `6383e57c...f21`, remote `SUCCESS`, and 8/8 clean census.
 
-This proves physical inventory and local groups only. It is not PP8/PP16 transport, HLO, model, or
-throughput evidence. No greenfield performance claim exists. Legacy execution remains oracle-only.
+Protected collective runs DB 406–412 all archived to the approved bucket and ended 8/8 clean:
+
+- DB 406 `...T133905344573798Z`: dominant `bf16[2,6144]` control/all-reduce, all group sizes.
+  Fleet-max p50 for 75 all-reduces: g2 `0.836`, g4 `1.083`, g8 `1.471`, g32 `3.941` ms.
+- DB 407 `...T134254891049866Z`: dominant-payload all-gather, g2/g4/g8/g32 p50
+  `0.798/1.012/1.475/4.503` ms.
+- DB 408 and 409: protected exact-HLO validation of collective-permute and fused tuple reduction.
+- DB 410 `...T135644529157649Z`: dominant-payload collective-permute, all-to-all, and fused tuple
+  matrices. Collective-permute p50 is `0.651/0.653/0.653/0.791` ms for 75 operations.
+- DB 411 `...T135850389312854Z`: supported six-operation `bf16[1,6144]` matrix.
+- DB 412 `...T140125151247631Z`: supported six-operation `bf16[1,2048]` matrix.
+
+Small decode reduce-scatter is deliberately **not** reported as measured. TPU-v4 optimized XLA
+rewrote 75 requested reduce-scatters to 75 all-reduces even after disabling the decomposition flag
+and making result segments non-equivalent. Diagnostics `...T134618415607642Z`,
+`...T135045281384327Z`, and `...T135140118884391Z` failed closed before timing and preserve HLO.
+
+## Interpretation and current boundary
+
+The legacy 75 full-pod MoE combines cost `106.495 ms/token` (`1.420 ms` attributed per layer), but
+an exact dependent chain of 75 full-pod all-reduces costs only `3.941 ms` p50; 75 nearest-neighbor
+permutes cost `0.791 ms`. Therefore 12 KiB ICI payload bandwidth is not the legacy floor. Most of
+the old time is arrival skew, layout/reshard, barrier waiting, and legacy decomposition around each
+collective. Replacing only the collective primitive cannot recover 100 ms; the stage-local layout
+and device-resident pipeline are the structural fix. These are synthetic mechanism results, not
+token speed.
 
 ## Exact next sequence
 
-1. Capture the protected dependent-chain TPU distributions with exact HLO, fleet agreement,
-   append-only DB/archive evidence, and clean pre/post census; expand across the required
-   operation/shape/dtype matrix after the first dominant-payload discriminator passes.
-2. Prove device-resident PP8 and PP16 stage-transfer skeletons with no host/Ray/Python stage dispatch,
-   no inactive-stage model-equivalent compute, exact point-to-point HLO, and fresh traces.
-3. Prove one exact real MoE layer whose combine is confined to its 2/4-chip stage.
-4. Continue through Gates B–H exactly as specified. Do not pack/load the full 753B model before the
-   first three architectural proofs pass.
+1. Finish the required collective floor with `f32[1,6144]` and small `int32` routing metadata;
+   document FP8/reduce-scatter support boundaries.
+2. Implement and protect the PP8 then PP16 device-resident stage-transfer chain: exact point-to-
+   point HLO, no host/Ray/Python dispatch, no inactive-stage model-equivalent compute, warmed full
+   distributions, fresh traces, DB/archive, and clean fleet.
+3. Prove one exact real MoE layer whose combine remains inside its 4/2-chip stage.
+4. Continue Gates B–H in the binding specification; do not load the full 753B checkpoint before
+   the three architectural prerequisites pass.
 
-Every result requires exact code/plan provenance. Update this file with current evidence and next
-action; detailed measurements belong in `docs/greenfield/PERFORMANCE_LOG.md`.
+The pod was rechecked at this update and all eight hosts reported `CENSUS_OK`.
