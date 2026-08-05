@@ -383,7 +383,7 @@ def _chain_function(config: CollectiveChainConfig) -> Any:
                     auxiliary = lax.optimization_barrier(
                         auxiliary
                         * jnp.asarray(0.25 / config.group_size, auxiliary.dtype)
-                        + feedback
+                        + feedback.astype(auxiliary.dtype)
                     )
                 return state, auxiliary
 
