@@ -120,6 +120,17 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   score-order positions. This is preserved as an explicit non-relaxed diagnostic. The runtime does
   not use CPU positions: it selects exactly from actual TPU scores and carries that exact state.
   Do not claim raw cross-framework position identity from DB 421.
+- Gate D implementation is in progress at `c984f5d`. The immutable PP8 schedule maps all 78 layers,
+  padded dense/sparse slots, every full-DSA producer, and five exact 8,192-byte cross-stage
+  IndexShare handoffs. A global 32-device one-live-row control shell proves eight local four-chip
+  reductions and two compact/residual lane transfers per stage without dead rows. The target-256K
+  state layout reconciles every plan assignment and bounds the padded KV/index/selection/transport
+  component at 1,090,555,904 bytes/chip. Device-side E4M3FN decode plus raw-FP8 dense/MoE/cached-DSA/
+  IndexShare bodies now exist; the cached bodies safely refuse invalid/aliased page tables, mutate
+  only the owning local cache, and match the readable oracle exactly on a forced four-device mesh.
+  CPU optimized HLO is DSA `3AG/0AR` and IndexShare `4AG/1AR`, local only. The full greenfield suite
+  is 203/203 and the legacy analysis/protection subset is 28/28. This is implementation/reference
+  evidence only: no complete layer stack, TPU decoder, measured decoder HBM, latency, or tok/s exists.
 
 ## Protected evidence
 
@@ -220,10 +231,12 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Build the complete 2K/8K short-context decoder for Gate D. Integrate the proven final-owner
-   loader and stage-local dense/DSA/IndexShare/MoE kernels into one device-resident PP8 pipeline;
-   prove raw tokens, exact runtime DSA selection/ties, cache/state integrity, no repeated 32-chip
-   layer collective, decoder peak HBM, fresh trace, and profiler-free steady wall.
+1. Complete the actual 78-layer PP8 program: bind stacked final-owner checkpoint/state tensors to
+   the immutable schedule, execute raw-FP8 attention + MLP bodies only on the active stage inside
+   the global pipeline, then add embedding/final-norm/logits/token/cache orchestration. Prove the
+   complete 2K/8K Gate-D decoder with raw tokens, exact runtime DSA selection/ties, cache/state
+   integrity, no repeated 32-chip layer collective, decoder peak HBM, fresh trace, and profiler-free
+   steady wall.
 2. Continue Gates E–H in binding order. The one-layer
    comparison provisionally favors PP8 for
    normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary

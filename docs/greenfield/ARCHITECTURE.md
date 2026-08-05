@@ -103,6 +103,18 @@ collectives remain inside the four-chip group; the exact device-score selection/
 passes. Raw PyTorch CPU scores differ enough at the 2,048-of-2,304 boundary to swap two members,
 which is preserved as a cross-framework diagnostic rather than used as runtime state. The complete
 decoder and serving path remain.
+
+Gate D now has an immutable all-78-layer PP8 schedule, five explicit cross-stage compact-state
+handoffs, and a one-live-row 32-device pipeline control shell. The target-256K state layout uses one
+global padded shape while reconciling each stage's actual KV/indexer bytes; its maximum padded state
+component is 1,090,555,904 bytes/chip. Raw checkpoint U8 E4M3FN decoding and dense, MoE, cached DSA,
+and IndexShare bodies execute inside a surrounding shard map from final-owner shards. The DSA body
+writes only the striped owner, scores BF16 cached keys, and performs exact local-candidate merge.
+IndexShare writes current KV before attending, gathers only each owner's selected rows, and merges
+local LSE results. Invalid or aliased live page tables are clipped before access, leave cache state
+unchanged, and propagate a false device health predicate. Forced four-device differential tests are
+exact; CPU HLO contains DSA `3AG/0AR` and IndexShare `4AG/1AR`. This is not yet the complete staged
+layer program and has no TPU latency or throughput claim.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
