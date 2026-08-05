@@ -33,6 +33,16 @@ Transport trace `...T143608529930365Z` failed validation because worker-0's orig
 canonical downloaded copy occupied the same parser tree; it has no DB row or accepted status. DB
 416 uses an isolated fleet directory and proves eight distinct embedded hostnames per plan.
 
+## Durable checkpoint-layout artifact
+
+`greenfield_one_layer_pack_20260805T151828912346032Z` is the first real bounded layer-3 artifact.
+At code `1969d925...f3d4`, it validated 1,544 leaves / 9,706,940,416 unique bytes from only source
+shards 38–40 and wrote four final PP8 files of 2,429,096,640 bytes each. Packed payload
+9,716,380,672 reconciles the intentional router replication. Manifest SHA-256 is
+`68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938`; local and approved-bucket
+`SUCCESS` exist. This is checkpoint-layout mechanism evidence, not a DB-linked TPU performance run
+and not Gate B for the complete model.
+
 ## Reusable tools, not execution dependencies
 
 - Optimized-HLO contract: `glm_tpu/greenfield/sharding/hlo_contract.py` and

@@ -24,3 +24,13 @@ paths are refused.
 
 This artifact authorizes only the one-layer PP8/PP16 proofs. It is not Gate B
 and cannot be reused as evidence that the full 753B checkpoint packs or loads.
+
+The first real artifact is
+`greenfield_one_layer_pack_20260805T151828912346032Z`, created at code
+`1969d9252a45237f1fa5a1eb0bcd44b6e8e8f3d4` from immutable source revision
+`gcs-object-set-830fd1bf7d8d6b6242895cfd50f5978e5cc5749da42246c19391855e586e9658`.
+It reconciles 9,706,940,416 unique source bytes to 9,716,380,672 packed payload
+bytes; the increase is the declared replication of the router weight and bias.
+All four files are 2,429,096,640 bytes. Manifest SHA-256 is
+`68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938`.
+The approved-bucket artifact has a remote `SUCCESS` marker.

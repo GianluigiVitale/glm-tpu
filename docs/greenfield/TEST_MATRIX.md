@@ -16,8 +16,8 @@
 | L0 MoE numerical contract | Block dequant, sigmoid/noaux_tc bias semantics, ties, normalization | Pass |
 | L1 four-device PP8 MoE reference | Distributed routes + all-top-4-on-one-chip; bounded output equivalence | Pass (synthetic) |
 | L2 MoE combine HLO | One stacked routed/shared four-rank AR; no other collective | Pass on CPU; TPU proof missing |
-| One-layer pack format | Exact source leaf set, ownership, byte/hash round trip, corruption refusals | Pass on tiny fixture |
-| Real layer-3 metadata | 1,544 leaves / 9,706,940,416 bytes / source shards 38–40 | Pass (metadata only) |
+| One-layer pack format | Exact source leaf set, ownership, byte/hash round trip, corruption refusals | Pass on tiny fixture and real artifact |
+| Real layer-3 pack | 1,544 leaves / 9,706,940,416 unique bytes / only shards 38–40; four final PP8 files; manifest `68ef8201...f938`; remote `SUCCESS` | Pass (layout mechanism; not Gate B) |
 | Gate C exact real local MoE layer | Reference exists; real weights/oracle/protected TPU evidence missing | In progress |
 | Gates B/D–H | Prohibited until earlier gates authorize them | Missing |
 
