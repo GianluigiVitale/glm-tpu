@@ -43,7 +43,8 @@ has_eight_unique_markers() {
 }
 
 strict_census() {
-  local label=$1 out="$RUN_DIR/census_${label}.txt"
+  local label=$1
+  local out="$RUN_DIR/census_${label}.txt"
   local carrier="${TAG}_${label}"
   local ray_enum
   # Literal remote program; expansions occur on the TPU VM.
