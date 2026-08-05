@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 21:29 UTC
+**Updated:** 2026-08-05 21:47 UTC
 
 ## Authority and isolation
 
@@ -93,6 +93,15 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   write-before-attend. The 36,060,088-byte safetensor is `a8927db...0364`; manifest is
   `54262529...4a9f`; local/remote `SUCCESS` and the local evidence ledger pass. This is an
   independent correctness artifact, not TPU or performance proof.
+- Bounded final-owner Gate C checkpoint
+  `greenfield_gate_c_pack_20260805T214609093206269Z` passed at `8a50d6a`. It is an exact
+  content-addressed subset of protected full layout `aca0eb6d...6a0` and oracle
+  `54262529...4a9f`: 31/31 raw leaves from shards 20/38/40 are hashed while streaming once, with
+  413,810,816 unique source bytes becoming four equal 125,611,520-byte PP8 stage-0 payloads.
+  Packed payload/file totals are 502,446,080/502,461,536 bytes; layout is `cdbea04f...c678` and
+  packed manifest is `3c5c48da...2a8a`. All four file hashes, the sealed local ledger, remote
+  size/generation/CRC32C, approved-bucket archive, and local/remote `SUCCESS` pass. This removes
+  the need to load ~92 GB of complete stage-0 owner files for Gate C but is not a TPU result.
 
 ## Protected evidence
 
@@ -181,9 +190,10 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Pack/load the bounded real layer-2/3 Gate C weights in final PP8 ownership, then run protected
-   dense/full-DSA/IndexShare TPU equivalence/HLO/HBM proofs against manifest `54262529...4a9f`.
-   Keep selected sets/tie order exact and all repeated collectives stage-local.
+1. Direct-load bounded pack `3c5c48da...2a8a` on the captured PP8 stage, then run protected
+   dense/full-DSA/IndexShare TPU equivalence/HLO/HBM proofs against oracle `54262529...4a9f`.
+   Keep selected sets/tie order exact, preserve the 8,192-byte IndexShare state, and keep every
+   repeated collective inside the four-chip stage.
 2. Only after Gate C, build the complete short-context decoder for Gate D and measure real wall
    token speed plus full memory headroom. Continue Gates E–H in binding order. The one-layer
    comparison provisionally favors PP8 for

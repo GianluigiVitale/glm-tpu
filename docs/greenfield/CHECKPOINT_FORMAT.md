@@ -43,6 +43,26 @@ criteria. They do **not** prove full-decoder HBM safety: KV, DSA state,
 executables, compiler overlays, and decoder temporaries remain unmeasured, and
 the plan correctly records `promotion_memory_proven=false`.
 
+## Bounded Gate C derivative
+
+Artifact `greenfield_gate_c_pack_20260805T214609093206269Z` at code `8a50d6a` derives only the 31
+real layer-2/3 dense, full-DSA, and IndexShare leaves from the protected complete PP8 layout. It
+copies every placement exactly; no independent ownership recipe is allowed. The subset layout
+binds parent `aca0eb6d...6a0`, oracle `54262529...4a9f`, and immutable source revision
+`gcs-object-set-830f...9658`. It opens only raw source shards 20, 38, and 40 and validates each raw
+tensor SHA-256 against the independent oracle while streaming all four owners together.
+
+The 413,810,816 unique source bytes produce 502,446,080 packed payload bytes because the protected
+layout intentionally replicates small stage-local leaves. Each owner payload is 125,611,520 bytes;
+the four complete files total 502,461,536 bytes. Subset-layout SHA-256 is
+`cdbea04f226f2bd93f3d5ae006ea14b5119e091e29a36da52d783e9d2284c678`; packed manifest is
+`3c5c48dadb1b42ec6c99667b79196477ed978cb555dc57dec9e4af38583f2a8a`. Local hashes and the sealed
+evidence ledger pass, and the approved-bucket objects have verified sizes, generations, CRC32C,
+and `SUCCESS`.
+
+This derivative exists only to make the protected Gate C load bounded; it does not replace the
+complete Gate B artifact and has no TPU, HBM, decoder, latency, or throughput claim.
+
 ## Bounded one-layer precursors
 
 Before the complete artifact, format version 1 defined a bounded

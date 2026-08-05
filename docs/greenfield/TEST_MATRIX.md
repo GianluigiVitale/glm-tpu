@@ -27,10 +27,11 @@
 | Gate B | Complete plan-aware checkpoint manifest/packer/direct loader and fail-closed corruption handling | Pass |
 | Gate C reference kernels | Dense/norm/RoPE, FP32 DSA/top-k, compact IndexShare, stage-local KV, sparse MLA and LSE merge; full-width FP32/BF16 legacy comparisons exact | Pass on CPU/reference |
 | Real Gate C oracle | 31 raw layer-2/3 tensors; 2,304-token full scorer; 2,048 exact positions; 8,192-byte IndexShare; dense/sparse-attention outputs; manifest `54262529...4a9f` | Pass (correctness artifact) |
+| Bounded Gate C final-owner pack | Exact protected-layout subset; 31 raw hashes; 413,810,816 source bytes; four equal PP8 owners; manifest `3c5c48da...2a8a`; local/remote integrity | Pass (layout mechanism) |
 | Gate C overall | Sparse PP8/PP16 protected prerequisite, ordered references, and independent oracle exist; protected real dense/full-DSA/IndexShare TPU proof remains | In progress |
 | Gates D–H | Await earlier gates | Missing |
 
-Last verified greenfield suite: 173/173 on forced CPU. CPU/HLO reference tests prove
+Last verified greenfield suite: 180/180 on forced CPU. CPU/HLO reference tests prove
 semantics/mechanisms only.
 DB 417/418 prove one real sparse layer under both required local plans; DB 420 proves complete
 checkpoint integrity/direct loading. None proves full-model correctness, decoder HBM, token latency,

@@ -65,6 +65,15 @@ the 36,060,088-byte safetensor SHA-256 is
 `a8927db679ed74b9adc38d516fab4c4985acc5dc7489d6379e28b2ba52270364`; local/remote `SUCCESS` and
 the local evidence ledger pass. This is correctness input, not TPU or performance evidence.
 
+`greenfield_gate_c_pack_20260805T214609093206269Z` is the bounded exact-final-owner derivative at
+code `8a50d6a`. Its 31 placements are copied from protected full PP8 layout `aca0eb6d...6a0`, and
+their raw bytes must match independent oracle `54262529...4a9f` while streaming. Unique source,
+packed payload, and packed file totals are 413,810,816, 502,446,080, and 502,461,536 bytes. Each of
+the four stage-0 owners has 31 leaves and a 125,611,520-byte payload. Subset layout is
+`cdbea04f...c678`; packed manifest is `3c5c48da...2a8a`. The local evidence ledger and all payload
+hashes pass; approved-bucket size/generation/CRC32C and local/remote `SUCCESS` pass. It is bounded
+checkpoint-layout evidence only, not a protected TPU/DB/performance result.
+
 ## Protected exact PP8 real layer
 
 DB 417 / `greenfield_real_layer_pp8_20260805T165737737514245Z` is the first real checkpoint-backed
