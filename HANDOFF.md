@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 14:40 UTC
+**Updated:** 2026-08-05 15:30 UTC
 
 ## Authority and isolation
 
@@ -24,8 +24,13 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 - Complete protected 75-operation collective floor over physical 2/4/8/32-chip groups.
 - Device-resident PP8/PP16 transport: closed physical lanes, exact point-to-point HLO, one compiled
   global program, deterministic checksums, warmed distributions, and fresh fleet XPlanes.
-- Greenfield tests last passed 54/54. No model layer, checkpoint loader, decoder, serving path, or
-  greenfield model-throughput result exists yet.
+- Independent batch-one MoE reference: FP8 128x128 block dequant, FP32 sigmoid/noaux_tc routing,
+  correction bias for selection only, exact lowest-id ties, normalized top-8, post-reduction 2.5
+  scale, 64 complete experts/chip, and intermediate-sharded shared expert. Routed/shared partials
+  share one four-chip combine without mixing value domains. Forced four-device distributed and
+  all-top-4-on-one-chip cases pass bounded tensor equivalence; routing is elementwise exact.
+- Greenfield tests last passed 61/61. No real checkpoint layer/capture, checkpoint loader, decoder,
+  serving path, or greenfield model-throughput result exists yet.
 
 ## Protected evidence
 
@@ -71,11 +76,14 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Prove one exact real GLM MoE layer whose routed/shared combine remains inside its four-chip PP8
-   stage: captured legacy-oracle inputs/outputs, exact router/expert ownership, adversarial expert
-   concentration, numerical contract, physical HLO, TPU result, DB/archive, and clean fleet.
-2. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
-3. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
+1. Build a one-layer-only artifact from checkpoint layer 3 without loading the full model. Source
+   leaves occupy safetensor shards 38–40: router/correction/shared tensors and 256 routed experts.
+   Stream directly into four final identity-owned shards and produce a standalone oracle capture.
+2. Run the exact real layer on one four-chip PP8 stage: normal routing and adversarial eight experts
+   on one chip, bounded tensor comparison, exact `bf16[2,1,6144]` four-rank HLO, HBM/latency,
+   DB/archive, and authenticated fleet cleanup.
+3. Add the mandatory PP16 two-chip form against the same oracle after PP8 is exact.
+4. Continue Gates B–H exactly as specified. Do not pack/load the full 753B checkpoint until the
    topology, transport, and exact topology-local MoE prerequisites all pass.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.

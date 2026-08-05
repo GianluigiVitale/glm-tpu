@@ -13,8 +13,11 @@
 | Gate A PP16 transport | DB 415 exact 16-hop HLO/distributions; DB 416 8-file/64-core trace | Pass (mechanism) |
 | Gate A inactive-stage/no-host-dispatch proof | One global device program; no model compute; HLO/trace only p2p permutes | Pass (skeleton) |
 | Gate A overall | Topology, collective floor, PP8/PP16 transport, trace, provenance, cleanup | Pass |
-| Gate C exact real local MoE layer | Not implemented | Missing |
+| L0 MoE numerical contract | Block dequant, sigmoid/noaux_tc bias semantics, ties, normalization | Pass |
+| L1 four-device PP8 MoE reference | Distributed routes + all-top-4-on-one-chip; bounded output equivalence | Pass (synthetic) |
+| L2 MoE combine HLO | One stacked routed/shared four-rank AR; no other collective | Pass on CPU; TPU proof missing |
+| Gate C exact real local MoE layer | Reference exists; real weights/oracle/protected TPU evidence missing | In progress |
 | Gates B/D–H | Prohibited until earlier gates authorize them | Missing |
 
-Last verified greenfield suite: 54/54. CPU/HLO and synthetic TPU chains prove mechanism only; they
+Last verified greenfield suite: 61/61. CPU/HLO and synthetic TPU chains prove mechanism only; they
 do not establish model correctness, token latency, or wall throughput.

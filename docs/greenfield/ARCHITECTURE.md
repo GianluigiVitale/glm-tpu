@@ -59,7 +59,17 @@ dispatch, or model-equivalent compute. For `bf16[1,6144]`, the whole ring is `0.
 
 ## Still unimplemented
 
-No model layer, checkpoint packer/loader, decoder, or serving path exists.
+An independent exactness-first batch-one MoE reference now exists under
+`kernels/reference/moe.py`. It pins FP8 block dequantization, FP32 sigmoid/noaux_tc routing,
+correction-bias selection-only semantics, lowest-expert-id ties, top-8 normalization, expert
+ownership, shared-expert sharding, and post-reduction routed scale. Forced four-device CPU tests
+prove distributed and adversarial single-chip expert concentration against the unsharded fallback.
+The optimized CPU HLO has one four-rank stacked routed/shared all-reduce and no other collective.
+CPU XLA promotes that reduction to f32; protected TPU HLO must instead prove the required
+`bf16[2,1,6144]` physical payload.
+
+No real checkpoint layer, captured layer oracle, checkpoint packer/loader, decoder, or serving path
+exists yet.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;
@@ -68,4 +78,5 @@ all-reduces have a `3.941 ms` fleet-max
 p50 and 75 full-ring nearest-neighbor permutes `0.791 ms`, versus `106.495 ms/token` attributed to
 the legacy MoE combine region. This isolates legacy arrival/layout/barrier behavior rather than raw
 small-payload ICI as the dominant loss. It is mechanism evidence, not model throughput. The next
-prerequisite is one exact real topology-local MoE layer—not a full-model port.
+prerequisite remains one exact real topology-local MoE layer—not a full-model port. The immediate
+work is a one-layer-only checkpoint/capture artifact; it must not load the complete model.
