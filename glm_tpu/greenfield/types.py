@@ -99,6 +99,10 @@ class ModelGeometry:
     kv_heads: int
     kv_lora_rank: int
     q_lora_rank: int
+    qk_nope_head_dim: int
+    qk_rope_head_dim: int
+    v_head_dim: int
+    num_nextn_predict_layers: int
     max_position_embeddings: int
     vocab_size: int
     activation_dtype: str
@@ -134,6 +138,10 @@ class ModelGeometry:
             "kv_heads",
             "kv_lora_rank",
             "q_lora_rank",
+            "qk_nope_head_dim",
+            "qk_rope_head_dim",
+            "v_head_dim",
+            "num_nextn_predict_layers",
             "max_position_embeddings",
             "vocab_size",
         ):
@@ -155,6 +163,10 @@ class ModelGeometry:
         if self.dsa_top_k > self.max_position_embeddings:
             raise GeometryValidationError(
                 "dsa_top_k cannot exceed max_position_embeddings"
+            )
+        if self.num_nextn_predict_layers != 1:
+            raise GeometryValidationError(
+                "the exact GLM-5.2 target requires one MTP layer"
             )
         if self.hidden_size % self.attention_heads:
             raise GeometryValidationError(
@@ -232,6 +244,10 @@ class ModelGeometry:
                 kv_heads=config["num_key_value_heads"],
                 kv_lora_rank=config["kv_lora_rank"],
                 q_lora_rank=config["q_lora_rank"],
+                qk_nope_head_dim=config["qk_nope_head_dim"],
+                qk_rope_head_dim=config["qk_rope_head_dim"],
+                v_head_dim=config["v_head_dim"],
+                num_nextn_predict_layers=config["num_nextn_predict_layers"],
                 max_position_embeddings=config["max_position_embeddings"],
                 vocab_size=config["vocab_size"],
                 activation_dtype=config["dtype"],
@@ -267,9 +283,13 @@ class ModelGeometry:
             "num_layers": self.num_layers,
             "num_routed_experts": self.num_routed_experts,
             "num_shared_experts": self.num_shared_experts,
+            "num_nextn_predict_layers": self.num_nextn_predict_layers,
+            "qk_nope_head_dim": self.qk_nope_head_dim,
+            "qk_rope_head_dim": self.qk_rope_head_dim,
             "q_lora_rank": self.q_lora_rank,
             "routed_top_k": self.routed_top_k,
             "vocab_size": self.vocab_size,
+            "v_head_dim": self.v_head_dim,
             "weight_storage_dtype": self.weight_storage_dtype,
         }
 

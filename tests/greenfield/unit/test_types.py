@@ -111,6 +111,10 @@ def test_checked_in_glm_geometry_is_exact(geometry: ModelGeometry) -> None:
     assert geometry.dsa_top_k == 2048
     assert geometry.dsa_indexer_heads == 32
     assert geometry.index_share_group_size == 4
+    assert geometry.qk_nope_head_dim == 192
+    assert geometry.qk_rope_head_dim == 64
+    assert geometry.v_head_dim == 256
+    assert geometry.num_nextn_predict_layers == 1
     assert geometry.fp8_block_shape == (128, 128)
     assert geometry.weight_storage_dtype == "fp8:e4m3"
     assert len(geometry.mlp_layer_types) == len(geometry.indexer_types) == 78
