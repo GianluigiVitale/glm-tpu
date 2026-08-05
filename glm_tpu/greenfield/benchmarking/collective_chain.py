@@ -171,6 +171,7 @@ class CompiledCollectiveChain:
     optimized_hlo: str
     hlo_report: HloLintReport
     compile_seconds: float
+    compiler_options: Mapping[str, Any]
 
 
 def _percentile(values: Sequence[float], quantile: float) -> float:
@@ -468,7 +469,17 @@ def build_collective_chain(
         out_specs=out_specs,
         check_vma=False,
     )
-    executable = jax.jit(mapped)
+    compiler_options: dict[str, Any] = {}
+    if (
+        config.kind is CollectiveKind.REDUCE_SCATTER
+        and runtime_devices
+        and {device.platform for device in runtime_devices} == {"tpu"}
+    ):
+        # TPU's default standalone-RS legalizer rewrites this small primitive
+        # to all-reduce + slice.  The RS arm is meaningful only when optimized
+        # HLO retains the requested physical operation.
+        compiler_options["xla_tpu_decompose_every_reduce_scatters_hlos"] = "false"
+    executable = jax.jit(mapped, compiler_options=compiler_options)
     host = np.linspace(
         -0.25,
         0.25,
@@ -495,6 +506,7 @@ def build_collective_chain(
         optimized_hlo=optimized_hlo,
         hlo_report=report,
         compile_seconds=compile_seconds,
+        compiler_options=compiler_options,
     )
 
 
@@ -543,6 +555,7 @@ def benchmark_collective_chain(compiled: CompiledCollectiveChain) -> dict[str, A
     distribution = _distribution(samples_ms)
     return {
         "compile_seconds": compiled.compile_seconds,
+        "compiler_options": dict(compiled.compiler_options),
         "config": compiled.config.to_dict(),
         "first_addressable_checksum": first_checksum,
         "hlo": compiled.hlo_report.to_dict(),
