@@ -77,8 +77,25 @@ def _git_head() -> str:
 def _atomic_write(path: Path, value: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
-    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    temporary.write_text(
+        json.dumps(
+            value,
+            allow_nan=False,
+            default=_json_default,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
     temporary.replace(path)
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"{type(value).__name__} is not JSON serializable")
 
 
 def _sha256_file(path: Path) -> str:
