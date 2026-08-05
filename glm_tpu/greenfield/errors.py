@@ -19,3 +19,7 @@ class PlanValidationError(GreenfieldConfigError):
 
 class HloContractViolationError(RuntimeError):
     """Lowered HLO violates an explicit physical execution contract."""
+
+
+class BenchmarkValidationError(GreenfieldConfigError):
+    """A synthetic benchmark does not satisfy its declared proof contract."""

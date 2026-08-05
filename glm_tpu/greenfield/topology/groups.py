@@ -377,3 +377,118 @@ def group_manifest_hash(
         sort_keys=True,
     ).encode("utf-8")
     return sha256(encoded).hexdigest()
+
+
+def _physical_neighbors(
+    left: PhysicalDevice,
+    right: PhysicalDevice,
+    topology: PhysicalTopology,
+) -> bool:
+    """Whether two chips share one physical torus edge."""
+
+    return _differing_axis(left, right, topology) is not None
+
+
+def physical_device_ring(
+    topology: PhysicalTopology,
+    device_ids: Iterable[int],
+) -> tuple[int, ...]:
+    """Find a deterministic physical Hamiltonian ring for one collective group.
+
+    The order is used as the ``member`` mesh axis for collective-permute.  It is
+    derived solely from observed coordinates; JAX ids only break coordinate
+    ties.  Candidate ordering uses the remaining-neighbor count to avoid
+    pathological DFS expansion on the complete 32-chip v4 torus.
+    """
+
+    requested = tuple(device_ids)
+    if not requested or len(requested) != len(set(requested)):
+        raise TopologyValidationError(
+            "a physical ring requires non-empty, unique device ids"
+        )
+    by_id = {device.device_id: device for device in topology.devices}
+    unknown = set(requested) - by_id.keys()
+    if unknown:
+        raise TopologyValidationError(
+            f"physical ring references unknown device ids {sorted(unknown)}"
+        )
+    devices = tuple(sorted((by_id[item] for item in requested), key=_device_key))
+    if len(devices) == 1:
+        return (devices[0].device_id,)
+    neighbors = {
+        device.device_id: frozenset(
+            candidate.device_id
+            for candidate in devices
+            if candidate != device
+            and _physical_neighbors(device, candidate, topology)
+        )
+        for device in devices
+    }
+    if any(not adjacent for adjacent in neighbors.values()):
+        raise TopologyValidationError(
+            "collective group contains a device with no physical neighbor"
+        )
+
+    start = devices[0].device_id
+
+    def search(
+        path: tuple[int, ...], remaining: frozenset[int]
+    ) -> tuple[int, ...] | None:
+        if not remaining:
+            return path if start in neighbors[path[-1]] else None
+        candidates = remaining.intersection(neighbors[path[-1]])
+        ordered = sorted(
+            candidates,
+            key=lambda item: (
+                len(neighbors[item].intersection(remaining - {item})),
+                _device_key(by_id[item]),
+            ),
+        )
+        for candidate in ordered:
+            result = search(path + (candidate,), remaining - {candidate})
+            if result is not None:
+                return result
+        return None
+
+    ring = search((start,), frozenset(requested) - {start})
+    if ring is None:
+        raise TopologyValidationError(
+            f"devices {sorted(requested)} have no physical Hamiltonian ring"
+        )
+    return ring
+
+
+def collective_groups_for_size(
+    topology: PhysicalTopology,
+    group_size: int,
+) -> tuple[tuple[int, ...], ...]:
+    """Build the required 2/4/8/32-chip benchmark groups as physical rings."""
+
+    if group_size == 2:
+        source = tuple(group.device_ids for group in build_pp16_lp2_groups(topology))
+    elif group_size == 4:
+        source = tuple(group.device_ids for group in build_pp8_lp4_groups(topology))
+    elif group_size == 8:
+        pp8 = build_pp8_lp4_groups(topology)
+        source = tuple(
+            pp8[index].device_ids + pp8[index + 1].device_ids
+            for index in range(0, len(pp8), 2)
+        )
+    elif group_size == len(topology.devices) == 32:
+        source = (tuple(device.device_id for device in topology.devices),)
+    else:
+        raise TopologyValidationError(
+            "collective benchmark group size must be one of 2, 4, 8, or 32"
+        )
+
+    groups = tuple(physical_device_ring(topology, group) for group in source)
+    members = [device for group in groups for device in group]
+    if (
+        any(len(group) != group_size for group in groups)
+        or len(members) != len(set(members))
+        or set(members) != {device.device_id for device in topology.devices}
+    ):
+        raise TopologyValidationError(
+            f"size-{group_size} collective groups must partition all devices"
+        )
+    return groups

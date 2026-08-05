@@ -2,6 +2,21 @@
 
 No greenfield model-performance measurement exists yet.
 
+## 2026-08-05 — dependent collective benchmark CPU/HLO mechanism
+
+The greenfield benchmark now compiles genuinely dependent control, all-reduce, reduce-scatter,
+all-gather, collective-permute, all-to-all, and fused tuple all-reduce chains. Forced-device CPU
+lowering preserves exactly three of each requested operation in the cross-operation test, preserves
+tuple-result fusion, and produces deterministic bitwise addressable checksums. An exact-75
+all-reduce smoke passes independently for group sizes 2/4/8/32. These are anti-elision and HLO
+contract results only; CPU timings are discarded and no TPU or model performance claim exists.
+The test uses a non-identity device assignment and proves that logical HLO partition ids are mapped
+back to physical device ids before accepting replica groups or collective-permute edges.
+
+The protected runner requires 75 dependent operations, 200+ warmups, 1,000+ measured invocations,
+full p50/p90/p95/p99 distributions, exact physical groups/counts/pairs, fleet HLO agreement, and
+first/last checksum equality. Protected metal evidence is still pending.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved the runtime physical

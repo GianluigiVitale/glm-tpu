@@ -10,8 +10,9 @@ replacement specification.
 - Starting harness pin: `a4a17ac4e90b15f1994bd8b26917ef62daa52660`
 - Starting legacy-oracle pin: `b3c25df47ac98783912dc658878181ec0a8ae16d`
 - Greenfield modules: `glm_tpu/greenfield`; legacy execution is never imported.
-- Root `goal.md` and `docs/glm-tpu-revolution.md` supersede inherited TP32 instructions. The owner's
-  untracked main-worktree `AGENTS.md` remains untouched and is absent from this worktree.
+- Branch-local `AGENTS.md`, root `goal.md`, and `docs/glm-tpu-revolution.md` supersede inherited TP32
+  instructions. The owner's untracked main-worktree `AGENTS.md` remains untouched and has no authority
+  in this worktree.
 
 ## Implemented contracts
 
@@ -30,8 +31,24 @@ Hamiltonian ring. Every stage boundary, including last-to-first token return, re
 physical-neighbor match for every transfer lane. PP16 first chooses adjacent two-chip pairs along
 the physical length-two axis where available.
 
+The HLO contract parser reads optimized textual XLA HLO and records physical replica groups,
+source-target pairs, result/operand shapes, source metadata, counts, channels, and global-id
+semantics. Policies reject missing/wrong groups, repeated full-pod residual synchronization, dead
+batch-32 rows, and count drift. Full-pod collective diagnostics require an explicit non-promotable
+policy; XLA all-to-all's absence of a global-id flag is a narrow named exemption while its exact
+replica groups remain mandatory. Because XLA numbers groups in executable partition order, every
+policy records the exact partition-to-physical-device assignment and reports both logical and
+physical groups/pairs.
+
+The dependent collective benchmark supports control, all-reduce, reduce-scatter, all-gather,
+collective-permute, all-to-all, and fused tuple all-reduce over physical groups of 2/4/8/32 chips.
+Rank-dependent state, nonlinear cross-iteration feedback, optimization barriers, bitwise output
+checksums, and optimized-HLO count assertions prevent elision. Protected configs require a chain of
+75, at least 200 warmups, at least 1,000 measured samples, and report complete distributions.
+
 ## Still unimplemented
 
-No transport executable, HLO linter, collective benchmark, model layer, checkpoint packer/loader,
-decoder, or serving path exists. Gate A is therefore only partially complete. The next executable
-must be a synthetic device-resident PP8/PP16 stage chain—not a model port.
+No transport executable, model layer, checkpoint packer/loader, decoder, or serving path exists.
+The collective benchmark has CPU/HLO mechanism proof but no protected TPU distribution yet. After
+that protected run, the next executable is the synthetic device-resident PP8/PP16 stage chain—not a
+model port.

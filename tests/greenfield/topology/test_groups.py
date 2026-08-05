@@ -9,6 +9,7 @@ from glm_tpu.greenfield.topology.discover import discover_physical_topology
 from glm_tpu.greenfield.topology.groups import (
     build_pp16_lp2_groups,
     build_pp8_lp4_groups,
+    collective_groups_for_size,
     group_manifest_hash,
     validate_local_groups,
 )
@@ -110,6 +111,30 @@ def test_group_hash_is_stable() -> None:
     assert group_manifest_hash(PlanName.PP16_LP2, groups_a) == group_manifest_hash(
         PlanName.PP16_LP2, groups_b
     )
+
+
+def test_collective_benchmark_groups_partition_physical_rings() -> None:
+    topo = topology()
+    by_id = {device.device_id: device for device in topo.devices}
+    for size in (2, 4, 8, 32):
+        groups = collective_groups_for_size(topo, size)
+        assert {len(group) for group in groups} == {size}
+        assert sorted(device for group in groups for device in group) == list(
+            range(32)
+        )
+        for group in groups:
+            for left, right in zip(group, group[1:] + group[:1]):
+                left_coordinates = by_id[left].coordinates
+                right_coordinates = by_id[right].coordinates
+                distances = [
+                    min(abs(a - b), dimension - abs(a - b))
+                    for a, b, dimension in zip(
+                        left_coordinates,
+                        right_coordinates,
+                        topo.topology_shape,
+                    )
+                ]
+                assert sum(distances) == 1
 
 
 def test_validator_refuses_cross_host_group() -> None:

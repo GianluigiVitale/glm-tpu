@@ -207,6 +207,61 @@ def test_policy_round_trip() -> None:
     assert HloContractPolicy.from_dict(policy.to_dict()) == policy
 
 
+def test_explicit_opcode_global_id_exemption_is_narrow() -> None:
+    all_to_all = GOOD_HLO.replace("all-reduce", "all-to-all").replace(
+        ", use_global_device_ids=true", ""
+    )
+    policy = HloContractPolicy(
+        name="XLA all-to-all spelling",
+        total_devices=8,
+        repeated_region_patterns=("decode",),
+        maximum_repeated_collective_group_size=4,
+        expected_repeated_replica_groups=((0, 1, 2, 3), (4, 5, 6, 7)),
+        expected_collectives=(CollectiveExpectation("all-to-all", 1),),
+        global_device_id_exempt_opcodes=("all-to-all",),
+    )
+    report = lint_hlo(parse_hlo_module(all_to_all), policy)
+    assert report.valid, report.violations
+
+    with pytest.raises(ValueError, match="collective opcodes"):
+        HloContractPolicy(
+            name="invalid exemption",
+            total_devices=8,
+            repeated_region_patterns=("decode",),
+            maximum_repeated_collective_group_size=4,
+            global_device_id_exempt_opcodes=("dot",),
+        )
+
+
+def test_nonidentity_device_assignment_is_mapped_to_physical_groups() -> None:
+    policy = HloContractPolicy(
+        name="physical assignment",
+        total_devices=8,
+        repeated_region_patterns=("decode",),
+        maximum_repeated_collective_group_size=4,
+        expected_repeated_replica_groups=((0, 2, 3, 1), (4, 6, 7, 5)),
+        expected_collectives=(CollectiveExpectation("all-reduce", 1),),
+        partition_id_to_device_id=(0, 2, 3, 1, 4, 6, 7, 5),
+    )
+    no_permute = GOOD_HLO.replace(
+        "  ROOT moved = bf16[1,6144]{1,0} collective-permute(local), channel_id=2, source_target_pairs={{0,4},{4,0},{1,5},{5,1},{2,6},{6,2},{3,7},{7,3}}, metadata={op_name=\"decode/pipeline/transport\" source_file=\"runtime/transport.py\" source_line=20}\n",
+        "",
+    )
+    report = lint_hlo(parse_hlo_module(no_permute), policy)
+    assert report.valid, report.violations
+    physical = report.to_dict()["collectives"][0]["physical_replica_groups"]
+    assert physical == [[0, 2, 3, 1], [4, 6, 7, 5]]
+
+    with pytest.raises(ValueError, match="permutation"):
+        HloContractPolicy(
+            name="bad assignment",
+            total_devices=8,
+            repeated_region_patterns=("decode",),
+            maximum_repeated_collective_group_size=4,
+            partition_id_to_device_id=(0, 1),
+        )
+
+
 def test_current_jax_lowering_exposes_exact_local_groups() -> None:
     program = r'''
 import numpy as np

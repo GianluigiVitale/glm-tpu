@@ -375,9 +375,11 @@ class HloContractPolicy:
     expected_repeated_replica_groups: tuple[tuple[int, ...], ...] = ()
     expected_collectives: tuple[CollectiveExpectation, ...] = ()
     expected_collective_permute_pairs: tuple[tuple[int, int], ...] = ()
+    partition_id_to_device_id: tuple[int, ...] = ()
     forbidden_row_width_pairs: tuple[tuple[int, int], ...] = ((32, 6144),)
     residual_width: int = 6144
     require_global_device_ids: bool = True
+    global_device_id_exempt_opcodes: tuple[str, ...] = ()
     require_repeated_region: bool = True
     allow_full_pod_repeated_collectives: bool = False
 
@@ -400,8 +402,18 @@ class HloContractPolicy:
         )
         object.__setattr__(
             self,
+            "partition_id_to_device_id",
+            tuple(self.partition_id_to_device_id),
+        )
+        object.__setattr__(
+            self,
             "forbidden_row_width_pairs",
             tuple(tuple(pair) for pair in self.forbidden_row_width_pairs),
+        )
+        object.__setattr__(
+            self,
+            "global_device_id_exempt_opcodes",
+            tuple(self.global_device_id_exempt_opcodes),
         )
         if not self.name.strip() or self.total_devices <= 0:
             raise ValueError("HLO policy requires a name and positive total_devices")
@@ -417,6 +429,18 @@ class HloContractPolicy:
             )
         for pattern in self.repeated_region_patterns:
             re.compile(pattern)
+        if set(self.global_device_id_exempt_opcodes) - COLLECTIVE_OPCODES:
+            raise ValueError(
+                "global-device-id exemptions must name collective opcodes"
+            )
+        if self.partition_id_to_device_id and (
+            len(self.partition_id_to_device_id) != self.total_devices
+            or sorted(self.partition_id_to_device_id)
+            != list(range(self.total_devices))
+        ):
+            raise ValueError(
+                "partition_id_to_device_id must be a permutation of all device ids"
+            )
         for group in self.expected_repeated_replica_groups:
             if (
                 not group
@@ -466,9 +490,13 @@ class HloContractPolicy:
             "forbidden_row_width_pairs": [
                 list(pair) for pair in self.forbidden_row_width_pairs
             ],
+            "global_device_id_exempt_opcodes": list(
+                self.global_device_id_exempt_opcodes
+            ),
             "maximum_repeated_collective_group_size": self.maximum_repeated_collective_group_size,
             "allow_full_pod_repeated_collectives": self.allow_full_pod_repeated_collectives,
             "name": self.name,
+            "partition_id_to_device_id": list(self.partition_id_to_device_id),
             "repeated_region_patterns": list(self.repeated_region_patterns),
             "require_global_device_ids": self.require_global_device_ids,
             "require_repeated_region": self.require_repeated_region,
@@ -534,6 +562,18 @@ class HloLintReport:
                 {
                     **instruction.to_dict(),
                     "inside_repeated_region": instruction.index in repeated,
+                    "physical_replica_groups": [
+                        list(group)
+                        for group in _physical_replica_groups(
+                            instruction, self.policy
+                        )
+                    ],
+                    "physical_source_target_pairs": [
+                        list(pair)
+                        for pair in _physical_source_target_pairs(
+                            instruction, self.policy
+                        )
+                    ],
                 }
                 for instruction in self.module.collectives
             ],
@@ -569,6 +609,39 @@ def _violation(
         message=message,
         instruction_name=None if instruction is None else instruction.name,
         computation=None if instruction is None else instruction.computation,
+    )
+
+
+def _physical_device_id(partition_id: int, policy: HloContractPolicy) -> int:
+    if not policy.partition_id_to_device_id:
+        return partition_id
+    if not 0 <= partition_id < len(policy.partition_id_to_device_id):
+        raise ValueError(
+            f"HLO partition id {partition_id} is outside the device assignment"
+        )
+    return policy.partition_id_to_device_id[partition_id]
+
+
+def _physical_replica_groups(
+    instruction: HloInstruction,
+    policy: HloContractPolicy,
+) -> tuple[tuple[int, ...], ...]:
+    return tuple(
+        tuple(_physical_device_id(item, policy) for item in group)
+        for group in instruction.replica_groups
+    )
+
+
+def _physical_source_target_pairs(
+    instruction: HloInstruction,
+    policy: HloContractPolicy,
+) -> tuple[tuple[int, int], ...]:
+    return tuple(
+        (
+            _physical_device_id(source, policy),
+            _physical_device_id(target, policy),
+        )
+        for source, target in instruction.source_target_pairs
     )
 
 
@@ -654,7 +727,8 @@ def lint_hlo(module: HloModule, policy: HloContractPolicy) -> HloLintReport:
                 )
         if expected_groups and instruction.replica_groups:
             actual_groups = {
-                tuple(sorted(group)) for group in instruction.replica_groups
+                tuple(sorted(group))
+                for group in _physical_replica_groups(instruction, policy)
             }
             if actual_groups != expected_groups:
                 violations.append(
@@ -668,6 +742,7 @@ def lint_hlo(module: HloModule, policy: HloContractPolicy) -> HloLintReport:
         if (
             policy.require_global_device_ids
             and instruction.opcode != "collective-permute"
+            and instruction.opcode not in policy.global_device_id_exempt_opcodes
             and not instruction.use_global_device_ids
         ):
             violations.append(
@@ -683,7 +758,7 @@ def lint_hlo(module: HloModule, policy: HloContractPolicy) -> HloLintReport:
             pair
             for instruction in module.collectives
             if instruction.opcode == "collective-permute"
-            for pair in instruction.source_target_pairs
+            for pair in _physical_source_target_pairs(instruction, policy)
         )
         if sorted(actual_pairs) != sorted(policy.expected_collective_permute_pairs):
             violations.append(

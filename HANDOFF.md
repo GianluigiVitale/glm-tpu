@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 13:21 UTC
+**Updated:** 2026-08-05 13:38 UTC
 
 ## Authority and location
 
@@ -23,7 +23,12 @@ serialize canonically and carry SHA-256 geometry/topology/plan hashes. Runtime d
 guessed topology or local ordering. The optimized-HLO contract parser now proves physical replica
 groups, collective counts/pairs/shapes, global-id semantics, repeated-region policy, and explicit
 diagnostic-only handling of full-pod repeated collectives. Focused HLO coverage passes 12/12.
-The complete greenfield L0/HLO suite passes 40/40.
+The dependent-chain benchmark now implements control, all-reduce, reduce-scatter, all-gather,
+collective-permute, all-to-all, and fused tuple reduction over physical 2/4/8/32-chip rings. Its
+nonlinear rank-dependent recurrence, barriers, exact optimized-HLO count/group/pair checks,
+partition-to-physical-device mapping, and bitwise checksums pass forced-device CPU coverage. Exact
+75-operation all-reduce lowering passes at every required group size. The complete greenfield suite
+passes 48/48. No TPU latency result exists yet.
 
 Protected Gate-A topology capture passed at code `75c8bb14cbd290930ff024937310f3aec6175090`:
 
@@ -43,8 +48,9 @@ throughput evidence. No greenfield performance claim exists. Legacy execution re
 
 ## Exact next sequence
 
-1. Implement the genuinely dependent 75-operation collective benchmark with anti-elision checksum,
-   exact HLO count, group sizes 2/4/8/32, required shapes/dtypes, and warmed distributions.
+1. Capture the protected dependent-chain TPU distributions with exact HLO, fleet agreement,
+   append-only DB/archive evidence, and clean pre/post census; expand across the required
+   operation/shape/dtype matrix after the first dominant-payload discriminator passes.
 2. Prove device-resident PP8 and PP16 stage-transfer skeletons with no host/Ray/Python stage dispatch,
    no inactive-stage model-equivalent compute, exact point-to-point HLO, and fresh traces.
 3. Prove one exact real MoE layer whose combine is confined to its 2/4-chip stage.

@@ -20,6 +20,11 @@ invariant and must not be used as the current group manifest.
 
 ## Reusable tools, not execution dependencies
 
+- Optimized-HLO contract: `glm_tpu/greenfield/sharding/hlo_contract.py` and
+  `scripts/greenfield/inspect_hlo_contract.py`; exact physical groups/counts/pairs/shapes and explicit
+  diagnostic-only full-pod policy.
+- Dependent collective mechanism: `glm_tpu/greenfield/benchmarking/collective_chain.py` and
+  `scripts/greenfield/microbench_collectives.py`; no protected TPU result exists yet.
 - XPlane truth: `scripts/analysis/parse_xplane.py` (nested physical HLO categories, groups, shapes,
   per-core/fleet counts) and `extract_steady_decode.py` (profiler-free wall/device agreement).
 - Append-only results: `bench/provenance.py`; greenfield runs additionally put full code/plan hashes
