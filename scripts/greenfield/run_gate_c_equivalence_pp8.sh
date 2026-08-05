@@ -6,6 +6,7 @@ readonly POD=db-v4-64-od
 readonly ZONE=us-central2-b
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
+readonly GREENFIELD_ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly ORACLE_REPO=/home/gianl/tpu-inference
@@ -21,6 +22,10 @@ readonly SOURCE_REVISION=gcs-object-set-830fd1bf7d8d6b6242895cfd50f5978e5cc5749d
 readonly TOPOLOGY_HASH=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
 readonly PP8_GROUP_HASH=d5943ab8d7a074677d82f8e823c8bc983847f8df1deefdee1fbda8da98923c14
 readonly LEGACY_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
+readonly RUN_WORKER=2
+readonly TOPOLOGY_RUN=/home/gianl/glm-run/greenfield_topology_20260805T125842425591441Z
+readonly PACK_REMOTE=gs://driftbench-dsv4-uc/checkpoints/greenfield/glm52/gate_c/PP8_LP4/greenfield_gate_c_pack_20260805T214609093206269Z
+readonly ORACLE_REMOTE=gs://driftbench-dsv4-uc/oracles/greenfield/glm52/gate_c/greenfield_gate_c_oracle_20260805T212801776974822Z
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
@@ -108,33 +113,30 @@ strict_census pre || {
   exit 1
 }
 
+say "syncing exact pin and immutable Gate C inputs to physical stage-0 worker $RUN_WORKER"
+# shellcheck disable=SC2016
+sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; tag='"$TAG"'; pack='"$PACK_REMOTE"'; oracle='"$ORACLE_REMOTE"'; topology='"$TOPOLOGY_RUN"'; idx=${HOSTNAME##*-w-}; [[ "$idx" == '"$RUN_WORKER"' ]]; if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin '"$BRANCH"'; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch '"$BRANCH"' "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; run=/home/gianl/glm-run/$tag; mkdir -p "$run/input/packed/base_decoder/stage_00" "$run/input/oracle"; gcloud storage cp "$pack/packed/manifest.json" "$pack/packed/layout_manifest.json" "$run/input/packed/" >/dev/null; for slot in 00 01 02 03; do gcloud storage cp "$pack/packed/base_decoder/stage_00/device_slot_${slot}.safetensors" "$run/input/packed/base_decoder/stage_00/" >/dev/null; done; gcloud storage cp "$oracle/manifest.json" "$oracle/oracle.safetensors" "$run/input/oracle/" >/dev/null; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$topology/topology.rank${idx}.json" ]] && [[ -r "$run/input/packed/manifest.json" ]] && [[ -r "$run/input/oracle/manifest.json" ]] && echo "SYNC_OK $(hostname) $pin"'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
+  --worker="$RUN_WORKER" --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
+grep -q '^SYNC_OK ' "$RUN_DIR/sync.txt" || {
+  say "ABORT: stage-0 worker pin/input sync failed"
+  exit 1
+}
+
 say "running direct load and real dense/full-DSA/IndexShare TPU equivalence"
 started=$(date +%s)
-(
-  cd "$WORKTREE"
-  JAX_PLATFORMS=tpu \
-    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
-    TPU_PROCESS_BOUNDS=1,1,1 \
-    TPU_VISIBLE_DEVICES=0,1,2,3 \
-    PYTHONPATH="$WORKTREE" \
-    /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_gate_c_equivalence.py \
-      --artifact-dir "$PACK_RUN/packed" \
-      --oracle-dir "$ORACLE_RUN/oracle" \
-      --topology-capture "$TOPOLOGY_CAPTURE" \
-      --expected-code-hash "$PIN" \
-      --packed-code-hash "$PACKED_CODE_HASH" \
-      --packed-manifest-sha256 "$PACKED_MANIFEST_SHA" \
-      --layout-manifest-sha256 "$LAYOUT_MANIFEST_SHA" \
-      --parent-layout-manifest-sha256 "$PARENT_LAYOUT_MANIFEST_SHA" \
-      --oracle-manifest-sha256 "$ORACLE_MANIFEST_SHA" \
-      --source-revision "$SOURCE_REVISION" \
-      --topology-sha256 "$TOPOLOGY_HASH" \
-      --plan-group-sha256 "$PP8_GROUP_HASH" \
-      --output "$RUN_DIR/runner.json" \
-      --hlo-dir "$RUN_DIR/hlo" \
-      --trace-root "$RUN_DIR/trace" \
-      --trace-steps 20
-) >"$RUN_DIR/runner.log" 2>&1
+# shellcheck disable=SC2016
+runner_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ "$idx" == '"$RUN_WORKER"' ]]; tag='"$TAG"'; wt='"$WORKTREE"'; topology='"$TOPOLOGY_RUN"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; log="$run/runner.log"; trap '\''gcloud storage cp --no-clobber "$log" "$run/runner.json" "$remote/diagnostic/" >/dev/null 2>&1 || true'\'' EXIT; cd "$wt"; env JAX_PLATFORMS=tpu TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=0,1,2,3 PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_gate_c_equivalence.py --artifact-dir "$run/input/packed" --oracle-dir "$run/input/oracle" --topology-capture "$topology/topology.rank${idx}.json" --expected-code-hash '"$PIN"' --packed-code-hash '"$PACKED_CODE_HASH"' --packed-manifest-sha256 '"$PACKED_MANIFEST_SHA"' --layout-manifest-sha256 '"$LAYOUT_MANIFEST_SHA"' --parent-layout-manifest-sha256 '"$PARENT_LAYOUT_MANIFEST_SHA"' --oracle-manifest-sha256 '"$ORACLE_MANIFEST_SHA"' --source-revision '"$SOURCE_REVISION"' --topology-sha256 '"$TOPOLOGY_HASH"' --plan-group-sha256 '"$PP8_GROUP_HASH"' --output "$run/runner.json" --hlo-dir "$run/hlo" --trace-root "$run/trace" --trace-steps 20 >"$log" 2>&1; gcloud storage cp --recursive --no-clobber "$run/hlo" "$run/trace" "$remote/" >/dev/null; gcloud storage cp --no-clobber "$run/runner.json" "$run/runner.log" "$remote/" >/dev/null; trap - EXIT; echo "GATE_C_UPLOAD_OK $(hostname)"'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
+  --worker="$RUN_WORKER" --command="$runner_command" >"$RUN_DIR/execute.txt" 2>&1
+grep -q '^GATE_C_UPLOAD_OK ' "$RUN_DIR/execute.txt" || {
+  say "ABORT: stage-0 Gate C execution/upload failed"
+  exit 1
+}
+gcloud storage cp "$REMOTE_PREFIX/runner.json" "$REMOTE_PREFIX/runner.log" \
+  "$RUN_DIR/" >/dev/null
+gcloud storage cp --recursive "$REMOTE_PREFIX/hlo" "$REMOTE_PREFIX/trace" \
+  "$RUN_DIR/" >/dev/null
 elapsed=$(( $(date +%s) - started ))
 say "runner completed in ${elapsed}s"
 
@@ -337,7 +339,7 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   cd "$RUN_DIR"
   find hlo trace -type f -print0 | sort -z | xargs -0 sha256sum
   sha256sum runner.json runner.log summary.json results_ckpt.db \
-    census_pre.txt census_post.txt orchestrator.sealed.log
+    census_pre.txt census_post.txt sync.txt execute.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
 (cd "$RUN_DIR" && sha256sum -c evidence.sha256 >/dev/null)
 
@@ -349,6 +351,7 @@ gcloud storage cp --no-clobber \
   "$RUN_DIR/results_ckpt.db" "$RUN_DIR/evidence.sha256" \
   "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log" \
   "$RUN_DIR/census_pre.txt" "$RUN_DIR/census_post.txt" \
+  "$RUN_DIR/sync.txt" "$RUN_DIR/execute.txt" \
   "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" \
   "$REMOTE_PREFIX/SUCCESS" >/dev/null
