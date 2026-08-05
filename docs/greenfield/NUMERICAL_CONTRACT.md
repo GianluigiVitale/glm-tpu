@@ -22,6 +22,24 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   `(0,1), (2,3), ...` and re-interleaves the result. Half-split pairing remains
   an explicit reference option; it is never selected implicitly.
 
+## DSA scorer and selected positions
+
+- The indexer query is `[rows,32,128]`; `decode_batch1` fixes `rows=1`. Its
+  key cache is `[context,128]`. Query/key projections, biased key LayerNorm,
+  per-head dots, ReLU, signed head weighting, and the final head sum are FP32
+  with JAX matmul precision pinned to `highest`.
+- The first 64 query/key dimensions use accepted interleaved RoPE. Per-head
+  dots are scaled by `128**-0.5`, ReLU occurs before signed head weighting,
+  and head weights are scaled by `32**-0.5`.
+- Selection is exact `lax.top_k`, never approximate. Equal finite scores are
+  ordered by lowest global position. Distributed selection keeps a full
+  `min(2048, local_context)` candidate width per local context owner, restores
+  ascending global-position order before the final exact merge, and is thus
+  invariant to collective concatenation order.
+- Compact selected state is `positions int32[rows,2048]` plus
+  `valid_counts int32[rows]`; invalid tail slots are exactly `-1`. This is the
+  only state IndexShare may reuse or transfer across a stage boundary.
+
 ## GLM-5.2 sparse MoE
 
 - Storage: routed/shared expert weights are FP8 E4M3 with FP32 inverse scales

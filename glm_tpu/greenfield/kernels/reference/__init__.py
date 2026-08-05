@@ -1,5 +1,16 @@
 """Readable exactness-first JAX reference kernels."""
 
+from .dsa import (
+    DsaNumericalContract,
+    SelectedPositions,
+    distributed_exact_topk_reference,
+    dsa_index_keys,
+    dsa_query_and_head_weights,
+    dsa_scores,
+    exact_topk,
+    local_topk_candidates,
+    merge_topk_candidates,
+)
 from .linear import (
     dense_swiglu,
     embedding_lookup,
@@ -21,13 +32,22 @@ from .rmsnorm import final_norm, rms_norm
 from .rotary import apply_rotary, rotary_cos_sin
 
 __all__ = (
+    "DsaNumericalContract",
     "GlmMoeNumericalContract",
+    "SelectedPositions",
     "apply_rotary",
     "dequantize_fp8_block_weight",
     "dense_swiglu",
+    "distributed_exact_topk_reference",
+    "dsa_index_keys",
+    "dsa_query_and_head_weights",
+    "dsa_scores",
     "embedding_lookup",
+    "exact_topk",
     "final_norm",
     "linear",
+    "local_topk_candidates",
+    "merge_topk_candidates",
     "reference_moe_from_routes",
     "residual_add",
     "rms_norm",
