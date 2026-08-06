@@ -42,6 +42,12 @@ from .one_layer import (
     validate_pallas_real_layer_hlo,
     validate_real_layer_hlo,
 )
+from .paired_transport import (
+    PairedTransportConfig,
+    benchmark_paired_transport,
+    build_paired_transport,
+    validate_paired_transport_hlo,
+)
 
 __all__ = [
     "CollectiveChainConfig",
@@ -50,12 +56,15 @@ __all__ = [
     "GateCDsaResult",
     "GateCIndexShareResult",
     "LatencyDistribution",
+    "PairedTransportConfig",
     "REAL_LAYER_OUTPUT_TOLERANCE",
     "ROUTE_WEIGHT_TOLERANCE",
     "TensorTolerance",
     "addressable_checksum",
     "benchmark_collective_chain",
+    "benchmark_paired_transport",
     "build_collective_chain",
+    "build_paired_transport",
     "collective_chain_hlo_policy",
     "compare_bounded_tensor",
     "jax_dtype",
@@ -74,6 +83,7 @@ __all__ = [
     "transport_chain_hlo_policy",
     "validate_compiled_transport",
     "validate_pallas_real_layer_hlo",
+    "validate_paired_transport_hlo",
     "validate_real_layer_hlo",
     "validate_transport_pairs",
 ]

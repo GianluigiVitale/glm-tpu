@@ -27,6 +27,7 @@ KINDS=${GLM_GREENFIELD_TRANSPORT_KINDS:-control,device_resident}
 PAYLOADS=${GLM_GREENFIELD_TRANSPORT_PAYLOADS:-bfloat16:1:6144,bfloat16:2:6144,bfloat16:1:2048,int32:1:2048}
 WARMUP=${GLM_GREENFIELD_TRANSPORT_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_TRANSPORT_ITERATIONS:-2000}
+PAIRED_PRODUCTION=${GLM_GREENFIELD_TRANSPORT_PAIRED_PRODUCTION:-0}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -48,6 +49,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 }
 [[ $ITERATIONS =~ ^[0-9]+$ && $ITERATIONS -ge 1000 ]] || {
   echo "protected run requires iterations>=1000" >&2
+  exit 2
+}
+[[ $PAIRED_PRODUCTION =~ ^[01]$ ]] || {
+  echo "paired production flag must be 0 or 1" >&2
   exit 2
 }
 
@@ -98,7 +103,7 @@ trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR"
 say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN"
-say "MATRIX plans=$PLANS kinds=$KINDS payloads=$PAYLOADS warmup=$WARMUP iterations=$ITERATIONS"
+say "MATRIX plans=$PLANS kinds=$KINDS payloads=$PAYLOADS warmup=$WARMUP iterations=$ITERATIONS paired=$PAIRED_PRODUCTION"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -124,7 +129,7 @@ coordinator="$coordinator:8476"
 say "launching eight-host device-resident transport coordinator=$coordinator"
 
 # shellcheck disable=SC2016
-capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_pipeline_transport.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/transport.rank${idx}.json" --plans '"$PLANS"' --kinds '"$KINDS"' --payloads '"$PAYLOADS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"'; sha256sum "$run/transport.rank${idx}.json" >"$run/transport.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/transport.rank${idx}.json" "$run/transport.rank${idx}.sha256" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; trap - EXIT; echo "CAPTURE_UPLOAD_OK $(hostname) rank=$idx"'
+capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; paired='"$PAIRED_PRODUCTION"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; cd "$wt"; paired_arg=(); [[ "$paired" == 1 ]] && paired_arg=(--paired-production); GLM_GREENFIELD_RUN_TAG="$tag" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_pipeline_transport.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/transport.rank${idx}.json" --plans '"$PLANS"' --kinds '"$KINDS"' --payloads '"$PAYLOADS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${paired_arg[@]}"; sha256sum "$run/transport.rank${idx}.json" >"$run/transport.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/transport.rank${idx}.json" "$run/transport.rank${idx}.sha256" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; trap - EXIT; echo "CAPTURE_UPLOAD_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$capture_command" >"$RUN_DIR/capture.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/capture.txt" CAPTURE_UPLOAD_OK || {
@@ -137,7 +142,7 @@ gcloud storage cp "$REMOTE_PREFIX/host_records/transport.rank*.json" \
 gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/hlo/" >/dev/null
 say "validating fleet agreement and appending provenance DB rows"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
-  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" <<'PY'
+  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$PAIRED_PRODUCTION" <<'PY'
 from __future__ import annotations
 
 import json
@@ -145,7 +150,8 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, oracle_pin, db_path, repo, oracle_repo = sys.argv[1:]
+run_dir, pin, oracle_pin, db_path, repo, oracle_repo, paired_expected_raw = sys.argv[1:]
+paired_expected = paired_expected_raw == "1"
 run_dir = Path(run_dir)
 records = [
     json.loads(path.read_text())
@@ -257,6 +263,79 @@ for case_index, key in enumerate(case_keys):
         }
     )
 
+paired_keys = [
+    (item["config"]["plan"], item["config"]["kind"])
+    for item in records[0]["paired_matrix"]
+]
+if paired_expected != bool(paired_keys):
+    raise SystemExit(
+        f"paired production expectation mismatch: expected={paired_expected} "
+        f"keys={paired_keys}"
+    )
+if len(paired_keys) != len(set(paired_keys)):
+    raise SystemExit("paired production matrix contains duplicate cases")
+paired_case_summaries = []
+for case_index, key in enumerate(paired_keys):
+    host_items = [record["paired_matrix"][case_index] for record in records]
+    if any(
+        (item["config"]["plan"], item["config"]["kind"]) != key
+        for item in host_items
+    ):
+        raise SystemExit(f"fleet paired matrix differs at {case_index}")
+    if len({item["optimized_hlo_sha256"] for item in host_items}) != 1:
+        raise SystemExit(f"fleet paired HLO differs for {key}")
+    expected_stages = 8 if key[0] == "PP8_LP4" else 16
+    for item in host_items:
+        config = item["config"]
+        if (
+            config["stage_count"] != expected_stages
+            or config["hidden_width"] != 6144
+            or config["metadata_width"] != 2052
+            or config["warmup_iterations"] < 200
+            or config["measured_iterations"] < 1000
+        ):
+            raise SystemExit(f"unprotected paired config for {key}")
+        if item["first_addressable_checksum"] != item["last_addressable_checksum"]:
+            raise SystemExit(f"nondeterministic paired output for {key}")
+        contract = item["hlo"]
+        if not contract["passed"] or contract["violations"]:
+            raise SystemExit(f"paired HLO failed for {key}: {contract}")
+        expected_kernels = expected_stages if key[1] == "pallas_remote_copy" else 0
+        expected_collectives = 2 * expected_stages if key[1] == "device_resident" else 0
+        if (
+            contract["kernel_custom_call_count"] != expected_kernels
+            or contract["collective_count"] != expected_collectives
+        ):
+            raise SystemExit(f"paired mechanism count mismatch for {key}")
+        if len(item["latency"]["samples_ms"]) != config["measured_iterations"]:
+            raise SystemExit(f"incomplete paired latency distribution for {key}")
+    distributions = {
+        name: max(item["latency"][name] for item in host_items)
+        for name in ("p50_ms", "p90_ms", "p95_ms", "p99_ms")
+    }
+    paired_case_summaries.append(
+        {
+            "case": {"kind": key[1], "plan": key[0]},
+            "fleet_maximum_host_latency": distributions,
+            "hlo_sha256": host_items[0]["optimized_hlo_sha256"],
+            "physical_pairs": host_items[0]["physical_pairs"],
+        }
+    )
+
+for record in records:
+    checksums = {
+        (item["config"]["plan"], item["config"]["kind"]):
+        item["first_addressable_checksum"]
+        for item in record["paired_matrix"]
+    }
+    for plan in {key[0] for key in paired_keys}:
+        reference = checksums.get((plan, "device_resident"))
+        pallas = checksums.get((plan, "pallas_remote_copy"))
+        if reference is not None and pallas is not None and reference != pallas:
+            raise SystemExit(
+                f"paired Pallas output differs from ppermute on {record['hostname']}"
+            )
+
 controls = {
     (case["case"]["plan"], case["case"]["dtype"], case["case"]["rows"], case["case"]["width"]):
     case["fleet_maximum_host_latency"]["p50_ms"]
@@ -272,6 +351,20 @@ for case in case_summaries:
         else case["fleet_maximum_host_latency"]["p50_ms"] - controls[key]
     )
 
+paired_controls = {
+    case["case"]["plan"]: case["fleet_maximum_host_latency"]["p50_ms"]
+    for case in paired_case_summaries
+    if case["case"]["kind"] == "control"
+}
+for case in paired_case_summaries:
+    identity = case["case"]
+    case["control_net_p50_ms"] = (
+        None
+        if identity["kind"] == "control"
+        else case["fleet_maximum_host_latency"]["p50_ms"]
+        - paired_controls[identity["plan"]]
+    )
+
 summary = {
     "cases": case_summaries,
     "code_hash": pin,
@@ -282,6 +375,7 @@ summary = {
     },
     "mechanism_only": True,
     "oracle_code_hash": oracle_pin,
+    "paired_cases": paired_case_summaries,
     "plan_contracts": records[0]["plan_contracts"],
     "topology_hash": topology_hashes.pop(),
 }
@@ -317,6 +411,21 @@ for case in case_summaries:
         item_id=item_id,
         prompt="Measure one protected full device-resident pipeline-stage ring.",
         gold="Exact point-to-point HLO, deterministic checksum, warmed distribution.",
+        raw_output=json.dumps(case, sort_keys=True),
+        extracted=str(case["fleet_maximum_host_latency"]["p50_ms"]),
+        correct=True,
+        score=None,
+    )
+for case in paired_case_summaries:
+    identity = case["case"]
+    item_id = f"{identity['plan']}:{identity['kind']}:paired-production"
+    pv.record_item(
+        conn,
+        run_id,
+        benchmark="greenfield_paired_pipeline_transport",
+        item_id=item_id,
+        prompt="Measure residual plus compact metadata over one full stage ring.",
+        gold="Exact paired output, intended HLO mechanism, warmed distribution.",
         raw_output=json.dumps(case, sort_keys=True),
         extracted=str(case["fleet_maximum_host_latency"]["p50_ms"]),
         correct=True,

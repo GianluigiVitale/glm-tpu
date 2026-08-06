@@ -22,9 +22,12 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
+    PairedTransportConfig,
     TransportChainConfig,
     TransportKind,
+    benchmark_paired_transport,
     benchmark_transport_chain,
+    build_paired_transport,
     build_transport_chain,
     validate_compiled_transport,
 )
@@ -130,6 +133,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--iterations", type=int, default=2000)
+    parser.add_argument("--paired-production", action="store_true")
     parser.add_argument("--allow-unprotected-test-config", action="store_true")
     return parser.parse_args()
 
@@ -213,6 +217,7 @@ def main() -> int:
             num_processes=args.num_processes,
         )
         matrix = []
+        paired_matrix = []
         plan_contracts = {}
         for plan in args.plans:
             groups = (
@@ -290,6 +295,56 @@ def main() -> int:
                     multihost_utils.sync_global_devices(
                         f"greenfield-transport-end-{label}"
                     )
+            if args.paired_production:
+                for kind in args.kinds:
+                    config = PairedTransportConfig(
+                        plan=plan,
+                        kind=kind,
+                        warmup_iterations=args.warmup,
+                        measured_iterations=args.iterations,
+                    )
+                    if not args.allow_unprotected_test_config:
+                        config.require_protected_contract()
+                    label = f"{plan.value.lower()}_{kind.value}_paired_production"
+                    multihost_utils.sync_global_devices(
+                        f"greenfield-paired-transport-start-{label}"
+                    )
+                    compiled = build_paired_transport(
+                        config,
+                        pairs,
+                        devices=jax.devices(),
+                    )
+                    hlo_sha256 = sha256(compiled.optimized_hlo.encode()).hexdigest()
+                    fleet_hlo_hashes = _fleet_digest(
+                        multihost_utils,
+                        hlo_sha256,
+                        num_processes=args.num_processes,
+                    )
+                    measured = benchmark_paired_transport(compiled)
+                    measured["fleet_hlo_hashes"] = fleet_hlo_hashes
+                    measured["optimized_hlo_sha256"] = hlo_sha256
+                    paired_matrix.append(measured)
+                    if jax.process_index() == 0:
+                        artifact_dir = args.output.parent / "hlo"
+                        artifact_dir.mkdir(parents=True, exist_ok=True)
+                        (artifact_dir / f"{label}.optimized_hlo.txt").write_text(
+                            compiled.optimized_hlo
+                        )
+                        _atomic_write(
+                            artifact_dir / f"{label}.hlo_contract.json",
+                            compiled.hlo_contract,
+                        )
+                    print(
+                        "GREENFIELD_PAIRED_TRANSPORT_CASE_OK "
+                        f"launch_process={args.process_id} "
+                        f"jax_process={jax.process_index()} case={label} "
+                        f"p50_ms={measured['latency']['p50_ms']:.6f} "
+                        f"hlo={hlo_sha256}",
+                        flush=True,
+                    )
+                    multihost_utils.sync_global_devices(
+                        f"greenfield-paired-transport-end-{label}"
+                    )
 
         record = {
             "captured_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -302,6 +357,7 @@ def main() -> int:
             "matrix": matrix,
             "mechanism_only": True,
             "model_equivalent_compute": False,
+            "paired_matrix": paired_matrix,
             "plan_contracts": plan_contracts,
             "schema_version": 1,
             "single_compiled_invocation_per_case": True,
