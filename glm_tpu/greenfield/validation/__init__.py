@@ -10,12 +10,20 @@ from .one_layer_oracle import (
     capture_one_layer_oracle,
     inspect_one_layer_oracle,
 )
+from .short_context_oracle import (
+    ShortContextOracleConfig,
+    capture_short_context_oracle,
+    inspect_short_context_oracle,
+)
 
 __all__ = (
     "GateCOracleConfig",
     "OneLayerOracleConfig",
+    "ShortContextOracleConfig",
     "capture_gate_c_oracle",
     "capture_one_layer_oracle",
+    "capture_short_context_oracle",
     "inspect_gate_c_oracle",
     "inspect_one_layer_oracle",
+    "inspect_short_context_oracle",
 )
