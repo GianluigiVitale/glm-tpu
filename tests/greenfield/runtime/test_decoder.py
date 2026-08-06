@@ -8,6 +8,25 @@ import sys
 import pytest
 
 
+def test_teacher_forced_prefill_builder_rejects_invalid_contracts() -> None:
+    from types import SimpleNamespace
+
+    from glm_tpu.greenfield.errors import PlanValidationError
+    from glm_tpu.greenfield.runtime import build_teacher_forced_prefill_program
+
+    config = SimpleNamespace(context_capacity=8, total_devices=32)
+    body_only = SimpleNamespace(complete_token_path=False, config=config)
+    complete = SimpleNamespace(complete_token_path=True, config=config)
+
+    with pytest.raises(PlanValidationError, match="complete-token decoder"):
+        build_teacher_forced_prefill_program(body_only, prompt_length=2)
+    for value in (True, 0, -1):
+        with pytest.raises(PlanValidationError, match="must be positive"):
+            build_teacher_forced_prefill_program(complete, prompt_length=value)
+    with pytest.raises(PlanValidationError, match="leave capacity"):
+        build_teacher_forced_prefill_program(complete, prompt_length=8)
+
+
 def test_complete_token_tpu_collective_lowering_is_exact_and_local() -> None:
     from glm_tpu.greenfield.runtime.decoder import (
         _validate_complete_token_collective_lowering,
@@ -355,7 +374,7 @@ import ml_dtypes
 import numpy as np
 from jax.sharding import NamedSharding
 from glm_tpu.greenfield.model import build_decoder_runtime_weight_layout, build_decoder_state_layout, build_pipeline_schedule
-from glm_tpu.greenfield.runtime import build_decoder_step_program, validate_decoder_step_hlo
+from glm_tpu.greenfield.runtime import build_decoder_step_program, build_teacher_forced_prefill_program, validate_decoder_step_hlo, validate_teacher_forced_prefill_hlo
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.checkpoint.test_runtime_pack import _small_plan
 
@@ -366,6 +385,7 @@ weight_layout = build_decoder_runtime_weight_layout(plan, schedule)
 groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8))
 pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in range(8) for slot in range(4))
 decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
+prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
 
 weights = {}
 weight_specs = decoder.input_specs[0]
@@ -411,10 +431,20 @@ inputs = (
 compiled = jax.jit(decoder.execute).lower(*inputs).compile()
 first = compiled(*inputs)
 second = compiled(weights, *first)
+prefill_inputs = (
+    weights,
+    *inputs[1:5],
+    jnp.asarray([5, 6], dtype=jnp.int32),
+    *inputs[6:9],
+)
+prefill_compiled = jax.jit(prefill.execute).lower(*prefill_inputs).compile()
+prefilled = prefill_compiled(*prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
+prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
 active = np.flatnonzero(metadata[:, 0, decoder.config.active_index] == 1)
 module = parse_hlo_module(compiled.as_text())
 hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True)
+prefill_hlo_contract = validate_teacher_forced_prefill_hlo(prefill_compiled.as_text(), program=prefill, schedule=schedule, backend_contract='cpu_reference')
 counts = {}
 for item in module.collectives: counts[item.opcode] = counts.get(item.opcode, 0) + 1
 local_groups = tuple(tuple(group) for group in groups)
@@ -446,6 +476,24 @@ print(json.dumps({
     'block_tables_unchanged': bool(np.array_equal(next_blocks, np.asarray([[0]], np.int32))),
     'positions': sorted(set(tuple(row) for row in metadata[active, 0, :4].tolist())),
     'producer': sorted(set(metadata[active, 0, decoder.config.producer_index].tolist())),
+    'prefill': {
+        'next_lengths': prefill_values[7].tolist(),
+        'next_position': prefill_values[5].tolist(),
+        'next_tokens': sorted(set(prefill_values[4][active, 0].tolist())),
+        'positions': sorted(set(tuple(row) for row in prefill_values[3][active, 0, :4].tolist())),
+        'valid_counts': sorted(set(prefill_values[3][active, 0, decoder.config.count_index].tolist())),
+    },
+    'prefill_hlo_contract': {
+        'collective_count': prefill_hlo_contract['decoder_contract']['collective_count'],
+        'collective_counts': prefill_hlo_contract['decoder_contract']['collective_counts'],
+        'dead_prompt_rows': prefill_hlo_contract['dead_prompt_rows'],
+        'host_transfer_markers': prefill_hlo_contract['host_transfer_markers'],
+        'host_transfer_opcodes': prefill_hlo_contract['host_transfer_opcodes'],
+        'loop_count': prefill_hlo_contract['loop_count'],
+        'passed': prefill_hlo_contract['passed'],
+        'prompt_shape_present': prefill_hlo_contract['prompt_shape_parameter_count'] > 0,
+        'violations': prefill_hlo_contract['violations'],
+    },
     'residual_exact': bool(np.array_equal(residual[active], np.ones((4, 1, 8), dtype=ml_dtypes.bfloat16))),
     'sparse_moe_backend': decoder.sparse_moe_backend,
     'valid_counts': sorted(set(metadata[active, 0, decoder.config.count_index].tolist())),
@@ -474,6 +522,28 @@ print(json.dumps({
     assert result["next_tokens"] == [0]
     assert result["next_position"] == [2]
     assert result["next_lengths"] == [3]
+    assert result["prefill"] == {
+        "next_lengths": [3],
+        "next_position": [2],
+        "next_tokens": [0],
+        "positions": [[0, 1, -1, -1]],
+        "valid_counts": [2],
+    }
+    assert result["prefill_hlo_contract"] == {
+        "collective_count": 92,
+        "collective_counts": {
+            "all-gather": 58,
+            "all-reduce": 17,
+            "collective-permute": 17,
+        },
+        "dead_prompt_rows": [],
+        "host_transfer_markers": [],
+        "host_transfer_opcodes": [],
+        "loop_count": 1,
+        "passed": True,
+        "prompt_shape_present": True,
+        "violations": [],
+    }
     assert result["block_tables_unchanged"]
     assert result["sparse_moe_backend"] == "reference"
     assert result["positions"] == [[0, 1, -1, -1]]

@@ -51,6 +51,7 @@ class DecoderStepConfig:
     local_parallel_size: int
     hidden_size: int
     selected_width: int
+    context_capacity: int
     maximum_layer_slots: int
     maximum_full_indexer_slots: int
     logical_page_size: int
@@ -65,6 +66,7 @@ class DecoderStepConfig:
             "local_parallel_size",
             "hidden_size",
             "selected_width",
+            "context_capacity",
             "maximum_layer_slots",
             "maximum_full_indexer_slots",
             "logical_page_size",
@@ -1103,6 +1105,7 @@ def build_decoder_step_program(
         local_parallel_size=plan.local_parallel_size,
         hidden_size=geometry.hidden_size,
         selected_width=geometry.dsa_top_k,
+        context_capacity=state_layout.context_capacity,
         maximum_layer_slots=max(stage.layer_count for stage in schedule.stages),
         maximum_full_indexer_slots=max(
             stage.full_indexer_count for stage in state_layout.stages
