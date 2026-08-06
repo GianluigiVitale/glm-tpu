@@ -1225,7 +1225,7 @@ def stage_local_moe_pallas_from_routes_mapped(
     shared_config = Fp8BlockMatmulConfig(
         block_shape=config.block_shape,
         row_tile=config.row_tile,
-        output_tile=config.output_tile,
+        output_tile=config.block_shape[0],
         contraction_tile=config.block_shape[1],
         output_dtype=config.output_dtype,
         accumulator_dtype=config.accumulator_dtype,
@@ -1403,7 +1403,7 @@ def stage_local_moe_pallas_feature_from_routes_mapped(
     shared_config = Fp8BlockMatmulConfig(
         block_shape=config.block_shape,
         row_tile=config.row_tile,
-        output_tile=config.output_tile,
+        output_tile=config.block_shape[0],
         contraction_tile=config.block_shape[1],
         output_dtype=config.output_dtype,
         accumulator_dtype=config.accumulator_dtype,

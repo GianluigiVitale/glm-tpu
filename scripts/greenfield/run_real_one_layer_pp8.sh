@@ -27,6 +27,11 @@ readonly PALLAS_FEATURE_PACK_CODE_HASH=5f6bb98c9b0036f393db27fc3857969f54aa171d
 
 PLAN_ID=${GLM_GREENFIELD_REAL_LAYER_PLAN:-PP8_LP4}
 KERNEL=${GLM_GREENFIELD_REAL_LAYER_KERNEL:-reference}
+FEATURE_OUTPUT_TILE=${GLM_GREENFIELD_FEATURE_OUTPUT_TILE:-128}
+[[ $FEATURE_OUTPUT_TILE == 128 || $FEATURE_OUTPUT_TILE == 256 ]] || {
+  echo "feature output tile must be 128 or 256" >&2
+  exit 2
+}
 case "$PLAN_ID" in
   PP8_LP4)
     PLAN_SLUG=pp8
@@ -80,12 +85,16 @@ case "$KERNEL" in
       exit 2
     }
     PLAN_SLUG=pp8_pallas_feature
+    if [[ $FEATURE_OUTPUT_TILE != 128 ]]; then
+      PLAN_SLUG=${PLAN_SLUG}_ot${FEATURE_OUTPUT_TILE}
+    fi
     PACK_RUN=$PALLAS_FEATURE_PACK_RUN
     PACK_MANIFEST_SHA=$PALLAS_FEATURE_PACK_MANIFEST_SHA
     KERNEL_ARGS=(
       --kernel pallas_feature
       --source-packed-manifest-sha256 "$PALLAS_FEATURE_SOURCE_MANIFEST_SHA"
       --packed-code-hash "$PALLAS_FEATURE_PACK_CODE_HASH"
+      --feature-output-tile "$FEATURE_OUTPUT_TILE"
     )
     ;;
   *)
@@ -93,8 +102,12 @@ case "$KERNEL" in
     exit 2
     ;;
 esac
+if [[ $KERNEL != pallas_feature && $FEATURE_OUTPUT_TILE != 128 ]]; then
+  echo "a non-default feature output tile requires pallas_feature" >&2
+  exit 2
+fi
 readonly PLAN_ID PLAN_SLUG PACK_RUN PACK_MANIFEST_SHA PLAN_GROUP_HASH KERNEL
-readonly TPU_BOUNDS TPU_VISIBLE EXPECTED_TRACE_CORES
+readonly TPU_BOUNDS TPU_VISIBLE EXPECTED_TRACE_CORES FEATURE_OUTPUT_TILE
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
@@ -183,6 +196,7 @@ say "RUN_DIR=$RUN_DIR"
 say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN"
 say "PACK=$PACK_MANIFEST_SHA ORACLE=$ORACLE_MANIFEST_SHA"
 say "KERNEL=$KERNEL"
+say "FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE"
 say "SOURCE_REVISION=$SOURCE_REVISION"
 say "warmup=$WARMUP iterations=$ITERATIONS trace_steps=20"
 strict_census pre || {
@@ -246,7 +260,14 @@ plan_slug = plan_slugs[plan_id]
 kernel = runner.get("kernel")
 if kernel not in ("reference", "pallas", "pallas_feature"):
     raise SystemExit(f"unsupported runner kernel identity: {kernel}")
+feature_output_tile = runner.get("feature_output_tile")
+if feature_output_tile not in (128, 256):
+    raise SystemExit(f"unsupported feature output tile: {feature_output_tile}")
+if kernel != "pallas_feature" and feature_output_tile != 128:
+    raise SystemExit("a non-default feature output tile requires pallas_feature")
 kernel_suffix = "" if kernel == "reference" else f"_{kernel}"
+if kernel == "pallas_feature" and feature_output_tile != 128:
+    kernel_suffix += f"_ot{feature_output_tile}"
 benchmark = f"greenfield_real_layer_{plan_slug}{kernel_suffix}"
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("runner status/code identity failed")
@@ -311,6 +332,7 @@ run_id = pv.start_run(
         "legacy_oracle_code_hash": oracle_pin,
         "hlo_sha256": runner["hlo"]["sha256"],
         "kernel": kernel,
+        "feature_output_tile": feature_output_tile,
         "packed_layout_sha256": runner["packed_checkpoint"].get("layout_sha256"),
         "packed_manifest_sha256": runner["packed_checkpoint"]["manifest_sha256"],
         "source_packed_manifest_sha256": runner["packed_checkpoint"].get("source_manifest_sha256"),
@@ -320,6 +342,7 @@ run_id = pv.start_run(
     },
     note=(
         f"Protected exact real layer-3 {plan_id}/{kernel} "
+        f"output_tile={feature_output_tile} "
         "normal/concentrated metal proof"
     ),
     harness_repo=repo,
@@ -335,7 +358,8 @@ for case in ("normal", "concentrated"):
         item_id=case,
         prompt=(
             "Execute one real batch-one GLM-5.2 layer-3 MoE on one "
-            f"{plan_id} stage with the {kernel} kernel path."
+            f"{plan_id} stage with the {kernel} kernel path and routed "
+            f"output tile {feature_output_tile}."
         ),
         gold="Exact routes, bounded BF16 output, one local stacked all-reduce.",
         raw_output=json.dumps(

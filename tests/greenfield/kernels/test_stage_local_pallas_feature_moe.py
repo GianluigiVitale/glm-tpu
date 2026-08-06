@@ -5,8 +5,13 @@ import os
 import subprocess
 import sys
 
+import pytest
 
-def test_feature_sharded_pallas_moe_matches_complete_expert_reference() -> None:
+
+@pytest.mark.parametrize("routed_output_tile", (128, 256))
+def test_feature_sharded_pallas_moe_matches_complete_expert_reference(
+    routed_output_tile: int,
+) -> None:
     """Prove balanced all-route feature shards and one local combine."""
 
     program = r'''
@@ -52,25 +57,25 @@ shared_out_sharding = NamedSharding(mesh, P("stage", None))
 shared_down_sharding = NamedSharding(mesh, P(None, "stage"))
 slot_sharding = NamedSharding(mesh, P("stage"))
 contract = GlmMoeNumericalContract(
-    hidden_size=8,
-    intermediate_size=8,
+    hidden_size=256,
+    intermediate_size=1024,
     num_experts=16,
     top_k=4,
     stage_size=4,
-    fp8_block_shape=(2, 2),
+    fp8_block_shape=(128, 128),
 )
 config = Fp8BlockMatmulConfig(
-    block_shape=(2, 2),
+    block_shape=(128, 128),
     row_tile=8,
-    output_tile=2,
-    contraction_tile=2,
+    output_tile=__ROUTED_OUTPUT_TILE__,
+    contraction_tile=128,
 )
 
 hidden = np.asarray(
-    [[0.5, -0.25, 0.75, 1.0, -1.0, 0.125, 0.25, -0.5]],
+    np.linspace(-0.5, 0.75, 256, dtype=np.float32)[None, :],
     dtype=ml_dtypes.bfloat16,
 )
-router = np.asarray(draw(1, (16, 8)), dtype=ml_dtypes.bfloat16)
+router = np.asarray(draw(1, (16, 256)), dtype=ml_dtypes.bfloat16)
 distributed_bias = np.asarray(
     [0.9, 0.0, 0.8, 0.0, 0.7, 0.0, 0.6, 0.0] + [0.0] * 8,
     dtype=np.float32,
@@ -80,21 +85,21 @@ concentrated_bias = np.asarray(
     dtype=np.float32,
 )
 
-expert_gate_nk = bits(draw(2, (16, 8, 8)))
-expert_up_nk = bits(draw(3, (16, 8, 8)))
-expert_down_nk = bits(draw(4, (16, 8, 8)))
+expert_gate_nk = bits(draw(2, (16, 1024, 256)))
+expert_up_nk = bits(draw(3, (16, 1024, 256)))
+expert_down_nk = bits(draw(4, (16, 256, 1024)))
 expert_gate_kn = np.ascontiguousarray(np.transpose(expert_gate_nk, (0, 2, 1)))
 expert_up_kn = np.ascontiguousarray(np.transpose(expert_up_nk, (0, 2, 1)))
 expert_down_kn = np.ascontiguousarray(np.transpose(expert_down_nk, (0, 2, 1)))
-expert_gate_scale = scales(5, (16, 4, 4))
-expert_up_scale = scales(6, (16, 4, 4))
-expert_down_scale = scales(7, (16, 4, 4))
-shared_gate = bits(draw(8, (8, 8)))
-shared_up = bits(draw(9, (8, 8)))
-shared_down = bits(draw(10, (8, 8)))
-shared_gate_scale = scales(11, (4, 4))
-shared_up_scale = scales(12, (4, 4))
-shared_down_scale = scales(13, (4, 4))
+expert_gate_scale = scales(5, (16, 8, 2))
+expert_up_scale = scales(6, (16, 8, 2))
+expert_down_scale = scales(7, (16, 2, 8))
+shared_gate = bits(draw(8, (1024, 256)))
+shared_up = bits(draw(9, (1024, 256)))
+shared_down = bits(draw(10, (256, 1024)))
+shared_gate_scale = scales(11, (8, 2))
+shared_up_scale = scales(12, (8, 2))
+shared_down_scale = scales(13, (2, 8))
 slots = np.arange(4, dtype=np.int32)
 
 def put(value, sharding):
@@ -199,6 +204,9 @@ print(json.dumps({
     },
 }, sort_keys=True))
 '''
+    program = program.replace(
+        "__ROUTED_OUTPUT_TILE__", str(routed_output_tile)
+    )
     env = dict(os.environ)
     env["JAX_PLATFORMS"] = "cpu"
     existing = env.get("XLA_FLAGS", "").strip()

@@ -43,6 +43,9 @@ from glm_tpu.greenfield.kernels.stage_local import (  # noqa: E402
     stage_local_moe_pallas_feature_mapped,
     stage_local_moe_pallas_mapped,
 )
+from glm_tpu.greenfield.kernels.pallas import (  # noqa: E402
+    Fp8BlockMatmulConfig,
+)
 from glm_tpu.greenfield.kernels.reference import (  # noqa: E402
     GlmMoeNumericalContract,
     route_glm_noaux_tc,
@@ -85,6 +88,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iterations", type=int, default=1000)
     parser.add_argument("--trace-steps", type=int, default=20)
     parser.add_argument("--expert-chunk-size", type=int, default=2)
+    parser.add_argument(
+        "--feature-output-tile",
+        type=int,
+        choices=(128, 256),
+        default=128,
+    )
     return parser.parse_args()
 
 
@@ -329,6 +338,7 @@ def _pallas_feature_stage_step(
     *,
     axis_name: str,
     contract: GlmMoeNumericalContract,
+    config: Fp8BlockMatmulConfig,
 ) -> tuple[Any, Any, Any]:
     """Adapt runner order to the expert-feature Pallas challenger."""
     return stage_local_moe_pallas_feature_mapped(
@@ -350,6 +360,7 @@ def _pallas_feature_stage_step(
         local_feature_shard,
         axis_name=axis_name,
         contract=contract,
+        config=config,
     )
 
 
@@ -452,6 +463,10 @@ def main() -> int:
     ):
         raise ValueError(
             "Pallas layer requires source manifest and pack code identities"
+        )
+    if args.kernel != "pallas_feature" and args.feature_output_tile != 128:
+        raise ValueError(
+            "a non-default feature output tile requires pallas_feature"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
@@ -582,6 +597,11 @@ def main() -> int:
         ),
         fp8_block_shape=tuple(geometry["fp8_block_shape"]),
     )
+    feature_config = Fp8BlockMatmulConfig(
+        block_shape=contract.fp8_block_shape,
+        contraction_tile=512,
+        output_tile=args.feature_output_tile,
+    )
 
     if args.kernel.startswith("pallas"):
         from jax import lax
@@ -619,6 +639,7 @@ def main() -> int:
                     ),
                     axis_name="feature",
                     contract=contract,
+                    config=feature_config,
                 ),
                 mesh=loaded.mesh,
                 in_specs=(
@@ -727,6 +748,7 @@ def main() -> int:
                 else contract.local_shared_intermediate
             ),
             feature_sharded_routed=args.kernel == "pallas_feature",
+            routed_output_tile=args.feature_output_tile,
         )
     else:
         hlo_contract = validate_real_layer_hlo(
@@ -857,6 +879,7 @@ def main() -> int:
         "load": {**loaded.load_record, "seconds": load_seconds},
         "model_id": loaded.manifest["model_id"],
         "kernel": args.kernel,
+        "feature_output_tile": args.feature_output_tile,
         "oracle": {
             "file_sha256": oracle_manifest["file"]["sha256"],
             "manifest_sha256": oracle_manifest["manifest_sha256"],
@@ -889,6 +912,7 @@ def main() -> int:
         "GREENFIELD_REAL_ONE_LAYER_OK "
         f"plan={args.plan_id} "
         f"kernel={args.kernel} "
+        f"feature_output_tile={args.feature_output_tile} "
         f"host={record['hostname']} stage={resolution.stage_id} "
         f"normal_p50_ms={timing['normal']['latency']['p50_ms']:.6f} "
         "concentrated_p50_ms="

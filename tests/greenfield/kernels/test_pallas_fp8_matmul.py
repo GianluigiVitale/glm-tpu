@@ -368,9 +368,22 @@ def test_fp8_block_up_gate_interpret_matches_two_references(
 
 
 def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:
-    with pytest.raises(ValueError, match="one output scale block"):
-        Fp8BlockMatmulConfig(output_tile=256)
-    with pytest.raises(ValueError, match="integral number"):
+    wide_routed_config = Fp8BlockMatmulConfig(output_tile=256)
+    with pytest.raises(ValueError, match="tiles must equal one scale block"):
+        fp8_block_matmul(
+            jnp.ones((1, 128), dtype=jnp.bfloat16),
+            jnp.zeros((128, 128), dtype=jnp.uint8),
+            jnp.ones((1, 1), dtype=jnp.float32),
+            config=wide_routed_config,
+            interpret=True,
+        )
+    with pytest.raises(
+        ValueError, match="integral output and contraction scale blocks"
+    ):
+        Fp8BlockMatmulConfig(output_tile=192)
+    with pytest.raises(
+        ValueError, match="integral output and contraction scale blocks"
+    ):
         Fp8BlockMatmulConfig(contraction_tile=192)
     with pytest.raises(ValueError, match="accumulator must be FP32"):
         Fp8BlockMatmulConfig(accumulator_dtype=jnp.bfloat16)
@@ -693,8 +706,10 @@ def test_fp8_selected_swiglu_down_rejects_contract_drift() -> None:
     "route_values",
     ([11, 500, 10, 12], [12, 10, 11, 12]),
 )
+@pytest.mark.parametrize("output_tile", (128, 256))
 def test_fp8_fused_selected_moe_interpret_matches_exact_reference(
     route_values: list[int],
+    output_tile: int,
 ) -> None:
     from jax._src.pallas.mosaic import tpu_info
 
@@ -757,6 +772,10 @@ def test_fp8_fused_selected_moe_interpret_matches_exact_reference(
         up_scale,
         down_bits,
         down_scale,
+        config=Fp8BlockMatmulConfig(
+            contraction_tile=512,
+            output_tile=output_tile,
+        ),
         interpret=True,
     )
 

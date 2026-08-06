@@ -150,6 +150,33 @@ def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
     )
     assert record["passed"], record
     assert record["routed_layout"] == "expert_intermediate_shard"
+    assert record["routed_output_tile"] == 128
+
+    wide_hlo = hlo.replace(
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512",
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+    )
+    wide = validate_pallas_real_layer_hlo(
+        wide_hlo,
+        local_experts=256,
+        routed_intermediate_size=512,
+        feature_sharded_routed=True,
+        routed_output_tile=256,
+    )
+    assert wide["passed"], wide
+    assert wide["routed_output_tile"] == 256
+
+    wrong_fingerprint = validate_pallas_real_layer_hlo(
+        wide_hlo,
+        local_experts=256,
+        routed_intermediate_size=512,
+        feature_sharded_routed=True,
+    )
+    assert not wrong_fingerprint["passed"]
+    assert any(
+        "kernel fingerprint" in item
+        for item in wrong_fingerprint["violations"]
+    )
 
     wrong_layout = validate_pallas_real_layer_hlo(hlo)
     assert not wrong_layout["passed"]

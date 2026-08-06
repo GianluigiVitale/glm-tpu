@@ -168,6 +168,7 @@ def validate_pallas_real_layer_hlo(
     stage_size: int = 4,
     routed_intermediate_size: int | None = None,
     feature_sharded_routed: bool = False,
+    routed_output_tile: int = 128,
 ) -> dict[str, Any]:
     """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
 
@@ -178,6 +179,8 @@ def validate_pallas_real_layer_hlo(
     )
     if routed_intermediate <= 0:
         raise ValueError("routed intermediate size must be positive")
+    if routed_output_tile not in (128, 256):
+        raise ValueError("routed output tile must be 128 or 256")
 
     base = validate_real_layer_hlo(
         optimized_hlo,
@@ -283,6 +286,20 @@ def validate_pallas_real_layer_hlo(
         )
 
     selected_line = kernel_calls["greenfield_fp8_fused_selected_moe_"]
+    expected_selected_name = (
+        "greenfield_fp8_fused_selected_moe_"
+        f"r8_g{local_experts}_h{hidden_size}_i{routed_intermediate}"
+    )
+    if routed_output_tile != 128:
+        expected_selected_name += f"_ot{routed_output_tile}"
+    expected_selected_pattern = re.compile(
+        re.escape(expected_selected_name) + r"(?=[^A-Za-z0-9_]|$)"
+    )
+    if selected_line and not expected_selected_pattern.search(selected_line[0]):
+        violations.append(
+            "fused selected kernel fingerprint drifted: expected "
+            f"{expected_selected_name}"
+        )
     if selected_line and selected_line[0].count(
         f"u8[{local_experts},{hidden_size},{routed_intermediate}]"
     ) < 2:
@@ -329,6 +346,7 @@ def validate_pallas_real_layer_hlo(
         "kernel_custom_calls": kernel_calls,
         "local_layout_custom_call_count": len(concat_calls),
         "local_layout_custom_calls": concat_calls,
+        "routed_output_tile": routed_output_tile,
         "routed_layout": (
             "expert_intermediate_shard"
             if feature_sharded_routed

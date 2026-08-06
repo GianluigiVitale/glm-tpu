@@ -51,12 +51,12 @@ class Fp8BlockMatmulConfig:
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
-        if self.output_tile != self.block_shape[0] or (
+        if self.output_tile % self.block_shape[0] != 0 or (
             self.contraction_tile % self.block_shape[1] != 0
         ):
             raise ValueError(
-                "TPU-v4 tiles require one output scale block and an integral "
-                "number of contraction scale blocks"
+                "TPU-v4 tiles require integral output and contraction scale "
+                "blocks"
             )
         if jnp.dtype(self.output_dtype) != jnp.dtype(jnp.bfloat16):
             raise ValueError("the TPU-v4 FP8 matmul output must be BF16")
@@ -70,9 +70,11 @@ def _validate_inputs(
     scale: Any,
     config: Fp8BlockMatmulConfig,
 ) -> tuple[int, int, int]:
-    if config.contraction_tile != config.block_shape[1]:
+    if config.output_tile != config.block_shape[0] or (
+        config.contraction_tile != config.block_shape[1]
+    ):
         raise ValueError(
-            "standalone FP8 matmul contraction tile must equal one scale block"
+            "standalone FP8 matmul tiles must equal one scale block"
         )
     if lhs.ndim != 2 or weight_bits.ndim != 2 or scale.ndim != 2:
         raise ValueError("FP8 matmul inputs must have ranks two, two, and two")
@@ -2659,6 +2661,12 @@ def fp8_fused_selected_moe(
     output_shape = jax.ShapeDtypeStruct(
         (route_count, config.row_tile, padded_hidden), config.output_dtype
     )
+    kernel_name = (
+        "greenfield_fp8_fused_selected_moe_"
+        f"r{route_count}_g{local_experts}_h{padded_hidden}_i{padded_intermediate}"
+    )
+    if config.output_tile != config.block_shape[0]:
+        kernel_name += f"_ot{config.output_tile}"
     call = pl.pallas_call(
         kernel,
         out_shape=output_shape,
@@ -2699,10 +2707,7 @@ def fp8_fused_selected_moe(
         ),
         compiler_params=pltpu.CompilerParams(disable_bounds_checks=True),
         interpret=interpret,
-        name=(
-            "greenfield_fp8_fused_selected_moe_"
-            f"r{route_count}_g{local_experts}_h{padded_hidden}_i{padded_intermediate}"
-        ),
+        name=kernel_name,
         cost_estimate=pl.CostEstimate(
             flops=(
                 6
