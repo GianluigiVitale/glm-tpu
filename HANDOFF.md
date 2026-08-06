@@ -821,6 +821,7 @@ syntax, affected CPU tests, and the matcher against the preserved failed draw pa
 correctly reports six exact hosts and refuses workers 0/3.
 
 Exact next: after authenticated zero-work/disk/session cleanup, retry the protected fresh all-event
-DSA capture at pin `3c45b47`; require repaired-or-clean 8/8 final state, correct raw item, complete
+DSA capture from the clean branch HEAD containing `3c45b47`; require repaired-or-clean 8/8 final
+state, correct raw item, complete
 step/event dump coverage, sealed compact oracle, approved archive/SUCCESS, and 8/8 cleanup. Then bind
 the separate observer replay to that oracle and run the protected real-prompt 2K Gate D comparison.
