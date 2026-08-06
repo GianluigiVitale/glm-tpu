@@ -167,7 +167,7 @@ def validate_pallas_real_layer_hlo(
     local_experts: int = 64,
     stage_size: int = 4,
 ) -> dict[str, Any]:
-    """Require four raw-FP8 kernels, bounded metadata, and one local combine."""
+    """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
 
     base = validate_real_layer_hlo(
         optimized_hlo,
@@ -181,8 +181,7 @@ def validate_pallas_real_layer_hlo(
         if " custom-call(" in line
     ]
     kernel_prefixes = (
-        "greenfield_fp8_selected_up_gate_",
-        "greenfield_fp8_selected_swiglu_down_",
+        "greenfield_fp8_fused_selected_moe_",
         "greenfield_fp8_block_up_gate_",
         "greenfield_fp8_block_matmul_",
     )
@@ -213,7 +212,6 @@ def validate_pallas_real_layer_hlo(
         # four asynchronous VMEM slices followed by this non-collective
         # bitwise reassembly.  Exact output shapes are checked below.
         "ConcatBitcast",
-        "GatherScatterIndicesBitpacked",
     }
     unexpected_targets = sorted(
         target for target in targets if target not in allowed_targets
@@ -226,12 +224,11 @@ def validate_pallas_real_layer_hlo(
         target: targets.count(target) for target in sorted(set(targets))
     }
     expected_target_counts = {
-        # Three scale gathers, three selected-output gathers, and the exact
-        # routed-weight gather from the 256-entry correction-bias vector.
-        "AssumeGatherIndicesInBound": 7,
+        # Three selected scale-table gathers, one final routed-output restore,
+        # and the exact correction-bias lookup from the 256-entry vector.
+        "AssumeGatherIndicesInBound": 5,
         "ConcatBitcast": 3,
-        "GatherScatterIndicesBitpacked": 2,
-        "tpu_custom_call": 4,
+        "tpu_custom_call": 3,
     }
     if target_counts != expected_target_counts:
         violations.append(
@@ -268,24 +265,19 @@ def validate_pallas_real_layer_hlo(
             f"expected={stage_size} observed={concat_arity}"
         )
 
-    selected_gate_line = kernel_calls[
-        "greenfield_fp8_selected_up_gate_"
-    ]
-    if selected_gate_line and selected_gate_line[0].count(
+    selected_line = kernel_calls["greenfield_fp8_fused_selected_moe_"]
+    if selected_line and selected_line[0].count(
         f"u8[{local_experts},{hidden_size},{intermediate_size}]"
     ) < 2:
         violations.append(
-            "selected gate/up call lacks two exact raw-U8 final-layout tables"
+            "fused selected call lacks two exact raw-U8 gate/up tables"
         )
-    selected_down_line = kernel_calls[
-        "greenfield_fp8_selected_swiglu_down_"
-    ]
-    if selected_down_line and (
+    if selected_line and (
         f"u8[{local_experts},{intermediate_size},{hidden_size}]"
-        not in selected_down_line[0]
+        not in selected_line[0]
     ):
         violations.append(
-            "selected down call lacks its exact raw-U8 final-layout table"
+            "fused selected call lacks its exact raw-U8 down table"
         )
 
     full_decoded_shapes = tuple(
