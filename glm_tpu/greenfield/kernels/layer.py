@@ -119,6 +119,7 @@ def stage_local_transformer_layer_fp8_mapped(
     rope_theta: float = 8_000_000.0,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
+    pallas_moe_fuse_route_weighting: bool = False,
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
@@ -130,6 +131,12 @@ def stage_local_transformer_layer_fp8_mapped(
         raise ValueError("layer MLP kind must be dense or sparse")
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise ValueError("layer sparse MoE backend is unknown")
+    if not isinstance(pallas_moe_fuse_route_weighting, bool):
+        raise ValueError("layer route-weight fusion flag must be boolean")
+    if pallas_moe_fuse_route_weighting and (
+        sparse_moe_backend != "pallas_feature"
+    ):
+        raise ValueError("route-weight fusion requires feature-Pallas MoE")
     if linear_backend not in ("reference", "pallas"):
         raise ValueError("layer FP8 linear backend is unknown")
     if (dsa is None) != (indexer_kind == "shared"):
@@ -308,6 +315,7 @@ def stage_local_transformer_layer_fp8_mapped(
                     contract=moe_contract,
                     axis_index_groups=axis_index_groups,
                     config=pallas_moe_config,
+                    fuse_route_weighting=pallas_moe_fuse_route_weighting,
                 )
             )
         output = residual_add(residual, update)

@@ -8,9 +8,13 @@ import sys
 import pytest
 
 
-@pytest.mark.parametrize("routed_output_tile", (128, 256))
+@pytest.mark.parametrize(
+    ("routed_output_tile", "fuse_route_weighting"),
+    ((128, False), (256, False), (256, True)),
+)
 def test_feature_sharded_pallas_moe_matches_complete_expert_reference(
     routed_output_tile: int,
+    fuse_route_weighting: bool,
 ) -> None:
     """Prove balanced all-route feature shards and one local combine."""
 
@@ -165,6 +169,7 @@ feature_map = jax.shard_map(
         axis_name="stage",
         contract=contract,
         config=config,
+        fuse_route_weighting=__FUSE_ROUTE_WEIGHTING__,
         interpret=True,
     ),
     mesh=mesh,
@@ -206,6 +211,9 @@ print(json.dumps({
 '''
     program = program.replace(
         "__ROUTED_OUTPUT_TILE__", str(routed_output_tile)
+    )
+    program = program.replace(
+        "__FUSE_ROUTE_WEIGHTING__", repr(fuse_route_weighting)
     )
     env = dict(os.environ)
     env["JAX_PLATFORMS"] = "cpu"

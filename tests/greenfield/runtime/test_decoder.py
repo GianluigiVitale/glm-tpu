@@ -14,7 +14,7 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     )
 
     selected = (
-        "out = bf16[8,1,6144] custom-call("
+        "out = bf16[8,8,6144] custom-call("
         "u8[256,6144,512], u8[256,6144,512], u8[256,512,6144]), "
         'custom_call_target="tpu_custom_call", '
         'metadata={op_name="greenfield_fp8_fused_selected_moe_'
@@ -46,6 +46,29 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     wide = _validate_pallas_feature_decoder_calls(wide_hlo, sparse_layers=75)
     assert wide["passed"], wide
     assert wide["feature_output_tile"] == 256
+    fused_hlo = wide_hlo.replace(
+        "out = bf16[8,8,6144]",
+        "out = bf16[8,6144]",
+    ).replace(
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_wsum",
+    )
+    fused = _validate_pallas_feature_decoder_calls(
+        fused_hlo,
+        sparse_layers=75,
+        fuse_route_weighting=True,
+    )
+    assert fused["passed"], fused
+    assert fused["fuse_route_weighting"] is True
+    stale_shape = _validate_pallas_feature_decoder_calls(
+        wide_hlo.replace(
+            "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+            "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_wsum",
+        ),
+        sparse_layers=75,
+        fuse_route_weighting=True,
+    )
+    assert not stale_shape["passed"]
     wrong_fingerprint = _validate_pallas_feature_decoder_calls(
         wide_hlo,
         sparse_layers=75,

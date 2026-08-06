@@ -121,6 +121,7 @@ class DecoderStepProgram:
     weight_layout_hash: str
     sparse_moe_backend: SparseMoeBackend
     feature_output_tile: int
+    feature_fuse_route_weighting: bool
     linear_backend: StageLinearBackend
 
 
@@ -129,6 +130,7 @@ def _validate_pallas_feature_decoder_calls(
     *,
     sparse_layers: int,
     feature_output_tile: int = PROMOTED_FEATURE_OUTPUT_TILE,
+    fuse_route_weighting: bool = False,
 ) -> dict[str, Any]:
     """Pin every production feature-MoE kernel and reject weight overlays."""
 
@@ -137,6 +139,8 @@ def _validate_pallas_feature_decoder_calls(
     selected_name = "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512"
     if feature_output_tile != 128:
         selected_name += f"_ot{feature_output_tile}"
+    if fuse_route_weighting:
+        selected_name += "_wsum"
     kernel_names = (
         selected_name,
         "greenfield_fp8_block_up_gate_m8_k6144_n512",
@@ -174,6 +178,21 @@ def _validate_pallas_feature_decoder_calls(
     if malformed_selected:
         violations.append(
             "decoder feature-Pallas selected kernels lack exact raw-U8 tables"
+        )
+    selected_result_shape = (
+        "bf16[8,6144]" if fuse_route_weighting else "bf16[8,8,6144]"
+    )
+    malformed_selected_result = [
+        line for line in selected_lines if selected_result_shape not in line
+    ]
+    if malformed_selected_result:
+        violations.append(
+            "decoder feature-Pallas selected result shape drifted: "
+            f"expected={selected_result_shape}"
+        )
+    if fuse_route_weighting and "bf16[8,8,6144]" in optimized_hlo:
+        violations.append(
+            "decoder retains the unfused routed [8,8,6144] HBM result"
         )
 
     shared_raw_shapes = {
@@ -226,6 +245,7 @@ def _validate_pallas_feature_decoder_calls(
         "forbidden_decoded_expert_overlays": forbidden_overlays,
         "forbidden_formatted_shared_overlays": forbidden_formatted_overlays,
         "feature_output_tile": feature_output_tile,
+        "fuse_route_weighting": fuse_route_weighting,
         "kernel_counts": kernel_counts,
         "passed": not violations,
         "violations": violations,
@@ -330,6 +350,7 @@ def validate_decoder_step_hlo(
     pairs: Sequence[Sequence[int]],
     backend_contract: str,
     feature_output_tile: int | None = None,
+    feature_fuse_route_weighting: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -352,6 +373,8 @@ def validate_decoder_step_hlo(
         )
     if feature_output_tile not in (128, 256):
         raise PlanValidationError("feature output tile must be 128 or 256")
+    if not isinstance(feature_fuse_route_weighting, bool):
+        raise PlanValidationError("feature route-weight fusion flag must be boolean")
     if (
         backend_contract
         not in (
@@ -362,6 +385,13 @@ def validate_decoder_step_hlo(
     ):
         raise PlanValidationError(
             "a non-default feature output tile requires a feature backend"
+        )
+    if feature_fuse_route_weighting and backend_contract not in (
+        "tpu_v4_pp8_pallas_feature",
+        "tpu_v4_pp8_pallas_feature_linear",
+    ):
+        raise PlanValidationError(
+            "feature route-weight fusion requires a feature backend"
         )
     skeleton = PipelineSkeletonConfig(
         config.stage_count,
@@ -544,6 +574,7 @@ def validate_decoder_step_hlo(
             optimized_hlo,
             sparse_layers=sparse_layers,
             feature_output_tile=feature_output_tile,
+            fuse_route_weighting=feature_fuse_route_weighting,
         )
         violations.extend(pallas_feature_contract["violations"])
     pallas_stage_linear_contract: dict[str, Any] = {}
@@ -574,6 +605,7 @@ def validate_decoder_step_hlo(
         ),
         "forbidden_shapes": forbidden_shapes,
         "feature_output_tile": feature_output_tile,
+        "feature_fuse_route_weighting": feature_fuse_route_weighting,
         "full_indexer_layers": full_layers,
         "layer_count": layers,
         "module_name": module.name,
@@ -670,6 +702,7 @@ def _execute_stage(
     block_shape: tuple[int, int],
     sparse_moe_backend: SparseMoeBackend,
     pallas_moe_config: Fp8BlockMatmulConfig | None,
+    pallas_moe_fuse_route_weighting: bool,
     linear_backend: StageLinearBackend,
 ) -> tuple[Any, Any, Any, Any]:
     import jax.numpy as jnp
@@ -739,6 +772,9 @@ def _execute_stage(
             block_shape=block_shape,
             sparse_moe_backend=sparse_moe_backend,
             pallas_moe_config=pallas_moe_config,
+            pallas_moe_fuse_route_weighting=(
+                pallas_moe_fuse_route_weighting
+            ),
             linear_backend=linear_backend,
         )
         residual = result.output
@@ -780,6 +816,7 @@ def build_decoder_step_program(
     axis_name: str = "device",
     sparse_moe_backend: SparseMoeBackend = "reference",
     feature_output_tile: int | None = None,
+    feature_fuse_route_weighting: bool = False,
     linear_backend: StageLinearBackend = "reference",
 ) -> DecoderStepProgram:
     """Build, but do not compile, the complete all-stage decode-step map."""
@@ -796,9 +833,15 @@ def build_decoder_step_program(
         )
     if feature_output_tile not in (128, 256):
         raise PlanValidationError("feature output tile must be 128 or 256")
+    if not isinstance(feature_fuse_route_weighting, bool):
+        raise PlanValidationError("feature route-weight fusion flag must be boolean")
     if sparse_moe_backend == "reference" and feature_output_tile != 128:
         raise PlanValidationError(
             "a non-default feature output tile requires pallas_feature"
+        )
+    if feature_fuse_route_weighting and sparse_moe_backend != "pallas_feature":
+        raise PlanValidationError(
+            "feature route-weight fusion requires pallas_feature"
         )
     if linear_backend not in ("reference", "pallas"):
         raise PlanValidationError("decoder FP8 linear backend is unknown")
@@ -965,6 +1008,9 @@ def build_decoder_step_program(
                     block_shape=geometry.fp8_block_shape,
                     sparse_moe_backend=sparse_moe_backend,
                     pallas_moe_config=pallas_moe_config,
+                    pallas_moe_fuse_route_weighting=(
+                        feature_fuse_route_weighting
+                    ),
                     linear_backend=linear_backend,
                 ),
                 lambda values: values,
@@ -1017,5 +1063,6 @@ def build_decoder_step_program(
         weight_layout_hash=weight_layout.layout_hash,
         sparse_moe_backend=sparse_moe_backend,
         feature_output_tile=feature_output_tile,
+        feature_fuse_route_weighting=feature_fuse_route_weighting,
         linear_backend=linear_backend,
     )

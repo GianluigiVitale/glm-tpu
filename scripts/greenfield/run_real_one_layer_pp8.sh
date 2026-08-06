@@ -28,8 +28,13 @@ readonly PALLAS_FEATURE_PACK_CODE_HASH=5f6bb98c9b0036f393db27fc3857969f54aa171d
 PLAN_ID=${GLM_GREENFIELD_REAL_LAYER_PLAN:-PP8_LP4}
 KERNEL=${GLM_GREENFIELD_REAL_LAYER_KERNEL:-reference}
 FEATURE_OUTPUT_TILE=${GLM_GREENFIELD_FEATURE_OUTPUT_TILE:-128}
+FEATURE_FUSE_ROUTE_WEIGHTING=${GLM_GREENFIELD_FEATURE_FUSE_ROUTE_WEIGHTING:-0}
 [[ $FEATURE_OUTPUT_TILE == 128 || $FEATURE_OUTPUT_TILE == 256 ]] || {
   echo "feature output tile must be 128 or 256" >&2
+  exit 2
+}
+[[ $FEATURE_FUSE_ROUTE_WEIGHTING == 0 || $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]] || {
+  echo "feature route-weight fusion must be 0 or 1" >&2
   exit 2
 }
 case "$PLAN_ID" in
@@ -88,6 +93,9 @@ case "$KERNEL" in
     if [[ $FEATURE_OUTPUT_TILE != 128 ]]; then
       PLAN_SLUG=${PLAN_SLUG}_ot${FEATURE_OUTPUT_TILE}
     fi
+    if [[ $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]]; then
+      PLAN_SLUG=${PLAN_SLUG}_wsum
+    fi
     PACK_RUN=$PALLAS_FEATURE_PACK_RUN
     PACK_MANIFEST_SHA=$PALLAS_FEATURE_PACK_MANIFEST_SHA
     KERNEL_ARGS=(
@@ -95,6 +103,7 @@ case "$KERNEL" in
       --source-packed-manifest-sha256 "$PALLAS_FEATURE_SOURCE_MANIFEST_SHA"
       --packed-code-hash "$PALLAS_FEATURE_PACK_CODE_HASH"
       --feature-output-tile "$FEATURE_OUTPUT_TILE"
+      --feature-fuse-route-weighting "$FEATURE_FUSE_ROUTE_WEIGHTING"
     )
     ;;
   *)
@@ -106,8 +115,13 @@ if [[ $KERNEL != pallas_feature && $FEATURE_OUTPUT_TILE != 128 ]]; then
   echo "a non-default feature output tile requires pallas_feature" >&2
   exit 2
 fi
+if [[ $KERNEL != pallas_feature && $FEATURE_FUSE_ROUTE_WEIGHTING != 0 ]]; then
+  echo "feature route-weight fusion requires pallas_feature" >&2
+  exit 2
+fi
 readonly PLAN_ID PLAN_SLUG PACK_RUN PACK_MANIFEST_SHA PLAN_GROUP_HASH KERNEL
 readonly TPU_BOUNDS TPU_VISIBLE EXPECTED_TRACE_CORES FEATURE_OUTPUT_TILE
+readonly FEATURE_FUSE_ROUTE_WEIGHTING
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
@@ -197,6 +211,7 @@ say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN"
 say "PACK=$PACK_MANIFEST_SHA ORACLE=$ORACLE_MANIFEST_SHA"
 say "KERNEL=$KERNEL"
 say "FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE"
+say "FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING"
 say "SOURCE_REVISION=$SOURCE_REVISION"
 say "warmup=$WARMUP iterations=$ITERATIONS trace_steps=20"
 strict_census pre || {
@@ -265,9 +280,16 @@ if feature_output_tile not in (128, 256):
     raise SystemExit(f"unsupported feature output tile: {feature_output_tile}")
 if kernel != "pallas_feature" and feature_output_tile != 128:
     raise SystemExit("a non-default feature output tile requires pallas_feature")
+feature_fuse_route_weighting = runner.get("feature_fuse_route_weighting")
+if not isinstance(feature_fuse_route_weighting, bool):
+    raise SystemExit("feature route-weight fusion identity is not boolean")
+if kernel != "pallas_feature" and feature_fuse_route_weighting:
+    raise SystemExit("feature route-weight fusion requires pallas_feature")
 kernel_suffix = "" if kernel == "reference" else f"_{kernel}"
 if kernel == "pallas_feature" and feature_output_tile != 128:
     kernel_suffix += f"_ot{feature_output_tile}"
+if feature_fuse_route_weighting:
+    kernel_suffix += "_wsum"
 benchmark = f"greenfield_real_layer_{plan_slug}{kernel_suffix}"
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("runner status/code identity failed")
@@ -333,6 +355,7 @@ run_id = pv.start_run(
         "hlo_sha256": runner["hlo"]["sha256"],
         "kernel": kernel,
         "feature_output_tile": feature_output_tile,
+        "feature_fuse_route_weighting": feature_fuse_route_weighting,
         "packed_layout_sha256": runner["packed_checkpoint"].get("layout_sha256"),
         "packed_manifest_sha256": runner["packed_checkpoint"]["manifest_sha256"],
         "source_packed_manifest_sha256": runner["packed_checkpoint"].get("source_manifest_sha256"),
@@ -343,6 +366,7 @@ run_id = pv.start_run(
     note=(
         f"Protected exact real layer-3 {plan_id}/{kernel} "
         f"output_tile={feature_output_tile} "
+        f"fuse_route_weighting={feature_fuse_route_weighting} "
         "normal/concentrated metal proof"
     ),
     harness_repo=repo,
@@ -359,7 +383,8 @@ for case in ("normal", "concentrated"):
         prompt=(
             "Execute one real batch-one GLM-5.2 layer-3 MoE on one "
             f"{plan_id} stage with the {kernel} kernel path and routed "
-            f"output tile {feature_output_tile}."
+            f"output tile {feature_output_tile}; fused route weighting "
+            f"is {feature_fuse_route_weighting}."
         ),
         gold="Exact routes, bounded BF16 output, one local stacked all-reduce.",
         raw_output=json.dumps(

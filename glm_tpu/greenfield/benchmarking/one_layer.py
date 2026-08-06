@@ -169,6 +169,7 @@ def validate_pallas_real_layer_hlo(
     routed_intermediate_size: int | None = None,
     feature_sharded_routed: bool = False,
     routed_output_tile: int = 128,
+    fuse_route_weighting: bool = False,
 ) -> dict[str, Any]:
     """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
 
@@ -181,6 +182,12 @@ def validate_pallas_real_layer_hlo(
         raise ValueError("routed intermediate size must be positive")
     if routed_output_tile not in (128, 256):
         raise ValueError("routed output tile must be 128 or 256")
+    if not isinstance(fuse_route_weighting, bool):
+        raise ValueError("route-weight fusion flag must be boolean")
+    if fuse_route_weighting and not feature_sharded_routed:
+        raise ValueError(
+            "route-weight fusion requires the feature-sharded routed layout"
+        )
 
     base = validate_real_layer_hlo(
         optimized_hlo,
@@ -238,8 +245,11 @@ def validate_pallas_real_layer_hlo(
     }
     expected_target_counts = {
         # Three selected scale-table gathers, one final routed-output restore,
-        # and the exact correction-bias lookup from the 256-entry vector.
-        "AssumeGatherIndicesInBound": 5,
+        # and the exact correction-bias lookup from the 256-entry vector. The
+        # fused route-sum path has no final routed-output restore.
+        "AssumeGatherIndicesInBound": (
+            4 if fuse_route_weighting else 5
+        ),
         "ConcatBitcast": 3,
         "tpu_custom_call": 3,
     }
@@ -290,6 +300,8 @@ def validate_pallas_real_layer_hlo(
     )
     if routed_output_tile != 128:
         expected_selected_name += f"_ot{routed_output_tile}"
+    if fuse_route_weighting:
+        expected_selected_name += "_wsum"
     expected_selected_pattern = re.compile(
         re.escape(expected_selected_name) + r"(?=[^A-Za-z0-9_]|$)"
     )
@@ -297,6 +309,22 @@ def validate_pallas_real_layer_hlo(
         violations.append(
             "fused selected kernel fingerprint drifted: expected "
             f"{expected_selected_name}"
+        )
+    expected_selected_result = (
+        f"bf16[8,{hidden_size}]"
+        if fuse_route_weighting
+        else f"bf16[8,8,{hidden_size}]"
+    )
+    if selected_line and expected_selected_result not in selected_line[0]:
+        violations.append(
+            "fused selected result shape drifted: expected "
+            f"{expected_selected_result}"
+        )
+    if fuse_route_weighting and (
+        f"bf16[8,8,{hidden_size}]" in optimized_hlo
+    ):
+        violations.append(
+            "fused route weighting retains the routed [8,8,H] HBM result"
         )
     if selected_line and selected_line[0].count(
         f"u8[{local_experts},{hidden_size},{routed_intermediate}]"
@@ -345,6 +373,7 @@ def validate_pallas_real_layer_hlo(
         "local_layout_custom_call_count": len(concat_calls),
         "local_layout_custom_calls": concat_calls,
         "routed_output_tile": routed_output_tile,
+        "fuse_route_weighting": fuse_route_weighting,
         "routed_layout": (
             "expert_intermediate_shard"
             if feature_sharded_routed

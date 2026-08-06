@@ -14,6 +14,7 @@ readonly WARMUP=${GLM_GREENFIELD_SHORT_DECODER_WARMUP:-2}
 readonly ITERATIONS=${GLM_GREENFIELD_SHORT_DECODER_ITERATIONS:-10}
 readonly TRACE_STEPS=${GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS:-0}
 readonly RUNTIME_KIND=${GLM_GREENFIELD_DECODER_RUNTIME_KIND:-pallas_feature_linear}
+readonly FEATURE_FUSE_ROUTE_WEIGHTING=${GLM_GREENFIELD_FEATURE_FUSE_ROUTE_WEIGHTING:-0}
 if [[ -n ${GLM_GREENFIELD_FEATURE_OUTPUT_TILE+x} ]]; then
   FEATURE_OUTPUT_TILE=$GLM_GREENFIELD_FEATURE_OUTPUT_TILE
 elif [[ $RUNTIME_KIND == reference ]]; then
@@ -29,6 +30,10 @@ readonly SOURCE_RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52
 readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a78272b93c14eafbd57e31dec
 [[ $FEATURE_OUTPUT_TILE == 128 || $FEATURE_OUTPUT_TILE == 256 ]] || {
   echo "feature output tile must be 128 or 256" >&2
+  exit 2
+}
+[[ $FEATURE_FUSE_ROUTE_WEIGHTING == 0 || $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]] || {
+  echo "feature route-weight fusion must be 0 or 1" >&2
   exit 2
 }
 case "$RUNTIME_KIND" in
@@ -65,6 +70,10 @@ if [[ $RUNTIME_KIND == reference && $FEATURE_OUTPUT_TILE != 128 ]]; then
   echo "a non-default feature output tile requires a feature runtime" >&2
   exit 2
 fi
+if [[ $RUNTIME_KIND == reference && $FEATURE_FUSE_ROUTE_WEIGHTING != 0 ]]; then
+  echo "feature route-weight fusion requires a feature runtime" >&2
+  exit 2
+fi
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
@@ -73,7 +82,12 @@ if [[ $FEATURE_OUTPUT_TILE != 128 ]]; then
   TILE_SUFFIX=_ot${FEATURE_OUTPUT_TILE}
 fi
 readonly TILE_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+FUSION_SUFFIX=
+if [[ $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]]; then
+  FUSION_SUFFIX=_wsum
+fi
+readonly FUSION_SUFFIX
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}${FUSION_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -144,7 +158,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -170,7 +184,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer 2K load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK || {
@@ -191,7 +205,7 @@ fi
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
-  "$FEATURE_OUTPUT_TILE" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" <<'PY'
 from __future__ import annotations
 
@@ -210,6 +224,7 @@ import sys
     oracle_repo,
     runtime_kind,
     feature_output_tile,
+    feature_fuse_route_weighting,
     sparse_moe_backend,
     hlo_backend_contract,
     runtime_manifest_sha256,
@@ -219,6 +234,7 @@ import sys
     trace_steps,
 ) = sys.argv[1:]
 feature_output_tile = int(feature_output_tile)
+feature_fuse_route_weighting = bool(int(feature_fuse_route_weighting))
 warmup = int(warmup)
 iterations = int(iterations)
 trace_steps = int(trace_steps)
@@ -253,6 +269,10 @@ if {record["feature_output_tile"] for record in records} != {
     feature_output_tile
 }:
     raise SystemExit("fleet feature output tile drifted")
+if {record["feature_fuse_route_weighting"] for record in records} != {
+    feature_fuse_route_weighting
+}:
+    raise SystemExit("fleet feature route-weight fusion drifted")
 if {record["sparse_moe_backend"] for record in records} != {sparse_moe_backend}:
     raise SystemExit("fleet sparse MoE backend drifted")
 expected_linear_backend = (
@@ -291,6 +311,8 @@ if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
     selected_kernel = "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512"
     if feature_output_tile != 128:
         selected_kernel += f"_ot{feature_output_tile}"
+    if feature_fuse_route_weighting:
+        selected_kernel += "_wsum"
     expected_kernel_counts = {
         selected_kernel: 75,
         "greenfield_fp8_block_up_gate_m8_k6144_n512": 75,
@@ -301,6 +323,8 @@ if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
         if (
             not feature["passed"]
             or feature["feature_output_tile"] != feature_output_tile
+            or feature["fuse_route_weighting"]
+            != feature_fuse_route_weighting
             or feature["kernel_counts"] != expected_kernel_counts
             or feature["expected_kernel_counts"] != expected_kernel_counts
             or feature["forbidden_decoded_expert_overlays"]
@@ -394,6 +418,7 @@ summary = {
     "fleet_p50_body_ms": fleet_p50,
     "fleet_p99_body_ms": fleet_p99,
     "feature_output_tile": feature_output_tile,
+    "feature_fuse_route_weighting": feature_fuse_route_weighting,
     "hlo_contract": records[0]["hlo_contract"],
     "host_count": 8,
     "iterations": iterations,
@@ -428,6 +453,9 @@ run_id = pv.start_run(
         "GLM_ENGINE": "greenfield_pp8_decoder_body",
         "greenfield_runtime_kind": runtime_kind,
         "greenfield_feature_output_tile": feature_output_tile,
+        "greenfield_feature_fuse_route_weighting": (
+            feature_fuse_route_weighting
+        ),
         "greenfield_sparse_moe_backend": sparse_moe_backend,
         "greenfield_code_hash": pin,
         "legacy_oracle_code_hash": oracle_pin,
@@ -439,7 +467,8 @@ run_id = pv.start_run(
     },
     note=(
         "Protected real 78-layer 2K transformer-body compile/run with "
-        f"feature output tile {feature_output_tile}; no token or tok/s claim."
+        f"feature output tile {feature_output_tile} and fused route weighting "
+        f"{feature_fuse_route_weighting}; no token or tok/s claim."
     ),
     harness_repo=repo,
     fork_repo=oracle_repo,
@@ -450,11 +479,13 @@ pv.record_item(
     benchmark=(
         "greenfield_78layer_2k_body_pp8"
         + (f"_ot{feature_output_tile}" if feature_output_tile != 128 else "")
+        + ("_wsum" if feature_fuse_route_weighting else "")
     ),
     item_id="body_step",
     prompt=(
         "Execute the real 78-layer PP8 decoder body at position zero with "
-        f"feature output tile {feature_output_tile}."
+        f"feature output tile {feature_output_tile} and fused route weighting "
+        f"{feature_fuse_route_weighting}."
     ),
     gold="Local-only HLO, exact pipeline state, direct runtime load, no raw-token claim.",
     raw_output=json.dumps(summary, sort_keys=True),
@@ -469,6 +500,7 @@ pv.finalize(
     benchmark=(
         "greenfield_78layer_2k_body_pp8"
         + (f"_ot{feature_output_tile}" if feature_output_tile != 128 else "")
+        + ("_wsum" if feature_fuse_route_weighting else "")
     ),
     metric="contract_valid",
     value=1.0,

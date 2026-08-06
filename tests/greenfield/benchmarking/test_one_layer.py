@@ -162,6 +162,27 @@ def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
     assert wide["passed"], wide
     assert wide["routed_output_tile"] == 256
 
+    fused_hlo = wide_hlo.replace(
+        "routed = bf16[8,8,6144]",
+        "routed = bf16[8,6144]",
+    ).replace(
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_wsum",
+    ).replace(
+        'gather4 = s32[1024] custom-call(index), custom_call_target="AssumeGatherIndicesInBound"',
+        "",
+    )
+    fused = validate_pallas_real_layer_hlo(
+        fused_hlo,
+        local_experts=256,
+        routed_intermediate_size=512,
+        feature_sharded_routed=True,
+        routed_output_tile=256,
+        fuse_route_weighting=True,
+    )
+    assert fused["passed"], fused
+    assert fused["fuse_route_weighting"] is True
+
     wrong_fingerprint = validate_pallas_real_layer_hlo(
         wide_hlo,
         local_experts=256,

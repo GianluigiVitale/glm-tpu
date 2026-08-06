@@ -94,6 +94,12 @@ def parse_args() -> argparse.Namespace:
         choices=(128, 256),
         default=128,
     )
+    parser.add_argument(
+        "--feature-fuse-route-weighting",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     return parser.parse_args()
 
 
@@ -339,6 +345,7 @@ def _pallas_feature_stage_step(
     axis_name: str,
     contract: GlmMoeNumericalContract,
     config: Fp8BlockMatmulConfig,
+    fuse_route_weighting: bool,
 ) -> tuple[Any, Any, Any]:
     """Adapt runner order to the expert-feature Pallas challenger."""
     return stage_local_moe_pallas_feature_mapped(
@@ -361,6 +368,7 @@ def _pallas_feature_stage_step(
         axis_name=axis_name,
         contract=contract,
         config=config,
+        fuse_route_weighting=fuse_route_weighting,
     )
 
 
@@ -443,6 +451,9 @@ def _measure_case(
 
 def main() -> int:
     args = parse_args()
+    args.feature_fuse_route_weighting = bool(
+        args.feature_fuse_route_weighting
+    )
     if (
         args.warmup < 200
         or args.iterations < 1000
@@ -467,6 +478,10 @@ def main() -> int:
     if args.kernel != "pallas_feature" and args.feature_output_tile != 128:
         raise ValueError(
             "a non-default feature output tile requires pallas_feature"
+        )
+    if args.kernel != "pallas_feature" and args.feature_fuse_route_weighting:
+        raise ValueError(
+            "feature route-weight fusion requires pallas_feature"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
@@ -640,6 +655,9 @@ def main() -> int:
                     axis_name="feature",
                     contract=contract,
                     config=feature_config,
+                    fuse_route_weighting=(
+                        args.feature_fuse_route_weighting
+                    ),
                 ),
                 mesh=loaded.mesh,
                 in_specs=(
@@ -749,6 +767,7 @@ def main() -> int:
             ),
             feature_sharded_routed=args.kernel == "pallas_feature",
             routed_output_tile=args.feature_output_tile,
+            fuse_route_weighting=args.feature_fuse_route_weighting,
         )
     else:
         hlo_contract = validate_real_layer_hlo(
@@ -880,6 +899,7 @@ def main() -> int:
         "model_id": loaded.manifest["model_id"],
         "kernel": args.kernel,
         "feature_output_tile": args.feature_output_tile,
+        "feature_fuse_route_weighting": args.feature_fuse_route_weighting,
         "oracle": {
             "file_sha256": oracle_manifest["file"]["sha256"],
             "manifest_sha256": oracle_manifest["manifest_sha256"],
@@ -913,6 +933,7 @@ def main() -> int:
         f"plan={args.plan_id} "
         f"kernel={args.kernel} "
         f"feature_output_tile={args.feature_output_tile} "
+        f"feature_fuse_route_weighting={args.feature_fuse_route_weighting} "
         f"host={record['hostname']} stage={resolution.stage_id} "
         f"normal_p50_ms={timing['normal']['latency']['p50_ms']:.6f} "
         "concentrated_p50_ms="

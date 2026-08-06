@@ -2220,6 +2220,7 @@ def fp8_fused_selected_moe(
     down_bits: Any,
     down_scale: Any,
     *,
+    route_weights: Any | None = None,
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
         contraction_tile=512
     ),
@@ -2228,8 +2229,10 @@ def fp8_fused_selected_moe(
     """Execute selected gate/up, exact BF16 SwiGLU, and down in one call.
 
     The gate and up rows live only in VMEM scratch between two nested Mosaic
-    pipelines. Complete routed weights remain raw U8 HBM operands, route work
-    is compacted once, and only the final BF16 expert outputs leave the call.
+    pipelines. Complete routed weights remain raw U8 HBM operands and route
+    work is compacted once. When ``route_weights`` is supplied, the exact BF16
+    weighting and route-axis sum also stay inside the call so only one local
+    hidden-width partial leaves it; the default retains per-route outputs.
     """
 
     route_count, local_experts, hidden_size, intermediate = (
@@ -2274,6 +2277,14 @@ def fp8_fused_selected_moe(
         raise ValueError(
             "fused selected down FP32 scale shape must be "
             f"{expected_down_scale}, got {down_scale.shape}/{down_scale.dtype}"
+        )
+    fuse_route_weighting = route_weights is not None
+    if fuse_route_weighting and (
+        route_weights.shape != (route_count,)
+        or route_weights.dtype != jnp.float32
+    ):
+        raise ValueError(
+            "fused selected route weights must be one FP32 top-k row"
         )
 
     padded_hidden = (
@@ -2352,6 +2363,16 @@ def fp8_fused_selected_moe(
     compact_local_ids = jnp.zeros_like(local_ids).at[compact_index].set(
         local_ids
     )
+    compact_route_weights = None
+    if fuse_route_weighting:
+        active_weights = jnp.where(
+            active,
+            route_weights,
+            jnp.zeros_like(route_weights),
+        ).astype(jnp.bfloat16)
+        compact_route_weights = jnp.zeros_like(active_weights).at[
+            compact_index
+        ].set(active_weights)
     gate_scale_table = _selected_scale_table(
         gate_scale,
         compact_local_ids,
@@ -2374,9 +2395,10 @@ def fp8_fused_selected_moe(
         block_shape=config.block_shape,
     )
 
-    def kernel(
+    def kernel_body(
         local_ids_value: Any,
         active_count_value: Any,
+        route_weights_value: Any,
         hidden_hbm_ref: Any,
         gate_hbm_ref: Any,
         gate_scale_hbm_ref: Any,
@@ -2390,6 +2412,7 @@ def fp8_fused_selected_moe(
         gate_accumulator_ref: Any,
         up_accumulator_ref: Any,
         down_accumulator_ref: Any,
+        route_output_vmem_ref: Any,
     ) -> None:
         def up_gate_kernel(
             hidden_ref: Any,
@@ -2649,29 +2672,208 @@ def fp8_fused_selected_moe(
             dimension_semantics=("parallel", "arbitrary", "arbitrary"),
             no_pipelining=interpret,
         )
+        down_output_ref = (
+            route_output_vmem_ref
+            if fuse_route_weighting
+            else output_hbm_ref
+        )
         down_pipeline(
             gate_vmem_ref,
             up_vmem_ref,
             down_hbm_ref,
             down_scale_hbm_ref,
-            output_hbm_ref,
+            down_output_ref,
             scratches=(down_accumulator_ref,),
         )
 
-    output_shape = jax.ShapeDtypeStruct(
-        (route_count, config.row_tile, padded_hidden), config.output_dtype
-    )
+        if fuse_route_weighting:
+            def combine_kernel(
+                route_output_ref: Any,
+                combined_output_ref: Any,
+            ) -> None:
+                active_slots = (
+                    jnp.arange(route_count, dtype=jnp.int32)
+                    < active_count_value[...]
+                )[:, None, None]
+                safe_outputs = jnp.where(
+                    active_slots,
+                    route_output_ref[...],
+                    jnp.zeros_like(route_output_ref[...]),
+                )
+                weights = route_weights_value[...].astype(
+                    config.output_dtype
+                )
+                weighted = (
+                    safe_outputs * weights[:, None, None]
+                ).astype(config.output_dtype)
+                combined_output_ref[...] = jnp.sum(
+                    weighted,
+                    axis=0,
+                    dtype=config.output_dtype,
+                )
+
+            def combine_input_index(
+                output_index: Any,
+            ) -> tuple[int, int, Any]:
+                return 0, 0, output_index
+
+            def combine_output_index(
+                output_index: Any,
+            ) -> tuple[int, Any]:
+                return 0, output_index
+
+            combine_pipeline = pltpu.emit_pipeline(
+                combine_kernel,
+                grid=(down_output_tiles,),
+                in_specs=pl.BlockSpec(
+                    (route_count, config.row_tile, config.output_tile),
+                    combine_input_index,
+                ),
+                out_specs=pl.BlockSpec(
+                    (config.row_tile, config.output_tile),
+                    combine_output_index,
+                ),
+                dimension_semantics=("parallel",),
+                no_pipelining=interpret,
+            )
+            combine_pipeline(
+                route_output_vmem_ref,
+                output_hbm_ref,
+            )
+
+    if fuse_route_weighting:
+        output_shape = jax.ShapeDtypeStruct(
+            (config.row_tile, padded_hidden), config.output_dtype
+        )
+    else:
+        output_shape = jax.ShapeDtypeStruct(
+            (route_count, config.row_tile, padded_hidden),
+            config.output_dtype,
+        )
     kernel_name = (
         "greenfield_fp8_fused_selected_moe_"
         f"r{route_count}_g{local_experts}_h{padded_hidden}_i{padded_intermediate}"
     )
     if config.output_tile != config.block_shape[0]:
         kernel_name += f"_ot{config.output_tile}"
+    if fuse_route_weighting:
+        kernel_name += "_wsum"
+    common_scratch_shapes = (
+        pltpu.VMEM(
+            (route_count, config.row_tile, padded_intermediate),
+            config.output_dtype,
+        ),
+        pltpu.VMEM(
+            (route_count, config.row_tile, padded_intermediate),
+            config.output_dtype,
+        ),
+        pltpu.VMEM(
+            (config.row_tile, config.output_tile),
+            config.accumulator_dtype,
+        ),
+        pltpu.VMEM(
+            (config.row_tile, config.output_tile),
+            config.accumulator_dtype,
+        ),
+        pltpu.VMEM(
+            (config.row_tile, config.output_tile),
+            config.accumulator_dtype,
+        ),
+    )
+    if fuse_route_weighting:
+        def kernel(
+            local_ids_value: Any,
+            active_count_value: Any,
+            route_weights_value: Any,
+            hidden_hbm_ref: Any,
+            gate_hbm_ref: Any,
+            gate_scale_hbm_ref: Any,
+            up_hbm_ref: Any,
+            up_scale_hbm_ref: Any,
+            down_hbm_ref: Any,
+            down_scale_hbm_ref: Any,
+            output_hbm_ref: Any,
+            gate_vmem_ref: Any,
+            up_vmem_ref: Any,
+            gate_accumulator_ref: Any,
+            up_accumulator_ref: Any,
+            down_accumulator_ref: Any,
+            route_output_vmem_ref: Any,
+            _body: Any = kernel_body,
+        ) -> None:
+            _body(
+                local_ids_value,
+                active_count_value,
+                route_weights_value,
+                hidden_hbm_ref,
+                gate_hbm_ref,
+                gate_scale_hbm_ref,
+                up_hbm_ref,
+                up_scale_hbm_ref,
+                down_hbm_ref,
+                down_scale_hbm_ref,
+                output_hbm_ref,
+                gate_vmem_ref,
+                up_vmem_ref,
+                gate_accumulator_ref,
+                up_accumulator_ref,
+                down_accumulator_ref,
+                route_output_vmem_ref,
+            )
+
+        scalar_prefetch = 3
+        scratch_shapes = common_scratch_shapes + (
+            pltpu.VMEM(
+                (route_count, config.row_tile, padded_hidden),
+                config.output_dtype,
+            ),
+        )
+    else:
+        def kernel(
+            local_ids_value: Any,
+            active_count_value: Any,
+            hidden_hbm_ref: Any,
+            gate_hbm_ref: Any,
+            gate_scale_hbm_ref: Any,
+            up_hbm_ref: Any,
+            up_scale_hbm_ref: Any,
+            down_hbm_ref: Any,
+            down_scale_hbm_ref: Any,
+            output_hbm_ref: Any,
+            gate_vmem_ref: Any,
+            up_vmem_ref: Any,
+            gate_accumulator_ref: Any,
+            up_accumulator_ref: Any,
+            down_accumulator_ref: Any,
+            _body: Any = kernel_body,
+        ) -> None:
+            _body(
+                local_ids_value,
+                active_count_value,
+                jnp.zeros((route_count,), dtype=jnp.bfloat16),
+                hidden_hbm_ref,
+                gate_hbm_ref,
+                gate_scale_hbm_ref,
+                up_hbm_ref,
+                up_scale_hbm_ref,
+                down_hbm_ref,
+                down_scale_hbm_ref,
+                output_hbm_ref,
+                gate_vmem_ref,
+                up_vmem_ref,
+                gate_accumulator_ref,
+                up_accumulator_ref,
+                down_accumulator_ref,
+                None,
+            )
+
+        scalar_prefetch = 2
+        scratch_shapes = common_scratch_shapes
     call = pl.pallas_call(
         kernel,
         out_shape=output_shape,
         grid_spec=pltpu.PrefetchScalarGridSpec(
-            num_scalar_prefetch=2,
+            num_scalar_prefetch=scalar_prefetch,
             in_specs=(
                 pl.BlockSpec(memory_space=pltpu.HBM),
                 pl.BlockSpec(memory_space=pltpu.HBM),
@@ -2682,39 +2884,23 @@ def fp8_fused_selected_moe(
                 pl.BlockSpec(memory_space=pltpu.HBM),
             ),
             out_specs=pl.BlockSpec(memory_space=pltpu.HBM),
-            scratch_shapes=(
-                pltpu.VMEM(
-                    (route_count, config.row_tile, padded_intermediate),
-                    config.output_dtype,
-                ),
-                pltpu.VMEM(
-                    (route_count, config.row_tile, padded_intermediate),
-                    config.output_dtype,
-                ),
-                pltpu.VMEM(
-                    (config.row_tile, config.output_tile),
-                    config.accumulator_dtype,
-                ),
-                pltpu.VMEM(
-                    (config.row_tile, config.output_tile),
-                    config.accumulator_dtype,
-                ),
-                pltpu.VMEM(
-                    (config.row_tile, config.output_tile),
-                    config.accumulator_dtype,
-                ),
-            ),
+            scratch_shapes=scratch_shapes,
         ),
         compiler_params=pltpu.CompilerParams(disable_bounds_checks=True),
         interpret=interpret,
         name=kernel_name,
         cost_estimate=pl.CostEstimate(
             flops=(
-                6
+                (6
                 * route_count
                 * config.row_tile
                 * padded_hidden
-                * padded_intermediate
+                * padded_intermediate)
+                + (
+                    2 * route_count * config.row_tile * padded_hidden
+                    if fuse_route_weighting
+                    else 0
+                )
             ),
             bytes_accessed=(
                 config.row_tile * padded_hidden * 2
@@ -2729,16 +2915,21 @@ def fp8_fused_selected_moe(
                     + down_output_tiles * down_contraction_tiles
                 )
                 * 4
-                + route_count * config.row_tile * padded_hidden * 2
+                + (
+                    config.row_tile * padded_hidden * 2
+                    if fuse_route_weighting
+                    else route_count * config.row_tile * padded_hidden * 2
+                )
             ),
             transcendentals=(
                 route_count * config.row_tile * padded_intermediate
             ),
         ),
     )
-    output_value = call(
+    call_inputs = (
         compact_local_ids,
         active_count,
+        *((compact_route_weights,) if fuse_route_weighting else ()),
         hidden,
         gate_raw,
         gate_scale_table,
@@ -2747,6 +2938,9 @@ def fp8_fused_selected_moe(
         down_raw,
         down_scale_table,
     )
+    output_value = call(*call_inputs)
+    if fuse_route_weighting:
+        return output_value[:1, :hidden_size]
     compact_slot_active = (
         jnp.arange(route_count, dtype=jnp.int32) < active_count
     )[:, None, None]

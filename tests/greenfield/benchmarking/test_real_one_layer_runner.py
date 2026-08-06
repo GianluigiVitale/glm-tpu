@@ -86,6 +86,7 @@ def test_pallas_feature_stage_adapter_reorders_router_and_correction_bias(
     values = tuple(object() for _ in range(15))
     local_feature_shard = object()
     contract = object()
+    config = object()
     observed = {}
 
     def fake_pallas_feature_stage(*args, **kwargs):
@@ -103,6 +104,8 @@ def test_pallas_feature_stage_adapter_reorders_router_and_correction_bias(
         local_feature_shard,
         axis_name="feature",
         contract=contract,
+        config=config,
+        fuse_route_weighting=True,
     )
 
     assert result == "mapped"
@@ -116,4 +119,6 @@ def test_pallas_feature_stage_adapter_reorders_router_and_correction_bias(
     assert observed["kwargs"] == {
         "axis_name": "feature",
         "contract": contract,
+        "config": config,
+        "fuse_route_weighting": True,
     }

@@ -209,6 +209,12 @@ def parse_args() -> argparse.Namespace:
         choices=(128, 256),
         default=None,
     )
+    parser.add_argument(
+        "--feature-fuse-route-weighting",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -219,6 +225,9 @@ def main() -> int:
         args.feature_output_tile = (
             128 if args.runtime_kind == "reference" else 256
         )
+    args.feature_fuse_route_weighting = bool(
+        args.feature_fuse_route_weighting
+    )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.context_capacity != 2048:
@@ -239,6 +248,10 @@ def main() -> int:
     if args.runtime_kind == "reference" and args.feature_output_tile != 128:
         raise ValueError(
             "a non-default feature output tile requires a feature runtime"
+        )
+    if args.runtime_kind == "reference" and args.feature_fuse_route_weighting:
+        raise ValueError(
+            "feature route-weight fusion requires a feature runtime"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
@@ -425,6 +438,9 @@ def main() -> int:
             devices=runtime_devices,
             sparse_moe_backend=sparse_moe_backend,
             feature_output_tile=args.feature_output_tile,
+            feature_fuse_route_weighting=(
+                args.feature_fuse_route_weighting
+            ),
             linear_backend=linear_backend,
         )
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-start")
@@ -555,6 +571,9 @@ def main() -> int:
             pairs=pairs,
             backend_contract=hlo_backend_contract,
             feature_output_tile=decoder.feature_output_tile,
+            feature_fuse_route_weighting=(
+                decoder.feature_fuse_route_weighting
+            ),
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -744,6 +763,9 @@ def main() -> int:
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
             "feature_output_tile": decoder.feature_output_tile,
+            "feature_fuse_route_weighting": (
+                decoder.feature_fuse_route_weighting
+            ),
             "linear_backend": decoder.linear_backend,
             "topology_hash": live_topology.topology_hash,
             "trace": trace_record,

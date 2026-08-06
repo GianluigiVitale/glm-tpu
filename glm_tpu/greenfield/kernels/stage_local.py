@@ -1285,6 +1285,7 @@ def stage_local_moe_pallas_feature_from_routes_mapped(
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
         contraction_tile=512
     ),
+    fuse_route_weighting: bool = False,
     interpret: bool = False,
 ) -> Any:
     """Execute all top-k routes on one stage-local feature shard.
@@ -1387,18 +1388,22 @@ def stage_local_moe_pallas_feature_from_routes_mapped(
         expert_up_scale,
         expert_down_bits,
         expert_down_scale,
+        route_weights=(route_weights[0] if fuse_route_weighting else None),
         config=config,
         interpret=interpret,
     )
-    weighted_routed = (
-        routed_outputs
-        * route_weights[0, :, None].astype(hidden_states.dtype)
-    ).astype(hidden_states.dtype)
-    local_routed = jnp.sum(
-        weighted_routed,
-        axis=0,
-        dtype=hidden_states.dtype,
-    )[None, :]
+    if fuse_route_weighting:
+        local_routed = routed_outputs
+    else:
+        weighted_routed = (
+            routed_outputs
+            * route_weights[0, :, None].astype(hidden_states.dtype)
+        ).astype(hidden_states.dtype)
+        local_routed = jnp.sum(
+            weighted_routed,
+            axis=0,
+            dtype=hidden_states.dtype,
+        )[None, :]
 
     shared_config = Fp8BlockMatmulConfig(
         block_shape=config.block_shape,
@@ -1463,6 +1468,7 @@ def stage_local_moe_pallas_feature_mapped(
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
         contraction_tile=512
     ),
+    fuse_route_weighting: bool = False,
     interpret: bool = False,
 ) -> tuple[Any, Any, Any]:
     """Route once and execute the stage-local expert-feature challenger."""
@@ -1498,6 +1504,7 @@ def stage_local_moe_pallas_feature_mapped(
         contract=contract,
         axis_index_groups=axis_index_groups,
         config=config,
+        fuse_route_weighting=fuse_route_weighting,
         interpret=interpret,
     )
     return output, route_indices, route_weights
