@@ -114,7 +114,7 @@ def _materialize_global_array(
     if value.is_fully_addressable:
         materialized = jax.device_get(value)
     else:
-        materialized = multihost_utils.process_allgather(value)
+        materialized = multihost_utils.process_allgather(value, tiled=True)
     host = np.asarray(materialized)
     if host.shape != tuple(value.shape):
         raise RuntimeError(

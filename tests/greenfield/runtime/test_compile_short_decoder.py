@@ -22,9 +22,11 @@ class _Multihost:
     def __init__(self, gathered: np.ndarray) -> None:
         self.gathered = gathered
         self.process_allgather_calls = 0
+        self.tiled_values: list[bool] = []
 
-    def process_allgather(self, value: object) -> np.ndarray:
+    def process_allgather(self, value: object, *, tiled: bool) -> np.ndarray:
         self.process_allgather_calls += 1
+        self.tiled_values.append(tiled)
         return self.gathered
 
 
@@ -39,6 +41,7 @@ def test_materialize_global_array_uses_device_get_when_fully_addressable() -> No
     np.testing.assert_array_equal(actual, expected)
     assert jax.device_get_calls == 1
     assert multihost.process_allgather_calls == 0
+    assert multihost.tiled_values == []
 
 
 def test_materialize_global_array_gathers_non_addressable_global_array() -> None:
@@ -52,6 +55,7 @@ def test_materialize_global_array_gathers_non_addressable_global_array() -> None
     np.testing.assert_array_equal(actual, expected)
     assert jax.device_get_calls == 0
     assert multihost.process_allgather_calls == 1
+    assert multihost.tiled_values == [True]
 
 
 def test_materialize_global_array_fails_closed_on_gather_shape_drift() -> None:
