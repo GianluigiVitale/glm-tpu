@@ -253,9 +253,19 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             linear_backend="unknown",  # type: ignore[arg-type]
         )
+    with pytest.raises(PlanValidationError, match="token-path flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=1,  # type: ignore[arg-type]
+        )
 
 
-def test_complete_small_decoder_step_runs_all_stages_on_forced_cpu() -> None:
+def test_complete_small_decoder_token_step_runs_all_stages_on_forced_cpu() -> None:
     program = r'''
 import json
 import jax
@@ -274,7 +284,7 @@ state = build_decoder_state_layout(plan, schedule, context_capacity=8, logical_p
 weight_layout = build_decoder_runtime_weight_layout(plan, schedule)
 groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8))
 pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in range(8) for slot in range(4))
-decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs)
+decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
 
 weights = {}
 weight_specs = decoder.input_specs[0]
@@ -302,6 +312,8 @@ metadata_host[..., decoder.config.visited_index] = 0
 metadata_host[..., decoder.config.health_index] = 1
 metadata_host[..., decoder.config.active_index] = 0
 for rank in groups[0]: metadata_host[rank, 0, decoder.config.active_index] = 1
+token_host = np.full((32, 1), -1, np.int32)
+for rank in groups[0]: token_host[rank, 0] = 5
 
 put = lambda value, spec: jax.device_put(value, NamedSharding(decoder.mesh, spec))
 inputs = (
@@ -310,15 +322,18 @@ inputs = (
     put(kv_host, decoder.input_specs[2]),
     put(index_host, decoder.input_specs[3]),
     put(metadata_host, decoder.input_specs[4]),
-    put(np.asarray([0], np.int32), decoder.input_specs[5]),
-    put(np.asarray([[0]], np.int32), decoder.input_specs[6]),
-    put(np.asarray([1], np.int32), decoder.input_specs[7]),
+    put(token_host, decoder.input_specs[5]),
+    put(np.asarray([0], np.int32), decoder.input_specs[6]),
+    put(np.asarray([[0]], np.int32), decoder.input_specs[7]),
+    put(np.asarray([1], np.int32), decoder.input_specs[8]),
 )
 compiled = jax.jit(decoder.execute).lower(*inputs).compile()
-residual, kv, index, metadata = map(np.asarray, jax.device_get(compiled(*inputs)))
+first = compiled(*inputs)
+second = compiled(weights, *first)
+residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
 active = np.flatnonzero(metadata[:, 0, decoder.config.active_index] == 1)
 module = parse_hlo_module(compiled.as_text())
-hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference')
+hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True)
 counts = {}
 for item in module.collectives: counts[item.opcode] = counts.get(item.opcode, 0) + 1
 local_groups = tuple(tuple(group) for group in groups)
@@ -337,15 +352,20 @@ for stage in range(8):
 print(json.dumps({
     'active': active.tolist(),
     'collectives_local': collectives_local,
+    'complete_token_path': decoder.complete_token_path,
     'counts': counts,
     'health': sorted(set(metadata[active, 0, decoder.config.health_index].tolist())),
     'hlo_contract': {key: hlo_contract[key] for key in ('collective_count', 'collective_counts', 'passed', 'violations')},
     'index_writes': index_writes,
-    'inactive_cache_unchanged': bool(np.all(kv[1:, 0, 0, 1] == 1)),
+    'untargeted_owner_cache_unchanged': bool(np.all(kv[[rank for group in groups for rank in group[1:]], 0, 0, 1] == 1)),
     'kv_writes': kv_writes,
+    'next_tokens': sorted(set(next_token[active, 0].tolist())),
+    'next_position': next_position.tolist(),
+    'next_lengths': next_lengths.tolist(),
+    'block_tables_unchanged': bool(np.array_equal(next_blocks, np.asarray([[0]], np.int32))),
     'positions': sorted(set(tuple(row) for row in metadata[active, 0, :4].tolist())),
     'producer': sorted(set(metadata[active, 0, decoder.config.producer_index].tolist())),
-    'residual_exact': bool(np.array_equal(residual[active], np.repeat(initial_row[None], 4, axis=0))),
+    'residual_exact': bool(np.array_equal(residual[active], np.ones((4, 1, 8), dtype=ml_dtypes.bfloat16))),
     'sparse_moe_backend': decoder.sparse_moe_backend,
     'valid_counts': sorted(set(metadata[active, 0, decoder.config.count_index].tolist())),
     'visited': sorted(set(metadata[active, 0, decoder.config.visited_index].tolist())),
@@ -369,28 +389,33 @@ print(json.dumps({
     result = json.loads(completed.stdout.strip().splitlines()[-1])
     assert result["active"] == [0, 1, 2, 3]
     assert result["residual_exact"]
+    assert result["complete_token_path"]
+    assert result["next_tokens"] == [0]
+    assert result["next_position"] == [2]
+    assert result["next_lengths"] == [3]
+    assert result["block_tables_unchanged"]
     assert result["sparse_moe_backend"] == "reference"
-    assert result["positions"] == [[0, -1, -1, -1]]
-    assert result["valid_counts"] == [1]
+    assert result["positions"] == [[0, 1, -1, -1]]
+    assert result["valid_counts"] == [2]
     assert result["producer"] == [7]
     assert result["visited"] == [255]
     assert result["health"] == [1]
     assert all(result["kv_writes"])
     assert all(result["index_writes"])
-    assert result["inactive_cache_unchanged"]
+    assert result["untargeted_owner_cache_unchanged"]
     assert result["collectives_local"]
     assert result["hlo_contract"] == {
-        "collective_count": 88,
+        "collective_count": 92,
         "collective_counts": {
-            "all-gather": 56,
-            "all-reduce": 16,
-            "collective-permute": 16,
+            "all-gather": 58,
+            "all-reduce": 17,
+            "collective-permute": 17,
         },
         "passed": True,
         "violations": [],
     }
     assert result["counts"] == {
-        "all-gather": 56,
-        "all-reduce": 16,
-        "collective-permute": 16,
+        "all-gather": 58,
+        "all-reduce": 17,
+        "collective-permute": 17,
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Protected first real 78-layer / 2K PP8 decoder-body compile and execution.
+# Protected real 78-layer / 2K PP8 body or complete-token execution.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -15,6 +15,7 @@ readonly ITERATIONS=${GLM_GREENFIELD_SHORT_DECODER_ITERATIONS:-10}
 readonly TRACE_STEPS=${GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS:-0}
 readonly RUNTIME_KIND=${GLM_GREENFIELD_DECODER_RUNTIME_KIND:-pallas_feature_linear}
 readonly FEATURE_FUSE_ROUTE_WEIGHTING=${GLM_GREENFIELD_FEATURE_FUSE_ROUTE_WEIGHTING:-0}
+readonly COMPLETE_TOKEN_PATH=${GLM_GREENFIELD_COMPLETE_TOKEN_PATH:-0}
 if [[ -n ${GLM_GREENFIELD_FEATURE_OUTPUT_TILE+x} ]]; then
   FEATURE_OUTPUT_TILE=$GLM_GREENFIELD_FEATURE_OUTPUT_TILE
 elif [[ $RUNTIME_KIND == reference ]]; then
@@ -34,6 +35,10 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
 }
 [[ $FEATURE_FUSE_ROUTE_WEIGHTING == 0 || $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]] || {
   echo "feature route-weight fusion must be 0 or 1" >&2
+  exit 2
+}
+[[ $COMPLETE_TOKEN_PATH == 0 || $COMPLETE_TOKEN_PATH == 1 ]] || {
+  echo "complete token path must be 0 or 1" >&2
   exit 2
 }
 case "$RUNTIME_KIND" in
@@ -87,7 +92,12 @@ if [[ $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]]; then
   FUSION_SUFFIX=_wsum
 fi
 readonly FUSION_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}${FUSION_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TOKEN_SUFFIX=
+if [[ $COMPLETE_TOKEN_PATH == 1 ]]; then
+  TOKEN_SUFFIX=_token
+fi
+readonly TOKEN_SUFFIX
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -158,7 +168,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -184,7 +194,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer 2K load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --complete-token-path "$complete_token_path" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK || {
@@ -205,7 +215,7 @@ fi
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
-  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$COMPLETE_TOKEN_PATH" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" <<'PY'
 from __future__ import annotations
 
@@ -225,6 +235,7 @@ import sys
     runtime_kind,
     feature_output_tile,
     feature_fuse_route_weighting,
+    complete_token_path,
     sparse_moe_backend,
     hlo_backend_contract,
     runtime_manifest_sha256,
@@ -235,6 +246,7 @@ import sys
 ) = sys.argv[1:]
 feature_output_tile = int(feature_output_tile)
 feature_fuse_route_weighting = bool(int(feature_fuse_route_weighting))
+complete_token_path = bool(int(complete_token_path))
 warmup = int(warmup)
 iterations = int(iterations)
 trace_steps = int(trace_steps)
@@ -273,6 +285,10 @@ if {record["feature_fuse_route_weighting"] for record in records} != {
     feature_fuse_route_weighting
 }:
     raise SystemExit("fleet feature route-weight fusion drifted")
+if {record["complete_token_path"] for record in records} != {
+    complete_token_path
+}:
+    raise SystemExit("fleet complete token-path flag drifted")
 if {record["sparse_moe_backend"] for record in records} != {sparse_moe_backend}:
     raise SystemExit("fleet sparse MoE backend drifted")
 expected_linear_backend = (
@@ -284,15 +300,27 @@ if {record["runtime_manifest_sha256"] for record in records} != {runtime_manifes
     raise SystemExit("fleet runtime manifest drifted")
 if {record["runtime_layout_hash"] for record in records} != {runtime_layout_hash}:
     raise SystemExit("fleet runtime layout drifted")
-if any(
-    not record["body_only"]
-    or not record["transformer_body_timing_only"]
-    or record["raw_token_claim"]
-    or not record["hlo_contract"]["passed"]
-    or not record["metadata_passed"]
-    for record in records
-):
-    raise SystemExit("body/HLO/metadata claim contract failed")
+for record in records:
+    if (
+        record["body_only"] == complete_token_path
+        or record["transformer_body_timing_only"] == complete_token_path
+        or record["raw_token_claim"]
+        or not record["hlo_contract"]["passed"]
+        or not record["metadata_passed"]
+    ):
+        raise SystemExit("step/HLO/metadata claim contract failed")
+    if complete_token_path:
+        token = record["token_contract"]
+        if (
+            token is None
+            or not token["synthetic_initial_state"]
+            or not token["all_active_lanes_equal"]
+            or not token["all_in_vocabulary"]
+            or len(token["profiler_free_window_tokens"]) != iterations
+        ):
+            raise SystemExit("complete token-path output contract failed")
+    elif record["token_contract"] is not None:
+        raise SystemExit("body-only record unexpectedly contains a token")
 if any(
     record["warmup"] != warmup
     or record["iterations"] != iterations
@@ -302,6 +330,10 @@ if any(
     raise SystemExit("decoder timing configuration drifted")
 if any(record["hlo_contract"]["violations"] for record in records):
     raise SystemExit("decoder HLO has violations")
+if {record["hlo_contract"]["complete_token_path"] for record in records} != {
+    complete_token_path
+}:
+    raise SystemExit("decoder HLO token-path contract drifted")
 if any(
     record["hlo_contract"]["backend_contract"] != hlo_backend_contract
     for record in records
@@ -410,8 +442,11 @@ fleet_p50 = max(record["profiler_free_body_wall"]["p50_ms"] for record in record
 fleet_p99 = max(record["profiler_free_body_wall"]["p99_ms"] for record in records)
 peaks = [value for value in map(peak, records) if value is not None]
 summary = {
-    "artifact_kind": "greenfield_real_78layer_2k_decoder_body_fleet",
-    "body_only": True,
+    "artifact_kind": (
+        "greenfield_real_78layer_2k_decoder_"
+        + ("token_mechanism_fleet" if complete_token_path else "body_fleet")
+    ),
+    "body_only": not complete_token_path,
     "code_hash": pin,
     "compile_seconds_max": max(record["compile_seconds"] for record in records),
     "context_capacity": 2048,
@@ -419,6 +454,7 @@ summary = {
     "fleet_p99_body_ms": fleet_p99,
     "feature_output_tile": feature_output_tile,
     "feature_fuse_route_weighting": feature_fuse_route_weighting,
+    "complete_token_path": complete_token_path,
     "hlo_contract": records[0]["hlo_contract"],
     "host_count": 8,
     "iterations": iterations,
@@ -434,7 +470,9 @@ summary = {
     "sparse_moe_backend": sparse_moe_backend,
     "topology_hash": records[0]["topology_hash"],
     "trace_steps": trace_steps,
-    "transformer_body_timing_only": True,
+    "synthetic_initial_state": complete_token_path,
+    "token_contract": records[0]["token_contract"],
+    "transformer_body_timing_only": not complete_token_path,
     "warmup": warmup,
     "xplane": xplane,
 }
@@ -445,12 +483,14 @@ sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
 
 conn = pv.connect(db_path)
+scope = "token-mechanism" if complete_token_path else "body"
 run_id = pv.start_run(
     conn,
-    model="zai-org/GLM-5.2-FP8:greenfield-78layer-2k-body",
+    model=f"zai-org/GLM-5.2-FP8:greenfield-78layer-2k-{scope}",
     revision=records[0]["runtime_manifest_sha256"],
     env={
-        "GLM_ENGINE": "greenfield_pp8_decoder_body",
+        "GLM_ENGINE": f"greenfield_pp8_decoder_{scope}",
+        "greenfield_complete_token_path": complete_token_path,
         "greenfield_runtime_kind": runtime_kind,
         "greenfield_feature_output_tile": feature_output_tile,
         "greenfield_feature_fuse_route_weighting": (
@@ -468,7 +508,13 @@ run_id = pv.start_run(
     note=(
         "Protected real 78-layer 2K transformer-body compile/run with "
         f"feature output tile {feature_output_tile} and fused route weighting "
-        f"{feature_fuse_route_weighting}; no token or tok/s claim."
+        f"{feature_fuse_route_weighting}; "
+        + (
+            "complete token mechanism from synthetic state, no correctness "
+            "or tok/s claim."
+            if complete_token_path
+            else "no token or tok/s claim."
+        )
     ),
     harness_repo=repo,
     fork_repo=oracle_repo,
@@ -477,17 +523,20 @@ pv.record_item(
     conn,
     run_id,
     benchmark=(
-        "greenfield_78layer_2k_body_pp8"
+        f"greenfield_78layer_2k_{scope}_pp8"
         + (f"_ot{feature_output_tile}" if feature_output_tile != 128 else "")
         + ("_wsum" if feature_fuse_route_weighting else "")
     ),
-    item_id="body_step",
+    item_id=("token_step_mechanism" if complete_token_path else "body_step"),
     prompt=(
-        "Execute the real 78-layer PP8 decoder body at position zero with "
+        "Execute the real 78-layer PP8 decoder step with "
         f"feature output tile {feature_output_tile} and fused route weighting "
         f"{feature_fuse_route_weighting}."
     ),
-    gold="Local-only HLO, exact pipeline state, direct runtime load, no raw-token claim.",
+    gold=(
+        "Local-only HLO, exact pipeline state, direct runtime load, and "
+        "bounded token mechanism without a raw-correctness claim."
+    ),
     raw_output=json.dumps(summary, sort_keys=True),
     extracted=str(summary["hlo_contract"]["collective_counts"]),
     correct=True,
@@ -498,13 +547,18 @@ pv.finalize(
     conn,
     run_id,
     benchmark=(
-        "greenfield_78layer_2k_body_pp8"
+        f"greenfield_78layer_2k_{scope}_pp8"
         + (f"_ot{feature_output_tile}" if feature_output_tile != 128 else "")
         + ("_wsum" if feature_fuse_route_weighting else "")
     ),
     metric="contract_valid",
     value=1.0,
-    note="Profiler-free body timing is not complete decode latency or tok/s.",
+    note=(
+        "Synthetic-state complete token timing is not raw-token correctness "
+        "or answer tok/s."
+        if complete_token_path
+        else "Profiler-free body timing is not complete decode latency or tok/s."
+    ),
 )
 conn.close()
 summary["results_db_run_id"] = run_id
@@ -516,7 +570,7 @@ snapshot.close()
 source.close()
 if sqlite3.connect(run_dir / "results_ckpt.db").execute("PRAGMA integrity_check").fetchone()[0] != "ok":
     raise SystemExit("results DB snapshot integrity failed")
-print(f"SHORT_DECODER_BODY_VALID db_run={run_id} p50_ms={fleet_p50:.6f}")
+print(f"SHORT_DECODER_STEP_VALID db_run={run_id} p50_ms={fleet_p50:.6f}")
 PY
 
 strict_census post || {
@@ -540,4 +594,4 @@ printf 'db_run=%s\n' "$DB_RUN" >"$RUN_DIR/SUCCESS"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR" "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX/SUCCESS" --no-clobber >/dev/null
 trap - EXIT
-echo "SHORT_DECODER_BODY_OK $TAG DB=$DB_RUN"
+echo "SHORT_DECODER_STEP_OK $TAG DB=$DB_RUN"

@@ -215,6 +215,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--complete-token-path",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -228,6 +234,7 @@ def main() -> int:
     args.feature_fuse_route_weighting = bool(
         args.feature_fuse_route_weighting
     )
+    args.complete_token_path = bool(args.complete_token_path)
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.context_capacity != 2048:
@@ -442,6 +449,7 @@ def main() -> int:
                 args.feature_fuse_route_weighting
             ),
             linear_backend=linear_backend,
+            complete_token_path=args.complete_token_path,
         )
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-start")
         load_started = time.monotonic()
@@ -462,6 +470,7 @@ def main() -> int:
         kv_global_shape = (total_devices, *kv_shape)
         index_global_shape = (total_devices, *index_shape)
         metadata_shape = (total_devices, 1, decoder.config.metadata_width)
+        token_shape = (total_devices, 1)
         initial_row = np.linspace(
             -0.5,
             0.5,
@@ -485,6 +494,12 @@ def main() -> int:
             value[..., decoder.config.visited_index] = 0
             value[..., decoder.config.health_index] = 1
             value[..., decoder.config.active_index] = int(rank in groups[0])
+            return value
+
+        def token_builder(rank: int, shape: tuple[int, ...]) -> np.ndarray:
+            value = np.full(shape, -1, dtype=np.int32)
+            if rank in groups[0]:
+                value[...] = np.int32(1)
             return value
 
         residual = _make_global_array(
@@ -515,6 +530,15 @@ def main() -> int:
             metadata_shape,
             metadata_builder,
         )
+        token = None
+        if args.complete_token_path:
+            token = _make_global_array(
+                jax,
+                decoder.mesh,
+                decoder.input_specs[5],
+                token_shape,
+                token_builder,
+            )
         position = jax.device_put(
             np.asarray([0], dtype=np.int32),
             NamedSharding(decoder.mesh, P()),
@@ -528,30 +552,55 @@ def main() -> int:
             np.asarray([1], dtype=np.int32),
             NamedSharding(decoder.mesh, P()),
         )
-        state_values = (
-            residual,
-            kv,
-            index,
-            metadata,
-            position,
-            block_tables,
-            context_lengths,
-        )
-        inputs = (
+        common_inputs = (
             loaded.weights,
             residual,
             kv,
             index,
             metadata,
-            position,
-            block_tables,
-            context_lengths,
         )
+        if args.complete_token_path:
+            assert token is not None
+            inputs = (
+                *common_inputs,
+                token,
+                position,
+                block_tables,
+                context_lengths,
+            )
+            state_values = (
+                residual,
+                kv,
+                index,
+                metadata,
+                token,
+                position,
+                block_tables,
+                context_lengths,
+            )
+            donate_argnums = (1, 2, 3, 4, 5)
+        else:
+            inputs = (
+                *common_inputs,
+                position,
+                block_tables,
+                context_lengths,
+            )
+            state_values = (
+                residual,
+                kv,
+                index,
+                metadata,
+                position,
+                block_tables,
+                context_lengths,
+            )
+            donate_argnums = (1, 2, 3, 4)
         multihost_utils.sync_global_devices("greenfield-short-decoder-compile-start")
         compile_started = time.monotonic()
         lowered = jax.jit(
             decoder.execute,
-            donate_argnums=(1, 2, 3, 4),
+            donate_argnums=donate_argnums,
         ).lower(*inputs)
         compiled = lowered.compile()
         compile_seconds = time.monotonic() - compile_started
@@ -574,18 +623,24 @@ def main() -> int:
             feature_fuse_route_weighting=(
                 decoder.feature_fuse_route_weighting
             ),
+            complete_token_path=decoder.complete_token_path,
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
             hlo_dir.mkdir(parents=True, exist_ok=True)
+            hlo_stem = (
+                "decoder_78layer_2k_token"
+                if args.complete_token_path
+                else "decoder_78layer_2k"
+            )
             with gzip.open(
-                hlo_dir / "decoder_78layer_2k.optimized_hlo.txt.gz",
+                hlo_dir / f"{hlo_stem}.optimized_hlo.txt.gz",
                 "wt",
                 encoding="utf-8",
             ) as stream:
                 stream.write(optimized_hlo)
             _atomic_json(
-                hlo_dir / "decoder_78layer_2k.hlo_contract.json",
+                hlo_dir / f"{hlo_stem}.hlo_contract.json",
                 hlo_contract,
             )
         del optimized_hlo
@@ -597,29 +652,45 @@ def main() -> int:
 
         output = compiled(*inputs)
         output[3].block_until_ready()
-        state_values = (*output, position, block_tables, context_lengths)
+        state_values = (
+            tuple(output)
+            if args.complete_token_path
+            else (*output, position, block_tables, context_lengths)
+        )
         current = output
-        for _ in range(args.warmup):
-            current = compiled(
+
+        def run_step(values: tuple[Any, ...]) -> tuple[Any, ...]:
+            if args.complete_token_path:
+                return compiled(loaded.weights, *values)
+            return compiled(
                 loaded.weights,
-                *current,
+                *values,
                 position,
                 block_tables,
                 context_lengths,
             )
+
+        for _ in range(args.warmup):
+            current = run_step(current)
             current[3].block_until_ready()
         samples = []
+        generated_tokens: list[int] = []
         for _ in range(args.iterations):
             started = time.perf_counter_ns()
-            current = compiled(
-                loaded.weights,
-                *current,
-                position,
-                block_tables,
-                context_lengths,
-            )
+            current = run_step(current)
             current[3].block_until_ready()
             samples.append((time.perf_counter_ns() - started) / 1_000_000)
+            if args.complete_token_path:
+                timed_token = _materialize_global_array(
+                    jax,
+                    multihost_utils,
+                    current[4],
+                )[list(groups[0]), 0]
+                if not np.all(timed_token == timed_token[0]):
+                    raise RuntimeError(
+                        "complete token lanes disagree after timed step"
+                    )
+                generated_tokens.append(int(timed_token[0]))
         trace_record = None
         if args.trace_root is not None:
             args.trace_root.mkdir(parents=True, exist_ok=False)
@@ -643,13 +714,7 @@ def main() -> int:
                         "greenfield_short_decoder_body_step",
                         step_num=step,
                     ):
-                        current = compiled(
-                            loaded.weights,
-                            *current,
-                            position,
-                            block_tables,
-                            context_lengths,
-                        )
+                        current = run_step(current)
                         current[3].block_until_ready()
                 jax.profiler.stop_trace()
                 tracing = False
@@ -676,7 +741,11 @@ def main() -> int:
                 "profiler_started_after_profiler_free_timing": True,
                 "steps": args.trace_steps,
             }
-        state_values = (*current, position, block_tables, context_lengths)
+        state_values = (
+            tuple(current)
+            if args.complete_token_path
+            else (*current, position, block_tables, context_lengths)
+        )
         metadata_host = _materialize_global_array(
             jax,
             multihost_utils,
@@ -708,14 +777,80 @@ def main() -> int:
                 set(active_metadata[:, decoder.config.visited_index].tolist())
             ),
         }
-        metadata_passed = (
+        base_metadata_passed = (
             metadata_contract["active_ranks"] == list(groups[0])
             and metadata_contract["health"] == [1]
             and metadata_contract["producer"] == [expected_producer]
-            and metadata_contract["valid_counts"] == [1]
             and metadata_contract["visited"] == [255]
-            and all(row[0] == 0 for row in metadata_contract["selected_prefix"])
         )
+        if args.complete_token_path:
+            next_context_lengths = np.asarray(
+                jax.device_get(current[7])
+            )
+            expected_valid_count = min(
+                int(next_context_lengths[0]),
+                decoder.config.selected_width,
+            )
+            selected_states_valid = []
+            for row in active_metadata:
+                count = int(row[decoder.config.count_index])
+                positions = row[: decoder.config.selected_width]
+                valid = positions[:count]
+                tail = positions[count:]
+                selected_states_valid.append(
+                    count == expected_valid_count
+                    and bool(np.all(valid >= 0))
+                    and bool(np.all(valid < next_context_lengths[0]))
+                    and len(set(valid.tolist())) == count
+                    and bool(np.all(tail == -1))
+                )
+            metadata_contract["selected_states_valid"] = (
+                selected_states_valid
+            )
+            metadata_passed = bool(
+                base_metadata_passed and all(selected_states_valid)
+            )
+        else:
+            metadata_passed = bool(
+                base_metadata_passed
+                and metadata_contract["valid_counts"] == [1]
+                and all(
+                    row[0] == 0
+                    for row in metadata_contract["selected_prefix"]
+                )
+            )
+        token_contract = None
+        if args.complete_token_path:
+            token_host = _materialize_global_array(
+                jax,
+                multihost_utils,
+                current[4],
+            )
+            active_tokens = token_host[active, 0]
+            token_contract = {
+                "active_tokens": sorted(set(active_tokens.tolist())),
+                "profiler_free_window_tokens": generated_tokens,
+                "all_active_lanes_equal": bool(
+                    active_tokens.size == len(groups[0])
+                    and np.all(active_tokens == active_tokens[0])
+                ),
+                "all_in_vocabulary": bool(
+                    np.all(active_tokens >= 0)
+                    and np.all(
+                        active_tokens < execution_plan.geometry.vocab_size
+                    )
+                ),
+                "next_position": np.asarray(
+                    jax.device_get(current[5])
+                ).tolist(),
+                "next_context_lengths": next_context_lengths.tolist(),
+                "synthetic_initial_state": True,
+            }
+            metadata_passed = bool(
+                metadata_passed
+                and token_contract["all_active_lanes_equal"]
+                and token_contract["all_in_vocabulary"]
+            )
         local_kv_nonzero = []
         local_index_nonzero = []
         for shard in current[1].addressable_shards:
@@ -726,10 +861,11 @@ def main() -> int:
             local_index_nonzero.append(int(np.count_nonzero(host[:, 0, 0, 0])))
         record = {
             "artifact_kind": (
-                "greenfield_real_78layer_2k_decoder_body_"
-                f"{args.runtime_kind}"
+                "greenfield_real_78layer_2k_decoder_"
+                + ("token_" if args.complete_token_path else "body_")
+                + f"{args.runtime_kind}"
             ),
-            "body_only": True,
+            "body_only": not args.complete_token_path,
             "code_hash": code_hash,
             "compile_seconds": compile_seconds,
             "context_capacity": args.context_capacity,
@@ -753,6 +889,9 @@ def main() -> int:
             "optimized_hlo_sha256": hlo_sha256,
             "plan_hash": execution_plan.plan_hash,
             "profiler_free_body_wall": _percentiles(samples),
+            "profiler_free_complete_step_wall": (
+                _percentiles(samples) if args.complete_token_path else None
+            ),
             "raw_token_claim": False,
             "runtime_layout_hash": pack_context.layout.layout_hash,
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
@@ -767,9 +906,11 @@ def main() -> int:
                 decoder.feature_fuse_route_weighting
             ),
             "linear_backend": decoder.linear_backend,
+            "complete_token_path": decoder.complete_token_path,
+            "token_contract": token_contract,
             "topology_hash": live_topology.topology_hash,
             "trace": trace_record,
-            "transformer_body_timing_only": True,
+            "transformer_body_timing_only": not args.complete_token_path,
             "warmup": args.warmup,
         }
         _atomic_json(args.output, record)
@@ -779,7 +920,7 @@ def main() -> int:
             "GREENFIELD_SHORT_DECODER_HOST_OK "
             f"launch_process={args.process_id} jax_process={jax.process_index()} "
             f"compile_s={compile_seconds:.3f} "
-            f"p50_body_ms={record['profiler_free_body_wall']['p50_ms']:.6f} "
+            f"p50_step_ms={record['profiler_free_body_wall']['p50_ms']:.6f} "
             f"hlo={hlo_sha256}",
             flush=True,
         )

@@ -19,7 +19,9 @@ from ..kernels.layer import (
 )
 from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..kernels.reference.dsa import DsaNumericalContract
+from ..kernels.reference.linear import vocabulary_logits
 from ..kernels.reference.moe import GlmMoeNumericalContract
+from ..kernels.reference.rmsnorm import final_norm
 from ..kernels.pallas import Fp8BlockMatmulConfig
 from ..kernels.stage_local import StageLinearBackend
 from ..model.schedule import PipelineSchedule, StageExecution
@@ -55,6 +57,7 @@ class DecoderStepConfig:
     local_rows_per_page: int
     packed_cache_width: int
     index_key_width: int
+    vocab_size: int
 
     def __post_init__(self) -> None:
         for field in (
@@ -68,6 +71,7 @@ class DecoderStepConfig:
             "local_rows_per_page",
             "packed_cache_width",
             "index_key_width",
+            "vocab_size",
         ):
             value = getattr(self, field)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
@@ -123,6 +127,7 @@ class DecoderStepProgram:
     feature_output_tile: int
     feature_fuse_route_weighting: bool
     linear_backend: StageLinearBackend
+    complete_token_path: bool
 
 
 def _validate_pallas_feature_decoder_calls(
@@ -351,6 +356,7 @@ def validate_decoder_step_hlo(
     backend_contract: str,
     feature_output_tile: int | None = None,
     feature_fuse_route_weighting: bool = False,
+    complete_token_path: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -375,6 +381,8 @@ def validate_decoder_step_hlo(
         raise PlanValidationError("feature output tile must be 128 or 256")
     if not isinstance(feature_fuse_route_weighting, bool):
         raise PlanValidationError("feature route-weight fusion flag must be boolean")
+    if not isinstance(complete_token_path, bool):
+        raise PlanValidationError("complete token-path flag must be boolean")
     if (
         backend_contract
         not in (
@@ -420,8 +428,12 @@ def validate_decoder_step_hlo(
     expected_reduction_component_count = 0
     sparse_layers = 0
     if backend_contract == "cpu_reference":
-        expected_gathers = 4 * layers + 3 * full_layers
-        expected_reductions = 2 * layers
+        expected_gathers = 4 * layers + 3 * full_layers + (
+            2 if complete_token_path else 0
+        )
+        expected_reductions = 2 * layers + (
+            1 if complete_token_path else 0
+        )
     else:
         dense_layers = sum(
             layer.mlp_kind == "dense"
@@ -452,15 +464,21 @@ def validate_decoder_step_hlo(
         # expecting 4 * layers physical instructions falsely reports 18
         # missing collectives, while checking only logical arity would allow a
         # physical launch-count regression to pass unnoticed.
-        expected_gathers = 2 * layers + 3 * full_layers
+        expected_gathers = 2 * layers + 3 * full_layers + (
+            2 if complete_token_path else 0
+        )
         expected_reduction_arity_counts = {"1": 277, "2": 16, "3": 1}
+        if complete_token_path:
+            expected_reduction_arity_counts["1"] += 1
         expected_reductions = sum(expected_reduction_arity_counts.values())
         expected_reduction_component_count = sum(
             int(arity) * count
             for arity, count in expected_reduction_arity_counts.items()
         )
         expected_reduction_result_shape_counts = {
-            "bf16[1,6144]": layers + dense_layers,
+            "bf16[1,6144]": (
+                layers + dense_layers + (1 if complete_token_path else 0)
+            ),
             "bf16[2,1,6144]": sparse_layers,
             "f32[256]": layers,
             "u32[1,1,128]": layers,
@@ -484,7 +502,9 @@ def validate_decoder_step_hlo(
         )
         reduction_result_shape_counts = dict(sorted(result_shapes.items()))
         reduction_component_count = sum(result_shapes.values())
-    expected_permutes = 2 * config.stage_count
+    expected_permutes = 2 * config.stage_count + (
+        1 if complete_token_path else 0
+    )
     violations = []
     observed_counts = {
         opcode: len(values) for opcode, values in sorted(by_opcode.items())
@@ -560,6 +580,31 @@ def validate_decoder_step_hlo(
                 )
     if forbidden_shapes:
         violations.append("decoder contains dead-row/full-pod live tensors")
+    forbidden_full_vocab = []
+    local_vocab = config.vocab_size // config.local_parallel_size
+    full_vocab_dimensions = (
+        (config.vocab_size,),
+        (1, config.vocab_size),
+        (config.local_parallel_size, local_vocab),
+        (config.local_parallel_size, 1, local_vocab),
+        (1, config.local_parallel_size, local_vocab),
+    )
+    for collective in by_opcode.get("all-gather", ()):
+        for shape in collective.result_shapes:
+            if (
+                shape.dtype in ("bf16", "f32")
+                and shape.dimensions in full_vocab_dimensions
+            ):
+                forbidden_full_vocab.append(
+                    f"{collective.name}:{shape.dtype}["
+                    + ",".join(str(value) for value in shape.dimensions)
+                    + "]"
+                )
+    if complete_token_path and forbidden_full_vocab:
+        violations.append(
+            "decoder reconstructs full vocabulary logits: "
+            f"{forbidden_full_vocab}"
+        )
     if module.num_partitions not in (None, config.total_devices):
         violations.append(
             f"decoder expected {config.total_devices} partitions, "
@@ -606,6 +651,8 @@ def validate_decoder_step_hlo(
         "forbidden_shapes": forbidden_shapes,
         "feature_output_tile": feature_output_tile,
         "feature_fuse_route_weighting": feature_fuse_route_weighting,
+        "complete_token_path": complete_token_path,
+        "forbidden_full_vocab_logits": forbidden_full_vocab,
         "full_indexer_layers": full_layers,
         "layer_count": layers,
         "module_name": module.name,
@@ -818,8 +865,14 @@ def build_decoder_step_program(
     feature_output_tile: int | None = None,
     feature_fuse_route_weighting: bool = False,
     linear_backend: StageLinearBackend = "reference",
+    complete_token_path: bool = False,
 ) -> DecoderStepProgram:
-    """Build, but do not compile, the complete all-stage decode-step map."""
+    """Build, but do not compile, one all-stage decoder step.
+
+    ``complete_token_path`` adds the sharded embedding and final
+    norm/logits/greedy-token boundaries. It defaults off so the protected
+    transformer-body executable and its input/output contract remain intact.
+    """
 
     if not axis_name:
         raise PlanValidationError("decoder axis name must be explicit")
@@ -845,6 +898,8 @@ def build_decoder_step_program(
         )
     if linear_backend not in ("reference", "pallas"):
         raise PlanValidationError("decoder FP8 linear backend is unknown")
+    if not isinstance(complete_token_path, bool):
+        raise PlanValidationError("complete token-path flag must be boolean")
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
         if sparse_moe_backend == "reference"
@@ -893,6 +948,7 @@ def build_decoder_step_program(
         local_rows_per_page=state_layout.stages[0].local_rows_per_page,
         packed_cache_width=state_layout.stages[0].packed_kv_width,
         index_key_width=state_layout.stages[0].index_key_width,
+        vocab_size=geometry.vocab_size,
     )
     skeleton = PipelineSkeletonConfig(
         config.stage_count,
@@ -964,16 +1020,19 @@ def build_decoder_step_program(
         packed_cache_width=config.packed_cache_width,
     )
 
-    def mapped(
+    local_vocab = geometry.vocab_size // config.local_parallel_size
+
+    def mapped_impl(
         local_weights: Mapping[str, Any],
         local_residual_container: Any,
         local_kv_container: Any,
         local_index_container: Any,
         local_metadata_container: Any,
+        local_token_container: Any | None,
         position: Any,
         block_tables: Any,
         context_lengths: Any,
-    ) -> tuple[Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         rank = lax.axis_index(axis_name)
         stage_id = stage_map[rank]
         local_slot = slot_map[rank]
@@ -984,6 +1043,63 @@ def build_decoder_step_program(
 
         def weight(name: str) -> Any:
             return local_weights[name][0]
+
+        next_token = jnp.full((1,), -1, dtype=jnp.int32)
+        if complete_token_path:
+            assert local_token_container is not None
+            token_id = local_token_container[0, 0]
+            active = metadata[0, config.active_index] == jnp.int32(1)
+            should_embed = active & (stage_id == jnp.int32(0))
+
+            def embed_token(values: tuple[Any, Any]) -> tuple[Any, Any]:
+                current_residual, current_metadata = values
+                local_start = local_slot * jnp.int32(local_vocab)
+                local_end = local_start + jnp.int32(local_vocab)
+                token_valid = (
+                    (token_id >= jnp.int32(0))
+                    & (token_id < jnp.int32(config.vocab_size))
+                )
+                owns_token = (
+                    token_valid
+                    & (token_id >= local_start)
+                    & (token_id < local_end)
+                )
+                local_id = jnp.clip(
+                    token_id - local_start,
+                    jnp.int32(0),
+                    jnp.int32(local_vocab - 1),
+                )
+                local_row = weight("global.embedding")[local_id][None, :]
+                local_row = jnp.where(
+                    owns_token,
+                    local_row,
+                    jnp.zeros_like(local_row),
+                )
+                embedded = lax.psum(
+                    local_row,
+                    axis_name,
+                    axis_index_groups=axis_groups,
+                )
+                current_metadata = current_metadata.at[
+                    0, config.visited_index
+                ].set(jnp.int32(0))
+                current_metadata = current_metadata.at[
+                    0, config.health_index
+                ].set(
+                    (
+                        current_metadata[0, config.health_index]
+                        == jnp.int32(1)
+                    ).astype(jnp.int32)
+                    * token_valid.astype(jnp.int32)
+                )
+                return embedded, current_metadata
+
+            residual, metadata = lax.cond(
+                should_embed,
+                embed_token,
+                lambda values: values,
+                (residual, metadata),
+            )
 
         for hop, stage in enumerate(schedule.stages):
             active = metadata[0, config.active_index] == jnp.int32(1)
@@ -1016,13 +1132,146 @@ def build_decoder_step_program(
                 lambda values: values,
                 (residual, kv_cache, index_cache, metadata),
             )
+            if complete_token_path and hop == config.stage_count - 1:
+
+                def sample_token(
+                    values: tuple[Any, Any],
+                ) -> tuple[Any, Any]:
+                    final_residual, final_metadata = values
+                    normalized = final_norm(
+                        final_residual,
+                        weight("global.final_norm"),
+                        epsilon=1e-5,
+                    )
+                    local_logits = vocabulary_logits(
+                        normalized,
+                        weight("global.lm_head"),
+                    )
+                    finite = jnp.all(jnp.isfinite(local_logits))
+                    safe_logits = jnp.where(
+                        jnp.isfinite(local_logits),
+                        local_logits,
+                        jnp.asarray(-jnp.inf, dtype=local_logits.dtype),
+                    )
+                    local_index = jnp.argmax(
+                        safe_logits[0], axis=0
+                    ).astype(jnp.int32)
+                    local_score = safe_logits[0, local_index][None]
+                    global_index = (
+                        local_slot * jnp.int32(local_vocab) + local_index
+                    )[None]
+                    candidate_score = jnp.where(
+                        finite,
+                        local_score,
+                        jnp.asarray([-jnp.inf], dtype=local_score.dtype),
+                    )
+                    candidate_index = jnp.where(
+                        finite,
+                        global_index,
+                        jnp.asarray([config.vocab_size], dtype=jnp.int32),
+                    )
+                    scores = lax.all_gather(
+                        candidate_score,
+                        axis_name,
+                        axis=0,
+                        axis_index_groups=axis_groups,
+                    )
+                    indices = lax.all_gather(
+                        candidate_index,
+                        axis_name,
+                        axis=0,
+                        axis_index_groups=axis_groups,
+                    )
+                    winning_score = jnp.max(scores, axis=0)
+                    chosen = jnp.min(
+                        jnp.where(
+                            scores == winning_score[None, ...],
+                            indices,
+                            jnp.int32(config.vocab_size),
+                        ),
+                        axis=0,
+                    ).astype(jnp.int32)
+                    head_valid = jnp.all(
+                        indices < jnp.int32(config.vocab_size)
+                    )
+                    final_metadata = final_metadata.at[
+                        0, config.health_index
+                    ].set(
+                        (
+                            final_metadata[0, config.health_index]
+                            == jnp.int32(1)
+                        ).astype(jnp.int32)
+                        * head_valid.astype(jnp.int32)
+                    )
+                    return chosen, final_metadata
+
+                next_token, metadata = lax.cond(
+                    should_execute,
+                    sample_token,
+                    lambda values: (next_token, values[1]),
+                    (residual, metadata),
+                )
             residual = lax.ppermute(residual, axis_name, canonical_pairs)
             metadata = lax.ppermute(metadata, axis_name, canonical_pairs)
+            if complete_token_path and hop == config.stage_count - 1:
+                next_token = lax.ppermute(
+                    next_token, axis_name, canonical_pairs
+                )
         return (
             residual[None, ...],
             kv_cache[None, ...],
             index_cache[None, ...],
             metadata[None, ...],
+            next_token[None, ...],
+            position + jnp.ones_like(position),
+            block_tables,
+            context_lengths + jnp.ones_like(context_lengths),
+        )
+
+    def mapped_body(
+        local_weights: Mapping[str, Any],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, Any, Any, Any]:
+        values = mapped_impl(
+            local_weights,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            None,
+            position,
+            block_tables,
+            context_lengths,
+        )
+        return values[:4]
+
+    def mapped_token(
+        local_weights: Mapping[str, Any],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        local_token_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+        return mapped_impl(
+            local_weights,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            local_token_container,
+            position,
+            block_tables,
+            context_lengths,
         )
 
     weight_specs = {
@@ -1033,21 +1282,36 @@ def build_decoder_step_program(
     kv_spec = P(axis_name, None, None, None, None)
     index_spec = P(axis_name, None, None, None, None)
     metadata_spec = P(axis_name, None, None)
-    input_specs = (
+    token_spec = P(axis_name, None)
+    common_specs = (
         weight_specs,
         residual_spec,
         kv_spec,
         index_spec,
         metadata_spec,
-        P(),
-        P(),
-        P(),
     )
+    if complete_token_path:
+        input_specs = (*common_specs, token_spec, P(), P(), P())
+        mapped = mapped_token
+        output_specs = (
+            residual_spec,
+            kv_spec,
+            index_spec,
+            metadata_spec,
+            token_spec,
+            P(),
+            P(),
+            P(),
+        )
+    else:
+        input_specs = (*common_specs, P(), P(), P())
+        mapped = mapped_body
+        output_specs = (residual_spec, kv_spec, index_spec, metadata_spec)
     execute = jax.shard_map(
         mapped,
         mesh=mesh,
         in_specs=input_specs,
-        out_specs=(residual_spec, kv_spec, index_spec, metadata_spec),
+        out_specs=output_specs,
         check_vma=False,
     )
     return DecoderStepProgram(
@@ -1065,4 +1329,5 @@ def build_decoder_step_program(
         feature_output_tile=feature_output_tile,
         feature_fuse_route_weighting=feature_fuse_route_weighting,
         linear_backend=linear_backend,
+        complete_token_path=complete_token_path,
     )
