@@ -4,29 +4,31 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import gzip
-from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
+from datetime import datetime, timezone
+from hashlib import sha256
+from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
-
 
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
+    FeatureRuntimeCheckpointLoadExpectation,
     RuntimeCheckpointLoadExpectation,
     load_runtime_checkpoint,
+    verify_feature_runtime_packed_checkpoint,
     verify_runtime_packed_checkpoint,
 )
 from glm_tpu.greenfield.model import (  # noqa: E402
@@ -41,7 +43,12 @@ from glm_tpu.greenfield.topology import (  # noqa: E402
     discover_physical_topology,
     validate_target_v4_64,
 )
-from scripts.greenfield.pack_runtime_checkpoint import _build_context  # noqa: E402
+from scripts.greenfield.pack_feature_runtime_checkpoint import (  # noqa: E402
+    _build_context as _build_feature_context,
+)
+from scripts.greenfield.pack_runtime_checkpoint import (  # noqa: E402
+    _build_context as _build_reference_context,
+)
 
 
 def _git_head() -> str:
@@ -153,8 +160,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-processes", type=int, default=8)
     parser.add_argument("--process-id", type=int, required=True)
     parser.add_argument("--expected-code-hash", required=True)
+    parser.add_argument(
+        "--runtime-kind",
+        choices=("reference", "pallas_feature"),
+        default="reference",
+    )
     parser.add_argument("--runtime-root", type=Path, required=True)
     parser.add_argument("--runtime-manifest-sha256", required=True)
+    parser.add_argument("--source-runtime-root", type=Path)
+    parser.add_argument("--source-runtime-manifest-sha256")
     parser.add_argument("--source-checkpoint-root", type=Path, required=True)
     parser.add_argument("--source-packed-manifest-sha256", required=True)
     parser.add_argument("--context-capacity", type=int, default=2048)
@@ -172,6 +186,13 @@ def main() -> int:
         raise ValueError("first production compile is fixed to 2K")
     if args.warmup < 1 or args.iterations < 1:
         raise ValueError("decoder warmup/iterations must be positive")
+    if args.runtime_kind == "pallas_feature" and (
+        args.source_runtime_root is None
+        or args.source_runtime_manifest_sha256 is None
+    ):
+        raise ValueError(
+            "feature runtime requires its source runtime root and manifest"
+        )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(
@@ -184,58 +205,112 @@ def main() -> int:
     )
     if not isinstance(runtime_manifest, dict):
         raise RuntimeError("runtime manifest is not an object")
-    context_args = SimpleNamespace(
-        source_checkpoint_root=args.source_checkpoint_root,
-        source_packed_manifest_sha256=args.source_packed_manifest_sha256,
-        destination=runtime_manifest["destination"],
-    )
-    pack_context = _build_context(
-        context_args,
-        runtime_manifest["pack_code_hash"],
-    )
-    plan = pack_context.source_checkpoint.layout["plan_manifest"][
-        "execution_plan"
-    ]
-    from glm_tpu.greenfield.types import ExecutionPlan
+    if args.runtime_kind == "reference":
+        context_args = SimpleNamespace(
+            source_checkpoint_root=args.source_checkpoint_root,
+            source_packed_manifest_sha256=args.source_packed_manifest_sha256,
+            destination=runtime_manifest["destination"],
+        )
+        pack_context = _build_reference_context(
+            context_args,
+            runtime_manifest["pack_code_hash"],
+        )
+        from glm_tpu.greenfield.types import ExecutionPlan
 
-    execution_plan = ExecutionPlan.from_dict(plan)
+        execution_plan = ExecutionPlan.from_dict(
+            pack_context.source_checkpoint.layout["plan_manifest"][
+                "execution_plan"
+            ]
+        )
+        expectation = RuntimeCheckpointLoadExpectation(
+            runtime_manifest_sha256=args.runtime_manifest_sha256,
+            runtime_layout_manifest_sha256=runtime_manifest[
+                "runtime_layout_manifest_sha256"
+            ],
+            runtime_layout_hash=runtime_manifest["runtime_layout_hash"],
+            source_packed_manifest_sha256=runtime_manifest[
+                "source_packed_manifest_sha256"
+            ],
+            source_layout_manifest_sha256=runtime_manifest[
+                "source_layout_manifest_sha256"
+            ],
+            plan_hash=runtime_manifest["plan_hash"],
+            schedule_hash=runtime_manifest["schedule_hash"],
+            pack_code_hash=runtime_manifest["pack_code_hash"],
+            destination=runtime_manifest["destination"],
+            source_destination=runtime_manifest[
+                "source_checkpoint_destination"
+            ],
+            plan_id=runtime_manifest["plan_id"],
+            model_id=runtime_manifest["model_id"],
+        )
+        verified_runtime = verify_runtime_packed_checkpoint(
+            args.runtime_root,
+            expectation,
+            pack_context.layout,
+            pack_context.source_checkpoint,
+        )
+        sparse_moe_backend = "reference"
+        hlo_backend_contract = "tpu_v4_pp8_reference"
+    else:
+        context_args = SimpleNamespace(
+            source_checkpoint_root=args.source_checkpoint_root,
+            source_packed_manifest_sha256=args.source_packed_manifest_sha256,
+            source_runtime_root=args.source_runtime_root,
+            source_runtime_manifest_sha256=(
+                args.source_runtime_manifest_sha256
+            ),
+            destination=runtime_manifest["destination"],
+        )
+        pack_context = _build_feature_context(
+            context_args,
+            runtime_manifest["pack_code_hash"],
+        )
+        execution_plan = pack_context.target_plan
+        expectation = FeatureRuntimeCheckpointLoadExpectation(
+            runtime_manifest_sha256=args.runtime_manifest_sha256,
+            runtime_layout_manifest_sha256=runtime_manifest[
+                "runtime_layout_manifest_sha256"
+            ],
+            runtime_layout_hash=runtime_manifest["runtime_layout_hash"],
+            source_runtime_manifest_sha256=runtime_manifest[
+                "source_runtime_manifest_sha256"
+            ],
+            source_runtime_layout_manifest_sha256=runtime_manifest[
+                "source_runtime_layout_manifest_sha256"
+            ],
+            source_runtime_layout_hash=runtime_manifest[
+                "source_runtime_layout_hash"
+            ],
+            plan_hash=runtime_manifest["plan_hash"],
+            schedule_hash=runtime_manifest["schedule_hash"],
+            pack_code_hash=runtime_manifest["pack_code_hash"],
+            destination=runtime_manifest["destination"],
+            source_destination=runtime_manifest[
+                "source_checkpoint_destination"
+            ],
+            plan_id=runtime_manifest["plan_id"],
+            model_id=runtime_manifest["model_id"],
+        )
+        verified_runtime = verify_feature_runtime_packed_checkpoint(
+            args.runtime_root,
+            expectation,
+            pack_context.layout,
+            pack_context.source_runtime_checkpoint,
+        )
+        sparse_moe_backend = "pallas_feature"
+        hlo_backend_contract = "tpu_v4_pp8_pallas_feature"
     schedule = build_pipeline_schedule(execution_plan)
     state_layout = build_decoder_state_layout(
         execution_plan,
         schedule,
         context_capacity=args.context_capacity,
     )
-    expectation = RuntimeCheckpointLoadExpectation(
-        runtime_manifest_sha256=args.runtime_manifest_sha256,
-        runtime_layout_manifest_sha256=runtime_manifest[
-            "runtime_layout_manifest_sha256"
-        ],
-        runtime_layout_hash=runtime_manifest["runtime_layout_hash"],
-        source_packed_manifest_sha256=runtime_manifest[
-            "source_packed_manifest_sha256"
-        ],
-        source_layout_manifest_sha256=runtime_manifest[
-            "source_layout_manifest_sha256"
-        ],
-        plan_hash=runtime_manifest["plan_hash"],
-        schedule_hash=runtime_manifest["schedule_hash"],
-        pack_code_hash=runtime_manifest["pack_code_hash"],
-        destination=runtime_manifest["destination"],
-        source_destination=runtime_manifest["source_checkpoint_destination"],
-        plan_id=runtime_manifest["plan_id"],
-        model_id=runtime_manifest["model_id"],
-    )
-    verified_runtime = verify_runtime_packed_checkpoint(
-        args.runtime_root,
-        expectation,
-        pack_context.layout,
-        pack_context.source_checkpoint,
-    )
-
     import jax
     import ml_dtypes
     from jax.experimental import multihost_utils
-    from jax.sharding import NamedSharding, PartitionSpec as P
+    from jax.sharding import NamedSharding
+    from jax.sharding import PartitionSpec as P
 
     jax.distributed.initialize(
         coordinator_address=args.coordinator_address,
@@ -293,6 +368,7 @@ def main() -> int:
             groups,
             pairs,
             devices=runtime_devices,
+            sparse_moe_backend=sparse_moe_backend,
         )
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-start")
         load_started = time.monotonic()
@@ -420,7 +496,7 @@ def main() -> int:
             schedule=schedule,
             groups=groups,
             pairs=pairs,
-            backend_contract="tpu_v4_pp8_reference",
+            backend_contract=hlo_backend_contract,
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -507,7 +583,10 @@ def main() -> int:
             host = np.asarray(jax.device_get(shard.data))
             local_index_nonzero.append(int(np.count_nonzero(host[:, 0, 0, 0])))
         record = {
-            "artifact_kind": "greenfield_real_78layer_2k_decoder_body",
+            "artifact_kind": (
+                "greenfield_real_78layer_2k_decoder_body_"
+                f"{args.runtime_kind}"
+            ),
             "body_only": True,
             "code_hash": code_hash,
             "compile_seconds": compile_seconds,
@@ -534,10 +613,12 @@ def main() -> int:
             "raw_token_claim": False,
             "runtime_layout_hash": pack_context.layout.layout_hash,
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
+            "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
             "schema_version": 1,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
+            "sparse_moe_backend": decoder.sparse_moe_backend,
             "topology_hash": live_topology.topology_hash,
             "transformer_body_timing_only": True,
         }
