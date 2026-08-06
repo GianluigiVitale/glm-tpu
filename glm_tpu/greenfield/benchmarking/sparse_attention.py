@@ -162,3 +162,67 @@ def validate_sparse_attention_hlo(
         "passed": not violations,
         "violations": violations,
     }
+
+
+def validate_sparse_attention_integration_hlo(
+    optimized_hlo: str,
+    *,
+    heads: int = 64,
+    top_k: int = 2048,
+    segment_block: int = 128,
+    cache_width: int = 640,
+    dma_rows: int = 8,
+) -> dict[str, Any]:
+    """Prove that an enclosing layer executable retained both Pallas calls."""
+
+    for name, value in (
+        ("heads", heads),
+        ("top_k", top_k),
+        ("segment_block", segment_block),
+        ("cache_width", cache_width),
+        ("dma_rows", dma_rows),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+    names = (
+        f"greenfield_owner_position_order_k{top_k}",
+        "greenfield_fused_selected_kv_sparse_mla_"
+        f"h{heads}_k{top_k}_b{segment_block}_w{cache_width}_d{dma_rows}",
+    )
+    custom_calls = [
+        line.strip()
+        for line in optimized_hlo.splitlines()
+        if " custom-call(" in line
+    ]
+    counts = {
+        name: sum(
+            name in line and 'custom_call_target="tpu_custom_call"' in line
+            for line in custom_calls
+        )
+        for name in names
+    }
+    forbidden_dead_rows = [
+        shape
+        for shape in (
+            f"s32[32,{top_k}]",
+            f"bf16[32,{top_k},{cache_width}]",
+            f"f32[32,{top_k},{cache_width}]",
+        )
+        if shape in optimized_hlo
+    ]
+    violations = [
+        f"expected one integrated {name} call, found {count}"
+        for name, count in counts.items()
+        if count != 1
+    ]
+    if forbidden_dead_rows:
+        violations.append(
+            f"integrated sparse attention contains dead rows: {forbidden_dead_rows}"
+        )
+    return {
+        "expected_kernel_names": list(names),
+        "kernel_custom_call_counts": counts,
+        "forbidden_dead_rows": forbidden_dead_rows,
+        "passed": not violations,
+        "violations": violations,
+    }

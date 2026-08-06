@@ -228,7 +228,10 @@ def _run_forced_cpu_gate_c_kernels() -> None:
         local_parallel_size=4,
         packed_cache_width=6,
     )
-    pages = 2
+    # Four physical pages leave one complete eight-row local DMA domain for
+    # the interpreted fused sparse-attention integration path. Only logical
+    # pages zero and one are live for this 12-token fixture.
+    pages = 4
     full_cache = values((pages * cache_layout.logical_page_size, 6), 59)
     cache_by_owner = np.zeros(
         (4, pages, cache_layout.local_rows_per_page, 6),
@@ -287,6 +290,33 @@ def _run_forced_cpu_gate_c_kernels() -> None:
     )
     assert index_hlo["passed"], index_hlo
     index_result = index_executable(*index_inputs)
+    pallas_index_executable = jax.jit(
+        lambda *args: stage_local_index_share_gate_c(
+            *args,
+            mesh=mesh,
+            contract=mla_contract,
+            cache_layout=cache_layout,
+            rope_theta=128.0,
+            sparse_attention_backend="pallas",
+            sparse_attention_interpret=True,
+        )
+    ).lower(*index_inputs).compile()
+    pallas_index_result = pallas_index_executable(*index_inputs)
+    np.testing.assert_allclose(
+        np.asarray(pallas_index_result.attended_latent, dtype=np.float32),
+        np.asarray(index_result.attended_latent, dtype=np.float32),
+        atol=0.03125,
+        rtol=0,
+    )
+    np.testing.assert_allclose(
+        np.asarray(pallas_index_result.attention_lse),
+        np.asarray(index_result.attention_lse),
+        atol=2e-5,
+        rtol=0,
+    )
+    np.testing.assert_array_equal(
+        np.asarray(pallas_index_result.contract_valid), np.asarray([True])
+    )
 
     index_normalized = rms_norm(
         jnp.asarray(index_residual_host),

@@ -235,6 +235,6 @@ remote_success=$(gcloud storage ls "$REMOTE_PREFIX/SUCCESS" 2>/dev/null || true)
   say "ABORT: remote SUCCESS marker did not verify"
   exit 1
 }
-say "SUCCESS DB=$(/home/gianl/vllm-env/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))[\"results_db_run_id\"])' "$RUN_DIR/summary.json")"
+say "SUCCESS DB=$(/home/gianl/vllm-env/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["results_db_run_id"])' "$RUN_DIR/summary.json")"
 say "ARCHIVE=$REMOTE_PREFIX"
 trap - EXIT

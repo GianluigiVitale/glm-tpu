@@ -4,6 +4,7 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.sparse_attention import (
     validate_sparse_attention_hlo,
+    validate_sparse_attention_integration_hlo,
 )
 
 
@@ -72,3 +73,15 @@ def test_validate_sparse_attention_hlo_rejects_shape_and_contract_drift() -> Non
         validate_sparse_attention_hlo(_valid_hlo(), top_k=0)
     with pytest.raises(ValueError, match="dtype"):
         validate_sparse_attention_hlo(_valid_hlo(), dtype="f16")
+
+
+def test_validate_sparse_attention_integration_requires_both_pallas_calls() -> None:
+    valid = validate_sparse_attention_integration_hlo(
+        _valid_hlo()
+        + '\n%x = f32[1] custom-call(), custom_call_target="other"\n'
+    )
+    assert valid["passed"]
+    missing = validate_sparse_attention_integration_hlo(
+        _valid_hlo().replace("greenfield_owner_position_order_k2048", "wrong")
+    )
+    assert not missing["passed"]

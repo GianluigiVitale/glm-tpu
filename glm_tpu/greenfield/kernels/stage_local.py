@@ -8,7 +8,7 @@ provided stage-local axis groups.
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple, Sequence
+from typing import Any, Literal, NamedTuple, Sequence
 
 import jax
 from jax import lax
@@ -16,9 +16,11 @@ import jax.numpy as jnp
 
 from .pallas import (
     Fp8BlockMatmulConfig,
+    SparseMlaConfig,
     fp8_block_matmul,
     fp8_block_up_gate,
     fp8_fused_selected_moe,
+    stage_local_sparse_mla_kernel,
 )
 from .reference.fp8 import dequantize_fp8_bits_block_weight
 from .reference.attention import (
@@ -27,8 +29,6 @@ from .reference.attention import (
     StageLocalKvLayout,
     canonicalize_selected_positions,
     combine_stage_local_attention,
-    gather_stage_local_selected_kv,
-    sparse_mla_attention,
 )
 from .reference.dsa import (
     DsaNumericalContract,
@@ -468,6 +468,9 @@ def stage_local_index_share_fp8_mapped(
     rope_theta: float = 8_000_000.0,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,
+    sparse_attention_backend: Literal["reference", "pallas"] = "reference",
+    sparse_attention_config: SparseMlaConfig = SparseMlaConfig(),
+    sparse_attention_interpret: bool = False,
 ) -> StageLocalIndexShareFp8Result:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -655,16 +658,19 @@ def stage_local_index_share_fp8_mapped(
     q_absorbed = full_query[..., : contract.kv_lora_rank]
     full_q_rope = full_query[..., contract.kv_lora_rank :]
     selected = SelectedPositions(selected_positions, selected_valid_counts)
-    segment = gather_stage_local_selected_kv(
+    partial = stage_local_sparse_mla_kernel(
+        q_absorbed,
+        full_q_rope,
         cache,
         block_tables,
         selected,
         context_lengths,
         layout=cache_layout,
         owner_index=local_slot,
-    )
-    partial = sparse_mla_attention(
-        q_absorbed, full_q_rope, segment, contract=contract
+        contract=contract,
+        backend=sparse_attention_backend,
+        config=sparse_attention_config,
+        interpret=sparse_attention_interpret,
     )
     gathered_outputs = lax.all_gather(
         partial.output,

@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 import jax
 from jax import lax
 import jax.numpy as jnp
 from jax.sharding import Mesh, PartitionSpec as P
+
+from ..kernels.pallas import (
+    SparseMlaConfig,
+    stage_local_sparse_mla_kernel,
+)
 
 from ..kernels.reference.attention import (
     MlaNumericalContract,
@@ -16,7 +21,6 @@ from ..kernels.reference.attention import (
     canonicalize_selected_positions,
     combine_stage_local_attention,
     gather_stage_local_selected_kv,
-    sparse_mla_attention,
 )
 from ..kernels.reference.dsa import (
     DsaNumericalContract,
@@ -440,6 +444,9 @@ def stage_local_index_share_gate_c(
     rms_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     axis_name: str = "stage",
+    sparse_attention_backend: Literal["reference", "pallas"] = "reference",
+    sparse_attention_config: SparseMlaConfig = SparseMlaConfig(),
+    sparse_attention_interpret: bool = False,
 ) -> GateCIndexShareResult:
     """Reuse compact DSA state, write local KV, and attend over local owners."""
 
@@ -592,11 +599,19 @@ def stage_local_index_share_gate_c(
             layout=cache_layout,
             owner_index=owner,
         )
-        partial = sparse_mla_attention(
+        partial = stage_local_sparse_mla_kernel(
             q_absorbed,
             full_q_rope,
-            segment,
+            local_cache,
+            tables,
+            local_selected,
+            lengths,
+            layout=cache_layout,
+            owner_index=owner,
             contract=contract,
+            backend=sparse_attention_backend,
+            config=sparse_attention_config,
+            interpret=sparse_attention_interpret,
         )
         gathered_outputs = lax.all_gather(
             partial.output,

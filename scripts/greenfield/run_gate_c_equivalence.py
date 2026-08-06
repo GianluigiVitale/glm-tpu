@@ -35,6 +35,7 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     stage_local_dsa_gate_c,
     stage_local_index_share_gate_c,
     validate_gate_c_hlo,
+    validate_sparse_attention_integration_hlo,
 )
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     GateCLoadExpectation,
@@ -92,6 +93,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hlo-dir", type=Path, required=True)
     parser.add_argument("--trace-root", type=Path)
     parser.add_argument("--trace-steps", type=int, default=20)
+    parser.add_argument(
+        "--sparse-attention-backend",
+        choices=("reference", "pallas"),
+        default="reference",
+    )
     parser.add_argument(
         "--development-forced-cpu",
         action="store_true",
@@ -462,11 +468,20 @@ def _save_hlo(
     *,
     case: str,
     hlo_dir: Path,
+    sparse_attention_backend: str = "reference",
 ) -> tuple[str, dict[str, Any], Path]:
     optimized_hlo = compiled.as_text()
     path = hlo_dir / f"{case}.optimized_hlo.txt"
     path.write_text(optimized_hlo)
     contract = validate_gate_c_hlo(optimized_hlo, case=case)
+    if case == "index_share" and sparse_attention_backend == "pallas":
+        integration = validate_sparse_attention_integration_hlo(optimized_hlo)
+        contract["sparse_attention_integration"] = integration
+        if not integration["passed"]:
+            contract["passed"] = False
+            contract["violations"] = list(contract["violations"]) + list(
+                integration["violations"]
+            )
     _atomic_write(path.with_suffix(".contract.json"), contract)
     if not contract["passed"]:
         raise RuntimeError(
@@ -842,13 +857,18 @@ def main() -> int:
             rope_theta=float(
                 oracle_manifest["numerical_contract"]["rope_theta"]
             ),
+            sparse_attention_backend=args.sparse_attention_backend,
+            sparse_attention_interpret=args.development_forced_cpu,
         )
 
     compile_started = time.perf_counter()
     index_compiled = jax.jit(index_share_step).lower(*index_inputs).compile()
     index_compile_seconds = time.perf_counter() - compile_started
     index_hlo_sha, index_hlo, index_hlo_path = _save_hlo(
-        index_compiled, case="index_share", hlo_dir=args.hlo_dir
+        index_compiled,
+        case="index_share",
+        hlo_dir=args.hlo_dir,
+        sparse_attention_backend=args.sparse_attention_backend,
     )
     index_device = index_compiled(*index_inputs)
     index = jax.device_get(index_device)
@@ -1024,6 +1044,7 @@ def main() -> int:
             "fed_producer_device_result_directly": True,
             "score_order_preserved": True,
             "shape": list(np.asarray(dsa.selected_positions).shape),
+            "sparse_attention_backend": args.sparse_attention_backend,
         },
         "numerical_evidence_contract": {
             "cross_framework_internal_tensors": "bounded",
