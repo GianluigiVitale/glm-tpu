@@ -241,3 +241,11 @@ Accepted legacy parent: `287.666063 ms/device token`, `3.476` device tok/s, abou
 Its 75 sequential physical 32-chip MoE combine regions cost `106.495 ms/token`. The greenfield
 collective floor and both real-layer plans show this is not a raw 12 KiB ICI or sparse-layer compute
 floor, but no greenfield full-decoder token-speed result exists yet.
+
+## Rejected complete feature-body evidence
+
+`greenfield_short_decoder_compile_pp8_pallas_feature_20260806T084346269707216Z` at `a8194cd`
+preserves eight host records, optimized HLO `64df6dc7...2ea0`, exact local collective/kernel
+contracts, correct decoder metadata, measured HBM, and authenticated clean failure census. Body
+p50/p99 is `58,804.040/58,804.323 ms`. The outer finalizer failed on a missing explicit-zero loader
+metric, so there is no DB row or remote `SUCCESS`; this is rejected diagnostic evidence only.

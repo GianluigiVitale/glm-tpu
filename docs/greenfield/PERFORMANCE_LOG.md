@@ -549,3 +549,24 @@ Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime
 and PP8/PP16 group manifests on all eight hosts. Observed topology is `2x4x4`; TPU-VM suffix order is
 not JAX process order. The accepted PP8 process ring is `[0,2,4,6,7,5,3,1]`; PP16 uses 16 adjacent
 two-chip stages. This is topology evidence only, not transport or model performance.
+
+## 2026-08-06 — rejected complete feature-body diagnostic
+
+`greenfield_short_decoder_compile_pp8_pallas_feature_20260806T084346269707216Z` at `a8194cd`
+completed the real 78-layer/2K feature body on all eight hosts. Fleet-max profiler-free p50/p99 over
+ten synchronized samples is `58,804.040455/58,804.322717 ms`; no token or tok/s claim is permitted.
+Load/compile maxima are `278.584/186.853 s`, and measured peak HBM is
+`26,144,010,752/33,014,398,976` bytes/chip.
+
+HLO `64df6dc7...2ea0` contains 79,861 instructions, 1,195,999 bundles, 389 overlays,
+`219AG/294AR/16CP`, and 75 each of the three raw-U8 feature-MoE kernels. It contains no decoded
+expert overlay. Every gather/reduce is limited to one of the eight exact four-chip groups, so the
+58.8-second wall is not a full-pod collective regression. The remaining layer graph still performs
+reference whole-matrix FP8 dequantization/projections for attention, DSA, sparse attention, and
+dense MLP. A fresh two-step fleet XPlane is the next discriminator before replacing those paths in
+the specification's Pallas order.
+
+All decoder metadata and direct-load invariants pass. Final DB/archive `SUCCESS` did not: the shell
+finalizer required a device-dequantization field that this loader version did not emit. The HLO,
+eight records, diagnostic archive, and clean 8/8 failure census are preserved, but the run remains
+evidence-rejected and has no DB row.

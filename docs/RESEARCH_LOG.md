@@ -4716,3 +4716,33 @@ before first invocation. Focused runtime/feature/decoder tests pass 14/14; E/F/I
 checks pass. Protected metal remains mandatory: next run is the 78-layer/2K feature-body compile,
 direct load, local-only HLO, peak-HBM, and fail-before-execute discriminator. No token-speed claim
 exists until the complete token path and Gate D pass.
+
+## 2026-08-06 09:07 — Complete feature body executes but is rejected at 58.804 seconds
+
+Protected diagnostic `greenfield_short_decoder_compile_pp8_pallas_feature_20260806T084346269707216Z`
+at `a8194cd` loaded all `104,272,169,728` runtime bytes/host, compiled the real 78-layer/2K body,
+passed the exact HLO contract, completed first-run + two warmups + ten measured executions, and
+wrote eight fleet-agreeing records. Fleet-max profiler-free body p50/p99 is
+`58,804.040455/58,804.322717 ms`. This is transformer-body wall only and is not token latency or
+tok/s. Compile max is `186.853 s`, load max `278.584 s`, and observed peak HBM is
+`26,144,010,752` of `33,014,398,976` bytes/chip.
+
+Optimized HLO SHA `64df6dc7...2ea0` has 79,861 instructions, 1,195,999 program bundles, 389 overlays,
+exact `219 AG / 294 AR / 16 CP`, 312 logical reduction results, and exactly 75 occurrences of each
+required feature-Pallas MoE kernel. No decoded routed-expert overlay exists. All 513 layer
+gathers/reduces use only `{{0,1,2,3},...,{28,29,30,31}}`; full-pod communication is not the cause.
+All hosts report active ranks `[0,1,2,3]`, producer `74`, count `1`, visited mask `255`, and health
+`1`. Direct-load counters show zero reshard, host concat, or host FP8 dequantization.
+
+The outer finalizer then failed on a schema bug: it required `fp8_device_dequantizations`, while the
+runtime loader did not emit that explicit zero field. Therefore there is no DB row or remote
+`SUCCESS`; host records/HLO/diagnostics are preserved and failure-exit census is 8/8 clean. Two
+preceding attempts exposed and fixed non-addressable metadata readback and JAX's required
+`process_allgather(..., tiled=True)` mode; both also ended clean.
+
+Source plus HLO localize the dominant defect outside the already-Pallas MoE: complete attention,
+DSA, sparse-attention, and dense paths still use reference whole-matrix FP8 dequantization and
+projection graphs. The feature change reduced reference-body expansion from 192,401 to 79,861 HLO
+instructions, 2.707M to 1.196M bundles, and 580 to 389 overlays, but body wall remains catastrophic.
+The next protected run uses one profiler-free sample followed by a fresh two-step/8-host XPlane to
+attribute exact non-MoE time before implementing the specification's remaining Pallas order.

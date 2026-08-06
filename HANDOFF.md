@@ -388,13 +388,29 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Run the protected 78-layer/2K PP8 feature-body compile/load from final-owner files. Require 75
-   of each raw-U8 production kernel, local-only collectives, no decoded expert overlay, direct-load
-   counters, measured HBM, preserved HLO on failure, and abort before first execution on drift.
-2. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
+1. Capture and parse the fresh two-step/8-host XPlane for the rejected `58.804 s` feature-body.
+   Attribute dense, DSA/top-k, selected-KV/attention, MoE, collectives, and inactive-stage time.
+   The strongest source/HLO diagnosis is whole-matrix FP8 dequant/reference projection expansion
+   outside MoE; do not tune collectives because all 513 layer gathers/reduces are PP8-local.
+2. Replace the trace-proven dominant non-MoE reference paths in the specification's Pallas order,
+   rerun exact Gate-C oracles, then repeat the protected body until `<=200 ms` is plausible.
+3. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
    Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
    profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
-3. Implement identical-condition raw-FP8 PP16 and WS32 challengers, adjudicate by protected wall,
+4. Implement identical-condition raw-FP8 PP16 and WS32 challengers, adjudicate by protected wall,
    then continue Gates E-H in binding order. No body-only result is a decoder or tok/s claim.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.
+
+## Rejected complete feature-body diagnostic
+
+`greenfield_short_decoder_compile_pp8_pallas_feature_20260806T084346269707216Z` at `a8194cd`
+produced eight complete host records after exact load, compile, HLO validation, metadata validation,
+and 13 executions. Fleet-max body p50/p99 is `58,804.040/58,804.323 ms`; this is transformer body
+only, not a token or tok/s result. HLO `64df6dc7...2ea0` has 79,861 instructions, 1,195,999 bundles,
+389 overlays, exact `219AG/294AR/16CP`, 75 of each required feature-Pallas MoE kernel, and no decoded
+expert overlay. Every gather/reduce uses only the eight four-chip PP8 groups. Peak HBM is
+`26,144,010,752` bytes/chip; all metadata contracts pass. Final DB/SUCCESS sealing failed only
+because the outer validator expected a device-dequant counter absent from the runtime loader schema;
+the diagnostic remains rejected, archived without a DB row, and ended 8/8 clean. The loader now
+emits that counter and a profiler-after-wall two-step fleet-XPlane mode is ready for exact attribution.

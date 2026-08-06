@@ -39,7 +39,8 @@
 | Pallas FP8 selected SwiGLU/down | DB 436/437: exact BF16 activation and distinct raw-U8 selected down matrices; normal-two/concentrated-eight order/zeros; one Pallas kernel + exact compaction/scale/restore metadata/no overlay; 0.773045/2.421714 ms p50 | Correctness/route-proportional mechanism pass |
 | Final-layout Pallas one-layer pack/load | Manifest `3da63bd9...e427`; exact source transforms; four final-owner raw files; 56 direct transfers; zero dequant/concat/runtime transpose | Pass |
 | Exact raw-FP8 Pallas PP8 MoE layer | DB 438 baseline plus DB 439 fused-routed: exact routes, bounded normal/concentrated outputs, three raw-U8 kernels, one local combine, no overlay, HBM/wall/XPlane/DB/archive/cleanup; 3.121940/7.063344 ms p50. DB 440 fully fused shared too but regressed 0.8–1.5%. | Correctness/layout/locality pass; DB 439 selected, latency still rejected |
-| Gate D implementation | All-78-layer schedule/state; DB420-exact runtime loader; fused raw-FP8 fallback layer; one-step all-stage map; exact forced-CPU state/local HLO | In progress; address measured route-imbalance/collective skew before short decoder |
+| Gate D feature-body diagnostic | Eight-host real 78-layer/2K execution at `a8194cd`; exact feature HLO/local groups/metadata/direct load; 58,804.040 ms p50, 26.144 GB peak HBM/chip; outer finalizer schema failure means no DB/SUCCESS | Evidence-rejected; non-MoE reference projection/dequant path requires XPlane attribution and Pallas replacement |
+| Gate D implementation | All-78-layer schedule/state; complete feature runtime; exact local HLO/metadata; real body executes but takes 58.804 s | In progress; trace and replace non-MoE reference projection/dequant paths before complete tokens |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
 
