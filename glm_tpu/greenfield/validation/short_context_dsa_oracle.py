@@ -113,6 +113,7 @@ class ShortContextDsaOracleConfig:
     expected_generated_tokens: int
     expected_seed: int
     expected_gold: str
+    expected_oob_dir: str
     expected_dump_prefix: str
     expected_process_count: int
     first_source_step: int
@@ -170,6 +171,12 @@ class ShortContextDsaOracleConfig:
             )
         if not self.expected_dump_prefix.startswith("/tmp/"):
             raise ValueError("legacy DSA dump prefix must be under /tmp")
+        if not self.expected_oob_dir.startswith(
+            "/home/gianl/gcs-models/models/"
+        ):
+            raise ValueError(
+                "legacy WK repair source must use the approved read-only model mount"
+            )
         if not self.expected_model_uri.startswith("gs://driftbench-dsv4-uc/"):
             raise ValueError("legacy model URI must use the approved bucket")
 
@@ -239,6 +246,8 @@ def _read_source_row(config: ShortContextDsaOracleConfig) -> dict[str, Any]:
         "GLM_MLA_DCP": "1",
         "GLM_PWAL_NAN_CHECK": "1",
         "GLM_STATE_HASH_REF": "/tmp/golden.json",
+        "GLM_WK_OOB_DIR": config.expected_oob_dir,
+        "GLM_WK_OOB_GOLDEN": "/tmp/golden.json",
     }
     environment_expected = {
         "model": config.expected_model_uri,
@@ -502,6 +511,10 @@ def capture_short_context_dsa_oracle(
         "format_version": FORMAT_VERSION,
         "legacy_repository_pin_at_capture": config.legacy_repository_pin,
         "model_id": MODEL_ID,
+        "repair_contract": {
+            "golden_manifest": "/tmp/golden.json",
+            "oob_checkpoint_dir": config.expected_oob_dir,
+        },
         "source": {
             "benchmark": source["benchmark"],
             "dump_prefix": config.expected_dump_prefix,
@@ -574,6 +587,18 @@ def inspect_short_context_dsa_oracle(output_dir: Path) -> dict[str, Any]:
         manifest["source"]["source_row_sha256"]
     ):
         raise ValueError("short-context DSA oracle source-row checksum mismatch")
+    repair_contract = manifest.get("repair_contract", {})
+    oob_dir = repair_contract.get("oob_checkpoint_dir", "")
+    if not isinstance(oob_dir, str) or not oob_dir.startswith(
+        "/home/gianl/gcs-models/models/"
+    ) or repair_contract.get("golden_manifest") != "/tmp/golden.json":
+        raise ValueError("short-context DSA oracle repair contract drifted")
+    source_os_environment = source.get("env_json", {}).get("os_env", {})
+    if source_os_environment.get("GLM_WK_OOB_DIR") != oob_dir or (
+        source_os_environment.get("GLM_WK_OOB_GOLDEN")
+        != repair_contract["golden_manifest"]
+    ):
+        raise ValueError("short-context DSA oracle repair provenance drifted")
     contract = manifest["event_contract"]
     steps = int(contract["decode_step_count"])
     events = int(contract["event_count"])

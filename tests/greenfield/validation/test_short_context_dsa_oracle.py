@@ -96,6 +96,8 @@ def _config(
         "GLM_MLA_DCP": "1",
         "GLM_PWAL_NAN_CHECK": "1",
         "GLM_STATE_HASH_REF": "/tmp/golden.json",
+        "GLM_WK_OOB_DIR": "/home/gianl/gcs-models/models/GLM-5.2-FP8",
+        "GLM_WK_OOB_GOLDEN": "/tmp/golden.json",
     }
     connection.execute(
         "UPDATE runs SET env_json=? WHERE run_id=1",
@@ -138,6 +140,9 @@ def _config(
         expected_generated_tokens=3,
         expected_seed=9,
         expected_gold="42",
+        expected_oob_dir=(
+            "/home/gianl/gcs-models/models/GLM-5.2-FP8"
+        ),
         expected_dump_prefix=dump_prefix,
         expected_process_count=8,
         first_source_step=2,
@@ -186,3 +191,22 @@ def test_short_context_dsa_oracle_refuses_token_manifest_drift(
     wrong = replace(config, token_oracle_manifest_sha256="c" * 64)
     with pytest.raises(ValueError, match="manifest pin drifted"):
         capture_short_context_dsa_oracle(wrong)
+
+
+def test_short_context_dsa_oracle_refuses_missing_repair_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(tmp_path, monkeypatch)
+    connection = sqlite3.connect(config.results_db)
+    environment = json.loads(
+        connection.execute("SELECT env_json FROM runs WHERE run_id=1").fetchone()[0]
+    )
+    del environment["os_env"]["GLM_WK_OOB_GOLDEN"]
+    connection.execute(
+        "UPDATE runs SET env_json=? WHERE run_id=1",
+        (json.dumps(environment),),
+    )
+    connection.commit()
+    connection.close()
+    with pytest.raises(ValueError, match="protocol drifted"):
+        capture_short_context_dsa_oracle(config)

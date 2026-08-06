@@ -56,6 +56,7 @@ def main() -> None:
     parser.add_argument("--item-row-id", type=int, required=True)
     parser.add_argument("--expected-harness-git", required=True)
     parser.add_argument("--expected-fork-git", required=True)
+    parser.add_argument("--expected-oob-dir", required=True)
     parser.add_argument("--expected-dump-prefix", required=True)
     args = parser.parse_args()
     manifest = capture_short_context_dsa_oracle(
@@ -81,6 +82,7 @@ def main() -> None:
             expected_generated_tokens=20,
             expected_seed=283835,
             expected_gold="110391",
+            expected_oob_dir=args.expected_oob_dir,
             expected_dump_prefix=args.expected_dump_prefix,
             expected_process_count=8,
             first_source_step=2,

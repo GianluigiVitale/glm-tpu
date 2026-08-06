@@ -14,6 +14,7 @@ readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly TOKEN_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
 readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/2k/$TOKEN_ORACLE_TAG/oracle
 readonly TOKEN_ORACLE_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
+readonly OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly DISK_MIN_FREE_GB=10
 readonly DISK_WARN_FREE_GB=15
 
@@ -130,17 +131,18 @@ MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
     exit 1
   }
 
-# All hosts must carry the exact clean legacy tree and the golden state file.
+# All hosts must carry the exact clean legacy tree, golden state file, and
+# approved read-only OOB checkpoint mirror used by the PWAL self-healer.
 # shellcheck disable=SC2016
-prereq='code=$(git -C /home/gianl/tpu-inference rev-parse HEAD); dirty=$(git -C /home/gianl/tpu-inference status --porcelain --untracked-files=no | wc -l); if [ "$code" = '"$LEGACY_PIN"' ] && [ "$dirty" -eq 0 ] && [ -r /tmp/golden.json ] && [ ! -e /tmp/'"$TAG"' ]; then echo "PREREQ_OK $(hostname)"; else echo "PREREQ_BAD $(hostname) code=$code dirty=$dirty"; fi'
+prereq='code=$(git -C /home/gianl/tpu-inference rev-parse HEAD); dirty=$(git -C /home/gianl/tpu-inference status --porcelain --untracked-files=no | wc -l); mount_source=$(findmnt -T '"$OOB_DIR"' -n -o SOURCE 2>/dev/null); mount_type=$(findmnt -T '"$OOB_DIR"' -n -o FSTYPE 2>/dev/null); if [ "$code" = '"$LEGACY_PIN"' ] && [ "$dirty" -eq 0 ] && [ -r /tmp/golden.json ] && [ -r '"$OOB_DIR"'/model.safetensors.index.json ] && [ "$mount_source" = driftbench-dsv4-uc ] && [ "$mount_type" = fuse.gcsfuse ] && [ ! -e /tmp/'"$TAG"' ]; then echo "PREREQ_OK $(hostname)"; else echo "PREREQ_BAD $(hostname) code=$code dirty=$dirty mount_source=$mount_source mount_type=$mount_type"; fi'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$prereq" >"$RUN_DIR/prereq.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/prereq.txt" PREREQ_OK || {
-  say "ABORT: exact legacy/golden/dump prerequisite failed"
+  say "ABORT: exact legacy/golden/OOB/dump prerequisite failed"
   exit 1
 }
 
-COMMON_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"' GLM_DSA_DUMP_TOPK_EVENTS=all GLM_DSA_DUMP_TOPK_SKIP_WARMUP=1 GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"
+COMMON_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"' GLM_DSA_DUMP_TOPK_EVENTS=all GLM_DSA_DUMP_TOPK_SKIP_WARMUP=1 GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"
 RAYLET_ENVS="$COMMON_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
 DRIVER_ENVS='NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=1 JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=120000 '"$COMMON_ENVS"
 
@@ -152,7 +154,7 @@ runtime_started=1
 
 # Verify every raylet inherited every source-defining flag.
 # shellcheck disable=SC2016
-env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_oracle_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP=1" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_DCP_SCATTER_IMPL=flat" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=all" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
+env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_oracle_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP=1" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_DCP_SCATTER_IMPL=flat" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=all" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$env_check" >"$RUN_DIR/raylet_env.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/raylet_env.txt" ENV_OK || {
@@ -180,8 +182,16 @@ grep -q '\[longctx\].*correct=True' "$RUN_DIR/legacy.log" || {
   say "ABORT: fresh legacy item was not correct"
   exit 1
 }
-grep -q 'GLM_LOAD_CHECKSUM' "$RUN_DIR/legacy.log" || {
-  say "ABORT: legacy load checksum evidence is absent"
+
+# Ray de-duplicates aggregate driver logs, so validate the load and final state
+# from each host's own current-session worker logs. Record any repair messages,
+# but do not require a corruption draw: exact final state is the acceptance gate.
+# shellcheck disable=SC2016
+integrity_check='logs=/tmp/ray/session_latest/logs; checksum=$(grep -Rhs --include="worker-*.out" -E "\[GLM_LOAD_CHECKSUM\].*SUMMARY verified=1882 mismatches=0 skipped=312$" "$logs" 2>/dev/null | tail -1); state=$(grep -Rhs --include="worker-*.out" -E "\[GLM_STATE_HASH\].*manifest VERIFIED leaves=2455 combined=371110325 ref=/tmp/golden.json$" "$logs" 2>/dev/null | tail -1); refusal=$(grep -Rhs --include="worker-*.out" -E "StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|LoadChecksumError|CodeFingerprintMismatchError|GLM_LOAD_CHECKSUM.*diverged|GLM_WK_OOB_GOLDEN.*(no manifest key|does not describe|no checkpoint prefix|still != golden)|GLM_WK_OOB_DIR.*STILL.*all-zero" "$logs" 2>/dev/null | tail -1); repair=$(grep -Rhs --include="worker-*.out" -E "zero-fill repaired at PWAL|manifest-repair at PWAL" "$logs" 2>/dev/null || true); printf "%s\n%s\n" "$checksum" "$state"; [ -z "$repair" ] || printf "%s\n" "$repair"; if [ -n "$checksum" ] && [ -n "$state" ] && [ -z "$refusal" ]; then echo "INTEGRITY_OK $(hostname)"; else [ -z "$refusal" ] || printf "%s\n" "$refusal"; echo "INTEGRITY_BAD $(hostname)"; fi'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="$integrity_check" >"$RUN_DIR/fleet_integrity.txt" 2>&1
+has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
+  say "ABORT: load/final-state integrity is not exact on all eight hosts"
   exit 1
 }
 
@@ -258,6 +268,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --item-row-id "$item_row_id" \
   --expected-harness-git "$source_harness" \
   --expected-fork-git "$source_fork" \
+  --expected-oob-dir "$OOB_DIR" \
   --expected-dump-prefix "$DUMP_PREFIX" >"$RUN_DIR/capture.json"
 
 # Snapshot the append-only provenance DB at the exact source row.
