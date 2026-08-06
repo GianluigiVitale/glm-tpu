@@ -10,9 +10,17 @@ from .fp8_matmul import (
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
 )
+from .topk import (
+    DsaTopKConfig,
+    local_topk_candidates_kernel,
+    local_topk_candidates_pallas,
+    merge_topk_candidates_kernel,
+    merge_topk_candidates_pallas,
+)
 
 __all__ = [
     "DsaScoreConfig",
+    "DsaTopKConfig",
     "Fp8BlockMatmulConfig",
     "dsa_scores_kernel",
     "dsa_scores_pallas",
@@ -22,4 +30,8 @@ __all__ = [
     "fp8_fused_selected_moe",
     "fp8_selected_swiglu_down",
     "fp8_selected_up_gate",
+    "local_topk_candidates_kernel",
+    "local_topk_candidates_pallas",
+    "merge_topk_candidates_kernel",
+    "merge_topk_candidates_pallas",
 ]
