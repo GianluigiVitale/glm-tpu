@@ -37,6 +37,20 @@ observed_source_manifest=$(/home/gianl/vllm-env/bin/python -c \
   echo "source one-layer manifest identity drifted" >&2
   exit 2
 }
+active_account=$(gcloud auth list --filter=status:ACTIVE --format='value(account)')
+[[ -n $active_account ]] || {
+  echo "gcloud has no active authenticated account" >&2
+  exit 2
+}
+source_payload_bytes=$(/home/gianl/vllm-env/bin/python -c \
+  'import json,sys; print(json.load(open(sys.argv[1]))["packed_payload_byte_count"])' \
+  "$SOURCE_ARTIFACT/manifest.json")
+available_bytes=$(df -B1 --output=avail /home/gianl/glm-run | tail -n 1)
+required_bytes=$(( source_payload_bytes + 2147483648 ))
+[[ $available_bytes -ge $required_bytes ]] || {
+  echo "insufficient disk for append-only Pallas derivative: available=$available_bytes required=$required_bytes" >&2
+  exit 2
+}
 [[ ! -e $RUN_DIR ]] || {
   echo "append-only run directory already exists: $RUN_DIR" >&2
   exit 2
@@ -133,10 +147,14 @@ for name, expected_size in objects:
         text=True,
     )
     value = json.loads(completed.stdout)
-    if int(value["size"]) != int(expected_size) or not value.get("generation"):
+    if (
+        int(value["size"]) != int(expected_size)
+        or not value.get("generation")
+        or not value.get("crc32c_hash")
+    ):
         raise SystemExit(f"remote identity drift for {name}")
     records.append({
-        "crc32c": value.get("crc32c"),
+        "crc32c": value["crc32c_hash"],
         "generation": value["generation"],
         "name": name,
         "size": int(value["size"]),

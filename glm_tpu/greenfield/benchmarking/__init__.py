@@ -34,6 +34,7 @@ from .one_layer import (
     ROUTE_WEIGHT_TOLERANCE,
     TensorTolerance,
     compare_bounded_tensor,
+    validate_pallas_real_layer_hlo,
     validate_real_layer_hlo,
 )
 
@@ -64,6 +65,7 @@ __all__ = [
     "build_transport_chain",
     "transport_chain_hlo_policy",
     "validate_compiled_transport",
+    "validate_pallas_real_layer_hlo",
     "validate_real_layer_hlo",
     "validate_transport_pairs",
 ]

@@ -27,12 +27,18 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     ROUTE_WEIGHT_TOLERANCE,
     compare_bounded_tensor,
     latency_distribution,
+    validate_pallas_real_layer_hlo,
     validate_real_layer_hlo,
 )
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     OneLayerLoadExpectation,
+    PallasOneLayerLoadExpectation,
     load_one_layer,
+    load_pallas_one_layer,
     resolve_stage_devices,
+)
+from glm_tpu.greenfield.kernels.stage_local import (  # noqa: E402
+    stage_local_moe_pallas_mapped,
 )
 from glm_tpu.greenfield.kernels.reference import (  # noqa: E402
     GlmMoeNumericalContract,
@@ -54,12 +60,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topology-capture", type=Path, required=True)
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--packed-manifest-sha256", required=True)
+    parser.add_argument("--source-packed-manifest-sha256")
+    parser.add_argument("--packed-code-hash")
     parser.add_argument("--oracle-manifest-sha256", required=True)
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--topology-sha256", required=True)
     parser.add_argument("--plan-group-sha256", required=True)
     parser.add_argument(
         "--plan-id", choices=("PP8_LP4", "PP16_LP2"), default="PP8_LP4"
+    )
+    parser.add_argument(
+        "--kernel", choices=("reference", "pallas"), default="reference"
     )
     parser.add_argument("--stage-id", type=int)
     parser.add_argument("--output", type=Path, required=True)
@@ -342,6 +353,13 @@ def main() -> int:
         raise ValueError("protected PP16 layer requires an explicit stage id")
     if args.plan_id == "PP8_LP4" and args.stage_id is not None:
         raise ValueError("protected PP8 layer derives its sole local stage")
+    if args.kernel == "pallas" and (
+        args.source_packed_manifest_sha256 is None
+        or args.packed_code_hash is None
+    ):
+        raise ValueError(
+            "Pallas layer requires source manifest and pack code identities"
+        )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(
@@ -384,13 +402,24 @@ def main() -> int:
             f"TPU_VISIBLE_DEVICES must identify {expected_runtime_size} captured "
             f"host-local chips, got {visible_device_indices}"
         )
-    expectation = OneLayerLoadExpectation(
-        manifest_sha256=args.packed_manifest_sha256,
-        source_revision=args.source_revision,
-        topology_hash=args.topology_sha256,
-        plan_group_hash=args.plan_group_sha256,
-        plan_id=args.plan_id,
-    )
+    if args.kernel == "pallas":
+        expectation = PallasOneLayerLoadExpectation(
+            manifest_sha256=args.packed_manifest_sha256,
+            source_manifest_sha256=args.source_packed_manifest_sha256,
+            code_hash=args.packed_code_hash,
+            source_revision=args.source_revision,
+            topology_hash=args.topology_sha256,
+            plan_group_hash=args.plan_group_sha256,
+            plan_id=args.plan_id,
+        )
+    else:
+        expectation = OneLayerLoadExpectation(
+            manifest_sha256=args.packed_manifest_sha256,
+            source_revision=args.source_revision,
+            topology_hash=args.topology_sha256,
+            plan_group_hash=args.plan_group_sha256,
+            plan_id=args.plan_id,
+        )
     resolution = resolve_stage_devices(
         local_devices,
         args.topology_capture,
@@ -399,12 +428,20 @@ def main() -> int:
         visible_device_indices=visible_device_indices,
     )
     load_started = time.perf_counter()
-    loaded = load_one_layer(
-        args.artifact_dir,
-        expectation,
-        resolution,
-        expert_chunk_size=args.expert_chunk_size,
-    )
+    if args.kernel == "pallas":
+        loaded = load_pallas_one_layer(
+            args.artifact_dir,
+            expectation,
+            resolution,
+            expert_chunk_size=args.expert_chunk_size,
+        )
+    else:
+        loaded = load_one_layer(
+            args.artifact_dir,
+            expectation,
+            resolution,
+            expert_chunk_size=args.expert_chunk_size,
+        )
     load_seconds = time.perf_counter() - load_started
     oracle_manifest, oracle = _load_oracle(
         args.oracle_dir,
@@ -436,49 +473,103 @@ def main() -> int:
         fp8_block_shape=tuple(geometry["fp8_block_shape"]),
     )
 
-    def step_fun_impl(
-        hidden_states: Any,
-        correction_bias: Any,
-        router_weight: Any,
-        expert_gate: Any,
-        expert_up: Any,
-        expert_down: Any,
-        shared_gate: Any,
-        shared_up: Any,
-        shared_down: Any,
-    ) -> tuple[Any, Any, Any]:
-        route_indices, route_weights = route_glm_noaux_tc(
-            hidden_states,
-            router_weight,
-            correction_bias,
-            top_k=contract.top_k,
-        )
-        output = stage_local_moe_from_routes(
-            hidden_states,
-            route_indices,
-            route_weights,
-            expert_gate,
-            expert_up,
-            expert_down,
-            shared_gate,
-            shared_up,
-            shared_down,
-            mesh=loaded.mesh,
-            contract=contract,
-        )
-        return output, route_indices, route_weights
+    if args.kernel == "pallas":
+        from jax import lax
+        from jax.sharding import PartitionSpec as P
 
-    normal_inputs = (
-        hidden,
-        loaded.correction_bias,
-        loaded.router_weight,
-        loaded.expert_gate,
-        loaded.expert_up,
-        loaded.expert_down,
-        loaded.shared_gate,
-        loaded.shared_up,
-        loaded.shared_down,
-    )
+        mapped_step = jax.shard_map(
+            lambda *values: stage_local_moe_pallas_mapped(
+                *values,
+                lax.axis_index("expert").astype(jnp.int32),
+                axis_name="expert",
+                contract=contract,
+            ),
+            mesh=loaded.mesh,
+            in_specs=(
+                P(),
+                P(),
+                P(),
+                P("expert", None, None),
+                P("expert", None, None),
+                P("expert", None, None),
+                P("expert", None, None),
+                P("expert", None, None),
+                P("expert", None, None),
+                P("expert", None),
+                P("expert", None),
+                P("expert", None),
+                P("expert", None),
+                P(None, "expert"),
+                P(None, "expert"),
+            ),
+            out_specs=(P(), P(), P()),
+            check_vma=False,
+        )
+
+        def step_fun_impl(*values: Any) -> tuple[Any, Any, Any]:
+            return mapped_step(*values)
+
+        normal_inputs = (
+            hidden,
+            loaded.correction_bias,
+            loaded.router_weight,
+            loaded.expert_gate_bits,
+            loaded.expert_gate_scale,
+            loaded.expert_up_bits,
+            loaded.expert_up_scale,
+            loaded.expert_down_bits,
+            loaded.expert_down_scale,
+            loaded.shared_gate_bits,
+            loaded.shared_gate_scale,
+            loaded.shared_up_bits,
+            loaded.shared_up_scale,
+            loaded.shared_down_bits,
+            loaded.shared_down_scale,
+        )
+    else:
+        def step_fun_impl(
+            hidden_states: Any,
+            correction_bias: Any,
+            router_weight: Any,
+            expert_gate: Any,
+            expert_up: Any,
+            expert_down: Any,
+            shared_gate: Any,
+            shared_up: Any,
+            shared_down: Any,
+        ) -> tuple[Any, Any, Any]:
+            route_indices, route_weights = route_glm_noaux_tc(
+                hidden_states,
+                router_weight,
+                correction_bias,
+                top_k=contract.top_k,
+            )
+            output = stage_local_moe_from_routes(
+                hidden_states,
+                route_indices,
+                route_weights,
+                expert_gate,
+                expert_up,
+                expert_down,
+                shared_gate,
+                shared_up,
+                shared_down,
+                mesh=loaded.mesh,
+                contract=contract,
+            )
+            return output, route_indices, route_weights
+
+        normal_inputs = (
+            hidden,
+            loaded.correction_bias,
+            loaded.router_weight,
+            loaded.expert_gate,
+            loaded.expert_up,
+            loaded.expert_down,
+            loaded.shared_gate,
+            loaded.shared_up,
+            loaded.shared_down,
+        )
     concentrated_inputs = (
         hidden,
         concentrated_bias,
@@ -491,11 +582,20 @@ def main() -> int:
     args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
     args.hlo_output.write_text(optimized_hlo)
     hlo_sha256 = sha256(optimized_hlo.encode()).hexdigest()
-    hlo_contract = validate_real_layer_hlo(
-        optimized_hlo,
-        hidden_size=contract.hidden_size,
-        stage_size=contract.stage_size,
-    )
+    if args.kernel == "pallas":
+        hlo_contract = validate_pallas_real_layer_hlo(
+            optimized_hlo,
+            hidden_size=contract.hidden_size,
+            intermediate_size=contract.intermediate_size,
+            local_experts=contract.local_experts,
+            stage_size=contract.stage_size,
+        )
+    else:
+        hlo_contract = validate_real_layer_hlo(
+            optimized_hlo,
+            hidden_size=contract.hidden_size,
+            stage_size=contract.stage_size,
+        )
     _atomic_write(
         args.hlo_output.with_suffix(".contract.json"), hlo_contract
     )
@@ -580,18 +680,9 @@ def main() -> int:
         "profiler_started_after_all_timing": True,
         "steps": args.trace_steps,
     }
-    persistent_bytes_per_device = (
-        contract.local_experts
-        * contract.hidden_size
-        * contract.intermediate_size
-        * 2
-        * 3
-        + contract.hidden_size
-        * contract.local_shared_intermediate
-        * 2
-        * 3
-        + contract.num_experts * contract.hidden_size * 2
-        + contract.num_experts * 4
+    persistent_bytes_per_device = max(
+        int(record["payload_byte_count"])
+        for record in loaded.manifest["files"]
     )
     record = {
         "captured_utc": datetime.now(timezone.utc).isoformat(
@@ -603,7 +694,7 @@ def main() -> int:
         "correctness": correctness,
         "device_memory_after_compile": device_memory_after_compile,
         "device_memory_after_timing": device_memory_after_timing,
-        "expected_persistent_bf16_bytes_per_device": (
+        "expected_persistent_weight_bytes_per_device": (
             persistent_bytes_per_device
         ),
         "hlo": {
@@ -627,15 +718,23 @@ def main() -> int:
         },
         "load": {**loaded.load_record, "seconds": load_seconds},
         "model_id": loaded.manifest["model_id"],
+        "kernel": args.kernel,
         "oracle": {
             "file_sha256": oracle_manifest["file"]["sha256"],
             "manifest_sha256": oracle_manifest["manifest_sha256"],
         },
         "packed_checkpoint": {
+            "code_hash": loaded.manifest["code_hash"],
+            "layout_sha256": loaded.manifest.get("layout", {}).get(
+                "layout_sha256"
+            ),
             "manifest_sha256": loaded.manifest["manifest_sha256"],
             "packed_payload_byte_count": loaded.manifest[
-                "packed_payload_byte_count"
+            "packed_payload_byte_count"
             ],
+            "source_manifest_sha256": loaded.manifest.get(
+                "source_manifest_sha256"
+            ),
         },
         "plan_group_sha256": args.plan_group_sha256,
         "plan_id": args.plan_id,
@@ -651,6 +750,7 @@ def main() -> int:
     print(
         "GREENFIELD_REAL_ONE_LAYER_OK "
         f"plan={args.plan_id} "
+        f"kernel={args.kernel} "
         f"host={record['hostname']} stage={resolution.stage_id} "
         f"normal_p50_ms={timing['normal']['latency']['p50_ms']:.6f} "
         "concentrated_p50_ms="

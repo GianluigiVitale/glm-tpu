@@ -5,6 +5,7 @@ import numpy as np
 from glm_tpu.greenfield.benchmarking.one_layer import (
     TensorTolerance,
     compare_bounded_tensor,
+    validate_pallas_real_layer_hlo,
     validate_real_layer_hlo,
 )
 
@@ -88,3 +89,50 @@ def test_real_layer_hlo_rejects_wrong_group_and_dead_rows() -> None:
     record = validate_real_layer_hlo(dead_rows)
     assert not record["passed"]
     assert any("dead-row" in item for item in record["violations"])
+
+
+def _pallas_hlo() -> str:
+    calls = [
+        "gate = (bf16[8,8,2048], bf16[8,8,2048]) custom-call(hidden, gate_bits, up_bits), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_selected_up_gate_r8_g64_k6144_n2048\"}, operand_layout_constraints={u8[64,6144,2048],u8[64,6144,2048]}",
+        "down = bf16[8,8,6144] custom-call(gate, down_bits), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_selected_swiglu_down_r8_g64_k2048_n6144\"}, operand_layout_constraints={u8[64,2048,6144]}",
+        "shared_gate = (bf16[1,512], bf16[1,512]) custom-call(hidden), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_block_up_gate_m8_k6144_n512\"}",
+        "shared_down = bf16[1,6144] custom-call(shared_gate), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_block_matmul_m8_k512_n6144\"}",
+    ]
+    calls.extend(
+        f"gather{i} = s32[1024] custom-call(index), custom_call_target=\"AssumeGatherIndicesInBound\""
+        for i in range(6)
+    )
+    calls.extend(
+        f"scatter{i} = s32[8,2] custom-call(index), custom_call_target=\"GatherScatterIndicesBitpacked\""
+        for i in range(2)
+    )
+    return GOOD_HLO.replace(
+        "  ROOT combine =",
+        "  " + "\n  ".join(calls) + "\n  ROOT combine =",
+    )
+
+
+def test_pallas_real_layer_hlo_requires_exact_kernel_and_metadata_calls() -> None:
+    record = validate_pallas_real_layer_hlo(_pallas_hlo())
+    assert record["passed"], record
+    assert record["kernel_custom_call_count"] == 4
+    assert record["custom_call_count"] == 12
+
+    drifted = _pallas_hlo().replace(
+        'custom_call_target="AssumeGatherIndicesInBound"',
+        'custom_call_target="unexpected_call"',
+        1,
+    )
+    record = validate_pallas_real_layer_hlo(drifted)
+    assert not record["passed"]
+    assert any("unexpected" in item for item in record["violations"])
+
+
+def test_pallas_real_layer_hlo_rejects_complete_decoded_overlay() -> None:
+    hlo = _pallas_hlo().replace(
+        "  ROOT combine =",
+        "  overlay = bf16[64,6144,2048] parameter(9)\n  ROOT combine =",
+    )
+    record = validate_pallas_real_layer_hlo(hlo)
+    assert not record["passed"]
+    assert record["forbidden_decoded_overlays"]

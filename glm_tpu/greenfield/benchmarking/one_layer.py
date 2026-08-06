@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any
 
 import numpy as np
@@ -153,6 +154,135 @@ def validate_real_layer_hlo(
         "module_name": module.name,
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
+def validate_pallas_real_layer_hlo(
+    optimized_hlo: str,
+    *,
+    hidden_size: int = 6144,
+    intermediate_size: int = 2048,
+    local_experts: int = 64,
+    stage_size: int = 4,
+) -> dict[str, Any]:
+    """Require four raw-FP8 kernels, bounded metadata, and one local combine."""
+
+    base = validate_real_layer_hlo(
+        optimized_hlo,
+        hidden_size=hidden_size,
+        stage_size=stage_size,
+    )
+    violations = list(base["violations"])
+    custom_calls = [
+        line.strip()
+        for line in optimized_hlo.splitlines()
+        if " custom-call(" in line
+    ]
+    kernel_prefixes = (
+        "greenfield_fp8_selected_up_gate_",
+        "greenfield_fp8_selected_swiglu_down_",
+        "greenfield_fp8_block_up_gate_",
+        "greenfield_fp8_block_matmul_",
+    )
+    kernel_calls = {
+        prefix: [
+            line
+            for line in custom_calls
+            if prefix in line
+            and 'custom_call_target="tpu_custom_call"' in line
+        ]
+        for prefix in kernel_prefixes
+    }
+    for prefix, lines in kernel_calls.items():
+        if len(lines) != 1:
+            violations.append(
+                f"expected one {prefix} Pallas call, found {len(lines)}"
+            )
+
+    target_pattern = re.compile(r'custom_call_target="([^"]+)"')
+    targets = []
+    for line in custom_calls:
+        match = target_pattern.search(line)
+        targets.append(match.group(1) if match else "<missing>")
+    allowed_targets = {
+        "tpu_custom_call",
+        "AssumeGatherIndicesInBound",
+        "GatherScatterIndicesBitpacked",
+    }
+    unexpected_targets = sorted(
+        target for target in targets if target not in allowed_targets
+    )
+    if unexpected_targets:
+        violations.append(
+            f"unexpected Pallas-layer custom-call targets: {unexpected_targets}"
+        )
+    target_counts = {
+        target: targets.count(target) for target in sorted(set(targets))
+    }
+    expected_target_counts = {
+        "AssumeGatherIndicesInBound": 6,
+        "GatherScatterIndicesBitpacked": 2,
+        "tpu_custom_call": 4,
+    }
+    if target_counts != expected_target_counts:
+        violations.append(
+            "Pallas-layer custom-call counts drifted: "
+            f"expected={expected_target_counts} observed={target_counts}"
+        )
+
+    selected_gate_line = kernel_calls[
+        "greenfield_fp8_selected_up_gate_"
+    ]
+    if selected_gate_line and selected_gate_line[0].count(
+        f"u8[{local_experts},{hidden_size},{intermediate_size}]"
+    ) < 2:
+        violations.append(
+            "selected gate/up call lacks two exact raw-U8 final-layout tables"
+        )
+    selected_down_line = kernel_calls[
+        "greenfield_fp8_selected_swiglu_down_"
+    ]
+    if selected_down_line and (
+        f"u8[{local_experts},{intermediate_size},{hidden_size}]"
+        not in selected_down_line[0]
+    ):
+        violations.append(
+            "selected down call lacks its exact raw-U8 final-layout table"
+        )
+
+    full_decoded_shapes = tuple(
+        dict.fromkeys(
+            (
+                f"bf16[{local_experts},{hidden_size},{intermediate_size}]",
+                f"f32[{local_experts},{hidden_size},{intermediate_size}]",
+                f"bf16[{local_experts},{intermediate_size},{hidden_size}]",
+                f"f32[{local_experts},{intermediate_size},{hidden_size}]",
+                f"bf16[{hidden_size},{intermediate_size // stage_size}]",
+                f"f32[{hidden_size},{intermediate_size // stage_size}]",
+                f"bf16[{intermediate_size // stage_size},{hidden_size}]",
+                f"f32[{intermediate_size // stage_size},{hidden_size}]",
+            )
+        )
+    )
+    forbidden_overlays = [
+        shape for shape in full_decoded_shapes if shape in optimized_hlo
+    ]
+    if forbidden_overlays:
+        violations.append(
+            f"found forbidden complete decoded weight overlays: {forbidden_overlays}"
+        )
+    return {
+        **base,
+        "custom_call_count": len(custom_calls),
+        "custom_call_target_counts": target_counts,
+        "expected_custom_call_target_counts": expected_target_counts,
+        "forbidden_decoded_overlays": forbidden_overlays,
+        "kernel_custom_call_count": sum(
+            len(lines) for lines in kernel_calls.values()
+        ),
+        "kernel_custom_calls": kernel_calls,
         "passed": not violations,
         "violations": violations,
     }

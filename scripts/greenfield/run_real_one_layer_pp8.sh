@@ -16,8 +16,13 @@ readonly SOURCE_REVISION=gcs-object-set-830fd1bf7d8d6b6242895cfd50f5978e5cc5749d
 readonly TOPOLOGY_HASH=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
 readonly PP8_GROUP_HASH=d5943ab8d7a074677d82f8e823c8bc983847f8df1deefdee1fbda8da98923c14
 readonly PP16_GROUP_HASH=6383e57c81478ac0d6de4525a4675f2a0d7cbc7aa73bd67bc662dc4e05840f21
+readonly PALLAS_PACK_RUN=/home/gianl/glm-run/greenfield_one_layer_pallas_pack_20260806T041854316280053Z
+readonly PALLAS_PACK_MANIFEST_SHA=3da63bd9c2332dd67fc29a1d158e5468e0fdf1db1a9a0e8b7977277b0812e427
+readonly PALLAS_SOURCE_MANIFEST_SHA=68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938
+readonly PALLAS_PACK_CODE_HASH=9f42e23272503a3735547c371229757d2c841b3a
 
 PLAN_ID=${GLM_GREENFIELD_REAL_LAYER_PLAN:-PP8_LP4}
+KERNEL=${GLM_GREENFIELD_REAL_LAYER_KERNEL:-reference}
 case "$PLAN_ID" in
   PP8_LP4)
     PLAN_SLUG=pp8
@@ -47,7 +52,30 @@ case "$PLAN_ID" in
     exit 2
     ;;
 esac
-readonly PLAN_ID PLAN_SLUG PACK_RUN PACK_MANIFEST_SHA PLAN_GROUP_HASH
+case "$KERNEL" in
+  reference)
+    KERNEL_ARGS=(--kernel reference)
+    ;;
+  pallas)
+    [[ $PLAN_ID == PP8_LP4 ]] || {
+      echo "Pallas bounded artifact currently supports protected PP8 only" >&2
+      exit 2
+    }
+    PLAN_SLUG=pp8_pallas
+    PACK_RUN=$PALLAS_PACK_RUN
+    PACK_MANIFEST_SHA=$PALLAS_PACK_MANIFEST_SHA
+    KERNEL_ARGS=(
+      --kernel pallas
+      --source-packed-manifest-sha256 "$PALLAS_SOURCE_MANIFEST_SHA"
+      --packed-code-hash "$PALLAS_PACK_CODE_HASH"
+    )
+    ;;
+  *)
+    echo "unsupported real-layer kernel: $KERNEL" >&2
+    exit 2
+    ;;
+esac
+readonly PLAN_ID PLAN_SLUG PACK_RUN PACK_MANIFEST_SHA PLAN_GROUP_HASH KERNEL
 readonly TPU_BOUNDS TPU_VISIBLE EXPECTED_TRACE_CORES
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
@@ -136,6 +164,7 @@ trap on_exit EXIT
 say "RUN_DIR=$RUN_DIR"
 say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN"
 say "PACK=$PACK_MANIFEST_SHA ORACLE=$ORACLE_MANIFEST_SHA"
+say "KERNEL=$KERNEL"
 say "SOURCE_REVISION=$SOURCE_REVISION"
 say "warmup=$WARMUP iterations=$ITERATIONS trace_steps=20"
 strict_census pre || {
@@ -163,6 +192,7 @@ started=$(date +%s)
       --topology-sha256 "$TOPOLOGY_HASH" \
       --plan-group-sha256 "$PLAN_GROUP_HASH" \
       --plan-id "$PLAN_ID" \
+      "${KERNEL_ARGS[@]}" \
       "${STAGE_ARGS[@]}" \
       --output "$RUN_DIR/runner.json" \
       --hlo-output "$RUN_DIR/hlo/layer.optimized_hlo.txt" \
@@ -195,7 +225,11 @@ plan_slugs = {"PP8_LP4": "pp8", "PP16_LP2": "pp16"}
 if plan_id not in plan_slugs:
     raise SystemExit(f"unsupported runner plan identity: {plan_id}")
 plan_slug = plan_slugs[plan_id]
-benchmark = f"greenfield_real_layer_{plan_slug}"
+kernel = runner.get("kernel")
+if kernel not in ("reference", "pallas"):
+    raise SystemExit(f"unsupported runner kernel identity: {kernel}")
+kernel_suffix = "" if kernel == "reference" else f"_{kernel}"
+benchmark = f"greenfield_real_layer_{plan_slug}{kernel_suffix}"
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("runner status/code identity failed")
 if not runner["hlo"]["contract"]["passed"]:
@@ -258,13 +292,16 @@ run_id = pv.start_run(
         "greenfield_code_hash": pin,
         "legacy_oracle_code_hash": oracle_pin,
         "hlo_sha256": runner["hlo"]["sha256"],
+        "kernel": kernel,
+        "packed_layout_sha256": runner["packed_checkpoint"].get("layout_sha256"),
         "packed_manifest_sha256": runner["packed_checkpoint"]["manifest_sha256"],
+        "source_packed_manifest_sha256": runner["packed_checkpoint"].get("source_manifest_sha256"),
         "oracle_manifest_sha256": runner["oracle"]["manifest_sha256"],
         "plan_group_sha256": runner["plan_group_sha256"],
         "topology_sha256": runner["topology_sha256"],
     },
     note=(
-        f"Protected exact real layer-3 {plan_id} "
+        f"Protected exact real layer-3 {plan_id}/{kernel} "
         "normal/concentrated metal proof"
     ),
     harness_repo=repo,
@@ -280,7 +317,7 @@ for case in ("normal", "concentrated"):
         item_id=case,
         prompt=(
             "Execute one real batch-one GLM-5.2 layer-3 MoE on one "
-            f"{plan_id} stage."
+            f"{plan_id} stage with the {kernel} kernel path."
         ),
         gold="Exact routes, bounded BF16 output, one local stacked all-reduce.",
         raw_output=json.dumps(
