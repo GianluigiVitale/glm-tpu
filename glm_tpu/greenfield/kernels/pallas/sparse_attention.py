@@ -412,21 +412,21 @@ def _fused_selected_kv_attention_pallas(
                 + jnp.int32(block_start)
             )
             dma_lanes_iota = jnp.arange(dma_rows, dtype=jnp.int32)[None, :]
-            selected_lanes = dma_lanes_iota == jnp.reshape(
-                dma_lane_ref[...], (segment_block, 1)
+            selected_lanes = dma_lanes_iota == jnp.transpose(
+                dma_lane_ref[...]
             )
             live_groups = group_slots[:, None] < valid_count
-            selected_and_live = (selected_lanes & live_groups).reshape(
-                segment_block * dma_rows, 1
-            )
+            selected_and_live = selected_lanes & live_groups
             # The TPU-v4 VMEM tile requires eight-row DMA slices. Keep only the
             # selected dynamic lane from each group and zero all overfetch and
             # tail lanes before both QK and PV, including poisoned padding.
             cache_tile = jnp.where(
-                selected_and_live,
-                cache_tile_ref[...].reshape(
-                    segment_block * dma_rows, cache_width
+                lax.broadcast_in_dim(
+                    selected_and_live,
+                    (segment_block, dma_rows, cache_width),
+                    (0, 1),
                 ),
+                cache_tile_ref[...],
                 jnp.zeros((), cache_tile_ref.dtype),
             )
             query_packed = jnp.concatenate(
@@ -449,31 +449,42 @@ def _fused_selected_kv_attention_pallas(
             scores = lax.dot_general(
                 query_packed[0],
                 cache_tile,
-                dimension_numbers=(((1,), (1,)), ((), ())),
+                dimension_numbers=(((1,), (2,)), ((), ())),
                 precision=precision,
                 preferred_element_type=jnp.float32,
             ) * jnp.float32(contract.softmax_scale)
-            absolute_slots = jnp.broadcast_to(
-                group_slots[:, None], (segment_block, dma_rows)
-            ).reshape(1, segment_block * dma_rows)
             scores = jnp.where(
-                (absolute_slots < valid_count)
-                & jnp.transpose(selected_and_live),
+                lax.broadcast_in_dim(
+                    selected_and_live,
+                    (heads, segment_block, dma_rows),
+                    (1, 2),
+                ),
                 scores,
                 _NEGATIVE_INFINITY,
             )
-            block_maximum = jnp.max(scores, axis=1, keepdims=True)
+            block_maximum = jnp.max(
+                jnp.max(scores, axis=2), axis=1, keepdims=True
+            )
             maximum = jnp.maximum(maximum_ref[...], block_maximum)
             correction = jnp.exp(maximum_ref[...] - maximum)
-            probabilities = jnp.exp(scores - maximum)
+            probabilities = jnp.exp(
+                scores
+                - lax.broadcast_in_dim(
+                    maximum,
+                    (heads, segment_block, dma_rows),
+                    (0, 1),
+                )
+            )
             denominator = (
                 denominator_ref[...] * correction
-                + jnp.sum(probabilities, axis=1, keepdims=True)
+                + jnp.sum(
+                    jnp.sum(probabilities, axis=2), axis=1, keepdims=True
+                )
             )
             partial = lax.dot_general(
                 probabilities.astype(cache_tile.dtype),
-                cache_tile[:, :latent],
-                dimension_numbers=(((1,), (0,)), ((), ())),
+                cache_tile[:, :, :latent],
+                dimension_numbers=(((1, 2), (0, 1)), ((), ())),
                 precision=precision,
                 preferred_element_type=jnp.float32,
             )
