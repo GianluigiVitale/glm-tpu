@@ -260,6 +260,50 @@ def _device_get_result(jax: Any, result: Any) -> tuple[np.ndarray, ...]:
     )
 
 
+def _pallas_stage_step(
+    hidden_states: Any,
+    correction_bias: Any,
+    router_weight: Any,
+    expert_gate_bits: Any,
+    expert_gate_scale: Any,
+    expert_up_bits: Any,
+    expert_up_scale: Any,
+    expert_down_bits: Any,
+    expert_down_scale: Any,
+    shared_gate_bits: Any,
+    shared_gate_scale: Any,
+    shared_up_bits: Any,
+    shared_up_scale: Any,
+    shared_down_bits: Any,
+    shared_down_scale: Any,
+    local_expert_shard: Any,
+    *,
+    axis_name: str,
+    contract: GlmMoeNumericalContract,
+) -> tuple[Any, Any, Any]:
+    """Adapt runner input order to the Pallas kernel's routing contract."""
+    return stage_local_moe_pallas_mapped(
+        hidden_states,
+        router_weight,
+        correction_bias,
+        expert_gate_bits,
+        expert_gate_scale,
+        expert_up_bits,
+        expert_up_scale,
+        expert_down_bits,
+        expert_down_scale,
+        shared_gate_bits,
+        shared_gate_scale,
+        shared_up_bits,
+        shared_up_scale,
+        shared_down_bits,
+        shared_down_scale,
+        local_expert_shard,
+        axis_name=axis_name,
+        contract=contract,
+    )
+
+
 def _correctness_record(
     jax: Any,
     compiled: Any,
@@ -478,9 +522,9 @@ def main() -> int:
         from jax.sharding import PartitionSpec as P
 
         mapped_step = jax.shard_map(
-            lambda *values: stage_local_moe_pallas_mapped(
+            lambda *values: _pallas_stage_step(
                 *values,
-                lax.axis_index("expert").astype(jnp.int32),
+                local_expert_shard=lax.axis_index("expert").astype(jnp.int32),
                 axis_name="expert",
                 contract=contract,
             ),
