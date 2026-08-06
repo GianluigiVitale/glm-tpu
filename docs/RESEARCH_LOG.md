@@ -4650,3 +4650,17 @@ approved archive/remote SUCCESS, hashes, and 8/8 census pass. The XPlane still m
 the removed routed HBM/launch boundary was real but secondary. Complete the small shared boundary
 fusion; if it is also marginal, shift directly to route-imbalance/collective-arrival skew. No
 decoder or tok/s claim exists.
+
+## 2026-08-06 05:32 — Shared fusion is a protected regression; close launch polishing
+
+DB 440 / `greenfield_real_layer_pp8_pallas_20260806T052955364574577Z` at `cfd5bab` fused the
+remaining shared gate/up, exact BF16 SwiGLU, and down boundary. All correctness, raw-U8 HLO,
+single-local-combine, HBM, XPlane, DB/archive, remote-SUCCESS, and 8/8 cleanup gates pass. HLO
+`4a0807b1...dc54` contains two Pallas calls total and no decoded overlay.
+
+Normal/concentrated p50 regresses from DB 439's `3.121940/7.063344` to
+`3.169569/7.122444 ms` (`+1.53%/+0.84%`). The physical psum is unchanged at `2.786832 ms`, but
+custom-call busy time increases to `1.862916 ms`. The candidate is rejected; the kernel remains
+tested and default-off, while the active composition and fail-closed HLO contract are restored to
+DB 439. Launch-only fusion is exhausted. Next evidence must characterize and reduce route-driven
+arrival skew at the four-chip combine before short-decoder integration. No tok/s claim exists.

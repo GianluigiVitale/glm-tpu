@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 05:24 UTC
+**Updated:** 2026-08-06 05:32 UTC
 
 ## Authority and isolation
 
@@ -79,9 +79,16 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `918bbabd...826f` drops from four to three raw-U8 calls, seven to five bounded gathers, and two to
   zero bitpacked gather/scatters while retaining one exact local all-reduce and no overlay. Fresh
   XPlane still spends `2.788/4.690 ms` per alternating step in the physical psum (`59.4%` of busy
-  time). The routed boundary was real but not dominant. Fuse the small shared boundary next; if
-  that remains marginal, stop launch polishing and attack measured route-imbalance/collective
-  arrival skew before integrating the short decoder. No decoder or tok/s result exists yet.
+  time). The routed boundary was real but not dominant.
+- Protected DB 440 / `greenfield_real_layer_pp8_pallas_20260806T052955364574577Z` fused the
+  remaining shared gate/up+SwiGLU+down boundary into a second all-in-one kernel and passed every
+  correctness/HLO/HBM/archive/cleanup gate at `cfd5bab`, but regressed DB 439 normal/concentrated
+  p50 to `3.169569/7.122444 ms` (`+1.53%/+0.84%`). Custom-call busy time rose
+  `1.724 -> 1.863 ms` while psum stayed `2.787 ms`; reject the composition. The tested kernel is
+  retained default-off, while the active stage and exact HLO guard are restored to DB 439's
+  three-call composition. Do not spend more time on launch-only fusion: next characterize and
+  reduce route-imbalance/collective arrival skew before integrating the short decoder. No decoder
+  or tok/s result exists yet.
 - Final-layout PP16 artifact `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes
   two independently hashed 4,855,045,080-byte files at pack code `51d1df9`: experts
   `0:128/128:256`, shared intermediate `0:1024/1024:2048`, manifest

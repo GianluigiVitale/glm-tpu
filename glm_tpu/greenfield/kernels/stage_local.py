@@ -16,7 +16,8 @@ import jax.numpy as jnp
 
 from .pallas import (
     Fp8BlockMatmulConfig,
-    fp8_fused_block_swiglu,
+    fp8_block_matmul,
+    fp8_block_up_gate,
     fp8_fused_selected_moe,
 )
 from .reference.fp8 import dequantize_fp8_bits_block_weight
@@ -1044,12 +1045,20 @@ def stage_local_moe_pallas_from_routes_mapped(
         output_dtype=config.output_dtype,
         accumulator_dtype=config.accumulator_dtype,
     )
-    local_shared = fp8_fused_block_swiglu(
+    shared_gate, shared_up = fp8_block_up_gate(
         hidden_states,
         shared_gate_bits,
         shared_gate_scale,
         shared_up_bits,
         shared_up_scale,
+        config=shared_config,
+        interpret=interpret,
+    )
+    shared_activated = (silu(shared_gate) * shared_up).astype(
+        hidden_states.dtype
+    )
+    local_shared = fp8_block_matmul(
+        shared_activated,
         shared_down_bits,
         shared_down_scale,
         config=shared_config,

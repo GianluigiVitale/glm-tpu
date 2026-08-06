@@ -94,7 +94,8 @@ def test_real_layer_hlo_rejects_wrong_group_and_dead_rows() -> None:
 def _pallas_hlo() -> str:
     calls = [
         "routed = bf16[8,8,6144] custom-call(hidden, gate_bits, up_bits, down_bits), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_fused_selected_moe_r8_g64_h6144_i2048\"}, operand_layout_constraints={u8[64,6144,2048],u8[64,6144,2048],u8[64,2048,6144]}",
-        "shared = bf16[1,6144] custom-call(hidden, shared_gate_bits, shared_up_bits, shared_down_bits), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_fused_block_swiglu_m8_h6144_i512_o6144\"}, operand_layout_constraints={u8[512,6144],u8[512,6144],u8[6144,512]}",
+        "shared_gate = (bf16[1,512], bf16[1,512]) custom-call(hidden), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_block_up_gate_m8_k6144_n512\"}",
+        "shared_down = bf16[1,6144] custom-call(shared_gate), custom_call_target=\"tpu_custom_call\", metadata={op_name=\"greenfield_fp8_block_matmul_m8_k512_n6144\"}",
     ]
     calls.extend(
         f"gather{i} = s32[1024] custom-call(index), custom_call_target=\"AssumeGatherIndicesInBound\""
@@ -116,9 +117,9 @@ def _pallas_hlo() -> str:
 def test_pallas_real_layer_hlo_requires_exact_kernel_and_metadata_calls() -> None:
     record = validate_pallas_real_layer_hlo(_pallas_hlo())
     assert record["passed"], record
-    assert record["kernel_custom_call_count"] == 2
+    assert record["kernel_custom_call_count"] == 3
     assert record["local_layout_custom_call_count"] == 3
-    assert record["custom_call_count"] == 10
+    assert record["custom_call_count"] == 11
 
     drifted = _pallas_hlo().replace(
         'custom_call_target="AssumeGatherIndicesInBound"',

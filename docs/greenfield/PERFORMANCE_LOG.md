@@ -479,6 +479,26 @@ gate/up/SwiGLU/down boundary once; if its wall effect is similarly marginal, pri
 measured route-imbalance/collective-arrival skew rather than further launch-only polishing. This
 remains a layer result, not decoder latency or tok/s.
 
+## 2026-08-06 — fully fused shared boundary is rejected
+
+Protected DB 440 / `greenfield_real_layer_pp8_pallas_20260806T052955364574577Z` at `cfd5bab`
+replaced the two shared projection calls with one raw-U8 Pallas call that keeps two `bf16[8,512]`
+gate/up tiles in VMEM across exact SwiGLU and down. The HLO `4a0807b1...dc54` has only two Pallas
+calls total, five bounded gathers, three exact local `ConcatBitcast` layouts, one local all-reduce,
+and no overlay. Correctness, 2,430,962,688-byte peak HBM, fresh XPlane, DB/archive/hashes/remote
+`SUCCESS`, and 8/8 cleanup pass.
+
+| case | DB 439 p50 | DB 440 p50 | change |
+|---|---:|---:|---:|
+| normal all-slot routes | 3.121940 | 3.169569 ms | +1.53% |
+| concentrated slot-2 routes | 7.063344 | 7.122444 ms | +0.84% |
+
+The XPlane explains the regression: physical psum is effectively unchanged
+`2.787760 -> 2.786832 ms`, while custom-call busy time increases `1.723666 -> 1.862916 ms`.
+The candidate is rejected. Its tested kernel remains default-off, and the active stage plus HLO
+guard are restored to DB 439. The launch-boundary search is closed; next work must target measured
+route imbalance and collective arrival skew. This is still not a decoder or tok/s result.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory
