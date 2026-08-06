@@ -10,6 +10,7 @@ from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
     fp8_block_up_gate,
+    fp8_fused_selected_moe,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
 )
@@ -341,6 +342,150 @@ def test_fp8_selected_swiglu_down_rejects_contract_drift() -> None:
             routes,
             expert_start,
             down_bits,
+            jnp.ones((2, 1, 2), dtype=jnp.float32),
+            interpret=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "route_values",
+    ([11, 500, 10, 12], [12, 10, 11, 12]),
+)
+def test_fp8_fused_selected_moe_interpret_matches_exact_reference(
+    route_values: list[int],
+) -> None:
+    from jax._src.pallas.mosaic import tpu_info
+
+    tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
+        tpu_info.ChipVersion.TPU_V4, 1
+    )
+    tpu_info.get_tpu_info.cache_clear()
+    routes, experts, hidden_size, intermediate = 4, 3, 135, 130
+    hidden = jnp.asarray(
+        np.linspace(-0.5, 0.5, hidden_size, dtype=np.float32)[None, :],
+        dtype=jnp.bfloat16,
+    )
+    up_linear = np.arange(
+        experts * intermediate * hidden_size, dtype=np.float32
+    ).reshape(experts, intermediate, hidden_size)
+    gate_bits_nk = _bits(jnp.asarray(np.sin(up_linear * 0.013) * 0.5))
+    up_bits_nk = _bits(jnp.asarray(np.cos(up_linear * 0.019) * 0.375))
+    gate_bits = jnp.transpose(gate_bits_nk, (0, 2, 1))
+    up_bits = jnp.transpose(up_bits_nk, (0, 2, 1))
+    up_scale_shape = (
+        experts,
+        (intermediate + 127) // 128,
+        (hidden_size + 127) // 128,
+    )
+    gate_scale = jnp.asarray(
+        np.linspace(
+            0.25, 0.75, np.prod(up_scale_shape), dtype=np.float32
+        ).reshape(up_scale_shape)
+    )
+    up_scale = jnp.asarray(
+        np.linspace(
+            0.5, 1.0, np.prod(up_scale_shape), dtype=np.float32
+        ).reshape(up_scale_shape)
+    )
+    down_linear = np.arange(
+        experts * hidden_size * intermediate, dtype=np.float32
+    ).reshape(experts, hidden_size, intermediate)
+    down_bits_nk = _bits(jnp.asarray(np.sin(down_linear * 0.017) * 0.375))
+    down_bits = jnp.transpose(down_bits_nk, (0, 2, 1))
+    down_scale_shape = (
+        experts,
+        (hidden_size + 127) // 128,
+        (intermediate + 127) // 128,
+    )
+    down_scale = jnp.asarray(
+        np.linspace(
+            0.375, 0.875, np.prod(down_scale_shape), dtype=np.float32
+        ).reshape(down_scale_shape)
+    )
+    route_indices = jnp.asarray(route_values, dtype=jnp.int32)
+    expert_start = jnp.asarray(10, dtype=jnp.int32)
+
+    actual = fp8_fused_selected_moe(
+        hidden,
+        route_indices,
+        expert_start,
+        gate_bits,
+        gate_scale,
+        up_bits,
+        up_scale,
+        down_bits,
+        down_scale,
+        interpret=True,
+    )
+
+    expected = []
+    for global_expert in np.asarray(route_indices):
+        local_expert = int(global_expert) - int(expert_start)
+        if not 0 <= local_expert < experts:
+            expected.append(np.zeros((hidden_size,), dtype=np.float32))
+            continue
+        decoded_gate = dequantize_fp8_bits_block_weight(
+            gate_bits_nk[local_expert], gate_scale[local_expert]
+        )
+        decoded_up = dequantize_fp8_bits_block_weight(
+            up_bits_nk[local_expert], up_scale[local_expert]
+        )
+        gate = lax.dot_general(
+            hidden,
+            decoded_gate,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        ).astype(jnp.bfloat16)
+        up = lax.dot_general(
+            hidden,
+            decoded_up,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        ).astype(jnp.bfloat16)
+        activated = (gate * jax.nn.sigmoid(gate) * up).astype(jnp.bfloat16)
+        decoded_down = dequantize_fp8_bits_block_weight(
+            down_bits_nk[local_expert], down_scale[local_expert]
+        )
+        value = lax.dot_general(
+            activated,
+            decoded_down,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        ).astype(jnp.bfloat16)
+        expected.append(np.asarray(value[0]))
+    np.testing.assert_array_equal(np.asarray(actual), np.stack(expected))
+
+
+def test_fp8_fused_selected_moe_rejects_down_contract_drift() -> None:
+    hidden = jnp.ones((1, 128), dtype=jnp.bfloat16)
+    routes = jnp.asarray([0, 1], dtype=jnp.int32)
+    expert_start = jnp.asarray(0, dtype=jnp.int32)
+    up_bits = jnp.zeros((2, 128, 128), dtype=jnp.uint8)
+    scale = jnp.ones((2, 1, 1), dtype=jnp.float32)
+
+    with pytest.raises(ValueError, match="down weights"):
+        fp8_fused_selected_moe(
+            hidden,
+            routes,
+            expert_start,
+            up_bits,
+            scale,
+            up_bits,
+            scale,
+            jnp.zeros((2, 127, 128), dtype=jnp.uint8),
+            scale,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="down FP32 scale shape"):
+        fp8_fused_selected_moe(
+            hidden,
+            routes,
+            expert_start,
+            up_bits,
+            scale,
+            up_bits,
+            scale,
+            up_bits,
             jnp.ones((2, 1, 2), dtype=jnp.float32),
             interpret=True,
         )

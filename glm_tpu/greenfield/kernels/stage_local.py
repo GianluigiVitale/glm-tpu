@@ -18,8 +18,7 @@ from .pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
     fp8_block_up_gate,
-    fp8_selected_swiglu_down,
-    fp8_selected_up_gate,
+    fp8_fused_selected_moe,
 )
 from .reference.fp8 import dequantize_fp8_bits_block_weight
 from .reference.attention import (
@@ -1011,7 +1010,7 @@ def stage_local_moe_pallas_from_routes_mapped(
         )
 
     expert_start = local_slot * jnp.int32(contract.local_experts)
-    gate, up = fp8_selected_up_gate(
+    routed_outputs = fp8_fused_selected_moe(
         hidden_states,
         route_indices[0],
         expert_start,
@@ -1019,14 +1018,6 @@ def stage_local_moe_pallas_from_routes_mapped(
         expert_gate_scale,
         expert_up_bits,
         expert_up_scale,
-        config=config,
-        interpret=interpret,
-    )
-    routed_outputs = fp8_selected_swiglu_down(
-        gate,
-        up,
-        route_indices[0],
-        expert_start,
         expert_down_bits,
         expert_down_scale,
         config=config,
