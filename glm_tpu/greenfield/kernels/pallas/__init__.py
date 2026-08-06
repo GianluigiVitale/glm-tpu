@@ -15,6 +15,13 @@ from .sparse_attention import (
     stage_local_sparse_mla_kernel,
     stage_local_sparse_mla_pallas,
 )
+from .stage_remote_copy import (
+    StageRemoteCopyConfig,
+    stage_remote_copy_kernel,
+    stage_remote_copy_pallas,
+    stage_value_remote_copy_kernel_name,
+    stage_value_remote_copy_pallas,
+)
 from .topk import (
     DsaTopKConfig,
     local_topk_candidates_kernel,
@@ -28,6 +35,7 @@ __all__ = [
     "DsaTopKConfig",
     "Fp8BlockMatmulConfig",
     "SparseMlaConfig",
+    "StageRemoteCopyConfig",
     "dsa_scores_kernel",
     "dsa_scores_pallas",
     "fp8_block_matmul",
@@ -42,4 +50,8 @@ __all__ = [
     "merge_topk_candidates_pallas",
     "stage_local_sparse_mla_kernel",
     "stage_local_sparse_mla_pallas",
+    "stage_remote_copy_kernel",
+    "stage_remote_copy_pallas",
+    "stage_value_remote_copy_kernel_name",
+    "stage_value_remote_copy_pallas",
 ]

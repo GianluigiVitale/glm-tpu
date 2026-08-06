@@ -16,6 +16,7 @@ import time
 from typing import Any, Mapping, Sequence
 
 from ..errors import BenchmarkValidationError, HloContractViolationError
+from ..kernels.pallas import stage_value_remote_copy_pallas
 from ..sharding.hlo_contract import (
     COLLECTIVE_OPCODES,
     CollectiveExpectation,
@@ -35,6 +36,7 @@ from .collective_chain import (
 class TransportKind(StrEnum):
     CONTROL = "control"
     DEVICE_RESIDENT = "device_resident"
+    PALLAS_REMOTE_COPY = "pallas_remote_copy"
 
 
 _STAGE_COUNTS = {
@@ -216,6 +218,8 @@ def _transport_function(
     from jax import lax
     import jax.numpy as jnp
 
+    targets = tuple(dict(logical_pairs)[rank] for rank in range(len(logical_pairs)))
+
     def transport(initial: Any) -> Any:
         with jax.named_scope("device_resident_stage_transport"):
             member = lax.axis_index("device")
@@ -228,6 +232,13 @@ def _transport_function(
             for hop in range(config.stage_count):
                 if config.kind is TransportKind.DEVICE_RESIDENT:
                     state = lax.ppermute(state, "device", logical_pairs)
+                elif config.kind is TransportKind.PALLAS_REMOTE_COPY:
+                    destination = jnp.asarray(targets, dtype=jnp.int32)[member]
+                    state = stage_value_remote_copy_pallas(
+                        state,
+                        destination,
+                        collective_id=8,
+                    )
                 anchor = state.reshape(-1)[hop % state.size]
                 if config.dtype == "int32":
                     feedback = jnp.bitwise_xor(anchor, jnp.right_shift(anchor, 3))
@@ -254,7 +265,7 @@ def _require_exact_payload_shapes(
     report: HloLintReport,
     config: TransportChainConfig,
 ) -> None:
-    if config.kind is TransportKind.CONTROL:
+    if config.kind is not TransportKind.DEVICE_RESIDENT:
         return
     expected = (config.rows, config.width)
     expected_dtype = _HLO_DTYPES[config.dtype]
@@ -276,6 +287,59 @@ def _require_exact_payload_shapes(
             f"transport payload shape contract expected {config.stage_count} "
             f"{expected_dtype}{expected} permutes; malformed={malformed}"
         )
+
+
+def _require_exact_pallas_remote_copy(
+    optimized_hlo: str,
+    config: TransportChainConfig,
+) -> dict[str, Any]:
+    dtype = _HLO_DTYPES[config.dtype]
+    kernel_name = (
+        f"greenfield_stage_remote_copy_{dtype}_{config.rows}x{config.width}"
+    )
+    custom_calls = [
+        line.strip()
+        for line in optimized_hlo.splitlines()
+        if " custom-call(" in line
+    ]
+    kernel_calls = [
+        line
+        for line in custom_calls
+        if kernel_name in line and 'custom_call_target="tpu_custom_call"' in line
+    ]
+    violations = []
+    expected_count = (
+        config.stage_count
+        if config.kind is TransportKind.PALLAS_REMOTE_COPY
+        else 0
+    )
+    if len(kernel_calls) != expected_count:
+        violations.append(
+            f"expected {expected_count} {kernel_name} calls, found {len(kernel_calls)}"
+        )
+    unexpected_tpu_calls = [
+        line
+        for line in custom_calls
+        if 'custom_call_target="tpu_custom_call"' in line and line not in kernel_calls
+    ]
+    if unexpected_tpu_calls:
+        violations.append(
+            f"unexpected transport TPU custom calls: {unexpected_tpu_calls}"
+        )
+    payload_shape = f"{dtype}[{config.rows},{config.width}]"
+    malformed = [line for line in kernel_calls if payload_shape not in line]
+    if malformed:
+        violations.append(
+            f"Pallas remote-copy calls lack exact payload shape {payload_shape}"
+        )
+    return {
+        "expected_kernel_name": kernel_name,
+        "kernel_custom_call_count": len(kernel_calls),
+        "kernel_custom_calls": kernel_calls,
+        "passed": not violations,
+        "unexpected_tpu_custom_calls": unexpected_tpu_calls,
+        "violations": violations,
+    }
 
 
 def build_transport_chain(
@@ -344,6 +408,13 @@ def build_transport_chain(
     if enforce_hlo_contract:
         report.raise_for_violations()
         _require_exact_payload_shapes(report, config)
+        pallas_contract = _require_exact_pallas_remote_copy(
+            optimized_hlo, config
+        )
+        if not pallas_contract["passed"]:
+            raise HloContractViolationError(
+                f"Pallas transport HLO rejected: {pallas_contract['violations']}"
+            )
     return CompiledTransportChain(
         config=config,
         compiled=compiled,
@@ -360,6 +431,13 @@ def validate_compiled_transport(compiled: CompiledTransportChain) -> None:
 
     compiled.hlo_report.raise_for_violations()
     _require_exact_payload_shapes(compiled.hlo_report, compiled.config)
+    pallas_contract = _require_exact_pallas_remote_copy(
+        compiled.optimized_hlo, compiled.config
+    )
+    if not pallas_contract["passed"]:
+        raise HloContractViolationError(
+            f"Pallas transport HLO rejected: {pallas_contract['violations']}"
+        )
 
 
 def benchmark_transport_chain(compiled: CompiledTransportChain) -> dict[str, Any]:
@@ -386,6 +464,9 @@ def benchmark_transport_chain(compiled: CompiledTransportChain) -> dict[str, Any
             "identical transport invocations produced different output bytes"
         )
     distribution = latency_distribution(samples_ms)
+    pallas_contract = _require_exact_pallas_remote_copy(
+        compiled.optimized_hlo, compiled.config
+    )
     return {
         "compile_seconds": compiled.compile_seconds,
         "config": compiled.config.to_dict(),
@@ -394,6 +475,7 @@ def benchmark_transport_chain(compiled: CompiledTransportChain) -> dict[str, Any
         "last_addressable_checksum": last_checksum,
         "latency": distribution.to_dict(),
         "mechanism_only": True,
+        "pallas_remote_copy": pallas_contract,
         "per_stage_hop_p50_ms": (
             None
             if compiled.config.kind is TransportKind.CONTROL

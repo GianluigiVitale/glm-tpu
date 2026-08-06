@@ -34,7 +34,7 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "invalid plans: $PLANS" >&2
   exit 2
 }
-[[ $KINDS =~ ^(control|device_resident)(,(control|device_resident))*$ ]] || {
+[[ $KINDS =~ ^(control|device_resident|pallas_remote_copy)(,(control|device_resident|pallas_remote_copy))*$ ]] || {
   echo "invalid kinds: $KINDS" >&2
   exit 2
 }
@@ -220,10 +220,22 @@ for case_index, key in enumerate(case_keys):
             raise SystemExit(f"invalid HLO contract for {key}")
         counts = item["hlo"]["collective_counts"]
         expected_counts = (
-            {} if key[1] == "control" else {"collective-permute": expected_stages}
+            {"collective-permute": expected_stages}
+            if key[1] == "device_resident"
+            else {}
         )
         if counts != expected_counts:
             raise SystemExit(f"physical collective count mismatch for {key}: {counts}")
+        pallas = item["pallas_remote_copy"]
+        expected_pallas_calls = (
+            expected_stages if key[1] == "pallas_remote_copy" else 0
+        )
+        if (
+            not pallas["passed"]
+            or pallas["violations"]
+            or pallas["kernel_custom_call_count"] != expected_pallas_calls
+        ):
+            raise SystemExit(f"Pallas remote-copy contract failed for {key}: {pallas}")
         if len(item["latency"]["samples_ms"]) != config["measured_iterations"]:
             raise SystemExit(f"incomplete latency distribution for {key}")
     distributions = {

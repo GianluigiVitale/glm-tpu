@@ -10,6 +10,7 @@ import pytest
 from glm_tpu.greenfield.benchmarking.transport_chain import (
     TransportChainConfig,
     TransportKind,
+    _require_exact_pallas_remote_copy,
     transport_chain_hlo_policy,
     validate_transport_pairs,
 )
@@ -66,6 +67,33 @@ def test_transport_policy_requires_every_pair_for_every_hop() -> None:
     assert set(counts.values()) == {0, 8}
 
 
+def test_pallas_transport_policy_forbids_top_level_collectives() -> None:
+    config = TransportChainConfig(
+        plan=PlanName.PP8_LP4,
+        kind=TransportKind.PALLAS_REMOTE_COPY,
+        rows=1,
+        width=6144,
+        dtype="bfloat16",
+        warmup_iterations=1,
+        measured_iterations=1,
+    )
+    policy = transport_chain_hlo_policy(
+        config,
+        ring_pairs(8, 4),
+        total_devices=32,
+        partition_id_to_device_id=tuple(range(32)),
+    )
+    assert all(item.count == 0 for item in policy.expected_collectives)
+    line = (
+        '%call = bf16[1,6144] custom-call(%x), '
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_stage_remote_copy_bf16_1x6144"}'
+    )
+    result = _require_exact_pallas_remote_copy("\n".join([line] * 8), config)
+    assert result["passed"], result
+    assert result["kernel_custom_call_count"] == 8
+
+
 def test_current_jax_preserves_exact_pp8_transport_hlo() -> None:
     program = r'''
 import json
@@ -83,7 +111,7 @@ pairs = tuple(
     for stage in range(8)
 )
 result = {}
-for kind in TransportKind:
+for kind in (TransportKind.CONTROL, TransportKind.DEVICE_RESIDENT):
     config = TransportChainConfig(
         plan=PlanName.PP8_LP4,
         kind=kind,

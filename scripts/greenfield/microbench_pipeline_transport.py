@@ -265,12 +265,17 @@ def main() -> int:
                         (artifact_dir / f"{label}.optimized_hlo.txt").write_text(
                             compiled.optimized_hlo
                         )
-                        _atomic_write(
-                            artifact_dir / f"{label}.hlo_contract.json",
-                            compiled.hlo_report.to_dict(),
-                        )
                     validate_compiled_transport(compiled)
                     measured = benchmark_transport_chain(compiled)
+                    if jax.process_index() == 0:
+                        contract = compiled.hlo_report.to_dict()
+                        contract["pallas_remote_copy"] = measured[
+                            "pallas_remote_copy"
+                        ]
+                        _atomic_write(
+                            artifact_dir / f"{label}.hlo_contract.json",
+                            contract,
+                        )
                     measured["fleet_hlo_hashes"] = fleet_hlo_hashes
                     measured["optimized_hlo_sha256"] = hlo_sha256
                     matrix.append(measured)
