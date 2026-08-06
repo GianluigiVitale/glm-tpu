@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 12:09 UTC
+**Updated:** 2026-08-06 12:39 UTC
 
 ## Authority and isolation
 
@@ -118,6 +118,12 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   production raw-U8 kernels, forbid decoded full-expert overlays, and abort before first execution
   on HLO drift. Focused runtime/feature/decoder coverage is 14/14; protected full-body metal proof
   is still required.
+- Raw-FP8 stage-linear integration at `a86ff8b` replaces q_a, q_b, kv_a, attention output, and
+  dense SwiGLU with 315 exact Pallas calls across the 78-layer body, while retaining the accepted
+  225-call feature-MoE path. Standalone fused RMSNorm/linear DB 451 is elementwise exact at the
+  production M1/K6144/N2048 shape and p50 `0.526695 ms`. Protected body DB 452 passes strict HLO,
+  ownership, fleet, archive, and cleanup contracts at p50 `4,876.099672 ms`, a `12.06x` reduction
+  from DB 442's `58,804.002894 ms`. This is transformer-body wall, not raw-token throughput.
 - Final-layout PP16 artifact `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes
   two independently hashed 4,855,045,080-byte files at pack code `51d1df9`: experts
   `0:128/128:256`, shared intermediate `0:1024/1024:2048`, manifest
@@ -388,15 +394,15 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Implement Section 7.2 item 9, stage-local RMSNorm/raw-FP8 linear fusion. DB 442 proves this is
-   the immediate 58.8-second 2K floor: whole-matrix reference FP8 dequantization contributes
-   7,317.698 ms per average core while feature-MoE contributes only 14.784 ms. Require
-   reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback evidence, then integrate accepted
-   kernels without creating a decoded weight overlay. Section 7.2 item 8 is closed by DB 448--450;
-   its evidence rejects Pallas remote copy and retains the accepted collective-permute transport.
-2. Integrate each accepted path, rerun its exact oracle gate, then repeat the protected 78-layer body.
-   The immediate trace target is removal of `reference/fp8.py:69-70` whole-matrix gathers; do not
-   tune the compact stage permutes or local layer collectives.
+1. Finish Section 7.2 item 9. DB 451 proves the production fused RMSNorm/raw-FP8 primitive and DB
+   452 proves the first 315-call body integration, reducing protected 78-layer wall by `91.71%`.
+   Capture a fresh DB452 XPlane, then remove the remaining structured kv_b and DSA wq_b/wk
+   reference dequant paths without decoded weight overlays. Preserve exact reference/CPU/TPU/tail/
+   dtype/HLO/microbenchmark/fallback evidence. Section 7.2 item 8 is closed by DB 448--450; retain
+   collective-permute transport and keep Pallas remote copy default-off.
+2. Integrate each remaining accepted path, rerun its exact oracle gate, then repeat the protected
+   78-layer body. Use the fresh trace to rank only the new critical path; do not tune compact stage
+   permutes or local layer collectives without measured evidence.
 3. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
    Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
    profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
@@ -502,6 +508,30 @@ paired remote-copy calls/step, zero collective-permute/all-reduce/all-gather cal
 and authenticated 8/8 cleanup pass. Two earlier compile diagnostics failed closed before timing:
 one exposed physical-versus-logical device addressing and one rejected an invalid `collective_id`
 without a custom barrier. Both were preserved without DB claims and ended clean.
+
+## Protected raw-FP8 stage linears and first body integration
+
+DB 451 / `greenfield_fp8_rmsnorm_linear_20260806T122035458333587Z` at `ef709da` proves the
+production M1/K6144/N2048 fused RMSNorm/raw-FP8 linear. FP32 square/mean/rsqrt remains outside the
+call; BF16 rounding, norm-weight multiplication, tiled raw-FP8 decode, and matmul occur inside one
+Pallas call without a normalized-activation or decoded-weight HBM overlay. The TPU output is
+elementwise exact against the accepted reference. After 200 warmups, 1,000 profiler-free samples
+give p50/p90/p95/p99 `0.526695/0.537813/0.541743/0.550947 ms`; compile is `0.238409 s`, peak HBM
+is 316,252,672 bytes, and HLO `c1d87788...e61` contains the one required custom call. Interpreter
+tail/dtype/validation tests, DB/archive/remote `SUCCESS`, and 8/8 cleanup pass.
+
+Commit `a86ff8b` then binds a default-off `pallas_feature_linear` body backend: 78 q_a, 78 q_b,
+78 kv_a, 78 attention-output, and three dense fused-SwiGLU replacements, plus the already accepted
+75 each feature-MoE calls. Protected DB 452 /
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_trace0_20260806T122817958087998Z`
+passes at the exact commit. Fleet p50/p99 is `4,876.099672/4,876.667969 ms`, down from DB 442's
+`58,804.002894 ms` by `12.06x` (`91.71%`). All 315 stage-linear and 225 feature-MoE custom-call
+counts are exact; no forbidden decoded weight/expert overlay exists. HLO `7e797b34...39dc` retains
+the exact `219AG/294AR/16CP` structure. Compile max is `156.878 s`; maximum peak HBM is
+26,135,755,776 bytes/chip. All eight hosts agree, strict HLO/metadata checks pass, DB 452 and the
+approved archive/remote `SUCCESS` are sealed, and post-run census is 8/8 clean. This is a decisive
+body-only result, not complete decoder latency or tok/s. Structured kv_b and DSA wq_b/wk remain on
+the reference dequant path and are the next item-9 targets.
 
 ## Protected feature-body attribution
 
