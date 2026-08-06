@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 16:24 UTC
+**Updated:** 2026-08-06 16:51 UTC
 
 ## Authority and isolation
 
@@ -643,6 +643,28 @@ are `4a07e963...f328` / `dad56da3...d07a`; archive/remote `SUCCESS` and both 8/8
 Commit `897621c` promotes `pallas_feature_linear` plus tile 256 as the production decoder defaults;
 reference mode still resolves to tile 128, and both choices remain explicit. Affected tests pass
 15/15. This is a protected transformer-body win, not raw-token latency or answer tok/s.
+
+## Rejected fused routed weighting/sum
+
+Commits `89f2c64` and `5dda806` add a default-off candidate that moves exact BF16 route weighting
+and the route-axis sum into the selected-expert Pallas call. The optimized selected result shrinks
+from `bf16[8,8,6144]` to `bf16[8,6144]`, the old routed HBM result is strictly rejected, and the
+fallback retains its separate two-prefetch signature. CPU/interpreter/HLO coverage passes 26/26.
+The first protected diagnostic at `89f2c64` failed closed before timing because TPU scalar memory
+forbids vector loads; its evidence is preserved and its failure-exit census is 8/8 clean. Commit
+`5dda806` replaces that load with eight scalar loads and explicit BF16 association.
+
+Same-commit protected candidate DB 472 /
+`greenfield_real_layer_pp8_pallas_feature_ot256_wsum_20260806T164727316423011Z` and baseline DB 473 /
+`greenfield_real_layer_pp8_pallas_feature_ot256_20260806T164837422574502Z` both pass exact routes,
+bounded normal/concentrated output, strict local HLO, fresh trace, DB/archive/remote `SUCCESS`, and
+8/8 cleanup. Candidate versus baseline normal p50 is `2.168395/2.164785 ms` (`+0.1668%`); concentrated
+is `2.167525/2.1694595 ms` (`-0.0892%`). The candidate selected call is `1.541705 ms/step` versus
+`1.539492` (`+0.1437%`), while maximum peak HBM is `2,430,519,808` versus `2,430,589,440` bytes.
+Candidate/baseline HLO SHAs are `853ec297...b638` / `36fe8fb4...314d`; summary SHAs are
+`6c98c90a...e6ab` / `7a1fcd5d...1762`. The structural elimination is real but performance-neutral;
+reject promotion, retain default-off, and do not spend full-body compiles on it. The next measured
+body bottleneck is attention output (`4.385456 ms/core`, approximately `35.084 ms` serialized).
 
 ## Protected feature-body attribution
 
