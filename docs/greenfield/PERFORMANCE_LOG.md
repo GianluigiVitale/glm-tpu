@@ -202,6 +202,32 @@ arrival skew, layout/reshard work, barrier waiting, and surrounding legacy decom
 swap alone can save only a few raw milliseconds. The topology-first stage-local layout and device-
 resident PP8/PP16 transport remain the required structural experiment.
 
+## 2026-08-06 — rejected complete PP8 reference-body diagnostic
+
+`greenfield_short_decoder_compile_pp8_20260806T004625161993456Z` loaded the complete runtime
+checkpoint and compiled the real 78-layer 2K decoder body. This is a rejected diagnostic, not a
+latency or token-rate result.
+
+- Runtime load: about `104.713 GB/host` from the exact 32-file derivative.
+- Compile: `380.003 s`; optimized HLO about `192,401` instructions.
+- Backend expansion: `2,707,043` program bundles and `580` overlays.
+- Memory: `1.17 GB` program plus `23.41 GB` arguments; observed about `25.46 GiB/chip`.
+- Physical collectives: `219 AG / 294 AR / 16 CP`, all topology-local. The 294 AR instructions
+  carry 312 logical results: arities `277x1 / 16x2 / 1x3` and result components
+  `81 bf16[1,6144] / 75 bf16[2,1,6144] / 78 f32[256] / 78 u32[1,1,128]`.
+
+Fleet device sequencing proved execution was active, not deadlocked: stages advanced one by one at
+100% duty while later stages waited at the pipeline permute. Extrapolated one-body latency was
+roughly 25–30 minutes, so the harness's 13 invocations could not complete. The cause is executable
+explosion from whole-matrix U8 lookup/dequantization plus the Python-unrolled conditional expert
+path. The run was stopped, diagnostic HLO/driver/runtime evidence was archived, and all eight hosts
+ended `CENSUS_OK`. No tok/s value can be derived from it.
+
+The corrective path begins with a compact Pallas kernel that retains raw U8 in HBM, dequantizes
+only one 128x128 tile in VMEM, and performs BF16 MXU work with FP32 accumulation. Full-model reruns
+remain prohibited until production-shaped kernel compile/correctness/HLO/microbenchmark evidence
+shows the reference graph explosion is removed.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

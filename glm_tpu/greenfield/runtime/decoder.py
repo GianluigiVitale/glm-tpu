@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
@@ -118,7 +119,7 @@ def validate_decoder_step_hlo(
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
-    if backend_contract not in ("cpu_reference", "tpu_stage_local_rewrite"):
+    if backend_contract not in ("cpu_reference", "tpu_v4_pp8_reference"):
         raise PlanValidationError("decoder HLO backend contract is unknown")
     skeleton = PipelineSkeletonConfig(
         config.stage_count,
@@ -139,14 +140,77 @@ def validate_decoder_step_hlo(
         for layer in stage.layers
     )
     layers = schedule.layer_count
+    reduction_arity_counts: dict[str, int] = {}
+    expected_reduction_arity_counts: dict[str, int] = {}
+    reduction_result_shape_counts: dict[str, int] = {}
+    expected_reduction_result_shape_counts: dict[str, int] = {}
+    reduction_component_count = 0
+    expected_reduction_component_count = 0
     if backend_contract == "cpu_reference":
         expected_gathers = 4 * layers + 3 * full_layers
         expected_reductions = 2 * layers
     else:
-        # Protected Gate C TPU HLO rewrites each IndexShare body from
-        # 4AG/1AR to 2AG/3AR. DSA remains 3AG/0AR and every MLP has one AR.
+        dense_layers = sum(
+            layer.mlp_kind == "dense"
+            for stage in schedule.stages
+            for layer in stage.layers
+        )
+        sparse_layers = layers - dense_layers
+        if (
+            config.stage_count,
+            config.local_parallel_size,
+            config.hidden_size,
+            config.selected_width,
+            layers,
+            dense_layers,
+            sparse_layers,
+        ) != (8, 4, 6144, 2048, 78, 3, 75):
+            raise PlanValidationError(
+                "the TPU v4 PP8 reference lowering contract is pinned to "
+                "the complete 78-layer GLM-5.2 decoder"
+            )
+
+        # Gate C established the semantic TPU rewrite: every attention body
+        # contributes three reduction results and every MLP contributes one.
+        # The first complete 78-layer optimized HLO then established the exact
+        # physical lowering.  All 312 logical results are present, but XLA
+        # launch-fuses 78 padded-u32 results into 43 single-result, 16
+        # two-result, and one three-result all-reduces.  Pin both views: merely
+        # expecting 4 * layers physical instructions falsely reports 18
+        # missing collectives, while checking only logical arity would allow a
+        # physical launch-count regression to pass unnoticed.
         expected_gathers = 2 * layers + 3 * full_layers
-        expected_reductions = 4 * layers
+        expected_reduction_arity_counts = {"1": 277, "2": 16, "3": 1}
+        expected_reductions = sum(expected_reduction_arity_counts.values())
+        expected_reduction_component_count = sum(
+            int(arity) * count
+            for arity, count in expected_reduction_arity_counts.items()
+        )
+        expected_reduction_result_shape_counts = {
+            "bf16[1,6144]": layers + dense_layers,
+            "bf16[2,1,6144]": sparse_layers,
+            "f32[256]": layers,
+            "u32[1,1,128]": layers,
+        }
+
+        reductions = by_opcode.get("all-reduce", ())
+        reduction_arity_counts = {
+            str(arity): count
+            for arity, count in sorted(
+                Counter(len(item.result_shapes) for item in reductions).items()
+            )
+        }
+        result_shapes = Counter(
+            (
+                f"{shape.dtype}["
+                + ",".join(str(dimension) for dimension in shape.dimensions)
+                + "]"
+            )
+            for item in reductions
+            for shape in item.result_shapes
+        )
+        reduction_result_shape_counts = dict(sorted(result_shapes.items()))
+        reduction_component_count = sum(result_shapes.values())
     expected_permutes = 2 * config.stage_count
     violations = []
     observed_counts = {
@@ -162,6 +226,28 @@ def validate_decoder_step_hlo(
             f"decoder collective counts drifted: expected={expected_counts} "
             f"observed={observed_counts}"
         )
+    if backend_contract == "tpu_v4_pp8_reference":
+        if reduction_arity_counts != expected_reduction_arity_counts:
+            violations.append(
+                "decoder physical all-reduce tuple arities drifted: "
+                f"expected={expected_reduction_arity_counts} "
+                f"observed={reduction_arity_counts}"
+            )
+        if reduction_component_count != expected_reduction_component_count:
+            violations.append(
+                "decoder logical all-reduce component count drifted: "
+                f"expected={expected_reduction_component_count} "
+                f"observed={reduction_component_count}"
+            )
+        if (
+            reduction_result_shape_counts
+            != expected_reduction_result_shape_counts
+        ):
+            violations.append(
+                "decoder all-reduce logical result shapes drifted: "
+                f"expected={expected_reduction_result_shape_counts} "
+                f"observed={reduction_result_shape_counts}"
+            )
     expected_groups = tuple(tuple(group) for group in canonical_groups)
     for collective in (
         *by_opcode.get("all-gather", ()),
@@ -207,6 +293,16 @@ def validate_decoder_step_hlo(
         "collective_count": len(collectives),
         "collective_counts": observed_counts,
         "expected_collective_counts": expected_counts,
+        "all_reduce_component_count": reduction_component_count,
+        "expected_all_reduce_component_count": (
+            expected_reduction_component_count
+        ),
+        "all_reduce_arity_counts": reduction_arity_counts,
+        "expected_all_reduce_arity_counts": expected_reduction_arity_counts,
+        "all_reduce_result_shape_counts": reduction_result_shape_counts,
+        "expected_all_reduce_result_shape_counts": (
+            expected_reduction_result_shape_counts
+        ),
         "forbidden_shapes": forbidden_shapes,
         "full_indexer_layers": full_layers,
         "layer_count": layers,

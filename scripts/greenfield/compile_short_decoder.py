@@ -420,7 +420,7 @@ def main() -> int:
             schedule=schedule,
             groups=groups,
             pairs=pairs,
-            backend_contract="tpu_stage_local_rewrite",
+            backend_contract="tpu_v4_pp8_reference",
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
