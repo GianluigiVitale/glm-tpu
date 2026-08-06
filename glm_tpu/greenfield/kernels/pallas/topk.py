@@ -119,17 +119,19 @@ def _select_blocks_pallas(
     ) -> None:
         block_scores = score_ref[...]
         block_positions = position_ref[...]
-        block_slots = lax.broadcasted_iota(jnp.int32, (1, input_width), 1)
+        block_slots = lax.broadcasted_iota(
+            jnp.int32, (1, 1, input_width), 2
+        )
         valid = (
             (block_positions >= jnp.int32(0))
             & (block_positions < valid_length_ref[0])
         )
         work_scores = jnp.where(valid, block_scores, _NEGATIVE_INFINITY)
         selected_scores = jnp.full(
-            (1, output_width), _NEGATIVE_INFINITY, dtype=jnp.float32
+            (1, 1, output_width), _NEGATIVE_INFINITY, dtype=jnp.float32
         )
         selected_positions = jnp.full(
-            (1, output_width), _NO_POSITION, dtype=jnp.int32
+            (1, 1, output_width), _NO_POSITION, dtype=jnp.int32
         )
 
         def select_one(
@@ -137,13 +139,13 @@ def _select_blocks_pallas(
             carry: tuple[Any, Any, Any, Any],
         ) -> tuple[Any, Any, Any, Any]:
             current_scores, current_valid, result_scores, result_positions = carry
-            best_score = jnp.max(current_scores, axis=1, keepdims=True)
+            best_score = jnp.max(current_scores, axis=2, keepdims=True)
             tied_positions = jnp.where(
                 current_valid & (current_scores == best_score),
                 block_positions,
                 _MAX_POSITION,
             )
-            best_position = jnp.min(tied_positions, axis=1, keepdims=True)
+            best_position = jnp.min(tied_positions, axis=2, keepdims=True)
             tied_slots = jnp.where(
                 current_valid
                 & (current_scores == best_score)
@@ -151,16 +153,18 @@ def _select_blocks_pallas(
                 block_slots,
                 _MAX_POSITION,
             )
-            best_slot = jnp.min(tied_slots, axis=1, keepdims=True)
+            best_slot = jnp.min(tied_slots, axis=2, keepdims=True)
             live = (
                 (best_slot != _MAX_POSITION)
                 & (best_score != _NEGATIVE_INFINITY)
             )
-            result_scores = result_scores.at[0, slot].set(
-                jnp.where(live[0, 0], best_score[0, 0], _NEGATIVE_INFINITY)
+            result_scores = result_scores.at[0, 0, slot].set(
+                jnp.where(
+                    live[0, 0, 0], best_score[0, 0, 0], _NEGATIVE_INFINITY
+                )
             )
-            result_positions = result_positions.at[0, slot].set(
-                jnp.where(live[0, 0], best_position[0, 0], _NO_POSITION)
+            result_positions = result_positions.at[0, 0, slot].set(
+                jnp.where(live[0, 0, 0], best_position[0, 0, 0], _NO_POSITION)
             )
             remove = (
                 current_valid
@@ -184,8 +188,8 @@ def _select_blocks_pallas(
         output_score_ref[...] = selected_scores
         output_position_ref[...] = selected_positions
 
-    def input_index(program: Any) -> tuple[Any, int]:
-        return program, 0
+    def input_index(program: Any) -> tuple[Any, int, int]:
+        return program, 0, 0
 
     def valid_length_index(program: Any) -> tuple[int]:
         del program
@@ -194,18 +198,18 @@ def _select_blocks_pallas(
     call = pl.pallas_call(
         kernel,
         out_shape=(
-            jax.ShapeDtypeStruct((programs, output_width), jnp.float32),
-            jax.ShapeDtypeStruct((programs, output_width), jnp.int32),
+            jax.ShapeDtypeStruct((programs, 1, output_width), jnp.float32),
+            jax.ShapeDtypeStruct((programs, 1, output_width), jnp.int32),
         ),
         grid=(programs,),
         in_specs=(
-            pl.BlockSpec((1, input_width), input_index),
-            pl.BlockSpec((1, input_width), input_index),
+            pl.BlockSpec((1, 1, input_width), input_index),
+            pl.BlockSpec((1, 1, input_width), input_index),
             pl.BlockSpec((1,), valid_length_index),
         ),
         out_specs=(
-            pl.BlockSpec((1, output_width), input_index),
-            pl.BlockSpec((1, output_width), input_index),
+            pl.BlockSpec((1, 1, output_width), input_index),
+            pl.BlockSpec((1, 1, output_width), input_index),
         ),
         compiler_params=pltpu.CompilerParams(
             dimension_semantics=("parallel",),
@@ -223,7 +227,10 @@ def _select_blocks_pallas(
             transcendentals=0,
         ),
     )
-    return call(scores, positions, valid_lengths)
+    output_scores, output_positions = call(
+        scores[:, None, :], positions[:, None, :], valid_lengths
+    )
+    return output_scores[:, 0, :], output_positions[:, 0, :]
 
 
 def _merge_candidate_tree_pallas(
