@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 20:28 UTC
+**Updated:** 2026-08-06 23:35 UTC
 
 ## Authority and isolation
 
@@ -820,8 +820,33 @@ Repair messages are retained when a strike occurs but are not required on a clea
 syntax, affected CPU tests, and the matcher against the preserved failed draw pass; the matcher
 correctly reports six exact hosts and refuses workers 0/3.
 
-Exact next: after authenticated zero-work/disk/session cleanup, retry the protected fresh all-event
-DSA capture from the clean branch HEAD containing `3c45b47`; require repaired-or-clean 8/8 final
-state, correct raw item, complete
-step/event dump coverage, sealed compact oracle, approved archive/SUCCESS, and 8/8 cleanup. Then bind
-the separate observer replay to that oracle and run the protected real-prompt 2K Gate D comparison.
+The self-healing retry `greenfield_short_context_dsa_oracle_20260806T221300Z` at source code
+`f5e047a` completed the real legacy execution. Workers 0, 1, and 4 repaired the same layer-10 WK
+zero-fill/fused-leaf corruption from the pinned read-only OOB mirror; all eight hosts then
+independently passed `verified=1882 mismatches=0 skipped=312` and exact
+`leaves=2455 combined=371110325`. DB run 480 / item row 1763 consumed the 2,034-token prompt,
+generated 20 tokens, and returned exact passkey `110391` (`correct=True`). The capture emitted all
+420 callback dumps (20 generated steps x 21 events) on the canonical callback replica. The strict
+eight-host capture/cleanup gates passed, but the original sealer refused because legacy padded
+scheduler rows contain stale selections. This was a sealer defect: the legacy verdict and explicit
+`valid` mask define only row 0 as live; rows 1--31 are informational padding.
+
+Commit `02f836e` fixes that defect without relaxing live-row correctness: format v2 excludes padded
+rows by the pinned valid mask, records their non-sentinel counts for provenance, separately binds
+the corrected sealer and immutable source-capture code hashes, adds realistic regression coverage,
+and provides a fail-closed recovery wrapper. Validation passes 16/16. Recovery artifact
+`greenfield_short_context_dsa_oracle_recovery_20260806T231905802593249Z` seals the 14 recurrent
+steps at positions 2034--2047 x all 21 producers x 2,048 selected positions: 294 exact source dumps,
+lowest-position tie order, sentinel tails, counts, scores, producer IDs, token-oracle linkage, DB
+snapshot, and source evidence. Manifest is
+`71224832652ce61024786d39d43dcbfdc6cde76bf2eff0350531b272f38f4f57`; evidence ledger is
+`9c87cada...a966`; remote ledger `99f39557...e72cf` verifies 443 objects by byte count, CRC32C,
+and generation under the approved bucket. Local/remote `SUCCESS`, clean pre/post 8/8 census, and
+source failure-exit 8/8 census all pass. Capture and archival phases are complete.
+
+Exact next: integrate this manifest-pinned oracle into a separate no-donation observer executable.
+Compare all 14 x 21 live selections, exact order/count/sentinel tail and recurrent token IDs while
+keeping the production executable observer-free. Pin the observer's local-only HLO/collective and
+no-callback/no-alias contracts. Then run protected real-prompt 2K Gate D with exact raw tokens,
+DSA/cache/state correctness, fresh fleet XPlanes, profiler-free wall, HBM, DB/archive/SUCCESS, and
+8/8 cleanup. Only after Gate D passes may recurrent latency be optimized below 200 ms.
