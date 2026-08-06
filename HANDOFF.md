@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 15:20 UTC
+**Updated:** 2026-08-06 15:32 UTC
 
 ## Authority and isolation
 
@@ -394,15 +394,13 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Finish and protect the trace-directed whole-table input-formatting removal now in the dirty
-   worktree: common block matmul, fused RMSNorm linear, shared up/gate, structured kv_b, and DSA
-   calls must consume complete `u8` tables and reinterpret only resident VMEM tiles. Focused CPU/
-   interpreter tests pass; commit, run a protected standalone TPU exact/HLO/wall proof, rerun Gate
-   C, then repeat the protected body and fresh trace. Reject unless the exact HLO has no complete
-   `f8e4m3fn` weight operand/formatting fusion and wall improves.
-2. The trace's next compute target is the feature-MoE call (`118.26 ms` serial estimate), followed
-   by attention-output (`35.10 ms`); do not optimize either until the formatting A/B establishes
-   the new baseline. Compact local collectives and stage permutes are not latency targets.
+1. Optimize the trace-dominant feature-MoE call, now `14.782 ms/core` or `118.256 ms` serialized
+   across PP8. Inspect the exact `[8,8,6144]` output and post-call route weighting/sum: eliminate
+   route/output HBM materialization or redundant row work only with exact route/tensor fallback,
+   interpreter/TPU/HLO microproof, protected one-layer A/B, body A/B, and fresh trace.
+2. Attention-output matmul is the second measured target (`4.385 ms/core`, `35.084 ms` serialized).
+   Do not tune it until feature-MoE establishes a new protected baseline. Compact local
+   collectives and stage permutes are not latency targets.
 3. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
    Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
    profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
@@ -595,6 +593,31 @@ stage estimate); feature MoE alone is `14.782 ms/core` (`118.259 ms` serial). Cr
 U8-to-F8 input formatting fusions consume `5.745 ms/core`, approximately `45.959 ms` serialized.
 XPlane/summary SHAs are `7f1082ba...aca` / `5d055bd3...a08`; DB/archive/remote `SUCCESS` and 8/8
 cleanup pass. This measurement, not guesswork, selects whole-table FP8 formatting as exact next.
+
+Commit `b4bff66` moves every complete common/structured/shared U8-to-FP8 reinterpretation inside
+the resident Pallas VMEM tile and makes the HLO contracts reject complete F8 operands. Focused
+CPU/interpreter/HLO coverage is 44/44. Protected DB 461 proves M8/K6144/N2048 elementwise exact,
+one direct `u8[2048,6144]` call/no formatting overlay, and p50 `0.406895 ms` versus DB 422's
+`0.520605` (`-21.84%`). DB 462 proves structured q/value exact at p50
+`0.201080/0.224360 ms`, paired `0.425840` versus DB 454's `0.550236` (`-22.61%`). DB 463 proves
+shared up/gate exact with two direct U8 operands at p50 `0.566560 ms` versus DB 423's `0.815435`
+(`-30.52%`). All three have strict HLO, DB/archive/remote `SUCCESS`, and 8/8 cleanup.
+
+Protected Gate C DB 464 passes dense/full-DSA/IndexShare correctness, exact selected state/cache,
+local HLO, fresh trace, and cleanup at the same pin. Protected body DB 465 then reaches p50/p99
+`244.431673/245.138700 ms`, improving DB 459 by `16.64%` (`1.200x`). Compile max is `173.169 s`,
+peak HBM `26,130,830,336` bytes/chip, and HLO `a9072597...e86` retains 738 exact Pallas calls and
+`219AG/294 physical AR/16CP` while all eight complete F8 weight shapes are absent. This body-only
+rate is `4.091 steps/s`; it is not complete answer speed and remains above the `<=200 ms` gate.
+
+Fresh trace DB 466 reproduces `244.812285 ms` with eight XPlanes/64 cores/two steps. Device
+mean/max falls `281.534/292.641 -> 234.391/243.724 ms`; busy time falls `270.397 -> 225.161 ms`.
+The old complete-weight bitcast category falls `5.745 -> 0 ms/core`, while formatting removal
+reduces step cycle by `45.278 ms` and body wall by `48.801 ms`. Feature-MoE is unchanged at
+`14.782 ms/core` (`118.256 ms` serialized) and is now the dominant real compute; attention output
+is `4.385 ms/core` (`35.084 ms` serialized). Actual psum is only `0.198 ms/core`; compact permute
+time is backpressure. XPlane/summary SHAs are `734f5f04...e3f` / `32bd4c1d...bc2`; DB/archive/
+remote `SUCCESS` and 8/8 cleanup pass.
 
 ## Protected feature-body attribution
 
