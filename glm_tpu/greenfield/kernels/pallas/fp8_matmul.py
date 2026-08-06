@@ -468,8 +468,9 @@ def fp8_structured_kv_b_q_absorb(
     selected_scale = scale[source_blocks]
     selected_scale = jnp.repeat(selected_scale[..., None], 128, axis=-1)
     selected_scale = selected_scale.reshape(
-        heads * contraction_tiles * output_tiles, 128
+        heads * contraction_tiles * output_tiles, 1, 128
     )
+    selected_scale = jnp.repeat(selected_scale, 8, axis=1)
     weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
 
     def kernel(
@@ -487,7 +488,7 @@ def fp8_structured_kv_b_q_absorb(
 
         decoded_weight = (
             weight_ref[...].astype(jnp.float32)
-            * scale_ref[0, 0].astype(jnp.float32)
+            * scale_ref[0, 0, 0].astype(jnp.float32)
         ).astype(jnp.bfloat16)
         accumulator_ref[...] += lax.dot_general(
             query_ref[0, ...],
@@ -512,12 +513,13 @@ def fp8_structured_kv_b_q_absorb(
             output_index,
         )
 
-    def scale_index(program_index: Any, contraction_index: Any) -> tuple[Any, int]:
+    def scale_index(program_index: Any, contraction_index: Any) -> tuple[Any, int, int]:
         head = program_index // output_tiles
         output_index = program_index % output_tiles
         return (
             (head * contraction_tiles + contraction_index) * output_tiles
             + output_index,
+            0,
             0,
         )
 
@@ -534,7 +536,7 @@ def fp8_structured_kv_b_q_absorb(
         in_specs=(
             pl.BlockSpec((1, 8, 128), query_index),
             pl.BlockSpec((128, 128), weight_index),
-            pl.BlockSpec((1, 128), scale_index),
+            pl.BlockSpec((1, 8, 128), scale_index),
         ),
         out_specs=pl.BlockSpec((1, 8, 128), output_index),
         scratch_shapes=(pltpu.VMEM((8, 128), jnp.float32),),
@@ -607,8 +609,9 @@ def fp8_structured_kv_b_value(
     selected_scale = jnp.where(active_blocks[..., None], selected_scale, 0.0)
     selected_scale = jnp.repeat(selected_scale[..., None], 128, axis=-1)
     selected_scale = selected_scale.reshape(
-        heads * output_blocks * contraction_tiles, 128
+        heads * output_blocks * contraction_tiles, 1, 128
     )
+    selected_scale = jnp.repeat(selected_scale, 8, axis=1)
     weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
 
     def kernel(
@@ -626,7 +629,7 @@ def fp8_structured_kv_b_value(
 
         decoded_weight = (
             weight_ref[...].astype(jnp.float32)
-            * scale_ref[0, 0].astype(jnp.float32)
+            * scale_ref[0, 0, 0].astype(jnp.float32)
         ).astype(jnp.bfloat16)
         accumulator_ref[...] += lax.dot_general(
             latent_ref[0, ...],
@@ -655,9 +658,10 @@ def fp8_structured_kv_b_value(
     def weight_index(program_index: Any, contraction_index: Any) -> tuple[Any, Any]:
         return source_block(program_index), contraction_index
 
-    def scale_index(program_index: Any, contraction_index: Any) -> tuple[Any, int]:
+    def scale_index(program_index: Any, contraction_index: Any) -> tuple[Any, int, int]:
         return (
             program_index * contraction_tiles + contraction_index,
+            0,
             0,
         )
 
@@ -674,7 +678,7 @@ def fp8_structured_kv_b_value(
         in_specs=(
             pl.BlockSpec((1, 8, 128), latent_index),
             pl.BlockSpec((128, 128), weight_index),
-            pl.BlockSpec((1, 128), scale_index),
+            pl.BlockSpec((1, 8, 128), scale_index),
         ),
         out_specs=pl.BlockSpec((1, 8, 128), output_index),
         scratch_shapes=(pltpu.VMEM((8, 128), jnp.float32),),
