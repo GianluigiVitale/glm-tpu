@@ -1,10 +1,10 @@
 """One-row TPU-v4 Pallas scorer for the GLM lightning indexer.
 
 The historical key cache remains BF16.  Each Pallas program reads one
-context tile, converts it to FP32 in VMEM, and walks the 32 query heads in a
-deterministic order.  ReLU and signed head weighting happen before the score
-tile leaves the kernel, so the implementation never creates the
-``[heads, context]`` intermediate in HBM.
+context tile, converts it to FP32 in VMEM, and evaluates all 32 query heads
+inside that program. ReLU, signed head weighting, and the FP32 head reduction
+happen before the score tile leaves the kernel, so the implementation never
+creates the ``[heads, context]`` intermediate in HBM.
 
 This module is deliberately isolated and default-off.  ``dsa_scores_kernel``
 retains the readable JAX scorer as its fallback until the Pallas path has
@@ -85,11 +85,12 @@ def dsa_scores_pallas(
     if padded_context != context:
         index_keys = jnp.pad(index_keys, ((0, padded_context - context), (0, 0)))
 
-    # A scalar HBM DMA is not a valid TPU-v4 tiled load.  Repeating each
-    # signed head weight across one exact output tile costs only 16 KiB for
-    # GLM's 32 heads and gives the kernel an aligned [1,128] operand.
+    # A scalar HBM DMA is not a valid TPU-v4 tiled load. Repeating each signed
+    # head weight across one exact output tile costs only 16 KiB for GLM's 32
+    # heads and lets one program compute all heads in VMEM without ever
+    # writing the [heads, context] intermediate to HBM.
     head_weight_table = jnp.broadcast_to(
-        jnp.transpose(head_weights), (heads, config.context_tile)
+        head_weights[..., None], (1, heads, config.context_tile)
     )
     context_tiles = padded_context // config.context_tile
 
@@ -98,18 +99,11 @@ def dsa_scores_pallas(
         key_ref: Any,
         head_weight_ref: Any,
         output_ref: Any,
-        accumulator_ref: Any,
     ) -> None:
-        head_index = pl.program_id(1)
-
-        @pl.when(head_index == 0)
-        def initialize_accumulator() -> None:
-            accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
-
         per_head = lax.dot_general(
-            query_ref[...].reshape((1, config.head_dim)),
+            query_ref[...],
             key_ref[...].astype(jnp.float32),
-            dimension_numbers=(((1,), (1,)), ((), ())),
+            dimension_numbers=(((2,), (1,)), ((), ())),
             preferred_element_type=jnp.float32,
         )
         contribution = (
@@ -117,45 +111,36 @@ def dsa_scores_pallas(
             * jnp.float32(config.head_dim**-0.5)
             * head_weight_ref[...]
         )
-        accumulator_ref[...] += contribution
+        output_ref[...] = jnp.sum(contribution, axis=1, dtype=jnp.float32)
 
-        @pl.when(head_index == heads - 1)
-        def store_output() -> None:
-            output_ref[...] = accumulator_ref[...]
-
-    def query_index(context_index: Any, head_index: Any) -> tuple[int, Any, int]:
+    def query_index(context_index: Any) -> tuple[int, int, int]:
         del context_index
-        return 0, head_index, 0
+        return 0, 0, 0
 
-    def key_index(context_index: Any, head_index: Any) -> tuple[Any, int]:
-        del head_index
+    def key_index(context_index: Any) -> tuple[Any, int]:
         return context_index, 0
 
-    def head_weight_index(
-        context_index: Any, head_index: Any
-    ) -> tuple[Any, int]:
+    def head_weight_index(context_index: Any) -> tuple[int, int, int]:
         del context_index
-        return head_index, 0
+        return 0, 0, 0
 
-    def output_index(context_index: Any, head_index: Any) -> tuple[int, Any]:
-        del head_index
+    def output_index(context_index: Any) -> tuple[int, Any]:
         return 0, context_index
 
     call = pl.pallas_call(
         kernel,
         out_shape=jax.ShapeDtypeStruct((1, padded_context), jnp.float32),
-        grid=(context_tiles, heads),
+        grid=(context_tiles,),
         in_specs=(
-            pl.BlockSpec((1, 1, config.head_dim), query_index),
+            pl.BlockSpec((1, heads, config.head_dim), query_index),
             pl.BlockSpec((config.context_tile, config.head_dim), key_index),
-            pl.BlockSpec((1, config.context_tile), head_weight_index),
+            pl.BlockSpec(
+                (1, heads, config.context_tile), head_weight_index
+            ),
         ),
         out_specs=pl.BlockSpec((1, config.context_tile), output_index),
-        scratch_shapes=(
-            pltpu.VMEM((1, config.context_tile), jnp.float32),
-        ),
         compiler_params=pltpu.CompilerParams(
-            dimension_semantics=("parallel", "arbitrary"),
+            dimension_semantics=("parallel",),
             disable_bounds_checks=True,
         ),
         interpret=interpret,
