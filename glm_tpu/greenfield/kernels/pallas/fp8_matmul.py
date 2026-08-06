@@ -367,6 +367,351 @@ def fp8_block_matmul(
     return call(lhs, weight_fp8, scale_table)[:rows, :output]
 
 
+def _validate_structured_kv_b(
+    activation: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    qk_nope_head_dim: int,
+    config: Fp8BlockMatmulConfig,
+) -> tuple[int, int, int, int]:
+    """Validate the production per-head MLA ``kv_b`` checkpoint layout."""
+
+    if config.block_shape != (128, 128) or config.row_tile != 8:
+        raise ValueError("structured kv_b requires TPU-v4 128x128 blocks and row tile 8")
+    if config.output_tile != 128 or config.contraction_tile != 128:
+        raise ValueError("structured kv_b requires exact 128-wide MXU tiles")
+    if activation.ndim != 3 or activation.shape[0] != 1:
+        raise ValueError("structured kv_b activation must contain one decode row")
+    if activation.dtype != jnp.bfloat16:
+        raise ValueError("structured kv_b activation must be BF16")
+    if weight_bits.ndim != 2 or weight_bits.dtype != jnp.uint8:
+        raise ValueError("structured kv_b weight must be a rank-two uint8 payload")
+    if scale.ndim != 2 or scale.dtype != jnp.float32:
+        raise ValueError("structured kv_b scale must be a rank-two FP32 table")
+    if (
+        not isinstance(qk_nope_head_dim, int)
+        or isinstance(qk_nope_head_dim, bool)
+        or qk_nope_head_dim <= 0
+    ):
+        raise ValueError("structured kv_b qk_nope width must be positive")
+    heads = activation.shape[1]
+    if heads <= 0 or weight_bits.shape[0] % heads:
+        raise ValueError("structured kv_b rows must divide exactly over heads")
+    combined_width = weight_bits.shape[0] // heads
+    latent = weight_bits.shape[1]
+    value_width = combined_width - qk_nope_head_dim
+    if latent != 512 or value_width <= 0:
+        raise ValueError("structured kv_b latent/value widths are invalid")
+    if combined_width != 448 or qk_nope_head_dim != 192 or value_width != 256:
+        raise ValueError("structured kv_b requires the exact GLM 192/256 head contract")
+    expected_scale = (
+        _ceil_div(weight_bits.shape[0], 128),
+        _ceil_div(latent, 128),
+    )
+    if scale.shape != expected_scale:
+        raise ValueError(
+            f"structured kv_b scale shape must be {expected_scale}, got {scale.shape}"
+        )
+    return heads, combined_width, latent, value_width
+
+
+def fp8_structured_kv_b_q_absorb(
+    q_nope: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Apply the transposed per-head ``kv_b`` key slice from raw FP8.
+
+    The checkpoint stores each head as ``[192 key rows, 256 value rows, 512
+    latent columns]`` inside one flattened ``[head * 448, 512]`` matrix.  Head
+    starts alternate between 128-row alignment and a 64-row offset.  This call
+    pads only the compact query activation into the two aligned source blocks,
+    reads the original raw checkpoint blocks without a runtime weight
+    transpose, and returns ``[1, heads, 512]`` BF16 absorbed queries.
+    """
+
+    heads, combined_width, latent, _ = _validate_structured_kv_b(
+        q_nope,
+        weight_bits,
+        scale,
+        qk_nope_head_dim=q_nope.shape[-1],
+        config=config,
+    )
+    if q_nope.shape != (1, heads, 192):
+        raise ValueError("structured kv_b q_nope must have shape [1, heads, 192]")
+    output_tiles = latent // 128
+    contraction_tiles = 2
+
+    head_rows = jnp.transpose(q_nope, (1, 0, 2))
+    head_rows = jnp.pad(head_rows, ((0, 0), (0, 7), (0, 0)))
+    aligned = jnp.where(
+        ((jnp.arange(heads, dtype=jnp.int32) * combined_width) % 128)[
+            :, None, None
+        ]
+        == 0,
+        jnp.pad(head_rows, ((0, 0), (0, 0), (0, 64))),
+        jnp.pad(head_rows, ((0, 0), (0, 0), (64, 0))),
+    )
+    aligned = jnp.transpose(
+        aligned.reshape(heads, 8, contraction_tiles, 128), (0, 2, 1, 3)
+    ).reshape(heads * contraction_tiles, 8, 128)
+
+    head_ids = jnp.arange(heads, dtype=jnp.int32)[:, None]
+    source_blocks = (
+        head_ids * jnp.int32(combined_width) // jnp.int32(128)
+        + jnp.arange(contraction_tiles, dtype=jnp.int32)[None, :]
+    )
+    selected_scale = scale[source_blocks]
+    selected_scale = jnp.repeat(selected_scale[..., None], 128, axis=-1)
+    selected_scale = selected_scale.reshape(
+        heads * contraction_tiles * output_tiles, 128
+    )
+    weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
+
+    def kernel(
+        query_ref: Any,
+        weight_ref: Any,
+        scale_ref: Any,
+        output_ref: Any,
+        accumulator_ref: Any,
+    ) -> None:
+        contraction_index = pl.program_id(1)
+
+        @pl.when(contraction_index == 0)
+        def initialize_accumulator() -> None:
+            accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
+
+        decoded_weight = (
+            weight_ref[...].astype(jnp.float32)
+            * scale_ref[0, 0].astype(jnp.float32)
+        ).astype(jnp.bfloat16)
+        accumulator_ref[...] += lax.dot_general(
+            query_ref[0, ...],
+            decoded_weight,
+            dimension_numbers=(((1,), (0,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        )
+
+        @pl.when(contraction_index == contraction_tiles - 1)
+        def store_output() -> None:
+            output_ref[0, ...] = accumulator_ref[...].astype(jnp.bfloat16)
+
+    def query_index(program_index: Any, contraction_index: Any) -> tuple[Any, int, int]:
+        head = program_index // output_tiles
+        return head * contraction_tiles + contraction_index, 0, 0
+
+    def weight_index(program_index: Any, contraction_index: Any) -> tuple[Any, Any]:
+        head = program_index // output_tiles
+        output_index = program_index % output_tiles
+        return (
+            (head * combined_width) // jnp.int32(128) + contraction_index,
+            output_index,
+        )
+
+    def scale_index(program_index: Any, contraction_index: Any) -> tuple[Any, int]:
+        head = program_index // output_tiles
+        output_index = program_index % output_tiles
+        return (
+            (head * contraction_tiles + contraction_index) * output_tiles
+            + output_index,
+            0,
+        )
+
+    def output_index(program_index: Any, contraction_index: Any) -> tuple[Any, int, int]:
+        del contraction_index
+        return program_index, 0, 0
+
+    call = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct(
+            (heads * output_tiles, 8, 128), jnp.bfloat16
+        ),
+        grid=(heads * output_tiles, contraction_tiles),
+        in_specs=(
+            pl.BlockSpec((1, 8, 128), query_index),
+            pl.BlockSpec((128, 128), weight_index),
+            pl.BlockSpec((1, 128), scale_index),
+        ),
+        out_specs=pl.BlockSpec((1, 8, 128), output_index),
+        scratch_shapes=(pltpu.VMEM((8, 128), jnp.float32),),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel", "arbitrary"),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_structured_kv_b_q_absorb_"
+            f"h{heads}_p192_l{latent}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=2 * heads * 192 * latent,
+            bytes_accessed=(
+                heads * contraction_tiles * 8 * 128 * 2
+                + heads * contraction_tiles * latent * 128
+                + selected_scale.size * 4
+                + heads * 8 * latent * 2
+            ),
+            transcendentals=0,
+        ),
+    )
+    result = call(aligned, weight_fp8, selected_scale)
+    result = result.reshape(heads, output_tiles, 8, 128)
+    result = jnp.transpose(result, (2, 0, 1, 3)).reshape(8, heads, latent)
+    return result[:1]
+
+
+def fp8_structured_kv_b_value(
+    attended_latent: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    qk_nope_head_dim: int = 192,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Apply the per-head ``kv_b`` value slice from raw FP8 tiles."""
+
+    heads, combined_width, latent, value_width = _validate_structured_kv_b(
+        attended_latent,
+        weight_bits,
+        scale,
+        qk_nope_head_dim=qk_nope_head_dim,
+        config=config,
+    )
+    if attended_latent.shape != (1, heads, latent):
+        raise ValueError(
+            "structured kv_b attended latent must have shape [1, heads, 512]"
+        )
+    contraction_tiles = latent // 128
+    output_blocks = 3
+    head_rows = jnp.transpose(attended_latent, (1, 0, 2))
+    head_rows = jnp.pad(head_rows, ((0, 0), (0, 7), (0, 0)))
+
+    head_ids = jnp.arange(heads, dtype=jnp.int32)[:, None]
+    value_starts = head_ids * jnp.int32(combined_width) + jnp.int32(
+        qk_nope_head_dim
+    )
+    source_blocks = value_starts // jnp.int32(128) + jnp.arange(
+        output_blocks, dtype=jnp.int32
+    )[None, :]
+    active_blocks = jnp.arange(output_blocks, dtype=jnp.int32)[None, :] < (
+        (value_starts % jnp.int32(128) + value_width + 127)
+        // jnp.int32(128)
+    )
+    source_blocks = jnp.clip(source_blocks, 0, scale.shape[0] - 1)
+    selected_scale = scale[source_blocks]
+    selected_scale = jnp.where(active_blocks[..., None], selected_scale, 0.0)
+    selected_scale = jnp.repeat(selected_scale[..., None], 128, axis=-1)
+    selected_scale = selected_scale.reshape(
+        heads * output_blocks * contraction_tiles, 128
+    )
+    weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
+
+    def kernel(
+        latent_ref: Any,
+        weight_ref: Any,
+        scale_ref: Any,
+        output_ref: Any,
+        accumulator_ref: Any,
+    ) -> None:
+        contraction_index = pl.program_id(1)
+
+        @pl.when(contraction_index == 0)
+        def initialize_accumulator() -> None:
+            accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
+
+        decoded_weight = (
+            weight_ref[...].astype(jnp.float32)
+            * scale_ref[0, 0].astype(jnp.float32)
+        ).astype(jnp.bfloat16)
+        accumulator_ref[...] += lax.dot_general(
+            latent_ref[0, ...],
+            decoded_weight,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        )
+
+        @pl.when(contraction_index == contraction_tiles - 1)
+        def store_output() -> None:
+            output_ref[0, ...] = accumulator_ref[...].astype(jnp.bfloat16)
+
+    def latent_index(program_index: Any, contraction_index: Any) -> tuple[Any, int, Any]:
+        head = program_index // output_blocks
+        return head, 0, contraction_index
+
+    def source_block(program_index: Any) -> Any:
+        head = program_index // output_blocks
+        output_block = program_index % output_blocks
+        block = (
+            (head * combined_width + qk_nope_head_dim) // jnp.int32(128)
+            + output_block
+        )
+        return jnp.minimum(block, jnp.int32(scale.shape[0] - 1))
+
+    def weight_index(program_index: Any, contraction_index: Any) -> tuple[Any, Any]:
+        return source_block(program_index), contraction_index
+
+    def scale_index(program_index: Any, contraction_index: Any) -> tuple[Any, int]:
+        return (
+            program_index * contraction_tiles + contraction_index,
+            0,
+        )
+
+    def output_index(program_index: Any, contraction_index: Any) -> tuple[Any, int, int]:
+        del contraction_index
+        return program_index, 0, 0
+
+    call = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct(
+            (heads * output_blocks, 8, 128), jnp.bfloat16
+        ),
+        grid=(heads * output_blocks, contraction_tiles),
+        in_specs=(
+            pl.BlockSpec((1, 8, 128), latent_index),
+            pl.BlockSpec((128, 128), weight_index),
+            pl.BlockSpec((1, 128), scale_index),
+        ),
+        out_specs=pl.BlockSpec((1, 8, 128), output_index),
+        scratch_shapes=(pltpu.VMEM((8, 128), jnp.float32),),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel", "arbitrary"),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_structured_kv_b_value_"
+            f"h{heads}_l{latent}_v{value_width}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=2 * heads * latent * value_width,
+            bytes_accessed=(
+                heads * output_blocks * 8 * latent * 2
+                + heads * output_blocks * latent * 128
+                + selected_scale.size * 4
+                + heads * output_blocks * 8 * 128 * 2
+            ),
+            transcendentals=0,
+        ),
+    )
+    result = call(head_rows, weight_fp8, selected_scale)
+    result = result.reshape(heads, output_blocks, 8, 128)[:, :, 0, :]
+    aligned = jnp.concatenate((result[:, 0], result[:, 1]), axis=-1)
+    unaligned = jnp.concatenate(
+        (result[:, 0, 64:], result[:, 1], result[:, 2, :64]), axis=-1
+    )
+    value_offsets = (
+        jnp.arange(heads, dtype=jnp.int32) * combined_width
+        + qk_nope_head_dim
+    ) % 128
+    output = jnp.where(value_offsets[:, None] == 0, aligned, unaligned)
+    return output[None, ...].astype(jnp.bfloat16)
+
+
 def fp8_rmsnorm_block_matmul(
     hidden: Any,
     norm_weight: Any,

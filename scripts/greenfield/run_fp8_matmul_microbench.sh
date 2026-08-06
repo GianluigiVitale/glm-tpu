@@ -30,9 +30,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   exit 2
 }
 [[ $KERNEL == single_up || $KERNEL == rmsnorm_linear || $KERNEL == up_gate || \
-  $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down ]] || {
+  $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
+  $KERNEL == structured_kv_b ]] || {
   echo "FP8 kernel must be single_up, rmsnorm_linear, up_gate, selected_up_gate," \
-    "or selected_swiglu_down" >&2
+    "selected_swiglu_down, or structured_kv_b" >&2
   exit 2
 }
 [[ $SELECTED_CASE == normal_two || $SELECTED_CASE == concentrated_eight ]] || {
@@ -78,7 +79,7 @@ strict_census() {
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   local command
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[m]icrobench_collectives[.]py|[m]icrobench_pipeline_transport[.]py|[t]race_pipeline_transport[.]py|[r]un_real_one_layer[.]py|[m]icrobench_fp8_matmul[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[m]icrobench_collectives[.]py|[m]icrobench_pipeline_transport[.]py|[t]race_pipeline_transport[.]py|[r]un_real_one_layer[.]py|[m]icrobench_fp8_matmul[.]py|[m]icrobench_structured_kv_b[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
     --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
@@ -110,21 +111,34 @@ ROWS=8
 [[ $KERNEL != rmsnorm_linear ]] || ROWS=1
 (
   cd "$WORKTREE"
+  if [[ $KERNEL == structured_kv_b ]]; then
+    RUNNER=(
+      scripts/greenfield/microbench_structured_kv_b.py
+      --expected-code-hash "$PIN"
+      --output "$RUN_DIR/runner.json"
+      --hlo-dir "$RUN_DIR/hlo"
+      --warmup "$WARMUP"
+      --iterations "$ITERATIONS"
+    )
+  else
+    RUNNER=(
+      scripts/greenfield/microbench_fp8_matmul.py
+      --expected-code-hash "$PIN"
+      --output "$RUN_DIR/runner.json"
+      --hlo-output "$RUN_DIR/hlo/fp8_matmul.optimized_hlo.txt"
+      --kernel "$KERNEL"
+      --rows "$ROWS"
+      --selected-route-case "$SELECTED_CASE"
+      --warmup "$WARMUP"
+      --iterations "$ITERATIONS"
+    )
+  fi
   JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
     TPU_PROCESS_BOUNDS=1,1,1 \
     TPU_VISIBLE_DEVICES=0,1,2,3 \
     PYTHONPATH="$WORKTREE" \
-    /home/gianl/vllm-env/bin/python \
-      scripts/greenfield/microbench_fp8_matmul.py \
-      --expected-code-hash "$PIN" \
-      --output "$RUN_DIR/runner.json" \
-      --hlo-output "$RUN_DIR/hlo/fp8_matmul.optimized_hlo.txt" \
-      --kernel "$KERNEL" \
-      --rows "$ROWS" \
-      --selected-route-case "$SELECTED_CASE" \
-      --warmup "$WARMUP" \
-      --iterations "$ITERATIONS"
+    /home/gianl/vllm-env/bin/python "${RUNNER[@]}"
 ) >"$RUN_DIR/runner.log" 2>&1
 elapsed=$(( $(date +%s) - started ))
 say "runner completed in ${elapsed}s"
@@ -179,12 +193,16 @@ pv.record_item(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     item_id=(
         (
-            "m8_k2048_n6144"
-            if runner["kernel"] == "selected_swiglu_down"
+            "h16_p192_l512_v256"
+            if runner["kernel"] == "structured_kv_b"
             else (
-                "m1_k6144_n2048"
-                if runner["kernel"] == "rmsnorm_linear"
-                else "m8_k6144_n2048"
+                "m8_k2048_n6144"
+                if runner["kernel"] == "selected_swiglu_down"
+                else (
+                    "m1_k6144_n2048"
+                    if runner["kernel"] == "rmsnorm_linear"
+                    else "m8_k6144_n2048"
+                )
             )
         )
         + (
@@ -197,7 +215,7 @@ pv.record_item(
         "Raw-U8 E4M3FN 128x128 block-scaled expert projection: "
         + runner["kernel"]
     ),
-    gold="Bounded exact-fallback output and one compact Pallas custom call.",
+    gold="Bounded exact-fallback output and required compact Pallas calls.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=str(runner["checksum"]),
     correct=True,

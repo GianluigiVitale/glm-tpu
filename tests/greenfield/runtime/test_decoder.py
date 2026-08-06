@@ -52,6 +52,8 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         "greenfield_fp8_block_matmul_m8_k2048_n4096",
         "greenfield_fp8_block_matmul_m8_k6144_n640",
         "greenfield_fp8_block_matmul_m8_k4096_n6144",
+        "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512",
+        "greenfield_fp8_structured_kv_b_value_h16_l512_v256",
     )
     calls = [
         f'%{name} = bf16[1,128] custom-call(u8[1,128]), '

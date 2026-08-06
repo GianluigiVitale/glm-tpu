@@ -198,6 +198,8 @@ def _validate_pallas_stage_linear_decoder_calls(
         "greenfield_fp8_block_matmul_m8_k2048_n4096": layers,
         "greenfield_fp8_block_matmul_m8_k6144_n640": layers,
         "greenfield_fp8_block_matmul_m8_k4096_n6144": layers,
+        "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": layers,
+        "greenfield_fp8_structured_kv_b_value_h16_l512_v256": layers,
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": (
             dense_layers
         ),
@@ -219,6 +221,7 @@ def _validate_pallas_stage_linear_decoder_calls(
             "4096,2048",
             "576,6144",
             "6144,4096",
+            "7168,512",
             "3072,6144",
             "6144,3072",
         )

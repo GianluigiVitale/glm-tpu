@@ -21,6 +21,8 @@ from .pallas import (
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
+    fp8_structured_kv_b_q_absorb,
+    fp8_structured_kv_b_value,
     stage_local_sparse_mla_kernel,
 )
 from .reference.attention import (
@@ -579,9 +581,6 @@ def stage_local_index_share_fp8_mapped(
         layout=cache_layout,
         physical_page_count=cache.shape[0],
     )
-    local_kv_b_weight = dequantize_fp8_bits_block_weight(
-        kv_b_bits, kv_b_scale, block_shape=block_shape
-    )
     if (precomputed_normalized is None) != (precomputed_q_residual is None):
         raise ValueError(
             "IndexShare shared q_a intermediates must be supplied together"
@@ -683,19 +682,35 @@ def stage_local_index_share_fp8_mapped(
         cache,
     )
 
-    local_kv_b = local_kv_b_weight.reshape(
-        local_heads, combined_width, contract.kv_lora_rank
-    )
-    local_weight_uk = local_kv_b[:, : contract.qk_nope_head_dim, :]
-    local_weight_uv = jnp.transpose(
-        local_kv_b[:, contract.qk_nope_head_dim :, :], (0, 2, 1)
-    )
-    q_absorbed_local = jnp.einsum(
-        "rhp,hpl->rhl",
-        q_nope.astype(jnp.float32),
-        local_weight_uk.astype(jnp.float32),
-        preferred_element_type=jnp.float32,
-    ).astype(cache.dtype)
+    local_weight_uv = None
+    if linear_backend == "reference":
+        local_kv_b = dequantize_fp8_bits_block_weight(
+            kv_b_bits, kv_b_scale, block_shape=block_shape
+        ).reshape(local_heads, combined_width, contract.kv_lora_rank)
+        local_weight_uk = local_kv_b[:, : contract.qk_nope_head_dim, :]
+        local_weight_uv = jnp.transpose(
+            local_kv_b[:, contract.qk_nope_head_dim :, :], (0, 2, 1)
+        )
+        q_absorbed_local = jnp.einsum(
+            "rhp,hpl->rhl",
+            q_nope.astype(jnp.float32),
+            local_weight_uk.astype(jnp.float32),
+            preferred_element_type=jnp.float32,
+        ).astype(cache.dtype)
+    elif linear_backend == "pallas":
+        q_absorbed_local = fp8_structured_kv_b_q_absorb(
+            q_nope,
+            kv_b_bits,
+            kv_b_scale,
+            config=Fp8BlockMatmulConfig(
+                block_shape=block_shape,
+                output_tile=block_shape[0],
+                contraction_tile=block_shape[1],
+            ),
+            interpret=linear_interpret,
+        )
+    else:
+        raise ValueError("stage-local FP8 linear backend is unknown")
     packed_query = jnp.concatenate((q_absorbed_local, q_rope), axis=-1)
     gathered_query = lax.all_gather(
         packed_query,
@@ -756,12 +771,27 @@ def stage_local_index_share_fp8_mapped(
         local_heads,
         axis=1,
     )
-    value_states = jnp.einsum(
-        "rhl,hlv->rhv",
-        attended_local.astype(jnp.float32),
-        local_weight_uv.astype(jnp.float32),
-        preferred_element_type=jnp.float32,
-    ).astype(residual.dtype)
+    if linear_backend == "reference":
+        assert local_weight_uv is not None
+        value_states = jnp.einsum(
+            "rhl,hlv->rhv",
+            attended_local.astype(jnp.float32),
+            local_weight_uv.astype(jnp.float32),
+            preferred_element_type=jnp.float32,
+        ).astype(residual.dtype)
+    else:
+        value_states = fp8_structured_kv_b_value(
+            attended_local,
+            kv_b_bits,
+            kv_b_scale,
+            qk_nope_head_dim=contract.qk_nope_head_dim,
+            config=Fp8BlockMatmulConfig(
+                block_shape=block_shape,
+                output_tile=block_shape[0],
+                contraction_tile=block_shape[1],
+            ),
+            interpret=linear_interpret,
+        )
     local_update = _stage_fp8_linear(
         value_states.reshape(1, local_heads * contract.v_head_dim),
         o_bits,

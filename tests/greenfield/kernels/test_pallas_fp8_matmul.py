@@ -15,6 +15,8 @@ from glm_tpu.greenfield.kernels.pallas import (
     fp8_rmsnorm_block_matmul,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
+    fp8_structured_kv_b_q_absorb,
+    fp8_structured_kv_b_value,
 )
 from glm_tpu.greenfield.kernels.reference.fp8 import (
     dequantize_fp8_bits_block_weight,
@@ -174,6 +176,102 @@ def test_fp8_rmsnorm_block_matmul_rejects_contract_drift() -> None:
             scale,
             epsilon=0.0,
             interpret=True,
+        )
+
+
+def _structured_kv_b_case() -> tuple[
+    jax.Array,
+    jax.Array,
+    jax.Array,
+    jax.Array,
+    tuple[jax.Array, jax.Array],
+]:
+    from jax._src.pallas.mosaic import tpu_info
+
+    tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
+        tpu_info.ChipVersion.TPU_V4, 1
+    )
+    tpu_info.get_tpu_info.cache_clear()
+    # Two heads are the minimum exact layout covering both the aligned and
+    # 64-row-offset checkpoint cases. The protected TPU proof uses all 16.
+    heads, qk_nope, value_width, latent = 2, 192, 256, 512
+    combined = qk_nope + value_width
+    q_nope = jnp.asarray(
+        np.linspace(-0.25, 0.375, heads * qk_nope, dtype=np.float32).reshape(
+            1, heads, qk_nope
+        ),
+        dtype=jnp.bfloat16,
+    )
+    attended = jnp.asarray(
+        np.linspace(-0.375, 0.25, heads * latent, dtype=np.float32).reshape(
+            1, heads, latent
+        ),
+        dtype=jnp.bfloat16,
+    )
+    # E4M3FN 0x38 is exactly +1.0. Distinct scales in all 28 source blocks
+    # isolate row-offset/scale selection without compiling a second JAX oracle.
+    weight_bits = jnp.full((heads * combined, latent), 0x38, dtype=jnp.uint8)
+    scale_values = np.linspace(0.125, 1.0, 7 * 4, dtype=np.float32).reshape(7, 4)
+    scale = jnp.asarray(scale_values)
+    decoded = np.repeat(np.repeat(scale_values, 128, axis=0), 128, axis=1)
+    decoded = decoded[: heads * combined, :latent]
+    decoded = np.asarray(jnp.asarray(decoded, dtype=jnp.bfloat16)).astype(np.float32)
+    decoded = decoded.reshape(heads, combined, latent)
+    expected_absorbed = jnp.asarray(
+        np.einsum(
+            "rhp,hpl->rhl",
+            np.asarray(q_nope).astype(np.float32),
+            decoded[:, :qk_nope],
+            dtype=np.float32,
+        ),
+        dtype=jnp.bfloat16,
+    )
+    expected_value = jnp.asarray(
+        np.einsum(
+            "rhl,hvl->rhv",
+            np.asarray(attended).astype(np.float32),
+            decoded[:, qk_nope:],
+            dtype=np.float32,
+        ),
+        dtype=jnp.bfloat16,
+    )
+
+    return q_nope, attended, weight_bits, scale, (expected_absorbed, expected_value)
+
+
+def test_fp8_structured_kv_b_q_absorb_interpret_matches_reference() -> None:
+    q_nope, _, weight_bits, scale, expected = _structured_kv_b_case()
+    actual = fp8_structured_kv_b_q_absorb(
+        q_nope, weight_bits, scale, interpret=True
+    )
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected[0]))
+
+
+def test_fp8_structured_kv_b_value_interpret_matches_reference() -> None:
+    _, attended, weight_bits, scale, expected = _structured_kv_b_case()
+    actual = fp8_structured_kv_b_value(
+        attended, weight_bits, scale, interpret=True
+    )
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected[1]))
+
+
+def test_fp8_structured_kv_b_rejects_contract_drift() -> None:
+    bits = jnp.zeros((2 * 448, 512), dtype=jnp.uint8)
+    scale = jnp.ones((7, 4), dtype=jnp.float32)
+    q_nope = jnp.zeros((1, 2, 192), dtype=jnp.bfloat16)
+    attended = jnp.zeros((1, 2, 512), dtype=jnp.bfloat16)
+
+    with pytest.raises(ValueError, match="exact GLM"):
+        fp8_structured_kv_b_q_absorb(
+            q_nope[:, :, :128], bits, scale, interpret=True
+        )
+    with pytest.raises(ValueError, match="activation must be BF16"):
+        fp8_structured_kv_b_value(
+            attended.astype(jnp.float32), bits, scale, interpret=True
+        )
+    with pytest.raises(ValueError, match="scale shape"):
+        fp8_structured_kv_b_value(
+            attended, bits, jnp.ones((7, 3), dtype=jnp.float32), interpret=True
         )
 
 

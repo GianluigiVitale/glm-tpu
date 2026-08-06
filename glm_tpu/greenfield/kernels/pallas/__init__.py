@@ -8,6 +8,8 @@ from .fp8_matmul import (
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
     fp8_rmsnorm_block_matmul,
+    fp8_structured_kv_b_q_absorb,
+    fp8_structured_kv_b_value,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
 )
@@ -44,6 +46,8 @@ __all__ = [
     "fp8_fused_block_swiglu",
     "fp8_fused_selected_moe",
     "fp8_rmsnorm_block_matmul",
+    "fp8_structured_kv_b_q_absorb",
+    "fp8_structured_kv_b_value",
     "fp8_selected_swiglu_down",
     "fp8_selected_up_gate",
     "local_topk_candidates_kernel",
