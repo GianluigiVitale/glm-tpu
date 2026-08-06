@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from hashlib import sha256
 from io import BytesIO
-import json
 from pathlib import Path
 
 import numpy as np
@@ -25,11 +25,11 @@ from glm_tpu.greenfield.model import (
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
 )
+from glm_tpu.greenfield.types import ExecutionPlan
 from tests.greenfield.checkpoint.test_runtime_pack import (
     _small_plan,
     _source_plans,
 )
-
 
 SOURCE_MANIFEST_SHA = "2" * 64
 SOURCE_LAYOUT_SHA = "3" * 64
@@ -67,8 +67,12 @@ def _source_file(plan: object) -> bytes:
     return plan.header + bytes([1]) * plan.payload_bytes
 
 
-def _build_artifact(tmp_path: Path) -> tuple[object, object, object, object]:
-    plan = _small_plan()
+def _build_artifact(
+    tmp_path: Path,
+    plan: ExecutionPlan | None = None,
+) -> tuple[object, object, object, object]:
+    if plan is None:
+        plan = _small_plan()
     schedule = build_pipeline_schedule(plan)
     layout = build_decoder_runtime_weight_layout(plan, schedule)
     source_plans = _source_plans(layout)

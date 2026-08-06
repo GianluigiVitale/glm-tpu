@@ -82,6 +82,10 @@ from .runtime_feature import (
     build_feature_runtime_layout_document,
     stream_feature_runtime_stage,
 )
+from .runtime_feature_loader import (
+    FeatureRuntimeCheckpointLoadExpectation,
+    verify_feature_runtime_packed_checkpoint,
+)
 from .runtime_loader import (
     LoadedRuntimeCheckpoint,
     RuntimeCheckpointLoadExpectation,
@@ -129,6 +133,7 @@ __all__ = (
     "RUNTIME_PACK_CONTROL_KIND",
     "DestinationFilePlan",
     "DestinationTensorPlan",
+    "FeatureRuntimeCheckpointLoadExpectation",
     "FeatureRuntimeDestinationFilePlan",
     "FeatureRuntimeSourceEvidence",
     "FeatureRuntimeTensorEvidence",
@@ -191,6 +196,7 @@ __all__ = (
     "stream_runtime_weight_file",
     "validate_gate_c_layout",
     "validate_gate_c_layout_bindings",
+    "verify_feature_runtime_packed_checkpoint",
     "verify_full_packed_checkpoint",
     "verify_gate_c_load_contract",
     "verify_one_layer_load_contract",

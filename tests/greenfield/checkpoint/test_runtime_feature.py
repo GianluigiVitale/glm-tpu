@@ -5,16 +5,23 @@ import struct
 from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from glm_tpu.greenfield.checkpoint import (
+    FEATURE_RUNTIME_FORMAT_VERSION,
+    FEATURE_RUNTIME_PACK_CONTROL_KIND,
+    FEATURE_RUNTIME_PACKED_ARTIFACT_KIND,
+    FeatureRuntimeCheckpointLoadExpectation,
     build_feature_runtime_destination_file_plans,
     build_feature_runtime_layout_document,
     build_runtime_destination_file_plans,
     stream_feature_runtime_stage,
     stream_runtime_weight_file,
+    verify_feature_runtime_packed_checkpoint,
+    verify_runtime_packed_checkpoint,
 )
 from glm_tpu.greenfield.errors import CheckpointValidationError
 from glm_tpu.greenfield.model import (
@@ -23,10 +30,20 @@ from glm_tpu.greenfield.model import (
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
 )
+from tests.greenfield.checkpoint.test_runtime_loader import (
+    _build_artifact,
+    _mapping_hash,
+    _write_json,
+)
 from tests.greenfield.checkpoint.test_runtime_pack import (
     _small_feature_source_plan,
     _source_file,
     _source_plans,
+)
+
+FEATURE_PACK_CODE_HASH = "5" * 40
+FEATURE_DESTINATION = (
+    "gs://driftbench-dsv4-uc/checkpoints/greenfield/test/runtime-feature"
 )
 
 
@@ -322,4 +339,198 @@ def test_feature_runtime_stage_refuses_truncated_authenticated_source() -> None:
             verified_source_file_sha256=source_file_hashes,
             source_tensor_sha256=source_tensor_hashes,
             chunk_bytes=7,
+        )
+
+
+def _build_feature_artifact(tmp_path: Path) -> tuple[object, object, object]:
+    source_plan = _small_feature_source_plan()
+    source_root = tmp_path / "source-runtime"
+    source_layout, source_packed, source_expectation, _ = _build_artifact(
+        source_root,
+        source_plan,
+    )
+    source_checkpoint = verify_runtime_packed_checkpoint(
+        source_root,
+        source_expectation,
+        source_layout,
+        source_packed,
+    )
+    target_plan = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+    target_schedule = build_pipeline_schedule(target_plan)
+    target_layout = build_decoder_feature_runtime_weight_layout(
+        target_plan,
+        target_schedule,
+        source_layout,
+    )
+    plans = build_feature_runtime_destination_file_plans(
+        target_layout,
+        source_checkpoint.plans,
+        source_runtime_manifest_sha256=source_expectation.runtime_manifest_sha256,
+    )
+    target_root = tmp_path / "feature-runtime"
+    target_root.mkdir()
+    layout_document = build_feature_runtime_layout_document(target_layout)
+    layout_path = target_root / "runtime_layout.json"
+    _write_json(layout_path, layout_document)
+    common: dict[str, object] = {
+        "destination": FEATURE_DESTINATION,
+        "file_count": len(plans),
+        "format_version": FEATURE_RUNTIME_FORMAT_VERSION,
+        "model_id": "zai-org/GLM-5.2-FP8",
+        "pack_code_hash": FEATURE_PACK_CODE_HASH,
+        "padding_bytes": sum(device.padding_bytes for device in target_layout.devices),
+        "plan_hash": target_layout.plan_hash,
+        "plan_id": "PP8_LP4",
+        "routed_expert_layout": target_layout.routed_expert_layout,
+        "runtime_file_bytes": sum(plan.file_bytes for plan in plans),
+        "runtime_layout_hash": target_layout.layout_hash,
+        "runtime_layout_manifest_sha256": layout_document["manifest_sha256"],
+        "runtime_payload_bytes": sum(plan.payload_bytes for plan in plans),
+        "schedule_hash": target_layout.schedule_hash,
+        "source_checkpoint_destination": source_expectation.destination,
+        "source_payload_bytes": sum(
+            device.source_bytes for device in target_layout.devices
+        ),
+        "source_runtime_layout_hash": source_expectation.runtime_layout_hash,
+        "source_runtime_layout_manifest_sha256": (
+            source_expectation.runtime_layout_manifest_sha256
+        ),
+        "source_runtime_manifest_sha256": (source_expectation.runtime_manifest_sha256),
+        "source_tensor_count": target_layout.source_leaf_count,
+        "tensor_count": len(target_layout.specs) * len(target_layout.devices),
+    }
+    control: dict[str, object] = {
+        "artifact_kind": FEATURE_RUNTIME_PACK_CONTROL_KIND,
+        **common,
+        "runtime_layout_file_sha256": sha256(layout_path.read_bytes()).hexdigest(),
+    }
+    control["control_sha256"] = _mapping_hash(control, "control_sha256")
+    _write_json(target_root / "control.json", control)
+
+    source_file_hashes = {
+        filename: record["sha256"]
+        for filename, record in source_checkpoint.evidence_by_filename.items()
+    }
+    source_tensor_hashes = {
+        (filename, tensor["name"]): tensor["sha256"]
+        for filename, record in source_checkpoint.evidence_by_filename.items()
+        for tensor in record["tensors"]
+    }
+    records = []
+    for stage_id in range(8):
+        source_stage = tuple(
+            plan for plan in source_checkpoint.plans if plan.stage_id == stage_id
+        )
+        destination_stage = tuple(plan for plan in plans if plan.stage_id == stage_id)
+        source_streams = {
+            plan.device_slot: (source_checkpoint.root / plan.filename).open("rb")
+            for plan in source_stage
+        }
+        output_streams = {}
+        try:
+            for plan in destination_stage:
+                path = target_root / plan.filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                output_streams[plan.device_slot] = path.open("wb")
+            stage_evidence = stream_feature_runtime_stage(
+                source_plans=source_stage,
+                destination_plans=destination_stage,
+                sources=source_streams,
+                outputs=output_streams,
+                verified_source_file_sha256=source_file_hashes,
+                source_tensor_sha256=source_tensor_hashes,
+                chunk_bytes=31,
+            )
+        finally:
+            for stream in (*source_streams.values(), *output_streams.values()):
+                stream.close()
+        for plan, evidence in zip(destination_stage, stage_evidence, strict=True):
+            record = evidence.to_dict()
+            record["destination_filename"] = record.pop("filename")
+            record.update(
+                {
+                    "crc32c": "AAAAAA==",
+                    "device_id": plan.device_id,
+                    "device_slot": plan.device_slot,
+                    "generation": plan.device_id + 1,
+                    "header_bytes": len(plan.header),
+                    "header_sha256": sha256(plan.header).hexdigest(),
+                    "runtime_layout_hash": target_layout.layout_hash,
+                    "source_runtime_manifest_sha256": (
+                        source_expectation.runtime_manifest_sha256
+                    ),
+                    "stage_id": plan.stage_id,
+                    "tensor_count": len(plan.tensors),
+                }
+            )
+            records.append(record)
+            _write_json(
+                target_root / "evidence" / f"{plan.filename}.json",
+                record,
+            )
+    manifest: dict[str, object] = {
+        "artifact_kind": FEATURE_RUNTIME_PACKED_ARTIFACT_KIND,
+        **common,
+        "control_sha256": control["control_sha256"],
+        "files": records,
+    }
+    manifest["manifest_sha256"] = _mapping_hash(manifest, "manifest_sha256")
+    _write_json(target_root / "runtime_manifest.json", manifest)
+    (target_root / "SUCCESS").write_text(
+        f"{manifest['manifest_sha256']}  runtime_manifest.json\n"
+    )
+    expectation = FeatureRuntimeCheckpointLoadExpectation(
+        runtime_manifest_sha256=manifest["manifest_sha256"],
+        runtime_layout_manifest_sha256=layout_document["manifest_sha256"],
+        runtime_layout_hash=target_layout.layout_hash,
+        source_runtime_manifest_sha256=(source_expectation.runtime_manifest_sha256),
+        source_runtime_layout_manifest_sha256=(
+            source_expectation.runtime_layout_manifest_sha256
+        ),
+        source_runtime_layout_hash=source_expectation.runtime_layout_hash,
+        plan_hash=target_layout.plan_hash,
+        schedule_hash=target_layout.schedule_hash,
+        pack_code_hash=FEATURE_PACK_CODE_HASH,
+        destination=FEATURE_DESTINATION,
+        source_destination=source_expectation.destination,
+    )
+    return target_layout, source_checkpoint, expectation
+
+
+def test_feature_runtime_artifact_verifier_pins_every_transform(
+    tmp_path: Path,
+) -> None:
+    target_layout, source_checkpoint, expectation = _build_feature_artifact(tmp_path)
+    target_root = tmp_path / "feature-runtime"
+    verified = verify_feature_runtime_packed_checkpoint(
+        target_root,
+        expectation,
+        target_layout,
+        source_checkpoint,
+    )
+    assert len(verified.plans) == 32
+    assert len(verified.evidence_by_filename) == 32
+
+    plan = verified.plans[12]
+    sidecar = target_root / "evidence" / f"{plan.filename}.json"
+    value = json.loads(sidecar.read_text())
+    gate = next(
+        tensor
+        for tensor in value["tensors"]
+        if tensor["name"] == "sparse.slot_00.experts.gate_proj.weight_bits"
+    )
+    gate["sources"][0]["feature_slice"]["start"] += 1
+    _write_json(sidecar, value)
+    with pytest.raises(
+        CheckpointValidationError,
+        match="tensor evidence drifted|sidecar disagrees",
+    ):
+        verify_feature_runtime_packed_checkpoint(
+            target_root,
+            expectation,
+            target_layout,
+            source_checkpoint,
         )
