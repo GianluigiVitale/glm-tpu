@@ -4,6 +4,20 @@ No greenfield full-decoder model-performance measurement exists yet. The real-la
 checkpoint-backed model compute; all other results are protected synthetic TPU mechanisms. None
 reports token speed.
 
+## 2026-08-06 — complete feature-runtime checkpoint, not performance
+
+`greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z` is the complete executable PP8
+checkpoint selected by DB 441. At pack code `d9a883b`, 32 files contain 834,177,357,824 payload
+bytes and exactly 26,068,042,432 runtime weight bytes/chip. Manifest `54e2f89b...d9917`, layout
+`ba21c4ec...c9e`, plan `f46f91c3...826a`, schedule `b407fcf5...1773`, source transformation,
+file hashes, remote generation/CRC32C, mounted verification, approved archive, and 8/8 cleanup pass.
+
+Commits `74a2952`, `33aa420`, and `aff0f42` bind the corresponding default-off feature-MoE backend
+to the complete decoder and fail before execution unless optimized HLO contains 75 each of the exact
+three raw-U8 production kernels with no decoded full-expert overlay. Focused coverage is 14/14. No
+TPU decoder-body execution, complete token, latency, or tok/s claim is attached to this artifact or
+these commits; the protected 78-layer body compile/load is the next discriminator.
+
 ## 2026-08-05 — protected Gate C correctness, not performance
 
 DB 421 / `greenfield_gate_c_pp8_20260805T224645828157364Z` executes real dense, full-DSA, and

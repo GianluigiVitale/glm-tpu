@@ -4690,3 +4690,29 @@ remains about `1.577 ms`, while fresh-XPlane psum time collapses from `2.788` to
 busy time from `4.690` to `1.902 ms`. Thus the old physical-psum duration was arrival skew, and
 feature sharding removes it. DB/archive/hash/remote-SUCCESS and 8/8 cleanup pass. Promote this
 routed ownership into the complete PP8 runtime artifact; no decoder or tok/s claim exists yet.
+
+## 2026-08-06 07:26 — Complete 834 GB feature runtime verified; decoder binding fails closed before execution
+
+The complete PP8 feature-runtime derivative passed as
+`greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z` at exact pack code `d9a883b`.
+It contains 32 final-owner files / 834,178,632,960 file bytes / 834,177,357,824 payload bytes,
+with 84,054,798,080 padding bytes and exactly 26,068,042,432 runtime weight bytes/chip. Runtime
+manifest `54e2f89b...d9917`, layout `ba21c4ec...c9e`, layout-manifest
+`8a52b764...3966`, plan `f46f91c3...826a`, and schedule `b407fcf5...1773` bind 14,640 source
+tensor uses to 11,648 final tensor records. The immutable source is runtime manifest
+`fdedaae3...e31dec` / layout `841a18f6...ac`; transformation, offline transpose, tensor/file
+hashes, GCS generation/CRC32C, mounted verification, checkpoint/result `SUCCESS`, approved archive,
+and authenticated 8/8 post-census all pass. This is a complete checkpoint artifact, not TPU compute,
+a decoder, or tok/s evidence.
+
+Commits `74a2952`, `33aa420`, and `aff0f42` then bind the selected feature ownership to the real
+78-layer decoder behind a default-off backend. Runtime/backend mismatch fails before JAX
+initialization. The protected compiler loads final owners directly and requires optimized HLO to
+contain exactly 75 each of `greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512`,
+`greenfield_fp8_block_up_gate_m8_k6144_n512`, and
+`greenfield_fp8_block_matmul_m8_k512_n6144`; it rejects any decoded
+`bf16/f32[256,6144,512]` or `[256,512,6144]` expert overlay. HLO drift is preserved and aborts
+before first invocation. Focused runtime/feature/decoder tests pass 14/14; E/F/I/UP and compile
+checks pass. Protected metal remains mandatory: next run is the 78-layer/2K feature-body compile,
+direct load, local-only HLO, peak-HBM, and fail-before-execute discriminator. No token-speed claim
+exists until the complete token path and Gate D pass.

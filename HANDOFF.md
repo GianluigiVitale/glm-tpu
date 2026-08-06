@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 06:05 UTC
+**Updated:** 2026-08-06 07:26 UTC
 
 ## Authority and isolation
 
@@ -104,6 +104,20 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   XPlane shows the physical psum collapse from `2.787760` to `0.028511 ms`; peak HBM is
   2,430,860,800 bytes/chip. DB/archive/hashes/remote `SUCCESS` and 8/8 cleanup pass. Select this
   routed layout for PP8 full-runtime integration. This is a real layer, not decoder or tok/s proof.
+- Complete feature-runtime derivative
+  `greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z` passed at pack code `d9a883b`.
+  It writes 32 files / 834,178,632,960 file bytes and 834,177,357,824 payload bytes, with exactly
+  26,068,042,432 runtime weight bytes/chip. Manifest `54e2f89b...d9917`, layout
+  `ba21c4ec...c9e`, plan `f46f91c3...826a`, and schedule `b407fcf5...1773` bind every source
+  tensor hash, feature slice, offline transpose, destination tensor/file hash, GCS generation and
+  CRC32C, and protected source runtime `fdedaae3...e31dec`. Mounted verification, checkpoint/result
+  `SUCCESS`, approved archive, and 8/8 post-census pass. This is a complete executable checkpoint
+  artifact, not a decoder or tok/s result.
+- Commits `74a2952`, `33aa420`, and `aff0f42` bind the default-off Pallas feature-MoE backend to
+  the 78-layer decoder, require the exact feature checkpoint layout, require 75 each of the three
+  production raw-U8 kernels, forbid decoded full-expert overlays, and abort before first execution
+  on HLO drift. Focused runtime/feature/decoder coverage is 14/14; protected full-body metal proof
+  is still required.
 - Final-layout PP16 artifact `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes
   two independently hashed 4,855,045,080-byte files at pack code `51d1df9`: experts
   `0:128/128:256`, shared intermediate `0:1024/1024:2048`, manifest
@@ -374,14 +388,13 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Extend the offline complete-runtime derivative and direct loader to DB 441's selected
-   expert-intermediate PP8 ownership. Stream and checksum every final shard; do not runtime-repack
-   the model or weaken the existing full-pack/load evidence.
-2. Bind the DB 441 layer composition to the complete runtime artifact, add embedding/final norm/
-   distributed logits/token control, and prove complete 2K/8K Gate D with raw tokens, exact
-   DSA/cache state, local-only HLO, measured HBM, fresh trace, and profiler-free steady wall. Do not
-   attempt 128K/256K before Gate D passes.
+1. Run the protected 78-layer/2K PP8 feature-body compile/load from final-owner files. Require 75
+   of each raw-U8 production kernel, local-only collectives, no decoded expert overlay, direct-load
+   counters, measured HBM, preserved HLO on failure, and abort before first execution on drift.
+2. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
+   Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
+   profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
 3. Implement identical-condition raw-FP8 PP16 and WS32 challengers, adjudicate by protected wall,
-   then continue Gates E-H in binding order. No one-layer result is a decoder or tok/s claim.
+   then continue Gates E-H in binding order. No body-only result is a decoder or tok/s claim.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.

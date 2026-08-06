@@ -31,6 +31,7 @@ fleet agreement, and eight-host clean pre/post census.
 | 438 | `greenfield_real_layer_pp8_pallas_20260806T050514347248323Z` | exact final-layout raw-FP8 PP8 MoE layer; correctness/locality pass, latency rejected |
 | 439 | `greenfield_real_layer_pp8_pallas_20260806T052141734174170Z` | fused routed raw-FP8 PP8 layer; exactness/locality pass, 1.3–1.5% wall win, performance rejected |
 | 440 | `greenfield_real_layer_pp8_pallas_20260806T052955364574577Z` | fully fused routed/shared raw-FP8 layer; all protection gates pass, 0.8–1.5% regression vs DB 439, rejected |
+| 441 | `greenfield_real_layer_pp8_pallas_feature_20260806T055854589778101Z` | feature-sharded raw-FP8 PP8 layer; exactness/locality pass, route-skew removed, selected for decoder integration |
 
 Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
 `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
@@ -77,6 +78,16 @@ layout is `e613d9ef655f7add11f8b9fd9e0fd630343c09b714882f967c405986cc6cc431`, pa
 9,716,380,672 bytes, and source Pallas manifest is `3da63bd9...e427`. Exact transformation,
 file/payload hashes, local/remote `SUCCESS`, and direct loading with zero runtime dequantization,
 concat, or transpose pass. Protected DB 441 is bound to this artifact.
+
+`greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z` extends that selected ownership to
+the complete PP8 base decoder. Pack code `d9a883b` writes 32 files / 834,178,632,960 file bytes,
+834,177,357,824 payload bytes, 84,054,798,080 padding bytes, and 26,068,042,432 runtime weight
+bytes/chip. Runtime manifest `54e2f89b...d9917`, layout `ba21c4ec...c9e`, plan
+`f46f91c3...826a`, and schedule `b407fcf5...1773` bind 14,640 source tensor uses to 11,648 final
+tensor records and protected source runtime `fdedaae3...e31dec`. Mounted verification, GCS
+generation/CRC32C checks, checkpoint/result `SUCCESS`, approved archive, and 8/8 cleanup pass. This
+is the executable final-layout checkpoint selected for the PP8 feature decoder; it is not TPU
+execution, decoder latency, or token-throughput evidence.
 
 `greenfield_gate_c_oracle_20260805T212801776974822Z` is the independent layer-2/3 Gate C
 correctness artifact at code `602d42f`. It reads 31 raw tensors from source shards 20/38/40 at the
