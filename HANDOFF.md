@@ -790,3 +790,37 @@ The first attempt `...T202503456286091Z` failed closed during remote verificatio
 gcloud schema calls the field `crc32c_hash`; it has no `SUCCESS` and no claim. Relevant CPU/runtime/
 HLO regressions pass 38/38 when explicitly pinned to the CPU backend. Gate D remains open until the
 real prompt produces exact raw tokens and all DSA/cache/trace/wall/HBM protections pass.
+
+## All-event DSA observer and fresh-oracle capture
+
+Commits `564145f` and `dce2588` extend the greenfield decoder observer and independent legacy-oracle
+sealer from one event to every recurrent DSA producer event. The production decoder remains
+observer-off. The compact oracle contract pins 14 recurrent steps × 21 producer layers, exact causal
+selected sets, score tensors, lowest-position tie order, sentinel tails, source dump checksums, token
+oracle, DB row, source fork/harness, and append-only archive provenance. Commit `6856f8e` adds a hard
+eight-host disk-reserve preflight so a full capture cannot begin below 10 GiB free per host.
+
+Protected capture `greenfield_short_context_dsa_oracle_20260806T212500Z` loaded the complete legacy
+model but failed closed before engine construction/decode. The load checksum reported
+`verified=1882 mismatches=0 skipped=312`; the independent state manifest then caught the known
+canonical-streamer finite zero-fill on worker 3 at
+`layers.10.self_attn.indexer.glm_dsa_adapted_wk` (expected sum `191463636`, observed `0`) and the
+fused leaf (expected `239851472`, observed `48387836`). Six other hosts reached exact
+`leaves=2455 combined=371110325`; worker 0 did not complete final verification after the peer
+refusal. No DSA artifact or result was accepted. Failure diagnostics were preserved and stop/census
+both prove 8/8 zero work.
+
+The failure was a capture-wrapper omission, not a new decoder/kernel fault: it omitted the already
+metal-validated PWAL OOB self-healer. Commit `3c45b47` fixes the methodology. Capture now requires
+the approved `driftbench-dsv4-uc` read-only gcsfuse model mirror on every host, arms exact
+`GLM_WK_OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8` and
+`GLM_WK_OOB_GOLDEN=/tmp/golden.json`, binds both values into the DB/sealed-oracle contract, and
+accepts only eight independent worker-log checksum plus exact final-manifest proofs with no refusal.
+Repair messages are retained when a strike occurs but are not required on a clean draw. Shellcheck,
+syntax, affected CPU tests, and the matcher against the preserved failed draw pass; the matcher
+correctly reports six exact hosts and refuses workers 0/3.
+
+Exact next: after authenticated zero-work/disk/session cleanup, retry the protected fresh all-event
+DSA capture at pin `3c45b47`; require repaired-or-clean 8/8 final state, correct raw item, complete
+step/event dump coverage, sealed compact oracle, approved archive/SUCCESS, and 8/8 cleanup. Then bind
+the separate observer replay to that oracle and run the protected real-prompt 2K Gate D comparison.
