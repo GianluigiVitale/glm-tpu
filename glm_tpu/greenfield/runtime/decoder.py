@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from ..errors import PlanValidationError
 from ..kernels.layer import (
@@ -12,6 +13,7 @@ from ..kernels.layer import (
     DenseFp8Weights,
     DsaFp8Weights,
     MoeFp8Weights,
+    SparseMoeBackend,
     stage_local_transformer_layer_fp8_mapped,
 )
 from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
@@ -19,7 +21,11 @@ from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.moe import GlmMoeNumericalContract
 from ..model.schedule import PipelineSchedule, StageExecution
 from ..model.state import DecoderStateLayout
-from ..model.weights import DecoderRuntimeWeightLayout
+from ..model.weights import (
+    COMPLETE_EXPERT_RUNTIME_LAYOUT,
+    FEATURE_EXPERT_RUNTIME_LAYOUT,
+    DecoderRuntimeWeightLayout,
+)
 from ..sharding.hlo_contract import parse_hlo_module
 from ..types import ExecutionPlan
 from .pipeline import (
@@ -106,6 +112,75 @@ class DecoderStepProgram:
     schedule_hash: str
     state_layout_hash: str
     weight_layout_hash: str
+    sparse_moe_backend: SparseMoeBackend
+
+
+def _validate_pallas_feature_decoder_calls(
+    optimized_hlo: str,
+    *,
+    sparse_layers: int,
+) -> dict[str, Any]:
+    """Pin every production feature-MoE kernel and reject weight overlays."""
+
+    kernel_names = (
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512",
+        "greenfield_fp8_block_up_gate_m8_k6144_n512",
+        "greenfield_fp8_block_matmul_m8_k512_n6144",
+    )
+    custom_calls = [
+        line.strip()
+        for line in optimized_hlo.splitlines()
+        if 'custom_call_target="tpu_custom_call"' in line
+    ]
+    calls_by_kernel = {
+        name: [line for line in custom_calls if name in line]
+        for name in kernel_names
+    }
+    kernel_counts = {
+        name: len(lines) for name, lines in calls_by_kernel.items()
+    }
+    expected_kernel_counts = {name: sparse_layers for name in kernel_names}
+    violations = []
+    if kernel_counts != expected_kernel_counts:
+        violations.append(
+            "decoder feature-Pallas kernel counts drifted: "
+            f"expected={expected_kernel_counts} observed={kernel_counts}"
+        )
+
+    selected_name = kernel_names[0]
+    selected_lines = calls_by_kernel[selected_name]
+    malformed_selected = [
+        line
+        for line in selected_lines
+        if line.count("u8[256,6144,512]") < 2
+        or "u8[256,512,6144]" not in line
+    ]
+    if malformed_selected:
+        violations.append(
+            "decoder feature-Pallas selected kernels lack exact raw-U8 tables"
+        )
+
+    forbidden_shapes = (
+        "bf16[256,6144,512]",
+        "f32[256,6144,512]",
+        "bf16[256,512,6144]",
+        "f32[256,512,6144]",
+    )
+    forbidden_overlays = [
+        shape for shape in forbidden_shapes if shape in optimized_hlo
+    ]
+    if forbidden_overlays:
+        violations.append(
+            "decoder contains complete decoded routed-expert overlays: "
+            f"{forbidden_overlays}"
+        )
+    return {
+        "expected_kernel_counts": expected_kernel_counts,
+        "forbidden_decoded_expert_overlays": forbidden_overlays,
+        "kernel_counts": kernel_counts,
+        "passed": not violations,
+        "violations": violations,
+    }
 
 
 def validate_decoder_step_hlo(
@@ -119,7 +194,11 @@ def validate_decoder_step_hlo(
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
-    if backend_contract not in ("cpu_reference", "tpu_v4_pp8_reference"):
+    if backend_contract not in (
+        "cpu_reference",
+        "tpu_v4_pp8_reference",
+        "tpu_v4_pp8_pallas_feature",
+    ):
         raise PlanValidationError("decoder HLO backend contract is unknown")
     skeleton = PipelineSkeletonConfig(
         config.stage_count,
@@ -146,6 +225,7 @@ def validate_decoder_step_hlo(
     expected_reduction_result_shape_counts: dict[str, int] = {}
     reduction_component_count = 0
     expected_reduction_component_count = 0
+    sparse_layers = 0
     if backend_contract == "cpu_reference":
         expected_gathers = 4 * layers + 3 * full_layers
         expected_reductions = 2 * layers
@@ -226,7 +306,10 @@ def validate_decoder_step_hlo(
             f"decoder collective counts drifted: expected={expected_counts} "
             f"observed={observed_counts}"
         )
-    if backend_contract == "tpu_v4_pp8_reference":
+    if backend_contract in (
+        "tpu_v4_pp8_reference",
+        "tpu_v4_pp8_pallas_feature",
+    ):
         if reduction_arity_counts != expected_reduction_arity_counts:
             violations.append(
                 "decoder physical all-reduce tuple arities drifted: "
@@ -288,6 +371,13 @@ def validate_decoder_step_hlo(
             f"decoder expected {config.total_devices} partitions, "
             f"found {module.num_partitions}"
         )
+    pallas_feature_contract: dict[str, Any] = {}
+    if backend_contract == "tpu_v4_pp8_pallas_feature":
+        pallas_feature_contract = _validate_pallas_feature_decoder_calls(
+            optimized_hlo,
+            sparse_layers=sparse_layers,
+        )
+        violations.extend(pallas_feature_contract["violations"])
     return {
         "backend_contract": backend_contract,
         "collective_count": len(collectives),
@@ -308,6 +398,7 @@ def validate_decoder_step_hlo(
         "layer_count": layers,
         "module_name": module.name,
         "num_partitions": module.num_partitions,
+        "pallas_feature_contract": pallas_feature_contract,
         "passed": not violations,
         "violations": violations,
     }
@@ -396,6 +487,7 @@ def _execute_stage(
     moe_contract: GlmMoeNumericalContract,
     cache_layout: StageLocalKvLayout,
     block_shape: tuple[int, int],
+    sparse_moe_backend: SparseMoeBackend,
 ) -> tuple[Any, Any, Any, Any]:
     import jax.numpy as jnp
 
@@ -462,6 +554,7 @@ def _execute_stage(
             cache_layout=cache_layout,
             axis_index_groups=axis_groups,
             block_shape=block_shape,
+            sparse_moe_backend=sparse_moe_backend,
         )
         residual = result.output
         kv_cache = kv_cache.at[layer.stage_slot].set(result.kv_cache)
@@ -500,11 +593,26 @@ def build_decoder_step_program(
     *,
     devices: Sequence[Any] | None = None,
     axis_name: str = "device",
+    sparse_moe_backend: SparseMoeBackend = "reference",
 ) -> DecoderStepProgram:
     """Build, but do not compile, the complete all-stage decode-step map."""
 
     if not axis_name:
         raise PlanValidationError("decoder axis name must be explicit")
+    if sparse_moe_backend not in ("reference", "pallas_feature"):
+        raise PlanValidationError("decoder sparse MoE backend is unknown")
+    expected_expert_layout = (
+        COMPLETE_EXPERT_RUNTIME_LAYOUT
+        if sparse_moe_backend == "reference"
+        else FEATURE_EXPERT_RUNTIME_LAYOUT
+    )
+    if weight_layout.routed_expert_layout != expected_expert_layout:
+        raise PlanValidationError(
+            "decoder sparse MoE backend and runtime expert layout disagree: "
+            f"backend={sparse_moe_backend!r} "
+            f"expected={expected_expert_layout!r} "
+            f"observed={weight_layout.routed_expert_layout!r}"
+        )
     hashes = (
         schedule.plan_hash,
         state_layout.plan_hash,
@@ -542,10 +650,11 @@ def build_decoder_step_program(
     stage_by_rank, slot_by_rank = _partition_maps(canonical_groups, skeleton)
 
     import jax
-    from jax import lax
     import jax.numpy as jnp
     import numpy as np
-    from jax.sharding import Mesh, PartitionSpec as P
+    from jax import lax
+    from jax.sharding import Mesh
+    from jax.sharding import PartitionSpec as P
 
     runtime_devices = tuple(jax.devices() if devices is None else devices)
     if len(runtime_devices) != config.total_devices:
@@ -642,6 +751,7 @@ def build_decoder_step_program(
                     moe_contract=moe_contract,
                     cache_layout=cache_layout,
                     block_shape=geometry.fp8_block_shape,
+                    sparse_moe_backend=sparse_moe_backend,
                 ),
                 lambda values: values,
                 (residual, kv_cache, index_cache, metadata),
@@ -691,4 +801,5 @@ def build_decoder_step_program(
         schedule_hash=schedule.schedule_hash,
         state_layout_hash=state_layout.state_layout_hash,
         weight_layout_hash=weight_layout.layout_hash,
+        sparse_moe_backend=sparse_moe_backend,
     )

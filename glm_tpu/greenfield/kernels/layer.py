@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple, Sequence
+from collections.abc import Sequence
+from typing import Any, Literal, NamedTuple
 
 import jax.numpy as jnp
 
@@ -17,7 +18,10 @@ from .stage_local import (
     stage_local_dsa_fp8_mapped,
     stage_local_index_share_fp8_mapped,
     stage_local_moe_fp8_mapped,
+    stage_local_moe_pallas_feature_mapped,
 )
+
+SparseMoeBackend = Literal["reference", "pallas_feature"]
 
 
 class AttentionFp8Weights(NamedTuple):
@@ -111,6 +115,7 @@ def stage_local_transformer_layer_fp8_mapped(
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
+    sparse_moe_backend: SparseMoeBackend = "reference",
 ) -> StageLocalLayerFp8Result:
     """Execute exact DSA/IndexShare, sparse MLA, and dense or MoE MLP."""
 
@@ -118,6 +123,8 @@ def stage_local_transformer_layer_fp8_mapped(
         raise ValueError("layer indexer kind must be full or shared")
     if mlp_kind not in ("dense", "sparse"):
         raise ValueError("layer MLP kind must be dense or sparse")
+    if sparse_moe_backend not in ("reference", "pallas_feature"):
+        raise ValueError("layer sparse MoE backend is unknown")
     if (dsa is None) != (indexer_kind == "shared"):
         raise ValueError("full DSA weights must exist only for a full indexer")
     if (dense is None) != (mlp_kind == "sparse"):
@@ -249,7 +256,12 @@ def stage_local_transformer_layer_fp8_mapped(
             post_attention_norm_weight,
             epsilon=rms_norm_epsilon,
         )
-        update, route_indices, route_weights = stage_local_moe_fp8_mapped(
+        sparse_moe = (
+            stage_local_moe_fp8_mapped
+            if sparse_moe_backend == "reference"
+            else stage_local_moe_pallas_feature_mapped
+        )
+        update, route_indices, route_weights = sparse_moe(
             normalized,
             moe.router_weight,
             moe.correction_bias,

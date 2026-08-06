@@ -5,6 +5,128 @@ import os
 import subprocess
 import sys
 
+import pytest
+
+
+def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_pallas_feature_decoder_calls,
+    )
+
+    selected = (
+        "out = bf16[8,1,6144] custom-call("
+        "u8[256,6144,512], u8[256,6144,512], u8[256,512,6144]), "
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_fp8_fused_selected_moe_'
+        'r8_g256_h6144_i512"}'
+    )
+    shared_up = (
+        "up = bf16[1,512] custom-call(u8[512,6144]), "
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_fp8_block_up_gate_m8_k6144_n512"}'
+    )
+    shared_down = (
+        "down = bf16[1,6144] custom-call(u8[6144,512]), "
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_fp8_block_matmul_m8_k512_n6144"}'
+    )
+    hlo = "\n".join((selected, shared_up, shared_down) * 75)
+    record = _validate_pallas_feature_decoder_calls(hlo, sparse_layers=75)
+    assert record["passed"], record
+
+    rejected = _validate_pallas_feature_decoder_calls(
+        hlo + "\noverlay = bf16[256,6144,512] parameter(0)",
+        sparse_layers=75,
+    )
+    assert not rejected["passed"]
+    assert rejected["forbidden_decoded_expert_overlays"]
+
+
+def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
+    from dataclasses import replace
+
+    from glm_tpu.greenfield.errors import PlanValidationError
+    from glm_tpu.greenfield.model import (
+        FEATURE_EXPERT_RUNTIME_LAYOUT,
+        build_decoder_feature_runtime_weight_layout,
+        build_decoder_runtime_weight_layout,
+        build_decoder_state_layout,
+        build_pipeline_schedule,
+    )
+    from glm_tpu.greenfield.runtime import build_decoder_step_program
+    from tests.greenfield.checkpoint.test_runtime_pack import (
+        _small_feature_source_plan,
+    )
+
+    source_plan = _small_feature_source_plan()
+    source_schedule = build_pipeline_schedule(source_plan)
+    source_state = build_decoder_state_layout(
+        source_plan,
+        source_schedule,
+        context_capacity=8,
+        logical_page_size=8,
+        packed_kv_width=8,
+    )
+    source_layout = build_decoder_runtime_weight_layout(
+        source_plan,
+        source_schedule,
+    )
+    feature_plan = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+    feature_schedule = build_pipeline_schedule(feature_plan)
+    feature_state = build_decoder_state_layout(
+        feature_plan,
+        feature_schedule,
+        context_capacity=8,
+        logical_page_size=8,
+        packed_kv_width=8,
+    )
+    feature_layout = build_decoder_feature_runtime_weight_layout(
+        feature_plan,
+        feature_schedule,
+        source_layout,
+    )
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4)) for stage in range(8)
+    )
+    pairs = tuple(
+        (groups[stage][slot], groups[(stage + 1) % 8][slot])
+        for stage in range(8)
+        for slot in range(4)
+    )
+
+    with pytest.raises(PlanValidationError, match="backend and runtime"):
+        build_decoder_step_program(
+            feature_plan,
+            feature_schedule,
+            feature_state,
+            feature_layout,
+            groups,
+            pairs,
+        )
+    with pytest.raises(PlanValidationError, match="backend and runtime"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            sparse_moe_backend="pallas_feature",
+        )
+    with pytest.raises(PlanValidationError, match="backend is unknown"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            sparse_moe_backend="unknown",  # type: ignore[arg-type]
+        )
+
 
 def test_complete_small_decoder_step_runs_all_stages_on_forced_cpu() -> None:
     program = r'''
@@ -97,6 +219,7 @@ print(json.dumps({
     'positions': sorted(set(tuple(row) for row in metadata[active, 0, :4].tolist())),
     'producer': sorted(set(metadata[active, 0, decoder.config.producer_index].tolist())),
     'residual_exact': bool(np.array_equal(residual[active], np.repeat(initial_row[None], 4, axis=0))),
+    'sparse_moe_backend': decoder.sparse_moe_backend,
     'valid_counts': sorted(set(metadata[active, 0, decoder.config.count_index].tolist())),
     'visited': sorted(set(metadata[active, 0, decoder.config.visited_index].tolist())),
 }, sort_keys=True))
@@ -119,6 +242,7 @@ print(json.dumps({
     result = json.loads(completed.stdout.strip().splitlines()[-1])
     assert result["active"] == [0, 1, 2, 3]
     assert result["residual_exact"]
+    assert result["sparse_moe_backend"] == "reference"
     assert result["positions"] == [[0, -1, -1, -1]]
     assert result["valid_counts"] == [1]
     assert result["producer"] == [7]
