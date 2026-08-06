@@ -15,10 +15,11 @@ import numpy as np
 from .short_context_oracle import inspect_short_context_oracle
 
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 ARTIFACT_KIND = "greenfield_short_context_legacy_dsa_oracle"
 MODEL_ID = "zai-org/GLM-5.2-FP8"
 TIE_POLICY = "descending_score_then_lowest_global_position"
+PADDED_ROW_POLICY = "excluded_by_valid_mask_and_provenance_counted"
 _DUMP_NAME = re.compile(
     r"\.step(?P<step>[0-9]{4})\.evt(?P<event>[0-9]{2})"
     r"\.proc(?P<process>[0-9]+)\.npz$"
@@ -101,6 +102,7 @@ class ShortContextDsaOracleConfig:
     source_dump_dir: Path
     output_dir: Path
     capture_code_hash: str
+    source_capture_code_hash: str
     legacy_repository_pin: str
     token_oracle_manifest_sha256: str
     run_id: int
@@ -161,6 +163,7 @@ class ShortContextDsaOracleConfig:
             raise ValueError("2K DSA capture must remain below selected width")
         for name in (
             "capture_code_hash",
+            "source_capture_code_hash",
             "legacy_repository_pin",
             "token_oracle_manifest_sha256",
         ):
@@ -298,7 +301,7 @@ def _validate_dump(
     step: int,
     event: int,
     position: int,
-) -> tuple[np.ndarray, np.ndarray, int]:
+) -> tuple[np.ndarray, np.ndarray, int, int]:
     scalars = {
         "step_index": step,
         "event_index": event,
@@ -357,11 +360,26 @@ def _validate_dump(
     ties = live_scores[1:] == live_scores[:-1]
     if np.any(live_indices[1:][ties] < live_indices[:-1][ties]):
         raise ValueError("legacy DSA lowest-position tie order drifted")
-    if rows > 1 and (
-        np.any(indices[1:] != -1) or not np.all(np.isneginf(scores[1:]))
-    ):
-        raise ValueError("legacy DSA padded rows contain selected work")
-    return live_indices.copy(), live_scores.copy(), valid_count
+    # Legacy's batch bucket is larger than the one live request. Invalid
+    # rows are explicitly outside the DSA verdict and may retain stale
+    # selections from earlier scheduler work. This is the established
+    # dsa_topk_diff contract: align and compare only ``valid`` rows while
+    # reporting pad-row payloads as provenance. Requiring sentinel payloads
+    # here would reject a correct live row based on semantically dead state.
+    padded_non_sentinel_rows = 0
+    if rows > 1:
+        padded_non_sentinel_rows = int(
+            np.count_nonzero(
+                np.any(indices[1:] != -1, axis=1)
+                | ~np.all(np.isneginf(scores[1:]), axis=1)
+            )
+        )
+    return (
+        live_indices.copy(),
+        live_scores.copy(),
+        valid_count,
+        padded_non_sentinel_rows,
+    )
 
 
 def capture_short_context_dsa_oracle(
@@ -430,9 +448,12 @@ def capture_short_context_dsa_oracle(
                     {
                         "byte_count": path.stat().st_size,
                         "event_index": event,
+                        "live_row_indices": [0],
+                        "padded_non_sentinel_row_count": values[3],
                         "path": relative,
                         "process_count": int(payload["process_count"]),
                         "process_index": process_index,
+                        "row_count": int(payload["valid"].size),
                         "sha256": _sha256_file(path),
                         "step_index": step,
                     }
@@ -451,7 +472,7 @@ def capture_short_context_dsa_oracle(
             elif event_replicas != replica_layout:
                 raise ValueError("legacy DSA source replica coverage drifted")
             assert canonical_values is not None
-            indices, scores, count = canonical_values
+            indices, scores, count, _ = canonical_values
             selected_positions[step_offset, event, :count] = indices
             selected_scores[step_offset, event, :count] = scores
             valid_counts[step_offset, event] = count
@@ -500,6 +521,7 @@ def capture_short_context_dsa_oracle(
             "event_count": config.event_count,
             "first_decode_position": config.first_decode_position,
             "first_source_step": config.first_source_step,
+            "padded_row_policy": PADDED_ROW_POLICY,
             "producer_layer_ids": list(config.producer_layer_ids),
             "selected_width": config.selected_width,
             "tie_policy": TIE_POLICY,
@@ -530,6 +552,7 @@ def capture_short_context_dsa_oracle(
             "run_id": source["run_id"],
             "source_row_sha256": source_row_sha256,
         },
+        "source_capture_code_hash": config.source_capture_code_hash,
         "source_dump_files": source_files,
         "token_oracle": {
             "generated_token_ids_sha256": token_manifest[
@@ -563,10 +586,18 @@ def inspect_short_context_dsa_oracle(output_dir: Path) -> dict[str, Any]:
         raise ValueError("short-context DSA oracle manifest checksum mismatch")
     if manifest.get("model_id") != MODEL_ID:
         raise ValueError("short-context DSA oracle model identity drifted")
-    for name in ("capture_code_hash", "legacy_repository_pin_at_capture"):
+    for name in (
+        "capture_code_hash",
+        "source_capture_code_hash",
+        "legacy_repository_pin_at_capture",
+    ):
         _validate_digest(manifest.get(name, ""), name, (40, 64))
     if manifest.get("event_contract", {}).get("tie_policy") != TIE_POLICY:
         raise ValueError("short-context DSA oracle tie policy drifted")
+    if manifest.get("event_contract", {}).get("padded_row_policy") != (
+        PADDED_ROW_POLICY
+    ):
+        raise ValueError("short-context DSA oracle padded-row policy drifted")
     expected_files = {
         "source_row": "source_row.json",
         "tensors": "dsa_events.safetensors",
@@ -684,4 +715,14 @@ def inspect_short_context_dsa_oracle(output_dir: Path) -> dict[str, Any]:
         _validate_digest(record.get("sha256", ""), "source dump", (64,))
         if int(record.get("byte_count", 0)) <= 0:
             raise ValueError("short-context DSA source-file record drifted")
+        row_count = int(record.get("row_count", 0))
+        padded_non_sentinel = int(
+            record.get("padded_non_sentinel_row_count", -1)
+        )
+        if (
+            record.get("live_row_indices") != [0]
+            or row_count <= 0
+            or not 0 <= padded_non_sentinel < row_count
+        ):
+            raise ValueError("short-context DSA padded-row provenance drifted")
     return manifest

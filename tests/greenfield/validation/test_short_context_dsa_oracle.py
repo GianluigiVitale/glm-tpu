@@ -30,6 +30,7 @@ def _write_dump(
     position: int,
     width: int,
     corrupt_set: bool = False,
+    pad_noise: bool = False,
 ) -> None:
     rows = 4
     count = position + 1
@@ -40,6 +41,15 @@ def _write_dump(
         selected[-1] = selected[0]
     indices[0, :count] = selected
     scores[0, :count] = np.arange(count, 0, -1, dtype=np.float32)
+    if pad_noise:
+        for row in range(1, rows):
+            stale_count = min(row + 1, width)
+            indices[row, :stale_count] = np.arange(
+                stale_count - 1, -1, -1, dtype=np.int32
+            )
+            scores[row, :stale_count] = np.arange(
+                stale_count, 0, -1, dtype=np.float32
+            )
     positions = np.asarray([position, 0, 0, 0], np.int32)
     valid = np.asarray([True, False, False, False], np.bool_)
     req_ids = np.zeros((rows,), np.int32)
@@ -72,6 +82,7 @@ def _config(
     monkeypatch: pytest.MonkeyPatch,
     *,
     corrupt_set: bool = False,
+    pad_noise: bool = False,
 ) -> ShortContextDsaOracleConfig:
     _patch_tokenizer(monkeypatch)
     token_config = _token_config(tmp_path)
@@ -119,6 +130,7 @@ def _config(
                 position=position,
                 width=8,
                 corrupt_set=corrupt_set and step_offset == 0 and event == 0,
+                pad_noise=pad_noise,
             )
     return ShortContextDsaOracleConfig(
         results_db=token_config.results_db,
@@ -126,6 +138,7 @@ def _config(
         source_dump_dir=tmp_path / "dumps",
         output_dir=tmp_path / "dsa_oracle",
         capture_code_hash="a" * 40,
+        source_capture_code_hash="a" * 40,
         legacy_repository_pin="b" * 40,
         token_oracle_manifest_sha256=json.loads(
             (token_config.output_dir / "manifest.json").read_text()
@@ -163,6 +176,21 @@ def test_short_context_dsa_oracle_roundtrip_and_append_only(
     assert len(manifest["source_dump_files"]) == 4
     with pytest.raises(FileExistsError, match="append-only"):
         capture_short_context_dsa_oracle(config)
+
+
+def test_short_context_dsa_oracle_excludes_invalid_pad_row_noise(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(tmp_path, monkeypatch, pad_noise=True)
+    manifest = capture_short_context_dsa_oracle(config)
+    assert manifest["event_contract"]["padded_row_policy"] == (
+        "excluded_by_valid_mask_and_provenance_counted"
+    )
+    assert {
+        record["padded_non_sentinel_row_count"]
+        for record in manifest["source_dump_files"]
+    } == {3}
+    assert inspect_short_context_dsa_oracle(config.output_dir) == manifest
 
 
 def test_short_context_dsa_oracle_refuses_set_and_tensor_drift(

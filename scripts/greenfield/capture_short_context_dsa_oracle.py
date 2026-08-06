@@ -50,6 +50,7 @@ def main() -> None:
     parser.add_argument("--source-dump-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expected-code-hash", required=True)
+    parser.add_argument("--source-capture-code-hash")
     parser.add_argument("--legacy-repository-pin", required=True)
     parser.add_argument("--token-oracle-manifest-sha256", required=True)
     parser.add_argument("--run-id", type=int, required=True)
@@ -66,6 +67,9 @@ def main() -> None:
             source_dump_dir=args.source_dump_dir,
             output_dir=args.output,
             capture_code_hash=args.expected_code_hash,
+            source_capture_code_hash=(
+                args.source_capture_code_hash or args.expected_code_hash
+            ),
             legacy_repository_pin=args.legacy_repository_pin,
             token_oracle_manifest_sha256=(
                 args.token_oracle_manifest_sha256
