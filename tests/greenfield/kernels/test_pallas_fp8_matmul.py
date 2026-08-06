@@ -151,7 +151,7 @@ def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts(
         tpu_info.ChipVersion.TPU_V4, 1
     )
     tpu_info.get_tpu_info.cache_clear()
-    routes, experts, contraction, output = 4, 3, 130, 128
+    routes, experts, contraction, output = 4, 3, 130, 135
     hidden = jnp.asarray(
         np.linspace(-0.5, 0.5, contraction, dtype=np.float32)[None, :],
         dtype=jnp.bfloat16,
@@ -176,14 +176,14 @@ def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts(
     )
     route_indices = jnp.asarray(route_values, dtype=jnp.int32)
     expert_start = jnp.asarray(10, dtype=jnp.int32)
-    gate_up_bits = jnp.concatenate((gate_bits, up_bits), axis=2)
-    gate_up_scale = jnp.concatenate((gate_scale, up_scale), axis=1)
     actual_gate, actual_up = fp8_selected_up_gate(
         hidden,
         route_indices,
         expert_start,
-        gate_up_bits,
-        gate_up_scale,
+        gate_bits,
+        gate_scale,
+        up_bits,
+        up_scale,
         interpret=True,
     )
 

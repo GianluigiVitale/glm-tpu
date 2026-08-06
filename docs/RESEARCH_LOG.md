@@ -4562,3 +4562,15 @@ four-depth 128K smoke with compute rows ON and all-gather OFF. The accepted pare
 `979f818e0` / 287.666063 ms until that smoke closes. Harness commit `d42883c` integrates the separate
 provenance-freeze fix so future E0 runs refuse any harness mutation during the driver and execute
 captured parser/extractor copies.
+
+## 2026-08-06 03:12 — Greenfield merged selected gate/up stream is an honest null
+
+On isolated branch `rewrite/topology-first-decode`, protected DB 431/432 tested a persistent
+`[G,K,gate_then_up]` raw-FP8 table after a failed-closed diagnostic identified TPU's bounded
+`s32[8,2]` compact-route restore annotation. The HLO guard now permits that target only at the exact
+shape/op name and only when it feeds the exact final order-restoring gather; its regression test
+passes. Normal-two p50 moved `1.341385 -> 1.327685 ms`, but concentrated-eight regressed
+`4.496970 -> 4.509895 ms` and peak allocation rose roughly 1.6 GB. Correctness, HLO, DB/archive,
+hashes, and clean-fleet gates pass. The challenger is rejected and the split-stream DB 429/430
+kernel/layout restored. Next discriminator removes host-expanded selected scale tables by indexing
+compact checkpoint-native scale blocks inside Pallas.

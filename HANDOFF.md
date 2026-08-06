@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 02:57 UTC
+**Updated:** 2026-08-06 03:12 UTC
 
 ## Authority and isolation
 
@@ -194,6 +194,12 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   markers/no overlay or unexpected call passes, and peak HBM is 2.307/2.395 GB. Both DB records,
   archives, hashes, remote SUCCESS markers, and 8/8 cleanup pass. Compaction is a `3.35x` normal
   win and adds only ~`0.004 ms` to the all-eight ceiling, but `1.34 ms` gate/up is not yet promoted.
+- Protected DB 431/432 at `ea8a61a` tested one persistent `[G,K,gate_then_up]` stream against that
+  split-stream baseline. Exactness, the raw-U8/no-overlay HLO contract, DB/archive/hashes, and 8/8
+  cleanup pass. Normal-two p50 improved only `1.341385 -> 1.327685 ms` (`1.02%`), concentrated-eight
+  regressed `4.496970 -> 4.509895 ms` (`0.29%`), and measured peak allocation rose from
+  `2.307/2.395` to `3.919/4.007 GB`. This is an honest null and is not promoted. The accepted
+  split-stream API/layout was restored after the measurement; DB 429/430 remain the baseline.
 
 ## Protected evidence
 
@@ -294,11 +300,13 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 429/430 prove route-proportional `1.341/4.497 ms` normal-two/concentrated-eight gate/up. Audit
-   the remaining per-route tile/dequant/MXU schedule against the proven same-weight M8 `0.815 ms`
-   and accepted stage-local layer. Only after a competitive protected kernel should activation,
-   down, and routed/shared combine be composed in binding Pallas order and the real one-layer gate
-   repeated. Never substitute same-weight M8 or a slow correctness-only GMM for production proof.
+1. DB 429/430 remain the route-proportional `1.341/4.497 ms` normal-two/concentrated-eight baseline;
+   DB 431/432 reject a merged output stream. Remove the selected-scale expansion next: pass compact
+   checkpoint-native scale blocks to Pallas and index them by selected expert/output/K tile inside
+   the kernel, with exact HLO/correctness and both route distributions. Only after a competitive
+   protected kernel should activation, down, and routed/shared combine be composed in binding
+   Pallas order and the real one-layer gate repeated. Never substitute same-weight M8 or a slow
+   correctness-only GMM for production proof.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,

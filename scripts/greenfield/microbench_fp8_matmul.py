@@ -171,24 +171,24 @@ def main() -> int:
     route_indices_host = None
     if args.kernel == "selected_up_gate":
         local_experts = 64
-        single_up_weight = weight_host
+        single_weight = weight_host
         single_gate_weight = gate_weight_host
         # Materialize the proposed persistent selected-expert checkpoint
         # layout directly as [G,K,N].  A timed device-side transpose of both
         # full 64-expert tables would invalidate this discriminator.
         weight_host = np.empty(
-            (local_experts, contraction, 2 * output), dtype=np.uint8
+            (local_experts, contraction, output), dtype=np.uint8
         )
+        gate_weight_host = np.empty_like(weight_host)
         for expert in range(local_experts):
-            weight_host[expert, :, :output] = np.bitwise_xor(
+            weight_host[expert] = np.bitwise_xor(
+                single_weight, np.uint8(expert & 1) * np.uint8(128)
+            ).T
+            gate_weight_host[expert] = np.bitwise_xor(
                 single_gate_weight,
                 np.uint8((expert // 2) & 1) * np.uint8(128),
             ).T
-            weight_host[expert, :, output:] = np.bitwise_xor(
-                single_up_weight,
-                np.uint8(expert & 1) * np.uint8(128),
-            ).T
-        up_scale_host = np.linspace(
+        scale_host = np.linspace(
             0.0005,
             0.0015,
             local_experts * (output // 128) * (contraction // 128),
@@ -200,9 +200,6 @@ def main() -> int:
             local_experts * (output // 128) * (contraction // 128),
             dtype=np.float32,
         ).reshape(local_experts, output // 128, contraction // 128)
-        scale_host = np.concatenate(
-            (gate_scale_host, up_scale_host), axis=1
-        )
         if args.selected_route_case == "normal_two":
             # Two routes owned by this 0:64 chip, interleaved with the six
             # routes owned by the other PP8 stage chips.
@@ -241,6 +238,8 @@ def main() -> int:
             kernel_hlo_name = "greenfield_fp8_block_up_gate"
         else:
             assert local_experts is not None and route_indices_host is not None
+            gate_bits = jax.device_put(gate_weight_host, device)
+            gate_scale = jax.device_put(gate_scale_host, device)
             route_indices = jax.device_put(route_indices_host, device)
             expert_start = jax.device_put(np.asarray(0, dtype=np.int32), device)
             kernel = fp8_selected_up_gate
@@ -248,21 +247,14 @@ def main() -> int:
                 lhs,
                 route_indices,
                 expert_start,
+                gate_bits,
+                gate_scale,
                 weight_bits,
                 scale,
             )
-            projection_blocks = output // 128
             reference_inputs = (
-                (
-                    "gate",
-                    weight_bits[:, :, :output],
-                    scale[:, :projection_blocks, :],
-                ),
-                (
-                    "up",
-                    weight_bits[:, :, output:],
-                    scale[:, projection_blocks:, :],
-                ),
+                ("gate", gate_bits, gate_scale),
+                ("up", weight_bits, scale),
             )
             kernel_hlo_name = "greenfield_fp8_selected_up_gate"
         lower_started = time.monotonic()
@@ -369,9 +361,9 @@ def main() -> int:
                         and len(bounded_route_restore_calls) <= 1
                         and len(bounded_route_restore_gathers)
                         == len(bounded_route_restore_calls)
-                        and f"u8[{local_experts},{contraction},{2 * output}]"
+                        and f"u8[{local_experts},{contraction},{output}]"
                         in kernel_calls[0]
-                        and f"f8e4m3fn[{local_experts},{contraction},{2 * output}]"
+                        and f"f8e4m3fn[{local_experts},{contraction},{output}]"
                         not in hlo
                     )
                 )

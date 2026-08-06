@@ -1,9 +1,7 @@
 """TPU-v4 raw-FP8 block matmul without a persistent BF16 weight overlay.
 
 The checkpoint stores E4M3FN payloads as their exact ``uint8`` encodings in
-``[out, in]`` order and one FP32 inverse scale per 128x128 block. Selected
-gate/up tables use final ``[expert, in, gate_then_up]`` order so one weight
-pipeline and MXU stream can produce both projections. TPU v4 has
+``[out, in]`` order and one FP32 inverse scale per 128x128 block.  TPU v4 has
 no native FP8 MXU matmul, so this kernel DMAs one checkpoint block at a time,
 bitcasts the bytes to E4M3FN, dequantizes that tile in VMEM, and executes the
 BF16 matmul with an FP32 accumulator.  Complete matrices are never decoded or
@@ -183,9 +181,10 @@ def _validate_selected_inputs(
         raise ValueError("selected-expert start must be an int32 scalar")
     if weight_bits.ndim != 3 or scale.ndim != 3:
         raise ValueError("selected expert weights/scales must have rank three")
-    # Selected-expert tables use final MXU access order [G,K,N]. This is
-    # intentionally different from the standalone [N,K] checkpoint probe and
-    # prevents a complete-table transpose in the decode JIT.
+    # Selected-expert tables use their final MXU access order [G,K,N].  This
+    # is intentionally different from the standalone [N,K] checkpoint probe:
+    # transposing a complete 64-expert table inside the decode JIT is both an
+    # extra full-HBM pass and an extra TPU custom call.
     local_experts, contraction, output = weight_bits.shape
     if local_experts <= 0:
         raise ValueError("selected-expert local weight table must be nonempty")
@@ -566,8 +565,10 @@ def fp8_selected_up_gate(
     hidden: Any,
     route_indices: Any,
     expert_start: Any,
-    gate_up_bits: Any,
-    gate_up_scale: Any,
+    gate_bits: Any,
+    gate_scale: Any,
+    up_bits: Any,
+    up_scale: Any,
     *,
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
         contraction_tile=512
@@ -583,33 +584,30 @@ def fp8_selected_up_gate(
     host routing, or eight-way conditional graph is materialized.
     """
 
-    (
-        route_count,
-        local_experts,
-        contraction,
-        combined_output,
-    ) = _validate_selected_inputs(
+    route_count, local_experts, contraction, output = _validate_selected_inputs(
         hidden,
         route_indices,
         expert_start,
-        gate_up_bits,
-        gate_up_scale,
+        gate_bits,
+        gate_scale,
         config,
     )
-    if combined_output % (2 * config.block_shape[0]) != 0:
-        raise ValueError(
-            "selected gate/up packed output must contain two complete "
-            "128-column block sequences"
-        )
-    projection_output = combined_output // 2
+    up_geometry = _validate_selected_inputs(
+        hidden,
+        route_indices,
+        expert_start,
+        up_bits,
+        up_scale,
+        config,
+    )
+    if up_geometry != (route_count, local_experts, contraction, output):
+        raise ValueError("selected expert gate/up geometries disagree")
 
     padded_contraction = (
         _ceil_div(contraction, config.contraction_tile)
         * config.contraction_tile
     )
-    padded_output = (
-        _ceil_div(combined_output, config.output_tile) * config.output_tile
-    )
+    padded_output = _ceil_div(output, config.output_tile) * config.output_tile
     hidden = jnp.pad(
         hidden,
         (
@@ -619,24 +617,22 @@ def fp8_selected_up_gate(
     )
 
     def pad_weight(value: Any) -> Any:
-        if (
-            padded_output == combined_output
-            and padded_contraction == contraction
-        ):
+        if padded_output == output and padded_contraction == contraction:
             return value
         return jnp.pad(
             value,
             (
                 (0, 0),
                 (0, padded_contraction - contraction),
-                (0, padded_output - combined_output),
+                (0, padded_output - output),
             ),
         )
 
     # Keep complete expert tables as checkpoint-native U8 Pallas operands.
     # Bitcasting only each DMA'd VMEM tile prevents a complete F8 table view
     # from entering the optimized HLO contract.
-    gate_up_raw = pad_weight(gate_up_bits)
+    gate_raw = pad_weight(gate_bits)
+    up_raw = pad_weight(up_bits)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
     contraction_blocks_per_tile = (
@@ -664,8 +660,15 @@ def fp8_selected_up_gate(
     compact_local_ids = jnp.zeros_like(local_ids).at[compact_index].set(
         local_ids
     )
-    gate_up_scale_table = _selected_scale_table(
-        gate_up_scale,
+    gate_scale_table = _selected_scale_table(
+        gate_scale,
+        compact_local_ids,
+        padded_output=padded_output,
+        padded_contraction=padded_contraction,
+        block_shape=config.block_shape,
+    )
+    up_scale_table = _selected_scale_table(
+        up_scale,
         compact_local_ids,
         padded_output=padded_output,
         padded_contraction=padded_contraction,
@@ -676,17 +679,25 @@ def fp8_selected_up_gate(
         local_ids_value: Any,
         active_count_value: Any,
         hidden_hbm_ref: Any,
-        gate_up_hbm_ref: Any,
-        gate_up_scale_hbm_ref: Any,
-        gate_up_output_hbm_ref: Any,
-        gate_up_accumulator_ref: Any,
+        gate_hbm_ref: Any,
+        gate_scale_hbm_ref: Any,
+        up_hbm_ref: Any,
+        up_scale_hbm_ref: Any,
+        gate_output_hbm_ref: Any,
+        up_output_hbm_ref: Any,
+        gate_accumulator_ref: Any,
+        up_accumulator_ref: Any,
     ) -> None:
         def inner_kernel(
             hidden_ref: Any,
-            gate_up_ref: Any,
-            gate_up_scale_ref: Any,
-            gate_up_output_ref: Any,
-            gate_up_accumulator: Any,
+            gate_ref: Any,
+            gate_scale_ref: Any,
+            up_ref: Any,
+            up_scale_ref: Any,
+            gate_output_ref: Any,
+            up_output_ref: Any,
+            gate_accumulator: Any,
+            up_accumulator: Any,
         ) -> None:
             output_index = pl.program_id(0)
             route_index = pl.program_id(1)
@@ -694,13 +705,12 @@ def fp8_selected_up_gate(
 
             @pl.when(contraction_index == 0)
             def initialize_accumulators() -> None:
-                gate_up_accumulator[...] = jnp.zeros_like(
-                    gate_up_accumulator
-                )
+                gate_accumulator[...] = jnp.zeros_like(gate_accumulator)
+                up_accumulator[...] = jnp.zeros_like(up_accumulator)
 
-            decoded_gate_up = (
+            decoded_gate = (
                 lax.bitcast_convert_type(
-                    gate_up_ref[...], jnp.float8_e4m3fn
+                    gate_ref[...], jnp.float8_e4m3fn
                 )
                 .astype(config.accumulator_dtype)
                 .reshape(
@@ -708,21 +718,44 @@ def fp8_selected_up_gate(
                     config.block_shape[1],
                     config.output_tile,
                 )
-                * gate_up_scale_ref[...].astype(config.accumulator_dtype)
+                * gate_scale_ref[...].astype(config.accumulator_dtype)
+            ).reshape(config.contraction_tile, config.output_tile).astype(
+                jnp.bfloat16
+            )
+            decoded_up = (
+                lax.bitcast_convert_type(
+                    up_ref[...], jnp.float8_e4m3fn
+                )
+                .astype(config.accumulator_dtype)
+                .reshape(
+                    contraction_blocks_per_tile,
+                    config.block_shape[1],
+                    config.output_tile,
+                )
+                * up_scale_ref[...].astype(config.accumulator_dtype)
             ).reshape(config.contraction_tile, config.output_tile).astype(
                 jnp.bfloat16
             )
             dimensions = (((1,), (0,)), ((), ()))
-            gate_up_accumulator[...] += lax.dot_general(
+            gate_accumulator[...] += lax.dot_general(
                 hidden_ref[...],
-                decoded_gate_up,
+                decoded_gate,
+                dimension_numbers=dimensions,
+                preferred_element_type=config.accumulator_dtype,
+            )
+            up_accumulator[...] += lax.dot_general(
+                hidden_ref[...],
+                decoded_up,
                 dimension_numbers=dimensions,
                 preferred_element_type=config.accumulator_dtype,
             )
 
             @pl.when(contraction_index == contraction_tiles - 1)
             def store_outputs() -> None:
-                gate_up_output_ref[...] = gate_up_accumulator[...].astype(
+                gate_output_ref[...] = gate_accumulator[...].astype(
+                    config.output_dtype
+                )
+                up_output_ref[...] = up_accumulator[...].astype(
                     config.output_dtype
                 )
 
@@ -796,17 +829,22 @@ def fp8_selected_up_gate(
                 hidden_spec,
                 weight_spec,
                 scale_spec,
+                weight_spec,
+                scale_spec,
             ),
-            out_specs=output_spec,
+            out_specs=(output_spec, output_spec),
             dimension_semantics=("parallel", "arbitrary", "arbitrary"),
             no_pipelining=interpret,
         )
         pipeline(
             hidden_hbm_ref,
-            gate_up_hbm_ref,
-            gate_up_scale_hbm_ref,
-            gate_up_output_hbm_ref,
-            scratches=(gate_up_accumulator_ref,),
+            gate_hbm_ref,
+            gate_scale_hbm_ref,
+            up_hbm_ref,
+            up_scale_hbm_ref,
+            gate_output_hbm_ref,
+            up_output_hbm_ref,
+            scratches=(gate_accumulator_ref, up_accumulator_ref),
         )
 
     output_shape = jax.ShapeDtypeStruct(
@@ -814,16 +852,25 @@ def fp8_selected_up_gate(
     )
     call = pl.pallas_call(
         kernel,
-        out_shape=output_shape,
+        out_shape=(output_shape, output_shape),
         grid_spec=pltpu.PrefetchScalarGridSpec(
             num_scalar_prefetch=2,
             in_specs=(
                 pl.BlockSpec(memory_space=pltpu.HBM),
                 pl.BlockSpec(memory_space=pltpu.HBM),
                 pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
             ),
-            out_specs=pl.BlockSpec(memory_space=pltpu.HBM),
+            out_specs=(
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+            ),
             scratch_shapes=(
+                pltpu.VMEM(
+                    (config.row_tile, config.output_tile),
+                    config.accumulator_dtype,
+                ),
                 pltpu.VMEM(
                     (config.row_tile, config.output_tile),
                     config.accumulator_dtype,
@@ -840,7 +887,7 @@ def fp8_selected_up_gate(
         ),
         cost_estimate=pl.CostEstimate(
             flops=(
-                2
+                4
                 * route_count
                 * config.row_tile
                 * padded_contraction
@@ -848,31 +895,31 @@ def fp8_selected_up_gate(
             ),
             bytes_accessed=(
                 config.row_tile * padded_contraction * 2
-                + route_count
+                + 2
+                * route_count
                 * padded_output
                 * padded_contraction
-                + route_count * output_tiles * contraction_tiles * 4
-                + route_count * padded_output * config.row_tile * 2
+                + 2 * route_count * output_tiles * contraction_tiles * 4
+                + 2 * route_count * padded_output * config.row_tile * 2
             ),
             transcendentals=0,
         ),
     )
-    gate_up = call(
+    gate, up = call(
         compact_local_ids,
         active_count,
         hidden,
-        gate_up_raw,
-        gate_up_scale_table,
+        gate_raw,
+        gate_scale_table,
+        up_raw,
+        up_scale_table,
     )
     compact_slot_active = (
         jnp.arange(route_count, dtype=jnp.int32) < active_count
     )[:, None, None]
-    gate_up = jnp.where(
-        compact_slot_active, gate_up, jnp.zeros_like(gate_up)
-    )
+    gate = jnp.where(compact_slot_active, gate, jnp.zeros_like(gate))
+    up = jnp.where(compact_slot_active, up, jnp.zeros_like(up))
     # compact_index is original->compact, restoring the binding top-k order.
-    gate_up = gate_up[compact_index, 0, :combined_output]
-    return (
-        gate_up[:, :projection_output],
-        gate_up[:, projection_output:],
-    )
+    gate = gate[compact_index]
+    up = up[compact_index]
+    return gate[:, 0, :output], up[:, 0, :output]

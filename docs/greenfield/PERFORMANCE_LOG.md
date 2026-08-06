@@ -340,6 +340,23 @@ Compaction is a `3.35x` normal-path improvement over the all-eight DB 428 ceilin
 about `0.004 ms` to the concentrated result. The `1.34 ms` normal gate/up projection is still not a
 full expert or layer and remains above the desired promotion budget; it has no decoder/tok-s claim.
 
+DB 431 / `greenfield_fp8_selected_up_gate_normal_two_20260806T030747934509941Z` and DB 432 /
+`greenfield_fp8_selected_up_gate_concentrated_eight_20260806T030852365380579Z` tested a single
+persistent `[G,K,gate_then_up]` raw table and one combined Pallas stream at `ea8a61a`:
+
+| case | p50 | p90 | p95 | p99 | mean | peak allocation |
+|---|---:|---:|---:|---:|---:|---:|
+| normal interleaved | 1.327685 | 1.340283 | 1.344851 | 1.355045 | 1.329922 ms | 3.919 GB |
+| concentrated | 4.509895 | 4.523469 | 4.527514 | 4.537501 | 4.511209 ms | 4.007 GB |
+
+Both protected comparisons reproduce DB 429/430's error bounds. HLO has one raw
+`u8[64,6144,4096]` Pallas call, one bounded scale-gather marker, and one exactly constrained
+`s32[8,2]` compact-route restore marker feeding only the final `bf16[8,4096]` order-restoring
+gather; no decoded overlay or unexpected call exists. The normal p50 gain is only `1.02%`, the
+concentrated ceiling regresses `0.29%`, and peak allocation increases by about 1.6 GB. The result is
+therefore an honest performance null, not a promotion. The split-stream DB 429/430 layout remains
+the accepted baseline. DB/archive/hash/remote-SUCCESS and eight-host pre/post cleanup all pass.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory
