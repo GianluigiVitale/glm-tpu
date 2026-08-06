@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 17:10 UTC
+**Updated:** 2026-08-06 17:22 UTC
 
 ## Authority and isolation
 
@@ -394,17 +394,14 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Continue optimizing the trace-dominant feature-MoE call, now `14.429 ms/core` or `115.432 ms`
-   serialized across PP8 after the protected output-tile promotion. Eliminate its exact
-   `[8,8,6144]` output and post-call route weighting/sum HBM path only with an exact fallback,
-   interpreter/TPU/HLO microproof, protected one-layer A/B, body A/B, and fresh trace.
-2. Attention-output matmul is the second measured target (`4.385 ms/core`, `35.084 ms` serialized).
-   Do not tune it until feature-MoE establishes a new protected baseline. Compact local
-   collectives and stage permutes are not latency targets.
-3. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
+1. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
    Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
    profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
-4. Implement identical-condition raw-FP8 PP16 and WS32 challengers, adjudicate by protected wall,
+2. Use the first complete-decoder trace to select the next optimization. The latest body trace
+   still identifies feature-MoE (`14.429044 ms/core`) and attention output (`4.385456 ms/core`),
+   but route weighting/sum fusion, attention output tile 256, and structured-value/output fusion
+   are now protected rejections. Do not infer another body optimization without measurement.
+3. Implement identical-condition raw-FP8 PP16 and WS32 challengers, adjudicate by protected wall,
    then continue Gates E-H in binding order. No body-only result is a decoder or tok/s claim.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.
@@ -684,6 +681,24 @@ contain one direct-U8 custom call and no decoded weight overlay, have approved a
 `4d2457b2...7631`. Reject decoder integration: doubling the output tile is neutral. The next
 structural candidate is one Pallas call for structured `kv_b` value projection plus attention
 output projection, keeping the intermediate value states in VMEM.
+
+## Rejected structured-value/attention-output fusion
+
+Commit `7421e57` implements that structural candidate as one default-off Pallas call. It performs
+the exact 16-head structured raw-FP8 value projection, repacks the BF16 value state in VMEM, and
+feeds the production `M8xK4096xN6144` raw-FP8 output projection without an HBM value-state result.
+The interpreter comparison, validation failures, and affected HLO/kernel suite pass 32/32.
+
+Protected same-process A/B DB 476 /
+`greenfield_fp8_fused_attention_output_20260806T171842700453846Z` is elementwise exact and finite.
+Candidate HLO `855d9b29...d453` has one exact direct-U8 call with `[7168,512]` and `[6144,4096]`
+raw operands, one `[8,6144]` result, no old kernel boundary, no value-state HBM result, and no
+decoded weight overlay. Baseline HLO `76840cda...4e24` has the expected two calls. Candidate versus
+baseline p50 is `1.1736855/0.6975100 ms` (`+68.27%`); p99 is `1.198501/0.720133 ms`. Compile is
+`0.510/0.562 s`; peak HBM is 29,378,560 bytes. Runner/summary SHAs are
+`b1ef75c1...247a` / `593557d3...697`. DB/archive/remote `SUCCESS` and authenticated 8/8 cleanup
+pass. Reject decoder integration: eliminating this HBM boundary loses substantially more to the
+serialized nested pipeline than it saves. Retain the exact fallback and default-off mechanism.
 
 ## Protected feature-body attribution
 
