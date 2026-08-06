@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-05 22:55 UTC
+**Updated:** 2026-08-06 01:44 UTC
 
 ## Authority and isolation
 
@@ -120,20 +120,29 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   score-order positions. This is preserved as an explicit non-relaxed diagnostic. The runtime does
   not use CPU positions: it selects exactly from actual TPU scores and carries that exact state.
   Do not claim raw cross-framework position identity from DB 421.
-- Gate D code is at `a2638a2`. The executable-ready runtime layout consumes the protected DB420
-  owner files exactly: 32/32 files, 122,640/122,640 leaves, and 750,122,559,744/750,122,559,744
-  source bytes match by name/dtype/shape/bytes. Its 364 uniform stage-slot tensors occupy
-  26,068,042,432 bytes/chip; padding is explicit (1,237,233,344–3,719,717,632 bytes/chip), raw FP8
-  stays U8, and the offline derivative streams/hashes with bounded host memory. With padded 256K
-  state (1,090,555,904) and the protected one-layer temporary floor (779,642,880), modeled
-  precompile occupancy is 27,938,241,216 bytes/chip, leaving 5,076,172,096 before the still-unknown
-  executable/overlay. A complete raw-FP8 layer shares q_a between DSA/attention and composes
-  dense/MoE residual math exactly. The generic one-step program executes all eight stages, owned
-  cache writes, and compact transport in one 32-device map. Its forced-CPU eight-layer proof returns
-  the one live row with exact state and HLO `56AG/16AR/16CP`, all four-chip/lane-local, no dead rows.
-  Suites are 212/212 greenfield plus 28/28 protection tests. This is CPU mechanism/memory-model
-  evidence only: the real 78-layer checkpoint has not been runtime-packed, compiled, or run on TPU;
-  no decoder HBM, latency, token, or tok/s claim exists.
+- The executable-ready PP8 runtime derivative is complete at
+  `greenfield_runtime_pack_pp8_20260806T002756318310857Z`: 32 files / 11,648 tensor records /
+  834,178,632,448 file bytes, runtime manifest `fdedaae3...ec`, layout
+  `841a18f6...ac`, and exactly 26,068,042,432 weight bytes/chip. It consumes DB420 ownership
+  exactly, keeps FP8 as U8, streams with bounded host memory, and has approved-bucket `SUCCESS`.
+- Rejected diagnostic `greenfield_short_decoder_compile_pp8_20260806T004625161993456Z` at
+  `20f44e6` loaded ~104.713 GB/host and compiled the real 78-layer 2K body successfully in
+  380.003 seconds. Optimized HLO has ~192,401 instructions and only local groups, but the backend
+  emitted 2,707,043 program bundles and 580 overlays. Program/argument memory is 1.17/23.41 GB;
+  observed HBM is ~25.46 GiB/chip, so capacity is not the immediate failure. Fleet sequencing
+  showed stages advancing one at a time at 100% duty; one body invocation projected ~25–30
+  minutes because the readable U8 lookup/dequant and eight conditional expert branches exploded
+  into the executable. The run was stopped and is never performance evidence.
+- The same HLO contains 219 all-gathers, 294 physical all-reduces, and 16 permutes. The previous
+  312-AR contract was counting logical results as launches: all 312 results exist, while TPU XLA
+  fuses 78 padded-u32 results into 43 singles, 16 pairs, and one triple, saving 18 physical
+  launches. The contract now pins both 294 physical instructions and 312 logical components plus
+  exact result shapes, so neither tuple fusion nor missing work is obscured.
+- A first independent Pallas FP8 matmul now tile-dequantizes raw E4M3FN U8 plus FP32 128x128 scales
+  only in VMEM, performs BF16 MXU work with FP32 accumulation, and never creates a full decoded
+  weight overlay. Pallas-interpreter reference and odd-tail tests pass. It is not yet a TPU result;
+  the next action is the production-shaped v4 compile/correctness/HLO/microbenchmark gate before
+  replacing the reference layer path.
 
 ## Protected evidence
 
@@ -234,13 +243,15 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Finish the protected runtime-checkpoint derivative/loader, bind its 364 global device-sharded
-   arrays plus padded state to the all-stage program, and compile the real 78-layer 2K form. Add
-   embedding/final-norm/distributed logits/token control, then prove the complete 2K/8K Gate-D
-   decoder with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
-   profiler-free steady wall. Do not attempt 256K until this short-context sequence passes.
-2. Continue Gates E–H in binding order. The one-layer
-   comparison provisionally favors PP8 for
+1. Prove the new raw-FP8 tile matmul on v4 against the exact fallback with a compact custom-call
+   HLO, no full BF16/F32 weight overlay, full latency distribution, HBM, provenance, archive, and
+   8/8 cleanup. Then compose fused up/gate, activation/scale, down, and routed/shared combine in
+   the binding Pallas order and repeat the real one-layer protected gate.
+2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
+   layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
+   control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,
+   measured HBM, fresh trace, and profiler-free steady wall. Do not attempt 256K before it passes.
+3. Continue Gates E–H in binding order. The one-layer comparison provisionally favors PP8 for
    normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
    (`1.076` vs `1.134 ms`); only complete protected decoder evidence may choose the
    final plan.
