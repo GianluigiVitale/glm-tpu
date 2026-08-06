@@ -21,6 +21,7 @@ from .gate_c import (
     validate_gate_c_hlo,
 )
 from .dsa import validate_dsa_score_hlo
+from .sparse_attention import validate_sparse_attention_hlo
 from .transport_chain import (
     TransportChainConfig,
     TransportKind,
@@ -61,6 +62,7 @@ __all__ = [
     "stage_local_index_share_gate_c",
     "validate_gate_c_hlo",
     "validate_dsa_score_hlo",
+    "validate_sparse_attention_hlo",
     "TransportChainConfig",
     "TransportKind",
     "benchmark_transport_chain",

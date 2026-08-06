@@ -10,6 +10,11 @@ from .fp8_matmul import (
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
 )
+from .sparse_attention import (
+    SparseMlaConfig,
+    stage_local_sparse_mla_kernel,
+    stage_local_sparse_mla_pallas,
+)
 from .topk import (
     DsaTopKConfig,
     local_topk_candidates_kernel,
@@ -22,6 +27,7 @@ __all__ = [
     "DsaScoreConfig",
     "DsaTopKConfig",
     "Fp8BlockMatmulConfig",
+    "SparseMlaConfig",
     "dsa_scores_kernel",
     "dsa_scores_pallas",
     "fp8_block_matmul",
@@ -34,4 +40,6 @@ __all__ = [
     "local_topk_candidates_pallas",
     "merge_topk_candidates_kernel",
     "merge_topk_candidates_pallas",
+    "stage_local_sparse_mla_kernel",
+    "stage_local_sparse_mla_pallas",
 ]

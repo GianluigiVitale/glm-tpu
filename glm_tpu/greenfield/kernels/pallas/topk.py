@@ -71,7 +71,7 @@ class DsaTopKConfig:
         return _next_power_of_two(max(self.selection_width, self.tile_size))
 
 
-def _bitonic_sort_pairs(
+def bitonic_sort_pairs(
     scores: Any,
     positions: Any,
     *,
@@ -183,7 +183,7 @@ def _select_blocks_pallas(
         block_scores = jnp.where(
             valid, block_scores, _NEGATIVE_INFINITY
         )
-        sorted_scores, sorted_positions = _bitonic_sort_pairs(
+        sorted_scores, sorted_positions = bitonic_sort_pairs(
             block_scores,
             block_positions,
             width=input_width,
