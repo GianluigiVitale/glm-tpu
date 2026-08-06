@@ -70,6 +70,11 @@ def parse_args() -> argparse.Namespace:
         choices=("single_up", "up_gate", "selected_up_gate"),
         default="single_up",
     )
+    parser.add_argument(
+        "--selected-route-case",
+        choices=("normal_two", "concentrated_eight"),
+        default="concentrated_eight",
+    )
     parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--iterations", type=int, default=1000)
     return parser.parse_args()
@@ -176,9 +181,16 @@ def main() -> int:
             local_experts * (output // 128) * (contraction // 128),
             dtype=np.float32,
         ).reshape(local_experts, output // 128, contraction // 128)
-        route_indices_host = np.asarray(
-            [0, 1, 7, 15, 31, 47, 55, 63], dtype=np.int32
-        )
+        if args.selected_route_case == "normal_two":
+            # Two routes owned by this 0:64 chip, interleaved with the six
+            # routes owned by the other PP8 stage chips.
+            route_indices_host = np.asarray(
+                [0, 64, 128, 192, 1, 65, 129, 193], dtype=np.int32
+            )
+        else:
+            route_indices_host = np.asarray(
+                [0, 1, 7, 15, 31, 47, 55, 63], dtype=np.int32
+            )
 
     with jax.default_device(device):
         lhs = jax.device_put(lhs_host, device)
@@ -250,7 +262,7 @@ def main() -> int:
             line
             for line in custom_calls
             if 'custom_call_target="AssumeGatherIndicesInBound"' in line
-            and "s32[1024]" in line
+            and " = s32[" in line
         ]
         unexpected_auxiliary_calls = [
             line
@@ -292,7 +304,7 @@ def main() -> int:
                 and (
                     args.kernel != "selected_up_gate"
                     or (
-                        len(bounded_metadata_calls) == 2
+                        2 <= len(bounded_metadata_calls) <= 8
                         and f"u8[{local_experts},{contraction},{output}]"
                         in kernel_calls[0]
                         and f"f8e4m3fn[{local_experts},{contraction},{output}]"
@@ -326,7 +338,13 @@ def main() -> int:
                 continue
             assert route_indices_host is not None
             route_values = []
-            for local_expert in route_indices_host.tolist():
+            for global_expert in route_indices_host.tolist():
+                local_expert = global_expert
+                if not 0 <= local_expert < local_experts:
+                    route_values.append(
+                        jnp.zeros((output,), dtype=jnp.bfloat16)
+                    )
+                    continue
                 decoded = dequantize_fp8_bits_block_weight(
                     jnp.transpose(bits[local_expert]),
                     projection_scale[local_expert],
@@ -413,6 +431,16 @@ def main() -> int:
         "device": str(device),
         "device_kind": device.device_kind,
         "kernel": args.kernel,
+        "selected_route_case": (
+            args.selected_route_case
+            if args.kernel == "selected_up_gate"
+            else None
+        ),
+        "selected_local_route_count": (
+            int(np.count_nonzero(route_indices_host < local_experts))
+            if route_indices_host is not None and local_experts is not None
+            else None
+        ),
         "shape": shape_record,
         "dtype_contract": {
             "lhs": "bfloat16",

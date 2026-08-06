@@ -578,9 +578,10 @@ def fp8_selected_up_gate(
     """Project one batch-one row through its locally owned selected experts.
 
     Outputs retain top-k route order. A route outside this chip's contiguous
-    expert interval produces an exact zero row. Route ids are scalar-prefetched
-    into the Pallas grid so each active route selects its own raw-FP8 matrix;
-    no selected BF16 matrix or eight-way conditional graph is materialized.
+    expert interval produces an exact zero row. Owned routes are compacted on
+    device and their dynamic count bounds the Pallas pipeline, so a chip does
+    not DMA or compute the other chips' route slots. No selected BF16 matrix,
+    host routing, or eight-way conditional graph is materialized.
     """
 
     route_count, local_experts, contraction, output = _validate_selected_inputs(
@@ -627,10 +628,9 @@ def fp8_selected_up_gate(
             ),
         )
 
-    # Keep the complete expert tables as checkpoint-native U8 in HBM.  A
-    # whole-table U8->F8 bitcast becomes a separate TPU custom call for each
-    # projection at this rank-3 layout.  Bitcast only the DMA'd VMEM tile in
-    # the Pallas body below.
+    # Keep complete expert tables as checkpoint-native U8 Pallas operands.
+    # Bitcasting only each DMA'd VMEM tile prevents a complete F8 table view
+    # from entering the optimized HLO contract.
     gate_raw = pad_weight(gate_bits)
     up_raw = pad_weight(up_bits)
     output_tiles = padded_output // config.output_tile
@@ -646,16 +646,30 @@ def fp8_selected_up_gate(
     active = (route_indices >= expert_start) & (
         route_indices < expert_start + jnp.int32(local_experts)
     )
+    active_i32 = active.astype(jnp.int32)
+    inactive_i32 = jnp.logical_not(active).astype(jnp.int32)
+    active_count = jnp.sum(active_i32, dtype=jnp.int32)
+    # Stable device compaction without a sort. compact_index maps each
+    # original route slot to its unique compacted slot; active slots precede
+    # inactive slots while preserving order within each partition.
+    compact_index = jnp.where(
+        active,
+        jnp.cumsum(active_i32) - jnp.int32(1),
+        active_count + jnp.cumsum(inactive_i32) - jnp.int32(1),
+    )
+    compact_local_ids = jnp.zeros_like(local_ids).at[compact_index].set(
+        local_ids
+    )
     gate_scale_table = _selected_scale_table(
         gate_scale,
-        local_ids,
+        compact_local_ids,
         padded_output=padded_output,
         padded_contraction=padded_contraction,
         block_shape=config.block_shape,
     )
     up_scale_table = _selected_scale_table(
         up_scale,
-        local_ids,
+        compact_local_ids,
         padded_output=padded_output,
         padded_contraction=padded_contraction,
         block_shape=config.block_shape,
@@ -663,7 +677,7 @@ def fp8_selected_up_gate(
 
     def kernel(
         local_ids_value: Any,
-        active_value: Any,
+        active_count_value: Any,
         hidden_hbm_ref: Any,
         gate_hbm_ref: Any,
         gate_scale_hbm_ref: Any,
@@ -694,49 +708,47 @@ def fp8_selected_up_gate(
                 gate_accumulator[...] = jnp.zeros_like(gate_accumulator)
                 up_accumulator[...] = jnp.zeros_like(up_accumulator)
 
-            @pl.when(active_value[route_index])
-            def accumulate_route() -> None:
-                decoded_gate = (
-                    lax.bitcast_convert_type(
-                        gate_ref[...], jnp.float8_e4m3fn
-                    )
-                    .astype(config.accumulator_dtype)
-                    .reshape(
-                        contraction_blocks_per_tile,
-                        config.block_shape[1],
-                        config.output_tile,
-                    )
-                    * gate_scale_ref[...].astype(config.accumulator_dtype)
-                ).reshape(config.contraction_tile, config.output_tile).astype(
-                    jnp.bfloat16
+            decoded_gate = (
+                lax.bitcast_convert_type(
+                    gate_ref[...], jnp.float8_e4m3fn
                 )
-                decoded_up = (
-                    lax.bitcast_convert_type(
-                        up_ref[...], jnp.float8_e4m3fn
-                    )
-                    .astype(config.accumulator_dtype)
-                    .reshape(
-                        contraction_blocks_per_tile,
-                        config.block_shape[1],
-                        config.output_tile,
-                    )
-                    * up_scale_ref[...].astype(config.accumulator_dtype)
-                ).reshape(config.contraction_tile, config.output_tile).astype(
-                    jnp.bfloat16
+                .astype(config.accumulator_dtype)
+                .reshape(
+                    contraction_blocks_per_tile,
+                    config.block_shape[1],
+                    config.output_tile,
                 )
-                dimensions = (((1,), (0,)), ((), ()))
-                gate_accumulator[...] += lax.dot_general(
-                    hidden_ref[...],
-                    decoded_gate,
-                    dimension_numbers=dimensions,
-                    preferred_element_type=config.accumulator_dtype,
+                * gate_scale_ref[...].astype(config.accumulator_dtype)
+            ).reshape(config.contraction_tile, config.output_tile).astype(
+                jnp.bfloat16
+            )
+            decoded_up = (
+                lax.bitcast_convert_type(
+                    up_ref[...], jnp.float8_e4m3fn
                 )
-                up_accumulator[...] += lax.dot_general(
-                    hidden_ref[...],
-                    decoded_up,
-                    dimension_numbers=dimensions,
-                    preferred_element_type=config.accumulator_dtype,
+                .astype(config.accumulator_dtype)
+                .reshape(
+                    contraction_blocks_per_tile,
+                    config.block_shape[1],
+                    config.output_tile,
                 )
+                * up_scale_ref[...].astype(config.accumulator_dtype)
+            ).reshape(config.contraction_tile, config.output_tile).astype(
+                jnp.bfloat16
+            )
+            dimensions = (((1,), (0,)), ((), ()))
+            gate_accumulator[...] += lax.dot_general(
+                hidden_ref[...],
+                decoded_gate,
+                dimension_numbers=dimensions,
+                preferred_element_type=config.accumulator_dtype,
+            )
+            up_accumulator[...] += lax.dot_general(
+                hidden_ref[...],
+                decoded_up,
+                dimension_numbers=dimensions,
+                preferred_element_type=config.accumulator_dtype,
+            )
 
             @pl.when(contraction_index == contraction_tiles - 1)
             def store_outputs() -> None:
@@ -808,7 +820,11 @@ def fp8_selected_up_gate(
         )
         pipeline = pltpu.emit_pipeline(
             inner_kernel,
-            grid=(output_tiles, route_count, contraction_tiles),
+            grid=(
+                output_tiles,
+                active_count_value[...],
+                contraction_tiles,
+            ),
             in_specs=(
                 hidden_spec,
                 weight_spec,
@@ -890,12 +906,20 @@ def fp8_selected_up_gate(
         ),
     )
     gate, up = call(
-        local_ids,
-        active,
+        compact_local_ids,
+        active_count,
         hidden,
         gate_raw,
         gate_scale_table,
         up_raw,
         up_scale_table,
     )
+    compact_slot_active = (
+        jnp.arange(route_count, dtype=jnp.int32) < active_count
+    )[:, None, None]
+    gate = jnp.where(compact_slot_active, gate, jnp.zeros_like(gate))
+    up = jnp.where(compact_slot_active, up, jnp.zeros_like(up))
+    # compact_index is original->compact, restoring the binding top-k order.
+    gate = gate[compact_index]
+    up = up[compact_index]
     return gate[:, 0, :output], up[:, 0, :output]

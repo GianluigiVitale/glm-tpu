@@ -135,7 +135,13 @@ def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:
         Fp8BlockMatmulConfig(accumulator_dtype=jnp.bfloat16)
 
 
-def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts() -> None:
+@pytest.mark.parametrize(
+    "route_values",
+    ([11, 500, 10, 12], [12, 10, 11, 12]),
+)
+def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts(
+    route_values: list[int],
+) -> None:
     # emit_pipeline needs physical tiling metadata even under the HLO
     # interpreter. Register v4's public JAX hardware description for this
     # forced-CPU test; the kernel still executes on the CPU interpreter.
@@ -168,7 +174,7 @@ def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts() -> None:
             scale_shape
         )
     )
-    route_indices = jnp.asarray([11, 500, 10, 12], dtype=jnp.int32)
+    route_indices = jnp.asarray(route_values, dtype=jnp.int32)
     expert_start = jnp.asarray(10, dtype=jnp.int32)
     actual_gate, actual_up = fp8_selected_up_gate(
         hidden,

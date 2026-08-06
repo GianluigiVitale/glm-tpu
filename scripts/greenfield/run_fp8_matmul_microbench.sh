@@ -11,7 +11,10 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
-TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${KERNEL}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
+TAG_STEM=$KERNEL
+[[ $KERNEL != selected_up_gate ]] || TAG_STEM=${KERNEL}_${SELECTED_CASE}
+TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${TAG_STEM}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-1000}
 RUN_DIR=/home/gianl/glm-run/$TAG
@@ -27,6 +30,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 }
 [[ $KERNEL == single_up || $KERNEL == up_gate || $KERNEL == selected_up_gate ]] || {
   echo "FP8 kernel must be single_up, up_gate, or selected_up_gate" >&2
+  exit 2
+}
+[[ $SELECTED_CASE == normal_two || $SELECTED_CASE == concentrated_eight ]] || {
+  echo "selected route case must be normal_two or concentrated_eight" >&2
   exit 2
 }
 [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || {
@@ -88,7 +95,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN kernel=$KERNEL warmup=$WARMUP iterations=$ITERATIONS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN kernel=$KERNEL selected_case=$SELECTED_CASE warmup=$WARMUP iterations=$ITERATIONS"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -109,6 +116,7 @@ started=$(date +%s)
       --output "$RUN_DIR/runner.json" \
       --hlo-output "$RUN_DIR/hlo/fp8_matmul.optimized_hlo.txt" \
       --kernel "$KERNEL" \
+      --selected-route-case "$SELECTED_CASE" \
       --warmup "$WARMUP" \
       --iterations "$ITERATIONS"
 ) >"$RUN_DIR/runner.log" 2>&1
@@ -150,6 +158,7 @@ run_id = pv.start_run(
         "hlo_sha256": runner["hlo"]["sha256"],
         "device_kind": runner["device_kind"],
         "kernel": runner["kernel"],
+        "selected_route_case": runner["selected_route_case"],
     },
     note=(
         "Protected production-shaped Pallas FP8 projection microbenchmark: "
@@ -162,7 +171,14 @@ pv.record_item(
     conn,
     run_id,
     benchmark=f"greenfield_fp8_{runner['kernel']}",
-    item_id="m8_k6144_n2048",
+    item_id=(
+        "m8_k6144_n2048"
+        + (
+            "_" + runner["selected_route_case"]
+            if runner["selected_route_case"] is not None
+            else ""
+        )
+    ),
     prompt=(
         "Raw-U8 E4M3FN 128x128 block-scaled expert projection: "
         + runner["kernel"]
