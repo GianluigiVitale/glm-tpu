@@ -139,6 +139,22 @@ def fp8_block_matmul(
     weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
+    if output_tiles > 128:
+        raise ValueError("FP8 matmul supports at most 128 output-scale blocks")
+    aligned_contraction_tiles = _ceil_div(contraction_tiles, 8) * 8
+    # Mosaic cannot issue a dynamically indexed scalar VMEM load from the
+    # compact [N-block,K-block] scale table: its two tiled dimensions require
+    # 8x128-aligned vector access.  Transpose and pad the few-KiB table so each
+    # program loads one aligned 8x128 scale tile, then selects its scalar in
+    # registers.  This is bounded metadata staging, not a decoded-weight
+    # overlay (GLM up: 24 KiB versus 12 MiB of FP8 weight bytes).
+    scale_table = jnp.pad(
+        jnp.transpose(scale),
+        (
+            (0, aligned_contraction_tiles - contraction_tiles),
+            (0, 128 - output_tiles),
+        ),
+    )
 
     def kernel(
         lhs_ref: Any,
@@ -157,11 +173,13 @@ def fp8_block_matmul(
         # 128x128 VMEM tile, apply its scalar inverse scale, then feed BF16 to
         # the MXU while accumulating in FP32.
         output_index = pl.program_id(0)
+        scale_tile = scale_ref[...]
+        scale_value = scale_tile[
+            contraction_index % jnp.int32(8), output_index
+        ]
         decoded_weight = (
             weight_ref[...].astype(config.accumulator_dtype)
-            * scale_ref[output_index, contraction_index].astype(
-                config.accumulator_dtype
-            )
+            * scale_value.astype(config.accumulator_dtype)
         ).astype(jnp.bfloat16)
         update = lax.dot_general(
             lhs_ref[...],
@@ -192,9 +210,9 @@ def fp8_block_matmul(
 
     def scale_index(
         output_index_value: Any, contraction_index: Any
-    ) -> tuple[int, int]:
-        del output_index_value, contraction_index
-        return 0, 0
+    ) -> tuple[Any, int]:
+        del output_index_value
+        return contraction_index // jnp.int32(8), 0
 
     call = pl.pallas_call(
         kernel,
@@ -209,11 +227,7 @@ def fp8_block_matmul(
             pl.BlockSpec(
                 (config.output_tile, config.contraction_tile), weight_index
             ),
-            # TPU block shapes must be 8x128-aligned unless a dimension spans
-            # its complete array.  The entire scale table is only a few KiB
-            # for GLM matrices, so keep it as one small VMEM resident table and
-            # index the current scalar by the two program ids.
-            pl.BlockSpec(scale.shape, scale_index),
+            pl.BlockSpec((8, 128), scale_index),
         ),
         out_specs=pl.BlockSpec(
             (padded_rows, config.output_tile), output_index
@@ -244,4 +258,4 @@ def fp8_block_matmul(
             transcendentals=0,
         ),
     )
-    return call(lhs, weight_fp8, scale)[:rows, :output]
+    return call(lhs, weight_fp8, scale_table)[:rows, :output]
