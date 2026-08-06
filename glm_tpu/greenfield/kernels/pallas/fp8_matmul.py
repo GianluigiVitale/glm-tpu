@@ -167,14 +167,15 @@ def _validate_selected_inputs(
         raise ValueError("selected-expert checkpoint payload must be uint8 bits")
     if scale.dtype != jnp.float32:
         raise ValueError("selected-expert block scales must be FP32")
-    expected_scale = (
+    expected_scale_prefix = (
         local_experts,
         _ceil_div(output, config.block_shape[0]),
-        _ceil_div(contraction, config.block_shape[1]),
     )
+    expected_scale = (*expected_scale_prefix, 128)
     if scale.shape != expected_scale:
         raise ValueError(
-            f"selected-expert scale shape must be {expected_scale}, got {scale.shape}"
+            "selected-expert scales must use the final TPU-aligned layout "
+            f"{expected_scale}, got {scale.shape}"
         )
     return route_indices.shape[0], local_experts, contraction, output
 
@@ -633,29 +634,11 @@ def fp8_selected_up_gate(
         local_ids
     )
 
-    def pad_scale(value: Any) -> Any:
-        return jnp.pad(
-            value,
-            (
-                (0, 0),
-                (
-                    0,
-                    padded_output // config.block_shape[0]
-                    - value.shape[1],
-                ),
-                (
-                    0,
-                    padded_contraction // config.block_shape[1]
-                    - value.shape[2],
-                ),
-            ),
-        )
-
-    # Keep checkpoint-native [expert,N-block,K-block] scales in HBM. Each
-    # program loads only one selected expert's 2x4 block for the current
-    # 256x512 weight tile and expands those eight FP32 values in VMEM.
-    gate_scale_table = pad_scale(gate_scale)
-    up_scale_table = pad_scale(up_scale)
+    # The final [expert,N-block,128] scale layout pads only compact metadata,
+    # not weights. A program loads two output blocks and masks four live K
+    # blocks from its aligned 128-wide scale tile entirely inside VMEM.
+    gate_scale_table = gate_scale
+    up_scale_table = up_scale
 
     def kernel(
         local_ids_value: Any,
@@ -690,21 +673,40 @@ def fp8_selected_up_gate(
                 gate_accumulator[...] = jnp.zeros_like(gate_accumulator)
                 up_accumulator[...] = jnp.zeros_like(up_accumulator)
 
+            def expand_scale(scale_tile: Any) -> Any:
+                columns = lax.broadcasted_iota(
+                    jnp.int32, scale_tile.shape, 1
+                )
+                first_block = (
+                    contraction_index
+                    * jnp.int32(contraction_blocks_per_tile)
+                )
+                block_values = []
+                for block_offset in range(contraction_blocks_per_tile):
+                    mask = columns == first_block + jnp.int32(block_offset)
+                    block_values.append(
+                        jnp.sum(
+                            jnp.where(mask, scale_tile, jnp.float32(0.0)),
+                            axis=1,
+                            dtype=jnp.float32,
+                        )
+                    )
+                compact = jnp.stack(block_values, axis=0)
+                return jnp.repeat(
+                    jnp.repeat(
+                        compact, config.block_shape[1], axis=0
+                    ),
+                    config.block_shape[0],
+                    axis=1,
+                )
+
             decoded_gate = (
                 lax.bitcast_convert_type(
                     gate_ref[...], jnp.float8_e4m3fn
                 )
                 .astype(config.accumulator_dtype)
                 .reshape(config.contraction_tile, config.output_tile)
-                * jnp.repeat(
-                    jnp.repeat(
-                        jnp.transpose(gate_scale_ref[...]),
-                        config.block_shape[1],
-                        axis=0,
-                    ),
-                    config.block_shape[0],
-                    axis=1,
-                )
+                * expand_scale(gate_scale_ref[...])
             ).reshape(config.contraction_tile, config.output_tile).astype(
                 jnp.bfloat16
             )
@@ -714,15 +716,7 @@ def fp8_selected_up_gate(
                 )
                 .astype(config.accumulator_dtype)
                 .reshape(config.contraction_tile, config.output_tile)
-                * jnp.repeat(
-                    jnp.repeat(
-                        jnp.transpose(up_scale_ref[...]),
-                        config.block_shape[1],
-                        axis=0,
-                    ),
-                    config.block_shape[0],
-                    axis=1,
-                )
+                * expand_scale(up_scale_ref[...])
             ).reshape(config.contraction_tile, config.output_tile).astype(
                 jnp.bfloat16
             )
@@ -768,17 +762,6 @@ def fp8_selected_up_gate(
                 output_index,
             )
 
-        def scale_index(
-            output_index: Any,
-            route_index: Any,
-            contraction_index: Any,
-        ) -> tuple[Any, Any, Any]:
-            return (
-                local_ids_value[route_index],
-                output_index,
-                contraction_index,
-            )
-
         def output_index(
             output_index_value: Any,
             route_index: Any,
@@ -799,9 +782,13 @@ def fp8_selected_up_gate(
             (
                 None,
                 output_blocks_per_tile,
-                contraction_blocks_per_tile,
+                128,
             ),
-            scale_index,
+            lambda output_index, route_index, contraction_index: (
+                local_ids_value[route_index],
+                output_index,
+                0,
+            ),
         )
         output_spec = pl.BlockSpec(
             (None, config.row_tile, config.output_tile), output_index
@@ -892,7 +879,7 @@ def fp8_selected_up_gate(
                 * output_tiles
                 * contraction_tiles
                 * output_blocks_per_tile
-                * contraction_blocks_per_tile
+                * 128
                 * 4
                 + 2 * route_count * padded_output * config.row_tile * 2
             ),

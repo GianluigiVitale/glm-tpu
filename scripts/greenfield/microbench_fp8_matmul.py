@@ -169,6 +169,8 @@ def main() -> int:
     ).reshape(output // 128, contraction // 128)
     local_experts = None
     route_indices_host = None
+    selected_reference_scale_host = None
+    selected_reference_gate_scale_host = None
     if args.kernel == "selected_up_gate":
         local_experts = 64
         single_weight = weight_host
@@ -200,6 +202,19 @@ def main() -> int:
             local_experts * (output // 128) * (contraction // 128),
             dtype=np.float32,
         ).reshape(local_experts, output // 128, contraction // 128)
+        selected_reference_scale_host = scale_host
+        selected_reference_gate_scale_host = gate_scale_host
+        # Materialize the proposed final TPU scale layout directly. Padding
+        # compact scale metadata to 128 K blocks gives Mosaic aligned HBM
+        # slices without expanding the eight selected routes inside the JIT.
+        scale_host = np.pad(
+            scale_host,
+            ((0, 0), (0, 0), (0, 128 - scale_host.shape[2])),
+        )
+        gate_scale_host = np.pad(
+            gate_scale_host,
+            ((0, 0), (0, 0), (0, 128 - gate_scale_host.shape[2])),
+        )
         if args.selected_route_case == "normal_two":
             # Two routes owned by this 0:64 chip, interleaved with the six
             # routes owned by the other PP8 stage chips.
@@ -238,8 +253,16 @@ def main() -> int:
             kernel_hlo_name = "greenfield_fp8_block_up_gate"
         else:
             assert local_experts is not None and route_indices_host is not None
+            assert selected_reference_scale_host is not None
+            assert selected_reference_gate_scale_host is not None
             gate_bits = jax.device_put(gate_weight_host, device)
             gate_scale = jax.device_put(gate_scale_host, device)
+            reference_scale = jax.device_put(
+                selected_reference_scale_host, device
+            )
+            reference_gate_scale = jax.device_put(
+                selected_reference_gate_scale_host, device
+            )
             route_indices = jax.device_put(route_indices_host, device)
             expert_start = jax.device_put(np.asarray(0, dtype=np.int32), device)
             kernel = fp8_selected_up_gate
@@ -253,8 +276,8 @@ def main() -> int:
                 scale,
             )
             reference_inputs = (
-                ("gate", gate_bits, gate_scale),
-                ("up", weight_bits, scale),
+                ("gate", gate_bits, reference_gate_scale),
+                ("up", weight_bits, reference_scale),
             )
             kernel_hlo_name = "greenfield_fp8_selected_up_gate"
         lower_started = time.monotonic()
@@ -372,7 +395,7 @@ def main() -> int:
                         and f"u8[{local_experts},{contraction},{output}]"
                         in kernel_calls[0]
                         and kernel_calls[0].count(
-                            f"f32[{local_experts},{output // 128},{contraction // 128}]"
+                            f"f32[{local_experts},{output // 128},128]"
                         )
                         == 2
                         and f"f8e4m3fn[{local_experts},{contraction},{output}]"
