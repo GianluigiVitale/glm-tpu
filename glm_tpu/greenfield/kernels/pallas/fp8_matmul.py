@@ -771,7 +771,7 @@ def fp8_selected_up_gate(
         ) -> tuple[Any, Any, int, Any]:
             return (
                 route_index,
-                contraction_index * jnp.int32(contraction_blocks_per_tile),
+                contraction_index,
                 0,
                 output_index,
             )
