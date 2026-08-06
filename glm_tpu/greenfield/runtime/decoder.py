@@ -1,0 +1,598 @@
+"""One-step all-stage raw-FP8 decoder program over the global device mesh."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Mapping, Sequence
+
+from ..errors import PlanValidationError
+from ..kernels.layer import (
+    AttentionFp8Weights,
+    DenseFp8Weights,
+    DsaFp8Weights,
+    MoeFp8Weights,
+    stage_local_transformer_layer_fp8_mapped,
+)
+from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
+from ..kernels.reference.dsa import DsaNumericalContract
+from ..kernels.reference.moe import GlmMoeNumericalContract
+from ..model.schedule import PipelineSchedule, StageExecution
+from ..model.state import DecoderStateLayout
+from ..model.weights import DecoderRuntimeWeightLayout
+from ..sharding.hlo_contract import parse_hlo_module
+from ..types import ExecutionPlan
+from .pipeline import (
+    PipelineSkeletonConfig,
+    _canonical_groups,
+    _canonical_pairs,
+    _partition_maps,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DecoderStepConfig:
+    stage_count: int
+    local_parallel_size: int
+    hidden_size: int
+    selected_width: int
+    maximum_layer_slots: int
+    maximum_full_indexer_slots: int
+    logical_page_size: int
+    local_rows_per_page: int
+    packed_cache_width: int
+    index_key_width: int
+
+    def __post_init__(self) -> None:
+        for field in (
+            "stage_count",
+            "local_parallel_size",
+            "hidden_size",
+            "selected_width",
+            "maximum_layer_slots",
+            "maximum_full_indexer_slots",
+            "logical_page_size",
+            "local_rows_per_page",
+            "packed_cache_width",
+            "index_key_width",
+        ):
+            value = getattr(self, field)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                raise PlanValidationError(f"decoder {field} must be positive")
+        if self.logical_page_size != (
+            self.local_parallel_size * self.local_rows_per_page
+        ):
+            raise PlanValidationError("decoder local page geometry is inconsistent")
+
+    @property
+    def total_devices(self) -> int:
+        return self.stage_count * self.local_parallel_size
+
+    @property
+    def metadata_width(self) -> int:
+        # Positions, count, producer, visited, health, active.
+        return self.selected_width + 5
+
+    @property
+    def count_index(self) -> int:
+        return self.selected_width
+
+    @property
+    def producer_index(self) -> int:
+        return self.selected_width + 1
+
+    @property
+    def visited_index(self) -> int:
+        return self.selected_width + 2
+
+    @property
+    def health_index(self) -> int:
+        return self.selected_width + 3
+
+    @property
+    def active_index(self) -> int:
+        return self.selected_width + 4
+
+
+@dataclass(frozen=True, slots=True)
+class DecoderStepProgram:
+    config: DecoderStepConfig
+    execute: Any
+    mesh: Any
+    input_specs: tuple[Any, ...]
+    groups: tuple[tuple[int, ...], ...]
+    pairs: tuple[tuple[int, int], ...]
+    plan_hash: str
+    schedule_hash: str
+    state_layout_hash: str
+    weight_layout_hash: str
+
+
+def validate_decoder_step_hlo(
+    optimized_hlo: str,
+    *,
+    config: DecoderStepConfig,
+    schedule: PipelineSchedule,
+    groups: Sequence[Sequence[int]],
+    pairs: Sequence[Sequence[int]],
+    backend_contract: str,
+) -> dict[str, Any]:
+    """Reject non-local collectives, count drift, and dead batch rows."""
+
+    if backend_contract not in ("cpu_reference", "tpu_stage_local_rewrite"):
+        raise PlanValidationError("decoder HLO backend contract is unknown")
+    skeleton = PipelineSkeletonConfig(
+        config.stage_count,
+        config.local_parallel_size,
+        config.hidden_size,
+        config.selected_width,
+    )
+    canonical_groups = _canonical_groups(groups, skeleton)
+    canonical_pairs = _canonical_pairs(pairs, canonical_groups, skeleton)
+    module = parse_hlo_module(optimized_hlo)
+    collectives = module.collectives
+    by_opcode: dict[str, list[Any]] = {}
+    for collective in collectives:
+        by_opcode.setdefault(collective.opcode, []).append(collective)
+    full_layers = sum(
+        layer.indexer_kind == "full"
+        for stage in schedule.stages
+        for layer in stage.layers
+    )
+    layers = schedule.layer_count
+    if backend_contract == "cpu_reference":
+        expected_gathers = 4 * layers + 3 * full_layers
+        expected_reductions = 2 * layers
+    else:
+        # Protected Gate C TPU HLO rewrites each IndexShare body from
+        # 4AG/1AR to 2AG/3AR. DSA remains 3AG/0AR and every MLP has one AR.
+        expected_gathers = 2 * layers + 3 * full_layers
+        expected_reductions = 4 * layers
+    expected_permutes = 2 * config.stage_count
+    violations = []
+    observed_counts = {
+        opcode: len(values) for opcode, values in sorted(by_opcode.items())
+    }
+    expected_counts = {
+        "all-gather": expected_gathers,
+        "all-reduce": expected_reductions,
+        "collective-permute": expected_permutes,
+    }
+    if observed_counts != expected_counts:
+        violations.append(
+            f"decoder collective counts drifted: expected={expected_counts} "
+            f"observed={observed_counts}"
+        )
+    expected_groups = tuple(tuple(group) for group in canonical_groups)
+    for collective in (
+        *by_opcode.get("all-gather", ()),
+        *by_opcode.get("all-reduce", ()),
+    ):
+        if collective.replica_groups != expected_groups:
+            violations.append(
+                f"decoder collective {collective.name} escaped local groups"
+            )
+        if collective.maximum_group_size != config.local_parallel_size:
+            violations.append(
+                f"decoder collective {collective.name} has non-local width"
+            )
+    expected_pair_multiset = sorted(canonical_pairs * expected_permutes)
+    observed_pair_multiset = sorted(
+        pair
+        for collective in by_opcode.get("collective-permute", ())
+        for pair in collective.source_target_pairs
+    )
+    if observed_pair_multiset != expected_pair_multiset:
+        violations.append("decoder transport pairs/counts drifted")
+    forbidden_shapes = []
+    for instruction in module.instructions:
+        for shape in instruction.operand_shapes + instruction.result_shapes:
+            if shape.dimensions in (
+                (config.total_devices, config.hidden_size),
+                (config.total_devices, 1, config.hidden_size),
+                (config.total_devices, config.selected_width),
+                (config.total_devices, 1, config.selected_width),
+            ):
+                forbidden_shapes.append(
+                    {"instruction": instruction.name, "shape": shape.to_dict()}
+                )
+    if forbidden_shapes:
+        violations.append("decoder contains dead-row/full-pod live tensors")
+    if module.num_partitions not in (None, config.total_devices):
+        violations.append(
+            f"decoder expected {config.total_devices} partitions, "
+            f"found {module.num_partitions}"
+        )
+    return {
+        "backend_contract": backend_contract,
+        "collective_count": len(collectives),
+        "collective_counts": observed_counts,
+        "expected_collective_counts": expected_counts,
+        "forbidden_shapes": forbidden_shapes,
+        "full_indexer_layers": full_layers,
+        "layer_count": layers,
+        "module_name": module.name,
+        "num_partitions": module.num_partitions,
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
+def _attention_weights(
+    weight: Any,
+    slot: int,
+) -> AttentionFp8Weights:
+    base = f"attention.slot_{slot:02d}"
+    return AttentionFp8Weights(
+        weight(f"{base}.q_a.weight_bits"),
+        weight(f"{base}.q_a.scale_inv"),
+        weight(f"{base}.q_a_norm"),
+        weight(f"{base}.q_b.weight_bits"),
+        weight(f"{base}.q_b.scale_inv"),
+        weight(f"{base}.kv_a.weight_bits"),
+        weight(f"{base}.kv_a.scale_inv"),
+        weight(f"{base}.kv_a_norm"),
+        weight(f"{base}.kv_b.weight_bits"),
+        weight(f"{base}.kv_b.scale_inv"),
+        weight(f"{base}.o.weight_bits"),
+        weight(f"{base}.o.scale_inv"),
+    )
+
+
+def _dsa_weights(weight: Any, slot: int) -> DsaFp8Weights:
+    base = f"indexer.slot_{slot:02d}"
+    return DsaFp8Weights(
+        weight(f"{base}.wq_b.weight_bits"),
+        weight(f"{base}.wq_b.scale_inv"),
+        weight(f"{base}.wk.weight_bits"),
+        weight(f"{base}.wk.scale_inv"),
+        weight(f"{base}.key_norm_weight"),
+        weight(f"{base}.key_norm_bias"),
+        weight(f"{base}.head_weight"),
+    )
+
+
+def _dense_weights(weight: Any, slot: int) -> DenseFp8Weights:
+    base = f"dense.slot_{slot:02d}"
+    return DenseFp8Weights(
+        weight(f"{base}.gate.weight_bits"),
+        weight(f"{base}.gate.scale_inv"),
+        weight(f"{base}.up.weight_bits"),
+        weight(f"{base}.up.scale_inv"),
+        weight(f"{base}.down.weight_bits"),
+        weight(f"{base}.down.scale_inv"),
+    )
+
+
+def _moe_weights(weight: Any, slot: int) -> MoeFp8Weights:
+    base = f"sparse.slot_{slot:02d}"
+    return MoeFp8Weights(
+        weight(f"{base}.router_weight"),
+        weight(f"{base}.correction_bias"),
+        weight(f"{base}.experts.gate_proj.weight_bits"),
+        weight(f"{base}.experts.gate_proj.scale_inv"),
+        weight(f"{base}.experts.up_proj.weight_bits"),
+        weight(f"{base}.experts.up_proj.scale_inv"),
+        weight(f"{base}.experts.down_proj.weight_bits"),
+        weight(f"{base}.experts.down_proj.scale_inv"),
+        weight(f"{base}.shared.gate_proj.weight_bits"),
+        weight(f"{base}.shared.gate_proj.scale_inv"),
+        weight(f"{base}.shared.up_proj.weight_bits"),
+        weight(f"{base}.shared.up_proj.scale_inv"),
+        weight(f"{base}.shared.down_proj.weight_bits"),
+        weight(f"{base}.shared.down_proj.scale_inv"),
+    )
+
+
+def _execute_stage(
+    stage: StageExecution,
+    values: tuple[Any, Any, Any, Any],
+    *,
+    weight: Any,
+    local_slot: Any,
+    position: Any,
+    block_tables: Any,
+    context_lengths: Any,
+    axis_name: str,
+    axis_groups: tuple[tuple[int, ...], ...],
+    config: DecoderStepConfig,
+    dsa_contract: DsaNumericalContract,
+    mla_contract: MlaNumericalContract,
+    moe_contract: GlmMoeNumericalContract,
+    cache_layout: StageLocalKvLayout,
+    block_shape: tuple[int, int],
+) -> tuple[Any, Any, Any, Any]:
+    import jax.numpy as jnp
+
+    residual, kv_cache, index_cache, metadata = values
+    full_slot = 0
+    for layer in stage.layers:
+        attention = _attention_weights(weight, layer.stage_slot)
+        input_norm = weight(
+            f"attention.slot_{layer.stage_slot:02d}.input_norm"
+        )
+        post_norm = weight(
+            f"attention.slot_{layer.stage_slot:02d}.post_norm"
+        )
+        if layer.indexer_kind == "full":
+            dsa = _dsa_weights(weight, full_slot)
+            layer_index_cache = index_cache[full_slot]
+            current_full_slot = full_slot
+            full_slot += 1
+        else:
+            dsa = None
+            layer_index_cache = index_cache[0]
+            current_full_slot = None
+        if layer.mlp_kind == "dense":
+            assert layer.dense_slot is not None
+            dense = _dense_weights(weight, layer.dense_slot)
+            moe = None
+        else:
+            assert layer.sparse_slot is not None
+            dense = None
+            moe = _moe_weights(weight, layer.sparse_slot)
+        producer_valid = (
+            jnp.asarray(True)
+            if layer.indexer_kind == "full"
+            else metadata[0, config.producer_index]
+            == jnp.int32(layer.index_state_producer_layer)
+        )
+        incoming_valid = (
+            (metadata[0, config.health_index] == jnp.int32(1))
+            & producer_valid
+        )[None]
+        result = stage_local_transformer_layer_fp8_mapped(
+            residual,
+            kv_cache[layer.stage_slot],
+            layer_index_cache,
+            metadata[:, : config.selected_width],
+            metadata[:, config.count_index],
+            position,
+            block_tables,
+            context_lengths,
+            input_norm,
+            post_norm,
+            attention,
+            dsa,
+            dense,
+            moe,
+            incoming_valid,
+            local_slot,
+            axis_name=axis_name,
+            indexer_kind=layer.indexer_kind,
+            mlp_kind=layer.mlp_kind,
+            dsa_contract=dsa_contract,
+            mla_contract=mla_contract,
+            moe_contract=moe_contract,
+            cache_layout=cache_layout,
+            axis_index_groups=axis_groups,
+            block_shape=block_shape,
+        )
+        residual = result.output
+        kv_cache = kv_cache.at[layer.stage_slot].set(result.kv_cache)
+        if current_full_slot is not None:
+            index_cache = index_cache.at[current_full_slot].set(
+                result.index_cache
+            )
+            metadata = metadata.at[0, config.producer_index].set(
+                jnp.int32(layer.layer_id)
+            )
+        metadata = metadata.at[:, : config.selected_width].set(
+            result.selected_positions
+        )
+        metadata = metadata.at[:, config.count_index].set(
+            result.selected_valid_counts
+        )
+        metadata = metadata.at[0, config.health_index].set(
+            result.contract_valid[0].astype(jnp.int32)
+        )
+    metadata = metadata.at[0, config.visited_index].set(
+        jnp.bitwise_or(
+            metadata[0, config.visited_index],
+            jnp.int32(1 << stage.assignment.stage_id),
+        )
+    )
+    return residual, kv_cache, index_cache, metadata
+
+
+def build_decoder_step_program(
+    plan: ExecutionPlan,
+    schedule: PipelineSchedule,
+    state_layout: DecoderStateLayout,
+    weight_layout: DecoderRuntimeWeightLayout,
+    groups: Sequence[Sequence[int]],
+    pairs: Sequence[Sequence[int]],
+    *,
+    devices: Sequence[Any] | None = None,
+    axis_name: str = "device",
+) -> DecoderStepProgram:
+    """Build, but do not compile, the complete all-stage decode-step map."""
+
+    if not axis_name:
+        raise PlanValidationError("decoder axis name must be explicit")
+    hashes = (
+        schedule.plan_hash,
+        state_layout.plan_hash,
+        weight_layout.plan_hash,
+    )
+    if hashes != (plan.plan_hash,) * 3:
+        raise PlanValidationError("decoder components belong to different plans")
+    if state_layout.schedule_hash != schedule.schedule_hash or (
+        weight_layout.schedule_hash != schedule.schedule_hash
+    ):
+        raise PlanValidationError("decoder component schedule hashes disagree")
+    geometry = plan.geometry
+    config = DecoderStepConfig(
+        stage_count=plan.pipeline_stages,
+        local_parallel_size=plan.local_parallel_size,
+        hidden_size=geometry.hidden_size,
+        selected_width=geometry.dsa_top_k,
+        maximum_layer_slots=max(stage.layer_count for stage in schedule.stages),
+        maximum_full_indexer_slots=max(
+            stage.full_indexer_count for stage in state_layout.stages
+        ),
+        logical_page_size=state_layout.logical_page_size,
+        local_rows_per_page=state_layout.stages[0].local_rows_per_page,
+        packed_cache_width=state_layout.stages[0].packed_kv_width,
+        index_key_width=state_layout.stages[0].index_key_width,
+    )
+    skeleton = PipelineSkeletonConfig(
+        config.stage_count,
+        config.local_parallel_size,
+        config.hidden_size,
+        config.selected_width,
+    )
+    canonical_groups = _canonical_groups(groups, skeleton)
+    canonical_pairs = _canonical_pairs(pairs, canonical_groups, skeleton)
+    stage_by_rank, slot_by_rank = _partition_maps(canonical_groups, skeleton)
+
+    import jax
+    from jax import lax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax.sharding import Mesh, PartitionSpec as P
+
+    runtime_devices = tuple(jax.devices() if devices is None else devices)
+    if len(runtime_devices) != config.total_devices:
+        raise PlanValidationError(
+            f"decoder expected {config.total_devices} devices, "
+            f"found {len(runtime_devices)}"
+        )
+    if all(hasattr(device, "id") for device in runtime_devices):
+        for stage, group in zip(schedule.stages, canonical_groups, strict=True):
+            observed_ids = tuple(int(runtime_devices[rank].id) for rank in group)
+            if observed_ids != stage.assignment.device_ids:
+                raise PlanValidationError(
+                    f"decoder runtime devices disagree with physical stage "
+                    f"{stage.assignment.stage_id}: expected="
+                    f"{stage.assignment.device_ids} observed={observed_ids}"
+                )
+    mesh = Mesh(np.asarray(runtime_devices, dtype=object), (axis_name,))
+    stage_map = jnp.asarray(stage_by_rank, dtype=jnp.int32)
+    slot_map = jnp.asarray(slot_by_rank, dtype=jnp.int32)
+    axis_groups = tuple(tuple(group) for group in canonical_groups)
+    dsa_contract = DsaNumericalContract(
+        hidden_size=geometry.hidden_size,
+        q_lora_rank=geometry.q_lora_rank,
+        num_heads=geometry.dsa_indexer_heads,
+        head_dim=geometry.dsa_indexer_head_dim,
+        rotary_dim=geometry.qk_rope_head_dim,
+        top_k=geometry.dsa_top_k,
+    )
+    mla_contract = MlaNumericalContract(
+        num_heads=geometry.attention_heads,
+        kv_lora_rank=geometry.kv_lora_rank,
+        qk_nope_head_dim=geometry.qk_nope_head_dim,
+        qk_rope_head_dim=geometry.qk_rope_head_dim,
+        qk_head_dim=(
+            geometry.qk_nope_head_dim + geometry.qk_rope_head_dim
+        ),
+        v_head_dim=geometry.v_head_dim,
+        packed_cache_width=config.packed_cache_width,
+        top_k=geometry.dsa_top_k,
+    )
+    moe_contract = GlmMoeNumericalContract(
+        hidden_size=geometry.hidden_size,
+        intermediate_size=geometry.moe_intermediate_size,
+        num_experts=geometry.num_routed_experts,
+        top_k=geometry.routed_top_k,
+        stage_size=plan.local_parallel_size,
+        fp8_block_shape=geometry.fp8_block_shape,
+    )
+    cache_layout = StageLocalKvLayout(
+        logical_page_size=config.logical_page_size,
+        local_parallel_size=config.local_parallel_size,
+        packed_cache_width=config.packed_cache_width,
+    )
+
+    def mapped(
+        local_weights: Mapping[str, Any],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, Any, Any, Any]:
+        rank = lax.axis_index(axis_name)
+        stage_id = stage_map[rank]
+        local_slot = slot_map[rank]
+        residual = local_residual_container[0]
+        kv_cache = local_kv_container[0]
+        index_cache = local_index_container[0]
+        metadata = local_metadata_container[0]
+
+        def weight(name: str) -> Any:
+            return local_weights[name][0]
+
+        for hop, stage in enumerate(schedule.stages):
+            active = metadata[0, config.active_index] == jnp.int32(1)
+            should_execute = active & (stage_id == jnp.int32(hop))
+            residual, kv_cache, index_cache, metadata = lax.cond(
+                should_execute,
+                lambda values, stage=stage: _execute_stage(
+                    stage,
+                    values,
+                    weight=weight,
+                    local_slot=local_slot,
+                    position=position,
+                    block_tables=block_tables,
+                    context_lengths=context_lengths,
+                    axis_name=axis_name,
+                    axis_groups=axis_groups,
+                    config=config,
+                    dsa_contract=dsa_contract,
+                    mla_contract=mla_contract,
+                    moe_contract=moe_contract,
+                    cache_layout=cache_layout,
+                    block_shape=geometry.fp8_block_shape,
+                ),
+                lambda values: values,
+                (residual, kv_cache, index_cache, metadata),
+            )
+            residual = lax.ppermute(residual, axis_name, canonical_pairs)
+            metadata = lax.ppermute(metadata, axis_name, canonical_pairs)
+        return (
+            residual[None, ...],
+            kv_cache[None, ...],
+            index_cache[None, ...],
+            metadata[None, ...],
+        )
+
+    weight_specs = {
+        spec.name: P(axis_name, *(None for _ in spec.shape))
+        for spec in weight_layout.specs
+    }
+    residual_spec = P(axis_name, None, None)
+    kv_spec = P(axis_name, None, None, None, None)
+    index_spec = P(axis_name, None, None, None, None)
+    metadata_spec = P(axis_name, None, None)
+    input_specs = (
+        weight_specs,
+        residual_spec,
+        kv_spec,
+        index_spec,
+        metadata_spec,
+        P(),
+        P(),
+        P(),
+    )
+    execute = jax.shard_map(
+        mapped,
+        mesh=mesh,
+        in_specs=input_specs,
+        out_specs=(residual_spec, kv_spec, index_spec, metadata_spec),
+        check_vma=False,
+    )
+    return DecoderStepProgram(
+        config=config,
+        execute=execute,
+        mesh=mesh,
+        input_specs=input_specs,
+        groups=canonical_groups,
+        pairs=canonical_pairs,
+        plan_hash=plan.plan_hash,
+        schedule_hash=schedule.schedule_hash,
+        state_layout_hash=state_layout.state_layout_hash,
+        weight_layout_hash=weight_layout.layout_hash,
+    )

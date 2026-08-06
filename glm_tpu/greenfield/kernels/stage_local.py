@@ -234,6 +234,8 @@ def stage_local_dsa_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
+    precomputed_normalized: Any | None = None,
+    precomputed_q_residual: Any | None = None,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
 
@@ -293,23 +295,35 @@ def stage_local_dsa_fp8_mapped(
         layout=cache_layout,
         physical_page_count=index_cache.shape[0],
     )
-    q_a_weight = dequantize_fp8_bits_block_weight(
-        q_a_bits, q_a_scale, block_shape=block_shape
-    )
     local_wq_b_weight = dequantize_fp8_bits_block_weight(
         wq_b_bits, wq_b_scale, block_shape=block_shape
     )
     wk_weight = dequantize_fp8_bits_block_weight(
         wk_bits, wk_scale, block_shape=block_shape
     )
-    normalized = rms_norm(
-        residual, input_norm_weight, epsilon=rms_norm_epsilon
-    )
-    q_residual = rms_norm(
-        linear(normalized, q_a_weight),
-        q_a_norm_weight,
-        epsilon=rms_norm_epsilon,
-    )
+    if (precomputed_normalized is None) != (precomputed_q_residual is None):
+        raise ValueError("DSA shared q_a intermediates must be supplied together")
+    if precomputed_normalized is None:
+        q_a_weight = dequantize_fp8_bits_block_weight(
+            q_a_bits, q_a_scale, block_shape=block_shape
+        )
+        normalized = rms_norm(
+            residual, input_norm_weight, epsilon=rms_norm_epsilon
+        )
+        q_residual = rms_norm(
+            linear(normalized, q_a_weight),
+            q_a_norm_weight,
+            epsilon=rms_norm_epsilon,
+        )
+    else:
+        normalized = precomputed_normalized
+        q_residual = precomputed_q_residual
+        if normalized.shape != residual.shape or normalized.dtype != residual.dtype:
+            raise ValueError("DSA precomputed normalized residual is invalid")
+        if q_residual.shape != (1, contract.q_lora_rank) or (
+            q_residual.dtype != residual.dtype
+        ):
+            raise ValueError("DSA precomputed q residual is invalid")
     local_query, local_head_weights = _local_dsa_query(
         q_residual,
         normalized,
@@ -446,6 +460,8 @@ def stage_local_index_share_fp8_mapped(
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
+    precomputed_normalized: Any | None = None,
+    precomputed_q_residual: Any | None = None,
 ) -> StageLocalIndexShareFp8Result:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -509,9 +525,6 @@ def stage_local_index_share_fp8_mapped(
         layout=cache_layout,
         physical_page_count=cache.shape[0],
     )
-    q_a_weight = dequantize_fp8_bits_block_weight(
-        q_a_bits, q_a_scale, block_shape=block_shape
-    )
     local_q_b_weight = dequantize_fp8_bits_block_weight(
         q_b_bits, q_b_scale, block_shape=block_shape
     )
@@ -524,14 +537,33 @@ def stage_local_index_share_fp8_mapped(
     local_o_weight = dequantize_fp8_bits_block_weight(
         o_bits, o_scale, block_shape=block_shape
     )
-    normalized = rms_norm(
-        residual, input_norm_weight, epsilon=rms_norm_epsilon
-    )
-    q_residual = rms_norm(
-        linear(normalized, q_a_weight),
-        q_a_norm_weight,
-        epsilon=rms_norm_epsilon,
-    )
+    if (precomputed_normalized is None) != (precomputed_q_residual is None):
+        raise ValueError(
+            "IndexShare shared q_a intermediates must be supplied together"
+        )
+    if precomputed_normalized is None:
+        q_a_weight = dequantize_fp8_bits_block_weight(
+            q_a_bits, q_a_scale, block_shape=block_shape
+        )
+        normalized = rms_norm(
+            residual, input_norm_weight, epsilon=rms_norm_epsilon
+        )
+        q_residual = rms_norm(
+            linear(normalized, q_a_weight),
+            q_a_norm_weight,
+            epsilon=rms_norm_epsilon,
+        )
+    else:
+        normalized = precomputed_normalized
+        q_residual = precomputed_q_residual
+        if normalized.shape != residual.shape or normalized.dtype != residual.dtype:
+            raise ValueError(
+                "IndexShare precomputed normalized residual is invalid"
+            )
+        if q_residual.shape != (1, q_lora_rank) or (
+            q_residual.dtype != residual.dtype
+        ):
+            raise ValueError("IndexShare precomputed q residual is invalid")
     q_states = linear(q_residual, local_q_b_weight).reshape(
         1, local_heads, contract.qk_head_dim
     )
