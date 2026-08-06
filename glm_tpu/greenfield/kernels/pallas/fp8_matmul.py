@@ -829,6 +829,421 @@ def fp8_structured_kv_b_value(
     return output[None, ...].astype(jnp.bfloat16)
 
 
+def fp8_fused_structured_kv_b_value_output(
+    attended_latent: Any,
+    kv_b_bits: Any,
+    kv_b_scale: Any,
+    output_bits: Any,
+    output_scale: Any,
+    *,
+    qk_nope_head_dim: int = 192,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Fuse structured value and attention-output projections in one call.
+
+    The structured per-head value blocks are accumulated and repacked in
+    VMEM. The second raw-FP8 projection consumes that BF16 scratch directly,
+    retaining the reference arithmetic while removing the intermediate HBM
+    result and its separate custom-call boundary.
+    """
+
+    heads, combined_width, latent, value_width = _validate_structured_kv_b(
+        attended_latent,
+        kv_b_bits,
+        kv_b_scale,
+        qk_nope_head_dim=qk_nope_head_dim,
+        config=config,
+    )
+    if attended_latent.shape != (1, heads, latent):
+        raise ValueError(
+            "fused structured value input must have shape [1, heads, 512]"
+        )
+    value_contraction = heads * value_width
+    if output_bits.ndim != 2 or output_bits.dtype != jnp.uint8:
+        raise ValueError("fused attention-output weight must be rank-two U8")
+    output_width, output_contraction = output_bits.shape
+    if output_width <= 0 or output_contraction != value_contraction:
+        raise ValueError(
+            "fused attention-output weight must contract all value heads"
+        )
+    expected_output_scale = (
+        _ceil_div(output_width, config.block_shape[0]),
+        _ceil_div(value_contraction, config.block_shape[1]),
+    )
+    if output_scale.shape != expected_output_scale or (
+        output_scale.dtype != jnp.float32
+    ):
+        raise ValueError(
+            "fused attention-output FP32 scale shape must be "
+            f"{expected_output_scale}, got "
+            f"{output_scale.shape}/{output_scale.dtype}"
+        )
+    if value_contraction % config.contraction_tile != 0 or (
+        output_width % config.output_tile != 0
+    ):
+        raise ValueError(
+            "fused attention-output production geometry must be tile aligned"
+        )
+
+    value_contraction_tiles = latent // config.contraction_tile
+    value_output_blocks = 3
+    head_rows = jnp.transpose(attended_latent, (1, 0, 2))
+    head_rows = jnp.pad(
+        head_rows,
+        ((0, 0), (0, config.row_tile - 1), (0, 0)),
+    )
+    head_ids = jnp.arange(heads, dtype=jnp.int32)[:, None]
+    value_starts = head_ids * jnp.int32(combined_width) + jnp.int32(
+        qk_nope_head_dim
+    )
+    source_blocks = value_starts // jnp.int32(128) + jnp.arange(
+        value_output_blocks, dtype=jnp.int32
+    )[None, :]
+    active_blocks = jnp.arange(
+        value_output_blocks, dtype=jnp.int32
+    )[None, :] < (
+        (value_starts % jnp.int32(128) + value_width + 127)
+        // jnp.int32(128)
+    )
+    source_blocks = jnp.clip(source_blocks, 0, kv_b_scale.shape[0] - 1)
+    selected_value_scale = kv_b_scale[source_blocks]
+    selected_value_scale = jnp.where(
+        active_blocks[..., None], selected_value_scale, 0.0
+    )
+    selected_value_scale = jnp.repeat(
+        selected_value_scale[..., None], 128, axis=-1
+    ).reshape(
+        heads * value_output_blocks * value_contraction_tiles,
+        1,
+        128,
+    )
+    selected_value_scale = jnp.repeat(
+        selected_value_scale, config.row_tile, axis=1
+    )
+    output_tiles = output_width // config.output_tile
+    output_contraction_tiles = (
+        value_contraction // config.contraction_tile
+    )
+    output_scale_table = _aligned_scale_table(
+        output_scale,
+        output_tiles=output_tiles,
+        contraction_tiles=output_contraction_tiles,
+    )
+
+    def kernel(
+        latent_hbm_ref: Any,
+        kv_b_hbm_ref: Any,
+        kv_b_scale_hbm_ref: Any,
+        output_weight_hbm_ref: Any,
+        output_scale_hbm_ref: Any,
+        output_hbm_ref: Any,
+        raw_value_vmem_ref: Any,
+        value_vmem_ref: Any,
+        value_accumulator_ref: Any,
+        output_accumulator_ref: Any,
+    ) -> None:
+        def value_kernel(
+            latent_ref: Any,
+            weight_ref: Any,
+            scale_ref: Any,
+            value_ref: Any,
+            accumulator_ref: Any,
+        ) -> None:
+            contraction_index = pl.program_id(1)
+
+            @pl.when(contraction_index == 0)
+            def initialize_accumulator() -> None:
+                accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
+
+            decoded_weight = (
+                lax.bitcast_convert_type(
+                    weight_ref[...], jnp.float8_e4m3fn
+                ).astype(config.accumulator_dtype)
+                * scale_ref[0, 0, 0].astype(config.accumulator_dtype)
+            ).astype(config.output_dtype)
+            accumulator_ref[...] += lax.dot_general(
+                latent_ref[0, ...],
+                decoded_weight,
+                dimension_numbers=(((1,), (1,)), ((), ())),
+                preferred_element_type=config.accumulator_dtype,
+            )
+
+            @pl.when(
+                contraction_index == value_contraction_tiles - 1
+            )
+            def store_value() -> None:
+                value_ref[0, ...] = accumulator_ref[...].astype(
+                    config.output_dtype
+                )
+
+        def value_latent_index(
+            program_index: Any, contraction_index: Any
+        ) -> tuple[Any, int, Any]:
+            head = program_index // value_output_blocks
+            return head, 0, contraction_index
+
+        def value_source_block(program_index: Any) -> Any:
+            head = program_index // value_output_blocks
+            output_block = program_index % value_output_blocks
+            block = (
+                (head * combined_width + qk_nope_head_dim)
+                // jnp.int32(128)
+                + output_block
+            )
+            return jnp.minimum(
+                block, jnp.int32(kv_b_scale.shape[0] - 1)
+            )
+
+        def value_weight_index(
+            program_index: Any, contraction_index: Any
+        ) -> tuple[Any, Any]:
+            return value_source_block(program_index), contraction_index
+
+        def value_scale_index(
+            program_index: Any, contraction_index: Any
+        ) -> tuple[Any, int, int]:
+            return (
+                program_index * value_contraction_tiles
+                + contraction_index,
+                0,
+                0,
+            )
+
+        def raw_value_index(
+            program_index: Any, contraction_index: Any
+        ) -> tuple[Any, int, int]:
+            del contraction_index
+            return program_index, 0, 0
+
+        value_pipeline = pltpu.emit_pipeline(
+            value_kernel,
+            grid=(
+                heads * value_output_blocks,
+                value_contraction_tiles,
+            ),
+            in_specs=(
+                pl.BlockSpec((1, config.row_tile, 128), value_latent_index),
+                pl.BlockSpec((128, 128), value_weight_index),
+                pl.BlockSpec((1, config.row_tile, 128), value_scale_index),
+            ),
+            out_specs=pl.BlockSpec(
+                (1, config.row_tile, 128), raw_value_index
+            ),
+            dimension_semantics=("parallel", "arbitrary"),
+            no_pipelining=interpret,
+        )
+        value_pipeline(
+            latent_hbm_ref,
+            kv_b_hbm_ref,
+            kv_b_scale_hbm_ref,
+            raw_value_vmem_ref,
+            scratches=(value_accumulator_ref,),
+        )
+
+        def repack_kernel(
+            raw_value_ref: Any,
+            packed_value_ref: Any,
+        ) -> None:
+            head = pl.program_id(0)
+            raw_value = raw_value_ref[...]
+            aligned = jnp.concatenate(
+                (raw_value[0], raw_value[1]), axis=-1
+            )
+            unaligned = jnp.concatenate(
+                (
+                    raw_value[0, :, 64:],
+                    raw_value[1],
+                    raw_value[2, :, :64],
+                ),
+                axis=-1,
+            )
+            value_offset = (
+                head * combined_width + qk_nope_head_dim
+            ) % jnp.int32(128)
+            packed_value_ref[...] = jnp.where(
+                value_offset == 0, aligned, unaligned
+            )
+
+        def raw_repack_index(head: Any) -> tuple[Any, int, int]:
+            return head, 0, 0
+
+        def packed_value_index(head: Any) -> tuple[int, Any]:
+            return 0, head
+
+        repack_pipeline = pltpu.emit_pipeline(
+            repack_kernel,
+            grid=(heads,),
+            in_specs=pl.BlockSpec(
+                (value_output_blocks, config.row_tile, 128),
+                raw_repack_index,
+            ),
+            out_specs=pl.BlockSpec(
+                (config.row_tile, value_width), packed_value_index
+            ),
+            dimension_semantics=("parallel",),
+            no_pipelining=interpret,
+        )
+        repack_pipeline(raw_value_vmem_ref, value_vmem_ref)
+
+        def output_kernel(
+            value_ref: Any,
+            weight_ref: Any,
+            scale_ref: Any,
+            result_ref: Any,
+            accumulator_ref: Any,
+        ) -> None:
+            output_index = pl.program_id(0)
+            contraction_index = pl.program_id(1)
+
+            @pl.when(contraction_index == 0)
+            def initialize_accumulator() -> None:
+                accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
+
+            scale_value = _scale_value(
+                scale_ref[...], contraction_index, output_index
+            )
+            decoded_weight = (
+                lax.bitcast_convert_type(
+                    weight_ref[...], jnp.float8_e4m3fn
+                ).astype(config.accumulator_dtype)
+                * scale_value.astype(config.accumulator_dtype)
+            ).astype(config.output_dtype)
+            accumulator_ref[...] += lax.dot_general(
+                value_ref[...],
+                decoded_weight,
+                dimension_numbers=(((1,), (1,)), ((), ())),
+                preferred_element_type=config.accumulator_dtype,
+            )
+
+            @pl.when(
+                contraction_index == output_contraction_tiles - 1
+            )
+            def store_output() -> None:
+                result_ref[...] = accumulator_ref[...].astype(
+                    config.output_dtype
+                )
+
+        def packed_input_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[int, Any]:
+            del output_index
+            return 0, contraction_index
+
+        def output_weight_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[Any, Any]:
+            return output_index, contraction_index
+
+        def output_scale_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[Any, int]:
+            del output_index
+            return contraction_index // jnp.int32(8), 0
+
+        def output_result_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[int, Any]:
+            del contraction_index
+            return 0, output_index
+
+        output_pipeline = pltpu.emit_pipeline(
+            output_kernel,
+            grid=(output_tiles, output_contraction_tiles),
+            in_specs=(
+                pl.BlockSpec(
+                    (config.row_tile, config.contraction_tile),
+                    packed_input_index,
+                ),
+                pl.BlockSpec(
+                    (config.output_tile, config.contraction_tile),
+                    output_weight_index,
+                    pipeline_mode=pl.Buffered(buffer_count=3),
+                ),
+                pl.BlockSpec((8, 128), output_scale_index),
+            ),
+            out_specs=pl.BlockSpec(
+                (config.row_tile, config.output_tile),
+                output_result_index,
+            ),
+            dimension_semantics=("parallel", "arbitrary"),
+            no_pipelining=interpret,
+        )
+        output_pipeline(
+            value_vmem_ref,
+            output_weight_hbm_ref,
+            output_scale_hbm_ref,
+            output_hbm_ref,
+            scratches=(output_accumulator_ref,),
+        )
+
+    call = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct(
+            (config.row_tile, output_width), config.output_dtype
+        ),
+        grid=(),
+        in_specs=(pl.BlockSpec(memory_space=pltpu.HBM),) * 5,
+        out_specs=pl.BlockSpec(memory_space=pltpu.HBM),
+        scratch_shapes=(
+            pltpu.VMEM(
+                (
+                    heads * value_output_blocks,
+                    config.row_tile,
+                    config.block_shape[0],
+                ),
+                config.output_dtype,
+            ),
+            pltpu.VMEM(
+                (config.row_tile, value_contraction),
+                config.output_dtype,
+            ),
+            pltpu.VMEM(
+                (config.row_tile, config.block_shape[0]),
+                config.accumulator_dtype,
+            ),
+            pltpu.VMEM(
+                (config.row_tile, config.output_tile),
+                config.accumulator_dtype,
+            ),
+        ),
+        compiler_params=pltpu.CompilerParams(disable_bounds_checks=True),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_fused_structured_value_output_"
+            f"h{heads}_l{latent}_v{value_width}_o{output_width}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=(
+                2 * heads * latent * value_width
+                + 2
+                * config.row_tile
+                * value_contraction
+                * output_width
+            ),
+            bytes_accessed=(
+                heads * config.row_tile * latent * 2
+                + heads
+                * value_output_blocks
+                * latent
+                * config.block_shape[0]
+                + selected_value_scale.size * 4
+                + output_width * value_contraction
+                + output_tiles * output_contraction_tiles * 4
+                + config.row_tile * output_width * 2
+            ),
+            transcendentals=0,
+        ),
+    )
+    return call(
+        head_rows,
+        kv_b_bits,
+        selected_value_scale,
+        output_bits,
+        output_scale_table,
+    )[:1, :output_width]
+
+
 def fp8_rmsnorm_block_matmul(
     hidden: Any,
     norm_weight: Any,

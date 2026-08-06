@@ -13,6 +13,7 @@ from glm_tpu.greenfield.kernels.pallas import (
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
+    fp8_fused_structured_kv_b_value_output,
     fp8_rmsnorm_block_matmul,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
@@ -309,6 +310,35 @@ def test_fp8_structured_kv_b_value_interpret_matches_reference() -> None:
     np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected[1]))
 
 
+def test_fp8_fused_structured_value_output_interpret_matches_reference() -> None:
+    _, attended, kv_b_bits, kv_b_scale, expected = _structured_kv_b_case()
+    value_states = expected[1].reshape(1, 512)
+    output_bits = jnp.full((256, 512), 0x38, dtype=jnp.uint8)
+    output_scale = jnp.asarray(
+        np.linspace(0.0625, 0.5, 8, dtype=np.float32).reshape(2, 4)
+    )
+    decoded_output = dequantize_fp8_bits_block_weight(
+        output_bits, output_scale
+    )
+    expected_output = lax.dot_general(
+        value_states,
+        decoded_output,
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+    actual = fp8_fused_structured_kv_b_value_output(
+        attended,
+        kv_b_bits,
+        kv_b_scale,
+        output_bits,
+        output_scale,
+        interpret=True,
+    )
+    np.testing.assert_array_equal(
+        np.asarray(actual), np.asarray(expected_output)
+    )
+
+
 def test_fp8_structured_kv_b_rejects_contract_drift() -> None:
     bits = jnp.zeros((2 * 448, 512), dtype=jnp.uint8)
     scale = jnp.ones((7, 4), dtype=jnp.float32)
@@ -326,6 +356,15 @@ def test_fp8_structured_kv_b_rejects_contract_drift() -> None:
     with pytest.raises(ValueError, match="scale shape"):
         fp8_structured_kv_b_value(
             attended, bits, jnp.ones((7, 3), dtype=jnp.float32), interpret=True
+        )
+    with pytest.raises(ValueError, match="contract all value heads"):
+        fp8_fused_structured_kv_b_value_output(
+            attended,
+            bits,
+            scale,
+            jnp.zeros((256, 384), dtype=jnp.uint8),
+            jnp.ones((2, 3), dtype=jnp.float32),
+            interpret=True,
         )
 
 

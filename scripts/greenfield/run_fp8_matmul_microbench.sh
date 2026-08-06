@@ -32,13 +32,13 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   exit 2
 }
 [[ $KERNEL == single_up || $KERNEL == rmsnorm_linear || $KERNEL == up_gate || \
-  $KERNEL == attention_output || \
+  $KERNEL == attention_output || $KERNEL == fused_attention_output || \
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
   $KERNEL == dsa_wk ]] || {
-  echo "FP8 kernel must be single_up, attention_output, rmsnorm_linear," \
-    "up_gate, selected_up_gate, selected_swiglu_down, structured_kv_b," \
-    "dsa_wq_b, or dsa_wk" >&2
+  echo "FP8 kernel must be single_up, attention_output," \
+    "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, or dsa_wk" >&2
   exit 2
 }
 [[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
@@ -92,7 +92,7 @@ strict_census() {
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   local command
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[m]icrobench_collectives[.]py|[m]icrobench_pipeline_transport[.]py|[t]race_pipeline_transport[.]py|[r]un_real_one_layer[.]py|[m]icrobench_fp8_matmul[.]py|[m]icrobench_structured_kv_b[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[m]icrobench_collectives[.]py|[m]icrobench_pipeline_transport[.]py|[t]race_pipeline_transport[.]py|[r]un_real_one_layer[.]py|[m]icrobench_fp8_matmul[.]py|[m]icrobench_structured_kv_b[.]py|[m]icrobench_fused_attention_output[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
     --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
@@ -118,7 +118,7 @@ strict_census pre || {
   exit 1
 }
 
-say "compiling and timing GLM expert $KERNEL projection on TPU v4"
+say "compiling and timing GLM production $KERNEL projection on TPU v4"
 started=$(date +%s)
 ROWS=8
 [[ $KERNEL != rmsnorm_linear ]] || ROWS=1
@@ -138,7 +138,16 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
-  if [[ $KERNEL == structured_kv_b ]]; then
+  if [[ $KERNEL == fused_attention_output ]]; then
+    RUNNER=(
+      scripts/greenfield/microbench_fused_attention_output.py
+      --expected-code-hash "$PIN"
+      --output "$RUN_DIR/runner.json"
+      --hlo-dir "$RUN_DIR/hlo"
+      --warmup "$WARMUP"
+      --iterations "$ITERATIONS"
+    )
+  elif [[ $KERNEL == structured_kv_b ]]; then
     RUNNER=(
       scripts/greenfield/microbench_structured_kv_b.py
       --expected-code-hash "$PIN"
@@ -225,6 +234,7 @@ run_id = pv.start_run(
 )
 shape_ids = {
     "attention_output": "m1_k4096_n6144",
+    "fused_attention_output": "h16_l512_v256_o6144",
     "dsa_wq_b": "m1_k2048_n1024",
     "dsa_wk": "m1_k6144_n128",
 }
