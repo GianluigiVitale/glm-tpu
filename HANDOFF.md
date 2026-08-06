@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 03:47 UTC
+**Updated:** 2026-08-06 05:06 UTC
 
 ## Authority and isolation
 
@@ -55,6 +55,22 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `4,860,038,656` bytes/chip with `5,639,681,536` measured peak against `33,014,413,312` available.
   A fresh 20-step/8-core XPlane observes exactly one physical `psum` per step. All hashes, DB
   integrity, approved archive, remote `SUCCESS`, and authenticated 8/8 post-census pass.
+- Final-layout Pallas derivative `greenfield_one_layer_pallas_pack_20260806T041854316280053Z`
+  transposes only routed raw-FP8 tables offline, preserves shared/router bytes, and writes four
+  independently hashed 2,429,096,824-byte files. Manifest `3da63bd9...e427`, layout
+  `3d9f3b85...545e`, 9,716,380,672-byte payload, exact source-transform verification, approved
+  archive, and remote `SUCCESS` pass. Its loader performs 56 final-owner raw transfers and zero
+  host/device dequantization, host concat, or runtime weight transpose.
+- Protected raw-FP8 Pallas layer-3 proof DB 438 /
+  `greenfield_real_layer_pp8_pallas_20260806T050514347248323Z` passed at `5fed847`. Normal and
+  concentrated p50/p90/p95/p99 are `3.164060/3.185520/3.193292/3.229554 ms` and
+  `7.171980/7.194523/7.204370/7.263152 ms`. Routes are exact; output max/p99/mean error is at most
+  `0.03125/0.01171875/0.002444`, and route-weight max error is below `9e-8`. HLO SHA
+  `0c8878cc...b20a` has four exact raw-U8 Pallas calls and one local
+  `bf16[2,1,6144]` all-reduce over `{{0,1,2,3}}`, with no decoded weight overlay or other
+  collective. Compile is `1.674 s`; measured peak HBM is 2,431,646,720 bytes/chip. Fresh XPlane,
+  DB/archive/hashes/remote `SUCCESS`, and 8/8 cleanup pass. This is the first correct no-overlay
+  real MoE layer, but its latency is performance-rejected pending kernel-boundary fusion.
 - Final-layout PP16 artifact `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes
   two independently hashed 4,855,045,080-byte files at pack code `51d1df9`: experts
   `0:128/128:256`, shared intermediate `0:1024/1024:2048`, manifest
@@ -325,19 +341,20 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 429/430 gate/up and DB 436/437 fused activation/down are the selected route-proportional raw-
-   FP8 kernels. Compose exact route-weighted routed output, raw-FP8 shared expert, and one four-chip
-   local combine; bind the protected real layer-3 oracle and repeat the real one-layer HLO/wall/HBM/
-   trace gate. The two separately measured normal p50s sum to `2.114 ms`, but that is not a combined
-   measurement and still writes gate/up BF16 to HBM; eliminate that boundary/launch if the composed
-   layer misses budget. Never substitute same-weight M8 or a slow correctness-only GMM for proof.
-2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
+1. DB 438 completes the exact raw-FP8 routed/shared composition and exposes the next measured
+   bottleneck: four sequential Pallas calls cost `3.164 ms` on normal routes. Fuse selected
+   gate/up + BF16 SwiGLU + down into one route-proportional call, then fuse the shared
+   gate/up/SwiGLU/down boundary if required. Preserve final raw-U8 layouts, selected-route work,
+   exact BF16 association, one local stacked combine, and the DB 438 oracle/HLO/HBM gates. A
+   challenger is promotable only on a fresh protected real-layer result; no arithmetic sum of
+   standalone kernels is evidence.
+2. Recompile only after the fused real-layer kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,
    measured HBM, fresh trace, and profiler-free steady wall. Do not attempt 256K before it passes.
-3. Continue Gates E–H in binding order. The one-layer comparison provisionally favors PP8 for
+3. Continue Gates E–H in binding order. The decoded-overlay comparison favored PP8 for
    normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
-   (`1.076` vs `1.134 ms`); only complete protected decoder evidence may choose the
-   final plan.
+   (`1.076` vs `1.134 ms`), but DB 438 proves the deployable raw-FP8 PP8 layer is currently much
+   slower. Only identical-condition raw-FP8 decoder evidence may choose the final plan.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.

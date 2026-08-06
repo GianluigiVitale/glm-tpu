@@ -36,15 +36,18 @@
 | Pallas FP8 block matmul | DB 422: production M8/K6144/N2048, raw-U8/128x128 VMEM dequant, BF16 MXU/FP32 accumulation, exact fallback, one custom call/no overlay, wall/HBM/DB/archive/cleanup | Pass on TPU v4 |
 | Pallas FP8 paired gate/up | DB 423: two raw matrices/two exact outputs, one custom call/no overlay, 0.815435 ms p50, wall/HBM/DB/archive/cleanup; same-weight M8 mechanism only | Pass on TPU v4; selected-expert GMM pending |
 | Pallas FP8 selected gate/up | DB 429/430: device dynamic owned-route compaction; exact normal-two/concentrated-eight outputs/order/zeros; one raw-U8 TPU kernel + bounded metadata/no overlay; 1.341385/4.496970 ms p50. DB 431--435 merged-stream, aligned compact-scale, and route-parallel challengers are exact but performance-rejected/null. | Correctness/route-proportional mechanism pass; DB 429/430 selected for activation/down composition |
-| Pallas FP8 selected SwiGLU/down | DB 436/437: exact BF16 activation and distinct raw-U8 selected down matrices; normal-two/concentrated-eight order/zeros; one Pallas kernel + exact compaction/scale/restore metadata/no overlay; 0.773045/2.421714 ms p50 | Correctness/route-proportional mechanism pass; routed/shared layer composition pending |
-| Gate D implementation | All-78-layer schedule/state; DB420-exact runtime loader; fused raw-FP8 fallback layer; one-step all-stage map; exact forced-CPU state/local HLO | In progress; hot path replacement required |
+| Pallas FP8 selected SwiGLU/down | DB 436/437: exact BF16 activation and distinct raw-U8 selected down matrices; normal-two/concentrated-eight order/zeros; one Pallas kernel + exact compaction/scale/restore metadata/no overlay; 0.773045/2.421714 ms p50 | Correctness/route-proportional mechanism pass |
+| Final-layout Pallas one-layer pack/load | Manifest `3da63bd9...e427`; exact source transforms; four final-owner raw files; 56 direct transfers; zero dequant/concat/runtime transpose | Pass |
+| Exact raw-FP8 Pallas PP8 MoE layer | DB 438: exact routes, bounded normal/concentrated outputs, four raw-U8 kernels, one local combine, no overlay, HBM/wall/XPlane/DB/archive/cleanup; 3.164060/7.171980 ms p50 | Correctness/layout/locality pass; performance rejected pending boundary fusion |
+| Gate D implementation | All-78-layer schedule/state; DB420-exact runtime loader; fused raw-FP8 fallback layer; one-step all-stage map; exact forced-CPU state/local HLO | In progress; fuse DB438 kernel boundaries before short decoder |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
 
-Last full verified suite: 240 passed / 1 skipped across greenfield plus ownership guards with
+Last full verified suite: 236 passed / 1 skipped across greenfield with
 `JAX_PLATFORMS=cpu` (2026-08-06).
-Latest focused selected-down/kernel-contract/ownership suite: 26 passed (2026-08-06).
+Latest focused Pallas composition/kernel/HLO/runner suite: 22 passed (2026-08-06).
 CPU/HLO reference tests prove semantics/mechanisms only.
-DB 417/418 prove one real sparse layer under both required local plans; DB 420 proves complete
-checkpoint integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers. None
-proves full-model correctness, decoder HBM, token latency, or wall throughput.
+DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
+integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 438 proves the
+deployable raw-FP8 PP8 MoE layer but misses its latency budget. None proves full-model correctness,
+decoder HBM, token latency, or wall throughput.

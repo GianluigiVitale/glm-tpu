@@ -4605,3 +4605,31 @@ claim. SwiGLU no longer materializes an activated intermediate, but the separate
 call still writes two BF16 route tables. Next is the exact route-weighted routed/shared four-chip
 combine and real layer-3 proof, followed by boundary fusion if measured wall requires it. There is
 still no decoder or tok/s result.
+
+## 2026-08-06 05:06 — Exact raw-FP8 Pallas layer passes; four-call latency is rejected
+
+The final-layout derivative pack completed as
+`greenfield_one_layer_pallas_pack_20260806T041854316280053Z`: manifest `3da63bd9...e427`, layout
+`3d9f3b85...545e`, four 2,429,096,824-byte files, exact source-transform hashes, approved remote
+`SUCCESS`. Its direct loader performs 56 raw final-owner transfers and no dequant/concat/transpose.
+
+Two append-only diagnostics failed safely before timing. The first exposed reversed router/bias
+runner arguments. The second compiled and passed exact routes/weights but failed output comparison;
+normal and concentrated errors were nearly identical, localizing the fault to the shared path.
+The shared standalone Pallas kernel had incorrectly inherited the routed selected kernel's
+512-wide contraction tile, applying one 128-block scale to four scale blocks. It now fails closed
+unless its contraction tile equals one scale block and the composition derives a 128-wide shared
+configuration. The real HLO also established that three `ConcatBitcast` calls only reassemble four
+local VMEM slices of each already-owned shared FP8 table; exact counts/shapes/arity are protected.
+
+DB 438 / `greenfield_real_layer_pp8_pallas_20260806T050514347248323Z` at `5fed847` passes both
+independent oracle cases. Normal/concentrated p50 is `3.164060/7.171980 ms`; output max/p99/mean
+error is at most `0.03125/0.01171875/0.002444`, routes are exact, and route-weight max error is
+below `9e-8`. HLO `0c8878cc...b20a` has four raw-U8 kernels, one exact local stacked BF16
+all-reduce, no other collective, and no decoded overlay. Peak HBM is 2.432 GB/chip; compile is
+1.674 s. DB/archive/hash/fresh-XPlane/remote-SUCCESS/8-host cleanup pass.
+
+Verdict: correctness/layout/locality gate passes, performance does not. This is a real layer, not
+tok/s. The measured next target is kernel-boundary/launch elimination: fuse selected
+gate/up+SwiGLU+down, then shared gate/up+SwiGLU+down if needed, and rerun the same protected oracle
+and HLO contract before building the short decoder.

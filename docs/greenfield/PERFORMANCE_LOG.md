@@ -425,6 +425,35 @@ a layer or token-rate result. Next evidence must compose route weighting, shared
 four-chip local combine, and the protected real layer oracle; fusion must then remove the remaining
 boundary if the measured layer misses budget.
 
+## 2026-08-06 — exact final-layout Pallas real MoE layer
+
+Protected DB 438 / `greenfield_real_layer_pp8_pallas_20260806T050514347248323Z` passed at
+`5fed847`. The direct raw loader binds derivative manifest `3da63bd9...e427`, source manifest
+`68ef8201...f938`, and independent oracle `c63ffa19...ebff`; it performs 56 final-owner transfers
+with zero dequantization, host concat, or runtime weight transpose. A composition error found by
+the preceding failed correctness run is now fail-closed: standalone shared kernels use one
+128-wide contraction tile per checkpoint scale block, while selected routed kernels retain their
+explicitly multi-scale 512-wide tile.
+
+| case | p50 | p90 | p95 | p99 | mean | max / p99 / mean output error |
+|---|---:|---:|---:|---:|---:|---:|
+| normal all-slot routes | 3.164060 | 3.185520 | 3.193292 | 3.229554 | 3.166073 ms | 0.03125 / 0.01171875 / 0.002388 |
+| concentrated slot-2 routes | 7.171980 | 7.194523 | 7.204370 | 7.263152 | 7.173990 ms | 0.03125 / 0.01171875 / 0.002444 |
+
+All route indices are exact and route-weight max error is below `9e-8`. HLO SHA
+`0c8878cc...b20a` contains exactly four raw-U8 Pallas calls, seven bounded gather markers, two
+bounded scatter-index markers, three non-collective local-layout `ConcatBitcast` calls, and one
+`bf16[2,1,6144]` all-reduce over local ranks `{{0,1,2,3}}`; no decoded weight overlay or other
+collective exists. Compile is `1.674 s`; peak HBM is 2,431,646,720 of 33,014,413,312 bytes/chip.
+The fresh 20-step XPlane, 1,000 synchronized samples after 200 warmups, DB integrity, approved
+archive/remote `SUCCESS`, hashes, and 8/8 cleanup pass.
+
+This is the first protected exact no-overlay real layer, not a decoder or tok/s result. It is
+performance-rejected: normal latency is `4.54x` DB 417's correctness-only decoded-overlay layer
+and four sequential Pallas launches/boundaries remain. Next evidence must fuse the selected
+gate/up/SwiGLU/down boundary, then the shared boundary if required, and repeat DB 438's complete
+real-layer gate.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory
