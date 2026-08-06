@@ -424,8 +424,11 @@ def _fused_selected_kv_attention_pallas(
                 cache_tile_ref[...],
                 dimension_numbers=(((2,), (1,)), ((0,), (0,))),
                 precision=precision,
+                preferred_element_type=jnp.float32,
             )
-            selected_cache = jnp.sum(selected_cache, axis=1)
+            selected_cache = jnp.sum(selected_cache, axis=1).astype(
+                cache_tile_ref.dtype
+            )
             selected_cache = jnp.where(
                 live_groups,
                 selected_cache,
