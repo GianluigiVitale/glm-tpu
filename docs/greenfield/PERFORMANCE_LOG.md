@@ -250,6 +250,24 @@ and eight-host pre/post cleanup pass. This is standalone blocking host-wall late
 not a complete expert, layer, decoder, or token-rate result. The next gate fuses up/gate, activation,
 down, and local combine before replacing the exact fallback in the real-layer harness.
 
+## 2026-08-06 — protected paired FP8 gate/up kernel
+
+DB 423 / `greenfield_fp8_up_gate_20260806T020551714072561Z` passed at `7654338`. One Pallas custom
+call consumes the production-width BF16 M8/K6144 input, two raw E4M3FN N2048/K6144 matrices, and
+two bounded `f32[48,128]` scale tables. It returns distinct BF16 gate/up results with FP32
+accumulators. Both are elementwise exact against complete dequantization plus FP32 dot, and the HLO
+contains no full BF16/F32 weight overlay. Compile time is `0.540 s`; scoped VMEM is 184,320 bytes;
+peak process HBM is 695,120,896 bytes.
+
+| p50 | p90 | p95 | p99 | mean |
+|---:|---:|---:|---:|---:|
+| 0.815435 | 0.827151 | 0.833372 | 0.851290 | 0.816744 ms |
+
+These are 1,000 profiler-free blocking samples after 200 warmups. DB integrity, hashes, approved
+archive/SUCCESS, and eight-host pre/post census pass. This is a same-weight M8 mechanism test, not
+a selected-expert GMM, layer, decoder, or token-rate result. The next kernel must allow the eight
+routes to address different locally owned expert matrices without a decoded-weight overlay.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

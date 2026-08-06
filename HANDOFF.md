@@ -148,6 +148,14 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   is 315,956,736 bytes. DB/archive/hashes and 8/8 pre/post census pass. This is standalone kernel
   wall, not layer latency or tok/s. Three preceding Mosaic-layout diagnostics failed closed before
   timing, were archived, and each ended 8/8 clean.
+- Protected DB 423 / `greenfield_fp8_up_gate_20260806T020551714072561Z` proves paired gate and up
+  projections in one v4 custom call at `7654338`. Both outputs are elementwise exact against their
+  independent full-dequant/FP32-dot fallbacks. Compile is `0.540 s`; profiler-free p50/p90/p95/p99
+  is `0.815435/0.827151/0.833372/0.851290 ms` over 1,000 samples after 200 warmups. The HLO has two
+  raw FP8 matrices and two bounded scale tables, no full BF16/F32 weight overlay, and 184,320 bytes
+  scoped VMEM. Peak process HBM is 695,120,896 bytes; DB/archive/hashes and 8/8 cleanup pass. This
+  is still a dense same-weight mechanism kernel: real routed integration must select potentially
+  different expert matrices for the eight routes without recreating the rejected branch graph.
 
 ## Protected evidence
 
@@ -248,10 +256,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Prove the new raw-FP8 tile matmul on v4 against the exact fallback with a compact custom-call
-   HLO, no full BF16/F32 weight overlay, full latency distribution, HBM, provenance, archive, and
-   8/8 cleanup. Then compose fused up/gate, activation/scale, down, and routed/shared combine in
-   the binding Pallas order and repeat the real one-layer protected gate.
+1. DB 422/423 close the dense raw-FP8 and paired up/gate mechanism gates. Implement a compact
+   selected-expert grouped kernel whose eight batch-one routes may name different local matrices;
+   then compose activation/scale, down, and routed/shared combine in the binding Pallas order and
+   repeat the real one-layer protected gate. Do not substitute the same-weight M8 microbenchmark
+   for routed-GMM evidence.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,
