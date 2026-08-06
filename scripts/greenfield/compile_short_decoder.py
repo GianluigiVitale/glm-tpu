@@ -65,6 +65,14 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _sha256_file(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _memory_stats(device: Any) -> dict[str, int] | None:
     value = device.memory_stats()
     if value is None:
@@ -193,6 +201,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--context-capacity", type=int, default=2048)
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--iterations", type=int, default=10)
+    parser.add_argument("--trace-root", type=Path)
+    parser.add_argument("--trace-steps", type=int, default=0)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -205,6 +215,10 @@ def main() -> int:
         raise ValueError("first production compile is fixed to 2K")
     if args.warmup < 1 or args.iterations < 1:
         raise ValueError("decoder warmup/iterations must be positive")
+    if args.trace_steps not in (0, 2):
+        raise ValueError("decoder diagnostic trace requires zero or two steps")
+    if (args.trace_root is None) != (args.trace_steps == 0):
+        raise ValueError("decoder trace root and trace steps must be enabled together")
     if args.runtime_kind == "pallas_feature" and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
@@ -562,6 +576,62 @@ def main() -> int:
             )
             current[3].block_until_ready()
             samples.append((time.perf_counter_ns() - started) / 1_000_000)
+        trace_record = None
+        if args.trace_root is not None:
+            args.trace_root.mkdir(parents=True, exist_ok=False)
+            options = jax.profiler.ProfileOptions()
+            options.python_tracer_level = 0
+            tracing = False
+            multihost_utils.sync_global_devices(
+                "greenfield-short-decoder-trace-ready"
+            )
+            try:
+                jax.profiler.start_trace(
+                    str(args.trace_root),
+                    profiler_options=options,
+                )
+                tracing = True
+                multihost_utils.sync_global_devices(
+                    "greenfield-short-decoder-trace-started"
+                )
+                for step in range(args.trace_steps):
+                    with jax.profiler.TraceAnnotation(
+                        "greenfield_short_decoder_body_step",
+                        step_num=step,
+                    ):
+                        current = compiled(
+                            loaded.weights,
+                            *current,
+                            position,
+                            block_tables,
+                            context_lengths,
+                        )
+                        current[3].block_until_ready()
+                jax.profiler.stop_trace()
+                tracing = False
+            finally:
+                if tracing:
+                    jax.profiler.stop_trace()
+            multihost_utils.sync_global_devices(
+                "greenfield-short-decoder-trace-stopped"
+            )
+            xplanes = tuple(sorted(args.trace_root.rglob("*.xplane.pb")))
+            if len(xplanes) != 1:
+                raise RuntimeError(
+                    "expected one local decoder XPlane, "
+                    f"found {len(xplanes)}"
+                )
+            trace_record = {
+                "files": [
+                    {
+                        "path": str(xplanes[0]),
+                        "sha256": _sha256_file(xplanes[0]),
+                        "size_bytes": xplanes[0].stat().st_size,
+                    }
+                ],
+                "profiler_started_after_profiler_free_timing": True,
+                "steps": args.trace_steps,
+            }
         state_values = (*current, position, block_tables, context_lengths)
         metadata_host = _materialize_global_array(
             jax,
@@ -627,6 +697,7 @@ def main() -> int:
             "fleet_local_device_ids_in_runtime_order": fleet_local_ids.tolist(),
             "hlo_contract": hlo_contract,
             "hostname": socket.gethostname(),
+            "iterations": args.iterations,
             "jax_process_index": jax.process_index(),
             "launch_process_id": args.process_id,
             "load_record": loaded.load_record,
@@ -648,7 +719,9 @@ def main() -> int:
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
             "topology_hash": live_topology.topology_hash,
+            "trace": trace_record,
             "transformer_body_timing_only": True,
+            "warmup": args.warmup,
         }
         _atomic_json(args.output, record)
         if not metadata_passed:

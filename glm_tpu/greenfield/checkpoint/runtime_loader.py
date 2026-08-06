@@ -658,6 +658,7 @@ def load_runtime_checkpoint(
             "device_memory_before": device_before,
             "device_roundtrip_bytes": roundtrip_bytes,
             "device_roundtrip_verified": verify_device_roundtrip,
+            "fp8_device_dequantizations": 0,
             "fp8_host_dequantizations": 0,
             "global_array_count": len(global_weights),
             "host_global_concatenations": 0,

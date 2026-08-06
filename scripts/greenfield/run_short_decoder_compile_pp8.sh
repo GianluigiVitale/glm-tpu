@@ -10,6 +10,9 @@ readonly GREENFIELD_ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
+readonly WARMUP=${GLM_GREENFIELD_SHORT_DECODER_WARMUP:-2}
+readonly ITERATIONS=${GLM_GREENFIELD_SHORT_DECODER_ITERATIONS:-10}
+readonly TRACE_STEPS=${GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS:-0}
 readonly SOURCE_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z
 readonly SOURCE_MANIFEST_SHA=0869493164a3a63797ea61d88c575f35bea8aa50790c46aa21ce6f0f7c4c78f1
 readonly SOURCE_RUNTIME_TAG=greenfield_runtime_pack_pp8_20260806T002756318310857Z
@@ -41,7 +44,7 @@ esac
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -65,7 +68,7 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "append-only run directory exists: $RUN_DIR" >&2
   exit 2
 }
-mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/host_logs" "$RUN_DIR/hlo"
+mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/host_logs" "$RUN_DIR/hlo" "$RUN_DIR/traces"
 
 say() {
   echo "[short-decoder-pp8 $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
@@ -112,7 +115,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND"
+say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -138,7 +141,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer 2K load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 2 --iterations 10 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK || {
@@ -151,15 +154,20 @@ gcloud storage cp "$REMOTE_PREFIX/host_records/decoder.rank*.json" \
 gcloud storage cp "$REMOTE_PREFIX/host_records/decoder.rank*.log" \
   "$RUN_DIR/host_logs/" >/dev/null
 gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/hlo/" >/dev/null
+if [[ $TRACE_STEPS -gt 0 ]]; then
+  gcloud storage cp "$REMOTE_PREFIX/traces/trace.rank*.xplane.pb" \
+    "$RUN_DIR/traces/" >/dev/null
+fi
 
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
   "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
-  "$RUNTIME_LAYOUT_HASH" <<'PY'
+  "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" <<'PY'
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import sqlite3
 import sys
@@ -176,7 +184,13 @@ import sys
     hlo_backend_contract,
     runtime_manifest_sha256,
     runtime_layout_hash,
+    warmup,
+    iterations,
+    trace_steps,
 ) = sys.argv[1:]
+warmup = int(warmup)
+iterations = int(iterations)
+trace_steps = int(trace_steps)
 run_dir = Path(run_dir)
 records = [json.loads(path.read_text()) for path in sorted((run_dir / "host_records").glob("*.json"))]
 if len(records) != 8:
@@ -219,6 +233,13 @@ if any(
     for record in records
 ):
     raise SystemExit("body/HLO/metadata claim contract failed")
+if any(
+    record["warmup"] != warmup
+    or record["iterations"] != iterations
+    or record["profiler_free_body_wall"]["count"] != iterations
+    for record in records
+):
+    raise SystemExit("decoder timing configuration drifted")
 if any(record["hlo_contract"]["violations"] for record in records):
     raise SystemExit("decoder HLO has violations")
 if any(
@@ -251,6 +272,39 @@ if any(record["load_record"]["fp8_device_dequantizations"] != 0 for record in re
     raise SystemExit("runtime loader performed a device FP8 dequantization")
 if any(record["load_record"]["loaded_payload_bytes"] != 104_272_169_728 for record in records):
     raise SystemExit("runtime loader payload bytes per host drifted")
+xplane = None
+if trace_steps:
+    traces = sorted((run_dir / "traces").glob("trace.rank*.xplane.pb"))
+    if len(traces) != 8:
+        raise SystemExit(f"expected eight decoder XPlanes, got {len(traces)}")
+    for record, path in zip(records, traces, strict=True):
+        trace = record["trace"]
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if (
+            trace is None
+            or trace["steps"] != trace_steps
+            or not trace["profiler_started_after_profiler_free_timing"]
+            or len(trace["files"]) != 1
+            or trace["files"][0]["sha256"] != digest
+            or trace["files"][0]["size_bytes"] != path.stat().st_size
+        ):
+            raise SystemExit("decoder trace record drifted")
+    sys.path.insert(0, str(Path(repo) / "scripts" / "analysis"))
+    import parse_xplane
+
+    xplane = parse_xplane.aggregate_fleet(
+        run_dir / "traces",
+        step_module_re=r"jit_mapped",
+    )
+    if (
+        xplane["n_files"] != 8
+        or xplane["n_cores"] != 64
+        or xplane["steps_per_core"] != trace_steps
+    ):
+        raise SystemExit("decoder fleet XPlane inventory drifted")
+else:
+    if any(record["trace"] is not None for record in records):
+        raise SystemExit("unrequested decoder trace was captured")
 
 def peak(record):
     values = []
@@ -275,6 +329,7 @@ summary = {
     "fleet_p99_body_ms": fleet_p99,
     "hlo_contract": records[0]["hlo_contract"],
     "host_count": 8,
+    "iterations": iterations,
     "maximum_peak_hbm_bytes": max(peaks) if peaks else None,
     "optimized_hlo_sha256": records[0]["optimized_hlo_sha256"],
     "plan_hash": records[0]["plan_hash"],
@@ -286,8 +341,14 @@ summary = {
     "state_layout_hash": records[0]["state_layout_hash"],
     "sparse_moe_backend": sparse_moe_backend,
     "topology_hash": records[0]["topology_hash"],
+    "trace_steps": trace_steps,
     "transformer_body_timing_only": True,
+    "warmup": warmup,
+    "xplane": xplane,
 }
+(run_dir / "xplane_summary.json").write_text(
+    json.dumps(xplane, indent=2, sort_keys=True) + "\n"
+)
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
 
@@ -356,8 +417,8 @@ say "sealing and archiving protected diagnostic evidence"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
-  find host_records host_logs hlo -type f -print0 | sort -z | xargs -0 sha256sum
-  sha256sum summary.json results_ckpt.db census_pre.txt census_post.txt \
+  find host_records host_logs hlo traces -type f -print0 | sort -z | xargs -0 sha256sum
+  sha256sum summary.json xplane_summary.json results_ckpt.db census_pre.txt census_post.txt \
     sync.txt execute.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
 DB_RUN=$(/home/gianl/vllm-env/bin/python -c \

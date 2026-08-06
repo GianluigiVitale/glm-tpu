@@ -258,6 +258,8 @@ def test_runtime_loader_reuses_final_owner_buffers_without_reshard(
         assert loaded.addressable_device_ids == tuple(range(32))
         assert loaded.load_record["runtime_checkpoint_reshards"] == 0
         assert loaded.load_record["host_global_concatenations"] == 0
+        assert loaded.load_record["fp8_device_dequantizations"] == 0
+        assert loaded.load_record["fp8_host_dequantizations"] == 0
         assert loaded.load_record["device_roundtrip_bytes"] == (
             loaded.load_record["loaded_payload_bytes"]
         )
