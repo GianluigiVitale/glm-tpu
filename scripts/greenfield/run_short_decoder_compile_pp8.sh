@@ -281,6 +281,8 @@ if runtime_kind == "pallas_feature_linear":
         "greenfield_fp8_block_matmul_m8_k2048_n4096": 78,
         "greenfield_fp8_block_matmul_m8_k6144_n640": 78,
         "greenfield_fp8_block_matmul_m8_k4096_n6144": 78,
+        "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": 78,
+        "greenfield_fp8_structured_kv_b_value_h16_l512_v256": 78,
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": 3,
     }
     for record in records:
