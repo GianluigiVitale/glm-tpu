@@ -231,6 +231,10 @@ def main() -> int:
         compile_seconds = time.monotonic() - lower_started
         hlo = compiled.as_text()
         hlo_sha256 = sha256(hlo.encode()).hexdigest()
+        # Preserve compiler output even when the fail-closed HLO contract
+        # rejects a diagnostic before correctness or timing.
+        args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
+        args.hlo_output.write_text(hlo)
 
         custom_calls = [
             line.strip()
@@ -370,8 +374,6 @@ def main() -> int:
                 for value in values
             )
 
-    args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
-    args.hlo_output.write_text(hlo)
     shape_record: dict[str, Any] = {
         "lhs": [lhs_rows, contraction],
         "weight_bits": list(weight_host.shape),

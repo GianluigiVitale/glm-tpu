@@ -627,12 +627,12 @@ def fp8_selected_up_gate(
             ),
         )
 
-    gate_fp8 = lax.bitcast_convert_type(
-        pad_weight(gate_bits), jnp.float8_e4m3fn
-    )
-    up_fp8 = lax.bitcast_convert_type(
-        pad_weight(up_bits), jnp.float8_e4m3fn
-    )
+    # Keep the complete expert tables as checkpoint-native U8 in HBM.  A
+    # whole-table U8->F8 bitcast becomes a separate TPU custom call for each
+    # projection at this rank-3 layout.  Bitcast only the DMA'd VMEM tile in
+    # the Pallas body below.
+    gate_raw = pad_weight(gate_bits)
+    up_raw = pad_weight(up_bits)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
     contraction_blocks_per_tile = (
@@ -697,7 +697,9 @@ def fp8_selected_up_gate(
             @pl.when(active_value[route_index])
             def accumulate_route() -> None:
                 decoded_gate = (
-                    gate_ref[...]
+                    lax.bitcast_convert_type(
+                        gate_ref[...], jnp.float8_e4m3fn
+                    )
                     .astype(config.accumulator_dtype)
                     .reshape(
                         contraction_blocks_per_tile,
@@ -709,7 +711,9 @@ def fp8_selected_up_gate(
                     jnp.bfloat16
                 )
                 decoded_up = (
-                    up_ref[...]
+                    lax.bitcast_convert_type(
+                        up_ref[...], jnp.float8_e4m3fn
+                    )
                     .astype(config.accumulator_dtype)
                     .reshape(
                         contraction_blocks_per_tile,
@@ -889,9 +893,9 @@ def fp8_selected_up_gate(
         local_ids,
         active,
         hidden,
-        gate_fp8,
+        gate_raw,
         gate_scale_table,
-        up_fp8,
+        up_raw,
         up_scale_table,
     )
     return gate[:, 0, :output], up[:, 0, :output]

@@ -294,6 +294,12 @@ weights as `[G,K,N]`, retain compact per-block scales, and require one total cus
 protected test is fast, selected-expert activation/down integration is blocked and no decoder or
 tok/s claim exists.
 
+Follow-up diagnostic `greenfield_fp8_selected_up_gate_20260806T024137692707617Z` at `5b77934`
+supplied `[G,K,N]` directly and failed the strengthened HLO gate before correctness or timing. The
+transpose was absent, but two whole-table U8-to-F8 bitcast calls remained alongside the Pallas call.
+The run has no DB/performance claim and ended 8/8 clean. The next revision moves the same-width
+bitcast inside Pallas after tile DMA so complete expert tables remain raw U8 in HBM.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

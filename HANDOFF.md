@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 02:40 UTC
+**Updated:** 2026-08-06 02:44 UTC
 
 ## Authority and isolation
 
@@ -171,6 +171,11 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   transpose/bitcast fusions. The exact next discriminator is a final packed `[G,K,N]` raw layout
   supplied directly to the kernel, with compact scales still expanded only for top-8 routes. The
   protected HLO must reduce to one total custom call before timing can promote the result.
+- Diagnostic `...T024137692707617Z` at `5b77934` supplied final `[G,K,N]` tables and failed closed
+  on the strengthened one-total-call contract before correctness/timing. It proved the transpose
+  was gone, but whole-table U8-to-F8 bitcasts still formed two extra calls; cleanup was 8/8. The
+  current code therefore keeps full tables U8 and performs the same-width bitcast only after each
+  selected tile reaches Pallas VMEM.
 
 ## Protected evidence
 
