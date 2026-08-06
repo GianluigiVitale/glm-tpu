@@ -432,6 +432,8 @@ def main() -> int:
             "hardware": "TPU v4 TensorCore",
             "selected_kv_hbm_tensor": False,
             "cache_fetch": "scalar-dynamic HBM-to-VMEM DMA per selected row",
+            "dma_rows_per_selected_row": config.dma_rows,
+            "dma_overfetch": "8x TPU-v4 VMEM tile granularity; unused lanes zeroed",
             "tile_consumption": "immediate online softmax and PV",
             "returned_state": "owner partial output plus additive LSE",
         },

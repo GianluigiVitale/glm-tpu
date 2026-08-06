@@ -3,8 +3,9 @@
 The readable fallback first materializes ``[1, top_k, cache_width]`` in HBM.
 The Pallas path never creates that tensor. A small exact TensorCore network
 orders one owner's selected positions, ordinary JAX resolves only compact
-page-row metadata, and the attention kernel dynamically DMAs each live cache
-row from HBM into tile-local VMEM before immediately consuming it in online
+page-row metadata, and the attention kernel dynamically DMAs an aligned
+eight-row TPU-v4 tile around each live cache row into VMEM. It masks the seven
+overfetch lanes before immediately consuming the selected lane in online
 softmax. Only the attended latent and additive LSE leave the kernel.
 
 This module is deliberately default-off and independent of legacy execution.
@@ -35,6 +36,7 @@ from .topk import bitonic_sort_pairs
 _NEGATIVE_INFINITY = float("-inf")
 _NO_POSITION = -1
 _MAX_EXACT_FP32_INTEGER = 1 << 24
+_TPU_V4_DMA_ROWS = 8
 
 
 def _ceil_div(value: int, divisor: int) -> int:
@@ -53,15 +55,18 @@ class SparseMlaConfig:
 
     segment_block: int = 128
     sort_tile: int = 128
+    dma_rows: int = _TPU_V4_DMA_ROWS
     vmem_limit_bytes: int | None = None
 
     def __post_init__(self) -> None:
-        for name in ("segment_block", "sort_tile"):
+        for name in ("segment_block", "sort_tile", "dma_rows"):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
         if self.sort_tile != 128:
             raise ValueError("TPU-v4 selected-position sort tiles must be 128")
+        if self.dma_rows != _TPU_V4_DMA_ROWS:
+            raise ValueError("TPU-v4 BF16 VMEM DMA rows must be 8")
         if self.vmem_limit_bytes is not None and (
             not isinstance(self.vmem_limit_bytes, int)
             or isinstance(self.vmem_limit_bytes, bool)
@@ -121,6 +126,8 @@ def _validate_inputs(
         raise ValueError("local sparse-MLA cache has an invalid shape")
     if cache_local.shape[0] <= 0:
         raise ValueError("local sparse-MLA cache must expose physical pages")
+    if cache_local.shape[0] * layout.local_rows_per_page < config.dma_rows:
+        raise ValueError("local sparse-MLA cache is smaller than one DMA tile")
     if cache_local.dtype != query_nope_absorbed.dtype:
         raise ValueError("query and local sparse-MLA cache dtypes must match")
     if layout.packed_cache_width != contract.packed_cache_width:
@@ -332,6 +339,11 @@ def _fused_selected_kv_attention_pallas(
         pad = segment_blocks * segment_block - segment_width
         flat_rows = jnp.pad(flat_rows, ((0, 0), (0, pad)))
     physical_segment_width = flat_rows.shape[1]
+    dma_rows = config.dma_rows
+    dma_starts = jnp.minimum(
+        flat_rows, jnp.int32(cache_flat.shape[0] - dma_rows)
+    )
+    dma_lanes = flat_rows - dma_starts
     precision = (
         lax.Precision.HIGHEST
         if query_nope_absorbed.dtype == jnp.float32
@@ -343,7 +355,8 @@ def _fused_selected_kv_attention_pallas(
         query_nope_ref: Any,
         query_rope_ref: Any,
         cache_ref: Any,
-        row_ref: Any,
+        dma_start_ref: Any,
+        dma_lane_ref: Any,
         output_ref: Any,
         lse_ref: Any,
         cache_tile_ref: Any,
@@ -378,8 +391,10 @@ def _fused_selected_kv_attention_pallas(
             descriptors = []
             for row in range(segment_block):
                 descriptor = pltpu.make_async_copy(
-                    cache_ref.at[pl.ds(row_ref[0, row], 1), :],
-                    cache_tile_ref.at[pl.ds(row, 1), :],
+                    cache_ref.at[
+                        pl.ds(dma_start_ref[0, row], dma_rows), :
+                    ],
+                    cache_tile_ref.at[row],
                     dma_sem,
                 )
                 descriptors.append(descriptor)
@@ -388,16 +403,26 @@ def _fused_selected_kv_attention_pallas(
             for descriptor in descriptors:
                 descriptor.wait()
 
-            tile_slots = (
-                jnp.arange(segment_block, dtype=jnp.int32)[:, None]
+            group_slots = (
+                jnp.arange(segment_block, dtype=jnp.int32)
                 + jnp.int32(block_start)
             )
-            # Tail DMAs use safe row zero, but their values are semantically
-            # absent. Zero them before both QK and PV so even poisoned padding
-            # cannot enter a multiply as ``0 * NaN``.
+            dma_lanes_iota = jnp.arange(dma_rows, dtype=jnp.int32)[None, :]
+            selected_lanes = dma_lanes_iota == jnp.reshape(
+                dma_lane_ref[...], (segment_block, 1)
+            )
+            live_groups = group_slots[:, None] < valid_count
+            selected_and_live = (selected_lanes & live_groups).reshape(
+                segment_block * dma_rows, 1
+            )
+            # The TPU-v4 VMEM tile requires eight-row DMA slices. Keep only the
+            # selected dynamic lane from each group and zero all overfetch and
+            # tail lanes before both QK and PV, including poisoned padding.
             cache_tile = jnp.where(
-                tile_slots < valid_count,
-                cache_tile_ref[...],
+                selected_and_live,
+                cache_tile_ref[...].reshape(
+                    segment_block * dma_rows, cache_width
+                ),
                 jnp.zeros((), cache_tile_ref.dtype),
             )
             query_packed = jnp.concatenate(
@@ -424,9 +449,14 @@ def _fused_selected_kv_attention_pallas(
                 precision=precision,
                 preferred_element_type=jnp.float32,
             ) * jnp.float32(contract.softmax_scale)
-            absolute_slots = jnp.transpose(tile_slots)
+            absolute_slots = jnp.broadcast_to(
+                group_slots[:, None], (segment_block, dma_rows)
+            ).reshape(1, segment_block * dma_rows)
             scores = jnp.where(
-                absolute_slots < valid_count, scores, _NEGATIVE_INFINITY
+                (absolute_slots < valid_count)
+                & jnp.transpose(selected_and_live),
+                scores,
+                _NEGATIVE_INFINITY,
             )
             block_maximum = jnp.max(scores, axis=1, keepdims=True)
             maximum = jnp.maximum(maximum_ref[...], block_maximum)
@@ -464,7 +494,7 @@ def _fused_selected_kv_attention_pallas(
         del block, valid_count
         return 0, 0, 0
 
-    def cache_row_index(block: Any, valid_count: Any) -> tuple[int, Any]:
+    def compact_row_index(block: Any, valid_count: Any) -> tuple[int, Any]:
         del valid_count
         return 0, block
 
@@ -483,7 +513,8 @@ def _fused_selected_kv_attention_pallas(
                     (1, heads, contract.qk_rope_head_dim), query_index
                 ),
                 pl.BlockSpec(memory_space=pltpu.MemorySpace.HBM),
-                pl.BlockSpec((1, segment_block), cache_row_index),
+                pl.BlockSpec((1, segment_block), compact_row_index),
+                pl.BlockSpec((1, segment_block), compact_row_index),
             ),
             out_specs=(
                 pl.BlockSpec((1, heads, latent), output_index),
@@ -491,7 +522,8 @@ def _fused_selected_kv_attention_pallas(
             ),
             scratch_shapes=(
                 pltpu.VMEM(
-                    (segment_block, cache_width), query_nope_absorbed.dtype
+                    (segment_block, dma_rows, cache_width),
+                    query_nope_absorbed.dtype,
                 ),
                 pltpu.VMEM((heads, 1), jnp.float32),
                 pltpu.VMEM((heads, 1), jnp.float32),
@@ -512,22 +544,26 @@ def _fused_selected_kv_attention_pallas(
         interpret=interpret,
         name=(
             "greenfield_fused_selected_kv_sparse_mla_"
-            f"h{heads}_k{segment_width}_b{segment_block}_w{cache_width}"
+            f"h{heads}_k{segment_width}_b{segment_block}_w{cache_width}_d{dma_rows}"
         ),
         cost_estimate=pl.CostEstimate(
             flops=(
                 heads
                 * physical_segment_width
+                * dma_rows
                 * (2 * cache_width + 2 * latent + 8)
             ),
             bytes_accessed=(
-                physical_segment_width * cache_width * cache_flat.dtype.itemsize
+                physical_segment_width
+                * dma_rows
+                * cache_width
+                * cache_flat.dtype.itemsize
                 + heads
                 * (latent + contract.qk_rope_head_dim)
                 * query_nope_absorbed.dtype.itemsize
                 + heads * latent * query_nope_absorbed.dtype.itemsize
             ),
-            transcendentals=heads * physical_segment_width,
+            transcendentals=heads * physical_segment_width * dma_rows,
         ),
     )
     output, lse_lanes = call(
@@ -535,7 +571,8 @@ def _fused_selected_kv_attention_pallas(
         query_nope_absorbed,
         query_rope,
         cache_flat,
-        flat_rows,
+        dma_starts,
+        dma_lanes,
     )
     return output, lse_lanes[:, :, 0]
 

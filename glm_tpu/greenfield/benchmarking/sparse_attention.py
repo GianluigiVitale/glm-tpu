@@ -13,6 +13,7 @@ def validate_sparse_attention_hlo(
     rope_width: int = 64,
     top_k: int = 2048,
     segment_block: int = 128,
+    dma_rows: int = 8,
     cache_rows: int = 65_536,
     cache_width: int = 640,
     dtype: str = "bf16",
@@ -25,6 +26,7 @@ def validate_sparse_attention_hlo(
         ("rope_width", rope_width),
         ("top_k", top_k),
         ("segment_block", segment_block),
+        ("dma_rows", dma_rows),
         ("cache_rows", cache_rows),
         ("cache_width", cache_width),
     ):
@@ -36,7 +38,7 @@ def validate_sparse_attention_hlo(
     expected_names = (
         f"greenfield_owner_position_order_k{top_k}",
         "greenfield_fused_selected_kv_sparse_mla_"
-        f"h{heads}_k{top_k}_b{segment_block}_w{cache_width}",
+        f"h{heads}_k{top_k}_b{segment_block}_w{cache_width}_d{dma_rows}",
     )
     custom_calls = [
         line.strip()
@@ -76,6 +78,10 @@ def validate_sparse_attention_hlo(
             f"bf16[{top_k},{cache_width}]",
             f"f32[1,{top_k},{cache_width}]",
             f"f32[{top_k},{cache_width}]",
+            f"bf16[1,{top_k * dma_rows},{cache_width}]",
+            f"bf16[{top_k * dma_rows},{cache_width}]",
+            f"f32[1,{top_k * dma_rows},{cache_width}]",
+            f"f32[{top_k * dma_rows},{cache_width}]",
         )
         if shape in optimized_hlo
     ]

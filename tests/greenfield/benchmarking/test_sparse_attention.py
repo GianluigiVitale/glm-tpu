@@ -11,7 +11,7 @@ def _valid_hlo() -> str:
     order = "greenfield_owner_position_order_k2048"
     attention = (
         "greenfield_fused_selected_kv_sparse_mla_"
-        "h64_k2048_b128_w640"
+        "h64_k2048_b128_w640_d8"
     )
     return f'''HloModule sparse_attention
 %positions = s32[1,2048] parameter(0)

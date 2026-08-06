@@ -151,9 +151,10 @@ def test_fused_attention_zeros_dma_tail_before_poison_can_propagate() -> None:
     q_nope, q_rope, caches, tables, positions, counts, lengths = _fixture(
         jnp.float32
     )
-    # Owner zero has two live rows, so its four-row DMA tile fetches safe row
-    # zero for two tail lanes. Poison that row to prove the lanes are zeroed
-    # before QK and PV instead of relying on 0*NaN behavior.
+    # Owner zero has two live rows, so its four-group compute block has two
+    # tail groups; every group also has seven aligned-DMA overfetch lanes.
+    # Poison row zero to prove absent lanes are zeroed before QK and PV rather
+    # than relying on 0*NaN behavior.
     cache = caches[0].at[0, 0, :].set(jnp.nan)
     selected = SelectedPositions(positions, counts)
     actual = stage_local_sparse_mla_pallas(
