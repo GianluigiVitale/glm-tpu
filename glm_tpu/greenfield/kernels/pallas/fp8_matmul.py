@@ -833,7 +833,10 @@ def fp8_selected_up_gate(
                 scale_spec,
             ),
             out_specs=(output_spec, output_spec),
-            dimension_semantics=("parallel", "arbitrary", "arbitrary"),
+            # Output tiles and compacted owned routes write disjoint rows and
+            # have no cross-program dependence. Expose both as parallel;
+            # only the K-tile axis carries the accumulator recurrence.
+            dimension_semantics=("parallel", "parallel", "arbitrary"),
             no_pipelining=interpret,
         )
         pipeline(
