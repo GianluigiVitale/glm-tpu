@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 03:28 UTC
+**Updated:** 2026-08-06 03:47 UTC
 
 ## Authority and isolation
 
@@ -214,6 +214,17 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   compaction, merged-stream, scale-staging, and scheduling experiments, DB 429/430 are the selected
   gate/up basis for composing activation and down; this is a kernel-stage choice, not a decoder or
   token-speed promotion.
+- Protected DB 436/437 at `f496eb1` prove exact BF16 SwiGLU plus selected raw-FP8 down projection.
+  Normal-two/concentrated-eight p50 is `0.773045/2.421714 ms`; p90/p95/p99 is
+  `0.781022/0.786141/0.794347` and `2.432291/2.435744/2.445903 ms`. Max/p99/mean BF16
+  error is `0.015625/0.0078125/0.000193` and `0.03125/0.03125/0.001447`. The identical HLO
+  has one raw `u8[64,2048,6144]` Pallas call, exactly two bounded compaction scatters plus
+  selected-scale/final-order gathers, no unexpected call or decoded overlay, and 491,520 bytes
+  scoped VMEM. Peak allocation is 1.489/1.502 GB. DB/archive/hashes/remote SUCCESS and 8/8 cleanup
+  pass. A prior `22e46ab` diagnostic compiled the kernel but failed the over-strict metadata
+  classifier before correctness/timing; it has no DB claim and ended 8/8 clean. Activation and down
+  are fused without an activated-intermediate HBM write, but the separately called gate/up kernel
+  still writes its two BF16 outputs; this is not yet a complete expert, layer, decoder, or tok/s.
 
 ## Protected evidence
 
@@ -314,12 +325,12 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 429/430 are the selected route-proportional `1.341/4.497 ms` gate/up basis after DB 431--435
-   reject merged-stream, compact-scale, and route-parallel challengers. Implement exact SwiGLU
-   activation plus raw-FP8 down projection without writing the 2x2048 selected intermediates to HBM;
-   first protect activation/down alone, then compose routed/shared local combine and repeat the real
-   one-layer gate. Never substitute same-weight M8 or a slow correctness-only GMM for production
-   proof.
+1. DB 429/430 gate/up and DB 436/437 fused activation/down are the selected route-proportional raw-
+   FP8 kernels. Compose exact route-weighted routed output, raw-FP8 shared expert, and one four-chip
+   local combine; bind the protected real layer-3 oracle and repeat the real one-layer HLO/wall/HBM/
+   trace gate. The two separately measured normal p50s sum to `2.114 ms`, but that is not a combined
+   measurement and still writes gate/up BF16 to HBM; eliminate that boundary/launch if the composed
+   layer misses budget. Never substitute same-weight M8 or a slow correctness-only GMM for proof.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,

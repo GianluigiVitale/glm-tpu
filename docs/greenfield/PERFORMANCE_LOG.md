@@ -393,6 +393,38 @@ normal regression and effectively zero (`0.003%`) concentrated change. It is rej
 DB 429/430 now form the selected gate/up basis for activation/down fusion; this does not promote a
 layer, decoder, or token-speed result.
 
+## 2026-08-06 — selected FP8 SwiGLU/down kernel
+
+Protected DB 436 / `greenfield_fp8_selected_swiglu_down_normal_two_20260806T034440557202346Z` and
+DB 437 / `greenfield_fp8_selected_swiglu_down_concentrated_eight_20260806T034542641482354Z` passed
+at `f496eb1`. The kernel accepts distinct BF16 gate/up route rows, forms exact BF16 SwiGLU inside
+Pallas, selects each owned route's final-layout raw `u8[64,2048,6144]` down matrix, dequantizes only
+VMEM tiles, accumulates in FP32, and restores original top-8 order with exact-zero nonowners.
+
+| case | local routes | p50 | p90 | p95 | p99 | mean | max / p99 error |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| normal interleaved | 2 | 0.773045 | 0.781022 | 0.786141 | 0.794347 | 0.773929 ms | 0.015625 / 0.0078125 |
+| concentrated | 8 | 2.421714 | 2.432291 | 2.435744 | 2.445903 | 2.423081 ms | 0.03125 / 0.03125 |
+
+Both use the identical optimized-HLO SHA `abf6e710...aca7c`: one raw-U8 Pallas call, two exact
+BF16 compaction scatters, one bounded selected-scale gather, one bounded final-order gather, no
+unexpected auxiliary call, and no full F8/BF16/F32 weight overlay. Scoped VMEM is 491,520 bytes;
+compile is 0.819/0.806 seconds and peak allocation is 1.489/1.502 GB. DB integrity, full evidence
+hashes, approved archive/SUCCESS, and eight-host pre/post census pass.
+
+Diagnostic `...T034144197515706Z` at `22e46ab` compiled the same one-kernel mechanism but failed
+closed before comparison/timing because two exact gate/up compaction-scatter index markers were
+misclassified as final-output restoration. The corrected contract pins each marker to its exact
+consumer rather than permitting a generic custom call. The diagnostic has no DB/performance claim
+and ended 8/8 clean.
+
+This completes the standalone activation/down proof only. It avoids writing the activated
+intermediate between SwiGLU and down, but separate gate/up outputs still cross an HBM/launch
+boundary. Adding DB 429 and DB 436 p50 gives an unmeasured `2.114 ms` normal two-call estimate, not
+a layer or token-rate result. Next evidence must compose route weighting, shared expert, the exact
+four-chip local combine, and the protected real layer oracle; fusion must then remove the remaining
+boundary if the measured layer misses budget.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

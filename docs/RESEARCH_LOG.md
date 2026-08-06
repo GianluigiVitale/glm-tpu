@@ -4593,3 +4593,15 @@ from `arbitrary` to `parallel`. Normal/concentrated p50 became `1.344635/4.49711
 8/8 cleanup pass. The annotation is rejected and restored. The accumulated final-layout,
 route-compaction, merged-stream, scale-staging, and scheduling evidence selects DB 429/430 as the
 gate/up basis for the mandated SwiGLU/down fusion stage; this is not a decoder or tok/s promotion.
+
+## 2026-08-06 03:47 — Greenfield selected SwiGLU/down passes protected metal
+
+DB 436/437 at `f496eb1` fuse exact BF16 SwiGLU with raw-FP8 selected down projection and preserve
+route order/zero nonowners. Normal-two/concentrated-eight p50 is `0.773045/2.421714 ms`; max BF16
+error is `0.015625/0.03125`. One `u8[64,2048,6144]` Pallas call, exact bounded compaction/scale/
+restore metadata, no decoded overlay, DB/archive/hashes, remote SUCCESS, and 8/8 cleanup pass.
+The preceding `22e46ab` run compiled but failed the old HLO classifier before timing and has no DB
+claim. SwiGLU no longer materializes an activated intermediate, but the separate DB 429/430 gate/up
+call still writes two BF16 route tables. Next is the exact route-weighted routed/shared four-chip
+combine and real layer-3 proof, followed by boundary fusion if measured wall requires it. There is
+still no decoder or tok/s result.
