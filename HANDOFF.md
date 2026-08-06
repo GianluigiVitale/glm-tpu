@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 15:32 UTC
+**Updated:** 2026-08-06 16:24 UTC
 
 ## Authority and isolation
 
@@ -394,9 +394,9 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Optimize the trace-dominant feature-MoE call, now `14.782 ms/core` or `118.256 ms` serialized
-   across PP8. Inspect the exact `[8,8,6144]` output and post-call route weighting/sum: eliminate
-   route/output HBM materialization or redundant row work only with exact route/tensor fallback,
+1. Continue optimizing the trace-dominant feature-MoE call, now `14.429 ms/core` or `115.432 ms`
+   serialized across PP8 after the protected output-tile promotion. Eliminate its exact
+   `[8,8,6144]` output and post-call route weighting/sum HBM path only with an exact fallback,
    interpreter/TPU/HLO microproof, protected one-layer A/B, body A/B, and fresh trace.
 2. Attention-output matmul is the second measured target (`4.385 ms/core`, `35.084 ms` serialized).
    Do not tune it until feature-MoE establishes a new protected baseline. Compact local
@@ -618,6 +618,31 @@ reduces step cycle by `45.278 ms` and body wall by `48.801 ms`. Feature-MoE is u
 is `4.385 ms/core` (`35.084 ms` serialized). Actual psum is only `0.198 ms/core`; compact permute
 time is backpressure. XPlane/summary SHAs are `734f5f04...e3f` / `32bd4c1d...bc2`; DB/archive/
 remote `SUCCESS` and 8/8 cleanup pass.
+
+## Protected feature-MoE output-tile promotion
+
+Commits `7223e16` and `54d97fe` add and strictly validate the default-off routed output-tile-256
+challenger while retaining the exact tile-128 fallback. Same-commit protected one-layer DB 467/468
+at `54d97fe` pass exact routes, bounded normal/concentrated tensors, raw-U8/no-overlay HLO, fresh
+trace, DB/archive, and 8/8 cleanup. Tile 256 improves normal p50
+`2.2184095 -> 2.1684095 ms` (`2.254%`) and concentrated p50
+`2.219930 -> 2.1687195 ms` (`2.307%`); the selected call falls
+`1.577027 -> 1.539488 ms`.
+
+Commit `4d20f94` binds that choice through the complete decoder and exact HLO/provenance guards.
+Identical-condition protected body baseline DB 469 /
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_trace0_20260806T155923343193548Z`
+records p50/p99 `244.679475/244.897979 ms` at tile 128. Candidate DB 470 /
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_trace2_20260806T160854944395218Z`
+records `241.782586/242.768365 ms` at tile 256: `-2.896889 ms`, `-1.184%`, `1.01198x`.
+Both retain exact `219AG/294 physical AR/16CP`, 738 raw-FP8 calls, identical plan/checkpoint/layout,
+and ~26.131 GB peak HBM/chip. DB 470's fresh eight-host/64-core/two-step XPlane shows the intended
+feature call at `14.429044 ms/core`, down from DB 466's `14.782 ms/core`; actual psum remains only
+`0.198293 ms/core`, and attention output remains `4.385456 ms/core`. Summary/XPlane-summary SHAs
+are `4a07e963...f328` / `dad56da3...d07a`; archive/remote `SUCCESS` and both 8/8 post-censuses pass.
+Commit `897621c` promotes `pallas_feature_linear` plus tile 256 as the production decoder defaults;
+reference mode still resolves to tile 128, and both choices remain explicit. Affected tests pass
+15/15. This is a protected transformer-body win, not raw-token latency or answer tok/s.
 
 ## Protected feature-body attribution
 
