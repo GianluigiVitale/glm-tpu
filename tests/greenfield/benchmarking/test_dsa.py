@@ -11,9 +11,9 @@ HloModule jit_dsa, num_partitions=1
 ENTRY %main (
   %query: f32[1,32,128],
   %keys: bf16[65536,128],
-  %weights: f32[1,32,128]
+  %weights: f32[1,32]
 ) -> f32[1,65536] {
-  ROOT %greenfield_dsa_score_r1_h32_d128_s65536 = f32[1,65536] custom-call(%query, %keys, %weights), custom_call_target="tpu_custom_call", operand_layout_constraints={f32[1,32,128], bf16[65536,128], f32[1,32,128]}, metadata={op_name="jit(dsa_scores_pallas)/greenfield_dsa_score_r1_h32_d128_s65536/pallas_call"}
+  ROOT %greenfield_dsa_score_r1_h32_d128_s65536 = f32[1,65536] custom-call(%query, %keys, %weights), custom_call_target="tpu_custom_call", operand_layout_constraints={f32[1,32,128], bf16[65536,128], f32[1,32]}, metadata={op_name="jit(dsa_scores_pallas)/greenfield_dsa_score_r1_h32_d128_s65536/pallas_call"}
 }
 """
 

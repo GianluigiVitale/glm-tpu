@@ -90,7 +90,7 @@ def validate_dsa_score_hlo(
         for required in (
             f"f32[1,{heads},{head_dim}]",
             f"bf16[{padded_context},{head_dim}]",
-            f"f32[1,{heads},128]",
+            f"f32[1,{heads}]",
             f"f32[1,{padded_context}]",
         ):
             if required not in call:

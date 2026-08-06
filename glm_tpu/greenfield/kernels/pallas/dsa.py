@@ -85,13 +85,6 @@ def dsa_scores_pallas(
     if padded_context != context:
         index_keys = jnp.pad(index_keys, ((0, padded_context - context), (0, 0)))
 
-    # A scalar HBM DMA is not a valid TPU-v4 tiled load. Repeating each signed
-    # head weight across one exact output tile costs only 16 KiB for GLM's 32
-    # heads and lets one program compute all heads in VMEM without ever
-    # writing the [heads, context] intermediate to HBM.
-    head_weight_table = jnp.broadcast_to(
-        head_weights[..., None], (1, heads, config.context_tile)
-    )
     context_tiles = padded_context // config.context_tile
 
     def kernel(
@@ -109,7 +102,7 @@ def dsa_scores_pallas(
         ) * jnp.float32(config.head_dim**-0.5)
         per_head = jnp.maximum(per_head, jnp.float32(0.0))
         output_ref[...] = lax.dot_general(
-            head_weight_ref[..., 0].reshape((1, heads)),
+            head_weight_ref[...],
             per_head.reshape((heads, config.context_tile)),
             dimension_numbers=(((1,), (0,)), ((), ())),
             precision=lax.Precision.HIGHEST,
@@ -123,9 +116,9 @@ def dsa_scores_pallas(
     def key_index(context_index: Any) -> tuple[Any, int]:
         return context_index, 0
 
-    def head_weight_index(context_index: Any) -> tuple[int, int, int]:
+    def head_weight_index(context_index: Any) -> tuple[int, int]:
         del context_index
-        return 0, 0, 0
+        return 0, 0
 
     def output_index(context_index: Any) -> tuple[int, Any]:
         return 0, context_index
@@ -137,9 +130,9 @@ def dsa_scores_pallas(
         in_specs=(
             pl.BlockSpec((1, heads, config.head_dim), query_index),
             pl.BlockSpec((config.context_tile, config.head_dim), key_index),
-            pl.BlockSpec(
-                (1, heads, config.context_tile), head_weight_index
-            ),
+            # The full [1,heads] array is legal even though it is narrower
+            # than a TPU tile; each block dimension equals the array extent.
+            pl.BlockSpec((1, heads), head_weight_index),
         ),
         out_specs=pl.BlockSpec((1, config.context_tile), output_index),
         compiler_params=pltpu.CompilerParams(
@@ -160,13 +153,13 @@ def dsa_scores_pallas(
             bytes_accessed=(
                 heads * config.head_dim * 4
                 + padded_context * config.head_dim * 2
-                + heads * config.context_tile * 4
+                + heads * 4
                 + padded_context * 4
             ),
             transcendentals=0,
         ),
     )
-    return call(query, index_keys, head_weight_table)[:, :context]
+    return call(query, index_keys, head_weights)[:, :context]
 
 
 def dsa_scores_kernel(
