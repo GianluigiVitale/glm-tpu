@@ -388,12 +388,13 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Implement Section 7.2 item 7, selected-KV gather fused with sparse attention, now that DB 445
-   closes exact top-k/position ordering. Then prove asynchronous remote copy and stage-local
-   RMSNorm/raw-FP8 linear fusion in the binding order. DB 442 proves that the last item removes the
-   immediate 58.8-second 2K floor, but do not skip the preceding topology/long-context kernels.
-   Require reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback evidence for each.
-2. Rerun exact Gate-C oracles after each integrated path, then repeat the protected 78-layer body.
+1. Implement Section 7.2 item 8, stage-to-stage asynchronous remote copy, now that DB 446/447 close
+   fused selected-KV sparse attention standalone and in Gate C. Then prove stage-local
+   RMSNorm/raw-FP8 linear fusion in the binding order. DB 442 proves that the latter removes the
+   immediate 58.8-second 2K floor. Require reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback
+   evidence for each; do not replace the accepted collective-permute transport without a protected
+   paired win and exact device-resident semantics.
+2. Integrate each accepted path, rerun its exact oracle gate, then repeat the protected 78-layer body.
    The immediate trace target is removal of `reference/fp8.py:69-70` whole-matrix gathers; do not
    tune the compact stage permutes or local layer collectives.
 3. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
@@ -442,6 +443,37 @@ DB 444 at `bacfbdf` is the exact but performance-rejected reduction predecessor:
 was `59.979532/4.495320 ms`. Three earlier bitonic/lowering diagnostics failed closed before
 timing on TPU-v4 layout, scalar-bool, and Mosaic legalization limits; all preserved diagnostics
 ended 8/8 clean. The accepted bitonic network is `43.96x/13.31x` faster than DB 444.
+
+## Protected fused selected-KV sparse attention
+
+DB 446 / `greenfield_sparse_attention_20260806T112854965924060Z` at `20527b9` closes Section 7.2
+item 7. Exact owner filtering/order feeds a single local Pallas attention call. Each selected row
+uses the minimum legal aligned eight-row TPU-v4 HBM-to-VMEM DMA tile, then compact external
+`[2048,1,8]` BF16 lane metadata selects the requested row before online FP32 softmax. There is no
+selected-KV HBM tensor; only output/LSE escape the kernel. Empty/tail/skew/invalid-metadata health
+and default-off reference fallback pass.
+
+After 200 warmups and 1,000 profiler-free samples, balanced 512-of-2,048-owner p50/p90/p95/p99 is
+`0.302346/0.316633/0.323973/0.379626 ms`; worst concentrated 2,048-of-2,048 is
+`0.398000/0.413380/0.421573/0.475643 ms`. Output max error is `0.00390625`; LSE max error is
+`3.815e-6`. HLO `63aac56e...9809` has exactly one ordering and one sparse-attention Pallas call,
+one compact bounded gather, no selected `[2048,640]` tensor, collective, dead batch, or sort/top-k
+fallback. Peak HBM is 87,524,864 bytes. DB/archive/remote `SUCCESS` and 8/8 cleanup pass. The
+minimum eight-row DMA causes finite-cache overfetch; no OOB occurs, but arbitrary NaNs in the seven
+unselected physical lanes are outside the finite-cache contract because TensorCore `0*NaN` can
+propagate. This is standalone kernel latency, not token speed.
+
+DB 447 / `greenfield_gate_c_pp8_sparse_attention_20260806T114113674126789Z` at `6221e87` proves
+the default-off Pallas path integrated into the real PP8 dense + full-DSA + IndexShare Gate C.
+All bounded comparisons pass: selected/attention positions are exact, attended-latent max/mean
+error is `0.0029297/0.0006252`, LSE `0.0009532/0.0002057`, and layer output
+`0.0078125/0.0001641`. IndexShare feeds the producer-selected 8,192-byte state directly and
+preserves order. HLO `ca8017ea...dfe7` has exactly the two expected Pallas calls, no dead row, and
+only the four-chip stage group: three local gathers (query, LSE, partial output) plus validity and
+output reductions. Peak HBM is 281,821,696 bytes/chip. Fresh XPlane, DB/archive hashes, remote
+`SUCCESS`, and 8/8 cleanup pass. This remains a correctness/mechanism proof, not performance or
+token-speed evidence. The preceding `...T113534819091053Z` run compiled correctly but failed an
+over-strict HLO variant classifier before any DB claim; its diagnostic is preserved and clean.
 
 ## Protected feature-body attribution
 
