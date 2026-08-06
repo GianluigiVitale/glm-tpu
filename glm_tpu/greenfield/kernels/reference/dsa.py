@@ -20,7 +20,9 @@ from .linear import linear
 from .rotary import apply_rotary, rotary_cos_sin
 
 
-_NEGATIVE_INFINITY = jnp.float32(float("-inf"))
+# Keep module import backend-neutral: multi-host callers must be able to call
+# ``jax.distributed.initialize`` after importing the reference contract.
+_NEGATIVE_INFINITY = float("-inf")
 
 
 @dataclass(frozen=True, slots=True)
