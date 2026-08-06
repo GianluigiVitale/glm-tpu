@@ -821,11 +821,33 @@ def validate_gate_c_hlo(
                 for item in all_reduces
             )
         )
-        if not reference_variant and not tpu_rewrite_variant:
+        pallas_partial_variant = (
+            len(all_gathers) == 3
+            and len(all_reduces) == 2
+            and len(output_reduces) == 1
+            and any(
+                collective_has_shape(item, "u32", (1, 1, 128))
+                for item in all_reduces
+            )
+            and any(
+                collective_has_shape(item, "bf16", (1, 64, 512))
+                for item in all_gathers
+            )
+            and any(
+                collective_has_shape(item, "f32", (1, 64, 1))
+                for item in all_gathers
+            )
+        )
+        if (
+            not reference_variant
+            and not tpu_rewrite_variant
+            and not pallas_partial_variant
+        ):
             violations.append(
                 "IndexShare Gate C requires either four local gathers plus "
                 "one output reduction, or the exact TPU two-gather/three-"
-                "reduction LSE+validity rewrite"
+                "reduction LSE+validity rewrite, or the fused-Pallas three-"
+                "gather/two-reduction partial merge"
             )
         if len(output_reduces) != 1:
             violations.append(
@@ -853,6 +875,14 @@ def validate_gate_c_hlo(
         violations.append(
             f"Gate C expected {stage_size} partitions, found {module.num_partitions}"
         )
+    index_share_lowering = None
+    if case == "index_share":
+        if len(all_gathers) == 3 and len(all_reduces) == 2:
+            index_share_lowering = "pallas_partial_gathers"
+        elif len(all_gathers) == 2 and len(all_reduces) == 3:
+            index_share_lowering = "tpu_lse_validity_reductions"
+        else:
+            index_share_lowering = "reference_gathers"
     return {
         "all_gather_count": len(all_gathers),
         "all_reduce_count": len(all_reduces),
@@ -862,15 +892,7 @@ def validate_gate_c_hlo(
         "module_name": module.name,
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
-        "index_share_lowering": (
-            "tpu_lse_validity_reductions"
-            if case == "index_share"
-            and len(all_gathers) == 2
-            and len(all_reduces) == 3
-            else "reference_gathers"
-            if case == "index_share"
-            else None
-        ),
+        "index_share_lowering": index_share_lowering,
         "passed": not violations,
         "violations": violations,
     }
