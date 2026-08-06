@@ -122,6 +122,9 @@ def _select_blocks_pallas(
         block_slots = lax.broadcasted_iota(
             jnp.int32, (1, 1, input_width), 2
         )
+        output_slots = lax.broadcasted_iota(
+            jnp.int32, (1, 1, output_width), 2
+        )
         valid = (
             (block_positions >= jnp.int32(0))
             & (block_positions < valid_length_ref[0])
@@ -158,13 +161,16 @@ def _select_blocks_pallas(
                 (best_slot != _MAX_POSITION)
                 & (best_score != _NEGATIVE_INFINITY)
             )
-            result_scores = result_scores.at[0, 0, slot].set(
-                jnp.where(
-                    live[0, 0, 0], best_score[0, 0, 0], _NEGATIVE_INFINITY
-                )
+            write_slot = output_slots == slot
+            result_scores = jnp.where(
+                write_slot,
+                jnp.where(live, best_score, _NEGATIVE_INFINITY),
+                result_scores,
             )
-            result_positions = result_positions.at[0, 0, slot].set(
-                jnp.where(live[0, 0, 0], best_position[0, 0, 0], _NO_POSITION)
+            result_positions = jnp.where(
+                write_slot,
+                jnp.where(live, best_position, _NO_POSITION),
+                result_positions,
             )
             remove = (
                 current_valid
