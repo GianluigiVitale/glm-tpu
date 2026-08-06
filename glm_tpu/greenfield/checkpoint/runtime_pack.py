@@ -19,6 +19,28 @@ from ..partitioning import BASE_LOAD_SET
 from .stream_pack import DestinationFilePlan, DestinationTensorPlan
 
 
+RUNTIME_LAYOUT_ARTIFACT_KIND = "greenfield_decoder_runtime_weight_layout"
+RUNTIME_PACK_CONTROL_KIND = "greenfield_runtime_checkpoint_pack_control"
+RUNTIME_PACKED_ARTIFACT_KIND = "greenfield_runtime_packed_checkpoint"
+RUNTIME_FORMAT_VERSION = 1
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def _mapping_hash(value: dict[str, Any], *, hash_field: str) -> str:
+    unhashed = dict(value)
+    unhashed.pop(hash_field, None)
+    return sha256(_canonical_json(unhashed).encode("utf-8")).hexdigest()
+
+
 def _digest(value: str, *, field: str) -> str:
     if (
         not isinstance(value, str)
@@ -82,6 +104,7 @@ class StreamedRuntimeFileEvidence:
     payload_bytes: int
     sha256: str
     source_filename: str
+    source_file_sha256: str
     source_payload_bytes: int
     source_leaf_count: int
     padding_bytes: int
@@ -95,10 +118,29 @@ class StreamedRuntimeFileEvidence:
             "payload_bytes": self.payload_bytes,
             "sha256": self.sha256,
             "source_filename": self.source_filename,
+            "source_file_sha256": self.source_file_sha256,
             "source_leaf_count": self.source_leaf_count,
             "source_payload_bytes": self.source_payload_bytes,
             "tensors": [tensor.to_dict() for tensor in self.tensors],
         }
+
+
+def build_runtime_layout_document(
+    layout: DecoderRuntimeWeightLayout,
+) -> dict[str, Any]:
+    """Return the self-authenticating semantic layout stored with an artifact."""
+
+    value: dict[str, Any] = {
+        "artifact_kind": RUNTIME_LAYOUT_ARTIFACT_KIND,
+        "format_version": RUNTIME_FORMAT_VERSION,
+        "layout": layout.to_dict(),
+        "runtime_layout_hash": layout.layout_hash,
+    }
+    value["manifest_sha256"] = _mapping_hash(
+        value,
+        hash_field="manifest_sha256",
+    )
+    return value
 
 
 def _runtime_header(
@@ -235,7 +277,8 @@ def _copy_exact(
             raise CheckpointValidationError(
                 f"runtime source truncated with {byte_count - copied} bytes remaining"
             )
-        if output.write(value) != len(value):
+        written = output.write(value)
+        if written is not None and written != len(value):
             raise CheckpointValidationError("runtime output write was incomplete")
         file_digest.update(value)
         tensor_digest.update(value)
@@ -255,7 +298,8 @@ def _write_zeros(
     written = 0
     while written < byte_count:
         value = chunk[: min(len(chunk), byte_count - written)]
-        if output.write(value) != len(value):
+        output_count = output.write(value)
+        if output_count is not None and output_count != len(value):
             raise CheckpointValidationError("runtime padding write was incomplete")
         file_digest.update(value)
         tensor_digest.update(value)
@@ -269,6 +313,7 @@ def stream_runtime_weight_file(
     runtime_plan: RuntimeDestinationFilePlan,
     source: BinaryIO,
     output: BinaryIO,
+    verified_source_file_sha256: str,
     chunk_bytes: int = 64 * 1024 * 1024,
 ) -> StreamedRuntimeFileEvidence:
     """Stream one verified final owner into its padded executable-ready file.
@@ -281,6 +326,10 @@ def stream_runtime_weight_file(
 
     if chunk_bytes <= 0:
         raise ValueError("runtime pack chunk_bytes must be positive")
+    source_file_sha256 = _digest(
+        verified_source_file_sha256,
+        field="verified_source_file_sha256",
+    )
     identity = (
         source_plan.filename == runtime_plan.source_filename
         and source_plan.stage_id == runtime_plan.stage_id
@@ -316,7 +365,8 @@ def stream_runtime_weight_file(
     if source.read(len(source_plan.header)) != source_plan.header:
         raise CheckpointValidationError("runtime source safetensors header drifted")
 
-    if output.write(runtime_plan.header) != len(runtime_plan.header):
+    header_count = output.write(runtime_plan.header)
+    if header_count is not None and header_count != len(runtime_plan.header):
         raise CheckpointValidationError("runtime header write was incomplete")
     file_digest = sha256(runtime_plan.header)
     output_bytes = len(runtime_plan.header)
@@ -372,6 +422,7 @@ def stream_runtime_weight_file(
         payload_bytes=runtime_plan.payload_bytes,
         sha256=file_digest.hexdigest(),
         source_filename=source_plan.filename,
+        source_file_sha256=source_file_sha256,
         source_payload_bytes=runtime_plan.device_layout.source_bytes,
         source_leaf_count=runtime_plan.device_layout.source_leaf_count,
         padding_bytes=runtime_plan.device_layout.padding_bytes,

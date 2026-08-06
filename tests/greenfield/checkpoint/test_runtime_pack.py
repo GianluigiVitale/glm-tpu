@@ -12,6 +12,7 @@ import pytest
 from glm_tpu.greenfield.checkpoint import (
     DestinationFilePlan,
     DestinationTensorPlan,
+    build_runtime_layout_document,
     build_runtime_destination_file_plans,
     stream_runtime_weight_file,
     verify_source_file_sha256,
@@ -159,6 +160,9 @@ def test_runtime_derivative_streams_every_leaf_and_explicit_padding() -> None:
         runtime_plan=runtime_plan,
         source=BytesIO(_source_file(source_plan)),
         output=output,
+        verified_source_file_sha256=sha256(
+            _source_file(source_plan)
+        ).hexdigest(),
         chunk_bytes=7,
     )
     observed = output.getvalue()
@@ -168,6 +172,9 @@ def test_runtime_derivative_streams_every_leaf_and_explicit_padding() -> None:
         evidence.payload_bytes
     )
     assert evidence.source_leaf_count == len(source_plan.tensors)
+    assert evidence.source_file_sha256 == sha256(
+        _source_file(source_plan)
+    ).hexdigest()
 
     header_size = struct.unpack("<Q", observed[:8])[0]
     header = json.loads(observed[8 : 8 + header_size])
@@ -222,6 +229,7 @@ def test_runtime_derivative_refuses_source_contract_drift() -> None:
             runtime_plan=runtime[0],
             source=BytesIO(_source_file(missing)),
             output=BytesIO(),
+            verified_source_file_sha256="c" * 64,
             chunk_bytes=7,
         )
     corrupt_header = bytearray(_source_file(source))
@@ -232,8 +240,27 @@ def test_runtime_derivative_refuses_source_contract_drift() -> None:
             runtime_plan=runtime[0],
             source=BytesIO(corrupt_header),
             output=BytesIO(),
+            verified_source_file_sha256="d" * 64,
             chunk_bytes=7,
         )
+
+
+def test_runtime_layout_document_is_self_authenticating() -> None:
+    plan = _small_plan()
+    schedule = build_pipeline_schedule(plan)
+    layout = build_decoder_runtime_weight_layout(plan, schedule)
+    document = build_runtime_layout_document(layout)
+    unhashed = dict(document)
+    observed = unhashed.pop("manifest_sha256")
+    encoded = json.dumps(
+        unhashed,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    assert observed == sha256(encoded).hexdigest()
+    assert document["runtime_layout_hash"] == layout.layout_hash
 
 
 def test_runtime_source_file_authentication_is_fail_closed(tmp_path: Path) -> None:
