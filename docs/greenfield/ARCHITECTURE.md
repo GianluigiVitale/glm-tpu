@@ -113,8 +113,24 @@ writes only the striped owner, scores BF16 cached keys, and performs exact local
 IndexShare writes current KV before attending, gathers only each owner's selected rows, and merges
 local LSE results. Invalid or aliased live page tables are clipped before access, leave cache state
 unchanged, and propagate a false device health predicate. Forced four-device differential tests are
-exact; CPU HLO contains DSA `3AG/0AR` and IndexShare `4AG/1AR`. This is not yet the complete staged
-layer program and has no TPU latency or throughput claim.
+exact; CPU HLO contains DSA `3AG/0AR` and IndexShare `4AG/1AR`. These component proofs have no TPU
+latency or throughput claim; their complete staged composition is described next.
+
+The runtime-weight derivative now maps those source leaves into 364 uniform executable slots while
+preserving physical ownership. It was reconciled directly against DB420 metadata: all 32 files,
+122,640 leaves, and 750,122,559,744 bytes match exactly. Each chip's runtime input tree is
+26,068,042,432 bytes; 1.237–3.720 GB of zeros are explicit stage padding. Together with the padded
+256K state and measured temporary floor, the precompile model is 27,938,241,216 bytes/chip, leaving
+5,076,172,096 bytes for the unmeasured executable/overlay. This is an arithmetic boundary, not HBM
+proof. The streaming transform emits raw FP8 as U8, hashes every tensor/file, and never device-
+double-buffers the source layout.
+
+A complete layer body shares normalized/q_a intermediates between DSA and MLA, then executes exact
+dense or MoE post-attention residual math. The generic decoder-step map binds schedule slots, padded
+KV/index state, producer validity, stage-local collectives, and residual/compact-state lane
+transport. A forced 32-device CPU proof executes an eight-layer small geometry through all eight
+stages, writes every owned current cache row, returns the single live row to stage 0, and has exact
+HLO `56AG/16AR/16CP` with local groups only. The production 78-layer compile and TPU run remain.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;

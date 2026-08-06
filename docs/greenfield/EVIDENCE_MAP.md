@@ -179,11 +179,12 @@ files and DB row remain untouched; the corrected fresh proof is DB 420.
 
 ## Reusable tools, not execution dependencies
 
-Gate-D code state `c984f5d` is deliberately not listed in the protected table. It provides the
-all-layer PP8 schedule, 32-device control shell, target-context state layout, device raw-FP8 decode,
-and stage-local dense/MoE/cached-DSA/IndexShare bodies. Forced-CPU differential evidence is exact
-and invalid page metadata fails closed, but no complete decoder has run on TPU and no DB, HBM,
-latency, or tok/s claim attaches to it.
+Gate-D code state `a2638a2` is deliberately not listed in the protected table. In addition to the
+all-layer schedule/state and raw-FP8 kernels, it provides an executable-ready layout that exactly
+reconciles DB420's 32 files / 122,640 leaves / 750,122,559,744 bytes, a bounded-memory derivative
+streamer, a fused full layer, and an all-stage decoder-step map. Forced-CPU differential and
+32-device HLO/state evidence pass, but no production runtime pack or complete decoder has run on
+TPU and no DB, measured decoder HBM, latency, or tok/s claim attaches to it.
 
 - Optimized-HLO contract: `glm_tpu/greenfield/sharding/hlo_contract.py` and
   `scripts/greenfield/inspect_hlo_contract.py`.

@@ -31,11 +31,11 @@
 | Real Gate C PP8 layers | DB 421: direct load; dense/full-DSA/IndexShare bounded outputs; exact device-score top-k/ties and state/cache; exact local HLO/XPlane/HBM; DB/archive/cleanup | Pass (correctness/mechanism) |
 | Gate C cross-framework diagnostic | PyTorch CPU vs TPU FP32 score drift swaps 2/2,048 cutoff members; retained explicitly, not runtime state or tolerance-relaxed | Raw position identity does not pass |
 | Gate C overall | MoE DB 417/418 plus dense/full-DSA/IndexShare DB 421 match the documented device arithmetic contract; no decoder/tok-s claim | Pass under documented device-score contract |
-| Gate D implementation | All-78-layer PP8 schedule; one-live-row global shell; exact 256K state layout; raw-FP8 dense/MoE/cached-DSA/IndexShare; exact four-device differential and fail-closed page metadata | In progress (CPU/reference only) |
+| Gate D implementation | All-78-layer schedule/state; DB420-exact 364-tensor runtime layout/streamer; fused raw-FP8 layer; one-step all-stage map; exact 4-/32-device differential, state and local HLO | In progress (CPU/reference only) |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
 
-Last verified suites: 203/203 greenfield and 28/28 analysis/protection tests on forced CPU.
+Last verified suites: 212/212 greenfield and 28/28 analysis/protection tests on forced CPU.
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove one real sparse layer under both required local plans; DB 420 proves complete
 checkpoint integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers. None

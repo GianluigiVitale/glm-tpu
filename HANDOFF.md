@@ -120,17 +120,20 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   score-order positions. This is preserved as an explicit non-relaxed diagnostic. The runtime does
   not use CPU positions: it selects exactly from actual TPU scores and carries that exact state.
   Do not claim raw cross-framework position identity from DB 421.
-- Gate D implementation is in progress at `c984f5d`. The immutable PP8 schedule maps all 78 layers,
-  padded dense/sparse slots, every full-DSA producer, and five exact 8,192-byte cross-stage
-  IndexShare handoffs. A global 32-device one-live-row control shell proves eight local four-chip
-  reductions and two compact/residual lane transfers per stage without dead rows. The target-256K
-  state layout reconciles every plan assignment and bounds the padded KV/index/selection/transport
-  component at 1,090,555,904 bytes/chip. Device-side E4M3FN decode plus raw-FP8 dense/MoE/cached-DSA/
-  IndexShare bodies now exist; the cached bodies safely refuse invalid/aliased page tables, mutate
-  only the owning local cache, and match the readable oracle exactly on a forced four-device mesh.
-  CPU optimized HLO is DSA `3AG/0AR` and IndexShare `4AG/1AR`, local only. The full greenfield suite
-  is 203/203 and the legacy analysis/protection subset is 28/28. This is implementation/reference
-  evidence only: no complete layer stack, TPU decoder, measured decoder HBM, latency, or tok/s exists.
+- Gate D code is at `a2638a2`. The executable-ready runtime layout consumes the protected DB420
+  owner files exactly: 32/32 files, 122,640/122,640 leaves, and 750,122,559,744/750,122,559,744
+  source bytes match by name/dtype/shape/bytes. Its 364 uniform stage-slot tensors occupy
+  26,068,042,432 bytes/chip; padding is explicit (1,237,233,344–3,719,717,632 bytes/chip), raw FP8
+  stays U8, and the offline derivative streams/hashes with bounded host memory. With padded 256K
+  state (1,090,555,904) and the protected one-layer temporary floor (779,642,880), modeled
+  precompile occupancy is 27,938,241,216 bytes/chip, leaving 5,076,172,096 before the still-unknown
+  executable/overlay. A complete raw-FP8 layer shares q_a between DSA/attention and composes
+  dense/MoE residual math exactly. The generic one-step program executes all eight stages, owned
+  cache writes, and compact transport in one 32-device map. Its forced-CPU eight-layer proof returns
+  the one live row with exact state and HLO `56AG/16AR/16CP`, all four-chip/lane-local, no dead rows.
+  Suites are 212/212 greenfield plus 28/28 protection tests. This is CPU mechanism/memory-model
+  evidence only: the real 78-layer checkpoint has not been runtime-packed, compiled, or run on TPU;
+  no decoder HBM, latency, token, or tok/s claim exists.
 
 ## Protected evidence
 
@@ -231,12 +234,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Complete the actual 78-layer PP8 program: bind stacked final-owner checkpoint/state tensors to
-   the immutable schedule, execute raw-FP8 attention + MLP bodies only on the active stage inside
-   the global pipeline, then add embedding/final-norm/logits/token/cache orchestration. Prove the
-   complete 2K/8K Gate-D decoder with raw tokens, exact runtime DSA selection/ties, cache/state
-   integrity, no repeated 32-chip layer collective, decoder peak HBM, fresh trace, and profiler-free
-   steady wall.
+1. Finish the protected runtime-checkpoint derivative/loader, bind its 364 global device-sharded
+   arrays plus padded state to the all-stage program, and compile the real 78-layer 2K form. Add
+   embedding/final-norm/distributed logits/token control, then prove the complete 2K/8K Gate-D
+   decoder with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
+   profiler-free steady wall. Do not attempt 256K until this short-context sequence passes.
 2. Continue Gates E–H in binding order. The one-layer
    comparison provisionally favors PP8 for
    normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
