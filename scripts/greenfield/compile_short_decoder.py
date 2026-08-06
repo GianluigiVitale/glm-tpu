@@ -105,6 +105,25 @@ def _percentiles(values: list[float]) -> dict[str, float]:
     }
 
 
+def _materialize_global_array(
+    jax: Any,
+    multihost_utils: Any,
+    value: Any,
+) -> np.ndarray:
+    """Materialize a global array without fetching non-addressable shards."""
+    if value.is_fully_addressable:
+        materialized = jax.device_get(value)
+    else:
+        materialized = multihost_utils.process_allgather(value)
+    host = np.asarray(materialized)
+    if host.shape != tuple(value.shape):
+        raise RuntimeError(
+            "global array gather changed shape: "
+            f"expected={tuple(value.shape)} actual={host.shape}"
+        )
+    return host
+
+
 def _make_global_array(
     jax: Any,
     mesh: Any,
@@ -544,7 +563,11 @@ def main() -> int:
             current[3].block_until_ready()
             samples.append((time.perf_counter_ns() - started) / 1_000_000)
         state_values = (*current, position, block_tables, context_lengths)
-        metadata_host = np.asarray(jax.device_get(current[3]))
+        metadata_host = _materialize_global_array(
+            jax,
+            multihost_utils,
+            current[3],
+        )
         active = np.flatnonzero(
             metadata_host[:, 0, decoder.config.active_index] == 1
         )
