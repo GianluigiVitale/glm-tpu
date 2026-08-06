@@ -13,7 +13,8 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
-[[ $KERNEL != selected_up_gate ]] || TAG_STEM=${KERNEL}_${SELECTED_CASE}
+[[ $KERNEL != selected_up_gate && $KERNEL != selected_swiglu_down ]] || \
+  TAG_STEM=${KERNEL}_${SELECTED_CASE}
 TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${TAG_STEM}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-1000}
@@ -28,8 +29,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing FP8 kernel run from a dirty worktree" >&2
   exit 2
 }
-[[ $KERNEL == single_up || $KERNEL == up_gate || $KERNEL == selected_up_gate ]] || {
-  echo "FP8 kernel must be single_up, up_gate, or selected_up_gate" >&2
+[[ $KERNEL == single_up || $KERNEL == up_gate || \
+  $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down ]] || {
+  echo "FP8 kernel must be single_up, up_gate, selected_up_gate," \
+    "or selected_swiglu_down" >&2
   exit 2
 }
 [[ $SELECTED_CASE == normal_two || $SELECTED_CASE == concentrated_eight ]] || {
@@ -172,7 +175,11 @@ pv.record_item(
     run_id,
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     item_id=(
-        "m8_k6144_n2048"
+        (
+            "m8_k2048_n6144"
+            if runner["kernel"] == "selected_swiglu_down"
+            else "m8_k6144_n2048"
+        )
         + (
             "_" + runner["selected_route_case"]
             if runner["selected_route_case"] is not None

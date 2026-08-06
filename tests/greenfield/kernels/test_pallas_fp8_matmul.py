@@ -10,6 +10,7 @@ from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
     fp8_block_up_gate,
+    fp8_selected_swiglu_down,
     fp8_selected_up_gate,
 )
 from glm_tpu.greenfield.kernels.reference.fp8 import (
@@ -212,3 +213,126 @@ def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts(
     np.testing.assert_array_equal(
         np.asarray(actual_up), reference(up_bits, up_scale)
     )
+
+
+@pytest.mark.parametrize(
+    "route_values",
+    ([11, 500, 10, 12], [12, 10, 11, 12]),
+)
+def test_fp8_selected_swiglu_down_interpret_uses_distinct_owned_experts(
+    route_values: list[int],
+) -> None:
+    from jax._src.pallas.mosaic import tpu_info
+
+    tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
+        tpu_info.ChipVersion.TPU_V4, 1
+    )
+    tpu_info.get_tpu_info.cache_clear()
+    routes, experts, intermediate, hidden = 4, 3, 130, 135
+    gate = jnp.asarray(
+        np.sin(
+            np.arange(routes * intermediate, dtype=np.float32).reshape(
+                routes, intermediate
+            )
+            * 0.013
+        ),
+        dtype=jnp.bfloat16,
+    )
+    up = jnp.asarray(
+        np.cos(
+            np.arange(routes * intermediate, dtype=np.float32).reshape(
+                routes, intermediate
+            )
+            * 0.017
+        ),
+        dtype=jnp.bfloat16,
+    )
+    linear = np.arange(
+        experts * hidden * intermediate, dtype=np.float32
+    ).reshape(experts, hidden, intermediate)
+    down_bits_nk = _bits(jnp.asarray(np.sin(linear * 0.019) * 0.375))
+    down_bits = jnp.transpose(down_bits_nk, (0, 2, 1))
+    scale_shape = (
+        experts,
+        (hidden + 127) // 128,
+        (intermediate + 127) // 128,
+    )
+    down_scale = jnp.asarray(
+        np.linspace(0.25, 0.75, np.prod(scale_shape), dtype=np.float32).reshape(
+            scale_shape
+        )
+    )
+    route_indices = jnp.asarray(route_values, dtype=jnp.int32)
+    expert_start = jnp.asarray(10, dtype=jnp.int32)
+    actual = fp8_selected_swiglu_down(
+        gate,
+        up,
+        route_indices,
+        expert_start,
+        down_bits,
+        down_scale,
+        interpret=True,
+    )
+
+    expected = []
+    for route_slot, global_expert in enumerate(np.asarray(route_indices)):
+        local_expert = int(global_expert) - int(expert_start)
+        if not 0 <= local_expert < experts:
+            expected.append(np.zeros((hidden,), dtype=np.float32))
+            continue
+        activated = (
+            gate[route_slot]
+            * jax.nn.sigmoid(gate[route_slot])
+            * up[route_slot]
+        ).astype(jnp.bfloat16)
+        decoded = dequantize_fp8_bits_block_weight(
+            down_bits_nk[local_expert], down_scale[local_expert]
+        )
+        value = lax.dot_general(
+            activated[None, :],
+            decoded,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        ).astype(jnp.bfloat16)
+        expected.append(np.asarray(value[0]))
+    np.testing.assert_array_equal(np.asarray(actual), np.stack(expected))
+
+
+def test_fp8_selected_swiglu_down_rejects_contract_drift() -> None:
+    gate = jnp.ones((2, 128), dtype=jnp.bfloat16)
+    up = jnp.ones_like(gate)
+    routes = jnp.asarray([0, 1], dtype=jnp.int32)
+    expert_start = jnp.asarray(0, dtype=jnp.int32)
+    down_bits = jnp.zeros((2, 128, 128), dtype=jnp.uint8)
+    scale = jnp.ones((2, 1, 1), dtype=jnp.float32)
+
+    with pytest.raises(ValueError, match="gate/up shapes"):
+        fp8_selected_swiglu_down(
+            gate,
+            up[:, :-1],
+            routes,
+            expert_start,
+            down_bits,
+            scale,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="inputs must be BF16"):
+        fp8_selected_swiglu_down(
+            gate.astype(jnp.float32),
+            up,
+            routes,
+            expert_start,
+            down_bits,
+            scale,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="scale shape"):
+        fp8_selected_swiglu_down(
+            gate,
+            up,
+            routes,
+            expert_start,
+            down_bits,
+            jnp.ones((2, 1, 2), dtype=jnp.float32),
+            interpret=True,
+        )

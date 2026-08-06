@@ -58,7 +58,10 @@ def _memory_stats(device: Any) -> dict[str, int] | None:
 
 
 def _is_bounded_route_restore_index_call(
-    line: str, *, route_count: int
+    line: str,
+    *,
+    route_count: int,
+    kernel_name: str = "fp8_selected_up_gate",
 ) -> bool:
     """Recognize only TPU's compact top-k output-gather index annotation."""
 
@@ -66,7 +69,7 @@ def _is_bounded_route_restore_index_call(
         f" = s32[{route_count},2]" in line
         and 'custom_call_target="GatherScatterIndicesBitpacked"' in line
         and (
-            'metadata={op_name="jit(fp8_selected_up_gate)/concatenate"'
+            f'metadata={{op_name="jit({kernel_name})/concatenate"'
             in line
         )
     )
@@ -86,7 +89,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-width", type=int, default=2048)
     parser.add_argument(
         "--kernel",
-        choices=("single_up", "up_gate", "selected_up_gate"),
+        choices=(
+            "single_up",
+            "up_gate",
+            "selected_up_gate",
+            "selected_swiglu_down",
+        ),
         default="single_up",
     )
     parser.add_argument(
@@ -109,7 +117,9 @@ def main() -> int:
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
     if args.rows != 8 or args.contraction != 6144 or args.output_width != 2048:
-        raise ValueError("first metal proof is fixed to the GLM expert up projection")
+        raise ValueError(
+            "protected metal proof is fixed to GLM hidden=6144/intermediate=2048"
+        )
     if args.warmup < 200 or args.iterations < 1000:
         raise ValueError("protected FP8 microbenchmark requires 200/1000 samples")
 
@@ -121,6 +131,7 @@ def main() -> int:
     from glm_tpu.greenfield.kernels.pallas import (
         fp8_block_matmul,
         fp8_block_up_gate,
+        fp8_selected_swiglu_down,
         fp8_selected_up_gate,
     )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
@@ -137,6 +148,10 @@ def main() -> int:
     rows = args.rows
     contraction = args.contraction
     output = args.output_width
+    selected_kernel = args.kernel in (
+        "selected_up_gate",
+        "selected_swiglu_down",
+    )
 
     lhs_rows = 1 if args.kernel == "selected_up_gate" else rows
     lhs_host = (
@@ -169,37 +184,63 @@ def main() -> int:
     ).reshape(output // 128, contraction // 128)
     local_experts = None
     route_indices_host = None
-    if args.kernel == "selected_up_gate":
+    gate_activation_host = None
+    up_activation_host = None
+    if selected_kernel:
         local_experts = 64
-        single_weight = weight_host
-        single_gate_weight = gate_weight_host
-        # Materialize the proposed persistent selected-expert checkpoint
-        # layout directly as [G,K,N].  A timed device-side transpose of both
-        # full 64-expert tables would invalidate this discriminator.
-        weight_host = np.empty(
-            (local_experts, contraction, output), dtype=np.uint8
-        )
-        gate_weight_host = np.empty_like(weight_host)
-        for expert in range(local_experts):
-            weight_host[expert] = np.bitwise_xor(
-                single_weight, np.uint8(expert & 1) * np.uint8(128)
-            ).T
-            gate_weight_host[expert] = np.bitwise_xor(
-                single_gate_weight,
-                np.uint8((expert // 2) & 1) * np.uint8(128),
-            ).T
-        scale_host = np.linspace(
-            0.0005,
-            0.0015,
-            local_experts * (output // 128) * (contraction // 128),
-            dtype=np.float32,
-        ).reshape(local_experts, output // 128, contraction // 128)
-        gate_scale_host = np.linspace(
-            0.000375,
-            0.001625,
-            local_experts * (output // 128) * (contraction // 128),
-            dtype=np.float32,
-        ).reshape(local_experts, output // 128, contraction // 128)
+        if args.kernel == "selected_up_gate":
+            single_weight = weight_host
+            single_gate_weight = gate_weight_host
+            # Materialize final selected-expert [G,K,N] checkpoint layout.
+            weight_host = np.empty(
+                (local_experts, contraction, output), dtype=np.uint8
+            )
+            gate_weight_host = np.empty_like(weight_host)
+            for expert in range(local_experts):
+                weight_host[expert] = np.bitwise_xor(
+                    single_weight, np.uint8(expert & 1) * np.uint8(128)
+                ).T
+                gate_weight_host[expert] = np.bitwise_xor(
+                    single_gate_weight,
+                    np.uint8((expert // 2) & 1) * np.uint8(128),
+                ).T
+            scale_host = np.linspace(
+                0.0005,
+                0.0015,
+                local_experts * (output // 128) * (contraction // 128),
+                dtype=np.float32,
+            ).reshape(local_experts, output // 128, contraction // 128)
+            gate_scale_host = np.linspace(
+                0.000375,
+                0.001625,
+                local_experts * (output // 128) * (contraction // 128),
+                dtype=np.float32,
+            ).reshape(local_experts, output // 128, contraction // 128)
+        else:
+            # Down final layout is [G,intermediate,hidden] = [G,2048,6144].
+            single_down = weight_host
+            weight_host = np.empty(
+                (local_experts, output, contraction), dtype=np.uint8
+            )
+            for expert in range(local_experts):
+                weight_host[expert] = np.bitwise_xor(
+                    single_down, np.uint8(expert & 1) * np.uint8(128)
+                )
+            scale_host = np.linspace(
+                0.0005,
+                0.0015,
+                local_experts * (contraction // 128) * (output // 128),
+                dtype=np.float32,
+            ).reshape(local_experts, contraction // 128, output // 128)
+            activation_linear = np.arange(rows * output, dtype=np.float32).reshape(
+                rows, output
+            )
+            gate_activation_host = (
+                np.sin(activation_linear * 0.0031) * 0.75
+            ).astype(ml_dtypes.bfloat16)
+            up_activation_host = (
+                np.cos(activation_linear * 0.0047) * 0.625
+            ).astype(ml_dtypes.bfloat16)
         if args.selected_route_case == "normal_two":
             # Two routes owned by this 0:64 chip, interleaved with the six
             # routes owned by the other PP8 stage chips.
@@ -236,7 +277,7 @@ def main() -> int:
                 ("up", weight_bits, scale),
             )
             kernel_hlo_name = "greenfield_fp8_block_up_gate"
-        else:
+        elif args.kernel == "selected_up_gate":
             assert local_experts is not None and route_indices_host is not None
             gate_bits = jax.device_put(gate_weight_host, device)
             gate_scale = jax.device_put(gate_scale_host, device)
@@ -257,6 +298,25 @@ def main() -> int:
                 ("up", weight_bits, scale),
             )
             kernel_hlo_name = "greenfield_fp8_selected_up_gate"
+        else:
+            assert local_experts is not None and route_indices_host is not None
+            assert gate_activation_host is not None
+            assert up_activation_host is not None
+            gate_activation = jax.device_put(gate_activation_host, device)
+            up_activation = jax.device_put(up_activation_host, device)
+            route_indices = jax.device_put(route_indices_host, device)
+            expert_start = jax.device_put(np.asarray(0, dtype=np.int32), device)
+            kernel = fp8_selected_swiglu_down
+            kernel_inputs = (
+                gate_activation,
+                up_activation,
+                route_indices,
+                expert_start,
+                weight_bits,
+                scale,
+            )
+            reference_inputs = (("down", weight_bits, scale),)
+            kernel_hlo_name = "greenfield_fp8_selected_swiglu_down"
         lower_started = time.monotonic()
         compiled = jax.jit(kernel).lower(*kernel_inputs).compile()
         compile_seconds = time.monotonic() - lower_started
@@ -283,19 +343,33 @@ def main() -> int:
             if 'custom_call_target="AssumeGatherIndicesInBound"' in line
             and " = s32[" in line
         ]
+        route_restore_kernel_name = (
+            "fp8_selected_swiglu_down"
+            if args.kernel == "selected_swiglu_down"
+            else "fp8_selected_up_gate"
+        )
         bounded_route_restore_calls = [
             line
             for line in custom_calls
-            if _is_bounded_route_restore_index_call(line, route_count=rows)
+            if _is_bounded_route_restore_index_call(
+                line,
+                route_count=rows,
+                kernel_name=route_restore_kernel_name,
+            )
         ]
+        route_restore_width = (
+            contraction
+            if args.kernel == "selected_swiglu_down"
+            else 2 * output
+        )
         bounded_route_restore_gathers = [
             line.strip()
             for line in hlo.splitlines()
             if " gather(" in line
-            and f" = bf16[{rows},{2 * output}]" in line
+            and f" = bf16[{rows},{route_restore_width}]" in line
             and "collapsed_slice_dims={0,1}" in line
             and "start_index_map={0,1}" in line
-            and f"slice_sizes={{1,1,{2 * output}}}" in line
+            and f"slice_sizes={{1,1,{route_restore_width}}}" in line
             and any(
                 f", {_custom_call_result_name(call)})" in line
                 for call in bounded_route_restore_calls
@@ -355,15 +429,23 @@ def main() -> int:
                 and not forbidden_full_overlays
                 and not unexpected_auxiliary_calls
                 and (
-                    args.kernel != "selected_up_gate"
+                    not selected_kernel
                     or (
                         2 <= len(allowed_auxiliary_calls) <= 8
                         and len(bounded_route_restore_calls) <= 1
                         and len(bounded_route_restore_gathers)
                         == len(bounded_route_restore_calls)
-                        and f"u8[{local_experts},{contraction},{output}]"
+                        and (
+                            f"u8[{local_experts},{output},{contraction}]"
+                            if args.kernel == "selected_swiglu_down"
+                            else f"u8[{local_experts},{contraction},{output}]"
+                        )
                         in kernel_calls[0]
-                        and f"f8e4m3fn[{local_experts},{contraction},{output}]"
+                        and (
+                            f"f8e4m3fn[{local_experts},{output},{contraction}]"
+                            if args.kernel == "selected_swiglu_down"
+                            else f"f8e4m3fn[{local_experts},{contraction},{output}]"
+                        )
                         not in hlo
                     )
                 )
@@ -373,13 +455,20 @@ def main() -> int:
             raise RuntimeError(f"FP8 Pallas HLO contract failed: {hlo_contract}")
 
         actual_raw = compiled(*kernel_inputs)
-        actual_values = (
-            (actual_raw,) if args.kernel == "single_up" else tuple(actual_raw)
+        single_output_kernel = args.kernel in (
+            "single_up",
+            "selected_swiglu_down",
         )
+        actual_values = (actual_raw,) if single_output_kernel else tuple(actual_raw)
         jax.block_until_ready(actual_values)
         expected_values = []
+        selected_output_width = (
+            contraction
+            if args.kernel == "selected_swiglu_down"
+            else output
+        )
         for _, bits, projection_scale in reference_inputs:
-            if args.kernel != "selected_up_gate":
+            if not selected_kernel:
                 decoded = dequantize_fp8_bits_block_weight(
                     bits, projection_scale
                 )
@@ -393,12 +482,39 @@ def main() -> int:
                 )
                 continue
             assert route_indices_host is not None
+            assert local_experts is not None
             route_values = []
-            for global_expert in route_indices_host.tolist():
+            for route_slot, global_expert in enumerate(
+                route_indices_host.tolist()
+            ):
                 local_expert = global_expert
                 if not 0 <= local_expert < local_experts:
                     route_values.append(
-                        jnp.zeros((output,), dtype=jnp.bfloat16)
+                        jnp.zeros(
+                            (selected_output_width,),
+                            dtype=jnp.bfloat16,
+                        )
+                    )
+                    continue
+                if args.kernel == "selected_swiglu_down":
+                    assert gate_activation_host is not None
+                    assert up_activation_host is not None
+                    decoded = dequantize_fp8_bits_block_weight(
+                        jnp.transpose(bits[local_expert]),
+                        projection_scale[local_expert],
+                    )
+                    activated = (
+                        gate_activation[route_slot]
+                        * jax.nn.sigmoid(gate_activation[route_slot])
+                        * up_activation[route_slot]
+                    ).astype(jnp.bfloat16)
+                    route_values.append(
+                        lax.dot_general(
+                            activated[None, :],
+                            decoded,
+                            dimension_numbers=(((1,), (1,)), ((), ())),
+                            preferred_element_type=jnp.float32,
+                        ).astype(jnp.bfloat16)[0]
                     )
                     continue
                 decoded = dequantize_fp8_bits_block_weight(
@@ -463,20 +579,27 @@ def main() -> int:
             value_raw = compiled(*kernel_inputs)
             jax.block_until_ready(value_raw)
             samples.append((time.perf_counter_ns() - started) / 1_000_000.0)
-            values = (
-                (value_raw,) if args.kernel == "single_up" else tuple(value_raw)
-            )
+            values = (value_raw,) if single_output_kernel else tuple(value_raw)
             checksum += sum(
                 float(np.asarray(value[0, 0], dtype=np.float32))
                 for value in values
             )
 
-    shape_record: dict[str, Any] = {
-        "lhs": [lhs_rows, contraction],
-        "weight_bits": list(weight_host.shape),
-        "scale": list(scale_host.shape),
-        "output": [rows, output],
-    }
+    if args.kernel == "selected_swiglu_down":
+        shape_record: dict[str, Any] = {
+            "gate": [rows, output],
+            "up": [rows, output],
+            "weight_bits": list(weight_host.shape),
+            "scale": list(scale_host.shape),
+            "output": [rows, contraction],
+        }
+    else:
+        shape_record = {
+            "lhs": [lhs_rows, contraction],
+            "weight_bits": list(weight_host.shape),
+            "scale": list(scale_host.shape),
+            "output": [rows, output],
+        }
     if route_indices_host is not None:
         shape_record["route_indices"] = list(route_indices_host.shape)
         shape_record["local_experts"] = local_experts
@@ -489,7 +612,7 @@ def main() -> int:
         "kernel": args.kernel,
         "selected_route_case": (
             args.selected_route_case
-            if args.kernel == "selected_up_gate"
+            if selected_kernel
             else None
         ),
         "selected_local_route_count": (
@@ -500,6 +623,11 @@ def main() -> int:
         "shape": shape_record,
         "dtype_contract": {
             "lhs": "bfloat16",
+            "activation": (
+                "bfloat16-swiglu"
+                if args.kernel == "selected_swiglu_down"
+                else None
+            ),
             "weight_storage": "uint8:e4m3fn-bits",
             "scale": "float32",
             "tile_dequant": "float32-product-to-bfloat16",

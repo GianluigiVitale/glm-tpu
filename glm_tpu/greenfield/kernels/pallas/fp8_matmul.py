@@ -923,3 +923,297 @@ def fp8_selected_up_gate(
     gate = gate[compact_index]
     up = up[compact_index]
     return gate[:, 0, :output], up[:, 0, :output]
+
+
+def fp8_selected_swiglu_down(
+    gate: Any,
+    up: Any,
+    route_indices: Any,
+    expert_start: Any,
+    down_bits: Any,
+    down_scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
+        contraction_tile=512
+    ),
+    interpret: bool = False,
+) -> Any:
+    """Apply exact BF16 SwiGLU and selected raw-FP8 down projections.
+
+    ``down_bits`` uses final ``[expert,intermediate,hidden]`` MXU order.
+    Outputs retain top-k route order and non-owned routes are exact zeros.
+    SwiGLU is formed inside the Pallas call, so no activated intermediate is
+    written to HBM between activation and the down projection.
+    """
+
+    if gate.ndim != 2 or gate.shape[0] <= 0:
+        raise ValueError("selected down gate must have shape [routes,intermediate]")
+    if up.shape != gate.shape:
+        raise ValueError("selected down gate/up shapes must agree")
+    if gate.dtype != jnp.bfloat16 or up.dtype != jnp.bfloat16:
+        raise ValueError("selected down gate/up inputs must be BF16")
+    if route_indices.shape != (gate.shape[0],) or route_indices.dtype != jnp.int32:
+        raise ValueError("selected down routes must be one int32 id per row")
+    if expert_start.shape != () or expert_start.dtype != jnp.int32:
+        raise ValueError("selected down expert start must be an int32 scalar")
+    if down_bits.ndim != 3 or down_bits.dtype != jnp.uint8:
+        raise ValueError("selected down weights must be rank-three uint8 bits")
+    local_experts, contraction, output = down_bits.shape
+    if local_experts <= 0 or contraction <= 0 or output <= 0:
+        raise ValueError("selected down weight dimensions must be positive")
+    if contraction != gate.shape[1]:
+        raise ValueError("selected down activation/weight contraction disagrees")
+    expected_scale = (
+        local_experts,
+        _ceil_div(output, config.block_shape[0]),
+        _ceil_div(contraction, config.block_shape[1]),
+    )
+    if down_scale.shape != expected_scale or down_scale.dtype != jnp.float32:
+        raise ValueError(
+            f"selected down FP32 scale shape must be {expected_scale}, "
+            f"got {down_scale.shape}/{down_scale.dtype}"
+        )
+
+    route_count = gate.shape[0]
+    padded_contraction = (
+        _ceil_div(contraction, config.contraction_tile)
+        * config.contraction_tile
+    )
+    padded_output = _ceil_div(output, config.output_tile) * config.output_tile
+    if padded_contraction != contraction:
+        gate = jnp.pad(gate, ((0, 0), (0, padded_contraction - contraction)))
+        up = jnp.pad(up, ((0, 0), (0, padded_contraction - contraction)))
+    if padded_contraction != contraction or padded_output != output:
+        down_bits = jnp.pad(
+            down_bits,
+            (
+                (0, 0),
+                (0, padded_contraction - contraction),
+                (0, padded_output - output),
+            ),
+        )
+
+    output_tiles = padded_output // config.output_tile
+    contraction_tiles = padded_contraction // config.contraction_tile
+    contraction_blocks_per_tile = (
+        config.contraction_tile // config.block_shape[1]
+    )
+    local_ids = jnp.clip(
+        route_indices - expert_start,
+        jnp.int32(0),
+        jnp.int32(local_experts - 1),
+    )
+    active = (route_indices >= expert_start) & (
+        route_indices < expert_start + jnp.int32(local_experts)
+    )
+    active_i32 = active.astype(jnp.int32)
+    inactive_i32 = jnp.logical_not(active).astype(jnp.int32)
+    active_count = jnp.sum(active_i32, dtype=jnp.int32)
+    compact_index = jnp.where(
+        active,
+        jnp.cumsum(active_i32) - jnp.int32(1),
+        active_count + jnp.cumsum(inactive_i32) - jnp.int32(1),
+    )
+    compact_local_ids = jnp.zeros_like(local_ids).at[compact_index].set(
+        local_ids
+    )
+    compact_gate = jnp.zeros(
+        (route_count, config.row_tile, padded_contraction), dtype=jnp.bfloat16
+    ).at[compact_index, 0, :].set(gate)
+    compact_up = jnp.zeros_like(compact_gate).at[compact_index, 0, :].set(up)
+    down_scale_table = _selected_scale_table(
+        down_scale,
+        compact_local_ids,
+        padded_output=padded_output,
+        padded_contraction=padded_contraction,
+        block_shape=config.block_shape,
+    )
+
+    def kernel(
+        local_ids_value: Any,
+        active_count_value: Any,
+        gate_hbm_ref: Any,
+        up_hbm_ref: Any,
+        down_hbm_ref: Any,
+        down_scale_hbm_ref: Any,
+        output_hbm_ref: Any,
+        accumulator_ref: Any,
+    ) -> None:
+        def inner_kernel(
+            gate_ref: Any,
+            up_ref: Any,
+            down_ref: Any,
+            scale_ref: Any,
+            output_ref: Any,
+            accumulator: Any,
+        ) -> None:
+            output_index = pl.program_id(0)
+            route_index = pl.program_id(1)
+            contraction_index = pl.program_id(2)
+
+            @pl.when(contraction_index == 0)
+            def initialize_accumulator() -> None:
+                accumulator[...] = jnp.zeros_like(accumulator)
+
+            activated = (
+                gate_ref[...]
+                * jax.nn.sigmoid(gate_ref[...])
+                * up_ref[...]
+            ).astype(jnp.bfloat16)
+            decoded_down = (
+                lax.bitcast_convert_type(
+                    down_ref[...], jnp.float8_e4m3fn
+                )
+                .astype(config.accumulator_dtype)
+                .reshape(
+                    contraction_blocks_per_tile,
+                    config.block_shape[1],
+                    config.output_tile,
+                )
+                * scale_ref[...].astype(config.accumulator_dtype)
+            ).reshape(config.contraction_tile, config.output_tile).astype(
+                jnp.bfloat16
+            )
+            accumulator[...] += lax.dot_general(
+                activated,
+                decoded_down,
+                dimension_numbers=(((1,), (0,)), ((), ())),
+                preferred_element_type=config.accumulator_dtype,
+            )
+
+            @pl.when(contraction_index == contraction_tiles - 1)
+            def store_output() -> None:
+                output_ref[...] = accumulator[...].astype(config.output_dtype)
+
+        def activation_index(
+            output_index: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, int, Any]:
+            del output_index
+            return route_index, 0, contraction_index
+
+        def weight_index(
+            output_index: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, Any, Any]:
+            return (
+                local_ids_value[route_index],
+                contraction_index,
+                output_index,
+            )
+
+        def scale_index(
+            output_index: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, Any, int, Any]:
+            return route_index, contraction_index, 0, output_index
+
+        def output_index(
+            output_index_value: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, int, Any]:
+            del contraction_index
+            return route_index, 0, output_index_value
+
+        activation_spec = pl.BlockSpec(
+            (None, config.row_tile, config.contraction_tile), activation_index
+        )
+        weight_spec = pl.BlockSpec(
+            (None, config.contraction_tile, config.output_tile),
+            weight_index,
+            pipeline_mode=pl.Buffered(buffer_count=3),
+        )
+        scale_spec = pl.BlockSpec(
+            (
+                None,
+                contraction_blocks_per_tile,
+                1,
+                config.output_tile,
+            ),
+            scale_index,
+        )
+        output_spec = pl.BlockSpec(
+            (None, config.row_tile, config.output_tile), output_index
+        )
+        pipeline = pltpu.emit_pipeline(
+            inner_kernel,
+            grid=(output_tiles, active_count_value[...], contraction_tiles),
+            in_specs=(activation_spec, activation_spec, weight_spec, scale_spec),
+            out_specs=output_spec,
+            dimension_semantics=("parallel", "arbitrary", "arbitrary"),
+            no_pipelining=interpret,
+        )
+        pipeline(
+            gate_hbm_ref,
+            up_hbm_ref,
+            down_hbm_ref,
+            down_scale_hbm_ref,
+            output_hbm_ref,
+            scratches=(accumulator_ref,),
+        )
+
+    output_shape = jax.ShapeDtypeStruct(
+        (route_count, config.row_tile, padded_output), config.output_dtype
+    )
+    call = pl.pallas_call(
+        kernel,
+        out_shape=output_shape,
+        grid_spec=pltpu.PrefetchScalarGridSpec(
+            num_scalar_prefetch=2,
+            in_specs=(
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+            ),
+            out_specs=pl.BlockSpec(memory_space=pltpu.HBM),
+            scratch_shapes=(
+                pltpu.VMEM(
+                    (config.row_tile, config.output_tile),
+                    config.accumulator_dtype,
+                ),
+            ),
+        ),
+        compiler_params=pltpu.CompilerParams(disable_bounds_checks=True),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_selected_swiglu_down_"
+            f"r{route_count}_g{local_experts}_k{padded_contraction}_n{padded_output}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=(
+                2
+                * route_count
+                * config.row_tile
+                * padded_contraction
+                * padded_output
+            ),
+            bytes_accessed=(
+                2 * route_count * config.row_tile * padded_contraction * 2
+                + route_count * padded_output * padded_contraction
+                + route_count * output_tiles * contraction_tiles * 4
+                + route_count * config.row_tile * padded_output * 2
+            ),
+            transcendentals=route_count * config.row_tile * padded_contraction,
+        ),
+    )
+    output_value = call(
+        compact_local_ids,
+        active_count,
+        compact_gate,
+        compact_up,
+        down_bits,
+        down_scale_table,
+    )
+    compact_slot_active = (
+        jnp.arange(route_count, dtype=jnp.int32) < active_count
+    )[:, None, None]
+    output_value = jnp.where(
+        compact_slot_active, output_value, jnp.zeros_like(output_value)
+    )
+    output_value = output_value[compact_index]
+    return output_value[:, 0, :output]
