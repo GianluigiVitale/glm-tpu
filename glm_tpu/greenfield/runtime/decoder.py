@@ -190,6 +190,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     *,
     layers: int,
     dense_layers: int,
+    full_indexer_layers: int,
 ) -> dict[str, Any]:
     """Pin every raw-FP8 attention/dense projection replacing an overlay."""
 
@@ -200,8 +201,8 @@ def _validate_pallas_stage_linear_decoder_calls(
         "greenfield_fp8_block_matmul_m8_k4096_n6144": layers,
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": layers,
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": layers,
-        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": layers,
-        "greenfield_fp8_block_matmul_f32_m8_k6144_n128": layers,
+        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": full_indexer_layers,
+        "greenfield_fp8_block_matmul_f32_m8_k6144_n128": full_indexer_layers,
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": (
             dense_layers
         ),
@@ -460,6 +461,7 @@ def validate_decoder_step_hlo(
                 optimized_hlo,
                 layers=layers,
                 dense_layers=dense_layers,
+                full_indexer_layers=full_layers,
             )
         )
         violations.extend(pallas_stage_linear_contract["violations"])

@@ -62,7 +62,9 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         'custom_call_target="tpu_custom_call", '
         f'metadata={{op_name="{name}"}}'
         for name in names
-        for _ in range(78)
+        for _ in range(
+            21 if "block_matmul_f32" in name else 78
+        )
     ]
     dense = "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144"
     calls.extend(
@@ -73,7 +75,7 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     )
     hlo = "\n".join(calls)
     record = _validate_pallas_stage_linear_decoder_calls(
-        hlo, layers=78, dense_layers=3
+        hlo, layers=78, dense_layers=3, full_indexer_layers=21
     )
     assert record["passed"], record
 
@@ -81,6 +83,7 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         hlo + "\noverlay = bf16[2048,6144] parameter(0)",
         layers=78,
         dense_layers=3,
+        full_indexer_layers=21,
     )
     assert not rejected["passed"]
     assert rejected["forbidden_decoded_weight_overlays"]
