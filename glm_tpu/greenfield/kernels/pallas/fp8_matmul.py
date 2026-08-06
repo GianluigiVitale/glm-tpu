@@ -623,11 +623,17 @@ def fp8_selected_up_gate(
             ),
         )
 
-    gate_fp8 = lax.bitcast_convert_type(
-        pad_weight(gate_bits), jnp.float8_e4m3fn
+    gate_fp8 = jnp.transpose(
+        lax.bitcast_convert_type(
+            pad_weight(gate_bits), jnp.float8_e4m3fn
+        ),
+        (0, 2, 1),
     )
-    up_fp8 = lax.bitcast_convert_type(
-        pad_weight(up_bits), jnp.float8_e4m3fn
+    up_fp8 = jnp.transpose(
+        lax.bitcast_convert_type(
+            pad_weight(up_bits), jnp.float8_e4m3fn
+        ),
+        (0, 2, 1),
     )
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
@@ -695,16 +701,16 @@ def fp8_selected_up_gate(
                 gate_value = jnp.repeat(
                     gate_scale_ref[...].reshape(
                         contraction_blocks_per_tile, config.output_tile
-                    ).T,
+                    ),
                     config.block_shape[1],
-                    axis=1,
+                    axis=0,
                 )
                 up_value = jnp.repeat(
                     up_scale_ref[...].reshape(
                         contraction_blocks_per_tile, config.output_tile
-                    ).T,
+                    ),
                     config.block_shape[1],
-                    axis=1,
+                    axis=0,
                 )
                 decoded_gate = (
                     gate_ref[...].astype(config.accumulator_dtype) * gate_value
@@ -712,7 +718,7 @@ def fp8_selected_up_gate(
                 decoded_up = (
                     up_ref[...].astype(config.accumulator_dtype) * up_value
                 ).astype(jnp.bfloat16)
-                dimensions = (((1,), (1,)), ((), ()))
+                dimensions = (((1,), (0,)), ((), ()))
                 gate_accumulator[...] += lax.dot_general(
                     hidden_ref[...],
                     decoded_gate,
@@ -750,8 +756,8 @@ def fp8_selected_up_gate(
         ) -> tuple[Any, Any, Any]:
             return (
                 local_ids_value[route_index],
-                output_index,
                 contraction_index,
+                output_index,
             )
 
         def scale_index(
@@ -778,7 +784,7 @@ def fp8_selected_up_gate(
             (config.row_tile, config.contraction_tile), hidden_index
         )
         weight_spec = pl.BlockSpec(
-            (None, config.output_tile, config.contraction_tile),
+            (None, config.contraction_tile, config.output_tile),
             weight_index,
             pipeline_mode=pl.Buffered(buffer_count=3),
         )
