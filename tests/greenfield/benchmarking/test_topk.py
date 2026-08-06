@@ -7,12 +7,12 @@ from glm_tpu.greenfield.benchmarking.topk import validate_dsa_topk_hlo
 
 def _local_hlo() -> str:
     names = [
-        "greenfield_dsa_topk_local_select_n65536_k2048_b2048_g32",
-        "greenfield_dsa_topk_local_merge_l0_g32_k2048",
-        "greenfield_dsa_topk_local_merge_l1_g16_k2048",
-        "greenfield_dsa_topk_local_merge_l2_g8_k2048",
-        "greenfield_dsa_topk_local_merge_l3_g4_k2048",
-        "greenfield_dsa_topk_local_merge_l4_g2_k2048",
+        "greenfield_dsa_topk_local_bitonic_select_n65536_k2048_b2048_g32",
+        "greenfield_dsa_topk_local_bitonic_merge_l0_g32_k2048",
+        "greenfield_dsa_topk_local_bitonic_merge_l1_g16_k2048",
+        "greenfield_dsa_topk_local_bitonic_merge_l2_g8_k2048",
+        "greenfield_dsa_topk_local_bitonic_merge_l3_g4_k2048",
+        "greenfield_dsa_topk_local_bitonic_merge_l4_g2_k2048",
     ]
     calls = "\n".join(
         f'%{name} = (f32[1,2048], s32[1,2048]) custom-call(%x), '
@@ -31,8 +31,8 @@ HloModule local
 
 def _merge_hlo() -> str:
     names = [
-        "greenfield_dsa_topk_global_merge_l0_g4_k2048",
-        "greenfield_dsa_topk_global_merge_l1_g2_k2048",
+        "greenfield_dsa_topk_global_bitonic_merge_l0_g4_k2048",
+        "greenfield_dsa_topk_global_bitonic_merge_l1_g2_k2048",
     ]
     calls = "\n".join(
         f'%{name} = (f32[1,2048], s32[1,2048]) custom-call(%x), '
@@ -80,7 +80,7 @@ def test_validate_topk_hlo_rejects_sort_collective_and_dead_rows(
 def test_validate_topk_hlo_rejects_missing_and_unexpected_calls() -> None:
     missing = validate_dsa_topk_hlo(
         _local_hlo().replace(
-            "greenfield_dsa_topk_local_merge_l4_g2_k2048", "wrong"
+            "greenfield_dsa_topk_local_bitonic_merge_l4_g2_k2048", "wrong"
         ),
         phase="local",
     )

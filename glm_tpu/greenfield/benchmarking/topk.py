@@ -22,7 +22,7 @@ def validate_dsa_topk_hlo(
     local_block_size: int = 2048,
     local_group_size: int = 4,
 ) -> dict[str, Any]:
-    """Require the exact reduction tree and reject XLA sort/top-k fallbacks."""
+    """Require the exact bitonic tree and reject XLA sort/top-k fallbacks."""
 
     for name, value in (
         ("top_k", top_k),
@@ -39,13 +39,14 @@ def validate_dsa_topk_hlo(
         groups = _next_power_of_two(_ceil_div(local_context, local_block_size))
         padded_context = groups * local_block_size
         expected_names = [
-            "greenfield_dsa_topk_local_select_"
+            "greenfield_dsa_topk_local_bitonic_select_"
             f"n{padded_context}_k{top_k}_b{local_block_size}_g{groups}"
         ]
         level = 0
         while groups > 1:
             expected_names.append(
-                f"greenfield_dsa_topk_local_merge_l{level}_g{groups}_k{top_k}"
+                "greenfield_dsa_topk_local_bitonic_merge_"
+                f"l{level}_g{groups}_k{top_k}"
             )
             groups //= 2
             level += 1
@@ -61,7 +62,8 @@ def validate_dsa_topk_hlo(
         level = 0
         while groups > 1:
             expected_names.append(
-                f"greenfield_dsa_topk_global_merge_l{level}_g{groups}_k{top_k}"
+                "greenfield_dsa_topk_global_bitonic_merge_"
+                f"l{level}_g{groups}_k{top_k}"
             )
             groups //= 2
             level += 1

@@ -345,6 +345,7 @@ def main() -> int:
         "algorithm": {
             "hardware": "TPU v4 TensorCore",
             "sparse_core_available": False,
+            "selector": "exact_bitonic_sort_network",
             "local_block_size": config.local_block_size,
             "local_tree_custom_calls": 6,
             "merge_tree_custom_calls": 2,
