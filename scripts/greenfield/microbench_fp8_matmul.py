@@ -113,6 +113,7 @@ def parse_args() -> argparse.Namespace:
         "--kernel",
         choices=(
             "single_up",
+            "attention_output",
             "rmsnorm_linear",
             "up_gate",
             "selected_up_gate",
@@ -121,6 +122,12 @@ def parse_args() -> argparse.Namespace:
             "dsa_wk",
         ),
         default="single_up",
+    )
+    parser.add_argument(
+        "--output-tile",
+        type=int,
+        choices=(128, 256),
+        default=128,
     )
     parser.add_argument(
         "--selected-route-case",
@@ -142,6 +149,7 @@ def main() -> int:
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
     production_shapes = {
+        "attention_output": (1, 4096, 6144),
         "dsa_wq_b": (1, 2048, 1024),
         "dsa_wk": (1, 6144, 128),
     }
@@ -155,6 +163,10 @@ def main() -> int:
             f"rows={expected_shape[0]}, hidden={expected_shape[1]}, "
             f"output={expected_shape[2]}"
         )
+    if args.kernel != "attention_output" and args.output_tile != 128:
+        raise ValueError(
+            "a non-default output tile requires the attention-output kernel"
+        )
     if args.warmup < 200 or args.iterations < 1000:
         raise ValueError("protected FP8 microbenchmark requires 200/1000 samples")
 
@@ -164,6 +176,7 @@ def main() -> int:
     from jax import lax
 
     from glm_tpu.greenfield.kernels.pallas import (
+        Fp8BlockMatmulConfig,
         fp8_block_matmul,
         fp8_block_matmul_f32,
         fp8_block_up_gate,
@@ -300,11 +313,28 @@ def main() -> int:
         weight_bits = jax.device_put(weight_host, device)
         scale = jax.device_put(scale_host, device)
         reference_lhs = lhs
-        if args.kernel == "single_up":
-            kernel = fp8_block_matmul
+        if args.kernel in ("single_up", "attention_output"):
+            def kernel(*values: Any) -> Any:
+                return fp8_block_matmul(
+                    *values,
+                    config=Fp8BlockMatmulConfig(
+                        output_tile=args.output_tile
+                    ),
+                )
+
             kernel_inputs = (lhs, weight_bits, scale)
-            reference_inputs = (("up", weight_bits, scale),)
-            kernel_hlo_name = "greenfield_fp8_block_matmul"
+            reference_inputs = ((args.kernel, weight_bits, scale),)
+            if args.kernel == "attention_output":
+                kernel_hlo_name = (
+                    "greenfield_fp8_block_matmul_m8_k4096_n6144"
+                    + (
+                        f"_ot{args.output_tile}"
+                        if args.output_tile != 128
+                        else ""
+                    )
+                )
+            else:
+                kernel_hlo_name = "greenfield_fp8_block_matmul"
         elif args.kernel in ("dsa_wq_b", "dsa_wk"):
             kernel = fp8_block_matmul_f32
             kernel_inputs = (lhs, weight_bits, scale)
@@ -667,6 +697,7 @@ def main() -> int:
         actual_raw = compiled(*kernel_inputs)
         single_output_kernel = args.kernel in (
             "single_up",
+            "attention_output",
             "rmsnorm_linear",
             "selected_swiglu_down",
             "dsa_wq_b",
@@ -834,6 +865,7 @@ def main() -> int:
         "device": str(device),
         "device_kind": device.device_kind,
         "kernel": args.kernel,
+        "output_tile": args.output_tile,
         "selected_route_case": (
             args.selected_route_case
             if selected_kernel

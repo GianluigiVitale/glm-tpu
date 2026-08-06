@@ -70,11 +70,13 @@ def _validate_inputs(
     scale: Any,
     config: Fp8BlockMatmulConfig,
 ) -> tuple[int, int, int]:
-    if config.output_tile != config.block_shape[0] or (
-        config.contraction_tile != config.block_shape[1]
-    ):
+    if config.output_tile not in (
+        config.block_shape[0],
+        2 * config.block_shape[0],
+    ) or config.contraction_tile != config.block_shape[1]:
         raise ValueError(
-            "standalone FP8 matmul tiles must equal one scale block"
+            "standalone FP8 matmul output tiles must span one or two scale "
+            "blocks and contraction tiles must equal one scale block"
         )
     if lhs.ndim != 2 or weight_bits.ndim != 2 or scale.ndim != 2:
         raise ValueError("FP8 matmul inputs must have ranks two, two, and two")
@@ -122,10 +124,42 @@ def _scale_value(
     )
 
 
+def _scale_vector(
+    scale_tile: Any,
+    contraction_index: Any,
+    output_index: Any,
+    *,
+    blocks_per_tile: int,
+    block_output: int,
+) -> Any:
+    """Load one scalar per output block and expand it over output rows."""
+
+    scale_rows = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 0)
+    scale_columns = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 1)
+    values = []
+    for block_offset in range(blocks_per_tile):
+        target_column = (
+            output_index * jnp.int32(blocks_per_tile)
+            + jnp.int32(block_offset)
+        )
+        scale_mask = (
+            (scale_rows == contraction_index % jnp.int32(8))
+            & (scale_columns == target_column)
+        )
+        value = jnp.sum(
+            jnp.where(scale_mask, scale_tile, jnp.float32(0.0)),
+            dtype=jnp.float32,
+        )
+        values.append(jnp.broadcast_to(value, (block_output,)))
+    return jnp.concatenate(values, axis=0)[:, None]
+
+
 def _aligned_scale_table(
     scale: Any, *, output_tiles: int, contraction_tiles: int
 ) -> Any:
-    if output_tiles > 128:
+    del output_tiles
+    output_scale_blocks = scale.shape[0]
+    if output_scale_blocks > 128:
         raise ValueError("FP8 matmul supports at most 128 output-scale blocks")
     aligned_contraction_tiles = _ceil_div(contraction_tiles, 8) * 8
     # Mosaic cannot issue a dynamically indexed scalar VMEM load from the
@@ -135,7 +169,7 @@ def _aligned_scale_table(
         jnp.transpose(scale),
         (
             (0, aligned_contraction_tiles - contraction_tiles),
-            (0, 128 - output_tiles),
+            (0, 128 - output_scale_blocks),
         ),
     )
 
@@ -256,6 +290,7 @@ def _fp8_block_matmul_impl(
 
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
+    blocks_per_output_tile = config.output_tile // config.block_shape[0]
     scale_table = _aligned_scale_table(
         scale,
         output_tiles=output_tiles,
@@ -276,22 +311,35 @@ def _fp8_block_matmul_impl(
             accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
 
         # TPU v4 cannot consume FP8 directly in its MXU.  Decode only this
-        # 128x128 VMEM tile, apply its scalar inverse scale, then feed BF16 to
-        # the MXU while accumulating in FP32.
+        # one- or two-block VMEM tile, apply its inverse scales, then feed BF16
+        # to the MXU while accumulating in FP32.
         output_index = pl.program_id(0)
-        scale_value = _scale_value(
-            scale_ref[...], contraction_index, output_index
-        )
         # Keep the complete checkpoint operand raw U8 through the custom-call
         # boundary. Reinterpret only the resident VMEM tile: an outer bitcast
         # makes TPU XLA execute a whole-table formatting fusion.
         weight_tile = lax.bitcast_convert_type(
             weight_ref[...], jnp.float8_e4m3fn
         )
-        decoded_weight = (
-            weight_tile.astype(config.accumulator_dtype)
-            * scale_value.astype(config.accumulator_dtype)
-        ).astype(jnp.bfloat16)
+        if blocks_per_output_tile == 1:
+            scale_value = _scale_value(
+                scale_ref[...], contraction_index, output_index
+            )
+            decoded_weight = (
+                weight_tile.astype(config.accumulator_dtype)
+                * scale_value.astype(config.accumulator_dtype)
+            ).astype(jnp.bfloat16)
+        else:
+            scale_vector = _scale_vector(
+                scale_ref[...],
+                contraction_index,
+                output_index,
+                blocks_per_tile=blocks_per_output_tile,
+                block_output=config.block_shape[0],
+            )
+            decoded_weight = (
+                weight_tile.astype(config.accumulator_dtype)
+                * scale_vector.astype(config.accumulator_dtype)
+            ).astype(jnp.bfloat16)
         update = lax.dot_general(
             lhs_ref[...],
             decoded_weight,
@@ -325,6 +373,11 @@ def _fp8_block_matmul_impl(
         del output_index_value
         return contraction_index // jnp.int32(8), 0
 
+    kernel_name = (
+        f"{kernel_prefix}m{padded_rows}_k{padded_contraction}_n{padded_output}"
+    )
+    if config.output_tile != config.block_shape[0]:
+        kernel_name += f"_ot{config.output_tile}"
     call = pl.pallas_call(
         kernel,
         out_shape=jax.ShapeDtypeStruct(
@@ -354,15 +407,16 @@ def _fp8_block_matmul_impl(
             disable_bounds_checks=True,
         ),
         interpret=interpret,
-        name=(
-            f"{kernel_prefix}m{padded_rows}_k{padded_contraction}_n{padded_output}"
-        ),
+        name=kernel_name,
         cost_estimate=pl.CostEstimate(
             flops=2 * padded_rows * padded_contraction * padded_output,
             bytes_accessed=(
                 padded_rows * padded_contraction * 2
                 + padded_output * padded_contraction
-                + output_tiles * contraction_tiles * 4
+                + output_tiles
+                * contraction_tiles
+                * blocks_per_output_tile
+                * 4
                 + padded_rows * padded_output * result_dtype.itemsize
             ),
             transcendentals=0,

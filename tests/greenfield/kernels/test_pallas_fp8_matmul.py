@@ -30,9 +30,18 @@ def _bits(values: jax.Array) -> jax.Array:
     return lax.bitcast_convert_type(quantized, jnp.uint8)
 
 
-@pytest.mark.parametrize("shape", [(1, 128, 128), (3, 130, 135)])
+@pytest.mark.parametrize(
+    ("shape", "output_tile"),
+    (
+        ((1, 128, 128), 128),
+        ((3, 130, 135), 128),
+        ((1, 128, 256), 256),
+        ((3, 130, 257), 256),
+    ),
+)
 def test_fp8_block_matmul_interpret_matches_reference(
     shape: tuple[int, int, int],
+    output_tile: int,
 ) -> None:
     rows, contraction, output = shape
     lhs = jnp.asarray(
@@ -64,7 +73,13 @@ def test_fp8_block_matmul_interpret_matches_reference(
         dimension_numbers=(((1,), (1,)), ((), ())),
         preferred_element_type=jnp.float32,
     ).astype(jnp.bfloat16)
-    actual = fp8_block_matmul(lhs, weight_bits, scale, interpret=True)
+    actual = fp8_block_matmul(
+        lhs,
+        weight_bits,
+        scale,
+        config=Fp8BlockMatmulConfig(output_tile=output_tile),
+        interpret=True,
+    )
     np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
 
 
@@ -79,7 +94,7 @@ def test_fp8_block_matmul_rejects_shape_and_dtype_drift() -> None:
         fp8_block_matmul(lhs, bits.astype(jnp.int8), scale, interpret=True)
     with pytest.raises(ValueError, match="scale shape"):
         fp8_block_matmul(lhs, bits, jnp.ones((1, 2), jnp.float32), interpret=True)
-    with pytest.raises(ValueError, match="equal one scale block"):
+    with pytest.raises(ValueError, match="contraction tiles"):
         fp8_block_matmul(
             lhs,
             bits,
@@ -368,13 +383,13 @@ def test_fp8_block_up_gate_interpret_matches_two_references(
 
 
 def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:
-    wide_routed_config = Fp8BlockMatmulConfig(output_tile=256)
-    with pytest.raises(ValueError, match="tiles must equal one scale block"):
+    unsupported_config = Fp8BlockMatmulConfig(output_tile=384)
+    with pytest.raises(ValueError, match="one or two scale blocks"):
         fp8_block_matmul(
             jnp.ones((1, 128), dtype=jnp.bfloat16),
             jnp.zeros((128, 128), dtype=jnp.uint8),
             jnp.ones((1, 1), dtype=jnp.float32),
-            config=wide_routed_config,
+            config=unsupported_config,
             interpret=True,
         )
     with pytest.raises(

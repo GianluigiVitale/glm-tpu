@@ -11,10 +11,12 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
+OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
 [[ $KERNEL != selected_up_gate && $KERNEL != selected_swiglu_down ]] || \
   TAG_STEM=${KERNEL}_${SELECTED_CASE}
+[[ $OUTPUT_TILE == 128 ]] || TAG_STEM=${TAG_STEM}_ot${OUTPUT_TILE}
 TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${TAG_STEM}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-1000}
@@ -30,11 +32,21 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   exit 2
 }
 [[ $KERNEL == single_up || $KERNEL == rmsnorm_linear || $KERNEL == up_gate || \
+  $KERNEL == attention_output || \
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
   $KERNEL == dsa_wk ]] || {
-  echo "FP8 kernel must be single_up, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, structured_kv_b, dsa_wq_b, or dsa_wk" >&2
+  echo "FP8 kernel must be single_up, attention_output, rmsnorm_linear," \
+    "up_gate, selected_up_gate, selected_swiglu_down, structured_kv_b," \
+    "dsa_wq_b, or dsa_wk" >&2
+  exit 2
+}
+[[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
+  echo "FP8 output tile must be 128 or 256" >&2
+  exit 2
+}
+[[ $KERNEL == attention_output || $OUTPUT_TILE == 128 ]] || {
+  echo "a non-default output tile requires attention_output" >&2
   exit 2
 }
 [[ $SELECTED_CASE == normal_two || $SELECTED_CASE == concentrated_eight ]] || {
@@ -100,7 +112,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN kernel=$KERNEL selected_case=$SELECTED_CASE warmup=$WARMUP iterations=$ITERATIONS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN kernel=$KERNEL output_tile=$OUTPUT_TILE selected_case=$SELECTED_CASE warmup=$WARMUP iterations=$ITERATIONS"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -119,6 +131,10 @@ if [[ $KERNEL == dsa_wq_b ]]; then
 elif [[ $KERNEL == dsa_wk ]]; then
   ROWS=1
   OUTPUT_WIDTH=128
+elif [[ $KERNEL == attention_output ]]; then
+  ROWS=1
+  CONTRACTION=4096
+  OUTPUT_WIDTH=6144
 fi
 (
   cd "$WORKTREE"
@@ -138,6 +154,7 @@ fi
       --output "$RUN_DIR/runner.json"
       --hlo-output "$RUN_DIR/hlo/fp8_matmul.optimized_hlo.txt"
       --kernel "$KERNEL"
+      --output-tile "$OUTPUT_TILE"
       --rows "$ROWS"
       --contraction "$CONTRACTION"
       --output-width "$OUTPUT_WIDTH"
@@ -170,6 +187,11 @@ run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("runner status/code identity failed")
+output_tile = runner.get("output_tile", 128)
+if output_tile not in (128, 256):
+    raise SystemExit("runner output tile is invalid")
+if runner["kernel"] != "attention_output" and output_tile != 128:
+    raise SystemExit("non-default output tile requires attention_output")
 if not runner["hlo"]["contract"]["passed"]:
     raise SystemExit("Pallas custom-call/full-overlay HLO contract failed")
 if not runner["comparison"]["passed"]:
@@ -191,6 +213,7 @@ run_id = pv.start_run(
         "hlo_sha256": runner["hlo"]["sha256"],
         "device_kind": runner["device_kind"],
         "kernel": runner["kernel"],
+        "output_tile": output_tile,
         "selected_route_case": runner["selected_route_case"],
     },
     note=(
@@ -201,6 +224,7 @@ run_id = pv.start_run(
     fork_repo=None,
 )
 shape_ids = {
+    "attention_output": "m1_k4096_n6144",
     "dsa_wq_b": "m1_k2048_n1024",
     "dsa_wk": "m1_k6144_n128",
 }
@@ -219,6 +243,8 @@ else:
     )
 if runner["selected_route_case"] is not None:
     item_id += "_" + runner["selected_route_case"]
+if output_tile != 128:
+    item_id += f"_ot{output_tile}"
 pv.record_item(
     conn,
     run_id,
