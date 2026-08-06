@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 03:23 UTC
+**Updated:** 2026-08-06 03:28 UTC
 
 ## Authority and isolation
 
@@ -207,6 +207,13 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   HLO/DB/archive/cleanup gates pass, but normal-two p50 regressed `1.341385 -> 3.416799 ms` (`2.55x`)
   while scoped VMEM grew `946,176 -> 6,596,608` bytes. No concentrated run was needed to reject it.
   The DB 429/430 scale staging and API were restored after the proof.
+- Protected DB 434/435 at `a21ad09` declared the independent compact-route grid axis `parallel`.
+  Normal/concentrated p50 became `1.344635/4.497115 ms` versus DB 429/430's
+  `1.341385/4.496970 ms`; exactness, HLO/no-overlay, DB/archive/hashes, and 8/8 cleanup pass. The
+  annotation is a performance null and was restored to `arbitrary`. After final layout, device
+  compaction, merged-stream, scale-staging, and scheduling experiments, DB 429/430 are the selected
+  gate/up basis for composing activation and down; this is a kernel-stage choice, not a decoder or
+  token-speed promotion.
 
 ## Protected evidence
 
@@ -307,13 +314,12 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 429/430 remain the route-proportional `1.341/4.497 ms` normal-two/concentrated-eight baseline;
-   DB 431/432 reject a merged stream and DB 433 rejects in-kernel compact-scale extraction. The
-   owned-route grid is mathematically independent but currently declared `arbitrary`; test a
-   `parallel` route dimension (and only then route/output grid order) under exact HLO/correctness and
-   both distributions. Only after a competitive protected kernel should activation, down, and
-   routed/shared combine be composed in binding Pallas order and the real one-layer gate repeated.
-   Never substitute same-weight M8 or a slow correctness-only GMM for production proof.
+1. DB 429/430 are the selected route-proportional `1.341/4.497 ms` gate/up basis after DB 431--435
+   reject merged-stream, compact-scale, and route-parallel challengers. Implement exact SwiGLU
+   activation plus raw-FP8 down projection without writing the 2x2048 selected intermediates to HBM;
+   first protect activation/down alone, then compose routed/shared local combine and repeat the real
+   one-layer gate. Never substitute same-weight M8 or a slow correctness-only GMM for production
+   proof.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,

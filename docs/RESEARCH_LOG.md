@@ -4584,3 +4584,12 @@ blocks inside Pallas. Exactness, raw-U8/no-overlay HLO, provenance, archive, and
 normal-two p50 regressed `1.341385 -> 3.416799 ms` and scoped VMEM grew from 946,176 to 6,596,608
 bytes. The candidate and API are rejected/restored. Next, test the currently `arbitrary` but
 mathematically independent owned-route grid dimension as `parallel`.
+
+## 2026-08-06 03:28 — Greenfield route-parallel annotation is a null
+
+Protected DB 434/435 at `a21ad09` changed only the selected kernel's independent route grid semantic
+from `arbitrary` to `parallel`. Normal/concentrated p50 became `1.344635/4.497115 ms`, versus DB
+429/430's `1.341385/4.496970 ms`. Exact comparisons, raw-U8/no-overlay HLO, DB/archive/hashes, and
+8/8 cleanup pass. The annotation is rejected and restored. The accumulated final-layout,
+route-compaction, merged-stream, scale-staging, and scheduling evidence selects DB 429/430 as the
+gate/up basis for the mandated SwiGLU/down fusion stage; this is not a decoder or tok/s promotion.

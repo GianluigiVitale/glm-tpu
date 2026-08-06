@@ -378,6 +378,21 @@ This is a `2.55x` regression versus DB 429's `1.341385 ms`; measured peak alloca
 scale staging, so the candidate is rejected without a concentrated run. DB/archive/hashes/remote
 SUCCESS and 8/8 cleanup pass, and the DB 429/430 kernel/layout was restored.
 
+DB 434 / `greenfield_fp8_selected_up_gate_normal_two_20260806T032417543569735Z` and DB 435 /
+`greenfield_fp8_selected_up_gate_concentrated_eight_20260806T032510518408956Z` at `a21ad09` tested
+whether declaring the independent compact-route grid axis `parallel` changes TPU scheduling:
+
+| case | p50 | p90 | p95 | p99 | mean |
+|---|---:|---:|---:|---:|---:|
+| normal interleaved | 1.344635 | 1.358001 | 1.362222 | 1.370948 | 1.345833 ms |
+| concentrated | 4.497115 | 4.509551 | 4.514593 | 4.527513 | 4.498973 ms |
+
+Both preserve the exact DB 429/430 numerical and HLO contracts and pass DB/archive/hash/remote-
+SUCCESS/8-host cleanup gates. Relative to `1.341385/4.496970 ms`, the annotation is a `0.24%`
+normal regression and effectively zero (`0.003%`) concentrated change. It is rejected and restored.
+DB 429/430 now form the selected gate/up basis for activation/down fusion; this does not promote a
+layer, decoder, or token-speed result.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory
