@@ -156,9 +156,12 @@ def fp8_block_matmul(
         # TPU v4 cannot consume FP8 directly in its MXU.  Decode only this
         # 128x128 VMEM tile, apply its scalar inverse scale, then feed BF16 to
         # the MXU while accumulating in FP32.
+        output_index = pl.program_id(0)
         decoded_weight = (
             weight_ref[...].astype(config.accumulator_dtype)
-            * scale_ref[0, 0].astype(config.accumulator_dtype)
+            * scale_ref[output_index, contraction_index].astype(
+                config.accumulator_dtype
+            )
         ).astype(jnp.bfloat16)
         update = lax.dot_general(
             lhs_ref[...],
@@ -187,6 +190,12 @@ def fp8_block_matmul(
         del contraction_index
         return 0, output_index_value
 
+    def scale_index(
+        output_index_value: Any, contraction_index: Any
+    ) -> tuple[int, int]:
+        del output_index_value, contraction_index
+        return 0, 0
+
     call = pl.pallas_call(
         kernel,
         out_shape=jax.ShapeDtypeStruct(
@@ -200,7 +209,11 @@ def fp8_block_matmul(
             pl.BlockSpec(
                 (config.output_tile, config.contraction_tile), weight_index
             ),
-            pl.BlockSpec((1, 1), weight_index),
+            # TPU block shapes must be 8x128-aligned unless a dimension spans
+            # its complete array.  The entire scale table is only a few KiB
+            # for GLM matrices, so keep it as one small VMEM resident table and
+            # index the current scalar by the two program ids.
+            pl.BlockSpec(scale.shape, scale_index),
         ),
         out_specs=pl.BlockSpec(
             (padded_rows, config.output_tile), output_index
