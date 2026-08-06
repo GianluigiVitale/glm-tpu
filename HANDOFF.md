@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 10:28 UTC
+**Updated:** 2026-08-06 12:09 UTC
 
 ## Authority and isolation
 
@@ -388,12 +388,12 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Implement Section 7.2 item 8, stage-to-stage asynchronous remote copy, now that DB 446/447 close
-   fused selected-KV sparse attention standalone and in Gate C. Then prove stage-local
-   RMSNorm/raw-FP8 linear fusion in the binding order. DB 442 proves that the latter removes the
-   immediate 58.8-second 2K floor. Require reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback
-   evidence for each; do not replace the accepted collective-permute transport without a protected
-   paired win and exact device-resident semantics.
+1. Implement Section 7.2 item 9, stage-local RMSNorm/raw-FP8 linear fusion. DB 442 proves this is
+   the immediate 58.8-second 2K floor: whole-matrix reference FP8 dequantization contributes
+   7,317.698 ms per average core while feature-MoE contributes only 14.784 ms. Require
+   reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback evidence, then integrate accepted
+   kernels without creating a decoded weight overlay. Section 7.2 item 8 is closed by DB 448--450;
+   its evidence rejects Pallas remote copy and retains the accepted collective-permute transport.
 2. Integrate each accepted path, rerun its exact oracle gate, then repeat the protected 78-layer body.
    The immediate trace target is removal of `reference/fp8.py:69-70` whole-matrix gathers; do not
    tune the compact stage permutes or local layer collectives.
@@ -474,6 +474,34 @@ output reductions. Peak HBM is 281,821,696 bytes/chip. Fresh XPlane, DB/archive 
 `SUCCESS`, and 8/8 cleanup pass. This remains a correctness/mechanism proof, not performance or
 token-speed evidence. The preceding `...T113534819091053Z` run compiled correctly but failed an
 over-strict HLO variant classifier before any DB claim; its diagnostic is preserved and clean.
+
+## Protected asynchronous stage remote copy
+
+DB 448 / `greenfield_transport_pallas_pp8_20260806T115640677420842Z` at `29b040d` and DB 449 /
+`greenfield_transport_pallas_paired_pp8_20260806T120235225511627Z` at `bfaec9d` close Section 7.2
+item 8 with an evidence-backed rejection. The generic Pallas path transfers one
+`bf16[1,6144]` payload; the production path starts asynchronous remote DMAs for both the residual
+and `s32[1,2052]` compact metadata before either wait. Both use logical device addressing, exact
+physical stage targets, deterministic cross-backend checksums, default-off dispatch with the
+accepted `ppermute` fallback, 200 warmups, 1,000 profiler-free samples, and exact HLO guards.
+
+The generic control / `ppermute` / Pallas p50 is `0.301991/0.330680/0.407570 ms`; control-subtracted
+transport is `0.028690/0.105580 ms`, so Pallas is `3.68x` slower. The production paired control /
+two-`ppermute` / paired-Pallas p50 is `0.380135/0.411980/0.488110 ms`; net is
+`0.031845/0.107975 ms`, so paired Pallas is `3.39x` slower and `0.076130 ms` worse raw. HLO
+`94725ae7...6084` has exactly eight generic communicating Pallas calls; HLO
+`12789dff...fb3` has exactly eight paired calls, each with two enqueue DMAs before its waits.
+Neither has a top-level collective or dead row. Correctness, DB/archive/remote `SUCCESS`, and 8/8
+cleanup pass. Evidence therefore retains `ppermute`; the Pallas mechanism remains default-off.
+
+Trace DB 450 / `greenfield_transport_trace_pallas_paired_pp8_20260806T120629031314193Z` at
+`01ec9ed` supplies the fresh physical proof: eight XPlanes, 64 cores, 20 steps/core, exactly eight
+paired remote-copy calls/step, zero collective-permute/all-reduce/all-gather calls, and a
+`0.557786 ms` trace-contaminated step cycle excluded from performance claims. Summary SHA is
+`ea2aa27f...286e`; all XPlane/host-record hashes, DB snapshot, approved archive/remote `SUCCESS`,
+and authenticated 8/8 cleanup pass. Two earlier compile diagnostics failed closed before timing:
+one exposed physical-versus-logical device addressing and one rejected an invalid `collective_id`
+without a custom barrier. Both were preserved without DB claims and ended clean.
 
 ## Protected feature-body attribution
 
