@@ -181,7 +181,11 @@ def _validate_selected_inputs(
         raise ValueError("selected-expert start must be an int32 scalar")
     if weight_bits.ndim != 3 or scale.ndim != 3:
         raise ValueError("selected expert weights/scales must have rank three")
-    local_experts, output, contraction = weight_bits.shape
+    # Selected-expert tables use their final MXU access order [G,K,N].  This
+    # is intentionally different from the standalone [N,K] checkpoint probe:
+    # transposing a complete 64-expert table inside the decode JIT is both an
+    # extra full-HBM pass and an extra TPU custom call.
+    local_experts, contraction, output = weight_bits.shape
     if local_experts <= 0:
         raise ValueError("selected-expert local weight table must be nonempty")
     if hidden.shape[1] != contraction:
@@ -618,22 +622,16 @@ def fp8_selected_up_gate(
             value,
             (
                 (0, 0),
-                (0, padded_output - output),
                 (0, padded_contraction - contraction),
+                (0, padded_output - output),
             ),
         )
 
-    gate_fp8 = jnp.transpose(
-        lax.bitcast_convert_type(
-            pad_weight(gate_bits), jnp.float8_e4m3fn
-        ),
-        (0, 2, 1),
+    gate_fp8 = lax.bitcast_convert_type(
+        pad_weight(gate_bits), jnp.float8_e4m3fn
     )
-    up_fp8 = jnp.transpose(
-        lax.bitcast_convert_type(
-            pad_weight(up_bits), jnp.float8_e4m3fn
-        ),
-        (0, 2, 1),
+    up_fp8 = lax.bitcast_convert_type(
+        pad_weight(up_bits), jnp.float8_e4m3fn
     )
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile

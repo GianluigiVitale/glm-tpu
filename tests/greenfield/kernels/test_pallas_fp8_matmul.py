@@ -153,8 +153,10 @@ def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts() -> None:
     linear = np.arange(
         experts * output * contraction, dtype=np.float32
     ).reshape(experts, output, contraction)
-    gate_bits = _bits(jnp.asarray(np.sin(linear * 0.013) * 0.5))
-    up_bits = _bits(jnp.asarray(np.cos(linear * 0.019) * 0.375))
+    gate_bits_nk = _bits(jnp.asarray(np.sin(linear * 0.013) * 0.5))
+    up_bits_nk = _bits(jnp.asarray(np.cos(linear * 0.019) * 0.375))
+    gate_bits = jnp.transpose(gate_bits_nk, (0, 2, 1))
+    up_bits = jnp.transpose(up_bits_nk, (0, 2, 1))
     scale_shape = (experts, (output + 127) // 128, (contraction + 127) // 128)
     gate_scale = jnp.asarray(
         np.linspace(0.25, 0.75, np.prod(scale_shape), dtype=np.float32).reshape(
@@ -187,7 +189,7 @@ def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts() -> None:
                 values.append(np.zeros((output,), dtype=np.float32))
                 continue
             decoded = dequantize_fp8_bits_block_weight(
-                bits[local_expert], scale[local_expert]
+                jnp.transpose(bits[local_expert]), scale[local_expert]
             )
             value = lax.dot_general(
                 hidden,

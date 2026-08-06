@@ -149,18 +149,21 @@ def main() -> int:
         local_experts = 64
         single_weight = weight_host
         single_gate_weight = gate_weight_host
+        # Materialize the proposed persistent selected-expert checkpoint
+        # layout directly as [G,K,N].  A timed device-side transpose of both
+        # full 64-expert tables would invalidate this discriminator.
         weight_host = np.empty(
-            (local_experts, output, contraction), dtype=np.uint8
+            (local_experts, contraction, output), dtype=np.uint8
         )
         gate_weight_host = np.empty_like(weight_host)
         for expert in range(local_experts):
             weight_host[expert] = np.bitwise_xor(
                 single_weight, np.uint8(expert & 1) * np.uint8(128)
-            )
+            ).T
             gate_weight_host[expert] = np.bitwise_xor(
                 single_gate_weight,
                 np.uint8((expert // 2) & 1) * np.uint8(128),
-            )
+            ).T
         scale_host = np.linspace(
             0.0005,
             0.0015,
@@ -262,7 +265,14 @@ def main() -> int:
             "kernel_custom_call_count": len(kernel_calls),
             "kernel_custom_calls": kernel_calls,
             "forbidden_full_weight_overlays": forbidden_full_overlays,
-            "passed": len(kernel_calls) == 1 and not forbidden_full_overlays,
+            "passed": (
+                len(kernel_calls) == 1
+                and not forbidden_full_overlays
+                and (
+                    args.kernel != "selected_up_gate"
+                    or len(custom_calls) == 1
+                )
+            ),
         }
         if not hlo_contract["passed"]:
             raise RuntimeError(f"FP8 Pallas HLO contract failed: {hlo_contract}")
@@ -291,7 +301,8 @@ def main() -> int:
             route_values = []
             for local_expert in route_indices_host.tolist():
                 decoded = dequantize_fp8_bits_block_weight(
-                    bits[local_expert], projection_scale[local_expert]
+                    jnp.transpose(bits[local_expert]),
+                    projection_scale[local_expert],
                 )
                 route_values.append(
                     lax.dot_general(
