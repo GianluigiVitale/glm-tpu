@@ -13,6 +13,7 @@ from glm_tpu.greenfield.kernels.reference.fp8 import (
     dequantize_fp8_bits_block_weight,
     fp8_e4m3fn_lookup,
 )
+from glm_tpu.greenfield.kernels.stage_local import _stage_fp8_linear
 
 
 def _bits(value: np.ndarray) -> np.ndarray:
@@ -41,6 +42,35 @@ def test_raw_bit_block_dequant_preserves_leading_expert_axis() -> None:
     expanded = np.repeat(np.repeat(np.asarray(scale), 2, axis=-2), 3, axis=-1)
     expected = _bits(values).view(ml_dtypes.float8_e4m3fn).astype(np.float32) * expanded
     np.testing.assert_array_equal(np.asarray(got), expected)
+
+
+def test_stage_fp8_linear_pallas_dispatch_matches_reference() -> None:
+    hidden = jnp.asarray(
+        np.linspace(-0.75, 0.5, 128, dtype=np.float32)[None, :],
+        dtype=jnp.bfloat16,
+    )
+    values = np.sin(
+        np.arange(128 * 128, dtype=np.float32).reshape(128, 128) * 0.013
+    )
+    bits = jnp.asarray(_bits(values))
+    scale = jnp.asarray([[0.625]], dtype=jnp.float32)
+    expected = _stage_fp8_linear(
+        hidden,
+        bits,
+        scale,
+        block_shape=(128, 128),
+        backend="reference",
+        interpret=False,
+    )
+    actual = _stage_fp8_linear(
+        hidden,
+        bits,
+        scale,
+        block_shape=(128, 128),
+        backend="pallas",
+        interpret=True,
+    )
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
 
 
 def test_raw_fp8_dense_and_moe_match_bf16_reference_on_forced_cpu() -> None:

@@ -189,7 +189,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument(
         "--runtime-kind",
-        choices=("reference", "pallas_feature"),
+        choices=("reference", "pallas_feature", "pallas_feature_linear"),
         default="reference",
     )
     parser.add_argument("--runtime-root", type=Path, required=True)
@@ -219,7 +219,7 @@ def main() -> int:
         raise ValueError("decoder diagnostic trace requires zero or two steps")
     if (args.trace_root is None) != (args.trace_steps == 0):
         raise ValueError("decoder trace root and trace steps must be enabled together")
-    if args.runtime_kind == "pallas_feature" and (
+    if args.runtime_kind in ("pallas_feature", "pallas_feature_linear") and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
     ):
@@ -284,6 +284,7 @@ def main() -> int:
             pack_context.source_checkpoint,
         )
         sparse_moe_backend = "reference"
+        linear_backend = "reference"
         hlo_backend_contract = "tpu_v4_pp8_reference"
     else:
         context_args = SimpleNamespace(
@@ -332,7 +333,14 @@ def main() -> int:
             pack_context.source_runtime_checkpoint,
         )
         sparse_moe_backend = "pallas_feature"
-        hlo_backend_contract = "tpu_v4_pp8_pallas_feature"
+        linear_backend = (
+            "pallas" if args.runtime_kind == "pallas_feature_linear" else "reference"
+        )
+        hlo_backend_contract = (
+            "tpu_v4_pp8_pallas_feature_linear"
+            if linear_backend == "pallas"
+            else "tpu_v4_pp8_pallas_feature"
+        )
     schedule = build_pipeline_schedule(execution_plan)
     state_layout = build_decoder_state_layout(
         execution_plan,
@@ -402,6 +410,7 @@ def main() -> int:
             pairs,
             devices=runtime_devices,
             sparse_moe_backend=sparse_moe_backend,
+            linear_backend=linear_backend,
         )
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-start")
         load_started = time.monotonic()
@@ -718,6 +727,7 @@ def main() -> int:
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
+            "linear_backend": decoder.linear_backend,
             "topology_hash": live_topology.topology_hash,
             "trace": trace_record,
             "transformer_body_timing_only": True,

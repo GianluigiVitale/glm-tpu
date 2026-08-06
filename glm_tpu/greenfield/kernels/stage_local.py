@@ -11,18 +11,18 @@ from __future__ import annotations
 from typing import Any, Literal, NamedTuple, Sequence
 
 import jax
-from jax import lax
 import jax.numpy as jnp
+from jax import lax
 
 from .pallas import (
     Fp8BlockMatmulConfig,
     SparseMlaConfig,
     fp8_block_matmul,
     fp8_block_up_gate,
+    fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
     stage_local_sparse_mla_kernel,
 )
-from .reference.fp8 import dequantize_fp8_bits_block_weight
 from .reference.attention import (
     MlaNumericalContract,
     SparseAttentionResult,
@@ -38,6 +38,7 @@ from .reference.dsa import (
     local_topk_candidates,
     merge_topk_candidates,
 )
+from .reference.fp8 import dequantize_fp8_bits_block_weight
 from .reference.linear import linear, residual_add, silu
 from .reference.moe import GlmMoeNumericalContract, route_glm_noaux_tc
 from .reference.rmsnorm import rms_norm
@@ -59,6 +60,42 @@ class StageLocalIndexShareFp8Result(NamedTuple):
     output: Any
     cache: Any
     contract_valid: Any
+
+
+StageLinearBackend = Literal["reference", "pallas"]
+
+
+def _stage_fp8_linear(
+    hidden: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    block_shape: tuple[int, int],
+    backend: StageLinearBackend,
+    interpret: bool,
+) -> Any:
+    """Apply one final-owner FP8 linear without changing the fallback."""
+
+    if backend == "reference":
+        return linear(
+            hidden,
+            dequantize_fp8_bits_block_weight(
+                weight_bits, scale, block_shape=block_shape
+            ),
+        )
+    if backend != "pallas":
+        raise ValueError("stage-local FP8 linear backend is unknown")
+    return fp8_block_matmul(
+        hidden,
+        weight_bits,
+        scale,
+        config=Fp8BlockMatmulConfig(
+            block_shape=block_shape,
+            output_tile=block_shape[0],
+            contraction_tile=block_shape[1],
+        ),
+        interpret=interpret,
+    )
 
 
 def _axis_groups(
@@ -242,6 +279,8 @@ def stage_local_dsa_fp8_mapped(
     rms_norm_epsilon: float = 1e-5,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,
+    linear_backend: StageLinearBackend = "reference",
+    linear_interpret: bool = False,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
 
@@ -310,14 +349,18 @@ def stage_local_dsa_fp8_mapped(
     if (precomputed_normalized is None) != (precomputed_q_residual is None):
         raise ValueError("DSA shared q_a intermediates must be supplied together")
     if precomputed_normalized is None:
-        q_a_weight = dequantize_fp8_bits_block_weight(
-            q_a_bits, q_a_scale, block_shape=block_shape
-        )
         normalized = rms_norm(
             residual, input_norm_weight, epsilon=rms_norm_epsilon
         )
         q_residual = rms_norm(
-            linear(normalized, q_a_weight),
+            _stage_fp8_linear(
+                normalized,
+                q_a_bits,
+                q_a_scale,
+                block_shape=block_shape,
+                backend=linear_backend,
+                interpret=linear_interpret,
+            ),
             q_a_norm_weight,
             epsilon=rms_norm_epsilon,
         )
@@ -471,6 +514,8 @@ def stage_local_index_share_fp8_mapped(
     sparse_attention_backend: Literal["reference", "pallas"] = "reference",
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(),
     sparse_attention_interpret: bool = False,
+    linear_backend: StageLinearBackend = "reference",
+    linear_interpret: bool = False,
 ) -> StageLocalIndexShareFp8Result:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -534,31 +579,26 @@ def stage_local_index_share_fp8_mapped(
         layout=cache_layout,
         physical_page_count=cache.shape[0],
     )
-    local_q_b_weight = dequantize_fp8_bits_block_weight(
-        q_b_bits, q_b_scale, block_shape=block_shape
-    )
-    kv_a_weight = dequantize_fp8_bits_block_weight(
-        kv_a_bits, kv_a_scale, block_shape=block_shape
-    )
     local_kv_b_weight = dequantize_fp8_bits_block_weight(
         kv_b_bits, kv_b_scale, block_shape=block_shape
-    )
-    local_o_weight = dequantize_fp8_bits_block_weight(
-        o_bits, o_scale, block_shape=block_shape
     )
     if (precomputed_normalized is None) != (precomputed_q_residual is None):
         raise ValueError(
             "IndexShare shared q_a intermediates must be supplied together"
         )
     if precomputed_normalized is None:
-        q_a_weight = dequantize_fp8_bits_block_weight(
-            q_a_bits, q_a_scale, block_shape=block_shape
-        )
         normalized = rms_norm(
             residual, input_norm_weight, epsilon=rms_norm_epsilon
         )
         q_residual = rms_norm(
-            linear(normalized, q_a_weight),
+            _stage_fp8_linear(
+                normalized,
+                q_a_bits,
+                q_a_scale,
+                block_shape=block_shape,
+                backend=linear_backend,
+                interpret=linear_interpret,
+            ),
             q_a_norm_weight,
             epsilon=rms_norm_epsilon,
         )
@@ -573,7 +613,14 @@ def stage_local_index_share_fp8_mapped(
             q_residual.dtype != residual.dtype
         ):
             raise ValueError("IndexShare precomputed q residual is invalid")
-    q_states = linear(q_residual, local_q_b_weight).reshape(
+    q_states = _stage_fp8_linear(
+        q_residual,
+        q_b_bits,
+        q_b_scale,
+        block_shape=block_shape,
+        backend=linear_backend,
+        interpret=linear_interpret,
+    ).reshape(
         1, local_heads, contract.qk_head_dim
     )
     q_nope = q_states[..., : contract.qk_nope_head_dim]
@@ -591,7 +638,14 @@ def stage_local_index_share_fp8_mapped(
         interleaved=True,
     )
 
-    current_kv = linear(normalized, kv_a_weight)
+    current_kv = _stage_fp8_linear(
+        normalized,
+        kv_a_bits,
+        kv_a_scale,
+        block_shape=block_shape,
+        backend=linear_backend,
+        interpret=linear_interpret,
+    )
     current_latent = rms_norm(
         current_kv[..., : contract.kv_lora_rank],
         kv_a_norm_weight,
@@ -708,9 +762,13 @@ def stage_local_index_share_fp8_mapped(
         local_weight_uv.astype(jnp.float32),
         preferred_element_type=jnp.float32,
     ).astype(residual.dtype)
-    local_update = linear(
+    local_update = _stage_fp8_linear(
         value_states.reshape(1, local_heads * contract.v_head_dim),
-        local_o_weight,
+        o_bits,
+        o_scale,
+        block_shape=block_shape,
+        backend=linear_backend,
+        interpret=linear_interpret,
     )
     update = lax.psum(
         local_update,
@@ -739,6 +797,8 @@ def stage_local_dense_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     epsilon: float = 1e-5,
+    linear_backend: StageLinearBackend = "reference",
+    linear_interpret: bool = False,
 ) -> Any:
     """Execute one dense SwiGLU from local raw shards and one local combine."""
 
@@ -752,21 +812,40 @@ def stage_local_dense_fp8_mapped(
         raise ValueError("dense local gate/up shards are invalid")
     if down_bits.shape != (hidden, gate_bits.shape[0]):
         raise ValueError("dense local down shard is invalid")
-    gate_weight = dequantize_fp8_bits_block_weight(
-        gate_bits, gate_scale, block_shape=block_shape
-    )
-    up_weight = dequantize_fp8_bits_block_weight(
-        up_bits, up_scale, block_shape=block_shape
-    )
-    down_weight = dequantize_fp8_bits_block_weight(
-        down_bits, down_scale, block_shape=block_shape
-    )
     normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
-    activated = (
-        silu(linear(normalized, gate_weight))
-        * linear(normalized, up_weight)
-    ).astype(normalized.dtype)
-    local_update = linear(activated, down_weight)
+    if linear_backend == "reference":
+        gate_weight = dequantize_fp8_bits_block_weight(
+            gate_bits, gate_scale, block_shape=block_shape
+        )
+        up_weight = dequantize_fp8_bits_block_weight(
+            up_bits, up_scale, block_shape=block_shape
+        )
+        down_weight = dequantize_fp8_bits_block_weight(
+            down_bits, down_scale, block_shape=block_shape
+        )
+        activated = (
+            silu(linear(normalized, gate_weight))
+            * linear(normalized, up_weight)
+        ).astype(normalized.dtype)
+        local_update = linear(activated, down_weight)
+    elif linear_backend == "pallas":
+        local_update = fp8_fused_block_swiglu(
+            normalized,
+            gate_bits,
+            gate_scale,
+            up_bits,
+            up_scale,
+            down_bits,
+            down_scale,
+            config=Fp8BlockMatmulConfig(
+                block_shape=block_shape,
+                output_tile=block_shape[0],
+                contraction_tile=block_shape[1],
+            ),
+            interpret=linear_interpret,
+        )
+    else:
+        raise ValueError("stage-local FP8 linear backend is unknown")
     update = lax.psum(
         local_update,
         axis_name=axis_name,

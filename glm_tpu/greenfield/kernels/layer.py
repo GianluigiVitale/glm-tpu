@@ -9,11 +9,12 @@ import jax.numpy as jnp
 
 from .reference.attention import MlaNumericalContract, StageLocalKvLayout
 from .reference.dsa import DsaNumericalContract
-from .reference.fp8 import dequantize_fp8_bits_block_weight
-from .reference.linear import linear, residual_add
+from .reference.linear import residual_add
 from .reference.moe import GlmMoeNumericalContract
 from .reference.rmsnorm import rms_norm
 from .stage_local import (
+    StageLinearBackend,
+    _stage_fp8_linear,
     stage_local_dense_fp8_mapped,
     stage_local_dsa_fp8_mapped,
     stage_local_index_share_fp8_mapped,
@@ -116,6 +117,8 @@ def stage_local_transformer_layer_fp8_mapped(
     rms_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     sparse_moe_backend: SparseMoeBackend = "reference",
+    linear_backend: StageLinearBackend = "reference",
+    linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
     """Execute exact DSA/IndexShare, sparse MLA, and dense or MoE MLP."""
 
@@ -125,6 +128,8 @@ def stage_local_transformer_layer_fp8_mapped(
         raise ValueError("layer MLP kind must be dense or sparse")
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise ValueError("layer sparse MoE backend is unknown")
+    if linear_backend not in ("reference", "pallas"):
+        raise ValueError("layer FP8 linear backend is unknown")
     if (dsa is None) != (indexer_kind == "shared"):
         raise ValueError("full DSA weights must exist only for a full indexer")
     if (dense is None) != (mlp_kind == "sparse"):
@@ -144,16 +149,18 @@ def stage_local_transformer_layer_fp8_mapped(
     ):
         raise ValueError("layer norm weights disagree with hidden size")
 
-    q_a_weight = dequantize_fp8_bits_block_weight(
-        attention.q_a_bits,
-        attention.q_a_scale,
-        block_shape=block_shape,
-    )
     normalized_input = rms_norm(
         residual, input_norm_weight, epsilon=rms_norm_epsilon
     )
     q_residual = rms_norm(
-        linear(normalized_input, q_a_weight),
+        _stage_fp8_linear(
+            normalized_input,
+            attention.q_a_bits,
+            attention.q_a_scale,
+            block_shape=block_shape,
+            backend=linear_backend,
+            interpret=linear_interpret,
+        ),
         attention.q_a_norm_weight,
         epsilon=rms_norm_epsilon,
     )
@@ -186,6 +193,8 @@ def stage_local_transformer_layer_fp8_mapped(
             rms_norm_epsilon=rms_norm_epsilon,
             precomputed_normalized=normalized_input,
             precomputed_q_residual=q_residual,
+            linear_backend=linear_backend,
+            linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache
         selected_positions = dsa_result.selected_positions
@@ -225,6 +234,8 @@ def stage_local_transformer_layer_fp8_mapped(
         rope_theta=rope_theta,
         precomputed_normalized=normalized_input,
         precomputed_q_residual=q_residual,
+        linear_backend=linear_backend,
+        linear_interpret=linear_interpret,
     )
     residual = attention_result.output
     if mlp_kind == "dense":
@@ -242,6 +253,8 @@ def stage_local_transformer_layer_fp8_mapped(
             axis_index_groups=axis_index_groups,
             block_shape=block_shape,
             epsilon=rms_norm_epsilon,
+            linear_backend=linear_backend,
+            linear_interpret=linear_interpret,
         )
         route_indices = jnp.full(
             (1, moe_contract.top_k), jnp.int32(-1), dtype=jnp.int32

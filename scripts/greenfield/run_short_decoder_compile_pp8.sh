@@ -36,6 +36,14 @@ case "$RUNTIME_KIND" in
     readonly SPARSE_MOE_BACKEND=pallas_feature
     readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_pallas_feature
     ;;
+  pallas_feature_linear)
+    readonly RUNTIME_TAG=greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z
+    readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/$RUNTIME_TAG
+    readonly RUNTIME_MANIFEST_SHA=54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917
+    readonly RUNTIME_LAYOUT_HASH=ba21c4ec1500837f17a53047da98a7ed7c3a06782ddffe49d8bd796d4d0d1c9e
+    readonly SPARSE_MOE_BACKEND=pallas_feature
+    readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_pallas_feature_linear
+    ;;
   *)
     echo "unsupported decoder runtime kind: $RUNTIME_KIND" >&2
     exit 2
@@ -220,6 +228,11 @@ if {record["runtime_kind"] for record in records} != {runtime_kind}:
     raise SystemExit("fleet runtime kind drifted")
 if {record["sparse_moe_backend"] for record in records} != {sparse_moe_backend}:
     raise SystemExit("fleet sparse MoE backend drifted")
+expected_linear_backend = (
+    "pallas" if runtime_kind == "pallas_feature_linear" else "reference"
+)
+if {record["linear_backend"] for record in records} != {expected_linear_backend}:
+    raise SystemExit("fleet FP8 linear backend drifted")
 if {record["runtime_manifest_sha256"] for record in records} != {runtime_manifest_sha256}:
     raise SystemExit("fleet runtime manifest drifted")
 if {record["runtime_layout_hash"] for record in records} != {runtime_layout_hash}:
@@ -247,7 +260,7 @@ if any(
     for record in records
 ):
     raise SystemExit("decoder HLO backend contract drifted")
-if runtime_kind == "pallas_feature":
+if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
     expected_kernel_counts = {
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512": 75,
         "greenfield_fp8_block_up_gate_m8_k6144_n512": 75,
@@ -262,6 +275,24 @@ if runtime_kind == "pallas_feature":
             or feature["forbidden_decoded_expert_overlays"]
         ):
             raise SystemExit("feature-Pallas HLO kernel/overlay contract drifted")
+if runtime_kind == "pallas_feature_linear":
+    expected_linear_kernel_counts = {
+        "greenfield_fp8_block_matmul_m8_k6144_n2048": 78,
+        "greenfield_fp8_block_matmul_m8_k2048_n4096": 78,
+        "greenfield_fp8_block_matmul_m8_k6144_n640": 78,
+        "greenfield_fp8_block_matmul_m8_k4096_n6144": 78,
+        "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": 3,
+    }
+    for record in records:
+        linear = record["hlo_contract"]["pallas_stage_linear_contract"]
+        if (
+            not linear["passed"]
+            or linear["kernel_counts"] != expected_linear_kernel_counts
+            or linear["expected_kernel_counts"]
+            != expected_linear_kernel_counts
+            or linear["forbidden_decoded_weight_overlays"]
+        ):
+            raise SystemExit("stage-linear Pallas HLO contract drifted")
 if any(record["load_record"]["runtime_checkpoint_reshards"] != 0 for record in records):
     raise SystemExit("runtime loader performed a checkpoint reshard")
 if any(record["load_record"]["host_global_concatenations"] != 0 for record in records):

@@ -42,6 +42,46 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     assert rejected["forbidden_decoded_expert_overlays"]
 
 
+def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_pallas_stage_linear_decoder_calls,
+    )
+
+    names = (
+        "greenfield_fp8_block_matmul_m8_k6144_n2048",
+        "greenfield_fp8_block_matmul_m8_k2048_n4096",
+        "greenfield_fp8_block_matmul_m8_k6144_n640",
+        "greenfield_fp8_block_matmul_m8_k4096_n6144",
+    )
+    calls = [
+        f'%{name} = bf16[1,128] custom-call(u8[1,128]), '
+        'custom_call_target="tpu_custom_call", '
+        f'metadata={{op_name="{name}"}}'
+        for name in names
+        for _ in range(78)
+    ]
+    dense = "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144"
+    calls.extend(
+        f'%{dense} = bf16[1,6144] custom-call(u8[3072,6144]), '
+        'custom_call_target="tpu_custom_call", '
+        f'metadata={{op_name="{dense}"}}'
+        for _ in range(3)
+    )
+    hlo = "\n".join(calls)
+    record = _validate_pallas_stage_linear_decoder_calls(
+        hlo, layers=78, dense_layers=3
+    )
+    assert record["passed"], record
+
+    rejected = _validate_pallas_stage_linear_decoder_calls(
+        hlo + "\noverlay = bf16[2048,6144] parameter(0)",
+        layers=78,
+        dense_layers=3,
+    )
+    assert not rejected["passed"]
+    assert rejected["forbidden_decoded_weight_overlays"]
+
+
 def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
     from dataclasses import replace
 
@@ -125,6 +165,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             sparse_moe_backend="unknown",  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="linear backend is unknown"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            linear_backend="unknown",  # type: ignore[arg-type]
         )
 
 
