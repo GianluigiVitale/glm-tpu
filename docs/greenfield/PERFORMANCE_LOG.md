@@ -228,6 +228,28 @@ only one 128x128 tile in VMEM, and performs BF16 MXU work with FP32 accumulation
 remain prohibited until production-shaped kernel compile/correctness/HLO/microbenchmark evidence
 shows the reference graph explosion is removed.
 
+## 2026-08-06 — protected Pallas FP8 up-projection kernel
+
+DB 422 / `greenfield_fp8_matmul_20260806T015232890679994Z` passed at `df44475` on TPU v4 for the
+production expert-up shape `M=8, K=6144, N=2048`. Raw U8 checkpoint codes are same-width bitcast to
+E4M3FN. The Pallas body DMAs and dequantizes only one 128x128 weight tile in VMEM, applies the exact
+FP32 block scale, converts the tile to BF16, and accumulates the MXU result in FP32.
+
+The optimized HLO has exactly one TPU custom call, an FP8 `2048x6144` operand, a bounded
+`f32[48,128]` aligned scale table, no complete BF16/F32 weight matrix, and 69,632 bytes of scoped
+VMEM. Compile time is `0.538 s`. The protected output is elementwise exact against complete JAX
+dequantization plus FP32-accumulating dot (`max/p99/mean abs = 0`). After 200 warmups, 1,000
+profiler-free samples are:
+
+| p50 | p90 | p95 | p99 | mean |
+|---:|---:|---:|---:|---:|
+| 0.520605 | 0.530900 | 0.534043 | 0.544112 | 0.521162 ms |
+
+Peak process HBM is `315,956,736` bytes. DB integrity, evidence hashes, approved archive/SUCCESS,
+and eight-host pre/post cleanup pass. This is standalone blocking host-wall latency for one kernel,
+not a complete expert, layer, decoder, or token-rate result. The next gate fuses up/gate, activation,
+down, and local combine before replacing the exact fallback in the real-layer harness.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

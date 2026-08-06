@@ -138,11 +138,16 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   fuses 78 padded-u32 results into 43 singles, 16 pairs, and one triple, saving 18 physical
   launches. The contract now pins both 294 physical instructions and 312 logical components plus
   exact result shapes, so neither tuple fusion nor missing work is obscured.
-- A first independent Pallas FP8 matmul now tile-dequantizes raw E4M3FN U8 plus FP32 128x128 scales
-  only in VMEM, performs BF16 MXU work with FP32 accumulation, and never creates a full decoded
-  weight overlay. Pallas-interpreter reference and odd-tail tests pass. It is not yet a TPU result;
-  the next action is the production-shaped v4 compile/correctness/HLO/microbenchmark gate before
-  replacing the reference layer path.
+- Protected DB 422 / `greenfield_fp8_matmul_20260806T015232890679994Z` proves the first independent
+  Pallas raw-FP8 kernel on v4 at `df44475`. Production shape is `M8xK6144 @ N2048xK6144`; U8 is
+  bitcast E4M3FN, only 128x128 weight tiles are dequantized in VMEM, BF16 feeds the MXU, and FP32
+  accumulates. It is elementwise exact against full JAX dequant+dot for the protected input. One
+  compact TPU custom call compiles in 0.538 s, contains no full BF16/F32 weight overlay, uses 69,632
+  scoped VMEM bytes, and has profiler-free p50/p90/p95/p99
+  `0.520605/0.530900/0.534043/0.544112 ms` over 1,000 samples after 200 warmups. Peak process HBM
+  is 315,956,736 bytes. DB/archive/hashes and 8/8 pre/post census pass. This is standalone kernel
+  wall, not layer latency or tok/s. Three preceding Mosaic-layout diagnostics failed closed before
+  timing, were archived, and each ended 8/8 clean.
 
 ## Protected evidence
 

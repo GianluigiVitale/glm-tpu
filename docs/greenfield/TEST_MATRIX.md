@@ -33,7 +33,7 @@
 | Gate C overall | MoE DB 417/418 plus dense/full-DSA/IndexShare DB 421 match the documented device arithmetic contract; no decoder/tok-s claim | Pass under documented device-score contract |
 | Gate D runtime artifact | Complete 32-file / 834,178,632,448-byte PP8 runtime derivative; exact DB420 identity and 26,068,042,432 weight bytes/chip | Pass (layout/load mechanism) |
 | Gate D reference-body diagnostic | Real 78-layer 2K load and compile; 25.46 GiB/chip; 219AG/294AR/16CP; 312 logical AR results; 2.7M bundles/580 overlays; staged execution projected 25–30 minutes/body | Evidence-rejected; reference graph cannot be the production engine |
-| Pallas FP8 block matmul | Raw-U8 bitcast, 128x128 VMEM tile dequant, BF16 MXU/FP32 accumulation, exact interpreter reference and odd-tail cases | Pass on Pallas interpreter; v4 metal gate pending |
+| Pallas FP8 block matmul | DB 422: production M8/K6144/N2048, raw-U8/128x128 VMEM dequant, BF16 MXU/FP32 accumulation, exact fallback, one custom call/no overlay, wall/HBM/DB/archive/cleanup | Pass on TPU v4 |
 | Gate D implementation | All-78-layer schedule/state; DB420-exact runtime loader; fused raw-FP8 fallback layer; one-step all-stage map; exact forced-CPU state/local HLO | In progress; hot path replacement required |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
