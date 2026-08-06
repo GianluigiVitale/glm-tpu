@@ -174,9 +174,19 @@ def fp8_block_matmul(
         # the MXU while accumulating in FP32.
         output_index = pl.program_id(0)
         scale_tile = scale_ref[...]
-        scale_value = scale_tile[
-            contraction_index % jnp.int32(8), output_index
-        ]
+        scale_rows = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 0)
+        scale_columns = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 1)
+        scale_mask = (
+            (scale_rows == contraction_index % jnp.int32(8))
+            & (scale_columns == output_index)
+        )
+        # Dynamic slicing a VMEM vector is not implemented by the v4 Mosaic
+        # lowering.  Select the one live scalar with register predicates and a
+        # vector reduction instead; the other 1,023 entries are zero.
+        scale_value = jnp.sum(
+            jnp.where(scale_mask, scale_tile, jnp.float32(0.0)),
+            dtype=jnp.float32,
+        )
         decoded_weight = (
             weight_ref[...].astype(config.accumulator_dtype)
             * scale_value.astype(config.accumulator_dtype)
