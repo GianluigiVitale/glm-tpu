@@ -203,6 +203,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iterations", type=int, default=10)
     parser.add_argument("--trace-root", type=Path)
     parser.add_argument("--trace-steps", type=int, default=0)
+    parser.add_argument(
+        "--feature-output-tile",
+        type=int,
+        choices=(128, 256),
+        default=128,
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -225,6 +231,10 @@ def main() -> int:
     ):
         raise ValueError(
             "feature runtime requires its source runtime root and manifest"
+        )
+    if args.runtime_kind == "reference" and args.feature_output_tile != 128:
+        raise ValueError(
+            "a non-default feature output tile requires a feature runtime"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
@@ -410,6 +420,7 @@ def main() -> int:
             pairs,
             devices=runtime_devices,
             sparse_moe_backend=sparse_moe_backend,
+            feature_output_tile=args.feature_output_tile,
             linear_backend=linear_backend,
         )
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-start")
@@ -539,6 +550,7 @@ def main() -> int:
             groups=groups,
             pairs=pairs,
             backend_contract=hlo_backend_contract,
+            feature_output_tile=decoder.feature_output_tile,
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -727,6 +739,7 @@ def main() -> int:
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
+            "feature_output_tile": decoder.feature_output_tile,
             "linear_backend": decoder.linear_backend,
             "topology_hash": live_topology.topology_hash,
             "trace": trace_record,

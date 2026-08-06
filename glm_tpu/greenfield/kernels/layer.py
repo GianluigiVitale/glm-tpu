@@ -7,6 +7,7 @@ from typing import Any, Literal, NamedTuple
 
 import jax.numpy as jnp
 
+from .pallas import Fp8BlockMatmulConfig
 from .reference.attention import MlaNumericalContract, StageLocalKvLayout
 from .reference.dsa import DsaNumericalContract
 from .reference.linear import residual_add
@@ -117,6 +118,7 @@ def stage_local_transformer_layer_fp8_mapped(
     rms_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     sparse_moe_backend: SparseMoeBackend = "reference",
+    pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
@@ -269,12 +271,7 @@ def stage_local_transformer_layer_fp8_mapped(
             post_attention_norm_weight,
             epsilon=rms_norm_epsilon,
         )
-        sparse_moe = (
-            stage_local_moe_fp8_mapped
-            if sparse_moe_backend == "reference"
-            else stage_local_moe_pallas_feature_mapped
-        )
-        update, route_indices, route_weights = sparse_moe(
+        moe_args = (
             normalized,
             moe.router_weight,
             moe.correction_bias,
@@ -291,10 +288,28 @@ def stage_local_transformer_layer_fp8_mapped(
             moe.shared_down_bits,
             moe.shared_down_scale,
             local_slot,
-            axis_name=axis_name,
-            contract=moe_contract,
-            axis_index_groups=axis_index_groups,
         )
+        if sparse_moe_backend == "reference":
+            update, route_indices, route_weights = stage_local_moe_fp8_mapped(
+                *moe_args,
+                axis_name=axis_name,
+                contract=moe_contract,
+                axis_index_groups=axis_index_groups,
+            )
+        else:
+            if pallas_moe_config is None:
+                raise ValueError(
+                    "feature-Pallas MoE requires an explicit tile config"
+                )
+            update, route_indices, route_weights = (
+                stage_local_moe_pallas_feature_mapped(
+                    *moe_args,
+                    axis_name=axis_name,
+                    contract=moe_contract,
+                    axis_index_groups=axis_index_groups,
+                    config=pallas_moe_config,
+                )
+            )
         output = residual_add(residual, update)
     return StageLocalLayerFp8Result(
         output,

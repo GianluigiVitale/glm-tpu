@@ -33,6 +33,24 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     hlo = "\n".join((selected, shared_up, shared_down) * 75)
     record = _validate_pallas_feature_decoder_calls(hlo, sparse_layers=75)
     assert record["passed"], record
+    assert record["feature_output_tile"] == 128
+
+    wide_hlo = hlo.replace(
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512",
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+    )
+    wide = _validate_pallas_feature_decoder_calls(
+        wide_hlo,
+        sparse_layers=75,
+        feature_output_tile=256,
+    )
+    assert wide["passed"], wide
+    assert wide["feature_output_tile"] == 256
+    wrong_fingerprint = _validate_pallas_feature_decoder_calls(
+        wide_hlo,
+        sparse_layers=75,
+    )
+    assert not wrong_fingerprint["passed"]
 
     rejected = _validate_pallas_feature_decoder_calls(
         hlo + "\noverlay = bf16[256,6144,512] parameter(0)",
@@ -188,6 +206,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             sparse_moe_backend="unknown",  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="non-default feature"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            feature_output_tile=256,
         )
     with pytest.raises(PlanValidationError, match="linear backend is unknown"):
         build_decoder_step_program(
