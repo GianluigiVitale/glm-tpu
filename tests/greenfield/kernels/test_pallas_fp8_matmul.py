@@ -127,8 +127,10 @@ def test_fp8_block_up_gate_interpret_matches_two_references(
 
 
 def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:
-    with pytest.raises(ValueError, match="one scale per Pallas weight tile"):
+    with pytest.raises(ValueError, match="one output scale block"):
         Fp8BlockMatmulConfig(output_tile=256)
+    with pytest.raises(ValueError, match="integral number"):
+        Fp8BlockMatmulConfig(contraction_tile=192)
     with pytest.raises(ValueError, match="accumulator must be FP32"):
         Fp8BlockMatmulConfig(accumulator_dtype=jnp.bfloat16)
 
