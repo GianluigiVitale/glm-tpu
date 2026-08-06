@@ -79,6 +79,29 @@ def _custom_call_result_name(line: str) -> str:
     return line.split(" = ", 1)[0].strip()
 
 
+def _is_bounded_compact_input_scatter(
+    line: str,
+    *,
+    index_result: str,
+    route_count: int,
+    row_tile: int,
+    width: int,
+    kernel_name: str,
+) -> bool:
+    """Recognize only one selected-down BF16 route-compaction scatter."""
+
+    return (
+        f" = bf16[{route_count},{row_tile},{width}]" in line
+        and " scatter(" in line
+        and f", {index_result}," in line
+        and "update_window_dims={1}" in line
+        and "inserted_window_dims={0,1}" in line
+        and "scatter_dims_to_operand_dims={0,1}" in line
+        and "index_vector_dim=1" in line
+        and f'metadata={{op_name="jit({kernel_name})/scatter"' in line
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-code-hash", required=True)
@@ -348,7 +371,7 @@ def main() -> int:
             if args.kernel == "selected_swiglu_down"
             else "fp8_selected_up_gate"
         )
-        bounded_route_restore_calls = [
+        bitpacked_index_calls = [
             line
             for line in custom_calls
             if _is_bounded_route_restore_index_call(
@@ -357,6 +380,42 @@ def main() -> int:
                 kernel_name=route_restore_kernel_name,
             )
         ]
+        hlo_lines = [line.strip() for line in hlo.splitlines()]
+        bounded_compact_input_scatter_calls = [
+            call
+            for call in bitpacked_index_calls
+            if any(
+                _is_bounded_compact_input_scatter(
+                    line,
+                    index_result=_custom_call_result_name(call),
+                    route_count=rows,
+                    row_tile=8,
+                    width=output,
+                    kernel_name="fp8_selected_swiglu_down",
+                )
+                for line in hlo_lines
+            )
+        ]
+        bounded_compact_input_scatters = [
+            line
+            for line in hlo_lines
+            if any(
+                _is_bounded_compact_input_scatter(
+                    line,
+                    index_result=_custom_call_result_name(call),
+                    route_count=rows,
+                    row_tile=8,
+                    width=output,
+                    kernel_name="fp8_selected_swiglu_down",
+                )
+                for call in bounded_compact_input_scatter_calls
+            )
+        ]
+        bounded_route_restore_calls = [
+            call
+            for call in bitpacked_index_calls
+            if call not in bounded_compact_input_scatter_calls
+        ]
         route_restore_width = (
             contraction
             if args.kernel == "selected_swiglu_down"
@@ -364,7 +423,7 @@ def main() -> int:
         )
         bounded_route_restore_gathers = [
             line.strip()
-            for line in hlo.splitlines()
+            for line in hlo_lines
             if " gather(" in line
             and f" = bf16[{rows},{route_restore_width}]" in line
             and "collapsed_slice_dims={0,1}" in line
@@ -375,8 +434,57 @@ def main() -> int:
                 for call in bounded_route_restore_calls
             )
         ]
+        selected_down_scale_index_calls = [
+            line
+            for line in bounded_metadata_calls
+            if " = s32[1024]" in line
+            and (
+                'metadata={op_name="jit(fp8_selected_swiglu_down)/'
+                'jit(_take)/gather"'
+            ) in line
+        ]
+        selected_down_restore_index_calls = [
+            line
+            for line in bounded_metadata_calls
+            if " = s32[1024]" in line
+            and (
+                'metadata={op_name="jit(fp8_selected_swiglu_down)/gather"'
+            ) in line
+        ]
+        selected_down_scale_gathers = [
+            line
+            for line in hlo_lines
+            if f" = f32[{rows},{contraction // 128},{output // 128}]" in line
+            and " gather(" in line
+            and "offset_dims={1,2}" in line
+            and "collapsed_slice_dims={0}" in line
+            and "start_index_map={0}" in line
+            and (
+                f"slice_sizes={{1,{contraction // 128},{output // 128}}}"
+                in line
+            )
+            and (
+                'metadata={op_name="jit(fp8_selected_swiglu_down)/'
+                'jit(_take)/gather"'
+            ) in line
+        ]
+        selected_down_restore_gathers = [
+            line
+            for line in hlo_lines
+            if f" = bf16[{rows},8,{contraction}]" in line
+            and " gather(" in line
+            and "offset_dims={1,2}" in line
+            and "collapsed_slice_dims={0}" in line
+            and "start_index_map={0}" in line
+            and f"slice_sizes={{1,8,{contraction}}}" in line
+            and (
+                'metadata={op_name="jit(fp8_selected_swiglu_down)/gather"'
+            ) in line
+        ]
         allowed_auxiliary_calls = (
-            bounded_metadata_calls + bounded_route_restore_calls
+            bounded_metadata_calls
+            + bounded_compact_input_scatter_calls
+            + bounded_route_restore_calls
         )
         unexpected_auxiliary_calls = [
             line
@@ -422,6 +530,21 @@ def main() -> int:
             ),
             "bounded_route_restore_custom_calls": bounded_route_restore_calls,
             "bounded_route_restore_gathers": bounded_route_restore_gathers,
+            "bounded_compact_input_scatter_custom_call_count": len(
+                bounded_compact_input_scatter_calls
+            ),
+            "bounded_compact_input_scatter_custom_calls": (
+                bounded_compact_input_scatter_calls
+            ),
+            "bounded_compact_input_scatters": bounded_compact_input_scatters,
+            "selected_down_scale_index_custom_calls": (
+                selected_down_scale_index_calls
+            ),
+            "selected_down_scale_gathers": selected_down_scale_gathers,
+            "selected_down_restore_index_custom_calls": (
+                selected_down_restore_index_calls
+            ),
+            "selected_down_restore_gathers": selected_down_restore_gathers,
             "unexpected_auxiliary_custom_calls": unexpected_auxiliary_calls,
             "forbidden_full_weight_overlays": forbidden_full_overlays,
             "passed": (
@@ -432,7 +555,25 @@ def main() -> int:
                     not selected_kernel
                     or (
                         2 <= len(allowed_auxiliary_calls) <= 8
-                        and len(bounded_route_restore_calls) <= 1
+                        and (
+                            (
+                                len(bounded_metadata_calls) == 2
+                                and len(selected_down_scale_index_calls) == 1
+                                and len(selected_down_scale_gathers) == 1
+                                and len(selected_down_restore_index_calls) == 1
+                                and len(selected_down_restore_gathers) == 1
+                                and len(
+                                    bounded_compact_input_scatter_calls
+                                ) == 2
+                                and len(bounded_compact_input_scatters) == 2
+                                and not bounded_route_restore_calls
+                            )
+                            if args.kernel == "selected_swiglu_down"
+                            else (
+                                len(bounded_route_restore_calls) <= 1
+                                and not bounded_compact_input_scatter_calls
+                            )
+                        )
                         and len(bounded_route_restore_gathers)
                         == len(bounded_route_restore_calls)
                         and (
