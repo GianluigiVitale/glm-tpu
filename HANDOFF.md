@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 16:51 UTC
+**Updated:** 2026-08-06 17:10 UTC
 
 ## Authority and isolation
 
@@ -665,6 +665,25 @@ Candidate/baseline HLO SHAs are `853ec297...b638` / `36fe8fb4...314d`; summary S
 `6c98c90a...e6ab` / `7a1fcd5d...1762`. The structural elimination is real but performance-neutral;
 reject promotion, retain default-off, and do not spend full-body compiles on it. The next measured
 body bottleneck is attention output (`4.385456 ms/core`, approximately `35.084 ms` serialized).
+
+## Rejected wide attention-output tile
+
+Protected DB 470 attributes `4.385456 ms/core` (`35.084 ms` serialized) to 78 raw-FP8
+attention-output projections, exact production shape `M8xK4096xN6144`. Commit `98b32a4` adds a
+bounded standalone tile-256 challenger with distinct per-128-row FP8 scale application, an exact
+`_ot256` fingerprint, odd/tail interpreter tests, and a protected harness; tile 128 remains the
+runtime default. Local kernel/HLO coverage passes 31/31.
+
+Same-commit protected baseline DB 474 /
+`greenfield_fp8_attention_output_20260806T170743299244891Z` and candidate DB 475 /
+`greenfield_fp8_attention_output_ot256_20260806T170834500879132Z` are both elementwise exact,
+contain one direct-U8 custom call and no decoded weight overlay, have approved archives/remote
+`SUCCESS`, and end with 8/8 cleanup. Candidate versus baseline p50 is `0.636600/0.6358845 ms`
+(`+0.1125%`); p99 is `0.660573/0.663005 ms`. Candidate/baseline HLO SHAs are
+`6518417e...2bad` / `19ec31f9...4718`; summary SHAs are `8adf20ed...2f53` /
+`4d2457b2...7631`. Reject decoder integration: doubling the output tile is neutral. The next
+structural candidate is one Pallas call for structured `kv_b` value projection plus attention
+output projection, keeping the intermediate value states in VMEM.
 
 ## Protected feature-body attribution
 
