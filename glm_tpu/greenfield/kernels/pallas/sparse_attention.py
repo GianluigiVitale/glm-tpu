@@ -429,6 +429,10 @@ def _fused_selected_kv_attention_pallas(
                 cache_tile_ref[...],
                 jnp.zeros((), cache_tile_ref.dtype),
             )
+            # Exactly one lane is nonzero per live group, so this tiled VMEM
+            # reduction is an exact compaction to the original 128 selected
+            # rows and restores one-contracting-dimension MXU operations.
+            selected_cache = jnp.sum(cache_tile, axis=1)
             query_packed = jnp.concatenate(
                 (
                     query_nope_ref[...],
@@ -448,43 +452,32 @@ def _fused_selected_kv_attention_pallas(
             )
             scores = lax.dot_general(
                 query_packed[0],
-                cache_tile,
-                dimension_numbers=(((1,), (2,)), ((), ())),
+                selected_cache,
+                dimension_numbers=(((1,), (1,)), ((), ())),
                 precision=precision,
                 preferred_element_type=jnp.float32,
             ) * jnp.float32(contract.softmax_scale)
             scores = jnp.where(
                 lax.broadcast_in_dim(
-                    selected_and_live,
-                    (heads, segment_block, dma_rows),
-                    (1, 2),
+                    group_slots < valid_count,
+                    (heads, segment_block),
+                    (1,),
                 ),
                 scores,
                 _NEGATIVE_INFINITY,
             )
-            block_maximum = jnp.max(
-                jnp.max(scores, axis=2), axis=1, keepdims=True
-            )
+            block_maximum = jnp.max(scores, axis=1, keepdims=True)
             maximum = jnp.maximum(maximum_ref[...], block_maximum)
             correction = jnp.exp(maximum_ref[...] - maximum)
-            probabilities = jnp.exp(
-                scores
-                - lax.broadcast_in_dim(
-                    maximum,
-                    (heads, segment_block, dma_rows),
-                    (0, 1),
-                )
-            )
+            probabilities = jnp.exp(scores - maximum)
             denominator = (
                 denominator_ref[...] * correction
-                + jnp.sum(
-                    jnp.sum(probabilities, axis=2), axis=1, keepdims=True
-                )
+                + jnp.sum(probabilities, axis=1, keepdims=True)
             )
             partial = lax.dot_general(
                 probabilities.astype(cache_tile.dtype),
-                cache_tile[:, :, :latent],
-                dimension_numbers=(((1, 2), (0, 1)), ((), ())),
+                selected_cache[:, :latent],
+                dimension_numbers=(((1,), (0,)), ((), ())),
                 precision=precision,
                 preferred_element_type=jnp.float32,
             )
@@ -565,7 +558,6 @@ def _fused_selected_kv_attention_pallas(
             flops=(
                 heads
                 * physical_segment_width
-                * dma_rows
                 * (2 * cache_width + 2 * latent + 8)
             ),
             bytes_accessed=(
@@ -578,7 +570,7 @@ def _fused_selected_kv_attention_pallas(
                 * query_nope_absorbed.dtype.itemsize
                 + heads * latent * query_nope_absorbed.dtype.itemsize
             ),
-            transcendentals=heads * physical_segment_width * dma_rows,
+            transcendentals=heads * physical_segment_width,
         ),
     )
     output, lse_lanes = call(
