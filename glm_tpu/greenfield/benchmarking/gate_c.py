@@ -1093,6 +1093,7 @@ def validate_gate_c_hlo(
         )
     dsa_pallas_kernel_counts: dict[str, int] = {}
     dsa_forbidden_overlays: list[str] = []
+    dsa_forbidden_formatted_overlays: list[str] = []
     if case == "dsa" and dsa_linear_backend == "pallas":
         expected_dsa_kernels = {
             "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": 1,
@@ -1117,6 +1118,14 @@ def validate_gate_c_hlo(
             )
             if shape in optimized_hlo
         ]
+        dsa_forbidden_formatted_overlays = [
+            shape
+            for shape in (
+                "f8e4m3fn[1024,2048]",
+                "f8e4m3fn[128,6144]",
+            )
+            if shape in optimized_hlo
+        ]
         if dsa_pallas_kernel_counts != expected_dsa_kernels:
             violations.append(
                 "Gate C raw-FP8 DSA kernel counts drifted: "
@@ -1131,6 +1140,11 @@ def validate_gate_c_hlo(
             violations.append(
                 "Gate C raw-FP8 DSA retained decoded overlays: "
                 f"{dsa_forbidden_overlays}"
+            )
+        if dsa_forbidden_formatted_overlays:
+            violations.append(
+                "Gate C raw-FP8 DSA performs whole-table FP8 formatting: "
+                f"{dsa_forbidden_formatted_overlays}"
             )
     if module.num_partitions not in (None, stage_size):
         violations.append(
@@ -1157,6 +1171,9 @@ def validate_gate_c_hlo(
         "dsa_linear_backend": dsa_linear_backend,
         "dsa_pallas_kernel_counts": dsa_pallas_kernel_counts,
         "dsa_forbidden_overlays": dsa_forbidden_overlays,
+        "dsa_forbidden_formatted_overlays": (
+            dsa_forbidden_formatted_overlays
+        ),
         "passed": not violations,
         "violations": violations,
     }

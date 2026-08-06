@@ -41,6 +41,13 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     assert not rejected["passed"]
     assert rejected["forbidden_decoded_expert_overlays"]
 
+    formatted = _validate_pallas_feature_decoder_calls(
+        hlo + "\nformatted = f8e4m3fn[512,6144] parameter(0)",
+        sparse_layers=75,
+    )
+    assert not formatted["passed"]
+    assert formatted["forbidden_formatted_shared_overlays"]
+
 
 def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     from glm_tpu.greenfield.runtime.decoder import (
@@ -87,6 +94,15 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     )
     assert not rejected["passed"]
     assert rejected["forbidden_decoded_weight_overlays"]
+
+    formatted = _validate_pallas_stage_linear_decoder_calls(
+        hlo + "\nformatted = f8e4m3fn[6144,4096] parameter(0)",
+        layers=78,
+        dense_layers=3,
+        full_indexer_layers=21,
+    )
+    assert not formatted["passed"]
+    assert formatted["forbidden_formatted_weight_overlays"]
 
 
 def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:

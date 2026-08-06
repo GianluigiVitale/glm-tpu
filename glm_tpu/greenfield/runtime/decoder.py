@@ -162,6 +162,24 @@ def _validate_pallas_feature_decoder_calls(
             "decoder feature-Pallas selected kernels lack exact raw-U8 tables"
         )
 
+    shared_raw_shapes = {
+        kernel_names[1]: ("u8[512,6144]",),
+        kernel_names[2]: ("u8[6144,512]",),
+    }
+    malformed_shared = [
+        name
+        for name, shapes in shared_raw_shapes.items()
+        if any(
+            any(shape not in line for shape in shapes)
+            for line in calls_by_kernel[name]
+        )
+    ]
+    if malformed_shared:
+        violations.append(
+            "decoder feature-Pallas shared kernels lack raw-U8 operands: "
+            f"{malformed_shared}"
+        )
+
     forbidden_shapes = (
         "bf16[256,6144,512]",
         "f32[256,6144,512]",
@@ -176,9 +194,23 @@ def _validate_pallas_feature_decoder_calls(
             "decoder contains complete decoded routed-expert overlays: "
             f"{forbidden_overlays}"
         )
+    forbidden_formatted_overlays = [
+        shape
+        for shape in (
+            "f8e4m3fn[512,6144]",
+            "f8e4m3fn[6144,512]",
+        )
+        if shape in optimized_hlo
+    ]
+    if forbidden_formatted_overlays:
+        violations.append(
+            "decoder contains whole-table shared FP8 formatting: "
+            f"{forbidden_formatted_overlays}"
+        )
     return {
         "expected_kernel_counts": expected_kernel_counts,
         "forbidden_decoded_expert_overlays": forbidden_overlays,
+        "forbidden_formatted_shared_overlays": forbidden_formatted_overlays,
         "kernel_counts": kernel_counts,
         "passed": not violations,
         "violations": violations,
@@ -234,6 +266,20 @@ def _validate_pallas_stage_linear_decoder_calls(
     forbidden_overlays = [
         shape for shape in forbidden_shapes if shape in optimized_hlo
     ]
+    forbidden_formatted_shapes = tuple(
+        f"f8e4m3fn[{shape}]"
+        for shape in (
+            "2048,6144",
+            "4096,2048",
+            "6144,4096",
+            "7168,512",
+            "1024,2048",
+            "128,6144",
+        )
+    )
+    forbidden_formatted_overlays = [
+        shape for shape in forbidden_formatted_shapes if shape in optimized_hlo
+    ]
     violations = []
     if kernel_counts != expected_kernel_counts:
         violations.append(
@@ -245,9 +291,15 @@ def _validate_pallas_stage_linear_decoder_calls(
             "decoder retains decoded attention/dense weight overlays: "
             f"{forbidden_overlays}"
         )
+    if forbidden_formatted_overlays:
+        violations.append(
+            "decoder performs whole-table FP8 input formatting outside "
+            f"Pallas: {forbidden_formatted_overlays}"
+        )
     return {
         "expected_kernel_counts": expected_kernel_counts,
         "forbidden_decoded_weight_overlays": forbidden_overlays,
+        "forbidden_formatted_weight_overlays": forbidden_formatted_overlays,
         "kernel_counts": kernel_counts,
         "passed": not violations,
         "violations": violations,

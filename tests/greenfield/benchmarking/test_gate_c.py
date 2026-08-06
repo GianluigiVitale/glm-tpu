@@ -519,6 +519,14 @@ ENTRY main {
         "greenfield_fp8_block_matmul_f32_m640_k6144_n128": 1,
     }
 
+    formatted = validate_gate_c_hlo(
+        hlo + "\nformatted = f8e4m3fn[1024,2048] parameter(3)",
+        case="dsa",
+        dsa_linear_backend="pallas",
+    )
+    assert not formatted["passed"]
+    assert formatted["dsa_forbidden_formatted_overlays"]
+
 
 def test_gate_c_index_hlo_accepts_exact_tpu_lse_validity_rewrite() -> None:
     from glm_tpu.greenfield.benchmarking import validate_gate_c_hlo

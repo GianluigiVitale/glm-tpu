@@ -195,6 +195,15 @@ def main() -> int:
             )
             for name, hlo in hlo_by_name.items()
         }
+        kernel_calls = {
+            name: [
+                line.strip()
+                for line in hlo.splitlines()
+                if expected_names[name] in line
+                and 'custom_call_target="tpu_custom_call"' in line
+            ]
+            for name, hlo in hlo_by_name.items()
+        }
         forbidden_overlays = {
             name: [
                 shape
@@ -210,8 +219,25 @@ def main() -> int:
             violations.append(
                 f"structured kv_b decoded overlay exists: {forbidden_overlays}"
             )
-        if "u8[7168,512]" not in q_hlo or "u8[7168,512]" not in value_hlo:
-            violations.append("structured kv_b calls do not consume raw U8 weights")
+        malformed_raw_calls = [
+            name
+            for name, calls in kernel_calls.items()
+            if len(calls) != 1 or "u8[7168,512]" not in calls[0]
+        ]
+        forbidden_formatted_overlays = {
+            name: "f8e4m3fn[7168,512]" in hlo
+            for name, hlo in hlo_by_name.items()
+        }
+        if malformed_raw_calls:
+            violations.append(
+                "structured kv_b calls do not consume raw U8 weights: "
+                f"{malformed_raw_calls}"
+            )
+        if any(forbidden_formatted_overlays.values()):
+            violations.append(
+                "structured kv_b performs whole-table FP8 formatting: "
+                f"{forbidden_formatted_overlays}"
+            )
 
         actual_q = q_compiled(q, weight_bits, scale)
         actual_value = value_compiled(attended, weight_bits, scale)
@@ -305,6 +331,9 @@ def main() -> int:
                     "expected_kernel_names": expected_names,
                     "kernel_counts": kernel_counts,
                     "forbidden_decoded_weight_overlays": forbidden_overlays,
+                    "forbidden_formatted_weight_overlays": (
+                        forbidden_formatted_overlays
+                    ),
                     "passed": not violations,
                     "violations": violations,
                 },

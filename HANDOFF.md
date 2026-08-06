@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 13:51 UTC
+**Updated:** 2026-08-06 15:20 UTC
 
 ## Authority and isolation
 
@@ -394,15 +394,15 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Finish Section 7.2 item 9. DB 451 proves the production fused RMSNorm/raw-FP8 primitive and DB
-   452 proves the first 315-call body integration, reducing protected 78-layer wall by `91.71%`.
-   DB454/455 eliminate and integrate structured kv_b; only DSA wq_b/wk reference dequant remains.
-   Remove that path without decoded weight overlays. Preserve exact reference/CPU/TPU/tail/
-   dtype/HLO/microbenchmark/fallback evidence. Section 7.2 item 8 is closed by DB 448--450; retain
-   collective-permute transport and keep Pallas remote copy default-off.
-2. Integrate each remaining accepted path, rerun its exact oracle gate, then repeat the protected
-   78-layer body. Use the fresh trace to rank only the new critical path; do not tune compact stage
-   permutes or local layer collectives without measured evidence.
+1. Finish and protect the trace-directed whole-table input-formatting removal now in the dirty
+   worktree: common block matmul, fused RMSNorm linear, shared up/gate, structured kv_b, and DSA
+   calls must consume complete `u8` tables and reinterpret only resident VMEM tiles. Focused CPU/
+   interpreter tests pass; commit, run a protected standalone TPU exact/HLO/wall proof, rerun Gate
+   C, then repeat the protected body and fresh trace. Reject unless the exact HLO has no complete
+   `f8e4m3fn` weight operand/formatting fusion and wall improves.
+2. The trace's next compute target is the feature-MoE call (`118.26 ms` serial estimate), followed
+   by attention-output (`35.10 ms`); do not optimize either until the formatting A/B establishes
+   the new baseline. Compact local collectives and stage permutes are not latency targets.
 3. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
    Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
    profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
@@ -567,6 +567,34 @@ This is still body-only, not complete token latency/tok/s. The immediately prece
 run produced the same ~1.064-second wall but was rejected because the outer harness duplicated the
 old kernel-count dictionary; it has no DB claim and ended clean. DSA wq_b/wk is now the sole
 remaining whole-matrix FP8 dequant path in item 9.
+
+## Protected raw-FP8 DSA and 293 ms body
+
+Commit `652b30c` adds an FP32-output raw-FP8 block matmul and binds DSA wq_b/wk without complete
+BF16/F32 decoded weights. Standalone protected DB 456/457 prove production wq_b/wk p50
+`0.236741/0.216940 ms`, max error below `1.67e-6`, exactly one named call each, no decoded overlay,
+DB/archive/remote `SUCCESS`, and 8/8 cleanup. Commit `8ef9304` then preserves those DSA tensors as
+U8 in the bounded loader and integrates them into Gate C. Protected DB 458 passes dense, exact
+device-score DSA set/order, IndexShare state/cache integrity, strict two-call/local-only HLO, fresh
+trace, DB/archive, and cleanup. Loader dequants fall from 44 to 36 with zero host dequant/reshard.
+
+The first body attempt at `8ef9304` failed closed before timing because its harness expected 78
+DSA projection pairs. The exact architecture has only 21 full IndexShare producer layers; the
+other 57 reuse compact state. Commit `b9f9ed8` binds that count. Protected DB 459 then passes at
+p50/p99 `293.232988/293.715581 ms`, a `3.627x`/`72.43%` improvement over DB 455 and
+`200.537x`/`99.501%` over DB 442. Compile max is `176.973 s`, peak HBM `26,137,713,664` bytes/chip,
+HLO `4f59da5a...e90` contains exactly 738 raw-FP8 calls and `219AG/294 physical AR/16CP`, no
+decoded weight overlay or full-pod layer group. DB/archive/remote `SUCCESS` and 8/8 cleanup pass.
+This remains transformer body only; `3.410 body steps/s` is not answer speed or a tok/s claim.
+
+Fresh trace DB 460 reproduces `293.011417 ms` at the same code/HLO with eight XPlanes, 64 cores,
+and two steps/core. Device mean/max step is `281.534/292.641 ms`. Actual local all-reduce work is
+only `0.207 ms` per average core; the `234.422 ms` collective category is stage backpressure at
+the two compact permute chains. Pallas custom calls total `26.671 ms/core` (`213.367 ms` serial
+stage estimate); feature MoE alone is `14.782 ms/core` (`118.259 ms` serial). Crucially, complete
+U8-to-F8 input formatting fusions consume `5.745 ms/core`, approximately `45.959 ms` serialized.
+XPlane/summary SHAs are `7f1082ba...aca` / `5d055bd3...a08`; DB/archive/remote `SUCCESS` and 8/8
+cleanup pass. This measurement, not guesswork, selects whole-table FP8 formatting as exact next.
 
 ## Protected feature-body attribution
 

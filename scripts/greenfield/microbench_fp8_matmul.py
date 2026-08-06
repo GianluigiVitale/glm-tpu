@@ -559,6 +559,15 @@ def main() -> int:
             )
             if shape in hlo
         ]
+        raw_weight_operand = f"u8[{output},{contraction}]"
+        formatted_weight_operand = f"f8e4m3fn[{output},{contraction}]"
+        required_raw_weight_count = 2 if args.kernel == "up_gate" else 1
+        raw_weight_operand_count = (
+            kernel_calls[0].count(raw_weight_operand) if kernel_calls else 0
+        )
+        forbidden_formatted_weight = (
+            formatted_weight_operand in hlo and not selected_kernel
+        )
         hlo_contract = {
             "custom_call_count": len(custom_calls),
             "kernel_custom_call_count": len(kernel_calls),
@@ -593,10 +602,24 @@ def main() -> int:
             "selected_down_restore_gathers": selected_down_restore_gathers,
             "unexpected_auxiliary_custom_calls": unexpected_auxiliary_calls,
             "forbidden_full_weight_overlays": forbidden_full_overlays,
+            "raw_weight_operand": raw_weight_operand,
+            "raw_weight_operand_count": raw_weight_operand_count,
+            "required_raw_weight_operand_count": required_raw_weight_count,
+            "forbidden_formatted_weight_operand": (
+                formatted_weight_operand if forbidden_formatted_weight else None
+            ),
             "passed": (
                 len(kernel_calls) == 1
                 and not forbidden_full_overlays
                 and not unexpected_auxiliary_calls
+                and (
+                    selected_kernel
+                    or (
+                        raw_weight_operand_count
+                        >= required_raw_weight_count
+                        and not forbidden_formatted_weight
+                    )
+                )
                 and (
                     not selected_kernel
                     or (

@@ -252,9 +252,6 @@ def _fp8_block_matmul_impl(
             ),
         )
 
-    # Same-width bitcast: no checkpoint bytes are decoded on the host and no
-    # BF16/F32 matrix is created outside the Pallas call.
-    weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
     scale_table = _aligned_scale_table(
@@ -283,8 +280,14 @@ def _fp8_block_matmul_impl(
         scale_value = _scale_value(
             scale_ref[...], contraction_index, output_index
         )
+        # Keep the complete checkpoint operand raw U8 through the custom-call
+        # boundary. Reinterpret only the resident VMEM tile: an outer bitcast
+        # makes TPU XLA execute a whole-table formatting fusion.
+        weight_tile = lax.bitcast_convert_type(
+            weight_ref[...], jnp.float8_e4m3fn
+        )
         decoded_weight = (
-            weight_ref[...].astype(config.accumulator_dtype)
+            weight_tile.astype(config.accumulator_dtype)
             * scale_value.astype(config.accumulator_dtype)
         ).astype(jnp.bfloat16)
         update = lax.dot_general(
@@ -363,7 +366,7 @@ def _fp8_block_matmul_impl(
             transcendentals=0,
         ),
     )
-    return call(lhs, weight_fp8, scale_table)[:rows, :output]
+    return call(lhs, weight_bits, scale_table)[:rows, :output]
 
 
 def fp8_block_matmul(
@@ -523,8 +526,6 @@ def fp8_structured_kv_b_q_absorb(
         heads * contraction_tiles * output_tiles, 1, 128
     )
     selected_scale = jnp.repeat(selected_scale, 8, axis=1)
-    weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
-
     def kernel(
         query_ref: Any,
         weight_ref: Any,
@@ -538,8 +539,11 @@ def fp8_structured_kv_b_q_absorb(
         def initialize_accumulator() -> None:
             accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
 
+        weight_tile = lax.bitcast_convert_type(
+            weight_ref[...], jnp.float8_e4m3fn
+        )
         decoded_weight = (
-            weight_ref[...].astype(jnp.float32)
+            weight_tile.astype(jnp.float32)
             * scale_ref[0, 0, 0].astype(jnp.float32)
         ).astype(jnp.bfloat16)
         accumulator_ref[...] += lax.dot_general(
@@ -612,7 +616,7 @@ def fp8_structured_kv_b_q_absorb(
             transcendentals=0,
         ),
     )
-    result = call(aligned, weight_fp8, selected_scale)
+    result = call(aligned, weight_bits, selected_scale)
     result = result.reshape(heads, output_tiles, 8, 128)
     result = jnp.transpose(result, (2, 0, 1, 3)).reshape(8, heads, latent)
     return result[:1]
@@ -664,8 +668,6 @@ def fp8_structured_kv_b_value(
         heads * output_blocks * contraction_tiles, 1, 128
     )
     selected_scale = jnp.repeat(selected_scale, 8, axis=1)
-    weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
-
     def kernel(
         latent_ref: Any,
         weight_ref: Any,
@@ -679,8 +681,11 @@ def fp8_structured_kv_b_value(
         def initialize_accumulator() -> None:
             accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
 
+        weight_tile = lax.bitcast_convert_type(
+            weight_ref[...], jnp.float8_e4m3fn
+        )
         decoded_weight = (
-            weight_ref[...].astype(jnp.float32)
+            weight_tile.astype(jnp.float32)
             * scale_ref[0, 0, 0].astype(jnp.float32)
         ).astype(jnp.bfloat16)
         accumulator_ref[...] += lax.dot_general(
@@ -754,7 +759,7 @@ def fp8_structured_kv_b_value(
             transcendentals=0,
         ),
     )
-    result = call(head_rows, weight_fp8, selected_scale)
+    result = call(head_rows, weight_bits, selected_scale)
     result = result.reshape(heads, output_blocks, 8, 128)[:, :, 0, :]
     aligned = jnp.concatenate((result[:, 0], result[:, 1]), axis=-1)
     unaligned = jnp.concatenate(
@@ -831,7 +836,6 @@ def fp8_rmsnorm_block_matmul(
             (0, padded_contraction - contraction),
         ),
     )
-    weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
     scale_table = _aligned_scale_table(
@@ -866,8 +870,11 @@ def fp8_rmsnorm_block_matmul(
         scale_value = _scale_value(
             scale_ref[...], contraction_index, output_index
         )
+        weight_tile = lax.bitcast_convert_type(
+            weight_ref[...], jnp.float8_e4m3fn
+        )
         decoded_weight = (
-            weight_ref[...].astype(config.accumulator_dtype)
+            weight_tile.astype(config.accumulator_dtype)
             * scale_value.astype(config.accumulator_dtype)
         ).astype(jnp.bfloat16)
         accumulator_ref[...] += lax.dot_general(
@@ -959,7 +966,7 @@ def fp8_rmsnorm_block_matmul(
         hidden,
         norm_weight,
         inverse_rms,
-        weight_fp8,
+        weight_bits,
         scale_table,
     )[:rows, :output]
 
@@ -1010,12 +1017,8 @@ def fp8_block_up_gate(
             ),
         )
 
-    gate_fp8 = lax.bitcast_convert_type(
-        pad_weight(gate_bits), jnp.float8_e4m3fn
-    )
-    up_fp8 = lax.bitcast_convert_type(
-        pad_weight(up_bits), jnp.float8_e4m3fn
-    )
+    gate_bits = pad_weight(gate_bits)
+    up_bits = pad_weight(up_bits)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
     gate_scale_table = _aligned_scale_table(
@@ -1054,11 +1057,17 @@ def fp8_block_up_gate(
         up_value = _scale_value(
             up_scale_ref[...], contraction_index, output_index
         )
+        gate_tile = lax.bitcast_convert_type(
+            gate_ref[...], jnp.float8_e4m3fn
+        )
+        up_tile = lax.bitcast_convert_type(
+            up_ref[...], jnp.float8_e4m3fn
+        )
         decoded_gate = (
-            gate_ref[...].astype(config.accumulator_dtype) * gate_value
+            gate_tile.astype(config.accumulator_dtype) * gate_value
         ).astype(jnp.bfloat16)
         decoded_up = (
-            up_ref[...].astype(config.accumulator_dtype) * up_value
+            up_tile.astype(config.accumulator_dtype) * up_value
         ).astype(jnp.bfloat16)
         dimensions = (((1,), (1,)), ((), ()))
         gate_accumulator_ref[...] += lax.dot_general(
@@ -1157,7 +1166,7 @@ def fp8_block_up_gate(
         ),
     )
     gate, up = call(
-        lhs, gate_fp8, gate_scale_table, up_fp8, up_scale_table
+        lhs, gate_bits, gate_scale_table, up_bits, up_scale_table
     )
     return gate[:rows, :output], up[:rows, :output]
 
