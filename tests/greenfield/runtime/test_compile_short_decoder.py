@@ -5,7 +5,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from scripts.greenfield.compile_short_decoder import _materialize_global_array
+from scripts.greenfield.compile_short_decoder import (
+    _materialize_global_array,
+    _validate_completed_step_selected_states,
+)
 
 
 class _Jax:
@@ -65,3 +68,48 @@ def test_materialize_global_array_fails_closed_on_gather_shape_drift() -> None:
 
     with pytest.raises(RuntimeError, match="global array gather changed shape"):
         _materialize_global_array(jax, multihost, value)
+
+
+def test_completed_step_selected_state_uses_next_position_as_exclusive_bound() -> None:
+    metadata = np.asarray(
+        [
+            [2, 0, 1, -1, 3, 99],
+            [1, 2, 0, -1, 3, 99],
+        ],
+        dtype=np.int32,
+    )
+    record = _validate_completed_step_selected_states(
+        metadata,
+        selected_width=4,
+        count_index=4,
+        next_position=3,
+        next_context_length=4,
+    )
+    assert record == {
+        "expected_valid_count": 3,
+        "next_context_length": 4,
+        "next_position": 3,
+        "position_context_aligned": True,
+        "rows_valid": [True, True],
+    }
+
+    future_position = metadata.copy()
+    future_position[0, 0] = 3
+    assert not all(
+        _validate_completed_step_selected_states(
+            future_position,
+            selected_width=4,
+            count_index=4,
+            next_position=3,
+            next_context_length=4,
+        )["rows_valid"]
+    )
+    assert not all(
+        _validate_completed_step_selected_states(
+            metadata,
+            selected_width=4,
+            count_index=4,
+            next_position=3,
+            next_context_length=3,
+        )["rows_valid"]
+    )

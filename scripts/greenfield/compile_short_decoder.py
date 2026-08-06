@@ -132,6 +132,50 @@ def _materialize_global_array(
     return host
 
 
+def _validate_completed_step_selected_states(
+    active_metadata: np.ndarray,
+    *,
+    selected_width: int,
+    count_index: int,
+    next_position: int,
+    next_context_length: int,
+) -> dict[str, Any]:
+    """Validate DSA state against the just-completed, not next, position."""
+
+    if selected_width <= 0 or count_index < selected_width:
+        raise ValueError("selected-state geometry is invalid")
+    if active_metadata.ndim != 2 or active_metadata.shape[1] <= count_index:
+        raise ValueError("active selected-state metadata shape is invalid")
+    position_context_aligned = (
+        next_position >= 0 and next_context_length == next_position + 1
+    )
+    expected_valid_count = min(next_position, selected_width)
+    rows_valid = []
+    for row in active_metadata:
+        count = int(row[count_index])
+        positions = row[:selected_width]
+        valid = positions[:count]
+        tail = positions[count:]
+        rows_valid.append(
+            position_context_aligned
+            and count == expected_valid_count
+            and bool(np.all(valid >= 0))
+            # The output position is the exclusive bound for the DSA state
+            # produced during this step. The incremented context length also
+            # includes the slot to be consumed by the following step.
+            and bool(np.all(valid < next_position))
+            and len(set(valid.tolist())) == count
+            and bool(np.all(tail == -1))
+        )
+    return {
+        "expected_valid_count": expected_valid_count,
+        "next_context_length": next_context_length,
+        "next_position": next_position,
+        "position_context_aligned": position_context_aligned,
+        "rows_valid": rows_valid,
+    }
+
+
 def _make_global_array(
     jax: Any,
     mesh: Any,
@@ -784,31 +828,25 @@ def main() -> int:
             and metadata_contract["visited"] == [255]
         )
         if args.complete_token_path:
+            next_position = np.asarray(jax.device_get(current[5]))
             next_context_lengths = np.asarray(
                 jax.device_get(current[7])
             )
-            expected_valid_count = min(
-                int(next_context_lengths[0]),
-                decoder.config.selected_width,
-            )
-            selected_states_valid = []
-            for row in active_metadata:
-                count = int(row[decoder.config.count_index])
-                positions = row[: decoder.config.selected_width]
-                valid = positions[:count]
-                tail = positions[count:]
-                selected_states_valid.append(
-                    count == expected_valid_count
-                    and bool(np.all(valid >= 0))
-                    and bool(np.all(valid < next_context_lengths[0]))
-                    and len(set(valid.tolist())) == count
-                    and bool(np.all(tail == -1))
+            selected_state_contract = (
+                _validate_completed_step_selected_states(
+                    active_metadata,
+                    selected_width=decoder.config.selected_width,
+                    count_index=decoder.config.count_index,
+                    next_position=int(next_position[0]),
+                    next_context_length=int(next_context_lengths[0]),
                 )
-            metadata_contract["selected_states_valid"] = (
-                selected_states_valid
+            )
+            metadata_contract["selected_state_contract"] = (
+                selected_state_contract
             )
             metadata_passed = bool(
-                base_metadata_passed and all(selected_states_valid)
+                base_metadata_passed
+                and all(selected_state_contract["rows_valid"])
             )
         else:
             metadata_passed = bool(
@@ -840,9 +878,7 @@ def main() -> int:
                         active_tokens < execution_plan.geometry.vocab_size
                     )
                 ),
-                "next_position": np.asarray(
-                    jax.device_get(current[5])
-                ).tolist(),
+                "next_position": next_position.tolist(),
                 "next_context_lengths": next_context_lengths.tolist(),
                 "synthetic_initial_state": True,
             }
