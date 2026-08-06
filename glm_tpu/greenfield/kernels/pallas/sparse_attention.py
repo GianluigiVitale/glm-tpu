@@ -340,9 +340,7 @@ def _fused_selected_kv_attention_pallas(
         flat_rows = jnp.pad(flat_rows, ((0, 0), (0, pad)))
     physical_segment_width = flat_rows.shape[1]
     dma_rows = config.dma_rows
-    dma_starts = jnp.minimum(
-        flat_rows, jnp.int32(cache_flat.shape[0] - dma_rows)
-    )
+    dma_starts = (flat_rows // jnp.int32(dma_rows)) * jnp.int32(dma_rows)
     dma_lanes = flat_rows - dma_starts
     precision = (
         lax.Precision.HIGHEST
@@ -392,7 +390,13 @@ def _fused_selected_kv_attention_pallas(
             for row in range(segment_block):
                 descriptor = pltpu.make_async_copy(
                     cache_ref.at[
-                        pl.ds(dma_start_ref[0, row], dma_rows), :
+                        pl.ds(
+                            pl.multiple_of(
+                                dma_start_ref[0, row], dma_rows
+                            ),
+                            dma_rows,
+                        ),
+                        :,
                     ],
                     cache_tile_ref.at[row],
                     dma_sem,
