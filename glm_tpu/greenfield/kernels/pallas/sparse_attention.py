@@ -342,6 +342,10 @@ def _fused_selected_kv_attention_pallas(
     dma_rows = config.dma_rows
     dma_starts = (flat_rows // jnp.int32(dma_rows)) * jnp.int32(dma_rows)
     dma_lanes = flat_rows - dma_starts
+    lane_weights = (
+        dma_lanes[0, :, None]
+        == jnp.arange(dma_rows, dtype=jnp.int32)[None, :]
+    ).astype(cache_flat.dtype)[:, None, :]
     precision = (
         lax.Precision.HIGHEST
         if query_nope_absorbed.dtype == jnp.float32
@@ -354,7 +358,7 @@ def _fused_selected_kv_attention_pallas(
         query_rope_ref: Any,
         cache_ref: Any,
         dma_start_ref: Any,
-        dma_lane_ref: Any,
+        lane_weight_ref: Any,
         output_ref: Any,
         lse_ref: Any,
         cache_tile_ref: Any,
@@ -411,20 +415,17 @@ def _fused_selected_kv_attention_pallas(
                 jnp.arange(segment_block, dtype=jnp.int32)
                 + jnp.int32(block_start)
             )
-            dma_lanes_iota = jnp.arange(dma_rows, dtype=jnp.int32)[None, :]
-            selected_lanes = dma_lanes_iota == jnp.transpose(
-                dma_lane_ref[...]
-            )
             live_groups = group_slots[:, None] < valid_count
             # Select one dynamic lane per eight-row DMA group with a batched
-            # one-hot contraction. This avoids Mosaic's unsupported rank-three
-            # predicate broadcast while keeping overfetch entirely in VMEM.
+            # one-hot contraction. The singleton lhs dimension avoids a Mosaic
+            # batched-dot parser limitation; reducing it is value-preserving.
             selected_cache = lax.dot_general(
-                selected_lanes.astype(cache_tile_ref.dtype),
+                lane_weight_ref[...],
                 cache_tile_ref[...],
-                dimension_numbers=(((1,), (1,)), ((0,), (0,))),
+                dimension_numbers=(((2,), (1,)), ((0,), (0,))),
                 precision=precision,
             )
+            selected_cache = jnp.sum(selected_cache, axis=1)
             selected_cache = jnp.where(
                 live_groups,
                 selected_cache,
@@ -503,6 +504,12 @@ def _fused_selected_kv_attention_pallas(
         del valid_count
         return 0, block
 
+    def lane_weight_index(
+        block: Any, valid_count: Any
+    ) -> tuple[Any, int, int]:
+        del valid_count
+        return block, 0, 0
+
     def output_index(block: Any, valid_count: Any) -> tuple[int, int, int]:
         del block, valid_count
         return 0, 0, 0
@@ -519,7 +526,9 @@ def _fused_selected_kv_attention_pallas(
                 ),
                 pl.BlockSpec(memory_space=pltpu.MemorySpace.HBM),
                 pl.BlockSpec((1, segment_block), compact_row_index),
-                pl.BlockSpec((1, segment_block), compact_row_index),
+                pl.BlockSpec(
+                    (segment_block, 1, dma_rows), lane_weight_index
+                ),
             ),
             out_specs=(
                 pl.BlockSpec((1, heads, latent), output_index),
@@ -562,6 +571,9 @@ def _fused_selected_kv_attention_pallas(
                 * dma_rows
                 * cache_width
                 * cache_flat.dtype.itemsize
+                + physical_segment_width
+                * dma_rows
+                * cache_flat.dtype.itemsize
                 + heads
                 * (latent + contract.qk_rope_head_dim)
                 * query_nope_absorbed.dtype.itemsize
@@ -576,7 +588,7 @@ def _fused_selected_kv_attention_pallas(
         query_rope,
         cache_flat,
         dma_starts,
-        dma_lanes,
+        lane_weights,
     )
     return output, lse_lanes[:, :, 0]
 
