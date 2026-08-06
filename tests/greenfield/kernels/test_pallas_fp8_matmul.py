@@ -10,6 +10,7 @@ from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
     fp8_block_up_gate,
+    fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
@@ -143,6 +144,117 @@ def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:
         Fp8BlockMatmulConfig(contraction_tile=192)
     with pytest.raises(ValueError, match="accumulator must be FP32"):
         Fp8BlockMatmulConfig(accumulator_dtype=jnp.bfloat16)
+
+
+def test_fp8_fused_block_swiglu_interpret_matches_exact_reference() -> None:
+    from jax._src.pallas.mosaic import tpu_info
+
+    tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
+        tpu_info.ChipVersion.TPU_V4, 1
+    )
+    tpu_info.get_tpu_info.cache_clear()
+    rows, hidden_size, intermediate, output = 1, 135, 130, 137
+    lhs = jnp.asarray(
+        np.linspace(-0.5, 0.5, rows * hidden_size, dtype=np.float32).reshape(
+            rows, hidden_size
+        ),
+        dtype=jnp.bfloat16,
+    )
+    projection_linear = np.arange(
+        intermediate * hidden_size, dtype=np.float32
+    ).reshape(intermediate, hidden_size)
+    gate_bits = _bits(jnp.asarray(np.sin(projection_linear * 0.013) * 0.5))
+    up_bits = _bits(jnp.asarray(np.cos(projection_linear * 0.019) * 0.375))
+    projection_scale_shape = (
+        (intermediate + 127) // 128,
+        (hidden_size + 127) // 128,
+    )
+    gate_scale = jnp.asarray(
+        np.linspace(
+            0.25, 0.75, np.prod(projection_scale_shape), dtype=np.float32
+        ).reshape(projection_scale_shape)
+    )
+    up_scale = jnp.asarray(
+        np.linspace(
+            0.5, 1.0, np.prod(projection_scale_shape), dtype=np.float32
+        ).reshape(projection_scale_shape)
+    )
+    down_linear = np.arange(output * intermediate, dtype=np.float32).reshape(
+        output, intermediate
+    )
+    down_bits = _bits(jnp.asarray(np.sin(down_linear * 0.017) * 0.375))
+    down_scale_shape = (
+        (output + 127) // 128,
+        (intermediate + 127) // 128,
+    )
+    down_scale = jnp.asarray(
+        np.linspace(
+            0.375, 0.875, np.prod(down_scale_shape), dtype=np.float32
+        ).reshape(down_scale_shape)
+    )
+
+    actual = fp8_fused_block_swiglu(
+        lhs,
+        gate_bits,
+        gate_scale,
+        up_bits,
+        up_scale,
+        down_bits,
+        down_scale,
+        interpret=True,
+    )
+    decoded_gate = dequantize_fp8_bits_block_weight(gate_bits, gate_scale)
+    decoded_up = dequantize_fp8_bits_block_weight(up_bits, up_scale)
+    gate = lax.dot_general(
+        lhs,
+        decoded_gate,
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+    up = lax.dot_general(
+        lhs,
+        decoded_up,
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+    activated = (gate * jax.nn.sigmoid(gate) * up).astype(jnp.bfloat16)
+    decoded_down = dequantize_fp8_bits_block_weight(down_bits, down_scale)
+    expected = lax.dot_general(
+        activated,
+        decoded_down,
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+
+
+def test_fp8_fused_block_swiglu_rejects_down_contract_drift() -> None:
+    lhs = jnp.ones((1, 128), dtype=jnp.bfloat16)
+    bits = jnp.zeros((128, 128), dtype=jnp.uint8)
+    scale = jnp.ones((1, 1), dtype=jnp.float32)
+
+    with pytest.raises(ValueError, match="contract the gate/up output"):
+        fp8_fused_block_swiglu(
+            lhs,
+            bits,
+            scale,
+            bits,
+            scale,
+            jnp.zeros((128, 127), dtype=jnp.uint8),
+            scale,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="down FP32 scale shape"):
+        fp8_fused_block_swiglu(
+            lhs,
+            bits,
+            scale,
+            bits,
+            scale,
+            bits,
+            jnp.ones((1, 2), dtype=jnp.float32),
+            interpret=True,
+        )
 
 
 @pytest.mark.parametrize(

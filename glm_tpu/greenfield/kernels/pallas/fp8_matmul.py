@@ -565,6 +565,384 @@ def fp8_block_up_gate(
     return gate[:rows, :output], up[:rows, :output]
 
 
+def fp8_fused_block_swiglu(
+    lhs: Any,
+    gate_bits: Any,
+    gate_scale: Any,
+    up_bits: Any,
+    up_scale: Any,
+    down_bits: Any,
+    down_scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Execute raw-FP8 gate/up, exact BF16 SwiGLU, and down in one call.
+
+    Complete checkpoint matrices remain raw U8 HBM operands. Gate and up
+    outputs are VMEM scratch shared by two nested Mosaic pipelines, so only
+    the final BF16 projection crosses the Pallas/HBM boundary.
+    """
+
+    rows, contraction, intermediate = _validate_inputs(
+        lhs, gate_bits, gate_scale, config
+    )
+    up_geometry = _validate_inputs(lhs, up_bits, up_scale, config)
+    if up_geometry != (rows, contraction, intermediate):
+        raise ValueError("fused block gate/up projection geometries disagree")
+    if down_bits.ndim != 2 or down_bits.dtype != jnp.uint8:
+        raise ValueError("fused block down weights must be rank-two U8")
+    output, down_contraction = down_bits.shape
+    if output <= 0 or down_contraction != intermediate:
+        raise ValueError(
+            "fused block down weight must contract the gate/up output"
+        )
+    expected_down_scale = (
+        _ceil_div(output, config.block_shape[0]),
+        _ceil_div(intermediate, config.block_shape[1]),
+    )
+    if down_scale.shape != expected_down_scale or (
+        down_scale.dtype != jnp.float32
+    ):
+        raise ValueError(
+            "fused block down FP32 scale shape must be "
+            f"{expected_down_scale}, got {down_scale.shape}/{down_scale.dtype}"
+        )
+
+    padded_rows = _ceil_div(rows, config.row_tile) * config.row_tile
+    padded_contraction = (
+        _ceil_div(contraction, config.contraction_tile)
+        * config.contraction_tile
+    )
+    padded_intermediate = (
+        _ceil_div(intermediate, config.output_tile) * config.output_tile
+    )
+    padded_output = _ceil_div(output, config.output_tile) * config.output_tile
+    lhs = jnp.pad(
+        lhs,
+        (
+            (0, padded_rows - rows),
+            (0, padded_contraction - contraction),
+        ),
+    )
+
+    def pad_projection(value: Any) -> Any:
+        return jnp.pad(
+            value,
+            (
+                (0, padded_intermediate - intermediate),
+                (0, padded_contraction - contraction),
+            ),
+        )
+
+    down_raw = jnp.pad(
+        down_bits,
+        (
+            (0, padded_output - output),
+            (0, padded_intermediate - intermediate),
+        ),
+    )
+    gate_raw = pad_projection(gate_bits)
+    up_raw = pad_projection(up_bits)
+    up_output_tiles = padded_intermediate // config.output_tile
+    up_contraction_tiles = padded_contraction // config.contraction_tile
+    down_output_tiles = padded_output // config.output_tile
+    down_contraction_tiles = padded_intermediate // config.contraction_tile
+    gate_scale_table = _aligned_scale_table(
+        gate_scale,
+        output_tiles=up_output_tiles,
+        contraction_tiles=up_contraction_tiles,
+    )
+    up_scale_table = _aligned_scale_table(
+        up_scale,
+        output_tiles=up_output_tiles,
+        contraction_tiles=up_contraction_tiles,
+    )
+    down_scale_table = _aligned_scale_table(
+        down_scale,
+        output_tiles=down_output_tiles,
+        contraction_tiles=down_contraction_tiles,
+    )
+
+    def kernel(
+        lhs_hbm_ref: Any,
+        gate_hbm_ref: Any,
+        gate_scale_hbm_ref: Any,
+        up_hbm_ref: Any,
+        up_scale_hbm_ref: Any,
+        down_hbm_ref: Any,
+        down_scale_hbm_ref: Any,
+        output_hbm_ref: Any,
+        gate_vmem_ref: Any,
+        up_vmem_ref: Any,
+        gate_accumulator_ref: Any,
+        up_accumulator_ref: Any,
+        down_accumulator_ref: Any,
+    ) -> None:
+        def up_gate_kernel(
+            lhs_ref: Any,
+            gate_ref: Any,
+            gate_scale_ref: Any,
+            up_ref: Any,
+            up_scale_ref: Any,
+            gate_output_ref: Any,
+            up_output_ref: Any,
+            gate_accumulator: Any,
+            up_accumulator: Any,
+        ) -> None:
+            output_index = pl.program_id(0)
+            contraction_index = pl.program_id(1)
+
+            @pl.when(contraction_index == 0)
+            def initialize_accumulators() -> None:
+                gate_accumulator[...] = jnp.zeros_like(gate_accumulator)
+                up_accumulator[...] = jnp.zeros_like(up_accumulator)
+
+            gate_value = _scale_value(
+                gate_scale_ref[...], contraction_index, output_index
+            )
+            up_value = _scale_value(
+                up_scale_ref[...], contraction_index, output_index
+            )
+            decoded_gate = (
+                lax.bitcast_convert_type(
+                    gate_ref[...], jnp.float8_e4m3fn
+                ).astype(config.accumulator_dtype)
+                * gate_value
+            ).astype(jnp.bfloat16)
+            decoded_up = (
+                lax.bitcast_convert_type(
+                    up_ref[...], jnp.float8_e4m3fn
+                ).astype(config.accumulator_dtype)
+                * up_value
+            ).astype(jnp.bfloat16)
+            dimensions = (((1,), (1,)), ((), ()))
+            gate_accumulator[...] += lax.dot_general(
+                lhs_ref[...],
+                decoded_gate,
+                dimension_numbers=dimensions,
+                preferred_element_type=config.accumulator_dtype,
+            )
+            up_accumulator[...] += lax.dot_general(
+                lhs_ref[...],
+                decoded_up,
+                dimension_numbers=dimensions,
+                preferred_element_type=config.accumulator_dtype,
+            )
+
+            @pl.when(contraction_index == up_contraction_tiles - 1)
+            def store_outputs() -> None:
+                gate_output_ref[...] = gate_accumulator[...].astype(
+                    config.output_dtype
+                )
+                up_output_ref[...] = up_accumulator[...].astype(
+                    config.output_dtype
+                )
+
+        def lhs_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[int, Any]:
+            del output_index
+            return 0, contraction_index
+
+        def projection_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[Any, Any]:
+            return output_index, contraction_index
+
+        def scale_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[Any, int]:
+            del output_index
+            return contraction_index // jnp.int32(8), 0
+
+        def projection_output_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[int, Any]:
+            del contraction_index
+            return 0, output_index
+
+        lhs_spec = pl.BlockSpec(
+            (padded_rows, config.contraction_tile), lhs_index
+        )
+        projection_spec = pl.BlockSpec(
+            (config.output_tile, config.contraction_tile),
+            projection_index,
+            pipeline_mode=pl.Buffered(buffer_count=3),
+        )
+        scale_spec = pl.BlockSpec((8, 128), scale_index)
+        projection_output_spec = pl.BlockSpec(
+            (padded_rows, config.output_tile), projection_output_index
+        )
+        up_gate_pipeline = pltpu.emit_pipeline(
+            up_gate_kernel,
+            grid=(up_output_tiles, up_contraction_tiles),
+            in_specs=(
+                lhs_spec,
+                projection_spec,
+                scale_spec,
+                projection_spec,
+                scale_spec,
+            ),
+            out_specs=(projection_output_spec, projection_output_spec),
+            dimension_semantics=("parallel", "arbitrary"),
+            no_pipelining=interpret,
+        )
+        up_gate_pipeline(
+            lhs_hbm_ref,
+            gate_hbm_ref,
+            gate_scale_hbm_ref,
+            up_hbm_ref,
+            up_scale_hbm_ref,
+            gate_vmem_ref,
+            up_vmem_ref,
+            scratches=(gate_accumulator_ref, up_accumulator_ref),
+        )
+
+        def down_kernel(
+            gate_ref: Any,
+            up_ref: Any,
+            down_ref: Any,
+            scale_ref: Any,
+            output_ref: Any,
+            accumulator: Any,
+        ) -> None:
+            output_index = pl.program_id(0)
+            contraction_index = pl.program_id(1)
+
+            @pl.when(contraction_index == 0)
+            def initialize_accumulator() -> None:
+                accumulator[...] = jnp.zeros_like(accumulator)
+
+            activated = (
+                gate_ref[...]
+                * jax.nn.sigmoid(gate_ref[...])
+                * up_ref[...]
+            ).astype(jnp.bfloat16)
+            scale_value = _scale_value(
+                scale_ref[...], contraction_index, output_index
+            )
+            decoded_down = (
+                lax.bitcast_convert_type(
+                    down_ref[...], jnp.float8_e4m3fn
+                ).astype(config.accumulator_dtype)
+                * scale_value
+            ).astype(jnp.bfloat16)
+            accumulator[...] += lax.dot_general(
+                activated,
+                decoded_down,
+                dimension_numbers=(((1,), (1,)), ((), ())),
+                preferred_element_type=config.accumulator_dtype,
+            )
+
+            @pl.when(contraction_index == down_contraction_tiles - 1)
+            def store_output() -> None:
+                output_ref[...] = accumulator[...].astype(
+                    config.output_dtype
+                )
+
+        def activation_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[int, Any]:
+            del output_index
+            return 0, contraction_index
+
+        def down_output_index(
+            output_index: Any, contraction_index: Any
+        ) -> tuple[int, Any]:
+            del contraction_index
+            return 0, output_index
+
+        activation_spec = pl.BlockSpec(
+            (padded_rows, config.contraction_tile), activation_index
+        )
+        down_output_spec = pl.BlockSpec(
+            (padded_rows, config.output_tile), down_output_index
+        )
+        down_pipeline = pltpu.emit_pipeline(
+            down_kernel,
+            grid=(down_output_tiles, down_contraction_tiles),
+            in_specs=(
+                activation_spec,
+                activation_spec,
+                projection_spec,
+                scale_spec,
+            ),
+            out_specs=down_output_spec,
+            dimension_semantics=("parallel", "arbitrary"),
+            no_pipelining=interpret,
+        )
+        down_pipeline(
+            gate_vmem_ref,
+            up_vmem_ref,
+            down_hbm_ref,
+            down_scale_hbm_ref,
+            output_hbm_ref,
+            scratches=(down_accumulator_ref,),
+        )
+
+    call = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct(
+            (padded_rows, padded_output), config.output_dtype
+        ),
+        grid=(),
+        in_specs=(pl.BlockSpec(memory_space=pltpu.HBM),) * 7,
+        out_specs=pl.BlockSpec(memory_space=pltpu.HBM),
+        scratch_shapes=(
+            pltpu.VMEM(
+                (padded_rows, padded_intermediate), config.output_dtype
+            ),
+            pltpu.VMEM(
+                (padded_rows, padded_intermediate), config.output_dtype
+            ),
+            pltpu.VMEM(
+                (padded_rows, config.output_tile),
+                config.accumulator_dtype,
+            ),
+            pltpu.VMEM(
+                (padded_rows, config.output_tile),
+                config.accumulator_dtype,
+            ),
+            pltpu.VMEM(
+                (padded_rows, config.output_tile),
+                config.accumulator_dtype,
+            ),
+        ),
+        compiler_params=pltpu.CompilerParams(disable_bounds_checks=True),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_fused_block_swiglu_"
+            f"m{padded_rows}_h{padded_contraction}_i{padded_intermediate}"
+            f"_o{padded_output}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=(
+                4 * padded_rows * padded_contraction * padded_intermediate
+                + 2 * padded_rows * padded_intermediate * padded_output
+            ),
+            bytes_accessed=(
+                padded_rows * padded_contraction * 2
+                + 2 * padded_intermediate * padded_contraction
+                + padded_output * padded_intermediate
+                + 2 * up_output_tiles * up_contraction_tiles * 4
+                + down_output_tiles * down_contraction_tiles * 4
+                + padded_rows * padded_output * 2
+            ),
+            transcendentals=padded_rows * padded_intermediate,
+        ),
+    )
+    return call(
+        lhs,
+        gate_raw,
+        gate_scale_table,
+        up_raw,
+        up_scale_table,
+        down_raw,
+        down_scale_table,
+    )[:rows, :output]
+
+
 def fp8_selected_up_gate(
     hidden: Any,
     route_indices: Any,
