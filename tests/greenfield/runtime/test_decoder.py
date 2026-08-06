@@ -8,6 +8,87 @@ import sys
 import pytest
 
 
+def test_complete_token_tpu_collective_lowering_is_exact_and_local() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_complete_token_collective_lowering,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4)) for stage in range(8)
+    )
+    pairs = tuple(
+        (groups[stage][slot], groups[(stage + 1) % 8][slot])
+        for stage in range(8)
+        for slot in range(4)
+    )
+    group_text = "{" + ",".join(
+        "{" + ",".join(map(str, group)) + "}" for group in groups
+    ) + "}"
+    pair_text = "{" + ",".join(
+        "{" + ",".join(map(str, pair)) + "}" for pair in pairs
+    ) + "}"
+    hlo = f'''HloModule complete_token, replica_count=1, num_partitions=32
+
+%add.1 (x: bf16[], y: bf16[]) -> bf16[] {{
+  %x = bf16[] parameter(0)
+  %y = bf16[] parameter(1)
+  ROOT %sum = bf16[] add(%x, %y)
+}}
+
+%add.2 (x: s32[], y: s32[]) -> s32[] {{
+  %x = s32[] parameter(0)
+  %y = s32[] parameter(1)
+  ROOT %sum = s32[] add(%x, %y)
+}}
+
+ENTRY %main (scores: bf16[4], ids: s32[4], token: s32[1]) -> s32[1] {{
+  %scores = bf16[4] parameter(0)
+  %ids = s32[4] parameter(1)
+  %token = s32[1] parameter(2)
+  %score_exchange = bf16[4] all-reduce(%scores), replica_groups={group_text}, use_global_device_ids=true, to_apply=%add.1
+  %id_exchange = s32[4] all-reduce(%ids), replica_groups={group_text}, use_global_device_ids=true, to_apply=%add.2
+  ROOT %token_return = (s32[1], s32[1], u32[], u32[]) collective-permute-start(%token), source_target_pairs={pair_text}, metadata={{op_name="jit(mapped_token)/shard_map/ppermute"}}
+}}
+'''
+    module = parse_hlo_module(hlo)
+    record = _validate_complete_token_collective_lowering(
+        module,
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert record["passed"], record
+    assert record["lowering"] == "local_one_hot_all_reduce"
+    assert record["score_exchange"][0]["operand_shapes"] == ["bf16[4]"]
+    assert record["token_id_exchange"][0]["operand_shapes"] == ["s32[4]"]
+    assert record["token_return"][0]["operand_shapes"] == ["s32[1]"]
+
+    nonlocal_hlo = hlo.replace(
+        f"replica_groups={group_text}",
+        "replica_groups={{" + ",".join(map(str, range(32))) + "}}",
+    )
+    rejected = _validate_complete_token_collective_lowering(
+        parse_hlo_module(nonlocal_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert not rejected["passed"]
+    assert any("escaped PP8 local groups" in item for item in rejected["violations"])
+
+    wrong_return = _validate_complete_token_collective_lowering(
+        parse_hlo_module(hlo.replace("token: s32[1]", "token: s32[2]").replace(
+            "%token = s32[1]", "%token = s32[2]"
+        )),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert not wrong_return["passed"]
+    assert any("exactly one s32[1]" in item for item in wrong_return["violations"])
+
+
 def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> None:
     from glm_tpu.greenfield.runtime.decoder import (
         _validate_pallas_feature_decoder_calls,

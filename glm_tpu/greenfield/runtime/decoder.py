@@ -346,6 +346,146 @@ def _validate_pallas_stage_linear_decoder_calls(
     }
 
 
+def _hlo_shape_signature(shapes: Sequence[Any]) -> tuple[str, ...]:
+    return tuple(
+        f"{shape.dtype}["
+        + ",".join(str(dimension) for dimension in shape.dimensions)
+        + "]"
+        for shape in shapes
+    )
+
+
+def _compact_collective_record(collective: Any) -> dict[str, Any]:
+    return {
+        "channel_id": collective.channel_id,
+        "name": collective.name,
+        "op_name": collective.op_name,
+        "operand_shapes": list(_hlo_shape_signature(collective.operand_shapes)),
+        "raw_opcode": collective.raw_opcode,
+        "replica_groups": [list(group) for group in collective.replica_groups],
+        "result_shapes": list(_hlo_shape_signature(collective.result_shapes)),
+        "source_target_pairs": [
+            list(pair) for pair in collective.source_target_pairs
+        ],
+        "use_global_device_ids": collective.use_global_device_ids,
+    }
+
+
+def _validate_complete_token_collective_lowering(
+    module: Any,
+    *,
+    expected_groups: Sequence[Sequence[int]],
+    expected_pairs: Sequence[Sequence[int]],
+    backend_contract: str,
+) -> dict[str, Any]:
+    """Pin TPU's compact top-1 exchange and one-token return lowering."""
+
+    if backend_contract == "cpu_reference":
+        return {
+            "applicable": False,
+            "backend_contract": backend_contract,
+            "lowering": "cpu_reference_all_gather",
+            "passed": True,
+            "violations": [],
+        }
+
+    canonical_groups = tuple(tuple(group) for group in expected_groups)
+    canonical_pairs = tuple(tuple(pair) for pair in expected_pairs)
+    reductions = tuple(
+        item for item in module.collectives if item.opcode == "all-reduce"
+    )
+    permutes = tuple(
+        item
+        for item in module.collectives
+        if item.opcode == "collective-permute"
+    )
+    score_exchange = tuple(
+        item
+        for item in reductions
+        if _hlo_shape_signature(item.result_shapes) == ("bf16[4]",)
+    )
+    token_id_exchange = tuple(
+        item
+        for item in reductions
+        if _hlo_shape_signature(item.result_shapes) == ("s32[4]",)
+    )
+    token_return = tuple(
+        item
+        for item in permutes
+        if _hlo_shape_signature(item.operand_shapes) == ("s32[1]",)
+    )
+    violations = []
+    if len(score_exchange) != 1:
+        violations.append(
+            "complete-token score exchange must be exactly one bf16[4] "
+            f"all-reduce, found {len(score_exchange)}"
+        )
+    if len(token_id_exchange) != 1:
+        violations.append(
+            "complete-token id exchange must be exactly one s32[4] "
+            f"all-reduce, found {len(token_id_exchange)}"
+        )
+    for label, candidates, expected_shape in (
+        ("score", score_exchange, "bf16[4]"),
+        ("id", token_id_exchange, "s32[4]"),
+    ):
+        for collective in candidates:
+            if _hlo_shape_signature(collective.operand_shapes) != (
+                expected_shape,
+            ):
+                violations.append(
+                    f"complete-token {label} exchange operand shape drifted"
+                )
+            if collective.replica_groups != canonical_groups:
+                violations.append(
+                    f"complete-token {label} exchange escaped PP8 local groups"
+                )
+            if not collective.use_global_device_ids:
+                violations.append(
+                    f"complete-token {label} exchange lacks global device ids"
+                )
+            if re.search(
+                r"\bto_apply=%?add(?:\.|,|\s|$)", collective.raw_line
+            ) is None:
+                violations.append(
+                    f"complete-token {label} exchange is not the pinned "
+                    "one-hot sum lowering"
+                )
+    if len(token_return) != 1:
+        violations.append(
+            "complete-token return must be exactly one s32[1] "
+            f"collective-permute, found {len(token_return)}"
+        )
+    for collective in token_return:
+        if _hlo_shape_signature(collective.result_shapes) != (
+            "s32[1]",
+            "s32[1]",
+            "u32[]",
+            "u32[]",
+        ):
+            violations.append("complete-token return TPU result shape drifted")
+        if collective.source_target_pairs != canonical_pairs:
+            violations.append("complete-token return lane pairs drifted")
+        if collective.op_name != "jit(mapped_token)/shard_map/ppermute":
+            violations.append("complete-token return source operation drifted")
+    return {
+        "applicable": True,
+        "backend_contract": backend_contract,
+        "lowering": "local_one_hot_all_reduce",
+        "passed": not violations,
+        "score_exchange": [
+            _compact_collective_record(item) for item in score_exchange
+        ],
+        "token_id_exchange": [
+            _compact_collective_record(item) for item in token_id_exchange
+        ],
+        "token_return": [
+            _compact_collective_record(item) for item in token_return
+        ],
+        "violations": violations,
+    }
+
+
 def validate_decoder_step_hlo(
     optimized_hlo: str,
     *,
@@ -464,12 +604,13 @@ def validate_decoder_step_hlo(
         # expecting 4 * layers physical instructions falsely reports 18
         # missing collectives, while checking only logical arity would allow a
         # physical launch-count regression to pass unnoticed.
-        expected_gathers = 2 * layers + 3 * full_layers + (
-            2 if complete_token_path else 0
-        )
+        # TPU XLA lowers each four-element top-1 all-gather to a one-hot local
+        # all-reduce.  The complete path therefore adds no physical gather,
+        # but adds embedding plus score/id singleton reductions.
+        expected_gathers = 2 * layers + 3 * full_layers
         expected_reduction_arity_counts = {"1": 277, "2": 16, "3": 1}
         if complete_token_path:
-            expected_reduction_arity_counts["1"] += 1
+            expected_reduction_arity_counts["1"] += 3
         expected_reductions = sum(expected_reduction_arity_counts.values())
         expected_reduction_component_count = sum(
             int(arity) * count
@@ -483,6 +624,10 @@ def validate_decoder_step_hlo(
             "f32[256]": layers,
             "u32[1,1,128]": layers,
         }
+        if complete_token_path:
+            expected_reduction_result_shape_counts.update(
+                {"bf16[4]": 1, "s32[4]": 1}
+            )
 
         reductions = by_opcode.get("all-reduce", ())
         reduction_arity_counts = {
@@ -566,6 +711,21 @@ def validate_decoder_step_hlo(
     )
     if observed_pair_multiset != expected_pair_multiset:
         violations.append("decoder transport pairs/counts drifted")
+    complete_token_collective_contract: dict[str, Any] = {
+        "applicable": False,
+        "passed": True,
+        "violations": [],
+    }
+    if complete_token_path:
+        complete_token_collective_contract = (
+            _validate_complete_token_collective_lowering(
+                module,
+                expected_groups=expected_groups,
+                expected_pairs=canonical_pairs,
+                backend_contract=backend_contract,
+            )
+        )
+        violations.extend(complete_token_collective_contract["violations"])
     forbidden_shapes = []
     for instruction in module.instructions:
         for shape in instruction.operand_shapes + instruction.result_shapes:
@@ -589,7 +749,7 @@ def validate_decoder_step_hlo(
         (config.local_parallel_size, 1, local_vocab),
         (1, config.local_parallel_size, local_vocab),
     )
-    for collective in by_opcode.get("all-gather", ()):
+    for collective in collectives:
         for shape in collective.result_shapes:
             if (
                 shape.dtype in ("bf16", "f32")
@@ -652,6 +812,9 @@ def validate_decoder_step_hlo(
         "feature_output_tile": feature_output_tile,
         "feature_fuse_route_weighting": feature_fuse_route_weighting,
         "complete_token_path": complete_token_path,
+        "complete_token_collective_contract": (
+            complete_token_collective_contract
+        ),
         "forbidden_full_vocab_logits": forbidden_full_vocab,
         "full_indexer_layers": full_layers,
         "layer_count": layers,
