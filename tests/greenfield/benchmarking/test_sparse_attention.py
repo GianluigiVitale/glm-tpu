@@ -19,6 +19,7 @@ def _valid_hlo() -> str:
 %rope = bf16[1,64,64] parameter(2)
 %cache = bf16[65536,640] parameter(3)
 %lse = f32[1,64] constant(0)
+%rows = s32[2048] custom-call(%positions), custom_call_target="AssumeGatherIndicesInBound", metadata={{op_name="jit(pallas_fn)/jit(take_along_axis)/gather"}}
 %ordered = s32[1,2048] custom-call(%positions), custom_call_target="tpu_custom_call", metadata={{op_name="{order}"}}
 %result = (bf16[1,64,512], f32[1,64,128]) custom-call(%query, %rope, %cache, %ordered), custom_call_target="tpu_custom_call", metadata={{op_name="{attention}"}}
 '''
@@ -27,7 +28,8 @@ def _valid_hlo() -> str:
 def test_validate_sparse_attention_hlo_accepts_two_fused_kernels() -> None:
     record = validate_sparse_attention_hlo(_valid_hlo())
     assert record["passed"]
-    assert record["custom_call_count"] == 2
+    assert record["custom_call_count"] == 3
+    assert record["metadata_gather_custom_call_count"] == 1
     assert not record["forbidden_selected_kv_materializations"]
 
 

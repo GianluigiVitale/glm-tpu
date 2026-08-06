@@ -53,7 +53,16 @@ def validate_sparse_attention_hlo(
         ]
         for name in expected_names
     }
-    expected_lines = {line for lines in kernel_calls.values() for line in lines}
+    metadata_gather_calls = [
+        line
+        for line in custom_calls
+        if 'custom_call_target="AssumeGatherIndicesInBound"' in line
+        and f"s32[{top_k}]" in line
+        and "take_along_axis)/gather" in line
+    ]
+    expected_lines = {
+        line for lines in kernel_calls.values() for line in lines
+    } | set(metadata_gather_calls)
     unexpected_custom_calls = [
         line for line in custom_calls if line not in expected_lines
     ]
@@ -109,6 +118,11 @@ def validate_sparse_attention_hlo(
     for name, lines in kernel_calls.items():
         if len(lines) != 1:
             violations.append(f"expected one {name} call, found {len(lines)}")
+    if len(metadata_gather_calls) != 1:
+        violations.append(
+            "expected one compact block-table metadata gather, found "
+            f"{len(metadata_gather_calls)}"
+        )
     if unexpected_custom_calls:
         violations.append(
             "unexpected sparse-attention custom calls: "
@@ -138,6 +152,8 @@ def validate_sparse_attention_hlo(
             name: len(lines) for name, lines in kernel_calls.items()
         },
         "custom_call_count": len(custom_calls),
+        "metadata_gather_custom_call_count": len(metadata_gather_calls),
+        "metadata_gather_custom_calls": metadata_gather_calls,
         "unexpected_custom_calls": unexpected_custom_calls,
         "forbidden_operations": forbidden_operations,
         "forbidden_selected_kv_materializations": forbidden_selected_kv,
