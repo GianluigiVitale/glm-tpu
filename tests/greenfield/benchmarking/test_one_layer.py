@@ -100,11 +100,18 @@ def _pallas_hlo() -> str:
     ]
     calls.extend(
         f"gather{i} = s32[1024] custom-call(index), custom_call_target=\"AssumeGatherIndicesInBound\""
-        for i in range(6)
+        for i in range(7)
     )
     calls.extend(
         f"scatter{i} = s32[8,2] custom-call(index), custom_call_target=\"GatherScatterIndicesBitpacked\""
         for i in range(2)
+    )
+    calls.extend(
+        (
+            "shared_gate_layout = u8[512,6144] custom-call(s0, s1, s2, s3), custom_call_target=\"ConcatBitcast\"",
+            "shared_up_layout = u8[512,6144] custom-call(s0, s1, s2, s3), custom_call_target=\"ConcatBitcast\"",
+            "shared_down_layout = u8[6144,512] custom-call(s0, s1, s2, s3), custom_call_target=\"ConcatBitcast\"",
+        )
     )
     return GOOD_HLO.replace(
         "  ROOT combine =",
@@ -116,7 +123,8 @@ def test_pallas_real_layer_hlo_requires_exact_kernel_and_metadata_calls() -> Non
     record = validate_pallas_real_layer_hlo(_pallas_hlo())
     assert record["passed"], record
     assert record["kernel_custom_call_count"] == 4
-    assert record["custom_call_count"] == 12
+    assert record["local_layout_custom_call_count"] == 3
+    assert record["custom_call_count"] == 16
 
     drifted = _pallas_hlo().replace(
         'custom_call_target="AssumeGatherIndicesInBound"',
@@ -126,6 +134,16 @@ def test_pallas_real_layer_hlo_requires_exact_kernel_and_metadata_calls() -> Non
     record = validate_pallas_real_layer_hlo(drifted)
     assert not record["passed"]
     assert any("unexpected" in item for item in record["violations"])
+
+
+def test_pallas_real_layer_hlo_rejects_shared_layout_shape_drift() -> None:
+    hlo = _pallas_hlo().replace(
+        "shared_down_layout = u8[6144,512]",
+        "shared_down_layout = u8[6144,1024]",
+    )
+    record = validate_pallas_real_layer_hlo(hlo)
+    assert not record["passed"]
+    assert any("ConcatBitcast shapes" in item for item in record["violations"])
 
 
 def test_pallas_real_layer_hlo_rejects_complete_decoded_overlay() -> None:

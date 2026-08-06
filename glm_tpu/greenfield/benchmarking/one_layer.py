@@ -209,6 +209,10 @@ def validate_pallas_real_layer_hlo(
     allowed_targets = {
         "tpu_custom_call",
         "AssumeGatherIndicesInBound",
+        # The TPU layout pass lowers each already-local shared FP8 table to
+        # four asynchronous VMEM slices followed by this non-collective
+        # bitwise reassembly.  Exact output shapes are checked below.
+        "ConcatBitcast",
         "GatherScatterIndicesBitpacked",
     }
     unexpected_targets = sorted(
@@ -222,7 +226,10 @@ def validate_pallas_real_layer_hlo(
         target: targets.count(target) for target in sorted(set(targets))
     }
     expected_target_counts = {
-        "AssumeGatherIndicesInBound": 6,
+        # Three scale gathers, three selected-output gathers, and the exact
+        # routed-weight gather from the 256-entry correction-bias vector.
+        "AssumeGatherIndicesInBound": 7,
+        "ConcatBitcast": 3,
         "GatherScatterIndicesBitpacked": 2,
         "tpu_custom_call": 4,
     }
@@ -230,6 +237,35 @@ def validate_pallas_real_layer_hlo(
         violations.append(
             "Pallas-layer custom-call counts drifted: "
             f"expected={expected_target_counts} observed={target_counts}"
+        )
+
+    concat_calls = [
+        line
+        for line in custom_calls
+        if 'custom_call_target="ConcatBitcast"' in line
+    ]
+    expected_concat_shapes = {
+        f"u8[{intermediate_size // stage_size},{hidden_size}]": 2,
+        f"u8[{hidden_size},{intermediate_size // stage_size}]": 1,
+    }
+    observed_concat_shapes = {
+        shape: sum(f"= {shape}" in line for line in concat_calls)
+        for shape in expected_concat_shapes
+    }
+    if observed_concat_shapes != expected_concat_shapes:
+        violations.append(
+            "local shared-FP8 ConcatBitcast shapes drifted: "
+            f"expected={expected_concat_shapes} "
+            f"observed={observed_concat_shapes}"
+        )
+    concat_arity = [
+        len(line.split("custom-call(", 1)[1].split(")", 1)[0].split(","))
+        for line in concat_calls
+    ]
+    if concat_arity != [stage_size] * len(concat_calls):
+        violations.append(
+            "local shared-FP8 ConcatBitcast arity drifted: "
+            f"expected={stage_size} observed={concat_arity}"
         )
 
     selected_gate_line = kernel_calls[
@@ -283,6 +319,8 @@ def validate_pallas_real_layer_hlo(
             len(lines) for lines in kernel_calls.values()
         ),
         "kernel_custom_calls": kernel_calls,
+        "local_layout_custom_call_count": len(concat_calls),
+        "local_layout_custom_calls": concat_calls,
         "passed": not violations,
         "violations": violations,
     }
