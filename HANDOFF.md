@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 19:47 UTC
+**Updated:** 2026-08-06 20:28 UTC
 
 ## Authority and isolation
 
@@ -394,15 +394,14 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
-   Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
-   profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
-2. Use the first complete-decoder trace to select the next optimization. The latest body trace
-   still identifies feature-MoE (`14.429044 ms/core`) and attention output (`4.385456 ms/core`),
-   but route weighting/sum fusion, attention output tile 256, and structured-value/output fusion
-   are now protected rejections. Do not infer another body optimization without measurement.
-3. Implement identical-condition raw-FP8 PP16 and WS32 challengers, adjudicate by protected wall,
-   then continue Gates E-H in binding order. No body-only result is a decoder or tok/s claim.
+1. Bind the sealed run-139/item-628 oracle to teacher-forced prefill and recurrent decode, then
+   prove complete 2K Gate D raw tokens, state/cache integrity, local-only HLO, measured HBM, fresh
+   trace, profiler-free steady wall, DB/archive, and cleanup.
+2. Add default-off full-decoder DSA event observability and obtain an independent exact event-order
+   oracle. The sealed raw-token artifact does not by itself prove all 21 producer events.
+3. Repeat Gate D at 8K, then optimize the measured complete decoder below 200 ms. Only afterward
+   run 128K/256K and identical-condition PP16/WS32 adjudication in the binding order. No body-only
+   or synthetic-state result is an answer tok/s claim.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.
 
@@ -768,3 +767,26 @@ pinned real 2K prompt/prefill or captured final-layout recurrent state plus inde
 DSA oracle; run the complete decoder with exact tokens, DSA set/tie order, state/cache integrity,
 fresh fleet XPlanes, wall/HBM, DB/archive, and cleanup; repeat at 8K. Only then optimize the measured
 complete decoder below 200 ms and proceed to 128K/256K.
+
+## Device-resident prefill and sealed 2K raw-token oracle
+
+Commit `684be03` adds a correctness-first teacher-forced prefill executable around the complete
+token step. One outer `lax.scan` carries residual, KV/index caches, position/context, and compact
+metadata entirely on device across the whole prompt; there is no per-token host or per-stage
+dispatch. Forced 32-device CPU execution passes exact cache/index/metadata writes. Its optimized
+HLO contains one device loop and one static copy of the complete decoder collectives
+(`58AG/17AR/17CP`), all local. This is a mechanism proof, not a production 128K prefill latency
+claim; the 2,034-token reference prefill is intentionally sequential.
+
+Commits `d9923a3` and `0047c9c` add, validate, and archive an independent append-only 2K token
+oracle. Artifact `greenfield_short_context_oracle_20260806T202544155912103Z` pins accepted legacy
+DB run 139 / item row 628 (`passkey_L2040_d0.25`, seed 283835, gold `110391`), source harness
+`b8e891e`, source fork `f0c63c302`, current legacy repository pin `b3c25df...16d`, exact tokenizer
+file hashes, 2,034 prompt IDs, and 20 raw output IDs. Prompt/output token-ID SHAs are
+`ec693ddf...56c` / `37761c49...3f6f`; tensor SHA is `cc5bc455...ab9a`; manifest is
+`f580c149...fe19`. Local inspection, file ledger `985bc6f9...959f`, remote-object ledger
+`1672b527...3dc2`, local/remote `SUCCESS` SHA `07700db5...6eec`, and approved-bucket archive pass.
+The first attempt `...T202503456286091Z` failed closed during remote verification because the local
+gcloud schema calls the field `crc32c_hash`; it has no `SUCCESS` and no claim. Relevant CPU/runtime/
+HLO regressions pass 38/38 when explicitly pinned to the CPU backend. Gate D remains open until the
+real prompt produces exact raw tokens and all DSA/cache/trace/wall/HBM protections pass.
