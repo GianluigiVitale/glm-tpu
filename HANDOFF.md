@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 12:39 UTC
+**Updated:** 2026-08-06 12:53 UTC
 
 ## Authority and isolation
 
@@ -396,8 +396,8 @@ enough; stage-local model layout remains the structural requirement.
 
 1. Finish Section 7.2 item 9. DB 451 proves the production fused RMSNorm/raw-FP8 primitive and DB
    452 proves the first 315-call body integration, reducing protected 78-layer wall by `91.71%`.
-   Capture a fresh DB452 XPlane, then remove the remaining structured kv_b and DSA wq_b/wk
-   reference dequant paths without decoded weight overlays. Preserve exact reference/CPU/TPU/tail/
+   DB453's fresh XPlane proves the remaining floor is structured kv_b and DSA wq_b/wk reference
+   dequant; remove those paths without decoded weight overlays. Preserve exact reference/CPU/TPU/tail/
    dtype/HLO/microbenchmark/fallback evidence. Section 7.2 item 8 is closed by DB 448--450; retain
    collective-permute transport and keep Pallas remote copy default-off.
 2. Integrate each remaining accepted path, rerun its exact oracle gate, then repeat the protected
@@ -532,6 +532,18 @@ the exact `219AG/294AR/16CP` structure. Compile max is `156.878 s`; maximum peak
 approved archive/remote `SUCCESS` are sealed, and post-run census is 8/8 clean. This is a decisive
 body-only result, not complete decoder latency or tok/s. Structured kv_b and DSA wq_b/wk remain on
 the reference dequant path and are the next item-9 targets.
+
+Fresh trace DB 453 /
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_trace2_20260806T124021528304196Z`
+at `0a934c2` reproduces p50 `4,876.357135 ms` (within 0.006% of DB 452) and captures eight
+XPlanes / 64 cores / two steps per core. The six remaining `reference/fp8.py:69-70` signatures
+total `573.504900 ms` per average core: DSA-shaped dequants contribute `96.134925 ms`, while
+structured kv_b contributes `477.369975 ms`. Eight serial stages predict `4,588.039200 ms`, or
+`94.09%` of body wall. The apparent `3,917.040445 ms` collective time is therefore stage-idle
+backpressure at the 16 compact permutes, not payload transfer latency. Device mean/max step is
+`4,700.132040/4,874.983940 ms`; busy time is `4,525.764602 ms`. Summary/XPlane SHAs are
+`a2f25c74...d935` / `04df4b66...09a7`; DB/archive/remote `SUCCESS` and 8/8 cleanup pass. This
+evidence makes structured kv_b the first remaining item-9 target, followed by DSA wq_b/wk.
 
 ## Protected feature-body attribution
 
