@@ -4574,3 +4574,13 @@ passes. Normal-two p50 moved `1.341385 -> 1.327685 ms`, but concentrated-eight r
 hashes, and clean-fleet gates pass. The challenger is rejected and the split-stream DB 429/430
 kernel/layout restored. Next discriminator removes host-expanded selected scale tables by indexing
 compact checkpoint-native scale blocks inside Pallas.
+
+## 2026-08-06 03:23 — Greenfield compact selected scales rejected
+
+Diagnostic `...T031705611686395Z` at `364867e` failed closed because a dynamic four-value K-block
+slice cannot satisfy TPU's 128-element HBM tile alignment; no DB/timing claim exists and cleanup is
+8/8. DB 433 at `8be32e0` used an aligned `[G,Nblock,128]` final scale layout and masked the live four
+blocks inside Pallas. Exactness, raw-U8/no-overlay HLO, provenance, archive, and cleanup pass, but
+normal-two p50 regressed `1.341385 -> 3.416799 ms` and scoped VMEM grew from 946,176 to 6,596,608
+bytes. The candidate and API are rejected/restored. Next, test the currently `arbitrary` but
+mathematically independent owned-route grid dimension as `parallel`.

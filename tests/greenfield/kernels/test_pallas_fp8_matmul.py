@@ -176,20 +176,14 @@ def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts(
     )
     route_indices = jnp.asarray(route_values, dtype=jnp.int32)
     expert_start = jnp.asarray(10, dtype=jnp.int32)
-    gate_scale_aligned = jnp.pad(
-        gate_scale, ((0, 0), (0, 0), (0, 128 - gate_scale.shape[2]))
-    )
-    up_scale_aligned = jnp.pad(
-        up_scale, ((0, 0), (0, 0), (0, 128 - up_scale.shape[2]))
-    )
     actual_gate, actual_up = fp8_selected_up_gate(
         hidden,
         route_indices,
         expert_start,
         gate_bits,
-        gate_scale_aligned,
+        gate_scale,
         up_bits,
-        up_scale_aligned,
+        up_scale,
         interpret=True,
     )
 

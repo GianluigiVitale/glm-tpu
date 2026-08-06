@@ -357,6 +357,27 @@ concentrated ceiling regresses `0.29%`, and peak allocation increases by about 1
 therefore an honest performance null, not a promotion. The split-stream DB 429/430 layout remains
 the accepted baseline. DB/archive/hash/remote-SUCCESS and eight-host pre/post cleanup all pass.
 
+The next compact-scale diagnostic `greenfield_fp8_selected_up_gate_normal_two_20260806T031705611686395Z`
+at `364867e` failed closed before correctness/timing: Mosaic could not prove that the dynamic
+K-block offset into `f32[64,16,48]` was aligned to TPU's 128-element HBM tile. It has no DB or
+performance claim, preserved its compiler error, and ended 8/8 clean.
+
+DB 433 / `greenfield_fp8_selected_up_gate_normal_two_20260806T031953587365200Z` at `8be32e0`
+tested the corrected final `[G,Nblock,128]` scale layout. The kernel loads an aligned two-output-
+block scale tile and masks/reduces the current four K blocks in VMEM. The comparison reproduces the
+normal baseline max/p99/mean error `0.00012207/0/5.76e-9`; HLO has one raw-U8 Pallas call with two
+`f32[64,16,128]` scale operands, two bounded gather markers, and no unexpected call or decoded
+overlay. The protected distribution is:
+
+| p50 | p90 | p95 | p99 | mean | compile | scoped VMEM |
+|---:|---:|---:|---:|---:|---:|---:|
+| 3.416799 | 3.429730 | 3.433913 | 3.443074 | 3.418136 ms | 1.986 s | 6,596,608 B |
+
+This is a `2.55x` regression versus DB 429's `1.341385 ms`; measured peak allocation remains about
+2.308 GB. The mask/reduction expansion is much more expensive than the existing bounded selected-
+scale staging, so the candidate is rejected without a concentrated run. DB/archive/hashes/remote
+SUCCESS and 8/8 cleanup pass, and the DB 429/430 kernel/layout was restored.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

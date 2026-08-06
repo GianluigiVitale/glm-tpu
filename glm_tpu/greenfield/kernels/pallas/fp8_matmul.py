@@ -134,6 +134,35 @@ def _aligned_scale_table(
     )
 
 
+def _selected_scale_table(
+    scale: Any,
+    local_ids: Any,
+    *,
+    padded_output: int,
+    padded_contraction: int,
+    block_shape: tuple[int, int],
+) -> Any:
+    """Expand only top-k selected scale metadata to direct vector loads."""
+
+    selected = jnp.take(scale, local_ids, axis=0)
+    output_blocks = padded_output // block_shape[0]
+    contraction_blocks = padded_contraction // block_shape[1]
+    selected = jnp.pad(
+        selected,
+        (
+            (0, 0),
+            (0, output_blocks - selected.shape[1]),
+            (0, contraction_blocks - selected.shape[2]),
+        ),
+    )
+    # [route,N-block,K-block] -> [route,K-block,1,N]. This is bounded by
+    # top-k=8 rather than local_experts=64 and matches the MXU output vector.
+    return jnp.transpose(
+        jnp.repeat(selected, block_shape[0], axis=1),
+        (0, 2, 1),
+    )[:, :, None, :]
+
+
 def _validate_selected_inputs(
     hidden: Any,
     route_indices: Any,
@@ -167,15 +196,14 @@ def _validate_selected_inputs(
         raise ValueError("selected-expert checkpoint payload must be uint8 bits")
     if scale.dtype != jnp.float32:
         raise ValueError("selected-expert block scales must be FP32")
-    expected_scale_prefix = (
+    expected_scale = (
         local_experts,
         _ceil_div(output, config.block_shape[0]),
+        _ceil_div(contraction, config.block_shape[1]),
     )
-    expected_scale = (*expected_scale_prefix, 128)
     if scale.shape != expected_scale:
         raise ValueError(
-            "selected-expert scales must use the final TPU-aligned layout "
-            f"{expected_scale}, got {scale.shape}"
+            f"selected-expert scale shape must be {expected_scale}, got {scale.shape}"
         )
     return route_indices.shape[0], local_experts, contraction, output
 
@@ -607,7 +635,6 @@ def fp8_selected_up_gate(
     up_raw = pad_weight(up_bits)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
-    output_blocks_per_tile = config.output_tile // config.block_shape[0]
     contraction_blocks_per_tile = (
         config.contraction_tile // config.block_shape[1]
     )
@@ -633,12 +660,20 @@ def fp8_selected_up_gate(
     compact_local_ids = jnp.zeros_like(local_ids).at[compact_index].set(
         local_ids
     )
-
-    # The final [expert,N-block,128] scale layout pads only compact metadata,
-    # not weights. A program loads two output blocks and masks four live K
-    # blocks from its aligned 128-wide scale tile entirely inside VMEM.
-    gate_scale_table = gate_scale
-    up_scale_table = up_scale
+    gate_scale_table = _selected_scale_table(
+        gate_scale,
+        compact_local_ids,
+        padded_output=padded_output,
+        padded_contraction=padded_contraction,
+        block_shape=config.block_shape,
+    )
+    up_scale_table = _selected_scale_table(
+        up_scale,
+        compact_local_ids,
+        padded_output=padded_output,
+        padded_contraction=padded_contraction,
+        block_shape=config.block_shape,
+    )
 
     def kernel(
         local_ids_value: Any,
@@ -673,40 +708,17 @@ def fp8_selected_up_gate(
                 gate_accumulator[...] = jnp.zeros_like(gate_accumulator)
                 up_accumulator[...] = jnp.zeros_like(up_accumulator)
 
-            def expand_scale(scale_tile: Any) -> Any:
-                columns = lax.broadcasted_iota(
-                    jnp.int32, scale_tile.shape, 1
-                )
-                first_block = (
-                    contraction_index
-                    * jnp.int32(contraction_blocks_per_tile)
-                )
-                block_values = []
-                for block_offset in range(contraction_blocks_per_tile):
-                    mask = columns == first_block + jnp.int32(block_offset)
-                    block_values.append(
-                        jnp.sum(
-                            jnp.where(mask, scale_tile, jnp.float32(0.0)),
-                            axis=1,
-                            dtype=jnp.float32,
-                        )
-                    )
-                compact = jnp.stack(block_values, axis=0)
-                return jnp.repeat(
-                    jnp.repeat(
-                        compact, config.block_shape[1], axis=0
-                    ),
-                    config.block_shape[0],
-                    axis=1,
-                )
-
             decoded_gate = (
                 lax.bitcast_convert_type(
                     gate_ref[...], jnp.float8_e4m3fn
                 )
                 .astype(config.accumulator_dtype)
-                .reshape(config.contraction_tile, config.output_tile)
-                * expand_scale(gate_scale_ref[...])
+                .reshape(
+                    contraction_blocks_per_tile,
+                    config.block_shape[1],
+                    config.output_tile,
+                )
+                * gate_scale_ref[...].astype(config.accumulator_dtype)
             ).reshape(config.contraction_tile, config.output_tile).astype(
                 jnp.bfloat16
             )
@@ -715,8 +727,12 @@ def fp8_selected_up_gate(
                     up_ref[...], jnp.float8_e4m3fn
                 )
                 .astype(config.accumulator_dtype)
-                .reshape(config.contraction_tile, config.output_tile)
-                * expand_scale(up_scale_ref[...])
+                .reshape(
+                    contraction_blocks_per_tile,
+                    config.block_shape[1],
+                    config.output_tile,
+                )
+                * up_scale_ref[...].astype(config.accumulator_dtype)
             ).reshape(config.contraction_tile, config.output_tile).astype(
                 jnp.bfloat16
             )
@@ -762,6 +778,18 @@ def fp8_selected_up_gate(
                 output_index,
             )
 
+        def scale_index(
+            output_index: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, Any, int, Any]:
+            return (
+                route_index,
+                contraction_index,
+                0,
+                output_index,
+            )
+
         def output_index(
             output_index_value: Any,
             route_index: Any,
@@ -781,14 +809,11 @@ def fp8_selected_up_gate(
         scale_spec = pl.BlockSpec(
             (
                 None,
-                output_blocks_per_tile,
-                128,
+                contraction_blocks_per_tile,
+                1,
+                config.output_tile,
             ),
-            lambda output_index, route_index, contraction_index: (
-                local_ids_value[route_index],
-                output_index,
-                0,
-            ),
+            scale_index,
         )
         output_spec = pl.BlockSpec(
             (None, config.row_tile, config.output_tile), output_index
@@ -874,13 +899,7 @@ def fp8_selected_up_gate(
                 * route_count
                 * padded_output
                 * padded_contraction
-                + 2
-                * route_count
-                * output_tiles
-                * contraction_tiles
-                * output_blocks_per_tile
-                * 128
-                * 4
+                + 2 * route_count * output_tiles * contraction_tiles * 4
                 + 2 * route_count * padded_output * config.row_tile * 2
             ),
             transcendentals=0,

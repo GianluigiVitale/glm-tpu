@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 03:12 UTC
+**Updated:** 2026-08-06 03:23 UTC
 
 ## Authority and isolation
 
@@ -200,6 +200,13 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   regressed `4.496970 -> 4.509895 ms` (`0.29%`), and measured peak allocation rose from
   `2.307/2.395` to `3.919/4.007 GB`. This is an honest null and is not promoted. The accepted
   split-stream API/layout was restored after the measurement; DB 429/430 remain the baseline.
+- Compact-scale diagnostic `...T031705611686395Z` at `364867e` failed closed before timing because
+  Mosaic requires the dynamic K-block HBM offset to align to its 128-element TPU tile; it has no DB
+  or performance claim and ended 8/8 clean. Protected DB 433 at `8be32e0` then tested an aligned
+  `[G,Nblock,128]` scale table with masked four-block extraction inside Pallas. It is exact and all
+  HLO/DB/archive/cleanup gates pass, but normal-two p50 regressed `1.341385 -> 3.416799 ms` (`2.55x`)
+  while scoped VMEM grew `946,176 -> 6,596,608` bytes. No concentrated run was needed to reject it.
+  The DB 429/430 scale staging and API were restored after the proof.
 
 ## Protected evidence
 
@@ -301,12 +308,12 @@ enough; stage-local model layout remains the structural requirement.
 ## Exact next sequence
 
 1. DB 429/430 remain the route-proportional `1.341/4.497 ms` normal-two/concentrated-eight baseline;
-   DB 431/432 reject a merged output stream. Remove the selected-scale expansion next: pass compact
-   checkpoint-native scale blocks to Pallas and index them by selected expert/output/K tile inside
-   the kernel, with exact HLO/correctness and both route distributions. Only after a competitive
-   protected kernel should activation, down, and routed/shared combine be composed in binding
-   Pallas order and the real one-layer gate repeated. Never substitute same-weight M8 or a slow
-   correctness-only GMM for production proof.
+   DB 431/432 reject a merged stream and DB 433 rejects in-kernel compact-scale extraction. The
+   owned-route grid is mathematically independent but currently declared `arbitrary`; test a
+   `parallel` route dimension (and only then route/output grid order) under exact HLO/correctness and
+   both distributions. Only after a competitive protected kernel should activation, down, and
+   routed/shared combine be composed in binding Pallas order and the real one-layer gate repeated.
+   Never substitute same-weight M8 or a slow correctness-only GMM for production proof.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,

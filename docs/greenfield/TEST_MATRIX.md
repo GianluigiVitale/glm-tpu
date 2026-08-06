@@ -35,14 +35,14 @@
 | Gate D reference-body diagnostic | Real 78-layer 2K load and compile; 25.46 GiB/chip; 219AG/294AR/16CP; 312 logical AR results; 2.7M bundles/580 overlays; staged execution projected 25–30 minutes/body | Evidence-rejected; reference graph cannot be the production engine |
 | Pallas FP8 block matmul | DB 422: production M8/K6144/N2048, raw-U8/128x128 VMEM dequant, BF16 MXU/FP32 accumulation, exact fallback, one custom call/no overlay, wall/HBM/DB/archive/cleanup | Pass on TPU v4 |
 | Pallas FP8 paired gate/up | DB 423: two raw matrices/two exact outputs, one custom call/no overlay, 0.815435 ms p50, wall/HBM/DB/archive/cleanup; same-weight M8 mechanism only | Pass on TPU v4; selected-expert GMM pending |
-| Pallas FP8 selected gate/up | DB 429/430: device dynamic owned-route compaction; exact normal-two/concentrated-eight outputs/order/zeros; one raw-U8 TPU kernel + bounded metadata/no overlay; 1.341385/4.496970 ms p50. DB 431/432 merged-stream challenger is exact but mixed 1.327685/4.509895 ms with higher peak allocation, so rejected. | Correctness/route-proportional mechanism pass; split-stream baseline retained; performance optimization continues |
+| Pallas FP8 selected gate/up | DB 429/430: device dynamic owned-route compaction; exact normal-two/concentrated-eight outputs/order/zeros; one raw-U8 TPU kernel + bounded metadata/no overlay; 1.341385/4.496970 ms p50. DB 431/432 merged stream and DB 433 aligned compact-scale extraction are exact but performance-rejected. | Correctness/route-proportional mechanism pass; DB 429/430 baseline retained; performance optimization continues |
 | Gate D implementation | All-78-layer schedule/state; DB420-exact runtime loader; fused raw-FP8 fallback layer; one-step all-stage map; exact forced-CPU state/local HLO | In progress; hot path replacement required |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
 
 Last full verified suite: 234 passed / 1 skipped across greenfield plus ownership guards with
 `JAX_PLATFORMS=cpu` (2026-08-06).
-Latest focused restored-baseline/kernel-contract suite: 9 passed (2026-08-06).
+Latest focused restored-baseline/kernel-contract suite after DB 433 rejection: 9 passed (2026-08-06).
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove one real sparse layer under both required local plans; DB 420 proves complete
 checkpoint integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers. None
