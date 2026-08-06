@@ -1,5 +1,13 @@
 """Compact Pallas kernels for the greenfield TPU execution path."""
 
-from .fp8_matmul import Fp8BlockMatmulConfig, fp8_block_matmul
+from .fp8_matmul import (
+    Fp8BlockMatmulConfig,
+    fp8_block_matmul,
+    fp8_block_up_gate,
+)
 
-__all__ = ["Fp8BlockMatmulConfig", "fp8_block_matmul"]
+__all__ = [
+    "Fp8BlockMatmulConfig",
+    "fp8_block_matmul",
+    "fp8_block_up_gate",
+]

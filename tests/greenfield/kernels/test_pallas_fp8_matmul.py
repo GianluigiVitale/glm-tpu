@@ -9,6 +9,7 @@ import pytest
 from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
+    fp8_block_up_gate,
 )
 from glm_tpu.greenfield.kernels.reference.fp8 import (
     dequantize_fp8_bits_block_weight,
@@ -69,6 +70,59 @@ def test_fp8_block_matmul_rejects_shape_and_dtype_drift() -> None:
         fp8_block_matmul(lhs, bits.astype(jnp.int8), scale, interpret=True)
     with pytest.raises(ValueError, match="scale shape"):
         fp8_block_matmul(lhs, bits, jnp.ones((1, 2), jnp.float32), interpret=True)
+
+
+@pytest.mark.parametrize("shape", [(1, 128, 128), (3, 130, 135)])
+def test_fp8_block_up_gate_interpret_matches_two_references(
+    shape: tuple[int, int, int],
+) -> None:
+    rows, contraction, output = shape
+    lhs = jnp.asarray(
+        np.linspace(-0.5, 0.5, rows * contraction, dtype=np.float32).reshape(
+            rows, contraction
+        ),
+        dtype=jnp.bfloat16,
+    )
+    linear = np.arange(output * contraction, dtype=np.float32).reshape(
+        output, contraction
+    )
+    gate_bits = _bits(jnp.asarray(np.sin(linear * 0.017) * 0.5))
+    up_bits = _bits(jnp.asarray(np.cos(linear * 0.011) * 0.375))
+    scale_shape = ((output + 127) // 128, (contraction + 127) // 128)
+    gate_scale = jnp.asarray(
+        np.linspace(0.25, 0.75, np.prod(scale_shape), dtype=np.float32).reshape(
+            scale_shape
+        )
+    )
+    up_scale = jnp.asarray(
+        np.linspace(0.5, 1.0, np.prod(scale_shape), dtype=np.float32).reshape(
+            scale_shape
+        )
+    )
+
+    def reference(bits: jax.Array, scale: jax.Array) -> jax.Array:
+        decoded = dequantize_fp8_bits_block_weight(bits, scale)
+        return lax.dot_general(
+            lhs,
+            decoded,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        ).astype(jnp.bfloat16)
+
+    actual_gate, actual_up = fp8_block_up_gate(
+        lhs,
+        gate_bits,
+        gate_scale,
+        up_bits,
+        up_scale,
+        interpret=True,
+    )
+    np.testing.assert_array_equal(
+        np.asarray(actual_gate), np.asarray(reference(gate_bits, gate_scale))
+    )
+    np.testing.assert_array_equal(
+        np.asarray(actual_up), np.asarray(reference(up_bits, up_scale))
+    )
 
 
 def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:

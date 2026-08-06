@@ -65,6 +65,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rows", type=int, default=8)
     parser.add_argument("--contraction", type=int, default=6144)
     parser.add_argument("--output-width", type=int, default=2048)
+    parser.add_argument(
+        "--kernel",
+        choices=("single_up", "up_gate"),
+        default="single_up",
+    )
     parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--iterations", type=int, default=1000)
     return parser.parse_args()
@@ -89,7 +94,10 @@ def main() -> int:
     import jax.numpy as jnp
     import ml_dtypes
 
-    from glm_tpu.greenfield.kernels.pallas import fp8_block_matmul
+    from glm_tpu.greenfield.kernels.pallas import (
+        fp8_block_matmul,
+        fp8_block_up_gate,
+    )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
         dequantize_fp8_bits_block_weight,
     )
@@ -123,15 +131,44 @@ def main() -> int:
         (output // 128) * (contraction // 128),
         dtype=np.float32,
     ).reshape(output // 128, contraction // 128)
+    gate_weight_host = (
+        ((linear * np.uint64(37) + np.uint64(11)) % np.uint64(120))
+        + ((linear // np.uint64(73)) % np.uint64(2)) * np.uint64(128)
+    ).astype(np.uint8).reshape(output, contraction)
+    gate_scale_host = np.linspace(
+        0.000375,
+        0.001625,
+        (output // 128) * (contraction // 128),
+        dtype=np.float32,
+    ).reshape(output // 128, contraction // 128)
 
     with jax.default_device(device):
         lhs = jax.device_put(lhs_host, device)
         weight_bits = jax.device_put(weight_host, device)
         scale = jax.device_put(scale_host, device)
+        if args.kernel == "single_up":
+            kernel = fp8_block_matmul
+            kernel_inputs = (lhs, weight_bits, scale)
+            reference_inputs = (("up", weight_bits, scale),)
+            kernel_hlo_name = "greenfield_fp8_block_matmul"
+        else:
+            gate_bits = jax.device_put(gate_weight_host, device)
+            gate_scale = jax.device_put(gate_scale_host, device)
+            kernel = fp8_block_up_gate
+            kernel_inputs = (
+                lhs,
+                gate_bits,
+                gate_scale,
+                weight_bits,
+                scale,
+            )
+            reference_inputs = (
+                ("gate", gate_bits, gate_scale),
+                ("up", weight_bits, scale),
+            )
+            kernel_hlo_name = "greenfield_fp8_block_up_gate"
         lower_started = time.monotonic()
-        compiled = jax.jit(fp8_block_matmul).lower(
-            lhs, weight_bits, scale
-        ).compile()
+        compiled = jax.jit(kernel).lower(*kernel_inputs).compile()
         compile_seconds = time.monotonic() - lower_started
         hlo = compiled.as_text()
         hlo_sha256 = sha256(hlo.encode()).hexdigest()
@@ -144,8 +181,7 @@ def main() -> int:
         kernel_calls = [
             line
             for line in custom_calls
-            if "greenfield_fp8_block_matmul" in line
-            or "tpu_custom_call" in line
+            if kernel_hlo_name in line or "tpu_custom_call" in line
         ]
         forbidden_full_overlays = [
             shape
@@ -167,42 +203,80 @@ def main() -> int:
         if not hlo_contract["passed"]:
             raise RuntimeError(f"FP8 Pallas HLO contract failed: {hlo_contract}")
 
-        actual = compiled(lhs, weight_bits, scale)
-        actual.block_until_ready()
-        decoded = dequantize_fp8_bits_block_weight(weight_bits, scale)
-        expected = lax.dot_general(
-            lhs,
-            decoded,
-            dimension_numbers=(((1,), (1,)), ((), ())),
-            preferred_element_type=jnp.float32,
-        ).astype(jnp.bfloat16)
-        expected.block_until_ready()
-        actual_host = np.asarray(actual, dtype=np.float32)
-        expected_host = np.asarray(expected, dtype=np.float32)
-        difference = np.abs(actual_host - expected_host)
+        actual_raw = compiled(*kernel_inputs)
+        actual_values = (
+            (actual_raw,) if args.kernel == "single_up" else tuple(actual_raw)
+        )
+        jax.block_until_ready(actual_values)
+        expected_values = []
+        for _, bits, projection_scale in reference_inputs:
+            decoded = dequantize_fp8_bits_block_weight(
+                bits, projection_scale
+            )
+            expected_values.append(
+                lax.dot_general(
+                    lhs,
+                    decoded,
+                    dimension_numbers=(((1,), (1,)), ((), ())),
+                    preferred_element_type=jnp.float32,
+                ).astype(jnp.bfloat16)
+            )
+        jax.block_until_ready(tuple(expected_values))
+        output_comparisons = []
+        differences = []
+        for (name, _, _), actual, expected in zip(
+            reference_inputs, actual_values, expected_values, strict=True
+        ):
+            actual_host = np.asarray(actual, dtype=np.float32)
+            expected_host = np.asarray(expected, dtype=np.float32)
+            difference = np.abs(actual_host - expected_host)
+            differences.append(difference.reshape(-1))
+            output_comparisons.append(
+                {
+                    "name": name,
+                    "all_finite": bool(np.isfinite(actual_host).all()),
+                    "max_abs": float(difference.max()),
+                    "mean_abs": float(difference.mean()),
+                    "p99_abs": float(np.percentile(difference, 99)),
+                    "passed": bool(
+                        np.isfinite(actual_host).all()
+                        and np.allclose(
+                            actual_host,
+                            expected_host,
+                            rtol=0.02,
+                            atol=0.0625,
+                        )
+                    ),
+                }
+            )
+        combined_difference = np.concatenate(differences)
         comparison = {
-            "all_finite": bool(np.isfinite(actual_host).all()),
-            "max_abs": float(difference.max()),
-            "mean_abs": float(difference.mean()),
-            "p99_abs": float(np.percentile(difference, 99)),
-            "passed": bool(
-                np.isfinite(actual_host).all()
-                and np.allclose(actual_host, expected_host, rtol=0.02, atol=0.0625)
-            ),
+            "outputs": output_comparisons,
+            "all_finite": all(value["all_finite"] for value in output_comparisons),
+            "max_abs": float(combined_difference.max()),
+            "mean_abs": float(combined_difference.mean()),
+            "p99_abs": float(np.percentile(combined_difference, 99)),
+            "passed": all(value["passed"] for value in output_comparisons),
         }
         if not comparison["passed"]:
             raise RuntimeError(f"FP8 Pallas/reference comparison failed: {comparison}")
 
         for _ in range(args.warmup):
-            compiled(lhs, weight_bits, scale).block_until_ready()
+            jax.block_until_ready(compiled(*kernel_inputs))
         samples = []
         checksum = 0.0
         for _ in range(args.iterations):
             started = time.perf_counter_ns()
-            value = compiled(lhs, weight_bits, scale)
-            value.block_until_ready()
+            value_raw = compiled(*kernel_inputs)
+            jax.block_until_ready(value_raw)
             samples.append((time.perf_counter_ns() - started) / 1_000_000.0)
-            checksum += float(np.asarray(value[0, 0], dtype=np.float32))
+            values = (
+                (value_raw,) if args.kernel == "single_up" else tuple(value_raw)
+            )
+            checksum += sum(
+                float(np.asarray(value[0, 0], dtype=np.float32))
+                for value in values
+            )
 
     args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
     args.hlo_output.write_text(hlo)
@@ -212,6 +286,7 @@ def main() -> int:
         "backend": jax.default_backend(),
         "device": str(device),
         "device_kind": device.device_kind,
+        "kernel": args.kernel,
         "shape": {
             "lhs": [rows, contraction],
             "weight_bits": [output, contraction],

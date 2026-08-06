@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Protected production-shaped TPU-v4 proof for the first greenfield Pallas kernel.
+# Protected production-shaped TPU-v4 proof for greenfield FP8 projection kernels.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -10,7 +10,8 @@ readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_matmul_$(date -u +%Y%m%dT%H%M%S%NZ)}
+KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
+TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${KERNEL}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-1000}
 RUN_DIR=/home/gianl/glm-run/$TAG
@@ -22,6 +23,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 }
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]] || {
   echo "refusing FP8 kernel run from a dirty worktree" >&2
+  exit 2
+}
+[[ $KERNEL == single_up || $KERNEL == up_gate ]] || {
+  echo "FP8 kernel must be single_up or up_gate" >&2
   exit 2
 }
 [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || {
@@ -83,13 +88,13 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN warmup=$WARMUP iterations=$ITERATIONS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN kernel=$KERNEL warmup=$WARMUP iterations=$ITERATIONS"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
 }
 
-say "compiling and timing GLM expert up projection on TPU v4"
+say "compiling and timing GLM expert $KERNEL projection on TPU v4"
 started=$(date +%s)
 (
   cd "$WORKTREE"
@@ -103,6 +108,7 @@ started=$(date +%s)
       --expected-code-hash "$PIN" \
       --output "$RUN_DIR/runner.json" \
       --hlo-output "$RUN_DIR/hlo/fp8_matmul.optimized_hlo.txt" \
+      --kernel "$KERNEL" \
       --warmup "$WARMUP" \
       --iterations "$ITERATIONS"
 ) >"$RUN_DIR/runner.log" 2>&1
@@ -136,24 +142,31 @@ import provenance as pv
 conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
-    model="zai-org/GLM-5.2-FP8:greenfield-fp8-up-kernel",
+    model=f"zai-org/GLM-5.2-FP8:greenfield-fp8-{runner['kernel']}-kernel",
     revision="runtime-u8-e4m3fn-block128",
     env={
         "GLM_ENGINE": "greenfield_fp8_matmul",
         "greenfield_code_hash": pin,
         "hlo_sha256": runner["hlo"]["sha256"],
         "device_kind": runner["device_kind"],
+        "kernel": runner["kernel"],
     },
-    note="Protected production-shaped Pallas FP8 up-projection microbenchmark",
+    note=(
+        "Protected production-shaped Pallas FP8 projection microbenchmark: "
+        + runner["kernel"]
+    ),
     harness_repo=repo,
     fork_repo=None,
 )
 pv.record_item(
     conn,
     run_id,
-    benchmark="greenfield_fp8_matmul",
+    benchmark=f"greenfield_fp8_{runner['kernel']}",
     item_id="m8_k6144_n2048",
-    prompt="Raw-U8 E4M3FN 128x128 block-scaled expert up projection.",
+    prompt=(
+        "Raw-U8 E4M3FN 128x128 block-scaled expert projection: "
+        + runner["kernel"]
+    ),
     gold="Bounded exact-fallback output and one compact Pallas custom call.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=str(runner["checksum"]),
@@ -164,7 +177,7 @@ pv.record_item(
 pv.finalize(
     conn,
     run_id,
-    benchmark="greenfield_fp8_matmul",
+    benchmark=f"greenfield_fp8_{runner['kernel']}",
     metric="contract_valid",
     value=1.0,
     note="Standalone kernel microbenchmark; not layer latency or token throughput.",

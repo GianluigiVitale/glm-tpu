@@ -94,6 +94,43 @@ def _validate_inputs(
     return rows, contraction, output
 
 
+def _scale_value(
+    scale_tile: Any, contraction_index: Any, output_index: Any
+) -> Any:
+    """Select one scalar from an aligned VMEM scale tile in registers."""
+
+    scale_rows = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 0)
+    scale_columns = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 1)
+    scale_mask = (
+        (scale_rows == contraction_index % jnp.int32(8))
+        & (scale_columns == output_index)
+    )
+    # Dynamic slicing a VMEM vector is not implemented by the v4 Mosaic
+    # lowering. The other 1,023 entries are masked to zero before reduction.
+    return jnp.sum(
+        jnp.where(scale_mask, scale_tile, jnp.float32(0.0)),
+        dtype=jnp.float32,
+    )
+
+
+def _aligned_scale_table(
+    scale: Any, *, output_tiles: int, contraction_tiles: int
+) -> Any:
+    if output_tiles > 128:
+        raise ValueError("FP8 matmul supports at most 128 output-scale blocks")
+    aligned_contraction_tiles = _ceil_div(contraction_tiles, 8) * 8
+    # Mosaic cannot issue a dynamically indexed scalar VMEM load from the
+    # compact [N-block,K-block] table. This bounded metadata staging is 24 KiB
+    # for GLM up, compared with 12 MiB of FP8 weight bytes.
+    return jnp.pad(
+        jnp.transpose(scale),
+        (
+            (0, aligned_contraction_tiles - contraction_tiles),
+            (0, 128 - output_tiles),
+        ),
+    )
+
+
 def fp8_block_matmul(
     lhs: Any,
     weight_bits: Any,
@@ -139,21 +176,10 @@ def fp8_block_matmul(
     weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
-    if output_tiles > 128:
-        raise ValueError("FP8 matmul supports at most 128 output-scale blocks")
-    aligned_contraction_tiles = _ceil_div(contraction_tiles, 8) * 8
-    # Mosaic cannot issue a dynamically indexed scalar VMEM load from the
-    # compact [N-block,K-block] scale table: its two tiled dimensions require
-    # 8x128-aligned vector access.  Transpose and pad the few-KiB table so each
-    # program loads one aligned 8x128 scale tile, then selects its scalar in
-    # registers.  This is bounded metadata staging, not a decoded-weight
-    # overlay (GLM up: 24 KiB versus 12 MiB of FP8 weight bytes).
-    scale_table = jnp.pad(
-        jnp.transpose(scale),
-        (
-            (0, aligned_contraction_tiles - contraction_tiles),
-            (0, 128 - output_tiles),
-        ),
+    scale_table = _aligned_scale_table(
+        scale,
+        output_tiles=output_tiles,
+        contraction_tiles=contraction_tiles,
     )
 
     def kernel(
@@ -173,19 +199,8 @@ def fp8_block_matmul(
         # 128x128 VMEM tile, apply its scalar inverse scale, then feed BF16 to
         # the MXU while accumulating in FP32.
         output_index = pl.program_id(0)
-        scale_tile = scale_ref[...]
-        scale_rows = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 0)
-        scale_columns = lax.broadcasted_iota(jnp.int32, scale_tile.shape, 1)
-        scale_mask = (
-            (scale_rows == contraction_index % jnp.int32(8))
-            & (scale_columns == output_index)
-        )
-        # Dynamic slicing a VMEM vector is not implemented by the v4 Mosaic
-        # lowering.  Select the one live scalar with register predicates and a
-        # vector reduction instead; the other 1,023 entries are zero.
-        scale_value = jnp.sum(
-            jnp.where(scale_mask, scale_tile, jnp.float32(0.0)),
-            dtype=jnp.float32,
+        scale_value = _scale_value(
+            scale_ref[...], contraction_index, output_index
         )
         decoded_weight = (
             weight_ref[...].astype(config.accumulator_dtype)
@@ -269,3 +284,201 @@ def fp8_block_matmul(
         ),
     )
     return call(lhs, weight_fp8, scale_table)[:rows, :output]
+
+
+def fp8_block_up_gate(
+    lhs: Any,
+    gate_bits: Any,
+    gate_scale: Any,
+    up_bits: Any,
+    up_scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> tuple[Any, Any]:
+    """Compute gate and up projections in one TPU custom call.
+
+    The two projections keep distinct FP32 accumulators and BF16 outputs.  The
+    following SwiGLU activation remains outside this first kernel so its exact
+    dtype boundary can be protected independently before a later fusion.
+    """
+
+    rows, contraction, output = _validate_inputs(
+        lhs, gate_bits, gate_scale, config
+    )
+    up_geometry = _validate_inputs(lhs, up_bits, up_scale, config)
+    if up_geometry != (rows, contraction, output):
+        raise ValueError("FP8 gate/up projection geometries disagree")
+    padded_rows = _ceil_div(rows, config.row_tile) * config.row_tile
+    padded_contraction = (
+        _ceil_div(contraction, config.contraction_tile)
+        * config.contraction_tile
+    )
+    padded_output = _ceil_div(output, config.output_tile) * config.output_tile
+    if padded_rows != rows or padded_contraction != contraction:
+        lhs = jnp.pad(
+            lhs,
+            ((0, padded_rows - rows), (0, padded_contraction - contraction)),
+        )
+
+    def pad_weight(value: Any) -> Any:
+        if padded_output == output and padded_contraction == contraction:
+            return value
+        return jnp.pad(
+            value,
+            (
+                (0, padded_output - output),
+                (0, padded_contraction - contraction),
+            ),
+        )
+
+    gate_fp8 = lax.bitcast_convert_type(
+        pad_weight(gate_bits), jnp.float8_e4m3fn
+    )
+    up_fp8 = lax.bitcast_convert_type(
+        pad_weight(up_bits), jnp.float8_e4m3fn
+    )
+    output_tiles = padded_output // config.output_tile
+    contraction_tiles = padded_contraction // config.contraction_tile
+    gate_scale_table = _aligned_scale_table(
+        gate_scale,
+        output_tiles=output_tiles,
+        contraction_tiles=contraction_tiles,
+    )
+    up_scale_table = _aligned_scale_table(
+        up_scale,
+        output_tiles=output_tiles,
+        contraction_tiles=contraction_tiles,
+    )
+
+    def kernel(
+        lhs_ref: Any,
+        gate_ref: Any,
+        gate_scale_ref: Any,
+        up_ref: Any,
+        up_scale_ref: Any,
+        gate_output_ref: Any,
+        up_output_ref: Any,
+        gate_accumulator_ref: Any,
+        up_accumulator_ref: Any,
+    ) -> None:
+        contraction_index = pl.program_id(1)
+
+        @pl.when(contraction_index == 0)
+        def initialize_accumulators() -> None:
+            gate_accumulator_ref[...] = jnp.zeros_like(gate_accumulator_ref)
+            up_accumulator_ref[...] = jnp.zeros_like(up_accumulator_ref)
+
+        output_index = pl.program_id(0)
+        gate_value = _scale_value(
+            gate_scale_ref[...], contraction_index, output_index
+        )
+        up_value = _scale_value(
+            up_scale_ref[...], contraction_index, output_index
+        )
+        decoded_gate = (
+            gate_ref[...].astype(config.accumulator_dtype) * gate_value
+        ).astype(jnp.bfloat16)
+        decoded_up = (
+            up_ref[...].astype(config.accumulator_dtype) * up_value
+        ).astype(jnp.bfloat16)
+        dimensions = (((1,), (1,)), ((), ()))
+        gate_accumulator_ref[...] += lax.dot_general(
+            lhs_ref[...],
+            decoded_gate,
+            dimension_numbers=dimensions,
+            preferred_element_type=config.accumulator_dtype,
+        )
+        up_accumulator_ref[...] += lax.dot_general(
+            lhs_ref[...],
+            decoded_up,
+            dimension_numbers=dimensions,
+            preferred_element_type=config.accumulator_dtype,
+        )
+
+        @pl.when(contraction_index == contraction_tiles - 1)
+        def store_outputs() -> None:
+            gate_output_ref[...] = gate_accumulator_ref[...].astype(
+                config.output_dtype
+            )
+            up_output_ref[...] = up_accumulator_ref[...].astype(
+                config.output_dtype
+            )
+
+    def lhs_index(output_index: Any, contraction_index: Any) -> tuple[Any, Any]:
+        del output_index
+        return 0, contraction_index
+
+    def weight_index(
+        output_index: Any, contraction_index: Any
+    ) -> tuple[Any, Any]:
+        return output_index, contraction_index
+
+    def output_index(
+        output_index_value: Any, contraction_index: Any
+    ) -> tuple[Any, Any]:
+        del contraction_index
+        return 0, output_index_value
+
+    def scale_index(
+        output_index_value: Any, contraction_index: Any
+    ) -> tuple[Any, int]:
+        del output_index_value
+        return contraction_index // jnp.int32(8), 0
+
+    output_shape = jax.ShapeDtypeStruct(
+        (padded_rows, padded_output), config.output_dtype
+    )
+    output_spec = pl.BlockSpec(
+        (padded_rows, config.output_tile), output_index
+    )
+    call = pl.pallas_call(
+        kernel,
+        out_shape=(output_shape, output_shape),
+        grid=(output_tiles, contraction_tiles),
+        in_specs=(
+            pl.BlockSpec(
+                (padded_rows, config.contraction_tile), lhs_index
+            ),
+            pl.BlockSpec(
+                (config.output_tile, config.contraction_tile), weight_index
+            ),
+            pl.BlockSpec((8, 128), scale_index),
+            pl.BlockSpec(
+                (config.output_tile, config.contraction_tile), weight_index
+            ),
+            pl.BlockSpec((8, 128), scale_index),
+        ),
+        out_specs=(output_spec, output_spec),
+        scratch_shapes=(
+            pltpu.VMEM(
+                (padded_rows, config.output_tile), config.accumulator_dtype
+            ),
+            pltpu.VMEM(
+                (padded_rows, config.output_tile), config.accumulator_dtype
+            ),
+        ),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel", "arbitrary"),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_block_up_gate_"
+            f"m{padded_rows}_k{padded_contraction}_n{padded_output}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=4 * padded_rows * padded_contraction * padded_output,
+            bytes_accessed=(
+                padded_rows * padded_contraction * 2
+                + 2 * padded_output * padded_contraction
+                + 2 * output_tiles * contraction_tiles * 4
+                + 2 * padded_rows * padded_output * 2
+            ),
+            transcendentals=0,
+        ),
+    )
+    gate, up = call(
+        lhs, gate_fp8, gate_scale_table, up_fp8, up_scale_table
+    )
+    return gate[:rows, :output], up[:rows, :output]
