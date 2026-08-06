@@ -288,17 +288,18 @@ found a physical BlockSpec indexing bug, which DB 427 fixes, but the corrected l
 
 The next controlled experiment removes a confounder rather than tuning this result: DB 427 accepts
 the two full 64-expert raw tables as `[G,N,K]` and transposes them to the Pallas `[G,K,N]` access
-order inside the timed JIT. Its optimized HLO therefore has three total custom calls, only one of
-which is the selected kernel. The greenfield checkpoint/kernel contract must persist raw expert
-weights as `[G,K,N]`, retain compact per-block scales, and require one total custom call. Until that
-protected test is fast, selected-expert activation/down integration is blocked and no decoder or
-tok/s claim exists.
+order inside the timed JIT. The greenfield checkpoint/kernel contract must persist raw expert
+weights as `[G,K,N]` and retain compact per-block scales. Until that protected test is fast,
+selected-expert activation/down integration is blocked and no decoder or tok/s claim exists.
 
-Follow-up diagnostic `greenfield_fp8_selected_up_gate_20260806T024137692707617Z` at `5b77934`
-supplied `[G,K,N]` directly and failed the strengthened HLO gate before correctness or timing. The
-transpose was absent, but two whole-table U8-to-F8 bitcast calls remained alongside the Pallas call.
-The run has no DB/performance claim and ended 8/8 clean. The next revision moves the same-width
-bitcast inside Pallas after tile DMA so complete expert tables remain raw U8 in HBM.
+Follow-up diagnostics `...T024137692707617Z` at `5b77934` and `...T024407985780210Z` at `911ca88`
+supplied `[G,K,N]` directly and failed an over-strict one-total-call HLO gate before correctness or
+timing. Both have no DB/performance claim and ended 8/8 clean. The second run preserved full HLO and
+corrected the earlier interpretation: its two auxiliary calls are bounded
+`AssumeGatherIndicesInBound` markers for compact scale gathers, not weight transformations. The
+main Pallas operand is raw `u8[64,6144,2048]`; tile-local U8-to-F8 bitcast is inside the kernel. The
+revised contract permits exactly those two metadata markers and rejects any other auxiliary call or
+full F8 table view.
 
 ## 2026-08-05 — protected topology/local-group proof
 

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 02:44 UTC
+**Updated:** 2026-08-06 02:48 UTC
 
 ## Authority and isolation
 
@@ -165,17 +165,18 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   proofs but are performance-rejected and must not enter the decoder. Three intervening scale-layout
   diagnostics failed comparison before timing and were preserved without DB claims; they exposed
   and fixed a BlockSpec element-offset-versus-block-index error.
-- DB 427 HLO has three total custom calls although only one is the selected Pallas kernel. Its API
-  receives each full local raw table as `[G,N,K]` and transposes it to `[G,K,N]` inside the JIT;
-  for two 64-expert K6144/N2048 tables that is about 1.5 GiB of raw traffic and appears as extra
-  transpose/bitcast fusions. The exact next discriminator is a final packed `[G,K,N]` raw layout
-  supplied directly to the kernel, with compact scales still expanded only for top-8 routes. The
-  protected HLO must reduce to one total custom call before timing can promote the result.
-- Diagnostic `...T024137692707617Z` at `5b77934` supplied final `[G,K,N]` tables and failed closed
-  on the strengthened one-total-call contract before correctness/timing. It proved the transpose
-  was gone, but whole-table U8-to-F8 bitcasts still formed two extra calls; cleanup was 8/8. The
-  current code therefore keeps full tables U8 and performs the same-width bitcast only after each
-  selected tile reaches Pallas VMEM.
+- DB 427 receives each full local raw table as `[G,N,K]` and transposes it to the Pallas `[G,K,N]`
+  access order inside the JIT, so final-layout packing remains the next controlled discriminator.
+  The original inference that its two auxiliary custom calls were transpose/bitcast fusions was
+  wrong: preserved follow-up HLO proves they are bounded `AssumeGatherIndicesInBound` markers for
+  the two compact scale gathers. This correction is explicit; custom-call count alone did not prove
+  the transpose cost.
+- Diagnostics `...T024137692707617Z` at `5b77934` and `...T024407985780210Z` at `911ca88` supplied
+  final `[G,K,N]` tables and failed closed on the over-strict one-total-call contract before
+  correctness/timing; both ended 8/8 clean. The second preserved full HLO: the selected kernel's
+  operands are raw `u8[64,6144,2048]`, plus exactly two bounded metadata markers and no weight
+  transform call. The corrected contract allows only those markers, forbids every other auxiliary
+  call/full F8 table view, and retains tile-local U8-to-F8 bitcast inside Pallas.
 
 ## Protected evidence
 
@@ -278,7 +279,8 @@ enough; stage-local model layout remains the structural requirement.
 
 1. DB 422/423 close the dense raw-FP8 and paired up/gate mechanism gates; DB 424--427 close distinct
    selected-expert correctness but reject the current `18--23 ms` layout. Eliminate the runtime
-   full-table transpose with final `[G,K,N]` raw packing and require one total custom call. Only if
+   full-table transpose with final `[G,K,N]` raw packing and require one TPU kernel plus only the
+   two bounded scale-gather metadata markers. Only if
    the protected result is competitive should it compose activation/scale, down, and routed/shared
    combine in the binding Pallas order and repeat the real one-layer gate. Never substitute the
    same-weight M8 microbenchmark or a slow correctness-only GMM for routed production evidence.

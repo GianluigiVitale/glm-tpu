@@ -246,6 +246,17 @@ def main() -> int:
             for line in custom_calls
             if kernel_hlo_name in line or "tpu_custom_call" in line
         ]
+        bounded_metadata_calls = [
+            line
+            for line in custom_calls
+            if 'custom_call_target="AssumeGatherIndicesInBound"' in line
+            and "s32[1024]" in line
+        ]
+        unexpected_auxiliary_calls = [
+            line
+            for line in custom_calls
+            if line not in kernel_calls and line not in bounded_metadata_calls
+        ]
         forbidden_full_overlays = [
             shape
             for shape in tuple(
@@ -268,13 +279,25 @@ def main() -> int:
             "custom_call_count": len(custom_calls),
             "kernel_custom_call_count": len(kernel_calls),
             "kernel_custom_calls": kernel_calls,
+            "bounded_metadata_custom_call_count": len(
+                bounded_metadata_calls
+            ),
+            "bounded_metadata_custom_calls": bounded_metadata_calls,
+            "unexpected_auxiliary_custom_calls": unexpected_auxiliary_calls,
             "forbidden_full_weight_overlays": forbidden_full_overlays,
             "passed": (
                 len(kernel_calls) == 1
                 and not forbidden_full_overlays
+                and not unexpected_auxiliary_calls
                 and (
                     args.kernel != "selected_up_gate"
-                    or len(custom_calls) == 1
+                    or (
+                        len(bounded_metadata_calls) == 2
+                        and f"u8[{local_experts},{contraction},{output}]"
+                        in kernel_calls[0]
+                        and f"f8e4m3fn[{local_experts},{contraction},{output}]"
+                        not in hlo
+                    )
                 )
             ),
         }
