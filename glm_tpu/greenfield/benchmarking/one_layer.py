@@ -254,17 +254,15 @@ def validate_pallas_real_layer_hlo(
         for line in custom_calls
         if 'custom_call_target="ConcatBitcast"' in line
     ]
-    if feature_sharded_routed:
-        expected_concat_shapes = {
-            f"u8[{intermediate_size // stage_size},{hidden_size}]": 1,
-            f"u8[{hidden_size},{intermediate_size // stage_size}]": 1,
-            f"bf16[{local_experts},{hidden_size}]": 1,
-        }
-    else:
-        expected_concat_shapes = {
-            f"u8[{intermediate_size // stage_size},{hidden_size}]": 2,
-            f"u8[{hidden_size},{intermediate_size // stage_size}]": 1,
-        }
+    # The current raw-U8 path reconstructs only the already-local shared
+    # gate/up and down shards at the four-device layout boundary.  The older
+    # F8-input path could instead expose a BF16 router layout marker; reject
+    # that historical variant so the one-layer guard matches the decoder's
+    # protected direct-U8 contract.
+    expected_concat_shapes = {
+        f"u8[{intermediate_size // stage_size},{hidden_size}]": 2,
+        f"u8[{hidden_size},{intermediate_size // stage_size}]": 1,
+    }
     observed_concat_shapes = {
         shape: sum(f"= {shape}" in line for line in concat_calls)
         for shape in expected_concat_shapes
