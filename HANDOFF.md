@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 02:48 UTC
+**Updated:** 2026-08-06 02:51 UTC
 
 ## Authority and isolation
 
@@ -177,6 +177,14 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   operands are raw `u8[64,6144,2048]`, plus exactly two bounded metadata markers and no weight
   transform call. The corrected contract allows only those markers, forbids every other auxiliary
   call/full F8 table view, and retains tile-local U8-to-F8 bitcast inside Pallas.
+- Protected DB 428 / `greenfield_fp8_selected_up_gate_20260806T024602582280149Z` passes that final
+  layout at `e5a70be`. Eight distinct all-local routes match full dequant/FP32 dot with max/p99/mean
+  BF16 error `0.0078125/0/5.77e-7` (up exact). Compile is `0.905 s`; p50/p90/p95/p99 is
+  `4.492525/4.504463/4.509004/4.517450 ms`, a `5.16x` improvement over DB 427's `23.196868 ms`.
+  HLO has one raw-U8 selected Pallas kernel, exactly two allowed scale-gather markers, no unexpected
+  auxiliary call/full F8 or BF16/F32 table, and 946,176 scoped VMEM bytes. Peak HBM is
+  2,395,303,936 bytes; DB/archive/evidence hashes/remote SUCCESS and 8/8 cleanup pass. This proves
+  final layout was a major cost, but `4.49 ms` gate/up alone remains performance-rejected.
 
 ## Protected evidence
 
@@ -277,13 +285,12 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 422/423 close the dense raw-FP8 and paired up/gate mechanism gates; DB 424--427 close distinct
-   selected-expert correctness but reject the current `18--23 ms` layout. Eliminate the runtime
-   full-table transpose with final `[G,K,N]` raw packing and require one TPU kernel plus only the
-   two bounded scale-gather metadata markers. Only if
-   the protected result is competitive should it compose activation/scale, down, and routed/shared
-   combine in the binding Pallas order and repeat the real one-layer gate. Never substitute the
-   same-weight M8 microbenchmark or a slow correctness-only GMM for routed production evidence.
+1. DB 428 proves final `[G,K,N]` raw packing cuts selected all-eight gate/up from `23.197` to
+   `4.493 ms`, but it remains rejected. Compact device routes so normal ownership executes only the
+   approximately two local experts; protect both normal-two and concentrated-eight distributions.
+   Then optimize the concentrated ceiling and only if competitive compose activation/scale, down,
+   and routed/shared combine in binding Pallas order and repeat the real one-layer gate. Never
+   substitute the same-weight M8 microbenchmark or a slow correctness-only GMM for production proof.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,

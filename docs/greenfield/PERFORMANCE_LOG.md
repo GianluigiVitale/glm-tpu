@@ -301,6 +301,25 @@ main Pallas operand is raw `u8[64,6144,2048]`; tile-local U8-to-F8 bitcast is in
 revised contract permits exactly those two metadata markers and rejects any other auxiliary call or
 full F8 table view.
 
+DB 428 / `greenfield_fp8_selected_up_gate_20260806T024602582280149Z` then passed at `e5a70be` with
+the final raw `[G,K,N]` layout. All eight routes select distinct local matrices. Gate/up comparisons
+pass with combined max/p99/mean BF16 absolute error `0.0078125/0/5.77e-7`; up is elementwise exact.
+
+| p50 | p90 | p95 | p99 | mean | compile |
+|---:|---:|---:|---:|---:|---:|
+| 4.492525 | 4.504463 | 4.509004 | 4.517450 | 4.494040 ms | 0.905 s |
+
+This is `5.16x` faster than DB 427's `23.196868 ms` p50 and proves final persistent access order was
+a major cost even though the auxiliary-call attribution was corrected. HLO contains one selected
+Pallas kernel over two `u8[64,6144,2048]` tables, exactly two bounded scale-gather markers, no other
+custom call/full F8 or decoded overlay, and 946,176 scoped VMEM bytes. Peak HBM is 2.395 GB.
+DB/archive/hashes, remote `SUCCESS`, and 8/8 cleanup pass.
+
+This remains a performance rejection: `4.49 ms` is gate/up alone for the adversarial eight-distinct-
+experts-on-one-chip case, not an expert, layer, decoder, or token rate. The next protected split must
+execute only the normally owned route count (approximately two on a PP8 chip) while retaining an
+explicit concentrated-eight ceiling.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory
