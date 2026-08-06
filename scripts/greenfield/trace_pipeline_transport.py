@@ -22,8 +22,10 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
+    PairedTransportConfig,
     TransportChainConfig,
     TransportKind,
+    build_paired_transport,
     build_transport_chain,
     validate_compiled_transport,
 )
@@ -49,6 +51,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trace-root", type=Path, required=True)
     parser.add_argument("--warmup", type=int, default=50)
     parser.add_argument("--trace-steps", type=int, default=20)
+    parser.add_argument(
+        "--mode",
+        choices=("reference_all", "pallas_paired_pp8"),
+        default="reference_all",
+    )
     return parser.parse_args()
 
 
@@ -143,7 +150,12 @@ def main() -> int:
             num_processes=args.num_processes,
         )
         traces = []
-        for plan in (PlanName.PP8_LP4, PlanName.PP16_LP2):
+        plans = (
+            (PlanName.PP8_LP4, PlanName.PP16_LP2)
+            if args.mode == "reference_all"
+            else (PlanName.PP8_LP4,)
+        )
+        for plan in plans:
             groups = (
                 build_pp8_lp4_groups(topology)
                 if plan is PlanName.PP8_LP4
@@ -151,25 +163,53 @@ def main() -> int:
             )
             lanes = stage_transfer_lanes(topology, groups)
             pairs = stage_transfer_pairs(topology, groups)
-            config = TransportChainConfig(
-                plan=plan,
-                kind=TransportKind.DEVICE_RESIDENT,
-                rows=1,
-                width=6144,
-                dtype="bfloat16",
-                warmup_iterations=200,
-                measured_iterations=1000,
-            )
-            compiled = build_transport_chain(
-                config,
-                pairs,
-                devices=jax.devices(),
-                enforce_hlo_contract=False,
-            )
-            validate_compiled_transport(compiled)
+            if args.mode == "reference_all":
+                config = TransportChainConfig(
+                    plan=plan,
+                    kind=TransportKind.DEVICE_RESIDENT,
+                    rows=1,
+                    width=6144,
+                    dtype="bfloat16",
+                    warmup_iterations=200,
+                    measured_iterations=1000,
+                )
+                compiled = build_transport_chain(
+                    config,
+                    pairs,
+                    devices=jax.devices(),
+                    enforce_hlo_contract=False,
+                )
+                validate_compiled_transport(compiled)
+                execute = lambda: compiled.compiled(compiled.input_value)
+                hlo_contract = {
+                    "collective_counts": compiled.hlo_report.to_dict()[
+                        "collective_counts"
+                    ],
+                    "kernel_custom_call_count": 0,
+                    "passed": True,
+                }
+                label = plan.value.lower()
+                step_module_re = r"jit_transport"
+            else:
+                config = PairedTransportConfig(
+                    plan=plan,
+                    kind=TransportKind.PALLAS_REMOTE_COPY,
+                    warmup_iterations=200,
+                    measured_iterations=1000,
+                )
+                compiled = build_paired_transport(
+                    config,
+                    pairs,
+                    devices=jax.devices(),
+                )
+                execute = lambda: compiled.compiled(
+                    compiled.residual, compiled.metadata
+                )
+                hlo_contract = compiled.hlo_contract
+                label = f"{plan.value.lower()}_pallas_paired"
+                step_module_re = r"jit_mapped"
             for _ in range(args.warmup):
-                jax.block_until_ready(compiled.compiled(compiled.input_value))
-            label = plan.value.lower()
+                jax.block_until_ready(execute())
             trace_dir = args.trace_root / label
             trace_dir.mkdir(parents=True, exist_ok=False)
             multihost_utils.sync_global_devices(f"greenfield-trace-ready-{label}")
@@ -190,8 +230,9 @@ def main() -> int:
                         "greenfield_transport_step",
                         step_num=step,
                         plan=plan.value,
+                        mode=args.mode,
                     ):
-                        result = compiled.compiled(compiled.input_value)
+                        result = execute()
                         jax.block_until_ready(result)
                 jax.profiler.stop_trace()
                 tracing = False
@@ -207,13 +248,13 @@ def main() -> int:
             traces.append(
                 {
                     "config": config.to_dict(),
-                    "hlo_collective_counts": compiled.hlo_report.to_dict()[
-                        "collective_counts"
-                    ],
+                    "hlo_contract": hlo_contract,
                     "hlo_sha256": sha256(compiled.optimized_hlo.encode()).hexdigest(),
+                    "label": label,
                     "physical_lanes": [list(lane) for lane in lanes],
                     "physical_pairs": [list(pair) for pair in pairs],
                     "trace_steps": args.trace_steps,
+                    "step_module_re": step_module_re,
                     "xplane": _file_record(xplanes[0]),
                 }
             )
@@ -234,6 +275,7 @@ def main() -> int:
                 "hostname": socket.gethostname(),
                 "jax_process_index": jax.process_index(),
                 "launch_process_id": args.process_id,
+                "mode": args.mode,
                 "schema_version": 1,
                 "topology_hash": topology.topology_hash,
                 "traces": traces,

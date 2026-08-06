@@ -21,11 +21,16 @@ ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_TRANSPORT_TRACE_TAG:-greenfield_transport_trace_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_TRANSPORT_TRACE_WARMUP:-50}
 TRACE_STEPS=${GLM_GREENFIELD_TRANSPORT_TRACE_STEPS:-20}
+MODE=${GLM_GREENFIELD_TRANSPORT_TRACE_MODE:-reference_all}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
 [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 20 && $TRACE_STEPS == 20 ]] || {
   echo "protected transport trace requires warmup>=20 and exactly 20 steps" >&2
+  exit 2
+}
+[[ $MODE =~ ^(reference_all|pallas_paired_pp8)$ ]] || {
+  echo "unknown transport trace mode: $MODE" >&2
   exit 2
 }
 mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/traces" "$RUN_DIR/fleet_traces"
@@ -74,7 +79,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR"
-say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN warmup=$WARMUP trace_steps=$TRACE_STEPS"
+say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN warmup=$WARMUP trace_steps=$TRACE_STEPS mode=$MODE"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -100,7 +105,7 @@ coordinator="$coordinator:8476"
 say "launching fresh eight-host XPlane capture coordinator=$coordinator"
 
 # shellcheck disable=SC2016
-capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; cd "$wt"; /home/gianl/vllm-env/bin/python scripts/greenfield/trace_pipeline_transport.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/trace.rank${idx}.json" --trace-root "$run/traces" --warmup '"$WARMUP"' --trace-steps '"$TRACE_STEPS"'; sha256sum "$run/trace.rank${idx}.json" >"$run/trace.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/trace.rank${idx}.json" "$run/trace.rank${idx}.sha256" "$remote/host_records/" >/dev/null; for plan in pp8_lp4 pp16_lp2; do xplane=$(find "$run/traces/$plan" -type f -name "*.xplane.pb"); [[ $(printf "%s\n" "$xplane" | sed "/^$/d" | wc -l) -eq 1 ]]; gcloud storage cp --no-clobber "$xplane" "$remote/traces/$plan/trace.rank${idx}.xplane.pb" >/dev/null; done; echo "TRACE_UPLOAD_OK $(hostname) rank=$idx"'
+capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; mode='"$MODE"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; cd "$wt"; /home/gianl/vllm-env/bin/python scripts/greenfield/trace_pipeline_transport.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/trace.rank${idx}.json" --trace-root "$run/traces" --warmup '"$WARMUP"' --trace-steps '"$TRACE_STEPS"' --mode "$mode"; sha256sum "$run/trace.rank${idx}.json" >"$run/trace.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/trace.rank${idx}.json" "$run/trace.rank${idx}.sha256" "$remote/host_records/" >/dev/null; labels="pp8_lp4 pp16_lp2"; [[ "$mode" == pallas_paired_pp8 ]] && labels="pp8_lp4_pallas_paired"; for plan in $labels; do xplane=$(find "$run/traces/$plan" -type f -name "*.xplane.pb"); [[ $(printf "%s\n" "$xplane" | sed "/^$/d" | wc -l) -eq 1 ]]; gcloud storage cp --no-clobber "$xplane" "$remote/traces/$plan/trace.rank${idx}.xplane.pb" >/dev/null; done; echo "TRACE_UPLOAD_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$capture_command" >"$RUN_DIR/capture.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/capture.txt" TRACE_UPLOAD_OK || {
@@ -113,7 +118,7 @@ gcloud storage cp "$REMOTE_PREFIX/host_records/trace.rank*.json" \
 gcloud storage rsync --recursive "$REMOTE_PREFIX/traces" "$RUN_DIR/fleet_traces" >/dev/null
 say "validating fresh XPlanes and appending provenance DB rows"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
-  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" <<'PY'
+  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$MODE" <<'PY'
 from __future__ import annotations
 
 from hashlib import sha256
@@ -122,7 +127,7 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, oracle_pin, db_path, repo, oracle_repo = sys.argv[1:]
+run_dir, pin, oracle_pin, db_path, repo, oracle_repo, mode = sys.argv[1:]
 run_dir = Path(run_dir)
 records = [
     json.loads(path.read_text())
@@ -150,21 +155,31 @@ if {record["code_hash"] for record in records} != {pin}:
     raise SystemExit("trace record carries stale code hash")
 if len({record["topology_hash"] for record in records}) != 1:
     raise SystemExit("trace topology hashes differ")
+if {record["mode"] for record in records} != {mode}:
+    raise SystemExit("trace mode differs across fleet")
 
 for record in records:
-    if [trace["config"]["plan"] for trace in record["traces"]] != [
-        "PP8_LP4", "PP16_LP2"
-    ]:
+    expected_plans = (
+        ["PP8_LP4", "PP16_LP2"]
+        if mode == "reference_all"
+        else ["PP8_LP4"]
+    )
+    if [trace["config"]["plan"] for trace in record["traces"]] != expected_plans:
         raise SystemExit("trace plan order differs")
     for trace in record["traces"]:
         expected = 8 if trace["config"]["plan"] == "PP8_LP4" else 16
-        if (
-            trace["trace_steps"] != 20
-            or trace["hlo_collective_counts"] != {"collective-permute": expected}
-        ):
+        contract = trace["hlo_contract"]
+        mechanism_valid = (
+            contract["collective_counts"] == {"collective-permute": expected}
+            if mode == "reference_all"
+            else contract["passed"]
+            and contract["collective_count"] == 0
+            and contract["kernel_custom_call_count"] == 8
+        )
+        if trace["trace_steps"] != 20 or not mechanism_valid:
             raise SystemExit("trace HLO/step contract failed")
         rank = record["launch_process_id"]
-        plan = trace["config"]["plan"].lower()
+        plan = trace["label"]
         local = run_dir / "fleet_traces" / plan / f"trace.rank{rank}.xplane.pb"
         digest = file_sha256(local)
         if digest != trace["xplane"]["sha256"]:
@@ -174,10 +189,15 @@ sys.path.insert(0, str(Path(repo) / "scripts" / "analysis"))
 import parse_xplane
 
 fleet = {}
-for plan, expected_hops in (("pp8_lp4", 8), ("pp16_lp2", 16)):
+specs = (
+    (("pp8_lp4", 8, r"jit_transport"), ("pp16_lp2", 16, r"jit_transport"))
+    if mode == "reference_all"
+    else (("pp8_lp4_pallas_paired", 8, r"jit_mapped"),)
+)
+for plan, expected_hops, step_module_re in specs:
     result = parse_xplane.aggregate_fleet(
         run_dir / "fleet_traces" / plan,
-        step_module_re=r"jit_transport",
+        step_module_re=step_module_re,
     )
     if (
         result["n_files"] != 8
@@ -208,25 +228,39 @@ for plan, expected_hops in (("pp8_lp4", 8), ("pp16_lp2", 16)):
         for values in result["ops"].values()
         if values.get("hlo_category") == "collective-permute-done"
     )
-    if (
-        forbidden != 0
-        or permute_starts != expected_hops
-        or permute_dones != expected_hops
-    ):
+    pallas_calls = sum(
+        values["invocations_per_step"]
+        for op_name, values in result["ops"].items()
+        if values.get("hlo_category") == "custom-call"
+        and "greenfield_stage_remote_copy_bf16_6144_s32_2052" in op_name
+    )
+    physical_valid = (
+        forbidden == 0
+        and permute_starts == expected_hops
+        and permute_dones == expected_hops
+        if mode == "reference_all"
+        else forbidden == 0
+        and permute_starts == 0
+        and permute_dones == 0
+        and pallas_calls == expected_hops
+    )
+    if not physical_valid:
         raise SystemExit(
             f"{plan} physical trace collective contract failed: "
             f"starts={permute_starts} dones={permute_dones} "
-            f"forbidden={forbidden} expected_hops={expected_hops}"
+            f"pallas={pallas_calls} forbidden={forbidden} expected_hops={expected_hops}"
         )
     result["observed_collective_permute_starts_per_step"] = permute_starts
     result["observed_collective_permute_dones_per_step"] = permute_dones
     result["expected_hops_per_step"] = expected_hops
+    result["observed_pallas_remote_copy_calls_per_step"] = pallas_calls
     fleet[plan] = result
 
 summary = {
     "code_hash": pin,
     "fleet": fleet,
     "mechanism_only": True,
+    "mode": mode,
     "oracle_code_hash": oracle_pin,
     "topology_hash": records[0]["topology_hash"],
 }
@@ -258,7 +292,11 @@ for plan, result in fleet.items():
         prompt="Capture twenty full device-resident transport invocations on all hosts.",
         gold="8 fresh XPlanes, 64 cores, exact point-to-point-only transport.",
         raw_output=json.dumps(result, sort_keys=True),
-        extracted=str(result["observed_collective_permute_starts_per_step"]),
+        extracted=str(
+            result["observed_collective_permute_starts_per_step"]
+            if mode == "reference_all"
+            else result["observed_pallas_remote_copy_calls_per_step"]
+        ),
         correct=True,
         score=None,
     )
