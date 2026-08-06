@@ -7,6 +7,7 @@ import pytest
 
 from scripts.greenfield.compile_short_decoder import (
     _materialize_global_array,
+    _raw_token_sequence_contract,
     _validate_completed_step_selected_states,
 )
 
@@ -113,3 +114,23 @@ def test_completed_step_selected_state_uses_next_position_as_exclusive_bound() -
             next_context_length=3,
         )["rows_valid"]
     )
+
+
+def test_raw_token_sequence_contract_is_exact_and_reports_first_drift() -> None:
+    expected = np.asarray([4, 8, 15, 16, 23, 42], dtype=np.int32)
+    exact = _raw_token_sequence_contract([4, 8, 15], expected)
+    assert exact == {
+        "compared_token_count": 3,
+        "exact_prefix_match": True,
+        "expected_token_ids": [4, 8, 15],
+        "first_mismatch_index": None,
+        "observed_token_ids": [4, 8, 15],
+        "oracle_token_count": 6,
+    }
+    drifted = _raw_token_sequence_contract([4, 7, 15], expected)
+    assert not drifted["exact_prefix_match"]
+    assert drifted["first_mismatch_index"] == 1
+    with pytest.raises(ValueError, match="exceeds"):
+        _raw_token_sequence_contract([], expected)
+    with pytest.raises(ValueError, match="exceeds"):
+        _raw_token_sequence_contract(expected.tolist() + [99], expected)

@@ -37,11 +37,16 @@ from glm_tpu.greenfield.model import (  # noqa: E402
 )
 from glm_tpu.greenfield.runtime import (  # noqa: E402
     build_decoder_step_program,
+    build_teacher_forced_prefill_program,
     validate_decoder_step_hlo,
+    validate_teacher_forced_prefill_hlo,
 )
 from glm_tpu.greenfield.topology import (  # noqa: E402
     discover_physical_topology,
     validate_target_v4_64,
+)
+from glm_tpu.greenfield.validation import (  # noqa: E402
+    inspect_short_context_oracle,
 )
 from scripts.greenfield.pack_feature_runtime_checkpoint import (  # noqa: E402
     _build_context as _build_feature_context,
@@ -176,6 +181,57 @@ def _validate_completed_step_selected_states(
     }
 
 
+def _load_short_context_oracle(
+    oracle_dir: Path,
+    *,
+    expected_manifest_sha256: str,
+) -> tuple[dict[str, Any], np.ndarray, np.ndarray]:
+    """Load exact prompt/output IDs only after the sealed oracle passes."""
+
+    from safetensors import safe_open
+
+    manifest = inspect_short_context_oracle(oracle_dir)
+    if manifest["manifest_sha256"] != expected_manifest_sha256:
+        raise RuntimeError(
+            "short-context oracle manifest differs from the protected pin"
+        )
+    tensor_path = oracle_dir / manifest["files"]["tokens"]["filename"]
+    with safe_open(tensor_path, framework="np") as handle:
+        prompt = np.asarray(
+            handle.get_tensor("prompt_token_ids"), dtype=np.int32
+        ).copy()
+        generated = np.asarray(
+            handle.get_tensor("generated_token_ids"), dtype=np.int32
+        ).copy()
+    return manifest, prompt, generated
+
+
+def _raw_token_sequence_contract(
+    observed: list[int],
+    expected: np.ndarray,
+) -> dict[str, Any]:
+    """Compare one autoregressive prefix without decoding or normalization."""
+
+    actual = np.asarray(observed, dtype=np.int32)
+    reference = np.asarray(expected, dtype=np.int32)
+    if actual.ndim != 1 or reference.ndim != 1:
+        raise ValueError("raw token sequences must be one-dimensional")
+    if actual.size <= 0 or actual.size > reference.size:
+        raise ValueError("raw token comparison length exceeds the oracle")
+    expected_prefix = reference[: actual.size]
+    mismatches = np.flatnonzero(actual != expected_prefix)
+    return {
+        "compared_token_count": int(actual.size),
+        "exact_prefix_match": bool(mismatches.size == 0),
+        "expected_token_ids": expected_prefix.tolist(),
+        "first_mismatch_index": (
+            None if mismatches.size == 0 else int(mismatches[0])
+        ),
+        "observed_token_ids": actual.tolist(),
+        "oracle_token_count": int(reference.size),
+    }
+
+
 def _make_global_array(
     jax: Any,
     mesh: Any,
@@ -265,6 +321,8 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument("--short-context-oracle-dir", type=Path)
+    parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -279,6 +337,15 @@ def main() -> int:
         args.feature_fuse_route_weighting
     )
     args.complete_token_path = bool(args.complete_token_path)
+    oracle_mode = args.short_context_oracle_dir is not None
+    if oracle_mode != (
+        args.short_context_oracle_manifest_sha256 is not None
+    ):
+        raise ValueError(
+            "short-context oracle directory and manifest pin are required together"
+        )
+    if oracle_mode and not args.complete_token_path:
+        raise ValueError("short-context oracle requires the complete-token path")
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.context_capacity != 2048:
@@ -289,6 +356,32 @@ def main() -> int:
         raise ValueError("decoder diagnostic trace requires zero or two steps")
     if (args.trace_root is None) != (args.trace_steps == 0):
         raise ValueError("decoder trace root and trace steps must be enabled together")
+    oracle_manifest = None
+    prompt_token_ids = None
+    oracle_generated_token_ids = None
+    if oracle_mode:
+        assert args.short_context_oracle_dir is not None
+        assert args.short_context_oracle_manifest_sha256 is not None
+        (
+            oracle_manifest,
+            prompt_token_ids,
+            oracle_generated_token_ids,
+        ) = _load_short_context_oracle(
+            args.short_context_oracle_dir,
+            expected_manifest_sha256=(
+                args.short_context_oracle_manifest_sha256
+            ),
+        )
+        compared_tokens = 1 + args.warmup + args.iterations
+        if compared_tokens > oracle_generated_token_ids.size:
+            raise ValueError(
+                "decoder correctness window exceeds the sealed token oracle"
+            )
+        recurrent_steps = args.warmup + args.iterations + args.trace_steps
+        if prompt_token_ids.size + recurrent_steps > args.context_capacity:
+            raise ValueError(
+                "prompt plus recurrent/trace steps exceeds context capacity"
+            )
     if args.runtime_kind in ("pallas_feature", "pallas_feature_linear") and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
@@ -438,6 +531,7 @@ def main() -> int:
     )
     loaded = None
     state_values: tuple[Any, ...] = ()
+    auxiliary_values: tuple[Any, ...] = ()
     try:
         if (
             jax.process_count() != 8
@@ -495,6 +589,13 @@ def main() -> int:
             linear_backend=linear_backend,
             complete_token_path=args.complete_token_path,
         )
+        prefill = None
+        if oracle_mode:
+            assert prompt_token_ids is not None
+            prefill = build_teacher_forced_prefill_program(
+                decoder,
+                prompt_length=int(prompt_token_ids.size),
+            )
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-start")
         load_started = time.monotonic()
         loaded = load_runtime_checkpoint(
@@ -524,7 +625,7 @@ def main() -> int:
 
         def residual_builder(rank: int, shape: tuple[int, ...]) -> np.ndarray:
             value = np.zeros(shape, dtype=ml_dtypes.bfloat16)
-            if rank in groups[0]:
+            if not oracle_mode and rank in groups[0]:
                 value[...] = initial_row
             return value
 
@@ -543,7 +644,11 @@ def main() -> int:
         def token_builder(rank: int, shape: tuple[int, ...]) -> np.ndarray:
             value = np.full(shape, -1, dtype=np.int32)
             if rank in groups[0]:
-                value[...] = np.int32(1)
+                value[...] = np.int32(
+                    prompt_token_ids[0]
+                    if oracle_mode and prompt_token_ids is not None
+                    else 1
+                )
             return value
 
         residual = _make_global_array(
@@ -583,6 +688,16 @@ def main() -> int:
                 token_shape,
                 token_builder,
             )
+        prompt = None
+        if oracle_mode:
+            assert prompt_token_ids is not None
+            prompt = jax.device_put(
+                prompt_token_ids,
+                NamedSharding(decoder.mesh, P()),
+            )
+        auxiliary_values = tuple(
+            value for value in (token, prompt) if value is not None
+        )
         position = jax.device_put(
             np.asarray([0], dtype=np.int32),
             NamedSharding(decoder.mesh, P()),
@@ -640,6 +755,20 @@ def main() -> int:
                 context_lengths,
             )
             donate_argnums = (1, 2, 3, 4)
+        prefill_inputs = None
+        if oracle_mode:
+            assert prefill is not None and prompt is not None
+            prefill_inputs = (
+                loaded.weights,
+                residual,
+                kv,
+                index,
+                metadata,
+                prompt,
+                position,
+                block_tables,
+                context_lengths,
+            )
         multihost_utils.sync_global_devices("greenfield-short-decoder-compile-start")
         compile_started = time.monotonic()
         lowered = jax.jit(
@@ -693,9 +822,83 @@ def main() -> int:
                 "decoder HLO contract failed before execution: "
                 f"{hlo_contract['violations']}"
             )
+        compiled_prefill = None
+        prefill_compile_seconds = None
+        prefill_hlo_sha256 = None
+        fleet_prefill_hlo_hashes = None
+        prefill_hlo_contract = None
+        if oracle_mode:
+            assert prefill is not None and prefill_inputs is not None
+            multihost_utils.sync_global_devices(
+                "greenfield-short-prefill-compile-start"
+            )
+            prefill_compile_started = time.monotonic()
+            lowered_prefill = jax.jit(
+                prefill.execute,
+                donate_argnums=(1, 2, 3, 4),
+            ).lower(*prefill_inputs)
+            compiled_prefill = lowered_prefill.compile()
+            prefill_compile_seconds = (
+                time.monotonic() - prefill_compile_started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-short-prefill-compile-end"
+            )
+            optimized_prefill_hlo = compiled_prefill.as_text()
+            prefill_hlo_sha256 = sha256(
+                optimized_prefill_hlo.encode("utf-8")
+            ).hexdigest()
+            fleet_prefill_hlo_hashes = _fleet_digest(
+                multihost_utils,
+                prefill_hlo_sha256,
+                num_processes=args.num_processes,
+            )
+            prefill_hlo_contract = validate_teacher_forced_prefill_hlo(
+                optimized_prefill_hlo,
+                program=prefill,
+                schedule=schedule,
+                backend_contract=hlo_backend_contract,
+            )
+            if jax.process_index() == 0:
+                hlo_dir = args.output.parent / "hlo"
+                with gzip.open(
+                    hlo_dir / "prefill_78layer_2k.optimized_hlo.txt.gz",
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(optimized_prefill_hlo)
+                _atomic_json(
+                    hlo_dir / "prefill_78layer_2k.hlo_contract.json",
+                    prefill_hlo_contract,
+                )
+            del optimized_prefill_hlo
+            if not prefill_hlo_contract["passed"]:
+                raise RuntimeError(
+                    "prefill HLO contract failed before execution: "
+                    f"{prefill_hlo_contract['violations']}"
+                )
 
-        output = compiled(*inputs)
-        output[3].block_until_ready()
+        generated_tokens: list[int] = []
+        prefill_wall_ms = None
+        if oracle_mode:
+            assert compiled_prefill is not None and prefill_inputs is not None
+            prefill_started = time.perf_counter_ns()
+            output = compiled_prefill(*prefill_inputs)
+            output[3].block_until_ready()
+            prefill_wall_ms = (
+                time.perf_counter_ns() - prefill_started
+            ) / 1_000_000
+            first_token = _materialize_global_array(
+                jax,
+                multihost_utils,
+                output[4],
+            )[list(groups[0]), 0]
+            if not np.all(first_token == first_token[0]):
+                raise RuntimeError("prefill token lanes disagree")
+            generated_tokens.append(int(first_token[0]))
+        else:
+            output = compiled(*inputs)
+            output[3].block_until_ready()
         state_values = (
             tuple(output)
             if args.complete_token_path
@@ -714,27 +917,39 @@ def main() -> int:
                 context_lengths,
             )
 
+        def materialize_active_token(
+            values: tuple[Any, ...], *, phase: str
+        ) -> int:
+            token_values = _materialize_global_array(
+                jax,
+                multihost_utils,
+                values[4],
+            )[list(groups[0]), 0]
+            if not np.all(token_values == token_values[0]):
+                raise RuntimeError(
+                    f"complete token lanes disagree after {phase} step"
+                )
+            return int(token_values[0])
+
         for _ in range(args.warmup):
             current = run_step(current)
             current[3].block_until_ready()
+            if oracle_mode:
+                generated_tokens.append(
+                    materialize_active_token(current, phase="warmup")
+                )
         samples = []
-        generated_tokens: list[int] = []
+        if not oracle_mode:
+            generated_tokens = []
         for _ in range(args.iterations):
             started = time.perf_counter_ns()
             current = run_step(current)
             current[3].block_until_ready()
             samples.append((time.perf_counter_ns() - started) / 1_000_000)
             if args.complete_token_path:
-                timed_token = _materialize_global_array(
-                    jax,
-                    multihost_utils,
-                    current[4],
-                )[list(groups[0]), 0]
-                if not np.all(timed_token == timed_token[0]):
-                    raise RuntimeError(
-                        "complete token lanes disagree after timed step"
-                    )
-                generated_tokens.append(int(timed_token[0]))
+                generated_tokens.append(
+                    materialize_active_token(current, phase="timed")
+                )
         trace_record = None
         if args.trace_root is not None:
             args.trace_root.mkdir(parents=True, exist_ok=False)
@@ -858,6 +1073,7 @@ def main() -> int:
                 )
             )
         token_contract = None
+        token_passed = True
         if args.complete_token_path:
             token_host = _materialize_global_array(
                 jax,
@@ -865,9 +1081,31 @@ def main() -> int:
                 current[4],
             )
             active_tokens = token_host[active, 0]
+            raw_sequence = None
+            if oracle_mode:
+                assert oracle_manifest is not None
+                assert oracle_generated_token_ids is not None
+                assert prompt_token_ids is not None
+                raw_sequence = _raw_token_sequence_contract(
+                    generated_tokens,
+                    oracle_generated_token_ids,
+                )
+            expected_next_position = (
+                int(prompt_token_ids.size)
+                + args.warmup
+                + args.iterations
+                + args.trace_steps
+                if oracle_mode and prompt_token_ids is not None
+                else None
+            )
             token_contract = {
                 "active_tokens": sorted(set(active_tokens.tolist())),
-                "profiler_free_window_tokens": generated_tokens,
+                "correctness_window_tokens": (
+                    generated_tokens if oracle_mode else None
+                ),
+                "profiler_free_window_tokens": generated_tokens[
+                    -args.iterations:
+                ],
                 "all_active_lanes_equal": bool(
                     active_tokens.size == len(groups[0])
                     and np.all(active_tokens == active_tokens[0])
@@ -880,13 +1118,48 @@ def main() -> int:
                 ),
                 "next_position": next_position.tolist(),
                 "next_context_lengths": next_context_lengths.tolist(),
-                "synthetic_initial_state": True,
+                "expected_next_position": expected_next_position,
+                "position_contract_passed": bool(
+                    expected_next_position is None
+                    or (
+                        next_position.tolist() == [expected_next_position]
+                        and next_context_lengths.tolist()
+                        == [expected_next_position + 1]
+                    )
+                ),
+                "prefill_used": oracle_mode,
+                "raw_token_sequence": raw_sequence,
+                "short_context_oracle": (
+                    {
+                        "generated_token_ids_sha256": oracle_manifest[
+                            "generated_token_ids_sha256"
+                        ],
+                        "manifest_sha256": oracle_manifest[
+                            "manifest_sha256"
+                        ],
+                        "prompt_token_count": int(prompt_token_ids.size),
+                        "prompt_token_ids_sha256": oracle_manifest[
+                            "prompt_token_ids_sha256"
+                        ],
+                        "source": oracle_manifest["source"],
+                    }
+                    if oracle_mode
+                    and oracle_manifest is not None
+                    and prompt_token_ids is not None
+                    else None
+                ),
+                "synthetic_initial_state": not oracle_mode,
             }
-            metadata_passed = bool(
-                metadata_passed
-                and token_contract["all_active_lanes_equal"]
+            token_passed = bool(
+                token_contract["all_active_lanes_equal"]
                 and token_contract["all_in_vocabulary"]
+                and token_contract["position_contract_passed"]
+                and (
+                    raw_sequence is None
+                    or raw_sequence["exact_prefix_match"]
+                )
             )
+            metadata_passed = bool(metadata_passed and token_passed)
         local_kv_nonzero = []
         local_index_nonzero = []
         for shard in current[1].addressable_shards:
@@ -898,18 +1171,24 @@ def main() -> int:
         record = {
             "artifact_kind": (
                 "greenfield_real_78layer_2k_decoder_"
-                + ("token_" if args.complete_token_path else "body_")
+                + (
+                    "token_oracle_"
+                    if oracle_mode
+                    else ("token_" if args.complete_token_path else "body_")
+                )
                 + f"{args.runtime_kind}"
             ),
             "body_only": not args.complete_token_path,
             "code_hash": code_hash,
             "compile_seconds": compile_seconds,
+            "decoder_compile_seconds": compile_seconds,
             "context_capacity": args.context_capacity,
             "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "device_memory_after_execute": [
                 _memory_stats(device) for device in jax.local_devices()
             ],
             "fleet_hlo_hashes": fleet_hlo_hashes,
+            "fleet_prefill_hlo_hashes": fleet_prefill_hlo_hashes,
             "fleet_local_device_ids_in_runtime_order": fleet_local_ids.tolist(),
             "hlo_contract": hlo_contract,
             "hostname": socket.gethostname(),
@@ -928,12 +1207,22 @@ def main() -> int:
             "profiler_free_complete_step_wall": (
                 _percentiles(samples) if args.complete_token_path else None
             ),
-            "raw_token_claim": False,
+            "prefill_compile_seconds": prefill_compile_seconds,
+            "prefill_hlo_contract": prefill_hlo_contract,
+            "prefill_hlo_sha256": prefill_hlo_sha256,
+            "prefill_wall_ms": prefill_wall_ms,
+            "prefill_used": oracle_mode,
+            "raw_token_claim": bool(
+                oracle_mode
+                and token_contract is not None
+                and token_contract["raw_token_sequence"] is not None
+                and token_contract["raw_token_sequence"]["exact_prefix_match"]
+            ),
             "runtime_layout_hash": pack_context.layout.layout_hash,
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 1,
+            "schema_version": 2,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
@@ -944,12 +1233,17 @@ def main() -> int:
             "linear_backend": decoder.linear_backend,
             "complete_token_path": decoder.complete_token_path,
             "token_contract": token_contract,
+            "token_passed": token_passed,
             "topology_hash": live_topology.topology_hash,
             "trace": trace_record,
             "transformer_body_timing_only": not args.complete_token_path,
             "warmup": args.warmup,
         }
         _atomic_json(args.output, record)
+        if not token_passed:
+            raise RuntimeError(
+                f"decoder raw-token contract failed: {token_contract}"
+            )
         if not metadata_passed:
             raise RuntimeError(f"decoder metadata contract failed: {metadata_contract}")
         print(
@@ -963,6 +1257,7 @@ def main() -> int:
         return 0
     finally:
         _delete_arrays(state_values)
+        _delete_arrays(auxiliary_values)
         if loaded is not None:
             loaded.close()
         jax.distributed.shutdown()

@@ -16,6 +16,11 @@ readonly TRACE_STEPS=${GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS:-0}
 readonly RUNTIME_KIND=${GLM_GREENFIELD_DECODER_RUNTIME_KIND:-pallas_feature_linear}
 readonly FEATURE_FUSE_ROUTE_WEIGHTING=${GLM_GREENFIELD_FEATURE_FUSE_ROUTE_WEIGHTING:-0}
 readonly COMPLETE_TOKEN_PATH=${GLM_GREENFIELD_COMPLETE_TOKEN_PATH:-0}
+readonly SHORT_CONTEXT_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE:-0}
+readonly SHORT_CONTEXT_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
+readonly SHORT_CONTEXT_ORACLE_ROOT=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/2k/$SHORT_CONTEXT_ORACLE_TAG
+readonly SHORT_CONTEXT_ORACLE_DIR=$SHORT_CONTEXT_ORACLE_ROOT/oracle
+readonly SHORT_CONTEXT_ORACLE_MANIFEST_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
 if [[ -n ${GLM_GREENFIELD_FEATURE_OUTPUT_TILE+x} ]]; then
   FEATURE_OUTPUT_TILE=$GLM_GREENFIELD_FEATURE_OUTPUT_TILE
 elif [[ $RUNTIME_KIND == reference ]]; then
@@ -41,6 +46,24 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
   echo "complete token path must be 0 or 1" >&2
   exit 2
 }
+[[ $SHORT_CONTEXT_ORACLE == 0 || $SHORT_CONTEXT_ORACLE == 1 ]] || {
+  echo "short-context oracle flag must be 0 or 1" >&2
+  exit 2
+}
+if [[ $SHORT_CONTEXT_ORACLE == 1 ]]; then
+  [[ $COMPLETE_TOKEN_PATH == 1 ]] || {
+    echo "short-context oracle requires complete token path" >&2
+    exit 2
+  }
+  ((1 + WARMUP + ITERATIONS <= 20)) || {
+    echo "correctness window exceeds the 20-token oracle" >&2
+    exit 2
+  }
+  ((2034 + WARMUP + ITERATIONS + TRACE_STEPS <= 2048)) || {
+    echo "oracle prompt plus recurrent/trace steps exceeds 2K capacity" >&2
+    exit 2
+  }
+fi
 case "$RUNTIME_KIND" in
   reference)
     readonly RUNTIME_TAG=$SOURCE_RUNTIME_TAG
@@ -97,7 +120,12 @@ if [[ $COMPLETE_TOKEN_PATH == 1 ]]; then
   TOKEN_SUFFIX=_token
 fi
 readonly TOKEN_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+ORACLE_SUFFIX=
+if [[ $SHORT_CONTEXT_ORACLE == 1 ]]; then
+  ORACLE_SUFFIX=_oracle
+fi
+readonly ORACLE_SUFFIX
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${ORACLE_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -113,6 +141,14 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "protected source/runtime checkpoint is unavailable" >&2
   exit 2
 }
+if [[ $SHORT_CONTEXT_ORACLE == 1 ]] && {
+  [[ ! -f $SHORT_CONTEXT_ORACLE_ROOT/SUCCESS ]] ||
+    [[ ! -f $SHORT_CONTEXT_ORACLE_DIR/manifest.json ]] ||
+    [[ ! -f $SHORT_CONTEXT_ORACLE_DIR/tokens.safetensors ]]
+}; then
+  echo "protected short-context token oracle is unavailable" >&2
+  exit 2
+fi
 [[ -r $RESULTS_DB ]] || {
   echo "results database is unavailable" >&2
   exit 2
@@ -168,7 +204,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -177,7 +213,7 @@ strict_census pre || {
 
 say "syncing exact code and runtime/source artifacts"
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_runtime_root='"$SOURCE_RUNTIME_ROOT"'; runtime_root='"$RUNTIME_ROOT"'; if [[ ${HOSTNAME##*-w-} == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source_root/SUCCESS" ]] && [[ -r "$source_runtime_root/SUCCESS" ]] && [[ -r "$runtime_root/SUCCESS" ]] && findmnt -T "$source_runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_runtime_root='"$SOURCE_RUNTIME_ROOT"'; runtime_root='"$RUNTIME_ROOT"'; oracle_mode='"$SHORT_CONTEXT_ORACLE"'; oracle_root='"$SHORT_CONTEXT_ORACLE_ROOT"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; if [[ ${HOSTNAME##*-w-} == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; oracle_ok=1; if [[ $oracle_mode == 1 ]]; then [[ -r "$oracle_root/SUCCESS" && -r "$oracle_dir/manifest.json" && -r "$oracle_dir/tokens.safetensors" ]] && findmnt -T "$oracle_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" || oracle_ok=0; fi; [[ $oracle_ok == 1 ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source_root/SUCCESS" ]] && [[ -r "$source_runtime_root/SUCCESS" ]] && [[ -r "$runtime_root/SUCCESS" ]] && findmnt -T "$source_runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
@@ -194,7 +230,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer 2K load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --complete-token-path "$complete_token_path" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --complete-token-path "$complete_token_path" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK || {
@@ -215,7 +251,7 @@ fi
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
-  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$COMPLETE_TOKEN_PATH" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$COMPLETE_TOKEN_PATH" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" <<'PY'
 from __future__ import annotations
 
@@ -236,6 +272,8 @@ import sys
     feature_output_tile,
     feature_fuse_route_weighting,
     complete_token_path,
+    short_context_oracle,
+    short_context_oracle_manifest_sha256,
     sparse_moe_backend,
     hlo_backend_contract,
     runtime_manifest_sha256,
@@ -247,6 +285,7 @@ import sys
 feature_output_tile = int(feature_output_tile)
 feature_fuse_route_weighting = bool(int(feature_fuse_route_weighting))
 complete_token_path = bool(int(complete_token_path))
+short_context_oracle = bool(int(short_context_oracle))
 warmup = int(warmup)
 iterations = int(iterations)
 trace_steps = int(trace_steps)
@@ -289,6 +328,15 @@ if {record["complete_token_path"] for record in records} != {
     complete_token_path
 }:
     raise SystemExit("fleet complete token-path flag drifted")
+if {record["prefill_used"] for record in records} != {
+    short_context_oracle
+}:
+    raise SystemExit("fleet short-context prefill flag drifted")
+if short_context_oracle:
+    for field in ("prefill_hlo_sha256",):
+        values = {record[field] for record in records}
+        if len(values) != 1 or None in values:
+            raise SystemExit(f"fleet field {field} disagrees: {values}")
 if {record["sparse_moe_backend"] for record in records} != {sparse_moe_backend}:
     raise SystemExit("fleet sparse MoE backend drifted")
 expected_linear_backend = (
@@ -304,23 +352,55 @@ for record in records:
     if (
         record["body_only"] == complete_token_path
         or record["transformer_body_timing_only"] == complete_token_path
-        or record["raw_token_claim"]
+        or record["raw_token_claim"] != short_context_oracle
         or not record["hlo_contract"]["passed"]
         or not record["metadata_passed"]
+        or not record["token_passed"]
     ):
         raise SystemExit("step/HLO/metadata claim contract failed")
     if complete_token_path:
         token = record["token_contract"]
         if (
             token is None
-            or not token["synthetic_initial_state"]
+            or token["synthetic_initial_state"] == short_context_oracle
+            or token["prefill_used"] != short_context_oracle
             or not token["all_active_lanes_equal"]
             or not token["all_in_vocabulary"]
             or len(token["profiler_free_window_tokens"]) != iterations
         ):
             raise SystemExit("complete token-path output contract failed")
+        if short_context_oracle:
+            raw = token["raw_token_sequence"]
+            oracle = token["short_context_oracle"]
+            if (
+                raw is None
+                or not raw["exact_prefix_match"]
+                or raw["compared_token_count"] != 1 + warmup + iterations
+                or raw["observed_token_ids"] != raw["expected_token_ids"]
+                or oracle is None
+                or oracle["manifest_sha256"]
+                != short_context_oracle_manifest_sha256
+                or oracle["prompt_token_count"] != 2034
+                or record["prefill_hlo_contract"] is None
+                or not record["prefill_hlo_contract"]["passed"]
+                or record["prefill_hlo_contract"]["loop_count"] != 1
+                or record["prefill_compile_seconds"] is None
+                or record["prefill_wall_ms"] is None
+            ):
+                raise SystemExit("real-prompt token/prefill contract failed")
+        elif (
+            token["raw_token_sequence"] is not None
+            or token["short_context_oracle"] is not None
+            or record["prefill_hlo_contract"] is not None
+            or record["prefill_hlo_sha256"] is not None
+        ):
+            raise SystemExit("synthetic token path contains oracle evidence")
     elif record["token_contract"] is not None:
         raise SystemExit("body-only record unexpectedly contains a token")
+if complete_token_path and len(
+    {json.dumps(record["token_contract"], sort_keys=True) for record in records}
+) != 1:
+    raise SystemExit("fleet token contracts disagree")
 if any(
     record["warmup"] != warmup
     or record["iterations"] != iterations
@@ -339,6 +419,18 @@ if any(
     for record in records
 ):
     raise SystemExit("decoder HLO backend contract drifted")
+if short_context_oracle:
+    for record in records:
+        prefill = record["prefill_hlo_contract"]
+        if (
+            prefill["backend_contract"] != hlo_backend_contract
+            or prefill["prompt_length"] != 2034
+            or prefill["violations"]
+            or len(set(record["fleet_prefill_hlo_hashes"])) != 1
+            or record["fleet_prefill_hlo_hashes"][0]
+            != record["prefill_hlo_sha256"]
+        ):
+            raise SystemExit("prefill HLO/fleet contract drifted")
 if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
     selected_kernel = "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512"
     if feature_output_tile != 128:
@@ -444,7 +536,11 @@ peaks = [value for value in map(peak, records) if value is not None]
 summary = {
     "artifact_kind": (
         "greenfield_real_78layer_2k_decoder_"
-        + ("token_mechanism_fleet" if complete_token_path else "body_fleet")
+        + (
+            "token_oracle_fleet"
+            if short_context_oracle
+            else ("token_mechanism_fleet" if complete_token_path else "body_fleet")
+        )
     ),
     "body_only": not complete_token_path,
     "code_hash": pin,
@@ -452,6 +548,12 @@ summary = {
     "context_capacity": 2048,
     "fleet_p50_body_ms": fleet_p50,
     "fleet_p99_body_ms": fleet_p99,
+    "fleet_p50_complete_step_ms": (
+        fleet_p50 if complete_token_path else None
+    ),
+    "fleet_p99_complete_step_ms": (
+        fleet_p99 if complete_token_path else None
+    ),
     "feature_output_tile": feature_output_tile,
     "feature_fuse_route_weighting": feature_fuse_route_weighting,
     "complete_token_path": complete_token_path,
@@ -461,7 +563,20 @@ summary = {
     "maximum_peak_hbm_bytes": max(peaks) if peaks else None,
     "optimized_hlo_sha256": records[0]["optimized_hlo_sha256"],
     "plan_hash": records[0]["plan_hash"],
-    "raw_token_claim": False,
+    "prefill_compile_seconds_max": (
+        max(record["prefill_compile_seconds"] for record in records)
+        if short_context_oracle
+        else None
+    ),
+    "prefill_hlo_contract": records[0]["prefill_hlo_contract"],
+    "prefill_hlo_sha256": records[0]["prefill_hlo_sha256"],
+    "prefill_used": short_context_oracle,
+    "prefill_wall_ms_max": (
+        max(record["prefill_wall_ms"] for record in records)
+        if short_context_oracle
+        else None
+    ),
+    "raw_token_claim": short_context_oracle,
     "runtime_kind": runtime_kind,
     "runtime_layout_hash": records[0]["runtime_layout_hash"],
     "runtime_manifest_sha256": records[0]["runtime_manifest_sha256"],
@@ -470,7 +585,14 @@ summary = {
     "sparse_moe_backend": sparse_moe_backend,
     "topology_hash": records[0]["topology_hash"],
     "trace_steps": trace_steps,
-    "synthetic_initial_state": complete_token_path,
+    "short_context_oracle_manifest_sha256": (
+        short_context_oracle_manifest_sha256
+        if short_context_oracle
+        else None
+    ),
+    "synthetic_initial_state": (
+        complete_token_path and not short_context_oracle
+    ),
     "token_contract": records[0]["token_contract"],
     "transformer_body_timing_only": not complete_token_path,
     "warmup": warmup,
@@ -483,7 +605,11 @@ sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
 
 conn = pv.connect(db_path)
-scope = "token-mechanism" if complete_token_path else "body"
+scope = (
+    "token-oracle"
+    if short_context_oracle
+    else ("token-mechanism" if complete_token_path else "body")
+)
 run_id = pv.start_run(
     conn,
     model=f"zai-org/GLM-5.2-FP8:greenfield-78layer-2k-{scope}",
@@ -491,6 +617,12 @@ run_id = pv.start_run(
     env={
         "GLM_ENGINE": f"greenfield_pp8_decoder_{scope}",
         "greenfield_complete_token_path": complete_token_path,
+        "greenfield_short_context_oracle": short_context_oracle,
+        "greenfield_short_context_oracle_manifest_sha256": (
+            short_context_oracle_manifest_sha256
+            if short_context_oracle
+            else None
+        ),
         "greenfield_runtime_kind": runtime_kind,
         "greenfield_feature_output_tile": feature_output_tile,
         "greenfield_feature_fuse_route_weighting": (
@@ -510,10 +642,15 @@ run_id = pv.start_run(
         f"feature output tile {feature_output_tile} and fused route weighting "
         f"{feature_fuse_route_weighting}; "
         + (
-            "complete token mechanism from synthetic state, no correctness "
-            "or tok/s claim."
-            if complete_token_path
-            else "no token or tok/s claim."
+            "real 2,034-token prompt with an exact sealed raw-token prefix; "
+            "not Gate D until full DSA event-order evidence passes."
+            if short_context_oracle
+            else (
+                "complete token mechanism from synthetic state, no correctness "
+                "or tok/s claim."
+                if complete_token_path
+                else "no token or tok/s claim."
+            )
         )
     ),
     harness_repo=repo,
@@ -527,15 +664,28 @@ pv.record_item(
         + (f"_ot{feature_output_tile}" if feature_output_tile != 128 else "")
         + ("_wsum" if feature_fuse_route_weighting else "")
     ),
-    item_id=("token_step_mechanism" if complete_token_path else "body_step"),
+    item_id=(
+        "raw_token_prefix"
+        if short_context_oracle
+        else ("token_step_mechanism" if complete_token_path else "body_step")
+    ),
     prompt=(
-        "Execute the real 78-layer PP8 decoder step with "
-        f"feature output tile {feature_output_tile} and fused route weighting "
-        f"{feature_fuse_route_weighting}."
+        "Execute the sealed 2,034-token short-context prompt through device-"
+        "resident prefill and recurrent PP8 decode."
+        if short_context_oracle
+        else (
+            "Execute the real 78-layer PP8 decoder step with "
+            f"feature output tile {feature_output_tile} and fused route weighting "
+            f"{feature_fuse_route_weighting}."
+        )
     ),
     gold=(
-        "Local-only HLO, exact pipeline state, direct runtime load, and "
-        "bounded token mechanism without a raw-correctness claim."
+        "Exact raw token IDs against the sealed accepted legacy prefix."
+        if short_context_oracle
+        else (
+            "Local-only HLO, exact pipeline state, direct runtime load, and "
+            "bounded token mechanism without a raw-correctness claim."
+        )
     ),
     raw_output=json.dumps(summary, sort_keys=True),
     extracted=str(summary["hlo_contract"]["collective_counts"]),
@@ -554,10 +704,15 @@ pv.finalize(
     metric="contract_valid",
     value=1.0,
     note=(
-        "Synthetic-state complete token timing is not raw-token correctness "
-        "or answer tok/s."
-        if complete_token_path
-        else "Profiler-free body timing is not complete decode latency or tok/s."
+        "Exact raw-token prefix and real-prompt recurrent wall pass; full Gate D "
+        "still requires exact all-event DSA evidence."
+        if short_context_oracle
+        else (
+            "Synthetic-state complete token timing is not raw-token correctness "
+            "or answer tok/s."
+            if complete_token_path
+            else "Profiler-free body timing is not complete decode latency or tok/s."
+        )
     ),
 )
 conn.close()
