@@ -1042,13 +1042,25 @@ def stage_local_moe_pallas_from_routes_mapped(
         dtype=hidden_states.dtype,
     )[None, :]
 
+    # Selected routed kernels explicitly apply every 128-wide scale block
+    # inside their wider contraction tile.  The standalone shared kernels
+    # consume one scalar scale per contraction tile, so keep that tile at one
+    # checkpoint scale block even when routed experts use k=512.
+    shared_config = Fp8BlockMatmulConfig(
+        block_shape=config.block_shape,
+        row_tile=config.row_tile,
+        output_tile=config.output_tile,
+        contraction_tile=config.block_shape[1],
+        output_dtype=config.output_dtype,
+        accumulator_dtype=config.accumulator_dtype,
+    )
     shared_gate, shared_up = fp8_block_up_gate(
         hidden_states,
         shared_gate_bits,
         shared_gate_scale,
         shared_up_bits,
         shared_up_scale,
-        config=config,
+        config=shared_config,
         interpret=interpret,
     )
     shared_activated = (silu(shared_gate) * shared_up).astype(
@@ -1058,7 +1070,7 @@ def stage_local_moe_pallas_from_routes_mapped(
         shared_activated,
         shared_down_bits,
         shared_down_scale,
-        config=config,
+        config=shared_config,
         interpret=interpret,
     )
 

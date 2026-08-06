@@ -70,6 +70,10 @@ def _validate_inputs(
     scale: Any,
     config: Fp8BlockMatmulConfig,
 ) -> tuple[int, int, int]:
+    if config.contraction_tile != config.block_shape[1]:
+        raise ValueError(
+            "standalone FP8 matmul contraction tile must equal one scale block"
+        )
     if lhs.ndim != 2 or weight_bits.ndim != 2 or scale.ndim != 2:
         raise ValueError("FP8 matmul inputs must have ranks two, two, and two")
     rows, contraction = lhs.shape

@@ -72,6 +72,14 @@ def test_fp8_block_matmul_rejects_shape_and_dtype_drift() -> None:
         fp8_block_matmul(lhs, bits.astype(jnp.int8), scale, interpret=True)
     with pytest.raises(ValueError, match="scale shape"):
         fp8_block_matmul(lhs, bits, jnp.ones((1, 2), jnp.float32), interpret=True)
+    with pytest.raises(ValueError, match="equal one scale block"):
+        fp8_block_matmul(
+            lhs,
+            bits,
+            scale,
+            config=Fp8BlockMatmulConfig(contraction_tile=512),
+            interpret=True,
+        )
 
 
 @pytest.mark.parametrize("shape", [(1, 128, 128), (3, 130, 135)])
