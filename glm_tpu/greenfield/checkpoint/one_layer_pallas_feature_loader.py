@@ -53,6 +53,12 @@ class PallasFeatureLoadExpectation:
         if self.model_id != "zai-org/GLM-5.2-FP8" or self.layer != 3:
             raise ValueError("expert-feature loader supports GLM layer 3")
 
+    @property
+    def stage_size(self) -> int:
+        """Return the physical width required by the PP8 feature layout."""
+
+        return 4
+
 
 def _rss_peak_bytes() -> int:
     return int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024

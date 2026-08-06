@@ -228,6 +228,7 @@ def _run_forced_cpu_feature_loader(artifact: Path) -> None:
         topology_hash=manifest["topology_hash"],
         plan_group_hash=manifest["plan_group_hash"],
     )
+    assert expectation.stage_size == 4
     assert verify_pallas_feature_load_contract(
         artifact, expectation
     ) == manifest
