@@ -14,6 +14,13 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
+from .pallas import (
+    Fp8BlockMatmulConfig,
+    fp8_block_matmul,
+    fp8_block_up_gate,
+    fp8_selected_swiglu_down,
+    fp8_selected_up_gate,
+)
 from .reference.fp8 import dequantize_fp8_bits_block_weight
 from .reference.attention import (
     MlaNumericalContract,
@@ -902,4 +909,229 @@ def stage_local_moe_fp8_mapped(
         contract.routed_scaling_factor, dtype=hidden_states.dtype
     )
     output = (combined[0] * scale + combined[1]).astype(hidden_states.dtype)
+    return output, route_indices, route_weights
+
+
+def stage_local_moe_pallas_from_routes_mapped(
+    hidden_states: Any,
+    route_indices: Any,
+    route_weights: Any,
+    expert_gate_bits: Any,
+    expert_gate_scale: Any,
+    expert_up_bits: Any,
+    expert_up_scale: Any,
+    expert_down_bits: Any,
+    expert_down_scale: Any,
+    shared_gate_bits: Any,
+    shared_gate_scale: Any,
+    shared_up_bits: Any,
+    shared_up_scale: Any,
+    shared_down_bits: Any,
+    shared_down_scale: Any,
+    local_slot: Any,
+    *,
+    axis_name: str,
+    contract: GlmMoeNumericalContract = GlmMoeNumericalContract(),
+    axis_index_groups: Sequence[Sequence[int]] | None = None,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
+        contraction_tile=512
+    ),
+    interpret: bool = False,
+) -> Any:
+    """Execute final-layout raw-FP8 MoE work and one local combine.
+
+    Routed tables are already packed in the Pallas MXU access order:
+    gate/up ``[local_experts, hidden, intermediate]`` and down
+    ``[local_experts, intermediate, hidden]``. Shared-expert shards retain
+    checkpoint ``[out, in]`` orientation because their feature sharding is
+    directly compatible with the standalone Pallas matmuls. No complete
+    expert table is transposed or decoded by the runtime.
+
+    The routed top-k reduction is performed in BF16 before the stage-local
+    collective. Routed and shared partials occupy separate leading rows of
+    the same ``psum`` and the routed factor is applied only after reduction.
+    """
+
+    groups = _axis_groups(axis_index_groups)
+    if hidden_states.shape != (1, contract.hidden_size):
+        raise ValueError("Pallas MoE hidden state must contain one exact row")
+    if hidden_states.dtype != jnp.bfloat16:
+        raise ValueError("Pallas MoE hidden state must be BF16")
+    if route_indices.shape != (1, contract.top_k) or (
+        route_indices.dtype != jnp.int32
+    ):
+        raise ValueError("Pallas MoE routes must be one exact int32 top-k row")
+    if route_weights.shape != (1, contract.top_k) or (
+        route_weights.dtype != jnp.float32
+    ):
+        raise ValueError("Pallas MoE route weights must be one FP32 top-k row")
+    if local_slot.shape != () or local_slot.dtype != jnp.int32:
+        raise ValueError("Pallas MoE local_slot must be an int32 scalar")
+    if config.block_shape != contract.fp8_block_shape:
+        raise ValueError(
+            "Pallas tile block shape must match the MoE numerical contract"
+        )
+
+    expected_gate_shape = (
+        contract.local_experts,
+        contract.hidden_size,
+        contract.intermediate_size,
+    )
+    expected_down_shape = (
+        contract.local_experts,
+        contract.intermediate_size,
+        contract.hidden_size,
+    )
+    if expert_gate_bits.shape != expected_gate_shape or (
+        expert_up_bits.shape != expected_gate_shape
+    ):
+        raise ValueError(
+            "Pallas routed gate/up tables must use final [G,K,N] layout"
+        )
+    if expert_down_bits.shape != expected_down_shape:
+        raise ValueError(
+            "Pallas routed down table must use final [G,K,N] layout"
+        )
+    shared_gate_shape = (
+        contract.local_shared_intermediate,
+        contract.hidden_size,
+    )
+    if shared_gate_bits.shape != shared_gate_shape or (
+        shared_up_bits.shape != shared_gate_shape
+    ):
+        raise ValueError(
+            "Pallas shared gate/up shards must retain [local_out,in] layout"
+        )
+    if shared_down_bits.shape != (
+        contract.hidden_size,
+        contract.local_shared_intermediate,
+    ):
+        raise ValueError(
+            "Pallas shared down shard must retain [out,local_in] layout"
+        )
+
+    expert_start = local_slot * jnp.int32(contract.local_experts)
+    gate, up = fp8_selected_up_gate(
+        hidden_states,
+        route_indices[0],
+        expert_start,
+        expert_gate_bits,
+        expert_gate_scale,
+        expert_up_bits,
+        expert_up_scale,
+        config=config,
+        interpret=interpret,
+    )
+    routed_outputs = fp8_selected_swiglu_down(
+        gate,
+        up,
+        route_indices[0],
+        expert_start,
+        expert_down_bits,
+        expert_down_scale,
+        config=config,
+        interpret=interpret,
+    )
+    weighted_routed = (
+        routed_outputs
+        * route_weights[0, :, None].astype(hidden_states.dtype)
+    ).astype(hidden_states.dtype)
+    local_routed = jnp.sum(
+        weighted_routed,
+        axis=0,
+        dtype=hidden_states.dtype,
+    )[None, :]
+
+    shared_gate, shared_up = fp8_block_up_gate(
+        hidden_states,
+        shared_gate_bits,
+        shared_gate_scale,
+        shared_up_bits,
+        shared_up_scale,
+        config=config,
+        interpret=interpret,
+    )
+    shared_activated = (silu(shared_gate) * shared_up).astype(
+        hidden_states.dtype
+    )
+    local_shared = fp8_block_matmul(
+        shared_activated,
+        shared_down_bits,
+        shared_down_scale,
+        config=config,
+        interpret=interpret,
+    )
+
+    combined = lax.psum(
+        jnp.stack((local_routed, local_shared), axis=0),
+        axis_name=axis_name,
+        axis_index_groups=groups,
+    )
+    scale = jnp.asarray(
+        contract.routed_scaling_factor, dtype=hidden_states.dtype
+    )
+    return (combined[0] * scale + combined[1]).astype(hidden_states.dtype)
+
+
+def stage_local_moe_pallas_mapped(
+    hidden_states: Any,
+    router_weight: Any,
+    correction_bias: Any,
+    expert_gate_bits: Any,
+    expert_gate_scale: Any,
+    expert_up_bits: Any,
+    expert_up_scale: Any,
+    expert_down_bits: Any,
+    expert_down_scale: Any,
+    shared_gate_bits: Any,
+    shared_gate_scale: Any,
+    shared_up_bits: Any,
+    shared_up_scale: Any,
+    shared_down_bits: Any,
+    shared_down_scale: Any,
+    local_slot: Any,
+    *,
+    axis_name: str,
+    contract: GlmMoeNumericalContract = GlmMoeNumericalContract(),
+    axis_index_groups: Sequence[Sequence[int]] | None = None,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
+        contraction_tile=512
+    ),
+    interpret: bool = False,
+) -> tuple[Any, Any, Any]:
+    """Route once, execute the final-layout Pallas MoE, and return routing."""
+
+    if router_weight.shape != (contract.num_experts, contract.hidden_size):
+        raise ValueError("Pallas MoE router weight shape is invalid")
+    if correction_bias.shape != (contract.num_experts,):
+        raise ValueError("Pallas MoE correction bias shape is invalid")
+    route_indices, route_weights = route_glm_noaux_tc(
+        hidden_states,
+        router_weight,
+        correction_bias,
+        top_k=contract.top_k,
+    )
+    output = stage_local_moe_pallas_from_routes_mapped(
+        hidden_states,
+        route_indices,
+        route_weights,
+        expert_gate_bits,
+        expert_gate_scale,
+        expert_up_bits,
+        expert_up_scale,
+        expert_down_bits,
+        expert_down_scale,
+        shared_gate_bits,
+        shared_gate_scale,
+        shared_up_bits,
+        shared_up_scale,
+        shared_down_bits,
+        shared_down_scale,
+        local_slot,
+        axis_name=axis_name,
+        contract=contract,
+        axis_index_groups=axis_index_groups,
+        config=config,
+        interpret=interpret,
+    )
     return output, route_indices, route_weights
