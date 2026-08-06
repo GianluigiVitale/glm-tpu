@@ -726,6 +726,7 @@ def main() -> int:
                 if args.kernel == "pallas"
                 else contract.local_shared_intermediate
             ),
+            feature_sharded_routed=args.kernel == "pallas_feature",
         )
     else:
         hlo_contract = validate_real_layer_hlo(

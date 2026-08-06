@@ -137,13 +137,19 @@ def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
         .replace("r8_g64_h6144_i2048", "r8_g256_h6144_i512")
         .replace("u8[64,6144,2048]", "u8[256,6144,512]")
         .replace("u8[64,2048,6144]", "u8[256,512,6144]")
+        .replace(
+            "shared_up_layout = u8[512,6144]",
+            "router_layout = bf16[256,6144]",
+        )
     )
     record = validate_pallas_real_layer_hlo(
         hlo,
         local_experts=256,
         routed_intermediate_size=512,
+        feature_sharded_routed=True,
     )
     assert record["passed"], record
+    assert record["routed_layout"] == "expert_intermediate_shard"
 
     wrong_layout = validate_pallas_real_layer_hlo(hlo)
     assert not wrong_layout["passed"]

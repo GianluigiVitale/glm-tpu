@@ -167,6 +167,7 @@ def validate_pallas_real_layer_hlo(
     local_experts: int = 64,
     stage_size: int = 4,
     routed_intermediate_size: int | None = None,
+    feature_sharded_routed: bool = False,
 ) -> dict[str, Any]:
     """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
 
@@ -250,10 +251,17 @@ def validate_pallas_real_layer_hlo(
         for line in custom_calls
         if 'custom_call_target="ConcatBitcast"' in line
     ]
-    expected_concat_shapes = {
-        f"u8[{intermediate_size // stage_size},{hidden_size}]": 2,
-        f"u8[{hidden_size},{intermediate_size // stage_size}]": 1,
-    }
+    if feature_sharded_routed:
+        expected_concat_shapes = {
+            f"u8[{intermediate_size // stage_size},{hidden_size}]": 1,
+            f"u8[{hidden_size},{intermediate_size // stage_size}]": 1,
+            f"bf16[{local_experts},{hidden_size}]": 1,
+        }
+    else:
+        expected_concat_shapes = {
+            f"u8[{intermediate_size // stage_size},{hidden_size}]": 2,
+            f"u8[{hidden_size},{intermediate_size // stage_size}]": 1,
+        }
     observed_concat_shapes = {
         shape: sum(f"= {shape}" in line for line in concat_calls)
         for shape in expected_concat_shapes
@@ -321,6 +329,11 @@ def validate_pallas_real_layer_hlo(
         "kernel_custom_calls": kernel_calls,
         "local_layout_custom_call_count": len(concat_calls),
         "local_layout_custom_calls": concat_calls,
+        "routed_layout": (
+            "expert_intermediate_shard"
+            if feature_sharded_routed
+            else "complete_expert_identity_shard"
+        ),
         "passed": not violations,
         "violations": violations,
     }
