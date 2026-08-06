@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import replace
 import json
 import os
@@ -15,6 +16,12 @@ from glm_tpu.greenfield.checkpoint.one_layer_pallas import (
     PallasOneLayerPackConfig,
     inspect_pallas_one_layer_artifact,
     pack_pallas_one_layer,
+)
+from glm_tpu.greenfield.checkpoint.one_layer_pallas_feature import (
+    PALLAS_FEATURE_LAYOUT_ID,
+    PallasFeaturePackConfig,
+    inspect_pallas_feature_one_layer_artifact,
+    pack_pallas_feature_one_layer,
 )
 from tests.greenfield.checkpoint.test_one_layer import (
     tiny_config,
@@ -118,6 +125,188 @@ def test_pallas_inspector_refuses_file_corruption(tmp_path: Path) -> None:
         stream.write(b"corrupt")
     with pytest.raises(ValueError, match="size mismatch"):
         inspect_pallas_one_layer_artifact(config.output_dir)
+
+
+def test_pallas_feature_derivative_balances_all_experts_without_new_bytes(
+    tmp_path: Path,
+) -> None:
+    import torch
+    from safetensors import safe_open
+
+    source_config = replace(
+        tiny_config(
+            tmp_path / "source_checkpoint", tmp_path / "source_artifact"
+        ),
+        intermediate_size=8,
+    )
+    write_tiny_source(source_config)
+    source_manifest = pack_one_layer_moe(source_config)
+    pallas_config = _pack_config(
+        source_config.output_dir,
+        tmp_path / "pallas_artifact",
+        source_manifest["manifest_sha256"],
+    )
+    pallas_manifest = pack_pallas_one_layer(pallas_config)
+    feature_config = PallasFeaturePackConfig(
+        source_artifact_dir=pallas_config.output_dir,
+        source_artifact_uri=(
+            "gs://driftbench-dsv4-uc/checkpoints/greenfield/test-pallas"
+        ),
+        source_manifest_sha256=pallas_manifest["manifest_sha256"],
+        output_dir=tmp_path / "feature_artifact",
+        code_hash="e" * 40,
+    )
+    feature = pack_pallas_feature_one_layer(feature_config)
+
+    assert inspect_pallas_feature_one_layer_artifact(
+        feature_config.output_dir,
+        source_artifact_dir=pallas_config.output_dir,
+    ) == feature
+    assert feature["layout"]["layout_id"] == PALLAS_FEATURE_LAYOUT_ID
+    assert feature["packed_payload_byte_count"] == pallas_manifest[
+        "packed_payload_byte_count"
+    ]
+    destination_path = feature_config.output_dir / "device_slot_02.safetensors"
+    with ExitStack() as stack:
+        sources = [
+            stack.enter_context(
+                safe_open(
+                    pallas_config.output_dir
+                    / f"device_slot_{slot:02d}.safetensors",
+                    framework="pt",
+                    device="cpu",
+                )
+            )
+            for slot in range(4)
+        ]
+        destination = stack.enter_context(
+            safe_open(destination_path, framework="pt", device="cpu")
+        )
+        assert destination.get_slice("expert_gate").get_shape() == [8, 8, 2]
+        assert destination.get_slice("expert_down").get_shape() == [8, 2, 8]
+        assert destination.get_slice("expert_gate_scale").get_shape() == [
+            8,
+            1,
+            4,
+        ]
+        expected_gate = torch.cat(
+            [source.get_tensor("expert_gate")[:, :, 4:6] for source in sources]
+        )
+        expected_down = torch.cat(
+            [source.get_tensor("expert_down")[:, 4:6, :] for source in sources]
+        )
+        assert torch.equal(destination.get_tensor("expert_gate"), expected_gate)
+        assert torch.equal(destination.get_tensor("expert_down"), expected_down)
+        assert torch.equal(
+            destination.get_tensor("shared_gate"),
+            sources[2].get_tensor("shared_gate"),
+        )
+
+    with pytest.raises(FileExistsError, match="append-only"):
+        pack_pallas_feature_one_layer(feature_config)
+
+
+def _run_forced_cpu_feature_loader(artifact: Path) -> None:
+    import jax
+    import numpy as np
+
+    from glm_tpu.greenfield.checkpoint.one_layer_loader import (
+        StageDeviceResolution,
+    )
+    from glm_tpu.greenfield.checkpoint.one_layer_pallas_feature_loader import (
+        PallasFeatureLoadExpectation,
+        load_pallas_feature_one_layer,
+        verify_pallas_feature_load_contract,
+    )
+
+    manifest = json.loads((artifact / "manifest.json").read_text())
+    expectation = PallasFeatureLoadExpectation(
+        manifest_sha256=manifest["manifest_sha256"],
+        source_manifest_sha256=manifest["source_manifest_sha256"],
+        code_hash=manifest["code_hash"],
+        source_revision=manifest["source_revision"],
+        topology_hash=manifest["topology_hash"],
+        plan_group_hash=manifest["plan_group_hash"],
+    )
+    assert verify_pallas_feature_load_contract(
+        artifact, expectation
+    ) == manifest
+    devices = tuple(jax.devices())
+    resolution = StageDeviceResolution(
+        devices=(devices[0], devices[2], devices[1], devices[3]),
+        coordinates=((0,), (2,), (1,), (3,)),
+        captured_device_ids=(0, 2, 1, 3),
+        captured_process_index=0,
+        stage_id=0,
+    )
+    loaded = load_pallas_feature_one_layer(
+        artifact, expectation, resolution, expert_chunk_size=1
+    )
+    assert loaded.expert_gate_bits.shape == (8, 8, 8)
+    assert loaded.expert_down_bits.shape == (8, 8, 8)
+    assert {shard.data.shape for shard in loaded.expert_gate_bits.addressable_shards} == {
+        (8, 8, 2)
+    }
+    assert {shard.data.shape for shard in loaded.expert_down_bits.addressable_shards} == {
+        (8, 2, 8)
+    }
+    assert loaded.load_record["routed_layout"] == "expert_intermediate_shard"
+    assert loaded.load_record["packed_single_device_transfers"] == 56
+    assert loaded.load_record["host_global_concatenations"] == 0
+    assert loaded.load_record["runtime_routed_weight_transposes"] == 0
+    assert np.asarray(loaded.expert_gate_bits).shape == (8, 8, 8)
+    loaded.close()
+
+
+def test_feature_loader_places_final_owners_without_runtime_reshard(
+    tmp_path: Path,
+) -> None:
+    source_config = replace(
+        tiny_config(
+            tmp_path / "source_checkpoint", tmp_path / "source_artifact"
+        ),
+        intermediate_size=8,
+    )
+    write_tiny_source(source_config)
+    source_manifest = pack_one_layer_moe(source_config)
+    pallas_config = _pack_config(
+        source_config.output_dir,
+        tmp_path / "pallas_artifact",
+        source_manifest["manifest_sha256"],
+    )
+    pallas_manifest = pack_pallas_one_layer(pallas_config)
+    feature_config = PallasFeaturePackConfig(
+        source_artifact_dir=pallas_config.output_dir,
+        source_artifact_uri=(
+            "gs://driftbench-dsv4-uc/checkpoints/greenfield/test-pallas"
+        ),
+        source_manifest_sha256=pallas_manifest["manifest_sha256"],
+        output_dir=tmp_path / "feature_artifact",
+        code_hash="e" * 40,
+    )
+    pack_pallas_feature_one_layer(feature_config)
+
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    existing = env.get("XLA_FLAGS", "").strip()
+    env["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=4".strip()
+    )
+    code = (
+        "from pathlib import Path; "
+        "from tests.greenfield.checkpoint.test_one_layer_pallas import "
+        "_run_forced_cpu_feature_loader; "
+        f"_run_forced_cpu_feature_loader(Path({str(feature_config.output_dir)!r}))"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 def _run_forced_cpu_raw_loader(artifact: Path) -> None:
