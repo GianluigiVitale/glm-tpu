@@ -94,6 +94,7 @@ def stage_value_remote_copy_pallas(
             send_semaphore,
             receive_semaphore,
             destination_ref[0],
+            device_id_type=pl.DeviceIdType.LOGICAL,
         )
         remote_dma.start()
         remote_dma.wait()
@@ -191,6 +192,7 @@ def stage_remote_copy_pallas(
             send_semaphores[0],
             receive_semaphores[0],
             destination_ref[0],
+            device_id_type=pl.DeviceIdType.LOGICAL,
         )
         metadata_dma = pltpu.make_async_remote_copy(
             metadata_ref,
@@ -198,6 +200,7 @@ def stage_remote_copy_pallas(
             send_semaphores[1],
             receive_semaphores[1],
             destination_ref[0],
+            device_id_type=pl.DeviceIdType.LOGICAL,
         )
         with jax.named_scope("start_remote_residual"):
             residual_dma.start()
