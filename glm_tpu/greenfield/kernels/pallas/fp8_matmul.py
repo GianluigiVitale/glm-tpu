@@ -134,45 +134,33 @@ def _aligned_scale_table(
     )
 
 
-def _aligned_selected_scale_table(
-    scale: Any, *, output_tiles: int
+def _selected_scale_table(
+    scale: Any,
+    local_ids: Any,
+    *,
+    padded_output: int,
+    padded_contraction: int,
+    block_shape: tuple[int, int],
 ) -> Any:
-    if output_tiles > 128:
-        raise ValueError("FP8 matmul supports at most 128 output-scale blocks")
-    contraction_blocks = scale.shape[2]
-    aligned_contraction_blocks = _ceil_div(contraction_blocks, 8) * 8
-    return jnp.pad(
-        jnp.transpose(scale, (0, 2, 1)),
+    """Expand only top-k selected scale metadata to direct vector loads."""
+
+    selected = jnp.take(scale, local_ids, axis=0)
+    output_blocks = padded_output // block_shape[0]
+    contraction_blocks = padded_contraction // block_shape[1]
+    selected = jnp.pad(
+        selected,
         (
             (0, 0),
-            (0, aligned_contraction_blocks - contraction_blocks),
-            (0, 128 - output_tiles),
+            (0, output_blocks - selected.shape[1]),
+            (0, contraction_blocks - selected.shape[2]),
         ),
     )
-
-
-def _scale_vector(
-    scale_tile: Any,
-    contraction_index: Any,
-    output_index: Any,
-    *,
-    contraction_blocks_per_tile: int,
-    contraction_block: int,
-    contraction_tile: int,
-) -> Any:
-    columns = lax.broadcasted_iota(jnp.int32, (1, contraction_tile), 1)
-    result = jnp.zeros((1, contraction_tile), dtype=jnp.float32)
-    first_block = contraction_index * jnp.int32(contraction_blocks_per_tile)
-    for block_offset in range(contraction_blocks_per_tile):
-        block = first_block + jnp.int32(block_offset)
-        value = _scale_value(scale_tile, block, output_index)
-        result = jnp.where(
-            columns // jnp.int32(contraction_block)
-            == jnp.int32(block_offset),
-            value,
-            result,
-        )
-    return result
+    # [route,N-block,K-block] -> [route,K-block,1,N]. This is bounded by
+    # top-k=8 rather than local_experts=64 and matches the MXU output vector.
+    return jnp.transpose(
+        jnp.repeat(selected, block_shape[0], axis=1),
+        (0, 2, 1),
+    )[:, :, None, :]
 
 
 def _validate_selected_inputs(
@@ -643,14 +631,6 @@ def fp8_selected_up_gate(
     )
     output_tiles = padded_output // config.output_tile
     contraction_tiles = padded_contraction // config.contraction_tile
-    gate_scale_table = _aligned_selected_scale_table(
-        gate_scale,
-        output_tiles=output_tiles,
-    )
-    up_scale_table = _aligned_selected_scale_table(
-        up_scale,
-        output_tiles=output_tiles,
-    )
     contraction_blocks_per_tile = (
         config.contraction_tile // config.block_shape[1]
     )
@@ -661,6 +641,20 @@ def fp8_selected_up_gate(
     )
     active = (route_indices >= expert_start) & (
         route_indices < expert_start + jnp.int32(local_experts)
+    )
+    gate_scale_table = _selected_scale_table(
+        gate_scale,
+        local_ids,
+        padded_output=padded_output,
+        padded_contraction=padded_contraction,
+        block_shape=config.block_shape,
+    )
+    up_scale_table = _selected_scale_table(
+        up_scale,
+        local_ids,
+        padded_output=padded_output,
+        padded_contraction=padded_contraction,
+        block_shape=config.block_shape,
     )
 
     def kernel(
@@ -698,21 +692,19 @@ def fp8_selected_up_gate(
 
             @pl.when(active_value[route_index])
             def accumulate_route() -> None:
-                gate_value = _scale_vector(
-                    gate_scale_ref[...],
-                    contraction_index,
-                    output_index,
-                    contraction_blocks_per_tile=contraction_blocks_per_tile,
-                    contraction_block=config.block_shape[1],
-                    contraction_tile=config.contraction_tile,
+                gate_value = jnp.repeat(
+                    gate_scale_ref[...].reshape(
+                        contraction_blocks_per_tile, config.output_tile
+                    ).T,
+                    config.block_shape[1],
+                    axis=1,
                 )
-                up_value = _scale_vector(
-                    up_scale_ref[...],
-                    contraction_index,
-                    output_index,
-                    contraction_blocks_per_tile=contraction_blocks_per_tile,
-                    contraction_block=config.block_shape[1],
-                    contraction_tile=config.contraction_tile,
+                up_value = jnp.repeat(
+                    up_scale_ref[...].reshape(
+                        contraction_blocks_per_tile, config.output_tile
+                    ).T,
+                    config.block_shape[1],
+                    axis=1,
                 )
                 decoded_gate = (
                     gate_ref[...].astype(config.accumulator_dtype) * gate_value
@@ -766,16 +758,12 @@ def fp8_selected_up_gate(
             output_index: Any,
             route_index: Any,
             contraction_index: Any,
-        ) -> tuple[Any, Any, int]:
-            del output_index
+        ) -> tuple[Any, Any, int, Any]:
             return (
-                local_ids_value[route_index],
-                (
-                    contraction_index
-                    * jnp.int32(contraction_blocks_per_tile)
-                )
-                // jnp.int32(8),
+                route_index,
+                contraction_index * jnp.int32(contraction_blocks_per_tile),
                 0,
+                output_index,
             )
 
         def output_index(
@@ -794,7 +782,15 @@ def fp8_selected_up_gate(
             weight_index,
             pipeline_mode=pl.Buffered(buffer_count=3),
         )
-        scale_spec = pl.BlockSpec((None, 8, 128), scale_index)
+        scale_spec = pl.BlockSpec(
+            (
+                None,
+                contraction_blocks_per_tile,
+                1,
+                config.output_tile,
+            ),
+            scale_index,
+        )
         output_spec = pl.BlockSpec(
             (None, config.row_tile, config.output_tile), output_index
         )
