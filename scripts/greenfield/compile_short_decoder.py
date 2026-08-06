@@ -7,6 +7,7 @@ import argparse
 import gzip
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -46,6 +47,7 @@ from glm_tpu.greenfield.topology import (  # noqa: E402
     validate_target_v4_64,
 )
 from glm_tpu.greenfield.validation import (  # noqa: E402
+    inspect_short_context_dsa_oracle,
     inspect_short_context_oracle,
 )
 from scripts.greenfield.pack_feature_runtime_checkpoint import (  # noqa: E402
@@ -206,6 +208,226 @@ def _load_short_context_oracle(
     return manifest, prompt, generated
 
 
+def _load_short_context_dsa_oracle(
+    oracle_dir: Path,
+    *,
+    expected_manifest_sha256: str,
+) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+    """Load exact all-event DSA tensors only after sealed inspection."""
+
+    from safetensors import safe_open
+
+    manifest = inspect_short_context_dsa_oracle(oracle_dir)
+    if manifest["manifest_sha256"] != expected_manifest_sha256:
+        raise RuntimeError(
+            "short-context DSA oracle manifest differs from the protected pin"
+        )
+    tensor_path = oracle_dir / manifest["files"]["tensors"]["filename"]
+    expected_names = {
+        "decode_positions",
+        "producer_layer_ids",
+        "selected_positions",
+        "selected_scores",
+        "valid_counts",
+    }
+    with safe_open(tensor_path, framework="np") as handle:
+        if set(handle.keys()) != expected_names:
+            raise RuntimeError("short-context DSA oracle tensor keys drifted")
+        tensors = {
+            name: np.asarray(handle.get_tensor(name)).copy()
+            for name in expected_names
+        }
+    return manifest, tensors
+
+
+def _stage_dsa_producer_layer_ids(schedule: Any) -> tuple[tuple[int, ...], ...]:
+    """Return full-indexer producers in executable stage/slot order."""
+
+    return tuple(
+        tuple(
+            int(layer.layer_id)
+            for layer in stage.layers
+            if layer.indexer_kind == "full"
+        )
+        for stage in schedule.stages
+    )
+
+
+def _validate_dsa_observation_step(
+    observation: np.ndarray,
+    *,
+    groups: tuple[tuple[int, ...], ...],
+    stage_producer_layer_ids: tuple[tuple[int, ...], ...],
+    selected_width: int,
+    expected_positions: np.ndarray,
+    expected_valid_counts: np.ndarray,
+    expected_producer_layer_ids: np.ndarray,
+    decode_position: int,
+) -> dict[str, Any]:
+    """Reconstruct one observer step and compare exact producer/order/tails."""
+
+    observed = np.asarray(observation)
+    expected_positions = np.asarray(expected_positions)
+    expected_valid_counts = np.asarray(expected_valid_counts)
+    expected_producer_layer_ids = np.asarray(expected_producer_layer_ids)
+    if selected_width <= 0:
+        raise ValueError("DSA selected width must be positive")
+    if len(groups) != len(stage_producer_layer_ids) or not groups:
+        raise ValueError("DSA stage/group mapping is invalid")
+    flat_ranks = tuple(rank for group in groups for rank in group)
+    if sorted(flat_ranks) != list(range(len(flat_ranks))):
+        raise ValueError("DSA groups must cover every rank exactly once")
+    maximum_slots = max(len(values) for values in stage_producer_layer_ids)
+    expected_shape = (len(flat_ranks), maximum_slots, selected_width + 2)
+    if observed.shape != expected_shape or observed.dtype != np.dtype(np.int32):
+        raise ValueError(
+            "DSA observer tensor contract drifted: "
+            f"expected={expected_shape}/int32 "
+            f"observed={observed.shape}/{observed.dtype}"
+        )
+    flat_producers = tuple(
+        producer
+        for stage_values in stage_producer_layer_ids
+        for producer in stage_values
+    )
+    event_count = len(flat_producers)
+    if (
+        expected_positions.shape != (event_count, selected_width)
+        or expected_valid_counts.shape != (event_count,)
+        or expected_producer_layer_ids.shape != (event_count,)
+    ):
+        raise ValueError("DSA oracle step tensor contract drifted")
+    if expected_producer_layer_ids.tolist() != list(flat_producers):
+        raise ValueError(
+            "DSA oracle producer mapping differs from the executable schedule"
+        )
+
+    lane_mismatch_stages: list[int] = []
+    padded_slot_mismatches: list[dict[str, int]] = []
+    producer_mismatches: list[dict[str, int]] = []
+    count_mismatches: list[dict[str, int]] = []
+    position_mismatch_count = 0
+    first_position_mismatch = None
+    event = 0
+    for stage, (group, stage_producers) in enumerate(
+        zip(groups, stage_producer_layer_ids, strict=True)
+    ):
+        lanes = observed[list(group)]
+        if not np.all(lanes == lanes[0]):
+            lane_mismatch_stages.append(stage)
+        canonical = lanes[0]
+        for slot, producer in enumerate(stage_producers):
+            row = canonical[slot]
+            observed_count = int(row[selected_width])
+            observed_producer = int(row[selected_width + 1])
+            expected_count = int(expected_valid_counts[event])
+            if observed_producer != producer:
+                producer_mismatches.append(
+                    {
+                        "event_index": event,
+                        "expected": producer,
+                        "observed": observed_producer,
+                    }
+                )
+            if observed_count != expected_count:
+                count_mismatches.append(
+                    {
+                        "event_index": event,
+                        "expected": expected_count,
+                        "observed": observed_count,
+                    }
+                )
+            mismatches = np.flatnonzero(
+                row[:selected_width] != expected_positions[event]
+            )
+            position_mismatch_count += int(mismatches.size)
+            if mismatches.size and first_position_mismatch is None:
+                offset = int(mismatches[0])
+                first_position_mismatch = {
+                    "event_index": event,
+                    "expected": int(expected_positions[event, offset]),
+                    "observed": int(row[offset]),
+                    "producer_layer_id": producer,
+                    "selected_offset": offset,
+                }
+            event += 1
+        for slot in range(len(stage_producers), maximum_slots):
+            if np.any(canonical[slot] != -1):
+                padded_slot_mismatches.append({"slot": slot, "stage": stage})
+
+    passed = not any(
+        (
+            lane_mismatch_stages,
+            padded_slot_mismatches,
+            producer_mismatches,
+            count_mismatches,
+            position_mismatch_count,
+        )
+    )
+    return {
+        "count_mismatches": count_mismatches,
+        "decode_position": int(decode_position),
+        "event_count": event_count,
+        "exact_selected_order_and_tail": position_mismatch_count == 0,
+        "first_position_mismatch": first_position_mismatch,
+        "lane_mismatch_stages": lane_mismatch_stages,
+        "padded_slot_mismatches": padded_slot_mismatches,
+        "passed": passed,
+        "position_mismatch_count": position_mismatch_count,
+        "producer_mismatches": producer_mismatches,
+    }
+
+
+def _observer_hlo_isolation_contract(
+    optimized_hlo: str,
+    *,
+    production_contract: dict[str, Any],
+    observer_contract: dict[str, Any],
+) -> dict[str, Any]:
+    """Prove the diagnostic executable is callback-free and non-donating."""
+
+    lowered = optimized_hlo.lower()
+    callback_markers = tuple(
+        marker
+        for marker in (
+            "host_callback",
+            "outside_compilation",
+            "xla_ffi_python_cpu_callback",
+            "xla_python_cpu_callback",
+        )
+        if marker in lowered
+    )
+    header = optimized_hlo.splitlines()[0] if optimized_hlo else ""
+    input_output_alias_present = bool(
+        re.search(r"\binput_output_alias\s*=", header)
+    )
+    compared_fields = (
+        "collective_count",
+        "collective_counts",
+        "all_reduce_component_count",
+        "all_reduce_arity_counts",
+        "all_reduce_result_shape_counts",
+    )
+    collective_contract_matches = all(
+        observer_contract.get(name) == production_contract.get(name)
+        for name in compared_fields
+    )
+    return {
+        "callback_markers": list(callback_markers),
+        "collective_contract_matches_production": collective_contract_matches,
+        "compared_collective_fields": list(compared_fields),
+        "donate_argnums": [],
+        "input_output_alias_present": input_output_alias_present,
+        "passed": bool(
+            production_contract.get("passed")
+            and observer_contract.get("passed")
+            and collective_contract_matches
+            and not callback_markers
+            and not input_output_alias_present
+        ),
+    }
+
+
 def _raw_token_sequence_contract(
     observed: list[int],
     expected: np.ndarray,
@@ -323,6 +545,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
+    parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
+    parser.add_argument("--short-context-dsa-oracle-manifest-sha256")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -346,6 +570,16 @@ def main() -> int:
         )
     if oracle_mode and not args.complete_token_path:
         raise ValueError("short-context oracle requires the complete-token path")
+    dsa_oracle_mode = args.short_context_dsa_oracle_dir is not None
+    if dsa_oracle_mode != (
+        args.short_context_dsa_oracle_manifest_sha256 is not None
+    ):
+        raise ValueError(
+            "short-context DSA oracle directory and manifest pin are required "
+            "together"
+        )
+    if dsa_oracle_mode and not oracle_mode:
+        raise ValueError("short-context DSA oracle requires the token oracle")
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.context_capacity != 2048:
@@ -359,6 +593,8 @@ def main() -> int:
     oracle_manifest = None
     prompt_token_ids = None
     oracle_generated_token_ids = None
+    dsa_oracle_manifest = None
+    dsa_oracle_tensors = None
     if oracle_mode:
         assert args.short_context_oracle_dir is not None
         assert args.short_context_oracle_manifest_sha256 is not None
@@ -382,6 +618,39 @@ def main() -> int:
             raise ValueError(
                 "prompt plus recurrent/trace steps exceeds context capacity"
             )
+    if dsa_oracle_mode:
+        assert args.short_context_dsa_oracle_dir is not None
+        assert args.short_context_dsa_oracle_manifest_sha256 is not None
+        assert oracle_manifest is not None
+        assert prompt_token_ids is not None
+        assert oracle_generated_token_ids is not None
+        (
+            dsa_oracle_manifest,
+            dsa_oracle_tensors,
+        ) = _load_short_context_dsa_oracle(
+            args.short_context_dsa_oracle_dir,
+            expected_manifest_sha256=(
+                args.short_context_dsa_oracle_manifest_sha256
+            ),
+        )
+        if dsa_oracle_manifest["token_oracle"]["manifest_sha256"] != (
+            oracle_manifest["manifest_sha256"]
+        ):
+            raise ValueError("DSA oracle is not linked to the pinned token oracle")
+        decode_positions = dsa_oracle_tensors["decode_positions"]
+        if (
+            decode_positions[0] != prompt_token_ids.size
+            or decode_positions[-1] >= args.context_capacity
+        ):
+            raise ValueError("DSA oracle positions do not align with the 2K prompt")
+        dsa_steps = int(decode_positions.size)
+        if args.warmup + args.iterations + args.trace_steps != dsa_steps:
+            raise ValueError(
+                "production warmup/timing/trace window must cover the exact DSA "
+                "oracle window"
+            )
+        if 1 + dsa_steps > oracle_generated_token_ids.size:
+            raise ValueError("DSA observer token window exceeds the token oracle")
     if args.runtime_kind in ("pallas_feature", "pallas_feature_linear") and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
@@ -513,6 +782,20 @@ def main() -> int:
             else "tpu_v4_pp8_pallas_feature"
         )
     schedule = build_pipeline_schedule(execution_plan)
+    stage_dsa_producers = _stage_dsa_producer_layer_ids(schedule)
+    if dsa_oracle_mode:
+        assert dsa_oracle_tensors is not None
+        expected_dsa_producers = tuple(
+            producer
+            for stage_values in stage_dsa_producers
+            for producer in stage_values
+        )
+        if dsa_oracle_tensors["producer_layer_ids"].tolist() != list(
+            expected_dsa_producers
+        ):
+            raise ValueError(
+                "DSA oracle producer IDs differ from the executable schedule"
+            )
     state_layout = build_decoder_state_layout(
         execution_plan,
         schedule,
@@ -589,6 +872,25 @@ def main() -> int:
             linear_backend=linear_backend,
             complete_token_path=args.complete_token_path,
         )
+        dsa_observer = None
+        if dsa_oracle_mode:
+            dsa_observer = build_decoder_step_program(
+                execution_plan,
+                schedule,
+                state_layout,
+                pack_context.layout,
+                groups,
+                pairs,
+                devices=runtime_devices,
+                sparse_moe_backend=sparse_moe_backend,
+                feature_output_tile=args.feature_output_tile,
+                feature_fuse_route_weighting=(
+                    args.feature_fuse_route_weighting
+                ),
+                linear_backend=linear_backend,
+                complete_token_path=True,
+                observe_dsa_events=True,
+            )
         prefill = None
         if oracle_mode:
             assert prompt_token_ids is not None
@@ -822,6 +1124,87 @@ def main() -> int:
                 "decoder HLO contract failed before execution: "
                 f"{hlo_contract['violations']}"
             )
+        compiled_dsa_observer = None
+        dsa_observer_compile_seconds = None
+        dsa_observer_hlo_sha256 = None
+        fleet_dsa_observer_hlo_hashes = None
+        dsa_observer_hlo_contract = None
+        dsa_observer_isolation_contract = None
+        if dsa_oracle_mode:
+            assert dsa_observer is not None
+            multihost_utils.sync_global_devices(
+                "greenfield-short-dsa-observer-compile-start"
+            )
+            observer_compile_started = time.monotonic()
+            # Deliberately no donate_argnums: the observer must replay first
+            # while preserving the prefill result for production timing.
+            lowered_dsa_observer = jax.jit(dsa_observer.execute).lower(*inputs)
+            compiled_dsa_observer = lowered_dsa_observer.compile()
+            dsa_observer_compile_seconds = (
+                time.monotonic() - observer_compile_started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-short-dsa-observer-compile-end"
+            )
+            optimized_dsa_observer_hlo = compiled_dsa_observer.as_text()
+            dsa_observer_hlo_sha256 = sha256(
+                optimized_dsa_observer_hlo.encode("utf-8")
+            ).hexdigest()
+            fleet_dsa_observer_hlo_hashes = _fleet_digest(
+                multihost_utils,
+                dsa_observer_hlo_sha256,
+                num_processes=args.num_processes,
+            )
+            dsa_observer_hlo_contract = validate_decoder_step_hlo(
+                optimized_dsa_observer_hlo,
+                config=dsa_observer.config,
+                schedule=schedule,
+                groups=groups,
+                pairs=pairs,
+                backend_contract=hlo_backend_contract,
+                feature_output_tile=dsa_observer.feature_output_tile,
+                feature_fuse_route_weighting=(
+                    dsa_observer.feature_fuse_route_weighting
+                ),
+                complete_token_path=True,
+            )
+            dsa_observer_isolation_contract = (
+                _observer_hlo_isolation_contract(
+                    optimized_dsa_observer_hlo,
+                    production_contract=hlo_contract,
+                    observer_contract=dsa_observer_hlo_contract,
+                )
+            )
+            if jax.process_index() == 0:
+                hlo_dir = args.output.parent / "hlo"
+                with gzip.open(
+                    hlo_dir
+                    / "decoder_78layer_2k_token_dsa_observer.optimized_hlo.txt.gz",
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(optimized_dsa_observer_hlo)
+                _atomic_json(
+                    hlo_dir
+                    / "decoder_78layer_2k_token_dsa_observer.hlo_contract.json",
+                    dsa_observer_hlo_contract,
+                )
+                _atomic_json(
+                    hlo_dir
+                    / "decoder_78layer_2k_token_dsa_observer.isolation_contract.json",
+                    dsa_observer_isolation_contract,
+                )
+            del optimized_dsa_observer_hlo
+            if not dsa_observer_hlo_contract["passed"]:
+                raise RuntimeError(
+                    "DSA observer HLO contract failed before execution: "
+                    f"{dsa_observer_hlo_contract['violations']}"
+                )
+            if not dsa_observer_isolation_contract["passed"]:
+                raise RuntimeError(
+                    "DSA observer isolation contract failed before execution: "
+                    f"{dsa_observer_isolation_contract}"
+                )
         compiled_prefill = None
         prefill_compile_seconds = None
         prefill_hlo_sha256 = None
@@ -880,6 +1263,7 @@ def main() -> int:
 
         generated_tokens: list[int] = []
         prefill_wall_ms = None
+        dsa_observer_contract = None
         if oracle_mode:
             assert compiled_prefill is not None and prefill_inputs is not None
             prefill_started = time.perf_counter_ns()
@@ -899,6 +1283,139 @@ def main() -> int:
         else:
             output = compiled(*inputs)
             output[3].block_until_ready()
+        if dsa_oracle_mode:
+            assert compiled_dsa_observer is not None
+            assert dsa_oracle_manifest is not None
+            assert dsa_oracle_tensors is not None
+            assert oracle_generated_token_ids is not None
+            assert prompt_token_ids is not None
+            observer_current = tuple(output)
+            observer_owns_current = False
+            observer_step_records = []
+            observer_tokens: list[int] = []
+            try:
+                for step, decode_position in enumerate(
+                    dsa_oracle_tensors["decode_positions"].tolist()
+                ):
+                    observer_result = compiled_dsa_observer(
+                        loaded.weights, *observer_current
+                    )
+                    observer_result[8].block_until_ready()
+                    observation_host = _materialize_global_array(
+                        jax,
+                        multihost_utils,
+                        observer_result[8],
+                    )
+                    step_contract = _validate_dsa_observation_step(
+                        observation_host,
+                        groups=groups,
+                        stage_producer_layer_ids=stage_dsa_producers,
+                        selected_width=decoder.config.selected_width,
+                        expected_positions=dsa_oracle_tensors[
+                            "selected_positions"
+                        ][step],
+                        expected_valid_counts=dsa_oracle_tensors[
+                            "valid_counts"
+                        ][step],
+                        expected_producer_layer_ids=dsa_oracle_tensors[
+                            "producer_layer_ids"
+                        ],
+                        decode_position=int(decode_position),
+                    )
+                    next_position = np.asarray(
+                        jax.device_get(observer_result[5])
+                    )
+                    step_contract["next_position"] = next_position.tolist()
+                    step_contract["position_passed"] = bool(
+                        next_position.tolist() == [int(decode_position) + 1]
+                    )
+                    step_contract["passed"] = bool(
+                        step_contract["passed"]
+                        and step_contract["position_passed"]
+                    )
+                    observer_step_records.append(step_contract)
+                    if not step_contract["passed"]:
+                        raise RuntimeError(
+                            "DSA observer exact-order contract failed: "
+                            f"{step_contract}"
+                        )
+                    observer_token = _materialize_global_array(
+                        jax,
+                        multihost_utils,
+                        observer_result[4],
+                    )[list(groups[0]), 0]
+                    if not np.all(observer_token == observer_token[0]):
+                        raise RuntimeError("DSA observer token lanes disagree")
+                    observer_tokens.append(int(observer_token[0]))
+                    if observer_owns_current:
+                        _delete_arrays(observer_current)
+                    observer_current = tuple(observer_result[:8])
+                    observer_owns_current = True
+                    _delete_arrays((observer_result[8],))
+                preserved_prefill_position = np.asarray(
+                    jax.device_get(output[5])
+                )
+                preserved_prefill_token = _materialize_global_array(
+                    jax,
+                    multihost_utils,
+                    output[4],
+                )[list(groups[0]), 0]
+                prefill_state_preserved = bool(
+                    preserved_prefill_position.tolist()
+                    == [int(prompt_token_ids.size)]
+                    and np.all(preserved_prefill_token == generated_tokens[0])
+                )
+                observer_token_contract = _raw_token_sequence_contract(
+                    observer_tokens,
+                    oracle_generated_token_ids[
+                        1 : 1 + len(observer_tokens)
+                    ],
+                )
+                dsa_observer_contract = {
+                    "all_steps_passed": all(
+                        record["passed"] for record in observer_step_records
+                    ),
+                    "decode_step_count": len(observer_step_records),
+                    "event_count": int(
+                        dsa_oracle_tensors["producer_layer_ids"].size
+                    ),
+                    "manifest_sha256": dsa_oracle_manifest[
+                        "manifest_sha256"
+                    ],
+                    "observer_executed_before_production": True,
+                    "observer_hlo_sha256": dsa_observer_hlo_sha256,
+                    "prefill_state_preserved_without_donation": (
+                        prefill_state_preserved
+                    ),
+                    "production_executable_observer_enabled": False,
+                    "score_comparison": {
+                        "compared": False,
+                        "oracle_sha256": dsa_oracle_manifest["arrays"][
+                            "selected_scores"
+                        ]["sha256"],
+                        "reason": (
+                            "greenfield observer exposes exact selected positions, "
+                            "counts, producer IDs, and sentinel tails; legacy scores "
+                            "remain diagnostic only"
+                        ),
+                    },
+                    "step_records": observer_step_records,
+                    "token_oracle_offset": 1,
+                    "token_sequence": observer_token_contract,
+                }
+                dsa_observer_contract["passed"] = bool(
+                    dsa_observer_contract["all_steps_passed"]
+                    and prefill_state_preserved
+                    and observer_token_contract["exact_prefix_match"]
+                )
+                if not dsa_observer_contract["passed"]:
+                    raise RuntimeError(
+                        "DSA observer replay contract failed: "
+                        f"{dsa_observer_contract}"
+                    )
+            finally:
+                if observer_owns_current:
+                    _delete_arrays(observer_current)
         state_values = (
             tuple(output)
             if args.complete_token_path
@@ -1160,6 +1677,12 @@ def main() -> int:
                 )
             )
             metadata_passed = bool(metadata_passed and token_passed)
+        if dsa_oracle_mode:
+            if dsa_observer_contract is None:
+                raise RuntimeError("DSA observer contract was not produced")
+            metadata_passed = bool(
+                metadata_passed and dsa_observer_contract["passed"]
+            )
         local_kv_nonzero = []
         local_index_nonzero = []
         for shard in current[1].addressable_shards:
@@ -1187,7 +1710,17 @@ def main() -> int:
             "device_memory_after_execute": [
                 _memory_stats(device) for device in jax.local_devices()
             ],
+            "dsa_observer_compile_seconds": dsa_observer_compile_seconds,
+            "dsa_observer_contract": dsa_observer_contract,
+            "dsa_observer_hlo_contract": dsa_observer_hlo_contract,
+            "dsa_observer_hlo_sha256": dsa_observer_hlo_sha256,
+            "dsa_observer_isolation_contract": (
+                dsa_observer_isolation_contract
+            ),
             "fleet_hlo_hashes": fleet_hlo_hashes,
+            "fleet_dsa_observer_hlo_hashes": (
+                fleet_dsa_observer_hlo_hashes
+            ),
             "fleet_prefill_hlo_hashes": fleet_prefill_hlo_hashes,
             "fleet_local_device_ids_in_runtime_order": fleet_local_ids.tolist(),
             "hlo_contract": hlo_contract,
@@ -1222,7 +1755,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 2,
+            "schema_version": 3,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
@@ -1236,6 +1769,9 @@ def main() -> int:
             "token_passed": token_passed,
             "topology_hash": live_topology.topology_hash,
             "trace": trace_record,
+            "trace_and_timing_use_observer_free_production_executable": bool(
+                not decoder.observe_dsa_events
+            ),
             "transformer_body_timing_only": not args.complete_token_path,
             "warmup": args.warmup,
         }

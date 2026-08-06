@@ -6,10 +6,14 @@ import numpy as np
 import pytest
 
 from scripts.greenfield.compile_short_decoder import (
+    _load_short_context_dsa_oracle,
     _materialize_global_array,
+    _observer_hlo_isolation_contract,
     _raw_token_sequence_contract,
+    _validate_dsa_observation_step,
     _validate_completed_step_selected_states,
 )
+from scripts.greenfield import compile_short_decoder as compile_module
 
 
 class _Jax:
@@ -134,3 +138,193 @@ def test_raw_token_sequence_contract_is_exact_and_reports_first_drift() -> None:
         _raw_token_sequence_contract([], expected)
     with pytest.raises(ValueError, match="exceeds"):
         _raw_token_sequence_contract(expected.tolist() + [99], expected)
+
+
+def test_load_short_context_dsa_oracle_requires_exact_manifest_pin(
+    tmp_path: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pathlib import Path
+
+    from safetensors.numpy import save_file
+
+    oracle_dir = Path(str(tmp_path))
+    tensors = {
+        "decode_positions": np.asarray([4], np.int32),
+        "producer_layer_ids": np.asarray([0, 2], np.int32),
+        "selected_positions": np.asarray(
+            [[[0, 1, 2, 3], [3, 2, 1, 0]]], np.int32
+        ),
+        "selected_scores": np.asarray(
+            [[[4, 3, 2, 1], [4, 3, 2, 1]]], np.float32
+        ),
+        "valid_counts": np.asarray([[4, 4]], np.int32),
+    }
+    save_file(tensors, oracle_dir / "dsa_events.safetensors")
+    manifest = {
+        "files": {"tensors": {"filename": "dsa_events.safetensors"}},
+        "manifest_sha256": "a" * 64,
+    }
+    monkeypatch.setattr(
+        compile_module,
+        "inspect_short_context_dsa_oracle",
+        lambda _: manifest,
+    )
+
+    loaded_manifest, loaded_tensors = _load_short_context_dsa_oracle(
+        oracle_dir,
+        expected_manifest_sha256="a" * 64,
+    )
+    assert loaded_manifest == manifest
+    for name, expected in tensors.items():
+        np.testing.assert_array_equal(loaded_tensors[name], expected)
+    with pytest.raises(RuntimeError, match="protected pin"):
+        _load_short_context_dsa_oracle(
+            oracle_dir,
+            expected_manifest_sha256="b" * 64,
+        )
+
+
+def _dsa_observation_fixture() -> tuple[
+    np.ndarray,
+    tuple[tuple[int, ...], ...],
+    tuple[tuple[int, ...], ...],
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
+    groups = ((0, 1), (2, 3))
+    producers = ((0, 2), (6,))
+    expected_positions = np.asarray(
+        [[0, 1, 2, -1], [2, 1, 0, -1], [1, 0, 2, -1]],
+        np.int32,
+    )
+    expected_counts = np.asarray([3, 3, 3], np.int32)
+    expected_producers = np.asarray([0, 2, 6], np.int32)
+    observation = np.full((4, 2, 6), -1, np.int32)
+    event = 0
+    for stage, group in enumerate(groups):
+        for slot, producer in enumerate(producers[stage]):
+            row = np.concatenate(
+                (
+                    expected_positions[event],
+                    np.asarray([expected_counts[event], producer], np.int32),
+                )
+            )
+            observation[list(group), slot] = row
+            event += 1
+    return (
+        observation,
+        groups,
+        producers,
+        expected_positions,
+        expected_counts,
+        expected_producers,
+    )
+
+
+def test_dsa_observer_reconstructs_stage_slots_and_lane_replication() -> None:
+    (
+        observation,
+        groups,
+        producers,
+        expected_positions,
+        expected_counts,
+        expected_producers,
+    ) = _dsa_observation_fixture()
+    record = _validate_dsa_observation_step(
+        observation,
+        groups=groups,
+        stage_producer_layer_ids=producers,
+        selected_width=4,
+        expected_positions=expected_positions,
+        expected_valid_counts=expected_counts,
+        expected_producer_layer_ids=expected_producers,
+        decode_position=3,
+    )
+    assert record["passed"]
+    assert record["event_count"] == 3
+    assert record["lane_mismatch_stages"] == []
+    assert record["padded_slot_mismatches"] == []
+    assert record["position_mismatch_count"] == 0
+
+
+def test_dsa_observer_refuses_lane_order_producer_and_padding_drift() -> None:
+    (
+        observation,
+        groups,
+        producers,
+        expected_positions,
+        expected_counts,
+        expected_producers,
+    ) = _dsa_observation_fixture()
+    drifted = observation.copy()
+    # Same selected set, wrong tie/order.
+    drifted[0:2, 0, 0:2] = drifted[0:2, 0, 1::-1]
+    # One replicated lane disagrees, one producer drifts, and dead padding is live.
+    drifted[1, 1, 0] = 99
+    drifted[2:4, 0, 5] = 7
+    drifted[2:4, 1, 0] = 0
+    record = _validate_dsa_observation_step(
+        drifted,
+        groups=groups,
+        stage_producer_layer_ids=producers,
+        selected_width=4,
+        expected_positions=expected_positions,
+        expected_valid_counts=expected_counts,
+        expected_producer_layer_ids=expected_producers,
+        decode_position=3,
+    )
+    assert not record["passed"]
+    assert record["position_mismatch_count"] == 2
+    assert record["first_position_mismatch"]["selected_offset"] == 0
+    assert record["lane_mismatch_stages"] == [0]
+    assert record["producer_mismatches"] == [
+        {"event_index": 2, "expected": 6, "observed": 7}
+    ]
+    assert record["padded_slot_mismatches"] == [{"slot": 1, "stage": 1}]
+
+
+def test_observer_hlo_isolation_requires_no_alias_callback_or_collective_drift(
+) -> None:
+    contract = {
+        "all_reduce_arity_counts": {"1": 1},
+        "all_reduce_component_count": 1,
+        "all_reduce_result_shape_counts": {"s32[1]": 1},
+        "collective_count": 3,
+        "collective_counts": {
+            "all-gather": 1,
+            "all-reduce": 1,
+            "collective-permute": 1,
+        },
+        "passed": True,
+    }
+    hlo = "HloModule observer, is_scheduled=true\nENTRY main {}\n"
+    exact = _observer_hlo_isolation_contract(
+        hlo,
+        production_contract=contract,
+        observer_contract=dict(contract),
+    )
+    assert exact["passed"]
+    assert exact["donate_argnums"] == []
+
+    aliased = _observer_hlo_isolation_contract(
+        "HloModule observer, input_output_alias={ {0}: (1, {}, may-alias) }\n",
+        production_contract=contract,
+        observer_contract=dict(contract),
+    )
+    assert not aliased["passed"]
+    callback = _observer_hlo_isolation_contract(
+        hlo + "outside_compilation\n",
+        production_contract=contract,
+        observer_contract=dict(contract),
+    )
+    assert not callback["passed"]
+    drifted = dict(contract)
+    drifted["collective_count"] = 4
+    collective = _observer_hlo_isolation_contract(
+        hlo,
+        production_contract=contract,
+        observer_contract=drifted,
+    )
+    assert not collective["passed"]
