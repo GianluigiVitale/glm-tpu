@@ -155,6 +155,10 @@ def build_teacher_forced_prefill_program(
         raise PlanValidationError(
             "teacher-forced prefill requires a complete-token decoder"
         )
+    if getattr(decoder, "observe_dsa_events", False):
+        raise PlanValidationError(
+            "teacher-forced prefill requires the observation-free decoder"
+        )
     if (
         not isinstance(prompt_length, int)
         or isinstance(prompt_length, bool)

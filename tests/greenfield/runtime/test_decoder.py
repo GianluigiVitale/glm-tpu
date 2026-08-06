@@ -363,6 +363,26 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             complete_token_path=1,  # type: ignore[arg-type]
         )
+    with pytest.raises(PlanValidationError, match="event-observation flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            observe_dsa_events=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="complete-token path"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            observe_dsa_events=True,
+        )
 
 
 def test_complete_small_decoder_token_step_runs_all_stages_on_forced_cpu() -> None:
@@ -385,6 +405,8 @@ weight_layout = build_decoder_runtime_weight_layout(plan, schedule)
 groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8))
 pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in range(8) for slot in range(4))
 decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
+explicit_default = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=False)
+observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True)
 prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
 
 weights = {}
@@ -428,7 +450,12 @@ inputs = (
     put(np.asarray([[0]], np.int32), decoder.input_specs[7]),
     put(np.asarray([1], np.int32), decoder.input_specs[8]),
 )
-compiled = jax.jit(decoder.execute).lower(*inputs).compile()
+lowered = jax.jit(decoder.execute).lower(*inputs)
+default_stablehlo = lowered.as_text()
+explicit_default_stablehlo = jax.jit(explicit_default.execute).lower(*inputs).as_text()
+compiled = lowered.compile()
+observer_compiled = jax.jit(observer.execute).lower(*inputs).compile()
+observed = observer_compiled(*inputs)
 first = compiled(*inputs)
 second = compiled(weights, *first)
 prefill_inputs = (
@@ -441,8 +468,18 @@ prefill_compiled = jax.jit(prefill.execute).lower(*prefill_inputs).compile()
 prefilled = prefill_compiled(*prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
 prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
+observation = np.asarray(jax.device_get(observed[8]))
+observation_rows = []
+for stage, group in enumerate(groups):
+    rows = observation[list(group), 0]
+    observation_rows.append({
+        'all_stage_lanes_equal': bool(np.all(rows == rows[0])),
+        'row': rows[0].tolist(),
+        'stage': stage,
+    })
 active = np.flatnonzero(metadata[:, 0, decoder.config.active_index] == 1)
 module = parse_hlo_module(compiled.as_text())
+observer_module = parse_hlo_module(observer_compiled.as_text())
 hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True)
 prefill_hlo_contract = validate_teacher_forced_prefill_hlo(prefill_compiled.as_text(), program=prefill, schedule=schedule, backend_contract='cpu_reference')
 counts = {}
@@ -464,6 +501,7 @@ print(json.dumps({
     'active': active.tolist(),
     'collectives_local': collectives_local,
     'complete_token_path': decoder.complete_token_path,
+    'default_observation_off_stablehlo_identical': default_stablehlo == explicit_default_stablehlo,
     'counts': counts,
     'health': sorted(set(metadata[active, 0, decoder.config.health_index].tolist())),
     'hlo_contract': {key: hlo_contract[key] for key in ('collective_count', 'collective_counts', 'passed', 'violations')},
@@ -473,6 +511,15 @@ print(json.dumps({
     'next_tokens': sorted(set(next_token[active, 0].tolist())),
     'next_position': next_position.tolist(),
     'next_lengths': next_lengths.tolist(),
+    'observer': {
+        'collective_counts': {
+            opcode: sum(item.opcode == opcode for item in observer_module.collectives)
+            for opcode in ('all-gather', 'all-reduce', 'collective-permute')
+        },
+        'host_callback_absent': all(marker not in observer_compiled.as_text().lower() for marker in ('host_callback', 'outside_compilation', 'xla_ffi_python_cpu_callback', 'xla_python_cpu_callback')),
+        'production_outputs_exact': all(np.array_equal(np.asarray(jax.device_get(observed[index])), np.asarray(jax.device_get(first[index]))) for index in range(8)),
+        'rows': observation_rows,
+    },
     'block_tables_unchanged': bool(np.array_equal(next_blocks, np.asarray([[0]], np.int32))),
     'positions': sorted(set(tuple(row) for row in metadata[active, 0, :4].tolist())),
     'producer': sorted(set(metadata[active, 0, decoder.config.producer_index].tolist())),
@@ -519,9 +566,27 @@ print(json.dumps({
     assert result["active"] == [0, 1, 2, 3]
     assert result["residual_exact"]
     assert result["complete_token_path"]
+    assert result["default_observation_off_stablehlo_identical"]
     assert result["next_tokens"] == [0]
     assert result["next_position"] == [2]
     assert result["next_lengths"] == [3]
+    assert result["observer"] == {
+        "collective_counts": {
+            "all-gather": 58,
+            "all-reduce": 17,
+            "collective-permute": 17,
+        },
+        "host_callback_absent": True,
+        "production_outputs_exact": True,
+        "rows": [
+            {
+                "all_stage_lanes_equal": True,
+                "row": [0, -1, -1, -1, 1, stage],
+                "stage": stage,
+            }
+            for stage in range(8)
+        ],
+    }
     assert result["prefill"] == {
         "next_lengths": [3],
         "next_position": [2],

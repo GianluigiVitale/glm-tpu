@@ -130,6 +130,7 @@ class DecoderStepProgram:
     feature_fuse_route_weighting: bool
     linear_backend: StageLinearBackend
     complete_token_path: bool
+    observe_dsa_events: bool
 
 
 def _validate_pallas_feature_decoder_calls(
@@ -916,7 +917,8 @@ def _execute_stage(
     pallas_moe_config: Fp8BlockMatmulConfig | None,
     pallas_moe_fuse_route_weighting: bool,
     linear_backend: StageLinearBackend,
-) -> tuple[Any, Any, Any, Any]:
+    dsa_observation: Any | None = None,
+) -> tuple[Any, ...]:
     import jax.numpy as jnp
 
     residual, kv_cache, index_cache, metadata = values
@@ -998,6 +1000,16 @@ def _execute_stage(
             metadata = metadata.at[0, config.producer_index].set(
                 jnp.int32(layer.layer_id)
             )
+            if dsa_observation is not None:
+                dsa_observation = dsa_observation.at[
+                    current_full_slot, : config.selected_width
+                ].set(result.selected_positions[0])
+                dsa_observation = dsa_observation.at[
+                    current_full_slot, config.selected_width
+                ].set(result.selected_valid_counts[0])
+                dsa_observation = dsa_observation.at[
+                    current_full_slot, config.selected_width + 1
+                ].set(jnp.int32(layer.layer_id))
         metadata = metadata.at[:, : config.selected_width].set(
             result.selected_positions
         )
@@ -1013,7 +1025,10 @@ def _execute_stage(
             jnp.int32(1 << stage.assignment.stage_id),
         )
     )
-    return residual, kv_cache, index_cache, metadata
+    values = (residual, kv_cache, index_cache, metadata)
+    if dsa_observation is None:
+        return values
+    return (*values, dsa_observation)
 
 
 def build_decoder_step_program(
@@ -1031,6 +1046,7 @@ def build_decoder_step_program(
     feature_fuse_route_weighting: bool = False,
     linear_backend: StageLinearBackend = "reference",
     complete_token_path: bool = False,
+    observe_dsa_events: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
 
@@ -1065,6 +1081,12 @@ def build_decoder_step_program(
         raise PlanValidationError("decoder FP8 linear backend is unknown")
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
+    if not isinstance(observe_dsa_events, bool):
+        raise PlanValidationError("DSA event-observation flag must be boolean")
+    if observe_dsa_events and not complete_token_path:
+        raise PlanValidationError(
+            "DSA event observation requires the complete-token path"
+        )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
         if sparse_moe_backend == "reference"
@@ -1198,7 +1220,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, ...]:
         rank = lax.axis_index(axis_name)
         stage_id = stage_map[rank]
         local_slot = slot_map[rank]
@@ -1206,6 +1228,16 @@ def build_decoder_step_program(
         kv_cache = local_kv_container[0]
         index_cache = local_index_container[0]
         metadata = local_metadata_container[0]
+        dsa_observation = None
+        if observe_dsa_events:
+            dsa_observation = jnp.full(
+                (
+                    config.maximum_full_indexer_slots,
+                    config.selected_width + 2,
+                ),
+                -1,
+                dtype=jnp.int32,
+            )
 
         def weight(name: str) -> Any:
             return local_weights[name][0]
@@ -1270,34 +1302,78 @@ def build_decoder_step_program(
         for hop, stage in enumerate(schedule.stages):
             active = metadata[0, config.active_index] == jnp.int32(1)
             should_execute = active & (stage_id == jnp.int32(hop))
-            residual, kv_cache, index_cache, metadata = lax.cond(
-                should_execute,
-                lambda values, stage=stage: _execute_stage(
-                    stage,
-                    values,
-                    weight=weight,
-                    local_slot=local_slot,
-                    position=position,
-                    block_tables=block_tables,
-                    context_lengths=context_lengths,
-                    axis_name=axis_name,
-                    axis_groups=axis_groups,
-                    config=config,
-                    dsa_contract=dsa_contract,
-                    mla_contract=mla_contract,
-                    moe_contract=moe_contract,
-                    cache_layout=cache_layout,
-                    block_shape=geometry.fp8_block_shape,
-                    sparse_moe_backend=sparse_moe_backend,
-                    pallas_moe_config=pallas_moe_config,
-                    pallas_moe_fuse_route_weighting=(
-                        feature_fuse_route_weighting
+            if observe_dsa_events:
+                assert dsa_observation is not None
+                (
+                    residual,
+                    kv_cache,
+                    index_cache,
+                    metadata,
+                    dsa_observation,
+                ) = lax.cond(
+                    should_execute,
+                    lambda values, stage=stage: _execute_stage(
+                        stage,
+                        values[:4],
+                        weight=weight,
+                        local_slot=local_slot,
+                        position=position,
+                        block_tables=block_tables,
+                        context_lengths=context_lengths,
+                        axis_name=axis_name,
+                        axis_groups=axis_groups,
+                        config=config,
+                        dsa_contract=dsa_contract,
+                        mla_contract=mla_contract,
+                        moe_contract=moe_contract,
+                        cache_layout=cache_layout,
+                        block_shape=geometry.fp8_block_shape,
+                        sparse_moe_backend=sparse_moe_backend,
+                        pallas_moe_config=pallas_moe_config,
+                        pallas_moe_fuse_route_weighting=(
+                            feature_fuse_route_weighting
+                        ),
+                        linear_backend=linear_backend,
+                        dsa_observation=values[4],
                     ),
-                    linear_backend=linear_backend,
-                ),
-                lambda values: values,
-                (residual, kv_cache, index_cache, metadata),
-            )
+                    lambda values: values,
+                    (
+                        residual,
+                        kv_cache,
+                        index_cache,
+                        metadata,
+                        dsa_observation,
+                    ),
+                )
+            else:
+                residual, kv_cache, index_cache, metadata = lax.cond(
+                    should_execute,
+                    lambda values, stage=stage: _execute_stage(
+                        stage,
+                        values,
+                        weight=weight,
+                        local_slot=local_slot,
+                        position=position,
+                        block_tables=block_tables,
+                        context_lengths=context_lengths,
+                        axis_name=axis_name,
+                        axis_groups=axis_groups,
+                        config=config,
+                        dsa_contract=dsa_contract,
+                        mla_contract=mla_contract,
+                        moe_contract=moe_contract,
+                        cache_layout=cache_layout,
+                        block_shape=geometry.fp8_block_shape,
+                        sparse_moe_backend=sparse_moe_backend,
+                        pallas_moe_config=pallas_moe_config,
+                        pallas_moe_fuse_route_weighting=(
+                            feature_fuse_route_weighting
+                        ),
+                        linear_backend=linear_backend,
+                    ),
+                    lambda values: values,
+                    (residual, kv_cache, index_cache, metadata),
+                )
             if complete_token_path and hop == config.stage_count - 1:
 
                 def sample_token(
@@ -1383,7 +1459,7 @@ def build_decoder_step_program(
                 next_token = lax.ppermute(
                     next_token, axis_name, canonical_pairs
                 )
-        return (
+        outputs = (
             residual[None, ...],
             kv_cache[None, ...],
             index_cache[None, ...],
@@ -1393,6 +1469,10 @@ def build_decoder_step_program(
             block_tables,
             context_lengths + jnp.ones_like(context_lengths),
         )
+        if not observe_dsa_events:
+            return outputs
+        assert dsa_observation is not None
+        return (*outputs, dsa_observation[None, ...])
 
     def mapped_body(
         local_weights: Mapping[str, Any],
@@ -1427,7 +1507,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, ...]:
         return mapped_impl(
             local_weights,
             local_residual_container,
@@ -1449,6 +1529,7 @@ def build_decoder_step_program(
     index_spec = P(axis_name, None, None, None, None)
     metadata_spec = P(axis_name, None, None)
     token_spec = P(axis_name, None)
+    dsa_observation_spec = P(axis_name, None, None)
     common_specs = (
         weight_specs,
         residual_spec,
@@ -1469,6 +1550,8 @@ def build_decoder_step_program(
             P(),
             P(),
         )
+        if observe_dsa_events:
+            output_specs = (*output_specs, dsa_observation_spec)
     else:
         input_specs = (*common_specs, P(), P(), P())
         mapped = mapped_body
@@ -1496,4 +1579,5 @@ def build_decoder_step_program(
         feature_fuse_route_weighting=feature_fuse_route_weighting,
         linear_backend=linear_backend,
         complete_token_path=complete_token_path,
+        observe_dsa_events=observe_dsa_events,
     )
