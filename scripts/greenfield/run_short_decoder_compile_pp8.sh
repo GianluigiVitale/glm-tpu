@@ -12,13 +12,36 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly SOURCE_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z
 readonly SOURCE_MANIFEST_SHA=0869493164a3a63797ea61d88c575f35bea8aa50790c46aa21ce6f0f7c4c78f1
-readonly RUNTIME_TAG=greenfield_runtime_pack_pp8_20260806T002756318310857Z
-readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime/PP8_LP4/$RUNTIME_TAG
-readonly RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a78272b93c14eafbd57e31dec
+readonly SOURCE_RUNTIME_TAG=greenfield_runtime_pack_pp8_20260806T002756318310857Z
+readonly SOURCE_RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime/PP8_LP4/$SOURCE_RUNTIME_TAG
+readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a78272b93c14eafbd57e31dec
+readonly RUNTIME_KIND=${GLM_GREENFIELD_DECODER_RUNTIME_KIND:-pallas_feature}
+case "$RUNTIME_KIND" in
+  reference)
+    readonly RUNTIME_TAG=$SOURCE_RUNTIME_TAG
+    readonly RUNTIME_ROOT=$SOURCE_RUNTIME_ROOT
+    readonly RUNTIME_MANIFEST_SHA=$SOURCE_RUNTIME_MANIFEST_SHA
+    readonly RUNTIME_LAYOUT_HASH=841a18f6dbbf329243482f97f01d28ca22211d63d323fca859477349cc0abcac
+    readonly SPARSE_MOE_BACKEND=reference
+    readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_reference
+    ;;
+  pallas_feature)
+    readonly RUNTIME_TAG=greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z
+    readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/$RUNTIME_TAG
+    readonly RUNTIME_MANIFEST_SHA=54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917
+    readonly RUNTIME_LAYOUT_HASH=ba21c4ec1500837f17a53047da98a7ed7c3a06782ddffe49d8bd796d4d0d1c9e
+    readonly SPARSE_MOE_BACKEND=pallas_feature
+    readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_pallas_feature
+    ;;
+  *)
+    echo "unsupported decoder runtime kind: $RUNTIME_KIND" >&2
+    exit 2
+    ;;
+esac
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -30,7 +53,7 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing decoder compile from a dirty worktree" >&2
   exit 2
 }
-[[ -f $SOURCE_ROOT/SUCCESS && -f $RUNTIME_ROOT/SUCCESS ]] || {
+[[ -f $SOURCE_ROOT/SUCCESS && -f $SOURCE_RUNTIME_ROOT/SUCCESS && -f $RUNTIME_ROOT/SUCCESS ]] || {
   echo "protected source/runtime checkpoint is unavailable" >&2
   exit 2
 }
@@ -89,8 +112,8 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN"
-say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
+say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND"
+say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -98,7 +121,7 @@ strict_census pre || {
 
 say "syncing exact code and runtime/source artifacts"
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; runtime_root='"$RUNTIME_ROOT"'; if [[ ${HOSTNAME##*-w-} == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source_root/SUCCESS" ]] && [[ -r "$runtime_root/SUCCESS" ]] && findmnt -T "$runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_runtime_root='"$SOURCE_RUNTIME_ROOT"'; runtime_root='"$RUNTIME_ROOT"'; if [[ ${HOSTNAME##*-w-} == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source_root/SUCCESS" ]] && [[ -r "$source_runtime_root/SUCCESS" ]] && [[ -r "$runtime_root/SUCCESS" ]] && findmnt -T "$source_runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
@@ -115,7 +138,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer 2K load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 2 --iterations 10 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 2 --iterations 10 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK || {
@@ -131,7 +154,9 @@ gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/hlo/" >/dev/null
 
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
-  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" <<'PY'
+  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
+  "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$RUNTIME_LAYOUT_HASH" <<'PY'
 from __future__ import annotations
 
 import json
@@ -139,7 +164,19 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, oracle_pin, db_path, repo, oracle_repo = sys.argv[1:]
+(
+    run_dir,
+    pin,
+    oracle_pin,
+    db_path,
+    repo,
+    oracle_repo,
+    runtime_kind,
+    sparse_moe_backend,
+    hlo_backend_contract,
+    runtime_manifest_sha256,
+    runtime_layout_hash,
+) = sys.argv[1:]
 run_dir = Path(run_dir)
 records = [json.loads(path.read_text()) for path in sorted((run_dir / "host_records").glob("*.json"))]
 if len(records) != 8:
@@ -165,6 +202,14 @@ for field in (
         raise SystemExit(f"fleet field {field} disagrees: {sorted(values)}")
 if {record["code_hash"] for record in records} != {pin}:
     raise SystemExit("fleet used stale code")
+if {record["runtime_kind"] for record in records} != {runtime_kind}:
+    raise SystemExit("fleet runtime kind drifted")
+if {record["sparse_moe_backend"] for record in records} != {sparse_moe_backend}:
+    raise SystemExit("fleet sparse MoE backend drifted")
+if {record["runtime_manifest_sha256"] for record in records} != {runtime_manifest_sha256}:
+    raise SystemExit("fleet runtime manifest drifted")
+if {record["runtime_layout_hash"] for record in records} != {runtime_layout_hash}:
+    raise SystemExit("fleet runtime layout drifted")
 if any(
     not record["body_only"]
     or not record["transformer_body_timing_only"]
@@ -176,10 +221,36 @@ if any(
     raise SystemExit("body/HLO/metadata claim contract failed")
 if any(record["hlo_contract"]["violations"] for record in records):
     raise SystemExit("decoder HLO has violations")
+if any(
+    record["hlo_contract"]["backend_contract"] != hlo_backend_contract
+    for record in records
+):
+    raise SystemExit("decoder HLO backend contract drifted")
+if runtime_kind == "pallas_feature":
+    expected_kernel_counts = {
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512": 75,
+        "greenfield_fp8_block_up_gate_m8_k6144_n512": 75,
+        "greenfield_fp8_block_matmul_m8_k512_n6144": 75,
+    }
+    for record in records:
+        feature = record["hlo_contract"]["pallas_feature_contract"]
+        if (
+            not feature["passed"]
+            or feature["kernel_counts"] != expected_kernel_counts
+            or feature["expected_kernel_counts"] != expected_kernel_counts
+            or feature["forbidden_decoded_expert_overlays"]
+        ):
+            raise SystemExit("feature-Pallas HLO kernel/overlay contract drifted")
 if any(record["load_record"]["runtime_checkpoint_reshards"] != 0 for record in records):
     raise SystemExit("runtime loader performed a checkpoint reshard")
 if any(record["load_record"]["host_global_concatenations"] != 0 for record in records):
     raise SystemExit("runtime loader performed a host global concat")
+if any(record["load_record"]["fp8_host_dequantizations"] != 0 for record in records):
+    raise SystemExit("runtime loader performed a host FP8 dequantization")
+if any(record["load_record"]["fp8_device_dequantizations"] != 0 for record in records):
+    raise SystemExit("runtime loader performed a device FP8 dequantization")
+if any(record["load_record"]["loaded_payload_bytes"] != 104_272_169_728 for record in records):
+    raise SystemExit("runtime loader payload bytes per host drifted")
 
 def peak(record):
     values = []
@@ -208,10 +279,12 @@ summary = {
     "optimized_hlo_sha256": records[0]["optimized_hlo_sha256"],
     "plan_hash": records[0]["plan_hash"],
     "raw_token_claim": False,
+    "runtime_kind": runtime_kind,
     "runtime_layout_hash": records[0]["runtime_layout_hash"],
     "runtime_manifest_sha256": records[0]["runtime_manifest_sha256"],
     "schedule_hash": records[0]["schedule_hash"],
     "state_layout_hash": records[0]["state_layout_hash"],
+    "sparse_moe_backend": sparse_moe_backend,
     "topology_hash": records[0]["topology_hash"],
     "transformer_body_timing_only": True,
 }
@@ -225,6 +298,8 @@ run_id = pv.start_run(
     revision=records[0]["runtime_manifest_sha256"],
     env={
         "GLM_ENGINE": "greenfield_pp8_decoder_body",
+        "greenfield_runtime_kind": runtime_kind,
+        "greenfield_sparse_moe_backend": sparse_moe_backend,
         "greenfield_code_hash": pin,
         "legacy_oracle_code_hash": oracle_pin,
         "hlo_sha256": records[0]["optimized_hlo_sha256"],
