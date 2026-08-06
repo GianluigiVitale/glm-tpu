@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 23:35 UTC
+**Updated:** 2026-08-06 23:48 UTC
 
 ## Authority and isolation
 
@@ -844,9 +844,17 @@ snapshot, and source evidence. Manifest is
 and generation under the approved bucket. Local/remote `SUCCESS`, clean pre/post 8/8 census, and
 source failure-exit 8/8 census all pass. Capture and archival phases are complete.
 
-Exact next: integrate this manifest-pinned oracle into a separate no-donation observer executable.
-Compare all 14 x 21 live selections, exact order/count/sentinel tail and recurrent token IDs while
-keeping the production executable observer-free. Pin the observer's local-only HLO/collective and
-no-callback/no-alias contracts. Then run protected real-prompt 2K Gate D with exact raw tokens,
-DSA/cache/state correctness, fresh fleet XPlanes, profiler-free wall, HBM, DB/archive/SUCCESS, and
-8/8 cleanup. Only after Gate D passes may recurrent latency be optimized below 200 ms.
+Commit `2dc300c` completes the observer-only harness integration. It loads the exact manifest pin,
+compiles a separate no-donation observer, replays all 14 recurrent steps from the preserved prefill
+state before production, reconstructs every stage/full-indexer slot, and requires four-lane
+replication plus exact 14 x 21 position order/count/producer/sentinel-tail equality. Observer tokens
+must equal token-oracle IDs 1--14 while prefill supplies ID 0. Its HLO must match production's exact
+local collective contract and contain no callback or input/output alias; production timing and trace
+remain observer-off. The protected wrapper pins both oracles, requires the exact 2+10+2 window, and
+can declare Gate D only after fleet agreement, cache/state, fresh XPlane, wall/HBM, DB/archive, and
+8/8 cleanup pass. Refusal, runtime, syntax, ShellCheck, and HLO coverage passes 20/20.
+
+Exact next: from clean `2dc300c`, launch the protected real-prompt 2K Gate D with complete-token,
+token-oracle, DSA-oracle, and two-step trace modes enabled. If exact DSA or token comparison fails,
+preserve and localize the first step/event/selected-offset mismatch; do not relax it. If it passes,
+seal the real answer-token rate and optimize the measured recurrent path below 200 ms.
