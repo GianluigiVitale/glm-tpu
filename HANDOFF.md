@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 17:22 UTC
+**Updated:** 2026-08-06 19:47 UTC
 
 ## Authority and isolation
 
@@ -735,3 +735,36 @@ expert overlay. Every gather/reduce uses only the eight four-chip PP8 groups. Pe
 because the outer validator expected a device-dequant counter absent from the runtime loader schema;
 the diagnostic remains rejected, archived without a DB row, and ended 8/8 clean. The loader now
 emits that counter and a profiler-after-wall two-step fleet-XPlane mode is ready for exact attribution.
+
+## Protected complete-token mechanism
+
+Commit `61c93b4` adds the default-off recurrent PP8 token step: stage-0 sharded embedding, the full
+78-layer body, exact final norm, four local LM-head shards, deterministic global top-1, and one tiny
+rank-lane token return. Position/context increment on device and every recurrent output can feed the
+next compiled call. Forced 32-device CPU execution twice recursively passes. Commit `0819b67` pins
+the TPU lowering discovered by the first fail-closed compile: XLA converts the two four-element
+top-1 gathers into exact local one-hot sums. The production contract requires one `bf16[4]` and one
+`s32[4]` all-reduce over all eight PP8 groups, one `s32[1]` token permute over the exact stage ring,
+and forbids full-vocabulary collectives. Commit `f7934d5` fixes the outer state validator to compare
+DSA state with the just-attended position rather than the incremented next-context slot; runtime/HLO
+coverage passes 26/26.
+
+Protected DB 477 /
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_trace0_20260806T193421580006958Z`
+passes at exact code `f7934d5`. Fleet p50/p99 complete-step wall is
+`242.411736/242.906796 ms` over ten profiler-free recurrent samples after two warmups. This is
+`4.125 synthetic-state steps/s`, not answer tok/s. All hosts generate the same in-vocabulary token;
+the captured timed window is `[504,364,2934,1010,474,314,62045,438,10549,11]`, and recurrent
+position/context/DSA state closes exactly at `13/14/13`. HLO `70fc29a6...ed3a` has exactly
+`219AG/297 physical AR/17CP`, 315 logical reduction components, 738 raw-FP8 calls, only four-chip
+layer/top-1 groups, no dead full-pod row, no decoded/formatted weight overlay, and no full-vocabulary
+logits materialization. Compile max is `167.178 s`; maximum measured peak HBM is
+`26,131,539,968` bytes/chip against `33,014,398,976`. Evidence hashes, DB snapshot/integrity,
+approved archive/remote `SUCCESS`, and authenticated 8/8 post-census pass.
+
+This closes only the complete-token execution mechanism. `raw_token_claim=false`, the initial state
+is synthetic, and no XPlane was requested, so Gate D remains open. Exact next: create a provenance-
+pinned real 2K prompt/prefill or captured final-layout recurrent state plus independent raw-token and
+DSA oracle; run the complete decoder with exact tokens, DSA set/tie order, state/cache integrity,
+fresh fleet XPlanes, wall/HBM, DB/archive, and cleanup; repeat at 8K. Only then optimize the measured
+complete decoder below 200 ms and proceed to 128K/256K.
