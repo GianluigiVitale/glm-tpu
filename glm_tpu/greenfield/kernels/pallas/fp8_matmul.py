@@ -666,126 +666,165 @@ def fp8_selected_up_gate(
     def kernel(
         local_ids_value: Any,
         active_value: Any,
-        hidden_ref: Any,
-        gate_ref: Any,
-        gate_scale_ref: Any,
-        up_ref: Any,
-        up_scale_ref: Any,
-        gate_output_ref: Any,
-        up_output_ref: Any,
+        hidden_hbm_ref: Any,
+        gate_hbm_ref: Any,
+        gate_scale_hbm_ref: Any,
+        up_hbm_ref: Any,
+        up_scale_hbm_ref: Any,
+        gate_output_hbm_ref: Any,
+        up_output_hbm_ref: Any,
         gate_accumulator_ref: Any,
         up_accumulator_ref: Any,
     ) -> None:
-        output_index = pl.program_id(0)
-        route_index = pl.program_id(1)
-        contraction_index = pl.program_id(2)
+        def inner_kernel(
+            hidden_ref: Any,
+            gate_ref: Any,
+            gate_scale_ref: Any,
+            up_ref: Any,
+            up_scale_ref: Any,
+            gate_output_ref: Any,
+            up_output_ref: Any,
+            gate_accumulator: Any,
+            up_accumulator: Any,
+        ) -> None:
+            output_index = pl.program_id(0)
+            route_index = pl.program_id(1)
+            contraction_index = pl.program_id(2)
 
-        @pl.when(contraction_index == 0)
-        def initialize_accumulators() -> None:
-            gate_accumulator_ref[...] = jnp.zeros_like(gate_accumulator_ref)
-            up_accumulator_ref[...] = jnp.zeros_like(up_accumulator_ref)
+            @pl.when(contraction_index == 0)
+            def initialize_accumulators() -> None:
+                gate_accumulator[...] = jnp.zeros_like(gate_accumulator)
+                up_accumulator[...] = jnp.zeros_like(up_accumulator)
 
-        route_active = active_value[route_index]
+            @pl.when(active_value[route_index])
+            def accumulate_route() -> None:
+                gate_value = _scale_vector(
+                    gate_scale_ref[...],
+                    contraction_index,
+                    output_index,
+                    contraction_blocks_per_tile=contraction_blocks_per_tile,
+                    contraction_block=config.block_shape[1],
+                    contraction_tile=config.contraction_tile,
+                )
+                up_value = _scale_vector(
+                    up_scale_ref[...],
+                    contraction_index,
+                    output_index,
+                    contraction_blocks_per_tile=contraction_blocks_per_tile,
+                    contraction_block=config.block_shape[1],
+                    contraction_tile=config.contraction_tile,
+                )
+                decoded_gate = (
+                    gate_ref[...].astype(config.accumulator_dtype) * gate_value
+                ).astype(jnp.bfloat16)
+                decoded_up = (
+                    up_ref[...].astype(config.accumulator_dtype) * up_value
+                ).astype(jnp.bfloat16)
+                dimensions = (((1,), (1,)), ((), ()))
+                gate_accumulator[...] += lax.dot_general(
+                    hidden_ref[...],
+                    decoded_gate,
+                    dimension_numbers=dimensions,
+                    preferred_element_type=config.accumulator_dtype,
+                )
+                up_accumulator[...] += lax.dot_general(
+                    hidden_ref[...],
+                    decoded_up,
+                    dimension_numbers=dimensions,
+                    preferred_element_type=config.accumulator_dtype,
+                )
 
-        @pl.when(route_active)
-        def accumulate_route() -> None:
-            gate_value = _scale_vector(
-                gate_scale_ref[...],
-                contraction_index,
+            @pl.when(contraction_index == contraction_tiles - 1)
+            def store_outputs() -> None:
+                gate_output_ref[...] = gate_accumulator[...].astype(
+                    config.output_dtype
+                )
+                up_output_ref[...] = up_accumulator[...].astype(
+                    config.output_dtype
+                )
+
+        def hidden_index(
+            output_index: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[int, Any]:
+            del route_index, output_index
+            return 0, contraction_index
+
+        def weight_index(
+            output_index: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, Any, Any]:
+            return (
+                local_ids_value[route_index],
                 output_index,
-                contraction_blocks_per_tile=contraction_blocks_per_tile,
-                contraction_block=config.block_shape[1],
-                contraction_tile=config.contraction_tile,
-            )
-            up_value = _scale_vector(
-                up_scale_ref[...],
                 contraction_index,
-                output_index,
-                contraction_blocks_per_tile=contraction_blocks_per_tile,
-                contraction_block=config.block_shape[1],
-                contraction_tile=config.contraction_tile,
-            )
-            decoded_gate = (
-                gate_ref[...].astype(config.accumulator_dtype) * gate_value
-            ).astype(jnp.bfloat16)
-            decoded_up = (
-                up_ref[...].astype(config.accumulator_dtype) * up_value
-            ).astype(jnp.bfloat16)
-            dimensions = (((1,), (1,)), ((), ()))
-            gate_accumulator_ref[...] += lax.dot_general(
-                hidden_ref[...],
-                decoded_gate,
-                dimension_numbers=dimensions,
-                preferred_element_type=config.accumulator_dtype,
-            )
-            up_accumulator_ref[...] += lax.dot_general(
-                hidden_ref[...],
-                decoded_up,
-                dimension_numbers=dimensions,
-                preferred_element_type=config.accumulator_dtype,
             )
 
-        @pl.when(contraction_index == contraction_tiles - 1)
-        def store_outputs() -> None:
-            gate_output_ref[...] = gate_accumulator_ref[...].astype(
-                config.output_dtype
-            )
-            up_output_ref[...] = up_accumulator_ref[...].astype(
-                config.output_dtype
+        def scale_index(
+            output_index: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, Any, int]:
+            del output_index
+            return (
+                local_ids_value[route_index],
+                (
+                    contraction_index
+                    * jnp.int32(contraction_blocks_per_tile)
+                )
+                // jnp.int32(8),
+                0,
             )
 
-    def hidden_index(
-        output_index: Any,
-        route_index: Any,
-        contraction_index: Any,
-        local_ids_value: Any,
-        active_value: Any,
-    ) -> tuple[int, Any]:
-        del route_index, output_index, local_ids_value, active_value
-        return 0, contraction_index
+        def output_index(
+            output_index_value: Any,
+            route_index: Any,
+            contraction_index: Any,
+        ) -> tuple[Any, int, Any]:
+            del contraction_index
+            return route_index, 0, output_index_value
 
-    def weight_index(
-        output_index: Any,
-        route_index: Any,
-        contraction_index: Any,
-        local_ids_value: Any,
-        active_value: Any,
-    ) -> tuple[Any, Any, Any]:
-        del active_value
-        return local_ids_value[route_index], output_index, contraction_index
-
-    def scale_index(
-        output_index: Any,
-        route_index: Any,
-        contraction_index: Any,
-        local_ids_value: Any,
-        active_value: Any,
-    ) -> tuple[Any, Any, int]:
-        del output_index, active_value
-        return (
-            local_ids_value[route_index],
-            (
-                contraction_index * jnp.int32(contraction_blocks_per_tile)
-            )
-            // jnp.int32(8),
-            0,
+        hidden_spec = pl.BlockSpec(
+            (config.row_tile, config.contraction_tile), hidden_index
         )
-
-    def output_index(
-        output_index_value: Any,
-        route_index: Any,
-        contraction_index: Any,
-        local_ids_value: Any,
-        active_value: Any,
-    ) -> tuple[Any, int, Any]:
-        del contraction_index, local_ids_value, active_value
-        return route_index, 0, output_index_value
+        weight_spec = pl.BlockSpec(
+            (None, config.output_tile, config.contraction_tile),
+            weight_index,
+            pipeline_mode=pl.Buffered(buffer_count=3),
+        )
+        scale_spec = pl.BlockSpec((None, 8, 128), scale_index)
+        output_spec = pl.BlockSpec(
+            (None, config.row_tile, config.output_tile), output_index
+        )
+        pipeline = pltpu.emit_pipeline(
+            inner_kernel,
+            grid=(output_tiles, route_count, contraction_tiles),
+            in_specs=(
+                hidden_spec,
+                weight_spec,
+                scale_spec,
+                weight_spec,
+                scale_spec,
+            ),
+            out_specs=(output_spec, output_spec),
+            dimension_semantics=("parallel", "arbitrary", "arbitrary"),
+            no_pipelining=interpret,
+        )
+        pipeline(
+            hidden_hbm_ref,
+            gate_hbm_ref,
+            gate_scale_hbm_ref,
+            up_hbm_ref,
+            up_scale_hbm_ref,
+            gate_output_hbm_ref,
+            up_output_hbm_ref,
+            scratches=(gate_accumulator_ref, up_accumulator_ref),
+        )
 
     output_shape = jax.ShapeDtypeStruct(
         (route_count, config.row_tile, padded_output), config.output_dtype
-    )
-    output_spec = pl.BlockSpec(
-        (None, config.row_tile, config.output_tile), output_index
     )
     call = pl.pallas_call(
         kernel,
@@ -793,22 +832,16 @@ def fp8_selected_up_gate(
         grid_spec=pltpu.PrefetchScalarGridSpec(
             num_scalar_prefetch=2,
             in_specs=(
-                pl.BlockSpec(
-                    (config.row_tile, config.contraction_tile), hidden_index
-                ),
-                pl.BlockSpec(
-                    (None, config.output_tile, config.contraction_tile),
-                    weight_index,
-                ),
-                pl.BlockSpec((None, 8, 128), scale_index),
-                pl.BlockSpec(
-                    (None, config.output_tile, config.contraction_tile),
-                    weight_index,
-                ),
-                pl.BlockSpec((None, 8, 128), scale_index),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
             ),
-            out_specs=(output_spec, output_spec),
-            grid=(output_tiles, route_count, contraction_tiles),
+            out_specs=(
+                pl.BlockSpec(memory_space=pltpu.HBM),
+                pl.BlockSpec(memory_space=pltpu.HBM),
+            ),
             scratch_shapes=(
                 pltpu.VMEM(
                     (config.row_tile, config.output_tile),
@@ -821,7 +854,6 @@ def fp8_selected_up_gate(
             ),
         ),
         compiler_params=pltpu.CompilerParams(
-            dimension_semantics=("parallel", "arbitrary", "arbitrary"),
             disable_bounds_checks=True,
         ),
         interpret=interpret,

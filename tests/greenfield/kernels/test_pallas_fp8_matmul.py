@@ -136,6 +136,15 @@ def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:
 
 
 def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts() -> None:
+    # emit_pipeline needs physical tiling metadata even under the HLO
+    # interpreter. Register v4's public JAX hardware description for this
+    # forced-CPU test; the kernel still executes on the CPU interpreter.
+    from jax._src.pallas.mosaic import tpu_info
+
+    tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
+        tpu_info.ChipVersion.TPU_V4, 1
+    )
+    tpu_info.get_tpu_info.cache_clear()
     routes, experts, contraction, output = 4, 3, 130, 135
     hidden = jnp.asarray(
         np.linspace(-0.5, 0.5, contraction, dtype=np.float32)[None, :],
