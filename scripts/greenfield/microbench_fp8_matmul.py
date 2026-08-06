@@ -57,6 +57,25 @@ def _memory_stats(device: Any) -> dict[str, int] | None:
     }
 
 
+def _is_bounded_route_restore_index_call(
+    line: str, *, route_count: int
+) -> bool:
+    """Recognize only TPU's compact top-k output-gather index annotation."""
+
+    return (
+        f" = s32[{route_count},2]" in line
+        and 'custom_call_target="GatherScatterIndicesBitpacked"' in line
+        and (
+            'metadata={op_name="jit(fp8_selected_up_gate)/concatenate"'
+            in line
+        )
+    )
+
+
+def _custom_call_result_name(line: str) -> str:
+    return line.split(" = ", 1)[0].strip()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-code-hash", required=True)
@@ -272,10 +291,31 @@ def main() -> int:
             if 'custom_call_target="AssumeGatherIndicesInBound"' in line
             and " = s32[" in line
         ]
+        bounded_route_restore_calls = [
+            line
+            for line in custom_calls
+            if _is_bounded_route_restore_index_call(line, route_count=rows)
+        ]
+        bounded_route_restore_gathers = [
+            line.strip()
+            for line in hlo.splitlines()
+            if " gather(" in line
+            and f" = bf16[{rows},{2 * output}]" in line
+            and "collapsed_slice_dims={0,1}" in line
+            and "start_index_map={0,1}" in line
+            and f"slice_sizes={{1,1,{2 * output}}}" in line
+            and any(
+                f", {_custom_call_result_name(call)})" in line
+                for call in bounded_route_restore_calls
+            )
+        ]
+        allowed_auxiliary_calls = (
+            bounded_metadata_calls + bounded_route_restore_calls
+        )
         unexpected_auxiliary_calls = [
             line
             for line in custom_calls
-            if line not in kernel_calls and line not in bounded_metadata_calls
+            if line not in kernel_calls and line not in allowed_auxiliary_calls
         ]
         forbidden_full_overlays = [
             shape
@@ -304,9 +344,18 @@ def main() -> int:
             "kernel_custom_call_count": len(kernel_calls),
             "kernel_custom_calls": kernel_calls,
             "bounded_metadata_custom_call_count": len(
+                allowed_auxiliary_calls
+            ),
+            "bounded_metadata_custom_calls": allowed_auxiliary_calls,
+            "bounded_gather_index_custom_call_count": len(
                 bounded_metadata_calls
             ),
-            "bounded_metadata_custom_calls": bounded_metadata_calls,
+            "bounded_gather_index_custom_calls": bounded_metadata_calls,
+            "bounded_route_restore_custom_call_count": len(
+                bounded_route_restore_calls
+            ),
+            "bounded_route_restore_custom_calls": bounded_route_restore_calls,
+            "bounded_route_restore_gathers": bounded_route_restore_gathers,
             "unexpected_auxiliary_custom_calls": unexpected_auxiliary_calls,
             "forbidden_full_weight_overlays": forbidden_full_overlays,
             "passed": (
@@ -316,7 +365,10 @@ def main() -> int:
                 and (
                     args.kernel != "selected_up_gate"
                     or (
-                        2 <= len(bounded_metadata_calls) <= 8
+                        2 <= len(allowed_auxiliary_calls) <= 8
+                        and len(bounded_route_restore_calls) <= 1
+                        and len(bounded_route_restore_gathers)
+                        == len(bounded_route_restore_calls)
                         and f"u8[{local_experts},{contraction},{2 * output}]"
                         in kernel_calls[0]
                         and f"f8e4m3fn[{local_experts},{contraction},{2 * output}]"
