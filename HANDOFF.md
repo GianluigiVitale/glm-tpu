@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 12:53 UTC
+**Updated:** 2026-08-06 13:51 UTC
 
 ## Authority and isolation
 
@@ -396,8 +396,8 @@ enough; stage-local model layout remains the structural requirement.
 
 1. Finish Section 7.2 item 9. DB 451 proves the production fused RMSNorm/raw-FP8 primitive and DB
    452 proves the first 315-call body integration, reducing protected 78-layer wall by `91.71%`.
-   DB453's fresh XPlane proves the remaining floor is structured kv_b and DSA wq_b/wk reference
-   dequant; remove those paths without decoded weight overlays. Preserve exact reference/CPU/TPU/tail/
+   DB454/455 eliminate and integrate structured kv_b; only DSA wq_b/wk reference dequant remains.
+   Remove that path without decoded weight overlays. Preserve exact reference/CPU/TPU/tail/
    dtype/HLO/microbenchmark/fallback evidence. Section 7.2 item 8 is closed by DB 448--450; retain
    collective-permute transport and keep Pallas remote copy default-off.
 2. Integrate each remaining accepted path, rerun its exact oracle gate, then repeat the protected
@@ -544,6 +544,29 @@ backpressure at the 16 compact permutes, not payload transfer latency. Device me
 `4,700.132040/4,874.983940 ms`; busy time is `4,525.764602 ms`. Summary/XPlane SHAs are
 `a2f25c74...d935` / `04df4b66...09a7`; DB/archive/remote `SUCCESS` and 8/8 cleanup pass. This
 evidence makes structured kv_b the first remaining item-9 target, followed by DSA wq_b/wk.
+
+DB 454 / `greenfield_fp8_structured_kv_b_20260806T133007099354989Z` at `faca3e4` proves both
+production raw-FP8 structured kv_b contractions without a runtime weight transpose or decoded
+`[7168,512]` overlay. Query absorption and value projection are elementwise exact against the
+independent host oracle; p50/p90/p95/p99 is `0.266695/0.276818/0.283333/0.295438 ms` and
+`0.283515/0.295668/0.300083/0.319414 ms`, with paired-sum p50 `0.550236 ms`. HLO SHAs are
+`5c805fbe...9d60` / `cc36fddb...f122`, each with exactly one named raw-weight call. Compile max is
+`0.646 s`; peak HBM is 4,388,352 bytes. CPU aligned/64-row-offset interpreter tests, DB/archive/
+remote `SUCCESS`, and 8/8 cleanup pass. The preceding `16abcd9` diagnostic failed before timing
+on a TPU metadata BlockSpec alignment requirement, was fixed with compact 8x128 scale staging, and
+ended 8/8 clean.
+
+Protected body DB 455 /
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_trace0_20260806T134131684536168Z`
+at `51a5e75` integrates 78 query-absorption and 78 value calls. Fleet p50/p99 is
+`1,063.484099/1,064.161217 ms`, improving DB 452 by `4.585x` (`78.19%`) and DB 442 by `55.294x`
+(`98.19%`). All 756 required Pallas calls are exact, the decoded kv_b overlay is absent, HLO
+`2bae55e0...6c0f` retains exact `219AG/294AR/16CP`, compile max is `178.329 s`, and peak HBM is
+26,138,384,384 bytes/chip. Fleet agreement, DB/archive/remote `SUCCESS`, and 8/8 cleanup pass.
+This is still body-only, not complete token latency/tok/s. The immediately preceding exact-code
+run produced the same ~1.064-second wall but was rejected because the outer harness duplicated the
+old kernel-count dictionary; it has no DB claim and ended clean. DSA wq_b/wk is now the sole
+remaining whole-matrix FP8 dequant path in item 9.
 
 ## Protected feature-body attribution
 
