@@ -1,24 +1,26 @@
 from __future__ import annotations
 
+import json
+import struct
 from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
-import json
 from pathlib import Path
-import struct
 
 import pytest
 
 from glm_tpu.greenfield.checkpoint import (
     DestinationFilePlan,
     DestinationTensorPlan,
-    build_runtime_layout_document,
     build_runtime_destination_file_plans,
+    build_runtime_layout_document,
     stream_runtime_weight_file,
     verify_source_file_sha256,
 )
-from glm_tpu.greenfield.errors import CheckpointValidationError
+from glm_tpu.greenfield.errors import CheckpointValidationError, PlanValidationError
 from glm_tpu.greenfield.model import (
+    FEATURE_EXPERT_RUNTIME_LAYOUT,
+    build_decoder_feature_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
 )
@@ -83,6 +85,14 @@ def _small_plan() -> ExecutionPlan:
         expert_layout="complete_expert_identity_lp4",
         kv_layout="stage_layer_context_sharded_lp4",
         transport="collective_permute_stage_ring",
+    )
+
+
+def _small_feature_source_plan() -> ExecutionPlan:
+    plan = _small_plan()
+    return replace(
+        plan,
+        geometry=replace(plan.geometry, moe_intermediate_size=8),
     )
 
 
@@ -261,6 +271,94 @@ def test_runtime_layout_document_is_self_authenticating() -> None:
     ).encode("utf-8")
     assert observed == sha256(encoded).hexdigest()
     assert document["runtime_layout_hash"] == layout.layout_hash
+
+
+def test_feature_runtime_layout_redistributes_only_routed_expert_features() -> None:
+    source_plan = _small_feature_source_plan()
+    source_schedule = build_pipeline_schedule(source_plan)
+    source_layout = build_decoder_runtime_weight_layout(
+        source_plan,
+        source_schedule,
+    )
+    target_plan = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+    target_schedule = build_pipeline_schedule(target_plan)
+    target_layout = build_decoder_feature_runtime_weight_layout(
+        target_plan,
+        target_schedule,
+        source_layout,
+    )
+
+    assert "routed_expert_layout" not in source_layout.to_dict()
+    assert all(
+        "transform" not in tensor.to_dict()
+        for device in source_layout.devices
+        for tensor in device.tensors
+    )
+    assert target_layout.plan_hash == target_plan.plan_hash
+    assert target_layout.schedule_hash == target_schedule.schedule_hash
+    assert target_layout.routed_expert_layout == FEATURE_EXPERT_RUNTIME_LAYOUT
+    assert target_layout.runtime_bytes_per_chip == source_layout.runtime_bytes_per_chip
+
+    specs = {spec.name: spec for spec in target_layout.specs}
+    assert specs["sparse.slot_00.experts.gate_proj.weight_bits"].shape == (
+        8,
+        8,
+        2,
+    )
+    assert specs["sparse.slot_00.experts.up_proj.scale_inv"].shape == (
+        8,
+        1,
+        4,
+    )
+    assert specs["sparse.slot_00.experts.down_proj.weight_bits"].shape == (
+        8,
+        2,
+        8,
+    )
+    assert specs["sparse.slot_00.experts.down_proj.scale_inv"].shape == (
+        8,
+        4,
+        1,
+    )
+
+    sparse_device = target_layout.devices[3 * 4]
+    bindings = {
+        tensor.spec.name: tensor for tensor in sparse_device.tensors
+    }
+    gate = bindings["sparse.slot_00.experts.gate_proj.weight_bits"]
+    assert gate.transform == "concat_experts_slice_output_transpose"
+    assert {source.source_device_slot for source in gate.sources} == {0, 1, 2, 3}
+    assert all(source.shape == (2, 8, 8) for source in gate.sources)
+    assert all(source.selected_shape == (2, 8, 2) for source in gate.sources)
+    assert gate.source_byte_count == gate.spec.byte_count
+
+    router = bindings["sparse.slot_00.router_weight"]
+    assert router.transform == "identity_runtime_tensor"
+    assert router.sources[0].source_device_slot == 0
+    assert router.sources[0].shape == router.spec.shape
+
+
+def test_feature_runtime_layout_rejects_partial_fp8_scale_blocks() -> None:
+    source_plan = _small_plan()
+    source_schedule = build_pipeline_schedule(source_plan)
+    source_layout = build_decoder_runtime_weight_layout(
+        source_plan,
+        source_schedule,
+    )
+    target_plan = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+    target_schedule = build_pipeline_schedule(target_plan)
+    with pytest.raises(PlanValidationError, match="complete FP8 scale blocks"):
+        build_decoder_feature_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            source_layout,
+        )
 
 
 def test_runtime_source_file_authentication_is_fail_closed(tmp_path: Path) -> None:

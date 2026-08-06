@@ -10,21 +10,38 @@ owner and makes every padding byte part of the content-addressed contract.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
 from functools import reduce
 from hashlib import sha256
-import json
 from operator import mul
-from typing import Any, Mapping
+from typing import Any
 
 from ..errors import PlanValidationError
 from ..types import ExecutionPlan
-from .schedule import LayerExecution, PipelineSchedule, StageExecution
-
+from .schedule import (
+    LayerExecution,
+    PipelineSchedule,
+    StageExecution,
+    build_pipeline_schedule,
+)
 
 _DTYPE_BYTES = {"BF16": 2, "F32": 4, "F8_E4M3": 1}
 _SLOT_KINDS = frozenset(("layer", "full_indexer", "dense", "sparse", "global"))
 _VALUE_CLASSES = frozenset(("parameter", "fp8_weight", "fp8_scale"))
+_RUNTIME_SOURCE_TRANSFORMS = frozenset(
+    (
+        "identity_concat",
+        "identity_runtime_tensor",
+        "concat_experts_slice_output_transpose",
+        "concat_experts_slice_contraction_transpose",
+        "concat_experts_slice_scale_output",
+        "concat_experts_slice_scale_contraction",
+    )
+)
+COMPLETE_EXPERT_RUNTIME_LAYOUT = "complete_expert_identity"
+FEATURE_EXPERT_RUNTIME_LAYOUT = "expert_intermediate_feature_lp4_pallas_kn_v1"
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -111,9 +128,13 @@ class RuntimeSourceLeaf:
     name: str
     dtype: str
     shape: tuple[int, ...]
+    source_device_slot: int | None = None
+    selected_shape: tuple[int, ...] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "shape", tuple(self.shape))
+        if self.selected_shape is not None:
+            object.__setattr__(self, "selected_shape", tuple(self.selected_shape))
         if not self.name or self.dtype not in _DTYPE_BYTES:
             raise PlanValidationError("runtime source name/dtype is invalid")
         if not self.shape or any(
@@ -121,18 +142,50 @@ class RuntimeSourceLeaf:
             for value in self.shape
         ):
             raise PlanValidationError("runtime source shape must be positive")
+        if self.source_device_slot is not None and (
+            not isinstance(self.source_device_slot, int)
+            or isinstance(self.source_device_slot, bool)
+            or self.source_device_slot < 0
+        ):
+            raise PlanValidationError(
+                "runtime source device slot must be non-negative"
+            )
+        if self.selected_shape is not None and (
+            not self.selected_shape
+            or len(self.selected_shape) != len(self.shape)
+            or any(
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value <= 0
+                for value in self.selected_shape
+            )
+        ):
+            raise PlanValidationError(
+                "runtime selected source shape must match source rank and be positive"
+            )
 
     @property
     def byte_count(self) -> int:
         return _product(self.shape) * _DTYPE_BYTES[self.dtype]
 
+    @property
+    def selected_byte_count(self) -> int:
+        shape = self.shape if self.selected_shape is None else self.selected_shape
+        return _product(shape) * _DTYPE_BYTES[self.dtype]
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        value = {
             "byte_count": self.byte_count,
             "dtype": self.dtype,
             "name": self.name,
             "shape": list(self.shape),
         }
+        if self.source_device_slot is not None:
+            value["source_device_slot"] = self.source_device_slot
+        if self.selected_shape is not None:
+            value["selected_byte_count"] = self.selected_byte_count
+            value["selected_shape"] = list(self.selected_shape)
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,26 +194,72 @@ class DeviceRuntimeTensor:
 
     spec: RuntimeTensorSpec
     sources: tuple[RuntimeSourceLeaf, ...]
+    transform: str = "identity_concat"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sources", tuple(self.sources))
+        if self.transform not in _RUNTIME_SOURCE_TRANSFORMS:
+            raise PlanValidationError("runtime source transform is invalid")
         if not self.sources:
+            if self.transform != "identity_concat":
+                raise PlanValidationError(
+                    "runtime padding cannot declare a source transform"
+                )
             return
         if any(source.dtype != self.spec.dtype for source in self.sources):
             raise PlanValidationError("runtime source dtype disagrees with tensor")
-        if len(self.sources) == 1:
-            expected_shape = self.sources[0].shape
+        selected_shapes = tuple(
+            source.shape
+            if source.selected_shape is None
+            else source.selected_shape
+            for source in self.sources
+        )
+        if self.transform in ("identity_concat", "identity_runtime_tensor"):
+            if any(source.selected_shape is not None for source in self.sources):
+                raise PlanValidationError(
+                    "identity runtime source cannot select a partial tensor"
+                )
+            if len(self.sources) == 1:
+                expected_shape = self.sources[0].shape
+            else:
+                leaf_shape = self.sources[0].shape
+                if any(source.shape != leaf_shape for source in self.sources):
+                    raise PlanValidationError(
+                        "runtime concatenation source shapes drifted"
+                    )
+                expected_shape = (len(self.sources), *leaf_shape)
+            if (
+                self.transform == "identity_runtime_tensor"
+                and len(self.sources) != 1
+            ):
+                raise PlanValidationError(
+                    "runtime tensor identity requires exactly one source"
+                )
         else:
-            leaf_shape = self.sources[0].shape
-            if any(source.shape != leaf_shape for source in self.sources):
-                raise PlanValidationError("runtime concatenation source shapes drifted")
-            expected_shape = (len(self.sources), *leaf_shape)
+            if len(self.sources) < 2 or any(
+                source.source_device_slot is None for source in self.sources
+            ):
+                raise PlanValidationError(
+                    "transformed runtime tensor requires multiple explicit source owners"
+                )
+            leaf_shape = selected_shapes[0]
+            if any(shape != leaf_shape for shape in selected_shapes):
+                raise PlanValidationError(
+                    "runtime transformed source selections drifted"
+                )
+            expected_shape = (
+                sum(shape[0] for shape in selected_shapes),
+                *leaf_shape[1:],
+            )
         if expected_shape != self.spec.shape:
             raise PlanValidationError(
                 f"runtime sources do not fill {self.spec.name}: "
                 f"expected={self.spec.shape} observed={expected_shape}"
             )
-        if len({source.name for source in self.sources}) != len(self.sources):
+        source_keys = tuple(
+            (source.source_device_slot, source.name) for source in self.sources
+        )
+        if len(set(source_keys)) != len(self.sources):
             raise PlanValidationError("runtime tensor repeats a source leaf")
         if self.source_byte_count != self.spec.byte_count:
             raise PlanValidationError("runtime tensor source bytes do not reconcile")
@@ -171,19 +270,22 @@ class DeviceRuntimeTensor:
 
     @property
     def source_byte_count(self) -> int:
-        return sum(source.byte_count for source in self.sources)
+        return sum(source.selected_byte_count for source in self.sources)
 
     @property
     def padding_bytes(self) -> int:
         return self.spec.byte_count if self.is_padding else 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        value = {
             "padding": self.is_padding,
             "padding_bytes": self.padding_bytes,
             "runtime": self.spec.to_dict(),
             "sources": [source.to_dict() for source in self.sources],
         }
+        if self.transform != "identity_concat":
+            value["transform"] = self.transform
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,10 +306,12 @@ class DeviceRuntimeWeightLayout:
         names = tuple(tensor.spec.name for tensor in self.tensors)
         if len(set(names)) != len(names):
             raise PlanValidationError("runtime device tensor names are duplicate")
-        source_names = [
-            source.name for tensor in self.tensors for source in tensor.sources
+        source_keys = [
+            (source.source_device_slot, source.name)
+            for tensor in self.tensors
+            for source in tensor.sources
         ]
-        if len(set(source_names)) != len(source_names):
+        if len(set(source_keys)) != len(source_keys):
             raise PlanValidationError("runtime device consumes a source leaf twice")
 
     @property
@@ -247,12 +351,18 @@ class DecoderRuntimeWeightLayout:
     schedule_hash: str
     specs: tuple[RuntimeTensorSpec, ...]
     devices: tuple[DeviceRuntimeWeightLayout, ...]
+    routed_expert_layout: str = COMPLETE_EXPERT_RUNTIME_LAYOUT
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "specs", tuple(self.specs))
         object.__setattr__(self, "devices", tuple(self.devices))
         if len(self.plan_hash) != 64 or len(self.schedule_hash) != 64:
             raise PlanValidationError("runtime weight hashes must be SHA-256")
+        if self.routed_expert_layout not in (
+            COMPLETE_EXPERT_RUNTIME_LAYOUT,
+            FEATURE_EXPERT_RUNTIME_LAYOUT,
+        ):
+            raise PlanValidationError("runtime routed expert layout is invalid")
         spec_names = tuple(spec.name for spec in self.specs)
         if len(set(spec_names)) != len(spec_names):
             raise PlanValidationError("runtime weight specs are duplicate")
@@ -292,7 +402,7 @@ class DecoderRuntimeWeightLayout:
         return sha256(_canonical_json(self.to_dict()).encode("utf-8")).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        value = {
             "devices": [device.to_dict() for device in self.devices],
             "maximum_padding_bytes_per_chip": self.maximum_padding_bytes_per_chip,
             "minimum_padding_bytes_per_chip": self.minimum_padding_bytes_per_chip,
@@ -302,6 +412,9 @@ class DecoderRuntimeWeightLayout:
             "source_leaf_count": self.source_leaf_count,
             "specs": [spec.to_dict() for spec in self.specs],
         }
+        if self.routed_expert_layout != COMPLETE_EXPERT_RUNTIME_LAYOUT:
+            value["routed_expert_layout"] = self.routed_expert_layout
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -687,4 +800,227 @@ def build_decoder_runtime_weight_layout(
         schedule_hash=schedule.schedule_hash,
         specs=specs,
         devices=tuple(devices),
+    )
+
+
+def _feature_routed_spec(
+    spec: RuntimeTensorSpec,
+    *,
+    num_experts: int,
+    hidden_size: int,
+    local_intermediate: int,
+    output_scale_blocks: int,
+    contraction_scale_blocks: int,
+) -> tuple[RuntimeTensorSpec, str, tuple[int, ...]] | None:
+    """Return the final Pallas feature-owner shape and source transform."""
+
+    marker = ".experts."
+    if marker not in spec.name:
+        return None
+    projection_and_role = spec.name.split(marker, maxsplit=1)[1]
+    if projection_and_role in (
+        "gate_proj.weight_bits",
+        "up_proj.weight_bits",
+    ):
+        shape = (num_experts, hidden_size, local_intermediate)
+        selected_shape = (
+            spec.shape[0],
+            hidden_size,
+            local_intermediate,
+        )
+        transform = "concat_experts_slice_output_transpose"
+    elif projection_and_role == "down_proj.weight_bits":
+        shape = (num_experts, local_intermediate, hidden_size)
+        selected_shape = (
+            spec.shape[0],
+            local_intermediate,
+            hidden_size,
+        )
+        transform = "concat_experts_slice_contraction_transpose"
+    elif projection_and_role in (
+        "gate_proj.scale_inv",
+        "up_proj.scale_inv",
+    ):
+        shape = (num_experts, output_scale_blocks, spec.shape[2])
+        selected_shape = (spec.shape[0], output_scale_blocks, spec.shape[2])
+        transform = "concat_experts_slice_scale_output"
+    elif projection_and_role == "down_proj.scale_inv":
+        shape = (num_experts, spec.shape[1], contraction_scale_blocks)
+        selected_shape = (
+            spec.shape[0],
+            spec.shape[1],
+            contraction_scale_blocks,
+        )
+        transform = "concat_experts_slice_scale_contraction"
+    else:
+        raise PlanValidationError(
+            f"unknown routed runtime tensor role {projection_and_role!r}"
+        )
+    return replace(spec, shape=shape), transform, selected_shape
+
+
+def build_decoder_feature_runtime_weight_layout(
+    plan: ExecutionPlan,
+    schedule: PipelineSchedule,
+    source_layout: DecoderRuntimeWeightLayout,
+) -> DecoderRuntimeWeightLayout:
+    """Derive DB441's exact final expert-feature ownership from a runtime pack.
+
+    The source is the verified complete-expert executable artifact.  Every
+    non-routed tensor remains on the same physical owner.  Routed tensors are
+    redistributed offline across the four files of one host-local stage: all
+    expert identities become local while each destination owns one contiguous
+    intermediate-feature slice in the exact ``[expert,K,N]`` Pallas order.
+    """
+
+    if schedule.plan_hash != plan.plan_hash:
+        raise PlanValidationError(
+            "feature runtime weights schedule belongs to another plan"
+        )
+    if plan.name.value != "PP8_LP4" or plan.local_parallel_size != 4:
+        raise PlanValidationError(
+            "feature runtime layout currently requires PP8_LP4"
+        )
+    if plan.expert_layout != FEATURE_EXPERT_RUNTIME_LAYOUT:
+        raise PlanValidationError(
+            "feature runtime plan does not declare the exact routed layout"
+        )
+    geometry = plan.geometry
+    intermediate = geometry.moe_intermediate_size
+    local_size = plan.local_parallel_size
+    if intermediate % local_size:
+        raise PlanValidationError(
+            "expert intermediate width does not divide over the local stage"
+        )
+    local_intermediate = intermediate // local_size
+    block_output, block_contraction = geometry.fp8_block_shape
+    if (
+        local_intermediate % block_output
+        or local_intermediate % block_contraction
+    ):
+        raise PlanValidationError(
+            "expert feature shard must preserve complete FP8 scale blocks"
+        )
+
+    source_plan = replace(
+        plan,
+        expert_layout=f"complete_expert_identity_lp{local_size}",
+    )
+    source_schedule = build_pipeline_schedule(source_plan)
+    expected_source = build_decoder_runtime_weight_layout(
+        source_plan,
+        source_schedule,
+    )
+    if source_layout.to_dict() != expected_source.to_dict():
+        raise PlanValidationError(
+            "feature runtime source is not the exact complete-expert layout"
+        )
+
+    output_scale_blocks = local_intermediate // block_output
+    contraction_scale_blocks = local_intermediate // block_contraction
+    transformed_by_name: dict[
+        str, tuple[RuntimeTensorSpec, str, tuple[int, ...]] | None
+    ] = {}
+    target_specs = []
+    for spec in source_layout.specs:
+        transformed = _feature_routed_spec(
+            spec,
+            num_experts=geometry.num_routed_experts,
+            hidden_size=geometry.hidden_size,
+            local_intermediate=local_intermediate,
+            output_scale_blocks=output_scale_blocks,
+            contraction_scale_blocks=contraction_scale_blocks,
+        )
+        transformed_by_name[spec.name] = transformed
+        target_specs.append(spec if transformed is None else transformed[0])
+
+    source_by_owner = {
+        (device.stage_id, device.device_slot): device
+        for device in source_layout.devices
+    }
+    target_spec_by_name = {spec.name: spec for spec in target_specs}
+    devices = []
+    for stage in schedule.stages:
+        stage_sources = tuple(
+            source_by_owner[(stage.assignment.stage_id, source_slot)]
+            for source_slot in range(local_size)
+        )
+        source_tensor_by_slot = tuple(
+            {tensor.spec.name: tensor for tensor in device.tensors}
+            for device in stage_sources
+        )
+        for device_slot, device_id in enumerate(stage.assignment.device_ids):
+            source_device = source_by_owner[
+                (stage.assignment.stage_id, device_slot)
+            ]
+            tensors = []
+            for source_binding in source_device.tensors:
+                name = source_binding.spec.name
+                target_spec = target_spec_by_name[name]
+                transformed = transformed_by_name[name]
+                if source_binding.is_padding:
+                    if any(
+                        not by_name[name].is_padding
+                        for by_name in source_tensor_by_slot
+                    ):
+                        raise PlanValidationError(
+                            "feature runtime routed liveness differs within a stage"
+                        )
+                    tensors.append(DeviceRuntimeTensor(target_spec, ()))
+                    continue
+                if transformed is None:
+                    tensors.append(
+                        DeviceRuntimeTensor(
+                            target_spec,
+                            (
+                                RuntimeSourceLeaf(
+                                    name=name,
+                                    dtype=source_binding.spec.dtype,
+                                    shape=source_binding.spec.shape,
+                                    source_device_slot=device_slot,
+                                ),
+                            ),
+                            transform="identity_runtime_tensor",
+                        )
+                    )
+                    continue
+                _, transform, selected_shape = transformed
+                if any(
+                    by_name[name].is_padding
+                    for by_name in source_tensor_by_slot
+                ):
+                    raise PlanValidationError(
+                        "feature runtime routed liveness differs within a stage"
+                    )
+                sources = tuple(
+                    RuntimeSourceLeaf(
+                        name=name,
+                        dtype=source_tensor_by_slot[source_slot][name].spec.dtype,
+                        shape=source_tensor_by_slot[source_slot][name].spec.shape,
+                        source_device_slot=source_slot,
+                        selected_shape=selected_shape,
+                    )
+                    for source_slot in range(local_size)
+                )
+                tensors.append(
+                    DeviceRuntimeTensor(
+                        target_spec,
+                        sources,
+                        transform=transform,
+                    )
+                )
+            devices.append(
+                DeviceRuntimeWeightLayout(
+                    stage_id=stage.assignment.stage_id,
+                    device_slot=device_slot,
+                    device_id=device_id,
+                    tensors=tuple(tensors),
+                )
+            )
+    return DecoderRuntimeWeightLayout(
+        plan_hash=plan.plan_hash,
+        schedule_hash=schedule.schedule_hash,
+        specs=tuple(target_specs),
+        devices=tuple(devices),
+        routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
     )
