@@ -104,14 +104,17 @@ def dsa_scores_pallas(
             query_ref[...],
             key_ref[...].astype(jnp.float32),
             dimension_numbers=(((2,), (1,)), ((), ())),
+            precision=lax.Precision.HIGHEST,
+            preferred_element_type=jnp.float32,
+        ) * jnp.float32(config.head_dim**-0.5)
+        per_head = jnp.maximum(per_head, jnp.float32(0.0))
+        output_ref[...] = lax.dot_general(
+            head_weight_ref[..., 0],
+            per_head,
+            dimension_numbers=(((1,), (1,)), ((0,), (0,))),
+            precision=lax.Precision.HIGHEST,
             preferred_element_type=jnp.float32,
         )
-        contribution = (
-            jnp.maximum(per_head, jnp.float32(0.0))
-            * jnp.float32(config.head_dim**-0.5)
-            * head_weight_ref[...]
-        )
-        output_ref[...] = jnp.sum(contribution, axis=1, dtype=jnp.float32)
 
     def query_index(context_index: Any) -> tuple[int, int, int]:
         del context_index
