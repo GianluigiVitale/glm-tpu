@@ -10,6 +10,7 @@ from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
     fp8_block_up_gate,
+    fp8_selected_up_gate,
 )
 from glm_tpu.greenfield.kernels.reference.fp8 import (
     dequantize_fp8_bits_block_weight,
@@ -130,3 +131,65 @@ def test_fp8_block_matmul_config_is_v4_numerically_pinned() -> None:
         Fp8BlockMatmulConfig(output_tile=256)
     with pytest.raises(ValueError, match="accumulator must be FP32"):
         Fp8BlockMatmulConfig(accumulator_dtype=jnp.bfloat16)
+
+
+def test_fp8_selected_up_gate_interpret_uses_distinct_owned_experts() -> None:
+    routes, experts, contraction, output = 4, 3, 130, 135
+    hidden = jnp.asarray(
+        np.linspace(-0.5, 0.5, contraction, dtype=np.float32)[None, :],
+        dtype=jnp.bfloat16,
+    )
+    linear = np.arange(
+        experts * output * contraction, dtype=np.float32
+    ).reshape(experts, output, contraction)
+    gate_bits = _bits(jnp.asarray(np.sin(linear * 0.013) * 0.5))
+    up_bits = _bits(jnp.asarray(np.cos(linear * 0.019) * 0.375))
+    scale_shape = (experts, (output + 127) // 128, (contraction + 127) // 128)
+    gate_scale = jnp.asarray(
+        np.linspace(0.25, 0.75, np.prod(scale_shape), dtype=np.float32).reshape(
+            scale_shape
+        )
+    )
+    up_scale = jnp.asarray(
+        np.linspace(0.5, 1.0, np.prod(scale_shape), dtype=np.float32).reshape(
+            scale_shape
+        )
+    )
+    route_indices = jnp.asarray([11, 500, 10, 12], dtype=jnp.int32)
+    expert_start = jnp.asarray(10, dtype=jnp.int32)
+    actual_gate, actual_up = fp8_selected_up_gate(
+        hidden,
+        route_indices,
+        expert_start,
+        gate_bits,
+        gate_scale,
+        up_bits,
+        up_scale,
+        interpret=True,
+    )
+
+    def reference(bits: jax.Array, scale: jax.Array) -> np.ndarray:
+        values = []
+        for global_expert in np.asarray(route_indices):
+            local_expert = int(global_expert) - int(expert_start)
+            if not 0 <= local_expert < experts:
+                values.append(np.zeros((output,), dtype=np.float32))
+                continue
+            decoded = dequantize_fp8_bits_block_weight(
+                bits[local_expert], scale[local_expert]
+            )
+            value = lax.dot_general(
+                hidden,
+                decoded,
+                dimension_numbers=(((1,), (1,)), ((), ())),
+                preferred_element_type=jnp.float32,
+            ).astype(jnp.bfloat16)
+            values.append(np.asarray(value[0]))
+        return np.stack(values)
+
+    np.testing.assert_array_equal(
+        np.asarray(actual_gate), reference(gate_bits, gate_scale)
+    )
+    np.testing.assert_array_equal(
+        np.asarray(actual_up), reference(up_bits, up_scale)
+    )

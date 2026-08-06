@@ -67,7 +67,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-width", type=int, default=2048)
     parser.add_argument(
         "--kernel",
-        choices=("single_up", "up_gate"),
+        choices=("single_up", "up_gate", "selected_up_gate"),
         default="single_up",
     )
     parser.add_argument("--warmup", type=int, default=200)
@@ -97,6 +97,7 @@ def main() -> int:
     from glm_tpu.greenfield.kernels.pallas import (
         fp8_block_matmul,
         fp8_block_up_gate,
+        fp8_selected_up_gate,
     )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
         dequantize_fp8_bits_block_weight,
@@ -113,9 +114,10 @@ def main() -> int:
     contraction = args.contraction
     output = args.output_width
 
+    lhs_rows = 1 if args.kernel == "selected_up_gate" else rows
     lhs_host = (
-        np.sin(np.arange(rows * contraction, dtype=np.float32) * 0.0037)
-        .reshape(rows, contraction)
+        np.sin(np.arange(lhs_rows * contraction, dtype=np.float32) * 0.0037)
+        .reshape(lhs_rows, contraction)
         .astype(ml_dtypes.bfloat16)
     )
     linear = np.arange(output * contraction, dtype=np.uint64)
@@ -141,6 +143,39 @@ def main() -> int:
         (output // 128) * (contraction // 128),
         dtype=np.float32,
     ).reshape(output // 128, contraction // 128)
+    local_experts = None
+    route_indices_host = None
+    if args.kernel == "selected_up_gate":
+        local_experts = 64
+        single_weight = weight_host
+        single_gate_weight = gate_weight_host
+        weight_host = np.empty(
+            (local_experts, output, contraction), dtype=np.uint8
+        )
+        gate_weight_host = np.empty_like(weight_host)
+        for expert in range(local_experts):
+            weight_host[expert] = np.bitwise_xor(
+                single_weight, np.uint8(expert & 1) * np.uint8(128)
+            )
+            gate_weight_host[expert] = np.bitwise_xor(
+                single_gate_weight,
+                np.uint8((expert // 2) & 1) * np.uint8(128),
+            )
+        scale_host = np.linspace(
+            0.0005,
+            0.0015,
+            local_experts * (output // 128) * (contraction // 128),
+            dtype=np.float32,
+        ).reshape(local_experts, output // 128, contraction // 128)
+        gate_scale_host = np.linspace(
+            0.000375,
+            0.001625,
+            local_experts * (output // 128) * (contraction // 128),
+            dtype=np.float32,
+        ).reshape(local_experts, output // 128, contraction // 128)
+        route_indices_host = np.asarray(
+            [0, 1, 7, 15, 31, 47, 55, 63], dtype=np.int32
+        )
 
     with jax.default_device(device):
         lhs = jax.device_put(lhs_host, device)
@@ -151,7 +186,7 @@ def main() -> int:
             kernel_inputs = (lhs, weight_bits, scale)
             reference_inputs = (("up", weight_bits, scale),)
             kernel_hlo_name = "greenfield_fp8_block_matmul"
-        else:
+        elif args.kernel == "up_gate":
             gate_bits = jax.device_put(gate_weight_host, device)
             gate_scale = jax.device_put(gate_scale_host, device)
             kernel = fp8_block_up_gate
@@ -167,6 +202,27 @@ def main() -> int:
                 ("up", weight_bits, scale),
             )
             kernel_hlo_name = "greenfield_fp8_block_up_gate"
+        else:
+            assert local_experts is not None and route_indices_host is not None
+            gate_bits = jax.device_put(gate_weight_host, device)
+            gate_scale = jax.device_put(gate_scale_host, device)
+            route_indices = jax.device_put(route_indices_host, device)
+            expert_start = jax.device_put(np.asarray(0, dtype=np.int32), device)
+            kernel = fp8_selected_up_gate
+            kernel_inputs = (
+                lhs,
+                route_indices,
+                expert_start,
+                gate_bits,
+                gate_scale,
+                weight_bits,
+                scale,
+            )
+            reference_inputs = (
+                ("gate", gate_bits, gate_scale),
+                ("up", weight_bits, scale),
+            )
+            kernel_hlo_name = "greenfield_fp8_selected_up_gate"
         lower_started = time.monotonic()
         compiled = jax.jit(kernel).lower(*kernel_inputs).compile()
         compile_seconds = time.monotonic() - lower_started
@@ -185,11 +241,19 @@ def main() -> int:
         ]
         forbidden_full_overlays = [
             shape
-            for shape in (
+            for shape in tuple(
+                dict.fromkeys((
                 f"bf16[{output},{contraction}]",
                 f"f32[{output},{contraction}]",
                 f"bf16[{contraction},{output}]",
                 f"f32[{contraction},{output}]",
+                *(() if local_experts is None else (
+                    f"bf16[{local_experts},{output},{contraction}]",
+                    f"f32[{local_experts},{output},{contraction}]",
+                    f"bf16[{local_experts},{contraction},{output}]",
+                    f"f32[{local_experts},{contraction},{output}]",
+                )),
+                ))
             )
             if shape in hlo
         ]
@@ -210,17 +274,34 @@ def main() -> int:
         jax.block_until_ready(actual_values)
         expected_values = []
         for _, bits, projection_scale in reference_inputs:
-            decoded = dequantize_fp8_bits_block_weight(
-                bits, projection_scale
-            )
-            expected_values.append(
-                lax.dot_general(
-                    lhs,
-                    decoded,
-                    dimension_numbers=(((1,), (1,)), ((), ())),
-                    preferred_element_type=jnp.float32,
-                ).astype(jnp.bfloat16)
-            )
+            if args.kernel != "selected_up_gate":
+                decoded = dequantize_fp8_bits_block_weight(
+                    bits, projection_scale
+                )
+                expected_values.append(
+                    lax.dot_general(
+                        lhs,
+                        decoded,
+                        dimension_numbers=(((1,), (1,)), ((), ())),
+                        preferred_element_type=jnp.float32,
+                    ).astype(jnp.bfloat16)
+                )
+                continue
+            assert route_indices_host is not None
+            route_values = []
+            for local_expert in route_indices_host.tolist():
+                decoded = dequantize_fp8_bits_block_weight(
+                    bits[local_expert], projection_scale[local_expert]
+                )
+                route_values.append(
+                    lax.dot_general(
+                        lhs,
+                        decoded,
+                        dimension_numbers=(((1,), (1,)), ((), ())),
+                        preferred_element_type=jnp.float32,
+                    ).astype(jnp.bfloat16)[0]
+                )
+            expected_values.append(jnp.stack(route_values, axis=0))
         jax.block_until_ready(tuple(expected_values))
         output_comparisons = []
         differences = []
@@ -280,6 +361,15 @@ def main() -> int:
 
     args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
     args.hlo_output.write_text(hlo)
+    shape_record: dict[str, Any] = {
+        "lhs": [lhs_rows, contraction],
+        "weight_bits": list(weight_host.shape),
+        "scale": list(scale_host.shape),
+        "output": [rows, output],
+    }
+    if route_indices_host is not None:
+        shape_record["route_indices"] = list(route_indices_host.shape)
+        shape_record["local_experts"] = local_experts
     record = {
         "status": "SUCCESS",
         "code_hash": code_hash,
@@ -287,12 +377,7 @@ def main() -> int:
         "device": str(device),
         "device_kind": device.device_kind,
         "kernel": args.kernel,
-        "shape": {
-            "lhs": [rows, contraction],
-            "weight_bits": [output, contraction],
-            "scale": [output // 128, contraction // 128],
-            "output": [rows, output],
-        },
+        "shape": shape_record,
         "dtype_contract": {
             "lhs": "bfloat16",
             "weight_storage": "uint8:e4m3fn-bits",

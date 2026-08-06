@@ -25,8 +25,8 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing FP8 kernel run from a dirty worktree" >&2
   exit 2
 }
-[[ $KERNEL == single_up || $KERNEL == up_gate ]] || {
-  echo "FP8 kernel must be single_up or up_gate" >&2
+[[ $KERNEL == single_up || $KERNEL == up_gate || $KERNEL == selected_up_gate ]] || {
+  echo "FP8 kernel must be single_up, up_gate, or selected_up_gate" >&2
   exit 2
 }
 [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || {

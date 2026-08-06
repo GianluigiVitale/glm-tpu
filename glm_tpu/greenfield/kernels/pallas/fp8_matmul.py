@@ -131,6 +131,63 @@ def _aligned_scale_table(
     )
 
 
+def _aligned_selected_scale_table(
+    scale: Any, *, output_tiles: int, contraction_tiles: int
+) -> Any:
+    if output_tiles > 128:
+        raise ValueError("FP8 matmul supports at most 128 output-scale blocks")
+    aligned_contraction_tiles = _ceil_div(contraction_tiles, 8) * 8
+    return jnp.pad(
+        jnp.transpose(scale, (0, 2, 1)),
+        (
+            (0, 0),
+            (0, aligned_contraction_tiles - contraction_tiles),
+            (0, 128 - output_tiles),
+        ),
+    )
+
+
+def _validate_selected_inputs(
+    hidden: Any,
+    route_indices: Any,
+    expert_start: Any,
+    weight_bits: Any,
+    scale: Any,
+    config: Fp8BlockMatmulConfig,
+) -> tuple[int, int, int, int]:
+    if hidden.ndim != 2 or hidden.shape[0] != 1:
+        raise ValueError("selected-expert hidden input must contain one row")
+    if route_indices.ndim != 1 or route_indices.shape[0] <= 0:
+        raise ValueError("selected-expert routes must be a nonempty vector")
+    if route_indices.dtype != jnp.int32:
+        raise ValueError("selected-expert routes must be int32")
+    if expert_start.shape != () or expert_start.dtype != jnp.int32:
+        raise ValueError("selected-expert start must be an int32 scalar")
+    if weight_bits.ndim != 3 or scale.ndim != 3:
+        raise ValueError("selected expert weights/scales must have rank three")
+    local_experts, output, contraction = weight_bits.shape
+    if local_experts <= 0:
+        raise ValueError("selected-expert local weight table must be nonempty")
+    if hidden.shape[1] != contraction:
+        raise ValueError("selected-expert hidden/weight contraction disagrees")
+    if hidden.dtype != jnp.bfloat16:
+        raise ValueError("selected-expert hidden input must be BF16")
+    if weight_bits.dtype != jnp.uint8:
+        raise ValueError("selected-expert checkpoint payload must be uint8 bits")
+    if scale.dtype != jnp.float32:
+        raise ValueError("selected-expert block scales must be FP32")
+    expected_scale = (
+        local_experts,
+        _ceil_div(output, config.block_shape[0]),
+        _ceil_div(contraction, config.block_shape[1]),
+    )
+    if scale.shape != expected_scale:
+        raise ValueError(
+            f"selected-expert scale shape must be {expected_scale}, got {scale.shape}"
+        )
+    return route_indices.shape[0], local_experts, contraction, output
+
+
 def fp8_block_matmul(
     lhs: Any,
     weight_bits: Any,
@@ -482,3 +539,279 @@ def fp8_block_up_gate(
         lhs, gate_fp8, gate_scale_table, up_fp8, up_scale_table
     )
     return gate[:rows, :output], up[:rows, :output]
+
+
+def fp8_selected_up_gate(
+    hidden: Any,
+    route_indices: Any,
+    expert_start: Any,
+    gate_bits: Any,
+    gate_scale: Any,
+    up_bits: Any,
+    up_scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> tuple[Any, Any]:
+    """Project one batch-one row through its locally owned selected experts.
+
+    Outputs retain top-k route order. A route outside this chip's contiguous
+    expert interval produces an exact zero row. Route ids are scalar-prefetched
+    into the Pallas grid so each active route selects its own raw-FP8 matrix;
+    no selected BF16 matrix or eight-way conditional graph is materialized.
+    """
+
+    route_count, local_experts, contraction, output = _validate_selected_inputs(
+        hidden,
+        route_indices,
+        expert_start,
+        gate_bits,
+        gate_scale,
+        config,
+    )
+    up_geometry = _validate_selected_inputs(
+        hidden,
+        route_indices,
+        expert_start,
+        up_bits,
+        up_scale,
+        config,
+    )
+    if up_geometry != (route_count, local_experts, contraction, output):
+        raise ValueError("selected expert gate/up geometries disagree")
+
+    padded_contraction = (
+        _ceil_div(contraction, config.contraction_tile)
+        * config.contraction_tile
+    )
+    padded_output = _ceil_div(output, config.output_tile) * config.output_tile
+    hidden = jnp.pad(
+        hidden,
+        (
+            (0, config.row_tile - 1),
+            (0, padded_contraction - contraction),
+        ),
+    )
+
+    def pad_weight(value: Any) -> Any:
+        if padded_output == output and padded_contraction == contraction:
+            return value
+        return jnp.pad(
+            value,
+            (
+                (0, 0),
+                (0, padded_output - output),
+                (0, padded_contraction - contraction),
+            ),
+        )
+
+    gate_fp8 = lax.bitcast_convert_type(
+        pad_weight(gate_bits), jnp.float8_e4m3fn
+    )
+    up_fp8 = lax.bitcast_convert_type(
+        pad_weight(up_bits), jnp.float8_e4m3fn
+    )
+    output_tiles = padded_output // config.output_tile
+    contraction_tiles = padded_contraction // config.contraction_tile
+    gate_scale_table = _aligned_selected_scale_table(
+        gate_scale,
+        output_tiles=output_tiles,
+        contraction_tiles=contraction_tiles,
+    )
+    up_scale_table = _aligned_selected_scale_table(
+        up_scale,
+        output_tiles=output_tiles,
+        contraction_tiles=contraction_tiles,
+    )
+    local_ids = jnp.clip(
+        route_indices - expert_start,
+        jnp.int32(0),
+        jnp.int32(local_experts - 1),
+    )
+    active = (route_indices >= expert_start) & (
+        route_indices < expert_start + jnp.int32(local_experts)
+    )
+
+    def kernel(
+        local_ids_value: Any,
+        active_value: Any,
+        hidden_ref: Any,
+        gate_ref: Any,
+        gate_scale_ref: Any,
+        up_ref: Any,
+        up_scale_ref: Any,
+        gate_output_ref: Any,
+        up_output_ref: Any,
+        gate_accumulator_ref: Any,
+        up_accumulator_ref: Any,
+    ) -> None:
+        route_index = pl.program_id(0)
+        output_index = pl.program_id(1)
+        contraction_index = pl.program_id(2)
+
+        @pl.when(contraction_index == 0)
+        def initialize_accumulators() -> None:
+            gate_accumulator_ref[...] = jnp.zeros_like(gate_accumulator_ref)
+            up_accumulator_ref[...] = jnp.zeros_like(up_accumulator_ref)
+
+        route_active = active_value[route_index]
+
+        @pl.when(route_active)
+        def accumulate_route() -> None:
+            gate_value = _scale_value(
+                gate_scale_ref[...], contraction_index, output_index
+            )
+            up_value = _scale_value(
+                up_scale_ref[...], contraction_index, output_index
+            )
+            decoded_gate = (
+                gate_ref[...].astype(config.accumulator_dtype) * gate_value
+            ).astype(jnp.bfloat16)
+            decoded_up = (
+                up_ref[...].astype(config.accumulator_dtype) * up_value
+            ).astype(jnp.bfloat16)
+            dimensions = (((1,), (1,)), ((), ()))
+            gate_accumulator_ref[...] += lax.dot_general(
+                hidden_ref[...],
+                decoded_gate,
+                dimension_numbers=dimensions,
+                preferred_element_type=config.accumulator_dtype,
+            )
+            up_accumulator_ref[...] += lax.dot_general(
+                hidden_ref[...],
+                decoded_up,
+                dimension_numbers=dimensions,
+                preferred_element_type=config.accumulator_dtype,
+            )
+
+        @pl.when(contraction_index == contraction_tiles - 1)
+        def store_outputs() -> None:
+            gate_output_ref[...] = gate_accumulator_ref[...].astype(
+                config.output_dtype
+            )
+            up_output_ref[...] = up_accumulator_ref[...].astype(
+                config.output_dtype
+            )
+
+    def hidden_index(
+        route_index: Any,
+        output_index: Any,
+        contraction_index: Any,
+        local_ids_value: Any,
+        active_value: Any,
+    ) -> tuple[int, Any]:
+        del route_index, output_index, local_ids_value, active_value
+        return 0, contraction_index
+
+    def weight_index(
+        route_index: Any,
+        output_index: Any,
+        contraction_index: Any,
+        local_ids_value: Any,
+        active_value: Any,
+    ) -> tuple[Any, Any, Any]:
+        del active_value
+        return local_ids_value[route_index], output_index, contraction_index
+
+    def scale_index(
+        route_index: Any,
+        output_index: Any,
+        contraction_index: Any,
+        local_ids_value: Any,
+        active_value: Any,
+    ) -> tuple[Any, Any, int]:
+        del output_index, active_value
+        return (
+            local_ids_value[route_index],
+            contraction_index // jnp.int32(8),
+            0,
+        )
+
+    def output_index(
+        route_index: Any,
+        output_index_value: Any,
+        contraction_index: Any,
+        local_ids_value: Any,
+        active_value: Any,
+    ) -> tuple[Any, int, Any]:
+        del contraction_index, local_ids_value, active_value
+        return route_index, 0, output_index_value
+
+    output_shape = jax.ShapeDtypeStruct(
+        (route_count, config.row_tile, padded_output), config.output_dtype
+    )
+    output_spec = pl.BlockSpec(
+        (None, config.row_tile, config.output_tile), output_index
+    )
+    call = pl.pallas_call(
+        kernel,
+        out_shape=(output_shape, output_shape),
+        grid_spec=pltpu.PrefetchScalarGridSpec(
+            num_scalar_prefetch=2,
+            in_specs=(
+                pl.BlockSpec(
+                    (config.row_tile, config.contraction_tile), hidden_index
+                ),
+                pl.BlockSpec(
+                    (None, config.output_tile, config.contraction_tile),
+                    weight_index,
+                ),
+                pl.BlockSpec((None, 8, 128), scale_index),
+                pl.BlockSpec(
+                    (None, config.output_tile, config.contraction_tile),
+                    weight_index,
+                ),
+                pl.BlockSpec((None, 8, 128), scale_index),
+            ),
+            out_specs=(output_spec, output_spec),
+            grid=(route_count, output_tiles, contraction_tiles),
+            scratch_shapes=(
+                pltpu.VMEM(
+                    (config.row_tile, config.output_tile),
+                    config.accumulator_dtype,
+                ),
+                pltpu.VMEM(
+                    (config.row_tile, config.output_tile),
+                    config.accumulator_dtype,
+                ),
+            ),
+        ),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel", "parallel", "arbitrary"),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_selected_up_gate_"
+            f"r{route_count}_g{local_experts}_k{padded_contraction}_n{padded_output}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=(
+                4
+                * route_count
+                * config.row_tile
+                * padded_contraction
+                * padded_output
+            ),
+            bytes_accessed=(
+                config.row_tile * padded_contraction * 2
+                + 2
+                * route_count
+                * padded_output
+                * padded_contraction
+                + 2 * route_count * output_tiles * contraction_tiles * 4
+                + 2 * route_count * padded_output * config.row_tile * 2
+            ),
+            transcendentals=0,
+        ),
+    )
+    gate, up = call(
+        local_ids,
+        active,
+        hidden,
+        gate_fp8,
+        gate_scale_table,
+        up_fp8,
+        up_scale_table,
+    )
+    return gate[:, 0, :output], up[:, 0, :output]
