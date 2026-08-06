@@ -31,9 +31,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 }
 [[ $KERNEL == single_up || $KERNEL == rmsnorm_linear || $KERNEL == up_gate || \
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
-  $KERNEL == structured_kv_b ]] || {
+  $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
+  $KERNEL == dsa_wk ]] || {
   echo "FP8 kernel must be single_up, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, or structured_kv_b" >&2
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, or dsa_wk" >&2
   exit 2
 }
 [[ $SELECTED_CASE == normal_two || $SELECTED_CASE == concentrated_eight ]] || {
@@ -109,6 +110,16 @@ say "compiling and timing GLM expert $KERNEL projection on TPU v4"
 started=$(date +%s)
 ROWS=8
 [[ $KERNEL != rmsnorm_linear ]] || ROWS=1
+CONTRACTION=6144
+OUTPUT_WIDTH=2048
+if [[ $KERNEL == dsa_wq_b ]]; then
+  ROWS=1
+  CONTRACTION=2048
+  OUTPUT_WIDTH=1024
+elif [[ $KERNEL == dsa_wk ]]; then
+  ROWS=1
+  OUTPUT_WIDTH=128
+fi
 (
   cd "$WORKTREE"
   if [[ $KERNEL == structured_kv_b ]]; then
@@ -128,6 +139,8 @@ ROWS=8
       --hlo-output "$RUN_DIR/hlo/fp8_matmul.optimized_hlo.txt"
       --kernel "$KERNEL"
       --rows "$ROWS"
+      --contraction "$CONTRACTION"
+      --output-width "$OUTPUT_WIDTH"
       --selected-route-case "$SELECTED_CASE"
       --warmup "$WARMUP"
       --iterations "$ITERATIONS"
@@ -187,30 +200,30 @@ run_id = pv.start_run(
     harness_repo=repo,
     fork_repo=None,
 )
+shape_ids = {
+    "dsa_wq_b": "m1_k2048_n1024",
+    "dsa_wk": "m1_k6144_n128",
+}
+if runner["kernel"] == "structured_kv_b":
+    item_id = "h16_p192_l512_v256"
+elif runner["kernel"] == "selected_swiglu_down":
+    item_id = "m8_k2048_n6144"
+else:
+    item_id = shape_ids.get(
+        runner["kernel"],
+        (
+            "m1_k6144_n2048"
+            if runner["kernel"] == "rmsnorm_linear"
+            else "m8_k6144_n2048"
+        ),
+    )
+if runner["selected_route_case"] is not None:
+    item_id += "_" + runner["selected_route_case"]
 pv.record_item(
     conn,
     run_id,
     benchmark=f"greenfield_fp8_{runner['kernel']}",
-    item_id=(
-        (
-            "h16_p192_l512_v256"
-            if runner["kernel"] == "structured_kv_b"
-            else (
-                "m8_k2048_n6144"
-                if runner["kernel"] == "selected_swiglu_down"
-                else (
-                    "m1_k6144_n2048"
-                    if runner["kernel"] == "rmsnorm_linear"
-                    else "m8_k6144_n2048"
-                )
-            )
-        )
-        + (
-            "_" + runner["selected_route_case"]
-            if runner["selected_route_case"] is not None
-            else ""
-        )
-    ),
+    item_id=item_id,
     prompt=(
         "Raw-U8 E4M3FN 128x128 block-scaled expert projection: "
         + runner["kernel"]

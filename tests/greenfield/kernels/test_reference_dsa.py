@@ -11,10 +11,12 @@ from glm_tpu.greenfield.kernels.reference import (
     DsaNumericalContract,
     distributed_exact_topk_reference,
     dsa_index_keys,
+    dsa_index_keys_from_projection,
     dsa_query_and_head_weights,
     dsa_scores,
     exact_topk,
     local_topk_candidates,
+    linear,
     merge_topk_candidates,
 )
 
@@ -99,6 +101,16 @@ def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
         jnp.asarray([0, 1, 2], dtype=jnp.int32),
         contract=contract,
     )
+    projected_keys = linear(
+        hidden_keys, key_weight, output_dtype=jnp.float32
+    )
+    keys_from_projection = dsa_index_keys_from_projection(
+        projected_keys,
+        norm_weight,
+        norm_bias,
+        jnp.asarray([0, 1, 2], dtype=jnp.int32),
+        contract=contract,
+    )
     got = dsa_scores(query, keys, weights)
     expected_per_head = np.maximum(
         np.einsum("rhd,sd->rhs", np.asarray(query), np.asarray(keys))
@@ -110,6 +122,9 @@ def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
     assert keys.shape == (3, 4)
     assert got.shape == (1, 3)
     assert got.dtype == jnp.float32
+    np.testing.assert_array_equal(
+        np.asarray(keys_from_projection), np.asarray(keys)
+    )
     np.testing.assert_allclose(np.asarray(got), expected, rtol=2e-7, atol=2e-7)
 
 

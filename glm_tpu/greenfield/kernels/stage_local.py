@@ -18,6 +18,7 @@ from .pallas import (
     Fp8BlockMatmulConfig,
     SparseMlaConfig,
     fp8_block_matmul,
+    fp8_block_matmul_f32,
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
@@ -36,6 +37,7 @@ from .reference.dsa import (
     DsaNumericalContract,
     SelectedPositions,
     dsa_index_keys,
+    dsa_index_keys_from_projection,
     dsa_scores,
     local_topk_candidates,
     merge_topk_candidates,
@@ -199,27 +201,25 @@ def _require_decode_metadata(
     )
 
 
-def _local_dsa_query(
-    q_residual: Any,
+def _local_dsa_query_from_projection(
+    projected_query: Any,
     normalized: Any,
-    query_weight: Any,
     head_weight: Any,
     position: Any,
     *,
     contract: DsaNumericalContract,
 ) -> tuple[Any, Any]:
-    local_heads = query_weight.shape[0] // contract.head_dim
-    if query_weight.shape != (
-        local_heads * contract.head_dim,
-        contract.q_lora_rank,
-    ):
-        raise ValueError("local DSA query shard has an invalid shape")
+    if projected_query.ndim != 2 or projected_query.shape[0] != 1:
+        raise ValueError("local DSA query projection must contain one row")
+    if projected_query.shape[1] % contract.head_dim:
+        raise ValueError("local DSA query width must divide into exact heads")
+    local_heads = projected_query.shape[1] // contract.head_dim
+    if projected_query.dtype != jnp.float32:
+        raise ValueError("local DSA query projection must remain FP32")
     if head_weight.shape != (local_heads, contract.hidden_size):
         raise ValueError("local DSA head-weight shard has an invalid shape")
     with jax.default_matmul_precision("highest"):
-        query = linear(
-            q_residual, query_weight, output_dtype=jnp.float32
-        ).reshape(1, local_heads, contract.head_dim)
+        query = projected_query.reshape(1, local_heads, contract.head_dim)
         weights = linear(
             normalized, head_weight, output_dtype=jnp.float32
         ) * jnp.float32(contract.num_heads**-0.5)
@@ -240,6 +240,34 @@ def _local_dsa_query(
             (rotated, query[..., contract.rotary_dim :]), axis=-1
         ).astype(jnp.float32),
         weights.astype(jnp.float32),
+    )
+
+
+def _local_dsa_query(
+    q_residual: Any,
+    normalized: Any,
+    query_weight: Any,
+    head_weight: Any,
+    position: Any,
+    *,
+    contract: DsaNumericalContract,
+) -> tuple[Any, Any]:
+    local_heads = query_weight.shape[0] // contract.head_dim
+    if query_weight.shape != (
+        local_heads * contract.head_dim,
+        contract.q_lora_rank,
+    ):
+        raise ValueError("local DSA query shard has an invalid shape")
+    with jax.default_matmul_precision("highest"):
+        projected_query = linear(
+            q_residual, query_weight, output_dtype=jnp.float32
+        )
+    return _local_dsa_query_from_projection(
+        projected_query,
+        normalized,
+        head_weight,
+        position,
+        contract=contract,
     )
 
 
@@ -342,12 +370,6 @@ def stage_local_dsa_fp8_mapped(
         layout=cache_layout,
         physical_page_count=index_cache.shape[0],
     )
-    local_wq_b_weight = dequantize_fp8_bits_block_weight(
-        wq_b_bits, wq_b_scale, block_shape=block_shape
-    )
-    wk_weight = dequantize_fp8_bits_block_weight(
-        wk_bits, wk_scale, block_shape=block_shape
-    )
     if (precomputed_normalized is None) != (precomputed_q_residual is None):
         raise ValueError("DSA shared q_a intermediates must be supplied together")
     if precomputed_normalized is None:
@@ -375,14 +397,39 @@ def stage_local_dsa_fp8_mapped(
             q_residual.dtype != residual.dtype
         ):
             raise ValueError("DSA precomputed q residual is invalid")
-    local_query, local_head_weights = _local_dsa_query(
-        q_residual,
-        normalized,
-        local_wq_b_weight,
-        head_weight,
-        position,
-        contract=contract,
-    )
+    if linear_backend == "reference":
+        local_wq_b_weight = dequantize_fp8_bits_block_weight(
+            wq_b_bits, wq_b_scale, block_shape=block_shape
+        )
+        local_query, local_head_weights = _local_dsa_query(
+            q_residual,
+            normalized,
+            local_wq_b_weight,
+            head_weight,
+            position,
+            contract=contract,
+        )
+    elif linear_backend == "pallas":
+        projected_query = fp8_block_matmul_f32(
+            q_residual,
+            wq_b_bits,
+            wq_b_scale,
+            config=Fp8BlockMatmulConfig(
+                block_shape=block_shape,
+                output_tile=block_shape[0],
+                contraction_tile=block_shape[1],
+            ),
+            interpret=linear_interpret,
+        )
+        local_query, local_head_weights = _local_dsa_query_from_projection(
+            projected_query,
+            normalized,
+            head_weight,
+            position,
+            contract=contract,
+        )
+    else:
+        raise ValueError("stage-local FP8 linear backend is unknown")
     query_width = local_heads * contract.head_dim
     packed_query = jnp.concatenate(
         (local_query.reshape(1, query_width), local_head_weights), axis=-1
@@ -401,14 +448,37 @@ def stage_local_dsa_fp8_mapped(
         gathered_query[..., query_width:], (1, 0, 2)
     ).reshape(1, contract.num_heads)
 
-    current_key = dsa_index_keys(
-        normalized,
-        wk_weight,
-        key_norm_weight,
-        key_norm_bias,
-        position,
-        contract=contract,
-    ).astype(index_cache.dtype)
+    if linear_backend == "reference":
+        wk_weight = dequantize_fp8_bits_block_weight(
+            wk_bits, wk_scale, block_shape=block_shape
+        )
+        current_key = dsa_index_keys(
+            normalized,
+            wk_weight,
+            key_norm_weight,
+            key_norm_bias,
+            position,
+            contract=contract,
+        ).astype(index_cache.dtype)
+    else:
+        projected_key = fp8_block_matmul_f32(
+            normalized,
+            wk_bits,
+            wk_scale,
+            config=Fp8BlockMatmulConfig(
+                block_shape=block_shape,
+                output_tile=block_shape[0],
+                contraction_tile=block_shape[1],
+            ),
+            interpret=linear_interpret,
+        )
+        current_key = dsa_index_keys_from_projection(
+            projected_key,
+            key_norm_weight,
+            key_norm_bias,
+            position,
+            contract=contract,
+        ).astype(index_cache.dtype)
 
     def write_current(value: Any) -> Any:
         return value.at[physical_page, local_row].set(current_key[0])

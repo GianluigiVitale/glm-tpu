@@ -4,6 +4,7 @@ from .dsa import DsaScoreConfig, dsa_scores_kernel, dsa_scores_pallas
 from .fp8_matmul import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
+    fp8_block_matmul_f32,
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
@@ -42,6 +43,7 @@ __all__ = [
     "dsa_scores_kernel",
     "dsa_scores_pallas",
     "fp8_block_matmul",
+    "fp8_block_matmul_f32",
     "fp8_block_up_gate",
     "fp8_fused_block_swiglu",
     "fp8_fused_selected_moe",

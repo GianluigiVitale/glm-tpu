@@ -117,6 +117,8 @@ def parse_args() -> argparse.Namespace:
             "up_gate",
             "selected_up_gate",
             "selected_swiglu_down",
+            "dsa_wq_b",
+            "dsa_wk",
         ),
         default="single_up",
     )
@@ -139,15 +141,19 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
-    expected_rows = 1 if args.kernel == "rmsnorm_linear" else 8
-    if (
-        args.rows != expected_rows
-        or args.contraction != 6144
-        or args.output_width != 2048
-    ):
+    production_shapes = {
+        "dsa_wq_b": (1, 2048, 1024),
+        "dsa_wk": (1, 6144, 128),
+    }
+    expected_shape = production_shapes.get(
+        args.kernel,
+        (1 if args.kernel == "rmsnorm_linear" else 8, 6144, 2048),
+    )
+    if (args.rows, args.contraction, args.output_width) != expected_shape:
         raise ValueError(
             "protected metal proof is fixed to its production decode shape: "
-            f"rows={expected_rows}, hidden=6144, output=2048"
+            f"rows={expected_shape[0]}, hidden={expected_shape[1]}, "
+            f"output={expected_shape[2]}"
         )
     if args.warmup < 200 or args.iterations < 1000:
         raise ValueError("protected FP8 microbenchmark requires 200/1000 samples")
@@ -159,6 +165,7 @@ def main() -> int:
 
     from glm_tpu.greenfield.kernels.pallas import (
         fp8_block_matmul,
+        fp8_block_matmul_f32,
         fp8_block_up_gate,
         fp8_rmsnorm_block_matmul,
         fp8_selected_swiglu_down,
@@ -184,7 +191,12 @@ def main() -> int:
         "selected_swiglu_down",
     )
 
-    lhs_rows = 1 if args.kernel in ("selected_up_gate", "rmsnorm_linear") else rows
+    lhs_rows = (
+        1
+        if args.kernel
+        in ("selected_up_gate", "rmsnorm_linear", "dsa_wq_b", "dsa_wk")
+        else rows
+    )
     lhs_host = (
         np.sin(np.arange(lhs_rows * contraction, dtype=np.float32) * 0.0037)
         .reshape(lhs_rows, contraction)
@@ -293,6 +305,11 @@ def main() -> int:
             kernel_inputs = (lhs, weight_bits, scale)
             reference_inputs = (("up", weight_bits, scale),)
             kernel_hlo_name = "greenfield_fp8_block_matmul"
+        elif args.kernel in ("dsa_wq_b", "dsa_wk"):
+            kernel = fp8_block_matmul_f32
+            kernel_inputs = (lhs, weight_bits, scale)
+            reference_inputs = ((args.kernel, weight_bits, scale),)
+            kernel_hlo_name = "greenfield_fp8_block_matmul_f32"
         elif args.kernel == "rmsnorm_linear":
             norm_weight_host = np.linspace(
                 0.5, 1.5, contraction, dtype=np.float32
@@ -629,6 +646,8 @@ def main() -> int:
             "single_up",
             "rmsnorm_linear",
             "selected_swiglu_down",
+            "dsa_wq_b",
+            "dsa_wk",
         )
         actual_values = (actual_raw,) if single_output_kernel else tuple(actual_raw)
         jax.block_until_ready(actual_values)
@@ -643,13 +662,24 @@ def main() -> int:
                 decoded = dequantize_fp8_bits_block_weight(
                     bits, projection_scale
                 )
+                projection = lax.dot_general(
+                    (
+                        reference_lhs.astype(jnp.float32)
+                        if args.kernel in ("dsa_wq_b", "dsa_wk")
+                        else reference_lhs
+                    ),
+                    (
+                        decoded.astype(jnp.float32)
+                        if args.kernel in ("dsa_wq_b", "dsa_wk")
+                        else decoded
+                    ),
+                    dimension_numbers=(((1,), (1,)), ((), ())),
+                    preferred_element_type=jnp.float32,
+                )
                 expected_values.append(
-                    lax.dot_general(
-                        reference_lhs,
-                        decoded,
-                        dimension_numbers=(((1,), (1,)), ((), ())),
-                        preferred_element_type=jnp.float32,
-                    ).astype(jnp.bfloat16)
+                    projection
+                    if args.kernel in ("dsa_wq_b", "dsa_wk")
+                    else projection.astype(jnp.bfloat16)
                 )
                 continue
             assert route_indices_host is not None
@@ -808,7 +838,11 @@ def main() -> int:
             "scale": "float32",
             "tile_dequant": "float32-product-to-bfloat16",
             "accumulator": "float32",
-            "output": "bfloat16",
+            "output": (
+                "float32"
+                if args.kernel in ("dsa_wq_b", "dsa_wk")
+                else "bfloat16"
+            ),
         },
         "compile_seconds": compile_seconds,
         "hlo": {

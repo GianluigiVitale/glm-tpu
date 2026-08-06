@@ -9,6 +9,7 @@ from jax import lax
 from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
+    fp8_block_matmul_f32,
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
@@ -86,6 +87,44 @@ def test_fp8_block_matmul_rejects_shape_and_dtype_drift() -> None:
             config=Fp8BlockMatmulConfig(contraction_tile=512),
             interpret=True,
         )
+
+
+@pytest.mark.parametrize("shape", [(1, 128, 128), (1, 130, 135)])
+def test_fp8_block_matmul_f32_interpret_matches_dsa_reference(
+    shape: tuple[int, int, int],
+) -> None:
+    rows, contraction, output = shape
+    lhs = jnp.asarray(
+        np.linspace(-0.375, 0.625, rows * contraction, dtype=np.float32).reshape(
+            rows, contraction
+        ),
+        dtype=jnp.bfloat16,
+    )
+    weight_values = np.arange(output * contraction, dtype=np.float32).reshape(
+        output, contraction
+    )
+    weight_bits = _bits(jnp.asarray(np.sin(weight_values * 0.009) * 0.375))
+    scale_shape = (
+        (output + 127) // 128,
+        (contraction + 127) // 128,
+    )
+    scale = jnp.asarray(
+        np.linspace(0.375, 1.0, np.prod(scale_shape), dtype=np.float32).reshape(
+            scale_shape
+        )
+    )
+    decoded = dequantize_fp8_bits_block_weight(weight_bits, scale)
+    expected = lax.dot_general(
+        lhs.astype(jnp.float32),
+        decoded.astype(jnp.float32),
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    )
+    actual = fp8_block_matmul_f32(lhs, weight_bits, scale, interpret=True)
+    assert actual.dtype == jnp.float32
+    np.testing.assert_allclose(
+        np.asarray(actual), np.asarray(expected), rtol=2e-3, atol=2e-3
+    )
 
 
 @pytest.mark.parametrize("shape", [(1, 128, 128), (1, 130, 135)])

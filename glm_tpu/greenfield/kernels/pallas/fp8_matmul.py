@@ -212,24 +212,24 @@ def _validate_selected_inputs(
     return route_indices.shape[0], local_experts, contraction, output
 
 
-def fp8_block_matmul(
+def _fp8_block_matmul_impl(
     lhs: Any,
     weight_bits: Any,
     scale: Any,
     *,
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    result_dtype: Any,
+    kernel_prefix: str,
     interpret: bool = False,
 ) -> Any:
-    """Return ``lhs @ dequant(weight_bits).T`` using tile-local dequantization.
-
-    ``interpret=True`` runs through the Pallas interpreter for semantic tests.
-    TPU promotion still requires a compiled kernel correctness proof, HLO/custom
-    call assertion, microbenchmark, and real-layer fallback comparison.
-    """
+    """Shared raw-FP8 implementation with an explicit result boundary."""
 
     rows, contraction, output = _validate_inputs(
         lhs, weight_bits, scale, config
     )
+    result_dtype = jnp.dtype(result_dtype)
+    if result_dtype not in (jnp.dtype(jnp.bfloat16), jnp.dtype(jnp.float32)):
+        raise ValueError("FP8 block matmul result must be BF16 or FP32")
     padded_rows = _ceil_div(rows, config.row_tile) * config.row_tile
     padded_contraction = (
         _ceil_div(contraction, config.contraction_tile)
@@ -297,7 +297,7 @@ def fp8_block_matmul(
 
         @pl.when(contraction_index == contraction_tiles - 1)
         def store_output() -> None:
-            output_ref[...] = accumulator_ref[...].astype(config.output_dtype)
+            output_ref[...] = accumulator_ref[...].astype(result_dtype)
 
     def lhs_index(output_index: Any, contraction_index: Any) -> tuple[Any, Any]:
         del output_index
@@ -323,7 +323,7 @@ def fp8_block_matmul(
     call = pl.pallas_call(
         kernel,
         out_shape=jax.ShapeDtypeStruct(
-            (padded_rows, padded_output), config.output_dtype
+            (padded_rows, padded_output), result_dtype
         ),
         grid=(output_tiles, contraction_tiles),
         in_specs=(
@@ -350,8 +350,7 @@ def fp8_block_matmul(
         ),
         interpret=interpret,
         name=(
-            "greenfield_fp8_block_matmul_"
-            f"m{padded_rows}_k{padded_contraction}_n{padded_output}"
+            f"{kernel_prefix}m{padded_rows}_k{padded_contraction}_n{padded_output}"
         ),
         cost_estimate=pl.CostEstimate(
             flops=2 * padded_rows * padded_contraction * padded_output,
@@ -359,12 +358,65 @@ def fp8_block_matmul(
                 padded_rows * padded_contraction * 2
                 + padded_output * padded_contraction
                 + output_tiles * contraction_tiles * 4
-                + padded_rows * padded_output * 2
+                + padded_rows * padded_output * result_dtype.itemsize
             ),
             transcendentals=0,
         ),
     )
     return call(lhs, weight_fp8, scale_table)[:rows, :output]
+
+
+def fp8_block_matmul(
+    lhs: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Return a BF16 raw-FP8 projection using tile-local dequantization.
+
+    ``interpret=True`` runs through the Pallas interpreter for semantic tests.
+    TPU promotion still requires a compiled kernel correctness proof, HLO/custom
+    call assertion, microbenchmark, and real-layer fallback comparison.
+    """
+
+    return _fp8_block_matmul_impl(
+        lhs,
+        weight_bits,
+        scale,
+        config=config,
+        result_dtype=config.output_dtype,
+        kernel_prefix="greenfield_fp8_block_matmul_",
+        interpret=interpret,
+    )
+
+
+def fp8_block_matmul_f32(
+    lhs: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Return an FP32 raw-FP8 projection for DSA query/key arithmetic.
+
+    The checkpoint tile is decoded to BF16 exactly as in the reference path,
+    the MXU accumulates in FP32, and the accumulator is retained as FP32 for
+    the DSA LayerNorm/RoPE/scoring path.  No complete decoded matrix is ever
+    materialized in HBM.
+    """
+
+    return _fp8_block_matmul_impl(
+        lhs,
+        weight_bits,
+        scale,
+        config=config,
+        result_dtype=jnp.float32,
+        kernel_prefix="greenfield_fp8_block_matmul_f32_",
+        interpret=interpret,
+    )
 
 
 def _validate_structured_kv_b(

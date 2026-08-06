@@ -193,6 +193,35 @@ def dsa_index_keys(
             key_weight_out_in,
             output_dtype=jnp.float32,
         )
+    return dsa_index_keys_from_projection(
+        projected,
+        key_norm_weight,
+        key_norm_bias,
+        positions,
+        contract=contract,
+    )
+
+
+def dsa_index_keys_from_projection(
+    projected: jax.Array,
+    key_norm_weight: jax.Array,
+    key_norm_bias: jax.Array,
+    positions: jax.Array,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+) -> jax.Array:
+    """Normalize and rotate an already-computed FP32 DSA key projection."""
+
+    tokens = projected.shape[0] if projected.ndim == 2 else -1
+    _require_shape("projected", projected, (tokens, contract.head_dim))
+    _require_shape("key_norm_weight", key_norm_weight, (contract.head_dim,))
+    _require_shape("key_norm_bias", key_norm_bias, (contract.head_dim,))
+    _require_shape("positions", positions, (tokens,))
+    if projected.dtype != jnp.float32:
+        raise ValueError("DSA key projection must remain FP32")
+    if not jnp.issubdtype(positions.dtype, jnp.integer):
+        raise ValueError("DSA positions must have an integer dtype")
+
     keys = _affine_layer_norm(
         projected,
         key_norm_weight,
