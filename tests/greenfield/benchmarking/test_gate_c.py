@@ -493,6 +493,33 @@ ENTRY main {
     assert result["passed"], result
 
 
+def test_gate_c_dsa_hlo_accepts_exact_raw_fp8_projection_calls() -> None:
+    from glm_tpu.greenfield.benchmarking import validate_gate_c_hlo
+
+    hlo = r'''HloModule jit_dsa_step, replica_count=1, num_partitions=4
+
+ENTRY main {
+  bits_wq = u8[1024,2048]{1,0} parameter(0)
+  bits_wk = u8[128,6144]{1,0} parameter(1)
+  query = f32[1,1152]{1,0} parameter(2)
+  wq = f32[8,1024]{1,0} custom-call(bits_wq), custom_call_target="tpu_custom_call", metadata={op_name="greenfield_fp8_block_matmul_f32_m8_k2048_n1024"}
+  wk = f32[640,128]{1,0} custom-call(bits_wk), custom_call_target="tpu_custom_call", metadata={op_name="greenfield_fp8_block_matmul_f32_m640_k6144_n128"}
+  gathered_query = f32[4,1,1152]{2,1,0} all-gather(query), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  gathered_scores = f32[4,1,2048]{2,1,0} all-gather(query), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  gathered_positions = s32[4,1,2048]{2,1,0} all-gather(query), dimensions={0}, replica_groups={{0,1,2,3}}, use_global_device_ids=true
+  ROOT result = (f32[8,1024]{1,0}, f32[640,128]{1,0}, f32[4,1,1152]{2,1,0}, f32[4,1,2048]{2,1,0}, s32[4,1,2048]{2,1,0}) tuple(wq, wk, gathered_query, gathered_scores, gathered_positions)
+}
+'''
+    result = validate_gate_c_hlo(
+        hlo, case="dsa", dsa_linear_backend="pallas"
+    )
+    assert result["passed"], result
+    assert result["dsa_pallas_kernel_counts"] == {
+        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": 1,
+        "greenfield_fp8_block_matmul_f32_m640_k6144_n128": 1,
+    }
+
+
 def test_gate_c_index_hlo_accepts_exact_tpu_lse_validity_rewrite() -> None:
     from glm_tpu.greenfield.benchmarking import validate_gate_c_hlo
 

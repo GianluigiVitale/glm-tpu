@@ -32,6 +32,7 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     TensorTolerance,
     compare_bounded_tensor,
     stage_local_dense_gate_c,
+    stage_local_dsa_fp8_gate_c,
     stage_local_dsa_gate_c,
     stage_local_index_share_gate_c,
     validate_gate_c_hlo,
@@ -93,6 +94,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hlo-dir", type=Path, required=True)
     parser.add_argument("--trace-root", type=Path)
     parser.add_argument("--trace-steps", type=int, default=20)
+    parser.add_argument(
+        "--dsa-linear-backend",
+        choices=("reference", "pallas"),
+        default="reference",
+    )
     parser.add_argument(
         "--sparse-attention-backend",
         choices=("reference", "pallas"),
@@ -469,11 +475,16 @@ def _save_hlo(
     case: str,
     hlo_dir: Path,
     sparse_attention_backend: str = "reference",
+    dsa_linear_backend: str = "reference",
 ) -> tuple[str, dict[str, Any], Path]:
     optimized_hlo = compiled.as_text()
     path = hlo_dir / f"{case}.optimized_hlo.txt"
     path.write_text(optimized_hlo)
-    contract = validate_gate_c_hlo(optimized_hlo, case=case)
+    contract = validate_gate_c_hlo(
+        optimized_hlo,
+        case=case,
+        dsa_linear_backend=dsa_linear_backend,
+    )
     if case == "index_share" and sparse_attention_backend == "pallas":
         integration = validate_sparse_attention_integration_hlo(optimized_hlo)
         contract["sparse_attention_integration"] = integration
@@ -607,12 +618,28 @@ def main() -> int:
         )
         evidence_class = "protected_single_host_tpu_v4_gate_c"
 
-    load_started = time.perf_counter()
-    loaded = load_gate_c_checkpoint(args.artifact_dir, expectation, resolution)
-    load_seconds = time.perf_counter() - load_started
     oracle_manifest, oracle = _load_oracle(
         args.oracle_dir, expectation=expectation
     )
+    producer = f"model.layers.{oracle_manifest['producer_layer']}"
+    raw_fp8_names = (
+        frozenset(
+            {
+                f"{producer}.self_attn.indexer.wq_b.weight",
+                f"{producer}.self_attn.indexer.wk.weight",
+            }
+        )
+        if args.dsa_linear_backend == "pallas"
+        else frozenset()
+    )
+    load_started = time.perf_counter()
+    loaded = load_gate_c_checkpoint(
+        args.artifact_dir,
+        expectation,
+        resolution,
+        raw_fp8_names=raw_fp8_names,
+    )
+    load_seconds = time.perf_counter() - load_started
     geometry = oracle_manifest["geometry"]
     context_length = int(geometry["context_length"])
     dsa_contract = DsaNumericalContract(
@@ -640,7 +667,6 @@ def main() -> int:
         packed_cache_width=mla_contract.packed_cache_width,
     )
     weights = loaded.weights
-    producer = f"model.layers.{oracle_manifest['producer_layer']}"
     consumer = f"model.layers.{oracle_manifest['consumer_layer']}"
     position = np.asarray([context_length - 1], dtype=np.int32)
     lengths = np.asarray([context_length], dtype=np.int32)
@@ -708,7 +734,7 @@ def main() -> int:
         oracle_array("positions"),
         layout=cache_layout,
     )
-    dsa_inputs = (
+    dsa_inputs_prefix = (
         _put(jax, loaded.mesh, oracle_array("producer_decode_residual"), P()),
         _put(jax, loaded.mesh, history, P("stage", None, None)),
         _put(jax, loaded.mesh, history_positions, P("stage", None)),
@@ -717,23 +743,54 @@ def main() -> int:
         weights[f"{producer}.input_layernorm.weight"],
         weights[f"{producer}.self_attn.q_a_proj.weight"],
         weights[f"{producer}.self_attn.q_a_layernorm.weight"],
-        weights[f"{producer}.self_attn.indexer.wq_b.weight"],
-        weights[f"{producer}.self_attn.indexer.wk.weight"],
+    )
+    dsa_inputs_suffix = (
         weights[f"{producer}.self_attn.indexer.k_norm.weight"],
         weights[f"{producer}.self_attn.indexer.k_norm.bias"],
         weights[f"{producer}.self_attn.indexer.weights_proj.weight"],
     )
-
-    def dsa_step(*values: Any) -> Any:
-        return stage_local_dsa_gate_c(
-            *values, mesh=loaded.mesh, contract=dsa_contract
+    if args.dsa_linear_backend == "pallas":
+        dsa_inputs = (
+            dsa_inputs_prefix
+            + (
+                weights[f"{producer}.self_attn.indexer.wq_b.weight"],
+                weights[f"{producer}.self_attn.indexer.wq_b.weight_scale_inv"],
+                weights[f"{producer}.self_attn.indexer.wk.weight"],
+                weights[f"{producer}.self_attn.indexer.wk.weight_scale_inv"],
+            )
+            + dsa_inputs_suffix
         )
+
+        def dsa_step(*values: Any) -> Any:
+            return stage_local_dsa_fp8_gate_c(
+                *values,
+                mesh=loaded.mesh,
+                contract=dsa_contract,
+                interpret=args.development_forced_cpu,
+            )
+    else:
+        dsa_inputs = (
+            dsa_inputs_prefix
+            + (
+                weights[f"{producer}.self_attn.indexer.wq_b.weight"],
+                weights[f"{producer}.self_attn.indexer.wk.weight"],
+            )
+            + dsa_inputs_suffix
+        )
+
+        def dsa_step(*values: Any) -> Any:
+            return stage_local_dsa_gate_c(
+                *values, mesh=loaded.mesh, contract=dsa_contract
+            )
 
     compile_started = time.perf_counter()
     dsa_compiled = jax.jit(dsa_step).lower(*dsa_inputs).compile()
     dsa_compile_seconds = time.perf_counter() - compile_started
     dsa_hlo_sha, dsa_hlo, dsa_hlo_path = _save_hlo(
-        dsa_compiled, case="dsa", hlo_dir=args.hlo_dir
+        dsa_compiled,
+        case="dsa",
+        hlo_dir=args.hlo_dir,
+        dsa_linear_backend=args.dsa_linear_backend,
     )
     dsa_device = dsa_compiled(*dsa_inputs)
     dsa = jax.device_get(dsa_device)
@@ -1046,6 +1103,7 @@ def main() -> int:
             "shape": list(np.asarray(dsa.selected_positions).shape),
             "sparse_attention_backend": args.sparse_attention_backend,
         },
+        "dsa_linear_backend": args.dsa_linear_backend,
         "numerical_evidence_contract": {
             "cross_framework_internal_tensors": "bounded",
             "device_score_selection_and_tie_order": "elementwise_exact",

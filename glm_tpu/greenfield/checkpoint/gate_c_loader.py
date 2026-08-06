@@ -226,6 +226,21 @@ def _device_put_plain(jax: Any, tensor: Any, device: object) -> Any:
     return value
 
 
+def _device_put_raw_fp8_bits(jax: Any, tensor: Any, device: object) -> Any:
+    """Transfer exact E4M3FN encodings without host-side dequantization."""
+
+    import torch
+
+    if tensor.dtype != torch.float8_e4m3fn:
+        raise CheckpointValidationError("raw Gate C FP8 tensor dtype drifted")
+    if not bool(torch.isfinite(tensor.float()).all()):
+        raise CheckpointValidationError("raw Gate C FP8 tensor is non-finite")
+    host = tensor.contiguous().view(torch.uint8).numpy()
+    value = jax.device_put(host, device)
+    value.block_until_ready()
+    return value
+
+
 def _placement_destinations(
     placement: Mapping[str, Any],
 ) -> dict[int, Mapping[str, Any]]:
@@ -244,6 +259,8 @@ def load_gate_c_checkpoint(
     artifact_dir: Path,
     expectation: GateCLoadExpectation,
     resolution: StageDeviceResolution,
+    *,
+    raw_fp8_names: frozenset[str] = frozenset(),
 ) -> LoadedGateCCheckpoint:
     """Direct-load and dequantize all 31 leaves without a host global concat."""
 
@@ -281,6 +298,15 @@ def load_gate_c_checkpoint(
         placement["source"]["name"]: placement
         for placement in placements
     }
+    unknown_raw_names = raw_fp8_names - {
+        placement["source"]["name"]
+        for placement in placements
+        if placement["source"]["dtype"] == "F8_E4M3"
+    }
+    if unknown_raw_names:
+        raise CheckpointValidationError(
+            f"requested raw Gate C FP8 tensors are unavailable: {sorted(unknown_raw_names)}"
+        )
     weights: dict[str, Any] = {}
     device_before = [_memory_stats(device) for device in resolution.devices]
     host_rss_before = _rss_peak_bytes()
@@ -326,6 +352,40 @@ def load_gate_c_checkpoint(
                         raise CheckpointValidationError(
                             f"Gate C FP8 scale ownership drifted: {name!r}"
                         )
+                    if name in raw_fp8_names:
+                        scale_arrays = []
+                        for handle, device in zip(
+                            handles, resolution.devices, strict=True
+                        ):
+                            weight = handle.get_tensor(name)
+                            scale = handle.get_tensor(scale_name)
+                            _validate_fp8_pair(weight, scale)
+                            local_arrays.append(
+                                _device_put_raw_fp8_bits(jax, weight, device)
+                            )
+                            scale_arrays.append(
+                                _device_put_plain(jax, scale, device)
+                            )
+                            transfers += 2
+                            del weight, scale
+                        weights[name] = _assemble_global(
+                            jax,
+                            tuple(source["shape"]),
+                            _sharding_for_placement(mesh, placement),
+                            local_arrays,
+                        )
+                        scale_source = scale_placement["source"]
+                        weights[scale_name] = _assemble_global(
+                            jax,
+                            tuple(scale_source["shape"]),
+                            _sharding_for_placement(mesh, scale_placement),
+                            scale_arrays,
+                        )
+                        consumed_scales.add(scale_name)
+                        raw_leaf_count += 2
+                        del local_arrays, scale_arrays, references
+                        gc.collect()
+                        continue
                     for handle, device in zip(
                         handles, resolution.devices, strict=True
                     ):
@@ -388,6 +448,9 @@ def load_gate_c_checkpoint(
             if placement["source"]["dtype"] != "F32"
             or not placement["source"]["name"].endswith("_scale_inv")
         } - consumed_scales
+        expected_weight_names.update(
+            f"{name}_scale_inv" for name in raw_fp8_names
+        )
         if set(weights) != expected_weight_names:
             raise CheckpointValidationError(
                 "Gate C semantic weight set does not reconcile"

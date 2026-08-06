@@ -10,7 +10,9 @@ import jax.numpy as jnp
 from jax.sharding import Mesh, PartitionSpec as P
 
 from ..kernels.pallas import (
+    Fp8BlockMatmulConfig,
     SparseMlaConfig,
+    fp8_block_matmul_f32,
     stage_local_sparse_mla_kernel,
 )
 
@@ -26,6 +28,7 @@ from ..kernels.reference.dsa import (
     DsaNumericalContract,
     SelectedPositions,
     dsa_index_keys,
+    dsa_index_keys_from_projection,
     dsa_scores,
     local_topk_candidates,
     merge_topk_candidates,
@@ -172,22 +175,23 @@ def stage_local_dense_gate_c(
     )
 
 
-def _local_dsa_query(
-    q_residual: jax.Array,
+def _local_dsa_query_from_projection(
+    projected_query: jax.Array,
     normalized: jax.Array,
-    query_weight: jax.Array,
     head_weight: jax.Array,
     position: jax.Array,
     *,
     contract: DsaNumericalContract,
 ) -> tuple[jax.Array, jax.Array]:
-    local_heads = query_weight.shape[0] // contract.head_dim
+    if projected_query.ndim != 2 or projected_query.shape[0] != 1:
+        raise ValueError("Gate C DSA query projection must contain one row")
+    if projected_query.shape[1] % contract.head_dim:
+        raise ValueError("Gate C DSA query projection has partial heads")
+    local_heads = projected_query.shape[1] // contract.head_dim
+    if projected_query.dtype != jnp.float32:
+        raise ValueError("Gate C DSA query projection must remain FP32")
     with jax.default_matmul_precision("highest"):
-        query = linear(
-            q_residual,
-            query_weight,
-            output_dtype=jnp.float32,
-        ).reshape(1, local_heads, contract.head_dim)
+        query = projected_query.reshape(1, local_heads, contract.head_dim)
         head_weights = linear(
             normalized,
             head_weight,
@@ -210,6 +214,112 @@ def _local_dsa_query(
             (rotated, query[..., contract.rotary_dim :]), axis=-1
         ).astype(jnp.float32),
         head_weights.astype(jnp.float32),
+    )
+
+
+def _local_dsa_query(
+    q_residual: jax.Array,
+    normalized: jax.Array,
+    query_weight: jax.Array,
+    head_weight: jax.Array,
+    position: jax.Array,
+    *,
+    contract: DsaNumericalContract,
+) -> tuple[jax.Array, jax.Array]:
+    with jax.default_matmul_precision("highest"):
+        projected_query = linear(
+            q_residual,
+            query_weight,
+            output_dtype=jnp.float32,
+        )
+    return _local_dsa_query_from_projection(
+        projected_query,
+        normalized,
+        head_weight,
+        position,
+        contract=contract,
+    )
+
+
+def _finish_stage_local_dsa_gate_c(
+    normalized: jax.Array,
+    q_residual: jax.Array,
+    local_query: jax.Array,
+    local_head_weights: jax.Array,
+    keys: jax.Array,
+    local_positions: jax.Array,
+    valid_lengths: jax.Array,
+    *,
+    axis_name: str,
+    contract: DsaNumericalContract,
+    stage_size: int,
+    context_capacity: int,
+) -> GateCDsaResult:
+    """Gather exact DSA domains and merge the topology-local candidates."""
+
+    local_heads = contract.num_heads // stage_size
+    query_width = local_heads * contract.head_dim
+    packed_query = jnp.concatenate(
+        (local_query.reshape(1, query_width), local_head_weights), axis=-1
+    )
+    gathered_query = lax.all_gather(
+        packed_query,
+        axis_name=axis_name,
+        axis=0,
+        tiled=False,
+    )
+    query = jnp.transpose(
+        gathered_query[..., :query_width], (1, 0, 2)
+    ).reshape(1, contract.num_heads, contract.head_dim)
+    gathered_head_weights = jnp.transpose(
+        gathered_query[..., query_width:], (1, 0, 2)
+    ).reshape(1, contract.num_heads)
+    local_scores = dsa_scores(query, keys, gathered_head_weights)
+    candidate_scores, candidate_positions = local_topk_candidates(
+        local_scores,
+        local_positions,
+        valid_lengths,
+        top_k=contract.top_k,
+    )
+    gathered_scores = lax.all_gather(
+        candidate_scores,
+        axis_name=axis_name,
+        axis=0,
+        tiled=False,
+    )
+    gathered_positions = lax.all_gather(
+        candidate_positions,
+        axis_name=axis_name,
+        axis=0,
+        tiled=False,
+    )
+    selected = merge_topk_candidates(
+        gathered_scores,
+        gathered_positions,
+        valid_lengths,
+        top_k=contract.top_k,
+        global_context_size=context_capacity,
+    )
+    flat_scores = jnp.transpose(gathered_scores, (1, 0, 2)).reshape(
+        1, stage_size * contract.top_k
+    )
+    flat_positions = jnp.transpose(
+        gathered_positions, (1, 0, 2)
+    ).reshape(1, stage_size * contract.top_k)
+    matches = selected.positions[:, :, None] == flat_positions[:, None, :]
+    selected_scores = jnp.max(
+        jnp.where(matches, flat_scores[:, None, :], -jnp.inf), axis=-1
+    )
+    return GateCDsaResult(
+        normalized,
+        q_residual,
+        query,
+        gathered_head_weights,
+        keys[None, ...],
+        local_scores[None, ...],
+        selected.positions,
+        selected_scores.astype(jnp.float32),
+        selected.valid_counts,
     )
 
 
@@ -248,8 +358,6 @@ def stage_local_dsa_gate_c(
         raise ValueError("DSA history does not cover every local owner")
     local_context = history_hidden_by_owner.shape[1]
     context_capacity = stage_size * local_context
-    local_heads = contract.num_heads // stage_size
-
     def mapped(
         residual: jax.Array,
         local_history_container: jax.Array,
@@ -283,26 +391,6 @@ def stage_local_dsa_gate_c(
             position,
             contract=contract,
         )
-        query_width = local_heads * contract.head_dim
-        packed_query = jnp.concatenate(
-            (
-                local_query.reshape(1, query_width),
-                local_head_weights,
-            ),
-            axis=-1,
-        )
-        gathered_query = lax.all_gather(
-            packed_query,
-            axis_name=axis_name,
-            axis=0,
-            tiled=False,
-        )
-        query = jnp.transpose(
-            gathered_query[..., :query_width], (1, 0, 2)
-        ).reshape(1, contract.num_heads, contract.head_dim)
-        gathered_head_weights = jnp.transpose(
-            gathered_query[..., query_width:], (1, 0, 2)
-        ).reshape(1, contract.num_heads)
         keys = dsa_index_keys(
             local_history,
             key_weight,
@@ -311,55 +399,18 @@ def stage_local_dsa_gate_c(
             local_positions,
             contract=contract,
         )
-        local_scores = dsa_scores(query, keys, gathered_head_weights)
-        candidate_scores, candidate_positions = local_topk_candidates(
-            local_scores,
-            local_positions,
-            valid_lengths,
-            top_k=contract.top_k,
-        )
-        gathered_scores = lax.all_gather(
-            candidate_scores,
-            axis_name=axis_name,
-            axis=0,
-            tiled=False,
-        )
-        gathered_positions = lax.all_gather(
-            candidate_positions,
-            axis_name=axis_name,
-            axis=0,
-            tiled=False,
-        )
-        selected = merge_topk_candidates(
-            gathered_scores,
-            gathered_positions,
-            valid_lengths,
-            top_k=contract.top_k,
-            global_context_size=context_capacity,
-        )
-        flat_scores = jnp.transpose(gathered_scores, (1, 0, 2)).reshape(
-            1, stage_size * contract.top_k
-        )
-        flat_positions = jnp.transpose(
-            gathered_positions, (1, 0, 2)
-        ).reshape(1, stage_size * contract.top_k)
-        matches = (
-            selected.positions[:, :, None] == flat_positions[:, None, :]
-        )
-        selected_scores = jnp.max(
-            jnp.where(matches, flat_scores[:, None, :], -jnp.inf),
-            axis=-1,
-        )
-        return GateCDsaResult(
+        return _finish_stage_local_dsa_gate_c(
             normalized,
             q_residual,
-            query,
-            gathered_head_weights,
-            keys[None, ...],
-            local_scores[None, ...],
-            selected.positions,
-            selected_scores.astype(jnp.float32),
-            selected.valid_counts,
+            local_query,
+            local_head_weights,
+            keys,
+            local_positions,
+            valid_lengths,
+            axis_name=axis_name,
+            contract=contract,
+            stage_size=stage_size,
+            context_capacity=context_capacity,
         )
 
     execute = jax.shard_map(
@@ -404,6 +455,172 @@ def stage_local_dsa_gate_c(
         q_a_norm_weight,
         wq_b_weight,
         wk_weight,
+        key_norm_weight,
+        key_norm_bias,
+        head_weight,
+    )
+
+
+def stage_local_dsa_fp8_gate_c(
+    decode_residual: jax.Array,
+    history_hidden_by_owner: jax.Array,
+    history_positions_by_owner: jax.Array,
+    decode_position: jax.Array,
+    context_lengths: jax.Array,
+    input_norm_weight: jax.Array,
+    q_a_weight: jax.Array,
+    q_a_norm_weight: jax.Array,
+    wq_b_bits: jax.Array,
+    wq_b_scale: jax.Array,
+    wk_bits: jax.Array,
+    wk_scale: jax.Array,
+    key_norm_weight: jax.Array,
+    key_norm_bias: jax.Array,
+    head_weight: jax.Array,
+    *,
+    mesh: Mesh,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+    block_shape: tuple[int, int] = (128, 128),
+    rms_norm_epsilon: float = 1e-5,
+    axis_name: str = "stage",
+    interpret: bool = False,
+) -> GateCDsaResult:
+    """Run Gate C DSA with tile-local raw-FP8 query/key projections."""
+
+    stage_size = int(mesh.devices.size)
+    _validate_mesh(mesh, axis_name=axis_name, stage_size=stage_size)
+    if contract.num_heads % stage_size:
+        raise ValueError("DSA heads must divide over the local stage")
+    if history_hidden_by_owner.ndim != 3 or history_positions_by_owner.shape != (
+        history_hidden_by_owner.shape[0],
+        history_hidden_by_owner.shape[1],
+    ):
+        raise ValueError("DSA owner-packed history shapes are invalid")
+    if history_hidden_by_owner.shape[0] != stage_size:
+        raise ValueError("DSA history does not cover every local owner")
+    local_context = history_hidden_by_owner.shape[1]
+    context_capacity = stage_size * local_context
+    config = Fp8BlockMatmulConfig(
+        block_shape=block_shape,
+        output_tile=block_shape[0],
+        contraction_tile=block_shape[1],
+    )
+
+    def mapped(
+        residual: jax.Array,
+        local_history_container: jax.Array,
+        local_positions_container: jax.Array,
+        position: jax.Array,
+        valid_lengths: jax.Array,
+        norm_weight: jax.Array,
+        qa_weight: jax.Array,
+        qa_norm_weight: jax.Array,
+        local_wq_bits: jax.Array,
+        local_wq_scale: jax.Array,
+        key_bits: jax.Array,
+        key_scale: jax.Array,
+        kn_weight: jax.Array,
+        kn_bias: jax.Array,
+        local_head_weight: jax.Array,
+    ) -> GateCDsaResult:
+        local_history = local_history_container[0]
+        local_positions = local_positions_container[0]
+        normalized = rms_norm(
+            residual, norm_weight, epsilon=rms_norm_epsilon
+        )
+        q_residual = rms_norm(
+            linear(normalized, qa_weight),
+            qa_norm_weight,
+            epsilon=rms_norm_epsilon,
+        )
+        projected_query = fp8_block_matmul_f32(
+            q_residual,
+            local_wq_bits,
+            local_wq_scale,
+            config=config,
+            interpret=interpret,
+        )
+        local_query, local_head_weights = _local_dsa_query_from_projection(
+            projected_query,
+            normalized,
+            local_head_weight,
+            position,
+            contract=contract,
+        )
+        projected_keys = fp8_block_matmul_f32(
+            local_history,
+            key_bits,
+            key_scale,
+            config=config,
+            interpret=interpret,
+        )
+        keys = dsa_index_keys_from_projection(
+            projected_keys,
+            kn_weight,
+            kn_bias,
+            local_positions,
+            contract=contract,
+        )
+        return _finish_stage_local_dsa_gate_c(
+            normalized,
+            q_residual,
+            local_query,
+            local_head_weights,
+            keys,
+            local_positions,
+            valid_lengths,
+            axis_name=axis_name,
+            contract=contract,
+            stage_size=stage_size,
+            context_capacity=context_capacity,
+        )
+
+    execute = jax.shard_map(
+        mapped,
+        mesh=mesh,
+        in_specs=(
+            P(),
+            P(axis_name, None, None),
+            P(axis_name, None),
+            P(),
+            P(),
+            P(),
+            P(),
+            P(),
+            P(axis_name, None),
+            P(axis_name, None),
+            P(),
+            P(),
+            P(),
+            P(),
+            P(axis_name, None),
+        ),
+        out_specs=GateCDsaResult(
+            P(),
+            P(),
+            P(),
+            P(),
+            P(axis_name, None, None),
+            P(axis_name, None, None),
+            P(),
+            P(),
+            P(),
+        ),
+        check_vma=False,
+    )
+    return execute(
+        decode_residual,
+        history_hidden_by_owner,
+        history_positions_by_owner,
+        decode_position,
+        context_lengths,
+        input_norm_weight,
+        q_a_weight,
+        q_a_norm_weight,
+        wq_b_bits,
+        wq_b_scale,
+        wk_bits,
+        wk_scale,
         key_norm_weight,
         key_norm_bias,
         head_weight,
@@ -745,11 +962,14 @@ def validate_gate_c_hlo(
     case: str,
     stage_size: int = 4,
     hidden_size: int = 6144,
+    dsa_linear_backend: Literal["reference", "pallas"] = "reference",
 ) -> dict[str, object]:
     """Reject non-local, unexpected, or dead-row Gate C communication."""
 
     if case not in ("dense", "dsa", "index_share"):
         raise ValueError(f"unknown Gate C HLO case {case!r}")
+    if dsa_linear_backend not in ("reference", "pallas"):
+        raise ValueError("unknown Gate C DSA linear backend")
     module = parse_hlo_module(optimized_hlo)
     expected_groups = (tuple(range(stage_size)),)
     violations = []
@@ -871,6 +1091,47 @@ def validate_gate_c_hlo(
         violations.append(
             f"Gate C contains forbidden dead-row/full-pod tensors: {forbidden_shapes}"
         )
+    dsa_pallas_kernel_counts: dict[str, int] = {}
+    dsa_forbidden_overlays: list[str] = []
+    if case == "dsa" and dsa_linear_backend == "pallas":
+        expected_dsa_kernels = {
+            "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": 1,
+            "greenfield_fp8_block_matmul_f32_m640_k6144_n128": 1,
+        }
+        custom_calls = [
+            line
+            for line in optimized_hlo.splitlines()
+            if 'custom_call_target="tpu_custom_call"' in line
+        ]
+        dsa_pallas_kernel_counts = {
+            name: sum(name in line for line in custom_calls)
+            for name in expected_dsa_kernels
+        }
+        dsa_forbidden_overlays = [
+            shape
+            for shape in (
+                "bf16[1024,2048]",
+                "f32[1024,2048]",
+                "bf16[128,6144]",
+                "f32[128,6144]",
+            )
+            if shape in optimized_hlo
+        ]
+        if dsa_pallas_kernel_counts != expected_dsa_kernels:
+            violations.append(
+                "Gate C raw-FP8 DSA kernel counts drifted: "
+                f"expected={expected_dsa_kernels} "
+                f"observed={dsa_pallas_kernel_counts}"
+            )
+        if len(custom_calls) != 2:
+            violations.append(
+                f"Gate C raw-FP8 DSA expected two custom calls, found {len(custom_calls)}"
+            )
+        if dsa_forbidden_overlays:
+            violations.append(
+                "Gate C raw-FP8 DSA retained decoded overlays: "
+                f"{dsa_forbidden_overlays}"
+            )
     if module.num_partitions not in (None, stage_size):
         violations.append(
             f"Gate C expected {stage_size} partitions, found {module.num_partitions}"
@@ -893,6 +1154,9 @@ def validate_gate_c_hlo(
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
         "index_share_lowering": index_share_lowering,
+        "dsa_linear_backend": dsa_linear_backend,
+        "dsa_pallas_kernel_counts": dsa_pallas_kernel_counts,
+        "dsa_forbidden_overlays": dsa_forbidden_overlays,
         "passed": not violations,
         "violations": violations,
     }

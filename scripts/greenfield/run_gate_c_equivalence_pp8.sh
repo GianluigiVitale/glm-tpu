@@ -33,6 +33,7 @@ TAG=${GLM_GREENFIELD_GATE_C_TAG:-greenfield_gate_c_pp8_$(date -u +%Y%m%dT%H%M%S%
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 SPARSE_ATTENTION_BACKEND=${GLM_GREENFIELD_GATE_C_SPARSE_ATTENTION_BACKEND:-reference}
+DSA_LINEAR_BACKEND=${GLM_GREENFIELD_GATE_C_DSA_LINEAR_BACKEND:-reference}
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing Gate C run outside $BRANCH" >&2
@@ -60,6 +61,10 @@ SPARSE_ATTENTION_BACKEND=${GLM_GREENFIELD_GATE_C_SPARSE_ATTENTION_BACKEND:-refer
 }
 [[ $SPARSE_ATTENTION_BACKEND == reference || $SPARSE_ATTENTION_BACKEND == pallas ]] || {
   echo "unsupported Gate C sparse-attention backend: $SPARSE_ATTENTION_BACKEND" >&2
+  exit 2
+}
+[[ $DSA_LINEAR_BACKEND == reference || $DSA_LINEAR_BACKEND == pallas ]] || {
+  echo "unsupported Gate C DSA linear backend: $DSA_LINEAR_BACKEND" >&2
   exit 2
 }
 mkdir -p "$RUN_DIR"
@@ -112,7 +117,7 @@ trap on_exit EXIT
 say "RUN_DIR=$RUN_DIR"
 say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN"
 say "PACK=$PACKED_MANIFEST_SHA ORACLE=$ORACLE_MANIFEST_SHA"
-say "SOURCE_REVISION=$SOURCE_REVISION trace_steps=20 sparse_attention=$SPARSE_ATTENTION_BACKEND"
+say "SOURCE_REVISION=$SOURCE_REVISION trace_steps=20 sparse_attention=$SPARSE_ATTENTION_BACKEND dsa_linear=$DSA_LINEAR_BACKEND"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -131,7 +136,7 @@ grep -q '^SYNC_OK ' "$RUN_DIR/sync.txt" || {
 say "running direct load and real dense/full-DSA/IndexShare TPU equivalence"
 started=$(date +%s)
 # shellcheck disable=SC2016
-runner_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ "$idx" == '"$RUN_WORKER"' ]]; tag='"$TAG"'; wt='"$WORKTREE"'; topology='"$TOPOLOGY_RUN"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; log="$run/runner.log"; trap '\''gcloud storage cp --no-clobber "$log" "$run/runner.json" "$remote/diagnostic/" >/dev/null 2>&1 || true'\'' EXIT; cd "$wt"; env JAX_PLATFORMS=tpu TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=0,1,2,3 PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_gate_c_equivalence.py --artifact-dir "$run/input/packed" --oracle-dir "$run/input/oracle" --topology-capture "$topology/topology.rank${idx}.json" --expected-code-hash '"$PIN"' --packed-code-hash '"$PACKED_CODE_HASH"' --packed-manifest-sha256 '"$PACKED_MANIFEST_SHA"' --layout-manifest-sha256 '"$LAYOUT_MANIFEST_SHA"' --parent-layout-manifest-sha256 '"$PARENT_LAYOUT_MANIFEST_SHA"' --oracle-manifest-sha256 '"$ORACLE_MANIFEST_SHA"' --source-revision '"$SOURCE_REVISION"' --topology-sha256 '"$TOPOLOGY_HASH"' --plan-group-sha256 '"$PP8_GROUP_HASH"' --sparse-attention-backend '"$SPARSE_ATTENTION_BACKEND"' --output "$run/runner.json" --hlo-dir "$run/hlo" --trace-root "$run/trace" --trace-steps 20 >"$log" 2>&1; gcloud storage cp --recursive --no-clobber "$run/hlo" "$run/trace" "$remote/" >/dev/null; gcloud storage cp --no-clobber "$run/runner.json" "$run/runner.log" "$remote/" >/dev/null; trap - EXIT; echo "GATE_C_UPLOAD_OK $(hostname)"'
+runner_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ "$idx" == '"$RUN_WORKER"' ]]; tag='"$TAG"'; wt='"$WORKTREE"'; topology='"$TOPOLOGY_RUN"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; log="$run/runner.log"; trap '\''gcloud storage cp --no-clobber "$log" "$run/runner.json" "$remote/diagnostic/" >/dev/null 2>&1 || true'\'' EXIT; cd "$wt"; env JAX_PLATFORMS=tpu TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=0,1,2,3 PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_gate_c_equivalence.py --artifact-dir "$run/input/packed" --oracle-dir "$run/input/oracle" --topology-capture "$topology/topology.rank${idx}.json" --expected-code-hash '"$PIN"' --packed-code-hash '"$PACKED_CODE_HASH"' --packed-manifest-sha256 '"$PACKED_MANIFEST_SHA"' --layout-manifest-sha256 '"$LAYOUT_MANIFEST_SHA"' --parent-layout-manifest-sha256 '"$PARENT_LAYOUT_MANIFEST_SHA"' --oracle-manifest-sha256 '"$ORACLE_MANIFEST_SHA"' --source-revision '"$SOURCE_REVISION"' --topology-sha256 '"$TOPOLOGY_HASH"' --plan-group-sha256 '"$PP8_GROUP_HASH"' --dsa-linear-backend '"$DSA_LINEAR_BACKEND"' --sparse-attention-backend '"$SPARSE_ATTENTION_BACKEND"' --output "$run/runner.json" --hlo-dir "$run/hlo" --trace-root "$run/trace" --trace-steps 20 >"$log" 2>&1; gcloud storage cp --recursive --no-clobber "$run/hlo" "$run/trace" "$remote/" >/dev/null; gcloud storage cp --no-clobber "$run/runner.json" "$run/runner.log" "$remote/" >/dev/null; trap - EXIT; echo "GATE_C_UPLOAD_OK $(hostname)"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
   --worker="$RUN_WORKER" --command="$runner_command" >"$RUN_DIR/execute.txt" 2>&1
 grep -q '^GATE_C_UPLOAD_OK ' "$RUN_DIR/execute.txt" || {
@@ -148,7 +153,8 @@ say "runner completed in ${elapsed}s"
 say "validating physical trace, linking DB, and building summary"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$ORACLE_PIN" "$RESULTS_DB" "$WORKTREE" \
-  "$ORACLE_REPO" "$elapsed" "$SPARSE_ATTENTION_BACKEND" <<'PY'
+  "$ORACLE_REPO" "$elapsed" "$SPARSE_ATTENTION_BACKEND" \
+  "$DSA_LINEAR_BACKEND" <<'PY'
 from __future__ import annotations
 
 from hashlib import sha256
@@ -157,7 +163,7 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, oracle_pin, db_path, repo, oracle_repo, elapsed, sparse_backend = sys.argv[1:]
+run_dir, pin, oracle_pin, db_path, repo, oracle_repo, elapsed, sparse_backend, dsa_backend = sys.argv[1:]
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if runner.get("status") != "SUCCESS" or runner.get("code_hash") != pin:
@@ -170,6 +176,8 @@ if not all(case["passed"] for case in runner["cases"].values()):
     raise SystemExit("Gate C correctness cases did not all pass")
 if not all(value["contract"]["passed"] for value in runner["hlo"].values()):
     raise SystemExit("Gate C HLO contract failed")
+if runner.get("dsa_linear_backend") != dsa_backend:
+    raise SystemExit("Gate C DSA linear backend identity failed")
 load = runner["load"]
 if (
     load["host_fp8_dequantizations"] != 0
@@ -268,6 +276,7 @@ run_id = pv.start_run(
         "oracle_manifest_sha256": runner["oracle"]["manifest_sha256"],
         "topology_sha256": runner["topology_sha256"],
         "sparse_attention_backend": sparse_backend,
+        "dsa_linear_backend": dsa_backend,
     },
     note=(
         "Protected PP8 Gate C dense/full-DSA/IndexShare exact device-score "
