@@ -109,9 +109,9 @@ def dsa_scores_pallas(
         ) * jnp.float32(config.head_dim**-0.5)
         per_head = jnp.maximum(per_head, jnp.float32(0.0))
         output_ref[...] = lax.dot_general(
-            head_weight_ref[..., 0],
-            per_head,
-            dimension_numbers=(((1,), (1,)), ((0,), (0,))),
+            head_weight_ref[..., 0].reshape((1, heads)),
+            per_head.reshape((heads, config.context_tile)),
+            dimension_numbers=(((1,), (0,)), ((), ())),
             precision=lax.Precision.HIGHEST,
             preferred_element_type=jnp.float32,
         )
