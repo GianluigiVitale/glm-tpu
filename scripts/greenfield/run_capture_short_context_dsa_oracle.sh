@@ -14,6 +14,8 @@ readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly TOKEN_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
 readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/2k/$TOKEN_ORACLE_TAG/oracle
 readonly TOKEN_ORACLE_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
+readonly DISK_MIN_FREE_GB=10
+readonly DISK_WARN_FREE_GB=15
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 HARNESS_PIN=$(git -C "$HARNESS_REPO" rev-parse HEAD)
@@ -121,6 +123,12 @@ strict_census pre || {
   say "ABORT: fleet is not eight-host zero work"
   exit 1
 }
+MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
+  bash "$WORKTREE/scripts/disk_watchdog.sh" check \
+  > >(tee "$RUN_DIR/disk_preflight.txt") 2>&1 || {
+    say "ABORT: eight-host disk reserve is below ${DISK_MIN_FREE_GB} GiB"
+    exit 1
+  }
 
 # All hosts must carry the exact clean legacy tree and the golden state file.
 # shellcheck disable=SC2016
