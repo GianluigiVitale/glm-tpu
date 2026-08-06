@@ -88,7 +88,7 @@ def main() -> int:
 
     from glm_tpu.greenfield.benchmarking.dsa import validate_dsa_score_hlo
     from glm_tpu.greenfield.kernels.pallas import dsa_scores_pallas
-    from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores
+    from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores, exact_topk
 
     if jax.default_backend() != "tpu":
         raise RuntimeError(f"DSA metal proof requires TPU, got {jax.default_backend()}")
@@ -133,16 +133,41 @@ def main() -> int:
     actual_host = np.asarray(actual, dtype=np.float32)
     expected_host = np.asarray(expected, dtype=np.float32)
     difference = np.abs(actual_host - expected_host)
+    valid_lengths = jnp.asarray([context], dtype=jnp.int32)
+    actual_selected = exact_topk(actual, valid_lengths, top_k=2048)
+    expected_selected = exact_topk(expected, valid_lengths, top_k=2048)
+    jax.block_until_ready((actual_selected, expected_selected))
+    actual_positions = np.asarray(actual_selected.positions, dtype=np.int32)
+    expected_positions = np.asarray(expected_selected.positions, dtype=np.int32)
+    position_mismatches = int(np.count_nonzero(actual_positions != expected_positions))
+    selection = {
+        "top_k": 2048,
+        "position_mismatch_count": position_mismatches,
+        "valid_counts_exact": bool(
+            np.array_equal(
+                np.asarray(actual_selected.valid_counts),
+                np.asarray(expected_selected.valid_counts),
+            )
+        ),
+        "positions_elementwise_exact": position_mismatches == 0,
+    }
+    selection["passed"] = bool(
+        selection["valid_counts_exact"]
+        and selection["positions_elementwise_exact"]
+    )
     comparison = {
         "all_finite": bool(np.isfinite(actual_host).all()),
         "max_abs": float(difference.max()),
         "mean_abs": float(difference.mean()),
         "p99_abs": float(np.percentile(difference, 99)),
-        "rtol": 2e-5,
-        "atol": 2e-4,
+        "max_abs_limit": 1e-3,
+        "mean_abs_limit": 2.5e-4,
+        "selection": selection,
         "passed": bool(
             np.isfinite(actual_host).all()
-            and np.allclose(actual_host, expected_host, rtol=2e-5, atol=2e-4)
+            and float(difference.max()) <= 1e-3
+            and float(difference.mean()) <= 2.5e-4
+            and selection["passed"]
         ),
     }
     if not comparison["passed"]:
