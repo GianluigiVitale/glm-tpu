@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 01:44 UTC
+**Updated:** 2026-08-06 02:40 UTC
 
 ## Authority and isolation
 
@@ -156,6 +156,21 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   scoped VMEM. Peak process HBM is 695,120,896 bytes; DB/archive/hashes and 8/8 cleanup pass. This
   is still a dense same-weight mechanism kernel: real routed integration must select potentially
   different expert matrices for the eight routes without recreating the rejected branch graph.
+- Protected DB 424--427 implement the distinct-selected-expert gate/up mechanism and keep raw FP8
+  weights in HBM. All four accepted runs preserve route order, select eight distinct local expert
+  matrices, match complete dequantization/FP32-dot within max BF16 error `0.0078125`, contain one
+  selected-expert Pallas kernel and no full BF16/F32 overlay, have approved archives/DB linkage,
+  and end 8/8 clean. Their p50s are `18.744/18.009/20.305/23.197 ms`; widening K tiles helped only
+  4%, while software pipelining and vector-scale staging regressed. They are correctness/mechanism
+  proofs but are performance-rejected and must not enter the decoder. Three intervening scale-layout
+  diagnostics failed comparison before timing and were preserved without DB claims; they exposed
+  and fixed a BlockSpec element-offset-versus-block-index error.
+- DB 427 HLO has three total custom calls although only one is the selected Pallas kernel. Its API
+  receives each full local raw table as `[G,N,K]` and transposes it to `[G,K,N]` inside the JIT;
+  for two 64-expert K6144/N2048 tables that is about 1.5 GiB of raw traffic and appears as extra
+  transpose/bitcast fusions. The exact next discriminator is a final packed `[G,K,N]` raw layout
+  supplied directly to the kernel, with compact scales still expanded only for top-8 routes. The
+  protected HLO must reduce to one total custom call before timing can promote the result.
 
 ## Protected evidence
 
@@ -256,11 +271,12 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 422/423 close the dense raw-FP8 and paired up/gate mechanism gates. Implement a compact
-   selected-expert grouped kernel whose eight batch-one routes may name different local matrices;
-   then compose activation/scale, down, and routed/shared combine in the binding Pallas order and
-   repeat the real one-layer protected gate. Do not substitute the same-weight M8 microbenchmark
-   for routed-GMM evidence.
+1. DB 422/423 close the dense raw-FP8 and paired up/gate mechanism gates; DB 424--427 close distinct
+   selected-expert correctness but reject the current `18--23 ms` layout. Eliminate the runtime
+   full-table transpose with final `[G,K,N]` raw packing and require one total custom call. Only if
+   the protected result is competitive should it compose activation/scale, down, and routed/shared
+   combine in the binding Pallas order and repeat the real one-layer gate. Never substitute the
+   same-weight M8 microbenchmark or a slow correctness-only GMM for routed production evidence.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,

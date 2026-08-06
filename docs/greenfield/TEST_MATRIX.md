@@ -35,11 +35,12 @@
 | Gate D reference-body diagnostic | Real 78-layer 2K load and compile; 25.46 GiB/chip; 219AG/294AR/16CP; 312 logical AR results; 2.7M bundles/580 overlays; staged execution projected 25–30 minutes/body | Evidence-rejected; reference graph cannot be the production engine |
 | Pallas FP8 block matmul | DB 422: production M8/K6144/N2048, raw-U8/128x128 VMEM dequant, BF16 MXU/FP32 accumulation, exact fallback, one custom call/no overlay, wall/HBM/DB/archive/cleanup | Pass on TPU v4 |
 | Pallas FP8 paired gate/up | DB 423: two raw matrices/two exact outputs, one custom call/no overlay, 0.815435 ms p50, wall/HBM/DB/archive/cleanup; same-weight M8 mechanism only | Pass on TPU v4; selected-expert GMM pending |
+| Pallas FP8 selected gate/up | DB 424--427: eight distinct local matrices, exact route order/bounded outputs, no decoded overlay, DB/archive/cleanup; p50 18.744--23.197 ms and DB427 has runtime full-table transpose/three total custom calls | Correctness pass; performance rejected; final `[G,K,N]` layout pending |
 | Gate D implementation | All-78-layer schedule/state; DB420-exact runtime loader; fused raw-FP8 fallback layer; one-step all-stage map; exact forced-CPU state/local HLO | In progress; hot path replacement required |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
 
-Last verified suite: 230 passed / 1 skipped across greenfield plus ownership guards with
+Last verified suite: 232 passed / 1 skipped across greenfield plus ownership guards with
 `JAX_PLATFORMS=cpu` (2026-08-06).
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove one real sparse layer under both required local plans; DB 420 proves complete

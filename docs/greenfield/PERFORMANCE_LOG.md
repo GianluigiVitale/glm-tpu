@@ -268,6 +268,32 @@ archive/SUCCESS, and eight-host pre/post census pass. This is a same-weight M8 m
 a selected-expert GMM, layer, decoder, or token-rate result. The next kernel must allow the eight
 routes to address different locally owned expert matrices without a decoded-weight overlay.
 
+## 2026-08-06 — selected-expert gate/up correctness; current layout rejected
+
+DB 424--427 prove the harder batch-one mechanism in which all eight routes address distinct raw-FP8
+expert matrices. Route order, local ownership, exact-zero non-owner behavior, bounded comparison,
+no decoded full-matrix overlay, DB/archive integrity, and 8/8 cleanup pass. These are not promoted
+performance results because every implementation is far above the sub-millisecond one-layer budget:
+
+| DB / implementation | p50 | p90 | p99 | compile | peak HBM |
+|---|---:|---:|---:|---:|---:|
+| 424 / K128 flat | 18.744257 | 18.760322 | 18.787954 ms | 0.826 s | 2.470 GB |
+| 425 / K512 reordered | 18.008643 | 18.023037 | 18.053317 ms | 0.818 s | 2.433 GB |
+| 426 / K512 triple-buffer pipeline | 20.305469 | 20.323746 | 20.349554 ms | 1.102 s | 2.433 GB |
+| 427 / vector scales + pipeline | 23.196868 | 23.211888 | 23.234651 ms | 2.050 s | 2.435 GB |
+
+All accepted comparisons have max absolute BF16 error `0.0078125`; up is elementwise exact in DB
+427. Three vector-scale diagnostics failed comparison before timing and have no DB claim. They
+found a physical BlockSpec indexing bug, which DB 427 fixes, but the corrected layout is slower.
+
+The next controlled experiment removes a confounder rather than tuning this result: DB 427 accepts
+the two full 64-expert raw tables as `[G,N,K]` and transposes them to the Pallas `[G,K,N]` access
+order inside the timed JIT. Its optimized HLO therefore has three total custom calls, only one of
+which is the selected kernel. The greenfield checkpoint/kernel contract must persist raw expert
+weights as `[G,K,N]`, retain compact per-block scales, and require one total custom call. Until that
+protected test is fast, selected-expert activation/down integration is blocked and no decoder or
+tok/s claim exists.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory
