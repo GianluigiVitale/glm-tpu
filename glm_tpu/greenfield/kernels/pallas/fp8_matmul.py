@@ -2691,26 +2691,32 @@ def fp8_fused_selected_moe(
                 route_output_ref: Any,
                 combined_output_ref: Any,
             ) -> None:
-                active_slots = (
-                    jnp.arange(route_count, dtype=jnp.int32)
-                    < active_count_value[...]
-                )[:, None, None]
-                safe_outputs = jnp.where(
-                    active_slots,
-                    route_output_ref[...],
-                    jnp.zeros_like(route_output_ref[...]),
-                )
-                weights = route_weights_value[...].astype(
-                    config.output_dtype
-                )
-                weighted = (
-                    safe_outputs * weights[:, None, None]
-                ).astype(config.output_dtype)
-                combined_output_ref[...] = jnp.sum(
-                    weighted,
-                    axis=0,
+                combined = jnp.zeros(
+                    (config.row_tile, config.output_tile),
                     dtype=config.output_dtype,
                 )
+                for route_slot in range(route_count):
+                    active_slot = (
+                        jnp.asarray(route_slot, dtype=jnp.int32)
+                        < active_count_value[...]
+                    )
+                    route_output = jnp.where(
+                        active_slot,
+                        route_output_ref[route_slot, ...],
+                        jnp.zeros_like(
+                            route_output_ref[route_slot, ...]
+                        ),
+                    )
+                    weight = route_weights_value[route_slot].astype(
+                        config.output_dtype
+                    )
+                    weighted = (route_output * weight).astype(
+                        config.output_dtype
+                    )
+                    combined = (combined + weighted).astype(
+                        config.output_dtype
+                    )
+                combined_output_ref[...] = combined
 
             def combine_input_index(
                 output_index: Any,
