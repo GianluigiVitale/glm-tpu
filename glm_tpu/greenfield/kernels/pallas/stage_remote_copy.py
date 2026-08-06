@@ -25,14 +25,12 @@ class StageRemoteCopyConfig:
     total_devices: int = 32
     hidden_width: int = 6144
     metadata_width: int = 2052
-    collective_id: int = 8
 
     def __post_init__(self) -> None:
         for name in (
             "total_devices",
             "hidden_width",
             "metadata_width",
-            "collective_id",
         ):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool):
@@ -41,8 +39,6 @@ class StageRemoteCopyConfig:
             raise ValueError("remote copy requires at least two devices")
         if self.hidden_width <= 0 or self.metadata_width <= 0:
             raise ValueError("remote-copy payload widths must be positive")
-        if self.collective_id < 0:
-            raise ValueError("collective_id must be nonnegative")
 
 
 def stage_value_remote_copy_kernel_name(value: Any) -> str:
@@ -65,7 +61,6 @@ def stage_value_remote_copy_pallas(
     value: Any,
     destination_rank: Any,
     *,
-    collective_id: int = 8,
     interpret: bool = False,
 ) -> Any:
     """Asynchronously DMA one rank-two payload to its destination device."""
@@ -75,10 +70,6 @@ def stage_value_remote_copy_pallas(
         destination_rank.dtype, jnp.integer
     ):
         raise ValueError("destination_rank must be an integer scalar")
-    if not isinstance(collective_id, int) or isinstance(collective_id, bool) or (
-        collective_id < 0
-    ):
-        raise ValueError("collective_id must be a nonnegative integer")
     destination = jnp.reshape(destination_rank.astype(jnp.int32), (1,))
 
     def kernel(
@@ -111,10 +102,7 @@ def stage_value_remote_copy_pallas(
                 pltpu.SemaphoreType.DMA,
             ),
         ),
-        compiler_params=pltpu.CompilerParams(
-            collective_id=collective_id,
-            dimension_semantics=(),
-        ),
+        compiler_params=pltpu.CompilerParams(dimension_semantics=()),
         interpret=interpret,
         name=kernel_name,
         cost_estimate=pl.CostEstimate(
@@ -234,7 +222,6 @@ def stage_remote_copy_pallas(
             ),
         ),
         compiler_params=pltpu.CompilerParams(
-            collective_id=config.collective_id,
             dimension_semantics=(),
         ),
         interpret=interpret,

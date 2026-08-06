@@ -237,7 +237,6 @@ def _transport_function(
                     state = stage_value_remote_copy_pallas(
                         state,
                         destination,
-                        collective_id=8,
                     )
                 anchor = state.reshape(-1)[hop % state.size]
                 if config.dtype == "int32":
