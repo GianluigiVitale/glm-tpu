@@ -4795,3 +4795,26 @@ Mosaic batched-dot parser limitation; and an unsupported v4 sublane gather. Load
 `f32[1,32]` head vector and matching both reference dot reductions removes the mismatch. This is a
 standalone scorer result, not layer/token performance. The binding next item is exact top-k and
 position ordering, followed by selected-KV+sparse attention.
+
+## 2026-08-06 10:28 — Exact bitonic top-k is 1.364 ms local + 0.338 ms merge on v4
+
+DB 445 / `greenfield_dsa_topk_20260806T102752126905724Z` at `3870c2f` closes standalone Section
+7.2 item 6. TPU v4 exposes no SparseCore, so the accepted path uses TensorCore bitonic networks:
+six calls reduce one production LP4 owner row `f32[1,65,536]` with arbitrary global positions to
+2,048 ordered candidates; two calls merge a deliberately permuted four-owner union. TPU JAX and
+independent host lexicographic oracles match scores, positions, valid counts, sentinel tails,
+high-score ties, and lowest-global-position order elementwise.
+
+After 200 warmups, 1,000 profiler-free samples give local mean/p50/p90/p95/p99
+`1.364911/1.364405/1.376845/1.379481/1.388090 ms` and merge
+`0.338555/0.337671/0.349403/0.354289/0.362475 ms`. HLO
+`e6b8e209...e7e90e` / `d990a754...0b674` has exactly `6/2` Pallas calls and no XLA sort/top-k,
+collective, unexpected call, or dead row. Compile is `8.381/6.176 s`; peak HBM is 17.795 MB.
+Hashes, DB snapshot, approved archive/remote `SUCCESS`, and 8/8 cleanup pass.
+
+DB 444 at `bacfbdf` is the exact but rejected serial-reduction baseline: local/merge p50
+`59.979532/4.495320 ms`. The bitonic network is `43.96x/13.31x` faster. Before the accepted run,
+three diagnostics failed before timing on a program-axis tile violation, boolean scalar squeeze,
+and wide-loop/bitpacked-select Mosaic legalization; every failure ended 8/8 clean. This remains a
+standalone selector, not integrated attention, layer wall, or tok/s. Next is Section 7.2 item 7,
+selected-KV gather fused with sparse attention.

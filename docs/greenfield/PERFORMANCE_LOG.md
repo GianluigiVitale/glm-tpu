@@ -608,3 +608,26 @@ The TPU/reference FP32 score max/mean/p99 error is
 collective, or unexpected custom call. Compile is `0.394 s`; peak HBM is `20,491,776` bytes.
 Runner/summary SHAs are `992bc991...fe12` / `37789e92...0af`; DB/archive/remote `SUCCESS` and 8/8
 cleanup pass. This latency is standalone scorer wall, not a layer or token result.
+
+## 2026-08-06 — exact TensorCore DSA top-k passes production-shape protected metal
+
+DB 445 / `greenfield_dsa_topk_20260806T102752126905724Z` at `3870c2f` measures the exact bitonic
+TPU-v4 path. The local runtime shape is `f32[1,65,536]` plus arbitrary global `s32[65,536]`
+positions to 2,048 ordered pairs; the global shape merges a deliberately permuted
+`f32/s32[4,1,2,048]` union. Both TPU JAX and independent host lexicographic oracles match scores,
+positions, valid counts, sentinels, and lowest-position high-score ties elementwise.
+
+| phase | mean | p50 | p90 | p95 | p99 |
+|---|---:|---:|---:|---:|---:|
+| local 65,536→2,048 | 1.364911 | 1.364405 | 1.376845 | 1.379481 | 1.388090 ms |
+| merge 4×2,048→2,048 | 0.338555 | 0.337671 | 0.349403 | 0.354289 | 0.362475 ms |
+
+Local/merge compile is `8.381/6.176 s`; peak allocation is `17,794,560` bytes. Optimized HLO
+`e6b8e209...e7e90e` / `d990a754...0b674` contains exactly six/two named Pallas calls, with no XLA
+sort/top-k, collective, unexpected call, or dead row. Runner/summary SHAs are
+`8d41a09c...bbc7` / `a0bd5514...5924`; DB/archive/remote `SUCCESS` and 8/8 cleanup pass.
+
+DB 444 at `bacfbdf` first proved the exact reduction structure but is performance-rejected:
+local/merge p50 was `59.979532/4.495320 ms`. Bitonic is `43.96x/13.31x` faster. Three subsequent
+compile diagnostics failed closed on TPU-v4 layout/scalar/compiler limitations before timing and
+ended clean. This closes standalone Section 7.2 item 6, not integration, layer wall, or tok/s.

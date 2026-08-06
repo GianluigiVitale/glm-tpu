@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 09:56 UTC
+**Updated:** 2026-08-06 10:28 UTC
 
 ## Authority and isolation
 
@@ -388,11 +388,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Implement Section 7.2 item 6, exact top-k and position ordering, now that DB 443 closes the
-   production-shape Pallas DSA scorer. Then implement selected-KV gather+sparse attention and
-   stage-local RMSNorm/raw-FP8 linear fusion. DB 442 proves that the last item removes the immediate
-   58.8-second 2K floor, but do not skip the correctness-critical long-context kernels. Require
-   reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback evidence for each.
+1. Implement Section 7.2 item 7, selected-KV gather fused with sparse attention, now that DB 445
+   closes exact top-k/position ordering. Then prove asynchronous remote copy and stage-local
+   RMSNorm/raw-FP8 linear fusion in the binding order. DB 442 proves that the last item removes the
+   immediate 58.8-second 2K floor, but do not skip the preceding topology/long-context kernels.
+   Require reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback evidence for each.
 2. Rerun exact Gate-C oracles after each integrated path, then repeat the protected 78-layer body.
    The immediate trace target is removal of `reference/fp8.py:69-70` whole-matrix gathers; do not
    tune the compact stage permutes or local layer collectives.
@@ -419,6 +419,29 @@ After 200 warmups, 1,000 profiler-free samples give p50/p90/p95/p99
 `0.326595/0.335482/0.341040/0.350320 ms`. Compile is `0.394 s`; peak HBM is `20,491,776` bytes.
 Runner/summary SHAs are `992bc991...fe12` / `37789e92...0af`; DB snapshot, approved archive/remote
 `SUCCESS`, and 8/8 cleanup pass. This is a standalone scorer proof, not integrated layer/token wall.
+
+## Protected exact Pallas DSA top-k
+
+DB 445 / `greenfield_dsa_topk_20260806T102752126905724Z` at `3870c2f` closes Section 7.2 item 6.
+TPU v4 has no SparseCore sort, so six exact TensorCore bitonic calls reduce one runtime-shaped
+`f32[1,65,536]`/`s32[65,536]` owner row to 2,048 candidates; two more calls merge the permuted
+four-owner `f32/s32[4,1,2,048]` union. Scores, positions, valid counts, sentinel tails, high-score
+ties, and lowest-global-position order are elementwise exact against both the TPU JAX reference
+and an independent host lexicographic oracle.
+
+After 200 warmups, 1,000 profiler-free samples give local p50/p90/p95/p99
+`1.364405/1.376845/1.379481/1.388090 ms` and merge
+`0.337671/0.349403/0.354289/0.362475 ms`. Optimized local/merge HLO SHAs are
+`e6b8e209...e7e90e` / `d990a754...0b674`; they contain exactly `6/2` named Pallas calls and no
+XLA sort/top-k, collective, unexpected call, or batch-32 row. Compile is `8.381/6.176 s`; peak HBM
+is `17,794,560` bytes. Runner/summary SHAs are `8d41a09c...bbc7` / `a0bd5514...5924`;
+DB/archive/remote `SUCCESS` and 8/8 cleanup pass. This is standalone selector evidence, not layer
+or token wall.
+
+DB 444 at `bacfbdf` is the exact but performance-rejected reduction predecessor: local/merge p50
+was `59.979532/4.495320 ms`. Three earlier bitonic/lowering diagnostics failed closed before
+timing on TPU-v4 layout, scalar-bool, and Mosaic legalization limits; all preserved diagnostics
+ended 8/8 clean. The accepted bitonic network is `43.96x/13.31x` faster than DB 444.
 
 ## Protected feature-body attribution
 

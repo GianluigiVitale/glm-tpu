@@ -42,7 +42,8 @@
 | Gate D feature-body diagnostic | Eight-host real 78-layer/2K execution at `a8194cd`; exact feature HLO/local groups/metadata/direct load; 58,804.040 ms p50, 26.144 GB peak HBM/chip; outer finalizer schema failure means no DB/SUCCESS | Evidence-rejected; non-MoE reference projection/dequant path requires XPlane attribution and Pallas replacement |
 | Gate D feature-body XPlane | DB 442: one clean wall sample then 8 files/64 cores/2 trace steps; 58,804.003 ms wall; dequant gather 7,317.698 ms/core x 8 serial stages = 58,541.584 ms; exact HLO/HBM/DB/archive/cleanup | Attribution pass; performance rejected; compact permute duration is pipeline wait, not bandwidth |
 | Pallas DSA scorer | DB 443: production one-row 256K/LP4 shard; one kernel/no per-head overlay/dead rows/collectives; score max error 2.861e-6; exact 2,048 positions/order; 0.326595/0.350320 ms p50/p99 | Standalone Section 7.2 item 5 pass; layer integration pending |
-| Gate D implementation | All-78-layer schedule/state; complete feature runtime; exact local HLO/metadata; real body executes but takes 58.804 s | In progress; follow Section 7.2 DSA/top-k/selected-KV/linear Pallas order before complete tokens |
+| Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
+| Gate D implementation | All-78-layer schedule/state; complete feature runtime; exact local HLO/metadata; real body executes but takes 58.804 s | In progress; next selected-KV+sparse attention, async copy, then linear fusion before complete tokens |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
 

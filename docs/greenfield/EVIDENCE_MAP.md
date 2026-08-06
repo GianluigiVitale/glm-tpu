@@ -271,3 +271,16 @@ unexpected custom call. TPU/reference score max error is `2.861e-6`; all 2,048 s
 and order are exact. Profiler-free p50/p99 is `0.326595/0.350320 ms` over 1,000 samples after 200
 warmups. HBM, DB snapshot, hashes, approved archive/remote `SUCCESS`, and 8/8 cleanup pass. This
 closes the standalone Section 7.2 scorer rung, not its layer integration or token performance.
+
+## Protected exact Pallas DSA top-k
+
+DB 445 / `greenfield_dsa_topk_20260806T102752126905724Z` at `3870c2f` proves the production
+one-row local `65,536 -> 2,048` selector and permuted four-owner `4x2,048 -> 2,048` merge on TPU
+v4. Exact high-score ties, lowest-global-position order, scores, positions, valid counts, and
+sentinels match both TPU JAX and independent host oracles elementwise. Local/merge p50/p99 is
+`1.364405/1.388090` and `0.337671/0.362475 ms` over 1,000 samples after 200 warmups. HLO SHAs
+`e6b8e209...e7e90e` / `d990a754...0b674` contain exactly six/two TensorCore Pallas calls and no
+XLA sort/top-k, collective, dead row, or unexpected call. Peak HBM, DB snapshot, hashes, approved
+archive/remote `SUCCESS`, and 8/8 cleanup pass. DB 444 is the exact but rejected reduction
+baseline at `59.979532/4.495320 ms` p50. These are standalone selector results, not layer/token
+throughput.
