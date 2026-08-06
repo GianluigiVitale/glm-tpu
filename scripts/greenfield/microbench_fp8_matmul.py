@@ -292,10 +292,16 @@ def main() -> int:
             line.strip()
             for line in hlo.splitlines()
             if " gather(" in line
-            and f" = bf16[{rows},{2 * output}]" in line
+            and any(
+                f" = bf16[{rows},{width}]" in line
+                for width in (output, 2 * output)
+            )
             and "collapsed_slice_dims={0,1}" in line
             and "start_index_map={0,1}" in line
-            and f"slice_sizes={{1,1,{2 * output}}}" in line
+            and any(
+                f"slice_sizes={{1,1,{width}}}" in line
+                for width in (output, 2 * output)
+            )
             and any(
                 f", {_custom_call_result_name(call)})" in line
                 for call in bounded_route_restore_calls
@@ -357,12 +363,18 @@ def main() -> int:
                 and (
                     args.kernel != "selected_up_gate"
                     or (
-                        2 <= len(allowed_auxiliary_calls) <= 8
+                        len(allowed_auxiliary_calls) <= 8
                         and len(bounded_route_restore_calls) <= 1
-                        and len(bounded_route_restore_gathers)
-                        == len(bounded_route_restore_calls)
+                        and (
+                            not bounded_route_restore_calls
+                            or 1 <= len(bounded_route_restore_gathers) <= 2
+                        )
                         and f"u8[{local_experts},{contraction},{output}]"
                         in kernel_calls[0]
+                        and kernel_calls[0].count(
+                            f"f32[{local_experts},{output // 128},{contraction // 128}]"
+                        )
+                        == 2
                         and f"f8e4m3fn[{local_experts},{contraction},{output}]"
                         not in hlo
                     )
