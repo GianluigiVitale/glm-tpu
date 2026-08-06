@@ -499,6 +499,36 @@ The candidate is rejected. Its tested kernel remains default-off, and the active
 guard are restored to DB 439. The launch-boundary search is closed; next work must target measured
 route imbalance and collective arrival skew. This is still not a decoder or tok/s result.
 
+## 2026-08-06 — feature sharding removes route-arrival skew
+
+The append-only derivative `greenfield_one_layer_pallas_feature_pack_20260806T054520020812918Z`
+replaces 64 complete routed experts/chip with all 256 expert identities and a 512-wide intermediate
+slice/chip. Gate/up and reciprocal down ownership remain final-layout raw U8; persistent payload is
+unchanged at 9,716,380,672 bytes. Manifest `a8b91435...5cc6`, layout `e613d9ef...c431`, exact source
+transformation, remote `SUCCESS`, and direct loading with no runtime dequant/concat/transpose pass.
+
+Protected DB 441 / `greenfield_real_layer_pp8_pallas_feature_20260806T055854589778101Z` at
+`65ded2c` passed both oracle cases:
+
+| case | DB 439 p50 | DB 441 p50 | p90 | p95 | p99 | change |
+|---|---:|---:|---:|---:|---:|---:|
+| normal all-slot routes | 3.121940 | 2.308015 | 2.336313 | 2.348303 | 2.380885 ms | -26.07% |
+| concentrated slot-2 routes | 7.063344 | 2.318155 | 2.348175 | 2.361629 | 2.393219 ms | -67.18% |
+
+Routes are elementwise exact. Output max/p99/mean error is at most
+`0.03125/0.01171875/0.002507`, and route-weight max error remains below `9e-8`. Optimized HLO SHA
+`3bbd527f...383f` has the exact `u8[256,6144,512]` gate/up and `u8[256,512,6144]` down operands,
+three Pallas calls, five bounded gathers, three exact local layout calls, one
+`bf16[2,1,6144]` all-reduce over `{{0,1,2,3}}`, and no decoded overlay or other collective.
+Compile is `1.560 s`; generated code is 1,616,896 bytes and peak HBM is 2,430,860,800 bytes/chip.
+
+The fresh XPlane identifies the mechanism: selected-kernel time is essentially unchanged
+`1.581196 -> 1.576724 ms`, while the physical psum falls `2.787760 -> 0.028511 ms` and total busy
+time falls `4.690090 -> 1.901923 ms`. The prior 2.79 ms “collective” was almost entirely
+route-dependent arrival waiting, not a 12 KiB four-chip reduction floor. DB integrity, evidence
+hashes, approved archive/remote `SUCCESS`, and authenticated 8/8 pre/post cleanup pass. The feature
+layout is selected for PP8 full-runtime integration. This is one real layer, not token throughput.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

@@ -69,6 +69,15 @@ every source/destination tensor hash, and preserves shared/router bytes. Its fou
 `3da63bd9c2332dd67fc29a1d158e5468e0fdf1db1a9a0e8b7977277b0812e427`. Local and approved-bucket
 `SUCCESS` pass. DB 438 is the protected execution bound to this artifact.
 
+`greenfield_one_layer_pallas_feature_pack_20260806T054520020812918Z` is the selected structural
+PP8 derivative. It maps every routed expert identity to every stage chip while slicing the 2,048
+intermediate dimension four ways; reciprocal down ownership preserves the single local combine and
+the per-chip persistent payload. Manifest is `a8b914350ea7b8fd281e425d6eb49eefad2082b48f16ec919c26ccbc7bbb5cc6`,
+layout is `e613d9ef655f7add11f8b9fd9e0fd630343c09b714882f967c405986cc6cc431`, payload is
+9,716,380,672 bytes, and source Pallas manifest is `3da63bd9...e427`. Exact transformation,
+file/payload hashes, local/remote `SUCCESS`, and direct loading with zero runtime dequantization,
+concat, or transpose pass. Protected DB 441 is bound to this artifact.
+
 `greenfield_gate_c_oracle_20260805T212801776974822Z` is the independent layer-2/3 Gate C
 correctness artifact at code `602d42f`. It reads 31 raw tensors from source shards 20/38/40 at the
 protected full-pack source revision and constructs no JAX/model/legacy execution. Its real

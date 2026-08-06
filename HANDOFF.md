@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 05:32 UTC
+**Updated:** 2026-08-06 06:05 UTC
 
 ## Authority and isolation
 
@@ -89,6 +89,21 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   three-call composition. Do not spend more time on launch-only fusion: next characterize and
   reduce route-imbalance/collective arrival skew before integrating the short decoder. No decoder
   or tok/s result exists yet.
+- Expert-feature derivative `greenfield_one_layer_pallas_feature_pack_20260806T054520020812918Z`
+  redistributes every routed expert across all four intermediate-feature owners without changing
+  per-chip persistent bytes. Manifest `a8b91435...5cc6`, layout `e613d9ef...c431`, exact
+  9,716,380,672-byte payload/source reconciliation, approved remote `SUCCESS`, and direct-loader
+  tests pass. Runtime weight transpose/concat/dequant counts are zero.
+- Protected DB 441 / `greenfield_real_layer_pp8_pallas_feature_20260806T055854589778101Z` at
+  `65ded2c` is the first structural route-balance win. Every chip owns all 256 expert identities and
+  one 512-wide intermediate slice, so normal and all-eight-concentrated routes execute the same
+  local work. Normal/concentrated p50 is `2.308015/2.318155 ms`, improving DB 439 by
+  `26.07%/67.18%`. Routes are exact and output max/p99/mean error is at most
+  `0.03125/0.01171875/0.002507`. HLO `3bbd527f...383f` has three raw-U8 calls, one exact local
+  four-chip all-reduce, no decoded overlay, and the selected kernel remains `1.577 ms`. Fresh
+  XPlane shows the physical psum collapse from `2.787760` to `0.028511 ms`; peak HBM is
+  2,430,860,800 bytes/chip. DB/archive/hashes/remote `SUCCESS` and 8/8 cleanup pass. Select this
+  routed layout for PP8 full-runtime integration. This is a real layer, not decoder or tok/s proof.
 - Final-layout PP16 artifact `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes
   two independently hashed 4,855,045,080-byte files at pack code `51d1df9`: experts
   `0:128/128:256`, shared intermediate `0:1024/1024:2048`, manifest
@@ -359,20 +374,14 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 438 completes the exact raw-FP8 routed/shared composition and exposes the next measured
-   bottleneck: four sequential Pallas calls cost `3.164 ms` on normal routes. Fuse selected
-   gate/up + BF16 SwiGLU + down into one route-proportional call, then fuse the shared
-   gate/up/SwiGLU/down boundary if required. Preserve final raw-U8 layouts, selected-route work,
-   exact BF16 association, one local stacked combine, and the DB 438 oracle/HLO/HBM gates. A
-   challenger is promotable only on a fresh protected real-layer result; no arithmetic sum of
-   standalone kernels is evidence.
-2. Recompile only after the fused real-layer kernel/overlay gate is acceptable. Bind the optimized
-   layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
-   control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,
-   measured HBM, fresh trace, and profiler-free steady wall. Do not attempt 256K before it passes.
-3. Continue Gates E–H in binding order. The decoded-overlay comparison favored PP8 for
-   normal routing (`0.696` vs `0.901 ms`) while PP16 wins the concentrated adversary
-   (`1.076` vs `1.134 ms`), but DB 438 proves the deployable raw-FP8 PP8 layer is currently much
-   slower. Only identical-condition raw-FP8 decoder evidence may choose the final plan.
+1. Extend the offline complete-runtime derivative and direct loader to DB 441's selected
+   expert-intermediate PP8 ownership. Stream and checksum every final shard; do not runtime-repack
+   the model or weaken the existing full-pack/load evidence.
+2. Bind the DB 441 layer composition to the complete runtime artifact, add embedding/final norm/
+   distributed logits/token control, and prove complete 2K/8K Gate D with raw tokens, exact
+   DSA/cache state, local-only HLO, measured HBM, fresh trace, and profiler-free steady wall. Do not
+   attempt 128K/256K before Gate D passes.
+3. Implement identical-condition raw-FP8 PP16 and WS32 challengers, adjudicate by protected wall,
+   then continue Gates E-H in binding order. No one-layer result is a decoder or tok/s claim.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.

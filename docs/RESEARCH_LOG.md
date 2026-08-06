@@ -4664,3 +4664,29 @@ custom-call busy time increases to `1.862916 ms`. The candidate is rejected; the
 tested and default-off, while the active composition and fail-closed HLO contract are restored to
 DB 439. Launch-only fusion is exhausted. Next evidence must characterize and reduce route-driven
 arrival skew at the four-chip combine before short-decoder integration. No tok/s claim exists.
+
+## 2026-08-06 06:00 — Expert-feature sharding removes the measured arrival skew
+
+The selected structural challenger stores all 256 expert identities on each PP8 chip but only one
+512-wide intermediate slice, with reciprocal down ownership. Per-chip routed bytes are unchanged;
+normal and concentrated routes now execute identical local dimensions before the same one local
+stacked combine. The exact derivative pack
+`greenfield_one_layer_pallas_feature_pack_20260806T054520020812918Z` has manifest
+`a8b91435...5cc6`, layout `e613d9ef...c431`, 9,716,380,672 reconciled payload bytes, final raw-U8
+owners, approved remote `SUCCESS`, and no runtime dequant/concat/transpose.
+
+Two protected diagnostics failed closed without timing claims: the first exposed a missing
+`stage_size` loader protocol property; the second compiled successfully and preserved exact HLO but
+showed that feature placement changes one local layout marker from shared U8 to replicated BF16
+router reassembly. The exact feature-specific shape/arity guard was added and rejects both layouts
+when checked under the wrong contract.
+
+DB 441 / `greenfield_real_layer_pp8_pallas_feature_20260806T055854589778101Z` at `65ded2c` passes
+normal/concentrated correctness and records `2.308015/2.318155 ms` p50, a `26.07%/67.18%`
+improvement over DB 439. Routes are exact; output max/p99/mean is at most
+`0.03125/0.01171875/0.002507`. HLO `3bbd527f...383f` has three raw-U8 kernels, one exact local
+four-chip all-reduce, and no decoded overlay. Peak HBM is 2.431 GB/chip. The selected fused kernel
+remains about `1.577 ms`, while fresh-XPlane psum time collapses from `2.788` to `0.0285 ms` and
+busy time from `4.690` to `1.902 ms`. Thus the old physical-psum duration was arrival skew, and
+feature sharding removes it. DB/archive/hash/remote-SUCCESS and 8/8 cleanup pass. Promote this
+routed ownership into the complete PP8 runtime artifact; no decoder or tok/s claim exists yet.
