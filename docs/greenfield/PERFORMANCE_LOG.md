@@ -570,3 +570,24 @@ All decoder metadata and direct-load invariants pass. Final DB/archive `SUCCESS`
 finalizer required a device-dequantization field that this loader version did not emit. The HLO,
 eight records, diagnostic archive, and clean 8/8 failure census are preserved, but the run remains
 evidence-rejected and has no DB row.
+
+## 2026-08-06 — protected complete feature-body attribution
+
+DB 442 / `greenfield_short_decoder_compile_pp8_pallas_feature_trace2_20260806T092025101122999Z`
+at `0cd5209` successfully sealed the corrected loader metric and a profiler-after-wall fleet trace.
+The one profiler-free body sample is `58,804.002894 ms`; this is body-only diagnostic wall, not a
+token or tok/s result. Compile max is `169.123 s` and peak HBM is `26,144,010,752` bytes/chip.
+
+Eight XPlanes cover 64 cores and two selected steps/core. Mean device step/busy time is
+`56,722.255839/54,643.549475 ms`. The profiler attributes `47,294.061096 ms` to 16 compact
+stage-permute start/done regions and `7,318.308852 ms` to gather/scatter. The former is serial
+pipeline waiting: dequant gather signatures alone total `7,317.697973 ms` per average core, and
+eight PP8 stages imply `58,541.584 ms`, within 0.45% of profiler-free wall. Caller attribution is:
+attention output `3,353.665`, shared q_a `1,616.121`, q_b `1,077.740`, kv_b `477.370`, kv_a
+`413.463`, dense `283.205`, DSA wq_b `69.072`, and DSA wk `27.063 ms/core`. Feature-MoE costs
+`14.784 ms/core`. Therefore whole-matrix reference FP8 dequantization is the immediate 2K floor;
+the permutes and local ICI are not optimization targets.
+
+HLO `7ef2b071...f59a` passes exact local collectives and feature-kernel counts. Summary/XPlane
+summary SHAs are `0361d44e...64e1` / `91a424fc...d17`. Approved archive/remote `SUCCESS`, DB
+linkage, and 8/8 cleanup pass. The result remains performance-rejected and does not complete Gate D.

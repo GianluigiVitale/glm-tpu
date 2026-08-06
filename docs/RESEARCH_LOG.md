@@ -4746,3 +4746,29 @@ projection graphs. The feature change reduced reference-body expansion from 192,
 instructions, 2.707M to 1.196M bundles, and 580 to 389 overlays, but body wall remains catastrophic.
 The next protected run uses one profiler-free sample followed by a fresh two-step/8-host XPlane to
 attribute exact non-MoE time before implementing the specification's remaining Pallas order.
+
+## 2026-08-06 09:36 — Fleet XPlane proves whole-matrix FP8 dequantization is the 58.8-second floor
+
+DB 442 / `greenfield_short_decoder_compile_pp8_pallas_feature_trace2_20260806T092025101122999Z`
+at `0cd5209` is the corrected, sealed protected attribution run. One profiler-free sample records
+fleet-max body wall `58,804.002894 ms`; the following fresh trace contains eight XPlanes, 64 cores,
+and two selected steps/core. Mean device step is `56,722.255839 ms`, busy time is
+`54,643.549475 ms`, and trace data outside selected steps is only `0.020975 ms/step`.
+
+XPlane labels `47,294.061096 ms` (`86.55%` busy) as the 16 compact stage-permute start/done regions
+and `7,318.308852 ms` (`13.39%`) as gather/scatter. The first number is pipeline backpressure, not
+wire time: PP8 executes one stage at a time, so inactive stages wait at their permutes. All
+whole-matrix dequant gather signatures total `7,317.697973 ms` per average core; multiplied by the
+eight serial stages this is `58,541.584 ms`, within 0.45% of profiler-free body wall. The largest
+callers are attention output `3,353.665`, shared q_a `1,616.121`, q_b `1,077.740`, kv_b `477.370`,
+and kv_a `413.463 ms/core`. Dense contributes about `283.205`, DSA wq_b/wk `69.072/27.063`, and
+the already-Pallas feature MoE only `14.784 ms/core`. This directly supersedes any interpretation
+that the tiny stage payload or local layer collectives consume 47 seconds.
+
+HLO `7ef2b071...f59a` passes exact `219AG/294AR/16CP`, 75 of each selected feature-MoE kernel,
+four-chip layer groups, and no decoded expert overlay. Compile max is `169.123 s`; peak HBM remains
+`26,144,010,752` bytes/chip. Summary SHA `0361d44e...64e1`, XPlane-summary SHA
+`91a424fc...d17`, DB linkage, approved archive/remote `SUCCESS`, and authenticated 8/8 cleanup
+pass. This is body attribution, not a decoder/token/tok/s pass. Continue Section 7.2 in order: DSA
+scorer, exact top-k, selected-KV+sparse attention, then raw-FP8 stage-local linear fusion that
+removes the measured gathers.

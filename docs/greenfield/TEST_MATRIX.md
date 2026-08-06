@@ -40,7 +40,8 @@
 | Final-layout Pallas one-layer pack/load | Manifest `3da63bd9...e427`; exact source transforms; four final-owner raw files; 56 direct transfers; zero dequant/concat/runtime transpose | Pass |
 | Exact raw-FP8 Pallas PP8 MoE layer | DB 438 baseline plus DB 439 fused-routed: exact routes, bounded normal/concentrated outputs, three raw-U8 kernels, one local combine, no overlay, HBM/wall/XPlane/DB/archive/cleanup; 3.121940/7.063344 ms p50. DB 440 fully fused shared too but regressed 0.8–1.5%. | Correctness/layout/locality pass; DB 439 selected, latency still rejected |
 | Gate D feature-body diagnostic | Eight-host real 78-layer/2K execution at `a8194cd`; exact feature HLO/local groups/metadata/direct load; 58,804.040 ms p50, 26.144 GB peak HBM/chip; outer finalizer schema failure means no DB/SUCCESS | Evidence-rejected; non-MoE reference projection/dequant path requires XPlane attribution and Pallas replacement |
-| Gate D implementation | All-78-layer schedule/state; complete feature runtime; exact local HLO/metadata; real body executes but takes 58.804 s | In progress; trace and replace non-MoE reference projection/dequant paths before complete tokens |
+| Gate D feature-body XPlane | DB 442: one clean wall sample then 8 files/64 cores/2 trace steps; 58,804.003 ms wall; dequant gather 7,317.698 ms/core x 8 serial stages = 58,541.584 ms; exact HLO/HBM/DB/archive/cleanup | Attribution pass; performance rejected; compact permute duration is pipeline wait, not bandwidth |
+| Gate D implementation | All-78-layer schedule/state; complete feature runtime; exact local HLO/metadata; real body executes but takes 58.804 s | In progress; follow Section 7.2 DSA/top-k/selected-KV/linear Pallas order before complete tokens |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |
 

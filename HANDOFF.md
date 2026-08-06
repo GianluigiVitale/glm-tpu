@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 07:26 UTC
+**Updated:** 2026-08-06 09:36 UTC
 
 ## Authority and isolation
 
@@ -388,12 +388,14 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Capture and parse the fresh two-step/8-host XPlane for the rejected `58.804 s` feature-body.
-   Attribute dense, DSA/top-k, selected-KV/attention, MoE, collectives, and inactive-stage time.
-   The strongest source/HLO diagnosis is whole-matrix FP8 dequant/reference projection expansion
-   outside MoE; do not tune collectives because all 513 layer gathers/reduces are PP8-local.
-2. Replace the trace-proven dominant non-MoE reference paths in the specification's Pallas order,
-   rerun exact Gate-C oracles, then repeat the protected body until `<=200 ms` is plausible.
+1. Implement the remaining kernels in Section 7.2's binding order: DSA scorer, exact top-k,
+   selected-KV gather+sparse attention, then stage-local RMSNorm/raw-FP8 linear fusion. DB 442
+   proves that the last item removes the immediate 58.8-second 2K floor, but do not skip the
+   preceding correctness-critical long-context kernels. Require reference/CPU/TPU/tail/dtype/HLO/
+   microbenchmark/fallback evidence for each.
+2. Rerun exact Gate-C oracles after each integrated path, then repeat the protected 78-layer body.
+   The immediate trace target is removal of `reference/fp8.py:69-70` whole-matrix gathers; do not
+   tune the compact stage permutes or local layer collectives.
 3. Add embedding, final norm, distributed logits/greedy token return, then prove complete 2K/8K
    Gate D with raw tokens, exact DSA/cache state, local-only HLO, measured HBM, fresh trace, and
    profiler-free steady wall. Do not attempt 128K/256K before Gate D passes.
@@ -401,6 +403,29 @@ enough; stage-local model layout remains the structural requirement.
    then continue Gates E-H in binding order. No body-only result is a decoder or tok/s claim.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.
+
+## Protected feature-body attribution
+
+DB 442 / `greenfield_short_decoder_compile_pp8_pallas_feature_trace2_20260806T092025101122999Z`
+at `0cd5209` is the successful, sealed attribution run. One profiler-free sample records fleet-max
+body p50 `58,804.002894 ms`; this remains transformer body only, not token latency or tok/s. The
+fresh trace contains eight XPlanes / 64 cores / two steps per core. Mean device step is
+`56,722.255839 ms`, with `54,643.549475 ms` busy per step.
+
+XPlane assigns `47,294.061096 ms` (`86.55%` busy) to the 16 compact stage
+`collective-permute` start/done regions and `7,318.308852 ms` (`13.39%`) to gather/scatter. This is
+pipeline backpressure, not a 47-second transfer: only the active stage computes while the other
+stages wait at the permutes, and all dequant gather signatures total `7,317.697973 ms` per average
+core. Eight serial PP8 stages therefore predict `58,541.584 ms`, within 0.45% of body wall. The
+largest callers are attention output (`3,353.665 ms/core`), shared q_a (`1,616.121`), q_b
+(`1,077.740`), kv_b (`477.370`), and kv_a (`413.463`). Feature-MoE is only `14.784 ms/core` in the
+trace. Thus whole-matrix reference FP8 dequantization, not ICI bandwidth or MoE, is the immediate
+2K critical path.
+
+HLO `7ef2b071...f59a` retains exact `219AG/294AR/16CP`, 75 of each feature-MoE Pallas kernel, local
+four-chip layer groups, and no decoded expert overlay. Compile max is `169.123 s`; peak HBM is
+`26,144,010,752` bytes/chip. Summary SHA is `0361d44e...64e1`, XPlane-summary SHA
+`91a424fc...d17`, approved archive/remote `SUCCESS`, DB integrity linkage, and 8/8 cleanup pass.
 
 ## Rejected complete feature-body diagnostic
 

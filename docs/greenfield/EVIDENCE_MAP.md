@@ -249,3 +249,15 @@ preserves eight host records, optimized HLO `64df6dc7...2ea0`, exact local colle
 contracts, correct decoder metadata, measured HBM, and authenticated clean failure census. Body
 p50/p99 is `58,804.040/58,804.323 ms`. The outer finalizer failed on a missing explicit-zero loader
 metric, so there is no DB row or remote `SUCCESS`; this is rejected diagnostic evidence only.
+
+## Protected complete feature-body attribution
+
+DB 442 / `greenfield_short_decoder_compile_pp8_pallas_feature_trace2_20260806T092025101122999Z`
+at `0cd5209` seals one profiler-free 78-layer/2K body sample (`58,804.002894 ms`) followed by eight
+fresh XPlanes / 64 cores / two steps per core. XPlane mean device step is `56,722.255839 ms` and
+busy time is `54,643.549475 ms`. Compact stage-permute regions account for `47,294.061096 ms` of
+waiting while whole-matrix FP8 dequant gathers account for `7,317.697973 ms` per average core.
+Eight serial stages predict `58,541.584 ms`, identifying reference weight dequantization as the
+critical path rather than transfer bandwidth. Attention o/q_a/q_b are the top three callers.
+Exact local HLO, feature kernel counts, HBM, hashes, approved archive/remote `SUCCESS`, DB linkage,
+and clean 8/8 census pass. This is attribution evidence only, not Gate D or token-speed evidence.
