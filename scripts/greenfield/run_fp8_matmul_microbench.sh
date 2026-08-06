@@ -29,9 +29,9 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing FP8 kernel run from a dirty worktree" >&2
   exit 2
 }
-[[ $KERNEL == single_up || $KERNEL == up_gate || \
+[[ $KERNEL == single_up || $KERNEL == rmsnorm_linear || $KERNEL == up_gate || \
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down ]] || {
-  echo "FP8 kernel must be single_up, up_gate, selected_up_gate," \
+  echo "FP8 kernel must be single_up, rmsnorm_linear, up_gate, selected_up_gate," \
     "or selected_swiglu_down" >&2
   exit 2
 }
@@ -106,6 +106,8 @@ strict_census pre || {
 
 say "compiling and timing GLM expert $KERNEL projection on TPU v4"
 started=$(date +%s)
+ROWS=8
+[[ $KERNEL != rmsnorm_linear ]] || ROWS=1
 (
   cd "$WORKTREE"
   JAX_PLATFORMS=tpu \
@@ -119,6 +121,7 @@ started=$(date +%s)
       --output "$RUN_DIR/runner.json" \
       --hlo-output "$RUN_DIR/hlo/fp8_matmul.optimized_hlo.txt" \
       --kernel "$KERNEL" \
+      --rows "$ROWS" \
       --selected-route-case "$SELECTED_CASE" \
       --warmup "$WARMUP" \
       --iterations "$ITERATIONS"
@@ -178,7 +181,11 @@ pv.record_item(
         (
             "m8_k2048_n6144"
             if runner["kernel"] == "selected_swiglu_down"
-            else "m8_k6144_n2048"
+            else (
+                "m1_k6144_n2048"
+                if runner["kernel"] == "rmsnorm_linear"
+                else "m8_k6144_n2048"
+            )
         )
         + (
             "_" + runner["selected_route_case"]

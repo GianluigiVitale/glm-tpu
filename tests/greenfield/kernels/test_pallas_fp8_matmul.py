@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import jax
-from jax import lax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax import lax
 
 from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
@@ -12,12 +12,14 @@ from glm_tpu.greenfield.kernels.pallas import (
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
+    fp8_rmsnorm_block_matmul,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
 )
 from glm_tpu.greenfield.kernels.reference.fp8 import (
     dequantize_fp8_bits_block_weight,
 )
+from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
 
 
 def _bits(values: jax.Array) -> jax.Array:
@@ -80,6 +82,97 @@ def test_fp8_block_matmul_rejects_shape_and_dtype_drift() -> None:
             bits,
             scale,
             config=Fp8BlockMatmulConfig(contraction_tile=512),
+            interpret=True,
+        )
+
+
+@pytest.mark.parametrize("shape", [(1, 128, 128), (1, 130, 135)])
+def test_fp8_rmsnorm_block_matmul_interpret_matches_exact_reference(
+    shape: tuple[int, int, int],
+) -> None:
+    rows, contraction, output = shape
+    hidden = jnp.asarray(
+        np.linspace(-0.875, 0.625, rows * contraction, dtype=np.float32).reshape(
+            rows, contraction
+        ),
+        dtype=jnp.bfloat16,
+    )
+    norm_weight = jnp.asarray(
+        np.linspace(0.5, 1.5, contraction, dtype=np.float32),
+        dtype=jnp.bfloat16,
+    )
+    linear_values = np.arange(
+        output * contraction, dtype=np.float32
+    ).reshape(output, contraction)
+    weight_bits = _bits(jnp.asarray(np.sin(linear_values * 0.013) * 0.5))
+    scale_shape = (
+        (output + 127) // 128,
+        (contraction + 127) // 128,
+    )
+    scale = jnp.asarray(
+        np.linspace(0.25, 0.875, np.prod(scale_shape), dtype=np.float32).reshape(
+            scale_shape
+        )
+    )
+    normalized = rms_norm(hidden, norm_weight, epsilon=1e-5)
+    decoded = dequantize_fp8_bits_block_weight(weight_bits, scale)
+    expected = lax.dot_general(
+        normalized,
+        decoded,
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+    actual = fp8_rmsnorm_block_matmul(
+        hidden,
+        norm_weight,
+        weight_bits,
+        scale,
+        epsilon=1e-5,
+        interpret=True,
+    )
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+
+
+def test_fp8_rmsnorm_block_matmul_rejects_contract_drift() -> None:
+    hidden = jnp.ones((1, 128), dtype=jnp.bfloat16)
+    norm_weight = jnp.ones((128,), dtype=jnp.bfloat16)
+    bits = jnp.zeros((128, 128), dtype=jnp.uint8)
+    scale = jnp.ones((1, 1), dtype=jnp.float32)
+
+    with pytest.raises(ValueError, match="one decode row"):
+        fp8_rmsnorm_block_matmul(
+            jnp.ones((2, 128), dtype=jnp.bfloat16),
+            norm_weight,
+            bits,
+            scale,
+            epsilon=1e-5,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="contraction width"):
+        fp8_rmsnorm_block_matmul(
+            hidden,
+            jnp.ones((127,), dtype=jnp.bfloat16),
+            bits,
+            scale,
+            epsilon=1e-5,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="weight must be BF16"):
+        fp8_rmsnorm_block_matmul(
+            hidden,
+            norm_weight.astype(jnp.float32),
+            bits,
+            scale,
+            epsilon=1e-5,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="epsilon must be positive"):
+        fp8_rmsnorm_block_matmul(
+            hidden,
+            norm_weight,
+            bits,
+            scale,
+            epsilon=0.0,
             interpret=True,
         )
 

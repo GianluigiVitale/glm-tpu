@@ -18,8 +18,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import jax
-from jax import lax
 import jax.numpy as jnp
+from jax import lax
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
@@ -365,6 +365,202 @@ def fp8_block_matmul(
         ),
     )
     return call(lhs, weight_fp8, scale_table)[:rows, :output]
+
+
+def fp8_rmsnorm_block_matmul(
+    hidden: Any,
+    norm_weight: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    epsilon: float,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Fuse exact batch-one RMSNorm pointwise work into a raw-FP8 linear.
+
+    The FP32 square/mean/rsqrt reduction remains an ordinary JAX reduction.
+    The Pallas call consumes the original BF16 row plus that one FP32 inverse
+    RMS value, performs the contract's BF16 rounding and norm-weight multiply
+    in VMEM, and immediately feeds the result to the raw-FP8 matmul.  No
+    normalized activation or decoded weight matrix is materialized in HBM.
+    """
+
+    rows, contraction, output = _validate_inputs(
+        hidden, weight_bits, scale, config
+    )
+    if rows != 1:
+        raise ValueError("fused stage-local RMSNorm requires one decode row")
+    if norm_weight.shape != (contraction,):
+        raise ValueError(
+            "RMSNorm weight must match the linear contraction width"
+        )
+    if norm_weight.dtype != jnp.bfloat16:
+        raise ValueError("fused stage-local RMSNorm weight must be BF16")
+    if (
+        not isinstance(epsilon, (int, float))
+        or isinstance(epsilon, bool)
+        or epsilon <= 0
+    ):
+        raise ValueError("fused stage-local RMSNorm epsilon must be positive")
+
+    padded_rows = _ceil_div(rows, config.row_tile) * config.row_tile
+    padded_contraction = (
+        _ceil_div(contraction, config.contraction_tile)
+        * config.contraction_tile
+    )
+    padded_output = _ceil_div(output, config.output_tile) * config.output_tile
+    hidden_f32 = hidden.astype(jnp.float32)
+    inverse_rms = lax.rsqrt(
+        jnp.mean(lax.square(hidden_f32), axis=-1, keepdims=True)
+        + jnp.float32(epsilon)
+    )
+    hidden = jnp.pad(
+        hidden,
+        ((0, padded_rows - rows), (0, padded_contraction - contraction)),
+    )
+    inverse_rms = jnp.pad(inverse_rms, ((0, padded_rows - rows), (0, 0)))
+    norm_weight = jnp.pad(
+        norm_weight, (0, padded_contraction - contraction)
+    )[None, :]
+    weight_bits = jnp.pad(
+        weight_bits,
+        (
+            (0, padded_output - output),
+            (0, padded_contraction - contraction),
+        ),
+    )
+    weight_fp8 = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
+    output_tiles = padded_output // config.output_tile
+    contraction_tiles = padded_contraction // config.contraction_tile
+    scale_table = _aligned_scale_table(
+        scale,
+        output_tiles=output_tiles,
+        contraction_tiles=contraction_tiles,
+    )
+
+    def kernel(
+        hidden_ref: Any,
+        norm_ref: Any,
+        inverse_rms_ref: Any,
+        weight_ref: Any,
+        scale_ref: Any,
+        output_ref: Any,
+        accumulator_ref: Any,
+    ) -> None:
+        contraction_index = pl.program_id(1)
+
+        @pl.when(contraction_index == 0)
+        def initialize_accumulator() -> None:
+            accumulator_ref[...] = jnp.zeros_like(accumulator_ref)
+
+        output_index = pl.program_id(0)
+        normalized = (
+            hidden_ref[...].astype(jnp.float32)
+            * inverse_rms_ref[...].astype(jnp.float32)
+        ).astype(jnp.bfloat16)
+        normalized = (
+            normalized * norm_ref[...].astype(jnp.bfloat16)
+        ).astype(jnp.bfloat16)
+        scale_value = _scale_value(
+            scale_ref[...], contraction_index, output_index
+        )
+        decoded_weight = (
+            weight_ref[...].astype(config.accumulator_dtype)
+            * scale_value.astype(config.accumulator_dtype)
+        ).astype(jnp.bfloat16)
+        accumulator_ref[...] += lax.dot_general(
+            normalized,
+            decoded_weight,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=config.accumulator_dtype,
+        )
+
+        @pl.when(contraction_index == contraction_tiles - 1)
+        def store_output() -> None:
+            output_ref[...] = accumulator_ref[...].astype(config.output_dtype)
+
+    def contraction_index(
+        output_index: Any, contraction_index_value: Any
+    ) -> tuple[int, Any]:
+        del output_index
+        return 0, contraction_index_value
+
+    def weight_index(
+        output_index: Any, contraction_index_value: Any
+    ) -> tuple[Any, Any]:
+        return output_index, contraction_index_value
+
+    def output_index(
+        output_index_value: Any, contraction_index_value: Any
+    ) -> tuple[int, Any]:
+        del contraction_index_value
+        return 0, output_index_value
+
+    def scale_index(
+        output_index_value: Any, contraction_index_value: Any
+    ) -> tuple[Any, int]:
+        del output_index_value
+        return contraction_index_value // jnp.int32(8), 0
+
+    call = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct(
+            (padded_rows, padded_output), config.output_dtype
+        ),
+        grid=(output_tiles, contraction_tiles),
+        in_specs=(
+            pl.BlockSpec(
+                (padded_rows, config.contraction_tile), contraction_index
+            ),
+            pl.BlockSpec((1, config.contraction_tile), contraction_index),
+            pl.BlockSpec((padded_rows, 1), lambda *_: (0, 0)),
+            pl.BlockSpec(
+                (config.output_tile, config.contraction_tile), weight_index
+            ),
+            pl.BlockSpec((8, 128), scale_index),
+        ),
+        out_specs=pl.BlockSpec(
+            (padded_rows, config.output_tile), output_index
+        ),
+        scratch_shapes=(
+            pltpu.VMEM(
+                (padded_rows, config.output_tile),
+                config.accumulator_dtype,
+            ),
+        ),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel", "arbitrary"),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_rmsnorm_block_matmul_"
+            f"m{padded_rows}_k{padded_contraction}_n{padded_output}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=(
+                2 * padded_rows * padded_contraction * padded_output
+                + 4 * rows * contraction
+            ),
+            bytes_accessed=(
+                padded_rows * padded_contraction * 2
+                + padded_contraction * 2
+                + rows * 4
+                + padded_output * padded_contraction
+                + output_tiles * contraction_tiles * 4
+                + padded_rows * padded_output * 2
+            ),
+            transcendentals=rows,
+        ),
+    )
+    return call(
+        hidden,
+        norm_weight,
+        inverse_rms,
+        weight_fp8,
+        scale_table,
+    )[:rows, :output]
 
 
 def fp8_block_up_gate(

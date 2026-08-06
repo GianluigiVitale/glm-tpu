@@ -4,17 +4,16 @@
 from __future__ import annotations
 
 import argparse
-from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from hashlib import sha256
+from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
@@ -114,6 +113,7 @@ def parse_args() -> argparse.Namespace:
         "--kernel",
         choices=(
             "single_up",
+            "rmsnorm_linear",
             "up_gate",
             "selected_up_gate",
             "selected_swiglu_down",
@@ -139,27 +139,35 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
-    if args.rows != 8 or args.contraction != 6144 or args.output_width != 2048:
+    expected_rows = 1 if args.kernel == "rmsnorm_linear" else 8
+    if (
+        args.rows != expected_rows
+        or args.contraction != 6144
+        or args.output_width != 2048
+    ):
         raise ValueError(
-            "protected metal proof is fixed to GLM hidden=6144/intermediate=2048"
+            "protected metal proof is fixed to its production decode shape: "
+            f"rows={expected_rows}, hidden=6144, output=2048"
         )
     if args.warmup < 200 or args.iterations < 1000:
         raise ValueError("protected FP8 microbenchmark requires 200/1000 samples")
 
     import jax
-    from jax import lax
     import jax.numpy as jnp
     import ml_dtypes
+    from jax import lax
 
     from glm_tpu.greenfield.kernels.pallas import (
         fp8_block_matmul,
         fp8_block_up_gate,
+        fp8_rmsnorm_block_matmul,
         fp8_selected_swiglu_down,
         fp8_selected_up_gate,
     )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
         dequantize_fp8_bits_block_weight,
     )
+    from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
 
     if jax.default_backend() != "tpu":
         raise RuntimeError(f"FP8 metal proof requires TPU, got {jax.default_backend()}")
@@ -176,7 +184,7 @@ def main() -> int:
         "selected_swiglu_down",
     )
 
-    lhs_rows = 1 if args.kernel == "selected_up_gate" else rows
+    lhs_rows = 1 if args.kernel in ("selected_up_gate", "rmsnorm_linear") else rows
     lhs_host = (
         np.sin(np.arange(lhs_rows * contraction, dtype=np.float32) * 0.0037)
         .reshape(lhs_rows, contraction)
@@ -279,11 +287,32 @@ def main() -> int:
         lhs = jax.device_put(lhs_host, device)
         weight_bits = jax.device_put(weight_host, device)
         scale = jax.device_put(scale_host, device)
+        reference_lhs = lhs
         if args.kernel == "single_up":
             kernel = fp8_block_matmul
             kernel_inputs = (lhs, weight_bits, scale)
             reference_inputs = (("up", weight_bits, scale),)
             kernel_hlo_name = "greenfield_fp8_block_matmul"
+        elif args.kernel == "rmsnorm_linear":
+            norm_weight_host = np.linspace(
+                0.5, 1.5, contraction, dtype=np.float32
+            ).astype(ml_dtypes.bfloat16)
+            norm_weight = jax.device_put(norm_weight_host, device)
+            kernel_inputs = (
+                lhs,
+                norm_weight,
+                weight_bits,
+                scale,
+            )
+
+            def kernel(*values: Any) -> Any:
+                return fp8_rmsnorm_block_matmul(
+                    *values, epsilon=1e-5
+                )
+
+            reference_lhs = rms_norm(lhs, norm_weight, epsilon=1e-5)
+            reference_inputs = (("rmsnorm_linear", weight_bits, scale),)
+            kernel_hlo_name = "greenfield_fp8_rmsnorm_block_matmul"
         elif args.kernel == "up_gate":
             gate_bits = jax.device_put(gate_weight_host, device)
             gate_scale = jax.device_put(gate_scale_host, device)
@@ -598,6 +627,7 @@ def main() -> int:
         actual_raw = compiled(*kernel_inputs)
         single_output_kernel = args.kernel in (
             "single_up",
+            "rmsnorm_linear",
             "selected_swiglu_down",
         )
         actual_values = (actual_raw,) if single_output_kernel else tuple(actual_raw)
@@ -615,7 +645,7 @@ def main() -> int:
                 )
                 expected_values.append(
                     lax.dot_general(
-                        lhs,
+                        reference_lhs,
                         decoded,
                         dimension_numbers=(((1,), (1,)), ((), ())),
                         preferred_element_type=jnp.float32,
@@ -764,6 +794,11 @@ def main() -> int:
         "shape": shape_record,
         "dtype_contract": {
             "lhs": "bfloat16",
+            "rmsnorm": (
+                "fp32-square-mean-rsqrt;bf16-round;bf16-weight"
+                if args.kernel == "rmsnorm_linear"
+                else None
+            ),
             "activation": (
                 "bfloat16-swiglu"
                 if args.kernel == "selected_swiglu_down"
