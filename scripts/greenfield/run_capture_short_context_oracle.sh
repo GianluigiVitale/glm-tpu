@@ -150,8 +150,11 @@ for path in sorted(root.rglob("*")):
     remote = json.loads(completed.stdout)
     if int(remote["size"]) != path.stat().st_size:
         raise SystemExit(f"remote size mismatch: {relative}")
+    crc32c = remote.get("crc32c_hash") or remote.get("crc32c")
+    if not crc32c:
+        raise SystemExit(f"remote CRC32C is missing: {relative}")
     records.append({
-        "crc32c": remote["crc32c"],
+        "crc32c": crc32c,
         "generation": remote["generation"],
         "path": relative,
         "size": int(remote["size"]),
