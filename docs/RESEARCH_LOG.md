@@ -4633,3 +4633,20 @@ Verdict: correctness/layout/locality gate passes, performance does not. This is 
 tok/s. The measured next target is kernel-boundary/launch elimination: fuse selected
 gate/up+SwiGLU+down, then shared gate/up+SwiGLU+down if needed, and rerun the same protected oracle
 and HLO contract before building the short decoder.
+
+## 2026-08-06 05:24 — Routed fusion passes but synchronization still dominates
+
+DB 439 / `greenfield_real_layer_pp8_pallas_20260806T052141734174170Z` at `fb04875` fuses selected
+gate/up, exact BF16 SwiGLU, and selected down in one Pallas call, retaining gate/up only in VMEM.
+Exact CPU interpreter and four-device stage parity passed before the protected run. The real TPU
+HLO `918bbabd...826f` drops four raw-U8 calls to three, seven bounded gathers to five, and removes
+both bitpacked gather/scatter helpers. It retains exactly one local four-chip all-reduce and no
+decoded overlay.
+
+Normal/concentrated p50 moves only `3.164060/7.171980 -> 3.121940/7.063344 ms` (`1.33%/1.51%`).
+Routes and bounded outputs remain exact; peak HBM is 2.431 GB/chip. DB 439, the fresh XPlane,
+approved archive/remote SUCCESS, hashes, and 8/8 census pass. The XPlane still measures
+`2.787760 ms` physical psum per alternating step, `59.4%` of `4.690090 ms` busy time. Therefore
+the removed routed HBM/launch boundary was real but secondary. Complete the small shared boundary
+fusion; if it is also marginal, shift directly to route-imbalance/collective-arrival skew. No
+decoder or tok/s claim exists.

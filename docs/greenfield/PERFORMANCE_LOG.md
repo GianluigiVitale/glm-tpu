@@ -454,6 +454,31 @@ and four sequential Pallas launches/boundaries remain. Next evidence must fuse t
 gate/up/SwiGLU/down boundary, then the shared boundary if required, and repeat DB 438's complete
 real-layer gate.
 
+## 2026-08-06 — fused selected routed real MoE layer
+
+Protected DB 439 / `greenfield_real_layer_pp8_pallas_20260806T052141734174170Z` passed at
+`fb04875`. One raw-U8 Pallas call now performs selected gate/up, exact BF16 SwiGLU, and down; the
+two gate/up route tables remain VMEM scratch and never cross an HBM/launch boundary.
+
+| case | p50 | p90 | p95 | p99 | mean | change vs DB 438 |
+|---|---:|---:|---:|---:|---:|---:|
+| normal all-slot routes | 3.121940 | 3.143600 | 3.150629 | 3.178332 | 3.123250 ms | -1.33% |
+| concentrated slot-2 routes | 7.063344 | 7.085381 | 7.094795 | 7.131541 | 7.066779 ms | -1.51% |
+
+Routes remain elementwise exact and output max/p99/mean error remains at most
+`0.03125/0.01171875/0.002444`. HLO SHA `918bbabd...826f` has three raw-U8 Pallas calls, five
+bounded gather markers, no bitpacked gather/scatter helper, three exact local `ConcatBitcast`
+layouts, one `bf16[2,1,6144]` all-reduce over `{{0,1,2,3}}`, and no decoded overlay. Compile is
+`1.534 s`; generated code falls from 1,812,992 to 1,544,704 bytes and measured peak HBM is
+2,431,378,432 bytes/chip. Fresh XPlane step/busy/physical-psum time is
+`5.047/4.690/2.788 ms`; psum remains `59.4%` of busy time. DB/archive/hashes/remote `SUCCESS` and
+8/8 cleanup pass.
+
+The boundary elimination is valid but not the dominant bottleneck. Fuse the smaller shared
+gate/up/SwiGLU/down boundary once; if its wall effect is similarly marginal, prioritize the
+measured route-imbalance/collective-arrival skew rather than further launch-only polishing. This
+remains a layer result, not decoder latency or tok/s.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

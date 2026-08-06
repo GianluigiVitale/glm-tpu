@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 05:06 UTC
+**Updated:** 2026-08-06 05:24 UTC
 
 ## Authority and isolation
 
@@ -71,6 +71,17 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   collective. Compile is `1.674 s`; measured peak HBM is 2,431,646,720 bytes/chip. Fresh XPlane,
   DB/archive/hashes/remote `SUCCESS`, and 8/8 cleanup pass. This is the first correct no-overlay
   real MoE layer, but its latency is performance-rejected pending kernel-boundary fusion.
+- Protected fused-routed proof DB 439 /
+  `greenfield_real_layer_pp8_pallas_20260806T052141734174170Z` passed at `fb04875`. One Pallas call
+  now performs selected gate/up, exact BF16 SwiGLU, and down with gate/up retained only in VMEM.
+  Normal/concentrated p50 is `3.121940/7.063344 ms`, only `1.3%/1.5%` faster than DB 438. Exact
+  routes, bounded outputs, peak HBM 2,431,378,432 bytes/chip, archive, and 8/8 cleanup pass. HLO
+  `918bbabd...826f` drops from four to three raw-U8 calls, seven to five bounded gathers, and two to
+  zero bitpacked gather/scatters while retaining one exact local all-reduce and no overlay. Fresh
+  XPlane still spends `2.788/4.690 ms` per alternating step in the physical psum (`59.4%` of busy
+  time). The routed boundary was real but not dominant. Fuse the small shared boundary next; if
+  that remains marginal, stop launch polishing and attack measured route-imbalance/collective
+  arrival skew before integrating the short decoder. No decoder or tok/s result exists yet.
 - Final-layout PP16 artifact `greenfield_one_layer_pack_pp16_20260805T172003732526347Z` writes
   two independently hashed 4,855,045,080-byte files at pack code `51d1df9`: experts
   `0:128/128:256`, shared intermediate `0:1024/1024:2048`, manifest
