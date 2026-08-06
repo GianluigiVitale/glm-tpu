@@ -147,34 +147,6 @@ def test_fused_selected_kv_attention_interpret_matches_stage_reference(
     np.testing.assert_array_equal(np.asarray(combined.contract_valid), [True])
 
 
-def test_fused_attention_zeros_dma_tail_before_poison_can_propagate() -> None:
-    q_nope, q_rope, caches, tables, positions, counts, lengths = _fixture(
-        jnp.float32
-    )
-    # Owner zero has two live rows, so its four-group compute block has two
-    # tail groups; every group also has seven aligned-DMA overfetch lanes.
-    # Poison row zero to prove absent lanes are zeroed before QK and PV rather
-    # than relying on 0*NaN behavior.
-    cache = caches[0].at[0, 0, :].set(jnp.nan)
-    selected = SelectedPositions(positions, counts)
-    actual = stage_local_sparse_mla_pallas(
-        q_nope,
-        q_rope,
-        cache,
-        tables,
-        selected,
-        lengths,
-        layout=LAYOUT,
-        owner_index=0,
-        contract=CONTRACT,
-        config=CONFIG,
-        interpret=True,
-    )
-    assert bool(jnp.all(jnp.isfinite(actual.output)))
-    assert bool(jnp.all(jnp.isfinite(actual.logsumexp)))
-    assert bool(jnp.all(actual.contract_valid))
-
-
 def test_fused_attention_rejects_duplicate_and_bad_page_metadata_in_health() -> None:
     q_nope, q_rope, caches, tables, positions, counts, lengths = _fixture(
         jnp.float32

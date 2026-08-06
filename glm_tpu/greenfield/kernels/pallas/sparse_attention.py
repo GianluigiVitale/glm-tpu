@@ -416,23 +416,20 @@ def _fused_selected_kv_attention_pallas(
                 dma_lane_ref[...]
             )
             live_groups = group_slots[:, None] < valid_count
-            selected_and_live = selected_lanes & live_groups
-            # The TPU-v4 VMEM tile requires eight-row DMA slices. Keep only the
-            # selected dynamic lane from each group and zero all overfetch and
-            # tail lanes before both QK and PV, including poisoned padding.
-            cache_tile = jnp.where(
-                lax.broadcast_in_dim(
-                    selected_and_live,
-                    (segment_block, dma_rows, cache_width),
-                    (0, 1),
-                ),
+            # Select one dynamic lane per eight-row DMA group with a batched
+            # one-hot contraction. This avoids Mosaic's unsupported rank-three
+            # predicate broadcast while keeping overfetch entirely in VMEM.
+            selected_cache = lax.dot_general(
+                selected_lanes.astype(cache_tile_ref.dtype),
                 cache_tile_ref[...],
-                jnp.zeros((), cache_tile_ref.dtype),
+                dimension_numbers=(((1,), (1,)), ((0,), (0,))),
+                precision=precision,
             )
-            # Exactly one lane is nonzero per live group, so this tiled VMEM
-            # reduction is an exact compaction to the original 128 selected
-            # rows and restores one-contracting-dimension MXU operations.
-            selected_cache = jnp.sum(cache_tile, axis=1)
+            selected_cache = jnp.where(
+                live_groups,
+                selected_cache,
+                jnp.zeros((), selected_cache.dtype),
+            )
             query_packed = jnp.concatenate(
                 (
                     query_nope_ref[...],
@@ -475,7 +472,7 @@ def _fused_selected_kv_attention_pallas(
                 + jnp.sum(probabilities, axis=1, keepdims=True)
             )
             partial = lax.dot_general(
-                probabilities.astype(cache_tile.dtype),
+                probabilities.astype(selected_cache.dtype),
                 selected_cache[:, :latent],
                 dimension_numbers=(((1,), (0,)), ((), ())),
                 precision=precision,
