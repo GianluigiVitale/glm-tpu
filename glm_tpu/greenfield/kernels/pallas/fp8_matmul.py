@@ -698,26 +698,30 @@ def fp8_selected_up_gate(
 
             @pl.when(active_value[route_index])
             def accumulate_route() -> None:
-                gate_value = jnp.repeat(
-                    gate_scale_ref[...].reshape(
-                        contraction_blocks_per_tile, config.output_tile
-                    ),
-                    config.block_shape[1],
-                    axis=0,
-                )
-                up_value = jnp.repeat(
-                    up_scale_ref[...].reshape(
-                        contraction_blocks_per_tile, config.output_tile
-                    ),
-                    config.block_shape[1],
-                    axis=0,
-                )
                 decoded_gate = (
-                    gate_ref[...].astype(config.accumulator_dtype) * gate_value
-                ).astype(jnp.bfloat16)
+                    gate_ref[...]
+                    .astype(config.accumulator_dtype)
+                    .reshape(
+                        contraction_blocks_per_tile,
+                        config.block_shape[1],
+                        config.output_tile,
+                    )
+                    * gate_scale_ref[...].astype(config.accumulator_dtype)
+                ).reshape(config.contraction_tile, config.output_tile).astype(
+                    jnp.bfloat16
+                )
                 decoded_up = (
-                    up_ref[...].astype(config.accumulator_dtype) * up_value
-                ).astype(jnp.bfloat16)
+                    up_ref[...]
+                    .astype(config.accumulator_dtype)
+                    .reshape(
+                        contraction_blocks_per_tile,
+                        config.block_shape[1],
+                        config.output_tile,
+                    )
+                    * up_scale_ref[...].astype(config.accumulator_dtype)
+                ).reshape(config.contraction_tile, config.output_tile).astype(
+                    jnp.bfloat16
+                )
                 dimensions = (((1,), (0,)), ((), ()))
                 gate_accumulator[...] += lax.dot_general(
                     hidden_ref[...],
