@@ -39,6 +39,10 @@ from .pipeline import (
 )
 
 
+REFERENCE_FEATURE_OUTPUT_TILE = 128
+PROMOTED_FEATURE_OUTPUT_TILE = 256
+
+
 @dataclass(frozen=True, slots=True)
 class DecoderStepConfig:
     stage_count: int
@@ -124,7 +128,7 @@ def _validate_pallas_feature_decoder_calls(
     optimized_hlo: str,
     *,
     sparse_layers: int,
-    feature_output_tile: int = 128,
+    feature_output_tile: int = PROMOTED_FEATURE_OUTPUT_TILE,
 ) -> dict[str, Any]:
     """Pin every production feature-MoE kernel and reject weight overlays."""
 
@@ -325,7 +329,7 @@ def validate_decoder_step_hlo(
     groups: Sequence[Sequence[int]],
     pairs: Sequence[Sequence[int]],
     backend_contract: str,
-    feature_output_tile: int = 128,
+    feature_output_tile: int | None = None,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -336,6 +340,16 @@ def validate_decoder_step_hlo(
         "tpu_v4_pp8_pallas_feature_linear",
     ):
         raise PlanValidationError("decoder HLO backend contract is unknown")
+    if feature_output_tile is None:
+        feature_output_tile = (
+            PROMOTED_FEATURE_OUTPUT_TILE
+            if backend_contract
+            in (
+                "tpu_v4_pp8_pallas_feature",
+                "tpu_v4_pp8_pallas_feature_linear",
+            )
+            else REFERENCE_FEATURE_OUTPUT_TILE
+        )
     if feature_output_tile not in (128, 256):
         raise PlanValidationError("feature output tile must be 128 or 256")
     if (
@@ -765,7 +779,7 @@ def build_decoder_step_program(
     devices: Sequence[Any] | None = None,
     axis_name: str = "device",
     sparse_moe_backend: SparseMoeBackend = "reference",
-    feature_output_tile: int = 128,
+    feature_output_tile: int | None = None,
     linear_backend: StageLinearBackend = "reference",
 ) -> DecoderStepProgram:
     """Build, but do not compile, the complete all-stage decode-step map."""
@@ -774,6 +788,12 @@ def build_decoder_step_program(
         raise PlanValidationError("decoder axis name must be explicit")
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise PlanValidationError("decoder sparse MoE backend is unknown")
+    if feature_output_tile is None:
+        feature_output_tile = (
+            PROMOTED_FEATURE_OUTPUT_TILE
+            if sparse_moe_backend == "pallas_feature"
+            else REFERENCE_FEATURE_OUTPUT_TILE
+        )
     if feature_output_tile not in (128, 256):
         raise PlanValidationError("feature output tile must be 128 or 256")
     if sparse_moe_backend == "reference" and feature_output_tile != 128:

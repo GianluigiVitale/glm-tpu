@@ -207,7 +207,7 @@ def parse_args() -> argparse.Namespace:
         "--feature-output-tile",
         type=int,
         choices=(128, 256),
-        default=128,
+        default=None,
     )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
@@ -215,6 +215,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.feature_output_tile is None:
+        args.feature_output_tile = (
+            128 if args.runtime_kind == "reference" else 256
+        )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.context_capacity != 2048:

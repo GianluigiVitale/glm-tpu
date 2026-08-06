@@ -31,7 +31,11 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
         'metadata={op_name="greenfield_fp8_block_matmul_m8_k512_n6144"}'
     )
     hlo = "\n".join((selected, shared_up, shared_down) * 75)
-    record = _validate_pallas_feature_decoder_calls(hlo, sparse_layers=75)
+    record = _validate_pallas_feature_decoder_calls(
+        hlo,
+        sparse_layers=75,
+        feature_output_tile=128,
+    )
     assert record["passed"], record
     assert record["feature_output_tile"] == 128
 
@@ -39,22 +43,20 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512",
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
     )
-    wide = _validate_pallas_feature_decoder_calls(
-        wide_hlo,
-        sparse_layers=75,
-        feature_output_tile=256,
-    )
+    wide = _validate_pallas_feature_decoder_calls(wide_hlo, sparse_layers=75)
     assert wide["passed"], wide
     assert wide["feature_output_tile"] == 256
     wrong_fingerprint = _validate_pallas_feature_decoder_calls(
         wide_hlo,
         sparse_layers=75,
+        feature_output_tile=128,
     )
     assert not wrong_fingerprint["passed"]
 
     rejected = _validate_pallas_feature_decoder_calls(
         hlo + "\noverlay = bf16[256,6144,512] parameter(0)",
         sparse_layers=75,
+        feature_output_tile=128,
     )
     assert not rejected["passed"]
     assert rejected["forbidden_decoded_expert_overlays"]
@@ -62,6 +64,7 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     formatted = _validate_pallas_feature_decoder_calls(
         hlo + "\nformatted = f8e4m3fn[512,6144] parameter(0)",
         sparse_layers=75,
+        feature_output_tile=128,
     )
     assert not formatted["passed"]
     assert formatted["forbidden_formatted_shared_overlays"]
