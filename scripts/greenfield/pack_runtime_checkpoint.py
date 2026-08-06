@@ -293,30 +293,39 @@ def _prepare(
     bucket: Any,
     prefix: str,
 ) -> None:
-    if args.run_dir.exists():
-        raise RuntimeError(f"append-only local run already exists: {args.run_dir}")
-    if next(bucket.list_blobs(prefix=f"{prefix}/", max_results=1), None):
-        raise RuntimeError("remote runtime destination prefix already exists")
-    args.run_dir.mkdir(parents=True)
+    if args.resume:
+        args.run_dir.mkdir(parents=True, exist_ok=True)
+        _remote_prerequisites(bucket=bucket, prefix=prefix, context=context)
+        if bucket.blob(f"{prefix}/SUCCESS").exists():
+            raise RuntimeError("runtime checkpoint is already complete")
+    else:
+        if args.run_dir.exists():
+            raise RuntimeError(
+                f"append-only local run already exists: {args.run_dir}"
+            )
+        if next(bucket.list_blobs(prefix=f"{prefix}/", max_results=1), None):
+            raise RuntimeError("remote runtime destination prefix already exists")
+        args.run_dir.mkdir(parents=True)
     control_path = args.run_dir / "control.json"
     layout_path = args.run_dir / "runtime_layout.json"
     _write_json_once(control_path, context.control)
     _write_json_once(layout_path, context.layout_document)
     control_blob = bucket.blob(f"{prefix}/control.json")
     layout_blob = bucket.blob(f"{prefix}/runtime_layout.json")
-    _upload_json_once(control_blob, context.control)
-    layout_blob.metadata = {
-        "file_sha256": context.control["runtime_layout_file_sha256"],
-        "runtime_layout_hash": context.layout.layout_hash,
-        "semantic_sha256": context.layout_document["manifest_sha256"],
-    }
-    layout_blob.upload_from_filename(
-        layout_path,
-        content_type="application/json",
-        if_generation_match=0,
-        checksum="crc32c",
-        timeout=300,
-    )
+    if not args.resume:
+        _upload_json_once(control_blob, context.control)
+        layout_blob.metadata = {
+            "file_sha256": context.control["runtime_layout_file_sha256"],
+            "runtime_layout_hash": context.layout.layout_hash,
+            "semantic_sha256": context.layout_document["manifest_sha256"],
+        }
+        layout_blob.upload_from_filename(
+            layout_path,
+            content_type="application/json",
+            if_generation_match=0,
+            checksum="crc32c",
+            timeout=300,
+        )
     summary = {
         "control_sha256": context.control["control_sha256"],
         **context.common,
@@ -531,6 +540,12 @@ def _pack_stage(
     prefix: str,
 ) -> None:
     _remote_prerequisites(bucket=bucket, prefix=prefix, context=context)
+    process_index = args.process_index
+    if args.topology_capture is not None:
+        capture = _read_json(args.topology_capture)
+        process_index = capture.get("jax_process_index")
+        if not isinstance(process_index, int) or isinstance(process_index, bool):
+            raise RuntimeError("topology capture lacks a valid JAX process index")
     assignments = {
         stage.assignment.process_index: stage.assignment.stage_id
         for stage in build_pipeline_schedule(
@@ -541,11 +556,11 @@ def _pack_stage(
             )
         ).stages
     }
-    if args.process_index not in assignments:
+    if process_index not in assignments:
         raise RuntimeError(
-            f"process index {args.process_index} owns no PP8 runtime stage"
+            f"process index {process_index} owns no PP8 runtime stage"
         )
-    stage_id = assignments[args.process_index]
+    stage_id = assignments[process_index]
     plans = tuple(plan for plan in context.plans if plan.stage_id == stage_id)
     if len(plans) != 4:
         raise RuntimeError("PP8 runtime stage does not contain four files")
@@ -584,7 +599,7 @@ def _pack_stage(
     summary = {
         "artifact_kind": "greenfield_runtime_checkpoint_stage_pack",
         "file_count": len(records),
-        "process_index": args.process_index,
+        "process_index": process_index,
         "runtime_layout_hash": context.layout.layout_hash,
         "stage_id": stage_id,
         "total_file_bytes": sum(record["file_bytes"] for record in records),
@@ -672,16 +687,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--process-index", type=int)
+    parser.add_argument("--topology-capture", type=Path)
     parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    if args.mode == "pack-stage" and args.process_index is None:
-        raise RuntimeError("pack-stage requires --process-index")
-    if args.mode != "pack-stage" and args.process_index is not None:
-        raise RuntimeError("--process-index is valid only for pack-stage")
+    selectors = int(args.process_index is not None) + int(
+        args.topology_capture is not None
+    )
+    if args.mode == "pack-stage" and selectors != 1:
+        raise RuntimeError(
+            "pack-stage requires exactly one of --process-index or "
+            "--topology-capture"
+        )
+    if args.mode != "pack-stage" and selectors:
+        raise RuntimeError(
+            "process/topology selectors are valid only for pack-stage"
+        )
     code_hash = _verify_repo(args.expected_code_hash)
     bucket_name, prefix = _parse_gs_uri(args.destination)
     context = _build_context(args, code_hash)
