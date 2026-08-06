@@ -167,7 +167,7 @@ def validate_pallas_real_layer_hlo(
     local_experts: int = 64,
     stage_size: int = 4,
 ) -> dict[str, Any]:
-    """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
+    """Require two fused raw-FP8 kernels and one exact local combine."""
 
     base = validate_real_layer_hlo(
         optimized_hlo,
@@ -182,8 +182,7 @@ def validate_pallas_real_layer_hlo(
     ]
     kernel_prefixes = (
         "greenfield_fp8_fused_selected_moe_",
-        "greenfield_fp8_block_up_gate_",
-        "greenfield_fp8_block_matmul_",
+        "greenfield_fp8_fused_block_swiglu_",
     )
     kernel_calls = {
         prefix: [
@@ -228,7 +227,7 @@ def validate_pallas_real_layer_hlo(
         # and the exact correction-bias lookup from the 256-entry vector.
         "AssumeGatherIndicesInBound": 5,
         "ConcatBitcast": 3,
-        "tpu_custom_call": 3,
+        "tpu_custom_call": 2,
     }
     if target_counts != expected_target_counts:
         violations.append(
@@ -278,6 +277,20 @@ def validate_pallas_real_layer_hlo(
     ):
         violations.append(
             "fused selected call lacks its exact raw-U8 down table"
+        )
+    shared_line = kernel_calls["greenfield_fp8_fused_block_swiglu_"]
+    local_intermediate = intermediate_size // stage_size
+    if shared_line and shared_line[0].count(
+        f"u8[{local_intermediate},{hidden_size}]"
+    ) < 2:
+        violations.append(
+            "fused shared call lacks two exact raw-U8 gate/up shards"
+        )
+    if shared_line and (
+        f"u8[{hidden_size},{local_intermediate}]" not in shared_line[0]
+    ):
+        violations.append(
+            "fused shared call lacks its exact raw-U8 down shard"
         )
 
     full_decoded_shapes = tuple(
