@@ -116,6 +116,7 @@ def _select_blocks_pallas(
         valid_length_ref: Any,
         output_score_ref: Any,
         output_position_ref: Any,
+        work_score_ref: Any,
     ) -> None:
         block_scores = score_ref[...]
         block_positions = position_ref[...]
@@ -129,29 +130,29 @@ def _select_blocks_pallas(
             (block_positions >= jnp.int32(0))
             & (block_positions < valid_length_ref[0])
         )
-        work_scores = jnp.where(valid, block_scores, _NEGATIVE_INFINITY)
-        selected_scores = jnp.full(
+        work_score_ref[...] = jnp.where(
+            valid, block_scores, _NEGATIVE_INFINITY
+        )
+        output_score_ref[...] = jnp.full(
             (1, 1, output_width), _NEGATIVE_INFINITY, dtype=jnp.float32
         )
-        selected_positions = jnp.full(
+        output_position_ref[...] = jnp.full(
             (1, 1, output_width), _NO_POSITION, dtype=jnp.int32
         )
 
-        def select_one(
-            slot: Any,
-            carry: tuple[Any, Any, Any, Any],
-        ) -> tuple[Any, Any, Any, Any]:
-            current_scores, current_valid, result_scores, result_positions = carry
+        def select_one(slot: Any, unused: None) -> None:
+            del unused
+            current_scores = work_score_ref[...]
             best_score = jnp.max(current_scores, axis=2, keepdims=True)
             tied_positions = jnp.where(
-                current_valid & (current_scores == best_score),
+                (current_scores == best_score)
+                & (best_score != _NEGATIVE_INFINITY),
                 block_positions,
                 _MAX_POSITION,
             )
             best_position = jnp.min(tied_positions, axis=2, keepdims=True)
             tied_slots = jnp.where(
-                current_valid
-                & (current_scores == best_score)
+                (current_scores == best_score)
                 & (block_positions == best_position),
                 block_slots,
                 _MAX_POSITION,
@@ -162,37 +163,28 @@ def _select_blocks_pallas(
                 & (best_score != _NEGATIVE_INFINITY)
             )
             write_slot = output_slots == slot
-            result_scores = jnp.where(
+            output_score_ref[...] = jnp.where(
                 write_slot,
                 jnp.where(live, best_score, _NEGATIVE_INFINITY),
-                result_scores,
+                output_score_ref[...],
             )
-            result_positions = jnp.where(
+            output_position_ref[...] = jnp.where(
                 write_slot,
                 jnp.where(live, best_position, _NO_POSITION),
-                result_positions,
+                output_position_ref[...],
             )
-            remove = (
-                current_valid
-                & live
-                & (block_slots == best_slot)
-            )
-            return (
-                jnp.where(remove, _NEGATIVE_INFINITY, current_scores),
-                current_valid & ~remove,
-                result_scores,
-                result_positions,
+            remove = live & (block_slots == best_slot)
+            work_score_ref[...] = jnp.where(
+                remove, _NEGATIVE_INFINITY, current_scores
             )
 
-        _, _, selected_scores, selected_positions = lax.fori_loop(
+        lax.fori_loop(
             0,
             selection_width,
             select_one,
-            (work_scores, valid, selected_scores, selected_positions),
+            None,
             unroll=1,
         )
-        output_score_ref[...] = selected_scores
-        output_position_ref[...] = selected_positions
 
     def input_index(program: Any) -> tuple[Any, int, int]:
         return program, 0, 0
@@ -216,6 +208,9 @@ def _select_blocks_pallas(
         out_specs=(
             pl.BlockSpec((1, 1, output_width), input_index),
             pl.BlockSpec((1, 1, output_width), input_index),
+        ),
+        scratch_shapes=(
+            pltpu.VMEM((1, 1, input_width), jnp.float32),
         ),
         compiler_params=pltpu.CompilerParams(
             dimension_semantics=("parallel",),
