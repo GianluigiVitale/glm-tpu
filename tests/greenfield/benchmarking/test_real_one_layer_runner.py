@@ -77,3 +77,43 @@ def test_pallas_stage_adapter_reorders_router_and_correction_bias(
         "axis_name": "expert",
         "contract": contract,
     }
+
+
+def test_pallas_feature_stage_adapter_reorders_router_and_correction_bias(
+    monkeypatch,
+) -> None:
+    module = _load_script()
+    values = tuple(object() for _ in range(15))
+    local_feature_shard = object()
+    contract = object()
+    observed = {}
+
+    def fake_pallas_feature_stage(*args, **kwargs):
+        observed["args"] = args
+        observed["kwargs"] = kwargs
+        return "mapped"
+
+    monkeypatch.setattr(
+        module,
+        "stage_local_moe_pallas_feature_mapped",
+        fake_pallas_feature_stage,
+    )
+    result = module._pallas_feature_stage_step(
+        *values,
+        local_feature_shard,
+        axis_name="feature",
+        contract=contract,
+    )
+
+    assert result == "mapped"
+    assert observed["args"] == (
+        values[0],
+        values[2],
+        values[1],
+        *values[3:],
+        local_feature_shard,
+    )
+    assert observed["kwargs"] == {
+        "axis_name": "feature",
+        "contract": contract,
+    }

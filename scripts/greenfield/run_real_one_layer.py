@@ -33,11 +33,14 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     OneLayerLoadExpectation,
     PallasOneLayerLoadExpectation,
+    PallasFeatureLoadExpectation,
     load_one_layer,
     load_pallas_one_layer,
+    load_pallas_feature_one_layer,
     resolve_stage_devices,
 )
 from glm_tpu.greenfield.kernels.stage_local import (  # noqa: E402
+    stage_local_moe_pallas_feature_mapped,
     stage_local_moe_pallas_mapped,
 )
 from glm_tpu.greenfield.kernels.reference import (  # noqa: E402
@@ -70,7 +73,9 @@ def parse_args() -> argparse.Namespace:
         "--plan-id", choices=("PP8_LP4", "PP16_LP2"), default="PP8_LP4"
     )
     parser.add_argument(
-        "--kernel", choices=("reference", "pallas"), default="reference"
+        "--kernel",
+        choices=("reference", "pallas", "pallas_feature"),
+        default="reference",
     )
     parser.add_argument("--stage-id", type=int)
     parser.add_argument("--output", type=Path, required=True)
@@ -304,6 +309,50 @@ def _pallas_stage_step(
     )
 
 
+def _pallas_feature_stage_step(
+    hidden_states: Any,
+    correction_bias: Any,
+    router_weight: Any,
+    expert_gate_bits: Any,
+    expert_gate_scale: Any,
+    expert_up_bits: Any,
+    expert_up_scale: Any,
+    expert_down_bits: Any,
+    expert_down_scale: Any,
+    shared_gate_bits: Any,
+    shared_gate_scale: Any,
+    shared_up_bits: Any,
+    shared_up_scale: Any,
+    shared_down_bits: Any,
+    shared_down_scale: Any,
+    local_feature_shard: Any,
+    *,
+    axis_name: str,
+    contract: GlmMoeNumericalContract,
+) -> tuple[Any, Any, Any]:
+    """Adapt runner order to the expert-feature Pallas challenger."""
+    return stage_local_moe_pallas_feature_mapped(
+        hidden_states,
+        router_weight,
+        correction_bias,
+        expert_gate_bits,
+        expert_gate_scale,
+        expert_up_bits,
+        expert_up_scale,
+        expert_down_bits,
+        expert_down_scale,
+        shared_gate_bits,
+        shared_gate_scale,
+        shared_up_bits,
+        shared_up_scale,
+        shared_down_bits,
+        shared_down_scale,
+        local_feature_shard,
+        axis_name=axis_name,
+        contract=contract,
+    )
+
+
 def _correctness_record(
     jax: Any,
     compiled: Any,
@@ -397,7 +446,7 @@ def main() -> int:
         raise ValueError("protected PP16 layer requires an explicit stage id")
     if args.plan_id == "PP8_LP4" and args.stage_id is not None:
         raise ValueError("protected PP8 layer derives its sole local stage")
-    if args.kernel == "pallas" and (
+    if args.kernel.startswith("pallas") and (
         args.source_packed_manifest_sha256 is None
         or args.packed_code_hash is None
     ):
@@ -456,6 +505,16 @@ def main() -> int:
             plan_group_hash=args.plan_group_sha256,
             plan_id=args.plan_id,
         )
+    elif args.kernel == "pallas_feature":
+        expectation = PallasFeatureLoadExpectation(
+            manifest_sha256=args.packed_manifest_sha256,
+            source_manifest_sha256=args.source_packed_manifest_sha256,
+            code_hash=args.packed_code_hash,
+            source_revision=args.source_revision,
+            topology_hash=args.topology_sha256,
+            plan_group_hash=args.plan_group_sha256,
+            plan_id=args.plan_id,
+        )
     else:
         expectation = OneLayerLoadExpectation(
             manifest_sha256=args.packed_manifest_sha256,
@@ -474,6 +533,13 @@ def main() -> int:
     load_started = time.perf_counter()
     if args.kernel == "pallas":
         loaded = load_pallas_one_layer(
+            args.artifact_dir,
+            expectation,
+            resolution,
+            expert_chunk_size=args.expert_chunk_size,
+        )
+    elif args.kernel == "pallas_feature":
+        loaded = load_pallas_feature_one_layer(
             args.artifact_dir,
             expectation,
             resolution,
@@ -517,38 +583,56 @@ def main() -> int:
         fp8_block_shape=tuple(geometry["fp8_block_shape"]),
     )
 
-    if args.kernel == "pallas":
+    if args.kernel.startswith("pallas"):
         from jax import lax
         from jax.sharding import PartitionSpec as P
 
-        mapped_step = jax.shard_map(
-            lambda *values: _pallas_stage_step(
-                *values,
-                local_expert_shard=lax.axis_index("expert").astype(jnp.int32),
-                axis_name="expert",
-                contract=contract,
-            ),
-            mesh=loaded.mesh,
-            in_specs=(
-                P(),
-                P(),
-                P(),
-                P("expert", None, None),
-                P("expert", None, None),
-                P("expert", None, None),
-                P("expert", None, None),
-                P("expert", None, None),
-                P("expert", None, None),
-                P("expert", None),
-                P("expert", None),
-                P("expert", None),
-                P("expert", None),
-                P(None, "expert"),
-                P(None, "expert"),
-            ),
-            out_specs=(P(), P(), P()),
-            check_vma=False,
-        )
+        if args.kernel == "pallas":
+            mapped_step = jax.shard_map(
+                lambda *values: _pallas_stage_step(
+                    *values,
+                    local_expert_shard=lax.axis_index("expert").astype(
+                        jnp.int32
+                    ),
+                    axis_name="expert",
+                    contract=contract,
+                ),
+                mesh=loaded.mesh,
+                in_specs=(
+                    P(), P(), P(),
+                    P("expert", None, None), P("expert", None, None),
+                    P("expert", None, None), P("expert", None, None),
+                    P("expert", None, None), P("expert", None, None),
+                    P("expert", None), P("expert", None),
+                    P("expert", None), P("expert", None),
+                    P(None, "expert"), P(None, "expert"),
+                ),
+                out_specs=(P(), P(), P()),
+                check_vma=False,
+            )
+        else:
+            mapped_step = jax.shard_map(
+                lambda *values: _pallas_feature_stage_step(
+                    *values,
+                    local_feature_shard=lax.axis_index("feature").astype(
+                        jnp.int32
+                    ),
+                    axis_name="feature",
+                    contract=contract,
+                ),
+                mesh=loaded.mesh,
+                in_specs=(
+                    P(), P(), P(),
+                    P(None, None, "feature"), P(None, "feature", None),
+                    P(None, None, "feature"), P(None, "feature", None),
+                    P(None, "feature", None), P(None, None, "feature"),
+                    P("feature", None), P("feature", None),
+                    P("feature", None), P("feature", None),
+                    P(None, "feature"), P(None, "feature"),
+                ),
+                out_specs=(P(), P(), P()),
+                check_vma=False,
+            )
 
         def step_fun_impl(*values: Any) -> tuple[Any, Any, Any]:
             return mapped_step(*values)
@@ -626,13 +710,22 @@ def main() -> int:
     args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
     args.hlo_output.write_text(optimized_hlo)
     hlo_sha256 = sha256(optimized_hlo.encode()).hexdigest()
-    if args.kernel == "pallas":
+    if args.kernel.startswith("pallas"):
         hlo_contract = validate_pallas_real_layer_hlo(
             optimized_hlo,
             hidden_size=contract.hidden_size,
             intermediate_size=contract.intermediate_size,
-            local_experts=contract.local_experts,
+            local_experts=(
+                contract.local_experts
+                if args.kernel == "pallas"
+                else contract.num_experts
+            ),
             stage_size=contract.stage_size,
+            routed_intermediate_size=(
+                None
+                if args.kernel == "pallas"
+                else contract.local_shared_intermediate
+            ),
         )
     else:
         hlo_contract = validate_real_layer_hlo(

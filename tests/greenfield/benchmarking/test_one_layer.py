@@ -131,6 +131,28 @@ def test_pallas_real_layer_hlo_requires_exact_kernel_and_metadata_calls() -> Non
     assert any("unexpected" in item for item in record["violations"])
 
 
+def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
+    hlo = (
+        _pallas_hlo()
+        .replace("r8_g64_h6144_i2048", "r8_g256_h6144_i512")
+        .replace("u8[64,6144,2048]", "u8[256,6144,512]")
+        .replace("u8[64,2048,6144]", "u8[256,512,6144]")
+    )
+    record = validate_pallas_real_layer_hlo(
+        hlo,
+        local_experts=256,
+        routed_intermediate_size=512,
+    )
+    assert record["passed"], record
+
+    wrong_layout = validate_pallas_real_layer_hlo(hlo)
+    assert not wrong_layout["passed"]
+    assert any(
+        "raw-U8 gate/up tables" in item
+        for item in wrong_layout["violations"]
+    )
+
+
 def test_pallas_real_layer_hlo_rejects_shared_layout_shape_drift() -> None:
     hlo = _pallas_hlo().replace(
         "shared_down_layout = u8[6144,512]",

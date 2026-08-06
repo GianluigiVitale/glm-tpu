@@ -20,6 +20,10 @@ readonly PALLAS_PACK_RUN=/home/gianl/glm-run/greenfield_one_layer_pallas_pack_20
 readonly PALLAS_PACK_MANIFEST_SHA=3da63bd9c2332dd67fc29a1d158e5468e0fdf1db1a9a0e8b7977277b0812e427
 readonly PALLAS_SOURCE_MANIFEST_SHA=68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938
 readonly PALLAS_PACK_CODE_HASH=9f42e23272503a3735547c371229757d2c841b3a
+readonly PALLAS_FEATURE_PACK_RUN=/home/gianl/glm-run/greenfield_one_layer_pallas_feature_pack_20260806T054520020812918Z
+readonly PALLAS_FEATURE_PACK_MANIFEST_SHA=a8b914350ea7b8fd281e425d6eb49eefad2082b48f16ec919c26ccbc7bbb5cc6
+readonly PALLAS_FEATURE_SOURCE_MANIFEST_SHA=3da63bd9c2332dd67fc29a1d158e5468e0fdf1db1a9a0e8b7977277b0812e427
+readonly PALLAS_FEATURE_PACK_CODE_HASH=5f6bb98c9b0036f393db27fc3857969f54aa171d
 
 PLAN_ID=${GLM_GREENFIELD_REAL_LAYER_PLAN:-PP8_LP4}
 KERNEL=${GLM_GREENFIELD_REAL_LAYER_KERNEL:-reference}
@@ -68,6 +72,20 @@ case "$KERNEL" in
       --kernel pallas
       --source-packed-manifest-sha256 "$PALLAS_SOURCE_MANIFEST_SHA"
       --packed-code-hash "$PALLAS_PACK_CODE_HASH"
+    )
+    ;;
+  pallas_feature)
+    [[ $PLAN_ID == PP8_LP4 ]] || {
+      echo "Pallas feature artifact supports protected PP8 only" >&2
+      exit 2
+    }
+    PLAN_SLUG=pp8_pallas_feature
+    PACK_RUN=$PALLAS_FEATURE_PACK_RUN
+    PACK_MANIFEST_SHA=$PALLAS_FEATURE_PACK_MANIFEST_SHA
+    KERNEL_ARGS=(
+      --kernel pallas_feature
+      --source-packed-manifest-sha256 "$PALLAS_FEATURE_SOURCE_MANIFEST_SHA"
+      --packed-code-hash "$PALLAS_FEATURE_PACK_CODE_HASH"
     )
     ;;
   *)
@@ -226,7 +244,7 @@ if plan_id not in plan_slugs:
     raise SystemExit(f"unsupported runner plan identity: {plan_id}")
 plan_slug = plan_slugs[plan_id]
 kernel = runner.get("kernel")
-if kernel not in ("reference", "pallas"):
+if kernel not in ("reference", "pallas", "pallas_feature"):
     raise SystemExit(f"unsupported runner kernel identity: {kernel}")
 kernel_suffix = "" if kernel == "reference" else f"_{kernel}"
 benchmark = f"greenfield_real_layer_{plan_slug}{kernel_suffix}"

@@ -166,8 +166,17 @@ def validate_pallas_real_layer_hlo(
     intermediate_size: int = 2048,
     local_experts: int = 64,
     stage_size: int = 4,
+    routed_intermediate_size: int | None = None,
 ) -> dict[str, Any]:
     """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
+
+    routed_intermediate = (
+        intermediate_size
+        if routed_intermediate_size is None
+        else routed_intermediate_size
+    )
+    if routed_intermediate <= 0:
+        raise ValueError("routed intermediate size must be positive")
 
     base = validate_real_layer_hlo(
         optimized_hlo,
@@ -267,13 +276,13 @@ def validate_pallas_real_layer_hlo(
 
     selected_line = kernel_calls["greenfield_fp8_fused_selected_moe_"]
     if selected_line and selected_line[0].count(
-        f"u8[{local_experts},{hidden_size},{intermediate_size}]"
+        f"u8[{local_experts},{hidden_size},{routed_intermediate}]"
     ) < 2:
         violations.append(
             "fused selected call lacks two exact raw-U8 gate/up tables"
         )
     if selected_line and (
-        f"u8[{local_experts},{intermediate_size},{hidden_size}]"
+        f"u8[{local_experts},{routed_intermediate},{hidden_size}]"
         not in selected_line[0]
     ):
         violations.append(
@@ -282,10 +291,10 @@ def validate_pallas_real_layer_hlo(
     full_decoded_shapes = tuple(
         dict.fromkeys(
             (
-                f"bf16[{local_experts},{hidden_size},{intermediate_size}]",
-                f"f32[{local_experts},{hidden_size},{intermediate_size}]",
-                f"bf16[{local_experts},{intermediate_size},{hidden_size}]",
-                f"f32[{local_experts},{intermediate_size},{hidden_size}]",
+                f"bf16[{local_experts},{hidden_size},{routed_intermediate}]",
+                f"f32[{local_experts},{hidden_size},{routed_intermediate}]",
+                f"bf16[{local_experts},{routed_intermediate},{hidden_size}]",
+                f"f32[{local_experts},{routed_intermediate},{hidden_size}]",
                 f"bf16[{hidden_size},{intermediate_size // stage_size}]",
                 f"f32[{hidden_size},{intermediate_size // stage_size}]",
                 f"bf16[{intermediate_size // stage_size},{hidden_size}]",
