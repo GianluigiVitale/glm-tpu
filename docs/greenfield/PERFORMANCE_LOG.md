@@ -320,6 +320,26 @@ experts-on-one-chip case, not an expert, layer, decoder, or token rate. The next
 execute only the normally owned route count (approximately two on a PP8 chip) while retaining an
 explicit concentrated-eight ceiling.
 
+DB 429 / `greenfield_fp8_selected_up_gate_normal_two_20260806T025246823530722Z` and DB 430 /
+`greenfield_fp8_selected_up_gate_concentrated_eight_20260806T025341496172586Z` passed together at
+`b900cea`. Stable device compaction maps original routes into owned-first slots, uses the dynamic
+owned count as the Pallas pipeline bound, masks unwritten slots, and restores exact top-8 order.
+There is no host/Python routing.
+
+| case | local routes | p50 | p90 | p95 | p99 | mean |
+|---|---:|---:|---:|---:|---:|---:|
+| normal interleaved | 2 | 1.341385 | 1.354894 | 1.360536 | 1.371749 | 1.342174 ms |
+| concentrated | 8 | 4.496970 | 4.509263 | 4.514649 | 4.524864 | 4.498625 ms |
+
+Normal comparison max/p99/mean error is `0.00012207/0/5.76e-9`; concentrated retains
+`0.0078125/0/5.77e-7`. Non-owner outputs are exact zeros. Each HLO contains one selected raw-U8
+Pallas kernel, four bounded gather-index markers, no unexpected call/full F8 or decoded overlay.
+Peak HBM is 2.307/2.395 GB. Both DB/archive/hash/remote-SUCCESS and clean-fleet gates pass.
+
+Compaction is a `3.35x` normal-path improvement over the all-eight DB 428 ceiling and adds only
+about `0.004 ms` to the concentrated result. The `1.34 ms` normal gate/up projection is still not a
+full expert or layer and remains above the desired promotion budget; it has no decoder/tok-s claim.
+
 ## 2026-08-05 — protected topology/local-group proof
 
 Artifact `greenfield_topology_20260805T125842425591441Z`, DB 405, proved runtime physical inventory

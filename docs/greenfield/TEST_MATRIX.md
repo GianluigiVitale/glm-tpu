@@ -35,7 +35,7 @@
 | Gate D reference-body diagnostic | Real 78-layer 2K load and compile; 25.46 GiB/chip; 219AG/294AR/16CP; 312 logical AR results; 2.7M bundles/580 overlays; staged execution projected 25–30 minutes/body | Evidence-rejected; reference graph cannot be the production engine |
 | Pallas FP8 block matmul | DB 422: production M8/K6144/N2048, raw-U8/128x128 VMEM dequant, BF16 MXU/FP32 accumulation, exact fallback, one custom call/no overlay, wall/HBM/DB/archive/cleanup | Pass on TPU v4 |
 | Pallas FP8 paired gate/up | DB 423: two raw matrices/two exact outputs, one custom call/no overlay, 0.815435 ms p50, wall/HBM/DB/archive/cleanup; same-weight M8 mechanism only | Pass on TPU v4; selected-expert GMM pending |
-| Pallas FP8 selected gate/up | DB 428: final raw `[G,K,N]`, eight distinct all-local matrices, exact route order/bounded outputs, one TPU kernel + two bounded metadata markers/no overlay, 4.492525 ms p50, DB/archive/cleanup | Correctness/final-layout pass; performance rejected; normal-owned-route compaction pending |
+| Pallas FP8 selected gate/up | DB 429/430: device dynamic owned-route compaction; exact normal-two/concentrated-eight outputs/order/zeros; one raw-U8 TPU kernel + bounded metadata/no overlay; 1.341385/4.496970 ms p50; DB/archive/cleanup | Correctness/route-proportional mechanism pass; performance optimization continues |
 | Gate D implementation | All-78-layer schedule/state; DB420-exact runtime loader; fused raw-FP8 fallback layer; one-step all-stage map; exact forced-CPU state/local HLO | In progress; hot path replacement required |
 | Gate D protected decoder | Complete 2K/8K tokens/cache/HBM/HLO/wall/XPlane | Missing |
 | Gates E–H | Await Gate D | Missing |

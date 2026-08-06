@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 02:51 UTC
+**Updated:** 2026-08-06 02:57 UTC
 
 ## Authority and isolation
 
@@ -185,6 +185,15 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   auxiliary call/full F8 or BF16/F32 table, and 946,176 scoped VMEM bytes. Peak HBM is
   2,395,303,936 bytes; DB/archive/evidence hashes/remote SUCCESS and 8/8 cleanup pass. This proves
   final layout was a major cost, but `4.49 ms` gate/up alone remains performance-rejected.
+- Protected paired DB 429/430 at `b900cea` compact owned routes on device and use their dynamic count
+  as the Pallas pipeline bound; outputs are gathered back to original top-8 order and non-owner rows
+  are exact zeros. Normal two-owned routes p50/p90/p95/p99 is
+  `1.341385/1.354894/1.360536/1.371749 ms`; concentrated eight is
+  `4.496970/4.509263/4.514649/4.524864 ms`. Both comparisons pass (normal max error
+  `0.00012207`, concentrated `0.0078125`; p99 0), one raw-U8 TPU kernel plus four bounded metadata
+  markers/no overlay or unexpected call passes, and peak HBM is 2.307/2.395 GB. Both DB records,
+  archives, hashes, remote SUCCESS markers, and 8/8 cleanup pass. Compaction is a `3.35x` normal
+  win and adds only ~`0.004 ms` to the all-eight ceiling, but `1.34 ms` gate/up is not yet promoted.
 
 ## Protected evidence
 
@@ -285,12 +294,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. DB 428 proves final `[G,K,N]` raw packing cuts selected all-eight gate/up from `23.197` to
-   `4.493 ms`, but it remains rejected. Compact device routes so normal ownership executes only the
-   approximately two local experts; protect both normal-two and concentrated-eight distributions.
-   Then optimize the concentrated ceiling and only if competitive compose activation/scale, down,
-   and routed/shared combine in binding Pallas order and repeat the real one-layer gate. Never
-   substitute the same-weight M8 microbenchmark or a slow correctness-only GMM for production proof.
+1. DB 429/430 prove route-proportional `1.341/4.497 ms` normal-two/concentrated-eight gate/up. Audit
+   the remaining per-route tile/dequant/MXU schedule against the proven same-weight M8 `0.815 ms`
+   and accepted stage-local layer. Only after a competitive protected kernel should activation,
+   down, and routed/shared combine be composed in binding Pallas order and the real one-layer gate
+   repeated. Never substitute same-weight M8 or a slow correctness-only GMM for production proof.
 2. Recompile only after the short-model kernel/overlay gate is acceptable. Bind the optimized
    layer to the complete runtime artifact, add embedding/final norm/distributed logits/token
    control, and prove complete 2K/8K Gate D with raw tokens, exact DSA/cache state, local-only HLO,
