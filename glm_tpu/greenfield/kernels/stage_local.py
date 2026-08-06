@@ -1076,6 +1076,248 @@ def stage_local_moe_pallas_from_routes_mapped(
     return (combined[0] * scale + combined[1]).astype(hidden_states.dtype)
 
 
+def stage_local_moe_pallas_feature_from_routes_mapped(
+    hidden_states: Any,
+    route_indices: Any,
+    route_weights: Any,
+    expert_gate_bits: Any,
+    expert_gate_scale: Any,
+    expert_up_bits: Any,
+    expert_up_scale: Any,
+    expert_down_bits: Any,
+    expert_down_scale: Any,
+    shared_gate_bits: Any,
+    shared_gate_scale: Any,
+    shared_up_bits: Any,
+    shared_up_scale: Any,
+    shared_down_bits: Any,
+    shared_down_scale: Any,
+    local_slot: Any,
+    *,
+    axis_name: str,
+    contract: GlmMoeNumericalContract = GlmMoeNumericalContract(),
+    axis_index_groups: Sequence[Sequence[int]] | None = None,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
+        contraction_tile=512
+    ),
+    interpret: bool = False,
+) -> Any:
+    """Execute all top-k routes on one stage-local feature shard.
+
+    Every stage chip owns the same expert identities but a disjoint quarter
+    of each expert's intermediate dimension. Gate/up output shards and the
+    reciprocal down contraction shards are therefore local, route work is
+    balanced independently of expert ids, and the existing single local
+    combine reconstructs the exact hidden-width partials.
+    """
+
+    groups = _axis_groups(axis_index_groups)
+    if hidden_states.shape != (1, contract.hidden_size) or (
+        hidden_states.dtype != jnp.bfloat16
+    ):
+        raise ValueError(
+            "feature-sharded Pallas MoE hidden must be one BF16 row"
+        )
+    if route_indices.shape != (1, contract.top_k) or (
+        route_indices.dtype != jnp.int32
+    ):
+        raise ValueError(
+            "feature-sharded Pallas routes must be one exact int32 top-k row"
+        )
+    if route_weights.shape != (1, contract.top_k) or (
+        route_weights.dtype != jnp.float32
+    ):
+        raise ValueError(
+            "feature-sharded Pallas route weights must be one FP32 top-k row"
+        )
+    if local_slot.shape != () or local_slot.dtype != jnp.int32:
+        raise ValueError(
+            "feature-sharded Pallas local_slot must be an int32 scalar"
+        )
+    if config.block_shape != contract.fp8_block_shape:
+        raise ValueError(
+            "Pallas tile block shape must match the MoE numerical contract"
+        )
+
+    local_intermediate = contract.local_shared_intermediate
+    expected_gate_shape = (
+        contract.num_experts,
+        contract.hidden_size,
+        local_intermediate,
+    )
+    expected_down_shape = (
+        contract.num_experts,
+        local_intermediate,
+        contract.hidden_size,
+    )
+    if expert_gate_bits.shape != expected_gate_shape or (
+        expert_up_bits.shape != expected_gate_shape
+    ):
+        raise ValueError(
+            "feature-sharded routed gate/up must use [E,H,I/stage]"
+        )
+    if expert_down_bits.shape != expected_down_shape:
+        raise ValueError(
+            "feature-sharded routed down must use [E,I/stage,H]"
+        )
+    expected_gate_scale = (
+        contract.num_experts,
+        local_intermediate // contract.fp8_block_shape[0],
+        contract.hidden_size // contract.fp8_block_shape[1],
+    )
+    expected_down_scale = (
+        contract.num_experts,
+        contract.hidden_size // contract.fp8_block_shape[0],
+        local_intermediate // contract.fp8_block_shape[1],
+    )
+    if expert_gate_scale.shape != expected_gate_scale or (
+        expert_up_scale.shape != expected_gate_scale
+    ):
+        raise ValueError("feature-sharded routed gate/up scale shape drifted")
+    if expert_down_scale.shape != expected_down_scale:
+        raise ValueError("feature-sharded routed down scale shape drifted")
+
+    shared_gate_shape = (local_intermediate, contract.hidden_size)
+    if shared_gate_bits.shape != shared_gate_shape or (
+        shared_up_bits.shape != shared_gate_shape
+    ):
+        raise ValueError(
+            "feature-sharded shared gate/up must retain [local_out,in]"
+        )
+    if shared_down_bits.shape != (
+        contract.hidden_size,
+        local_intermediate,
+    ):
+        raise ValueError(
+            "feature-sharded shared down must retain [out,local_in]"
+        )
+
+    routed_outputs = fp8_fused_selected_moe(
+        hidden_states,
+        route_indices[0],
+        jnp.asarray(0, dtype=jnp.int32),
+        expert_gate_bits,
+        expert_gate_scale,
+        expert_up_bits,
+        expert_up_scale,
+        expert_down_bits,
+        expert_down_scale,
+        config=config,
+        interpret=interpret,
+    )
+    weighted_routed = (
+        routed_outputs
+        * route_weights[0, :, None].astype(hidden_states.dtype)
+    ).astype(hidden_states.dtype)
+    local_routed = jnp.sum(
+        weighted_routed,
+        axis=0,
+        dtype=hidden_states.dtype,
+    )[None, :]
+
+    shared_config = Fp8BlockMatmulConfig(
+        block_shape=config.block_shape,
+        row_tile=config.row_tile,
+        output_tile=config.output_tile,
+        contraction_tile=config.block_shape[1],
+        output_dtype=config.output_dtype,
+        accumulator_dtype=config.accumulator_dtype,
+    )
+    shared_gate, shared_up = fp8_block_up_gate(
+        hidden_states,
+        shared_gate_bits,
+        shared_gate_scale,
+        shared_up_bits,
+        shared_up_scale,
+        config=shared_config,
+        interpret=interpret,
+    )
+    shared_activated = (silu(shared_gate) * shared_up).astype(
+        hidden_states.dtype
+    )
+    local_shared = fp8_block_matmul(
+        shared_activated,
+        shared_down_bits,
+        shared_down_scale,
+        config=shared_config,
+        interpret=interpret,
+    )
+
+    combined = lax.psum(
+        jnp.stack((local_routed, local_shared), axis=0),
+        axis_name=axis_name,
+        axis_index_groups=groups,
+    )
+    scale = jnp.asarray(
+        contract.routed_scaling_factor, dtype=hidden_states.dtype
+    )
+    return (combined[0] * scale + combined[1]).astype(hidden_states.dtype)
+
+
+def stage_local_moe_pallas_feature_mapped(
+    hidden_states: Any,
+    router_weight: Any,
+    correction_bias: Any,
+    expert_gate_bits: Any,
+    expert_gate_scale: Any,
+    expert_up_bits: Any,
+    expert_up_scale: Any,
+    expert_down_bits: Any,
+    expert_down_scale: Any,
+    shared_gate_bits: Any,
+    shared_gate_scale: Any,
+    shared_up_bits: Any,
+    shared_up_scale: Any,
+    shared_down_bits: Any,
+    shared_down_scale: Any,
+    local_slot: Any,
+    *,
+    axis_name: str,
+    contract: GlmMoeNumericalContract = GlmMoeNumericalContract(),
+    axis_index_groups: Sequence[Sequence[int]] | None = None,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
+        contraction_tile=512
+    ),
+    interpret: bool = False,
+) -> tuple[Any, Any, Any]:
+    """Route once and execute the stage-local expert-feature challenger."""
+
+    if router_weight.shape != (contract.num_experts, contract.hidden_size):
+        raise ValueError("feature-sharded Pallas router shape is invalid")
+    if correction_bias.shape != (contract.num_experts,):
+        raise ValueError("feature-sharded Pallas correction bias is invalid")
+    route_indices, route_weights = route_glm_noaux_tc(
+        hidden_states,
+        router_weight,
+        correction_bias,
+        top_k=contract.top_k,
+    )
+    output = stage_local_moe_pallas_feature_from_routes_mapped(
+        hidden_states,
+        route_indices,
+        route_weights,
+        expert_gate_bits,
+        expert_gate_scale,
+        expert_up_bits,
+        expert_up_scale,
+        expert_down_bits,
+        expert_down_scale,
+        shared_gate_bits,
+        shared_gate_scale,
+        shared_up_bits,
+        shared_up_scale,
+        shared_down_bits,
+        shared_down_scale,
+        local_slot,
+        axis_name=axis_name,
+        contract=contract,
+        axis_index_groups=axis_index_groups,
+        config=config,
+        interpret=interpret,
+    )
+    return output, route_indices, route_weights
+
+
 def stage_local_moe_pallas_mapped(
     hidden_states: Any,
     router_weight: Any,
