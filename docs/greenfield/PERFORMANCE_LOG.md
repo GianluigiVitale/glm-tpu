@@ -591,3 +591,20 @@ the permutes and local ICI are not optimization targets.
 HLO `7ef2b071...f59a` passes exact local collectives and feature-kernel counts. Summary/XPlane
 summary SHAs are `0361d44e...64e1` / `91a424fc...d17`. Approved archive/remote `SUCCESS`, DB
 linkage, and 8/8 cleanup pass. The result remains performance-rejected and does not complete Gate D.
+
+## 2026-08-06 — production-shape Pallas DSA scorer passes protected metal
+
+DB 443 / `greenfield_dsa_score_20260806T095455945075126Z` at `d068a9f` measures the exact one-row
+256K/LP4 scorer shape (`32` heads, `128` dimensions, `65,536` local keys). After 200 warmups, 1,000
+profiler-free samples are:
+
+| mean | p50 | p90 | p95 | p99 |
+|---:|---:|---:|---:|---:|
+| 0.327558 | 0.326595 | 0.335482 | 0.341040 | 0.350320 ms |
+
+The TPU/reference FP32 score max/mean/p99 error is
+`2.861e-6/2.417e-7/1.386e-6`, and the exact 2,048-position output/order has zero mismatches. HLO
+`5e2b7185...b295` has one named Pallas call and no per-head HBM overlay, dead-row shape,
+collective, or unexpected custom call. Compile is `0.394 s`; peak HBM is `20,491,776` bytes.
+Runner/summary SHAs are `992bc991...fe12` / `37789e92...0af`; DB/archive/remote `SUCCESS` and 8/8
+cleanup pass. This latency is standalone scorer wall, not a layer or token result.

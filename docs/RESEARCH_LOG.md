@@ -4772,3 +4772,26 @@ four-chip layer groups, and no decoded expert overlay. Compile max is `169.123 s
 pass. This is body attribution, not a decoder/token/tok/s pass. Continue Section 7.2 in order: DSA
 scorer, exact top-k, selected-KV+sparse attention, then raw-FP8 stage-local linear fusion that
 removes the measured gathers.
+
+## 2026-08-06 09:56 — Production 256K/LP4 Pallas DSA scorer passes protected metal
+
+DB 443 / `greenfield_dsa_score_20260806T095455945075126Z` at `d068a9f` closes Section 7.2 item 5.
+The default-off kernel consumes exactly one query row `f32[1,32,128]`, one local 256K/LP4 BF16 key
+shard `[65,536,128]`, and signed `f32[1,32]` head weights. It computes both highest-precision dot
+reductions, ReLU, scaling, and head weighting inside one call and emits only `f32[1,65,536]`.
+Optimized HLO `5e2b7185...b295` has exactly one `greenfield_dsa_score_r1_h32_d128_s65536` custom
+call and no per-head score overlay, batch-32 dead rows, collective, or unexpected custom call.
+
+TPU/reference max/mean/p99 score error is `2.861e-6/2.417e-7/1.386e-6`. More importantly, all
+2,048 selected positions and score order are elementwise exact. After 200 warmups, 1,000
+profiler-free samples have mean/p50/p90/p95/p99
+`0.327558/0.326595/0.335482/0.341040/0.350320 ms`. Compile is `0.394 s`, peak HBM is
+`20,491,776` bytes, and runner/summary SHAs are `992bc991...fe12` / `37789e92...0af`. DB snapshot,
+approved archive/remote `SUCCESS`, and authenticated 8/8 cleanup pass.
+
+Five earlier diagnostics failed closed without a DB/timing claim: an unaligned query block; a
+too-strict score bound; two exact-position mismatches under a non-reference head reduction; a
+Mosaic batched-dot parser limitation; and an unsupported v4 sublane gather. Loading the complete
+`f32[1,32]` head vector and matching both reference dot reductions removes the mismatch. This is a
+standalone scorer result, not layer/token performance. The binding next item is exact top-k and
+position ordering, followed by selected-KV+sparse attention.

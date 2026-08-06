@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 09:36 UTC
+**Updated:** 2026-08-06 09:56 UTC
 
 ## Authority and isolation
 
@@ -388,11 +388,11 @@ enough; stage-local model layout remains the structural requirement.
 
 ## Exact next sequence
 
-1. Implement the remaining kernels in Section 7.2's binding order: DSA scorer, exact top-k,
-   selected-KV gather+sparse attention, then stage-local RMSNorm/raw-FP8 linear fusion. DB 442
-   proves that the last item removes the immediate 58.8-second 2K floor, but do not skip the
-   preceding correctness-critical long-context kernels. Require reference/CPU/TPU/tail/dtype/HLO/
-   microbenchmark/fallback evidence for each.
+1. Implement Section 7.2 item 6, exact top-k and position ordering, now that DB 443 closes the
+   production-shape Pallas DSA scorer. Then implement selected-KV gather+sparse attention and
+   stage-local RMSNorm/raw-FP8 linear fusion. DB 442 proves that the last item removes the immediate
+   58.8-second 2K floor, but do not skip the correctness-critical long-context kernels. Require
+   reference/CPU/TPU/tail/dtype/HLO/microbenchmark/fallback evidence for each.
 2. Rerun exact Gate-C oracles after each integrated path, then repeat the protected 78-layer body.
    The immediate trace target is removal of `reference/fp8.py:69-70` whole-matrix gathers; do not
    tune the compact stage permutes or local layer collectives.
@@ -403,6 +403,22 @@ enough; stage-local model layout remains the structural requirement.
    then continue Gates E-H in binding order. No body-only result is a decoder or tok/s claim.
 
 The pod ended the latest proof with all eight hosts `CENSUS_OK`.
+
+## Protected Pallas DSA scorer
+
+DB 443 / `greenfield_dsa_score_20260806T095455945075126Z` at `d068a9f` passes Section 7.2 item 5
+at the production one-row 256K/LP4 shape: query `f32[1,32,128]`, local BF16 keys
+`[65,536,128]`, and scores `f32[1,65,536]`. One Pallas call performs both highest-precision dots,
+per-head ReLU, signed head weighting, and the FP32 head reduction without a per-head score overlay.
+HLO `5e2b7185...b295` contains no collective, batch-32 dead rows, unexpected custom call, or
+`[32,context]` HBM tensor.
+
+Against the TPU JAX reference, score max/mean/p99 error is
+`2.861e-6/2.417e-7/1.386e-6`; all 2,048 selected positions and their order are elementwise exact.
+After 200 warmups, 1,000 profiler-free samples give p50/p90/p95/p99
+`0.326595/0.335482/0.341040/0.350320 ms`. Compile is `0.394 s`; peak HBM is `20,491,776` bytes.
+Runner/summary SHAs are `992bc991...fe12` / `37789e92...0af`; DB snapshot, approved archive/remote
+`SUCCESS`, and 8/8 cleanup pass. This is a standalone scorer proof, not integrated layer/token wall.
 
 ## Protected feature-body attribution
 

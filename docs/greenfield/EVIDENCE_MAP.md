@@ -261,3 +261,13 @@ Eight serial stages predict `58,541.584 ms`, identifying reference weight dequan
 critical path rather than transfer bandwidth. Attention o/q_a/q_b are the top three callers.
 Exact local HLO, feature kernel counts, HBM, hashes, approved archive/remote `SUCCESS`, DB linkage,
 and clean 8/8 census pass. This is attribution evidence only, not Gate D or token-speed evidence.
+
+## Protected production Pallas DSA scorer
+
+DB 443 / `greenfield_dsa_score_20260806T095455945075126Z` at `d068a9f` proves a one-row
+`f32[1,32,128] x bf16[65,536,128] -> f32[1,65,536]` Pallas scorer for one 256K/LP4 shard. HLO
+`5e2b7185...b295` has exactly one kernel, no `[32,context]` overlay, batch-32 row, collective, or
+unexpected custom call. TPU/reference score max error is `2.861e-6`; all 2,048 selected positions
+and order are exact. Profiler-free p50/p99 is `0.326595/0.350320 ms` over 1,000 samples after 200
+warmups. HBM, DB snapshot, hashes, approved archive/remote `SUCCESS`, and 8/8 cleanup pass. This
+closes the standalone Section 7.2 scorer rung, not its layer integration or token performance.
