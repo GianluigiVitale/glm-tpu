@@ -107,11 +107,7 @@ def _bitonic_sort_pairs(
             ) == jnp.int32(0)
             lower_half = ~upper_half
             take_better = lower_half == descending
-            choose_self = jnp.where(
-                take_better,
-                self_better_or_equal,
-                ~self_better_or_equal,
-            )
+            choose_self = take_better == self_better_or_equal
             scores = jnp.where(choose_self, scores, partner_scores)
             positions = jnp.where(
                 choose_self, positions, partner_positions
@@ -175,10 +171,14 @@ def _select_blocks_pallas(
         output_position_ref: Any,
     ) -> None:
         block_scores = score_ref[...]
-        block_positions = position_ref[...]
+        # TPU-v4 Mosaic cannot legalize masked selects between wide int32
+        # position vectors. DSA positions are below 2**24, so FP32 preserves
+        # every integer exactly through comparison/permutation; cast back only
+        # at the kernel boundary.
+        block_positions = position_ref[...].astype(jnp.float32)
         valid = (
-            (block_positions >= jnp.int32(0))
-            & (block_positions < valid_length_ref[0])
+            (block_positions >= jnp.float32(0.0))
+            & (block_positions < valid_length_ref[0].astype(jnp.float32))
         )
         block_scores = jnp.where(
             valid, block_scores, _NEGATIVE_INFINITY
@@ -191,9 +191,9 @@ def _select_blocks_pallas(
         output_score_ref[...] = sorted_scores[:, :, :output_width]
         output_position_ref[...] = jnp.where(
             sorted_scores[:, :, :output_width] == _NEGATIVE_INFINITY,
-            _NO_POSITION,
+            jnp.float32(_NO_POSITION),
             sorted_positions[:, :, :output_width],
-        )
+        ).astype(jnp.int32)
 
     def input_index(program: Any) -> tuple[Any, int, int]:
         return program, 0, 0
