@@ -512,6 +512,11 @@ def main() -> int:
                 hlo_contract,
             )
         del optimized_hlo
+        if not hlo_contract["passed"]:
+            raise RuntimeError(
+                "decoder HLO contract failed before execution: "
+                f"{hlo_contract['violations']}"
+            )
 
         output = compiled(*inputs)
         output[3].block_until_ready()
@@ -623,8 +628,6 @@ def main() -> int:
             "transformer_body_timing_only": True,
         }
         _atomic_json(args.output, record)
-        if not hlo_contract["passed"]:
-            raise RuntimeError(f"decoder HLO contract failed: {hlo_contract['violations']}")
         if not metadata_passed:
             raise RuntimeError(f"decoder metadata contract failed: {metadata_contract}")
         print(
