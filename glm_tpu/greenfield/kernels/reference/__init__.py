@@ -29,6 +29,16 @@ from .dsa import (
     merge_topk_candidates,
     merge_topk_candidates_with_scores,
 )
+from .dsa_association import (
+    Layer0DsaProbeGeometry,
+    Layer0DsaState,
+    LegacyScoreGeometry,
+    affine_key_layer_norm,
+    bfloat16_from_uint16_bits,
+    layer0_dsa_state,
+    legacy_pagewise_dcp_scores,
+    one_row_pagewise_scores,
+)
 from .linear import (
     dense_swiglu,
     embedding_lookup,
@@ -61,6 +71,9 @@ from .rotary import apply_rotary, rotary_cos_sin
 __all__ = (
     "CanonicalSelectedPositions",
     "DsaNumericalContract",
+    "Layer0DsaProbeGeometry",
+    "Layer0DsaState",
+    "LegacyScoreGeometry",
     "GlmMoeNumericalContract",
     "IndexShareSchedule",
     "IndexShareState",
@@ -71,6 +84,8 @@ __all__ = (
     "SparseAttentionResult",
     "StageLocalKvLayout",
     "apply_rotary",
+    "affine_key_layer_norm",
+    "bfloat16_from_uint16_bits",
     "canonicalize_selected_positions",
     "combine_stage_local_attention",
     "dequantize_fp8_bits_block_weight",
@@ -90,6 +105,8 @@ __all__ = (
     "gather_stage_local_selected_kv",
     "linear",
     "local_topk_candidates",
+    "layer0_dsa_state",
+    "legacy_pagewise_dcp_scores",
     "merge_topk_candidates",
     "merge_topk_candidates_with_scores",
     "pack_index_share_transfer",
@@ -99,6 +116,7 @@ __all__ = (
     "resolve_index_share_layer",
     "restore_index_share_transfer",
     "rms_norm",
+    "one_row_pagewise_scores",
     "rotary_cos_sin",
     "route_glm_noaux_tc",
     "route_glm_noaux_tc_logits",

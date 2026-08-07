@@ -14,6 +14,10 @@ from .legacy_residuals import (
     LegacyResidualComparisonConfig,
     compare_legacy_residuals,
 )
+from .layer0_dsa_association import (
+    compare_dsa_association_scores,
+    inspect_layer0_dsa_association_input,
+)
 from .short_context_oracle import (
     ShortContextOracleConfig,
     capture_short_context_oracle,
@@ -44,7 +48,9 @@ __all__ = (
     "capture_short_context_oracle",
     "capture_short_context_dsa_oracle",
     "capture_short_context_logprob_oracle",
+    "compare_dsa_association_scores",
     "inspect_gate_c_oracle",
+    "inspect_layer0_dsa_association_input",
     "inspect_one_layer_oracle",
     "inspect_short_context_oracle",
     "inspect_short_context_dsa_oracle",
