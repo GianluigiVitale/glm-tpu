@@ -41,14 +41,12 @@ def validate_dsa_association_hlo(
             f"f32[{decode_rows},{heads},{head_dim}]",
             f"bf16[{context},{head_dim}]",
             f"f32[{decode_rows},{heads}]",
-            f"f32[{decode_rows},{heads},{page_size}]",
             f"f32[{context}]",
         ),
         "one_row_score": (
             f"f32[1,{heads},{head_dim}]",
             f"bf16[{context},{head_dim}]",
             f"f32[1,{heads}]",
-            f"f32[{heads},{page_size}]",
             f"f32[{context}]",
         ),
     }
@@ -57,6 +55,34 @@ def validate_dsa_association_hlo(
     required_shapes = required_by_phase[phase]
     missing_shapes = [
         shape for shape in required_shapes if shape not in optimized_hlo
+    ]
+    score_intermediate_candidates: tuple[str, ...] = ()
+    score_source_markers: tuple[str, ...] = ()
+    if phase == "legacy_score":
+        score_intermediate_candidates = (
+            f"f32[{decode_rows},{heads},{page_size}]",
+            f"f32[{decode_rows},{page_size},{heads}]",
+        )
+        score_source_markers = (
+            "thd,tpd->thp/dot_general",
+            "th,thp->tp/dot_general",
+        )
+    elif phase == "one_row_score":
+        score_intermediate_candidates = (
+            f"f32[{heads},{page_size}]",
+            f"f32[{page_size},{heads}]",
+        )
+        score_source_markers = (
+            "hd,pd->hp/dot_general",
+            "h,hp->p/dot_general",
+        )
+    score_intermediate_shapes = [
+        shape
+        for shape in score_intermediate_candidates
+        if shape in optimized_hlo
+    ]
+    missing_score_markers = [
+        marker for marker in score_source_markers if marker not in optimized_hlo
     ]
     forbidden_operations = [
         token
@@ -86,6 +112,16 @@ def validate_dsa_association_hlo(
         violations.append(
             f"DSA association {phase} lacks exact shapes: {missing_shapes}"
         )
+    if score_intermediate_candidates and not score_intermediate_shapes:
+        violations.append(
+            f"DSA association {phase} lacks an exact logical/physical score tile: "
+            f"{list(score_intermediate_candidates)}"
+        )
+    if missing_score_markers:
+        violations.append(
+            f"DSA association {phase} lost score source markers: "
+            f"{missing_score_markers}"
+        )
     if forbidden_operations:
         violations.append(
             f"DSA association {phase} contains forbidden operations: "
@@ -100,6 +136,8 @@ def validate_dsa_association_hlo(
         "phase": phase,
         "required_shapes": list(required_shapes),
         "missing_shapes": missing_shapes,
+        "score_intermediate_shapes": score_intermediate_shapes,
+        "missing_score_markers": missing_score_markers,
         "forbidden_operations": forbidden_operations,
         "forbidden_dead_rows": forbidden_dead_rows,
         "diagnostic_batch32_allowed": phase != "one_row_score",

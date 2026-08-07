@@ -1353,3 +1353,27 @@ one serialized `bash scripts/greenfield/run_layer0_dsa_association_probe.sh`. It
 diagnostic evidence, not decoder performance. Use its exact set/order matrix to choose the smallest
 one-row correction; only after isolated CPU/HLO/TPU proof may one protected 8K Gate-D retry run. Do
 not repeat the full 753B draw blindly and do not proceed to 128K while 8K DSA exactness fails.
+
+## First bounded layer-0 probe stopped at an exact physical-layout HLO discrepancy
+
+Bounded diagnostic `greenfield_layer0_dsa_association_20260807T201408349129630Z` at pin
+`ae8eda19b35b67ff66fae73d78d71e9bc09e4745` acquired the serialized lease, passed the fresh
+eight-host pre-census, compiled both real layer-0 state variants, and compiled the legacy scorer on
+one local four-chip TPU host. It stopped before all comparisons because the initial scorer contract
+required the logical intermediate `f32[32,32,512]`; optimized TPU HLO preserves the exact physical
+transpose `f32[32,512,32]`. The entry/output shapes and both source contractions remain exact, and
+the HLO contains no collective or host callback. Its SHA is
+`1b1a28cb01842b6484b4a451d2a0c4276ce07b9ffaadb81f14e5c2668849a8bf`.
+
+No comparison matrix, DB row, `SUCCESS`, timing, Gate-D, or arithmetic conclusion exists. The
+append-only diagnostic is preserved locally and under the approved bucket failure prefix; its
+failure-exit census is authenticated 8/8 clean. The narrow validator correction accepts only the
+logical or this observed physical score-tile permutation and additionally requires the exact
+einsum source markers. It does not wildcard dimensions, admit collectives, or relax the production
+one-row dead-row refusal. Thirteen focused CPU tests pass, and read-only validation of the immutable
+TPU HLO now records only `f32[32,512,32]` and passes.
+
+Exact next: commit and push the narrow HLO correction, prove the branch/fleet clean, and run one
+serialized bounded probe retry. If a later phase exposes another physical layout, preserve that
+HLO and change the contract only for the exact observed lowering. Use only a completed exact
+set/order matrix to choose a production correction; do not launch the full model first.

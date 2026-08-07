@@ -5064,3 +5064,20 @@ legacy page/DCP reconstruction, one-row XLA/Pallas challengers, strict artifact/
 protected lease/census/DB/archive handling, and 12 new focused tests. The complete CPU suite is 392
 passed / 1 skipped. Next is exactly one bounded protected probe; its set/order matrix, not another
 753B run, will select the smallest production correction.
+
+## 2026-08-07 20:20 — First bounded probe preserves an observed TPU score-tile transpose
+
+Diagnostic `greenfield_layer0_dsa_association_20260807T201408349129630Z` at `ae8eda1` passed its
+eight-host idle census and compiled the two layer-0 state builders plus the exact legacy scorer on
+one four-chip TPU host. It failed closed only because the HLO gate expected logical
+`f32[32,32,512]`, while TPU optimized HLO contains physical `f32[32,512,32]`. The exact entry and
+result geometry and source contractions `thd,tpd->thp` and `th,thp->tp` are present; no collective,
+callback, comparison result, DB row, `SUCCESS`, or performance evidence exists. HLO SHA is
+`1b1a28cb...a8bf`, the failed artifact is append-only locally and in the approved bucket, and the
+failure census is 8/8 clean.
+
+The corrected fail-closed contract accepts only those two exact layouts while requiring both source
+markers; the one-row contract remains separate and still rejects diagnostic M=32 rows. Thirteen
+focused CPU tests pass, and read-only validation of the immutable TPU HLO passes with only the
+observed physical layout recorded. Next is a clean-pin serialized retry of the same bounded probe,
+not a full checkpoint run.
