@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seal the immutable run-480 DSA source after the pad-row sealer correction.
+# Seal an immutable short-context DSA source after a sealer-only correction.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -8,26 +8,69 @@ readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
-readonly SOURCE_TAG=greenfield_short_context_dsa_oracle_20260806T221300Z
-readonly SOURCE_RUN_DIR=/home/gianl/glm-run/$SOURCE_TAG
-readonly SOURCE_CAPTURE_PIN=f5e047a63c5bdaff1da96f7af4134948543942ed
 readonly LEGACY_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
-readonly TOKEN_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
-readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/2k/$TOKEN_ORACLE_TAG/oracle
-readonly TOKEN_ORACLE_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
-readonly DUMP_PREFIX=/tmp/$SOURCE_TAG/topk.npz
-readonly RUN_ID=480
-readonly ITEM_ROW_ID=1763
-readonly SOURCE_HARNESS=a4a17ac
-readonly SOURCE_FORK=b3c25df47
 readonly OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 
+PROFILE=${GLM_GREENFIELD_SHORT_DSA_RECOVERY_PROFILE:-2k}
+case "$PROFILE" in
+  2k)
+    SOURCE_TAG=greenfield_short_context_dsa_oracle_20260806T221300Z
+    SOURCE_CAPTURE_PIN=f5e047a63c5bdaff1da96f7af4134948543942ed
+    TOKEN_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
+    TOKEN_ORACLE_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
+    RUN_ID=480
+    ITEM_ROW_ID=1763
+    SOURCE_HARNESS=a4a17ac
+    SOURCE_FORK=b3c25df47
+    EXPECTED_BENCHMARK=passkey_L2040_d0.25
+    EXPECTED_PROMPT_TOKENS=2034
+    EXPECTED_GENERATED_TOKENS=20
+    EXPECTED_SEED=283835
+    EXPECTED_GOLD=110391
+    FIRST_DECODE_POSITION=2034
+    EXPECTED_DUMP_COUNT=420
+    TAG_PREFIX=greenfield_short_context_dsa_oracle_recovery
+    ;;
+  8k)
+    # The source run passed execution/integrity and failed only because it was
+    # paired with the historical run-104 continuation.  Run 485 is now sealed
+    # as the exact current-runtime token trajectory.
+    SOURCE_TAG=greenfield_short_context_dsa_oracle_8k_20260807T161952737081154Z
+    SOURCE_CAPTURE_PIN=b5adc6385fda39cfaa7deed5bcef5d06edaaa511
+    TOKEN_ORACLE_TAG=greenfield_short_context_oracle_8k_20260807T172307269147351Z
+    TOKEN_ORACLE_SHA=e4fbcbdbf0fc8b1969e2f82ee457ab1563db4a8b37d2dea2bc4d1e828a13acf2
+    RUN_ID=485
+    ITEM_ROW_ID=1769
+    SOURCE_HARNESS=a4a17ac
+    SOURCE_FORK=b3c25df47
+    EXPECTED_BENCHMARK=passkey_L8192_d0.5
+    EXPECTED_PROMPT_TOKENS=8155
+    EXPECTED_GENERATED_TOKENS=20
+    EXPECTED_SEED=1093997
+    EXPECTED_GOLD=881446
+    FIRST_DECODE_POSITION=8155
+    EXPECTED_DUMP_COUNT=483
+    TAG_PREFIX=greenfield_short_context_dsa_oracle_8k_recovery
+    ;;
+  *)
+    echo "unsupported short-context DSA recovery profile: $PROFILE" >&2
+    exit 2
+    ;;
+esac
+readonly PROFILE SOURCE_TAG SOURCE_CAPTURE_PIN TOKEN_ORACLE_TAG TOKEN_ORACLE_SHA
+readonly RUN_ID ITEM_ROW_ID SOURCE_HARNESS SOURCE_FORK EXPECTED_BENCHMARK
+readonly EXPECTED_PROMPT_TOKENS EXPECTED_GENERATED_TOKENS EXPECTED_SEED
+readonly EXPECTED_GOLD FIRST_DECODE_POSITION EXPECTED_DUMP_COUNT TAG_PREFIX
+readonly SOURCE_RUN_DIR=/home/gianl/glm-run/$SOURCE_TAG
+readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/$PROFILE/$TOKEN_ORACLE_TAG/oracle
+readonly DUMP_PREFIX=/tmp/$SOURCE_TAG/topk.npz
+
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_SHORT_DSA_RECOVERY_TAG:-greenfield_short_context_dsa_oracle_recovery_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DSA_RECOVERY_TAG:-${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 SOURCE_DIR=$RUN_DIR/source_dumps
 ORACLE_DIR=$RUN_DIR/oracle
-REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/2k/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/$PROFILE/$TAG
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing DSA recovery outside $BRANCH" >&2
@@ -85,7 +128,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "SOURCE=$SOURCE_RUN_DIR SOURCE_CAPTURE_PIN=$SOURCE_CAPTURE_PIN SEALER_PIN=$PIN"
+say "PROFILE=$PROFILE SOURCE=$SOURCE_RUN_DIR SOURCE_CAPTURE_PIN=$SOURCE_CAPTURE_PIN SEALER_PIN=$PIN"
 say "RUN_DIR=$RUN_DIR REMOTE_PREFIX=$REMOTE_PREFIX"
 strict_census pre || {
   say "ABORT: fleet is not eight-host zero work"
@@ -108,7 +151,7 @@ grep -q '\[longctx\].*correct=True' "$SOURCE_RUN_DIR/legacy.log" || {
   say "ABORT: source capture raw item was not correct"
   exit 1
 }
-[[ $(find "$SOURCE_RUN_DIR/source_dumps" -type f -name '*.npz' | wc -l) -eq 420 ]] || {
+[[ $(find "$SOURCE_RUN_DIR/source_dumps" -type f -name '*.npz' | wc -l) -eq "$EXPECTED_DUMP_COUNT" ]] || {
   say "ABORT: immutable source dump inventory drifted"
   exit 1
 }
@@ -139,18 +182,18 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --item-row-id "$ITEM_ROW_ID" \
   --expected-harness-git "$SOURCE_HARNESS" \
   --expected-fork-git "$SOURCE_FORK" \
-  --expected-benchmark passkey_L2040_d0.25 \
+  --expected-benchmark "$EXPECTED_BENCHMARK" \
   --expected-model-uri gs://driftbench-dsv4-uc/models/GLM-5.2-FP8 \
-  --expected-prompt-tokens 2034 \
-  --expected-generated-tokens 20 \
-  --expected-seed 283835 \
-  --expected-gold 110391 \
+  --expected-prompt-tokens "$EXPECTED_PROMPT_TOKENS" \
+  --expected-generated-tokens "$EXPECTED_GENERATED_TOKENS" \
+  --expected-seed "$EXPECTED_SEED" \
+  --expected-gold "$EXPECTED_GOLD" \
   --expected-oob-dir "$OOB_DIR" \
   --expected-dump-prefix "$DUMP_PREFIX" \
   --expected-process-count 8 \
   --first-source-step 2 \
   --decode-step-count 14 \
-  --first-decode-position 2034 \
+  --first-decode-position "$FIRST_DECODE_POSITION" \
   --selected-width 2048 >"$RUN_DIR/capture.json"
 
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$RUN_DIR/results_ckpt.db" <<'PY'
