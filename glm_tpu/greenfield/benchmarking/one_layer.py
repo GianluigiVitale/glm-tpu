@@ -136,7 +136,7 @@ def validate_real_layer_hlo(
             )
     expected_payloads = [("bf16", (2, 1, hidden_size))]
     if reconstruct_down_fp32:
-        expected_payloads.append(("f32", (8, 1, hidden_size)))
+        expected_payloads.append(("f32", (8, hidden_size)))
     observed_payloads = [
         (shape.dtype.lower(), shape.dimensions)
         for collective in collectives

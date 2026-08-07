@@ -1410,11 +1410,19 @@ def stage_local_moe_pallas_feature_from_routes_mapped(
     if fuse_route_weighting:
         local_routed = routed_outputs
     elif reconstruct_down_fp32:
-        complete_routed = lax.psum(
+        complete_routed_fp32 = lax.psum(
             routed_outputs,
             axis_name=axis_name,
             axis_index_groups=groups,
-        ).astype(hidden_states.dtype)
+        )
+        # The cast is intentionally separated from the collective.  Without
+        # this barrier TPU XLA can commute the BF16 conversion into the psum
+        # and lower a BF16-result all-reduce, defeating the diagnostic's
+        # numerical contract even though its operand starts in FP32.
+        complete_routed_fp32 = lax.optimization_barrier(
+            complete_routed_fp32
+        )
+        complete_routed = complete_routed_fp32.astype(hidden_states.dtype)
         route_owners = route_indices[0] // jnp.int32(
             contract.local_experts
         )

@@ -210,6 +210,9 @@ lowered = jax.jit(feature_map).lower(
     common[0], common[1], put(distributed_bias, rep), *feature_tail
 )
 hlo = lowered.compile().as_text()
+all_reduce_lines = [
+    line.strip() for line in hlo.splitlines() if " all-reduce(" in line
+]
 print(json.dumps({
     "distributed": run_case(distributed_bias),
     "concentrated": run_case(concentrated_bias),
@@ -218,6 +221,7 @@ print(json.dumps({
         "all_reduce": hlo.count(" all-reduce("),
         "collective_permute": hlo.count(" collective-permute("),
     },
+    "all_reduce_lines": all_reduce_lines,
 }, sort_keys=True))
 '''
     program = program.replace(
@@ -256,3 +260,12 @@ print(json.dumps({
         "all_reduce": 2 if reconstruct_down_fp32 else 1,
         "collective_permute": 0,
     }
+    if reconstruct_down_fp32:
+        assert any(
+            "f32[4,256]" in line
+            for line in result["all_reduce_lines"]
+        ), result["all_reduce_lines"]
+        assert not any(
+            "bf16[4,256]" in line
+            for line in result["all_reduce_lines"]
+        ), result["all_reduce_lines"]

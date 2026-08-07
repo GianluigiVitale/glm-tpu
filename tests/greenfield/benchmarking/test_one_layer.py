@@ -173,8 +173,8 @@ def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_downf32",
     ).replace(
         "  ROOT combine =",
-        "  routed_partial = f32[8,1,6144]{2,1,0} parameter(1)\n"
-        "  routed_full = f32[8,1,6144]{2,1,0} all-reduce("
+        "  routed_partial = f32[8,6144]{1,0} parameter(1)\n"
+        "  routed_full = f32[8,6144]{1,0} all-reduce("
         "routed_partial), channel_id=2, replica_groups={{0,1,2,3}}, "
         "use_global_device_ids=true, to_apply=add\n  ROOT combine =",
     )
