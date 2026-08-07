@@ -30,6 +30,7 @@ case "$PROFILE" in
     EXPECTED_GENERATED_TOKENS=20
     EXPECTED_SEED=283835
     EXPECTED_GOLD=110391
+    FIRST_SOURCE_STEP=2
     FIRST_DECODE_POSITION=2034
     TAG_PREFIX=greenfield_short_context_dsa_oracle
     ;;
@@ -46,6 +47,8 @@ case "$PROFILE" in
     EXPECTED_GENERATED_TOKENS=20
     EXPECTED_SEED=1093997
     EXPECTED_GOLD=881446
+    # Four 2,048-token prefill chunks precede recurrent decode at 8K.
+    FIRST_SOURCE_STEP=5
     FIRST_DECODE_POSITION=8155
     TAG_PREFIX=greenfield_short_context_dsa_oracle_8k
     ;;
@@ -58,7 +61,7 @@ readonly PROFILE TOKEN_ORACLE_TAG TOKEN_ORACLE_SHA BENCHMARK_LENGTH
 readonly BENCHMARK_DEPTH BENCHMARK_MAX_LEN BENCHMARK_MAX_BATCHED_TOKENS
 readonly BENCHMARK_NUM_BLOCKS EXPECTED_BENCHMARK EXPECTED_PROMPT_TOKENS
 readonly EXPECTED_GENERATED_TOKENS EXPECTED_SEED EXPECTED_GOLD
-readonly FIRST_DECODE_POSITION TAG_PREFIX
+readonly FIRST_SOURCE_STEP FIRST_DECODE_POSITION TAG_PREFIX
 readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/$PROFILE/$TOKEN_ORACLE_TAG/oracle
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
@@ -323,7 +326,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --expected-oob-dir "$OOB_DIR" \
   --expected-dump-prefix "$DUMP_PREFIX" \
   --expected-process-count 8 \
-  --first-source-step 2 \
+  --first-source-step "$FIRST_SOURCE_STEP" \
   --decode-step-count 14 \
   --first-decode-position "$FIRST_DECODE_POSITION" \
   --selected-width 2048 >"$RUN_DIR/capture.json"

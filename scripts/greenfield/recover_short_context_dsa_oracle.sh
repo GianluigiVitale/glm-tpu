@@ -27,6 +27,7 @@ case "$PROFILE" in
     EXPECTED_GENERATED_TOKENS=20
     EXPECTED_SEED=283835
     EXPECTED_GOLD=110391
+    FIRST_SOURCE_STEP=2
     FIRST_DECODE_POSITION=2034
     EXPECTED_DUMP_COUNT=420
     TAG_PREFIX=greenfield_short_context_dsa_oracle_recovery
@@ -48,6 +49,7 @@ case "$PROFILE" in
     EXPECTED_GENERATED_TOKENS=20
     EXPECTED_SEED=1093997
     EXPECTED_GOLD=881446
+    FIRST_SOURCE_STEP=5
     FIRST_DECODE_POSITION=8155
     EXPECTED_DUMP_COUNT=483
     TAG_PREFIX=greenfield_short_context_dsa_oracle_8k_recovery
@@ -60,7 +62,8 @@ esac
 readonly PROFILE SOURCE_TAG SOURCE_CAPTURE_PIN TOKEN_ORACLE_TAG TOKEN_ORACLE_SHA
 readonly RUN_ID ITEM_ROW_ID SOURCE_HARNESS SOURCE_FORK EXPECTED_BENCHMARK
 readonly EXPECTED_PROMPT_TOKENS EXPECTED_GENERATED_TOKENS EXPECTED_SEED
-readonly EXPECTED_GOLD FIRST_DECODE_POSITION EXPECTED_DUMP_COUNT TAG_PREFIX
+readonly EXPECTED_GOLD FIRST_SOURCE_STEP FIRST_DECODE_POSITION
+readonly EXPECTED_DUMP_COUNT TAG_PREFIX
 readonly SOURCE_RUN_DIR=/home/gianl/glm-run/$SOURCE_TAG
 readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/$PROFILE/$TOKEN_ORACLE_TAG/oracle
 readonly DUMP_PREFIX=/tmp/$SOURCE_TAG/topk.npz
@@ -191,7 +194,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --expected-oob-dir "$OOB_DIR" \
   --expected-dump-prefix "$DUMP_PREFIX" \
   --expected-process-count 8 \
-  --first-source-step 2 \
+  --first-source-step "$FIRST_SOURCE_STEP" \
   --decode-step-count 14 \
   --first-decode-position "$FIRST_DECODE_POSITION" \
   --selected-width 2048 >"$RUN_DIR/capture.json"
