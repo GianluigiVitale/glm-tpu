@@ -505,6 +505,27 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             observe_dsa_events=True,
         )
+    with pytest.raises(PlanValidationError, match="residual-observation flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            observe_layer_residuals=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="isolated DSA observer"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=True,
+            observe_layer_residuals=True,
+        )
 
 
 def test_complete_small_decoder_token_step_runs_all_stages_on_forced_cpu() -> None:
@@ -533,7 +554,7 @@ groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8
 pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in range(8) for slot in range(4))
 decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
 explicit_default = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=False)
-observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True)
+observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True)
 prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
 
 weights = {}
@@ -597,6 +618,7 @@ residual, kv, index, metadata, next_token, next_position, next_blocks, next_leng
 prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
 observation = np.asarray(jax.device_get(observed[8]))
 token_observation = np.asarray(jax.device_get(observed[9]))
+layer_residual_observation = np.asarray(jax.device_get(observed[10]))
 observation_rows = []
 for stage, group in enumerate(groups):
     rows = observation[list(group), 0]
@@ -654,6 +676,20 @@ print(json.dumps({
         'hlo_contract': {key: observer_hlo_contract[key] for key in ('passed', 'token_observation_candidates', 'violations')},
         'production_outputs_exact': all(np.array_equal(np.asarray(jax.device_get(observed[index])), np.asarray(jax.device_get(first[index]))) for index in range(8)),
         'rows': observation_rows,
+        'layer_residuals': {
+            'dtype': layer_residual_observation.dtype.name,
+            'shape': list(layer_residual_observation.shape),
+            'stage_lane_replication': all(
+                np.array_equal(
+                    layer_residual_observation[list(group), stage],
+                    np.broadcast_to(
+                        layer_residual_observation[group[0], stage],
+                        layer_residual_observation[list(group), stage].shape,
+                    ),
+                )
+                for stage, group in enumerate(groups)
+            ),
+        },
         'token_observation': {
             'candidate_ids': token_observation_lanes[0, :token_candidate_width].tolist(),
             'candidate_scores': token_candidate_scores.tolist(),
@@ -725,6 +761,11 @@ print(json.dumps({
             "violations": [],
         },
         "production_outputs_exact": True,
+        "layer_residuals": {
+            "dtype": "bfloat16",
+            "shape": [32, 9, 8],
+            "stage_lane_replication": True,
+        },
         "rows": [
             {
                 "all_stage_lanes_equal": True,

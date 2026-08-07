@@ -152,6 +152,7 @@ class DecoderStepProgram:
     linear_backend: StageLinearBackend
     complete_token_path: bool
     observe_dsa_events: bool
+    observe_layer_residuals: bool
 
 
 def _validate_pallas_feature_decoder_calls(
@@ -1056,6 +1057,7 @@ def _execute_stage(
     pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
     dsa_observation: Any | None = None,
+    layer_residual_observation: Any | None = None,
 ) -> tuple[Any, ...]:
     import jax.numpy as jnp
     from jax import lax
@@ -1063,6 +1065,10 @@ def _execute_stage(
     residual, kv_cache, index_cache, metadata = values
     full_slot = 0
     for layer in stage.layers:
+        if layer_residual_observation is not None:
+            layer_residual_observation = layer_residual_observation.at[
+                layer.layer_id
+            ].set(residual[0])
         attention = _attention_weights(weight, layer.stage_slot)
         input_norm = weight(
             f"attention.slot_{layer.stage_slot:02d}.input_norm"
@@ -1134,6 +1140,10 @@ def _execute_stage(
             linear_backend=linear_backend,
         )
         residual = result.output
+        if layer_residual_observation is not None:
+            layer_residual_observation = layer_residual_observation.at[
+                layer.layer_id + 1
+            ].set(residual[0])
         kv_cache = kv_cache.at[layer.stage_slot].set(result.kv_cache)
         if current_full_slot is not None:
             index_cache = index_cache.at[current_full_slot].set(
@@ -1176,9 +1186,11 @@ def _execute_stage(
         )
     )
     values = (residual, kv_cache, index_cache, metadata)
-    if dsa_observation is None:
-        return values
-    return (*values, dsa_observation)
+    if dsa_observation is not None:
+        values = (*values, dsa_observation)
+    if layer_residual_observation is not None:
+        values = (*values, layer_residual_observation)
+    return values
 
 
 def build_decoder_step_program(
@@ -1198,6 +1210,7 @@ def build_decoder_step_program(
     linear_backend: StageLinearBackend = "reference",
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
+    observe_layer_residuals: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
 
@@ -1250,9 +1263,15 @@ def build_decoder_step_program(
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(observe_dsa_events, bool):
         raise PlanValidationError("DSA event-observation flag must be boolean")
+    if not isinstance(observe_layer_residuals, bool):
+        raise PlanValidationError("layer residual-observation flag must be boolean")
     if observe_dsa_events and not complete_token_path:
         raise PlanValidationError(
             "DSA event observation requires the complete-token path"
+        )
+    if observe_layer_residuals and not observe_dsa_events:
+        raise PlanValidationError(
+            "layer residual observation requires the isolated DSA observer"
         )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
@@ -1397,6 +1416,7 @@ def build_decoder_step_program(
         metadata = local_metadata_container[0]
         dsa_observation = None
         token_observation = None
+        layer_residual_observation = None
         if observe_dsa_events:
             dsa_observation = jnp.full(
                 (
@@ -1411,6 +1431,11 @@ def build_decoder_step_program(
                 -1,
                 dtype=jnp.int32,
             )
+            if observe_layer_residuals:
+                layer_residual_observation = jnp.zeros(
+                    (geometry.num_layers + 1, geometry.hidden_size),
+                    dtype=residual.dtype,
+                )
 
         def weight(name: str) -> Any:
             return local_weights[name][0]
@@ -1477,50 +1502,100 @@ def build_decoder_step_program(
             should_execute = active & (stage_id == jnp.int32(hop))
             if observe_dsa_events:
                 assert dsa_observation is not None
-                (
-                    residual,
-                    kv_cache,
-                    index_cache,
-                    metadata,
-                    dsa_observation,
-                ) = lax.cond(
-                    should_execute,
-                    lambda values, stage=stage: _execute_stage(
-                        stage,
-                        values[:4],
-                        weight=weight,
-                        local_slot=local_slot,
-                        position=position,
-                        block_tables=block_tables,
-                        context_lengths=context_lengths,
-                        axis_name=axis_name,
-                        axis_groups=axis_groups,
-                        config=config,
-                        dsa_contract=dsa_contract,
-                        mla_contract=mla_contract,
-                        moe_contract=moe_contract,
-                        cache_layout=cache_layout,
-                        block_shape=geometry.fp8_block_shape,
-                        sparse_moe_backend=sparse_moe_backend,
-                        pallas_moe_config=pallas_moe_config,
-                        pallas_moe_fuse_route_weighting=(
-                            feature_fuse_route_weighting
-                        ),
-                        pallas_moe_reconstruct_down_fp32=(
-                            feature_reconstruct_down_fp32
-                        ),
-                        linear_backend=linear_backend,
-                        dsa_observation=values[4],
-                    ),
-                    lambda values: values,
+                if observe_layer_residuals:
+                    assert layer_residual_observation is not None
                     (
                         residual,
                         kv_cache,
                         index_cache,
                         metadata,
                         dsa_observation,
-                    ),
-                )
+                        layer_residual_observation,
+                    ) = lax.cond(
+                        should_execute,
+                        lambda values, stage=stage: _execute_stage(
+                            stage,
+                            values[:4],
+                            weight=weight,
+                            local_slot=local_slot,
+                            position=position,
+                            block_tables=block_tables,
+                            context_lengths=context_lengths,
+                            axis_name=axis_name,
+                            axis_groups=axis_groups,
+                            config=config,
+                            dsa_contract=dsa_contract,
+                            mla_contract=mla_contract,
+                            moe_contract=moe_contract,
+                            cache_layout=cache_layout,
+                            block_shape=geometry.fp8_block_shape,
+                            sparse_moe_backend=sparse_moe_backend,
+                            pallas_moe_config=pallas_moe_config,
+                            pallas_moe_fuse_route_weighting=(
+                                feature_fuse_route_weighting
+                            ),
+                            pallas_moe_reconstruct_down_fp32=(
+                                feature_reconstruct_down_fp32
+                            ),
+                            linear_backend=linear_backend,
+                            dsa_observation=values[4],
+                            layer_residual_observation=values[5],
+                        ),
+                        lambda values: values,
+                        (
+                            residual,
+                            kv_cache,
+                            index_cache,
+                            metadata,
+                            dsa_observation,
+                            layer_residual_observation,
+                        ),
+                    )
+                else:
+                    (
+                        residual,
+                        kv_cache,
+                        index_cache,
+                        metadata,
+                        dsa_observation,
+                    ) = lax.cond(
+                        should_execute,
+                        lambda values, stage=stage: _execute_stage(
+                            stage,
+                            values[:4],
+                            weight=weight,
+                            local_slot=local_slot,
+                            position=position,
+                            block_tables=block_tables,
+                            context_lengths=context_lengths,
+                            axis_name=axis_name,
+                            axis_groups=axis_groups,
+                            config=config,
+                            dsa_contract=dsa_contract,
+                            mla_contract=mla_contract,
+                            moe_contract=moe_contract,
+                            cache_layout=cache_layout,
+                            block_shape=geometry.fp8_block_shape,
+                            sparse_moe_backend=sparse_moe_backend,
+                            pallas_moe_config=pallas_moe_config,
+                            pallas_moe_fuse_route_weighting=(
+                                feature_fuse_route_weighting
+                            ),
+                            pallas_moe_reconstruct_down_fp32=(
+                                feature_reconstruct_down_fp32
+                            ),
+                            linear_backend=linear_backend,
+                            dsa_observation=values[4],
+                        ),
+                        lambda values: values,
+                        (
+                            residual,
+                            kv_cache,
+                            index_cache,
+                            metadata,
+                            dsa_observation,
+                        ),
+                    )
             else:
                 residual, kv_cache, index_cache, metadata = lax.cond(
                     should_execute,
@@ -1778,10 +1853,17 @@ def build_decoder_step_program(
             return outputs
         assert dsa_observation is not None
         assert token_observation is not None
-        return (
+        observation_outputs = (
             *outputs,
             dsa_observation[None, ...],
             token_observation[None, ...],
+        )
+        if not observe_layer_residuals:
+            return observation_outputs
+        assert layer_residual_observation is not None
+        return (
+            *observation_outputs,
+            layer_residual_observation[None, ...],
         )
 
     def mapped_body(
@@ -1841,6 +1923,7 @@ def build_decoder_step_program(
     token_spec = P(axis_name, None)
     dsa_observation_spec = P(axis_name, None, None)
     token_observation_spec = P(axis_name, None)
+    layer_residual_observation_spec = P(axis_name, None, None)
     common_specs = (
         weight_specs,
         residual_spec,
@@ -1867,6 +1950,11 @@ def build_decoder_step_program(
                 dsa_observation_spec,
                 token_observation_spec,
             )
+            if observe_layer_residuals:
+                output_specs = (
+                    *output_specs,
+                    layer_residual_observation_spec,
+                )
     else:
         input_specs = (*common_specs, P(), P(), P())
         mapped = mapped_body
@@ -1896,4 +1984,5 @@ def build_decoder_step_program(
         linear_backend=linear_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
+        observe_layer_residuals=observe_layer_residuals,
     )

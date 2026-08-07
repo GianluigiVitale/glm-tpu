@@ -160,6 +160,101 @@ def _materialize_global_array(
     return host
 
 
+def _canonicalize_layer_residual_observation(
+    observation: np.ndarray,
+    *,
+    groups: tuple[tuple[int, ...], ...],
+    schedule: Any,
+    hidden_size: int,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Collapse replicated stage writers into one exact boundary sequence."""
+
+    observed = np.asarray(observation)
+    scheduled_layers = tuple(
+        (layer.layer_id, stage.assignment.stage_id)
+        for stage in schedule.stages
+        for layer in stage.layers
+    )
+    layer_count = len(scheduled_layers)
+    layer_to_stage = dict(scheduled_layers)
+    flat_ranks = tuple(rank for group in groups for rank in group)
+    expected_shape = (
+        len(flat_ranks),
+        layer_count + 1,
+        hidden_size,
+    )
+    if (
+        observed.ndim != 3
+        or observed.shape != expected_shape
+        or observed.dtype.name != "bfloat16"
+        or len(layer_to_stage) != layer_count
+        or tuple(sorted(layer_to_stage)) != tuple(range(layer_count))
+        or tuple(sorted(flat_ranks)) != tuple(range(len(flat_ranks)))
+    ):
+        raise RuntimeError(
+            "layer residual observer tensor contract drifted: "
+            f"expected={expected_shape}/bfloat16 "
+            f"observed={observed.shape}/{observed.dtype}"
+        )
+
+    canonical = np.empty(
+        (layer_count + 1, observed.shape[-1]), dtype=observed.dtype
+    )
+    boundary_records: list[dict[str, Any]] = []
+    lane_mismatches: list[int] = []
+    writer_mismatches: list[int] = []
+    nonwriter_nonzero: list[int] = []
+    all_ranks = set(flat_ranks)
+    for boundary in range(layer_count + 1):
+        writer_stages = set()
+        if boundary > 0:
+            writer_stages.add(layer_to_stage[boundary - 1])
+        if boundary < layer_count:
+            writer_stages.add(layer_to_stage[boundary])
+        writer_rows = []
+        writer_ranks: set[int] = set()
+        for stage_id in sorted(writer_stages):
+            group = tuple(groups[stage_id])
+            writer_ranks.update(group)
+            lanes = observed[list(group), boundary]
+            if not all(np.array_equal(lanes[0], lane) for lane in lanes[1:]):
+                lane_mismatches.append(boundary)
+            writer_rows.append(lanes[0])
+        if not writer_rows:
+            raise RuntimeError(f"layer boundary {boundary} has no writer")
+        if not all(
+            np.array_equal(writer_rows[0], row) for row in writer_rows[1:]
+        ):
+            writer_mismatches.append(boundary)
+        canonical[boundary] = writer_rows[0]
+        inactive = sorted(all_ranks - writer_ranks)
+        if inactive and np.any(observed[inactive, boundary] != 0):
+            nonwriter_nonzero.append(boundary)
+        boundary_records.append(
+            {
+                "boundary": boundary,
+                "writer_stages": sorted(writer_stages),
+            }
+        )
+    digest = sha256(np.ascontiguousarray(canonical).tobytes()).hexdigest()
+    contract = {
+        "boundary_count": layer_count + 1,
+        "boundary_records": boundary_records,
+        "canonical_sha256": digest,
+        "dtype": observed.dtype.name,
+        "hidden_size": int(observed.shape[-1]),
+        "lane_mismatch_boundaries": sorted(set(lane_mismatches)),
+        "nonwriter_nonzero_boundaries": sorted(set(nonwriter_nonzero)),
+        "passed": bool(
+            not lane_mismatches
+            and not writer_mismatches
+            and not nonwriter_nonzero
+        ),
+        "writer_mismatch_boundaries": sorted(set(writer_mismatches)),
+    }
+    return canonical, contract
+
+
 def _validate_completed_step_selected_states(
     active_metadata: np.ndarray,
     *,
@@ -915,6 +1010,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
     parser.add_argument("--short-context-dsa-oracle-manifest-sha256")
+    parser.add_argument(
+        "--observe-layer-residuals",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
+    parser.add_argument("--layer-residual-position", type=int, default=2044)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -932,6 +1034,7 @@ def main() -> int:
         args.feature_reconstruct_down_fp32
     )
     args.complete_token_path = bool(args.complete_token_path)
+    args.observe_layer_residuals = bool(args.observe_layer_residuals)
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
         args.short_context_oracle_manifest_sha256 is not None
@@ -951,6 +1054,10 @@ def main() -> int:
         )
     if dsa_oracle_mode and not oracle_mode:
         raise ValueError("short-context DSA oracle requires the token oracle")
+    if args.observe_layer_residuals and not dsa_oracle_mode:
+        raise ValueError(
+            "layer residual observation requires the sealed DSA/token oracle"
+        )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.context_capacity != 2048:
@@ -1022,6 +1129,12 @@ def main() -> int:
             )
         if 1 + dsa_steps > oracle_generated_token_ids.size:
             raise ValueError("DSA observer token window exceeds the token oracle")
+        if args.observe_layer_residuals and args.layer_residual_position not in set(
+            int(value) for value in decode_positions.tolist()
+        ):
+            raise ValueError(
+                "layer residual position is outside the sealed observer window"
+            )
     if args.runtime_kind in ("pallas_feature", "pallas_feature_linear") and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
@@ -1282,6 +1395,7 @@ def main() -> int:
                 linear_backend=linear_backend,
                 complete_token_path=True,
                 observe_dsa_events=True,
+                observe_layer_residuals=args.observe_layer_residuals,
             )
         prefill = None
         if oracle_mode:
@@ -1666,6 +1780,7 @@ def main() -> int:
         prefill_wall_ms = None
         prefill_token_oracle_contract = None
         dsa_observer_contract = None
+        layer_residual_contract = None
         if oracle_mode:
             assert compiled_prefill is not None and prefill_inputs is not None
             prefill_started = time.perf_counter_ns()
@@ -1714,6 +1829,7 @@ def main() -> int:
             observer_step_records = []
             observer_artifacts: list[dict[str, Any]] = []
             observer_tokens: list[int] = []
+            teacher_forced_input_tokens: list[int] = []
             try:
                 for step, decode_position in enumerate(
                     dsa_oracle_tensors["decode_positions"].tolist()
@@ -1732,6 +1848,56 @@ def main() -> int:
                         multihost_utils,
                         observer_result[9],
                     )
+                    if (
+                        args.observe_layer_residuals
+                        and int(decode_position) == args.layer_residual_position
+                    ):
+                        residual_observation_host = _materialize_global_array(
+                            jax,
+                            multihost_utils,
+                            observer_result[10],
+                        )
+                        (
+                            canonical_layer_residuals,
+                            layer_residual_contract,
+                        ) = _canonicalize_layer_residual_observation(
+                            residual_observation_host,
+                            groups=groups,
+                            schedule=schedule,
+                            hidden_size=execution_plan.geometry.hidden_size,
+                        )
+                        layer_residual_contract["decode_position"] = int(
+                            decode_position
+                        )
+                        layer_residual_contract["teacher_forced"] = True
+                        if not layer_residual_contract["passed"]:
+                            raise RuntimeError(
+                                "layer residual observer replication contract "
+                                f"failed: {layer_residual_contract}"
+                            )
+                        if jax.process_index() == 0:
+                            residual_dir = (
+                                args.output.parent / "layer_residual_observer"
+                            )
+                            _atomic_npz(
+                                residual_dir
+                                / (
+                                    "position_"
+                                    f"{int(decode_position)}_boundaries.npz"
+                                ),
+                                boundary_layer_ids=np.arange(
+                                    canonical_layer_residuals.shape[0],
+                                    dtype=np.int32,
+                                ),
+                                decode_position=np.asarray(
+                                    [decode_position], dtype=np.int32
+                                ),
+                                residuals=canonical_layer_residuals,
+                            )
+                            _atomic_json(
+                                residual_dir / "contract.json",
+                                layer_residual_contract,
+                            )
                     observer_token = _materialize_global_array(
                         jax,
                         multihost_utils,
@@ -1831,11 +1997,34 @@ def main() -> int:
                             f"{step_contract}"
                         )
                     observer_tokens.append(observed_token_id)
+                    next_observer_values = list(observer_result[:8])
+                    if args.observe_layer_residuals:
+                        forced_token_id = expected_token_id
+
+                        def teacher_token_builder(
+                            rank: int, shape: tuple[int, ...]
+                        ) -> np.ndarray:
+                            value = np.full(shape, -1, dtype=np.int32)
+                            if rank in groups[0]:
+                                value[...] = np.int32(forced_token_id)
+                            return value
+
+                        forced_token = _make_global_array(
+                            jax,
+                            dsa_observer.mesh,
+                            dsa_observer.input_specs[5],
+                            (dsa_observer.config.total_devices, 1),
+                            teacher_token_builder,
+                        )
+                        next_observer_values[4] = forced_token
+                        teacher_forced_input_tokens.append(forced_token_id)
                     if observer_owns_current:
                         _delete_arrays(observer_current)
-                    observer_current = tuple(observer_result[:8])
+                    if args.observe_layer_residuals:
+                        _delete_arrays((observer_result[4],))
+                    observer_current = tuple(next_observer_values)
                     observer_owns_current = True
-                    _delete_arrays((observer_result[8], observer_result[9]))
+                    _delete_arrays(tuple(observer_result[8:]))
                 preserved_prefill_position = np.asarray(
                     jax.device_get(output[5])
                 )
@@ -1874,6 +2063,12 @@ def main() -> int:
                     ),
                     "prefill_token_sequence": prefill_token_oracle_contract,
                     "production_executable_observer_enabled": False,
+                    "layer_residual_observation": layer_residual_contract,
+                    "teacher_forced_input_token_ids": (
+                        teacher_forced_input_tokens
+                        if args.observe_layer_residuals
+                        else None
+                    ),
                     "score_comparison": {
                         "compared": True,
                         "cross_backend_total_order_is_gate": False,
@@ -1899,8 +2094,26 @@ def main() -> int:
                     dsa_observer_contract["all_steps_passed"]
                     and prefill_state_preserved
                     and observer_token_contract["exact_prefix_match"]
+                    and (
+                        not args.observe_layer_residuals
+                        or (
+                            layer_residual_contract is not None
+                            and layer_residual_contract["passed"]
+                            and teacher_forced_input_tokens
+                            == oracle_generated_token_ids[
+                                1 : 1 + len(teacher_forced_input_tokens)
+                            ].tolist()
+                        )
+                    )
                 )
                 if not dsa_observer_contract["passed"]:
+                    if args.observe_layer_residuals and jax.process_index() == 0:
+                        _atomic_json(
+                            args.output.parent
+                            / "layer_residual_observer"
+                            / "observer_contract.json",
+                            dsa_observer_contract,
+                        )
                     raise RuntimeError(
                         "DSA observer replay contract failed: "
                         f"{dsa_observer_contract}"

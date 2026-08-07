@@ -4,8 +4,10 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from ml_dtypes import bfloat16
 
 from scripts.greenfield.compile_short_decoder import (
+    _canonicalize_layer_residual_observation,
     _load_short_context_dsa_oracle,
     _materialize_global_array,
     _observer_hlo_isolation_contract,
@@ -74,6 +76,121 @@ def test_materialize_global_array_fails_closed_on_gather_shape_drift() -> None:
 
     with pytest.raises(RuntimeError, match="global array gather changed shape"):
         _materialize_global_array(jax, multihost, value)
+
+
+def _layer_residual_observation_fixture() -> tuple[
+    np.ndarray,
+    np.ndarray,
+    tuple[tuple[int, ...], ...],
+    SimpleNamespace,
+]:
+    groups = ((0, 1), (2, 3))
+    schedule = SimpleNamespace(
+        stages=(
+            SimpleNamespace(
+                assignment=SimpleNamespace(stage_id=0),
+                layers=(
+                    SimpleNamespace(layer_id=0),
+                    SimpleNamespace(layer_id=1),
+                ),
+            ),
+            SimpleNamespace(
+                assignment=SimpleNamespace(stage_id=1),
+                layers=(
+                    SimpleNamespace(layer_id=2),
+                    SimpleNamespace(layer_id=3),
+                ),
+            ),
+        )
+    )
+    canonical = np.asarray(
+        np.arange(1, 16, dtype=np.float32).reshape(5, 3),
+        dtype=bfloat16,
+    )
+    observation = np.zeros((4, 5, 3), dtype=bfloat16)
+    writers = ((0,), (0,), (0, 1), (1,), (1,))
+    for boundary, writer_stages in enumerate(writers):
+        for stage_id in writer_stages:
+            observation[list(groups[stage_id]), boundary] = canonical[boundary]
+    return observation, canonical, groups, schedule
+
+
+def test_layer_residual_observer_canonicalizes_exact_stage_writers() -> None:
+    observation, expected, groups, schedule = (
+        _layer_residual_observation_fixture()
+    )
+
+    canonical, contract = _canonicalize_layer_residual_observation(
+        observation,
+        groups=groups,
+        schedule=schedule,
+        hidden_size=3,
+    )
+
+    np.testing.assert_array_equal(canonical, expected)
+    assert contract["passed"]
+    assert contract["boundary_count"] == 5
+    assert contract["dtype"] == "bfloat16"
+    assert contract["lane_mismatch_boundaries"] == []
+    assert contract["writer_mismatch_boundaries"] == []
+    assert contract["nonwriter_nonzero_boundaries"] == []
+    assert [record["writer_stages"] for record in contract["boundary_records"]] == [
+        [0],
+        [0],
+        [0, 1],
+        [1],
+        [1],
+    ]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "contract_key", "expected_boundary"),
+    (
+        ("lane", "lane_mismatch_boundaries", 1),
+        ("writer", "writer_mismatch_boundaries", 2),
+        ("nonwriter", "nonwriter_nonzero_boundaries", 1),
+    ),
+)
+def test_layer_residual_observer_fails_closed_on_replication_drift(
+    mutation: str,
+    contract_key: str,
+    expected_boundary: int,
+) -> None:
+    observation, _, groups, schedule = _layer_residual_observation_fixture()
+    if mutation == "lane":
+        observation[1, 1, 0] += bfloat16(1)
+    elif mutation == "writer":
+        observation[list(groups[1]), 2, 0] += bfloat16(1)
+    else:
+        observation[2, 1, 0] = bfloat16(1)
+
+    _, contract = _canonicalize_layer_residual_observation(
+        observation,
+        groups=groups,
+        schedule=schedule,
+        hidden_size=3,
+    )
+
+    assert not contract["passed"]
+    assert contract[contract_key] == [expected_boundary]
+
+
+def test_layer_residual_observer_rejects_shape_and_dtype_drift() -> None:
+    observation, _, groups, schedule = _layer_residual_observation_fixture()
+    with pytest.raises(RuntimeError, match="tensor contract drifted"):
+        _canonicalize_layer_residual_observation(
+            observation[:, :-1],
+            groups=groups,
+            schedule=schedule,
+            hidden_size=3,
+        )
+    with pytest.raises(RuntimeError, match="tensor contract drifted"):
+        _canonicalize_layer_residual_observation(
+            observation.astype(np.float32),
+            groups=groups,
+            schedule=schedule,
+            hidden_size=3,
+        )
 
 
 def test_completed_step_selected_state_uses_next_position_as_exclusive_bound() -> None:
