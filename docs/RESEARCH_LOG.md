@@ -4818,3 +4818,25 @@ three diagnostics failed before timing on a program-axis tile violation, boolean
 and wide-loop/bitpacked-select Mosaic legalization; every failure ended 8/8 clean. This remains a
 standalone selector, not integrated attention, layer wall, or tok/s. Next is Section 7.2 item 7,
 selected-KV gather fused with sparse attention.
+
+## 2026-08-07 09:34 — All-boundary legacy observation perturbs arithmetic; selected isolation replaces it
+
+Protected legacy diagnostic
+`greenfield_legacy_layer_residual_p2044_20260807T074001755663269Z` failed the sealed raw-token
+prefix and therefore has no accepted residual, DB row, `SUCCESS`, Gate D, or timing claim. Cleanup
+is authenticated 8/8 zero work. Its eight files are preserved only as a rejected draw. A CPU
+sensitivity projection of its final residual through the real final norm and two decisive LM-head
+rows favors wrong token `12877` by `0.125`, proving that returning all 79 boundaries changed the
+observer arithmetic enough to invalidate it as the legacy production oracle.
+
+Isolated observer pin `15f9606000c4dfd50b52873a35c5458b1f9339ad` and greenfield harness
+pin `cd98b07e94a2bac4497e0ed74302adf119d076bc` replace the all-boundary output. Production keeps
+its historical output tree and donated cache. Separate no-donation executables, with the same
+compiler options, capture only boundaries `1,77,78` from the production pre-step cache. They return
+already-live hidden/residual components; logical BF16 addition is host-only after execution. Each
+selected residual is accepted only when its observer final hidden row is bitwise identical to
+production. Optimized-HLO contracts reject host callbacks and top-level aliases, and the fleet
+validator requires 24 contracts with one HLO hash per boundary. Failed token draws now persist the
+exact sequence before raising. Verification is 10/10 observer tests, 40/40 related regressions, and
+365 passed / 1 skipped for the full greenfield CPU suite. This is methodology, not model evidence;
+the protected selected-boundary run remains next.

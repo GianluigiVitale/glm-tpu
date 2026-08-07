@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 07:39 UTC
+**Updated:** 2026-08-07 09:34 UTC
 
 ## Authority and isolation
 
@@ -1132,3 +1132,44 @@ top-16 margin, validates checksum/state on all hosts, retrieves exactly eight pr
 reconstructs every one of the 79 x 6,144 BF16 values, compares them to greenfield SHA
 `d14366c9...f5656b57`, archives append-only evidence, and ends with authenticated 8/8 zero work.
 It is diagnostic correctness evidence only: no timing, throughput, Gate D, or performance claim.
+
+## All-boundary legacy draw rejected; isolated selected observers are pinned
+
+Protected run
+`greenfield_legacy_layer_residual_p2044_20260807T074001755663269Z` compiled and
+executed the first legacy observer, but failed closed because the generated tokens no longer
+matched the sealed prefix. It has no DB row, `SUCCESS`, accepted residual, Gate D, or performance
+claim; its failure-exit census proves 8/8 zero work. The eight retrieved boundary files and their
+comparison are retained only under explicit `failed_draw` names. They report boundary 0 equal and
+boundaries 1--78 unequal, but cannot localize production arithmetic because making all 79 values
+live changed the decode executable itself. A read-only CPU sensitivity projection through the real
+final norm and decisive LM-head rows confirms the rejected final residual favors wrong token
+`12877` over `16345` by `0.125`; sealed legacy instead favors `16345` by `0.25`.
+
+Observer pin `15f9606000c4dfd50b52873a35c5458b1f9339ad` replaces that methodology on
+the isolated `greenfield/legacy-residual-observer` branch, exactly two commits above sealed oracle
+`b3c25df47ac98783912dc658878181ec0a8ae16d`. Production again has its historical output tree and
+donated cache path. Three separate observer executables capture boundaries `1,77,78` before the
+production focus step from the same pre-step cache; each uses production compiler options, never
+donates, returns only the selected already-live hidden/residual components, and finishes before
+production begins. Logical BF16 residual addition occurs only on the host after both programs.
+Every boundary is accepted only if the observer final hidden row equals production bit-for-bit.
+Each optimized observer HLO also writes an append-only SHA contract and rejects callbacks or a
+top-level input/output alias.
+
+Greenfield harness commit `cd98b07e94a2bac4497e0ed74302adf119d076bc` pins that observer,
+requires 24 fleet-agreeing HLO contracts, validates selected-boundary coverage/replication, and
+labels the first unequal selected boundary as coarse localization rather than the earliest model
+boundary. Failed logprob draws now persist the exact expected/observed sequences and first mismatch
+before raising. Observer verification is 10/10 plus 40/40 related regressions; the complete
+greenfield suite is 365 passed / 1 skipped. Python compile, Bash syntax, ShellCheck, and diff checks
+pass.
+
+Exact next: after the documentation commit is pushed and a clean eight-host census passes, run
+`bash scripts/greenfield/run_capture_legacy_layer_residuals.sh`. Accept only exact 15-token
+production reproduction, sealed position-2,044 top-16 margin, 8/8 checksum/state, 24 callback-free
+and alias-free fleet HLO contracts, bitwise observer/production final-hidden equality for all three
+boundaries, exact selected-boundary reconstruction, approved append-only archive, DB linkage, and
+8/8 zero-work cleanup. If 77->78 contains the dominant accepted error jump, instrument layer 77
+sublayers next; otherwise refine the selected interval. Never infer the earliest divergence from a
+sparse boundary set and never relax the raw-token gate.
