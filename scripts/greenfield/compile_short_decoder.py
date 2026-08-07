@@ -160,6 +160,19 @@ def _materialize_global_array(
     return host
 
 
+def _encode_bfloat16_bits(value: np.ndarray) -> np.ndarray:
+    """Return a portable little-endian uint16 representation of BF16 bits."""
+
+    observed = np.asarray(value)
+    if observed.dtype.name != "bfloat16":
+        raise ValueError(
+            "BF16 bit encoding requires bfloat16 input, "
+            f"got {observed.dtype}"
+        )
+    native_bits = np.ascontiguousarray(observed).view(np.uint16)
+    return native_bits.astype(np.dtype("<u2"), copy=False)
+
+
 def _canonicalize_layer_residual_observation(
     observation: np.ndarray,
     *,
@@ -236,7 +249,8 @@ def _canonicalize_layer_residual_observation(
                 "writer_stages": sorted(writer_stages),
             }
         )
-    digest = sha256(np.ascontiguousarray(canonical).tobytes()).hexdigest()
+    canonical_bits = _encode_bfloat16_bits(canonical)
+    digest = sha256(canonical_bits.tobytes()).hexdigest()
     contract = {
         "boundary_count": layer_count + 1,
         "boundary_records": boundary_records,
@@ -250,6 +264,9 @@ def _canonicalize_layer_residual_observation(
             and not writer_mismatches
             and not nonwriter_nonzero
         ),
+        "storage_byte_order": "little",
+        "storage_dtype": canonical_bits.dtype.str,
+        "storage_field": "residual_bfloat16_bits",
         "writer_mismatch_boundaries": sorted(set(writer_mismatches)),
     }
     return canonical, contract
@@ -1892,7 +1909,11 @@ def main() -> int:
                                 decode_position=np.asarray(
                                     [decode_position], dtype=np.int32
                                 ),
-                                residuals=canonical_layer_residuals,
+                                residual_bfloat16_bits=(
+                                    _encode_bfloat16_bits(
+                                        canonical_layer_residuals
+                                    )
+                                ),
                             )
                             _atomic_json(
                                 residual_dir / "contract.json",

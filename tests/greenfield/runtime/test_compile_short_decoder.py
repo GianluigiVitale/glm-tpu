@@ -8,6 +8,7 @@ from ml_dtypes import bfloat16
 
 from scripts.greenfield.compile_short_decoder import (
     _canonicalize_layer_residual_observation,
+    _encode_bfloat16_bits,
     _load_short_context_dsa_oracle,
     _materialize_global_array,
     _observer_hlo_isolation_contract,
@@ -131,6 +132,9 @@ def test_layer_residual_observer_canonicalizes_exact_stage_writers() -> None:
     assert contract["passed"]
     assert contract["boundary_count"] == 5
     assert contract["dtype"] == "bfloat16"
+    assert contract["storage_byte_order"] == "little"
+    assert contract["storage_dtype"] == "<u2"
+    assert contract["storage_field"] == "residual_bfloat16_bits"
     assert contract["lane_mismatch_boundaries"] == []
     assert contract["writer_mismatch_boundaries"] == []
     assert contract["nonwriter_nonzero_boundaries"] == []
@@ -141,6 +145,18 @@ def test_layer_residual_observer_canonicalizes_exact_stage_writers() -> None:
         [1],
         [1],
     ]
+
+
+def test_layer_residual_bfloat16_storage_is_portable_uint16_bits() -> None:
+    values = np.asarray([[0.0, 1.0, -2.5]], dtype=bfloat16)
+
+    bits = _encode_bfloat16_bits(values)
+
+    assert bits.dtype.str == "<u2"
+    assert bits.tolist() == [[0x0000, 0x3F80, 0xC020]]
+    assert bits.tobytes() == b"\x00\x00\x80\x3f\x20\xc0"
+    with pytest.raises(ValueError, match="requires bfloat16"):
+        _encode_bfloat16_bits(values.astype(np.float32))
 
 
 @pytest.mark.parametrize(
