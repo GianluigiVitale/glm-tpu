@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 22:02 UTC
+**Updated:** 2026-08-07 22:05 UTC
 
 ## Authority and isolation
 
@@ -1523,3 +1523,29 @@ requires each to form an independent 0--7 fleet bijection, and retains exact glo
 
 Exact next: commit/push this narrow identity correction and rerun the serialized bounded probe once.
 Do not interpret the rejected launch as numerical evidence and do not load the full decoder first.
+
+## Distributed arithmetic passes; artifact publication owner fails
+
+The corrected protected launch
+`greenfield_layer0_dsa_association_20260807T220248890303736Z` at `78283a5` executed the complete
+32-chip distributed projection/norm phase successfully on all eight hosts. Launch-to-JAX ordering
+is `0:1, 1:6, 2:0, 3:7, 4:2, 5:4, 6:3, 7:5`; local device sets cover exactly 0--31. Every host
+reports fleet-identical HLO SHA `40c98625...4467` and q-residual SHA `59e65063...b60b`. The TPU HLO
+has exactly one global-id `f32[32]` all-reduce and one `bf16[32,64,32]` all-gather over ranks 0--31,
+with no contract violation. Runtime raw-FP8/FP32-scale byte sums remain exactly
+`2448103424/53100864`.
+
+The wrapper then failed before the one-host score matrix because the script wrote the artifact on
+topology-ordered JAX process 0 (launch worker 2), while the shell attempted to upload the artifact
+only from launch worker 0. Seven hosts exited successfully and launch worker 0 failed on the absent
+local directory. Thus the distributed arithmetic is useful partial diagnostic evidence, but the
+overall run has no comparison matrix, DB row, final archive `SUCCESS`, arithmetic conclusion,
+decoder execution, Gate-D, timing or throughput claim. Failure capture SHA is
+`97356689...0f5e`; authenticated 8/8 cleanup SHA is `acba8d07...0ca2` and partial evidence is
+archived in the approved bucket.
+
+The narrow correction binds the single artifact/HLO writer to launch worker 0, records both its
+launch and JAX identities in the manifest, and makes the validator compare that producer record to
+the fleet map. Focused tests remain 32/32 with Python/Bash/ShellCheck/diff checks green. Exact next:
+commit/push and run one final bounded retry; it should reuse the already-proven arithmetic and reach
+the score matrix. Do not run the full decoder first.

@@ -223,6 +223,15 @@ if distributed_manifest["manifest_sha256"] != distributed_sha or (
     runner["distributed_q_a_norm_artifact"] != distributed_manifest
 ):
     raise SystemExit("distributed q-a norm artifact linkage failed")
+launch_zero = next(
+    record for record in distributed_records if record["launch_process_id"] == 0
+)
+if distributed_manifest.get("producer") != {
+    "hostname": launch_zero["hostname"],
+    "launch_process_id": 0,
+    "jax_process_index": launch_zero["jax_process_index"],
+}:
+    raise SystemExit("distributed q-a norm artifact owner drifted")
 for name, record in runner["hlo"]["state"].items():
     if not record["contract"]["passed"]:
         raise SystemExit(f"layer-0 DSA state HLO failed: {name}")

@@ -5186,3 +5186,19 @@ The narrow fix records launch and JAX identities separately and requires both fl
 0--7, while the existing physical-device check still requires exact IDs 0--31. Focused tests and
 static checks pass. One bounded retry is warranted because the rejected launch never reached the
 arithmetic under test.
+
+## 2026-08-07 22:05 — Distributed q-a norm executes; writer identity blocks the matrix
+
+Protected bounded launch `greenfield_layer0_dsa_association_20260807T220248890303736Z` at
+`78283a5` completed the 32-chip arithmetic on all hosts. Both identity maps are bijective, physical
+device IDs cover 0--31, all HLOs hash to `40c98625...4467`, and every replicated q residual hashes
+to `59e65063...b60b`. Exact TPU HLO contains one `f32[32]` all-reduce and one
+`bf16[32,64,32]` all-gather over ranks 0--31 with global IDs and zero violations. Sealed raw weight
+and scale byte sums also pass.
+
+The post-script upload failed only on launch worker 0: the Python artifact writer was keyed to JAX
+process 0, which topology maps to launch worker 2, while the shell publisher was keyed to launch
+worker 0. The score matrix therefore never ran and there is no DB/final-SUCCESS/numerical conclusion
+or performance claim. Cleanup is authenticated 8/8 and partial evidence is archived. The correction
+keys the writer to launch process 0 and binds its launch/JAX/hostname producer identity in the
+manifest. One final bounded retry is warranted because the distributed computation itself passed.

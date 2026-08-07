@@ -376,7 +376,10 @@ def main() -> int:
         }
         _atomic_json(args.output, record)
 
-        if jax.process_index() == 0:
+        # The orchestrator and follow-on one-host scorer live on launch worker
+        # zero. JAX process zero is topology ordered onto a different VM on
+        # this pod, so bind artifact ownership to the preserved launch id.
+        if args.process_id == 0:
             from safetensors.numpy import save_file
 
             args.artifact_dir.mkdir(parents=True, exist_ok=False)
@@ -400,6 +403,11 @@ def main() -> int:
                 "code_hash": code_hash,
                 "input_manifest_sha256": manifest["manifest_sha256"],
                 "hlo_sha256": hlo_sha256,
+                "producer": {
+                    "hostname": socket.gethostname(),
+                    "launch_process_id": args.process_id,
+                    "jax_process_index": jax.process_index(),
+                },
                 "q_residual": record["q_residual"],
                 "file": {
                     "filename": tensor_path.name,
