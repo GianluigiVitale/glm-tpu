@@ -25,10 +25,15 @@ case "$PROFILE" in
     TAG_PREFIX=greenfield_short_context_oracle
     ;;
   8k)
-    SOURCE_RUN_ID=104
-    SOURCE_ITEM_ROW_ID=506
-    SOURCE_HARNESS_GIT=fd6af78
-    SOURCE_FORK_GIT=3b2963082
+    # Pair the protected 8K token oracle with the current immutable legacy
+    # execution pin used by the all-event DSA capture.  Historical run 104 is
+    # preserved in its already-sealed artifact, but its continuation differs
+    # after the passkey phrase and therefore cannot define the same recurrent
+    # trajectory as the fresh run-485 DSA tensors.
+    SOURCE_RUN_ID=485
+    SOURCE_ITEM_ROW_ID=1769
+    SOURCE_HARNESS_GIT=a4a17ac
+    SOURCE_FORK_GIT=b3c25df47
     SOURCE_BENCHMARK=passkey_L8192_d0.5
     SOURCE_PROMPT_TOKENS=8155
     SOURCE_GENERATED_TOKENS=20
