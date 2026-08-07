@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 06:58 UTC
+**Updated:** 2026-08-07 07:39 UTC
 
 ## Authority and isolation
 
@@ -1096,3 +1096,39 @@ self-describing. Exact next: change future residual artifacts to an explicit lit
 `uint16` BF16-bit field and add readback validation; do not rerun this expensive capture solely for
 metadata because the protected raw bytes are exact and immutable. Then implement the independent,
 observer-only legacy boundary capture at the pinned oracle source and compare the two trajectories.
+
+## Independent legacy boundary observer is armed
+
+Greenfield commit `e7e0dbd` fixes all future residual files to use the explicit portable
+`residual_bfloat16_bits` little-endian uint16 field; the first protected artifact remains exactly
+recoverable from its immutable `void16` bytes and is accepted by the compatibility reader only.
+
+The isolated legacy-oracle branch `greenfield/legacy-residual-observer` is pushed at
+`cf066ab3e29151153d3f930a4c5ecc20ba716a9f`, exactly one commit above sealed oracle
+`b3c25df47ac98783912dc658878181ec0a8ae16d`. It registers default-off pre-hooks on all 78 decoder
+layers and the final norm, returns a separate callback-free `[79,32,6144]` BF16 decode output, and
+writes only addressable target-row shards as explicit little-endian BF16 bits. The accepted oracle
+checkout is unchanged. Eight observer tests include the real TorchAX `functional_call`/JAX JIT
+seam and StableHLO callback absence; two existing MTP output-pytree tests and 18 unaffected runner
+tests pass. Three pre-existing `continue_decode` unit failures caused by a `None` mocked flight-
+recorder field are unrelated and were not changed.
+
+Greenfield commit `ee22501` adds fail-closed eight-process reconstruction, bitwise duplicate/coverage
+checks, compatibility readback of the sealed greenfield artifact, per-boundary BF16 comparison,
+first-divergence reporting, and the protected wrapper. Verification is 362 passed / 1 skipped with
+`JAX_PLATFORMS=cpu`, plus Python compile, Bash syntax, ShellCheck, and diff checks. An earlier test
+invocation accidentally inherited the local TPU backend; it was terminated, produced no evidence,
+and left no libtpu holder before the complete CPU-only rerun.
+
+Exact next command, only from a clean branch/fleet, is:
+
+```bash
+bash scripts/greenfield/run_capture_legacy_layer_residuals.sh
+```
+
+The wrapper materializes a pin-specific detached observer worktree on every host, proves raylet
+environment/import/code fingerprints, reproduces all 15 sealed legacy tokens and position-2,044
+top-16 margin, validates checksum/state on all hosts, retrieves exactly eight process files,
+reconstructs every one of the 79 x 6,144 BF16 values, compares them to greenfield SHA
+`d14366c9...f5656b57`, archives append-only evidence, and ends with authenticated 8/8 zero work.
+It is diagnostic correctness evidence only: no timing, throughput, Gate D, or performance claim.
