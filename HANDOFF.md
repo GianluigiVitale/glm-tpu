@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 02:39 UTC
+**Updated:** 2026-08-07 06:00 UTC
 
 ## Authority and isolation
 
@@ -1010,3 +1010,24 @@ gate. All other collective counts/shapes passed, but the contract predicted the 
 one-layer lowering. No prefill, token, DSA, timing, or tok/s claim was reached. Diagnostics are
 preserved and failure-exit cleanup is 8/8 clean. The exact next action is the same protected 2K
 challenger with only that observed exact shape pinned; no arithmetic or acceptance gate is relaxed.
+
+Commit `70e5792` pins that observed complete-decoder result shape. The second protected challenger
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_oracle_dsa_trace2_20260807T053429062047282Z`
+then passed complete production/observer/prefill HLO, executed the real 2,034-token device prefill,
+returned exact first token `220`, and passed all `14 x 21` executing-device DSA contracts. Its first
+ten recurrent tokens are exact. At the first boundary, position 2,044, the FP32 reconstruction
+changed the previous wrong margin (`12877=20.875`, `16345=20.75`) to an exact BF16-logit tie
+(`12877=20.75`, `16345=20.75`); exact lowest-token-id tie order therefore still selects `12877`
+instead of oracle token `16345`. The complete expected/observed recurrent sequences are
+`[104550,101294,16,13,3155,537,10662,432,13,576,16345,374,6176,13]` and
+`[104550,101294,16,13,3155,537,10662,432,13,576,12877,374,6303,13]`; the position-2,046 mismatch
+is downstream of the changed autoregressive input. Legacy's sealed position-2,044 logprob margin
+remains `+0.25` for `16345`, so the diagnostic removed one BF16 ULP of inversion but did not recover
+the full arithmetic difference. The run failed closed before production warmup/timing/trace, makes
+no tok/s claim, preserved all observer artifacts, and ended with authenticated 8/8 zero work.
+
+Exact next: keep the sealed token trajectory teacher-forced and capture compact residuals at every
+layer boundary in independent legacy-oracle and greenfield observer executables. Locate the first
+divergent boundary before changing more arithmetic. The observer must remain default-off and
+callback-free on device, production HLO/timing must stay isolated, artifacts must bind layer,
+position, trajectory, code/model/checkpoint hashes, and no token/tie gate may be relaxed.
