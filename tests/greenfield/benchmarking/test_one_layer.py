@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 
 from glm_tpu.greenfield.benchmarking.one_layer import (
@@ -38,6 +40,7 @@ def test_bounded_tensor_records_all_three_bars() -> None:
     assert record["passed"]
     assert record["error"]["max_abs"] == 0.125
     assert record["error"]["max_abs_index"] == [0, 99]
+    json.dumps(record)
     failed = compare_bounded_tensor(
         observed,
         reference,

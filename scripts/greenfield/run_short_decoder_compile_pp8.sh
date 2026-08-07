@@ -261,7 +261,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer 2K load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --complete-token-path "$complete_token_path" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --complete-token-path "$complete_token_path" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK || {
@@ -278,6 +278,10 @@ if [[ $TRACE_STEPS -gt 0 ]]; then
   gcloud storage cp "$REMOTE_PREFIX/traces/trace.rank*.xplane.pb" \
     "$RUN_DIR/traces/" >/dev/null
 fi
+if [[ $SHORT_CONTEXT_DSA_ORACLE == 1 ]]; then
+  gcloud storage cp "$REMOTE_PREFIX/dsa_observer/*" \
+    "$RUN_DIR/dsa_observer/" >/dev/null
+fi
 
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
@@ -291,6 +295,8 @@ import hashlib
 from pathlib import Path
 import sqlite3
 import sys
+
+import numpy as np
 
 (
     run_dir,
@@ -367,7 +373,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {4}:
+if {record["schema_version"] for record in records} != {5}:
     raise SystemExit("fleet decoder record schema drifted")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
@@ -497,8 +503,11 @@ if short_context_dsa_oracle:
             or not dsa["score_comparison"][
                 "executing_score_order_and_ties_are_gate"
             ]
-            or not dsa["score_comparison"][
+            or dsa["score_comparison"][
                 "legacy_scores_use_position_aligned_bounded_gate"
+            ]
+            or not dsa["score_comparison"][
+                "legacy_scores_use_position_aligned_diagnostic"
             ]
             or dsa["score_comparison"]["legacy_score_tolerance"]
             != {"max_abs": 0.125, "mean_abs": 0.01, "p99_abs": 0.03125}
@@ -506,6 +515,11 @@ if short_context_dsa_oracle:
                 "selected_set_against_legacy_is_exact_gate"
             ]
             or len(dsa["observation_artifacts"]) != 14
+            or dsa["prefill_token_sequence"] is None
+            or not dsa["prefill_token_sequence"]["exact_prefix_match"]
+            or dsa["prefill_token_sequence"]["compared_token_count"] != 1
+            or dsa["prefill_token_sequence"]["observed_token_ids"]
+            != dsa["prefill_token_sequence"]["expected_token_ids"]
             or dsa["token_oracle_offset"] != 1
             or not dsa["token_sequence"]["exact_prefix_match"]
             or dsa["token_sequence"]["compared_token_count"] != 14
@@ -526,7 +540,6 @@ if short_context_dsa_oracle:
                 and not step["selected_set_mismatches"]
                 and not step["tail_mismatches"]
                 and not step["score_contract_mismatches"]
-                and step["legacy_score_bounded_comparison"]["passed"]
                 and step["legacy_score_bounded_comparison"][
                     "coverage_complete"
                 ]
@@ -554,6 +567,31 @@ if short_context_dsa_oracle:
             ]
         ):
             raise SystemExit("exact DSA observer/Gate D contract failed")
+    artifact_records = records[0]["dsa_observer_contract"][
+        "observation_artifacts"
+    ]
+    artifact_names = [record["filename"] for record in artifact_records]
+    artifact_paths = sorted((run_dir / "dsa_observer").glob("*.npz"))
+    if [path.name for path in artifact_paths] != artifact_names:
+        raise SystemExit("DSA observer artifact inventory drifted")
+    for record, path in zip(artifact_records, artifact_paths, strict=True):
+        with np.load(path) as bundle:
+            if set(bundle.files) != {"decode_position", "observation"}:
+                raise SystemExit("DSA observer artifact fields drifted")
+            decode_position = np.asarray(bundle["decode_position"])
+            observation = np.asarray(bundle["observation"])
+        digest = hashlib.sha256(
+            np.ascontiguousarray(observation).tobytes()
+        ).hexdigest()
+        if (
+            decode_position.shape != (1,)
+            or int(decode_position[0])
+            not in range(2034, 2048)
+            or observation.shape != (32, 5, 4098)
+            or observation.dtype != np.dtype(np.int32)
+            or digest != record["observation_sha256"]
+        ):
+            raise SystemExit("DSA observer artifact tensor/hash drifted")
 else:
     for record in records:
         if any(
@@ -867,7 +905,7 @@ pv.record_item(
         )
     ),
     gold=(
-        "Exact tokens/DSA sets/device ties plus bounded position-aligned legacy scores."
+        "Exact tokens and executing-device DSA sets/ties; legacy scores retained diagnostically."
         if short_context_dsa_oracle
         else (
             "Exact raw token IDs against the sealed accepted legacy prefix."

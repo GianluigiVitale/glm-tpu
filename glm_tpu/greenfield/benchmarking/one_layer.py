@@ -66,7 +66,10 @@ def compare_bounded_tensor(
     rms = float(np.sqrt(np.mean(np.square(error)))) if error.size else 0.0
     maximum_flat_index = int(np.argmax(error)) if error.size else 0
     maximum_index = (
-        list(np.unravel_index(maximum_flat_index, error.shape))
+        [
+            int(value)
+            for value in np.unravel_index(maximum_flat_index, error.shape)
+        ]
         if error.size
         else []
     )

@@ -299,13 +299,15 @@ def _validate_dsa_observation_step(
     expected_producer_layer_ids: np.ndarray,
     decode_position: int,
 ) -> dict[str, Any]:
-    """Gate exact device sets/ties and bounded position-aligned legacy scores.
+    """Gate exact device sets/ties and diagnose position-aligned legacy scores.
 
     The numerical contract deliberately does not require total score-rank
     identity across independent TPU programs. It does require an exact
     selected set, an exact ``-1``/``-inf`` tail, canonical lowest-position
-    ties for the scores produced by this executing greenfield program, and the
-    already accepted bounded score comparison against the legacy oracle.
+    ties for the scores produced by this executing greenfield program. The
+    accepted Gate C score bounds apply only when both programs consume the
+    same captured hidden input; after full-network reduction reassociation,
+    position-aligned legacy scores are retained as a non-gating diagnostic.
     """
 
     observed = np.asarray(observation)
@@ -562,7 +564,7 @@ def _validate_dsa_observation_step(
             tail_mismatches,
             score_contract_mismatches,
         )
-    ) and bool(score_comparison["passed"])
+    )
     return {
         "count_mismatches": count_mismatches,
         "decode_position": int(decode_position),
@@ -1470,6 +1472,7 @@ def main() -> int:
 
         generated_tokens: list[int] = []
         prefill_wall_ms = None
+        prefill_token_oracle_contract = None
         dsa_observer_contract = None
         if oracle_mode:
             assert compiled_prefill is not None and prefill_inputs is not None
@@ -1487,6 +1490,24 @@ def main() -> int:
             if not np.all(first_token == first_token[0]):
                 raise RuntimeError("prefill token lanes disagree")
             generated_tokens.append(int(first_token[0]))
+            if dsa_oracle_mode:
+                assert oracle_generated_token_ids is not None
+                prefill_token_oracle_contract = _raw_token_sequence_contract(
+                    generated_tokens,
+                    oracle_generated_token_ids,
+                )
+                if jax.process_index() == 0:
+                    _atomic_json(
+                        args.output.parent
+                        / "dsa_observer"
+                        / "prefill_token_observation.json",
+                        prefill_token_oracle_contract,
+                    )
+                if not prefill_token_oracle_contract["exact_prefix_match"]:
+                    raise RuntimeError(
+                        "prefill first-token oracle contract failed: "
+                        f"{prefill_token_oracle_contract}"
+                    )
         else:
             output = compiled(*inputs)
             output[3].block_until_ready()
@@ -1620,12 +1641,14 @@ def main() -> int:
                     "prefill_state_preserved_without_donation": (
                         prefill_state_preserved
                     ),
+                    "prefill_token_sequence": prefill_token_oracle_contract,
                     "production_executable_observer_enabled": False,
                     "score_comparison": {
                         "compared": True,
                         "cross_backend_total_order_is_gate": False,
                         "executing_score_order_and_ties_are_gate": True,
-                        "legacy_scores_use_position_aligned_bounded_gate": True,
+                        "legacy_scores_use_position_aligned_bounded_gate": False,
+                        "legacy_scores_use_position_aligned_diagnostic": True,
                         "legacy_score_tolerance": (
                             DSA_CROSS_BACKEND_SCORE_TOLERANCE.to_dict()
                         ),
@@ -1990,7 +2013,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 4,
+            "schema_version": 5,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

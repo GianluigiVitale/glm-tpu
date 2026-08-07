@@ -299,7 +299,7 @@ def test_dsa_observer_allows_cross_backend_nontie_rank_drift() -> None:
     assert record["legacy_score_bounded_comparison"]["passed"]
 
 
-def test_dsa_observer_refuses_cross_backend_score_bound_drift() -> None:
+def test_dsa_observer_records_cross_backend_score_bound_drift() -> None:
     (
         observation,
         groups,
@@ -322,7 +322,7 @@ def test_dsa_observer_refuses_cross_backend_score_bound_drift() -> None:
         expected_producer_layer_ids=expected_producers,
         decode_position=3,
     )
-    assert not record["passed"]
+    assert record["passed"]
     assert record["exact_selected_set_and_tail"]
     assert record["actual_device_score_order_and_ties"]
     assert not record["legacy_score_bounded_comparison"]["passed"]
