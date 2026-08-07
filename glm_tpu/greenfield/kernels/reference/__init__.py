@@ -55,7 +55,7 @@ from .moe import (
     stage_local_moe,
     stage_local_moe_from_routes,
 )
-from .rmsnorm import final_norm, rms_norm
+from .rmsnorm import final_norm, fused_add_rms_norm, rms_norm
 from .rotary import apply_rotary, rotary_cos_sin
 
 __all__ = (
@@ -85,6 +85,7 @@ __all__ = (
     "embedding_lookup",
     "exact_topk",
     "final_norm",
+    "fused_add_rms_norm",
     "gather_paged_selected_kv",
     "gather_stage_local_selected_kv",
     "linear",

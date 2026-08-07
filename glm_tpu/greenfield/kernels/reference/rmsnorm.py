@@ -50,6 +50,49 @@ def rms_norm(
     ).astype(activation_dtype)
 
 
+def fused_add_rms_norm(
+    hidden_states: jax.Array,
+    residual: jax.Array,
+    weight: jax.Array,
+    *,
+    epsilon: float,
+) -> tuple[jax.Array, jax.Array]:
+    """Match the accepted decoder's fused residual-add/RMSNorm boundary.
+
+    The normalization consumes the unrounded FP32 sum.  The independently
+    returned residual is the same sum rounded to the activation dtype.  These
+    two values are intentionally not interchangeable: rounding the sum before
+    the variance reduction changes BF16 model arithmetic.
+    """
+
+    if hidden_states.shape != residual.shape:
+        raise ValueError("fused RMSNorm hidden and residual shapes must match")
+    if hidden_states.dtype != residual.dtype:
+        raise ValueError("fused RMSNorm hidden and residual dtypes must match")
+    if hidden_states.ndim < 1:
+        raise ValueError("fused RMSNorm inputs must have at least one dimension")
+    if weight.shape != (hidden_states.shape[-1],):
+        raise ValueError(
+            "fused RMSNorm weight must match the final hidden dimension"
+        )
+    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or epsilon <= 0:
+        raise ValueError("fused RMSNorm epsilon must be positive")
+    if not jnp.issubdtype(hidden_states.dtype, jnp.inexact):
+        raise ValueError("fused RMSNorm activations must have an inexact dtype")
+    if not jnp.issubdtype(weight.dtype, jnp.inexact):
+        raise ValueError("fused RMSNorm weight must have an inexact dtype")
+
+    activation_dtype = hidden_states.dtype
+    summed = hidden_states.astype(jnp.float32) + residual.astype(jnp.float32)
+    carried_residual = summed.astype(activation_dtype)
+    variance = jnp.mean(lax.square(summed), axis=-1, keepdims=True)
+    normalized = summed * lax.rsqrt(variance + jnp.float32(epsilon))
+    output = (
+        normalized.astype(weight.dtype) * weight
+    ).astype(activation_dtype)
+    return output, carried_residual
+
+
 def final_norm(
     hidden_states: jax.Array,
     weight: jax.Array,

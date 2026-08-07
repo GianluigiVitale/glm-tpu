@@ -10,6 +10,7 @@ from glm_tpu.greenfield.kernels.reference import (
     dense_swiglu,
     embedding_lookup,
     final_norm,
+    fused_add_rms_norm,
     linear,
     residual_add,
     rms_norm,
@@ -39,6 +40,63 @@ def test_rms_norm_refuses_shape_dtype_and_epsilon_drift() -> None:
         rms_norm(jnp.ones((1, 4)), jnp.ones((4,)), epsilon=0)
     with pytest.raises(ValueError, match="inexact"):
         rms_norm(jnp.ones((1, 4), jnp.int32), jnp.ones((4,)), epsilon=1e-5)
+
+
+def test_fused_add_rms_norm_uses_unrounded_fp32_sum() -> None:
+    rng = np.random.default_rng(0)
+    hidden = jnp.asarray(
+        rng.normal(size=(1, 64)) * 3.0, dtype=jnp.bfloat16
+    )
+    residual = jnp.asarray(
+        rng.normal(size=(1, 64)) * 3.0, dtype=jnp.bfloat16
+    )
+    weight = jnp.asarray(
+        rng.normal(loc=1.0, scale=0.1, size=(64,)), dtype=jnp.bfloat16
+    )
+
+    normalized, carried = fused_add_rms_norm(
+        hidden, residual, weight, epsilon=1e-5
+    )
+    summed = hidden.astype(jnp.float32) + residual.astype(jnp.float32)
+    expected_carried = summed.astype(jnp.bfloat16)
+    expected_normalized = (
+        (
+            summed
+            * jax.lax.rsqrt(
+                jnp.mean(summed * summed, axis=-1, keepdims=True) + 1e-5
+            )
+        ).astype(jnp.bfloat16)
+        * weight
+    ).astype(jnp.bfloat16)
+    np.testing.assert_array_equal(np.asarray(carried), np.asarray(expected_carried))
+    np.testing.assert_array_equal(
+        np.asarray(normalized), np.asarray(expected_normalized)
+    )
+
+    rounded_first = rms_norm(expected_carried, weight, epsilon=1e-5)
+    mismatch_count = int(
+        jnp.count_nonzero(
+            jax.lax.bitcast_convert_type(normalized, jnp.uint16)
+            != jax.lax.bitcast_convert_type(rounded_first, jnp.uint16)
+        )
+    )
+    assert mismatch_count == 18
+
+
+def test_fused_add_rms_norm_refuses_state_contract_drift() -> None:
+    hidden = jnp.ones((1, 4), dtype=jnp.bfloat16)
+    residual = jnp.ones((1, 4), dtype=jnp.bfloat16)
+    weight = jnp.ones((4,), dtype=jnp.bfloat16)
+    with pytest.raises(ValueError, match="shapes"):
+        fused_add_rms_norm(hidden, residual[:, :3], weight, epsilon=1e-5)
+    with pytest.raises(ValueError, match="dtypes"):
+        fused_add_rms_norm(
+            hidden, residual.astype(jnp.float32), weight, epsilon=1e-5
+        )
+    with pytest.raises(ValueError, match="weight"):
+        fused_add_rms_norm(hidden, residual, weight[:3], epsilon=1e-5)
+    with pytest.raises(ValueError, match="epsilon"):
+        fused_add_rms_norm(hidden, residual, weight, epsilon=0)
 
 
 def test_linear_preserves_checkpoint_out_in_orientation_and_leading_shape() -> None:
