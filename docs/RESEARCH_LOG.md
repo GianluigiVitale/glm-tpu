@@ -5081,3 +5081,21 @@ markers; the one-row contract remains separate and still rejects diagnostic M=32
 focused CPU tests pass, and read-only validation of the immutable TPU HLO passes with only the
 observed physical layout recorded. Next is a clean-pin serialized retry of the same bounded probe,
 not a full checkpoint run.
+
+## 2026-08-07 20:28 — DB 486 rules out the first association matrix; fused qkv-a is isolated next
+
+Bounded TPU run `greenfield_layer0_dsa_association_20260807T201857533092232Z` at `7296d00` passed
+as DB run 486, archived with exact checksums and 8/8 clean pre/post censuses. The one-row XLA scorer
+is elementwise equal to the reconstructed M32/page512/DCP8 scorer and has a one-row/collective-free
+HLO. All FP32/BF16 and divide/rsqrt variants keep the exact sealed set but miss 1,640 order slots,
+with mean signed score error about `+0.0260275`. Pallas misses 1,505 order slots and differs from
+pagewise XLA by max/mean `0.011721/0.004481`; it is closer but not exact. This diagnostic has no
+decoder, Gate-D, latency, or tok/s claim.
+
+The previously omitted association is the legacy fused A projection: `q_c` is the leading 2,048
+columns of one live BF16 width-2,624 `q_a + kv_a` matmul. Builder pin `c9d0382` adds the exact real
+576-row companion weights/scales in v2 artifact
+`greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z` (26,219,180-byte tensor SHA
+`be643e33...d7f9`, internal manifest `574f3553...73141`) while preserving v1 readback. Next is one
+bounded fused-width state/scorer matrix whose HLO keeps the companion output live, not a full-model
+retry.

@@ -98,6 +98,48 @@ def test_layer0_state_preserves_chunk_and_decode_geometry() -> None:
     assert np.isfinite(np.asarray(state.query)).all()
 
 
+def test_layer0_state_keeps_legacy_fused_qkv_companion_live() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=3,
+        hidden_size=8,
+        q_lora_rank=4,
+        qkv_a_companion_rank=2,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    rng = np.random.default_rng(13)
+
+    def bf16(shape: tuple[int, ...]) -> jnp.ndarray:
+        return jnp.asarray(
+            rng.normal(size=shape).astype(ml_dtypes.bfloat16)
+        )
+
+    state = layer0_dsa_state(
+        bf16((3, 8)),
+        jnp.asarray([0, 1, 2, 0, 1], dtype=jnp.int32),
+        jnp.asarray([2], dtype=jnp.int32),
+        bf16((8,)),
+        bf16((6, 8)),
+        bf16((4,)),
+        jnp.asarray(rng.normal(size=(8, 4)), dtype=jnp.float32),
+        jnp.asarray(rng.normal(size=(4, 8)), dtype=jnp.float32),
+        bf16((4,)),
+        bf16((4,)),
+        bf16((2, 8)),
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        q_a_projection_mode="legacy_fused_qkv_a",
+    )
+    assert state.query.shape == (3, 2, 4)
+    assert state.qkv_a_companion.shape == (3, 2)
+    assert state.qkv_a_companion.dtype == jnp.bfloat16
+    assert np.any(np.asarray(state.qkv_a_companion) != 0)
+
+
 def test_legacy_pagewise_geometry_reconstructs_direct_row() -> None:
     rng = np.random.default_rng(17)
     query = rng.normal(size=(3, 2, 4)).astype(np.float32)

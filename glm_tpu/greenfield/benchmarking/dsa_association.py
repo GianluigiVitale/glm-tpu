@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 AssociationPhase = Literal[
     "legacy_state",
+    "legacy_fused_qkv_state",
     "legacy_score",
     "one_row_score",
 ]
@@ -36,6 +37,14 @@ def validate_dsa_association_hlo(
             f"bf16[{context},{head_dim}]",
             f"f32[{decode_rows},{heads}]",
             "bf16[2048,6144]",
+        ),
+        "legacy_fused_qkv_state": (
+            f"f32[{decode_rows},{heads},{head_dim}]",
+            f"bf16[{context},{head_dim}]",
+            f"f32[{decode_rows},{heads}]",
+            "bf16[2624,6144]",
+            f"bf16[{decode_rows},576]",
+            "legacy_fused_qkv_a_m32_n2624",
         ),
         "legacy_score": (
             f"f32[{decode_rows},{heads},{head_dim}]",
@@ -84,6 +93,15 @@ def validate_dsa_association_hlo(
     missing_score_markers = [
         marker for marker in score_source_markers if marker not in optimized_hlo
     ]
+    fused_qkv_candidates: tuple[str, ...] = ()
+    if phase == "legacy_fused_qkv_state":
+        fused_qkv_candidates = (
+            f"bf16[{decode_rows},2624]",
+            f"bf16[2624,{decode_rows}]",
+        )
+    fused_qkv_intermediate_shapes = [
+        shape for shape in fused_qkv_candidates if shape in optimized_hlo
+    ]
     forbidden_operations = [
         token
         for token in (
@@ -122,6 +140,11 @@ def validate_dsa_association_hlo(
             f"DSA association {phase} lost score source markers: "
             f"{missing_score_markers}"
         )
+    if fused_qkv_candidates and not fused_qkv_intermediate_shapes:
+        violations.append(
+            "DSA association fused qkv_a state lacks its exact "
+            f"logical/physical output: {list(fused_qkv_candidates)}"
+        )
     if forbidden_operations:
         violations.append(
             f"DSA association {phase} contains forbidden operations: "
@@ -138,6 +161,7 @@ def validate_dsa_association_hlo(
         "missing_shapes": missing_shapes,
         "score_intermediate_shapes": score_intermediate_shapes,
         "missing_score_markers": missing_score_markers,
+        "fused_qkv_intermediate_shapes": fused_qkv_intermediate_shapes,
         "forbidden_operations": forbidden_operations,
         "forbidden_dead_rows": forbidden_dead_rows,
         "diagnostic_batch32_allowed": phase != "one_row_score",

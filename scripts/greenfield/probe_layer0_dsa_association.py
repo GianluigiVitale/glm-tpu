@@ -146,6 +146,10 @@ def main() -> int:
     )
     q_a_bits = put_host(arrays["self_attn__q_a_proj__weight"])
     q_a_scale = put_host(arrays["self_attn__q_a_proj__weight_scale_inv"])
+    kv_a_bits = put_host(arrays["self_attn__kv_a_proj_with_mqa__weight"])
+    kv_a_scale = put_host(
+        arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"]
+    )
     wq_b_bits = put_host(arrays["self_attn__indexer__wq_b__weight"])
     wq_b_scale = put_host(
         arrays["self_attn__indexer__wq_b__weight_scale_inv"]
@@ -168,41 +172,80 @@ def main() -> int:
         return value
 
     q_a_bf16 = dequantize("q_a_bf16", q_a_bits, q_a_scale, jnp.bfloat16)
+    kv_a_bf16 = dequantize(
+        "kv_a_bf16", kv_a_bits, kv_a_scale, jnp.bfloat16
+    )
+    fused_qkv_a_bf16 = jnp.concatenate((q_a_bf16, kv_a_bf16), axis=0)
+    jax.block_until_ready(fused_qkv_a_bf16)
     wq_b_fp32 = dequantize("wq_b_fp32", wq_b_bits, wq_b_scale, jnp.float32)
     wk_fp32 = dequantize("wk_fp32", wk_bits, wk_scale, jnp.float32)
     wq_b_bf16 = dequantize("wq_b_bf16", wq_b_bits, wq_b_scale, jnp.bfloat16)
     wk_bf16 = dequantize("wk_bf16", wk_bits, wk_scale, jnp.bfloat16)
 
-    state_arguments = (
+    state_prefix = (
         unique_embeddings,
         prompt_rows,
         current_row,
         input_norm_weight,
-        q_a_bf16,
-        q_a_norm_weight,
     )
     state_tail = (key_norm_weight, key_norm_bias, head_weight)
     geometry = Layer0DsaProbeGeometry()
     state_definitions = {
-        "legacy_fp32_divsqrt": (wq_b_fp32, wk_fp32, "divide_sqrt"),
-        "legacy_fp32_rsqrt": (wq_b_fp32, wk_fp32, "multiply_rsqrt"),
-        "legacy_bf16_divsqrt": (wq_b_bf16, wk_bf16, "divide_sqrt"),
+        "legacy_fp32_divsqrt": (
+            q_a_bf16,
+            wq_b_fp32,
+            wk_fp32,
+            "divide_sqrt",
+            "separate_q_a",
+        ),
+        "legacy_fp32_rsqrt": (
+            q_a_bf16,
+            wq_b_fp32,
+            wk_fp32,
+            "multiply_rsqrt",
+            "separate_q_a",
+        ),
+        "legacy_bf16_divsqrt": (
+            q_a_bf16,
+            wq_b_bf16,
+            wk_bf16,
+            "divide_sqrt",
+            "separate_q_a",
+        ),
         "greenfield_bf16_rsqrt_legacy_geometry": (
+            q_a_bf16,
             wq_b_bf16,
             wk_bf16,
             "multiply_rsqrt",
+            "separate_q_a",
+        ),
+        "legacy_fused_qkv_fp32_divsqrt": (
+            fused_qkv_a_bf16,
+            wq_b_fp32,
+            wk_fp32,
+            "divide_sqrt",
+            "legacy_fused_qkv_a",
         ),
     }
     states: dict[str, Any] = {}
     state_hlo_records: dict[str, Any] = {}
-    for name, (wq_weight, wk_weight, norm_mode) in state_definitions.items():
+    for name, (
+        q_a_projection_weight,
+        wq_weight,
+        wk_weight,
+        norm_mode,
+        q_a_projection_mode,
+    ) in state_definitions.items():
         function = partial(
             layer0_dsa_state,
             geometry=geometry,
             key_norm_mode=norm_mode,
+            q_a_projection_mode=q_a_projection_mode,
         )
         function_arguments = (
-            *state_arguments,
+            *state_prefix,
+            q_a_projection_weight,
+            q_a_norm_weight,
             wq_weight,
             wk_weight,
             *state_tail,
@@ -214,15 +257,20 @@ def main() -> int:
         jax.block_until_ready(state)
         if state.query.shape != (32, 32, 128) or (
             state.index_keys.shape != (8156, 128)
-        ) or state.head_weights.shape != (32, 32):
+        ) or state.head_weights.shape != (32, 32) or (
+            state.qkv_a_companion.shape != (32, 576)
+        ):
             raise RuntimeError(f"layer-0 DSA state geometry drifted: {name}")
         if state.query.dtype != jnp.float32 or (
             state.index_keys.dtype != jnp.bfloat16
-        ) or state.head_weights.dtype != jnp.float32:
+        ) or state.head_weights.dtype != jnp.float32 or (
+            state.qkv_a_companion.dtype != jnp.bfloat16
+        ):
             raise RuntimeError(f"layer-0 DSA state dtype drifted: {name}")
         states[name] = state
         if name in (
             "legacy_fp32_divsqrt",
+            "legacy_fused_qkv_fp32_divsqrt",
             "greenfield_bf16_rsqrt_legacy_geometry",
         ):
             hlo = compiled.as_text()
@@ -230,7 +278,11 @@ def main() -> int:
             hlo_path.write_text(hlo)
             contract = validate_dsa_association_hlo(
                 hlo,
-                phase="legacy_state",
+                phase=(
+                    "legacy_fused_qkv_state"
+                    if q_a_projection_mode == "legacy_fused_qkv_a"
+                    else "legacy_state"
+                ),
             )
             if not contract["passed"]:
                 raise RuntimeError(
@@ -349,6 +401,38 @@ def main() -> int:
         )
     )
 
+    fused_state = states["legacy_fused_qkv_fp32_divsqrt"]
+    fused_query_one = fused_state.query[:1]
+    fused_head_one = fused_state.head_weights[:1]
+    fused_one_row_score = one_row_compiled(
+        fused_query_one,
+        fused_state.index_keys,
+        fused_head_one,
+    )
+    jax.block_until_ready(fused_one_row_score)
+    fused_one_row_host = np.asarray(fused_one_row_score, dtype=np.float32)
+    comparisons["one_row_pagewise_on_fused_qkv_legacy_state"] = (
+        compare_dsa_association_scores(
+            fused_one_row_host,
+            expected_positions,
+            expected_scores,
+        )
+    )
+    fused_pallas_score = pallas_compiled(
+        fused_query_one,
+        fused_state.index_keys,
+        fused_head_one,
+    )
+    jax.block_until_ready(fused_pallas_score)
+    fused_pallas_host = np.asarray(fused_pallas_score[0], dtype=np.float32)
+    comparisons["one_row_pallas_on_fused_qkv_legacy_state"] = (
+        compare_dsa_association_scores(
+            fused_pallas_host,
+            expected_positions,
+            expected_scores,
+        )
+    )
+
     state_deltas = {
         name: {
             "query_vs_legacy": _tensor_delta(state.query[0], legacy_state.query[0]),
@@ -359,6 +443,10 @@ def main() -> int:
             "head_weights_vs_legacy": _tensor_delta(
                 state.head_weights[0],
                 legacy_state.head_weights[0],
+            ),
+            "qkv_a_companion_vs_legacy": _tensor_delta(
+                state.qkv_a_companion,
+                legacy_state.qkv_a_companion,
             ),
         }
         for name, state in states.items()
@@ -372,6 +460,14 @@ def main() -> int:
         "one_row_pallas_vs_legacy_pagewise": _tensor_delta(
             pallas_host,
             full_scores["legacy_fp32_divsqrt"],
+        ),
+        "fused_qkv_one_row_pagewise_vs_legacy_pagewise": _tensor_delta(
+            fused_one_row_host,
+            full_scores["legacy_fused_qkv_fp32_divsqrt"],
+        ),
+        "fused_qkv_one_row_pallas_vs_legacy_pagewise": _tensor_delta(
+            fused_pallas_host,
+            full_scores["legacy_fused_qkv_fp32_divsqrt"],
         ),
     }
     record = {
@@ -408,14 +504,23 @@ def main() -> int:
                 "contract": pallas_contract,
             },
         },
-        "legacy_association_restored": comparisons[
+        "standalone_legacy_association_restored": comparisons[
             "legacy_fp32_divsqrt"
+        ]["passed"],
+        "legacy_association_restored": comparisons[
+            "legacy_fused_qkv_fp32_divsqrt"
         ]["passed"],
         "one_row_pagewise_restored": comparisons[
             "one_row_pagewise_on_legacy_state"
         ]["passed"],
         "one_row_pallas_restored": comparisons[
             "one_row_pallas_on_legacy_state"
+        ]["passed"],
+        "fused_qkv_one_row_pagewise_restored": comparisons[
+            "one_row_pagewise_on_fused_qkv_legacy_state"
+        ]["passed"],
+        "fused_qkv_one_row_pallas_restored": comparisons[
+            "one_row_pallas_on_fused_qkv_legacy_state"
         ]["passed"],
         "profiler_free_timing": False,
         "memory_stats": _memory_stats(device),

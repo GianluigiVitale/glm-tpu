@@ -1377,3 +1377,34 @@ Exact next: commit and push the narrow HLO correction, prove the branch/fleet cl
 serialized bounded probe retry. If a later phase exposes another physical layout, preserve that
 HLO and change the contract only for the exact observed lowering. Use only a completed exact
 set/order matrix to choose a production correction; do not launch the full model first.
+
+## First bounded matrix completes; legacy fused qkv-a association is the next isolated variable
+
+Protected bounded run `greenfield_layer0_dsa_association_20260807T201857533092232Z` at
+`7296d00873276192ced8a122f4b3b17d59a63f64` is accepted as DB run 486 and archived at the approved
+result prefix with local/remote `SUCCESS`, exact evidence checksums, and authenticated 8/8 pre/post
+zero-work censuses. All state/scorer HLO contracts pass; the one-row XLA scorer has no diagnostic
+M=32 rows or collectives and is elementwise identical to the reconstructed M32/page512/DCP8 scorer.
+The existing Pallas scorer differs from that reconstruction in all 8,156 scores, with max/mean
+absolute error `0.011721/0.004481`.
+
+None of the first six variants restores sealed order. All preserve the exact 2,048-position set.
+FP32-versus-BF16 `wq_b/wk` and divide-versus-rsqrt key normalization have indistinguishable
+selection metrics: 1,640 order mismatches and mean signed score error about `+0.0260275`. The
+one-row XLA path has the same result, while Pallas reduces order mismatches to 1,505 and mean signed
+error to `+0.0222018` but remains inexact. This rules out those associations as sufficient fixes;
+it does not authorize a decoder change or performance claim.
+
+Source audit found the missing upstream association: sealed legacy obtains `q_c` from one live
+BF16 fused `q_a_proj + kv_a_proj_with_mqa` matmul of output width 2,624, then slices the leading
+2,048 values. The first probe and greenfield compute `q_a` alone at width 2,048. Builder pin
+`c9d0382` created append-only v2 real input
+`greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z`, adding only the exact 576-row
+companion FP8 tensor and scales. Its tensor file is 26,219,180 bytes, SHA
+`be643e33...d7f9`, with internal manifest `574f3553...73141`; the v2 inspector also retains exact
+read compatibility with the sealed v1 artifact.
+
+Exact next: finish the bounded fused-width variant, requiring the full `bf16[32,2624]` result and
+its 576-value companion to remain live in HLO, then run one serialized bounded probe. Compare its
+M32, one-row XLA, and one-row Pallas set/order/scores. Do not alter or reload the full decoder unless
+this isolated association supplies exact evidence.

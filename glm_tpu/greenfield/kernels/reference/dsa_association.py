@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, NamedTuple
 
+import jax
 from jax import lax
 import jax.numpy as jnp
 
@@ -20,6 +21,7 @@ from .rotary import apply_rotary, rotary_cos_sin
 
 
 KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
+QaProjectionMode = Literal["separate_q_a", "legacy_fused_qkv_a"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +33,7 @@ class Layer0DsaProbeGeometry:
     decode_rows: int = 32
     hidden_size: int = 6144
     q_lora_rank: int = 2048
+    qkv_a_companion_rank: int = 576
     heads: int = 32
     head_dim: int = 128
     rotary_dim: int = 64
@@ -46,6 +49,7 @@ class Layer0DsaProbeGeometry:
             "decode_rows",
             "hidden_size",
             "q_lora_rank",
+            "qkv_a_companion_rank",
             "heads",
             "head_dim",
             "rotary_dim",
@@ -84,11 +88,12 @@ class LegacyScoreGeometry:
 
 
 class Layer0DsaState(NamedTuple):
-    """Query, cache keys, and signed head weights for one DSA event."""
+    """Live fused-projection output plus DSA state for one event."""
 
     query: Any
     index_keys: Any
     head_weights: Any
+    qkv_a_companion: Any
 
 
 def bfloat16_from_uint16_bits(value: Any) -> Any:
@@ -196,12 +201,17 @@ def layer0_dsa_state(
     *,
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
+    q_a_projection_mode: QaProjectionMode = "separate_q_a",
 ) -> Layer0DsaState:
     """Build one event with legacy prompt-chunk and decode-row geometry.
 
     ``wq_b_weight`` and ``wk_weight`` are supplied already dequantized.  The
     caller can therefore compare FP32 legacy adaptation with BF16 production
     adaptation without changing any other operation or compiler shape.
+
+    Under ``legacy_fused_qkv_a``, ``q_a_weight`` is the already packed
+    ``q_a + kv_a`` weight. The companion output remains live in the returned
+    state so XLA cannot prune the fused output width.
     """
 
     expected_shapes = {
@@ -209,7 +219,6 @@ def layer0_dsa_state(
         "prompt_embedding_rows": (geometry.prompt_tokens,),
         "current_embedding_row": (1,),
         "input_norm_weight": (geometry.hidden_size,),
-        "q_a_weight": (geometry.q_lora_rank, geometry.hidden_size),
         "q_a_norm_weight": (geometry.q_lora_rank,),
         "wq_b_weight": (geometry.heads * geometry.head_dim, geometry.q_lora_rank),
         "wk_weight": (geometry.head_dim, geometry.hidden_size),
@@ -222,7 +231,6 @@ def layer0_dsa_state(
         "prompt_embedding_rows": prompt_embedding_rows,
         "current_embedding_row": current_embedding_row,
         "input_norm_weight": input_norm_weight,
-        "q_a_weight": q_a_weight,
         "q_a_norm_weight": q_a_norm_weight,
         "wq_b_weight": wq_b_weight,
         "wk_weight": wk_weight,
@@ -236,6 +244,19 @@ def layer0_dsa_state(
                 f"layer-0 DSA {name} shape drifted: "
                 f"expected={expected} found={values[name].shape}"
             )
+    q_a_output = geometry.q_lora_rank
+    if q_a_projection_mode == "legacy_fused_qkv_a":
+        q_a_output += geometry.qkv_a_companion_rank
+    elif q_a_projection_mode != "separate_q_a":
+        raise ValueError(
+            f"unsupported q_a projection mode {q_a_projection_mode!r}"
+        )
+    expected_q_a_weight = (q_a_output, geometry.hidden_size)
+    if q_a_weight.shape != expected_q_a_weight:
+        raise ValueError(
+            "layer-0 DSA q_a weight shape drifted: "
+            f"expected={expected_q_a_weight} found={q_a_weight.shape}"
+        )
     if unique_embeddings.dtype != jnp.bfloat16:
         raise ValueError("layer-0 DSA embeddings must remain BF16")
     if prompt_embedding_rows.dtype != jnp.int32 or (
@@ -291,11 +312,25 @@ def layer0_dsa_state(
         input_norm_weight,
         epsilon=geometry.rms_norm_epsilon,
     )
-    q_a = _dot_out_in(
-        normalized,
-        q_a_weight.astype(jnp.bfloat16),
-        output_dtype=jnp.bfloat16,
-    )
+    if q_a_projection_mode == "legacy_fused_qkv_a":
+        with jax.named_scope("legacy_fused_qkv_a_m32_n2624"):
+            fused_qkv_a = _dot_out_in(
+                normalized,
+                q_a_weight.astype(jnp.bfloat16),
+                output_dtype=jnp.bfloat16,
+            )
+            q_a = fused_qkv_a[:, : geometry.q_lora_rank]
+            qkv_a_companion = fused_qkv_a[:, geometry.q_lora_rank :]
+    else:
+        q_a = _dot_out_in(
+            normalized,
+            q_a_weight.astype(jnp.bfloat16),
+            output_dtype=jnp.bfloat16,
+        )
+        qkv_a_companion = jnp.zeros(
+            (geometry.decode_rows, geometry.qkv_a_companion_rank),
+            dtype=jnp.bfloat16,
+        )
     q_residual = rms_norm(
         q_a,
         q_a_norm_weight,
@@ -342,6 +377,7 @@ def layer0_dsa_state(
         query=query,
         index_keys=jnp.concatenate((prompt_keys, current_key), axis=0),
         head_weights=head_weights.astype(jnp.float32),
+        qkv_a_companion=qkv_a_companion,
     )
 
 

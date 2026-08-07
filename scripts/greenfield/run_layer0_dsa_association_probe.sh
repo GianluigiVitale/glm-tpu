@@ -8,8 +8,8 @@ readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
-readonly DEFAULT_INPUT=/home/gianl/glm-run/greenfield_layer0_dsa_input_20260807T195410522988362Z
-readonly INPUT_MANIFEST_SHA=577ec8a1f41d567057eccb687ab72ad804cfc8d623467a05f6421892ca3b0619
+readonly DEFAULT_INPUT=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
+readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_LAYER0_DSA_TAG:-greenfield_layer0_dsa_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
@@ -133,8 +133,11 @@ expected_variants = {
     "legacy_fp32_rsqrt",
     "legacy_bf16_divsqrt",
     "greenfield_bf16_rsqrt_legacy_geometry",
+    "legacy_fused_qkv_fp32_divsqrt",
     "one_row_pagewise_on_legacy_state",
     "one_row_pallas_on_legacy_state",
+    "one_row_pagewise_on_fused_qkv_legacy_state",
+    "one_row_pallas_on_fused_qkv_legacy_state",
 }
 if set(runner["comparisons"]) != expected_variants:
     raise SystemExit("layer-0 DSA comparison matrix is incomplete")
