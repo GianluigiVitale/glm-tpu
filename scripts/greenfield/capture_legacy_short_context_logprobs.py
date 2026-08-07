@@ -29,7 +29,7 @@ from glm_tpu.greenfield.validation import (  # noqa: E402
 
 
 MODEL_URI = "gs://driftbench-dsv4-uc/models/GLM-5.2-FP8"
-LEGACY_REPOSITORY = Path("/home/gianl/tpu-inference")
+DEFAULT_LEGACY_REPOSITORY = Path("/home/gianl/tpu-inference")
 LAUNCHER_REPOSITORY = Path("/home/gianl/glm-tpu")
 
 
@@ -83,6 +83,10 @@ def main() -> None:
     parser.add_argument("--result-json", type=Path, required=True)
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--expected-legacy-code-hash", required=True)
+    parser.add_argument(
+        "--legacy-repository", type=Path, default=DEFAULT_LEGACY_REPOSITORY
+    )
+    parser.add_argument("--expected-oracle-base-hash")
     parser.add_argument("--top-k", type=int, default=16)
     parser.add_argument("--step-count", type=int, default=15)
     parser.add_argument("--focus-position", type=int, default=2044)
@@ -92,15 +96,22 @@ def main() -> None:
     if args.output.exists() or args.result_json.exists():
         raise FileExistsError("append-only logprob capture destination exists")
     code_hash = _git(REPO_ROOT, "rev-parse", "HEAD")
-    legacy_hash = _git(LEGACY_REPOSITORY, "rev-parse", "HEAD")
+    legacy_repository = args.legacy_repository.resolve()
+    legacy_hash = _git(legacy_repository, "rev-parse", "HEAD")
     launcher_hash = _git(LAUNCHER_REPOSITORY, "rev-parse", "HEAD")
     if code_hash != args.expected_code_hash:
         raise RuntimeError("greenfield capture code hash drifted")
     if legacy_hash != args.expected_legacy_code_hash:
         raise RuntimeError("legacy oracle code hash drifted")
+    if args.expected_oracle_base_hash is not None:
+        parent_hash = _git(legacy_repository, "rev-parse", f"{legacy_hash}^")
+        if parent_hash != args.expected_oracle_base_hash:
+            raise RuntimeError("legacy observer is not based on the sealed oracle pin")
     if _git(REPO_ROOT, "status", "--porcelain"):
         raise RuntimeError("greenfield capture worktree is dirty")
-    if _git(LEGACY_REPOSITORY, "status", "--porcelain", "--untracked-files=no"):
+    if _git(
+        legacy_repository, "status", "--porcelain", "--untracked-files=no"
+    ):
         raise RuntimeError("legacy oracle worktree is dirty")
 
     token_manifest = inspect_short_context_oracle(args.token_oracle_dir)
@@ -174,7 +185,7 @@ def main() -> None:
     )
 
     harness_short = _git(REPO_ROOT, "rev-parse", "--short", "HEAD")
-    legacy_short = _git(LEGACY_REPOSITORY, "rev-parse", "--short", "HEAD")
+    legacy_short = _git(legacy_repository, "rev-parse", "--short", "HEAD")
     connection = pv.connect(str(args.results_db))
     run_id = pv.start_run(
         connection,
@@ -185,6 +196,7 @@ def main() -> None:
             "attention_path": engine.attention_path(),
             "generated_steps": args.step_count,
             "launcher_code_hash": launcher_hash,
+            "legacy_oracle_base_pin": args.expected_oracle_base_hash,
             "prompt_token_count": int(prompt_token_ids.size),
             "sampling": "greedy",
             "token_oracle_manifest_sha256": token_manifest["manifest_sha256"],
@@ -192,7 +204,7 @@ def main() -> None:
         },
         note="sealed 2K legacy top-logprob arithmetic diagnostic",
         harness_repo=str(REPO_ROOT),
-        fork_repo=str(LEGACY_REPOSITORY),
+        fork_repo=str(legacy_repository),
     )
     prompt_path = args.token_oracle_dir / token_manifest["files"]["prompt"][
         "filename"

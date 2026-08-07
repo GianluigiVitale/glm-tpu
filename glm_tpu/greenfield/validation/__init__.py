@@ -10,6 +10,10 @@ from .one_layer_oracle import (
     capture_one_layer_oracle,
     inspect_one_layer_oracle,
 )
+from .legacy_residuals import (
+    LegacyResidualComparisonConfig,
+    compare_legacy_residuals,
+)
 from .short_context_oracle import (
     ShortContextOracleConfig,
     capture_short_context_oracle,
@@ -30,11 +34,13 @@ from .short_context_logprob_oracle import (
 __all__ = (
     "GateCOracleConfig",
     "OneLayerOracleConfig",
+    "LegacyResidualComparisonConfig",
     "ShortContextOracleConfig",
     "ShortContextDsaOracleConfig",
     "ShortContextLogprobOracleConfig",
     "capture_gate_c_oracle",
     "capture_one_layer_oracle",
+    "compare_legacy_residuals",
     "capture_short_context_oracle",
     "capture_short_context_dsa_oracle",
     "capture_short_context_logprob_oracle",
