@@ -30,17 +30,23 @@ def _write_dump(
     position: int,
     width: int,
     corrupt_set: bool = False,
+    out_of_range: bool = False,
     pad_noise: bool = False,
+    tie_order_drift: bool = False,
 ) -> None:
     rows = 4
-    count = position + 1
+    count = min(position + 1, width)
     indices = np.full((rows, width), -1, np.int32)
     scores = np.full((rows, width), -np.inf, np.float32)
-    selected = np.arange(count - 1, -1, -1, dtype=np.int32)
+    selected = np.arange(position, position - count, -1, dtype=np.int32)
     if corrupt_set:
         selected[-1] = selected[0]
+    if out_of_range:
+        selected[-1] = position + 1
     indices[0, :count] = selected
     scores[0, :count] = np.arange(count, 0, -1, dtype=np.float32)
+    if tie_order_drift:
+        scores[0, 1] = scores[0, 0]
     if pad_noise:
         for row in range(1, rows):
             stale_count = min(row + 1, width)
@@ -82,7 +88,11 @@ def _config(
     monkeypatch: pytest.MonkeyPatch,
     *,
     corrupt_set: bool = False,
+    first_decode_position: int = 5,
+    out_of_range: bool = False,
     pad_noise: bool = False,
+    selected_width: int = 8,
+    tie_order_drift: bool = False,
 ) -> ShortContextDsaOracleConfig:
     _patch_tokenizer(monkeypatch)
     token_config = _token_config(tmp_path)
@@ -117,7 +127,8 @@ def _config(
     connection.commit()
     connection.close()
     source = tmp_path / "dumps" / "worker_02"
-    for step_offset, position in enumerate((5, 6)):
+    for step_offset in range(2):
+        position = first_decode_position + step_offset
         for event in range(2):
             _write_dump(
                 source
@@ -128,9 +139,15 @@ def _config(
                 step=step_offset + 2,
                 event=event,
                 position=position,
-                width=8,
+                width=selected_width,
                 corrupt_set=corrupt_set and step_offset == 0 and event == 0,
+                out_of_range=(
+                    out_of_range and step_offset == 0 and event == 0
+                ),
                 pad_noise=pad_noise,
+                tie_order_drift=(
+                    tie_order_drift and step_offset == 0 and event == 0
+                ),
             )
     return ShortContextDsaOracleConfig(
         results_db=token_config.results_db,
@@ -160,8 +177,8 @@ def _config(
         expected_process_count=8,
         first_source_step=2,
         decode_step_count=2,
-        first_decode_position=5,
-        selected_width=8,
+        first_decode_position=first_decode_position,
+        selected_width=selected_width,
         producer_layer_ids=(0, 4),
     )
 
@@ -191,6 +208,46 @@ def test_short_context_dsa_oracle_excludes_invalid_pad_row_noise(
         for record in manifest["source_dump_files"]
     } == {3}
     assert inspect_short_context_dsa_oracle(config.output_dir) == manifest
+
+
+def test_short_context_dsa_oracle_accepts_saturated_arbitrary_causal_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        first_decode_position=9,
+        selected_width=8,
+    )
+    manifest = capture_short_context_dsa_oracle(config)
+    assert inspect_short_context_dsa_oracle(config.output_dir) == manifest
+    assert manifest["event_contract"]["first_decode_position"] == 9
+    assert manifest["event_contract"]["selected_width"] == 8
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    (
+        ("corrupt_set", "selected set"),
+        ("out_of_range", "selected set"),
+        ("tie_order_drift", "tie order"),
+    ),
+)
+def test_short_context_dsa_oracle_refuses_saturated_selection_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fault: str,
+    message: str,
+) -> None:
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        first_decode_position=9,
+        selected_width=8,
+        **{fault: True},
+    )
+    with pytest.raises(ValueError, match=message):
+        capture_short_context_dsa_oracle(config)
 
 
 def test_short_context_dsa_oracle_refuses_set_and_tensor_drift(

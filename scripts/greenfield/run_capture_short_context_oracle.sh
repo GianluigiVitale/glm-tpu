@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seal the accepted run-139/item-628 2K passkey result as a token oracle.
+# Seal one pinned accepted short-context passkey result as a token oracle.
 set -euo pipefail
 
 readonly BRANCH=rewrite/topology-first-decode
@@ -10,11 +10,46 @@ readonly LEGACY_REPO=/home/gianl/tpu-inference
 readonly LEGACY_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 
+PROFILE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE_PROFILE:-2k}
+case "$PROFILE" in
+  2k)
+    SOURCE_RUN_ID=139
+    SOURCE_ITEM_ROW_ID=628
+    SOURCE_HARNESS_GIT=b8e891e
+    SOURCE_FORK_GIT=f0c63c302
+    SOURCE_BENCHMARK=passkey_L2040_d0.25
+    SOURCE_PROMPT_TOKENS=2034
+    SOURCE_GENERATED_TOKENS=20
+    SOURCE_SEED=283835
+    SOURCE_GOLD=110391
+    TAG_PREFIX=greenfield_short_context_oracle
+    ;;
+  8k)
+    SOURCE_RUN_ID=104
+    SOURCE_ITEM_ROW_ID=506
+    SOURCE_HARNESS_GIT=fd6af78
+    SOURCE_FORK_GIT=3b2963082
+    SOURCE_BENCHMARK=passkey_L8192_d0.5
+    SOURCE_PROMPT_TOKENS=8155
+    SOURCE_GENERATED_TOKENS=20
+    SOURCE_SEED=1093997
+    SOURCE_GOLD=881446
+    TAG_PREFIX=greenfield_short_context_oracle_8k
+    ;;
+  *)
+    echo "unsupported short-context oracle profile: $PROFILE" >&2
+    exit 2
+    ;;
+esac
+readonly PROFILE SOURCE_RUN_ID SOURCE_ITEM_ROW_ID SOURCE_HARNESS_GIT
+readonly SOURCE_FORK_GIT SOURCE_BENCHMARK SOURCE_PROMPT_TOKENS
+readonly SOURCE_GENERATED_TOKENS SOURCE_SEED SOURCE_GOLD TAG_PREFIX
+
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE_TAG:-greenfield_short_context_oracle_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE_TAG:-${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 ORACLE_DIR=$RUN_DIR/oracle
-REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/short_context/2k/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/short_context/$PROFILE/$TAG
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing short-context oracle outside $BRANCH" >&2
@@ -55,7 +90,7 @@ say() {
 }
 
 say "RUN_DIR=$RUN_DIR PIN=$PIN LEGACY_PIN=$LEGACY_PIN"
-say "SOURCE=results.db run=139 item_row=628 REMOTE_PREFIX=$REMOTE_PREFIX"
+say "PROFILE=$PROFILE SOURCE=results.db run=$SOURCE_RUN_ID item_row=$SOURCE_ITEM_ROW_ID REMOTE_PREFIX=$REMOTE_PREFIX"
 git -C "$WORKTREE" status --short --branch >"$RUN_DIR/greenfield_status.txt"
 git -C "$LEGACY_REPO" status --short --branch >"$RUN_DIR/legacy_status.txt"
 
@@ -66,16 +101,16 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --output "$ORACLE_DIR" \
   --expected-code-hash "$PIN" \
   --legacy-repository-pin "$LEGACY_PIN" \
-  --run-id 139 \
-  --item-row-id 628 \
-  --expected-harness-git b8e891e \
-  --expected-fork-git f0c63c302 \
-  --expected-benchmark passkey_L2040_d0.25 \
+  --run-id "$SOURCE_RUN_ID" \
+  --item-row-id "$SOURCE_ITEM_ROW_ID" \
+  --expected-harness-git "$SOURCE_HARNESS_GIT" \
+  --expected-fork-git "$SOURCE_FORK_GIT" \
+  --expected-benchmark "$SOURCE_BENCHMARK" \
   --expected-model-uri gs://driftbench-dsv4-uc/models/GLM-5.2-FP8 \
-  --expected-prompt-tokens 2034 \
-  --expected-generated-tokens 20 \
-  --expected-seed 283835 \
-  --expected-gold 110391 >"$RUN_DIR/capture.json"
+  --expected-prompt-tokens "$SOURCE_PROMPT_TOKENS" \
+  --expected-generated-tokens "$SOURCE_GENERATED_TOKENS" \
+  --expected-seed "$SOURCE_SEED" \
+  --expected-gold "$SOURCE_GOLD" >"$RUN_DIR/capture.json"
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$ORACLE_DIR" <<'PY' >"$RUN_DIR/inspection.json"
@@ -176,8 +211,8 @@ legacy_repository_pin=$LEGACY_PIN
 manifest_sha256=$manifest_sha
 evidence_sha256=$evidence_sha
 remote_objects_sha256=$remote_objects_sha
-prompt_token_count=2034
-generated_token_count=20
+prompt_token_count=$SOURCE_PROMPT_TOKENS
+generated_token_count=$SOURCE_GENERATED_TOKENS
 remote_prefix=$REMOTE_PREFIX
 EOF
 gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" \
@@ -188,4 +223,4 @@ remote_success_sha=$(gcloud storage cat "$REMOTE_PREFIX/SUCCESS" | sha256sum | a
   echo "remote SUCCESS checksum mismatch" >&2
   exit 2
 }
-echo "[short-context-oracle $(date -u +%H:%M:%S)] SUCCESS manifest=$manifest_sha prompt=2034 generated=20"
+echo "[short-context-oracle $(date -u +%H:%M:%S)] SUCCESS manifest=$manifest_sha prompt=$SOURCE_PROMPT_TOKENS generated=$SOURCE_GENERATED_TOKENS"

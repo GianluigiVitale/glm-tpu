@@ -1,4 +1,4 @@
-"""Seal all recurrent 2K legacy DSA events as an independent oracle."""
+"""Seal recurrent short-context legacy DSA events as an independent oracle."""
 
 from __future__ import annotations
 
@@ -156,11 +156,6 @@ class ShortContextDsaOracleConfig:
             raise ValueError("producer_layer_ids must be non-negative integers")
         if len(set(self.producer_layer_ids)) != len(self.producer_layer_ids):
             raise ValueError("producer_layer_ids must be unique")
-        if (
-            self.first_decode_position + self.decode_step_count
-            > self.selected_width
-        ):
-            raise ValueError("2K DSA capture must remain below selected width")
         for name in (
             "capture_code_hash",
             "source_capture_code_hash",
@@ -294,6 +289,42 @@ def _load_dump(path: Path) -> dict[str, np.ndarray]:
         return {key: np.asarray(handle[key]).copy() for key in handle.files}
 
 
+def _validate_selected_row(
+    indices: np.ndarray,
+    scores: np.ndarray,
+    *,
+    position: int,
+    selected_width: int,
+    context: str,
+) -> int:
+    """Validate the exact causal top-k representation for one live row."""
+
+    valid_count = min(position + 1, selected_width)
+    live_indices = indices[:valid_count]
+    live_scores = scores[:valid_count]
+    unique_count = int(np.unique(live_indices).size)
+    if unique_count != valid_count or np.any(live_indices < 0) or np.any(
+        live_indices > position
+    ):
+        raise ValueError(f"{context} selected set is not unique and causal")
+    if position + 1 <= selected_width and not np.array_equal(
+        np.sort(live_indices), np.arange(position + 1, dtype=np.int32)
+    ):
+        raise ValueError(f"{context} selected set is not the exact causal prefix")
+    if np.any(indices[valid_count:] != -1) or not np.all(
+        np.isneginf(scores[valid_count:])
+    ):
+        raise ValueError(f"{context} sentinel tail drifted")
+    if not np.all(np.isfinite(live_scores)) or np.any(
+        live_scores[1:] > live_scores[:-1]
+    ):
+        raise ValueError(f"{context} scores are not finite descending values")
+    ties = live_scores[1:] == live_scores[:-1]
+    if np.any(live_indices[1:][ties] < live_indices[:-1][ties]):
+        raise ValueError(f"{context} lowest-position tie order drifted")
+    return valid_count
+
+
 def _validate_dump(
     payload: Mapping[str, np.ndarray],
     *,
@@ -342,24 +373,15 @@ def _validate_dump(
         raise ValueError("legacy DSA decode dump must contain one live row zero")
     if int(payload["positions"][0]) != position or int(payload["req_ids"][0]) != 0:
         raise ValueError("legacy DSA live row position/request drifted")
-    valid_count = min(position + 1, config.selected_width)
+    valid_count = _validate_selected_row(
+        indices[0],
+        scores[0],
+        position=position,
+        selected_width=config.selected_width,
+        context="legacy DSA",
+    )
     live_indices = indices[0, :valid_count]
     live_scores = scores[0, :valid_count]
-    if not np.array_equal(
-        np.sort(live_indices), np.arange(valid_count, dtype=np.int32)
-    ):
-        raise ValueError("legacy 2K DSA selected set is not the exact causal prefix")
-    if np.any(indices[0, valid_count:] != -1) or not np.all(
-        np.isneginf(scores[0, valid_count:])
-    ):
-        raise ValueError("legacy DSA sentinel tail drifted")
-    if not np.all(np.isfinite(live_scores)) or np.any(
-        live_scores[1:] > live_scores[:-1]
-    ):
-        raise ValueError("legacy DSA scores are not finite descending values")
-    ties = live_scores[1:] == live_scores[:-1]
-    if np.any(live_indices[1:][ties] < live_indices[:-1][ties]):
-        raise ValueError("legacy DSA lowest-position tie order drifted")
     # Legacy's batch bucket is larger than the one live request. Invalid
     # rows are explicitly outside the DSA verdict and may retain stale
     # selections from earlier scheduler work. This is the established
@@ -681,23 +703,18 @@ def inspect_short_context_dsa_oracle(output_dir: Path) -> dict[str, Any]:
     ):
         raise ValueError("short-context DSA step/event mapping drifted")
     for step, position in enumerate(expected_positions.tolist()):
-        count = min(position + 1, width)
-        if np.any(tensors["valid_counts"][step] != count):
-            raise ValueError("short-context DSA valid-count contract drifted")
         for event in range(events):
             indices = tensors["selected_positions"][step, event]
             scores = tensors["selected_scores"][step, event]
-            if not np.array_equal(
-                np.sort(indices[:count]), np.arange(count, dtype=np.int32)
-            ) or np.any(indices[count:] != -1):
-                raise ValueError("short-context DSA selected-set contract drifted")
-            if not np.all(np.isfinite(scores[:count])) or not np.all(
-                np.isneginf(scores[count:])
-            ) or np.any(scores[1:count] > scores[: count - 1]):
-                raise ValueError("short-context DSA selected-score contract drifted")
-            ties = scores[1:count] == scores[: count - 1]
-            if np.any(indices[1:count][ties] < indices[: count - 1][ties]):
-                raise ValueError("short-context DSA tie-order contract drifted")
+            count = _validate_selected_row(
+                indices,
+                scores,
+                position=position,
+                selected_width=width,
+                context="short-context DSA",
+            )
+            if int(tensors["valid_counts"][step, event]) != count:
+                raise ValueError("short-context DSA valid-count contract drifted")
     source_files = manifest.get("source_dump_files")
     if not isinstance(source_files, list) or len(source_files) < steps * events:
         raise ValueError("short-context DSA source-file coverage drifted")
