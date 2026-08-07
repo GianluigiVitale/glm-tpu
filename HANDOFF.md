@@ -1310,9 +1310,10 @@ bodies, 210 admitted colliding occurrences, zero forbidden shapes, and the uncha
 `219/372/17` local collective contract. Focused runtime/HLO tests pass 53/53; the complete
 CPU-only greenfield suite passes 380 with one skip.
 
-Exact next: from clean pin `b7853e2` and an authenticated idle fleet, run exactly one serialized
-`bash scripts/greenfield/run_short_decoder_compile_pp8_8k.sh`. Accept only exact paired token and
-294-event DSA oracles, state/load/cache integrity, 8K HLO including 21/21 pinned score bodies, fresh
+Exact next: from a clean branch containing `b7853e2` and an authenticated idle fleet, run exactly
+one serialized `bash scripts/greenfield/run_short_decoder_compile_pp8_8k.sh`. Accept only exact
+paired token and 294-event DSA oracles, state/load/cache integrity, 8K HLO including 21/21 pinned
+score bodies, fresh
 eight-host XPlanes, profiler-free wall, per-chip HBM, DB/archive linkage, and authenticated 8/8
 zero-work cleanup. Do not claim the first rejected draw and do not continue to 128K if 8K Gate D
 fails.
