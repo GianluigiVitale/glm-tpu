@@ -93,6 +93,11 @@ class DecoderStepConfig:
         return self.selected_width + 5
 
     @property
+    def dsa_observation_width(self) -> int:
+        # Position ids, bit-exact FP32 selected-score payload, count, producer.
+        return 2 * self.selected_width + 2
+
+    @property
     def count_index(self) -> int:
         return self.selected_width
 
@@ -927,6 +932,7 @@ def _execute_stage(
     dsa_observation: Any | None = None,
 ) -> tuple[Any, ...]:
     import jax.numpy as jnp
+    from jax import lax
 
     residual, kv_cache, index_cache, metadata = values
     full_slot = 0
@@ -1012,10 +1018,18 @@ def _execute_stage(
                     current_full_slot, : config.selected_width
                 ].set(result.selected_positions[0])
                 dsa_observation = dsa_observation.at[
-                    current_full_slot, config.selected_width
+                    current_full_slot,
+                    config.selected_width : 2 * config.selected_width,
+                ].set(
+                    lax.bitcast_convert_type(
+                        result.selected_scores[0], jnp.int32
+                    )
+                )
+                dsa_observation = dsa_observation.at[
+                    current_full_slot, 2 * config.selected_width
                 ].set(result.selected_valid_counts[0])
                 dsa_observation = dsa_observation.at[
-                    current_full_slot, config.selected_width + 1
+                    current_full_slot, 2 * config.selected_width + 1
                 ].set(jnp.int32(layer.layer_id))
         metadata = metadata.at[:, : config.selected_width].set(
             result.selected_positions
@@ -1240,7 +1254,7 @@ def build_decoder_step_program(
             dsa_observation = jnp.full(
                 (
                     config.maximum_full_indexer_slots,
-                    config.selected_width + 2,
+                    config.dsa_observation_width,
                 ),
                 -1,
                 dtype=jnp.int32,

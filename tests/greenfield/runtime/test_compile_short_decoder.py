@@ -192,6 +192,7 @@ def _dsa_observation_fixture() -> tuple[
     np.ndarray,
     np.ndarray,
     np.ndarray,
+    np.ndarray,
 ]:
     groups = ((0, 1), (2, 3))
     producers = ((0, 2), (6,))
@@ -200,14 +201,19 @@ def _dsa_observation_fixture() -> tuple[
         np.int32,
     )
     expected_counts = np.asarray([3, 3, 3], np.int32)
+    expected_scores = np.asarray(
+        [[3, 2, 1, -np.inf], [3, 2, 1, -np.inf], [3, 2, 1, -np.inf]],
+        np.float32,
+    )
     expected_producers = np.asarray([0, 2, 6], np.int32)
-    observation = np.full((4, 2, 6), -1, np.int32)
+    observation = np.full((4, 2, 10), -1, np.int32)
     event = 0
     for stage, group in enumerate(groups):
         for slot, producer in enumerate(producers[stage]):
             row = np.concatenate(
                 (
                     expected_positions[event],
+                    expected_scores[event].view(np.int32),
                     np.asarray([expected_counts[event], producer], np.int32),
                 )
             )
@@ -218,6 +224,7 @@ def _dsa_observation_fixture() -> tuple[
         groups,
         producers,
         expected_positions,
+        expected_scores,
         expected_counts,
         expected_producers,
     )
@@ -229,6 +236,7 @@ def test_dsa_observer_reconstructs_stage_slots_and_lane_replication() -> None:
         groups,
         producers,
         expected_positions,
+        expected_scores,
         expected_counts,
         expected_producers,
     ) = _dsa_observation_fixture()
@@ -238,6 +246,7 @@ def test_dsa_observer_reconstructs_stage_slots_and_lane_replication() -> None:
         stage_producer_layer_ids=producers,
         selected_width=4,
         expected_positions=expected_positions,
+        expected_scores=expected_scores,
         expected_valid_counts=expected_counts,
         expected_producer_layer_ids=expected_producers,
         decode_position=3,
@@ -246,7 +255,107 @@ def test_dsa_observer_reconstructs_stage_slots_and_lane_replication() -> None:
     assert record["event_count"] == 3
     assert record["lane_mismatch_stages"] == []
     assert record["padded_slot_mismatches"] == []
-    assert record["position_mismatch_count"] == 0
+    assert record["exact_selected_set_and_tail"]
+    assert record["actual_device_score_order_and_ties"]
+    assert record["legacy_total_order_match"]
+    assert record["legacy_score_bounded_comparison"]["passed"]
+
+
+def test_dsa_observer_allows_cross_backend_nontie_rank_drift() -> None:
+    (
+        observation,
+        groups,
+        producers,
+        expected_positions,
+        expected_scores,
+        expected_counts,
+        expected_producers,
+    ) = _dsa_observation_fixture()
+    drifted = observation.copy()
+    bounded_expected_scores = expected_scores.copy()
+    bounded_expected_scores[0, 1] = np.float32(2.99)
+    # The executing program assigns a different descending score order to the
+    # same exact set. Its scores remain canonical and inside the established
+    # cross-program bound, so the raw order difference stays diagnostic.
+    drifted[0:2, 0, 0:3] = np.asarray([1, 0, 2], np.int32)
+    drifted_scores = np.asarray([3.01, 3.0, 1.0], np.float32).view(np.int32)
+    drifted[0:2, 0, 4:7] = drifted_scores
+    record = _validate_dsa_observation_step(
+        drifted,
+        groups=groups,
+        stage_producer_layer_ids=producers,
+        selected_width=4,
+        expected_positions=expected_positions,
+        expected_scores=bounded_expected_scores,
+        expected_valid_counts=expected_counts,
+        expected_producer_layer_ids=expected_producers,
+        decode_position=3,
+    )
+    assert record["passed"]
+    assert record["exact_selected_set_and_tail"]
+    assert record["actual_device_score_order_and_ties"]
+    assert not record["legacy_total_order_match"]
+    assert record["legacy_order_mismatch_count"] == 2
+    assert record["legacy_score_bounded_comparison"]["passed"]
+
+
+def test_dsa_observer_refuses_cross_backend_score_bound_drift() -> None:
+    (
+        observation,
+        groups,
+        producers,
+        expected_positions,
+        expected_scores,
+        expected_counts,
+        expected_producers,
+    ) = _dsa_observation_fixture()
+    drifted = observation.copy()
+    drifted[0:2, 0, 4] = np.asarray([3.2], np.float32).view(np.int32)[0]
+    record = _validate_dsa_observation_step(
+        drifted,
+        groups=groups,
+        stage_producer_layer_ids=producers,
+        selected_width=4,
+        expected_positions=expected_positions,
+        expected_scores=expected_scores,
+        expected_valid_counts=expected_counts,
+        expected_producer_layer_ids=expected_producers,
+        decode_position=3,
+    )
+    assert not record["passed"]
+    assert record["exact_selected_set_and_tail"]
+    assert record["actual_device_score_order_and_ties"]
+    assert not record["legacy_score_bounded_comparison"]["passed"]
+    assert record["legacy_score_bounded_comparison"]["error"]["max_abs"] > 0.19
+
+
+def test_dsa_observer_refuses_selected_set_drift() -> None:
+    (
+        observation,
+        groups,
+        producers,
+        expected_positions,
+        expected_scores,
+        expected_counts,
+        expected_producers,
+    ) = _dsa_observation_fixture()
+    drifted = observation.copy()
+    drifted[0:2, 0, 2] = 3
+    record = _validate_dsa_observation_step(
+        drifted,
+        groups=groups,
+        stage_producer_layer_ids=producers,
+        selected_width=4,
+        expected_positions=expected_positions,
+        expected_scores=expected_scores,
+        expected_valid_counts=expected_counts,
+        expected_producer_layer_ids=expected_producers,
+        decode_position=3,
+    )
+    assert not record["passed"]
+    assert not record["exact_selected_set_and_tail"]
+    assert record["selected_set_mismatches"][0]["expected_only_first"] == [2]
+    assert record["selected_set_mismatches"][0]["observed_only_first"] == [3]
 
 
 def test_dsa_observer_refuses_lane_order_producer_and_padding_drift() -> None:
@@ -255,15 +364,19 @@ def test_dsa_observer_refuses_lane_order_producer_and_padding_drift() -> None:
         groups,
         producers,
         expected_positions,
+        expected_scores,
         expected_counts,
         expected_producers,
     ) = _dsa_observation_fixture()
     drifted = observation.copy()
-    # Same selected set, wrong tie/order.
+    # Same selected set, but equal executing scores are in wrong position order.
     drifted[0:2, 0, 0:2] = drifted[0:2, 0, 1::-1]
+    tied = np.asarray([3.0, 3.0], np.float32).view(np.int32)
+    drifted[0:2, 0, 4:6] = tied
+    drifted[0:2, 0, 7] = np.asarray([0.0], np.float32).view(np.int32)[0]
     # One replicated lane disagrees, one producer drifts, and dead padding is live.
     drifted[1, 1, 0] = 99
-    drifted[2:4, 0, 5] = 7
+    drifted[2:4, 0, 9] = 7
     drifted[2:4, 1, 0] = 0
     record = _validate_dsa_observation_step(
         drifted,
@@ -271,13 +384,26 @@ def test_dsa_observer_refuses_lane_order_producer_and_padding_drift() -> None:
         stage_producer_layer_ids=producers,
         selected_width=4,
         expected_positions=expected_positions,
+        expected_scores=expected_scores,
         expected_valid_counts=expected_counts,
         expected_producer_layer_ids=expected_producers,
         decode_position=3,
     )
     assert not record["passed"]
-    assert record["position_mismatch_count"] == 2
-    assert record["first_position_mismatch"]["selected_offset"] == 0
+    assert record["legacy_order_mismatch_count"] == 2
+    assert record["first_legacy_order_mismatch"]["selected_offset"] == 0
+    assert not record["actual_device_score_order_and_ties"]
+    assert record["score_contract_mismatches"][0][
+        "first_noncanonical_offset"
+    ] == 0
+    assert record["tail_mismatches"] == [
+        {
+            "event_index": 0,
+            "position_tail_mismatch_count": 0,
+            "producer_layer_id": 0,
+            "score_tail_mismatch_count": 1,
+        }
+    ]
     assert record["lane_mismatch_stages"] == [0]
     assert record["producer_mismatches"] == [
         {"event_index": 2, "expected": 6, "observed": 7}

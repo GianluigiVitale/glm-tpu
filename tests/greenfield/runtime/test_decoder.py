@@ -615,7 +615,18 @@ print(json.dumps({
         "rows": [
             {
                 "all_stage_lanes_equal": True,
-                "row": [0, -1, -1, -1, 1, stage],
+                "row": [
+                    0,
+                    -1,
+                    -1,
+                    -1,
+                    0,
+                    -8388608,
+                    -8388608,
+                    -8388608,
+                    1,
+                    stage,
+                ],
                 "stage": stage,
             }
             for stage in range(8)

@@ -40,7 +40,7 @@ from .reference.dsa import (
     dsa_index_keys_from_projection,
     dsa_scores,
     local_topk_candidates,
-    merge_topk_candidates,
+    merge_topk_candidates_with_scores,
 )
 from .reference.fp8 import dequantize_fp8_bits_block_weight
 from .reference.linear import linear, residual_add, silu
@@ -55,6 +55,7 @@ class StageLocalDsaFp8Result(NamedTuple):
     index_cache: Any
     selected_positions: Any
     valid_counts: Any
+    selected_scores: Any
     contract_valid: Any
 
 
@@ -307,6 +308,7 @@ def stage_local_dsa_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
+    lora_norm_epsilon: float = 1e-6,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,
     linear_backend: StageLinearBackend = "reference",
@@ -386,7 +388,7 @@ def stage_local_dsa_fp8_mapped(
                 interpret=linear_interpret,
             ),
             q_a_norm_weight,
-            epsilon=rms_norm_epsilon,
+            epsilon=lora_norm_epsilon,
         )
     else:
         normalized = precomputed_normalized
@@ -531,7 +533,7 @@ def stage_local_dsa_fp8_mapped(
         tiled=False,
         axis_index_groups=groups,
     )
-    selected = merge_topk_candidates(
+    selected = merge_topk_candidates_with_scores(
         gathered_scores,
         gathered_positions,
         context_lengths,
@@ -547,6 +549,7 @@ def stage_local_dsa_fp8_mapped(
         index_cache,
         selected.positions,
         selected.valid_counts,
+        selected.scores,
         metadata_valid & selection_valid,
     )
 
@@ -580,6 +583,7 @@ def stage_local_index_share_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
+    lora_norm_epsilon: float = 1e-6,
     rope_theta: float = 8_000_000.0,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,
@@ -669,7 +673,7 @@ def stage_local_index_share_fp8_mapped(
                 interpret=linear_interpret,
             ),
             q_a_norm_weight,
-            epsilon=rms_norm_epsilon,
+            epsilon=lora_norm_epsilon,
         )
     else:
         normalized = precomputed_normalized
@@ -718,7 +722,7 @@ def stage_local_index_share_fp8_mapped(
     current_latent = rms_norm(
         current_kv[..., : contract.kv_lora_rank],
         kv_a_norm_weight,
-        epsilon=rms_norm_epsilon,
+        epsilon=lora_norm_epsilon,
     )
     current_rope = apply_rotary(
         current_kv[

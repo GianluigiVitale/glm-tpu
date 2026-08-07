@@ -187,7 +187,8 @@ fi
   echo "append-only run directory exists: $RUN_DIR" >&2
   exit 2
 }
-mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/host_logs" "$RUN_DIR/hlo" "$RUN_DIR/traces"
+mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/host_logs" "$RUN_DIR/hlo" \
+  "$RUN_DIR/traces" "$RUN_DIR/dsa_observer"
 
 say() {
   echo "[short-decoder-pp8 $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
@@ -366,7 +367,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {3}:
+if {record["schema_version"] for record in records} != {4}:
     raise SystemExit("fleet decoder record schema drifted")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
@@ -491,7 +492,20 @@ if short_context_dsa_oracle:
             or not dsa["observer_executed_before_production"]
             or not dsa["prefill_state_preserved_without_donation"]
             or dsa["production_executable_observer_enabled"]
-            or dsa["score_comparison"]["compared"]
+            or not dsa["score_comparison"]["compared"]
+            or dsa["score_comparison"]["cross_backend_total_order_is_gate"]
+            or not dsa["score_comparison"][
+                "executing_score_order_and_ties_are_gate"
+            ]
+            or not dsa["score_comparison"][
+                "legacy_scores_use_position_aligned_bounded_gate"
+            ]
+            or dsa["score_comparison"]["legacy_score_tolerance"]
+            != {"max_abs": 0.125, "mean_abs": 0.01, "p99_abs": 0.03125}
+            or not dsa["score_comparison"][
+                "selected_set_against_legacy_is_exact_gate"
+            ]
+            or len(dsa["observation_artifacts"]) != 14
             or dsa["token_oracle_offset"] != 1
             or not dsa["token_sequence"]["exact_prefix_match"]
             or dsa["token_sequence"]["compared_token_count"] != 14
@@ -502,12 +516,21 @@ if short_context_dsa_oracle:
             or not all(
                 step["passed"]
                 and step["position_passed"]
-                and step["exact_selected_order_and_tail"]
+                and step["exact_selected_set_and_tail"]
+                and step["actual_device_score_order_and_ties"]
                 and step["event_count"] == 21
                 and not step["lane_mismatch_stages"]
                 and not step["padded_slot_mismatches"]
                 and not step["producer_mismatches"]
                 and not step["count_mismatches"]
+                and not step["selected_set_mismatches"]
+                and not step["tail_mismatches"]
+                and not step["score_contract_mismatches"]
+                and step["legacy_score_bounded_comparison"]["passed"]
+                and step["legacy_score_bounded_comparison"][
+                    "coverage_complete"
+                ]
+                and len(step["observation_sha256"]) == 64
                 for step in steps
             )
             or observer_hlo is None
@@ -844,7 +867,7 @@ pv.record_item(
         )
     ),
     gold=(
-        "Exact raw token IDs and all 14x21 DSA selected orders against sealed oracles."
+        "Exact tokens/DSA sets/device ties plus bounded position-aligned legacy scores."
         if short_context_dsa_oracle
         else (
             "Exact raw token IDs against the sealed accepted legacy prefix."
@@ -911,7 +934,8 @@ say "sealing and archiving protected diagnostic evidence"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
-  find host_records host_logs hlo traces -type f -print0 | sort -z | xargs -0 sha256sum
+  find host_records host_logs hlo traces dsa_observer -type f -print0 | \
+    sort -z | xargs -0 sha256sum
   sha256sum summary.json xplane_summary.json results_ckpt.db census_pre.txt census_post.txt \
     sync.txt execute.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"

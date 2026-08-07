@@ -25,6 +25,10 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+from glm_tpu.greenfield.benchmarking.one_layer import (  # noqa: E402
+    TensorTolerance,
+    compare_bounded_tensor,
+)
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     FeatureRuntimeCheckpointLoadExpectation,
     RuntimeCheckpointLoadExpectation,
@@ -58,6 +62,13 @@ from scripts.greenfield.pack_runtime_checkpoint import (  # noqa: E402
 )
 
 
+DSA_CROSS_BACKEND_SCORE_TOLERANCE = TensorTolerance(
+    max_abs=0.125,
+    p99_abs=0.03125,
+    mean_abs=0.01,
+)
+
+
 def _git_head() -> str:
     return subprocess.check_output(
         ["git", "-C", str(REPO), "rev-parse", "HEAD"],
@@ -69,6 +80,16 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    temporary.replace(path)
+
+
+def _atomic_npz(path: Path, **arrays: np.ndarray) -> None:
+    """Write one diagnostic tensor bundle without exposing a partial file."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
+    with temporary.open("wb") as handle:
+        np.savez_compressed(handle, **arrays)
     temporary.replace(path)
 
 
@@ -253,6 +274,19 @@ def _stage_dsa_producer_layer_ids(schedule: Any) -> tuple[tuple[int, ...], ...]:
     )
 
 
+def _float32_topk_descending_key(values: np.ndarray) -> np.ndarray:
+    """Unsigned key whose ascending order is ``lax.top_k`` FP32 order."""
+
+    scores = np.ascontiguousarray(values, dtype=np.float32)
+    bits = scores.view(np.uint32)
+    ascending = np.where(
+        (bits >> np.uint32(31)) == np.uint32(0),
+        bits ^ np.uint32(0x80000000),
+        ~bits,
+    ).astype(np.uint32, copy=False)
+    return np.bitwise_not(ascending)
+
+
 def _validate_dsa_observation_step(
     observation: np.ndarray,
     *,
@@ -260,14 +294,23 @@ def _validate_dsa_observation_step(
     stage_producer_layer_ids: tuple[tuple[int, ...], ...],
     selected_width: int,
     expected_positions: np.ndarray,
+    expected_scores: np.ndarray,
     expected_valid_counts: np.ndarray,
     expected_producer_layer_ids: np.ndarray,
     decode_position: int,
 ) -> dict[str, Any]:
-    """Reconstruct one observer step and compare exact producer/order/tails."""
+    """Gate exact device sets/ties and bounded position-aligned legacy scores.
+
+    The numerical contract deliberately does not require total score-rank
+    identity across independent TPU programs. It does require an exact
+    selected set, an exact ``-1``/``-inf`` tail, canonical lowest-position
+    ties for the scores produced by this executing greenfield program, and the
+    already accepted bounded score comparison against the legacy oracle.
+    """
 
     observed = np.asarray(observation)
     expected_positions = np.asarray(expected_positions)
+    expected_scores = np.asarray(expected_scores)
     expected_valid_counts = np.asarray(expected_valid_counts)
     expected_producer_layer_ids = np.asarray(expected_producer_layer_ids)
     if selected_width <= 0:
@@ -278,7 +321,8 @@ def _validate_dsa_observation_step(
     if sorted(flat_ranks) != list(range(len(flat_ranks))):
         raise ValueError("DSA groups must cover every rank exactly once")
     maximum_slots = max(len(values) for values in stage_producer_layer_ids)
-    expected_shape = (len(flat_ranks), maximum_slots, selected_width + 2)
+    observation_width = 2 * selected_width + 2
+    expected_shape = (len(flat_ranks), maximum_slots, observation_width)
     if observed.shape != expected_shape or observed.dtype != np.dtype(np.int32):
         raise ValueError(
             "DSA observer tensor contract drifted: "
@@ -293,6 +337,7 @@ def _validate_dsa_observation_step(
     event_count = len(flat_producers)
     if (
         expected_positions.shape != (event_count, selected_width)
+        or expected_scores.shape != (event_count, selected_width)
         or expected_valid_counts.shape != (event_count,)
         or expected_producer_layer_ids.shape != (event_count,)
     ):
@@ -306,8 +351,14 @@ def _validate_dsa_observation_step(
     padded_slot_mismatches: list[dict[str, int]] = []
     producer_mismatches: list[dict[str, int]] = []
     count_mismatches: list[dict[str, int]] = []
-    position_mismatch_count = 0
-    first_position_mismatch = None
+    selected_set_mismatches: list[dict[str, Any]] = []
+    tail_mismatches: list[dict[str, Any]] = []
+    score_contract_mismatches: list[dict[str, Any]] = []
+    legacy_order_mismatch_count = 0
+    first_legacy_order_mismatch = None
+    position_aligned_observed_scores: list[np.ndarray] = []
+    position_aligned_expected_scores: list[np.ndarray] = []
+    expected_live_score_count = 0
     event = 0
     for stage, (group, stage_producers) in enumerate(
         zip(groups, stage_producer_layer_ids, strict=True)
@@ -318,8 +369,12 @@ def _validate_dsa_observation_step(
         canonical = lanes[0]
         for slot, producer in enumerate(stage_producers):
             row = canonical[slot]
-            observed_count = int(row[selected_width])
-            observed_producer = int(row[selected_width + 1])
+            observed_positions = row[:selected_width]
+            observed_scores = np.ascontiguousarray(
+                row[selected_width : 2 * selected_width]
+            ).view(np.float32)
+            observed_count = int(row[2 * selected_width])
+            observed_producer = int(row[2 * selected_width + 1])
             expected_count = int(expected_valid_counts[event])
             if observed_producer != producer:
                 producer_mismatches.append(
@@ -337,44 +392,196 @@ def _validate_dsa_observation_step(
                         "observed": observed_count,
                     }
                 )
-            mismatches = np.flatnonzero(
-                row[:selected_width] != expected_positions[event]
+            order_mismatches = np.flatnonzero(
+                observed_positions != expected_positions[event]
             )
-            position_mismatch_count += int(mismatches.size)
-            if mismatches.size and first_position_mismatch is None:
-                offset = int(mismatches[0])
-                first_position_mismatch = {
+            legacy_order_mismatch_count += int(order_mismatches.size)
+            if (
+                order_mismatches.size
+                and first_legacy_order_mismatch is None
+            ):
+                offset = int(order_mismatches[0])
+                first_legacy_order_mismatch = {
                     "event_index": event,
                     "expected": int(expected_positions[event, offset]),
-                    "observed": int(row[offset]),
+                    "observed": int(observed_positions[offset]),
                     "producer_layer_id": producer,
                     "selected_offset": offset,
                 }
+
+            safe_observed_count = min(max(observed_count, 0), selected_width)
+            safe_expected_count = min(max(expected_count, 0), selected_width)
+            observed_live = observed_positions[:safe_observed_count]
+            observed_live_scores = observed_scores[:safe_observed_count]
+            expected_live = expected_positions[event, :safe_expected_count]
+            expected_live_scores = expected_scores[event, :safe_expected_count]
+            expected_live_score_count += int(safe_expected_count)
+            expected_only = np.setdiff1d(expected_live, observed_live)
+            observed_only = np.setdiff1d(observed_live, expected_live)
+            if (
+                observed_count != expected_count
+                or expected_only.size
+                or observed_only.size
+            ):
+                selected_set_mismatches.append(
+                    {
+                        "event_index": event,
+                        "expected_only_count": int(expected_only.size),
+                        "expected_only_first": expected_only[:8].tolist(),
+                        "observed_only_count": int(observed_only.size),
+                        "observed_only_first": observed_only[:8].tolist(),
+                        "producer_layer_id": producer,
+                    }
+                )
+
+            observed_tail = observed_positions[safe_observed_count:]
+            observed_score_tail = observed_scores[safe_observed_count:]
+            if (
+                observed_count < 0
+                or observed_count > selected_width
+                or np.any(observed_tail != -1)
+                or np.any(~np.isneginf(observed_score_tail))
+            ):
+                tail_mismatches.append(
+                    {
+                        "event_index": event,
+                        "position_tail_mismatch_count": int(
+                            np.count_nonzero(observed_tail != -1)
+                        ),
+                        "producer_layer_id": producer,
+                        "score_tail_mismatch_count": int(
+                            np.count_nonzero(~np.isneginf(observed_score_tail))
+                        ),
+                    }
+                )
+
+            invalid_position_count = int(
+                np.count_nonzero(
+                    (observed_live < 0)
+                    | (observed_live > int(decode_position))
+                )
+            )
+            duplicate_position_count = int(
+                observed_live.size - np.unique(observed_live).size
+            )
+            nonfinite_score_count = int(
+                np.count_nonzero(~np.isfinite(observed_live_scores))
+            )
+            canonical_order = np.lexsort(
+                (
+                    observed_live.astype(np.int64, copy=False),
+                    _float32_topk_descending_key(observed_live_scores),
+                )
+            )
+            order_is_canonical = bool(
+                np.array_equal(
+                    canonical_order,
+                    np.arange(observed_live.size, dtype=np.int64),
+                )
+            )
+            if (
+                invalid_position_count
+                or duplicate_position_count
+                or nonfinite_score_count
+                or not order_is_canonical
+            ):
+                first_wrong_offset = None
+                if not order_is_canonical and canonical_order.size:
+                    wrong = np.flatnonzero(
+                        canonical_order
+                        != np.arange(canonical_order.size, dtype=np.int64)
+                    )
+                    if wrong.size:
+                        first_wrong_offset = int(wrong[0])
+                score_contract_mismatches.append(
+                    {
+                        "duplicate_position_count": duplicate_position_count,
+                        "event_index": event,
+                        "first_noncanonical_offset": first_wrong_offset,
+                        "invalid_position_count": invalid_position_count,
+                        "nonfinite_score_count": nonfinite_score_count,
+                        "producer_layer_id": producer,
+                    }
+                )
+
+            if (
+                observed_count == expected_count
+                and not expected_only.size
+                and not observed_only.size
+                and safe_observed_count
+            ):
+                observed_order = np.argsort(observed_live, kind="stable")
+                expected_order = np.argsort(expected_live, kind="stable")
+                position_aligned_observed_scores.append(
+                    observed_live_scores[observed_order]
+                )
+                position_aligned_expected_scores.append(
+                    expected_live_scores[expected_order]
+                )
             event += 1
         for slot in range(len(stage_producers), maximum_slots):
             if np.any(canonical[slot] != -1):
                 padded_slot_mismatches.append({"slot": slot, "stage": stage})
 
+    if position_aligned_observed_scores:
+        aligned_observed = np.concatenate(position_aligned_observed_scores)
+        aligned_expected = np.concatenate(position_aligned_expected_scores)
+        score_comparison = compare_bounded_tensor(
+            aligned_observed,
+            aligned_expected,
+            DSA_CROSS_BACKEND_SCORE_TOLERANCE,
+        )
+    else:
+        score_comparison = {
+            "error": None,
+            "observed_range": None,
+            "passed": False,
+            "reason": "no exact position-aligned live scores",
+            "reference_range": None,
+            "shape": [0],
+            "tolerance": DSA_CROSS_BACKEND_SCORE_TOLERANCE.to_dict(),
+        }
+    aligned_position_count = int(
+        sum(values.size for values in position_aligned_observed_scores)
+    )
+    score_comparison["aligned_position_count"] = aligned_position_count
+    score_comparison["expected_position_count"] = expected_live_score_count
+    score_comparison["coverage_complete"] = bool(
+        aligned_position_count == expected_live_score_count
+    )
+    score_comparison["passed"] = bool(
+        score_comparison["passed"] and score_comparison["coverage_complete"]
+    )
     passed = not any(
         (
             lane_mismatch_stages,
             padded_slot_mismatches,
             producer_mismatches,
             count_mismatches,
-            position_mismatch_count,
+            selected_set_mismatches,
+            tail_mismatches,
+            score_contract_mismatches,
         )
-    )
+    ) and bool(score_comparison["passed"])
     return {
         "count_mismatches": count_mismatches,
         "decode_position": int(decode_position),
         "event_count": event_count,
-        "exact_selected_order_and_tail": position_mismatch_count == 0,
-        "first_position_mismatch": first_position_mismatch,
+        "actual_device_score_order_and_ties": not score_contract_mismatches,
+        "exact_selected_set_and_tail": not (
+            selected_set_mismatches or tail_mismatches
+        ),
+        "first_legacy_order_mismatch": first_legacy_order_mismatch,
         "lane_mismatch_stages": lane_mismatch_stages,
+        "legacy_order_mismatch_count": legacy_order_mismatch_count,
+        "legacy_total_order_match": legacy_order_mismatch_count == 0,
         "padded_slot_mismatches": padded_slot_mismatches,
         "passed": passed,
-        "position_mismatch_count": position_mismatch_count,
         "producer_mismatches": producer_mismatches,
+        "score_contract_mismatches": score_contract_mismatches,
+        "legacy_score_bounded_comparison": score_comparison,
+        "selected_set_mismatches": selected_set_mismatches,
+        "tail_mismatches": tail_mismatches,
     }
 
 
@@ -1292,6 +1499,7 @@ def main() -> int:
             observer_current = tuple(output)
             observer_owns_current = False
             observer_step_records = []
+            observer_artifacts: list[dict[str, Any]] = []
             observer_tokens: list[int] = []
             try:
                 for step, decode_position in enumerate(
@@ -1306,6 +1514,26 @@ def main() -> int:
                         multihost_utils,
                         observer_result[8],
                     )
+                    observation_sha256 = sha256(
+                        np.ascontiguousarray(observation_host).tobytes()
+                    ).hexdigest()
+                    artifact_name = f"step_{step:02d}_position_{decode_position}.npz"
+                    if jax.process_index() == 0:
+                        _atomic_npz(
+                            args.output.parent / "dsa_observer" / artifact_name,
+                            decode_position=np.asarray(
+                                [decode_position], dtype=np.int32
+                            ),
+                            observation=np.asarray(
+                                observation_host, dtype=np.int32
+                            ),
+                        )
+                    observer_artifacts.append(
+                        {
+                            "filename": artifact_name,
+                            "observation_sha256": observation_sha256,
+                        }
+                    )
                     step_contract = _validate_dsa_observation_step(
                         observation_host,
                         groups=groups,
@@ -1313,6 +1541,9 @@ def main() -> int:
                         selected_width=decoder.config.selected_width,
                         expected_positions=dsa_oracle_tensors[
                             "selected_positions"
+                        ][step],
+                        expected_scores=dsa_oracle_tensors[
+                            "selected_scores"
                         ][step],
                         expected_valid_counts=dsa_oracle_tensors[
                             "valid_counts"
@@ -1326,6 +1557,7 @@ def main() -> int:
                         jax.device_get(observer_result[5])
                     )
                     step_contract["next_position"] = next_position.tolist()
+                    step_contract["observation_sha256"] = observation_sha256
                     step_contract["position_passed"] = bool(
                         next_position.tolist() == [int(decode_position) + 1]
                     )
@@ -1336,7 +1568,7 @@ def main() -> int:
                     observer_step_records.append(step_contract)
                     if not step_contract["passed"]:
                         raise RuntimeError(
-                            "DSA observer exact-order contract failed: "
+                            "DSA observer device-score/set/tie contract failed: "
                             f"{step_contract}"
                         )
                     observer_token = _materialize_global_array(
@@ -1384,20 +1616,23 @@ def main() -> int:
                     ],
                     "observer_executed_before_production": True,
                     "observer_hlo_sha256": dsa_observer_hlo_sha256,
+                    "observation_artifacts": observer_artifacts,
                     "prefill_state_preserved_without_donation": (
                         prefill_state_preserved
                     ),
                     "production_executable_observer_enabled": False,
                     "score_comparison": {
-                        "compared": False,
+                        "compared": True,
+                        "cross_backend_total_order_is_gate": False,
+                        "executing_score_order_and_ties_are_gate": True,
+                        "legacy_scores_use_position_aligned_bounded_gate": True,
+                        "legacy_score_tolerance": (
+                            DSA_CROSS_BACKEND_SCORE_TOLERANCE.to_dict()
+                        ),
                         "oracle_sha256": dsa_oracle_manifest["arrays"][
                             "selected_scores"
                         ]["sha256"],
-                        "reason": (
-                            "greenfield observer exposes exact selected positions, "
-                            "counts, producer IDs, and sentinel tails; legacy scores "
-                            "remain diagnostic only"
-                        ),
+                        "selected_set_against_legacy_is_exact_gate": True,
                     },
                     "step_records": observer_step_records,
                     "token_oracle_offset": 1,
@@ -1755,7 +1990,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 3,
+            "schema_version": 4,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

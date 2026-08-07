@@ -18,6 +18,7 @@ from glm_tpu.greenfield.kernels.reference import (
     local_topk_candidates,
     linear,
     merge_topk_candidates,
+    merge_topk_candidates_with_scores,
 )
 
 
@@ -232,6 +233,11 @@ def test_merge_is_invariant_to_candidate_concatenation_order() -> None:
     )
     np.testing.assert_array_equal(np.asarray(first.positions), [[0, 1, 2, 3]])
     np.testing.assert_array_equal(np.asarray(second.positions), np.asarray(first.positions))
+    scored = merge_topk_candidates_with_scores(
+        scores, positions, valid, top_k=4, global_context_size=6
+    )
+    np.testing.assert_array_equal(np.asarray(scored.positions), [[0, 1, 2, 3]])
+    np.testing.assert_array_equal(np.asarray(scored.scores), [[5.0, 5.0, 4.0, 4.0]])
 
 
 def test_decode_reference_has_one_live_row_not_batch_32() -> None:

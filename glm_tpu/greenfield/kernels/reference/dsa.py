@@ -80,6 +80,14 @@ class SelectedPositions(NamedTuple):
     valid_counts: jax.Array
 
 
+class ScoredSelectedPositions(NamedTuple):
+    """Exact compact selection plus the executing score for every slot."""
+
+    positions: jax.Array
+    valid_counts: jax.Array
+    scores: jax.Array
+
+
 def _require_shape(name: str, value: jax.Array, expected: tuple[int, ...]) -> None:
     if value.shape != expected:
         raise ValueError(f"{name} must have shape {expected}, got {value.shape}")
@@ -375,15 +383,15 @@ def local_topk_candidates(
     return values.astype(jnp.float32), positions.astype(jnp.int32)
 
 
-def merge_topk_candidates(
+def _merge_topk_candidates_scored(
     candidate_scores: jax.Array,
     candidate_positions: jax.Array,
     valid_lengths: jax.Array,
     *,
     top_k: int,
     global_context_size: int,
-) -> SelectedPositions:
-    """Merge stage-local candidates independent of collective concatenation order.
+) -> ScoredSelectedPositions:
+    """Merge candidates and retain the scores selected by the same top-k.
 
     Inputs are ``[local_group, rows, candidates]``. A stable ascending-global-
     position pre-sort makes the final ``lax.top_k`` tie break identical to a
@@ -410,7 +418,7 @@ def merge_topk_candidates(
     position_order = jnp.argsort(positions, axis=1, stable=True)
     sorted_scores = jnp.take_along_axis(scores, position_order, axis=1)
     sorted_positions = jnp.take_along_axis(positions, position_order, axis=1)
-    _, selected_slots = lax.top_k(sorted_scores, top_k)
+    selected_scores, selected_slots = lax.top_k(sorted_scores, top_k)
     selected = jnp.take_along_axis(sorted_positions, selected_slots, axis=1)
     valid_counts = jnp.clip(
         valid_lengths.astype(jnp.int32),
@@ -418,8 +426,61 @@ def merge_topk_candidates(
         jnp.int32(min(top_k, global_context_size)),
     )
     slots = lax.broadcasted_iota(jnp.int32, (rows, top_k), 1)
-    selected = jnp.where(slots < valid_counts[:, None], selected, jnp.int32(-1))
-    return SelectedPositions(selected.astype(jnp.int32), valid_counts)
+    live = slots < valid_counts[:, None]
+    selected = jnp.where(live, selected, jnp.int32(-1))
+    selected_scores = jnp.where(
+        live,
+        selected_scores.astype(jnp.float32),
+        jnp.float32(_NEGATIVE_INFINITY),
+    )
+    return ScoredSelectedPositions(
+        selected.astype(jnp.int32),
+        valid_counts,
+        selected_scores,
+    )
+
+
+def merge_topk_candidates(
+    candidate_scores: jax.Array,
+    candidate_positions: jax.Array,
+    valid_lengths: jax.Array,
+    *,
+    top_k: int,
+    global_context_size: int,
+) -> SelectedPositions:
+    """Merge stage-local candidates independent of concatenation order."""
+
+    selected = _merge_topk_candidates_scored(
+        candidate_scores,
+        candidate_positions,
+        valid_lengths,
+        top_k=top_k,
+        global_context_size=global_context_size,
+    )
+    return SelectedPositions(selected.positions, selected.valid_counts)
+
+
+def merge_topk_candidates_with_scores(
+    candidate_scores: jax.Array,
+    candidate_positions: jax.Array,
+    valid_lengths: jax.Array,
+    *,
+    top_k: int,
+    global_context_size: int,
+) -> ScoredSelectedPositions:
+    """Return exact positions and their executing-device FP32 scores.
+
+    This is an observer surface, not a second selector: the scores are the
+    values emitted by the same ``lax.top_k`` that chose ``positions``.
+    """
+
+    return _merge_topk_candidates_scored(
+        candidate_scores,
+        candidate_positions,
+        valid_lengths,
+        top_k=top_k,
+        global_context_size=global_context_size,
+    )
 
 
 def distributed_exact_topk_reference(

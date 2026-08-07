@@ -83,6 +83,7 @@ class StageLocalLayerFp8Result(NamedTuple):
     index_cache: Any
     selected_positions: Any
     selected_valid_counts: Any
+    selected_scores: Any
     route_indices: Any
     route_weights: Any
     contract_valid: Any
@@ -116,6 +117,7 @@ def stage_local_transformer_layer_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
+    lora_norm_epsilon: float = 1e-6,
     rope_theta: float = 8_000_000.0,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
@@ -171,7 +173,7 @@ def stage_local_transformer_layer_fp8_mapped(
             interpret=linear_interpret,
         ),
         attention.q_a_norm_weight,
-        epsilon=rms_norm_epsilon,
+        epsilon=lora_norm_epsilon,
     )
 
     if indexer_kind == "full":
@@ -200,6 +202,7 @@ def stage_local_transformer_layer_fp8_mapped(
             axis_index_groups=axis_index_groups,
             block_shape=block_shape,
             rms_norm_epsilon=rms_norm_epsilon,
+            lora_norm_epsilon=lora_norm_epsilon,
             precomputed_normalized=normalized_input,
             precomputed_q_residual=q_residual,
             linear_backend=linear_backend,
@@ -208,8 +211,14 @@ def stage_local_transformer_layer_fp8_mapped(
         index_cache = dsa_result.index_cache
         selected_positions = dsa_result.selected_positions
         selected_valid_counts = dsa_result.valid_counts
+        selected_scores = dsa_result.selected_scores
         dsa_valid = dsa_result.contract_valid
     else:
+        selected_scores = jnp.full(
+            selected_positions.shape,
+            -jnp.inf,
+            dtype=jnp.float32,
+        )
         dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
 
     attention_result = stage_local_index_share_fp8_mapped(
@@ -240,6 +249,7 @@ def stage_local_transformer_layer_fp8_mapped(
         axis_index_groups=axis_index_groups,
         block_shape=block_shape,
         rms_norm_epsilon=rms_norm_epsilon,
+        lora_norm_epsilon=lora_norm_epsilon,
         rope_theta=rope_theta,
         precomputed_normalized=normalized_input,
         precomputed_q_residual=q_residual,
@@ -325,6 +335,7 @@ def stage_local_transformer_layer_fp8_mapped(
         index_cache,
         selected_positions,
         selected_valid_counts,
+        selected_scores,
         route_indices,
         route_weights,
         (

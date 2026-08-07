@@ -17,6 +17,7 @@ from .attention import (
 from .fp8 import dequantize_fp8_bits_block_weight, fp8_e4m3fn_lookup
 from .dsa import (
     DsaNumericalContract,
+    ScoredSelectedPositions,
     SelectedPositions,
     distributed_exact_topk_reference,
     dsa_index_keys,
@@ -26,6 +27,7 @@ from .dsa import (
     exact_topk,
     local_topk_candidates,
     merge_topk_candidates,
+    merge_topk_candidates_with_scores,
 )
 from .linear import (
     dense_swiglu,
@@ -65,6 +67,7 @@ __all__ = (
     "MlaNumericalContract",
     "SelectedKvSegment",
     "SelectedPositions",
+    "ScoredSelectedPositions",
     "SparseAttentionResult",
     "StageLocalKvLayout",
     "apply_rotary",
@@ -87,6 +90,7 @@ __all__ = (
     "linear",
     "local_topk_candidates",
     "merge_topk_candidates",
+    "merge_topk_candidates_with_scores",
     "pack_index_share_transfer",
     "produce_index_share_state",
     "reference_moe_from_routes",
