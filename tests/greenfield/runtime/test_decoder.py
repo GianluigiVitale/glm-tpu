@@ -82,6 +82,40 @@ ENTRY %main (scores: bf16[4], ids: s32[4], token: s32[1]) -> s32[1] {{
     assert record["score_exchange"][0]["operand_shapes"] == ["bf16[4]"]
     assert record["token_id_exchange"][0]["operand_shapes"] == ["s32[4]"]
     assert record["token_return"][0]["operand_shapes"] == ["s32[1]"]
+    assert record["accepted_token_return_op_names"] == [
+        "jit(mapped_token)/shard_map/ppermute",
+        "jit(execute)/while/body/closed_call/shard_map/ppermute",
+    ]
+
+    prefill_record = _validate_complete_token_collective_lowering(
+        parse_hlo_module(
+            hlo.replace(
+                "jit(mapped_token)/shard_map/ppermute",
+                "jit(execute)/while/body/closed_call/shard_map/ppermute",
+            )
+        ),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert prefill_record["passed"], prefill_record
+
+    wrong_source = _validate_complete_token_collective_lowering(
+        parse_hlo_module(
+            hlo.replace(
+                "jit(mapped_token)/shard_map/ppermute",
+                "jit(unrelated)/shard_map/ppermute",
+            )
+        ),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert not wrong_source["passed"]
+    assert any(
+        "source operation drifted" in item
+        for item in wrong_source["violations"]
+    )
 
     nonlocal_hlo = hlo.replace(
         f"replica_groups={group_text}",

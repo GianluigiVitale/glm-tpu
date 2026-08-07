@@ -459,6 +459,10 @@ def _validate_complete_token_collective_lowering(
             "complete-token return must be exactly one s32[1] "
             f"collective-permute, found {len(token_return)}"
         )
+    accepted_token_return_op_names = (
+        "jit(mapped_token)/shard_map/ppermute",
+        "jit(execute)/while/body/closed_call/shard_map/ppermute",
+    )
     for collective in token_return:
         if _hlo_shape_signature(collective.result_shapes) != (
             "s32[1]",
@@ -469,12 +473,15 @@ def _validate_complete_token_collective_lowering(
             violations.append("complete-token return TPU result shape drifted")
         if collective.source_target_pairs != canonical_pairs:
             violations.append("complete-token return lane pairs drifted")
-        if collective.op_name != "jit(mapped_token)/shard_map/ppermute":
+        if collective.op_name not in accepted_token_return_op_names:
             violations.append("complete-token return source operation drifted")
     return {
         "applicable": True,
         "backend_contract": backend_contract,
         "lowering": "local_one_hot_all_reduce",
+        "accepted_token_return_op_names": list(
+            accepted_token_return_op_names
+        ),
         "passed": not violations,
         "score_exchange": [
             _compact_collective_record(item) for item in score_exchange
