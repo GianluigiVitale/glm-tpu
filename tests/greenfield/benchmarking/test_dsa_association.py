@@ -144,6 +144,78 @@ def test_association_hlo_rejects_collective() -> None:
     assert result["forbidden_operations"] == [" all-reduce("]
 
 
+def _distributed_norm_hlo(*, gather_dtype: str = "bf16") -> str:
+    group = ",".join(str(rank) for rank in range(32))
+    return "\n".join(
+        (
+            "HloModule distributed_norm, num_partitions=32, replica_count=1",
+            "ENTRY main {",
+            "  weight = f8e4m3fn[6144,82] parameter(0), "
+            'metadata={op_name="legacy_runtime_fused_qkv_a_m32_tp32_distributed_norm"}',
+            "  scale = f32[48,82] parameter(1)",
+            "  q = bf16[32,2048] parameter(2)",
+            "  companion = bf16[32,18] parameter(3)",
+            "  local_sum = f32[32] parameter(4), "
+            'metadata={op_name="legacy_tp32_q_a_rms_norm_variance_psum"}',
+            "  reduced = f32[32] all-reduce(local_sum), "
+            f"replica_groups={{{{{group}}}}}, "
+            "use_global_device_ids=true, to_apply=add, "
+            'metadata={op_name="legacy_tp32_q_a_rms_norm_variance_psum/psum"}',
+            f"  local_norm = {gather_dtype}[32,64] parameter(5)",
+            f"  gathered = {gather_dtype}[32,64,32] all-gather(local_norm), "
+            f"dimensions={{2}}, replica_groups={{{{{group}}}}}, "
+            "use_global_device_ids=true, "
+            'metadata={op_name="legacy_tp32_q_a_rms_norm_bf16_all_gather/all_gather"}',
+            "  ROOT result = (bf16[32,2048], bf16[32,18]) tuple(q, companion)",
+            "}",
+        )
+    )
+
+
+def test_distributed_norm_hlo_requires_exact_two_tp32_collectives() -> None:
+    result = validate_dsa_association_hlo(
+        _distributed_norm_hlo(),
+        phase="legacy_tp32_distributed_q_a_norm",
+    )
+    assert result["passed"] is True
+    assert result["distributed_collective_contract"][
+        "collective_counts"
+    ] == {"all-gather": 1, "all-reduce": 1}
+    assert result["distributed_collective_violations"] == []
+
+
+def test_distributed_norm_hlo_rejects_tpu_dtype_or_group_drift() -> None:
+    promoted = validate_dsa_association_hlo(
+        _distributed_norm_hlo(gather_dtype="f32"),
+        phase="legacy_tp32_distributed_q_a_norm",
+    )
+    assert promoted["passed"] is False
+    assert "all-gather payload drifted" in promoted["violations"][0]
+    cpu_only = validate_dsa_association_hlo(
+        _distributed_norm_hlo(gather_dtype="f32"),
+        phase="legacy_tp32_distributed_q_a_norm",
+        allow_cpu_bf16_collective_promotion=True,
+    )
+    assert cpu_only["passed"] is True
+
+    exact_group = "replica_groups={{" + ",".join(
+        str(rank) for rank in range(32)
+    ) + "}}"
+    wrong_group = _distributed_norm_hlo().replace(
+        exact_group,
+        "replica_groups={{0,1,2,3}}",
+    )
+    drifted = validate_dsa_association_hlo(
+        wrong_group,
+        phase="legacy_tp32_distributed_q_a_norm",
+    )
+    assert drifted["passed"] is False
+    assert any(
+        "replica groups drifted" in violation
+        for violation in drifted["distributed_collective_violations"]
+    )
+
+
 def test_score_hlo_rejects_missing_exact_tile_or_source_marker() -> None:
     valid = "\n".join(
         (

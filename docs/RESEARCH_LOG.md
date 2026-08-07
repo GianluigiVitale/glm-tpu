@@ -5156,3 +5156,19 @@ physical projection owns 32 x 64 q-a columns, but the following norm is logicall
 must reduce its statistics over that sharding. The existing probes reassembled full q-a before an
 ordinary norm. Inspect and adapt the pinned sharding/norm path, require its exact physical HLO, and
 only then run one serialized bounded TPU challenger. No full-model retry is authorized first.
+
+## 2026-08-07 21:59 — Distributed q-a RMSNorm challenger is ready for bounded metal
+
+The reuse-registry source truth has been adapted into an independent diagnostic. It executes the
+exact raw-FP8 local-N82 fused projection on 32 shards, performs one FP32 variance psum across ranks
+0--31, all-gathers the normalized BF16 q-a shards in the observed rank-3 layout, and preserves the
+18-column companion. A checksum-bound artifact carries only the resulting q residual into the
+existing one-host DSA matrix, where only the query branch is replaced.
+
+The exact HLO validator requires one `f32[32]` all-reduce and one `bf16[32,64,32]` all-gather with
+global device IDs and rejects every other collective or callback. Full-pod communication remains
+diagnostic-only and forbidden in the greenfield production decoder. Forced-32 semantic and
+full-geometry HLO tests pass; the complete CPU-only greenfield suite is 412 passed / 1 skipped in
+332.82 seconds, with two pre-existing SWIG warnings. Static Python/Bash/ShellCheck/diff/line-length
+checks pass. No TPU execution or arithmetic conclusion exists yet. The only authorized next TPU
+action is one serialized bounded association probe from a committed clean pin.

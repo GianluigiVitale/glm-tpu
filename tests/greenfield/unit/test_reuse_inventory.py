@@ -37,6 +37,7 @@ def test_reuse_inventory_is_complete_and_unambiguous() -> None:
         "legacy-state-integrity",
         "legacy-dsa-diff-and-dump",
         "legacy-dsa-kernels",
+        "legacy-distributed-q-a-rmsnorm",
         "legacy-fp8-matmul-and-gmm",
         "legacy-pipeline-parallel-helpers",
         "ws32-2d-layout-reference",

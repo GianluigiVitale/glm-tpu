@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 12:35 UTC
+**Updated:** 2026-08-07 21:59 UTC
 
 ## Authority and isolation
 
@@ -1473,3 +1473,33 @@ then normalizes the logical 2,048 values; the prior bounded probes reassembled q
 ordinary full-width norm. Prove that boundary under the immutable real input with a one-row
 challenger and exact HLO before one serialized bounded TPU probe. Do not run the complete 753B
 decoder until an exact set/order result authorizes a correction.
+
+## Distributed q-a RMSNorm challenger is implemented and CPU/HLO sealed
+
+The pinned reuse audit has been converted into an independent bounded implementation without
+importing legacy or vLLM execution. The diagnostic reproduces the real local-N82 raw-FP8 fused
+projection, keeps its 18-column kv-a companion sharded, reduces the q-a FP32 square sum over the
+exact physical 32-rank group, and all-gathers the normalized BF16 `32 x 64` shards before the
+replicated 2,048-wide norm weight. The score phase replaces only q-a query state; sealed prompt
+keys, head weights, FP32 wq-b and the already-proven companion remain unchanged.
+
+The HLO contract admits this full-pod group only in the named diagnostic phase. It requires exactly
+one global-id `f32[32]` all-reduce and one rank-3 `bf16[32,64,32]` all-gather over ranks 0--31 and
+still forbids collective-permute, reduce-scatter, all-to-all, callbacks and outside compilation.
+TPU BF16 is strict; the separately flagged CPU path may admit XLA's BF16-to-FP32 gather promotion.
+The protected wrapper serializes both phases under the existing global lease, syncs the exact pin
+to eight hosts, seals per-rank HLO/output identity and a checksum-bound q-residual artifact, then
+runs the existing one-host exact set/order matrix. It retains DB/archive/SUCCESS and three
+authenticated 8/8 census gates.
+
+Focused forced-32 coverage passes 32/32. The complete CPU-only greenfield suite passes
+412 with one skip and two pre-existing SWIG warnings in 332.82 seconds; Python compilation, Bash
+syntax, ShellCheck, line-length and diff checks also pass. This is implementation evidence only:
+there is no TPU result, arithmetic conclusion, decoder change, Gate-D retry, timing or throughput
+claim yet.
+
+Exact next: commit and push the clean bounded implementation, prove the fleet idle, then run exactly
+one serialized `bash scripts/greenfield/run_layer0_dsa_association_probe.sh`. Only an exact sealed
+2,048-position set and order may authorize the smallest one-row production correction and one
+protected 8K Gate-D retry. A failed association is recorded and closed; it must not trigger a blind
+full-model run.

@@ -6,6 +6,7 @@ readonly POD=db-v4-64-od
 readonly ZONE=us-central2-b
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
+readonly GREENFIELD_ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly DEFAULT_INPUT=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
@@ -29,7 +30,8 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "results DB/input missing or append-only run path already exists" >&2
   exit 2
 }
-mkdir -p "$RUN_DIR/hlo" "$RUN_DIR/input"
+mkdir -p "$RUN_DIR/hlo" "$RUN_DIR/input" \
+  "$RUN_DIR/distributed_hlo" "$RUN_DIR/distributed_host_records"
 cp "$INPUT_DIR/manifest.json" "$RUN_DIR/input/manifest.json"
 cp "$INPUT_DIR/layer0_dsa_input.safetensors" \
   "$RUN_DIR/input/layer0_dsa_input.safetensors"
@@ -59,7 +61,7 @@ strict_census() {
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   local command
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_dsa_association[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_dsa_association[.]py|[p]robe_layer0_distributed_q_a_norm[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
     --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
@@ -85,7 +87,50 @@ strict_census pre || {
   exit 1
 }
 
-say "compiling bounded layer-0 association matrix on one TPU-v4 host"
+say "syncing exact greenfield pin to all eight diagnostic hosts"
+# shellcheck disable=SC2016
+sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && echo "SYNC_OK $(hostname) $pin"'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
+has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
+  say "ABORT: exact eight-host code sync failed"
+  exit 1
+}
+
+say "staging immutable bounded input through the approved bucket"
+gcloud storage cp --no-clobber \
+  "$RUN_DIR/input/manifest.json" \
+  "$RUN_DIR/input/layer0_dsa_input.safetensors" \
+  "$REMOTE_PREFIX/distributed_input/" >/dev/null
+
+coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
+  --command="hostname -I" 2>/dev/null | grep -Eo '192\.168\.[0-9]+\.[0-9]+' | head -1)
+[[ -n "$coordinator" ]] || {
+  say "ABORT: could not resolve worker-0 coordinator address"
+  exit 1
+}
+coordinator="$coordinator:8476"
+say "running exact 32-chip q-a projection/RMSNorm association coordinator=$coordinator"
+# shellcheck disable=SC2016
+distributed_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/input" "$run/distributed_hlo"; gcloud storage cp "$remote/distributed_input/manifest.json" "$remote/distributed_input/layer0_dsa_input.safetensors" "$run/input/" >/dev/null; cd "$wt"; JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/probe_layer0_distributed_q_a_norm.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash "$pin" --input-dir "$run/input" --input-manifest-sha256 '"$INPUT_MANIFEST_SHA"' --output "$run/distributed.rank${idx}.json" --artifact-dir "$run/distributed_q_a_norm_artifact" --hlo-dir "$run/distributed_hlo" >"$run/distributed.rank${idx}.log" 2>&1; sha256sum "$run/distributed.rank${idx}.json" "$run/distributed.rank${idx}.log" >"$run/distributed.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/distributed.rank${idx}.json" "$run/distributed.rank${idx}.log" "$run/distributed.rank${idx}.sha256" "$remote/distributed_host_records/" >/dev/null; if [[ "$idx" == 0 ]]; then gcloud storage cp --recursive --no-clobber "$run/distributed_q_a_norm_artifact" "$remote/" >/dev/null; gcloud storage cp --no-clobber "$run/distributed_hlo/distributed_q_a_norm.optimized_hlo.txt" "$remote/distributed_hlo/" >/dev/null; fi; echo "DISTRIBUTED_Q_A_NORM_OK $(hostname) rank=$idx"'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="$distributed_command" >"$RUN_DIR/distributed_capture.txt" 2>&1
+has_eight_unique_markers "$RUN_DIR/distributed_capture.txt" \
+  DISTRIBUTED_Q_A_NORM_OK || {
+  say "ABORT: distributed q-a norm did not pass on all eight hosts"
+  exit 1
+}
+gcloud storage cp "$REMOTE_PREFIX/distributed_host_records/distributed.rank*" \
+  "$RUN_DIR/distributed_host_records/" >/dev/null
+strict_census distributed_post || {
+  say "ABORT: distributed phase did not release the complete fleet"
+  exit 1
+}
+DIST_MANIFEST_SHA=$(/home/gianl/vllm-env/bin/python -c \
+  'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
+  "$RUN_DIR/distributed_q_a_norm_artifact/manifest.json")
+
+say "compiling bounded layer-0 score matrix on one TPU-v4 host"
 started=$(date +%s)
 (
   cd "$WORKTREE"
@@ -99,6 +144,9 @@ started=$(date +%s)
       --expected-code-hash "$PIN" \
       --input-dir "$RUN_DIR/input" \
       --input-manifest-sha256 "$INPUT_MANIFEST_SHA" \
+      --distributed-q-a-norm-dir \
+        "$RUN_DIR/distributed_q_a_norm_artifact" \
+      --distributed-q-a-norm-manifest-sha256 "$DIST_MANIFEST_SHA" \
       --output "$RUN_DIR/runner.json" \
       --hlo-dir "$RUN_DIR/hlo"
 ) >"$RUN_DIR/runner.log" 2>&1
@@ -107,7 +155,7 @@ say "runner completed in ${elapsed}s"
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" \
-  "$INPUT_MANIFEST_SHA" <<'PY'
+  "$INPUT_MANIFEST_SHA" "$DIST_MANIFEST_SHA" <<'PY'
 from __future__ import annotations
 
 import json
@@ -115,13 +163,64 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, db_path, repo, elapsed, input_sha = sys.argv[1:]
+run_dir, pin, db_path, repo, elapsed, input_sha, distributed_sha = sys.argv[1:]
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("layer-0 DSA runner status/code identity failed")
 if runner["input_manifest_sha256"] != input_sha:
     raise SystemExit("layer-0 DSA input identity failed")
+distributed_records = [
+    json.loads(path.read_text())
+    for path in sorted((run_dir / "distributed_host_records").glob("*.json"))
+]
+if len(distributed_records) != 8 or {
+    record["jax_process_index"] for record in distributed_records
+} != set(range(8)) or len({
+    record["hostname"] for record in distributed_records
+}) != 8:
+    raise SystemExit("distributed q-a norm does not cover eight unique hosts")
+if any(
+    record["status"] != "SUCCESS"
+    or record["code_hash"] != pin
+    or record["input_manifest_sha256"] != input_sha
+    or record["global_device_count"] != 32
+    or record["diagnostic_only_full_pod_collectives"] is not True
+    or record["profiler_free_timing"] is not False
+    for record in distributed_records
+):
+    raise SystemExit("distributed q-a norm identity/scope contract failed")
+if sorted(
+    device
+    for record in distributed_records
+    for device in record["local_device_ids"]
+) != list(range(32)):
+    raise SystemExit("distributed q-a norm device IDs do not cover 0..31")
+if len({record["hlo_sha256"] for record in distributed_records}) != 1 or len({
+    record["q_residual"]["sha256"] for record in distributed_records
+}) != 1:
+    raise SystemExit("distributed q-a norm fleet HLO/output differs")
+for record in distributed_records:
+    contract = record["hlo_contract"]
+    collective = contract["distributed_collective_contract"]
+    if (
+        not contract["passed"]
+        or contract["distributed_collective_violations"]
+        or collective["collective_counts"]
+        != {"all-gather": 1, "all-reduce": 1}
+        or collective["cpu_bf16_collective_promotion_allowed"] is not False
+    ):
+        raise SystemExit("distributed q-a norm physical HLO contract failed")
+    for operation in collective["collectives"]:
+        if operation["replica_groups"] != [list(range(32))]:
+            raise SystemExit("distributed q-a norm replica group drifted")
+distributed_manifest = json.loads(
+    (run_dir / "distributed_q_a_norm_artifact" / "manifest.json").read_text()
+)
+if distributed_manifest["manifest_sha256"] != distributed_sha or (
+    runner["distributed_q_a_norm_artifact"] != distributed_manifest
+):
+    raise SystemExit("distributed q-a norm artifact linkage failed")
 for name, record in runner["hlo"]["state"].items():
     if not record["contract"]["passed"]:
         raise SystemExit(f"layer-0 DSA state HLO failed: {name}")
@@ -154,6 +253,7 @@ expected_variants = {
     "legacy_fused_qkv_fp32_divsqrt",
     "legacy_runtime_fused_qkv_global_fp32_divsqrt",
     "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
+    "legacy_tp32_distributed_q_a_norm_fp32_divsqrt",
     "one_row_pagewise_on_legacy_state",
     "one_row_pallas_on_legacy_state",
     "one_row_pagewise_on_fused_qkv_legacy_state",
@@ -162,6 +262,8 @@ expected_variants = {
     "one_row_pallas_on_runtime_fused_qkv_global_legacy_state",
     "one_row_pagewise_on_runtime_fused_qkv_sharded_legacy_state",
     "one_row_pallas_on_runtime_fused_qkv_sharded_legacy_state",
+    "one_row_pagewise_on_runtime_fused_qkv_distributed_norm_legacy_state",
+    "one_row_pallas_on_runtime_fused_qkv_distributed_norm_legacy_state",
 }
 if set(runner["comparisons"]) != expected_variants:
     raise SystemExit("layer-0 DSA comparison matrix is incomplete")
@@ -177,11 +279,15 @@ conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
     model="zai-org/GLM-5.2-FP8:greenfield-layer0-dsa-association",
-    revision="bounded-real-layer0-v2-runtime-fp8-tp32",
+    revision="bounded-real-layer0-v3-tp32-distributed-q-a-norm",
     env={
         "GLM_ENGINE": "greenfield_layer0_dsa_association",
         "greenfield_code_hash": pin,
         "input_manifest_sha256": input_sha,
+        "distributed_q_a_norm_manifest_sha256": distributed_sha,
+        "distributed_q_a_norm_hlo_sha256": distributed_records[0][
+            "hlo_sha256"
+        ],
         "device_kind": runner["device_kind"],
     },
     note="Protected bounded real layer-0 8K DSA association diagnostic.",
@@ -243,8 +349,10 @@ PY
 
 (
   cd "$RUN_DIR"
-  find hlo input -type f -print0 | sort -z | xargs -0 sha256sum
-  sha256sum runner.json runner.log summary.json results_ckpt.db census_pre.txt
+  find hlo input distributed_hlo distributed_host_records \
+    distributed_q_a_norm_artifact -type f -print0 | sort -z | xargs -0 sha256sum
+  sha256sum runner.json runner.log summary.json results_ckpt.db \
+    census_pre.txt census_distributed_post.txt sync.txt distributed_capture.txt
 ) >"$RUN_DIR/evidence.sha256"
 
 strict_census post || {
@@ -259,10 +367,16 @@ gcloud storage cp --recursive --no-clobber "$RUN_DIR/hlo" \
   "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp --recursive --no-clobber "$RUN_DIR/input" \
   "$REMOTE_PREFIX/" >/dev/null
+gcloud storage cp --recursive --no-clobber \
+  "$RUN_DIR/distributed_q_a_norm_artifact" \
+  "$RUN_DIR/distributed_hlo" "$RUN_DIR/distributed_host_records" \
+  "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp --no-clobber \
   "$RUN_DIR/runner.json" "$RUN_DIR/runner.log" "$RUN_DIR/summary.json" \
   "$RUN_DIR/results_ckpt.db" "$RUN_DIR/evidence.sha256" \
   "$RUN_DIR/orchestrator.log" "$RUN_DIR/census_pre.txt" \
+  "$RUN_DIR/census_distributed_post.txt" "$RUN_DIR/sync.txt" \
+  "$RUN_DIR/distributed_capture.txt" \
   "$RUN_DIR/census_post.txt" "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" \
   "$REMOTE_PREFIX/SUCCESS" >/dev/null

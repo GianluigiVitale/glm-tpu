@@ -1,16 +1,26 @@
 from __future__ import annotations
 
+from functools import partial
+import os
+import subprocess
+import sys
+
+import jax
 import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 import pytest
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from glm_tpu.greenfield.kernels.reference.dsa_association import (
     Layer0DsaProbeGeometry,
+    LegacyTp32QaNormOutput,
     LegacyScoreGeometry,
     affine_key_layer_norm,
     bfloat16_from_uint16_bits,
     layer0_dsa_state,
+    layer0_dsa_state_from_q_residual,
+    legacy_tp32_fused_qkv_a_rms_norm,
     legacy_pagewise_dcp_scores,
     one_row_pagewise_scores,
     pack_legacy_fused_qkv_runtime_weights,
@@ -250,6 +260,274 @@ def test_layer0_runtime_fp8_global_and_sharded_fused_modes_are_live() -> None:
         assert state.qkv_a_companion.dtype == jnp.bfloat16
         assert np.isfinite(np.asarray(state.query)).all()
         assert np.any(np.asarray(state.qkv_a_companion) != 0)
+
+
+def _run_forced_32_distributed_q_a_norm_case() -> None:
+    if len(jax.devices()) != 32:
+        raise AssertionError(f"expected 32 CPU devices, got {jax.devices()}")
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=3,
+        hidden_size=128,
+        q_lora_rank=64,
+        qkv_a_companion_rank=32,
+        legacy_tensor_shards=32,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    rng = np.random.default_rng(29)
+    q_bits = rng.integers(
+        0x20, 0x48, size=(geometry.q_lora_rank, geometry.hidden_size), dtype=np.uint8
+    )
+    kv_bits = rng.integers(
+        0x20,
+        0x48,
+        size=(geometry.qkv_a_companion_rank, geometry.hidden_size),
+        dtype=np.uint8,
+    )
+    packed = pack_legacy_fused_qkv_runtime_weights(
+        jnp.asarray(q_bits),
+        jnp.asarray(rng.uniform(0.005, 0.02, size=(1, 1)), dtype=jnp.float32),
+        jnp.asarray(kv_bits),
+        jnp.asarray(rng.uniform(0.005, 0.02, size=(1, 1)), dtype=jnp.float32),
+        geometry=geometry,
+    )
+    normalized = jnp.asarray(
+        rng.normal(size=(geometry.decode_rows, geometry.hidden_size)).astype(
+            ml_dtypes.bfloat16
+        )
+    )
+    norm_weight = jnp.asarray(
+        rng.uniform(0.75, 1.25, size=(geometry.q_lora_rank,)).astype(
+            ml_dtypes.bfloat16
+        )
+    )
+    mesh = Mesh(np.asarray(jax.devices(), dtype=object), ("legacy_model",))
+    mapped = jax.shard_map(
+        partial(
+            legacy_tp32_fused_qkv_a_rms_norm,
+            axis_name="legacy_model",
+            geometry=geometry,
+        ),
+        mesh=mesh,
+        in_specs=(P(), P(None, "legacy_model"), P(None, "legacy_model"), P()),
+        out_specs=LegacyTp32QaNormOutput(
+            P(),
+            P(None, "legacy_model"),
+        ),
+        check_vma=False,
+    )
+    arguments = (
+        jax.device_put(normalized, NamedSharding(mesh, P())),
+        jax.device_put(
+            packed.global_weight,
+            NamedSharding(mesh, P(None, "legacy_model")),
+        ),
+        jax.device_put(
+            packed.global_scale,
+            NamedSharding(mesh, P(None, "legacy_model")),
+        ),
+        jax.device_put(norm_weight, NamedSharding(mesh, P())),
+    )
+    lowered = jax.jit(mapped).lower(*arguments)
+    compiled = lowered.compile()
+    actual = compiled(*arguments)
+    jax.block_until_ready(actual)
+
+    local_output = (
+        geometry.q_lora_rank + geometry.qkv_a_companion_rank
+    ) // geometry.legacy_tensor_shards
+    q_local = geometry.q_lora_rank // geometry.legacy_tensor_shards
+    expanded_scale = jnp.repeat(
+        packed.global_scale,
+        geometry.hidden_size // packed.global_scale.shape[0],
+        axis=0,
+    )
+    decoded = (
+        packed.global_weight.astype(jnp.float32) * expanded_scale
+    ).astype(jnp.bfloat16)
+    projected = jax.lax.dot_general(
+        normalized,
+        decoded,
+        dimension_numbers=(((1,), (0,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+    projected = projected.reshape(
+        geometry.decode_rows,
+        geometry.legacy_tensor_shards,
+        local_output,
+    )
+    logical_q = projected[:, :, :q_local].reshape(
+        geometry.decode_rows, geometry.q_lora_rank
+    )
+    logical_companion = projected[:, :, q_local:].reshape(
+        geometry.decode_rows, geometry.qkv_a_companion_rank
+    )
+    value_f32 = logical_q.astype(jnp.float32)
+    reference = (
+        value_f32
+        * jax.lax.rsqrt(
+            jnp.mean(jnp.square(value_f32), axis=-1, keepdims=True)
+            + jnp.float32(geometry.q_norm_epsilon)
+        )
+    ).astype(jnp.bfloat16)
+    reference = (reference * norm_weight).astype(jnp.bfloat16)
+    np.testing.assert_allclose(
+        np.asarray(actual.q_residual, dtype=np.float32),
+        np.asarray(reference, dtype=np.float32),
+        rtol=0,
+        atol=2**-7,
+    )
+    np.testing.assert_array_equal(
+        np.asarray(actual.qkv_a_companion_shard).view(np.uint16),
+        np.asarray(logical_companion).view(np.uint16),
+    )
+
+    from glm_tpu.greenfield.benchmarking.dsa_association import (
+        validate_dsa_association_hlo,
+    )
+
+    contract = validate_dsa_association_hlo(
+        compiled.as_text(),
+        phase="legacy_tp32_distributed_q_a_norm",
+        context=6,
+        decode_rows=geometry.decode_rows,
+        heads=geometry.heads,
+        head_dim=geometry.head_dim,
+        page_size=2,
+        hidden_size=geometry.hidden_size,
+        q_lora_rank=geometry.q_lora_rank,
+        qkv_a_companion_rank=geometry.qkv_a_companion_rank,
+        tensor_shards=geometry.legacy_tensor_shards,
+        allow_cpu_bf16_collective_promotion=True,
+    )
+    assert contract["passed"], contract
+    assert contract["distributed_collective_contract"][
+        "collective_counts"
+    ] == {"all-gather": 1, "all-reduce": 1}
+
+    full = Layer0DsaProbeGeometry()
+    full_arguments = (
+        jax.device_put(
+            jnp.zeros(
+                (full.decode_rows, full.hidden_size), dtype=jnp.bfloat16
+            ),
+            NamedSharding(mesh, P()),
+        ),
+        jax.device_put(
+            jnp.zeros(
+                (
+                    full.hidden_size,
+                    full.q_lora_rank + full.qkv_a_companion_rank,
+                ),
+                dtype=jnp.float8_e4m3fn,
+            ),
+            NamedSharding(mesh, P(None, "legacy_model")),
+        ),
+        jax.device_put(
+            jnp.ones(
+                (
+                    full.hidden_size // 128,
+                    full.q_lora_rank + full.qkv_a_companion_rank,
+                ),
+                dtype=jnp.float32,
+            ),
+            NamedSharding(mesh, P(None, "legacy_model")),
+        ),
+        jax.device_put(
+            jnp.ones((full.q_lora_rank,), dtype=jnp.bfloat16),
+            NamedSharding(mesh, P()),
+        ),
+    )
+    full_mapped = jax.shard_map(
+        partial(
+            legacy_tp32_fused_qkv_a_rms_norm,
+            axis_name="legacy_model",
+            geometry=full,
+        ),
+        mesh=mesh,
+        in_specs=(P(), P(None, "legacy_model"), P(None, "legacy_model"), P()),
+        out_specs=LegacyTp32QaNormOutput(
+            P(),
+            P(None, "legacy_model"),
+        ),
+        check_vma=False,
+    )
+    full_hlo = jax.jit(full_mapped).lower(*full_arguments).compile().as_text()
+    full_contract = validate_dsa_association_hlo(
+        full_hlo,
+        phase="legacy_tp32_distributed_q_a_norm",
+        allow_cpu_bf16_collective_promotion=True,
+    )
+    assert full_contract["passed"], full_contract
+    assert full_contract["missing_shapes"] == []
+
+
+def test_distributed_q_a_norm_exactness_and_hlo_on_forced_32_cpu() -> None:
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    existing = env.get("XLA_FLAGS", "").strip()
+    env["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=32".strip()
+    )
+    code = (
+        "from tests.greenfield.kernels.test_dsa_association import "
+        "_run_forced_32_distributed_q_a_norm_case; "
+        "_run_forced_32_distributed_q_a_norm_case()"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_layer0_state_replacement_changes_only_query() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=3,
+        hidden_size=8,
+        q_lora_rank=4,
+        qkv_a_companion_rank=2,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    rng = np.random.default_rng(31)
+    q_residual = jnp.asarray(
+        rng.normal(size=(3, 4)).astype(ml_dtypes.bfloat16)
+    )
+    keys = jnp.asarray(rng.normal(size=(6, 4)).astype(ml_dtypes.bfloat16))
+    head_weights = jnp.asarray(rng.normal(size=(3, 2)), dtype=jnp.float32)
+    companion = jnp.asarray(
+        rng.normal(size=(3, 2)).astype(ml_dtypes.bfloat16)
+    )
+    wq_b = jnp.asarray(rng.normal(size=(8, 4)), dtype=jnp.float32)
+    state = layer0_dsa_state_from_q_residual(
+        q_residual,
+        keys,
+        head_weights,
+        companion,
+        wq_b,
+        geometry=geometry,
+    )
+    assert state.query.shape == (3, 2, 4)
+    np.testing.assert_array_equal(np.asarray(state.index_keys), np.asarray(keys))
+    np.testing.assert_array_equal(
+        np.asarray(state.head_weights), np.asarray(head_weights)
+    )
+    np.testing.assert_array_equal(
+        np.asarray(state.qkv_a_companion), np.asarray(companion)
+    )
 
 
 def test_legacy_pagewise_geometry_reconstructs_direct_row() -> None:

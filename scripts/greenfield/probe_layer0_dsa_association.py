@@ -37,6 +37,79 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _sha256_file(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _manifest_hash(value: dict[str, Any]) -> str:
+    payload = dict(value)
+    payload.pop("manifest_sha256", None)
+    encoded = json.dumps(
+        payload,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    return sha256(encoded).hexdigest()
+
+
+def _inspect_distributed_q_a_norm_artifact(
+    artifact_dir: Path,
+    *,
+    expected_manifest_sha256: str,
+    expected_code_hash: str,
+    expected_input_manifest_sha256: str,
+) -> tuple[dict[str, Any], np.ndarray]:
+    from safetensors import safe_open
+
+    artifact_dir = Path(artifact_dir)
+    manifest = json.loads((artifact_dir / "manifest.json").read_text())
+    if manifest.get("artifact_kind") != "greenfield_distributed_q_a_norm" or (
+        manifest.get("format_version") != 1
+        or manifest.get("diagnostic_only") is not True
+    ):
+        raise ValueError("unsupported distributed q-a norm artifact")
+    if manifest.get("manifest_sha256") != _manifest_hash(manifest) or (
+        manifest.get("manifest_sha256") != expected_manifest_sha256
+    ):
+        raise ValueError("distributed q-a norm manifest checksum mismatch")
+    if manifest.get("code_hash") != expected_code_hash or (
+        manifest.get("input_manifest_sha256")
+        != expected_input_manifest_sha256
+    ):
+        raise ValueError("distributed q-a norm provenance drifted")
+    file_record = manifest.get("file", {})
+    if file_record.get("filename") != "distributed_q_a_norm.safetensors":
+        raise ValueError("distributed q-a norm filename drifted")
+    tensor_path = artifact_dir / file_record["filename"]
+    if tensor_path.stat().st_size != file_record.get("byte_count") or (
+        _sha256_file(tensor_path) != file_record.get("sha256")
+    ):
+        raise ValueError("distributed q-a norm tensor integrity failed")
+    with safe_open(tensor_path, framework="np") as handle:
+        if handle.metadata() != {
+            "artifact_kind": "greenfield_distributed_q_a_norm",
+            "format_version": "1",
+        } or list(handle.keys()) != ["q_residual_bfloat16_bits"]:
+            raise ValueError("distributed q-a norm tensor metadata drifted")
+        q_bits = handle.get_tensor("q_residual_bfloat16_bits").copy()
+    q_record = manifest.get("q_residual", {})
+    if q_bits.shape != (32, 2048) or q_bits.dtype != np.uint16 or (
+        q_record.get("shape") != [32, 2048]
+        or q_record.get("dtype") != "bfloat16"
+        or q_record.get("byte_count") != q_bits.nbytes
+        or q_record.get("sha256")
+        != sha256(q_bits.view(np.uint8)).hexdigest()
+    ):
+        raise ValueError("distributed q-a norm tensor contract drifted")
+    return manifest, q_bits
+
+
 def _memory_stats(device: Any) -> dict[str, int] | None:
     value = device.memory_stats()
     if value is None:
@@ -66,6 +139,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--input-manifest-sha256", required=True)
+    parser.add_argument("--distributed-q-a-norm-dir", type=Path, required=True)
+    parser.add_argument(
+        "--distributed-q-a-norm-manifest-sha256",
+        required=True,
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     return parser.parse_args()
@@ -92,6 +170,7 @@ def main() -> int:
     from glm_tpu.greenfield.kernels.pallas.dsa import dsa_scores_pallas
     from glm_tpu.greenfield.kernels.reference.dsa_association import (
         Layer0DsaProbeGeometry,
+        layer0_dsa_state_from_q_residual,
         layer0_dsa_state,
         legacy_pagewise_dcp_scores,
         one_row_pagewise_scores,
@@ -118,6 +197,16 @@ def main() -> int:
         args.input_dir,
         expected_manifest_sha256=args.input_manifest_sha256,
     )
+    distributed_q_a_manifest, distributed_q_a_bits = (
+        _inspect_distributed_q_a_norm_artifact(
+            args.distributed_q_a_norm_dir,
+            expected_manifest_sha256=(
+                args.distributed_q_a_norm_manifest_sha256
+            ),
+            expected_code_hash=code_hash,
+            expected_input_manifest_sha256=manifest["manifest_sha256"],
+        )
+    )
     args.hlo_dir.mkdir(parents=True, exist_ok=True)
 
     unique_ids = arrays["unique_token_ids"]
@@ -141,6 +230,9 @@ def main() -> int:
     current_row = put_host(current_row_host)
     input_norm_weight = put_host(bf16_host("input_layernorm__weight"))
     q_a_norm_weight = put_host(bf16_host("self_attn__q_a_layernorm__weight"))
+    distributed_q_a_residual = put_host(
+        distributed_q_a_bits.view(ml_dtypes.bfloat16)
+    )
     key_norm_weight = put_host(
         bf16_host("self_attn__indexer__k_norm__weight")
     )
@@ -397,6 +489,53 @@ def main() -> int:
                 "contract": contract,
             }
 
+    sharded_state = states[
+        "legacy_runtime_fused_qkv_sharded_fp32_divsqrt"
+    ]
+    replacement_arguments = (
+        distributed_q_a_residual,
+        sharded_state.index_keys,
+        sharded_state.head_weights,
+        sharded_state.qkv_a_companion,
+        wq_b_fp32,
+    )
+    replacement_function = partial(
+        layer0_dsa_state_from_q_residual,
+        geometry=geometry,
+    )
+    started = time.monotonic()
+    replacement_compiled = jax.jit(replacement_function).lower(
+        *replacement_arguments
+    ).compile()
+    compile_seconds["state_legacy_tp32_distributed_q_a_norm"] = (
+        time.monotonic() - started
+    )
+    distributed_state = replacement_compiled(*replacement_arguments)
+    jax.block_until_ready(distributed_state)
+    distributed_state_name = (
+        "legacy_tp32_distributed_q_a_norm_fp32_divsqrt"
+    )
+    states[distributed_state_name] = distributed_state
+    replacement_hlo = replacement_compiled.as_text()
+    replacement_hlo_path = (
+        args.hlo_dir / "state_legacy_tp32_distributed_q_a_norm.optimized_hlo.txt"
+    )
+    replacement_hlo_path.write_text(replacement_hlo)
+    replacement_contract = validate_dsa_association_hlo(
+        replacement_hlo,
+        phase="legacy_tp32_distributed_q_a_norm_state",
+    )
+    if not replacement_contract["passed"]:
+        raise RuntimeError(
+            "distributed q-a norm replacement-state HLO failed: "
+            f"{replacement_contract}"
+        )
+    state_hlo_records[distributed_state_name] = {
+        "filename": replacement_hlo_path.name,
+        "sha256": sha256(replacement_hlo.encode()).hexdigest(),
+        "contract": replacement_contract,
+    }
+
     legacy_state = states["legacy_fp32_divsqrt"]
     started = time.monotonic()
     legacy_score_compiled = jax.jit(legacy_pagewise_dcp_scores).lower(
@@ -547,6 +686,10 @@ def main() -> int:
             "runtime_fused_qkv_sharded",
             "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
         ),
+        (
+            "runtime_fused_qkv_distributed_norm",
+            distributed_state_name,
+        ),
     ):
         runtime_state = states[state_name]
         runtime_one_row = one_row_compiled(
@@ -626,6 +769,10 @@ def main() -> int:
             "runtime_fused_qkv_sharded",
             "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
         ),
+        (
+            "runtime_fused_qkv_distributed_norm",
+            distributed_state_name,
+        ),
     ):
         score_deltas[f"{label}_one_row_pagewise_vs_legacy_pagewise"] = (
             _tensor_delta(
@@ -648,6 +795,7 @@ def main() -> int:
         "code_hash": code_hash,
         "input_manifest_sha256": manifest["manifest_sha256"],
         "input_builder_code_hash": manifest["code_hash"],
+        "distributed_q_a_norm_artifact": distributed_q_a_manifest,
         "backend": jax.default_backend(),
         "device": str(device),
         "device_kind": device.device_kind,
@@ -683,7 +831,7 @@ def main() -> int:
             "legacy_fp32_divsqrt"
         ]["passed"],
         "legacy_association_restored": comparisons[
-            "legacy_runtime_fused_qkv_sharded_fp32_divsqrt"
+            distributed_state_name
         ]["passed"],
         "predecoded_fused_qkv_association_restored": comparisons[
             "legacy_fused_qkv_fp32_divsqrt"
@@ -693,6 +841,9 @@ def main() -> int:
         ]["passed"],
         "runtime_fused_qkv_sharded_association_restored": comparisons[
             "legacy_runtime_fused_qkv_sharded_fp32_divsqrt"
+        ]["passed"],
+        "runtime_fused_qkv_distributed_norm_association_restored": comparisons[
+            distributed_state_name
         ]["passed"],
         "one_row_pagewise_restored": comparisons[
             "one_row_pagewise_on_legacy_state"
@@ -718,6 +869,16 @@ def main() -> int:
         "runtime_fused_qkv_sharded_one_row_pallas_restored": comparisons[
             "one_row_pallas_on_runtime_fused_qkv_sharded_legacy_state"
         ]["passed"],
+        "runtime_fused_qkv_distributed_norm_one_row_pagewise_restored": (
+            comparisons[
+                "one_row_pagewise_on_runtime_fused_qkv_distributed_norm_legacy_state"
+            ]["passed"]
+        ),
+        "runtime_fused_qkv_distributed_norm_one_row_pallas_restored": (
+            comparisons[
+                "one_row_pallas_on_runtime_fused_qkv_distributed_norm_legacy_state"
+            ]["passed"]
+        ),
         "profiler_free_timing": False,
         "memory_stats": _memory_stats(device),
     }

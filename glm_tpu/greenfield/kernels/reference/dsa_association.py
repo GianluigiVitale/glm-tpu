@@ -112,6 +112,13 @@ class LegacyFusedQkvRuntimeWeights(NamedTuple):
     sharded_scale: Any
 
 
+class LegacyTp32QaNormOutput(NamedTuple):
+    """Replicated q-a norm result plus the still-sharded fused companion."""
+
+    q_residual: Any
+    qkv_a_companion_shard: Any
+
+
 def bfloat16_from_uint16_bits(value: Any) -> Any:
     """Reinterpret portable little-endian BF16 payload bits on device."""
 
@@ -256,6 +263,225 @@ def _legacy_runtime_fp8_dot(lhs: Any, weight: Any, scale: Any) -> Any:
     return output.astype(lhs.dtype)
 
 
+def legacy_tp32_sharded_rms_norm(
+    local_value: Any,
+    weight: Any,
+    *,
+    axis_name: str,
+    tensor_shards: int,
+    logical_width: int,
+    epsilon: float,
+) -> Any:
+    """Reproduce the sealed feature-sharded RMSNorm association.
+
+    The legacy fused q-a projection leaves 64 of 2,048 q-a columns on each
+    member of the 32-way ``model`` group.  Torchax lowers the logical mean to
+    a local FP32 reduce followed by one 32-way all-reduce.  The normalized
+    BF16 shards are then all-gathered before multiplication by the replicated
+    BF16 RMSNorm weight.  The accepted legacy XPlane attributes exactly those
+    two collectives to ``q_a_layernorm``.
+
+    This function is diagnostic-only and must be called inside a ``shard_map``
+    that binds ``axis_name``.  It deliberately uses the observed rank-3
+    all-gather result ``[rows, local_width, tensor_shards]`` before restoring
+    shard-major logical feature order.
+    """
+
+    if not isinstance(axis_name, str) or not axis_name:
+        raise ValueError("legacy TP32 RMSNorm axis name must be non-empty")
+    for name, value in (
+        ("tensor_shards", tensor_shards),
+        ("logical_width", logical_width),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"legacy TP32 RMSNorm {name} must be positive")
+    if local_value.ndim != 2 or weight.shape != (logical_width,):
+        raise ValueError("legacy TP32 RMSNorm shapes drifted")
+    if local_value.shape[-1] * tensor_shards != logical_width:
+        raise ValueError("legacy TP32 RMSNorm local width does not reconstruct")
+    if local_value.dtype != jnp.bfloat16 or weight.dtype != jnp.bfloat16:
+        raise ValueError("legacy TP32 RMSNorm values and weight must be BF16")
+    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (
+        epsilon <= 0
+    ):
+        raise ValueError("legacy TP32 RMSNorm epsilon must be positive")
+
+    value_f32 = local_value.astype(jnp.float32)
+    with jax.named_scope("legacy_tp32_q_a_rms_norm_variance_psum"):
+        local_square_sum = jnp.sum(jnp.square(value_f32), axis=-1)
+        global_square_sum = lax.psum(local_square_sum, axis_name)
+        inverse_rms = lax.rsqrt(
+            global_square_sum / jnp.float32(logical_width)
+            + jnp.float32(epsilon)
+        )
+    local_normalized = (value_f32 * inverse_rms[:, None]).astype(
+        jnp.bfloat16
+    )
+    with jax.named_scope("legacy_tp32_q_a_rms_norm_bf16_all_gather"):
+        gathered = lax.all_gather(
+            local_normalized,
+            axis_name,
+            axis=local_normalized.ndim,
+            tiled=False,
+        )
+        full_normalized = gathered.transpose(0, 2, 1).reshape(
+            local_value.shape[0], logical_width
+        )
+    return (full_normalized * weight).astype(local_value.dtype)
+
+
+def legacy_tp32_fused_qkv_a_rms_norm(
+    normalized_hidden: Any,
+    local_qkv_weight: Any,
+    local_qkv_scale: Any,
+    q_a_norm_weight: Any,
+    *,
+    axis_name: str,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> LegacyTp32QaNormOutput:
+    """Run the real local-N82 projection and distributed q-a RMSNorm.
+
+    ``local_qkv_weight`` and ``local_qkv_scale`` are one physical shard of the
+    packed tensors returned by :func:`pack_legacy_fused_qkv_runtime_weights`.
+    The q-a result becomes replicated only at the exact legacy norm boundary;
+    the 18-column kv-a companion remains sharded and live.
+    """
+
+    shards = geometry.legacy_tensor_shards
+    if geometry.hidden_size % 128 or geometry.q_lora_rank % shards or (
+        geometry.qkv_a_companion_rank % shards
+    ):
+        raise ValueError("legacy TP32 fused qkv geometry does not divide")
+    q_local = geometry.q_lora_rank // shards
+    companion_local = geometry.qkv_a_companion_rank // shards
+    local_output = q_local + companion_local
+    expected_shapes = {
+        "normalized_hidden": (geometry.decode_rows, geometry.hidden_size),
+        "local_qkv_weight": (geometry.hidden_size, local_output),
+        "local_qkv_scale": (geometry.hidden_size // 128, local_output),
+        "q_a_norm_weight": (geometry.q_lora_rank,),
+    }
+    values = {
+        "normalized_hidden": normalized_hidden,
+        "local_qkv_weight": local_qkv_weight,
+        "local_qkv_scale": local_qkv_scale,
+        "q_a_norm_weight": q_a_norm_weight,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"legacy TP32 fused qkv {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if normalized_hidden.dtype != jnp.bfloat16 or (
+        local_qkv_weight.dtype != jnp.float8_e4m3fn
+    ) or local_qkv_scale.dtype != jnp.float32 or (
+        q_a_norm_weight.dtype != jnp.bfloat16
+    ):
+        raise ValueError("legacy TP32 fused qkv dtype contract drifted")
+
+    with jax.named_scope(
+        "legacy_runtime_fused_qkv_a_m32_tp32_distributed_norm"
+    ):
+        local_qkv_a = _legacy_runtime_fp8_dot(
+            normalized_hidden,
+            local_qkv_weight,
+            local_qkv_scale,
+        )
+        local_q_a = local_qkv_a[:, :q_local]
+        companion = local_qkv_a[:, q_local:]
+        q_residual = legacy_tp32_sharded_rms_norm(
+            local_q_a,
+            q_a_norm_weight,
+            axis_name=axis_name,
+            tensor_shards=shards,
+            logical_width=geometry.q_lora_rank,
+            epsilon=geometry.q_norm_epsilon,
+        )
+    return LegacyTp32QaNormOutput(q_residual, companion)
+
+
+def layer0_dsa_state_from_q_residual(
+    q_residual: Any,
+    index_keys: Any,
+    head_weights: Any,
+    qkv_a_companion: Any,
+    wq_b_weight: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> Layer0DsaState:
+    """Replace only the q-a norm association in an otherwise sealed state.
+
+    Prompt keys and head weights are independent of q-a.  Accepting them as
+    explicit inputs lets a bounded multi-host diagnostic execute the physical
+    distributed norm once and reuse the already-proven one-device state for
+    every unaffected quantity.
+    """
+
+    expected_shapes = {
+        "q_residual": (geometry.decode_rows, geometry.q_lora_rank),
+        "index_keys": (geometry.prompt_tokens + 1, geometry.head_dim),
+        "head_weights": (geometry.decode_rows, geometry.heads),
+        "qkv_a_companion": (
+            geometry.decode_rows,
+            geometry.qkv_a_companion_rank,
+        ),
+        "wq_b_weight": (
+            geometry.heads * geometry.head_dim,
+            geometry.q_lora_rank,
+        ),
+    }
+    values = {
+        "q_residual": q_residual,
+        "index_keys": index_keys,
+        "head_weights": head_weights,
+        "qkv_a_companion": qkv_a_companion,
+        "wq_b_weight": wq_b_weight,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 DSA replacement {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if q_residual.dtype != jnp.bfloat16 or (
+        index_keys.dtype != jnp.bfloat16
+    ) or head_weights.dtype != jnp.float32 or (
+        qkv_a_companion.dtype != jnp.bfloat16
+    ) or wq_b_weight.dtype != jnp.float32:
+        raise ValueError("layer-0 DSA replacement dtype contract drifted")
+
+    query = _dot_out_in(
+        q_residual.astype(jnp.float32),
+        wq_b_weight,
+        output_dtype=jnp.float32,
+    ).reshape(geometry.decode_rows, geometry.heads, geometry.head_dim)
+    decode_positions = jnp.zeros(
+        (geometry.decode_rows,), dtype=jnp.int32
+    ).at[0].set(jnp.int32(geometry.prompt_tokens))
+    cos, sin = rotary_cos_sin(
+        decode_positions,
+        rotary_dim=geometry.rotary_dim,
+        theta=geometry.theta,
+        dtype=jnp.float32,
+    )
+    rotated_query = apply_rotary(
+        query[:, :, : geometry.rotary_dim],
+        cos[:, None, :],
+        sin[:, None, :],
+        interleaved=True,
+    )
+    query = jnp.concatenate(
+        (rotated_query, query[:, :, geometry.rotary_dim :]), axis=-1
+    ).astype(jnp.float32)
+    return Layer0DsaState(
+        query=query,
+        index_keys=index_keys,
+        head_weights=head_weights,
+        qkv_a_companion=qkv_a_companion,
+    )
+
+
 def _unpack_legacy_fused_qkv_output(
     packed: Any,
     *,
@@ -359,6 +585,52 @@ def _project_keys(
     return jnp.concatenate(
         (rotated, keys[:, geometry.rotary_dim :]), axis=-1
     ).astype(jnp.bfloat16)
+
+
+def layer0_decode_normalized_hidden(
+    unique_embeddings: Any,
+    current_embedding_row: Any,
+    input_norm_weight: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> Any:
+    """Build the sealed M32 decode input and apply its ordinary input norm."""
+
+    expected_shapes = {
+        "unique_embeddings": (
+            unique_embeddings.shape[0],
+            geometry.hidden_size,
+        ),
+        "current_embedding_row": (1,),
+        "input_norm_weight": (geometry.hidden_size,),
+    }
+    values = {
+        "unique_embeddings": unique_embeddings,
+        "current_embedding_row": current_embedding_row,
+        "input_norm_weight": input_norm_weight,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 decode normalization {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if unique_embeddings.dtype != jnp.bfloat16 or (
+        input_norm_weight.dtype != jnp.bfloat16
+    ):
+        raise ValueError("layer-0 decode normalization inputs must be BF16")
+    if current_embedding_row.dtype != jnp.int32:
+        raise ValueError("layer-0 decode embedding row must be int32")
+
+    current = jnp.take(unique_embeddings, current_embedding_row, axis=0)
+    decode_hidden = jnp.zeros(
+        (geometry.decode_rows, geometry.hidden_size), dtype=jnp.bfloat16
+    ).at[0].set(current[0])
+    return rms_norm(
+        decode_hidden,
+        input_norm_weight,
+        epsilon=geometry.rms_norm_epsilon,
+    )
 
 
 def layer0_dsa_state(
@@ -540,14 +812,11 @@ def layer0_dsa_state(
         (prompt_chunks, position_chunks),
     ).reshape(padded_tokens, geometry.head_dim)[: geometry.prompt_tokens]
 
-    current = jnp.take(unique_embeddings, current_embedding_row, axis=0)
-    decode_hidden = jnp.zeros(
-        (geometry.decode_rows, geometry.hidden_size), dtype=jnp.bfloat16
-    ).at[0].set(current[0])
-    normalized = rms_norm(
-        decode_hidden,
+    normalized = layer0_decode_normalized_hidden(
+        unique_embeddings,
+        current_embedding_row,
         input_norm_weight,
-        epsilon=geometry.rms_norm_epsilon,
+        geometry=geometry,
     )
     if q_a_projection_mode == "legacy_fused_qkv_a":
         with jax.named_scope("legacy_fused_qkv_a_m32_n2624"):

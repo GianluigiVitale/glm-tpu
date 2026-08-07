@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any, Literal
+
+from ..sharding.hlo_contract import parse_hlo_module
 
 
 AssociationPhase = Literal[
@@ -11,6 +14,8 @@ AssociationPhase = Literal[
     "legacy_fused_qkv_state",
     "legacy_runtime_fused_qkv_global_state",
     "legacy_runtime_fused_qkv_sharded_state",
+    "legacy_tp32_distributed_q_a_norm",
+    "legacy_tp32_distributed_q_a_norm_state",
     "legacy_score",
     "one_row_score",
 ]
@@ -25,15 +30,39 @@ def validate_dsa_association_hlo(
     heads: int = 32,
     head_dim: int = 128,
     page_size: int = 512,
+    hidden_size: int = 6144,
+    q_lora_rank: int = 2048,
+    qkv_a_companion_rank: int = 576,
+    tensor_shards: int = 32,
+    allow_cpu_bf16_collective_promotion: bool = False,
 ) -> dict[str, Any]:
     """Pin legacy diagnostic geometry separately from the one-row challenger."""
 
-    dimensions = (context, decode_rows, heads, head_dim, page_size)
+    dimensions = (
+        context,
+        decode_rows,
+        heads,
+        head_dim,
+        page_size,
+        hidden_size,
+        q_lora_rank,
+        qkv_a_companion_rank,
+        tensor_shards,
+    )
     if any(
         not isinstance(value, int) or isinstance(value, bool) or value <= 0
         for value in dimensions
     ):
         raise ValueError("DSA association HLO dimensions must be positive")
+    if q_lora_rank % tensor_shards or (
+        qkv_a_companion_rank % tensor_shards
+    ) or hidden_size % 128:
+        raise ValueError("DSA association distributed geometry must divide")
+    if not isinstance(allow_cpu_bf16_collective_promotion, bool):
+        raise ValueError("CPU collective-promotion flag must be boolean")
+    q_local = q_lora_rank // tensor_shards
+    companion_local = qkv_a_companion_rank // tensor_shards
+    local_output = q_local + companion_local
     required_by_phase = {
         "legacy_state": (
             f"f32[{decode_rows},{heads},{head_dim}]",
@@ -77,6 +106,22 @@ def validate_dsa_association_hlo(
             "f32[32,48,82]",
             f"bf16[{decode_rows},576]",
             "legacy_runtime_fused_qkv_a_m32_tp32_n82",
+        ),
+        "legacy_tp32_distributed_q_a_norm": (
+            f"f8e4m3fn[{hidden_size},{local_output}]",
+            f"f32[{hidden_size // 128},{local_output}]",
+            f"bf16[{decode_rows},{q_lora_rank}]",
+            f"bf16[{decode_rows},{companion_local}]",
+            "legacy_runtime_fused_qkv_a_m32_tp32_distributed_norm",
+            "legacy_tp32_q_a_rms_norm_variance_psum",
+            "legacy_tp32_q_a_rms_norm_bf16_all_gather",
+        ),
+        "legacy_tp32_distributed_q_a_norm_state": (
+            f"bf16[{decode_rows},{q_lora_rank}]",
+            f"f32[{decode_rows},{heads},{head_dim}]",
+            f"bf16[{context},{head_dim}]",
+            f"f32[{decode_rows},{heads}]",
+            f"bf16[{decode_rows},{qkv_a_companion_rank}]",
         ),
         "legacy_score": (
             f"f32[{decode_rows},{heads},{head_dim}]",
@@ -150,19 +195,112 @@ def validate_dsa_association_hlo(
     fused_qkv_intermediate_shapes = [
         shape for shape in fused_qkv_candidates if shape in optimized_hlo
     ]
-    forbidden_operations = [
-        token
-        for token in (
+    allowed_distributed_collectives = phase == "legacy_tp32_distributed_q_a_norm"
+    forbidden_tokens = (
+        " collective-permute(",
+        " reduce-scatter(",
+        " all-to-all(",
+        "xla_python_cpu_callback",
+        "host_callback",
+        "outside_compilation",
+    )
+    if not allowed_distributed_collectives:
+        forbidden_tokens = (
             " all-gather(",
             " all-reduce(",
-            " collective-permute(",
-            " reduce-scatter(",
-            "xla_python_cpu_callback",
-            "host_callback",
-            "outside_compilation",
+            *forbidden_tokens,
         )
+    forbidden_operations = [
+        token
+        for token in forbidden_tokens
         if token in optimized_hlo
     ]
+    distributed_collective_contract: dict[str, Any] | None = None
+    distributed_collective_violations: list[str] = []
+    if allowed_distributed_collectives:
+        try:
+            module = parse_hlo_module(optimized_hlo)
+        except ValueError as error:
+            distributed_collective_violations.append(
+                f"distributed q-a norm HLO parse failed: {error}"
+            )
+        else:
+            collectives = module.collectives
+            counts = Counter(item.opcode for item in collectives)
+            expected_counts = Counter({"all-reduce": 1, "all-gather": 1})
+            if counts != expected_counts:
+                distributed_collective_violations.append(
+                    "distributed q-a norm requires exactly one all-reduce and "
+                    f"one all-gather, found {dict(sorted(counts.items()))}"
+                )
+            expected_groups = (tuple(range(tensor_shards)),)
+            for item in collectives:
+                if item.replica_groups != expected_groups:
+                    distributed_collective_violations.append(
+                        f"{item.name} replica groups drifted: "
+                        f"expected={expected_groups} found={item.replica_groups}"
+                    )
+                if not item.use_global_device_ids:
+                    distributed_collective_violations.append(
+                        f"{item.name} does not use global device ids"
+                    )
+            reductions = [
+                item for item in collectives if item.opcode == "all-reduce"
+            ]
+            gathers = [
+                item for item in collectives if item.opcode == "all-gather"
+            ]
+            reduction_shapes = [
+                (shape.dtype, shape.dimensions)
+                for item in reductions
+                for shape in item.result_shapes
+            ]
+            gather_shapes = [
+                (shape.dtype, shape.dimensions)
+                for item in gathers
+                for shape in item.result_shapes
+            ]
+            expected_reduction_shapes = {
+                ("f32", (decode_rows,)),
+                ("f32", (decode_rows, 1)),
+            }
+            expected_gather_shapes = {
+                ("bf16", (decode_rows, q_local, tensor_shards))
+            }
+            if allow_cpu_bf16_collective_promotion:
+                expected_gather_shapes.add(
+                    ("f32", (decode_rows, q_local, tensor_shards))
+                )
+            if reductions and not (
+                set(reduction_shapes) & expected_reduction_shapes
+            ):
+                distributed_collective_violations.append(
+                    "distributed q-a norm all-reduce payload drifted: "
+                    f"{reduction_shapes}"
+                )
+            if gathers and not (set(gather_shapes) & expected_gather_shapes):
+                distributed_collective_violations.append(
+                    "distributed q-a norm all-gather payload drifted: "
+                    f"expected={sorted(expected_gather_shapes)} "
+                    f"found={gather_shapes}"
+                )
+            distributed_collective_contract = {
+                "collective_count": len(collectives),
+                "collective_counts": dict(sorted(counts.items())),
+                "collectives": [item.to_dict() for item in collectives],
+                "expected_replica_groups": [list(expected_groups[0])],
+                "expected_all_reduce_shapes": [
+                    {"dtype": dtype, "dimensions": list(dimensions)}
+                    for dtype, dimensions in sorted(expected_reduction_shapes)
+                ],
+                "expected_all_gather_shapes": [
+                    {"dtype": dtype, "dimensions": list(dimensions)}
+                    for dtype, dimensions in sorted(expected_gather_shapes)
+                ],
+                "cpu_bf16_collective_promotion_allowed": (
+                    allow_cpu_bf16_collective_promotion
+                ),
+            }
     forbidden_dead_rows = []
     if phase == "one_row_score":
         forbidden_dead_rows = [
@@ -198,6 +336,7 @@ def validate_dsa_association_hlo(
             f"DSA association {phase} contains forbidden operations: "
             f"{forbidden_operations}"
         )
+    violations.extend(distributed_collective_violations)
     if forbidden_dead_rows:
         violations.append(
             f"one-row DSA challenger contains legacy dead rows: "
@@ -211,6 +350,10 @@ def validate_dsa_association_hlo(
         "missing_score_markers": missing_score_markers,
         "fused_qkv_intermediate_shapes": fused_qkv_intermediate_shapes,
         "forbidden_operations": forbidden_operations,
+        "distributed_collective_contract": distributed_collective_contract,
+        "distributed_collective_violations": (
+            distributed_collective_violations
+        ),
         "forbidden_dead_rows": forbidden_dead_rows,
         "diagnostic_batch32_allowed": phase != "one_row_score",
         "passed": not violations,
