@@ -897,7 +897,7 @@ hashes every raw observer tensor. Production/observer output equality and produc
 pass. Relevant verification is 59 tests plus Python compile, Bash syntax, ShellCheck, and diff
 checks; the commit is pushed.
 
-Exact next: run protected real-prompt 2K Gate D from clean `b406e3a` with complete-token,
+Exact next: run protected real-prompt 2K Gate D from clean branch HEAD containing `b406e3a` with complete-token,
 token-oracle, DSA-oracle, and two-step trace modes. Preserve any first bounded-score/set/tie/token
 failure; do not relax it. If it passes, seal the first real answer-token rate, then optimize the
 measured recurrent path below 200 ms before 8K, 128K, and 256K progression.
