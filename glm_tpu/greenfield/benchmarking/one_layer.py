@@ -194,7 +194,7 @@ def validate_pallas_real_layer_hlo(
     fuse_route_weighting: bool = False,
     reconstruct_down_fp32: bool = False,
 ) -> dict[str, Any]:
-    """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
+    """Require raw-FP8 kernels, bounded metadata, and local combines."""
 
     routed_intermediate = (
         intermediate_size
@@ -238,6 +238,10 @@ def validate_pallas_real_layer_hlo(
         "greenfield_fp8_fused_selected_moe_",
         "greenfield_fp8_block_up_gate_",
         "greenfield_fp8_block_matmul_",
+    ) + (
+        ("greenfield_fp32_to_bf16_",)
+        if reconstruct_down_fp32
+        else ()
     )
     kernel_calls = {
         prefix: [
@@ -285,7 +289,7 @@ def validate_pallas_real_layer_hlo(
             4 if fuse_route_weighting else 5
         ),
         "ConcatBitcast": 3,
-        "tpu_custom_call": 3,
+        "tpu_custom_call": 4 if reconstruct_down_fp32 else 3,
     }
     if target_counts != expected_target_counts:
         violations.append(
@@ -360,6 +364,16 @@ def validate_pallas_real_layer_hlo(
             "fused selected result shape drifted: expected "
             f"{expected_selected_result}"
         )
+    if reconstruct_down_fp32:
+        boundary_lines = kernel_calls["greenfield_fp32_to_bf16_"]
+        if boundary_lines and (
+            f"bf16[8,{hidden_size}]" not in boundary_lines[0]
+            or f"f32[8,{hidden_size}]" not in boundary_lines[0]
+        ):
+            violations.append(
+                "FP32 reconstruction boundary lacks exact FP32 operand and "
+                "BF16 result"
+            )
     if fuse_route_weighting and (
         f"bf16[8,8,{hidden_size}]" in optimized_hlo
     ):

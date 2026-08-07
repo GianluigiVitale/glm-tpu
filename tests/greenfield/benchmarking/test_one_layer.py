@@ -176,7 +176,12 @@ def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
         "  routed_partial = f32[8,6144]{1,0} parameter(1)\n"
         "  routed_full = f32[8,6144]{1,0} all-reduce("
         "routed_partial), channel_id=2, replica_groups={{0,1,2,3}}, "
-        "use_global_device_ids=true, to_apply=add\n  ROOT combine =",
+        "use_global_device_ids=true, to_apply=add\n"
+        "  routed_cast = bf16[8,6144]{1,0} custom-call(routed_full), "
+        'custom_call_target="tpu_custom_call", '
+        "operand_layout_constraints={f32[8,6144]}, "
+        'metadata={op_name="greenfield_fp32_to_bf16_r8_h6144"}\n'
+        "  ROOT combine =",
     )
     fp32 = validate_pallas_real_layer_hlo(
         fp32_hlo,

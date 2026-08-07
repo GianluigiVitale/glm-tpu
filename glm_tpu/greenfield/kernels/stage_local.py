@@ -22,6 +22,7 @@ from .pallas import (
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
+    fp32_to_bf16_pallas_boundary,
     fp8_structured_kv_b_q_absorb,
     fp8_structured_kv_b_value,
     stage_local_sparse_mla_kernel,
@@ -1415,14 +1416,15 @@ def stage_local_moe_pallas_feature_from_routes_mapped(
             axis_name=axis_name,
             axis_index_groups=groups,
         )
-        # The cast is intentionally separated from the collective.  Without
-        # this barrier TPU XLA can commute the BF16 conversion into the psum
-        # and lower a BF16-result all-reduce, defeating the diagnostic's
-        # numerical contract even though its operand starts in FP32.
-        complete_routed_fp32 = lax.optimization_barrier(
-            complete_routed_fp32
+        # Keep the conversion behind an opaque device custom-call.  A plain
+        # cast, even after lax.optimization_barrier, is commuted into the psum
+        # by TPU XLA and lowers a BF16-result all-reduce.
+        complete_routed = fp32_to_bf16_pallas_boundary(
+            complete_routed_fp32,
+            row_tile=contract.top_k,
+            output_tile=config.block_shape[0],
+            interpret=interpret,
         )
-        complete_routed = complete_routed_fp32.astype(hidden_states.dtype)
         route_owners = route_indices[0] // jnp.int32(
             contract.local_experts
         )

@@ -14,6 +14,7 @@ from glm_tpu.greenfield.kernels.pallas import (
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
     fp8_fused_structured_kv_b_value_output,
+    fp32_to_bf16_pallas_boundary,
     fp8_rmsnorm_block_matmul,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
@@ -29,6 +30,44 @@ from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
 def _bits(values: jax.Array) -> jax.Array:
     quantized = values.astype(jnp.float8_e4m3fn)
     return lax.bitcast_convert_type(quantized, jnp.uint8)
+
+
+@pytest.mark.parametrize("shape", ((8, 256), (3, 135)))
+def test_fp32_to_bf16_pallas_boundary_interpret_matches_cast(
+    shape: tuple[int, int],
+) -> None:
+    from jax._src.pallas.mosaic import tpu_info
+
+    tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
+        tpu_info.ChipVersion.TPU_V4, 1
+    )
+    tpu_info.get_tpu_info.cache_clear()
+    value = jnp.asarray(
+        np.linspace(-3.0, 3.0, np.prod(shape), dtype=np.float32).reshape(shape)
+    )
+    actual = fp32_to_bf16_pallas_boundary(value, interpret=True)
+    assert actual.shape == shape
+    assert actual.dtype == jnp.bfloat16
+    np.testing.assert_array_equal(
+        np.asarray(actual), np.asarray(value.astype(jnp.bfloat16))
+    )
+
+
+def test_fp32_to_bf16_pallas_boundary_rejects_contract_drift() -> None:
+    with pytest.raises(ValueError, match="rank-two FP32"):
+        fp32_to_bf16_pallas_boundary(
+            jnp.ones((8, 128), dtype=jnp.bfloat16), interpret=True
+        )
+    with pytest.raises(ValueError, match="rank-two FP32"):
+        fp32_to_bf16_pallas_boundary(
+            jnp.ones((1, 8, 128), dtype=jnp.float32), interpret=True
+        )
+    with pytest.raises(ValueError, match="tiles must be positive"):
+        fp32_to_bf16_pallas_boundary(
+            jnp.ones((8, 128), dtype=jnp.float32),
+            output_tile=0,
+            interpret=True,
+        )
 
 
 @pytest.mark.parametrize(

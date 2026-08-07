@@ -478,6 +478,77 @@ def fp8_block_matmul_f32(
     )
 
 
+def fp32_to_bf16_pallas_boundary(
+    value: Any,
+    *,
+    row_tile: int = 8,
+    output_tile: int = 128,
+    interpret: bool = False,
+) -> Any:
+    """Cast one rank-two FP32 tensor behind an opaque device boundary.
+
+    This diagnostic kernel prevents TPU XLA from commuting a downstream BF16
+    cast into an upstream FP32 collective.  It is intentionally separate from
+    the arithmetic kernels so the optimized HLO must expose an FP32 operand at
+    the custom-call boundary.
+    """
+
+    if value.ndim != 2 or value.dtype != jnp.float32:
+        raise ValueError("Pallas precision boundary requires rank-two FP32")
+    if (
+        not isinstance(row_tile, int)
+        or isinstance(row_tile, bool)
+        or row_tile <= 0
+        or not isinstance(output_tile, int)
+        or isinstance(output_tile, bool)
+        or output_tile <= 0
+    ):
+        raise ValueError("Pallas precision-boundary tiles must be positive")
+    rows, width = value.shape
+    if rows <= 0 or width <= 0:
+        raise ValueError("Pallas precision-boundary dimensions must be positive")
+    padded_rows = _ceil_div(rows, row_tile) * row_tile
+    padded_width = _ceil_div(width, output_tile) * output_tile
+    if (padded_rows, padded_width) != value.shape:
+        value = jnp.pad(
+            value,
+            ((0, padded_rows - rows), (0, padded_width - width)),
+        )
+
+    def kernel(input_ref: Any, output_ref: Any) -> None:
+        output_ref[...] = input_ref[...].astype(jnp.bfloat16)
+
+    def tile_index(
+        row_index: Any, output_index: Any
+    ) -> tuple[Any, Any]:
+        return row_index, output_index
+
+    call = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct(
+            (padded_rows, padded_width), jnp.bfloat16
+        ),
+        grid=(padded_rows // row_tile, padded_width // output_tile),
+        in_specs=(pl.BlockSpec((row_tile, output_tile), tile_index),),
+        out_specs=pl.BlockSpec((row_tile, output_tile), tile_index),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel", "arbitrary"),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_fp32_to_bf16_"
+            f"r{padded_rows}_h{padded_width}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=0,
+            bytes_accessed=padded_rows * padded_width * 6,
+            transcendentals=0,
+        ),
+    )(value)
+    return call[:rows, :width]
+
+
 def _validate_structured_kv_b(
     activation: Any,
     weight_bits: Any,

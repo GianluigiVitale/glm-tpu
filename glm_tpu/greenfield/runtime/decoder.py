@@ -186,6 +186,10 @@ def _validate_pallas_feature_decoder_calls(
         selected_name,
         "greenfield_fp8_block_up_gate_m8_k6144_n512",
         "greenfield_fp8_block_matmul_m8_k512_n6144",
+    ) + (
+        ("greenfield_fp32_to_bf16_r8_h6144",)
+        if reconstruct_down_fp32
+        else ()
     )
     custom_calls = [
         line.strip()
@@ -241,6 +245,18 @@ def _validate_pallas_feature_decoder_calls(
         violations.append(
             "decoder retains the unfused routed [8,8,6144] HBM result"
         )
+    if reconstruct_down_fp32:
+        boundary_name = "greenfield_fp32_to_bf16_r8_h6144"
+        malformed_boundary = [
+            line
+            for line in calls_by_kernel[boundary_name]
+            if "f32[8,6144]" not in line or "bf16[8,6144]" not in line
+        ]
+        if malformed_boundary:
+            violations.append(
+                "decoder FP32 reconstruction boundaries lack exact FP32 "
+                "operands and BF16 results"
+            )
 
     shared_raw_shapes = {
         kernel_names[1]: ("u8[512,6144]",),

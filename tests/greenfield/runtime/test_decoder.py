@@ -217,6 +217,12 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_downf32",
     )
+    fp32_hlo += "\n" + "\n".join(
+        "cast = bf16[8,6144] custom-call(f32[8,6144]), "
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_fp32_to_bf16_r8_h6144"}'
+        for _ in range(75)
+    )
     fp32 = _validate_pallas_feature_decoder_calls(
         fp32_hlo,
         sparse_layers=75,
