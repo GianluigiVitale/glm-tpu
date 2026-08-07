@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 10:52 UTC
+**Updated:** 2026-08-07 12:35 UTC
 
 ## Authority and isolation
 
@@ -1195,3 +1195,40 @@ invocation still exposes the previously documented unrelated `padded_num_reqs=No
 
 The protected wrapper now pins the new observer, detached runtime path, and exact oracle distance.
 Exact next remains one serialized selected-boundary retry under the unchanged acceptance contract.
+
+## Second selected-observer attempt rejected; warmup isolation is now fail-fast
+
+Protected run
+`greenfield_legacy_layer_residual_p2044_20260807T111359503822439Z` reached generation and reproduced
+all 15 sealed legacy tokens. At position 2,044 it reproduced token `16345` first, `12877` second,
+and the sealed `+0.25` margin. All eight hosts passed `1,882/0/312` checkpoint checks and the exact
+`2,455`-leaf / `371110325` state manifest. The source runner wrote DB run 483 / item 1767, but the
+outer protected validator correctly rejected the capture: every selected observer reported
+`production_output_equal=[False, False, False]`, with about 24,000 differing BF16 hidden elements
+and maximum error `0.2578125--0.260009765625` per host. No accepted residual, comparison, `SUCCESS`,
+Gate D, or performance claim exists. Failure-exit cleanup is authenticated 8/8 `CENSUS_OK`.
+
+The run also exposed an HLO-recorder bug: the compilation name contains launcher metadata after
+`boundary <n>`, while the recorder regex required the number at end-of-string, so all expected HLO
+files were absent and fleet integrity independently refused every host. Rejected-draw-only CPU
+reconstruction shows boundary-77 mean error `0.265951`, boundary-78 mean error `0.312380`, and a
+`+0.046429` jump across layer 77. This resembles the earlier rejected all-boundary hint but is not
+accepted localization because the observer changed production arithmetic.
+
+Observer pin `6239d0e80d0888ad7177384c03404d494fc544a1`, four commits above the unchanged sealed
+oracle, makes isolation a precondition rather than a post-generation discovery. Before production
+warmup donates the exact 32-row cache, it takes a blocked device copy of that cache and preserves the
+production hidden output. Each selected non-donating observer warmup consumes that exact snapshot and
+must reproduce the production BF16 hidden output bit-for-bit; any drift refuses during warmup before
+larger buckets or generation. Tapped hidden/residual outputs retain their natural sharding while only
+the final hidden output remains explicitly constrained. The HLO regex now accepts the real launcher
+suffix. Focused observer tests pass 13/13, including real deletion of the donated original buffer and
+warmup-drift refusal; the greenfield residual validator passes 4/4.
+
+The greenfield wrapper pins this observer/runtime, requires the exact warmup-isolation success line,
+requires `production_output_equal=[True, True, True]`, scans stdout and stderr for refusals, and still
+requires one NPZ plus three callback-free/alias-free HLO contracts per host. Bash syntax, ShellCheck,
+and diff checks pass. Exact next: commit/push this wrapper and evidence, prove a clean fleet census,
+then run one serialized protected retry. If warmup isolation fails again, do not repeat the expensive
+draw blindly; use the now-recorded HLO and pursue an opaque device tap or same-input layer-77 sublayer
+equivalence without relaxing production-output equality.

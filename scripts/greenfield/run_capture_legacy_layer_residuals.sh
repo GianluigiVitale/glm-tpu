@@ -9,11 +9,11 @@ readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly HARNESS_REPO=/home/gianl/glm-tpu
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-residual-observer
-readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-residual-4284e8798
+readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-residual-6239d0e80
 readonly OBSERVER_BRANCH=greenfield/legacy-residual-observer
-readonly OBSERVER_PIN=4284e8798d49168536927630274a985643debeb6
+readonly OBSERVER_PIN=6239d0e80d0888ad7177384c03404d494fc544a1
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
-readonly OBSERVER_COMMIT_DISTANCE=3
+readonly OBSERVER_COMMIT_DISTANCE=4
 readonly OBSERVER_BOUNDARIES=1,77,78
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
@@ -220,7 +220,7 @@ say "capturing sealed legacy tokens, top-16 logits, and position-2044 boundaries
 
 # Validate every host's exact loaded/final state and observer file before use.
 # shellcheck disable=SC2016
-integrity_check='logs=/tmp/ray/session_latest/logs; checksum=$(grep -Rhs --include="worker-*.out" -E "\[GLM_LOAD_CHECKSUM\].*SUMMARY verified=1882 mismatches=0 skipped=312$" "$logs" 2>/dev/null | tail -1); state=$(grep -Rhs --include="worker-*.out" -E "\[GLM_STATE_HASH\].*manifest VERIFIED leaves=2455 combined=371110325 ref=/tmp/golden.json$" "$logs" 2>/dev/null | tail -1); armed=$(grep -Rhs --include="worker-*.out" -F "[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" -F "[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER] wrote" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "boundaries.position2044.proc*.npz" 2>/dev/null | wc -l); hlo=$(find /tmp/'"$TAG"' -type f -name "observer_hlo.boundary*.proc*.json" 2>/dev/null | wc -l); refusal=$(grep -Rhs --include="worker-*.out" -E "StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|LoadChecksumError|CodeFingerprintMismatchError|legacy residual.*(drifted|requires|non-finite|already dumped|HLO contract failed)" "$logs" 2>/dev/null | tail -1); printf "%s\n%s\n%s\n%s\nfiles=%s hlo=%s\n" "$checksum" "$state" "$armed" "$wrote" "$files" "$hlo"; if [ -n "$checksum" ] && [ -n "$state" ] && [ -n "$armed" ] && [ -n "$wrote" ] && [ "$files" -eq 1 ] && [ "$hlo" -eq 3 ] && [ -z "$refusal" ]; then echo "INTEGRITY_OK $(hostname)"; else [ -z "$refusal" ] || printf "%s\n" "$refusal"; echo "INTEGRITY_BAD $(hostname)"; fi'
+integrity_check='logs=/tmp/ray/session_latest/logs; checksum=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -E "\[GLM_LOAD_CHECKSUM\].*SUMMARY verified=1882 mismatches=0 skipped=312$" "$logs" 2>/dev/null | tail -1); state=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -E "\[GLM_STATE_HASH\].*manifest VERIFIED leaves=2455 combined=371110325 ref=/tmp/golden.json$" "$logs" 2>/dev/null | tail -1); armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER] ARMED" "$logs" 2>/dev/null | tail -1); warmup=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "Legacy residual observer warmup isolation passed for all selected boundaries." "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -E "\[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER\] wrote.*production_output_equal=\[True, True, True\]$" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "boundaries.position2044.proc*.npz" 2>/dev/null | wc -l); hlo=$(find /tmp/'"$TAG"' -type f -name "observer_hlo.boundary*.proc*.json" 2>/dev/null | wc -l); refusal=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -E "StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|LoadChecksumError|CodeFingerprintMismatchError|legacy residual.*(drifted|requires|non-finite|already dumped|HLO contract failed|warmup differs from production)|GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER.*REFUSED|production_output_equal=\[False" "$logs" 2>/dev/null | tail -1); printf "%s\n%s\n%s\n%s\n%s\nfiles=%s hlo=%s\n" "$checksum" "$state" "$armed" "$warmup" "$wrote" "$files" "$hlo"; if [ -n "$checksum" ] && [ -n "$state" ] && [ -n "$armed" ] && [ -n "$warmup" ] && [ -n "$wrote" ] && [ "$files" -eq 1 ] && [ "$hlo" -eq 3 ] && [ -z "$refusal" ]; then echo "INTEGRITY_OK $(hostname)"; else [ -z "$refusal" ] || printf "%s\n" "$refusal"; echo "INTEGRITY_BAD $(hostname)"; fi'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$integrity_check" >"$RUN_DIR/fleet_integrity.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {

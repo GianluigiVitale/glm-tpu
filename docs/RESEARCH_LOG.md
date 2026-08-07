@@ -4866,3 +4866,35 @@ real donating JIT, asserts the originally queued buffer is deleted, and proves t
 uses the valid replacement. Observer plus HLO-honesty tests pass 16/16, Python compilation and diff
 checks pass. The protected wrapper pins the new detached path and oracle commit distance `3` for a
 single serialized retry under the unchanged acceptance contract.
+
+## 2026-08-07 12:35 — Second selected observer reproduced the sealed oracle but perturbed production; fail-fast isolation proof pinned
+
+Protected retry `greenfield_legacy_layer_residual_p2044_20260807T111359503822439Z` passed all eight
+checkpoint checks (`1,882` verified, zero mismatches, `312` skipped), all eight exact state manifests
+(`2,455` leaves, combined `371110325`), all production and observer compiles, and all 15 sealed legacy
+tokens. At position 2,044 it reproduced `16345` first and `12877` second with the sealed `+0.25`
+margin. The source runner recorded DB run 483 / item 1767, but the protected wrapper rejected it:
+every host wrote `production_output_equal=[False, False, False]`, with 24,056--24,104 differing BF16
+hidden elements and maximum error `0.2578125--0.260009765625`. The capture has no accepted residual,
+comparison, `SUCCESS`, Gate D, or performance claim; failure-exit census is 8/8 clean.
+
+No observer HLO file was written because the recorder regex anchored immediately after the boundary
+number while the real compilation name appends launcher metadata. This was an independent fleet-
+integrity refusal. Rejected-diagnostic reconstruction only: boundary 1 differs in 3,552 elements
+(mean `1.7848e-5`, max `0.000488`), boundary 77 in 6,098 (mean `0.265951`, max `1.21875`), and
+boundary 78 in 6,095 (mean `0.312380`, max `3.75`); the mean error rises `0.046429` across layer 77.
+That direction is not admissible localization because the observer changed production output.
+
+Observer commit `6239d0e80d0888ad7177384c03404d494fc544a1` turns output isolation into a fail-fast
+warmup contract. It makes a blocked device copy of the exact pre-donation 32-row cache, preserves the
+production hidden output, runs each selected non-donating observer warmup against the snapshot, and
+requires bitwise-equal BF16 output before larger buckets or generation. Tapped components retain
+natural output sharding; only the final output remains constrained. The HLO matcher accepts the real
+metadata suffix. Focused tests pass 13/13, including deleted-buffer refresh and deliberate warmup
+drift refusal; greenfield residual validation passes 4/4.
+
+The wrapper now pins observer distance four, requires the exact warmup-isolation success message and
+`production_output_equal=[True, True, True]`, scans both stdout/stderr for refusals, and retains the
+one-NPZ/three-HLO-per-host contract. Bash syntax, ShellCheck, and diff checks pass. Next is one clean-
+fleet serialized retry after the greenfield commit is pushed. A second warmup-isolation failure will
+stop repetition and select an opaque device tap or same-input layer-77 sublayer proof instead.
