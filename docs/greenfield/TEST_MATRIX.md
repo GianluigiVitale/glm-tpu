@@ -43,15 +43,15 @@
 | Gate D feature-body XPlane | DB 442: one clean wall sample then 8 files/64 cores/2 trace steps; 58,804.003 ms wall; dequant gather 7,317.698 ms/core x 8 serial stages = 58,541.584 ms; exact HLO/HBM/DB/archive/cleanup | Attribution pass; performance rejected; compact permute duration is pipeline wait, not bandwidth |
 | Pallas DSA scorer | DB 443: production one-row 256K/LP4 shard; one kernel/no per-head overlay/dead rows/collectives; score max error 2.861e-6; exact 2,048 positions/order; 0.326595/0.350320 ms p50/p99 | Standalone Section 7.2 item 5 pass; layer integration pending |
 | Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
-| Gate D implementation | Complete raw-token recurrence/device prefill; DB 477 synthetic p50 242.412 ms; sealed token/DSA oracles; callback-free all-event observer; `b406e3a` fixes LoRA epsilon; `715870e` gates exact first/subsequent tokens and executing-score sets/ties while archiving legacy score diagnostics | In progress; real 2K Gate D rerun next |
-| Gate D protected decoder | Three fail-closed attempts: scan HLO metadata; invalid cross-program total-order gate; invalid same-input score tolerance. Latest real step passes all 21 executing-device set/tail/tie events, but stopped before tokens/timing. Every failure ended 8/8 clean. | Missing; corrected protected rerun required before answer tok/s |
+| Gate D implementation | Complete raw-token recurrence/device prefill; DB 477 synthetic p50 242.412 ms; sealed token/DSA oracles; callback-free all-event observer; `b406e3a` fixes LoRA epsilon; `715870e` gates executing-score sets/ties; `ffa3db7` records observer-only global top-16 token logits/rank/margins with production HLO isolation | In progress; protected divergence diagnostic next |
+| Gate D protected decoder | Four fail-closed attempts. Latest passes prefill token plus all 14x21 DSA events and matches ten recurrent tokens; first mismatch at offset 10 is expected `16345`, observed `12877`. No timing; every failure ended 8/8 clean. | Missing; raw-token cause/fix required before answer tok/s |
 | Gates E–H | Await Gate D | Missing |
 
-Last full verified suite: 236 passed / 1 skipped across greenfield with
-`JAX_PLATFORMS=cpu` (2026-08-06).
+Last full verified suite: 343 passed / 1 skipped across greenfield with
+`JAX_PLATFORMS=cpu` (2026-08-07).
 Latest focused Pallas composition/kernel/HLO/runner suite: 22 passed (2026-08-06).
-Latest corrected DSA/decoder observer and LoRA-numerics suite: 59 passed plus Python/Bash/ShellCheck
-(2026-08-07).
+Latest logit/DSA decoder-observer suite: included in the 343-test full pass plus
+Python/Bash/ShellCheck/diff checks (2026-08-07).
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the

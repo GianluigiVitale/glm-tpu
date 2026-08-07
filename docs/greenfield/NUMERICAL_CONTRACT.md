@@ -48,6 +48,12 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   layers, so position-aligned legacy score errors and total rank order are recorded diagnostics,
   not Gate C same-input comparisons and not gates. Exact raw tokens remain mandatory. The observer
   is a separate no-donation executable; the production executable remains observer-off.
+- When raw tokens diverge, that separate observer may export a compact canonical global top-16
+  logit record: BF16 vocabulary logits are cast to FP32 only for bit-exact storage, scores descend,
+  equal scores use lowest token ID, and the emitted winner must equal the recurrent output. This is
+  diagnostic evidence only: expected-token rank/margins never relax exact raw-token equality. The
+  wider score/id payload must reuse the two existing local exchanges, add no collective, and leave
+  all non-token collective shapes/counts identical to production.
 - Compact selected state is `positions int32[rows,2048]` plus
   `valid_counts int32[rows]`; invalid tail slots are exactly `-1`. IndexShare
   reuses the score-ordered positions unchanged. Only the positions array is

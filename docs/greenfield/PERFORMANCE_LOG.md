@@ -674,3 +674,22 @@ later full-decoder hidden inputs already differ after topology/reduction reassoc
 continues to require executing-device exactness and all subsequent raw tokens. It also makes the
 physical JAX-process-0 worker upload all 14 raw observer artifacts for final SHA/content validation.
 Local verification passes 59 relevant tests plus static checks. Another protected run is required.
+
+## 2026-08-07 — full DSA replay passes; first raw-token divergence localized
+
+Rejected diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260807T014648797562615Z`
+at `0a42c93` passed the real 2,034-token prefill first token (`220`) and all 294 observer DSA events
+(14 steps x 21 producers): exact causal set/count/tails, executing-score order/lowest-position
+ties, producer IDs, replication, padding, and next position. The observer token sequence matched
+the independent oracle through recurrent offset 9, then offset 10 expected `16345` and produced
+`12877`. Observed sequence was
+`[104550,101294,16,13,3155,537,10662,432,13,576,12877,374,6303,13]`.
+All 14 raw observations are preserved; failure-exit census is 8/8 clean.
+
+The run stopped before production warmup/timing/trace, so it has no DB row, answer-rate, or Gate D
+claim. Commit `ffa3db7` adds an observer-only canonical global top-16 logit record with exact IDs,
+FP32-cast score bits, expected-token rank/margins, fleet lane health, and per-tensor hashes. It adds
+no collective and allows only the two declared token-exchange result shapes to differ from
+production; every non-token collective remains an exact isolation gate. Full local verification is
+343 passed / 1 skipped plus Python/Bash/ShellCheck/diff checks. Protected metal evidence is next.

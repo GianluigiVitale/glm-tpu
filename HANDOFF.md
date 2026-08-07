@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 01:45 UTC
+**Updated:** 2026-08-07 02:39 UTC
 
 ## Authority and isolation
 
@@ -915,7 +915,28 @@ the physical JAX-process-0 worker, bumps schema to 5, and fixes NumPy index JSON
 Exact device set/tail/tie gates and all 15 token IDs remain mandatory. Relevant verification is 59
 tests plus Python compile, Bash syntax, ShellCheck, and diff checks; the commit is pushed.
 
-Exact next: rerun protected real-prompt 2K Gate D from clean branch HEAD containing `715870e` with
-complete-token, both sealed oracles, and two-step trace modes. Preserve the first exact
-token/set/tie/cache failure without relaxing it. If it passes, seal the first real answer-token
-rate, then optimize below 200 ms before 8K, 128K, and 256K progression.
+Fourth protected attempt
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260807T014648797562615Z`
+at `0a42c93` passed the exact prefill first token (`220`) and every one of 14 x 21 executing-device
+DSA event contracts at positions 2,034--2,047. Observer tokens matched the independent oracle for
+the first ten recurrent steps, then diverged at observer offset 10: expected `16345`, observed
+`12877`. The two later differing tokens are downstream of that changed autoregressive input. All
+14 raw NPZs are preserved locally and remotely; the failure stopped before production warmup,
+timing, or trace and ended with authenticated 8/8 zero work. This proves DSA routing is not the
+remaining first-divergence cause; Gate D and answer tok/s remain unproven.
+
+Commit `ffa3db7` adds a compact, separate, no-donation logit observer for that exact boundary. It
+records the canonical global top 16 token IDs plus bit-exact FP32-cast logit payloads, exact
+lowest-ID ties, expected-token rank, top-1/top-2 and top-1/expected margins, lane/sentinel health,
+and independent hashes in each NPZ. It widens only the observer's existing score/id exchanges and
+adds no collective; the HLO isolation gate subtracts only those two declared shapes and requires
+every non-token collective shape/count to remain identical. The static observer flag leaves the
+production sampling source path/output/HLO surface unchanged. Schema 6 and the fleet artifact
+validator require the new tensor. Full local verification is 343 passed / 1 skipped plus Python
+compile, Bash syntax, ShellCheck, and diff checks; the commit is pushed.
+
+Exact next: launch one serialized protected real-prompt 2K Gate D diagnostic at clean `ffa3db7`.
+Use the top-16 evidence at the first raw-token divergence to identify whether the expected token is
+runner-up/near-boundary or absent from the candidate set; do not relax exact raw tokens. Then fix
+the underlying arithmetic/reduction cause, rerun Gate D to valid wall/HBM/XPlane/DB/archive
+evidence, and optimize below 200 ms before 8K, 128K, and 256K progression.
