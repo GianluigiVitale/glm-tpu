@@ -13,6 +13,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     layer0_dsa_state,
     legacy_pagewise_dcp_scores,
     one_row_pagewise_scores,
+    pack_legacy_fused_qkv_runtime_weights,
 )
 from glm_tpu.greenfield.validation.layer0_dsa_association import (
     compare_dsa_association_scores,
@@ -138,6 +139,117 @@ def test_layer0_state_keeps_legacy_fused_qkv_companion_live() -> None:
     assert state.qkv_a_companion.shape == (3, 2)
     assert state.qkv_a_companion.dtype == jnp.bfloat16
     assert np.any(np.asarray(state.qkv_a_companion) != 0)
+
+
+def test_legacy_runtime_fused_qkv_pack_preserves_part_per_shard_order() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=3,
+        hidden_size=128,
+        q_lora_rank=4,
+        qkv_a_companion_rank=2,
+        legacy_tensor_shards=2,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    q_bits = np.arange(4 * 128, dtype=np.uint8).reshape(4, 128) % 0x70
+    kv_bits = (
+        np.arange(2 * 128, dtype=np.uint8).reshape(2, 128) + 3
+    ) % 0x70
+    packed = pack_legacy_fused_qkv_runtime_weights(
+        jnp.asarray(q_bits),
+        jnp.asarray([[2.0]], dtype=jnp.float32),
+        jnp.asarray(kv_bits),
+        jnp.asarray([[5.0]], dtype=jnp.float32),
+        geometry=geometry,
+    )
+    assert packed.global_weight.shape == (128, 6)
+    assert packed.global_scale.shape == (1, 6)
+    assert packed.sharded_weight.shape == (2, 128, 3)
+    assert packed.sharded_scale.shape == (2, 1, 3)
+    assert packed.global_weight.dtype == jnp.float8_e4m3fn
+    assert np.array_equal(
+        np.asarray(packed.global_weight).view(np.uint8),
+        np.asarray(packed.sharded_weight)
+        .transpose(1, 0, 2)
+        .reshape(128, 6)
+        .view(np.uint8),
+    )
+    assert np.array_equal(
+        np.asarray(packed.sharded_weight[0]).view(np.uint8),
+        np.concatenate((q_bits[:2].T, kv_bits[:1].T), axis=1),
+    )
+    assert np.array_equal(
+        np.asarray(packed.sharded_scale[:, 0]),
+        np.asarray([[2.0, 2.0, 5.0], [2.0, 2.0, 5.0]], dtype=np.float32),
+    )
+
+
+def test_layer0_runtime_fp8_global_and_sharded_fused_modes_are_live() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=3,
+        hidden_size=128,
+        q_lora_rank=4,
+        qkv_a_companion_rank=2,
+        legacy_tensor_shards=2,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    rng = np.random.default_rng(19)
+
+    def bf16(shape: tuple[int, ...]) -> jnp.ndarray:
+        return jnp.asarray(rng.normal(size=shape).astype(ml_dtypes.bfloat16))
+
+    packed = pack_legacy_fused_qkv_runtime_weights(
+        jnp.full((4, 128), 0x38, dtype=jnp.uint8),
+        jnp.asarray([[0.5]], dtype=jnp.float32),
+        jnp.full((2, 128), 0x30, dtype=jnp.uint8),
+        jnp.asarray([[0.25]], dtype=jnp.float32),
+        geometry=geometry,
+    )
+    prefix = (
+        bf16((3, 128)),
+        jnp.asarray([0, 1, 2, 0, 1], dtype=jnp.int32),
+        jnp.asarray([2], dtype=jnp.int32),
+        bf16((128,)),
+    )
+    tail = (
+        bf16((4,)),
+        jnp.asarray(rng.normal(size=(8, 4)), dtype=jnp.float32),
+        jnp.asarray(rng.normal(size=(4, 128)), dtype=jnp.float32),
+        bf16((4,)),
+        bf16((4,)),
+        bf16((2, 128)),
+    )
+    global_state = layer0_dsa_state(
+        *prefix,
+        packed.global_weight,
+        *tail,
+        packed.global_scale,
+        geometry=geometry,
+        q_a_projection_mode="legacy_runtime_fused_qkv_a_global",
+    )
+    sharded_state = layer0_dsa_state(
+        *prefix,
+        packed.sharded_weight,
+        *tail,
+        packed.sharded_scale,
+        geometry=geometry,
+        q_a_projection_mode="legacy_runtime_fused_qkv_a_sharded",
+    )
+    for state in (global_state, sharded_state):
+        assert state.query.shape == (3, 2, 4)
+        assert state.qkv_a_companion.shape == (3, 2)
+        assert state.qkv_a_companion.dtype == jnp.bfloat16
+        assert np.isfinite(np.asarray(state.query)).all()
+        assert np.any(np.asarray(state.qkv_a_companion) != 0)
 
 
 def test_legacy_pagewise_geometry_reconstructs_direct_row() -> None:

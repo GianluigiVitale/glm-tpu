@@ -1408,3 +1408,40 @@ Exact next: finish the bounded fused-width variant, requiring the full `bf16[32,
 its 576-value companion to remain live in HLO, then run one serialized bounded probe. Compare its
 M32, one-row XLA, and one-row Pallas set/order/scores. Do not alter or reload the full decoder unless
 this isolated association supplies exact evidence.
+
+## Predecoded fused width is rejected; raw-FP8 TP32-local projection is isolated next
+
+Protected bounded run
+`greenfield_layer0_dsa_association_20260807T203120669202672Z` at
+`07d89f003acdd236f665f270d30656c3bce0d6be` completed as DB run 487, has local/remote `SUCCESS`,
+exact evidence checksums, the approved-bucket archive, and authenticated 8/8 pre/post zero-work
+censuses. Its fused state HLO keeps the full logical `bf16[32,2624]` result and live
+`bf16[32,576]` companion, contains no collective/callback, and hashes to
+`3753d5465f59abf61e559e75c3f0bb8cdd78972e6b94a28db4194e2a4bee60a7`.
+
+The predecoded BF16 fused-width hypothesis is rejected. It changes all 4,096 query entries but
+worsens the reconstructed legacy scorer to 1,703 order mismatches and one selected-set swap; its
+one-row XLA result is identical to that M32/pagewise reconstruction. The fused-state Pallas scorer
+keeps the set but still misses 1,523 order slots. This is bounded diagnostic evidence only: no
+decoder, Gate-D, timing, or token-rate claim.
+
+The next source audit found the exact association the prior fused probe still omitted. The sealed
+oracle sets `DISABLE_WEIGHT_REQUANTIZATION=1`; its FP8 linear method retains
+`fused_qkv_a_proj.weight` as raw `float8_e4m3fn[6144,2624]` with separate
+`f32[48,2624]` scales (also recorded directly by the accepted legacy state-hash log). Although the
+vLLM layer declares `disable_tp=True`, the TPU linear adapter classifies the object as a
+`MergedColumnParallelLinear`, assigns output sharding over the 32-way `ATTN_HEAD=model` mesh, and
+reorders each fused part independently. The actual shard-map body therefore consumes 64 q-a plus
+18 kv-a columns and executes a local width-82 dot; the prior probe passed a predecoded logical
+width-2,624 BF16 matrix to one device.
+
+The bounded challenger now independently reconstructs both exact runtime layouts from the sealed
+raw bits/scales, keeps raw FP8 and FP32 scale operands live, executes global-N2624 and mapped
+TP32-local-N82 variants, and compares their M32, one-row XLA, and one-row Pallas results. The HLO
+contracts require exact source/packed shapes, named associations, live companion output, and zero
+collectives/dead one-row batches. The immutable real artifact reconstructs the exact sealed state
+byte sums `2448103424` (FP8 weight) and `53100864` (FP32 scale), with local shapes
+`[32,6144,82]` and `[32,48,82]`; the protected runner fails closed on any identity drift. Focused
+CPU tests and offline full-geometry CPU HLO validation pass. Exact next: commit/push this
+bounded-only change, then run one serialized probe. Only an exact set and order may authorize a
+production correction and protected 8K retry.

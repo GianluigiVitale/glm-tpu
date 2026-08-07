@@ -5099,3 +5099,33 @@ columns of one live BF16 width-2,624 `q_a + kv_a` matmul. Builder pin `c9d0382` 
 `be643e33...d7f9`, internal manifest `574f3553...73141`) while preserving v1 readback. Next is one
 bounded fused-width state/scorer matrix whose HLO keeps the companion output live, not a full-model
 retry.
+
+## 2026-08-07 20:49 — DB 487 rejects predecoded fused width; actual raw-FP8 TP32 local N=82 path isolated
+
+Bounded run `greenfield_layer0_dsa_association_20260807T203120669202672Z` at `07d89f0` completed as
+DB 487 with checksum-valid local/remote `SUCCESS` and clean 8/8 censuses. The fused state keeps
+`bf16[32,2624]` plus the live 576-column companion and has no collectives. It does not restore the
+oracle: reconstructed XLA has 1,703 order mismatches plus one set swap; Pallas has an exact set but
+1,523 order mismatches. Fusing the already-dequantized BF16 matrices is therefore the wrong
+association, not a decoder correction.
+
+The sealed legacy source and its accepted state-hash log expose the omitted runtime boundary. With
+`DISABLE_WEIGHT_REQUANTIZATION=1`, `VllmFp8LinearMethod` stores the fused weight as raw
+`float8_e4m3fn[6144,2624]` and its expanded block scales as `f32[48,2624]`; the state log records
+those exact layer-0 shapes. `VllmQuantLinearConfig` classifies the nominally `disable_tp=True`
+object by its `MergedColumnParallelLinear` type, applies `P(None, ATTN_HEAD)`, and sets
+`n_shards=32` on the sealed `model:32` mesh. The loader's per-part reorder consequently makes each
+shard own q-a 64 columns followed by kv-a 18 columns. `sharded_quantized_matmul` dequantizes those
+raw codes with the separate 48x82 scale inside the shard-map body and runs an M32 x K6144 x N82
+BF16 dot. The previous one-device logical-N2624 dot could not reproduce that physical reduction
+association.
+
+The isolated probe now reconstructs the runtime raw-FP8 global and exact TP32-local layouts from
+the immutable v2 artifact without importing legacy execution. It pins U8 source, FP8 packed,
+separate FP32 scale, local-N82, live companion, no-collective HLO contracts and compares M32 plus
+one-row XLA/Pallas scores. Full-shape reconstruction produces global `[6144,2624]` FP8 and
+`[48,2624]` FP32-scale tensors whose byte sums are exactly the sealed state-log values
+`2448103424` and `53100864`, then local `[32,6144,82]` / `[32,48,82]` layouts. Twenty focused CPU
+tests, Python/Bash/ShellCheck, and offline full-geometry CPU HLO checks pass. This remains
+diagnostic-only; the next TPU action is exactly one serialized bounded probe, never a full
+checkpoint retry first.

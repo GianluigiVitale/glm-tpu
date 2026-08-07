@@ -30,6 +30,7 @@ from .dsa import (
     merge_topk_candidates_with_scores,
 )
 from .dsa_association import (
+    LegacyFusedQkvRuntimeWeights,
     Layer0DsaProbeGeometry,
     Layer0DsaState,
     LegacyScoreGeometry,
@@ -38,6 +39,7 @@ from .dsa_association import (
     layer0_dsa_state,
     legacy_pagewise_dcp_scores,
     one_row_pagewise_scores,
+    pack_legacy_fused_qkv_runtime_weights,
 )
 from .linear import (
     dense_swiglu,
@@ -73,6 +75,7 @@ __all__ = (
     "DsaNumericalContract",
     "Layer0DsaProbeGeometry",
     "Layer0DsaState",
+    "LegacyFusedQkvRuntimeWeights",
     "LegacyScoreGeometry",
     "GlmMoeNumericalContract",
     "IndexShareSchedule",
@@ -110,6 +113,7 @@ __all__ = (
     "merge_topk_candidates",
     "merge_topk_candidates_with_scores",
     "pack_index_share_transfer",
+    "pack_legacy_fused_qkv_runtime_weights",
     "produce_index_share_state",
     "reference_moe_from_routes",
     "residual_add",

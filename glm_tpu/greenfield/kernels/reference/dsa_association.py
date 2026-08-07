@@ -21,7 +21,12 @@ from .rotary import apply_rotary, rotary_cos_sin
 
 
 KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
-QaProjectionMode = Literal["separate_q_a", "legacy_fused_qkv_a"]
+QaProjectionMode = Literal[
+    "separate_q_a",
+    "legacy_fused_qkv_a",
+    "legacy_runtime_fused_qkv_a_global",
+    "legacy_runtime_fused_qkv_a_sharded",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +39,7 @@ class Layer0DsaProbeGeometry:
     hidden_size: int = 6144
     q_lora_rank: int = 2048
     qkv_a_companion_rank: int = 576
+    legacy_tensor_shards: int = 32
     heads: int = 32
     head_dim: int = 128
     rotary_dim: int = 64
@@ -50,6 +56,7 @@ class Layer0DsaProbeGeometry:
             "hidden_size",
             "q_lora_rank",
             "qkv_a_companion_rank",
+            "legacy_tensor_shards",
             "heads",
             "head_dim",
             "rotary_dim",
@@ -96,12 +103,180 @@ class Layer0DsaState(NamedTuple):
     qkv_a_companion: Any
 
 
+class LegacyFusedQkvRuntimeWeights(NamedTuple):
+    """Raw-FP8 runtime layouts produced by the sealed TP32 loader."""
+
+    global_weight: Any
+    global_scale: Any
+    sharded_weight: Any
+    sharded_scale: Any
+
+
 def bfloat16_from_uint16_bits(value: Any) -> Any:
     """Reinterpret portable little-endian BF16 payload bits on device."""
 
     if value.dtype != jnp.uint16:
         raise ValueError("BF16 artifact payload must use uint16 bits")
     return lax.bitcast_convert_type(value, jnp.bfloat16)
+
+
+def pack_legacy_fused_qkv_runtime_weights(
+    q_a_weight_bits: Any,
+    q_a_scale: Any,
+    kv_a_weight_bits: Any,
+    kv_a_scale: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+    quant_block: int = 128,
+) -> LegacyFusedQkvRuntimeWeights:
+    """Reconstruct the sealed loader's raw-FP8 fused-output packing.
+
+    The legacy layer is declared ``disable_tp=True``, but the TPU linear
+    adapter classifies its ``MergedColumnParallelLinear`` by type and shards
+    the fused output over all 32 ``ATTN_HEAD`` shards.  Loading therefore
+    reorders each fused part independently: every shard owns 64 q-a columns
+    followed by 18 kv-a columns.  The 2-D block scales retain their 48-way
+    contracting axis and expand only the output axis before the same reorder.
+
+    Both the global reordered tensors and the exact per-shard tensors remain
+    live so a bounded probe can distinguish a global-width dot from the real
+    local ``N=82`` dot without importing the legacy execution path.
+    """
+
+    if not isinstance(quant_block, int) or isinstance(quant_block, bool) or (
+        quant_block <= 0
+    ):
+        raise ValueError("legacy FP8 quant block must be a positive integer")
+    expected = {
+        "q_a_weight_bits": (geometry.q_lora_rank, geometry.hidden_size),
+        "q_a_scale": (
+            (geometry.q_lora_rank + quant_block - 1) // quant_block,
+            (geometry.hidden_size + quant_block - 1) // quant_block,
+        ),
+        "kv_a_weight_bits": (
+            geometry.qkv_a_companion_rank,
+            geometry.hidden_size,
+        ),
+        "kv_a_scale": (
+            (geometry.qkv_a_companion_rank + quant_block - 1) // quant_block,
+            (geometry.hidden_size + quant_block - 1) // quant_block,
+        ),
+    }
+    values = {
+        "q_a_weight_bits": q_a_weight_bits,
+        "q_a_scale": q_a_scale,
+        "kv_a_weight_bits": kv_a_weight_bits,
+        "kv_a_scale": kv_a_scale,
+    }
+    for name, shape in expected.items():
+        if values[name].shape != shape:
+            raise ValueError(
+                f"legacy fused qkv {name} shape drifted: "
+                f"expected={shape} found={values[name].shape}"
+            )
+    if q_a_weight_bits.dtype != jnp.uint8 or (
+        kv_a_weight_bits.dtype != jnp.uint8
+    ):
+        raise ValueError("legacy fused qkv source weights must be raw uint8 bits")
+    if q_a_scale.dtype != jnp.float32 or kv_a_scale.dtype != jnp.float32:
+        raise ValueError("legacy fused qkv source scales must be FP32")
+
+    shards = geometry.legacy_tensor_shards
+    if geometry.q_lora_rank % shards or (
+        geometry.qkv_a_companion_rank % shards
+    ):
+        raise ValueError("legacy fused qkv outputs must divide the tensor shards")
+    q_per_shard = geometry.q_lora_rank // shards
+    kv_per_shard = geometry.qkv_a_companion_rank // shards
+    q_fp8 = lax.bitcast_convert_type(q_a_weight_bits, jnp.float8_e4m3fn)
+    kv_fp8 = lax.bitcast_convert_type(kv_a_weight_bits, jnp.float8_e4m3fn)
+    q_sharded = q_fp8.reshape(
+        shards, q_per_shard, geometry.hidden_size
+    ).transpose(0, 2, 1)
+    kv_sharded = kv_fp8.reshape(
+        shards, kv_per_shard, geometry.hidden_size
+    ).transpose(0, 2, 1)
+    sharded_weight = jnp.concatenate((q_sharded, kv_sharded), axis=-1)
+
+    def expanded_output_scale(scale: Any, output_size: int) -> Any:
+        return jnp.repeat(scale, quant_block, axis=0)[:output_size]
+
+    q_scale_full = expanded_output_scale(q_a_scale, geometry.q_lora_rank)
+    kv_scale_full = expanded_output_scale(
+        kv_a_scale, geometry.qkv_a_companion_rank
+    )
+    q_scale_sharded = q_scale_full.reshape(
+        shards, q_per_shard, -1
+    ).transpose(0, 2, 1)
+    kv_scale_sharded = kv_scale_full.reshape(
+        shards, kv_per_shard, -1
+    ).transpose(0, 2, 1)
+    sharded_scale = jnp.concatenate(
+        (q_scale_sharded, kv_scale_sharded), axis=-1
+    )
+
+    local_output = q_per_shard + kv_per_shard
+    with jax.named_scope("legacy_fused_qkv_runtime_pack_tp32_n82"):
+        global_weight = sharded_weight.transpose(1, 0, 2).reshape(
+            geometry.hidden_size, shards * local_output
+        )
+        global_scale = sharded_scale.transpose(1, 0, 2).reshape(
+            sharded_scale.shape[1], shards * local_output
+        )
+    return LegacyFusedQkvRuntimeWeights(
+        global_weight=global_weight,
+        global_scale=global_scale,
+        sharded_weight=sharded_weight,
+        sharded_scale=sharded_scale,
+    )
+
+
+def _legacy_runtime_fp8_dot(lhs: Any, weight: Any, scale: Any) -> Any:
+    """Independently reproduce the disabled-requant XLA matmul body."""
+
+    if lhs.ndim != 2 or weight.ndim != 2 or scale.ndim != 2:
+        raise ValueError("legacy runtime FP8 dot requires rank-2 operands")
+    if weight.shape[0] != lhs.shape[1] or scale.shape[1] != weight.shape[1]:
+        raise ValueError("legacy runtime FP8 dot dimensions drifted")
+    if weight.shape[0] % scale.shape[0]:
+        raise ValueError("legacy runtime FP8 contracting scale is ragged")
+    if weight.dtype != jnp.float8_e4m3fn or scale.dtype != jnp.float32:
+        raise ValueError("legacy runtime FP8 dot dtype contract drifted")
+    block = weight.shape[0] // scale.shape[0]
+    expanded_scale = jnp.repeat(scale, block, axis=0)[: weight.shape[0]]
+    decoded = (
+        weight.astype(jnp.float32) * expanded_scale.astype(jnp.float32)
+    ).astype(lhs.dtype)
+    output = lax.dot_general(
+        lhs,
+        decoded,
+        dimension_numbers=(((1,), (0,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    )
+    return output.astype(lhs.dtype)
+
+
+def _unpack_legacy_fused_qkv_output(
+    packed: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry,
+) -> tuple[Any, Any]:
+    """Undo the fused-part-per-shard output reorder after the runtime dot."""
+
+    shards = geometry.legacy_tensor_shards
+    q_per_shard = geometry.q_lora_rank // shards
+    kv_per_shard = geometry.qkv_a_companion_rank // shards
+    local_output = q_per_shard + kv_per_shard
+    if packed.shape != (geometry.decode_rows, shards * local_output):
+        raise ValueError("legacy fused qkv packed output geometry drifted")
+    packed = packed.reshape(geometry.decode_rows, shards, local_output)
+    q_a = packed[:, :, :q_per_shard].reshape(
+        geometry.decode_rows, geometry.q_lora_rank
+    )
+    companion = packed[:, :, q_per_shard:].reshape(
+        geometry.decode_rows, geometry.qkv_a_companion_rank
+    )
+    return q_a, companion
 
 
 def _dot_out_in(lhs: Any, weight_out_in: Any, *, output_dtype: Any) -> Any:
@@ -198,6 +373,7 @@ def layer0_dsa_state(
     key_norm_weight: Any,
     key_norm_bias: Any,
     head_weight: Any,
+    q_a_projection_scale: Any | None = None,
     *,
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
@@ -209,9 +385,12 @@ def layer0_dsa_state(
     caller can therefore compare FP32 legacy adaptation with BF16 production
     adaptation without changing any other operation or compiler shape.
 
-    Under ``legacy_fused_qkv_a``, ``q_a_weight`` is the already packed
-    ``q_a + kv_a`` weight. The companion output remains live in the returned
-    state so XLA cannot prune the fused output width.
+    Under ``legacy_fused_qkv_a``, ``q_a_weight`` is the already dequantized
+    logical ``q_a + kv_a`` weight.  The two ``legacy_runtime_*`` modes instead
+    consume the raw-FP8 reordered weight and its separate FP32 scale exactly
+    as the sealed disabled-requant path presents them to its XLA matmul.  The
+    companion output remains live in every fused mode so XLA cannot prune the
+    fused output width.
     """
 
     expected_shapes = {
@@ -247,16 +426,74 @@ def layer0_dsa_state(
     q_a_output = geometry.q_lora_rank
     if q_a_projection_mode == "legacy_fused_qkv_a":
         q_a_output += geometry.qkv_a_companion_rank
-    elif q_a_projection_mode != "separate_q_a":
+        expected_q_a_weight = (q_a_output, geometry.hidden_size)
+    elif q_a_projection_mode == "separate_q_a":
+        expected_q_a_weight = (q_a_output, geometry.hidden_size)
+    elif q_a_projection_mode == "legacy_runtime_fused_qkv_a_global":
+        q_a_output += geometry.qkv_a_companion_rank
+        if geometry.q_lora_rank % geometry.legacy_tensor_shards or (
+            geometry.qkv_a_companion_rank % geometry.legacy_tensor_shards
+        ):
+            raise ValueError(
+                "legacy fused qkv outputs must divide the tensor shards"
+            )
+        expected_q_a_weight = (geometry.hidden_size, q_a_output)
+    elif q_a_projection_mode == "legacy_runtime_fused_qkv_a_sharded":
+        q_a_output += geometry.qkv_a_companion_rank
+        if geometry.q_lora_rank % geometry.legacy_tensor_shards or (
+            geometry.qkv_a_companion_rank % geometry.legacy_tensor_shards
+        ):
+            raise ValueError(
+                "legacy fused qkv outputs must divide the tensor shards"
+            )
+        local_output = q_a_output // geometry.legacy_tensor_shards
+        expected_q_a_weight = (
+            geometry.legacy_tensor_shards,
+            geometry.hidden_size,
+            local_output,
+        )
+    else:
         raise ValueError(
             f"unsupported q_a projection mode {q_a_projection_mode!r}"
         )
-    expected_q_a_weight = (q_a_output, geometry.hidden_size)
     if q_a_weight.shape != expected_q_a_weight:
         raise ValueError(
             "layer-0 DSA q_a weight shape drifted: "
             f"expected={expected_q_a_weight} found={q_a_weight.shape}"
         )
+    runtime_mode = q_a_projection_mode.startswith("legacy_runtime_")
+    if runtime_mode:
+        local_output = q_a_output // geometry.legacy_tensor_shards
+        expected_scale = (
+            (
+                geometry.hidden_size // 128,
+                q_a_output,
+            )
+            if q_a_projection_mode == "legacy_runtime_fused_qkv_a_global"
+            else (
+                geometry.legacy_tensor_shards,
+                geometry.hidden_size // 128,
+                local_output,
+            )
+        )
+        if q_a_projection_scale is None or (
+            q_a_projection_scale.shape != expected_scale
+        ):
+            found = (
+                None
+                if q_a_projection_scale is None
+                else q_a_projection_scale.shape
+            )
+            raise ValueError(
+                "legacy runtime fused qkv scale shape drifted: "
+                f"expected={expected_scale} found={found}"
+            )
+        if q_a_weight.dtype != jnp.float8_e4m3fn or (
+            q_a_projection_scale.dtype != jnp.float32
+        ):
+            raise ValueError("legacy runtime fused qkv dtype contract drifted")
+    elif q_a_projection_scale is not None:
+        raise ValueError("non-runtime q_a projection must not receive a scale")
     if unique_embeddings.dtype != jnp.bfloat16:
         raise ValueError("layer-0 DSA embeddings must remain BF16")
     if prompt_embedding_rows.dtype != jnp.int32 or (
@@ -321,6 +558,35 @@ def layer0_dsa_state(
             )
             q_a = fused_qkv_a[:, : geometry.q_lora_rank]
             qkv_a_companion = fused_qkv_a[:, geometry.q_lora_rank :]
+    elif q_a_projection_mode == "legacy_runtime_fused_qkv_a_global":
+        with jax.named_scope("legacy_runtime_fused_qkv_a_m32_global_n2624"):
+            packed_qkv_a = _legacy_runtime_fp8_dot(
+                normalized,
+                q_a_weight,
+                q_a_projection_scale,
+            )
+            q_a, qkv_a_companion = _unpack_legacy_fused_qkv_output(
+                packed_qkv_a,
+                geometry=geometry,
+            )
+    elif q_a_projection_mode == "legacy_runtime_fused_qkv_a_sharded":
+        with jax.named_scope("legacy_runtime_fused_qkv_a_m32_tp32_n82"):
+            local_qkv_a = lax.map(
+                lambda operands: _legacy_runtime_fp8_dot(
+                    normalized,
+                    operands[0],
+                    operands[1],
+                ),
+                (q_a_weight, q_a_projection_scale),
+            )
+            packed_qkv_a = local_qkv_a.transpose(1, 0, 2).reshape(
+                geometry.decode_rows,
+                geometry.q_lora_rank + geometry.qkv_a_companion_rank,
+            )
+            q_a, qkv_a_companion = _unpack_legacy_fused_qkv_output(
+                packed_qkv_a,
+                geometry=geometry,
+            )
     else:
         q_a = _dot_out_in(
             normalized,

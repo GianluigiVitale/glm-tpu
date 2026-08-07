@@ -44,6 +44,70 @@ def test_fused_qkv_state_hlo_requires_live_exact_output_width() -> None:
     assert result["fused_qkv_intermediate_shapes"] == ["bf16[2624,32]"]
 
 
+def test_runtime_fused_qkv_pack_hlo_pins_raw_fp8_tp32_layout() -> None:
+    hlo = "\n".join(
+        (
+            "u8[2048,6144]",
+            "f32[16,48]",
+            "u8[576,6144]",
+            "f32[5,48]",
+            "f8e4m3fn[6144,2624]",
+            "f32[48,2624]",
+            "f8e4m3fn[32,6144,82]",
+            "f32[32,48,82]",
+            "legacy_fused_qkv_runtime_pack_tp32_n82",
+        )
+    )
+    result = validate_dsa_association_hlo(
+        hlo,
+        phase="legacy_fused_qkv_runtime_pack",
+    )
+    assert result["passed"] is True
+
+
+@pytest.mark.parametrize(
+    ("phase", "weight_shape", "scale_shape", "tile_shape", "marker"),
+    (
+        (
+            "legacy_runtime_fused_qkv_global_state",
+            "f8e4m3fn[6144,2624]",
+            "f32[48,2624]",
+            "bf16[32,2624]",
+            "legacy_runtime_fused_qkv_a_m32_global_n2624",
+        ),
+        (
+            "legacy_runtime_fused_qkv_sharded_state",
+            "f8e4m3fn[32,6144,82]",
+            "f32[32,48,82]",
+            "bf16[32,82,32]",
+            "legacy_runtime_fused_qkv_a_m32_tp32_n82",
+        ),
+    ),
+)
+def test_runtime_fused_qkv_state_hlo_requires_exact_live_layout(
+    phase: str,
+    weight_shape: str,
+    scale_shape: str,
+    tile_shape: str,
+    marker: str,
+) -> None:
+    hlo = "\n".join(
+        (
+            "f32[32,32,128]",
+            "bf16[8156,128]",
+            "f32[32,32]",
+            weight_shape,
+            scale_shape,
+            "bf16[32,576]",
+            tile_shape,
+            marker,
+        )
+    )
+    result = validate_dsa_association_hlo(hlo, phase=phase)  # type: ignore[arg-type]
+    assert result["passed"] is True
+    assert result["fused_qkv_intermediate_shapes"] == [tile_shape]
+
+
 def test_one_row_hlo_rejects_legacy_dead_rows() -> None:
     hlo = "\n".join(
         (

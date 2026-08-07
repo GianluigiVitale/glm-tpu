@@ -128,16 +128,40 @@ for name, record in runner["hlo"]["state"].items():
 for name in ("legacy_score", "one_row_pagewise_score", "one_row_pallas_score"):
     if not runner["hlo"][name]["contract"]["passed"]:
         raise SystemExit(f"layer-0 DSA scorer HLO failed: {name}")
+if not runner["hlo"]["legacy_fused_qkv_runtime_pack"]["contract"]["passed"]:
+    raise SystemExit("layer-0 DSA runtime-pack HLO failed")
+runtime_identity = runner["runtime_fused_qkv_layout_identity"]
+expected_runtime_identity = {
+    "global_weight_shape": [6144, 2624],
+    "global_weight_dtype": "float8_e4m3fn",
+    "global_weight_byte_sum": 2448103424,
+    "global_scale_shape": [48, 2624],
+    "global_scale_dtype": "float32",
+    "global_scale_byte_sum": 53100864,
+    "sealed_legacy_state_hash_shape_and_byte_sum_match": True,
+}
+for name, expected in expected_runtime_identity.items():
+    if runtime_identity.get(name) != expected:
+        raise SystemExit(
+            "layer-0 DSA sealed runtime-layout identity failed: "
+            f"{name} expected={expected!r} found={runtime_identity.get(name)!r}"
+        )
 expected_variants = {
     "legacy_fp32_divsqrt",
     "legacy_fp32_rsqrt",
     "legacy_bf16_divsqrt",
     "greenfield_bf16_rsqrt_legacy_geometry",
     "legacy_fused_qkv_fp32_divsqrt",
+    "legacy_runtime_fused_qkv_global_fp32_divsqrt",
+    "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
     "one_row_pagewise_on_legacy_state",
     "one_row_pallas_on_legacy_state",
     "one_row_pagewise_on_fused_qkv_legacy_state",
     "one_row_pallas_on_fused_qkv_legacy_state",
+    "one_row_pagewise_on_runtime_fused_qkv_global_legacy_state",
+    "one_row_pallas_on_runtime_fused_qkv_global_legacy_state",
+    "one_row_pagewise_on_runtime_fused_qkv_sharded_legacy_state",
+    "one_row_pallas_on_runtime_fused_qkv_sharded_legacy_state",
 }
 if set(runner["comparisons"]) != expected_variants:
     raise SystemExit("layer-0 DSA comparison matrix is incomplete")
@@ -153,7 +177,7 @@ conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
     model="zai-org/GLM-5.2-FP8:greenfield-layer0-dsa-association",
-    revision="bounded-real-layer0-v1",
+    revision="bounded-real-layer0-v2-runtime-fp8-tp32",
     env={
         "GLM_ENGINE": "greenfield_layer0_dsa_association",
         "greenfield_code_hash": pin,

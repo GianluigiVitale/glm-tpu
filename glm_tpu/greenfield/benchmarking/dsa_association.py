@@ -7,7 +7,10 @@ from typing import Any, Literal
 
 AssociationPhase = Literal[
     "legacy_state",
+    "legacy_fused_qkv_runtime_pack",
     "legacy_fused_qkv_state",
+    "legacy_runtime_fused_qkv_global_state",
+    "legacy_runtime_fused_qkv_sharded_state",
     "legacy_score",
     "one_row_score",
 ]
@@ -45,6 +48,35 @@ def validate_dsa_association_hlo(
             "bf16[2624,6144]",
             f"bf16[{decode_rows},576]",
             "legacy_fused_qkv_a_m32_n2624",
+        ),
+        "legacy_fused_qkv_runtime_pack": (
+            "u8[2048,6144]",
+            "f32[16,48]",
+            "u8[576,6144]",
+            "f32[5,48]",
+            "f8e4m3fn[6144,2624]",
+            "f32[48,2624]",
+            "f8e4m3fn[32,6144,82]",
+            "f32[32,48,82]",
+            "legacy_fused_qkv_runtime_pack_tp32_n82",
+        ),
+        "legacy_runtime_fused_qkv_global_state": (
+            f"f32[{decode_rows},{heads},{head_dim}]",
+            f"bf16[{context},{head_dim}]",
+            f"f32[{decode_rows},{heads}]",
+            "f8e4m3fn[6144,2624]",
+            "f32[48,2624]",
+            f"bf16[{decode_rows},576]",
+            "legacy_runtime_fused_qkv_a_m32_global_n2624",
+        ),
+        "legacy_runtime_fused_qkv_sharded_state": (
+            f"f32[{decode_rows},{heads},{head_dim}]",
+            f"bf16[{context},{head_dim}]",
+            f"f32[{decode_rows},{heads}]",
+            "f8e4m3fn[32,6144,82]",
+            "f32[32,48,82]",
+            f"bf16[{decode_rows},576]",
+            "legacy_runtime_fused_qkv_a_m32_tp32_n82",
         ),
         "legacy_score": (
             f"f32[{decode_rows},{heads},{head_dim}]",
@@ -98,6 +130,22 @@ def validate_dsa_association_hlo(
         fused_qkv_candidates = (
             f"bf16[{decode_rows},2624]",
             f"bf16[2624,{decode_rows}]",
+        )
+    elif phase == "legacy_runtime_fused_qkv_global_state":
+        fused_qkv_candidates = (
+            f"bf16[{decode_rows},2624]",
+            f"bf16[2624,{decode_rows}]",
+        )
+    elif phase == "legacy_runtime_fused_qkv_sharded_state":
+        fused_qkv_candidates = tuple(
+            dict.fromkeys(
+                (
+                    f"bf16[32,{decode_rows},82]",
+                    f"bf16[32,82,{decode_rows}]",
+                    f"bf16[{decode_rows},32,82]",
+                    f"bf16[{decode_rows},82,32]",
+                )
+            )
         )
     fused_qkv_intermediate_shapes = [
         shape for shape in fused_qkv_candidates if shape in optimized_hlo

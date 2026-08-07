@@ -19,6 +19,9 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
 EXPECTED_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
+# Accepted sealed state-hash log values for layer-0 fused_qkv_a_proj.
+SEALED_LEGACY_FUSED_QKV_WEIGHT_BYTE_SUM = 2_448_103_424
+SEALED_LEGACY_FUSED_QKV_SCALE_BYTE_SUM = 53_100_864
 
 
 def _git_head() -> str:
@@ -92,6 +95,7 @@ def main() -> int:
         layer0_dsa_state,
         legacy_pagewise_dcp_scores,
         one_row_pagewise_scores,
+        pack_legacy_fused_qkv_runtime_weights,
     )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
         dequantize_fp8_bits_block_weight,
@@ -177,6 +181,77 @@ def main() -> int:
     )
     fused_qkv_a_bf16 = jnp.concatenate((q_a_bf16, kv_a_bf16), axis=0)
     jax.block_until_ready(fused_qkv_a_bf16)
+    geometry = Layer0DsaProbeGeometry()
+    runtime_pack_function = partial(
+        pack_legacy_fused_qkv_runtime_weights,
+        geometry=geometry,
+    )
+    started = time.monotonic()
+    runtime_pack_compiled = jax.jit(runtime_pack_function).lower(
+        q_a_bits,
+        q_a_scale,
+        kv_a_bits,
+        kv_a_scale,
+    ).compile()
+    compile_seconds["legacy_fused_qkv_runtime_pack"] = (
+        time.monotonic() - started
+    )
+    runtime_weights = runtime_pack_compiled(
+        q_a_bits,
+        q_a_scale,
+        kv_a_bits,
+        kv_a_scale,
+    )
+    jax.block_until_ready(runtime_weights)
+    runtime_weight_host = np.asarray(runtime_weights.global_weight)
+    runtime_scale_host = np.ascontiguousarray(
+        np.asarray(runtime_weights.global_scale, dtype=np.float32)
+    )
+    runtime_layout_identity = {
+        "global_weight_shape": list(runtime_weight_host.shape),
+        "global_weight_dtype": str(runtime_weight_host.dtype),
+        "global_weight_byte_sum": int(
+            runtime_weight_host.view(np.uint8).sum(dtype=np.uint64)
+        ),
+        "global_weight_sha256": sha256(
+            runtime_weight_host.view(np.uint8).tobytes(order="C")
+        ).hexdigest(),
+        "global_scale_shape": list(runtime_scale_host.shape),
+        "global_scale_dtype": str(runtime_scale_host.dtype),
+        "global_scale_byte_sum": int(
+            runtime_scale_host.view(np.uint8).sum(dtype=np.uint64)
+        ),
+        "global_scale_sha256": sha256(
+            runtime_scale_host.view(np.uint8).tobytes(order="C")
+        ).hexdigest(),
+        "sealed_legacy_state_hash_shape_and_byte_sum_match": False,
+    }
+    if runtime_layout_identity["global_weight_byte_sum"] != (
+        SEALED_LEGACY_FUSED_QKV_WEIGHT_BYTE_SUM
+    ) or runtime_layout_identity["global_scale_byte_sum"] != (
+        SEALED_LEGACY_FUSED_QKV_SCALE_BYTE_SUM
+    ):
+        raise RuntimeError(
+            "legacy fused qkv runtime layout disagrees with the sealed "
+            f"state-hash log: {runtime_layout_identity}"
+        )
+    runtime_layout_identity[
+        "sealed_legacy_state_hash_shape_and_byte_sum_match"
+    ] = True
+    runtime_pack_hlo = runtime_pack_compiled.as_text()
+    runtime_pack_path = (
+        args.hlo_dir / "legacy_fused_qkv_runtime_pack.optimized_hlo.txt"
+    )
+    runtime_pack_path.write_text(runtime_pack_hlo)
+    runtime_pack_contract = validate_dsa_association_hlo(
+        runtime_pack_hlo,
+        phase="legacy_fused_qkv_runtime_pack",
+    )
+    if not runtime_pack_contract["passed"]:
+        raise RuntimeError(
+            "legacy fused qkv runtime-pack HLO contract failed: "
+            f"{runtime_pack_contract}"
+        )
     wq_b_fp32 = dequantize("wq_b_fp32", wq_b_bits, wq_b_scale, jnp.float32)
     wk_fp32 = dequantize("wk_fp32", wk_bits, wk_scale, jnp.float32)
     wq_b_bf16 = dequantize("wq_b_bf16", wq_b_bits, wq_b_scale, jnp.bfloat16)
@@ -189,10 +264,10 @@ def main() -> int:
         input_norm_weight,
     )
     state_tail = (key_norm_weight, key_norm_bias, head_weight)
-    geometry = Layer0DsaProbeGeometry()
     state_definitions = {
         "legacy_fp32_divsqrt": (
             q_a_bf16,
+            None,
             wq_b_fp32,
             wk_fp32,
             "divide_sqrt",
@@ -200,6 +275,7 @@ def main() -> int:
         ),
         "legacy_fp32_rsqrt": (
             q_a_bf16,
+            None,
             wq_b_fp32,
             wk_fp32,
             "multiply_rsqrt",
@@ -207,6 +283,7 @@ def main() -> int:
         ),
         "legacy_bf16_divsqrt": (
             q_a_bf16,
+            None,
             wq_b_bf16,
             wk_bf16,
             "divide_sqrt",
@@ -214,6 +291,7 @@ def main() -> int:
         ),
         "greenfield_bf16_rsqrt_legacy_geometry": (
             q_a_bf16,
+            None,
             wq_b_bf16,
             wk_bf16,
             "multiply_rsqrt",
@@ -221,16 +299,34 @@ def main() -> int:
         ),
         "legacy_fused_qkv_fp32_divsqrt": (
             fused_qkv_a_bf16,
+            None,
             wq_b_fp32,
             wk_fp32,
             "divide_sqrt",
             "legacy_fused_qkv_a",
+        ),
+        "legacy_runtime_fused_qkv_global_fp32_divsqrt": (
+            runtime_weights.global_weight,
+            runtime_weights.global_scale,
+            wq_b_fp32,
+            wk_fp32,
+            "divide_sqrt",
+            "legacy_runtime_fused_qkv_a_global",
+        ),
+        "legacy_runtime_fused_qkv_sharded_fp32_divsqrt": (
+            runtime_weights.sharded_weight,
+            runtime_weights.sharded_scale,
+            wq_b_fp32,
+            wk_fp32,
+            "divide_sqrt",
+            "legacy_runtime_fused_qkv_a_sharded",
         ),
     }
     states: dict[str, Any] = {}
     state_hlo_records: dict[str, Any] = {}
     for name, (
         q_a_projection_weight,
+        q_a_projection_scale,
         wq_weight,
         wk_weight,
         norm_mode,
@@ -249,6 +345,7 @@ def main() -> int:
             wq_weight,
             wk_weight,
             *state_tail,
+            q_a_projection_scale,
         )
         started = time.monotonic()
         compiled = jax.jit(function).lower(*function_arguments).compile()
@@ -271,6 +368,8 @@ def main() -> int:
         if name in (
             "legacy_fp32_divsqrt",
             "legacy_fused_qkv_fp32_divsqrt",
+            "legacy_runtime_fused_qkv_global_fp32_divsqrt",
+            "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
             "greenfield_bf16_rsqrt_legacy_geometry",
         ):
             hlo = compiled.as_text()
@@ -278,11 +377,15 @@ def main() -> int:
             hlo_path.write_text(hlo)
             contract = validate_dsa_association_hlo(
                 hlo,
-                phase=(
-                    "legacy_fused_qkv_state"
-                    if q_a_projection_mode == "legacy_fused_qkv_a"
-                    else "legacy_state"
-                ),
+                phase={
+                    "legacy_fused_qkv_a": "legacy_fused_qkv_state",
+                    "legacy_runtime_fused_qkv_a_global": (
+                        "legacy_runtime_fused_qkv_global_state"
+                    ),
+                    "legacy_runtime_fused_qkv_a_sharded": (
+                        "legacy_runtime_fused_qkv_sharded_state"
+                    ),
+                }.get(q_a_projection_mode, "legacy_state"),
             )
             if not contract["passed"]:
                 raise RuntimeError(
@@ -433,6 +536,50 @@ def main() -> int:
         )
     )
 
+    runtime_one_row_scores: dict[str, np.ndarray] = {}
+    runtime_pallas_scores: dict[str, np.ndarray] = {}
+    for label, state_name in (
+        (
+            "runtime_fused_qkv_global",
+            "legacy_runtime_fused_qkv_global_fp32_divsqrt",
+        ),
+        (
+            "runtime_fused_qkv_sharded",
+            "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
+        ),
+    ):
+        runtime_state = states[state_name]
+        runtime_one_row = one_row_compiled(
+            runtime_state.query[:1],
+            runtime_state.index_keys,
+            runtime_state.head_weights[:1],
+        )
+        jax.block_until_ready(runtime_one_row)
+        runtime_one_row_host = np.asarray(runtime_one_row, dtype=np.float32)
+        runtime_one_row_scores[label] = runtime_one_row_host
+        comparisons[f"one_row_pagewise_on_{label}_legacy_state"] = (
+            compare_dsa_association_scores(
+                runtime_one_row_host,
+                expected_positions,
+                expected_scores,
+            )
+        )
+        runtime_pallas = pallas_compiled(
+            runtime_state.query[:1],
+            runtime_state.index_keys,
+            runtime_state.head_weights[:1],
+        )
+        jax.block_until_ready(runtime_pallas)
+        runtime_pallas_host = np.asarray(runtime_pallas[0], dtype=np.float32)
+        runtime_pallas_scores[label] = runtime_pallas_host
+        comparisons[f"one_row_pallas_on_{label}_legacy_state"] = (
+            compare_dsa_association_scores(
+                runtime_pallas_host,
+                expected_positions,
+                expected_scores,
+            )
+        )
+
     state_deltas = {
         name: {
             "query_vs_legacy": _tensor_delta(state.query[0], legacy_state.query[0]),
@@ -470,6 +617,28 @@ def main() -> int:
             full_scores["legacy_fused_qkv_fp32_divsqrt"],
         ),
     }
+    for label, state_name in (
+        (
+            "runtime_fused_qkv_global",
+            "legacy_runtime_fused_qkv_global_fp32_divsqrt",
+        ),
+        (
+            "runtime_fused_qkv_sharded",
+            "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
+        ),
+    ):
+        score_deltas[f"{label}_one_row_pagewise_vs_legacy_pagewise"] = (
+            _tensor_delta(
+                runtime_one_row_scores[label],
+                full_scores[state_name],
+            )
+        )
+        score_deltas[f"{label}_one_row_pallas_vs_legacy_pagewise"] = (
+            _tensor_delta(
+                runtime_pallas_scores[label],
+                full_scores[state_name],
+            )
+        )
     record = {
         "status": "SUCCESS",
         "claim_scope": (
@@ -486,7 +655,13 @@ def main() -> int:
         "comparisons": comparisons,
         "state_deltas": state_deltas,
         "score_deltas": score_deltas,
+        "runtime_fused_qkv_layout_identity": runtime_layout_identity,
         "hlo": {
+            "legacy_fused_qkv_runtime_pack": {
+                "filename": runtime_pack_path.name,
+                "sha256": sha256(runtime_pack_hlo.encode()).hexdigest(),
+                "contract": runtime_pack_contract,
+            },
             "state": state_hlo_records,
             "legacy_score": {
                 "filename": legacy_score_path.name,
@@ -508,7 +683,16 @@ def main() -> int:
             "legacy_fp32_divsqrt"
         ]["passed"],
         "legacy_association_restored": comparisons[
+            "legacy_runtime_fused_qkv_sharded_fp32_divsqrt"
+        ]["passed"],
+        "predecoded_fused_qkv_association_restored": comparisons[
             "legacy_fused_qkv_fp32_divsqrt"
+        ]["passed"],
+        "runtime_fused_qkv_global_association_restored": comparisons[
+            "legacy_runtime_fused_qkv_global_fp32_divsqrt"
+        ]["passed"],
+        "runtime_fused_qkv_sharded_association_restored": comparisons[
+            "legacy_runtime_fused_qkv_sharded_fp32_divsqrt"
         ]["passed"],
         "one_row_pagewise_restored": comparisons[
             "one_row_pagewise_on_legacy_state"
@@ -521,6 +705,18 @@ def main() -> int:
         ]["passed"],
         "fused_qkv_one_row_pallas_restored": comparisons[
             "one_row_pallas_on_fused_qkv_legacy_state"
+        ]["passed"],
+        "runtime_fused_qkv_global_one_row_pagewise_restored": comparisons[
+            "one_row_pagewise_on_runtime_fused_qkv_global_legacy_state"
+        ]["passed"],
+        "runtime_fused_qkv_global_one_row_pallas_restored": comparisons[
+            "one_row_pallas_on_runtime_fused_qkv_global_legacy_state"
+        ]["passed"],
+        "runtime_fused_qkv_sharded_one_row_pagewise_restored": comparisons[
+            "one_row_pagewise_on_runtime_fused_qkv_sharded_legacy_state"
+        ]["passed"],
+        "runtime_fused_qkv_sharded_one_row_pallas_restored": comparisons[
+            "one_row_pallas_on_runtime_fused_qkv_sharded_legacy_state"
         ]["passed"],
         "profiler_free_timing": False,
         "memory_stats": _memory_stats(device),
