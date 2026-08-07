@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "captured_utc": "2026-08-07T21:20:00Z",
+  "policy": {
+    "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
+    "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
+    "oracle_only": "The source may produce or explain reference evidence but must never be imported by greenfield model execution.",
+    "rejected": "Preserved negative evidence; do not repeat or promote the mechanism without a new discriminator.",
+    "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
+  },
+  "source_pins": {
+    "greenfield": "05d991506ad7717f5e7c68354937a2327887dc5b",
+    "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
+    "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+    "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
+    "vllm_reference": "a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c"
+  },
+  "assets": [
+    {
+      "id": "provenance-db",
+      "category": "protection",
+      "source_repo": "glm-tpu",
+      "source_pin": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
+      "source_paths": ["bench/provenance.py", "bench/results.db"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["scripts/greenfield/run_*.sh"],
+      "gate": "all",
+      "reason": "Append-only run/item/summary records and DB snapshots are already the campaign provenance authority."
+    },
+    {
+      "id": "xplane-wall-analysis",
+      "category": "observability",
+      "source_repo": "glm-tpu",
+      "source_pin": "38d6c96d93ec7e3500a6f8e50b624191bcfe0d1a",
+      "source_paths": ["scripts/analysis/parse_xplane.py", "scripts/analysis/extract_steady_decode.py"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["scripts/greenfield/run_pipeline_transport_trace.sh", "scripts/greenfield/run_real_one_layer_pp8.sh", "scripts/greenfield/run_short_decoder_compile_pp8.sh"],
+      "gate": "A-H",
+      "reason": "The parser already attributes TPU operations by source, shape, bytes and FLOPs; the wall extractor already isolates profiler-free steady decode."
+    },
+    {
+      "id": "protected-run-operations",
+      "category": "protection",
+      "source_repo": "glm-tpu",
+      "source_pin": "edc23c92da1ca08f7a601b943eb1792fc89c022d",
+      "source_paths": ["scripts/e0_capture_arm.sh", "scripts/resume_health_proof.sh", "scripts/analysis/test_ray_ownership_guards.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/run_*.sh"],
+      "gate": "all TPU gates",
+      "reason": "Exact ownership, global lease, fresh census, immutable pin, archive and cleanup patterns are carried into the isolated launchers instead of being redesigned."
+    },
+    {
+      "id": "quality-and-long-context-harness",
+      "category": "validation",
+      "source_repo": "moe-tpu and glm-tpu",
+      "source_pin": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
+      "source_paths": ["/home/gianl/moe-tpu/bench/dsv4_longctx.py", "bench/glm_longctx.py", "bench/run_bench.py", "bench/rescore.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["bench/glm_longctx.py", "bench/run_bench.py"],
+      "gate": "128K/256K quality",
+      "reason": "The proven DSV4 trial construction and provenance discipline were adapted to GLM generation, exact prompt token targeting and the protected four-depth ladder."
+    },
+    {
+      "id": "model-config-and-reference",
+      "category": "model semantics",
+      "source_repo": "transformers/vLLM snapshots",
+      "source_pin": "a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c",
+      "source_paths": ["configs/glm-5.2-fp8-config.json", "configs/glm-5.2-fp8-keyset.json", "reference/modeling_glm_moe_dsa.py", "reference/configuration_glm_moe_dsa.py", "/home/gianl/vllm-build/vllm/model_executor/models/deepseek_v2.py"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": ["glm_tpu/greenfield/model", "glm_tpu/greenfield/kernels/reference", "glm_tpu/greenfield/validation"],
+      "gate": "B-D",
+      "reason": "Geometry, tensor names and arithmetic semantics are source truth; model classes are never imported into greenfield execution."
+    },
+    {
+      "id": "accepted-greenfield-evidence-ledger",
+      "category": "evidence",
+      "source_repo": "glm-tpu",
+      "source_pin": "05d991506ad7717f5e7c68354937a2327887dc5b",
+      "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["all gate decisions"],
+      "gate": "A-H",
+      "reason": "Accepted DB 405-488 artifacts, rejected diagnostics and exact pins prevent repeated experiments and unsupported promotion claims."
+    },
+    {
+      "id": "packed-checkpoint-chain",
+      "category": "checkpoint",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "05d991506ad7717f5e7c68354937a2327887dc5b",
+      "source_paths": ["glm_tpu/greenfield/checkpoint", "scripts/greenfield/pack_checkpoint_streaming.py", "scripts/greenfield/pack_runtime_checkpoint.py", "scripts/greenfield/pack_feature_runtime_checkpoint.py"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["glm_tpu/greenfield/runtime/decoder.py"],
+      "gate": "B-D",
+      "reason": "The complete PP8 plan-aware pack, final-owner loaders and runtime derivative already reconcile every source byte and must remain the only full-model load path."
+    },
+    {
+      "id": "legacy-state-integrity",
+      "category": "protection",
+      "source_repo": "tpu-inference",
+      "source_pin": "94b7464330794d79bfca9292cf6b7f9316a87192",
+      "source_paths": ["tpu_inference/runner/load_checksum.py", "tpu_inference/runner/load_nan_check.py", "tpu_inference/runner/load_state_hash.py", "tpu_inference/runner/write_probe.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/checkpoint/*_loader.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh"],
+      "gate": "B-D and long context",
+      "reason": "Checksum, finite-state, manifest and write-probe failure modes are preserved as interfaces and independently implemented around final-owner state."
+    },
+    {
+      "id": "legacy-dsa-diff-and-dump",
+      "category": "validation",
+      "source_repo": "tpu-inference",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+      "source_paths": ["tpu_inference/runner/dsa_topk_dump.py", "tpu_inference/runner/dsa_topk_diff.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/short_context_dsa_oracle.py", "scripts/greenfield/compile_short_decoder.py"],
+      "gate": "C-D",
+      "reason": "Event identity, selected-set, tie-order, padding and IndexShare checks are reused through sealed portable artifacts, not runtime imports."
+    },
+    {
+      "id": "legacy-code-and-step-fingerprints",
+      "category": "protection",
+      "source_repo": "tpu-inference",
+      "source_pin": "94b7464330794d79bfca9292cf6b7f9316a87192",
+      "source_paths": ["tpu_inference/runner/code_fingerprint.py", "tpu_inference/runner/glm_step_tracer.py", "tpu_inference/runner/flight_recorder.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/run_*.sh", "glm_tpu/greenfield/sharding/hlo_contract.py"],
+      "gate": "all TPU gates",
+      "reason": "Greenfield launchers bind exact commits/configs/HLO and use fresh trace windows; the legacy runner itself is not imported."
+    },
+    {
+      "id": "legacy-loader-corruption-fixes",
+      "category": "checkpoint",
+      "source_repo": "tpu-inference",
+      "source_pin": "d504db9028951801d0e8e2a9761e5f94b42b01b9",
+      "source_paths": ["tpu_inference/utils.py", "tpu_inference/runner/load_checksum.py", "tests/test_t2j_no_alias.py", "tests/runner/test_glm_load_checksum.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/checkpoint/full_loader.py", "glm_tpu/greenfield/checkpoint/runtime_loader.py"],
+      "gate": "B-D",
+      "reason": "The torch-storage alias and scalar-checksum failure classes inform direct immutable host reads, device round trips and all-leaf checksum coverage."
+    },
+    {
+      "id": "legacy-dsa-kernels",
+      "category": "kernel reference",
+      "source_repo": "tpu-inference",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+      "source_paths": ["tpu_inference/kernels/dsa/indexer_kernel.py", "tpu_inference/kernels/dsa/sparse_mla_kernel.py", "tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "tpu_inference/layers/vllm/custom_ops/mla_attention.py"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa.py", "glm_tpu/greenfield/kernels/pallas/dsa.py", "glm_tpu/greenfield/kernels/pallas/sparse_attention.py"],
+      "gate": "C-D",
+      "reason": "These sources pin arithmetic and edge cases. Greenfield kernels are independent and have their own HLO and protected-metal proofs."
+    },
+    {
+      "id": "legacy-fp8-matmul-and-gmm",
+      "category": "kernel reference",
+      "source_repo": "tpu-inference",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+      "source_paths": ["tpu_inference/kernels/quantized_matmul", "tpu_inference/kernels/megablox", "tpu_inference/layers/common/fused_moe_gmm.py"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/pallas/fp8_matmul.py", "glm_tpu/greenfield/kernels/stage_local.py"],
+      "gate": "C-F",
+      "reason": "Tiling, block-scale and route metadata patterns are useful references, but direct imports would reintroduce the legacy execution dependency."
+    },
+    {
+      "id": "legacy-pipeline-parallel-helpers",
+      "category": "runtime reference",
+      "source_repo": "tpu-inference",
+      "source_pin": "804b52e5f18973b94723445f3998b81f1b0e39eb",
+      "source_paths": ["tpu_inference/layers/jax/pp_utils.py", "tests/e2e/test_pipeline_parallel.py", "origin/pp-backup@9ecd1e79c"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": ["glm_tpu/greenfield/runtime/pipeline.py", "glm_tpu/greenfield/benchmarking/transport_chain.py"],
+      "gate": "A-D",
+      "reason": "Layer-range and sharded-device-put ideas are reusable, but placeholder layers and vLLM PP dispatch violate the no-inactive-compute/no-host-dispatch contract."
+    },
+    {
+      "id": "legacy-dsa-live-rows",
+      "category": "optimization evidence",
+      "source_repo": "tpu-inference",
+      "source_pin": "13bfbca3a9f41fc988ef1e86feeebe44fcce96a2",
+      "source_paths": ["glm-dsa-score-live-corrected", "glm-dsa-dcp-live-rows", "tests/layers/vllm/test_glm_dsa_dcp_decode_cpu.py"],
+      "disposition": "rejected",
+      "greenfield_consumers": ["true decode_batch1 row-one contract"],
+      "gate": "D-F",
+      "reason": "Useful proof that dead rows can be removed, superseded structurally by greenfield's static one-row decode; do not transplant batch reconstruction."
+    },
+    {
+      "id": "legacy-scorer-scan8",
+      "category": "optimization candidate",
+      "source_repo": "tpu-inference",
+      "source_pin": "bb3e4c7d6647507d7c1dd61368fa4cd05b546352",
+      "source_paths": ["tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "tests/layers/vllm/test_glm_dsa_scorer_gather_cpu.py"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["future DSA fallback if the protected Pallas scorer loses end-to-end"],
+      "gate": "F",
+      "reason": "Exact map-to-scan unroll evidence is valuable only as a bounded fallback; current greenfield Pallas scorer is already protected and faster."
+    },
+    {
+      "id": "legacy-moe-psum-fusion",
+      "category": "optimization semantics",
+      "source_repo": "tpu-inference",
+      "source_pin": "83915fe742e435da3471a96786921679c392d70c",
+      "source_paths": ["tpu_inference/layers/common/moe_psum_fusion.py", "tests/layers/common/test_moe_psum_fusion.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/moe.py", "glm_tpu/greenfield/kernels/stage_local.py"],
+      "gate": "C-F",
+      "reason": "Tuple-combine and historical scaling association are preserved inside the local 2/4-chip stage rather than the legacy 32-chip group."
+    },
+    {
+      "id": "legacy-moe-compute-row-narrowing",
+      "category": "optimization evidence",
+      "source_repo": "tpu-inference",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+      "source_paths": ["glm-moe-compute-live-corrected", "/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z"],
+      "disposition": "rejected",
+      "greenfield_consumers": ["one-row/router shape tests"],
+      "gate": "D-F",
+      "reason": "Protected 3.394737 wall tok/s evidence proves row narrowing alone cannot solve the 106 ms global-combine floor; retain semantics, not architecture."
+    },
+    {
+      "id": "legacy-moe-allgather",
+      "category": "negative evidence",
+      "source_repo": "tpu-inference",
+      "source_pin": "aa608543b73921a330f48271d8263d4ec2ca14a4",
+      "source_paths": ["glm-moe-live-allgather-corrected", "/home/gianl/glm-run/moe_allgather_exact_20260805T002126894390635Z"],
+      "disposition": "rejected",
+      "greenfield_consumers": ["architecture stop conditions"],
+      "gate": "G",
+      "reason": "Replacing the full-pod combine primitive did not remove synchronization depth; do not retry it as a topology solution."
+    },
+    {
+      "id": "ws32-2d-layout-reference",
+      "category": "architecture candidate",
+      "source_repo": "tpu-inference",
+      "source_pin": "fce8d6c41d683502893ca578240edbed393f7018",
+      "source_paths": ["origin/patemotter/2dtp-merge", "glm-decode-2d-f32@dab2db7b3", "glm-hybrid-ep-tp@6baf66e2a", "tests/layers/common/test_decode_2d_f32_reduce.py"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["future WS32_2D plan and numerical contract"],
+      "gate": "G",
+      "reason": "Reciprocal expert/feature specs and FP32 partial preservation are the strongest existing WS32 starting point, but DeepSeek JAX layout is not a GLM drop-in."
+    },
+    {
+      "id": "quantized-2d-matmul-drafts",
+      "category": "kernel candidate",
+      "source_repo": "tpu-inference",
+      "source_pin": "57adb4b999476edac8e26a18df26cbc213458ace",
+      "source_paths": ["origin/patemotter/2d_quant_matmul", "origin/patemotter/quant_2d_matmul"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["future WS32_2D Pallas discriminator"],
+      "gate": "G",
+      "reason": "A working draft and reference already exist; audit and adapt them before writing any new 2D quantized matmul."
+    },
+    {
+      "id": "glm-mtp-and-indexshare",
+      "category": "speculation candidate",
+      "source_repo": "tpu-inference and glm-tpu",
+      "source_pin": "89e1d5b5a8a428c738d15e22b8a2002cc20df540",
+      "source_paths": ["glm-5.2-v4-mtp@6beacb5d2", "glm-5.2-v4-mtp-g4@89e1d5b5a", "parity/glm_mtp_parity.py", "docs/08-mtp-design.md"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["future verify_k_tokens and Gate H"],
+      "gate": "H",
+      "reason": "Dense MTP weight sharing/load filtering and exact IndexShare carriage are already CPU-proven; defer integration until the base decoder passes G."
+    },
+    {
+      "id": "dsv4-parity-methodology",
+      "category": "validation methodology",
+      "source_repo": "moe-tpu",
+      "source_pin": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
+      "source_paths": ["/home/gianl/moe-tpu/parity/dsv4_engine_full_parity.py", "/home/gianl/moe-tpu/parity/dsv4_real_engine_layer_parity.py", "/home/gianl/moe-tpu/parity/dsv4_runner_decode_parity.py", "/home/gianl/moe-tpu/parity/dsv4_pallas_decode_parity.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["parity/glm_engine_common.py", "glm_tpu/greenfield/validation", "tests/greenfield/equivalence"],
+      "gate": "C-D",
+      "reason": "Random-checkpoint transplant, chunked-cache parity and real-layer differential patterns were reused; DSV4 model math is not imported."
+    },
+    {
+      "id": "dsv4-paged-pallas-pattern",
+      "category": "kernel methodology",
+      "source_repo": "moe-tpu/tpu-inference",
+      "source_pin": "17d635a112a92f5d7879110822dccfcde0610b48",
+      "source_paths": ["docs/recon/doc09-csa-kernel.md", "docs/recon/doc11-mlav2-map.md", "tpu_inference/kernels/mla/dsv4/kernel.py", "tpu_inference/kernels/mla/v2/kernel.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/pallas/sparse_attention.py"],
+      "gate": "C-F",
+      "reason": "Paged BlockSpec, online softmax, v4 VMEM and selected-segment patterns informed the independent GLM sparse-attention kernel. DSV4 sink/inverse-RoPE math is excluded."
+    },
+    {
+      "id": "legacy-residual-observer",
+      "category": "negative evidence",
+      "source_repo": "tpu-inference",
+      "source_pin": "78a5fce88fc222feb69357e0bb411e6c9a9b944c",
+      "source_paths": ["greenfield/legacy-residual-observer", "/home/gianl/glm-run/greenfield_legacy_layer_residual_p2044_20260807T123637962992026Z"],
+      "disposition": "rejected",
+      "greenfield_consumers": ["source-level and bounded same-input diagnostics only"],
+      "gate": "D",
+      "reason": "Returning selected boundaries perturbed production arithmetic. Preserve the evidence and do not reuse the full-model capture method."
+    },
+    {
+      "id": "old-glm-tpu-worktrees",
+      "category": "historical tooling",
+      "source_repo": "glm-tpu",
+      "source_pin": "multiple pinned worktree heads",
+      "source_paths": ["perf-collective-chain-microbench@f05fb0d", "ops-compile-bucket-evidence@edc23c9", "ops-e0-provenance-freeze@1be75ca", "ops-xplane-roofline@38d6c96", "ops-dcp-exact-recovery@4a0bd08", "ops-sparse-compile-buckets@f6cc0fd"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["greenfield collective benchmark, protected launchers, XPlane parser and HLO gates"],
+      "gate": "A-H",
+      "reason": "The current greenfield implementations supersede these single-purpose branches, but their tests and failure classes remain part of the audit trail."
+    },
+    {
+      "id": "legacy-execution-stack",
+      "category": "forbidden dependency",
+      "source_repo": "tpu-inference/vLLM",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+      "source_paths": ["tpu_inference/models", "tpu_inference/runner/tpu_runner.py", "tpu_inference/executors", "vllm/model_executor/models/deepseek_v2.py"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": [],
+      "gate": "never imported",
+      "reason": "This is the measurement/correctness oracle. Importing it would violate the independent native-JAX definition of done."
+    }
+  ]
+}

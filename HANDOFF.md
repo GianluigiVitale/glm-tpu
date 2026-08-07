@@ -1445,3 +1445,31 @@ byte sums `2448103424` (FP8 weight) and `53100864` (FP32 scale), with local shap
 CPU tests and offline full-geometry CPU HLO validation pass. Exact next: commit/push this
 bounded-only change, then run one serialized probe. Only an exact set and order may authorize a
 production correction and protected 8K retry.
+
+## Raw-FP8 fused-QKV association rejected; pinned reuse audit now precedes implementation
+
+Bounded protected run `greenfield_layer0_dsa_association_20260807T205946537394555Z` at
+`05d991506ad7717f5e7c68354937a2327887dc5b` completed as DB 488 with checksum-valid local/remote
+`SUCCESS`, approved-bucket archive, and authenticated 8/8 clean pre/post censuses. The runtime pack
+keeps raw FP8, FP32 scales, and the exact TP32-local `bf16[32,32,82]` result live in HLO with no
+collective or callback. It reconstructs the sealed state byte sums exactly.
+
+The result rejects raw-FP8 fused projection association as the missing 8K correction. TP32-local
+XLA has 1,703 order mismatches, one selected-set swap, and max/mean score error
+`0.0340824/0.0259581`; global XLA has 1,650 mismatches, one set swap, and mean error `0.0261870`.
+Pallas preserves the set but misses 1,523 order slots with mean error `0.0221107`. No decoder was
+changed or loaded, and there is no Gate-D, timing, or throughput claim.
+
+Before writing another component, the repository/worktree sweep is now a durable input:
+`docs/greenfield/REUSE_INVENTORY.md` plus `configs/greenfield-reuse-inventory.json` classify the
+existing GLM-TPU, legacy, moe-tpu, vLLM-reference, artifact, protection, parity, kernel, WS32 and
+MTP work as direct reuse, adapted, oracle-only, rejected, or research candidates. `AGENTS.md` and
+the README require consultation, and a unit test rejects any `tpu_inference` or `vllm` import below
+`glm_tpu/greenfield`. The legacy model execution boundary remains unchanged.
+
+Exact next: reuse the pinned legacy linear-sharding and RMSNorm semantics to isolate the actual
+distributed q-a norm association. The fused runtime projects q-a as 32 physical 64-column shards,
+then normalizes the logical 2,048 values; the prior bounded probes reassembled q-a and applied an
+ordinary full-width norm. Prove that boundary under the immutable real input with a one-row
+challenger and exact HLO before one serialized bounded TPU probe. Do not run the complete 753B
+decoder until an exact set/order result authorizes a correction.

@@ -773,3 +773,24 @@ This closes protected 2K Gate D correctness, not Gate E: latency exceeds 200 ms 
 4.5 tok/s. Summary/XPlane/DB snapshot SHAs are `1ba77357...b60`, `0d8ac98d...afa0`, and
 `5789f5e8...26b8`; remote `SUCCESS` binds DB 484 and all sealed checksums pass. Next is the
 required 8K decoder proof, then evidence-driven PP8 optimization before 128K and 256K.
+
+## 2026-08-07 — DB 488 rejects raw-FP8 fused-QKV projection association
+
+Bounded diagnostic DB 488 / tag
+`greenfield_layer0_dsa_association_20260807T205946537394555Z` at `05d9915` passed its exact
+artifact, raw-FP8/FP32-scale, HLO, DB/archive, local/remote `SUCCESS`, and authenticated 8/8 clean
+census contracts. The TP32-local pack HLO keeps the physical `bf16[32,32,82]` result live and has
+no collective or callback; the pack and global-state HLO SHAs are `b6134565...668e` and
+`0cfebff1...6d98`.
+
+Neither physical projection association restores the sealed 8K DSA order. The TP32-local path has
+1,703 order mismatches, one selected-set swap, and max/mean absolute score error
+`0.0340824/0.0259581`; the global path has 1,650 order mismatches, one set swap, and mean error
+`0.0261870`. The associated Pallas result preserves the set but misses 1,523 order slots with mean
+error `0.0221107`. This is correctness-diagnostic evidence only: it changes no decoder and carries
+no latency, Gate-D, or throughput claim.
+
+The remaining high-value discriminator is upstream of the scorer: the real fused projection
+physically shards q-a as 32 x 64 and the logical 2,048-wide RMSNorm therefore has a distributed
+reduction association. The next bounded proof must adapt the already pinned legacy sharding/norm
+semantics and verify exact HLO before any full-model retry.

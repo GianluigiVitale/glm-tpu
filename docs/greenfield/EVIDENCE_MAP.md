@@ -1,5 +1,11 @@
 # Greenfield evidence and reusable protection map
 
+The cross-repository reuse decisions and pinned implementation candidates are indexed in
+[`REUSE_INVENTORY.md`](REUSE_INVENTORY.md) and
+`configs/greenfield-reuse-inventory.json`. They define what is directly reused, independently
+adapted, oracle-only, rejected, or reserved for a later gate; they do not weaken the evidence rules
+below.
+
 ## Accepted protected greenfield evidence
 
 Every accepted run has a local directory under `/home/gianl/glm-run`, a same-tag archive under

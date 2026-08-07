@@ -12,6 +12,12 @@ Read these files before acting, in this order:
 3. `HANDOFF.md`, repository state, and live process/fleet state (current status only).
 4. Relevant `docs/RESEARCH_LOG.md`, protected artifacts, and observability documentation.
 
+Before implementing a component that may overlap prior work, also read
+`docs/greenfield/REUSE_INVENTORY.md` and its machine-readable
+`configs/greenfield-reuse-inventory.json`. Update the registry when a source is reused, adapted,
+rejected, or reserved for a later challenger. It does not override `goal.md` or the binding
+specification.
+
 If documents conflict, `goal.md` and `docs/glm-tpu-revolution.md` win. `HANDOFF.md` reports mutable
 status and must not change the goal. `KICKOFF.md` and `PLAN.md` are summaries. `docs/suggestions.md`,
 `docs/RESEARCH_LOG.md`, old campaign documents, and protected artifacts are evidence/advice, not

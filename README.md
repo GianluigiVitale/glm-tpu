@@ -10,7 +10,9 @@ topology-local group; only the live residual and compact metadata cross pipeline
 
 Read [AGENTS.md](AGENTS.md), [goal.md](goal.md), and
 [docs/glm-tpu-revolution.md](docs/glm-tpu-revolution.md) before changing code. Current evidence and
-the next action are in [HANDOFF.md](HANDOFF.md).
+the next action are in [HANDOFF.md](HANDOFF.md). Before implementing a component, consult the pinned
+[reuse inventory](docs/greenfield/REUSE_INVENTORY.md) so existing protection, parity, kernel,
+checkpoint, benchmark, and architecture work is reused or deliberately classified.
 
 The inherited `tpu-inference` implementation is a correctness and measurement oracle only. This
 branch does not extend or import its model-execution path. Historical files under `docs/` remain

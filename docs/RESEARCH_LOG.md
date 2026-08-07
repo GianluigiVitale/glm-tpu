@@ -5129,3 +5129,30 @@ one-row XLA/Pallas scores. Full-shape reconstruction produces global `[6144,2624
 tests, Python/Bash/ShellCheck, and offline full-geometry CPU HLO checks pass. This remains
 diagnostic-only; the next TPU action is exactly one serialized bounded probe, never a full
 checkpoint retry first.
+
+## 2026-08-07 21:28 — DB 488 rejects raw-FP8 projection association; reuse registry is binding workflow
+
+DB 488 / `greenfield_layer0_dsa_association_20260807T205946537394555Z` at `05d9915` passes the
+bounded artifact/runtime-layout/HLO contracts, append-only DB linkage, archive, local/remote
+`SUCCESS`, and authenticated 8/8 clean censuses. Its TP32-local pack retains the exact
+`bf16[32,32,82]` result and raw FP8/FP32 scale operands with no collective or callback. The
+TP32-local scorer still has 1,703 order mismatches plus one set swap
+(`max/mean=0.0340824/0.0259581`); the global raw-FP8 path has 1,650 mismatches plus one swap
+(`mean=0.0261870`); Pallas preserves the set but misses 1,523 order slots (`mean=0.0221107`). This
+closes that association without changing the decoder or making a performance claim.
+
+A cross-repository audit then covered all eleven glm-tpu worktrees, the legacy GLM optimization and
+protection branches/worktrees, moe-tpu DSV4 parity/paged-attention/long-context work, vLLM/HF model
+references, glm-run evidence through DB 488, and the local resume evidence. The durable outputs are
+`docs/greenfield/REUSE_INVENTORY.md` and `configs/greenfield-reuse-inventory.json`. They pin and
+classify 25+ reusable or negative assets across provenance, XPlane/wall analysis, fleet protection,
+checkpoint integrity/layout, DSA validation/kernels, GMM, pipeline helpers, WS32 2D matmul, MTP,
+parity, and protected artifacts. A source test enforces that legacy/vLLM model execution remains
+oracle-only.
+
+The inventory changes the next diagnostic from a blank implementation to a bounded adaptation of
+existing source truth. The strongest remaining association is the distributed q-a RMSNorm:
+physical projection owns 32 x 64 q-a columns, but the following norm is logically width 2,048 and
+must reduce its statistics over that sharding. The existing probes reassembled full q-a before an
+ordinary norm. Inspect and adapt the pinned sharding/norm path, require its exact physical HLO, and
+only then run one serialized bounded TPU challenger. No full-model retry is authorized first.
