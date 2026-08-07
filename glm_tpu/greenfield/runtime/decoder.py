@@ -17,12 +17,13 @@ from ..kernels.layer import (
     MoeFp8Weights,
     SparseMoeBackend,
     stage_local_transformer_layer_fp8_mapped,
+    stage_local_transformer_layer_fp8_split_mapped,
 )
 from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.linear import vocabulary_logits
 from ..kernels.reference.moe import GlmMoeNumericalContract
-from ..kernels.reference.rmsnorm import final_norm
+from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
 from ..kernels.pallas import Fp8BlockMatmulConfig
 from ..kernels.stage_local import StageLinearBackend
 from ..model.schedule import PipelineSchedule, StageExecution
@@ -153,6 +154,7 @@ class DecoderStepProgram:
     complete_token_path: bool
     observe_dsa_events: bool
     observe_layer_residuals: bool
+    split_residual_state: bool
 
 
 def _validate_pallas_feature_decoder_calls(
@@ -579,6 +581,7 @@ def validate_decoder_step_hlo(
     feature_reconstruct_down_fp32: bool = False,
     complete_token_path: bool = False,
     token_observation_candidates: int = 1,
+    split_residual_state: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -614,6 +617,8 @@ def validate_decoder_step_hlo(
         )
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
+    if not isinstance(split_residual_state, bool):
+        raise PlanValidationError("split residual-state flag must be boolean")
     if (
         not isinstance(token_observation_candidates, int)
         or isinstance(token_observation_candidates, bool)
@@ -848,6 +853,30 @@ def validate_decoder_step_hlo(
     )
     if observed_pair_multiset != expected_pair_multiset:
         violations.append("decoder transport pairs/counts drifted")
+    residual_transport_dimensions = (
+        (2, 1, config.hidden_size)
+        if split_residual_state
+        else (1, config.hidden_size)
+    )
+    residual_transport_dtype = (
+        "f32" if backend_contract == "cpu_reference" else "bf16"
+    )
+    residual_transports = [
+        collective
+        for collective in by_opcode.get("collective-permute", ())
+        if any(
+            shape.dtype == residual_transport_dtype
+            and shape.dimensions == residual_transport_dimensions
+            for shape in collective.operand_shapes
+        )
+    ]
+    if len(residual_transports) != config.stage_count:
+        violations.append(
+            "decoder residual transport count/shape drifted: expected "
+            f"{config.stage_count} {residual_transport_dtype}"
+            f"{residual_transport_dimensions}, "
+            f"found {len(residual_transports)}"
+        )
     complete_token_collective_contract: dict[str, Any] = {
         "applicable": False,
         "passed": True,
@@ -870,6 +899,7 @@ def validate_decoder_step_hlo(
             if shape.dimensions in (
                 (config.total_devices, config.hidden_size),
                 (config.total_devices, 1, config.hidden_size),
+                (config.total_devices, 2, 1, config.hidden_size),
                 (config.total_devices, config.selected_width),
                 (config.total_devices, 1, config.selected_width),
             ):
@@ -952,6 +982,15 @@ def validate_decoder_step_hlo(
         "feature_fuse_route_weighting": feature_fuse_route_weighting,
         "feature_reconstruct_down_fp32": feature_reconstruct_down_fp32,
         "complete_token_path": complete_token_path,
+        "split_residual_state": split_residual_state,
+        "residual_transport_dimensions": list(
+            residual_transport_dimensions
+        ),
+        "residual_transport_dtype": residual_transport_dtype,
+        "residual_transport_count": len(residual_transports),
+        "residual_transports": [
+            _compact_collective_record(item) for item in residual_transports
+        ],
         "token_observation_candidates": token_observation_candidates,
         "complete_token_collective_contract": (
             complete_token_collective_contract
@@ -1193,6 +1232,183 @@ def _execute_stage(
     return values
 
 
+def _execute_stage_split(
+    stage: StageExecution,
+    values: tuple[Any, Any, Any, Any],
+    *,
+    weight: Any,
+    local_slot: Any,
+    position: Any,
+    block_tables: Any,
+    context_lengths: Any,
+    axis_name: str,
+    axis_groups: tuple[tuple[int, ...], ...],
+    config: DecoderStepConfig,
+    dsa_contract: DsaNumericalContract,
+    mla_contract: MlaNumericalContract,
+    moe_contract: GlmMoeNumericalContract,
+    cache_layout: StageLocalKvLayout,
+    block_shape: tuple[int, int],
+    sparse_moe_backend: SparseMoeBackend,
+    pallas_moe_config: Fp8BlockMatmulConfig | None,
+    pallas_moe_fuse_route_weighting: bool,
+    pallas_moe_reconstruct_down_fp32: bool,
+    linear_backend: StageLinearBackend,
+    dsa_observation: Any | None = None,
+    layer_residual_observation: Any | None = None,
+) -> tuple[Any, ...]:
+    """Execute one stage with the accepted hidden/residual state association."""
+
+    import jax.numpy as jnp
+    from jax import lax
+
+    residual_state, kv_cache, index_cache, metadata = values
+    if residual_state.shape != (2, 1, config.hidden_size):
+        raise ValueError("split decoder state must be [hidden,residual]")
+    hidden_states = residual_state[0]
+    residual = residual_state[1]
+    full_slot = 0
+
+    def combined_boundary() -> Any:
+        return (
+            hidden_states.astype(jnp.float32)
+            + residual.astype(jnp.float32)
+        ).astype(hidden_states.dtype)
+
+    for layer in stage.layers:
+        if layer_residual_observation is not None:
+            layer_residual_observation = layer_residual_observation.at[
+                layer.layer_id
+            ].set(combined_boundary()[0])
+        attention = _attention_weights(weight, layer.stage_slot)
+        input_norm = weight(
+            f"attention.slot_{layer.stage_slot:02d}.input_norm"
+        )
+        post_norm = weight(
+            f"attention.slot_{layer.stage_slot:02d}.post_norm"
+        )
+        if layer.indexer_kind == "full":
+            dsa = _dsa_weights(weight, full_slot)
+            layer_index_cache = index_cache[full_slot]
+            current_full_slot = full_slot
+            full_slot += 1
+        else:
+            dsa = None
+            layer_index_cache = index_cache[0]
+            current_full_slot = None
+        if layer.mlp_kind == "dense":
+            assert layer.dense_slot is not None
+            dense = _dense_weights(weight, layer.dense_slot)
+            moe = None
+        else:
+            assert layer.sparse_slot is not None
+            dense = None
+            moe = _moe_weights(weight, layer.sparse_slot)
+        producer_valid = (
+            jnp.asarray(True)
+            if layer.indexer_kind == "full"
+            else metadata[0, config.producer_index]
+            == jnp.int32(layer.index_state_producer_layer)
+        )
+        incoming_valid = (
+            (metadata[0, config.health_index] == jnp.int32(1))
+            & producer_valid
+        )[None]
+        result = stage_local_transformer_layer_fp8_split_mapped(
+            hidden_states,
+            residual,
+            kv_cache[layer.stage_slot],
+            layer_index_cache,
+            metadata[:, : config.selected_width],
+            metadata[:, config.count_index],
+            position,
+            block_tables,
+            context_lengths,
+            input_norm,
+            post_norm,
+            attention,
+            dsa,
+            dense,
+            moe,
+            incoming_valid,
+            local_slot,
+            axis_name=axis_name,
+            indexer_kind=layer.indexer_kind,
+            mlp_kind=layer.mlp_kind,
+            dsa_contract=dsa_contract,
+            mla_contract=mla_contract,
+            moe_contract=moe_contract,
+            cache_layout=cache_layout,
+            axis_index_groups=axis_groups,
+            block_shape=block_shape,
+            sparse_moe_backend=sparse_moe_backend,
+            pallas_moe_config=pallas_moe_config,
+            pallas_moe_fuse_route_weighting=pallas_moe_fuse_route_weighting,
+            pallas_moe_reconstruct_down_fp32=(
+                pallas_moe_reconstruct_down_fp32
+            ),
+            linear_backend=linear_backend,
+        )
+        hidden_states = result.hidden_states
+        residual = result.residual
+        if layer_residual_observation is not None:
+            layer_residual_observation = layer_residual_observation.at[
+                layer.layer_id + 1
+            ].set(combined_boundary()[0])
+        kv_cache = kv_cache.at[layer.stage_slot].set(result.kv_cache)
+        if current_full_slot is not None:
+            index_cache = index_cache.at[current_full_slot].set(
+                result.index_cache
+            )
+            metadata = metadata.at[0, config.producer_index].set(
+                jnp.int32(layer.layer_id)
+            )
+            if dsa_observation is not None:
+                dsa_observation = dsa_observation.at[
+                    current_full_slot, : config.selected_width
+                ].set(result.selected_positions[0])
+                dsa_observation = dsa_observation.at[
+                    current_full_slot,
+                    config.selected_width : 2 * config.selected_width,
+                ].set(
+                    lax.bitcast_convert_type(
+                        result.selected_scores[0], jnp.int32
+                    )
+                )
+                dsa_observation = dsa_observation.at[
+                    current_full_slot, 2 * config.selected_width
+                ].set(result.selected_valid_counts[0])
+                dsa_observation = dsa_observation.at[
+                    current_full_slot, 2 * config.selected_width + 1
+                ].set(jnp.int32(layer.layer_id))
+        metadata = metadata.at[:, : config.selected_width].set(
+            result.selected_positions
+        )
+        metadata = metadata.at[:, config.count_index].set(
+            result.selected_valid_counts
+        )
+        metadata = metadata.at[0, config.health_index].set(
+            result.contract_valid[0].astype(jnp.int32)
+        )
+    metadata = metadata.at[0, config.visited_index].set(
+        jnp.bitwise_or(
+            metadata[0, config.visited_index],
+            jnp.int32(1 << stage.assignment.stage_id),
+        )
+    )
+    outputs: tuple[Any, ...] = (
+        jnp.stack((hidden_states, residual), axis=0),
+        kv_cache,
+        index_cache,
+        metadata,
+    )
+    if dsa_observation is not None:
+        outputs = (*outputs, dsa_observation)
+    if layer_residual_observation is not None:
+        outputs = (*outputs, layer_residual_observation)
+    return outputs
+
+
 def build_decoder_step_program(
     plan: ExecutionPlan,
     schedule: PipelineSchedule,
@@ -1211,11 +1427,14 @@ def build_decoder_step_program(
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
     observe_layer_residuals: bool = False,
+    split_residual_state: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
 
     ``complete_token_path`` adds the sharded embedding and final
-    norm/logits/greedy-token boundaries. It defaults off so the protected
+    norm/logits/greedy-token boundaries. ``split_residual_state`` preserves
+    the accepted decoder's two live BF16 residual components so fused norms
+    consume their unrounded FP32 sum. Both default off so the protected
     transformer-body executable and its input/output contract remain intact.
     """
 
@@ -1265,6 +1484,8 @@ def build_decoder_step_program(
         raise PlanValidationError("DSA event-observation flag must be boolean")
     if not isinstance(observe_layer_residuals, bool):
         raise PlanValidationError("layer residual-observation flag must be boolean")
+    if not isinstance(split_residual_state, bool):
+        raise PlanValidationError("split residual-state flag must be boolean")
     if observe_dsa_events and not complete_token_path:
         raise PlanValidationError(
             "DSA event observation requires the complete-token path"
@@ -1440,6 +1661,27 @@ def build_decoder_step_program(
         def weight(name: str) -> Any:
             return local_weights[name][0]
 
+        execute_stage = (
+            _execute_stage_split
+            if split_residual_state
+            else _execute_stage
+        )
+
+        def normalize_final(final_residual: Any) -> Any:
+            if split_residual_state:
+                normalized, _ = fused_add_rms_norm(
+                    final_residual[0],
+                    final_residual[1],
+                    weight("global.final_norm"),
+                    epsilon=1e-5,
+                )
+                return normalized
+            return final_norm(
+                final_residual,
+                weight("global.final_norm"),
+                epsilon=1e-5,
+            )
+
         next_token = jnp.full((1,), -1, dtype=jnp.int32)
         if complete_token_path:
             assert local_token_container is not None
@@ -1476,6 +1718,12 @@ def build_decoder_step_program(
                     axis_name,
                     axis_index_groups=axis_groups,
                 )
+                if split_residual_state:
+                    current_residual = jnp.stack(
+                        (embedded, jnp.zeros_like(embedded)), axis=0
+                    )
+                else:
+                    current_residual = embedded
                 current_metadata = current_metadata.at[
                     0, config.visited_index
                 ].set(jnp.int32(0))
@@ -1488,7 +1736,7 @@ def build_decoder_step_program(
                     ).astype(jnp.int32)
                     * token_valid.astype(jnp.int32)
                 )
-                return embedded, current_metadata
+                return current_residual, current_metadata
 
             residual, metadata = lax.cond(
                 should_embed,
@@ -1513,7 +1761,7 @@ def build_decoder_step_program(
                         layer_residual_observation,
                     ) = lax.cond(
                         should_execute,
-                        lambda values, stage=stage: _execute_stage(
+                        lambda values, stage=stage: execute_stage(
                             stage,
                             values[:4],
                             weight=weight,
@@ -1560,7 +1808,7 @@ def build_decoder_step_program(
                         dsa_observation,
                     ) = lax.cond(
                         should_execute,
-                        lambda values, stage=stage: _execute_stage(
+                        lambda values, stage=stage: execute_stage(
                             stage,
                             values[:4],
                             weight=weight,
@@ -1599,7 +1847,7 @@ def build_decoder_step_program(
             else:
                 residual, kv_cache, index_cache, metadata = lax.cond(
                     should_execute,
-                    lambda values, stage=stage: _execute_stage(
+                    lambda values, stage=stage: execute_stage(
                         stage,
                         values,
                         weight=weight,
@@ -1639,11 +1887,7 @@ def build_decoder_step_program(
                             final_metadata,
                             current_token_observation,
                         ) = values
-                        normalized = final_norm(
-                            final_residual,
-                            weight("global.final_norm"),
-                            epsilon=1e-5,
-                        )
+                        normalized = normalize_final(final_residual)
                         local_logits = vocabulary_logits(
                             normalized,
                             weight("global.lm_head"),
@@ -1754,11 +1998,7 @@ def build_decoder_step_program(
                         values: tuple[Any, Any],
                     ) -> tuple[Any, Any]:
                         final_residual, final_metadata = values
-                        normalized = final_norm(
-                            final_residual,
-                            weight("global.final_norm"),
-                            epsilon=1e-5,
-                        )
+                        normalized = normalize_final(final_residual)
                         local_logits = vocabulary_logits(
                             normalized,
                             weight("global.lm_head"),
@@ -1916,7 +2156,11 @@ def build_decoder_step_program(
         spec.name: P(axis_name, *(None for _ in spec.shape))
         for spec in weight_layout.specs
     }
-    residual_spec = P(axis_name, None, None)
+    residual_spec = (
+        P(axis_name, None, None, None)
+        if split_residual_state
+        else P(axis_name, None, None)
+    )
     kv_spec = P(axis_name, None, None, None, None)
     index_spec = P(axis_name, None, None, None, None)
     metadata_spec = P(axis_name, None, None)
@@ -1985,4 +2229,5 @@ def build_decoder_step_program(
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
         observe_layer_residuals=observe_layer_residuals,
+        split_residual_state=split_residual_state,
     )

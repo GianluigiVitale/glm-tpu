@@ -515,6 +515,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             observe_layer_residuals=1,  # type: ignore[arg-type]
         )
+    with pytest.raises(PlanValidationError, match="split residual-state flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            split_residual_state=1,  # type: ignore[arg-type]
+        )
     with pytest.raises(PlanValidationError, match="isolated DSA observer"):
         build_decoder_step_program(
             source_plan,
@@ -553,9 +563,11 @@ weight_layout = build_decoder_runtime_weight_layout(plan, schedule)
 groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8))
 pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in range(8) for slot in range(4))
 decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
-explicit_default = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=False)
+explicit_default = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=False, split_residual_state=False)
 observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True)
+split = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, split_residual_state=True)
 prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
+split_prefill = build_teacher_forced_prefill_program(split, prompt_length=2)
 
 weights = {}
 weight_specs = decoder.input_specs[0]
@@ -574,6 +586,8 @@ for spec in weight_layout.specs:
 residual_host = np.zeros((32, 1, 8), dtype=ml_dtypes.bfloat16)
 initial_row = np.asarray([[0.5, -0.25, 0.75, 1.0, -1.0, 0.125, 0.25, -0.5]], dtype=ml_dtypes.bfloat16)
 for rank in groups[0]: residual_host[rank] = initial_row
+split_residual_host = np.zeros((32, 2, 1, 8), dtype=ml_dtypes.bfloat16)
+for rank in groups[0]: split_residual_host[rank, 0] = initial_row
 kv_host = np.ones((32, 1, 1, 2, 8), dtype=ml_dtypes.bfloat16)
 index_host = np.ones((32, 1, 1, 2, 2), dtype=ml_dtypes.bfloat16)
 metadata_host = np.full((32, 1, decoder.config.metadata_width), -1, np.int32)
@@ -598,14 +612,22 @@ inputs = (
     put(np.asarray([[0]], np.int32), decoder.input_specs[7]),
     put(np.asarray([1], np.int32), decoder.input_specs[8]),
 )
+split_inputs = (
+    weights,
+    put(split_residual_host, split.input_specs[1]),
+    *inputs[2:],
+)
 lowered = jax.jit(decoder.execute).lower(*inputs)
 default_stablehlo = lowered.as_text()
 explicit_default_stablehlo = jax.jit(explicit_default.execute).lower(*inputs).as_text()
 compiled = lowered.compile()
+split_compiled = jax.jit(split.execute).lower(*split_inputs).compile()
 observer_compiled = jax.jit(observer.execute).lower(*inputs).compile()
 observed = observer_compiled(*inputs)
 first = compiled(*inputs)
 second = compiled(weights, *first)
+split_first = split_compiled(*split_inputs)
+split_second = split_compiled(weights, *split_first)
 prefill_inputs = (
     weights,
     *inputs[1:5],
@@ -614,8 +636,18 @@ prefill_inputs = (
 )
 prefill_compiled = jax.jit(prefill.execute).lower(*prefill_inputs).compile()
 prefilled = prefill_compiled(*prefill_inputs)
+split_prefill_inputs = (
+    weights,
+    *split_inputs[1:5],
+    jnp.asarray([5, 6], dtype=jnp.int32),
+    *split_inputs[6:9],
+)
+split_prefill_compiled = jax.jit(split_prefill.execute).lower(*split_prefill_inputs).compile()
+split_prefilled = split_prefill_compiled(*split_prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
+split_residual, split_kv, split_index, split_metadata, split_next_token, split_next_position, split_next_blocks, split_next_lengths = map(np.asarray, jax.device_get(split_second))
 prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
+split_prefill_values = list(map(np.asarray, jax.device_get(split_prefilled)))
 observation = np.asarray(jax.device_get(observed[8]))
 token_observation = np.asarray(jax.device_get(observed[9]))
 layer_residual_observation = np.asarray(jax.device_get(observed[10]))
@@ -636,8 +668,10 @@ active = np.flatnonzero(metadata[:, 0, decoder.config.active_index] == 1)
 module = parse_hlo_module(compiled.as_text())
 observer_module = parse_hlo_module(observer_compiled.as_text())
 hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True)
+split_hlo_contract = validate_decoder_step_hlo(split_compiled.as_text(), config=split.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, split_residual_state=True)
 observer_hlo_contract = validate_decoder_step_hlo(observer_compiled.as_text(), config=observer.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, token_observation_candidates=observer.config.token_observation_candidates)
 prefill_hlo_contract = validate_teacher_forced_prefill_hlo(prefill_compiled.as_text(), program=prefill, schedule=schedule, backend_contract='cpu_reference')
+split_prefill_hlo_contract = validate_teacher_forced_prefill_hlo(split_prefill_compiled.as_text(), program=split_prefill, schedule=schedule, backend_contract='cpu_reference')
 counts = {}
 for item in module.collectives: counts[item.opcode] = counts.get(item.opcode, 0) + 1
 local_groups = tuple(tuple(group) for group in groups)
@@ -720,6 +754,26 @@ print(json.dumps({
         'violations': prefill_hlo_contract['violations'],
     },
     'residual_exact': bool(np.array_equal(residual[active], np.ones((4, 1, 8), dtype=ml_dtypes.bfloat16))),
+    'split': {
+        'active': np.flatnonzero(split_metadata[:, 0, split.config.active_index] == 1).tolist(),
+        'collective_counts': split_hlo_contract['collective_counts'],
+        'finite': bool(np.all(np.isfinite(split_residual))),
+        'hlo_contract': {key: split_hlo_contract[key] for key in ('passed', 'residual_transport_count', 'residual_transport_dimensions', 'residual_transport_dtype', 'split_residual_state', 'violations')},
+        'next_lengths': split_next_lengths.tolist(),
+        'next_position': split_next_position.tolist(),
+        'next_tokens': sorted(set(split_next_token[active, 0].tolist())),
+        'prefill': {
+            'hlo_passed': split_prefill_hlo_contract['passed'],
+            'next_lengths': split_prefill_values[7].tolist(),
+            'next_position': split_prefill_values[5].tolist(),
+            'next_tokens': sorted(set(split_prefill_values[4][active, 0].tolist())),
+            'residual_shape': list(split_prefill_values[0].shape),
+            'violations': split_prefill_hlo_contract['violations'],
+        },
+        'program_flag': split.split_residual_state,
+        'residual_shape': list(split_residual.shape),
+        'visited': sorted(set(split_metadata[active, 0, split.config.visited_index].tolist())),
+    },
     'sparse_moe_backend': decoder.sparse_moe_backend,
     'valid_counts': sorted(set(metadata[active, 0, decoder.config.count_index].tolist())),
     'visited': sorted(set(metadata[active, 0, decoder.config.visited_index].tolist())),
@@ -745,6 +799,37 @@ print(json.dumps({
     assert result["residual_exact"]
     assert result["complete_token_path"]
     assert result["default_observation_off_stablehlo_identical"]
+    assert result["split"] == {
+        "active": [0, 1, 2, 3],
+        "collective_counts": {
+            "all-gather": 58,
+            "all-reduce": 17,
+            "collective-permute": 17,
+        },
+        "finite": True,
+        "hlo_contract": {
+            "passed": True,
+            "residual_transport_count": 8,
+            "residual_transport_dimensions": [2, 1, 8],
+            "residual_transport_dtype": "f32",
+            "split_residual_state": True,
+            "violations": [],
+        },
+        "next_lengths": [3],
+        "next_position": [2],
+        "next_tokens": [0],
+        "prefill": {
+            "hlo_passed": True,
+            "next_lengths": [3],
+            "next_position": [2],
+            "next_tokens": [0],
+            "residual_shape": [32, 2, 1, 8],
+            "violations": [],
+        },
+        "program_flag": True,
+        "residual_shape": [32, 2, 1, 8],
+        "visited": [255],
+    }
     assert result["next_tokens"] == [0]
     assert result["next_position"] == [2]
     assert result["next_lengths"] == [3]

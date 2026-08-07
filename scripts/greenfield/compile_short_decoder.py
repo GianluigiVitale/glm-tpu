@@ -1023,6 +1023,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--split-residual-state",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1051,6 +1057,7 @@ def main() -> int:
         args.feature_reconstruct_down_fp32
     )
     args.complete_token_path = bool(args.complete_token_path)
+    args.split_residual_state = bool(args.split_residual_state)
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
@@ -1390,6 +1397,7 @@ def main() -> int:
             ),
             linear_backend=linear_backend,
             complete_token_path=args.complete_token_path,
+            split_residual_state=args.split_residual_state,
         )
         dsa_observer = None
         if dsa_oracle_mode:
@@ -1413,6 +1421,7 @@ def main() -> int:
                 complete_token_path=True,
                 observe_dsa_events=True,
                 observe_layer_residuals=args.observe_layer_residuals,
+                split_residual_state=args.split_residual_state,
             )
         prefill = None
         if oracle_mode:
@@ -1436,7 +1445,20 @@ def main() -> int:
         total_devices = decoder.config.total_devices
         kv_shape = state_layout.stages[0].padded_kv_cache_shape
         index_shape = state_layout.stages[0].padded_indexer_cache_shape
-        residual_shape = (total_devices, 1, execution_plan.geometry.hidden_size)
+        residual_shape = (
+            (
+                total_devices,
+                2,
+                1,
+                execution_plan.geometry.hidden_size,
+            )
+            if args.split_residual_state
+            else (
+                total_devices,
+                1,
+                execution_plan.geometry.hidden_size,
+            )
+        )
         kv_global_shape = (total_devices, *kv_shape)
         index_global_shape = (total_devices, *index_shape)
         metadata_shape = (total_devices, 1, decoder.config.metadata_width)
@@ -1451,7 +1473,10 @@ def main() -> int:
         def residual_builder(rank: int, shape: tuple[int, ...]) -> np.ndarray:
             value = np.zeros(shape, dtype=ml_dtypes.bfloat16)
             if not oracle_mode and rank in groups[0]:
-                value[...] = initial_row
+                if args.split_residual_state:
+                    value[:, 0, ...] = initial_row
+                else:
+                    value[...] = initial_row
             return value
 
         def zero_bf16(_: int, shape: tuple[int, ...]) -> np.ndarray:
@@ -1625,6 +1650,7 @@ def main() -> int:
                 decoder.feature_reconstruct_down_fp32
             ),
             complete_token_path=decoder.complete_token_path,
+            split_residual_state=decoder.split_residual_state,
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -1699,6 +1725,7 @@ def main() -> int:
                 token_observation_candidates=(
                     dsa_observer.config.token_observation_candidates
                 ),
+                split_residual_state=dsa_observer.split_residual_state,
             )
             dsa_observer_isolation_contract = (
                 _observer_hlo_isolation_contract(
@@ -2481,7 +2508,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 7,
+            "schema_version": 8,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
@@ -2491,6 +2518,21 @@ def main() -> int:
             ),
             "feature_reconstruct_down_fp32": (
                 decoder.feature_reconstruct_down_fp32
+            ),
+            "split_residual_state": decoder.split_residual_state,
+            "residual_transport_components": (
+                2 if decoder.split_residual_state else 1
+            ),
+            "residual_transport_bytes_per_stage": (
+                (2 if decoder.split_residual_state else 1)
+                * execution_plan.geometry.hidden_size
+                * np.dtype(ml_dtypes.bfloat16).itemsize
+            ),
+            "split_residual_extra_bytes_per_device": (
+                execution_plan.geometry.hidden_size
+                * np.dtype(ml_dtypes.bfloat16).itemsize
+                if decoder.split_residual_state
+                else 0
             ),
             "linear_backend": decoder.linear_backend,
             "complete_token_path": decoder.complete_token_path,

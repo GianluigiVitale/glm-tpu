@@ -131,6 +131,12 @@ KV/index state, producer validity, stage-local collectives, and residual/compact
 transport. A forced 32-device CPU proof executes an eight-layer small geometry through all eight
 stages, writes every owned current cache row, returns the single live row to stage 0, and has exact
 HLO `56AG/16AR/16CP` with local groups only. The production 78-layer compile and TPU run remain.
+The default-off exact-association challenger carries two live BF16 components rather than rounding
+their sum before each RMSNorm. Its forced 32-device complete-token and teacher-forced-prefill proof
+retains the same physical collective counts, has exactly eight residual permutes of local shape
+`[2,1,H]`, one live row, no callback or host dispatch, and leaves the original default StableHLO
+unchanged. TPU-v4 promotion additionally requires eight `bf16[2,1,6144]` permutes and measured HBM;
+CPU lowering uses FP32 reference intermediates and is semantic evidence only.
 Protected TPU dependent-chain matrices now cover the dominant payload, required bf16 live-
 residual/intermediate shapes, `f32[1,6144]`, and small `int32` routing metadata. FP8 is a checkpoint
 weight-storage format here, not a numerically valid residual/reduction or stage-transfer payload;

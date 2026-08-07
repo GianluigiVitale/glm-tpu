@@ -693,3 +693,21 @@ FP32-cast score bits, expected-token rank/margins, fleet lane health, and per-te
 no collective and allows only the two declared token-exchange result shapes to differ from
 production; every non-token collective remains an exact isolation gate. Full local verification is
 343 passed / 1 skipped plus Python/Bash/ShellCheck/diff checks. Protected metal evidence is next.
+
+## 2026-08-07 — exact fused residual association is integrated, awaiting protected metal
+
+Source inspection of the accepted fused norm established a concrete semantic mismatch: it forms
+`hidden + residual` in FP32, normalizes that unrounded value, and separately carries a BF16-rounded
+sum. The earlier greenfield decoder instead rounded the sum to BF16 before normalization at both
+norms in every layer. A deterministic BF16 fixture proves the two formulas differ; this is a direct
+arithmetic counterexample and a plausible cumulative explanation for the position-2,044 token
+inversion, not yet protected-model proof.
+
+The default-off split-state path now preserves both live components through dense, DSA,
+IndexShare, MoE, final norm, the eight PP8 stage transfers, and teacher-forced prefill. A forced
+32-device CPU run passes two recurrent steps and prefill with unchanged collective counts, exactly
+eight residual transfers of local shape `[2,1,H]`, local groups only, and byte-identical StableHLO
+for the disabled default. The protected runner records the flag, HLO dtype/shape/count, 24,576-byte
+stage payload, 12,288-byte incremental buffer, fleet agreement, HBM, and DB provenance. CPU tests
+and static checks pass; no TPU run, token correction, timing result, Gate D, or throughput claim is
+made here.

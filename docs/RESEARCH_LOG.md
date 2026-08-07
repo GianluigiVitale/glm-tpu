@@ -4930,3 +4930,29 @@ routed/shared update, and final boundary reconstruction while binding the common
 DSA selection, weights, dtypes, and reduction association. Gate D remains blocked on the first
 position-2,044 arithmetic inversion; the first ten recurrent tokens remain exact and no tok/s
 claim is valid.
+
+## 2026-08-07 14:24 — Source-level fused-norm mismatch found; exact split-state Gate D challenger armed locally
+
+The rejected observer is no longer needed to identify a concrete arithmetic mismatch. The accepted
+vLLM fused-add RMSNorm implementation adds hidden and residual after FP32 conversion, normalizes
+that unrounded FP32 sum, and returns the sum independently rounded to BF16. Greenfield previously
+used a BF16 residual add and then normalized the already-rounded value, twice per layer. A native
+JAX `fused_add_rms_norm` now models the accepted association exactly; a deterministic BF16 fixture
+has 18 differing outputs versus rounded-first normalization. This source/fixture proof is stronger
+than speculative boundary localization but is not yet a protected full-model result.
+
+The default-off decoder challenger preserves `(hidden_update, carried_residual)` through every
+layer, initializes `(embedding, zero)`, and applies fused final norm. Dense/DSA/IndexShare/MoE
+component proofs preserve existing local collective counts. The forced 32-device decoder executes
+two complete recurrent steps plus teacher-forced prefill, returns `[32,2,1,H]` state, and the HLO
+contract finds eight local residual permutes with unchanged aggregate counts; explicit
+`split_residual_state=False` is StableHLO-identical to the old default. The TPU contract requires
+`bf16[2,1,6144]`, rejects full-pod `[32,2,1,6144]`, and accounts for 24,576 transport bytes plus
+12,288 incremental bytes/device.
+
+The protected PP8 runner now propagates `GLM_GREENFIELD_SPLIT_RESIDUAL_STATE` (default `0`) through
+production, observer, prefill, allocation, fleet validation, HLO, schema-8 records, tags, HBM/byte
+accounting, and DB provenance. Focused decoder, stage-layer, reference-core, runner-unit, Python,
+Bash, ShellCheck, and diff checks pass. No TPU workflow was launched and no token, latency, Gate D,
+or throughput claim exists. Next is a clean commit/push and fresh authenticated census immediately
+before one serialized protected 2K exact-token/DSA run with the flag enabled.

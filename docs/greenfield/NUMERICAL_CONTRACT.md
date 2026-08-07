@@ -10,6 +10,15 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   normalized value back to the activation dtype, then multiplies the norm
   weight in that dtype. Transformer/final norm use epsilon `1e-5`; attention
   LoRA norms use the model's `1e-6` default.
+- The accepted fused residual-add/RMSNorm boundary first adds the two BF16
+  inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
+  the independently carried residual is the same sum rounded to BF16. A
+  rounded-first BF16 add followed by ordinary RMSNorm is not equivalent. The
+  default-off split-state decoder therefore preserves raw hidden update plus
+  carried residual through every layer and applies the same fused operation at
+  final norm. Its PP8 stage payload is exactly `bf16[2,1,6144]` (24,576 bytes),
+  adding 12,288 bytes to the historical one-component transport; no additional
+  row, collective, cache, weight, or metadata payload is allowed.
 - Linear weights retain checkpoint orientation `[out_features, in_features]`.
   Dequantized BF16 activations/weights produce an explicit BF16 result; FP32
   router/indexer projections request FP32 explicitly. Bias and leading-shape

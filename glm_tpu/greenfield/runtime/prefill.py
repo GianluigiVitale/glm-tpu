@@ -53,6 +53,7 @@ def validate_teacher_forced_prefill_hlo(
             decoder.feature_reconstruct_down_fp32
         ),
         complete_token_path=True,
+        split_residual_state=decoder.split_residual_state,
     )
     module = parse_hlo_module(optimized_hlo)
     loops = [
