@@ -144,6 +144,7 @@ def parse_args() -> argparse.Namespace:
         "--distributed-q-a-norm-manifest-sha256",
         required=True,
     )
+    parser.add_argument("--distributed-q-a-norm-code-hash", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     return parser.parse_args()
@@ -169,9 +170,12 @@ def main() -> int:
     )
     from glm_tpu.greenfield.kernels.pallas.dsa import dsa_scores_pallas
     from glm_tpu.greenfield.kernels.reference.dsa_association import (
+        LegacyDcpXlaScoreGeometry,
         Layer0DsaProbeGeometry,
         layer0_dsa_state_from_q_residual,
         layer0_dsa_state,
+        legacy_local_dcp_score_inputs,
+        legacy_local_dcp_xla_scores,
         legacy_pagewise_dcp_scores,
         one_row_pagewise_scores,
         pack_legacy_fused_qkv_runtime_weights,
@@ -203,7 +207,7 @@ def main() -> int:
             expected_manifest_sha256=(
                 args.distributed_q_a_norm_manifest_sha256
             ),
-            expected_code_hash=code_hash,
+            expected_code_hash=args.distributed_q_a_norm_code_hash,
             expected_input_manifest_sha256=manifest["manifest_sha256"],
         )
     )
@@ -575,6 +579,74 @@ def main() -> int:
             expected_scores,
         )
 
+    local_dcp_geometry = LegacyDcpXlaScoreGeometry()
+    local_dcp_inputs = legacy_local_dcp_score_inputs(
+        legacy_state.index_keys,
+        0,
+        geometry=local_dcp_geometry,
+    )
+    local_dcp_function = partial(
+        legacy_local_dcp_xla_scores,
+        geometry=local_dcp_geometry,
+    )
+    started = time.monotonic()
+    local_dcp_compiled = jax.jit(local_dcp_function).lower(
+        legacy_state.query,
+        local_dcp_inputs.cache,
+        legacy_state.head_weights,
+        local_dcp_inputs.block_tables,
+        local_dcp_inputs.kv_lens,
+    ).compile()
+    compile_seconds["legacy_local_dcp_xla_score"] = (
+        time.monotonic() - started
+    )
+    local_dcp_hlo = local_dcp_compiled.as_text()
+    local_dcp_path = (
+        args.hlo_dir / "legacy_local_dcp_xla_score.optimized_hlo.txt"
+    )
+    local_dcp_path.write_text(local_dcp_hlo)
+    local_dcp_contract = validate_dsa_association_hlo(
+        local_dcp_hlo,
+        phase="legacy_local_dcp_xla_score",
+    )
+    if not local_dcp_contract["passed"]:
+        raise RuntimeError(
+            "legacy local DCP XLA score HLO contract failed: "
+            f"{local_dcp_contract}"
+        )
+
+    local_dcp_scores: dict[str, np.ndarray] = {}
+    for name, state in states.items():
+        score_host = np.full(
+            (state.index_keys.shape[0],), -np.inf, dtype=np.float32
+        )
+        for shard in range(local_dcp_geometry.dcp_size):
+            packed = legacy_local_dcp_score_inputs(
+                state.index_keys,
+                shard,
+                geometry=local_dcp_geometry,
+            )
+            local = local_dcp_compiled(
+                state.query,
+                packed.cache,
+                state.head_weights,
+                packed.block_tables,
+                packed.kv_lens,
+            )
+            jax.block_until_ready(local)
+            local_host = np.asarray(local[0], dtype=np.float32)
+            positions = np.asarray(packed.local_positions, dtype=np.int32)
+            valid = positions < score_host.shape[0]
+            score_host[positions[valid]] = local_host[valid]
+        local_dcp_scores[name] = score_host
+        comparisons[f"legacy_local_dcp_xla_on_{name}"] = (
+            compare_dsa_association_scores(
+                score_host,
+                expected_positions,
+                expected_scores,
+            )
+        )
+
     query_one = legacy_state.query[:1]
     head_one = legacy_state.head_weights[:1]
     started = time.monotonic()
@@ -743,6 +815,10 @@ def main() -> int:
         if name != "legacy_fp32_divsqrt"
     }
     score_deltas = {
+        "legacy_local_dcp_xla_vs_nested_legacy_pagewise": _tensor_delta(
+            local_dcp_scores["legacy_fp32_divsqrt"],
+            full_scores["legacy_fp32_divsqrt"],
+        ),
         "one_row_pagewise_vs_legacy_pagewise": _tensor_delta(
             one_row_host,
             full_scores["legacy_fp32_divsqrt"],
@@ -816,6 +892,11 @@ def main() -> int:
                 "sha256": sha256(legacy_score_hlo.encode()).hexdigest(),
                 "contract": legacy_score_contract,
             },
+            "legacy_local_dcp_xla_score": {
+                "filename": local_dcp_path.name,
+                "sha256": sha256(local_dcp_hlo.encode()).hexdigest(),
+                "contract": local_dcp_contract,
+            },
             "one_row_pagewise_score": {
                 "filename": one_row_path.name,
                 "sha256": sha256(one_row_hlo.encode()).hexdigest(),
@@ -830,6 +911,13 @@ def main() -> int:
         "standalone_legacy_association_restored": comparisons[
             "legacy_fp32_divsqrt"
         ]["passed"],
+        "legacy_local_dcp_xla_restored": comparisons[
+            "legacy_local_dcp_xla_on_legacy_fp32_divsqrt"
+        ]["passed"],
+        "legacy_local_dcp_xla_by_state_restored": {
+            name: comparisons[f"legacy_local_dcp_xla_on_{name}"]["passed"]
+            for name in states
+        },
         "legacy_association_restored": comparisons[
             distributed_state_name
         ]["passed"],

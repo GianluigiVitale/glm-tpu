@@ -24,6 +24,34 @@ def test_legacy_score_hlo_requires_exact_diagnostic_geometry() -> None:
     assert result["diagnostic_batch32_allowed"] is True
 
 
+def test_legacy_local_dcp_xla_hlo_requires_sealed_8k_shapes() -> None:
+    hlo = "\n".join(
+        (
+            "f32[32,32,128]",
+            "bf16[24,512,128]",
+            "f32[32,32]",
+            "s32[32,3]",
+            "s32[32]",
+            "f32[32,1536]",
+            "f32[32,512,32]",
+            "thd,tpd->thp/dot_general",
+            "th,thp->tp/dot_general",
+        )
+    )
+    result = validate_dsa_association_hlo(
+        hlo, phase="legacy_local_dcp_xla_score"
+    )
+    assert result["passed"] is True
+    assert result["diagnostic_batch32_allowed"] is True
+
+    wrong_width = validate_dsa_association_hlo(
+        hlo.replace("s32[32,3]", "s32[32,84]"),
+        phase="legacy_local_dcp_xla_score",
+    )
+    assert wrong_width["passed"] is False
+    assert "s32[32,3]" in wrong_width["missing_shapes"]
+
+
 def test_fused_qkv_state_hlo_requires_live_exact_output_width() -> None:
     hlo = "\n".join(
         (

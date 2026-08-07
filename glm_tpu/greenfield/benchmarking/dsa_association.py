@@ -17,6 +17,7 @@ AssociationPhase = Literal[
     "legacy_tp32_distributed_q_a_norm",
     "legacy_tp32_distributed_q_a_norm_state",
     "legacy_score",
+    "legacy_local_dcp_xla_score",
     "one_row_score",
 ]
 
@@ -34,6 +35,9 @@ def validate_dsa_association_hlo(
     q_lora_rank: int = 2048,
     qkv_a_companion_rank: int = 576,
     tensor_shards: int = 32,
+    dcp_size: int = 8,
+    local_cache_pages: int = 24,
+    max_model_len: int = 8704,
     allow_cpu_bf16_collective_promotion: bool = False,
 ) -> dict[str, Any]:
     """Pin legacy diagnostic geometry separately from the one-row challenger."""
@@ -48,6 +52,9 @@ def validate_dsa_association_hlo(
         q_lora_rank,
         qkv_a_companion_rank,
         tensor_shards,
+        dcp_size,
+        local_cache_pages,
+        max_model_len,
     )
     if any(
         not isinstance(value, int) or isinstance(value, bool) or value <= 0
@@ -63,6 +70,10 @@ def validate_dsa_association_hlo(
     q_local = q_lora_rank // tensor_shards
     companion_local = qkv_a_companion_rank // tensor_shards
     local_output = q_local + companion_local
+    global_page_size = page_size * dcp_size
+    owned_blocks = (
+        max_model_len + global_page_size - 1
+    ) // global_page_size
     required_by_phase = {
         "legacy_state": (
             f"f32[{decode_rows},{heads},{head_dim}]",
@@ -129,6 +140,14 @@ def validate_dsa_association_hlo(
             f"f32[{decode_rows},{heads}]",
             f"f32[{context}]",
         ),
+        "legacy_local_dcp_xla_score": (
+            f"f32[{decode_rows},{heads},{head_dim}]",
+            f"bf16[{local_cache_pages},{page_size},{head_dim}]",
+            f"f32[{decode_rows},{heads}]",
+            f"s32[{decode_rows},{owned_blocks}]",
+            f"s32[{decode_rows}]",
+            f"f32[{decode_rows},{owned_blocks * page_size}]",
+        ),
         "one_row_score": (
             f"f32[1,{heads},{head_dim}]",
             f"bf16[{context},{head_dim}]",
@@ -144,7 +163,7 @@ def validate_dsa_association_hlo(
     ]
     score_intermediate_candidates: tuple[str, ...] = ()
     score_source_markers: tuple[str, ...] = ()
-    if phase == "legacy_score":
+    if phase in ("legacy_score", "legacy_local_dcp_xla_score"):
         score_intermediate_candidates = (
             f"f32[{decode_rows},{heads},{page_size}]",
             f"f32[{decode_rows},{page_size},{heads}]",

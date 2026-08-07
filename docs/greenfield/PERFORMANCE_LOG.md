@@ -809,7 +809,17 @@ one-row Pallas has an exact set but 1,249 mismatches. Their score max/mean error
 `0.0304594/0.0228811` and `0.0268021/0.0191863`, respectively. This run is diagnostic-only and
 contains no decoder latency or token-rate result.
 
-The unmodified reconstructed state already matches captured query, keys, and head weights
-elementwise while its score output remains inexact. That evidence relocates the next discriminator
-to the accepted Pallas scorer's exact physical association rather than another upstream q-a
-projection or normalization change.
+The unmodified variants match the reconstructed FP32/divsqrt baseline state elementwise; this is
+not a captured internal-state comparison because only sealed selected positions/scores exist. The
+next concrete discriminator is therefore the accepted XLA DCP scorer's exact three-page local
+geometry, replacing the diagnostic's mismatched nested 84-page reconstruction before another
+upstream q-a hypothesis is attempted.
+
+## Exact local DCP scorer checkpoint — implementation only
+
+The next bounded probe now compiles the accepted three-page local XLA scorer geometry and stitches
+the eight DCP stripes outside the executable. It reuses the sealed DB489 q-a artifact, so it does
+not repeat the diagnostic full-pod projection/norm. Focused coverage is 36/36 and the complete
+CPU-only suite is 416 passed / 1 skipped; the exact 20,188-byte CPU HLO contract passes. These are
+static/correctness readiness facts only. No TPU result, decoder latency, token rate, Gate-D result,
+or performance comparison exists for this checkpoint.

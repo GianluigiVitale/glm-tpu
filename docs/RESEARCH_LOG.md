@@ -5221,10 +5221,48 @@ preserves the set with 1,249 order mismatches and errors `0.0268021/0.0191863/0.
 `0.00945234/0.00335265/0.00679396` max/mean/p99 over all 8,156 positions. This closes the
 distributed-norm hypothesis without a production change or performance claim.
 
-The matrix also sharpens localization. Before any replacement, `legacy_bf16_divsqrt` reproduces
-the captured query, keys, and head weights elementwise, while the recomputed scorer still differs
-from the sealed output by a roughly constant positive error and 1,640 order slots. The remaining
-gap is therefore inside the accepted scorer's TPU/Pallas dtype, local-layout, tiling, or reduction
-association, not something another upstream projection layout can solve alone. The next bounded
-audit compares the accepted eight-host Pallas scorer signatures and source path to the diagnostic
-one-host Pallas executable before changing or rerunning the complete decoder.
+The matrix also narrows, but does not fully localize, the gap. `legacy_bf16_divsqrt` reproduces the
+reconstructed FP32/divsqrt baseline query, keys, and head weights elementwise while the baseline
+score still differs from the sealed selected-score evidence by a roughly constant positive error
+and 1,640 order slots. Those deltas are internal comparisons, not captured legacy state: the input
+artifact seals selected positions/scores but no legacy query/key tensors.
+
+Current source/run provenance identifies an exact scorer mismatch worth testing before another
+upstream hypothesis. DB485 ran `GLM_DSA_SCORER=xla`, not Pallas. With `max_model_len=8704`, DCP8
+and 512 local keys per 4,096-token global page, `GLM_DSA_BT_WIDTH=owned` makes the physical local
+walk three pages. The bounded reconstruction instead maps eight shards inside a single 84-page
+XLA program. The next diagnostic must reproduce the accepted local XLA scorer's `R=32`, `P=512`,
+three-page static geometry and BF16-cache/FP32-query boundary, then merge the eight local stripes
+offline. Only that result can distinguish scorer association from remaining upstream state.
+
+## 2026-08-07 22:46 — Exact local XLA scorer discriminator is CPU/HLO sealed
+
+The accepted source path confirms the precise discriminator. Under DCP8, the 512-token local page
+implies a 4,096-token global block-table entry. `max_model_len=8704` and the accepted `owned` width
+therefore retain three entries. Inside the shard-map body the legacy path converts the global
+length to an exact shard-local prefix, gathers one BF16 cache page per `lax.map` iteration, upcasts
+it to FP32, evaluates `thd,tpd->thp`, scales before ReLU, then evaluates `th,thp->tp`. The prior
+diagnostic changed that compilation association by nesting all eight stripes inside one 84-page
+program.
+
+Greenfield now reproduces one local body without importing the legacy execution path. Its operands
+are exactly query `f32[32,32,128]`, cache `bf16[24,512,128]`, head weights `f32[32,32]`, block
+table `s32[32,3]`, and lengths `s32[32]`; its result is `f32[32,1536]`. A single compiled scorer is
+invoked for each DCP stripe and the live row is stitched by the exact affine local-column to global
+position map outside HLO. This preserves the legacy static association solely for diagnosis;
+production remains one live row.
+
+The runner reuses DB489's immutable distributed-q-a result rather than executing another full-pod
+norm. The wrapper pins that artifact's manifest, source code, original input identity and payload
+checksum, while retaining the global lease, exact eight-host sync, pre/post census, results DB,
+approved-bucket archive and terminal SUCCESS gates. Thirty-six focused tests pass. The full
+CPU-only greenfield suite is 416 passed / 1 skipped with two pre-existing SWIG warnings in 333.26
+seconds; the exact 20,188-byte CPU HLO passes shape/source/no-collective checks. Python, Bash,
+ShellCheck, JSON, line-length and diff validation pass.
+
+During validation, one pytest was initially started without `JAX_PLATFORMS=cpu` and acquired the
+local libtpu lock as PID 436988. It was terminated by exact PID before model use; an authenticated
+all-worker follow-up census returned eight unique clean hosts. No TPU arithmetic conclusion or
+performance claim follows from this implementation checkpoint. Exact next is one clean-pin,
+serialized protected scorer probe. Its exact set/order matrix alone decides whether a one-row
+production correction and one 8K Gate-D retry are authorized.

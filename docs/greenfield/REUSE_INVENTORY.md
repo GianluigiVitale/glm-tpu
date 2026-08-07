@@ -22,6 +22,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
+| Exact 8K local scorer | legacy XLA scorer source, DB485 run config and accepted XPlane | Bounded independent `R=32`, `P=512`, three-owned-page DCP scorer association; diagnostic only, never a production dead-row path. |
 | Checkpoint layout | existing greenfield plan/pack/load chain | Gate B is already complete; the 834 GB runtime derivative is the only full PP8 decoder input. |
 | Kernels | legacy DSA/GMM/quantized matmul plus DSV4 paged-attention research | Arithmetic/tiling reference; greenfield implementations remain independent and protected. |
 | Parity | `moe-tpu/parity` and existing GLM parity harnesses | Random-checkpoint transplant, real-layer differentials and cache/chunk tests, adapted to GLM. |
@@ -95,15 +96,14 @@ Before adding a new greenfield component:
 5. Record the source pin, disposition and greenfield consumer here and in the JSON registry.
 6. Preserve negative evidence instead of rerunning a rejected mechanism.
 
-The immediate Gate-D diagnosis now resumes from this inventory. DB 488 ruled out raw-FP8 fused-QKV
-physical dot association as the missing DSA variable. The next bounded discriminator should first
-reuse the legacy sharding/norm evidence to test the physically sharded 2048-wide q-a RMSNorm
-association; it must not trigger another blind full-753B retry.
+DB489 has now rejected the distributed q-a norm as sufficient: it improves the sealed order error
+but still misses 1,501 XLA and 1,249 Pallas slots. The run's internal state deltas do not constitute
+captured query/key proof because the portable artifact seals selected positions/scores only.
 
-That discriminator is now implemented as an isolated diagnostic adaptation. Source pin
-`b3c25df4` supplies fused-output sharding and local-N82 FP8 dot semantics; vLLM pin `a30addc7`
-supplies the FP32-square/mean, rsqrt, BF16-weight contract; accepted E0 XPlane
-`e0cap_sparse_20260805T071818146401337Z/analysis_t2.json` proves the physical `f32[32]`
-all-reduce and `bf16[32,64,32]` all-gather occur 78 times at `q_a_layernorm`. Forced-32-device
-tests require those exact groups, counts, shapes and shard-major reconstruction before a bounded
-protected challenger may run.
+The next adaptation therefore targets a concrete scorer-shape mismatch. DB485 provenance pins
+`GLM_DSA_SCORER=xla`, `max_model_len=8704`, DCP8, 512 local keys per 4,096-token global page,
+`GLM_DSA_BT_WIDTH=owned`, and 24 cache blocks. The accepted local body walks exactly three pages at
+`R=32`; the older diagnostic nested eight shards in one 84-page program. Greenfield independently
+reproduces the local cache/block-table/length operands and exact XLA einsum/reduction association,
+then stitches eight stripes only outside the compiled scorer. This remains bounded diagnostic code:
+production `decode_batch1` is still one row and may never inherit the legacy dead-row bucket.

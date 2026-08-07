@@ -94,6 +94,61 @@ class LegacyScoreGeometry:
             raise ValueError("local score width must contain complete pages")
 
 
+@dataclass(frozen=True, slots=True)
+class LegacyDcpXlaScoreGeometry:
+    """Exact static local scorer geometry of the sealed 8K oracle.
+
+    The legacy cache uses a 4,096-token logical block split over DCP8, so
+    each physical scorer sees 512 keys per block-table entry.  At the sealed
+    ``max_model_len=8704`` the owned-width gate retains exactly three block
+    entries.  ``cache_pages=24`` is the protected run's explicit cache-block
+    override.  This geometry is diagnostic-only; greenfield decode remains
+    one row and never adopts the legacy batch bucket.
+    """
+
+    dcp_size: int = 8
+    local_page_size: int = 512
+    max_model_len: int = 8704
+    cache_pages: int = 24
+    decode_rows: int = 32
+    heads: int = 32
+    head_dim: int = 128
+
+    def __post_init__(self) -> None:
+        values = (
+            self.dcp_size,
+            self.local_page_size,
+            self.max_model_len,
+            self.cache_pages,
+            self.decode_rows,
+            self.heads,
+            self.head_dim,
+        )
+        if any(
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value <= 0
+            for value in values
+        ):
+            raise ValueError("legacy DCP XLA scorer geometry must be positive")
+        if self.cache_pages < self.owned_block_count:
+            raise ValueError("legacy DCP XLA cache cannot hold its owned blocks")
+
+    @property
+    def global_page_size(self) -> int:
+        return self.dcp_size * self.local_page_size
+
+    @property
+    def owned_block_count(self) -> int:
+        return (
+            self.max_model_len + self.global_page_size - 1
+        ) // self.global_page_size
+
+    @property
+    def local_score_width(self) -> int:
+        return self.owned_block_count * self.local_page_size
+
+
 class Layer0DsaState(NamedTuple):
     """Live fused-projection output plus DSA state for one event."""
 
@@ -117,6 +172,15 @@ class LegacyTp32QaNormOutput(NamedTuple):
 
     q_residual: Any
     qkv_a_companion_shard: Any
+
+
+class LegacyLocalDcpScoreInputs(NamedTuple):
+    """One DCP shard's cache and metadata for the exact local XLA scorer."""
+
+    cache: Any
+    block_tables: Any
+    kv_lens: Any
+    local_positions: Any
 
 
 def bfloat16_from_uint16_bits(value: Any) -> Any:
@@ -1006,6 +1070,156 @@ def legacy_pagewise_dcp_scores(
     return jnp.full((context,), -jnp.inf, dtype=jnp.float32).at[
         scatter_positions.reshape(-1)
     ].set(scores.reshape(-1), mode="drop")
+
+
+def legacy_local_dcp_score_inputs(
+    index_keys: Any,
+    shard: int,
+    *,
+    geometry: LegacyDcpXlaScoreGeometry = LegacyDcpXlaScoreGeometry(),
+) -> LegacyLocalDcpScoreInputs:
+    """Pack one protected DCP8 stripe into the sealed 8K local shapes.
+
+    Packing is intentionally outside :func:`legacy_local_dcp_xla_scores` so
+    its compiled HLO sees the same cache, block-table, and local-length
+    operands as the accepted shard-map body.  Only row zero is live in this
+    bounded event; the other 31 rows preserve the legacy static bucket solely
+    to reproduce its numerical association.
+    """
+
+    if index_keys.ndim != 2 or index_keys.shape[1] != geometry.head_dim:
+        raise ValueError("legacy local DCP index-key geometry drifted")
+    if index_keys.dtype != jnp.bfloat16:
+        raise ValueError("legacy local DCP index keys must remain BF16")
+    if not isinstance(shard, int) or isinstance(shard, bool) or not (
+        0 <= shard < geometry.dcp_size
+    ):
+        raise ValueError("legacy local DCP shard is out of range")
+    context = index_keys.shape[0]
+    if context > geometry.max_model_len:
+        raise ValueError("legacy local DCP context exceeds max_model_len")
+
+    local_columns = jnp.arange(
+        geometry.local_score_width, dtype=jnp.int32
+    )
+    local_page = jnp.int32(geometry.local_page_size)
+    global_page = jnp.int32(geometry.global_page_size)
+    local_positions = (
+        (local_columns // local_page) * global_page
+        + jnp.int32(shard * geometry.local_page_size)
+        + local_columns % local_page
+    )
+    valid = local_positions < jnp.int32(context)
+    safe_positions = jnp.clip(local_positions, 0, context - 1)
+    local_keys = jnp.where(
+        valid[:, None],
+        jnp.take(index_keys, safe_positions, axis=0),
+        jnp.zeros((1, geometry.head_dim), dtype=jnp.bfloat16),
+    ).reshape(
+        geometry.owned_block_count,
+        geometry.local_page_size,
+        geometry.head_dim,
+    )
+    cache = jnp.pad(
+        local_keys,
+        (
+            (0, geometry.cache_pages - geometry.owned_block_count),
+            (0, 0),
+            (0, 0),
+        ),
+    )
+    block_tables = jnp.zeros(
+        (geometry.decode_rows, geometry.owned_block_count),
+        dtype=jnp.int32,
+    ).at[0].set(
+        jnp.arange(geometry.owned_block_count, dtype=jnp.int32)
+    )
+    kv_lens = jnp.zeros((geometry.decode_rows,), dtype=jnp.int32).at[0].set(
+        jnp.sum(valid, dtype=jnp.int32)
+    )
+    return LegacyLocalDcpScoreInputs(
+        cache=cache,
+        block_tables=block_tables,
+        kv_lens=kv_lens,
+        local_positions=local_positions,
+    )
+
+
+def legacy_local_dcp_xla_scores(
+    query: Any,
+    index_cache: Any,
+    head_weights: Any,
+    block_tables: Any,
+    kv_lens: Any,
+    *,
+    geometry: LegacyDcpXlaScoreGeometry = LegacyDcpXlaScoreGeometry(),
+) -> Any:
+    """Reproduce one accepted 8K XLA scorer shard with exact static shapes."""
+
+    if query.shape != (
+        geometry.decode_rows,
+        geometry.heads,
+        geometry.head_dim,
+    ) or head_weights.shape != (geometry.decode_rows, geometry.heads):
+        raise ValueError("legacy local DCP query/head-weight geometry drifted")
+    if index_cache.shape != (
+        geometry.cache_pages,
+        geometry.local_page_size,
+        geometry.head_dim,
+    ):
+        raise ValueError("legacy local DCP cache geometry drifted")
+    if block_tables.shape != (
+        geometry.decode_rows,
+        geometry.owned_block_count,
+    ) or kv_lens.shape != (geometry.decode_rows,):
+        raise ValueError("legacy local DCP score metadata geometry drifted")
+    if query.dtype != jnp.float32 or head_weights.dtype != jnp.float32:
+        raise ValueError("legacy local DCP query/head weights must remain FP32")
+    if index_cache.dtype != jnp.bfloat16:
+        raise ValueError("legacy local DCP cache must remain BF16")
+    if block_tables.dtype != jnp.int32 or kv_lens.dtype != jnp.int32:
+        raise ValueError("legacy local DCP metadata must remain int32")
+
+    scale = geometry.head_dim**-0.5
+
+    def block_scores(block: Any) -> Any:
+        page_ids = jnp.clip(
+            block_tables[:, block], 0, geometry.cache_pages - 1
+        )
+        key_block = index_cache[page_ids].astype(jnp.float32)
+        per_head = jnp.maximum(
+            jnp.einsum(
+                "thd,tpd->thp",
+                query,
+                key_block,
+                preferred_element_type=jnp.float32,
+            )
+            * scale,
+            jnp.float32(0.0),
+        )
+        scores = jnp.einsum(
+            "th,thp->tp",
+            head_weights,
+            per_head,
+            preferred_element_type=jnp.float32,
+        )
+        local_columns = (
+            block * geometry.local_page_size
+            + lax.broadcasted_iota(
+                jnp.int32, (1, geometry.local_page_size), 1
+            )
+        )
+        return jnp.where(
+            local_columns < kv_lens[:, None], scores, -jnp.inf
+        )
+
+    blocks = lax.map(
+        block_scores,
+        jnp.arange(geometry.owned_block_count, dtype=jnp.int32),
+    )
+    return blocks.transpose(1, 0, 2).reshape(
+        geometry.decode_rows, geometry.local_score_width
+    )
 
 
 def one_row_pagewise_scores(

@@ -1569,9 +1569,43 @@ pagewise XLA reconstruction is max/mean/p99 `0.00945234/0.00335265/0.00679396` a
 scores. This is diagnostic correctness evidence only; it authorizes no decoder correction,
 Gate-D retry, latency, or throughput claim.
 
-Most importantly, the unchanged `legacy_bf16_divsqrt` state already matches the captured query,
-keys, and head weights elementwise, yet its recomputed scores still miss 1,640 sealed order slots.
-Therefore another upstream q-a layout change cannot by itself explain the remaining oracle gap.
-Exact next: inspect the accepted multi-host Pallas scorer's physical input layout, tiling, dtype
-boundaries, and reduction association against the one-host bounded scorer, then implement only the
-smallest scorer-association challenger with exact HLO. Do not launch the full 753B decoder first.
+Within the reconstructed matrix, `legacy_bf16_divsqrt` matches the FP32/divsqrt baseline's query,
+keys, and head weights elementwise, yet the baseline scores still miss 1,640 sealed order slots.
+This rules out those isolated precision variants, but it is not a captured-internal-state proof:
+the immutable artifact contains sealed selected positions/scores, not legacy query/key tensors.
+The strongest concrete remaining mismatch is scorer geometry. The accepted 8K oracle uses the XLA
+DCP scorer with a three-page local walk; the bounded reconstruction nests eight shards inside one
+84-page program. Exact next: reproduce the accepted local XLA scorer shapes, BF16-cache boundary,
+page width, and reduction association before revisiting upstream state. Do not launch the full 753B
+decoder first.
+
+## Exact local DCP XLA scorer is implementation-ready
+
+The DB485 source/run audit is now an independent bounded greenfield implementation. It packs each
+of the eight DCP stripes into the accepted local cache shape `bf16[24,512,128]`, uses the exact
+`s32[32,3]` block table and per-shard `s32[32]` prefix length, and compiles the unchanged XLA body
+from `f32[32,32,128]` query plus `f32[32,32]` head weights to `f32[32,1536]`. Each shard runs
+through one compiled executable and only row zero is stitched back to global positions offline.
+The 32-row bucket is diagnostic-only and cannot enter production `decode_batch1`.
+
+The protected wrapper reuses the checksum-bound DB489 distributed-q-a artifact (manifest identity
+`046b4f0e...50e2`, source code `54edbf7`) instead of repeating its already-closed 32-chip phase.
+It still holds the global lease, requires authenticated eight-host pre/post zero-work censuses,
+syncs the exact clean pin, runs the scorer on one four-chip host, and retains DB/archive/SUCCESS
+linkage. The new DB revision is `bounded-real-layer0-v4-exact-local-xla-dcp-score`; correctness is
+the exact sealed set-and-order result, never timing.
+
+Focused CPU coverage passes 36/36. The complete CPU-only greenfield suite passes 416 with one skip
+and two pre-existing SWIG warnings in 333.26 seconds. The exact CPU-compiled scorer HLO passes its
+contract at 20,188 bytes with the required cache, metadata, result and score-tile shapes and no
+collective/callback. Python compilation, Bash syntax, ShellCheck, JSON, line-length and diff checks
+pass. An initial unpinned pytest invocation briefly acquired the local libtpu lock as PID 436988;
+that exact process was terminated before model use and a subsequent authenticated census returned
+eight unique `CENSUS_OK` hosts. This is implementation evidence only: there is no TPU arithmetic
+result, decoder correction, Gate-D retry, latency or throughput claim yet.
+
+Exact next: commit and push this clean bounded checkpoint, then run exactly one serialized
+`bash scripts/greenfield/run_layer0_dsa_association_probe.sh`. If and only if an exact set and order
+is restored, translate the association to the smallest true-one-row production implementation and
+retry protected 8K Gate D once. Otherwise record the rejection and resume the source/state audit;
+do not launch the complete decoder blindly.

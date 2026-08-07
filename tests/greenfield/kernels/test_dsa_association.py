@@ -13,6 +13,7 @@ import pytest
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from glm_tpu.greenfield.kernels.reference.dsa_association import (
+    LegacyDcpXlaScoreGeometry,
     Layer0DsaProbeGeometry,
     LegacyTp32QaNormOutput,
     LegacyScoreGeometry,
@@ -20,6 +21,8 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     bfloat16_from_uint16_bits,
     layer0_dsa_state,
     layer0_dsa_state_from_q_residual,
+    legacy_local_dcp_score_inputs,
+    legacy_local_dcp_xla_scores,
     legacy_tp32_fused_qkv_a_rms_norm,
     legacy_pagewise_dcp_scores,
     one_row_pagewise_scores,
@@ -555,6 +558,93 @@ def test_legacy_pagewise_geometry_reconstructs_direct_row() -> None:
     )
     expected = np.einsum("h,hs->s", head_weights[0], per_head)
     assert np.allclose(actual, expected, rtol=1e-6, atol=1e-6)
+
+
+def test_legacy_dcp_xla_geometry_pins_sealed_8k_shapes() -> None:
+    geometry = LegacyDcpXlaScoreGeometry()
+    assert geometry.global_page_size == 4096
+    assert geometry.owned_block_count == 3
+    assert geometry.local_score_width == 1536
+    with pytest.raises(ValueError, match="cannot hold"):
+        LegacyDcpXlaScoreGeometry(cache_pages=2)
+
+
+def test_legacy_local_dcp_xla_scores_reconstruct_direct_row() -> None:
+    geometry = LegacyDcpXlaScoreGeometry(
+        dcp_size=2,
+        local_page_size=2,
+        max_model_len=9,
+        cache_pages=4,
+        decode_rows=3,
+        heads=2,
+        head_dim=4,
+    )
+    rng = np.random.default_rng(37)
+    query = rng.normal(size=(3, 2, 4)).astype(np.float32)
+    keys = rng.normal(size=(7, 4)).astype(ml_dtypes.bfloat16)
+    head_weights = rng.normal(size=(3, 2)).astype(np.float32)
+    stitched = np.full((7,), -np.inf, dtype=np.float32)
+
+    for shard in range(geometry.dcp_size):
+        packed = legacy_local_dcp_score_inputs(
+            jnp.asarray(keys), shard, geometry=geometry
+        )
+        assert packed.cache.shape == (4, 2, 4)
+        assert packed.block_tables.shape == (3, 3)
+        assert packed.kv_lens.shape == (3,)
+        local = np.asarray(
+            legacy_local_dcp_xla_scores(
+                jnp.asarray(query),
+                packed.cache,
+                jnp.asarray(head_weights),
+                packed.block_tables,
+                packed.kv_lens,
+                geometry=geometry,
+            )[0],
+            dtype=np.float32,
+        )
+        positions = np.asarray(packed.local_positions)
+        valid = positions < len(keys)
+        stitched[positions[valid]] = local[valid]
+
+    per_head = np.maximum(
+        np.einsum("hd,sd->hs", query[0], keys.astype(np.float32)) * 0.5,
+        0.0,
+    )
+    expected = np.einsum("h,hs->s", head_weights[0], per_head)
+    np.testing.assert_allclose(stitched, expected, rtol=1e-6, atol=1e-6)
+
+
+def test_legacy_local_dcp_xla_scores_reject_contract_drift() -> None:
+    geometry = LegacyDcpXlaScoreGeometry(
+        dcp_size=2,
+        local_page_size=2,
+        max_model_len=8,
+        cache_pages=3,
+        decode_rows=3,
+        heads=2,
+        head_dim=4,
+    )
+    query = jnp.ones((3, 2, 4), dtype=jnp.float32)
+    keys = jnp.ones((7, 4), dtype=jnp.bfloat16)
+    weights = jnp.ones((3, 2), dtype=jnp.float32)
+    packed = legacy_local_dcp_score_inputs(keys, 0, geometry=geometry)
+
+    with pytest.raises(ValueError, match="out of range"):
+        legacy_local_dcp_score_inputs(keys, 2, geometry=geometry)
+    with pytest.raises(ValueError, match="must remain BF16"):
+        legacy_local_dcp_score_inputs(
+            keys.astype(jnp.float32), 0, geometry=geometry
+        )
+    with pytest.raises(ValueError, match="must remain FP32"):
+        legacy_local_dcp_xla_scores(
+            query.astype(jnp.bfloat16),
+            packed.cache,
+            weights,
+            packed.block_tables,
+            packed.kv_lens,
+            geometry=geometry,
+        )
 
 
 def test_one_row_pagewise_matches_direct_small_score() -> None:

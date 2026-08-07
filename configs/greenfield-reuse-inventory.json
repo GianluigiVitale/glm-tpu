@@ -160,6 +160,17 @@
       "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
     },
     {
+      "id": "legacy-8k-local-xla-scorer-association",
+      "category": "numerical association evidence",
+      "source_repo": "tpu-inference and protected glm-run evidence",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d / DB485",
+      "source_paths": ["tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "tpu_inference/layers/vllm/custom_ops/mla_attention.py", "/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_20260807T161952737081154Z", "/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z/analysis_t2.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "scripts/greenfield/probe_layer0_dsa_association.py"],
+      "gate": "D",
+      "reason": "DB485 pins the XLA scorer, DCP8, max_model_len 8704, owned three-block walk, local P=512 stripe, and 24 cache blocks. Greenfield independently reproduces that bounded R=32 local body and stitches shards outside the compiled scorer; production remains one row."
+    },
+    {
       "id": "legacy-fp8-matmul-and-gmm",
       "category": "kernel reference",
       "source_repo": "tpu-inference",
