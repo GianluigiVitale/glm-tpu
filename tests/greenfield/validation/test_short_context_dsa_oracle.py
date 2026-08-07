@@ -22,6 +22,28 @@ from tests.greenfield.validation.test_short_context_oracle import (
 )
 
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DSA_SEALERS = (
+    REPO_ROOT / "scripts/greenfield/run_capture_short_context_dsa_oracle.sh",
+    REPO_ROOT / "scripts/greenfield/recover_short_context_dsa_oracle.sh",
+)
+
+
+@pytest.mark.parametrize("sealer", DSA_SEALERS)
+def test_dsa_sealer_freezes_live_log_before_evidence_ledger(
+    sealer: Path,
+) -> None:
+    source = sealer.read_text()
+    freeze = 'cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"'
+
+    assert freeze in source
+    assert source.index(freeze) < source.index(
+        '(root / "evidence_sha256.json").write_text('
+    )
+    assert source.count('relative == "orchestrator.log"') == 2
+    assert "ThreadPoolExecutor(max_workers=16)" in source
+
+
 def _write_dump(
     path: Path,
     *,

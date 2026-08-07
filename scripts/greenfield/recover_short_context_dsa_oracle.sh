@@ -216,6 +216,8 @@ strict_census post || {
   exit 1
 }
 
+say "freezing recovered-oracle evidence"
+cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" <<'PY'
 from hashlib import sha256
 import json
@@ -225,7 +227,12 @@ import sys
 root = Path(sys.argv[1])
 records = []
 for path in sorted(root.rglob("*")):
-    if not path.is_file() or path.name in {"SUCCESS", "evidence_sha256.json"}:
+    relative = path.relative_to(root).as_posix()
+    if (
+        not path.is_file()
+        or relative == "orchestrator.log"
+        or path.name in {"SUCCESS", "evidence_sha256.json"}
+    ):
         continue
     digest = sha256()
     with path.open("rb") as stream:
@@ -233,7 +240,7 @@ for path in sorted(root.rglob("*")):
             digest.update(chunk)
     records.append({
         "byte_count": path.stat().st_size,
-        "path": path.relative_to(root).as_posix(),
+        "path": relative,
         "sha256": digest.hexdigest(),
     })
 (root / "evidence_sha256.json").write_text(
@@ -247,6 +254,7 @@ gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" <<'PY' \
   >"$RUN_DIR/remote_objects.json"
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import subprocess
@@ -254,11 +262,19 @@ import sys
 
 root = Path(sys.argv[1])
 prefix = sys.argv[2]
-records = []
+paths = []
 for path in sorted(root.rglob("*")):
-    if not path.is_file() or path.name in {"SUCCESS", "remote_objects.json"}:
-        continue
     relative = path.relative_to(root).as_posix()
+    if (
+        not path.is_file()
+        or relative == "orchestrator.log"
+        or path.name in {"SUCCESS", "remote_objects.json"}
+    ):
+        continue
+    paths.append((path, relative))
+
+def describe(item):
+    path, relative = item
     remote = json.loads(subprocess.run(
         ["gcloud", "storage", "objects", "describe", f"{prefix}/{relative}", "--format=json"],
         check=True, capture_output=True, text=True,
@@ -266,12 +282,15 @@ for path in sorted(root.rglob("*")):
     crc32c = remote.get("crc32c_hash") or remote.get("crc32c")
     if int(remote["size"]) != path.stat().st_size or not crc32c:
         raise SystemExit(f"remote object verification failed: {relative}")
-    records.append({
+    return {
         "crc32c": crc32c,
         "generation": remote["generation"],
         "path": relative,
         "size": int(remote["size"]),
-    })
+    }
+
+with ThreadPoolExecutor(max_workers=16) as executor:
+    records = list(executor.map(describe, paths))
 print(json.dumps({"objects": records}, indent=2, sort_keys=True))
 PY
 gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
