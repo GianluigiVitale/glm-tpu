@@ -935,8 +935,38 @@ production sampling source path/output/HLO surface unchanged. Schema 6 and the f
 validator require the new tensor. Full local verification is 343 passed / 1 skipped plus Python
 compile, Bash syntax, ShellCheck, and diff checks; the commit is pushed.
 
-Exact next: launch one serialized protected real-prompt 2K Gate D diagnostic at clean `ffa3db7`.
-Use the top-16 evidence at the first raw-token divergence to identify whether the expected token is
-runner-up/near-boundary or absent from the candidate set; do not relax exact raw tokens. Then fix
-the underlying arithmetic/reduction cause, rerun Gate D to valid wall/HBM/XPlane/DB/archive
-evidence, and optimize below 200 ms before 8K, 128K, and 256K progression.
+Fifth protected attempt
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260807T024019917849358Z`
+at `4a3802e` completed the top-16 diagnostic. It again passed the exact prefill token and all
+14 x 21 executing-device DSA events. At the first divergence, decode position 2,044, the expected
+token `16345` is runner-up rather than missing: greenfield scores `12877=20.875` and
+`16345=20.75`, an inverted margin of `0.125` (one BF16 ULP at this magnitude). The other first-ten
+tokens remain exact; later mismatches are downstream. The run failed closed before production
+timing and ended with authenticated 8/8 zero work.
+
+Commits `627d0e5` and `8482243` add a separate legacy-oracle-only top-16 logprob capture with sealed
+prompt/output identity, DB provenance, per-host checksum/state verification, append-only archive,
+remote verification, and clean-fleet enforcement. They do not import the legacy execution path
+into greenfield production. Full greenfield verification is 345 passed / 1 skipped plus static
+checks; both commits are pushed.
+
+Protected legacy capture
+`greenfield_short_context_legacy_logprobs_20260807T032528485799884Z` succeeded at `8482243`, DB run
+481 / item 1764. It reproduced all 15 expected output tokens. At position 2,044 legacy instead ranks
+`16345` first at logprob `-0.808534` and `12877` second at `-1.058534`, a correct-token margin of
+exactly `0.25`. The 16-way tensor/manifest is sealed under
+`gs://driftbench-dsv4-uc/oracles/greenfield/glm52/short_context_logprobs/2k/greenfield_short_context_legacy_logprobs_20260807T032528485799884Z`
+with manifest SHA `3e6b5864...34a62`; every host passed `1882` checksum leaves, the common 2,455-leaf
+state hash `371110325`, and final zero-work census. This proves the first failure is a real
+greenfield arithmetic/model-execution inversion, not sampling, tie-breaking, DSA selection,
+corrupt weights, or a missing candidate. Gate D and answer tok/s remain unproven.
+
+The leading concrete cause is now the feature-sharded MoE reduction boundary. Each chip computes
+only a 512/2,048 down-projection slice, casts that partial to BF16, then local-psums; legacy owns a
+complete expert and rounds only after the full 2,048 contraction. Exact next: add a default-off
+diagnostic that retains each routed down partial in FP32 through the local-four reconstruction,
+casts only the reconstructed complete expert to BF16, then applies deterministic owner masking and
+the existing BF16 routed/shared combine. Prove its isolated kernel/reference/HLO contracts first,
+then run one protected 2K challenger. If it restores raw tokens, replace the diagnostic overhead
+with a final-layout complete-expert Pallas pack; if not, capture compact per-layer residuals on the
+exact teacher-forced trajectory to locate the earliest divergence. Never relax the raw-token gate.
