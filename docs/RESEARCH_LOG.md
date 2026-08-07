@@ -5307,3 +5307,26 @@ all-worker follow-up census returned eight unique clean hosts. No TPU arithmetic
 performance claim follows from this implementation checkpoint. Exact next is one clean-pin,
 serialized protected scorer probe. Its exact set/order matrix alone decides whether a one-row
 production correction and one 8K Gate-D retry are authorized.
+
+## 2026-08-07 23:24 — DB491 confirms epsilon source truth but rejects it as a sufficient fix
+
+Bounded protected run `greenfield_layer0_dsa_association_20260807T231449677046310Z` at
+`ea879a24d196f61e238a22ee5bb393d3b6fa938d` completed as DB 491 / item 1775. It pins the accepted
+config SHA `22e49334...65ff` and the exact three epsilon roles: input RMSNorm `1e-5`, q-a RMSNorm
+`1e-5`, and key affine LayerNorm `1e-6`. The 32-chip diagnostic HLO SHA is `11804add...6d2`; it
+contains exactly one global-ID `f32[32]` all-reduce and one `bf16[32,64,32]` all-gather. The
+fleet-identical q-residual SHA is `20f07a17...29d`. Local/remote `SUCCESS`, DB snapshot, approved
+archive, and all three authenticated 8/8 clean censuses pass.
+
+The source correction is real and large, but insufficient. Exact local DCP XLA retains the exact
+2,048-position set with no swaps and reduces mean score error from DB489's `0.0228811` to
+`0.00134283` (about 17x), yet 1,408 order positions still differ. Max/signed/p99 error is
+`0.00506306/+0.000276074/0.00403500`, correlation `0.999995592`. The pagewise and exact local DCP
+outputs are again elementwise identical. The one-row Pallas result keeps the set but misses 1,161
+order positions, with mean error `0.00436344` and a fully negative signed delta.
+
+Runner/summary/evidence/DB-snapshot SHAs are `cbc90643...7cf`, `6b25c686...887`,
+`df2d0c7b...06a`, and `ecd963e6...8d7`. This run has no decoder, Gate-D, latency, or throughput
+claim. Production remains unchanged. The next discriminator is the physical FP32 RMSNorm reduction
+association and BF16 norm-weight boundary, using accepted source/HLO and the existing bounded
+artifact before another serialized run.

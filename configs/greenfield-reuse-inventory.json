@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "05d991506ad7717f5e7c68354937a2327887dc5b",
+    "greenfield": "ea879a24d196f61e238a22ee5bb393d3b6fa938d",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,12 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "05d991506ad7717f5e7c68354937a2327887dc5b",
+      "source_pin": "ea879a24d196f61e238a22ee5bb393d3b6fa938d",
       "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted DB 405-488 artifacts, rejected diagnostics and exact pins prevent repeated experiments and unsupported promotion claims."
+      "reason": "Accepted DB 405-491 artifacts, rejected diagnostics and exact pins prevent repeated experiments and unsupported promotion claims."
     },
     {
       "id": "packed-checkpoint-chain",
@@ -157,7 +157,7 @@
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "scripts/greenfield/probe_layer0_distributed_q_a_norm.py", "scripts/greenfield/probe_layer0_dsa_association.py"],
       "gate": "D",
-      "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. DB490 rejects scorer geometry, while the pinned config and accepted vLLM source prove q_a/kv_a RMSNorm epsilon 1e-5. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
+      "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. DB490 rejects scorer geometry; the pinned config and accepted vLLM source prove q_a/kv_a RMSNorm epsilon 1e-5; DB491 shows that correction cuts mean score error about 17x but still misses 1,408 order slots. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
     },
     {
       "id": "legacy-8k-local-xla-scorer-association",

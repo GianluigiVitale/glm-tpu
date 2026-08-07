@@ -842,3 +842,17 @@ scorer. Production and its performance status remain unchanged pending exact set
 
 Diagnostic readiness is CPU-only: 33/33 focused and 417 passed / 1 skipped full greenfield tests,
 plus Bash, ShellCheck, Python, JSON and diff checks. It is not TPU or performance evidence.
+
+## DB 491 — model-epsilon DSA diagnostic; no performance claim
+
+DB 491 / `greenfield_layer0_dsa_association_20260807T231449677046310Z` at `ea879a2` passes the
+bounded HLO, model-config provenance, DB/archive/SUCCESS, checksum, and three authenticated 8/8
+cleanup contracts. Its exact local DCP XLA result preserves the 2,048-position set with zero swaps
+but has 1,408 order mismatches. Max/mean/signed/p99 score error is
+`0.00506306/0.00134283/+0.000276074/0.00403500`. This is about a 17x mean-error improvement over
+DB489's wrong `1e-6` q-a epsilon, but it does not satisfy the exact order gate. One-row Pallas has
+1,161 order mismatches and mean error `0.00436344`.
+
+The run is explicitly diagnostic-only: it has no profiler-free timing, decoder execution, Gate-D
+result, or token-rate claim. Production remains at the last accepted DB484 status pending the
+remaining numerical-association proof.

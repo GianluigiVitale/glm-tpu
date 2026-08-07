@@ -114,3 +114,10 @@ vLLM constructs q_a/kv_a RMSNorm from the pinned model config, whose SHA is
 `22e49334...65ff` and whose epsilon is `1e-5`. The earlier `1e-6` greenfield conclusion is
 superseded. The existing distributed association runner is therefore reused once with explicit
 config provenance; no new scorer, loader, model path, or protection harness is being invented.
+
+DB491 proves that correction reduces exact-local-XLA mean score error about 17x, from `0.0228811`
+to `0.00134283`, while retaining the exact selected set. It still misses 1,408 order positions, so
+epsilon alone is rejected as a sufficient fix. The next reuse-first discriminator is the accepted
+RMSNorm lowering itself: inspect preserved HLO/source for division placement, local sum/mean
+association, and the BF16 norm-weight multiplication boundary before creating or running a new
+candidate.

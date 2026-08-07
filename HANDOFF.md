@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 23:13 UTC
+**Updated:** 2026-08-07 23:24 UTC
 
 ## Authority and isolation
 
@@ -1643,3 +1643,33 @@ Python compilation, JSON and diff checks pass. Exact next: commit/push the diagn
 correction, then run one serialized protected layer-0 matrix. If it restores exact order, change production q_a/kv_a
 LoRA epsilon to `1e-5`, correct the affected reference contracts, and run one protected 8K Gate-D
 retry. Do not load the full decoder for the diagnostic itself.
+
+## DB491 proves the model epsilon correction is large but not sufficient
+
+Protected bounded run `greenfield_layer0_dsa_association_20260807T231449677046310Z` at exact pin
+`ea879a24d196f61e238a22ee5bb393d3b6fa938d` completed as DB run 491 / item 1775. Local and
+approved-bucket `SUCCESS`, DB integrity, exact evidence checksums, and authenticated pre,
+distributed-post, and post eight-host zero-work censuses pass. The run pins model-config SHA
+`22e49334...65ff`, q-a/input RMSNorm epsilon `1e-5`, and the separate key LayerNorm epsilon
+`1e-6`. Its diagnostic HLO has exactly one global-ID `f32[32]` all-reduce and one
+`bf16[32,64,32]` all-gather over devices 0--31, with no other collective or callback. HLO,
+q-residual, internal artifact-manifest, runner, summary, evidence-list, and DB-snapshot SHAs are
+`11804add...6d2`, `20f07a17...29d`, `7518e7ef...c16`, `cbc90643...7cf`,
+`6b25c686...887`, `df2d0c7b...06a`, and `ecd963e6...8d7`.
+
+The corrected epsilon is directionally decisive but does not restore exact order. The exact local
+DCP XLA scorer preserves the sealed 2,048-position set with zero swaps, but has 1,408 order
+mismatches. Score max/mean/signed/p99 error is
+`0.00506306/0.00134283/+0.000276074/0.00403500`, correlation `0.999995592`. Relative to DB489's
+wrong-epsilon distributed result, mean score error improves `0.0228811 -> 0.00134283` (about 17x)
+and order mismatches improve `1,501 -> 1,408`. The pagewise and exact local DCP XLA results remain
+elementwise identical. One-row Pallas preserves the set with 1,161 order mismatches and
+max/mean/signed/p99 `0.00962067/0.00436344/-0.00436344/0.00780971`.
+
+This is bounded diagnostic evidence only. It authorizes neither a Gate-D retry nor latency/token-
+rate claims, and production q_a/kv_a defaults remain unchanged while the residual association is
+unresolved. Exact next: audit the accepted RMSNorm reduction lowering and already-preserved HLO
+before adding code. In particular, discriminate `local sum -> psum -> /2048`,
+`local mean -> psum -> /32`, and `local sum/2048 -> psum`, plus the exact BF16 weight-multiply
+boundary. Use an existing artifact or a bounded candidate matrix first; do not rerun the complete
+8K decoder blindly.
