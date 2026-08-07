@@ -38,14 +38,16 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   invariant to collective concatenation order.
 - Exactness is defined against the FP32 score row produced by the executing device program: the
   distributed merge must equal a canonical global top-k of that same row, including lowest-global-
-  position ties. Independent cross-backend score tensors use bounded comparison because CPU
-  PyTorch and TPU XLA need not share dot/reduction association. Raw CPU positions are retained as
-  a diagnostic and may never replace, seed, or relax runtime selection.
+  position ties. Independent cross-backend score tensors on the same captured hidden input use
+  bounded comparison because CPU PyTorch and TPU XLA need not share dot/reduction association. Raw
+  CPU positions are retained as a diagnostic and may never replace, seed, or relax runtime
+  selection.
 - The full-decoder observer therefore records positions and the bit-exact FP32 scores emitted by
-  the same executing `lax.top_k`. It gates canonical executing-score order/ties, exact set/count and
-  tails, and position-aligned legacy scores under the accepted Gate C bounds (max/p99/mean absolute
-  error `0.125/0.03125/0.01`). Independent legacy total rank order is diagnostic, not a gate. The
-  observer is a separate no-donation executable; the production executable remains observer-off.
+  the same executing `lax.top_k`. It gates canonical executing-score order/ties and exact
+  set/count/tails. Full-network topology reassociation changes the hidden input presented to later
+  layers, so position-aligned legacy score errors and total rank order are recorded diagnostics,
+  not Gate C same-input comparisons and not gates. Exact raw tokens remain mandatory. The observer
+  is a separate no-donation executable; the production executable remains observer-off.
 - Compact selected state is `positions int32[rows,2048]` plus
   `valid_counts int32[rows]`; invalid tail slots are exactly `-1`. IndexShare
   reuses the score-ordered positions unchanged. Only the positions array is

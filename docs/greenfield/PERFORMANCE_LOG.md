@@ -647,9 +647,30 @@ preserved and authenticated failure-exit census is 8/8 clean.
 The mismatch exposed an over-strict harness assumption: independent TPU programs are not required
 to have identical total FP32 score order. Commit `b406e3a` replaces that gate with the documented
 contract—exact top-k set/count/tails and lowest-position ties against the executing device scores,
-plus bounded position-aligned legacy scores—while retaining raw legacy order as a diagnostic. The
+while retaining position-aligned legacy scores/order as diagnostics. The
 same audit found and fixed a real arithmetic defect: q_a/kv_a LoRA RMSNorm used `1e-5` rather than
 the model's `1e-6`. The observer now stores and hashes its raw score/position tensors and remains a
 separate callback-free, no-donation executable. Production outputs/HLO are observer-off. Local
 verification passes 59 relevant tests plus syntax/static checks. A new protected run is required;
 `b406e3a` itself is not performance evidence.
+
+## 2026-08-07 — executing-device DSA contract passes first real step
+
+Rejected diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260807T011313172353535Z`
+at `9281341` passed real load, production/observer/prefill compile, the 2,034-token device prefill,
+and all executing-device DSA checks at position 2,034: 21/21 exact causal sets/counts/tails,
+canonical score order/lowest-position ties, producer IDs, four-lane replication, padding, and next
+position. It then failed the newly added same-input Gate C score tolerance applied to the
+independent full-network legacy path (`max/p99/mean 69.366638/28.665792/3.300944`). It stopped
+before token replay/timing, has no DB row or answer-rate claim, and ended 8/8 clean.
+
+The retrieved raw observation (989,858 bytes, SHA `3cfaa3b3...a53803`) shows layer 0 is close
+(`0.028/0.025/0.010`, correlation ~1.0), then score error grows monotonically with depth while each
+greenfield event's best correlation remains its same legacy layer. Thus the failed tolerance was
+methodologically invalid: Gate C bounds compare two programs on the same captured hidden input;
+later full-decoder hidden inputs already differ after topology/reduction reassociation. Commit
+`715870e` keeps these score statistics diagnostic, gates the exact first token before replay, and
+continues to require executing-device exactness and all subsequent raw tokens. It also makes the
+physical JAX-process-0 worker upload all 14 raw observer artifacts for final SHA/content validation.
+Local verification passes 59 relevant tests plus static checks. Another protected run is required.

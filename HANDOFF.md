@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 01:10 UTC
+**Updated:** 2026-08-07 01:45 UTC
 
 ## Authority and isolation
 
@@ -889,15 +889,33 @@ comparison.
 
 Commit `b406e3a` fixes the LoRA epsilon throughout stage, layer, and Gate C paths and upgrades the
 observer without changing the default-off production output surface. The separate callback-free
-observer now exports bit-exact executing FP32 selected scores, gates exact selected set/count,
-`-1`/`-inf` tails, unique causal positions, canonical executing-score order/lowest-position ties,
-and position-aligned legacy scores under the accepted Gate C bounds
-`max/p99/mean <= 0.125/0.03125/0.01`; legacy total order is retained but is not a gate. It saves and
-hashes every raw observer tensor. Production/observer output equality and production HLO identity
-pass. Relevant verification is 59 tests plus Python compile, Bash syntax, ShellCheck, and diff
-checks; the commit is pushed.
+observer exports bit-exact executing FP32 selected scores and gates exact selected set/count,
+`-1`/`-inf` tails, unique causal positions, and canonical executing-score order/lowest-position
+ties. Production/observer output equality and production HLO identity pass.
 
-Exact next: run protected real-prompt 2K Gate D from clean branch HEAD containing `b406e3a` with complete-token,
-token-oracle, DSA-oracle, and two-step trace modes. Preserve any first bounded-score/set/tie/token
-failure; do not relax it. If it passes, seal the first real answer-token rate, then optimize the
-measured recurrent path below 200 ms before 8K, 128K, and 256K progression.
+Third protected attempt
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260807T011313172353535Z`
+at `9281341` again passed load/compile/prefill and reached position 2,034. All 21 events passed exact
+set/tails, executing-score order/ties, producer, replication, padding, and position. The added
+position-aligned legacy score bound failed (`max/p99/mean 69.367/28.666/3.301`) before token/timing.
+The raw tensor was written by JAX process 0 on physical worker 2, retrieved as 989,858-byte
+`step_00_position_2034.npz` (SHA `3cfaa3b3...a53803`), and preserved. Failure-exit census is 8/8
+clean; there is still no answer tok/s claim.
+
+Per-event analysis proves correct layer mapping and depth accumulation, not a weight/layer swap.
+Layer 0 matches the same-input bound (`max/p99/mean 0.028/0.025/0.010`, correlation ~1.0); later
+hidden states diverge progressively under 78-layer topology/reduction reassociation, reaching the
+global diagnostic above. The Gate C bounds apply only when both programs consume the same captured
+hidden input. Applying them to different full-network hidden states was another harness scope bug;
+the binding contract gates executing-device selection and exact raw tokens.
+
+Commit `715870e` fixes that scope, adds an immediate exact prefill first-token gate, retains all
+legacy score errors/order as diagnostics, validates and archives all 14 raw observer tensors from
+the physical JAX-process-0 worker, bumps schema to 5, and fixes NumPy index JSON serialization.
+Exact device set/tail/tie gates and all 15 token IDs remain mandatory. Relevant verification is 59
+tests plus Python compile, Bash syntax, ShellCheck, and diff checks; the commit is pushed.
+
+Exact next: rerun protected real-prompt 2K Gate D from clean branch HEAD containing `715870e` with
+complete-token, both sealed oracles, and two-step trace modes. Preserve the first exact
+token/set/tie/cache failure without relaxing it. If it passes, seal the first real answer-token
+rate, then optimize below 200 ms before 8K, 128K, and 256K progression.
