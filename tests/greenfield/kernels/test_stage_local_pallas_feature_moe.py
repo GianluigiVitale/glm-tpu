@@ -9,12 +9,22 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    ("routed_output_tile", "fuse_route_weighting"),
-    ((128, False), (256, False), (256, True)),
+    (
+        "routed_output_tile",
+        "fuse_route_weighting",
+        "reconstruct_down_fp32",
+    ),
+    (
+        (128, False, False),
+        (256, False, False),
+        (256, True, False),
+        (256, False, True),
+    ),
 )
 def test_feature_sharded_pallas_moe_matches_complete_expert_reference(
     routed_output_tile: int,
     fuse_route_weighting: bool,
+    reconstruct_down_fp32: bool,
 ) -> None:
     """Prove balanced all-route feature shards and one local combine."""
 
@@ -170,6 +180,7 @@ feature_map = jax.shard_map(
         contract=contract,
         config=config,
         fuse_route_weighting=__FUSE_ROUTE_WEIGHTING__,
+        reconstruct_down_fp32=__RECONSTRUCT_DOWN_FP32__,
         interpret=True,
     ),
     mesh=mesh,
@@ -215,6 +226,9 @@ print(json.dumps({
     program = program.replace(
         "__FUSE_ROUTE_WEIGHTING__", repr(fuse_route_weighting)
     )
+    program = program.replace(
+        "__RECONSTRUCT_DOWN_FP32__", repr(reconstruct_down_fp32)
+    )
     env = dict(os.environ)
     env["JAX_PLATFORMS"] = "cpu"
     existing = env.get("XLA_FLAGS", "").strip()
@@ -239,6 +253,6 @@ print(json.dumps({
     assert set(result["concentrated"]["routes"][0]) == {8, 9, 10, 11}
     assert result["collectives"] == {
         "all_gather": 0,
-        "all_reduce": 1,
+        "all_reduce": 2 if reconstruct_down_fp32 else 1,
         "collective_permute": 0,
     }

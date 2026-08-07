@@ -15,6 +15,7 @@ readonly ITERATIONS=${GLM_GREENFIELD_SHORT_DECODER_ITERATIONS:-10}
 readonly TRACE_STEPS=${GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS:-0}
 readonly RUNTIME_KIND=${GLM_GREENFIELD_DECODER_RUNTIME_KIND:-pallas_feature_linear}
 readonly FEATURE_FUSE_ROUTE_WEIGHTING=${GLM_GREENFIELD_FEATURE_FUSE_ROUTE_WEIGHTING:-0}
+readonly FEATURE_RECONSTRUCT_DOWN_FP32=${GLM_GREENFIELD_FEATURE_RECONSTRUCT_DOWN_FP32:-0}
 readonly COMPLETE_TOKEN_PATH=${GLM_GREENFIELD_COMPLETE_TOKEN_PATH:-0}
 readonly SHORT_CONTEXT_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE:-0}
 readonly SHORT_CONTEXT_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
@@ -45,6 +46,10 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
 }
 [[ $FEATURE_FUSE_ROUTE_WEIGHTING == 0 || $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]] || {
   echo "feature route-weight fusion must be 0 or 1" >&2
+  exit 2
+}
+[[ $FEATURE_RECONSTRUCT_DOWN_FP32 == 0 || $FEATURE_RECONSTRUCT_DOWN_FP32 == 1 ]] || {
+  echo "feature FP32 reconstruction must be 0 or 1" >&2
   exit 2
 }
 [[ $COMPLETE_TOKEN_PATH == 0 || $COMPLETE_TOKEN_PATH == 1 ]] || {
@@ -121,6 +126,14 @@ if [[ $RUNTIME_KIND == reference && $FEATURE_FUSE_ROUTE_WEIGHTING != 0 ]]; then
   echo "feature route-weight fusion requires a feature runtime" >&2
   exit 2
 fi
+if [[ $RUNTIME_KIND == reference && $FEATURE_RECONSTRUCT_DOWN_FP32 != 0 ]]; then
+  echo "feature FP32 reconstruction requires a feature runtime" >&2
+  exit 2
+fi
+if [[ $FEATURE_RECONSTRUCT_DOWN_FP32 == 1 && $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]]; then
+  echo "feature FP32 reconstruction is incompatible with route-weight fusion" >&2
+  exit 2
+fi
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
@@ -134,6 +147,11 @@ if [[ $FEATURE_FUSE_ROUTE_WEIGHTING == 1 ]]; then
   FUSION_SUFFIX=_wsum
 fi
 readonly FUSION_SUFFIX
+RECONSTRUCTION_SUFFIX=
+if [[ $FEATURE_RECONSTRUCT_DOWN_FP32 == 1 ]]; then
+  RECONSTRUCTION_SUFFIX=_downf32
+fi
+readonly RECONSTRUCTION_SUFFIX
 TOKEN_SUFFIX=
 if [[ $COMPLETE_TOKEN_PATH == 1 ]]; then
   TOKEN_SUFFIX=_token
@@ -147,7 +165,7 @@ if [[ $SHORT_CONTEXT_DSA_ORACLE == 1 ]]; then
   ORACLE_SUFFIX=_oracle_dsa
 fi
 readonly ORACLE_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${ORACLE_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${ORACLE_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -235,7 +253,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -261,7 +279,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer 2K load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --complete-token-path "$complete_token_path" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK || {
@@ -286,7 +304,7 @@ fi
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
-  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$COMPLETE_TOKEN_PATH" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" <<'PY'
 from __future__ import annotations
 
@@ -308,6 +326,7 @@ import numpy as np
     runtime_kind,
     feature_output_tile,
     feature_fuse_route_weighting,
+    feature_reconstruct_down_fp32,
     complete_token_path,
     short_context_oracle,
     short_context_oracle_manifest_sha256,
@@ -323,6 +342,7 @@ import numpy as np
 ) = sys.argv[1:]
 feature_output_tile = int(feature_output_tile)
 feature_fuse_route_weighting = bool(int(feature_fuse_route_weighting))
+feature_reconstruct_down_fp32 = bool(int(feature_reconstruct_down_fp32))
 complete_token_path = bool(int(complete_token_path))
 short_context_oracle = bool(int(short_context_oracle))
 short_context_dsa_oracle = bool(int(short_context_dsa_oracle))
@@ -365,6 +385,10 @@ if {record["feature_fuse_route_weighting"] for record in records} != {
     feature_fuse_route_weighting
 }:
     raise SystemExit("fleet feature route-weight fusion drifted")
+if {record["feature_reconstruct_down_fp32"] for record in records} != {
+    feature_reconstruct_down_fp32
+}:
+    raise SystemExit("fleet feature FP32 reconstruction drifted")
 if {record["complete_token_path"] for record in records} != {
     complete_token_path
 }:
@@ -373,7 +397,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {6}:
+if {record["schema_version"] for record in records} != {7}:
     raise SystemExit("fleet decoder record schema drifted")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
@@ -638,6 +662,8 @@ if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
     selected_kernel = "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512"
     if feature_output_tile != 128:
         selected_kernel += f"_ot{feature_output_tile}"
+    if feature_reconstruct_down_fp32:
+        selected_kernel += "_downf32"
     if feature_fuse_route_weighting:
         selected_kernel += "_wsum"
     expected_kernel_counts = {
@@ -652,6 +678,8 @@ if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
             or feature["feature_output_tile"] != feature_output_tile
             or feature["fuse_route_weighting"]
             != feature_fuse_route_weighting
+            or feature["reconstruct_down_fp32"]
+            != feature_reconstruct_down_fp32
             or feature["kernel_counts"] != expected_kernel_counts
             or feature["expected_kernel_counts"] != expected_kernel_counts
             or feature["forbidden_decoded_expert_overlays"]
@@ -770,6 +798,7 @@ summary = {
     ),
     "feature_output_tile": feature_output_tile,
     "feature_fuse_route_weighting": feature_fuse_route_weighting,
+    "feature_reconstruct_down_fp32": feature_reconstruct_down_fp32,
     "complete_token_path": complete_token_path,
     "dsa_observer_compile_seconds_max": (
         max(record["dsa_observer_compile_seconds"] for record in records)
@@ -869,6 +898,9 @@ run_id = pv.start_run(
         "greenfield_feature_fuse_route_weighting": (
             feature_fuse_route_weighting
         ),
+        "greenfield_feature_reconstruct_down_fp32": (
+            feature_reconstruct_down_fp32
+        ),
         "greenfield_sparse_moe_backend": sparse_moe_backend,
         "greenfield_code_hash": pin,
         "legacy_oracle_code_hash": oracle_pin,
@@ -884,7 +916,8 @@ run_id = pv.start_run(
     note=(
         "Protected real 78-layer 2K transformer-body compile/run with "
         f"feature output tile {feature_output_tile} and fused route weighting "
-        f"{feature_fuse_route_weighting}; "
+        f"{feature_fuse_route_weighting}, FP32 routed-down reconstruction "
+        f"{feature_reconstruct_down_fp32}; "
         + (
             "real 2,034-token prompt with exact raw tokens and exact all-event "
             "DSA observer evidence; protected 2K Gate D."
@@ -911,6 +944,7 @@ pv.record_item(
     benchmark=(
         f"greenfield_78layer_2k_{scope}_pp8"
         + (f"_ot{feature_output_tile}" if feature_output_tile != 128 else "")
+        + ("_downf32" if feature_reconstruct_down_fp32 else "")
         + ("_wsum" if feature_fuse_route_weighting else "")
     ),
     item_id=(
@@ -929,7 +963,8 @@ pv.record_item(
         else (
             "Execute the real 78-layer PP8 decoder step with "
             f"feature output tile {feature_output_tile} and fused route weighting "
-            f"{feature_fuse_route_weighting}."
+            f"{feature_fuse_route_weighting}, FP32 routed-down reconstruction "
+            f"{feature_reconstruct_down_fp32}."
         )
     ),
     gold=(
@@ -956,6 +991,7 @@ pv.finalize(
     benchmark=(
         f"greenfield_78layer_2k_{scope}_pp8"
         + (f"_ot{feature_output_tile}" if feature_output_tile != 128 else "")
+        + ("_downf32" if feature_reconstruct_down_fp32 else "")
         + ("_wsum" if feature_fuse_route_weighting else "")
     ),
     metric="contract_valid",

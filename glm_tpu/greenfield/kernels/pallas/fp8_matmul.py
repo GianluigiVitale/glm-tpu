@@ -2690,6 +2690,7 @@ def fp8_fused_selected_moe(
     down_scale: Any,
     *,
     route_weights: Any | None = None,
+    down_result_dtype: Any = jnp.bfloat16,
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(
         contraction_tile=512
     ),
@@ -2699,9 +2700,12 @@ def fp8_fused_selected_moe(
 
     The gate and up rows live only in VMEM scratch between two nested Mosaic
     pipelines. Complete routed weights remain raw U8 HBM operands and route
-    work is compacted once. When ``route_weights`` is supplied, the exact BF16
-    weighting and route-axis sum also stay inside the call so only one local
-    hidden-width partial leaves it; the default retains per-route outputs.
+    work is compacted once. The default rounds each down result to BF16. The
+    diagnostic FP32 result retains the final down accumulator so a caller can
+    reconstruct a feature-sharded complete expert before that rounding point.
+    When ``route_weights`` is supplied, the exact BF16 weighting and route-axis
+    sum also stay inside the call so only one local hidden-width partial leaves
+    it; this fused form is intentionally incompatible with FP32 down results.
     """
 
     route_count, local_experts, hidden_size, intermediate = (
@@ -2754,6 +2758,16 @@ def fp8_fused_selected_moe(
     ):
         raise ValueError(
             "fused selected route weights must be one FP32 top-k row"
+        )
+    down_result_dtype = jnp.dtype(down_result_dtype)
+    if down_result_dtype not in (
+        jnp.dtype(jnp.bfloat16),
+        jnp.dtype(jnp.float32),
+    ):
+        raise ValueError("fused selected down result must be BF16 or FP32")
+    if fuse_route_weighting and down_result_dtype != jnp.dtype(jnp.bfloat16):
+        raise ValueError(
+            "fused route weighting requires BF16 down results"
         )
 
     padded_hidden = (
@@ -3071,7 +3085,7 @@ def fp8_fused_selected_moe(
             @pl.when(contraction_index == down_contraction_tiles - 1)
             def store_output() -> None:
                 output_ref[...] = accumulator[...].astype(
-                    config.output_dtype
+                    down_result_dtype
                 )
 
         def activation_index(
@@ -3223,7 +3237,7 @@ def fp8_fused_selected_moe(
     else:
         output_shape = jax.ShapeDtypeStruct(
             (route_count, config.row_tile, padded_hidden),
-            config.output_dtype,
+            down_result_dtype,
         )
     kernel_name = (
         "greenfield_fp8_fused_selected_moe_"
@@ -3231,6 +3245,8 @@ def fp8_fused_selected_moe(
     )
     if config.output_tile != config.block_shape[0]:
         kernel_name += f"_ot{config.output_tile}"
+    if down_result_dtype == jnp.dtype(jnp.float32):
+        kernel_name += "_downf32"
     if fuse_route_weighting:
         kernel_name += "_wsum"
     common_scratch_shapes = (
@@ -3391,9 +3407,14 @@ def fp8_fused_selected_moe(
                 )
                 * 4
                 + (
-                    config.row_tile * padded_hidden * 2
+                    config.row_tile
+                    * padded_hidden
+                    * jnp.dtype(config.output_dtype).itemsize
                     if fuse_route_weighting
-                    else route_count * config.row_tile * padded_hidden * 2
+                    else route_count
+                    * config.row_tile
+                    * padded_hidden
+                    * down_result_dtype.itemsize
                 )
             ),
             transcendentals=(

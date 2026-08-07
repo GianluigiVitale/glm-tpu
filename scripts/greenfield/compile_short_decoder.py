@@ -900,6 +900,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
     )
     parser.add_argument(
+        "--feature-reconstruct-down-fp32",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
+    parser.add_argument(
         "--complete-token-path",
         type=int,
         choices=(0, 1),
@@ -921,6 +927,9 @@ def main() -> int:
         )
     args.feature_fuse_route_weighting = bool(
         args.feature_fuse_route_weighting
+    )
+    args.feature_reconstruct_down_fp32 = bool(
+        args.feature_reconstruct_down_fp32
     )
     args.complete_token_path = bool(args.complete_token_path)
     oracle_mode = args.short_context_oracle_dir is not None
@@ -1027,6 +1036,21 @@ def main() -> int:
     if args.runtime_kind == "reference" and args.feature_fuse_route_weighting:
         raise ValueError(
             "feature route-weight fusion requires a feature runtime"
+        )
+    if (
+        args.runtime_kind == "reference"
+        and args.feature_reconstruct_down_fp32
+    ):
+        raise ValueError(
+            "feature FP32 reconstruction requires a feature runtime"
+        )
+    if (
+        args.feature_reconstruct_down_fp32
+        and args.feature_fuse_route_weighting
+    ):
+        raise ValueError(
+            "feature FP32 reconstruction is incompatible with fused route "
+            "weighting"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
@@ -1231,6 +1255,9 @@ def main() -> int:
             feature_fuse_route_weighting=(
                 args.feature_fuse_route_weighting
             ),
+            feature_reconstruct_down_fp32=(
+                args.feature_reconstruct_down_fp32
+            ),
             linear_backend=linear_backend,
             complete_token_path=args.complete_token_path,
         )
@@ -1248,6 +1275,9 @@ def main() -> int:
                 feature_output_tile=args.feature_output_tile,
                 feature_fuse_route_weighting=(
                     args.feature_fuse_route_weighting
+                ),
+                feature_reconstruct_down_fp32=(
+                    args.feature_reconstruct_down_fp32
                 ),
                 linear_backend=linear_backend,
                 complete_token_path=True,
@@ -1460,6 +1490,9 @@ def main() -> int:
             feature_fuse_route_weighting=(
                 decoder.feature_fuse_route_weighting
             ),
+            feature_reconstruct_down_fp32=(
+                decoder.feature_reconstruct_down_fp32
+            ),
             complete_token_path=decoder.complete_token_path,
         )
         if jax.process_index() == 0:
@@ -1527,6 +1560,9 @@ def main() -> int:
                 feature_output_tile=dsa_observer.feature_output_tile,
                 feature_fuse_route_weighting=(
                     dsa_observer.feature_fuse_route_weighting
+                ),
+                feature_reconstruct_down_fp32=(
+                    dsa_observer.feature_reconstruct_down_fp32
                 ),
                 complete_token_path=True,
                 token_observation_candidates=(
@@ -2211,13 +2247,16 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 6,
+            "schema_version": 7,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
             "feature_output_tile": decoder.feature_output_tile,
             "feature_fuse_route_weighting": (
                 decoder.feature_fuse_route_weighting
+            ),
+            "feature_reconstruct_down_fp32": (
+                decoder.feature_reconstruct_down_fp32
             ),
             "linear_backend": decoder.linear_backend,
             "complete_token_path": decoder.complete_token_path,

@@ -122,6 +122,7 @@ def stage_local_transformer_layer_fp8_mapped(
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     pallas_moe_fuse_route_weighting: bool = False,
+    pallas_moe_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
@@ -139,6 +140,22 @@ def stage_local_transformer_layer_fp8_mapped(
         sparse_moe_backend != "pallas_feature"
     ):
         raise ValueError("route-weight fusion requires feature-Pallas MoE")
+    if not isinstance(pallas_moe_reconstruct_down_fp32, bool):
+        raise ValueError("FP32 routed-down reconstruction flag must be boolean")
+    if pallas_moe_reconstruct_down_fp32 and (
+        sparse_moe_backend != "pallas_feature"
+    ):
+        raise ValueError(
+            "FP32 routed-down reconstruction requires feature-Pallas MoE"
+        )
+    if (
+        pallas_moe_reconstruct_down_fp32
+        and pallas_moe_fuse_route_weighting
+    ):
+        raise ValueError(
+            "FP32 routed-down reconstruction is incompatible with fused "
+            "route weighting"
+        )
     if linear_backend not in ("reference", "pallas"):
         raise ValueError("layer FP8 linear backend is unknown")
     if (dsa is None) != (indexer_kind == "shared"):
@@ -326,6 +343,9 @@ def stage_local_transformer_layer_fp8_mapped(
                     axis_index_groups=axis_index_groups,
                     config=pallas_moe_config,
                     fuse_route_weighting=pallas_moe_fuse_route_weighting,
+                    reconstruct_down_fp32=(
+                        pallas_moe_reconstruct_down_fp32
+                    ),
                 )
             )
         output = residual_add(residual, update)

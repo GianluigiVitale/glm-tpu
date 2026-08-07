@@ -105,38 +105,56 @@ def validate_real_layer_hlo(
     *,
     hidden_size: int = 6144,
     stage_size: int = 4,
+    reconstruct_down_fp32: bool = False,
 ) -> dict[str, Any]:
-    """Require one BF16 stacked combine over the exact local stage ranks."""
+    """Require only the declared local reconstruction/combine collectives."""
 
     module = parse_hlo_module(optimized_hlo)
     violations = []
     collectives = module.collectives
-    if len(collectives) != 1:
-        violations.append(
-            f"expected exactly one collective, found {len(collectives)}"
+    expected_collective_count = 2 if reconstruct_down_fp32 else 1
+    if len(collectives) != expected_collective_count:
+        expected_label = (
+            "one"
+            if expected_collective_count == 1
+            else str(expected_collective_count)
         )
-    if collectives:
-        collective = collectives[0]
+        violations.append(
+            f"expected exactly {expected_label} collectives, "
+            f"found {len(collectives)}"
+        )
+    expected_groups = (tuple(range(stage_size)),)
+    for collective in collectives:
         if collective.opcode != "all-reduce":
             violations.append(
                 f"expected all-reduce combine, found {collective.opcode}"
             )
-        expected_groups = (tuple(range(stage_size)),)
         if collective.replica_groups != expected_groups:
             violations.append(
                 "expected exact local replica group "
                 f"{expected_groups}, found {collective.replica_groups}"
             )
-        shapes = collective.operand_shapes + collective.result_shapes
-        expected_payload = (2, 1, hidden_size)
+    expected_payloads = [("bf16", (2, 1, hidden_size))]
+    if reconstruct_down_fp32:
+        expected_payloads.append(("f32", (8, 1, hidden_size)))
+    observed_payloads = [
+        (shape.dtype.lower(), shape.dimensions)
+        for collective in collectives
+        for shape in collective.result_shapes
+    ]
+    for expected_dtype, expected_shape in expected_payloads:
+        accepted_dtypes = (
+            {"bf16", "bfloat16"}
+            if expected_dtype == "bf16"
+            else {expected_dtype}
+        )
         if not any(
-            shape.dtype.lower() in {"bf16", "bfloat16"}
-            and shape.dimensions == expected_payload
-            for shape in shapes
+            dtype in accepted_dtypes and shape == expected_shape
+            for dtype, shape in observed_payloads
         ):
             violations.append(
-                "combine payload is not exact "
-                f"bf16{expected_payload}: {[shape.to_dict() for shape in shapes]}"
+                "local collective payload is missing exact "
+                f"{expected_dtype}{expected_shape}: {observed_payloads}"
             )
     forbidden = []
     for instruction in module.instructions:
@@ -153,6 +171,7 @@ def validate_real_layer_hlo(
         )
     return {
         "collective_count": len(collectives),
+        "expected_collective_count": expected_collective_count,
         "collectives": [item.to_dict() for item in collectives],
         "module_name": module.name,
         "num_partitions": module.num_partitions,
@@ -173,6 +192,7 @@ def validate_pallas_real_layer_hlo(
     feature_sharded_routed: bool = False,
     routed_output_tile: int = 128,
     fuse_route_weighting: bool = False,
+    reconstruct_down_fp32: bool = False,
 ) -> dict[str, Any]:
     """Require three raw-FP8 kernels, bounded metadata, and one local combine."""
 
@@ -191,11 +211,22 @@ def validate_pallas_real_layer_hlo(
         raise ValueError(
             "route-weight fusion requires the feature-sharded routed layout"
         )
+    if not isinstance(reconstruct_down_fp32, bool):
+        raise ValueError("FP32 reconstruction flag must be boolean")
+    if reconstruct_down_fp32 and not feature_sharded_routed:
+        raise ValueError(
+            "FP32 reconstruction requires the feature-sharded routed layout"
+        )
+    if reconstruct_down_fp32 and fuse_route_weighting:
+        raise ValueError(
+            "FP32 reconstruction is incompatible with fused route weighting"
+        )
 
     base = validate_real_layer_hlo(
         optimized_hlo,
         hidden_size=hidden_size,
         stage_size=stage_size,
+        reconstruct_down_fp32=reconstruct_down_fp32,
     )
     violations = list(base["violations"])
     custom_calls = [
@@ -303,6 +334,8 @@ def validate_pallas_real_layer_hlo(
     )
     if routed_output_tile != 128:
         expected_selected_name += f"_ot{routed_output_tile}"
+    if reconstruct_down_fp32:
+        expected_selected_name += "_downf32"
     if fuse_route_weighting:
         expected_selected_name += "_wsum"
     expected_selected_pattern = re.compile(
@@ -316,7 +349,11 @@ def validate_pallas_real_layer_hlo(
     expected_selected_result = (
         f"bf16[8,{hidden_size}]"
         if fuse_route_weighting
-        else f"bf16[8,8,{hidden_size}]"
+        else (
+            f"f32[8,8,{hidden_size}]"
+            if reconstruct_down_fp32
+            else f"bf16[8,8,{hidden_size}]"
+        )
     )
     if selected_line and expected_selected_result not in selected_line[0]:
         violations.append(
@@ -377,6 +414,7 @@ def validate_pallas_real_layer_hlo(
         "local_layout_custom_calls": concat_calls,
         "routed_output_tile": routed_output_tile,
         "fuse_route_weighting": fuse_route_weighting,
+        "reconstruct_down_fp32": reconstruct_down_fp32,
         "routed_layout": (
             "expert_intermediate_shard"
             if feature_sharded_routed

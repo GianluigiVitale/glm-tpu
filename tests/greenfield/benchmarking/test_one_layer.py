@@ -165,6 +165,30 @@ def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
     assert wide["passed"], wide
     assert wide["routed_output_tile"] == 256
 
+    fp32_hlo = wide_hlo.replace(
+        "routed = bf16[8,8,6144]",
+        "routed = f32[8,8,6144]",
+    ).replace(
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_downf32",
+    ).replace(
+        "  ROOT combine =",
+        "  routed_partial = f32[8,1,6144]{2,1,0} parameter(1)\n"
+        "  routed_full = f32[8,1,6144]{2,1,0} all-reduce("
+        "routed_partial), channel_id=2, replica_groups={{0,1,2,3}}, "
+        "use_global_device_ids=true, to_apply=add\n  ROOT combine =",
+    )
+    fp32 = validate_pallas_real_layer_hlo(
+        fp32_hlo,
+        local_experts=256,
+        routed_intermediate_size=512,
+        feature_sharded_routed=True,
+        routed_output_tile=256,
+        reconstruct_down_fp32=True,
+    )
+    assert fp32["passed"], fp32
+    assert fp32["reconstruct_down_fp32"] is True
+
     fused_hlo = wide_hlo.replace(
         "routed = bf16[8,8,6144]",
         "routed = bf16[8,6144]",

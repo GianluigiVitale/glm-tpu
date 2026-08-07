@@ -148,6 +148,7 @@ class DecoderStepProgram:
     sparse_moe_backend: SparseMoeBackend
     feature_output_tile: int
     feature_fuse_route_weighting: bool
+    feature_reconstruct_down_fp32: bool
     linear_backend: StageLinearBackend
     complete_token_path: bool
     observe_dsa_events: bool
@@ -159,14 +160,26 @@ def _validate_pallas_feature_decoder_calls(
     sparse_layers: int,
     feature_output_tile: int = PROMOTED_FEATURE_OUTPUT_TILE,
     fuse_route_weighting: bool = False,
+    reconstruct_down_fp32: bool = False,
 ) -> dict[str, Any]:
     """Pin every production feature-MoE kernel and reject weight overlays."""
 
     if feature_output_tile not in (128, 256):
         raise PlanValidationError("feature output tile must be 128 or 256")
+    if not isinstance(reconstruct_down_fp32, bool):
+        raise PlanValidationError(
+            "feature FP32 reconstruction flag must be boolean"
+        )
+    if reconstruct_down_fp32 and fuse_route_weighting:
+        raise PlanValidationError(
+            "feature FP32 reconstruction is incompatible with fused route "
+            "weighting"
+        )
     selected_name = "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512"
     if feature_output_tile != 128:
         selected_name += f"_ot{feature_output_tile}"
+    if reconstruct_down_fp32:
+        selected_name += "_downf32"
     if fuse_route_weighting:
         selected_name += "_wsum"
     kernel_names = (
@@ -208,7 +221,13 @@ def _validate_pallas_feature_decoder_calls(
             "decoder feature-Pallas selected kernels lack exact raw-U8 tables"
         )
     selected_result_shape = (
-        "bf16[8,6144]" if fuse_route_weighting else "bf16[8,8,6144]"
+        "bf16[8,6144]"
+        if fuse_route_weighting
+        else (
+            "f32[8,8,6144]"
+            if reconstruct_down_fp32
+            else "bf16[8,8,6144]"
+        )
     )
     malformed_selected_result = [
         line for line in selected_lines if selected_result_shape not in line
@@ -274,6 +293,7 @@ def _validate_pallas_feature_decoder_calls(
         "forbidden_formatted_shared_overlays": forbidden_formatted_overlays,
         "feature_output_tile": feature_output_tile,
         "fuse_route_weighting": fuse_route_weighting,
+        "reconstruct_down_fp32": reconstruct_down_fp32,
         "kernel_counts": kernel_counts,
         "passed": not violations,
         "violations": violations,
@@ -539,6 +559,7 @@ def validate_decoder_step_hlo(
     backend_contract: str,
     feature_output_tile: int | None = None,
     feature_fuse_route_weighting: bool = False,
+    feature_reconstruct_down_fp32: bool = False,
     complete_token_path: bool = False,
     token_observation_candidates: int = 1,
 ) -> dict[str, Any]:
@@ -565,6 +586,15 @@ def validate_decoder_step_hlo(
         raise PlanValidationError("feature output tile must be 128 or 256")
     if not isinstance(feature_fuse_route_weighting, bool):
         raise PlanValidationError("feature route-weight fusion flag must be boolean")
+    if not isinstance(feature_reconstruct_down_fp32, bool):
+        raise PlanValidationError(
+            "feature FP32 reconstruction flag must be boolean"
+        )
+    if feature_reconstruct_down_fp32 and feature_fuse_route_weighting:
+        raise PlanValidationError(
+            "feature FP32 reconstruction is incompatible with fused route "
+            "weighting"
+        )
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if (
@@ -596,6 +626,13 @@ def validate_decoder_step_hlo(
     ):
         raise PlanValidationError(
             "feature route-weight fusion requires a feature backend"
+        )
+    if feature_reconstruct_down_fp32 and backend_contract not in (
+        "tpu_v4_pp8_pallas_feature",
+        "tpu_v4_pp8_pallas_feature_linear",
+    ):
+        raise PlanValidationError(
+            "feature FP32 reconstruction requires a feature backend"
         )
     skeleton = PipelineSkeletonConfig(
         config.stage_count,
@@ -665,6 +702,8 @@ def validate_decoder_step_hlo(
         # but adds embedding plus score/id singleton reductions.
         expected_gathers = 2 * layers + 3 * full_layers
         expected_reduction_arity_counts = {"1": 277, "2": 16, "3": 1}
+        if feature_reconstruct_down_fp32:
+            expected_reduction_arity_counts["1"] += sparse_layers
         if complete_token_path:
             expected_reduction_arity_counts["1"] += 3
         expected_reductions = sum(expected_reduction_arity_counts.values())
@@ -680,6 +719,10 @@ def validate_decoder_step_hlo(
             "f32[256]": layers,
             "u32[1,1,128]": layers,
         }
+        if feature_reconstruct_down_fp32:
+            expected_reduction_result_shape_counts[
+                "f32[8,1,6144]"
+            ] = sparse_layers
         if complete_token_path:
             if token_observation_candidates == 1:
                 expected_reduction_result_shape_counts.update(
@@ -858,6 +901,7 @@ def validate_decoder_step_hlo(
             sparse_layers=sparse_layers,
             feature_output_tile=feature_output_tile,
             fuse_route_weighting=feature_fuse_route_weighting,
+            reconstruct_down_fp32=feature_reconstruct_down_fp32,
         )
         violations.extend(pallas_feature_contract["violations"])
     pallas_stage_linear_contract: dict[str, Any] = {}
@@ -889,6 +933,7 @@ def validate_decoder_step_hlo(
         "forbidden_shapes": forbidden_shapes,
         "feature_output_tile": feature_output_tile,
         "feature_fuse_route_weighting": feature_fuse_route_weighting,
+        "feature_reconstruct_down_fp32": feature_reconstruct_down_fp32,
         "complete_token_path": complete_token_path,
         "token_observation_candidates": token_observation_candidates,
         "complete_token_collective_contract": (
@@ -992,6 +1037,7 @@ def _execute_stage(
     sparse_moe_backend: SparseMoeBackend,
     pallas_moe_config: Fp8BlockMatmulConfig | None,
     pallas_moe_fuse_route_weighting: bool,
+    pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
     dsa_observation: Any | None = None,
 ) -> tuple[Any, ...]:
@@ -1066,6 +1112,9 @@ def _execute_stage(
             pallas_moe_fuse_route_weighting=(
                 pallas_moe_fuse_route_weighting
             ),
+            pallas_moe_reconstruct_down_fp32=(
+                pallas_moe_reconstruct_down_fp32
+            ),
             linear_backend=linear_backend,
         )
         residual = result.output
@@ -1129,6 +1178,7 @@ def build_decoder_step_program(
     sparse_moe_backend: SparseMoeBackend = "reference",
     feature_output_tile: int | None = None,
     feature_fuse_route_weighting: bool = False,
+    feature_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
@@ -1154,6 +1204,10 @@ def build_decoder_step_program(
         raise PlanValidationError("feature output tile must be 128 or 256")
     if not isinstance(feature_fuse_route_weighting, bool):
         raise PlanValidationError("feature route-weight fusion flag must be boolean")
+    if not isinstance(feature_reconstruct_down_fp32, bool):
+        raise PlanValidationError(
+            "feature FP32 reconstruction flag must be boolean"
+        )
     if sparse_moe_backend == "reference" and feature_output_tile != 128:
         raise PlanValidationError(
             "a non-default feature output tile requires pallas_feature"
@@ -1161,6 +1215,18 @@ def build_decoder_step_program(
     if feature_fuse_route_weighting and sparse_moe_backend != "pallas_feature":
         raise PlanValidationError(
             "feature route-weight fusion requires pallas_feature"
+        )
+    if (
+        feature_reconstruct_down_fp32
+        and sparse_moe_backend != "pallas_feature"
+    ):
+        raise PlanValidationError(
+            "feature FP32 reconstruction requires pallas_feature"
+        )
+    if feature_reconstruct_down_fp32 and feature_fuse_route_weighting:
+        raise PlanValidationError(
+            "feature FP32 reconstruction is incompatible with fused route "
+            "weighting"
         )
     if linear_backend not in ("reference", "pallas"):
         raise PlanValidationError("decoder FP8 linear backend is unknown")
@@ -1424,6 +1490,9 @@ def build_decoder_step_program(
                         pallas_moe_fuse_route_weighting=(
                             feature_fuse_route_weighting
                         ),
+                        pallas_moe_reconstruct_down_fp32=(
+                            feature_reconstruct_down_fp32
+                        ),
                         linear_backend=linear_backend,
                         dsa_observation=values[4],
                     ),
@@ -1459,6 +1528,9 @@ def build_decoder_step_program(
                         pallas_moe_config=pallas_moe_config,
                         pallas_moe_fuse_route_weighting=(
                             feature_fuse_route_weighting
+                        ),
+                        pallas_moe_reconstruct_down_fp32=(
+                            feature_reconstruct_down_fp32
                         ),
                         linear_backend=linear_backend,
                     ),
@@ -1804,6 +1876,7 @@ def build_decoder_step_program(
         sparse_moe_backend=sparse_moe_backend,
         feature_output_tile=feature_output_tile,
         feature_fuse_route_weighting=feature_fuse_route_weighting,
+        feature_reconstruct_down_fp32=feature_reconstruct_down_fp32,
         linear_backend=linear_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,

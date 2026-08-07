@@ -7,6 +7,8 @@ import sys
 
 import pytest
 
+from glm_tpu.greenfield.errors import PlanValidationError
+
 
 def test_teacher_forced_prefill_builder_rejects_invalid_contracts() -> None:
     from types import SimpleNamespace
@@ -208,6 +210,36 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     wide = _validate_pallas_feature_decoder_calls(wide_hlo, sparse_layers=75)
     assert wide["passed"], wide
     assert wide["feature_output_tile"] == 256
+    fp32_hlo = wide_hlo.replace(
+        "out = bf16[8,8,6144]",
+        "out = f32[8,8,6144]",
+    ).replace(
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_downf32",
+    )
+    fp32 = _validate_pallas_feature_decoder_calls(
+        fp32_hlo,
+        sparse_layers=75,
+        reconstruct_down_fp32=True,
+    )
+    assert fp32["passed"], fp32
+    assert fp32["reconstruct_down_fp32"] is True
+    stale_fp32_shape = _validate_pallas_feature_decoder_calls(
+        wide_hlo.replace(
+            "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",
+            "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256_downf32",
+        ),
+        sparse_layers=75,
+        reconstruct_down_fp32=True,
+    )
+    assert not stale_fp32_shape["passed"]
+    with pytest.raises(PlanValidationError, match="incompatible"):
+        _validate_pallas_feature_decoder_calls(
+            fp32_hlo,
+            sparse_layers=75,
+            fuse_route_weighting=True,
+            reconstruct_down_fp32=True,
+        )
     fused_hlo = wide_hlo.replace(
         "out = bf16[8,8,6144]",
         "out = bf16[8,6144]",
@@ -404,6 +436,28 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             feature_output_tile=256,
+        )
+    with pytest.raises(PlanValidationError, match="requires pallas_feature"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            feature_reconstruct_down_fp32=True,
+        )
+    with pytest.raises(PlanValidationError, match="incompatible"):
+        build_decoder_step_program(
+            feature_plan,
+            feature_schedule,
+            feature_state,
+            feature_layout,
+            groups,
+            pairs,
+            sparse_moe_backend="pallas_feature",
+            feature_fuse_route_weighting=True,
+            feature_reconstruct_down_fp32=True,
         )
     with pytest.raises(PlanValidationError, match="linear backend is unknown"):
         build_decoder_step_program(

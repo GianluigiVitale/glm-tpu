@@ -761,9 +761,11 @@ def test_fp8_selected_swiglu_down_rejects_contract_drift() -> None:
     ([11, 500, 10, 12], [12, 10, 11, 12]),
 )
 @pytest.mark.parametrize("output_tile", (128, 256))
+@pytest.mark.parametrize("retain_down_f32", (False, True))
 def test_fp8_fused_selected_moe_interpret_matches_exact_reference(
     route_values: list[int],
     output_tile: int,
+    retain_down_f32: bool,
 ) -> None:
     from jax._src.pallas.mosaic import tpu_info
 
@@ -826,6 +828,7 @@ def test_fp8_fused_selected_moe_interpret_matches_exact_reference(
         up_scale,
         down_bits,
         down_scale,
+        down_result_dtype=(jnp.float32 if retain_down_f32 else jnp.bfloat16),
         config=Fp8BlockMatmulConfig(
             contraction_tile=512,
             output_tile=output_tile,
@@ -866,9 +869,21 @@ def test_fp8_fused_selected_moe_interpret_matches_exact_reference(
             decoded_down,
             dimension_numbers=(((1,), (1,)), ((), ())),
             preferred_element_type=jnp.float32,
-        ).astype(jnp.bfloat16)
+        ).astype(jnp.float32 if retain_down_f32 else jnp.bfloat16)
         expected.append(np.asarray(value[0]))
-    np.testing.assert_array_equal(np.asarray(actual), np.stack(expected))
+    assert actual.dtype == (jnp.float32 if retain_down_f32 else jnp.bfloat16)
+    if retain_down_f32:
+        # The interpreted tiled accumulator and the monolithic reference dot
+        # associate FP32 adds differently. Pin the observed FP32-only bound;
+        # the promoted contract still rounds just once after reconstruction.
+        np.testing.assert_allclose(
+            np.asarray(actual),
+            np.stack(expected),
+            rtol=2e-5,
+            atol=1e-5,
+        )
+    else:
+        np.testing.assert_array_equal(np.asarray(actual), np.stack(expected))
 
 
 def test_fp8_fused_selected_moe_rejects_down_contract_drift() -> None:
@@ -902,5 +917,34 @@ def test_fp8_fused_selected_moe_rejects_down_contract_drift() -> None:
             scale,
             up_bits,
             jnp.ones((2, 1, 2), dtype=jnp.float32),
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="requires BF16 down results"):
+        fp8_fused_selected_moe(
+            hidden,
+            routes,
+            expert_start,
+            up_bits,
+            scale,
+            up_bits,
+            scale,
+            up_bits,
+            scale,
+            route_weights=jnp.ones((2,), dtype=jnp.float32),
+            down_result_dtype=jnp.float32,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="must be BF16 or FP32"):
+        fp8_fused_selected_moe(
+            hidden,
+            routes,
+            expert_start,
+            up_bits,
+            scale,
+            up_bits,
+            scale,
+            up_bits,
+            scale,
+            down_result_dtype=jnp.float16,
             interpret=True,
         )

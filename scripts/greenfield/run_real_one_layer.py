@@ -100,6 +100,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--feature-reconstruct-down-fp32",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     return parser.parse_args()
 
 
@@ -346,6 +352,7 @@ def _pallas_feature_stage_step(
     contract: GlmMoeNumericalContract,
     config: Fp8BlockMatmulConfig,
     fuse_route_weighting: bool,
+    reconstruct_down_fp32: bool,
 ) -> tuple[Any, Any, Any]:
     """Adapt runner order to the expert-feature Pallas challenger."""
     return stage_local_moe_pallas_feature_mapped(
@@ -369,6 +376,7 @@ def _pallas_feature_stage_step(
         contract=contract,
         config=config,
         fuse_route_weighting=fuse_route_weighting,
+        reconstruct_down_fp32=reconstruct_down_fp32,
     )
 
 
@@ -454,6 +462,9 @@ def main() -> int:
     args.feature_fuse_route_weighting = bool(
         args.feature_fuse_route_weighting
     )
+    args.feature_reconstruct_down_fp32 = bool(
+        args.feature_reconstruct_down_fp32
+    )
     if (
         args.warmup < 200
         or args.iterations < 1000
@@ -482,6 +493,18 @@ def main() -> int:
     if args.kernel != "pallas_feature" and args.feature_fuse_route_weighting:
         raise ValueError(
             "feature route-weight fusion requires pallas_feature"
+        )
+    if args.kernel != "pallas_feature" and args.feature_reconstruct_down_fp32:
+        raise ValueError(
+            "feature FP32 reconstruction requires pallas_feature"
+        )
+    if (
+        args.feature_reconstruct_down_fp32
+        and args.feature_fuse_route_weighting
+    ):
+        raise ValueError(
+            "feature FP32 reconstruction is incompatible with fused route "
+            "weighting"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
@@ -658,6 +681,9 @@ def main() -> int:
                     fuse_route_weighting=(
                         args.feature_fuse_route_weighting
                     ),
+                    reconstruct_down_fp32=(
+                        args.feature_reconstruct_down_fp32
+                    ),
                 ),
                 mesh=loaded.mesh,
                 in_specs=(
@@ -768,6 +794,7 @@ def main() -> int:
             feature_sharded_routed=args.kernel == "pallas_feature",
             routed_output_tile=args.feature_output_tile,
             fuse_route_weighting=args.feature_fuse_route_weighting,
+            reconstruct_down_fp32=args.feature_reconstruct_down_fp32,
         )
     else:
         hlo_contract = validate_real_layer_hlo(
@@ -900,6 +927,9 @@ def main() -> int:
         "kernel": args.kernel,
         "feature_output_tile": args.feature_output_tile,
         "feature_fuse_route_weighting": args.feature_fuse_route_weighting,
+        "feature_reconstruct_down_fp32": (
+            args.feature_reconstruct_down_fp32
+        ),
         "oracle": {
             "file_sha256": oracle_manifest["file"]["sha256"],
             "manifest_sha256": oracle_manifest["manifest_sha256"],
@@ -934,6 +964,8 @@ def main() -> int:
         f"kernel={args.kernel} "
         f"feature_output_tile={args.feature_output_tile} "
         f"feature_fuse_route_weighting={args.feature_fuse_route_weighting} "
+        "feature_reconstruct_down_fp32="
+        f"{args.feature_reconstruct_down_fp32} "
         f"host={record['hostname']} stage={resolution.stage_id} "
         f"normal_p50_ms={timing['normal']['latency']['p50_ms']:.6f} "
         "concentrated_p50_ms="

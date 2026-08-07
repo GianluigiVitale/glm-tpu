@@ -106,6 +106,7 @@ def test_pallas_feature_stage_adapter_reorders_router_and_correction_bias(
         contract=contract,
         config=config,
         fuse_route_weighting=True,
+        reconstruct_down_fp32=False,
     )
 
     assert result == "mapped"
@@ -121,4 +122,5 @@ def test_pallas_feature_stage_adapter_reorders_router_and_correction_bias(
         "contract": contract,
         "config": config,
         "fuse_route_weighting": True,
+        "reconstruct_down_fp32": False,
     }

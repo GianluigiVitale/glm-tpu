@@ -49,6 +49,9 @@ def validate_teacher_forced_prefill_hlo(
         feature_fuse_route_weighting=(
             decoder.feature_fuse_route_weighting
         ),
+        feature_reconstruct_down_fp32=(
+            decoder.feature_reconstruct_down_fp32
+        ),
         complete_token_path=True,
     )
     module = parse_hlo_module(optimized_hlo)
