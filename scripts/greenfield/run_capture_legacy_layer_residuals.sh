@@ -9,10 +9,12 @@ readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly HARNESS_REPO=/home/gianl/glm-tpu
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-residual-observer
-readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-residual-cf066ab3e
+readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-residual-15f960600
 readonly OBSERVER_BRANCH=greenfield/legacy-residual-observer
-readonly OBSERVER_PIN=cf066ab3e29151153d3f930a4c5ecc20ba716a9f
+readonly OBSERVER_PIN=15f9606000c4dfd50b52873a35c5458b1f9339ad
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
+readonly OBSERVER_COMMIT_DISTANCE=2
+readonly OBSERVER_BOUNDARIES=1,77,78
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly MODEL_ID=gs://driftbench-dsv4-uc/models/GLM-5.2-FP8
@@ -52,8 +54,14 @@ REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/layer_residuals/2k/$TAG
   echo "legacy observer development worktree is dirty" >&2
   exit 2
 }
-[[ $(git -C "$OBSERVER_DEV_REPO" rev-parse HEAD^) == "$ORACLE_PIN" ]] || {
-  echo "legacy observer is not a one-commit child of the sealed oracle" >&2
+git -C "$OBSERVER_DEV_REPO" merge-base --is-ancestor \
+  "$ORACLE_PIN" "$OBSERVER_PIN" || {
+  echo "legacy observer does not descend from the sealed oracle" >&2
+  exit 2
+}
+[[ $(git -C "$OBSERVER_DEV_REPO" rev-list --count \
+  "$ORACLE_PIN..$OBSERVER_PIN") -eq $OBSERVER_COMMIT_DISTANCE ]] || {
+  echo "legacy observer commit distance from the sealed oracle drifted" >&2
   exit 2
 }
 [[ $(git -C "$ORACLE_REPO" rev-parse HEAD) == "$ORACLE_PIN" ]] || {
@@ -149,7 +157,7 @@ MIN_FREE_GB=10 WARN_FREE_GB=15 bash "$WORKTREE/scripts/disk_watchdog.sh" check \
 # oracle checkout remains untouched and continues to identify the semantic
 # parent.  Existing non-exact destinations fail closed rather than being reset.
 # shellcheck disable=SC2016
-sync_observer='set -e; base='"$ORACLE_REPO"'; dest='"$OBSERVER_RUNTIME_REPO"'; pin='"$OBSERVER_PIN"'; branch='"$OBSERVER_BRANCH"'; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then :; elif [ -e "$dest" ]; then echo "SYNC_BAD $(hostname) destination_exists"; exit 0; else git -C "$base" fetch origin "$branch" >/dev/null 2>&1 && git -C "$base" worktree add --detach "$dest" "$pin" >/dev/null 2>&1; fi; code=$(git -C "$dest" rev-parse HEAD); parent=$(git -C "$dest" rev-parse HEAD^); dirty=$(git -C "$dest" status --porcelain | wc -l); if [ "$code" = "$pin" ] && [ "$parent" = '"$ORACLE_PIN"' ] && [ "$dirty" -eq 0 ]; then echo "SYNC_OK $(hostname)"; else echo "SYNC_BAD $(hostname) code=$code parent=$parent dirty=$dirty"; fi'
+sync_observer='set -e; base='"$ORACLE_REPO"'; dest='"$OBSERVER_RUNTIME_REPO"'; pin='"$OBSERVER_PIN"'; oracle='"$ORACLE_PIN"'; branch='"$OBSERVER_BRANCH"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then :; elif [ -e "$dest" ]; then echo "SYNC_BAD $(hostname) destination_exists"; exit 0; else git -C "$base" fetch origin "$branch" >/dev/null 2>&1 && git -C "$base" worktree add --detach "$dest" "$pin" >/dev/null 2>&1; fi; code=$(git -C "$dest" rev-parse HEAD); dirty=$(git -C "$dest" status --porcelain | wc -l); commits=$(git -C "$dest" rev-list --count "$oracle..$pin"); ancestor=0; git -C "$dest" merge-base --is-ancestor "$oracle" "$pin" && ancestor=1; if [ "$code" = "$pin" ] && [ "$dirty" -eq 0 ] && [ "$commits" -eq "$distance" ] && [ "$ancestor" -eq 1 ]; then echo "SYNC_OK $(hostname)"; else echo "SYNC_BAD $(hostname) code=$code dirty=$dirty commits=$commits ancestor=$ancestor"; fi'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$sync_observer" >"$RUN_DIR/sync_observer.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/sync_observer.txt" SYNC_OK || {
@@ -166,7 +174,7 @@ has_eight_unique_markers "$RUN_DIR/prereq.txt" PREREQ_OK || {
   exit 1
 }
 
-COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR=$OOB_DIR GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_EXPECT_CODE_HASH=$OBSERVER_SHORT GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER=1 GLM_GREENFIELD_LEGACY_RESIDUAL_PATH=$DUMP_PREFIX GLM_GREENFIELD_LEGACY_RESIDUAL_POSITION=2044 GLM_GREENFIELD_LEGACY_RESIDUAL_DECODE_ROWS=32 GLM_GREENFIELD_LEGACY_RESIDUAL_RUN_TAG=$TAG GLM_GREENFIELD_LEGACY_RESIDUAL_CODE_HASH=$OBSERVER_PIN GLM_GREENFIELD_LEGACY_RESIDUAL_ORACLE_PIN=$ORACLE_PIN GLM_GREENFIELD_LEGACY_RESIDUAL_MODEL_ID=$MODEL_ID"
+COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR=$OOB_DIR GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_EXPECT_CODE_HASH=$OBSERVER_SHORT GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER=1 GLM_GREENFIELD_LEGACY_RESIDUAL_PATH=$DUMP_PREFIX GLM_GREENFIELD_LEGACY_RESIDUAL_POSITION=2044 GLM_GREENFIELD_LEGACY_RESIDUAL_DECODE_ROWS=32 GLM_GREENFIELD_LEGACY_RESIDUAL_BOUNDARIES=$OBSERVER_BOUNDARIES GLM_GREENFIELD_LEGACY_RESIDUAL_RUN_TAG=$TAG GLM_GREENFIELD_LEGACY_RESIDUAL_CODE_HASH=$OBSERVER_PIN GLM_GREENFIELD_LEGACY_RESIDUAL_ORACLE_PIN=$ORACLE_PIN GLM_GREENFIELD_LEGACY_RESIDUAL_MODEL_ID=$MODEL_ID"
 RAYLET_ENVS="$COMMON_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
 DRIVER_ENVS="NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=1 JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=120000 $COMMON_ENVS"
 
@@ -177,7 +185,7 @@ EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
 runtime_started=1
 
 # shellcheck disable=SC2016
-env_check='p=$(pgrep -x raylet | head -1); f=/tmp/legacy_residual_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$OBSERVER_SHORT"'" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER=1" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_PATH='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_POSITION=2044" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_CODE_HASH='"$OBSERVER_PIN"'" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
+env_check='p=$(pgrep -x raylet | head -1); f=/tmp/legacy_residual_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$OBSERVER_SHORT"'" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER=1" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_PATH='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_POSITION=2044" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_BOUNDARIES='"$OBSERVER_BOUNDARIES"'" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_CODE_HASH='"$OBSERVER_PIN"'" "$f" && grep -qx "GLM_GREENFIELD_LEGACY_RESIDUAL_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$env_check" >"$RUN_DIR/raylet_env.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/raylet_env.txt" ENV_OK || {
@@ -205,13 +213,14 @@ say "capturing sealed legacy tokens, top-16 logits, and position-2044 boundaries
     --legacy-repository "$OBSERVER_RUNTIME_REPO" \
     --expected-legacy-code-hash "$OBSERVER_PIN" \
     --expected-oracle-base-hash "$ORACLE_PIN" \
+    --expected-oracle-commit-distance "$OBSERVER_COMMIT_DISTANCE" \
     --top-k 16 --step-count 15 --focus-position 2044 \
     --focus-token-id 16345 --focus-token-id 12877
 ) >"$RUN_DIR/legacy.log" 2>&1
 
 # Validate every host's exact loaded/final state and observer file before use.
 # shellcheck disable=SC2016
-integrity_check='logs=/tmp/ray/session_latest/logs; checksum=$(grep -Rhs --include="worker-*.out" -E "\[GLM_LOAD_CHECKSUM\].*SUMMARY verified=1882 mismatches=0 skipped=312$" "$logs" 2>/dev/null | tail -1); state=$(grep -Rhs --include="worker-*.out" -E "\[GLM_STATE_HASH\].*manifest VERIFIED leaves=2455 combined=371110325 ref=/tmp/golden.json$" "$logs" 2>/dev/null | tail -1); armed=$(grep -Rhs --include="worker-*.out" -F "[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" -F "[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER] wrote" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "boundaries.position2044.proc*.npz" 2>/dev/null | wc -l); refusal=$(grep -Rhs --include="worker-*.out" -E "StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|LoadChecksumError|CodeFingerprintMismatchError|legacy residual.*(drifted|requires|non-finite|already dumped)" "$logs" 2>/dev/null | tail -1); printf "%s\n%s\n%s\n%s\nfiles=%s\n" "$checksum" "$state" "$armed" "$wrote" "$files"; if [ -n "$checksum" ] && [ -n "$state" ] && [ -n "$armed" ] && [ -n "$wrote" ] && [ "$files" -eq 1 ] && [ -z "$refusal" ]; then echo "INTEGRITY_OK $(hostname)"; else [ -z "$refusal" ] || printf "%s\n" "$refusal"; echo "INTEGRITY_BAD $(hostname)"; fi'
+integrity_check='logs=/tmp/ray/session_latest/logs; checksum=$(grep -Rhs --include="worker-*.out" -E "\[GLM_LOAD_CHECKSUM\].*SUMMARY verified=1882 mismatches=0 skipped=312$" "$logs" 2>/dev/null | tail -1); state=$(grep -Rhs --include="worker-*.out" -E "\[GLM_STATE_HASH\].*manifest VERIFIED leaves=2455 combined=371110325 ref=/tmp/golden.json$" "$logs" 2>/dev/null | tail -1); armed=$(grep -Rhs --include="worker-*.out" -F "[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" -F "[GLM_GREENFIELD_LEGACY_RESIDUAL_OBSERVER] wrote" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "boundaries.position2044.proc*.npz" 2>/dev/null | wc -l); hlo=$(find /tmp/'"$TAG"' -type f -name "observer_hlo.boundary*.proc*.json" 2>/dev/null | wc -l); refusal=$(grep -Rhs --include="worker-*.out" -E "StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|LoadChecksumError|CodeFingerprintMismatchError|legacy residual.*(drifted|requires|non-finite|already dumped|HLO contract failed)" "$logs" 2>/dev/null | tail -1); printf "%s\n%s\n%s\n%s\nfiles=%s hlo=%s\n" "$checksum" "$state" "$armed" "$wrote" "$files" "$hlo"; if [ -n "$checksum" ] && [ -n "$state" ] && [ -n "$armed" ] && [ -n "$wrote" ] && [ "$files" -eq 1 ] && [ "$hlo" -eq 3 ] && [ -z "$refusal" ]; then echo "INTEGRITY_OK $(hostname)"; else [ -z "$refusal" ] || printf "%s\n" "$refusal"; echo "INTEGRITY_BAD $(hostname)"; fi'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$integrity_check" >"$RUN_DIR/fleet_integrity.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
@@ -236,6 +245,65 @@ dump_count=$(find "$SOURCE_DIR" -type f -name 'boundaries.position2044.proc*.npz
   say "ABORT: expected eight residual dump files, found $dump_count"
   exit 1
 }
+hlo_count=$(find "$SOURCE_DIR" -type f -name 'observer_hlo.boundary*.proc*.json' | wc -l)
+[[ $hlo_count -eq 24 ]] || {
+  say "ABORT: expected 24 observer HLO contracts, found $hlo_count"
+  exit 1
+}
+
+/home/gianl/vllm-env/bin/python - "$SOURCE_DIR" "$OBSERVER_PIN" \
+  "$ORACLE_PIN" <<'PY' >"$RUN_DIR/observer_hlo_contract.json"
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+expected_code = sys.argv[2]
+expected_oracle = sys.argv[3]
+expected_boundaries = (1, 77, 78)
+paths = sorted(root.rglob("observer_hlo.boundary*.proc*.json"))
+assert len(paths) == 24, len(paths)
+seen = set()
+hashes = {boundary: set() for boundary in expected_boundaries}
+records = []
+for path in paths:
+    value = json.loads(path.read_text())
+    assert value["artifact_kind"] == \
+        "glm52_legacy_selected_boundary_hlo_contract"
+    assert value["code_hash"] == expected_code
+    assert value["oracle_pin"] == expected_oracle
+    assert value["passed"] is True
+    assert value["forbidden_callback_markers"] == []
+    assert value["top_level_input_output_alias"] is False
+    identity = (int(value["process_index"]), int(value["boundary_id"]))
+    assert 0 <= identity[0] < 8
+    assert identity[1] in expected_boundaries
+    assert identity not in seen
+    seen.add(identity)
+    hashes[identity[1]].add(value["hlo_sha256"])
+    records.append({
+        "boundary_id": identity[1],
+        "hlo_sha256": value["hlo_sha256"],
+        "path": path.relative_to(root).as_posix(),
+        "process_index": identity[0],
+    })
+assert seen == {
+    (process, boundary)
+    for process in range(8)
+    for boundary in expected_boundaries
+}
+assert all(len(values) == 1 for values in hashes.values()), hashes
+print(json.dumps({
+    "artifact_kind": "glm52_legacy_selected_boundary_hlo_fleet_contract",
+    "boundaries": list(expected_boundaries),
+    "fleet_hlo_sha256": {
+        str(boundary): next(iter(hashes[boundary]))
+        for boundary in expected_boundaries
+    },
+    "passed": True,
+    "records": records,
+}, indent=2, sort_keys=True))
+PY
 
 run_id=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["run_id"])' \
@@ -301,6 +369,7 @@ say "reconstructing the target row and locating the first divergent boundary"
   --position 2044 --run-tag "$TAG" \
   --legacy-code-hash "$OBSERVER_PIN" --oracle-pin "$ORACLE_PIN" \
   --model-id "$MODEL_ID" --process-count 8 \
+  --boundary-id 1 --boundary-id 77 --boundary-id 78 \
   >"$RUN_DIR/comparison_summary.json"
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" <<'PY'
@@ -381,7 +450,9 @@ lines = {
     "legacy_oracle_pin": sys.argv[5],
     "source_run_id": sys.argv[6],
     "source_item_row_id": sys.argv[7],
-    "first_divergent_boundary": comparison["first_divergent_boundary"],
+    "first_selected_divergent_boundary": comparison["first_divergent_boundary"],
+    "selected_boundary_ids": ",".join(
+        str(value) for value in comparison["boundary_ids"]),
     "legacy_canonical_sha256": comparison["legacy"]["canonical_sha256"],
     "greenfield_canonical_sha256": comparison["greenfield"]["canonical_sha256"],
     "evidence_sha256": sha256((root / "evidence_sha256.json").read_bytes()).hexdigest(),
@@ -403,4 +474,4 @@ remote_success_sha=$(gcloud storage cat "$REMOTE_PREFIX/SUCCESS" | sha256sum | a
 first_boundary=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["first_divergent_boundary"])' \
   "$COMPARISON_DIR/comparison.json")
-say "SUCCESS run=$run_id item=$item_row_id first_divergent_boundary=$first_boundary"
+say "SUCCESS run=$run_id item=$item_row_id first_selected_divergent_boundary=$first_boundary"

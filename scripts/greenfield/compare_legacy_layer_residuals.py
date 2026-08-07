@@ -31,8 +31,12 @@ def main() -> None:
     parser.add_argument("--oracle-pin", required=True)
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--process-count", type=int, default=8)
+    parser.add_argument("--boundary-id", type=int, action="append", default=[])
     args = parser.parse_args()
 
+    config_kwargs = {}
+    if args.boundary_id:
+        config_kwargs["expected_boundary_ids"] = tuple(args.boundary_id)
     comparison = compare_legacy_residuals(
         LegacyResidualComparisonConfig(
             source_dump_dir=args.source_dump_dir,
@@ -45,10 +49,13 @@ def main() -> None:
             expected_oracle_pin=args.oracle_pin,
             expected_model_id=args.model_id,
             expected_process_count=args.process_count,
+            **config_kwargs,
         ))
     print(json.dumps({
         "divergent_boundary_count": comparison["divergent_boundary_count"],
-        "first_divergent_boundary": comparison["first_divergent_boundary"],
+        "first_selected_divergent_boundary": comparison[
+            "first_divergent_boundary"
+        ],
         "legacy_canonical_sha256": comparison["legacy"]["canonical_sha256"],
     }, sort_keys=True))
 

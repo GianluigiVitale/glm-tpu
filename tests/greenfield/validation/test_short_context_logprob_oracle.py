@@ -18,6 +18,10 @@ from glm_tpu.greenfield.validation.short_context_oracle import (
     ShortContextOracleConfig,
     capture_short_context_oracle,
 )
+from scripts.greenfield.capture_legacy_short_context_logprobs import (
+    _raw_token_prefix_contract,
+    _write_append_only_json,
+)
 
 
 @dataclass
@@ -35,6 +39,47 @@ class _Tokenizer:
 
     def decode(self, values: list[int], **_: object) -> str:
         return "".join(chr(value) for value in values)
+
+
+def test_failed_legacy_draw_contract_preserves_exact_tokens(
+    tmp_path: Path,
+) -> None:
+    expected = np.asarray([10, 20, 30, 40], dtype=np.int32)
+    generated = np.asarray([10, 20, 31, 40], dtype=np.int32)
+    contract = _raw_token_prefix_contract(
+        prompt_token_count=2034,
+        expected_token_ids=expected,
+        generated_token_ids=generated,
+    )
+    assert contract == {
+        "expected_count": 4,
+        "expected_token_ids": [10, 20, 30, 40],
+        "first_mismatch_decode_position": 2035,
+        "first_mismatch_expected_token_id": 30,
+        "first_mismatch_generated_token_id": 31,
+        "first_mismatch_offset": 2,
+        "generated_count": 4,
+        "generated_token_ids": [10, 20, 31, 40],
+        "passed": False,
+    }
+    destination = tmp_path / "failed.json"
+    _write_append_only_json(destination, {"token_contract": contract})
+    assert json.loads(destination.read_text())["token_contract"] == contract
+    with pytest.raises(FileExistsError):
+        _write_append_only_json(destination, {"passed": True})
+
+
+def test_failed_legacy_draw_contract_records_short_completion() -> None:
+    contract = _raw_token_prefix_contract(
+        prompt_token_count=7,
+        expected_token_ids=np.asarray([1, 2, 3], dtype=np.int32),
+        generated_token_ids=np.asarray([1, 2], dtype=np.int32),
+    )
+    assert contract["first_mismatch_offset"] == 2
+    assert contract["first_mismatch_decode_position"] == 8
+    assert contract["first_mismatch_expected_token_id"] == 3
+    assert contract["first_mismatch_generated_token_id"] is None
+    assert not contract["passed"]
 
 
 def _token_oracle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:

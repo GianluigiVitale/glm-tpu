@@ -39,6 +39,16 @@ def _git(repository: Path, *arguments: str) -> str:
     ).strip()
 
 
+def _git_is_ancestor(repository: Path, ancestor: str, descendant: str) -> bool:
+    return subprocess.run(
+        [
+            "git", "-C", str(repository), "merge-base", "--is-ancestor",
+            ancestor, descendant,
+        ],
+        check=False,
+    ).returncode == 0
+
+
 def _focus_contract(
     *,
     position: int,
@@ -74,6 +84,59 @@ def _focus_contract(
     }
 
 
+def _raw_token_prefix_contract(
+    *,
+    prompt_token_count: int,
+    expected_token_ids: np.ndarray,
+    generated_token_ids: np.ndarray,
+) -> dict[str, object]:
+    """Describe an exact token-prefix comparison without losing a failed draw."""
+
+    expected = np.asarray(expected_token_ids, dtype=np.int32).reshape(-1)
+    generated = np.asarray(generated_token_ids, dtype=np.int32).reshape(-1)
+    shared = min(expected.size, generated.size)
+    unequal = np.flatnonzero(expected[:shared] != generated[:shared])
+    first_offset: int | None
+    if unequal.size:
+        first_offset = int(unequal[0])
+    elif expected.size != generated.size:
+        first_offset = shared
+    else:
+        first_offset = None
+    first_expected = (
+        int(expected[first_offset])
+        if first_offset is not None and first_offset < expected.size
+        else None
+    )
+    first_generated = (
+        int(generated[first_offset])
+        if first_offset is not None and first_offset < generated.size
+        else None
+    )
+    return {
+        "expected_count": int(expected.size),
+        "expected_token_ids": expected.tolist(),
+        "first_mismatch_decode_position": (
+            prompt_token_count - 1 + first_offset
+            if first_offset is not None
+            else None
+        ),
+        "first_mismatch_expected_token_id": first_expected,
+        "first_mismatch_generated_token_id": first_generated,
+        "first_mismatch_offset": first_offset,
+        "generated_count": int(generated.size),
+        "generated_token_ids": generated.tolist(),
+        "passed": first_offset is None,
+    }
+
+
+def _write_append_only_json(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(payload, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--token-oracle-dir", type=Path, required=True)
@@ -87,6 +150,7 @@ def main() -> None:
         "--legacy-repository", type=Path, default=DEFAULT_LEGACY_REPOSITORY
     )
     parser.add_argument("--expected-oracle-base-hash")
+    parser.add_argument("--expected-oracle-commit-distance", type=int, default=1)
     parser.add_argument("--top-k", type=int, default=16)
     parser.add_argument("--step-count", type=int, default=15)
     parser.add_argument("--focus-position", type=int, default=2044)
@@ -104,9 +168,20 @@ def main() -> None:
     if legacy_hash != args.expected_legacy_code_hash:
         raise RuntimeError("legacy oracle code hash drifted")
     if args.expected_oracle_base_hash is not None:
-        parent_hash = _git(legacy_repository, "rev-parse", f"{legacy_hash}^")
-        if parent_hash != args.expected_oracle_base_hash:
-            raise RuntimeError("legacy observer is not based on the sealed oracle pin")
+        if args.expected_oracle_commit_distance <= 0:
+            raise ValueError("expected oracle commit distance must be positive")
+        distance = int(
+            _git(
+                legacy_repository,
+                "rev-list",
+                "--count",
+                f"{args.expected_oracle_base_hash}..{legacy_hash}",
+            ))
+        if (not _git_is_ancestor(
+                legacy_repository, args.expected_oracle_base_hash, legacy_hash)
+                or distance != args.expected_oracle_commit_distance):
+            raise RuntimeError(
+                "legacy observer ancestry from the sealed oracle pin drifted")
     if _git(REPO_ROOT, "status", "--porcelain"):
         raise RuntimeError("greenfield capture worktree is dirty")
     if _git(
@@ -171,9 +246,30 @@ def main() -> None:
         raise RuntimeError("legacy oracle returned an unexpected output cardinality")
     completion = outputs[0].outputs[0]
     generated_token_ids = np.asarray(completion.token_ids, dtype=np.int32)
-    if generated_token_ids.shape != (args.step_count,) or not np.array_equal(
-        generated_token_ids, expected_token_ids[: args.step_count]
-    ):
+    token_contract = _raw_token_prefix_contract(
+        prompt_token_count=int(prompt_token_ids.size),
+        expected_token_ids=expected_token_ids[: args.step_count],
+        generated_token_ids=generated_token_ids,
+    )
+    if generated_token_ids.shape != (args.step_count,) or not token_contract[
+        "passed"
+    ]:
+        failure = {
+            "artifact_kind": "glm52_legacy_logprob_failed_draw",
+            "build_seconds": build_seconds,
+            "generation_seconds": generation_seconds,
+            "greenfield_capture_code_hash": code_hash,
+            "legacy_observer_code_hash": legacy_hash,
+            "legacy_oracle_base_hash": args.expected_oracle_base_hash,
+            "legacy_oracle_commit_distance": (
+                args.expected_oracle_commit_distance
+            ),
+            "passed": False,
+            "token_contract": token_contract,
+            "token_oracle_manifest_sha256": token_manifest["manifest_sha256"],
+        }
+        _write_append_only_json(args.result_json, failure)
+        print(json.dumps(failure, sort_keys=True), file=sys.stderr)
         raise RuntimeError(
             "legacy logprob run did not reproduce the sealed raw-token prefix"
         )
@@ -197,6 +293,9 @@ def main() -> None:
             "generated_steps": args.step_count,
             "launcher_code_hash": launcher_hash,
             "legacy_oracle_base_pin": args.expected_oracle_base_hash,
+            "legacy_oracle_commit_distance": (
+                args.expected_oracle_commit_distance
+            ),
             "prompt_token_count": int(prompt_token_ids.size),
             "sampling": "greedy",
             "token_oracle_manifest_sha256": token_manifest["manifest_sha256"],
@@ -279,10 +378,7 @@ def main() -> None:
         "step_count": args.step_count,
         "top_k": args.top_k,
     }
-    args.result_json.parent.mkdir(parents=True, exist_ok=True)
-    args.result_json.write_text(
-        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    _write_append_only_json(args.result_json, result)
     print(json.dumps(result, sort_keys=True))
 
 
