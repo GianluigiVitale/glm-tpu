@@ -123,7 +123,6 @@ def main() -> None:
 
     import engine
     import provenance as pv
-    from vllm import SamplingParams
 
     started = time.monotonic()
     llm = engine.build_llm(
@@ -138,6 +137,11 @@ def main() -> None:
         ),
     )
     build_seconds = time.monotonic() - started
+    # Import only after build_llm has resolved the TPU platform through the
+    # repository's required environment override.  Importing SamplingParams
+    # first bypasses that bootstrap and leaves vllm.platforms incomplete.
+    from vllm import SamplingParams
+
     sampling = SamplingParams(
         temperature=0.0,
         max_tokens=args.step_count,
