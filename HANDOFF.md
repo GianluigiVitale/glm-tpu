@@ -1268,3 +1268,51 @@ whose production output remains bitwise unchanged. Compare attention residual, r
 update, and boundary-78 reconstruction under one common input/cache/DSA state, preserve reduction
 association in the contract, and only then apply the smallest numerical correction before the
 protected 2K Gate-D retry.
+
+## Paired 8K oracles sealed; first PP8 8K draw rejected only by a linter collision
+
+The current path supersedes the old residual-observer exact-next above. The accepted 2K Gate-D run
+is DB run 484 / item 1768 at greenfield pin `095d7a1...`: exact tokens and all 294 DSA events,
+topology-local `219` all-gathers / `372` all-reduces / `17` collective-permutes, peak HBM
+`26,245,004,800` bytes, p50/p99 `244.091151/244.247375 ms`, and `4.096830 tok/s`. It proves Gate D
+at 2K but fails the Gate-E `<=200 ms` and `>=4.5 wall tok/s` thresholds.
+
+The paired current-runtime 8K token oracle is
+`greenfield_short_context_oracle_8k_20260807T172307269147351Z`, manifest
+`e4fbcbdbf0fc8b1969e2f82ee457ab1563db4a8b37d2dea2bc4d1e828a13acf2`, with 8,155 prompt tokens
+and 20 generated tokens. The independently recovered protected 8K DSA oracle is
+`greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z`, manifest
+`f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da`. It contains exact positions
+8,155--8,168 and 14 x 21 = 294 events, has an object-by-object verified local/remote ledger, exact
+DB 485 / item 1769 provenance, five independent 8/8 stop/census sets, and immutable sealed logs.
+
+Greenfield pin `b5591dd` added the isolated protected PP8 8K profile. Its first draw,
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T175648292491307Z`, loaded and compiled the production executable on all eight
+hosts, then failed closed before any model execution because the HLO linter reported only
+`decoder contains dead-row/full-pod live tensors`. It has no token/DSA/prefill execution, timing,
+DB row, `SUCCESS`, Gate-D result, or performance claim. The failure census proves authenticated
+8/8 zero work. Host logs and the exact optimized HLO are preserved locally and under the approved
+result prefix.
+
+The rejected HLO contains exactly 21 full-DSA scorer bodies. Each body has the pinned
+head-query/key contraction, scale/clamp, head-weight multiply, and head reduction. Their legitimate
+local score tensor is `f32[32,2048]`: 32 DSA indexer heads by the 8K/LP4 2,048-position local context
+shard. This collided with both the 32-device dead-row sentinel and DSA selected width 2,048. The
+accepted 2K HLO has the identical 21-body / 210-occurrence opcode fingerprint at `f32[32,512]`.
+
+Greenfield commit `b7853e20ddf28eadcd323b2d8e4dce0e7fcfa0aa` is pushed. It models the 32 DSA heads explicitly
+and admits the colliding shape only inside that exact six-operation scorer fingerprint with the
+pinned contraction, head-weight broadcast/multiply, and final reduction. Unrelated f32 or BF16
+`[32,2048]`, full-pod hidden rows, dead scorer-query rows, opcode/name drift, body-count drift, and
+wrong dtypes remain fail-closed. Offline revalidation passes the accepted 2K decoder, 2K device-loop
+prefill, isolated 2K DSA observer, and rejected 8K decoder; the 8K record reports 21/21 valid scorer
+bodies, 210 admitted colliding occurrences, zero forbidden shapes, and the unchanged
+`219/372/17` local collective contract. Focused runtime/HLO tests pass 53/53; the complete
+CPU-only greenfield suite passes 380 with one skip.
+
+Exact next: from clean pin `b7853e2` and an authenticated idle fleet, run exactly one serialized
+`bash scripts/greenfield/run_short_decoder_compile_pp8_8k.sh`. Accept only exact paired token and
+294-event DSA oracles, state/load/cache integrity, 8K HLO including 21/21 pinned score bodies, fresh
+eight-host XPlanes, profiler-free wall, per-chip HBM, DB/archive linkage, and authenticated 8/8
+zero-work cleanup. Do not claim the first rejected draw and do not continue to 128K if 8K Gate D
+fails.
