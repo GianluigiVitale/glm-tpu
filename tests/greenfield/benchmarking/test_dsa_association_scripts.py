@@ -28,6 +28,8 @@ def test_distributed_q_a_probe_is_exact_pin_and_collective_bound() -> None:
         '"jax_process_index": jax.process_index()',
         "if args.process_id == 0:",
         "jax.make_array_from_callback",
+        "MODEL_CONFIG_SHA256",
+        'model_config.get("rms_norm_eps") != 1e-5',
         "legacy_tp32_distributed_q_a_norm",
         "distributed_collective_violations",
         "diagnostic_only_full_pod_collectives",
@@ -60,6 +62,7 @@ def test_state_probe_requires_checksum_bound_distributed_result() -> None:
         "LegacyDcpXlaScoreGeometry",
         "legacy_local_dcp_score_inputs",
         "legacy_local_dcp_xla_scores",
+        "model_epsilon_distributed_local_dcp_association_restored",
         'phase="legacy_local_dcp_xla_score"',
     ):
         assert required in source
@@ -101,6 +104,18 @@ def test_distributed_result_artifact_round_trips_and_refuses_drift(
         "diagnostic_only": True,
         "code_hash": code_hash,
         "input_manifest_sha256": input_hash,
+        "model_config": {
+            "path": "reference/hf-repo/config.json",
+            "sha256": (
+                "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff"
+            ),
+            "rms_norm_eps": 1e-5,
+        },
+        "numerical_geometry": {
+            "input_rms_norm_epsilon": 1e-5,
+            "q_a_rms_norm_epsilon": 1e-5,
+            "key_layer_norm_epsilon": 1e-6,
+        },
         "hlo_sha256": "3" * 64,
         "q_residual": {
             "shape": [32, 2048],
@@ -128,29 +143,30 @@ def test_distributed_result_artifact_round_trips_and_refuses_drift(
     np.testing.assert_array_equal(actual, q_bits)
 
 
-def test_protected_wrapper_reuses_sealed_distributed_phase() -> None:
+def test_protected_wrapper_serializes_model_epsilon_distributed_phase() -> None:
     source = WRAPPER.read_text()
     for required in (
         ".glm_pod_workload.lock",
         "strict_census pre",
+        "strict_census distributed_post",
         "strict_census post",
+        "probe_layer0_distributed_q_a_norm.py",
         "probe_layer0_dsa_association.py",
-        "DEFAULT_DISTRIBUTED_Q_A_DIR",
-        "DISTRIBUTED_Q_A_MANIFEST_SHA",
-        "DISTRIBUTED_Q_A_CODE_HASH",
-        "no repeated 32-chip phase",
+        "DISTRIBUTED_Q_A_NORM_OK",
+        "MODEL_CONFIG_SHA",
+        "model epsilon 1e-5",
         "distributed_q_a_norm_manifest_sha256",
         "--distributed-q-a-norm-code-hash",
         "legacy_local_dcp_xla_score",
-        "bounded-real-layer0-v4-exact-local-xla-dcp-score",
+        "bounded-real-layer0-v5-model-epsilon-distributed-q-a",
         "bench/results.db",
         "--no-clobber",
         "REMOTE_PREFIX/SUCCESS",
     ):
         assert required in source
     for forbidden in (
-        "probe_layer0_distributed_q_a_norm.py --coordinator-address",
-        "running exact 32-chip q-a projection/RMSNorm association",
+        "DEFAULT_DISTRIBUTED_Q_A_DIR",
+        "no repeated 32-chip phase",
     ):
         assert forbidden not in source
     completed = subprocess.run(

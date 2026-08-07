@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 22:05 UTC
+**Updated:** 2026-08-07 23:13 UTC
 
 ## Authority and isolation
 
@@ -883,11 +883,12 @@ The subsequent arithmetic/methodology audit found two distinct issues. First, to
 between independent TPU score programs contradicted the binding device-score contract: exactness is
 the canonical global top-k/set, lowest-position ties, and tails of the executing FP32 score row;
 cross-program score tensors use bounded comparison and raw legacy total order is diagnostic only.
-Second, the greenfield runtime incorrectly used transformer epsilon `1e-5` for q_a/kv_a LoRA
-RMSNorm; GLM-5.2 requires the model default `1e-6`. This was a real numerical bug, not a relaxed
-comparison.
+Second, the audit then classified q_a/kv_a LoRA RMSNorm epsilon `1e-5` as a defect and changed it
+to `1e-6`. Later pinned-config/source audit (recorded at the end of this handoff) proves that
+classification was wrong: GLM-5.2 requires `1e-5` for these RMSNorms. This paragraph preserves the
+historical decision without treating it as the current numerical contract.
 
-Commit `b406e3a` fixes the LoRA epsilon throughout stage, layer, and Gate C paths and upgrades the
+Commit `b406e3a` changed the LoRA epsilon throughout stage, layer, and Gate C paths and upgraded the
 observer without changing the default-off production output surface. The separate callback-free
 observer exports bit-exact executing FP32 selected scores and gates exact selected set/count,
 `-1`/`-inf` tails, unique causal positions, and canonical executing-score order/lowest-position
@@ -1609,3 +1610,36 @@ Exact next: commit and push this clean bounded checkpoint, then run exactly one 
 is restored, translate the association to the smallest true-one-row production implementation and
 retry protected 8K Gate D once. Otherwise record the rejection and resume the source/state audit;
 do not launch the complete decoder blindly.
+
+## DB490 rejects scorer geometry; pinned model epsilon is the next discriminator
+
+Protected bounded run `greenfield_layer0_dsa_association_20260807T224711202903102Z` at
+`01ba8cd143b855b3e0c2bb917f61a9d75b4410f3` completed as DB 490 with local/remote `SUCCESS`, exact
+evidence hashes, approved archive, and authenticated 8/8 pre/post cleanup. The exact local XLA
+scorer HLO SHA is `e4e4d6cd...65b4e`; it has the required query/cache/weight/table/length/output
+shapes, physical score tile `f32[32,512,32]`, and no collective or callback.
+
+The local scorer is elementwise identical to the prior nested pagewise reconstruction across all
+8,156 scores: zero mismatches and zero max/mean/p99 delta. It therefore does not restore the sealed
+order. The baseline remains exact-set with 1,640 order mismatches; the DB489 distributed state
+remains exact-set with 1,501 order mismatches. Every selected-score delta has positive signed mean
+equal to mean absolute error, pointing to a systematic state scale rather than scorer association.
+Runner/summary/evidence/DB-snapshot SHAs are `81499059...d737`, `d1f69178...62af`,
+`67f60373...d662`, and `ce0447bf...d0f`. This is diagnostic-only and carries no decoder, Gate-D,
+latency, or throughput claim.
+
+The next source audit found a concrete numerical-contract error. Both accepted config copies
+(`reference/hf-repo/config.json` and the model-streamer config) hash to
+`22e49334...65ff` and pin `rms_norm_eps=1e-5`. Accepted vLLM pin `a30addc...d1c` passes that value
+to both q_a and kv_a RMSNorm. Greenfield production and every prior bounded q-a probe instead used
+`1e-6`; DB489 therefore did not test the accepted model norm. Key affine LayerNorm remains a
+separate `1e-6` operation. The bounded diagnostic now pins the config SHA, executes a fresh exact
+32-chip q-a norm with `1e-5`, and feeds it to the already-proven exact local scorer. Production is
+unchanged until that matrix passes exact set and order.
+
+The focused diagnostic suite passes 33/33. The complete CPU-only greenfield suite passes 417 with
+one skip and the same two pre-existing SWIG warnings in 333.75 seconds; Bash syntax, ShellCheck,
+Python compilation, JSON and diff checks pass. Exact next: commit/push the diagnostic-only
+correction, then run one serialized protected layer-0 matrix. If it restores exact order, change production q_a/kv_a
+LoRA epsilon to `1e-5`, correct the affected reference contracts, and run one protected 8K Gate-D
+retry. Do not load the full decoder for the diagnostic itself.

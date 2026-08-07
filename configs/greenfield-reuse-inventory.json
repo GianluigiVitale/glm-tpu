@@ -152,12 +152,12 @@
       "id": "legacy-distributed-q-a-rmsnorm",
       "category": "numerical association evidence",
       "source_repo": "tpu-inference, vLLM reference, and accepted glm-run XPlane",
-      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
-      "source_paths": ["tpu_inference/layers/common/quantization/fp8.py", "tpu_inference/layers/common/linear.py", "tpu_inference/layers/common/utils.py", "tpu_inference/layers/vllm/custom_ops/mla_attention.py", "/home/gianl/vllm-build/vllm/ir/ops/layernorm.py@a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c", "/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z/analysis_t2.json"],
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d / vLLM a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c / config 22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff",
+      "source_paths": ["tpu_inference/layers/common/quantization/fp8.py", "tpu_inference/layers/common/linear.py", "tpu_inference/layers/common/utils.py", "tpu_inference/layers/vllm/custom_ops/mla_attention.py", "/home/gianl/vllm-build/vllm/ir/ops/layernorm.py@a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c", "/home/gianl/vllm-build/vllm/model_executor/models/deepseek_v2.py@a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c", "reference/hf-repo/config.json", "/home/gianl/glm-run/e0cap_sparse_20260805T071818146401337Z/analysis_t2.json", "/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T224711202903102Z"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "scripts/greenfield/probe_layer0_distributed_q_a_norm.py", "scripts/greenfield/probe_layer0_dsa_association.py"],
       "gate": "D",
-      "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
+      "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. DB490 rejects scorer geometry, while the pinned config and accepted vLLM source prove q_a/kv_a RMSNorm epsilon 1e-5. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
     },
     {
       "id": "legacy-8k-local-xla-scorer-association",

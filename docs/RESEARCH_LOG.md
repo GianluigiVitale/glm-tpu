@@ -5235,6 +5235,47 @@ XLA program. The next diagnostic must reproduce the accepted local XLA scorer's 
 three-page static geometry and BF16-cache/FP32-query boundary, then merge the eight local stripes
 offline. Only that result can distinguish scorer association from remaining upstream state.
 
+## 2026-08-07 22:54 — DB490 rejects local scorer geometry; model RMSNorm epsilon was mis-pinned
+
+Protected bounded run `greenfield_layer0_dsa_association_20260807T224711202903102Z` at full pin
+`01ba8cd143b855b3e0c2bb917f61a9d75b4410f3` completed as DB 490. Local and remote `SUCCESS`, DB
+integrity, exact evidence checksums, approved-bucket archive, and authenticated 8/8 pre/post
+zero-work censuses pass. Runner, summary, evidence-list, and DB snapshot hash to
+`81499059...d737`, `d1f69178...62af`, `67f60373...d662`, and `ce0447bf...d0f`.
+
+The exact three-page local scorer is not the missing association. HLO `e4e4d6cd...65b4e` has entry
+query `f32[32,32,128]`, cache `bf16[24,512,128]`, head weights `f32[32,32]`, block tables
+`s32[32,3]`, lengths `s32[32]`, output `f32[32,1536]`, and the observed physical score tile
+`f32[32,512,32]`, with no collective or callback. After offline DCP8 stitching its complete score
+row is elementwise identical to the prior nested pagewise reconstruction: zero mismatches and
+zero max/mean/p99 delta. The baseline still has exact set / 1,640 order mismatches; the distributed
+q-a state has exact set / 1,501 order mismatches. All its sealed-aligned score deltas are positive,
+with mean signed error equal to mean absolute error (`0.0260275` baseline and `0.0228811`
+distributed), which is consistent with a systematic scale error.
+
+Read-only provenance then exposes that error. `reference/hf-repo/config.json` and
+`/home/gianl/.cache/vllm/assets/model_streamer/b7022b53/config.json` are byte-identical at SHA
+`22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff` and declare
+`rms_norm_eps: 1e-05`. At accepted vLLM pin `a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c`,
+`vllm/model_executor/models/deepseek_v2.py` constructs q_a and kv_a RMSNorm with exactly
+`config.rms_norm_eps`; no override to `1e-6` exists. The earlier `b406e3a` conclusion was wrong:
+greenfield production and DB489's `Layer0DsaProbeGeometry` use `1e-6`, so DB489 did not execute the
+accepted model arithmetic. The indexer key affine LayerNorm is independent and correctly remains
+`1e-6`.
+
+The next diagnostic changes only bounded `q_norm_epsilon` to the pinned `1e-5`, records the config
+path/SHA/value and all three epsilon roles in every rank record and artifact, reruns the exact
+32-chip association once, and reuses the proven local scorer matrix. Production defaults remain
+unchanged until exact set/order evidence authorizes the correction. This is source-backed reuse of
+the existing probe and ownership/archive stack, not a new execution architecture.
+
+Focused diagnostic coverage passes 33/33. The complete CPU-only greenfield suite passes 417 with
+one skip and two pre-existing SWIG warnings in 333.75 seconds. Bash syntax, ShellCheck, Python
+compilation, JSON and diff checks pass. One accidentally unpinned test process acquired the local
+libtpu lock before model execution; exact PID 473984 was terminated and the lock released. No model
+workflow started. The protected wrapper's authenticated pre-census remains mandatory before the
+single serialized launch.
+
 ## 2026-08-07 22:46 — Exact local XLA scorer discriminator is CPU/HLO sealed
 
 The accepted source path confirms the precise discriminator. Under DCP8, the 512-token local page

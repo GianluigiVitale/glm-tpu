@@ -19,6 +19,10 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
 EXPECTED_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
+MODEL_CONFIG_PATH = REPO / "reference/hf-repo/config.json"
+MODEL_CONFIG_SHA256 = (
+    "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff"
+)
 SEALED_LEGACY_FUSED_QKV_WEIGHT_BYTE_SUM = 2_448_103_424
 SEALED_LEGACY_FUSED_QKV_SCALE_BYTE_SUM = 53_100_864
 
@@ -99,6 +103,12 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
+    model_config_sha256 = _sha256_file(MODEL_CONFIG_PATH)
+    model_config = json.loads(MODEL_CONFIG_PATH.read_text())
+    if model_config_sha256 != MODEL_CONFIG_SHA256 or (
+        model_config.get("rms_norm_eps") != 1e-5
+    ):
+        raise RuntimeError("pinned GLM-5.2 RMSNorm config identity drifted")
 
     import jax
     import jax.numpy as jnp
@@ -188,6 +198,10 @@ def main() -> int:
         ):
             raise RuntimeError(
                 "distributed q-a norm runtime pack disagrees with sealed state"
+            )
+        if geometry.q_norm_epsilon != model_config["rms_norm_eps"]:
+            raise RuntimeError(
+                "distributed q-a norm epsilon disagrees with pinned model config"
             )
 
         normalize_arguments = (
@@ -333,6 +347,16 @@ def main() -> int:
             "code_hash": code_hash,
             "hostname": socket.gethostname(),
             "input_manifest_sha256": manifest["manifest_sha256"],
+            "model_config": {
+                "path": str(MODEL_CONFIG_PATH.relative_to(REPO)),
+                "sha256": model_config_sha256,
+                "rms_norm_eps": model_config["rms_norm_eps"],
+            },
+            "numerical_geometry": {
+                "input_rms_norm_epsilon": geometry.rms_norm_epsilon,
+                "q_a_rms_norm_epsilon": geometry.q_norm_epsilon,
+                "key_layer_norm_epsilon": geometry.key_norm_epsilon,
+            },
             "launch_process_id": args.process_id,
             "jax_process_index": jax.process_index(),
             "local_device_ids": [device.id for device in jax.local_devices()],
@@ -402,6 +426,8 @@ def main() -> int:
                 "diagnostic_only": True,
                 "code_hash": code_hash,
                 "input_manifest_sha256": manifest["manifest_sha256"],
+                "model_config": record["model_config"],
+                "numerical_geometry": record["numerical_geometry"],
                 "hlo_sha256": hlo_sha256,
                 "producer": {
                     "hostname": socket.gethostname(),

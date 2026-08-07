@@ -100,10 +100,17 @@ DB489 has now rejected the distributed q-a norm as sufficient: it improves the s
 but still misses 1,501 XLA and 1,249 Pallas slots. The run's internal state deltas do not constitute
 captured query/key proof because the portable artifact seals selected positions/scores only.
 
-The next adaptation therefore targets a concrete scorer-shape mismatch. DB485 provenance pins
+The next adaptation targeted a concrete scorer-shape mismatch. DB485 provenance pins
 `GLM_DSA_SCORER=xla`, `max_model_len=8704`, DCP8, 512 local keys per 4,096-token global page,
 `GLM_DSA_BT_WIDTH=owned`, and 24 cache blocks. The accepted local body walks exactly three pages at
 `R=32`; the older diagnostic nested eight shards in one 84-page program. Greenfield independently
 reproduces the local cache/block-table/length operands and exact XLA einsum/reduction association,
 then stitches eight stripes only outside the compiled scorer. This remains bounded diagnostic code:
 production `decode_batch1` is still one row and may never inherit the legacy dead-row bucket.
+
+DB490 proves that exact local scorer is elementwise identical to the older reconstruction and
+rejects scorer geometry. The same registry then exposes the next reusable source truth: accepted
+vLLM constructs q_a/kv_a RMSNorm from the pinned model config, whose SHA is
+`22e49334...65ff` and whose epsilon is `1e-5`. The earlier `1e-6` greenfield conclusion is
+superseded. The existing distributed association runner is therefore reused once with explicit
+config provenance; no new scorer, loader, model path, or protection harness is being invented.

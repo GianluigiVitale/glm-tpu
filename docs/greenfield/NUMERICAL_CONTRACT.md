@@ -8,8 +8,10 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
 
 - RMSNorm converts activations to FP32 for square/mean/rsqrt, rounds the
   normalized value back to the activation dtype, then multiplies the norm
-  weight in that dtype. Transformer/final norm use epsilon `1e-5`; attention
-  LoRA norms use the model's `1e-6` default.
+  weight in that dtype. Transformer/final norm and q_a/kv_a attention LoRA
+  RMSNorm use the pinned model config's epsilon `1e-5`. The indexer key
+  affine LayerNorm is a distinct operation and retains its source epsilon
+  `1e-6`.
 - The accepted fused residual-add/RMSNorm boundary first adds the two BF16
   inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
   the independently carried residual is the same sum rounded to BF16. A

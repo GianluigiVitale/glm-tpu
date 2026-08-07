@@ -83,6 +83,18 @@ def _inspect_distributed_q_a_norm_artifact(
         != expected_input_manifest_sha256
     ):
         raise ValueError("distributed q-a norm provenance drifted")
+    if manifest.get("model_config") != {
+        "path": "reference/hf-repo/config.json",
+        "sha256": (
+            "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff"
+        ),
+        "rms_norm_eps": 1e-5,
+    } or manifest.get("numerical_geometry") != {
+        "input_rms_norm_epsilon": 1e-5,
+        "q_a_rms_norm_epsilon": 1e-5,
+        "key_layer_norm_epsilon": 1e-6,
+    }:
+        raise ValueError("distributed q-a norm numerical provenance drifted")
     file_record = manifest.get("file", {})
     if file_record.get("filename") != "distributed_q_a_norm.safetensors":
         raise ValueError("distributed q-a norm filename drifted")
@@ -872,6 +884,11 @@ def main() -> int:
         "input_manifest_sha256": manifest["manifest_sha256"],
         "input_builder_code_hash": manifest["code_hash"],
         "distributed_q_a_norm_artifact": distributed_q_a_manifest,
+        "numerical_geometry": {
+            "input_rms_norm_epsilon": geometry.rms_norm_epsilon,
+            "q_a_rms_norm_epsilon": geometry.q_norm_epsilon,
+            "key_layer_norm_epsilon": geometry.key_norm_epsilon,
+        },
         "backend": jax.default_backend(),
         "device": str(device),
         "device_kind": device.device_kind,
@@ -933,6 +950,11 @@ def main() -> int:
         "runtime_fused_qkv_distributed_norm_association_restored": comparisons[
             distributed_state_name
         ]["passed"],
+        "model_epsilon_distributed_local_dcp_association_restored": (
+            comparisons[
+                f"legacy_local_dcp_xla_on_{distributed_state_name}"
+            ]["passed"]
+        ),
         "one_row_pagewise_restored": comparisons[
             "one_row_pagewise_on_legacy_state"
         ]["passed"],

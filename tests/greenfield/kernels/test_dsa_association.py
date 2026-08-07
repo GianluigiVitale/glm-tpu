@@ -33,6 +33,13 @@ from glm_tpu.greenfield.validation.layer0_dsa_association import (
 )
 
 
+def test_layer0_probe_geometry_pins_distinct_model_and_key_epsilons() -> None:
+    geometry = Layer0DsaProbeGeometry()
+    assert geometry.rms_norm_epsilon == 1e-5
+    assert geometry.q_norm_epsilon == 1e-5
+    assert geometry.key_norm_epsilon == 1e-6
+
+
 def test_bfloat16_artifact_bits_roundtrip() -> None:
     expected = np.asarray([0.0, 1.0, -2.5, 0.125], dtype=ml_dtypes.bfloat16)
     bits = expected.view(np.uint16)

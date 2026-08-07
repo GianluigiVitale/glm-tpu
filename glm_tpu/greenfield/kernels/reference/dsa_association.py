@@ -45,7 +45,11 @@ class Layer0DsaProbeGeometry:
     rotary_dim: int = 64
     theta: float = 8_000_000.0
     rms_norm_epsilon: float = 1e-5
-    q_norm_epsilon: float = 1e-6
+    # The accepted GLM-5.2 config pins rms_norm_eps=1e-5 and vLLM passes
+    # that value to q_a_layernorm.  This bounded diagnostic geometry must
+    # reproduce the model value; key_norm below is a distinct LayerNorm
+    # whose source contract remains 1e-6.
+    q_norm_epsilon: float = 1e-5
     key_norm_epsilon: float = 1e-6
 
     def __post_init__(self) -> None:

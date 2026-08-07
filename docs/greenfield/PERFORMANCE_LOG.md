@@ -648,8 +648,9 @@ The mismatch exposed an over-strict harness assumption: independent TPU programs
 to have identical total FP32 score order. Commit `b406e3a` replaces that gate with the documented
 contract—exact top-k set/count/tails and lowest-position ties against the executing device scores,
 while retaining position-aligned legacy scores/order as diagnostics. The
-same audit found and fixed a real arithmetic defect: q_a/kv_a LoRA RMSNorm used `1e-5` rather than
-the model's `1e-6`. The observer now stores and hashes its raw score/position tensors and remains a
+same audit changed q_a/kv_a LoRA RMSNorm from `1e-5` to `1e-6`; the later pinned-config/source
+audit below proves that historical classification was wrong and restores `1e-5` as the required
+contract. The observer now stores and hashes its raw score/position tensors and remains a
 separate callback-free, no-donation executable. Production outputs/HLO are observer-off. Local
 verification passes 59 relevant tests plus syntax/static checks. A new protected run is required;
 `b406e3a` itself is not performance evidence.
@@ -823,3 +824,21 @@ not repeat the diagnostic full-pod projection/norm. Focused coverage is 36/36 an
 CPU-only suite is 416 passed / 1 skipped; the exact 20,188-byte CPU HLO contract passes. These are
 static/correctness readiness facts only. No TPU result, decoder latency, token rate, Gate-D result,
 or performance comparison exists for this checkpoint.
+
+## DB 490 — exact local DCP scorer rejected; no performance claim
+
+DB 490 / `greenfield_layer0_dsa_association_20260807T224711202903102Z` at `01ba8cd` passes exact
+HLO, DB/archive/SUCCESS, evidence hashes, and 8/8 cleanup. HLO `e4e4d6cd...65b4e` reproduces the
+accepted three-page local scorer shapes and has no collective/callback. Its stitched score row is
+elementwise identical to the prior pagewise reconstruction (zero delta), so scorer geometry is
+rejected as the missing 8K association. Baseline/distributed states remain exact-set but have
+1,640/1,501 order mismatches. This diagnostic has no timing or throughput result.
+
+The pinned model config SHA `22e49334...65ff` declares `rms_norm_eps=1e-5`, and accepted vLLM uses
+it for q_a/kv_a RMSNorm. Earlier greenfield work incorrectly changed those norms to `1e-6`; DB489
+used the same wrong value. The next bounded run therefore repeats only the existing distributed
+q-a phase at model epsilon `1e-5`, with config/numerical provenance, then applies the exact local
+scorer. Production and its performance status remain unchanged pending exact set/order proof.
+
+Diagnostic readiness is CPU-only: 33/33 focused and 417 passed / 1 skipped full greenfield tests,
+plus Bash, ShellCheck, Python, JSON and diff checks. It is not TPU or performance evidence.
