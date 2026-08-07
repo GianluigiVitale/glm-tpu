@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 06:31 UTC
+**Updated:** 2026-08-07 06:58 UTC
 
 ## Authority and isolation
 
@@ -1069,3 +1069,30 @@ same position-2,044 tie/mismatch, all 14 x 21 DSA contracts, exact residual writ
 contract, preserved HLO/logs/artifacts, and authenticated 8/8 zero-work cleanup. Then add an
 independent observer-only legacy capture at the pinned oracle source, compare corresponding
 boundaries, and isolate the earliest divergent layer/operation before changing arithmetic.
+
+## Greenfield position-2,044 layer boundaries captured on real TPU
+
+Protected diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_oracle_dsa_residual_p2044_trace2_20260807T063203702756771Z`
+at code `312f043` completed the intended capture and failed closed only at the unchanged raw-token
+gate. Production, observer, and prefill HLO contracts pass; the observer isolation contract has no
+callback/alias and exactly matches production collective counts. Prefill token `220`, all 14 x 21
+DSA contracts, and the first ten recurrent tokens pass. Position 2,044 remains expected `16345`,
+observed `12877`; with teacher forcing, positions 2,045--2,047 return exact `374,6176,13`, proving
+the former later mismatch was downstream.
+
+The artifact contains all 79 `[6144]` BF16 boundary bit rows at position 2,044. Four-lane stage
+replication, all seven cross-stage duplicate writers, zero nonwriters, shape, in-memory BF16 dtype,
+and finiteness pass. Canonical byte SHA is
+`d14366c997dea49dfdd71740ba2d64690201fe794b3bd401145231d0f5656b57`; no mismatch lists are
+populated. The three residual files, 14 DSA NPZs, production/observer/prefill HLO, and all eight
+logs exist locally and at the approved result prefix; the failure-exit census is authenticated 8/8
+zero work. No production timing, DB row, Gate D, or tok/s claim exists.
+
+Serialization caveat discovered by independent readback: NumPy preserves the exact two bytes per
+BF16 element and the canonical SHA, but writes the custom `ml_dtypes.bfloat16` NPZ field descriptor
+as `void16`. The values remain losslessly readable as `uint16` BF16 bits, but the file is not
+self-describing. Exact next: change future residual artifacts to an explicit little-endian
+`uint16` BF16-bit field and add readback validation; do not rerun this expensive capture solely for
+metadata because the protected raw bytes are exact and immutable. Then implement the independent,
+observer-only legacy boundary capture at the pinned oracle source and compare the two trajectories.
