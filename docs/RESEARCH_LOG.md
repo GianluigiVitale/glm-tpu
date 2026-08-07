@@ -5009,3 +5009,33 @@ A source regression pins that conditional inventory; 27 focused runner/decoder t
 and diff checks pass. Executing the patched validator read-only over the immutable failed draw now
 passes every pre-DB condition, including the 8-file/64-core/two-step XPlane inventory. It does not
 retrofit acceptance. Next is one clean-pin serialized retry under identical protected flags.
+
+## 2026-08-07 15:58 — Protected PP8 2K Gate D passes; Gate E remains open
+
+DB run `484`, item `1768`, tag
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T153043648919419Z`
+at `095d7a1` is the first accepted complete greenfield decoder result. The sealed 2,034-token
+prompt, 13-token production prefix, 14-token isolated replay, and all `14 x 21 = 294` executing-
+device DSA events pass exact sets, counts, tails, lowest-position ties, producer/lane/padding, and
+token order. The corrected position-2,044 token is `16345`. Production timing and trace use the
+observer-free executable; prefill preserves the cache without donation.
+
+Production/observer/prefill HLO SHAs are `bc23eca0...515a`, `3ec4ed4a...9a7f`, and
+`edb89700...69f`. The production contract passes exact `219AG/372AR/17CP`, all repeated groups are
+the eight declared four-chip groups, and the eight inter-stage transfers are exactly
+`bf16[2,1,6144]` (24,576 bytes). There is no full-pod hidden reconstruction, dead batch row,
+decoded weight/expert overlay, callback, or observer alias. Eight fresh XPlanes cover 64 cores and
+two selected steps/core.
+
+Fleet-max profiler-free complete-step p50/p99 is `244.091151/244.247375 ms`, or `4.096830`
+single-stream tok/s. Peak HBM is `26,245,004,800 / 33,014,398,976` bytes/chip, leaving at least
+`6,769,394,176` measured bytes. Compile/observer/prefill maxima are
+`156.857/171.783/172.489 s`; prefill wall max is `495,076.606 ms`. This passes correctness Gate D
+at 2K but fails Gate E's `<=200 ms` and `>=4.5 tok/s` thresholds; no useful-performance claim is
+made.
+
+Summary/XPlane/DB-snapshot SHAs are `1ba77357...b60`, `0d8ac98d...afa0`, and
+`5789f5e8...26b8`. Every sealed checksum revalidates, approved-bucket `SUCCESS` contains
+`db_run=484`, and pre/post censuses each prove eight unique `CENSUS_OK` hosts. The required next
+Gate D evidence is 8K under the same split-state numerical contract, followed by PP8 optimization
+before protected 128K/256K promotion.

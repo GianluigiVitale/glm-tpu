@@ -753,3 +753,23 @@ The rejected draw measured fleet-max p50/p99 complete-step wall
 `219AG/372AR/17CP` and eight local `bf16[2,1,6144]` transfers. Because there is no DB row,
 summary, sealed archive, or local/remote `SUCCESS`, none of these timings is an accepted Gate D/E
 claim. One identical protected retry from the corrected clean pin is required.
+
+## 2026-08-07 — first accepted complete PP8 decoder passes protected 2K Gate D
+
+DB 484 / item 1768 / tag
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T153043648919419Z`
+at `095d7a1` passes exact sealed tokens and all 294 DSA events. The former position-2,044 mismatch
+is fixed (`16345`), and the production and observer sequences have zero mismatches. Direct load,
+state/cache, HLO, metadata, observer isolation, fleet agreement, fresh traces, DB snapshot,
+approved archive, and authenticated pre/post cleanup all pass.
+
+Fleet-max profiler-free complete-step p50/p99 is `244.091151/244.247375 ms`, yielding
+`4.096830` single-stream tok/s. Peak HBM is `26,245,004,800` bytes/chip with
+`6,769,394,176` measured bytes remaining. Eight XPlanes cover 64 cores and two steps/core. HLO
+`bc23eca0...515a` has exact `219AG/372AR/17CP`, eight `bf16[2,1,6144]` stage transfers, only local
+four-chip repeated groups, and no forbidden reconstruction/overlay/dead row.
+
+This closes protected 2K Gate D correctness, not Gate E: latency exceeds 200 ms and rate is below
+4.5 tok/s. Summary/XPlane/DB snapshot SHAs are `1ba77357...b60`, `0d8ac98d...afa0`, and
+`5789f5e8...26b8`; remote `SUCCESS` binds DB 484 and all sealed checksums pass. Next is the
+required 8K decoder proof, then evidence-driven PP8 optimization before 128K and 256K.
