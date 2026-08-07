@@ -737,7 +737,7 @@ def validate_decoder_step_hlo(
         }
         if feature_reconstruct_down_fp32:
             expected_reduction_result_shape_counts[
-                "f32[8,1,6144]"
+                "f32[8,6144]"
             ] = sparse_layers
         if complete_token_path:
             if token_observation_candidates == 1:

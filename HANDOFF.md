@@ -1001,3 +1001,12 @@ run the protected complete 2K decoder/oracle/DSA challenger with FP32 reconstruc
 pack and remeasure. If token 2,044 still inverts, keep teacher forcing on the sealed trajectory and
 capture compact per-layer residuals to locate the first arithmetic divergence. Never relax the raw
 token, DSA, state/cache, HLO, wall/HBM, trace, DB/archive, or cleanup gates.
+
+The first full challenger
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_oracle_dsa_trace2_20260807T051528775553030Z`
+at `8198f95` loaded and compiled for about 17 minutes, then failed closed at the pre-execution HLO
+gate. All other collective counts/shapes passed, but the contract predicted the 75 new results as
+`f32[8,1,6144]`; the real complete TPU HLO lowers them as `f32[8,6144]`, identical to the sealed
+one-layer lowering. No prefill, token, DSA, timing, or tok/s claim was reached. Diagnostics are
+preserved and failure-exit cleanup is 8/8 clean. The exact next action is the same protected 2K
+challenger with only that observed exact shape pinned; no arithmetic or acceptance gate is relaxed.
