@@ -730,3 +730,26 @@ All eight host logs are byte-identical (`c6387cb0...aaba`) and cleanup ended wit
 throughput result exists. The contract now pins the singleton embedding form only when split state
 and complete-token execution are both enabled. Revalidation passes the archived split HLO
 (`418c75be...0023`) with zero violations and also passes the prior default TPU HLO unchanged.
+
+## 2026-08-07 — split-state protected draw corrects tokens but outer inventory rejects evidence
+
+Rejected post-execution diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T145659123253046Z`
+at `e5df9f4` passes the inner production/observer/prefill HLO contracts, all 294 DSA events, and the
+sealed token sequences. In particular, position 2,044 now emits expected token `16345` rather than
+the prior `12877`; production matches 13/13 available prefix tokens and the isolated observer
+matches 14/14 recurrent tokens. All eight fresh XPlanes exist and the failure census is 8/8 clean.
+
+The outer validator then rejected the already-correct inner feature contract because its expected
+dictionary omitted the 75 `greenfield_fp32_to_bf16_r8_h6144` conversion boundaries required by
+the enabled FP32 down-reconstruction path. The actual and inner-expected dictionaries agree
+exactly and have no forbidden overlay. A conditional outer expectation plus static regression fixes
+that validator defect; 27 focused tests pass, and a read-only execution of the patched validator
+over the archived draw passes every condition before DB mutation.
+
+The rejected draw measured fleet-max p50/p99 complete-step wall
+`244.285871/244.535177 ms` (`4.093565` implied tok/s), peak HBM `26,245,004,800` bytes/chip, and
+`6,769,394,176` bytes minimum measured margin. HLO is `bc23eca0...515a` with
+`219AG/372AR/17CP` and eight local `bf16[2,1,6144]` transfers. Because there is no DB row,
+summary, sealed archive, or local/remote `SUCCESS`, none of these timings is an accepted Gate D/E
+claim. One identical protected retry from the corrected clean pin is required.

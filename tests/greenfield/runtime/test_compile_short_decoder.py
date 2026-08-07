@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -18,6 +19,19 @@ from scripts.greenfield.compile_short_decoder import (
     _validate_token_observation_step,
 )
 from scripts.greenfield import compile_short_decoder as compile_module
+
+
+REPO = Path(__file__).resolve().parents[3]
+PROTECTED_RUNNER = REPO / "scripts/greenfield/run_short_decoder_compile_pp8.sh"
+
+
+def test_protected_runner_pins_fp32_feature_boundary_kernel() -> None:
+    source = PROTECTED_RUNNER.read_text()
+    assert (
+        'if feature_reconstruct_down_fp32:\n'
+        '        expected_kernel_counts["greenfield_fp32_to_bf16_r8_h6144"] = 75'
+        in source
+    )
 
 
 class _Jax:

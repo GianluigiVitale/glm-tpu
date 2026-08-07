@@ -4979,3 +4979,33 @@ All eight failure logs are byte-identical (`c6387cb0...aaba`); optimized-HLO tex
 trace, DB row, `SUCCESS`, Gate D, or performance claim. The authenticated failure census is 8/8
 clean and diagnostics are in the approved bucket. Next is focused/offline regression validation,
 commit/push, then one fresh-census serialized retry under the otherwise identical protected flags.
+
+## 2026-08-07 15:31 — Split residual fixes the sealed inversion; outer kernel inventory rejects the draw
+
+Protected diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T145659123253046Z`
+at `e5df9f4` passed fresh eight-host census and sync, real direct load, production/observer/prefill
+HLO, device prefill, all 294 DSA events, recurrent token replay, ten profiler-free steps, and fresh
+two-step traces on all eight hosts. The production exact prefix is
+`[220,104550,101294,16,13,3155,537,10662,432,13,576,16345,374]`; the observer's 14 recurrent
+tokens are also exact. The former position-2,044 inversion is corrected: `16345` now wins instead
+of `12877`. This is direct protected-model evidence for the fused-add/split-state numerical fix.
+
+The inner HLO contract passes `219AG/372AR/17CP`, eight `bf16[2,1,6144]` residual permutes, local
+groups only, and no forbidden overlay. It correctly counts 75 each of the selected, shared-up,
+shared-down, and explicit `greenfield_fp32_to_bf16_r8_h6144` kernels. The outer fleet validator
+independently reconstructed only the first three entries and therefore rejected the draw with
+`feature-Pallas HLO kernel/overlay contract drifted`. The wrapper never wrote a DB row, summary,
+local or remote `SUCCESS`, or sealed archive, so this is not an accepted Gate D or performance
+result. Its authenticated failure census is eight unique `CENSUS_OK` hosts.
+
+Diagnostic fleet-max p50/p99 complete-step wall is `244.285871/244.535177 ms`, implied `4.093565`
+tok/s, and peak HBM is `26,245,004,800 / 33,014,398,976` bytes with `6,769,394,176` bytes measured
+margin. These numbers remain non-claiming and are below Gate E. Production/observer/prefill HLO
+SHAs are `bc23eca0...515a`, `3ec4ed4a...9a7f`, and `edb89700...69f`.
+
+The exact fix adds the missing 75 conversion boundaries only when FP32 reconstruction is enabled.
+A source regression pins that conditional inventory; 27 focused runner/decoder tests, Bash syntax,
+and diff checks pass. Executing the patched validator read-only over the immutable failed draw now
+passes every pre-DB condition, including the 8-file/64-core/two-step XPlane inventory. It does not
+retrofit acceptance. Next is one clean-pin serialized retry under identical protected flags.

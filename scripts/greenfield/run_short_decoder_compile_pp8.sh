@@ -753,6 +753,8 @@ if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
         "greenfield_fp8_block_up_gate_m8_k6144_n512": 75,
         "greenfield_fp8_block_matmul_m8_k512_n6144": 75,
     }
+    if feature_reconstruct_down_fp32:
+        expected_kernel_counts["greenfield_fp32_to_bf16_r8_h6144"] = 75
     for record in records:
         feature = record["hlo_contract"]["pallas_feature_contract"]
         if (
