@@ -970,3 +970,34 @@ the existing BF16 routed/shared combine. Prove its isolated kernel/reference/HLO
 then run one protected 2K challenger. If it restores raw tokens, replace the diagnostic overhead
 with a final-layout complete-expert Pallas pack; if not, capture compact per-layer residuals on the
 exact teacher-forced trajectory to locate the earliest divergence. Never relax the raw-token gate.
+
+## FP32 routed-down reconstruction is now a protected real-TPU mechanism
+
+Commits `2d60723`, `794ba2d`, and `aa8105c` implement the default-off diagnostic, its numerical and
+four-device semantics, strict one-layer/decoder HLO contracts, and an opaque on-device
+`greenfield_fp32_to_bf16_r8_h6144` Pallas conversion boundary. Full verification is 353 passed / 1
+skipped. Two protected attempts failed closed before timing:
+`...downf32_20260807T044842501378323Z` exposed both an incorrect one-layer singleton-shape
+expectation and TPU XLA commuting the BF16 cast into the reduction; after correcting the shape,
+`...downf32_20260807T045959921629248Z` proved `lax.optimization_barrier` still allowed the same
+BF16-result reduction. Both artifacts are preserved and both failure-exit censuses are 8/8 clean.
+
+DB 482 / `greenfield_real_layer_pp8_pallas_feature_ot256_downf32_20260807T051217371806033Z` at
+`aa8105c` passes the protected PP8 real-MoE-layer gate. Optimized HLO
+`2a01bb2d...9a26` contains exactly one local `f32[8,6144]` four-chip all-reduce feeding the exact
+FP32-input/BF16-output Pallas boundary, plus the existing local `bf16[2,1,6144]` routed/shared
+combine. It has four intended Pallas calls, no decoded weight overlay, no global collective, and
+the contract passes. Normal/concentrated routes are exact; output max/p99/mean errors are at most
+`0.03125/0.01171875/0.002444`. Profiler-free normal/concentrated p50 is
+`2.197155/2.195815 ms`, only about 1.50%/1.21% slower than DB 473's same-OT256 BF16 path; p99 is
+`2.258372/2.245028 ms`. Fresh XPlane records 8 cores, 20 steps/core, `2.246920 ms` cycle,
+`1.802875 ms` busy, and two physical psums totaling `0.043176 ms/step`. Compile is `1.720 s`; peak
+HBM is `2,430,771,200` bytes/chip. Summary SHA is `1aa45e40...3a8e`; DB snapshot, evidence ledger,
+approved archive/remote `SUCCESS`, and authenticated 8/8 cleanup pass.
+
+This proves only the numerical mechanism and local lowering, not Gate D or answer tok/s. Exact next:
+run the protected complete 2K decoder/oracle/DSA challenger with FP32 reconstruction enabled. If all
+15 raw tokens restore, replace the diagnostic boundary with a final-layout complete-expert Pallas
+pack and remeasure. If token 2,044 still inverts, keep teacher forcing on the sealed trajectory and
+capture compact per-layer residuals to locate the first arithmetic divergence. Never relax the raw
+token, DSA, state/cache, HLO, wall/HBM, trace, DB/archive, or cleanup gates.
