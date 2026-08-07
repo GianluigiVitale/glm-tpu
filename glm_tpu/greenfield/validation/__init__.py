@@ -20,18 +20,28 @@ from .short_context_dsa_oracle import (
     capture_short_context_dsa_oracle,
     inspect_short_context_dsa_oracle,
 )
+from .short_context_logprob_oracle import (
+    ShortContextLogprobOracleConfig,
+    capture_short_context_logprob_oracle,
+    inspect_short_context_logprob_oracle,
+    normalize_sample_logprobs,
+)
 
 __all__ = (
     "GateCOracleConfig",
     "OneLayerOracleConfig",
     "ShortContextOracleConfig",
     "ShortContextDsaOracleConfig",
+    "ShortContextLogprobOracleConfig",
     "capture_gate_c_oracle",
     "capture_one_layer_oracle",
     "capture_short_context_oracle",
     "capture_short_context_dsa_oracle",
+    "capture_short_context_logprob_oracle",
     "inspect_gate_c_oracle",
     "inspect_one_layer_oracle",
     "inspect_short_context_oracle",
     "inspect_short_context_dsa_oracle",
+    "inspect_short_context_logprob_oracle",
+    "normalize_sample_logprobs",
 )
