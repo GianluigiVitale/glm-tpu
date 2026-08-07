@@ -11,7 +11,8 @@ import numpy as np
 
 
 ARTIFACT_KIND = "greenfield_layer0_dsa_association_input"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
+SUPPORTED_FORMAT_VERSIONS = (1, FORMAT_VERSION)
 MODEL_ID = "zai-org/GLM-5.2-FP8"
 
 
@@ -68,8 +69,9 @@ def inspect_layer0_dsa_association_input(
 
     input_dir = Path(input_dir)
     manifest = json.loads((input_dir / "manifest.json").read_text())
+    format_version = manifest.get("format_version")
     if manifest.get("artifact_kind") != ARTIFACT_KIND or (
-        manifest.get("format_version") != FORMAT_VERSION
+        format_version not in SUPPORTED_FORMAT_VERSIONS
     ):
         raise ValueError("unsupported layer-0 DSA association input")
     if manifest.get("model_id") != MODEL_ID or (
@@ -147,10 +149,23 @@ def inspect_layer0_dsa_association_input(
         ),
         "unique_token_ids": ((unique,), np.dtype(np.int32)),
     }
+    if format_version >= 2:
+        expected_contract.update(
+            {
+                "self_attn__kv_a_proj_with_mqa__weight": (
+                    (576, 6144),
+                    np.dtype(np.uint8),
+                ),
+                "self_attn__kv_a_proj_with_mqa__weight_scale_inv": (
+                    (5, 48),
+                    np.dtype(np.float32),
+                ),
+            }
+        )
     with safe_open(artifact_path, framework="np") as handle:
         if handle.metadata() != {
             "artifact_kind": ARTIFACT_KIND,
-            "format_version": str(FORMAT_VERSION),
+            "format_version": str(format_version),
         }:
             raise ValueError("layer-0 DSA tensor metadata drifted")
         if set(handle.keys()) != set(expected_contract):
@@ -194,7 +209,8 @@ def inspect_layer0_dsa_association_input(
     if source_index.get("filename") != "model.safetensors.index.json":
         raise ValueError("layer-0 DSA source index identity drifted")
     _require_digest(source_index.get("sha256"), field="source_index.sha256")
-    if len(manifest.get("source_records", [])) != 12:
+    expected_source_records = 14 if format_version >= 2 else 12
+    if len(manifest.get("source_records", [])) != expected_source_records:
         raise ValueError("layer-0 DSA source tensor coverage drifted")
     return manifest, arrays
 

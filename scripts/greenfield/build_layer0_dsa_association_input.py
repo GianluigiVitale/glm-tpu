@@ -25,12 +25,14 @@ REPO = Path(__file__).resolve().parents[2]
 EXPECTED_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
 EXPECTED_BRANCH = "rewrite/topology-first-decode"
 SOURCE_SHARD = "model-00001-of-00141.safetensors"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 SOURCE_NAMES = (
     "model.layers.0.input_layernorm.weight",
     "model.layers.0.self_attn.q_a_proj.weight",
     "model.layers.0.self_attn.q_a_proj.weight_scale_inv",
+    "model.layers.0.self_attn.kv_a_proj_with_mqa.weight",
+    "model.layers.0.self_attn.kv_a_proj_with_mqa.weight_scale_inv",
     "model.layers.0.self_attn.q_a_layernorm.weight",
     "model.layers.0.self_attn.indexer.wq_b.weight",
     "model.layers.0.self_attn.indexer.wq_b.weight_scale_inv",
@@ -46,6 +48,14 @@ SOURCE_CONTRACT = {
     "model.layers.0.input_layernorm.weight": ((6144,), "uint16"),
     "model.layers.0.self_attn.q_a_proj.weight": ((2048, 6144), "uint8"),
     "model.layers.0.self_attn.q_a_proj.weight_scale_inv": ((16, 48), "float32"),
+    "model.layers.0.self_attn.kv_a_proj_with_mqa.weight": (
+        (576, 6144),
+        "uint8",
+    ),
+    "model.layers.0.self_attn.kv_a_proj_with_mqa.weight_scale_inv": (
+        (5, 48),
+        "float32",
+    ),
     "model.layers.0.self_attn.q_a_layernorm.weight": ((2048,), "uint16"),
     "model.layers.0.self_attn.indexer.wq_b.weight": ((4096, 2048), "uint8"),
     "model.layers.0.self_attn.indexer.wq_b.weight_scale_inv": (
