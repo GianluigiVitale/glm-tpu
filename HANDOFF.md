@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 00:15 UTC
+**Updated:** 2026-08-07 01:10 UTC
 
 ## Authority and isolation
 
@@ -870,7 +870,34 @@ scan-wrapped prefill) while retaining exact opcode, singleton shape, 32 ring pai
 one-hot reductions, and collective counts. An unrelated source path still fails. The preserved real
 TPU prefill HLO now passes and the decoder/harness regression passes 15/15.
 
-Exact next: retry protected real-prompt 2K Gate D from clean `ff582bd` with complete-token,
-token-oracle, DSA-oracle, and two-step trace modes enabled. If exact DSA or token comparison fails,
-preserve and localize the first step/event/selected-offset mismatch; do not relax it. If it passes,
-seal the real answer-token rate and optimize the measured recurrent path below 200 ms.
+Second protected attempt
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260807T001553313414003Z`
+at `34b7611` passed production/observer/prefill lowering, loaded the real checkpoint, executed the
+2,034-token device prefill, and reached the first real observer step. It then failed closed because
+the old harness required total selected-position order identity against the independent legacy TPU
+program: event 0 offset 39 expected `970` and observed `1670`, with 40,075 order mismatches across
+21 events. Counts, producer IDs, lane replication, padded slots, and next position all passed. No
+production timing or answer tok/s was reached or claimed; failure-exit census is 8/8 clean.
+
+The subsequent arithmetic/methodology audit found two distinct issues. First, total rank identity
+between independent TPU score programs contradicted the binding device-score contract: exactness is
+the canonical global top-k/set, lowest-position ties, and tails of the executing FP32 score row;
+cross-program score tensors use bounded comparison and raw legacy total order is diagnostic only.
+Second, the greenfield runtime incorrectly used transformer epsilon `1e-5` for q_a/kv_a LoRA
+RMSNorm; GLM-5.2 requires the model default `1e-6`. This was a real numerical bug, not a relaxed
+comparison.
+
+Commit `b406e3a` fixes the LoRA epsilon throughout stage, layer, and Gate C paths and upgrades the
+observer without changing the default-off production output surface. The separate callback-free
+observer now exports bit-exact executing FP32 selected scores, gates exact selected set/count,
+`-1`/`-inf` tails, unique causal positions, canonical executing-score order/lowest-position ties,
+and position-aligned legacy scores under the accepted Gate C bounds
+`max/p99/mean <= 0.125/0.03125/0.01`; legacy total order is retained but is not a gate. It saves and
+hashes every raw observer tensor. Production/observer output equality and production HLO identity
+pass. Relevant verification is 59 tests plus Python compile, Bash syntax, ShellCheck, and diff
+checks; the commit is pushed.
+
+Exact next: run protected real-prompt 2K Gate D from clean `b406e3a` with complete-token,
+token-oracle, DSA-oracle, and two-step trace modes. Preserve any first bounded-score/set/tie/token
+failure; do not relax it. If it passes, seal the first real answer-token rate, then optimize the
+measured recurrent path below 200 ms before 8K, 128K, and 256K progression.

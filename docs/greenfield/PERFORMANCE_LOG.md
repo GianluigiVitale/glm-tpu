@@ -631,3 +631,25 @@ DB 444 at `bacfbdf` first proved the exact reduction structure but is performanc
 local/merge p50 was `59.979532/4.495320 ms`. Bitonic is `43.96x/13.31x` faster. Three subsequent
 compile diagnostics failed closed on TPU-v4 layout/scalar/compiler limitations before timing and
 ended clean. This closes standalone Section 7.2 item 6, not integration, layer wall, or tok/s.
+
+## 2026-08-07 — second real-prompt Gate D attempt reaches DSA observation
+
+Rejected diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260807T001553313414003Z`
+at `34b7611` passed the corrected production/observer/prefill HLO gates, loaded the real model,
+executed the 2,034-token device prefill, and reached position 2,034 of the separate observer replay.
+The old comparator then rejected event 0 offset 39 (`970` legacy versus `1670` greenfield) and
+reported 40,075 total-order position mismatches across 21 DSA events. Count, producer, stage-lane,
+padded-slot, and next-position contracts passed. Execution stopped before the production warmup,
+timing, or trace window, so this run has no DB row and no answer-rate claim. Diagnostics are
+preserved and authenticated failure-exit census is 8/8 clean.
+
+The mismatch exposed an over-strict harness assumption: independent TPU programs are not required
+to have identical total FP32 score order. Commit `b406e3a` replaces that gate with the documented
+contract—exact top-k set/count/tails and lowest-position ties against the executing device scores,
+plus bounded position-aligned legacy scores—while retaining raw legacy order as a diagnostic. The
+same audit found and fixed a real arithmetic defect: q_a/kv_a LoRA RMSNorm used `1e-5` rather than
+the model's `1e-6`. The observer now stores and hashes its raw score/position tensors and remains a
+separate callback-free, no-donation executable. Production outputs/HLO are observer-off. Local
+verification passes 59 relevant tests plus syntax/static checks. A new protected run is required;
+`b406e3a` itself is not performance evidence.

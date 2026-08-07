@@ -41,6 +41,11 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   position ties. Independent cross-backend score tensors use bounded comparison because CPU
   PyTorch and TPU XLA need not share dot/reduction association. Raw CPU positions are retained as
   a diagnostic and may never replace, seed, or relax runtime selection.
+- The full-decoder observer therefore records positions and the bit-exact FP32 scores emitted by
+  the same executing `lax.top_k`. It gates canonical executing-score order/ties, exact set/count and
+  tails, and position-aligned legacy scores under the accepted Gate C bounds (max/p99/mean absolute
+  error `0.125/0.03125/0.01`). Independent legacy total rank order is diagnostic, not a gate. The
+  observer is a separate no-donation executable; the production executable remains observer-off.
 - Compact selected state is `positions int32[rows,2048]` plus
   `valid_counts int32[rows]`; invalid tail slots are exactly `-1`. IndexShare
   reuses the score-ordered positions unchanged. Only the positions array is
