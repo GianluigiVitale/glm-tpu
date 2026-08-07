@@ -1549,3 +1549,29 @@ launch and JAX identities in the manifest, and makes the validator compare that 
 the fleet map. Focused tests remain 32/32 with Python/Bash/ShellCheck/diff checks green. Exact next:
 commit/push and run one final bounded retry; it should reuse the already-proven arithmetic and reach
 the score matrix. Do not run the full decoder first.
+
+## DB489 rejects distributed q-a RMSNorm and moves the audit to scorer association
+
+Protected bounded run `greenfield_layer0_dsa_association_20260807T220615983460791Z` at
+`54edbf7412f278dcec84baeca61771b4f4fa605a` is accepted as DB run 489. Local and approved-bucket
+`SUCCESS`, checksum-sealed evidence, the DB snapshot, and all three authenticated eight-host
+zero-work censuses pass. The distributed phase covers physical devices 0--31 and retains exactly one
+global-id `f32[32]` all-reduce plus one `bf16[32,64,32]` all-gather. Its HLO SHA is
+`314956e1...0202`, q-residual SHA is `59e65063...b60b`, artifact-manifest SHA is
+`046b4f0e...50e2`, summary SHA is `4d5baaac...1454`, and DB-snapshot SHA is
+`02956625...739`.
+
+The hypothesis improves but does not restore the sealed 8K order. Distributed-norm XLA keeps the
+exact selected set but misses 1,501 order positions, with max/mean/p99 score error
+`0.0304594/0.0228811/0.0287610`; one-row Pallas keeps the set but misses 1,249 order positions, with
+`0.0268021/0.0191863/0.0232533`. No set swap remains. The Pallas score delta relative to the
+pagewise XLA reconstruction is max/mean/p99 `0.00945234/0.00335265/0.00679396` across all 8,156
+scores. This is diagnostic correctness evidence only; it authorizes no decoder correction,
+Gate-D retry, latency, or throughput claim.
+
+Most importantly, the unchanged `legacy_bf16_divsqrt` state already matches the captured query,
+keys, and head weights elementwise, yet its recomputed scores still miss 1,640 sealed order slots.
+Therefore another upstream q-a layout change cannot by itself explain the remaining oracle gap.
+Exact next: inspect the accepted multi-host Pallas scorer's physical input layout, tiling, dtype
+boundaries, and reduction association against the one-host bounded scorer, then implement only the
+smallest scorer-association challenger with exact HLO. Do not launch the full 753B decoder first.

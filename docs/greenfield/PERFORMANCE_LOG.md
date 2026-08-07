@@ -794,3 +794,22 @@ The remaining high-value discriminator is upstream of the scorer: the real fused
 physically shards q-a as 32 x 64 and the logical 2,048-wide RMSNorm therefore has a distributed
 reduction association. The next bounded proof must adapt the already pinned legacy sharding/norm
 semantics and verify exact HLO before any full-model retry.
+
+## 2026-08-07 — DB 489 rejects distributed q-a RMSNorm association
+
+Bounded diagnostic DB 489 / tag
+`greenfield_layer0_dsa_association_20260807T220615983460791Z` at `54edbf7` passes its exact
+32-chip projection/norm HLO, q-residual artifact, DB/archive, local/remote `SUCCESS`, and three
+authenticated 8/8 clean censuses. The diagnostic HLO contains exactly one global `f32[32]`
+all-reduce and one `bf16[32,64,32]` all-gather; HLO and artifact-manifest SHAs are
+`314956e1...0202` and `046b4f0e...50e2`.
+
+It does not restore sealed order. XLA has an exact selected set but 1,501 order mismatches;
+one-row Pallas has an exact set but 1,249 mismatches. Their score max/mean errors are
+`0.0304594/0.0228811` and `0.0268021/0.0191863`, respectively. This run is diagnostic-only and
+contains no decoder latency or token-rate result.
+
+The unmodified reconstructed state already matches captured query, keys, and head weights
+elementwise while its score output remains inexact. That evidence relocates the next discriminator
+to the accepted Pallas scorer's exact physical association rather than another upstream q-a
+projection or normalization change.

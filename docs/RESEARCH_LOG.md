@@ -5202,3 +5202,29 @@ worker 0. The score matrix therefore never ran and there is no DB/final-SUCCESS/
 or performance claim. Cleanup is authenticated 8/8 and partial evidence is archived. The correction
 keys the writer to launch process 0 and binds its launch/JAX/hostname producer identity in the
 manifest. One final bounded retry is warranted because the distributed computation itself passed.
+
+## 2026-08-07 22:08 — DB489 rejects distributed q-a norm; the missing association is in scoring
+
+The final bounded retry `greenfield_layer0_dsa_association_20260807T220615983460791Z` at
+`54edbf7` completed as DB 489 with local/remote `SUCCESS`, sealed evidence, approved-bucket archive,
+and three authenticated 8/8 clean censuses. The 32-chip phase covers device IDs 0--31 and has the
+exact diagnostic contract: one global-ID `f32[32]` all-reduce, one `bf16[32,64,32]` all-gather, and
+no other collective or callback. HLO, q-residual, artifact-manifest, summary, evidence-list, and DB
+snapshot SHAs are respectively `314956e1...0202`, `59e65063...b60b`, `046b4f0e...50e2`,
+`4d5baaac...1454`, `0cb9af16...16ed`, and `02956625...739`.
+
+Distributed q-a normalization is directionally closer but not exact. XLA preserves the 2,048-item
+set with 1,501 order mismatches and max/mean/p99 score error
+`0.0304594/0.0228811/0.0287610` (correlation `0.999994349`). The existing one-row Pallas scorer
+preserves the set with 1,249 order mismatches and errors `0.0268021/0.0191863/0.0232533`
+(correlation `0.999998119`). Its score delta from the pagewise XLA reconstruction is
+`0.00945234/0.00335265/0.00679396` max/mean/p99 over all 8,156 positions. This closes the
+distributed-norm hypothesis without a production change or performance claim.
+
+The matrix also sharpens localization. Before any replacement, `legacy_bf16_divsqrt` reproduces
+the captured query, keys, and head weights elementwise, while the recomputed scorer still differs
+from the sealed output by a roughly constant positive error and 1,640 order slots. The remaining
+gap is therefore inside the accepted scorer's TPU/Pallas dtype, local-layout, tiling, or reduction
+association, not something another upstream projection layout can solve alone. The next bounded
+audit compares the accepted eight-host Pallas scorer signatures and source path to the diagnostic
+one-host Pallas executable before changing or rerunning the complete decoder.
