@@ -22,6 +22,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
+| Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Reuse DB491 q residual and existing BF16-origin key state to isolate raw-FP8 -> BF16 fused leaf -> FP32 adapter rounding on one host. |
 | Exact 8K local scorer | legacy XLA scorer source, DB485 run config and accepted XPlane | Bounded independent `R=32`, `P=512`, three-owned-page DCP scorer association; diagnostic only, never a production dead-row path. |
 | Checkpoint layout | existing greenfield plan/pack/load chain | Gate B is already complete; the 834 GB runtime derivative is the only full PP8 decoder input. |
 | Kernels | legacy DSA/GMM/quantized matmul plus DSV4 paged-attention research | Arithmetic/tiling reference; greenfield implementations remain independent and protected. |
@@ -125,6 +126,7 @@ without a redundant TPU launch.
 The next reuse-first discriminator is already present in the sealed state and bounded matrix. The
 accepted layer-0 `wk_weights_proj.weight` is BF16 and its OOB repair dequantizes `wk` to that BF16
 dtype before the adapter casts it to FP32. DB491 instead paired the corrected q residual with
-direct-FP32-origin `wk` keys. Reuse DB491's immutable q artifact and the existing BF16-origin key
-state to isolate only that boundary on one TPU host; do not rebuild either the loader or the
-closed 32-chip diagnostic.
+direct-FP32-origin `wk` keys. The bounded runner now reuses DB491's immutable q artifact and the
+existing BF16-origin key state to isolate only that boundary on one TPU host. Its wrapper pins the
+artifact manifest/source and omits the closed 32-chip phase; no loader, scorer, or model execution
+path was rebuilt.

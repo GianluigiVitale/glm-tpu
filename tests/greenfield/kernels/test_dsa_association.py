@@ -631,6 +631,29 @@ def test_layer0_state_replacement_changes_only_query() -> None:
         np.asarray(state.qkv_a_companion), np.asarray(companion)
     )
 
+    bf16_origin_keys = keys.at[0, 0].set(keys[0, 0] + jnp.bfloat16(0.25))
+    bf16_wk_state = layer0_dsa_state_from_q_residual(
+        q_residual,
+        bf16_origin_keys,
+        head_weights,
+        companion,
+        wq_b,
+        geometry=geometry,
+    )
+    np.testing.assert_array_equal(
+        np.asarray(bf16_wk_state.query), np.asarray(state.query)
+    )
+    assert not np.array_equal(
+        np.asarray(bf16_wk_state.index_keys), np.asarray(state.index_keys)
+    )
+    np.testing.assert_array_equal(
+        np.asarray(bf16_wk_state.head_weights), np.asarray(state.head_weights)
+    )
+    np.testing.assert_array_equal(
+        np.asarray(bf16_wk_state.qkv_a_companion),
+        np.asarray(state.qkv_a_companion),
+    )
+
 
 def test_legacy_pagewise_geometry_reconstructs_direct_row() -> None:
     rng = np.random.default_rng(17)

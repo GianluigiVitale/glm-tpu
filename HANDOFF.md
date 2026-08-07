@@ -1698,3 +1698,26 @@ directly to FP32. Exact next: reuse immutable DB491 q-residual manifest
 `7518e7ef...d8c16`, replace only its key state with the existing BF16-origin `wk` variant, and run
 the exact local-DCP/one-row scorer matrix on one TPU host. Do not repeat the closed 32-chip q-a
 phase and do not load the complete decoder unless this isolated state restores exact set/order.
+
+## BF16-origin wk discriminator is implementation-ready without a repeated full-pod phase
+
+The bounded matrix now creates a second DB491 replacement state from the same checksum-bound q-a
+residual, FP32 `wq_b`, head weights, and fused companion, changing only `index_keys` produced from
+BF16-origin `wk`. It refuses if those keys are elementwise unchanged. The state reuses the exact
+same compiled replacement executable, and the existing exact local-DCP XLA, one-row XLA, and
+one-row Pallas scorers compare it against the sealed 2,048-position set/order. The runner records
+the accepted fused/adapted state shapes, dtypes, byte sums, source association, and candidate key
+delta as explicit provenance.
+
+The protected wrapper now pins DB491 artifact manifest
+`7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c43dcded7d809120e30d8c16` and source
+`ea879a24d196f61e238a22ee5bb393d3b6fa938d`, copies and revalidates its checksummed payload, and
+runs only the one-host scorer matrix under the global lease. It retains exact eight-host code
+sync, pre/post zero-work censuses, DB snapshot, approved archive, and terminal SUCCESS. Focused
+script/state tests pass 5/5; Python compilation, Bash syntax, ShellCheck, and diff checks pass.
+
+Exact next: commit/push this clean bounded candidate, prove an authenticated idle fleet, and run
+exactly one serialized `bash scripts/greenfield/run_layer0_dsa_association_probe.sh`. Only exact
+set and lowest-position order from the BF16-origin-wk local-DCP candidate may authorize the
+production epsilon/wk correction and one protected 8K Gate-D retry. Otherwise record the rejection
+and continue the source/state audit; never run the full decoder blindly.

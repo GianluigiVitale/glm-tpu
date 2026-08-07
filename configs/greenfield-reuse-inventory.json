@@ -160,6 +160,17 @@
       "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. DB490 rejects scorer geometry; the pinned config and accepted vLLM source prove q_a/kv_a RMSNorm epsilon 1e-5; DB491 shows that correction cuts mean score error about 17x but still misses 1,408 order slots. A source-faithful logical-width GSPMD mean is bitwise identical to the manual distributed norm on forced-32 exact BF16 inputs and retains the same full-geometry collective association, so no redundant TPU run is warranted. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
     },
     {
+      "id": "legacy-bf16-fused-wk-adapter",
+      "category": "numerical association evidence",
+      "source_repo": "tpu-inference and protected glm-run evidence",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d / DB485 / DB491",
+      "source_paths": ["tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/source_capture/legacy.log", "/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/probe_layer0_dsa_association.py", "scripts/greenfield/run_layer0_dsa_association_probe.sh"],
+      "gate": "D",
+      "reason": "The accepted layer-0 fused wk_weights_proj leaf is BF16 and repaired from raw FP8 into that dtype before the DSA adapter casts it to FP32. The bounded candidate reuses immutable DB491 q state and changes only prompt keys to this BF16-origin wk path; the closed 32-chip norm is not repeated."
+    },
+    {
       "id": "legacy-8k-local-xla-scorer-association",
       "category": "numerical association evidence",
       "source_repo": "tpu-inference and protected glm-run evidence",

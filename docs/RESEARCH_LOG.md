@@ -5352,3 +5352,19 @@ dequantization. Its older `legacy_bf16_divsqrt` state rounded both `wq_b` and `w
 did not isolate the key path; however its `index_keys` can be paired with DB491's immutable query
 and unchanged head weights. The next candidate reuses DB491's checksum-bound artifact and runs
 only the one-host scorer matrix. It must not repeat the full-pod q-a phase.
+
+## 2026-08-07 23:58 — BF16-origin wk is isolated on immutable DB491 query state
+
+The bounded runner now combines DB491's checksum-bound corrected q residual with prompt keys made
+from the existing BF16-origin `wk` state, while retaining direct-FP32 `wq_b`, the same head weights,
+and the same fused companion. A runtime refusal requires the candidate keys to differ from the
+direct-FP32-wk baseline. Both states execute the same compiled replacement HLO, after which the
+exact local-DCP XLA, one-row XLA, and Pallas matrices run unchanged. The output records sealed
+fused/adapted wk shapes, dtypes and byte sums plus the measured key delta.
+
+The protected wrapper no longer reruns the closed global norm. It pins DB491 manifest
+`7518e7ef...d8c16` and source `ea879a2`, revalidates the copied safetensors payload, and reserves
+only one four-chip host for scoring while retaining the fleet lease, exact eight-host sync,
+pre/post censuses, DB/archive and SUCCESS gates. Focused tests pass 5/5; compile and shell checks
+pass. This is implementation evidence only. One clean serialized bounded run is the exact next
+step; no decoder correction or performance claim is authorized yet.

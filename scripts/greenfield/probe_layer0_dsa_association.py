@@ -22,6 +22,12 @@ EXPECTED_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
 # Accepted sealed state-hash log values for layer-0 fused_qkv_a_proj.
 SEALED_LEGACY_FUSED_QKV_WEIGHT_BYTE_SUM = 2_448_103_424
 SEALED_LEGACY_FUSED_QKV_SCALE_BYTE_SUM = 53_100_864
+SEALED_LEGACY_WK_WEIGHTS_PROJ_SHAPE = (160, 6144)
+SEALED_LEGACY_WK_WEIGHTS_PROJ_DTYPE = "bfloat16"
+SEALED_LEGACY_WK_WEIGHTS_PROJ_BYTE_SUM = 241_456_714
+SEALED_LEGACY_ADAPTED_WK_SHAPE = (128, 6144)
+SEALED_LEGACY_ADAPTED_WK_DTYPE = "float32"
+SEALED_LEGACY_ADAPTED_WK_BYTE_SUM = 193_298_069
 
 
 def _git_head() -> str:
@@ -552,6 +558,40 @@ def main() -> int:
         "contract": replacement_contract,
     }
 
+    # The accepted OOB repair dequantizes raw-FP8 wk into the fused BF16
+    # wk_weights_proj parameter before the adapter casts that leaf to FP32.
+    # Pair only those BF16-origin prompt keys with the immutable DB491 q-a
+    # residual; q projection, head weights, and companion remain unchanged.
+    bf16_wk_key_state = states["legacy_bf16_divsqrt"]
+    bf16_wk_replacement_arguments = (
+        distributed_q_a_residual,
+        bf16_wk_key_state.index_keys,
+        sharded_state.head_weights,
+        sharded_state.qkv_a_companion,
+        wq_b_fp32,
+    )
+    distributed_bf16_wk_state = replacement_compiled(
+        *bf16_wk_replacement_arguments
+    )
+    jax.block_until_ready(distributed_bf16_wk_state)
+    distributed_bf16_wk_state_name = (
+        "legacy_tp32_distributed_q_a_norm_bf16_wk_divsqrt"
+    )
+    states[distributed_bf16_wk_state_name] = distributed_bf16_wk_state
+    bf16_wk_key_delta = _tensor_delta(
+        distributed_bf16_wk_state.index_keys,
+        distributed_state.index_keys,
+    )
+    if bf16_wk_key_delta["elementwise_exact"]:
+        raise RuntimeError("BF16-origin wk candidate did not change prompt keys")
+    state_hlo_records[distributed_bf16_wk_state_name] = {
+        "filename": replacement_hlo_path.name,
+        "sha256": sha256(replacement_hlo.encode()).hexdigest(),
+        "contract": replacement_contract,
+        "reused_executable": True,
+        "input_difference": "BF16-origin wk prompt keys only",
+    }
+
     legacy_state = states["legacy_fp32_divsqrt"]
     started = time.monotonic()
     legacy_score_compiled = jax.jit(legacy_pagewise_dcp_scores).lower(
@@ -774,6 +814,10 @@ def main() -> int:
             "runtime_fused_qkv_distributed_norm",
             distributed_state_name,
         ),
+        (
+            "runtime_fused_qkv_distributed_norm_bf16_wk",
+            distributed_bf16_wk_state_name,
+        ),
     ):
         runtime_state = states[state_name]
         runtime_one_row = one_row_compiled(
@@ -861,6 +905,10 @@ def main() -> int:
             "runtime_fused_qkv_distributed_norm",
             distributed_state_name,
         ),
+        (
+            "runtime_fused_qkv_distributed_norm_bf16_wk",
+            distributed_bf16_wk_state_name,
+        ),
     ):
         score_deltas[f"{label}_one_row_pagewise_vs_legacy_pagewise"] = (
             _tensor_delta(
@@ -897,6 +945,25 @@ def main() -> int:
         "state_deltas": state_deltas,
         "score_deltas": score_deltas,
         "runtime_fused_qkv_layout_identity": runtime_layout_identity,
+        "accepted_wk_dtype_boundary": {
+            "sealed_fused_shape": list(SEALED_LEGACY_WK_WEIGHTS_PROJ_SHAPE),
+            "sealed_fused_dtype": SEALED_LEGACY_WK_WEIGHTS_PROJ_DTYPE,
+            "sealed_fused_byte_sum": (
+                SEALED_LEGACY_WK_WEIGHTS_PROJ_BYTE_SUM
+            ),
+            "sealed_adapted_wk_shape": list(
+                SEALED_LEGACY_ADAPTED_WK_SHAPE
+            ),
+            "sealed_adapted_wk_dtype": SEALED_LEGACY_ADAPTED_WK_DTYPE,
+            "sealed_adapted_wk_byte_sum": (
+                SEALED_LEGACY_ADAPTED_WK_BYTE_SUM
+            ),
+            "source_association": (
+                "raw FP8 wk -> BF16 fused wk_weights_proj -> FP32 adapter"
+            ),
+            "candidate_changes_only_prompt_keys": True,
+            "candidate_key_delta_vs_direct_fp32_wk": bf16_wk_key_delta,
+        },
         "hlo": {
             "legacy_fused_qkv_runtime_pack": {
                 "filename": runtime_pack_path.name,
@@ -955,6 +1022,11 @@ def main() -> int:
                 f"legacy_local_dcp_xla_on_{distributed_state_name}"
             ]["passed"]
         ),
+        "model_epsilon_bf16_wk_local_dcp_association_restored": (
+            comparisons[
+                f"legacy_local_dcp_xla_on_{distributed_bf16_wk_state_name}"
+            ]["passed"]
+        ),
         "one_row_pagewise_restored": comparisons[
             "one_row_pagewise_on_legacy_state"
         ]["passed"],
@@ -987,6 +1059,16 @@ def main() -> int:
         "runtime_fused_qkv_distributed_norm_one_row_pallas_restored": (
             comparisons[
                 "one_row_pallas_on_runtime_fused_qkv_distributed_norm_legacy_state"
+            ]["passed"]
+        ),
+        "runtime_fused_qkv_distributed_norm_bf16_wk_one_row_pagewise_restored": (
+            comparisons[
+                "one_row_pagewise_on_runtime_fused_qkv_distributed_norm_bf16_wk_legacy_state"
+            ]["passed"]
+        ),
+        "runtime_fused_qkv_distributed_norm_bf16_wk_one_row_pallas_restored": (
+            comparisons[
+                "one_row_pallas_on_runtime_fused_qkv_distributed_norm_bf16_wk_legacy_state"
             ]["passed"]
         ),
         "profiler_free_timing": False,

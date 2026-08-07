@@ -12,10 +12,14 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly DEFAULT_INPUT=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly MODEL_CONFIG_SHA=22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff
+readonly DEFAULT_DISTRIBUTED_Q_A_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact
+readonly DISTRIBUTED_Q_A_MANIFEST_SHA=7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c43dcded7d809120e30d8c16
+readonly DISTRIBUTED_Q_A_CODE_HASH=ea879a24d196f61e238a22ee5bb393d3b6fa938d
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_LAYER0_DSA_TAG:-greenfield_layer0_dsa_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
 INPUT_DIR=${GLM_GREENFIELD_LAYER0_DSA_INPUT:-$DEFAULT_INPUT}
+DISTRIBUTED_Q_A_DIR=${GLM_GREENFIELD_DISTRIBUTED_Q_A_INPUT:-$DEFAULT_DISTRIBUTED_Q_A_DIR}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -27,15 +31,19 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing layer-0 DSA probe from a dirty worktree" >&2
   exit 2
 }
-[[ -r $RESULTS_DB && -d $INPUT_DIR && ! -e $RUN_DIR ]] || {
-  echo "results DB/input missing or append-only run path already exists" >&2
+[[ -r $RESULTS_DB && -d $INPUT_DIR && -d $DISTRIBUTED_Q_A_DIR &&
+  ! -e $RUN_DIR ]] || {
+  echo "results DB/inputs missing or append-only run path already exists" >&2
   exit 2
 }
 mkdir -p "$RUN_DIR/hlo" "$RUN_DIR/input" \
-  "$RUN_DIR/distributed_hlo" "$RUN_DIR/distributed_host_records"
+  "$RUN_DIR/distributed_q_a_norm_artifact"
 cp "$INPUT_DIR/manifest.json" "$RUN_DIR/input/manifest.json"
 cp "$INPUT_DIR/layer0_dsa_input.safetensors" \
   "$RUN_DIR/input/layer0_dsa_input.safetensors"
+cp "$DISTRIBUTED_Q_A_DIR/manifest.json" \
+  "$DISTRIBUTED_Q_A_DIR/distributed_q_a_norm.safetensors" \
+  "$RUN_DIR/distributed_q_a_norm_artifact/"
 
 say() {
   echo "[layer0-dsa $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
@@ -98,38 +106,14 @@ has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
   exit 1
 }
 
-say "staging immutable bounded input through the approved bucket"
-gcloud storage cp --no-clobber \
-  "$RUN_DIR/input/manifest.json" \
-  "$RUN_DIR/input/layer0_dsa_input.safetensors" \
-  "$REMOTE_PREFIX/distributed_input/" >/dev/null
-
-coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
-  --command="hostname -I" 2>/dev/null | grep -Eo '192\.168\.[0-9]+\.[0-9]+' | head -1)
-[[ -n "$coordinator" ]] || {
-  say "ABORT: could not resolve worker-0 coordinator address"
-  exit 1
-}
-coordinator="$coordinator:8476"
-say "running exact 32-chip q-a projection/RMSNorm association with model epsilon 1e-5 coordinator=$coordinator"
-# shellcheck disable=SC2016
-distributed_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/input" "$run/distributed_hlo"; gcloud storage cp "$remote/distributed_input/manifest.json" "$remote/distributed_input/layer0_dsa_input.safetensors" "$run/input/" >/dev/null; cd "$wt"; JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/probe_layer0_distributed_q_a_norm.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash "$pin" --input-dir "$run/input" --input-manifest-sha256 '"$INPUT_MANIFEST_SHA"' --output "$run/distributed.rank${idx}.json" --artifact-dir "$run/distributed_q_a_norm_artifact" --hlo-dir "$run/distributed_hlo" >"$run/distributed.rank${idx}.log" 2>&1; sha256sum "$run/distributed.rank${idx}.json" "$run/distributed.rank${idx}.log" >"$run/distributed.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/distributed.rank${idx}.json" "$run/distributed.rank${idx}.log" "$run/distributed.rank${idx}.sha256" "$remote/distributed_host_records/" >/dev/null; if [[ "$idx" == 0 ]]; then gcloud storage cp --recursive --no-clobber "$run/distributed_q_a_norm_artifact" "$remote/" >/dev/null; gcloud storage cp --no-clobber "$run/distributed_hlo/distributed_q_a_norm.optimized_hlo.txt" "$remote/distributed_hlo/" >/dev/null; fi; echo "DISTRIBUTED_Q_A_NORM_OK $(hostname) rank=$idx"'
-gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$distributed_command" >"$RUN_DIR/distributed_capture.txt" 2>&1
-has_eight_unique_markers "$RUN_DIR/distributed_capture.txt" \
-  DISTRIBUTED_Q_A_NORM_OK || {
-  say "ABORT: distributed q-a norm did not pass on all eight hosts"
-  exit 1
-}
-gcloud storage cp "$REMOTE_PREFIX/distributed_host_records/distributed.rank*" \
-  "$RUN_DIR/distributed_host_records/" >/dev/null
-strict_census distributed_post || {
-  say "ABORT: distributed phase did not release the complete fleet"
-  exit 1
-}
 DIST_MANIFEST_SHA=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
   "$RUN_DIR/distributed_q_a_norm_artifact/manifest.json")
+[[ $DIST_MANIFEST_SHA == "$DISTRIBUTED_Q_A_MANIFEST_SHA" ]] || {
+  say "ABORT: sealed DB491 distributed q-a artifact identity drifted"
+  exit 1
+}
+say "reusing sealed DB491 q-a artifact; no repeated 32-chip phase"
 
 say "compiling bounded layer-0 score matrix on one TPU-v4 host"
 started=$(date +%s)
@@ -148,7 +132,7 @@ started=$(date +%s)
       --distributed-q-a-norm-dir \
         "$RUN_DIR/distributed_q_a_norm_artifact" \
       --distributed-q-a-norm-manifest-sha256 "$DIST_MANIFEST_SHA" \
-      --distributed-q-a-norm-code-hash "$PIN" \
+      --distributed-q-a-norm-code-hash "$DISTRIBUTED_Q_A_CODE_HASH" \
       --output "$RUN_DIR/runner.json" \
       --hlo-dir "$RUN_DIR/hlo"
 ) >"$RUN_DIR/runner.log" 2>&1
@@ -158,7 +142,7 @@ say "runner completed in ${elapsed}s"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" \
   "$INPUT_MANIFEST_SHA" "$DIST_MANIFEST_SHA" \
-  "$PIN" "$MODEL_CONFIG_SHA" <<'PY'
+  "$DISTRIBUTED_Q_A_CODE_HASH" "$MODEL_CONFIG_SHA" <<'PY'
 from __future__ import annotations
 
 import json
@@ -183,18 +167,6 @@ if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("layer-0 DSA runner status/code identity failed")
 if runner["input_manifest_sha256"] != input_sha:
     raise SystemExit("layer-0 DSA input identity failed")
-distributed_records = [
-    json.loads(path.read_text())
-    for path in sorted((run_dir / "distributed_host_records").glob("*.json"))
-]
-if len(distributed_records) != 8 or {
-    record["launch_process_id"] for record in distributed_records
-} != set(range(8)) or {
-    record["jax_process_index"] for record in distributed_records
-} != set(range(8)) or len({
-    record["hostname"] for record in distributed_records
-}) != 8:
-    raise SystemExit("distributed q-a norm does not cover eight unique hosts")
 expected_model_config = {
     "path": "reference/hf-repo/config.json",
     "sha256": model_config_sha,
@@ -205,42 +177,6 @@ expected_numerical_geometry = {
     "q_a_rms_norm_epsilon": 1e-5,
     "key_layer_norm_epsilon": 1e-6,
 }
-if any(
-    record["status"] != "SUCCESS"
-    or record["code_hash"] != pin
-    or record["input_manifest_sha256"] != input_sha
-    or record["global_device_count"] != 32
-    or record["model_config"] != expected_model_config
-    or record["numerical_geometry"] != expected_numerical_geometry
-    or record["diagnostic_only_full_pod_collectives"] is not True
-    or record["profiler_free_timing"] is not False
-    for record in distributed_records
-):
-    raise SystemExit("distributed q-a norm identity/scope contract failed")
-if sorted(
-    device
-    for record in distributed_records
-    for device in record["local_device_ids"]
-) != list(range(32)):
-    raise SystemExit("distributed q-a norm device IDs do not cover 0..31")
-if len({record["hlo_sha256"] for record in distributed_records}) != 1 or len({
-    record["q_residual"]["sha256"] for record in distributed_records
-}) != 1:
-    raise SystemExit("distributed q-a norm fleet HLO/output differs")
-for record in distributed_records:
-    contract = record["hlo_contract"]
-    collective = contract["distributed_collective_contract"]
-    if (
-        not contract["passed"]
-        or contract["distributed_collective_violations"]
-        or collective["collective_counts"]
-        != {"all-gather": 1, "all-reduce": 1}
-        or collective["cpu_bf16_collective_promotion_allowed"] is not False
-    ):
-        raise SystemExit("distributed q-a norm physical HLO contract failed")
-    for operation in collective["collectives"]:
-        if operation["replica_groups"] != [list(range(32))]:
-            raise SystemExit("distributed q-a norm replica group drifted")
 distributed_manifest = json.loads(
     (run_dir / "distributed_q_a_norm_artifact" / "manifest.json").read_text()
 )
@@ -256,15 +192,6 @@ if distributed_manifest.get("code_hash") != distributed_code_hash or (
     or distributed_manifest.get("diagnostic_only") is not True
 ):
     raise SystemExit("distributed q-a norm provenance drifted")
-launch_zero = next(
-    record for record in distributed_records if record["launch_process_id"] == 0
-)
-if distributed_manifest.get("producer") != {
-    "hostname": launch_zero["hostname"],
-    "launch_process_id": 0,
-    "jax_process_index": launch_zero["jax_process_index"],
-}:
-    raise SystemExit("distributed q-a norm artifact owner drifted")
 if runner.get("numerical_geometry") != expected_numerical_geometry:
     raise SystemExit("layer-0 DSA numerical geometry drifted")
 if runner.get(
@@ -273,6 +200,31 @@ if runner.get(
     "legacy_tp32_distributed_q_a_norm_fp32_divsqrt"
 ):
     raise SystemExit("model-epsilon local-DCP verdict linkage drifted")
+bf16_wk_state = "legacy_tp32_distributed_q_a_norm_bf16_wk_divsqrt"
+if runner.get(
+    "model_epsilon_bf16_wk_local_dcp_association_restored"
+) != runner["legacy_local_dcp_xla_by_state_restored"].get(bf16_wk_state):
+    raise SystemExit("BF16-origin wk local-DCP verdict linkage drifted")
+expected_wk_boundary = {
+    "sealed_fused_shape": [160, 6144],
+    "sealed_fused_dtype": "bfloat16",
+    "sealed_fused_byte_sum": 241456714,
+    "sealed_adapted_wk_shape": [128, 6144],
+    "sealed_adapted_wk_dtype": "float32",
+    "sealed_adapted_wk_byte_sum": 193298069,
+    "source_association": (
+        "raw FP8 wk -> BF16 fused wk_weights_proj -> FP32 adapter"
+    ),
+    "candidate_changes_only_prompt_keys": True,
+}
+wk_boundary = runner.get("accepted_wk_dtype_boundary", {})
+for name, expected in expected_wk_boundary.items():
+    if wk_boundary.get(name) != expected:
+        raise SystemExit(f"accepted wk dtype boundary drifted: {name}")
+if wk_boundary.get("candidate_key_delta_vs_direct_fp32_wk", {}).get(
+    "elementwise_exact"
+) is not False:
+    raise SystemExit("BF16-origin wk candidate did not change prompt keys")
 for name, record in runner["hlo"]["state"].items():
     if not record["contract"]["passed"]:
         raise SystemExit(f"layer-0 DSA state HLO failed: {name}")
@@ -311,6 +263,7 @@ expected_variants = {
     "legacy_runtime_fused_qkv_global_fp32_divsqrt",
     "legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
     "legacy_tp32_distributed_q_a_norm_fp32_divsqrt",
+    "legacy_tp32_distributed_q_a_norm_bf16_wk_divsqrt",
     "one_row_pagewise_on_legacy_state",
     "one_row_pallas_on_legacy_state",
     "one_row_pagewise_on_fused_qkv_legacy_state",
@@ -321,6 +274,8 @@ expected_variants = {
     "one_row_pallas_on_runtime_fused_qkv_sharded_legacy_state",
     "one_row_pagewise_on_runtime_fused_qkv_distributed_norm_legacy_state",
     "one_row_pallas_on_runtime_fused_qkv_distributed_norm_legacy_state",
+    "one_row_pagewise_on_runtime_fused_qkv_distributed_norm_bf16_wk_legacy_state",
+    "one_row_pallas_on_runtime_fused_qkv_distributed_norm_bf16_wk_legacy_state",
     "legacy_local_dcp_xla_on_legacy_fp32_divsqrt",
     "legacy_local_dcp_xla_on_legacy_fp32_rsqrt",
     "legacy_local_dcp_xla_on_legacy_bf16_divsqrt",
@@ -329,6 +284,7 @@ expected_variants = {
     "legacy_local_dcp_xla_on_legacy_runtime_fused_qkv_global_fp32_divsqrt",
     "legacy_local_dcp_xla_on_legacy_runtime_fused_qkv_sharded_fp32_divsqrt",
     "legacy_local_dcp_xla_on_legacy_tp32_distributed_q_a_norm_fp32_divsqrt",
+    "legacy_local_dcp_xla_on_legacy_tp32_distributed_q_a_norm_bf16_wk_divsqrt",
 }
 if set(runner["comparisons"]) != expected_variants:
     raise SystemExit("layer-0 DSA comparison matrix is incomplete")
@@ -344,7 +300,7 @@ conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
     model="zai-org/GLM-5.2-FP8:greenfield-layer0-dsa-association",
-    revision="bounded-real-layer0-v5-model-epsilon-distributed-q-a",
+    revision="bounded-real-layer0-v6-model-epsilon-bf16-origin-wk",
     env={
         "GLM_ENGINE": "greenfield_layer0_dsa_association",
         "greenfield_code_hash": pin,
@@ -356,6 +312,7 @@ run_id = pv.start_run(
         "distributed_q_a_norm_source_code_hash": distributed_code_hash,
         "model_config_sha256": model_config_sha,
         "q_a_rms_norm_epsilon": 1e-5,
+        "wk_origin": "raw-fp8-to-bf16-fused-parameter-to-fp32-adapter",
         "device_kind": runner["device_kind"],
     },
     note="Protected bounded real layer-0 8K DSA association diagnostic.",
@@ -378,10 +335,10 @@ pv.record_item(
         sort_keys=True,
     ),
     correct=bool(
-        runner["model_epsilon_distributed_local_dcp_association_restored"]
+        runner["model_epsilon_bf16_wk_local_dcp_association_restored"]
     ),
     score=float(
-        runner["model_epsilon_distributed_local_dcp_association_restored"]
+        runner["model_epsilon_bf16_wk_local_dcp_association_restored"]
     ),
     latency_ms=None,
 )
@@ -421,10 +378,10 @@ PY
 
 (
   cd "$RUN_DIR"
-  find hlo input distributed_hlo distributed_host_records \
-    distributed_q_a_norm_artifact -type f -print0 | sort -z | xargs -0 sha256sum
+  find hlo input distributed_q_a_norm_artifact -type f -print0 | \
+    sort -z | xargs -0 sha256sum
   sha256sum runner.json runner.log summary.json results_ckpt.db \
-    census_pre.txt census_distributed_post.txt sync.txt distributed_capture.txt
+    census_pre.txt sync.txt
 ) >"$RUN_DIR/evidence.sha256"
 
 strict_census post || {
@@ -441,14 +398,12 @@ gcloud storage cp --recursive --no-clobber "$RUN_DIR/input" \
   "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp --recursive --no-clobber \
   "$RUN_DIR/distributed_q_a_norm_artifact" \
-  "$RUN_DIR/distributed_hlo" "$RUN_DIR/distributed_host_records" \
   "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp --no-clobber \
   "$RUN_DIR/runner.json" "$RUN_DIR/runner.log" "$RUN_DIR/summary.json" \
   "$RUN_DIR/results_ckpt.db" "$RUN_DIR/evidence.sha256" \
   "$RUN_DIR/orchestrator.log" "$RUN_DIR/census_pre.txt" \
-  "$RUN_DIR/census_distributed_post.txt" "$RUN_DIR/sync.txt" \
-  "$RUN_DIR/distributed_capture.txt" \
+  "$RUN_DIR/sync.txt" \
   "$RUN_DIR/census_post.txt" "$REMOTE_PREFIX/" >/dev/null
 gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" \
   "$REMOTE_PREFIX/SUCCESS" >/dev/null

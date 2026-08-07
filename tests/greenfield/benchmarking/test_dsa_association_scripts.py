@@ -59,6 +59,10 @@ def test_state_probe_requires_checksum_bound_distributed_result() -> None:
         "_inspect_distributed_q_a_norm_artifact",
         "layer0_dsa_state_from_q_residual",
         "legacy_tp32_distributed_q_a_norm_fp32_divsqrt",
+        "legacy_tp32_distributed_q_a_norm_bf16_wk_divsqrt",
+        "SEALED_LEGACY_WK_WEIGHTS_PROJ_DTYPE",
+        "candidate_changes_only_prompt_keys",
+        "model_epsilon_bf16_wk_local_dcp_association_restored",
         "LegacyDcpXlaScoreGeometry",
         "legacy_local_dcp_score_inputs",
         "legacy_local_dcp_xla_scores",
@@ -143,30 +147,34 @@ def test_distributed_result_artifact_round_trips_and_refuses_drift(
     np.testing.assert_array_equal(actual, q_bits)
 
 
-def test_protected_wrapper_serializes_model_epsilon_distributed_phase() -> None:
+def test_protected_wrapper_reuses_db491_for_bf16_wk_discriminator() -> None:
     source = WRAPPER.read_text()
     for required in (
         ".glm_pod_workload.lock",
         "strict_census pre",
-        "strict_census distributed_post",
         "strict_census post",
-        "probe_layer0_distributed_q_a_norm.py",
         "probe_layer0_dsa_association.py",
-        "DISTRIBUTED_Q_A_NORM_OK",
+        "DEFAULT_DISTRIBUTED_Q_A_DIR",
+        "DISTRIBUTED_Q_A_MANIFEST_SHA",
+        "DISTRIBUTED_Q_A_CODE_HASH",
+        "reusing sealed DB491 q-a artifact; no repeated 32-chip phase",
         "MODEL_CONFIG_SHA",
-        "model epsilon 1e-5",
         "distributed_q_a_norm_manifest_sha256",
         "--distributed-q-a-norm-code-hash",
         "legacy_local_dcp_xla_score",
-        "bounded-real-layer0-v5-model-epsilon-distributed-q-a",
+        "legacy_tp32_distributed_q_a_norm_bf16_wk_divsqrt",
+        "accepted_wk_dtype_boundary",
+        "model_epsilon_bf16_wk_local_dcp_association_restored",
+        "bounded-real-layer0-v6-model-epsilon-bf16-origin-wk",
         "bench/results.db",
         "--no-clobber",
         "REMOTE_PREFIX/SUCCESS",
     ):
         assert required in source
     for forbidden in (
-        "DEFAULT_DISTRIBUTED_Q_A_DIR",
-        "no repeated 32-chip phase",
+        "probe_layer0_distributed_q_a_norm.py",
+        "DISTRIBUTED_Q_A_NORM_OK",
+        "strict_census distributed_post",
     ):
         assert forbidden not in source
     completed = subprocess.run(
