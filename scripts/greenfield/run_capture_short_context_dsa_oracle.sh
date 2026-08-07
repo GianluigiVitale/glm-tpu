@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Capture and seal one fresh, flat-scatter 2K legacy DSA event oracle.
+# Capture and seal one fresh, flat-scatter short-context DSA event oracle.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -11,22 +11,65 @@ readonly LEGACY_REPO=/home/gianl/tpu-inference
 readonly LEGACY_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
-readonly TOKEN_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
-readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/2k/$TOKEN_ORACLE_TAG/oracle
-readonly TOKEN_ORACLE_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
 readonly OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly DISK_MIN_FREE_GB=10
 readonly DISK_WARN_FREE_GB=15
+
+PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
+case "$PROFILE" in
+  2k)
+    TOKEN_ORACLE_TAG=greenfield_short_context_oracle_20260806T202544155912103Z
+    TOKEN_ORACLE_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
+    BENCHMARK_LENGTH=2040
+    BENCHMARK_DEPTH=0.25
+    BENCHMARK_MAX_LEN=2560
+    BENCHMARK_MAX_BATCHED_TOKENS=2048
+    BENCHMARK_NUM_BLOCKS=8
+    EXPECTED_BENCHMARK=passkey_L2040_d0.25
+    EXPECTED_PROMPT_TOKENS=2034
+    EXPECTED_GENERATED_TOKENS=20
+    EXPECTED_SEED=283835
+    EXPECTED_GOLD=110391
+    FIRST_DECODE_POSITION=2034
+    TAG_PREFIX=greenfield_short_context_dsa_oracle
+    ;;
+  8k)
+    TOKEN_ORACLE_TAG=greenfield_short_context_oracle_8k_20260807T161454146116252Z
+    TOKEN_ORACLE_SHA=15864f30fa57e4c93af301822d60781b2fd33f83245a9613248e7360f1450530
+    BENCHMARK_LENGTH=8192
+    BENCHMARK_DEPTH=0.5
+    BENCHMARK_MAX_LEN=8704
+    BENCHMARK_MAX_BATCHED_TOKENS=2048
+    BENCHMARK_NUM_BLOCKS=24
+    EXPECTED_BENCHMARK=passkey_L8192_d0.5
+    EXPECTED_PROMPT_TOKENS=8155
+    EXPECTED_GENERATED_TOKENS=20
+    EXPECTED_SEED=1093997
+    EXPECTED_GOLD=881446
+    FIRST_DECODE_POSITION=8155
+    TAG_PREFIX=greenfield_short_context_dsa_oracle_8k
+    ;;
+  *)
+    echo "unsupported short-context DSA oracle profile: $PROFILE" >&2
+    exit 2
+    ;;
+esac
+readonly PROFILE TOKEN_ORACLE_TAG TOKEN_ORACLE_SHA BENCHMARK_LENGTH
+readonly BENCHMARK_DEPTH BENCHMARK_MAX_LEN BENCHMARK_MAX_BATCHED_TOKENS
+readonly BENCHMARK_NUM_BLOCKS EXPECTED_BENCHMARK EXPECTED_PROMPT_TOKENS
+readonly EXPECTED_GENERATED_TOKENS EXPECTED_SEED EXPECTED_GOLD
+readonly FIRST_DECODE_POSITION TAG_PREFIX
+readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/$PROFILE/$TOKEN_ORACLE_TAG/oracle
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 HARNESS_PIN=$(git -C "$HARNESS_REPO" rev-parse HEAD)
 HARNESS_SHORT=$(git -C "$HARNESS_REPO" rev-parse --short HEAD)
 LEGACY_SHORT=$(git -C "$LEGACY_REPO" rev-parse --short HEAD)
-TAG=${GLM_GREENFIELD_SHORT_DSA_ORACLE_TAG:-greenfield_short_context_dsa_oracle_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DSA_ORACLE_TAG:-${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 SOURCE_DIR=$RUN_DIR/source_dumps
 ORACLE_DIR=$RUN_DIR/oracle
-REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/2k/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/$PROFILE/$TAG
 DUMP_PREFIX=/tmp/$TAG/topk.npz
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
@@ -119,7 +162,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
-say "DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX"
+say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX"
 strict_census pre || {
   say "ABORT: fleet is not eight-host zero work"
   exit 1
@@ -162,7 +205,7 @@ has_eight_unique_markers "$RUN_DIR/raylet_env.txt" ENV_OK || {
   exit 1
 }
 
-say "running one exact 2K raw passkey item"
+say "running one exact $PROFILE raw passkey item"
 (
   cd "$HARNESS_REPO/bench"
   set -a
@@ -172,9 +215,11 @@ say "running one exact 2K raw passkey item"
   # shellcheck disable=SC2086
   LIBTPU_INIT_ARGS='--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false' \
     env $DRIVER_ENVS setsid --wait /home/gianl/vllm-env/bin/python -u \
-    glm_longctx.py --lengths 2040 --depths 0.25 --trials 1 \
-    --protocol raw --max-new 20 --max-len 2560 --max-seqs 1 \
-    --max-batched-tokens 2048 --gmu 0.90 --num-gpu-blocks 8 \
+    glm_longctx.py --lengths "$BENCHMARK_LENGTH" --depths "$BENCHMARK_DEPTH" --trials 1 \
+    --protocol raw --max-new "$EXPECTED_GENERATED_TOKENS" \
+    --max-len "$BENCHMARK_MAX_LEN" --max-seqs 1 \
+    --max-batched-tokens "$BENCHMARK_MAX_BATCHED_TOKENS" --gmu 0.90 \
+    --num-gpu-blocks "$BENCHMARK_NUM_BLOCKS" \
     --seed 12345 --note "fresh flat all-event DSA oracle $TAG" \
     --out-json "$RUN_DIR/legacy_summary.json"
 ) >"$RUN_DIR/legacy.log" 2>&1
@@ -221,6 +266,7 @@ dump_count=$(find "$SOURCE_DIR" -type f -name 'topk.step*.evt*.proc*.npz' | wc -
 }
 
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$run_id" \
+  "$EXPECTED_PROMPT_TOKENS" "$EXPECTED_GENERATED_TOKENS" \
   >"$RUN_DIR/source_identity.json" <<'PY'
 import json
 import sqlite3
@@ -237,8 +283,8 @@ row = connection.execute(
 assert len(row) == 1, row
 value = dict(row[0])
 assert value["correct"] == 1
-assert value["n_prompt_tokens"] == 2034
-assert value["n_gen_tokens"] == 20
+assert value["n_prompt_tokens"] == int(sys.argv[3])
+assert value["n_gen_tokens"] == int(sys.argv[4])
 print(json.dumps(value, indent=2, sort_keys=True))
 PY
 item_row_id=$(/home/gianl/vllm-env/bin/python -c \
@@ -268,8 +314,19 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --item-row-id "$item_row_id" \
   --expected-harness-git "$source_harness" \
   --expected-fork-git "$source_fork" \
+  --expected-benchmark "$EXPECTED_BENCHMARK" \
+  --expected-model-uri gs://driftbench-dsv4-uc/models/GLM-5.2-FP8 \
+  --expected-prompt-tokens "$EXPECTED_PROMPT_TOKENS" \
+  --expected-generated-tokens "$EXPECTED_GENERATED_TOKENS" \
+  --expected-seed "$EXPECTED_SEED" \
+  --expected-gold "$EXPECTED_GOLD" \
   --expected-oob-dir "$OOB_DIR" \
-  --expected-dump-prefix "$DUMP_PREFIX" >"$RUN_DIR/capture.json"
+  --expected-dump-prefix "$DUMP_PREFIX" \
+  --expected-process-count 8 \
+  --first-source-step 2 \
+  --decode-step-count 14 \
+  --first-decode-position "$FIRST_DECODE_POSITION" \
+  --selected-width 2048 >"$RUN_DIR/capture.json"
 
 # Snapshot the append-only provenance DB at the exact source row.
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$RUN_DIR/results_ckpt.db" <<'PY'

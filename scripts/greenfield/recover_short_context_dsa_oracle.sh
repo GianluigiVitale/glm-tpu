@@ -139,8 +139,19 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --item-row-id "$ITEM_ROW_ID" \
   --expected-harness-git "$SOURCE_HARNESS" \
   --expected-fork-git "$SOURCE_FORK" \
+  --expected-benchmark passkey_L2040_d0.25 \
+  --expected-model-uri gs://driftbench-dsv4-uc/models/GLM-5.2-FP8 \
+  --expected-prompt-tokens 2034 \
+  --expected-generated-tokens 20 \
+  --expected-seed 283835 \
+  --expected-gold 110391 \
   --expected-oob-dir "$OOB_DIR" \
-  --expected-dump-prefix "$DUMP_PREFIX" >"$RUN_DIR/capture.json"
+  --expected-dump-prefix "$DUMP_PREFIX" \
+  --expected-process-count 8 \
+  --first-source-step 2 \
+  --decode-step-count 14 \
+  --first-decode-position 2034 \
+  --selected-width 2048 >"$RUN_DIR/capture.json"
 
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$RUN_DIR/results_ckpt.db" <<'PY'
 import sqlite3

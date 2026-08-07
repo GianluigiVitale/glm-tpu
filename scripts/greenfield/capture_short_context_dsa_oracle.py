@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seal a provenance-pinned fresh 2K legacy DSA event capture."""
+"""Seal a provenance-pinned fresh short-context legacy DSA capture."""
 
 from __future__ import annotations
 
@@ -57,8 +57,19 @@ def main() -> None:
     parser.add_argument("--item-row-id", type=int, required=True)
     parser.add_argument("--expected-harness-git", required=True)
     parser.add_argument("--expected-fork-git", required=True)
+    parser.add_argument("--expected-benchmark", required=True)
+    parser.add_argument("--expected-model-uri", required=True)
+    parser.add_argument("--expected-prompt-tokens", type=int, required=True)
+    parser.add_argument("--expected-generated-tokens", type=int, required=True)
+    parser.add_argument("--expected-seed", type=int, required=True)
+    parser.add_argument("--expected-gold", required=True)
     parser.add_argument("--expected-oob-dir", required=True)
     parser.add_argument("--expected-dump-prefix", required=True)
+    parser.add_argument("--expected-process-count", type=int, default=8)
+    parser.add_argument("--first-source-step", type=int, required=True)
+    parser.add_argument("--decode-step-count", type=int, required=True)
+    parser.add_argument("--first-decode-position", type=int, required=True)
+    parser.add_argument("--selected-width", type=int, required=True)
     args = parser.parse_args()
     manifest = capture_short_context_dsa_oracle(
         ShortContextDsaOracleConfig(
@@ -78,21 +89,19 @@ def main() -> None:
             item_row_id=args.item_row_id,
             expected_harness_git=args.expected_harness_git,
             expected_fork_git=args.expected_fork_git,
-            expected_benchmark="passkey_L2040_d0.25",
-            expected_model_uri=(
-                "gs://driftbench-dsv4-uc/models/GLM-5.2-FP8"
-            ),
-            expected_prompt_tokens=2034,
-            expected_generated_tokens=20,
-            expected_seed=283835,
-            expected_gold="110391",
+            expected_benchmark=args.expected_benchmark,
+            expected_model_uri=args.expected_model_uri,
+            expected_prompt_tokens=args.expected_prompt_tokens,
+            expected_generated_tokens=args.expected_generated_tokens,
+            expected_seed=args.expected_seed,
+            expected_gold=args.expected_gold,
             expected_oob_dir=args.expected_oob_dir,
             expected_dump_prefix=args.expected_dump_prefix,
-            expected_process_count=8,
-            first_source_step=2,
-            decode_step_count=14,
-            first_decode_position=2034,
-            selected_width=2048,
+            expected_process_count=args.expected_process_count,
+            first_source_step=args.first_source_step,
+            decode_step_count=args.decode_step_count,
+            first_decode_position=args.first_decode_position,
+            selected_width=args.selected_width,
             producer_layer_ids=PRODUCER_LAYER_IDS,
         )
     )
