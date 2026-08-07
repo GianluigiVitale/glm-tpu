@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 09:34 UTC
+**Updated:** 2026-08-07 10:52 UTC
 
 ## Authority and isolation
 
@@ -1173,3 +1173,25 @@ boundaries, exact selected-boundary reconstruction, approved append-only archive
 8/8 zero-work cleanup. If 77->78 contains the dominant accepted error jump, instrument layer 77
 sublayers next; otherwise refine the selected interval. Never infer the earliest divergence from a
 sparse boundary set and never relax the raw-token gate.
+
+## First selected-observer attempt rejected; deferred-cache fix pinned
+
+Protected run
+`greenfield_legacy_layer_residual_p2044_20260807T093610754508593Z` loaded and verified the full
+model on all eight hosts, compiled production boundary-32 plus selected boundary `1,77,78`
+executables, and compiled every production bucket through 2,048. It then failed closed before
+generation during the deferred warmup pass: the observer task retained the initially queued
+`bf16[8,16,32,128]` KV-cache object after the preceding production warmup donated that buffer.
+JAX correctly refused it as deleted. There is no runner result, residual, DB row, `SUCCESS`, Gate D,
+or arithmetic claim. The wrapper stopped the owned runtime and the failure census is 8/8 clean.
+
+Observer pin `4284e8798d49168536927630274a985643debeb6`, three commits above the unchanged sealed oracle,
+substitutes `runner.kv_caches` only when a deferred observer warmup dispatches. That value is the
+valid output of the immediately preceding same-bucket production warmup; every other exact input
+is retained, observer donation remains disabled, and observer cache outputs remain discarded. A
+CPU regression donates and proves deletion of the originally queued JAX buffer, then proves the
+observer succeeds through the refreshed cache. Observer/HLO tests pass 16/16; the broader runner
+invocation still exposes the previously documented unrelated `padded_num_reqs=None` mock failure.
+
+The protected wrapper now pins the new observer, detached runtime path, and exact oracle distance.
+Exact next remains one serialized selected-boundary retry under the unchanged acceptance contract.

@@ -4840,3 +4840,29 @@ validator requires 24 contracts with one HLO hash per boundary. Failed token dra
 exact sequence before raising. Verification is 10/10 observer tests, 40/40 related regressions, and
 365 passed / 1 skipped for the full greenfield CPU suite. This is methodology, not model evidence;
 the protected selected-boundary run remains next.
+
+## 2026-08-07 10:52 — Selected observer failed before generation on a donated queued cache; current-cache warmup fix pinned
+
+Protected attempt
+`greenfield_legacy_layer_residual_p2044_20260807T093610754508593Z` is rejected diagnostics only.
+All eight checkpoint checksum scans passed (`1,882` verified, zero mismatches, `312` skipped) and
+all eight state manifests passed (`2,455` leaves, combined checksum `371110325`). Production
+boundary-32 and separate no-donation boundary `1,77,78` HLOs compiled fleet-wide, followed by all
+production buckets through 2,048. Before any sealed-token generation or residual capture, the
+deferred warmup pass failed with `Array has been deleted with shape=bfloat16[8,16,32,128]`.
+
+The cause is exact: `_run_compilation` queues every warmup before the flush. The production
+boundary-32 warmup donates the initially queued KV-cache buffers and updates `runner.kv_caches`,
+but each observer warmup previously dispatched the stale cache object retained in its queued
+`args`. This is observer orchestration, not a model-arithmetic result. The wrapper preserved logs,
+stopped the authenticated owned runtime on every host, and closed with eight `CENSUS_OK` hosts. No
+runner JSON, NPZ, comparison, DB row, `SUCCESS`, Gate D, or performance claim exists.
+
+Observer commit `4284e8798d49168536927630274a985643debeb6` replaces only argument 1 of a deferred
+observer warmup with the current valid `runner.kv_caches`. Task ordering makes that cache the output
+of the immediately preceding same-bucket production warmup. All other compile inputs remain exact;
+the observer still has no donation, and its cache outputs are discarded. A CPU regression uses a
+real donating JIT, asserts the originally queued buffer is deleted, and proves the observer warmup
+uses the valid replacement. Observer plus HLO-honesty tests pass 16/16, Python compilation and diff
+checks pass. The protected wrapper pins the new detached path and oracle commit distance `3` for a
+single serialized retry under the unchanged acceptance contract.
