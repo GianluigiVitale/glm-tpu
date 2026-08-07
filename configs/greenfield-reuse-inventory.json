@@ -157,7 +157,7 @@
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "scripts/greenfield/probe_layer0_distributed_q_a_norm.py", "scripts/greenfield/probe_layer0_dsa_association.py"],
       "gate": "D",
-      "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. DB490 rejects scorer geometry; the pinned config and accepted vLLM source prove q_a/kv_a RMSNorm epsilon 1e-5; DB491 shows that correction cuts mean score error about 17x but still misses 1,408 order slots. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
+      "reason": "The source and accepted XPlane jointly prove a 32-way FP32 variance all-reduce followed by a BF16 rank-3 all-gather at q_a_layernorm. DB490 rejects scorer geometry; the pinned config and accepted vLLM source prove q_a/kv_a RMSNorm epsilon 1e-5; DB491 shows that correction cuts mean score error about 17x but still misses 1,408 order slots. A source-faithful logical-width GSPMD mean is bitwise identical to the manual distributed norm on forced-32 exact BF16 inputs and retains the same full-geometry collective association, so no redundant TPU run is warranted. Greenfield independently reproduces only this bounded oracle association; it remains forbidden in production layers."
     },
     {
       "id": "legacy-8k-local-xla-scorer-association",

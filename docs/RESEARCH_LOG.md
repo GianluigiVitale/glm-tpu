@@ -5330,3 +5330,25 @@ Runner/summary/evidence/DB-snapshot SHAs are `cbc90643...7cf`, `6b25c686...887`,
 claim. Production remains unchanged. The next discriminator is the physical FP32 RMSNorm reduction
 association and BF16 norm-weight boundary, using accepted source/HLO and the existing bounded
 artifact before another serialized run.
+
+## 2026-08-07 23:45 — Logical GSPMD RMSNorm is equivalent; sealed fused wk proves a narrower dtype boundary
+
+An independent source-level challenger now expresses the complete q-a fused projection and
+logical-width RMSNorm to ordinary `jax.jit` with explicit global sharding, allowing GSPMD to choose
+the reduction placement. Forced-32 execution is bitwise identical to the existing manual
+shard-map diagnostic on exact BF16 inputs. Its full-geometry optimized HLO has the same single
+all-reduce/all-gather pair and retains division by 2,048 after the reduction. Automatic
+partitioning therefore does not supply a novel association and is rejected without spending a
+protected TPU run. The HLO parser was extended to resolve current mesh-form replica groups to
+physical ranks; the focused kernel/validator suite passes 14/14. This is static mechanism evidence
+only, with no arithmetic claim against the sealed score oracle and no performance claim.
+
+The follow-on source and accepted-state audit found a real untested boundary. Layer 0's sealed
+`wk_weights_proj.weight` is BF16 `[160,6144]`, byte sum `241456714`, and accepted logs show both
+halves repaired from the out-of-band mirror. The repair calls `scaled_dequantize` for raw FP8 `wk`
+with the fused parameter's BF16 dtype, then the DSA adapter casts the fused BF16 leaf to FP32. The
+bounded greenfield replacement used DB491's corrected query with keys built from direct-FP32 `wk`
+dequantization. Its older `legacy_bf16_divsqrt` state rounded both `wq_b` and `wk`, so that result
+did not isolate the key path; however its `index_keys` can be paired with DB491's immutable query
+and unchanged head weights. The next candidate reuses DB491's checksum-bound artifact and runs
+only the one-host scorer matrix. It must not repeat the full-pod q-a phase.

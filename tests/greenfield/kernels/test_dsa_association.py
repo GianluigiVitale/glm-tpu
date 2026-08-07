@@ -24,6 +24,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     legacy_local_dcp_score_inputs,
     legacy_local_dcp_xla_scores,
     legacy_tp32_fused_qkv_a_rms_norm,
+    legacy_tp32_gspmd_fused_qkv_a_rms_norm,
     legacy_pagewise_dcp_scores,
     one_row_pagewise_scores,
     pack_legacy_fused_qkv_runtime_weights,
@@ -419,6 +420,69 @@ def _run_forced_32_distributed_q_a_norm_case() -> None:
         "collective_counts"
     ] == {"all-gather": 1, "all-reduce": 1}
 
+    replicated = NamedSharding(mesh, P())
+    output_sharded = NamedSharding(mesh, P(None, "legacy_model"))
+    gspmd_function = jax.jit(
+        partial(
+            legacy_tp32_gspmd_fused_qkv_a_rms_norm,
+            geometry=geometry,
+        ),
+        in_shardings=(
+            replicated,
+            output_sharded,
+            output_sharded,
+            replicated,
+        ),
+        out_shardings=LegacyTp32QaNormOutput(
+            replicated,
+            output_sharded,
+        ),
+    )
+    gspmd_lowered = gspmd_function.lower(*arguments)
+    gspmd_compiled = gspmd_lowered.compile()
+    gspmd_actual = gspmd_compiled(*arguments)
+    jax.block_until_ready(gspmd_actual)
+    np.testing.assert_allclose(
+        np.asarray(gspmd_actual.q_residual, dtype=np.float32),
+        np.asarray(reference, dtype=np.float32),
+        rtol=0,
+        atol=2**-7,
+    )
+    np.testing.assert_array_equal(
+        np.asarray(gspmd_actual.qkv_a_companion_shard).view(np.uint16),
+        np.asarray(logical_companion).view(np.uint16),
+    )
+    np.testing.assert_array_equal(
+        np.asarray(gspmd_actual.q_residual).view(np.uint16),
+        np.asarray(actual.q_residual).view(np.uint16),
+    )
+    gspmd_hlo = gspmd_compiled.as_text()
+    gspmd_contract = validate_dsa_association_hlo(
+        gspmd_hlo,
+        phase="legacy_tp32_gspmd_q_a_norm",
+        context=6,
+        decode_rows=geometry.decode_rows,
+        heads=geometry.heads,
+        head_dim=geometry.head_dim,
+        page_size=2,
+        hidden_size=geometry.hidden_size,
+        q_lora_rank=geometry.q_lora_rank,
+        qkv_a_companion_rank=geometry.qkv_a_companion_rank,
+        tensor_shards=geometry.legacy_tensor_shards,
+        allow_cpu_bf16_collective_promotion=True,
+    )
+    assert gspmd_contract["passed"], (
+        gspmd_contract,
+        [
+            line.strip()
+            for line in gspmd_hlo.splitlines()
+            if "all-reduce" in line or "all-gather" in line
+        ],
+    )
+    assert gspmd_contract["distributed_collective_contract"][
+        "collective_counts"
+    ] == {"all-gather": 1, "all-reduce": 1}
+
     full = Layer0DsaProbeGeometry()
     full_arguments = (
         jax.device_put(
@@ -474,6 +538,34 @@ def _run_forced_32_distributed_q_a_norm_case() -> None:
     )
     assert full_contract["passed"], full_contract
     assert full_contract["missing_shapes"] == []
+
+    full_gspmd_function = jax.jit(
+        partial(
+            legacy_tp32_gspmd_fused_qkv_a_rms_norm,
+            geometry=full,
+        ),
+        in_shardings=(
+            replicated,
+            output_sharded,
+            output_sharded,
+            replicated,
+        ),
+        out_shardings=LegacyTp32QaNormOutput(
+            replicated,
+            output_sharded,
+        ),
+    )
+    full_gspmd_hlo = full_gspmd_function.lower(
+        *full_arguments
+    ).compile().as_text()
+    full_gspmd_contract = validate_dsa_association_hlo(
+        full_gspmd_hlo,
+        phase="legacy_tp32_gspmd_q_a_norm",
+        allow_cpu_bf16_collective_promotion=True,
+    )
+    assert full_gspmd_contract["passed"], full_gspmd_contract
+    assert full_gspmd_contract["missing_shapes"] == []
+    assert "0.00048828125" in full_gspmd_hlo
 
 
 def test_distributed_q_a_norm_exactness_and_hlo_on_forced_32_cpu() -> None:

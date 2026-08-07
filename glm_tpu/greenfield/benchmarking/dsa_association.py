@@ -15,6 +15,7 @@ AssociationPhase = Literal[
     "legacy_runtime_fused_qkv_global_state",
     "legacy_runtime_fused_qkv_sharded_state",
     "legacy_tp32_distributed_q_a_norm",
+    "legacy_tp32_gspmd_q_a_norm",
     "legacy_tp32_distributed_q_a_norm_state",
     "legacy_score",
     "legacy_local_dcp_xla_score",
@@ -127,6 +128,14 @@ def validate_dsa_association_hlo(
             "legacy_tp32_q_a_rms_norm_variance_psum",
             "legacy_tp32_q_a_rms_norm_bf16_all_gather",
         ),
+        "legacy_tp32_gspmd_q_a_norm": (
+            f"f8e4m3fn[{hidden_size},{local_output}]",
+            f"f32[{hidden_size // 128},{local_output}]",
+            f"bf16[{decode_rows},{q_lora_rank}]",
+            f"bf16[{decode_rows},{companion_local}]",
+            "legacy_runtime_fused_qkv_a_m32_tp32_gspmd_norm",
+            "legacy_tp32_q_a_rms_norm_source_mean",
+        ),
         "legacy_tp32_distributed_q_a_norm_state": (
             f"bf16[{decode_rows},{q_lora_rank}]",
             f"f32[{decode_rows},{heads},{head_dim}]",
@@ -214,7 +223,10 @@ def validate_dsa_association_hlo(
     fused_qkv_intermediate_shapes = [
         shape for shape in fused_qkv_candidates if shape in optimized_hlo
     ]
-    allowed_distributed_collectives = phase == "legacy_tp32_distributed_q_a_norm"
+    allowed_distributed_collectives = phase in (
+        "legacy_tp32_distributed_q_a_norm",
+        "legacy_tp32_gspmd_q_a_norm",
+    )
     forbidden_tokens = (
         " collective-permute(",
         " reduce-scatter(",
@@ -286,10 +298,18 @@ def validate_dsa_association_hlo(
             expected_gather_shapes = {
                 ("bf16", (decode_rows, q_local, tensor_shards))
             }
+            if phase == "legacy_tp32_gspmd_q_a_norm":
+                expected_gather_shapes.add(
+                    ("bf16", (decode_rows, q_lora_rank))
+                )
             if allow_cpu_bf16_collective_promotion:
                 expected_gather_shapes.add(
                     ("f32", (decode_rows, q_local, tensor_shards))
                 )
+                if phase == "legacy_tp32_gspmd_q_a_norm":
+                    expected_gather_shapes.add(
+                        ("f32", (decode_rows, q_lora_rank))
+                    )
             if reductions and not (
                 set(reduction_shapes) & expected_reduction_shapes
             ):
@@ -303,6 +323,13 @@ def validate_dsa_association_hlo(
                     f"expected={sorted(expected_gather_shapes)} "
                     f"found={gather_shapes}"
                 )
+            reduction_operand_names = [
+                name for item in reductions for name in item.operand_names
+            ]
+            named_multiply_reduce_operand = any(
+                "multiply_reduce_fusion" in name
+                for name in reduction_operand_names
+            )
             distributed_collective_contract = {
                 "collective_count": len(collectives),
                 "collective_counts": dict(sorted(counts.items())),
@@ -318,6 +345,10 @@ def validate_dsa_association_hlo(
                 ],
                 "cpu_bf16_collective_promotion_allowed": (
                     allow_cpu_bf16_collective_promotion
+                ),
+                "all_reduce_operand_names": reduction_operand_names,
+                "named_multiply_reduce_operand": (
+                    named_multiply_reduce_operand
                 ),
             }
     forbidden_dead_rows = []

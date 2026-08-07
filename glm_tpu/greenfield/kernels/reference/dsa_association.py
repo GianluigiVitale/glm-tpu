@@ -469,6 +469,85 @@ def legacy_tp32_fused_qkv_a_rms_norm(
     return LegacyTp32QaNormOutput(q_residual, companion)
 
 
+def legacy_tp32_gspmd_fused_qkv_a_rms_norm(
+    normalized_hidden: Any,
+    global_qkv_weight: Any,
+    global_qkv_scale: Any,
+    q_a_norm_weight: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> LegacyTp32QaNormOutput:
+    """Reproduce the source-level fused projection and RMSNorm for GSPMD.
+
+    The accepted Torchax path expresses q-a RMSNorm as a logical-width
+    ``mean`` and lets GSPMD partition the feature-sharded tensor.  This
+    diagnostic tests whether that source form changes reduction association
+    relative to manually spelling ``local sum -> psum -> divide`` inside
+    :func:`jax.shard_map`.  It keeps the same shard-major fused ``N=82``
+    runtime layout, but presents the complete logical operation to ``jax.jit``
+    so the partitioner chooses the collective and division placement.
+
+    Callers must provide explicit global ``NamedSharding`` values: hidden and
+    norm weight replicated, fused weight/scale sharded over their output axis,
+    q-a output replicated, and companion output-sharded.  The function has no
+    explicit collective and is never a production greenfield layer.
+    """
+
+    shards = geometry.legacy_tensor_shards
+    if geometry.q_lora_rank % shards or (
+        geometry.qkv_a_companion_rank % shards
+    ) or geometry.hidden_size % 128:
+        raise ValueError("legacy TP32 GSPMD fused qkv geometry does not divide")
+    q_local = geometry.q_lora_rank // shards
+    companion_local = geometry.qkv_a_companion_rank // shards
+    local_output = q_local + companion_local
+    fused_output = geometry.q_lora_rank + geometry.qkv_a_companion_rank
+    expected_shapes = {
+        "normalized_hidden": (geometry.decode_rows, geometry.hidden_size),
+        "global_qkv_weight": (geometry.hidden_size, fused_output),
+        "global_qkv_scale": (geometry.hidden_size // 128, fused_output),
+        "q_a_norm_weight": (geometry.q_lora_rank,),
+    }
+    values = {
+        "normalized_hidden": normalized_hidden,
+        "global_qkv_weight": global_qkv_weight,
+        "global_qkv_scale": global_qkv_scale,
+        "q_a_norm_weight": q_a_norm_weight,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"legacy TP32 GSPMD fused qkv {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if normalized_hidden.dtype != jnp.bfloat16 or (
+        global_qkv_weight.dtype != jnp.float8_e4m3fn
+    ) or global_qkv_scale.dtype != jnp.float32 or (
+        q_a_norm_weight.dtype != jnp.bfloat16
+    ):
+        raise ValueError("legacy TP32 GSPMD fused qkv dtype contract drifted")
+
+    with jax.named_scope("legacy_runtime_fused_qkv_a_m32_tp32_gspmd_norm"):
+        fused = _legacy_runtime_fp8_dot(
+            normalized_hidden,
+            global_qkv_weight,
+            global_qkv_scale,
+        ).reshape(geometry.decode_rows, shards, local_output)
+        q_a = fused[:, :, :q_local].reshape(
+            geometry.decode_rows, geometry.q_lora_rank
+        )
+        companion = fused[:, :, q_local:].reshape(
+            geometry.decode_rows, geometry.qkv_a_companion_rank
+        )
+        with jax.named_scope("legacy_tp32_q_a_rms_norm_source_mean"):
+            q_residual = rms_norm(
+                q_a,
+                q_a_norm_weight,
+                epsilon=geometry.q_norm_epsilon,
+            )
+    return LegacyTp32QaNormOutput(q_residual, companion)
+
+
 def layer0_dsa_state_from_q_residual(
     q_residual: Any,
     index_keys: Any,

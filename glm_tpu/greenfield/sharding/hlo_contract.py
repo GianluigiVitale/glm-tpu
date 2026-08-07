@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+from itertools import product
 import json
+import math
 import re
 from typing import Any, Mapping, Sequence
 
@@ -183,6 +185,67 @@ def _braced_groups(attributes: str, name: str) -> tuple[tuple[int, ...], ...]:
     start = attributes.find(marker)
     if start < 0:
         return ()
+    value = attributes[start + len(marker) :].lstrip()
+    mesh_match = re.match(r"mesh\[([^]]+)\]\s*\{([^}]*)\}", value)
+    if mesh_match is not None:
+        axis_items = re.findall(
+            r"'([^']+)'\s*=\s*([0-9]+)", mesh_match.group(1)
+        )
+        selected_axes = re.findall(r"'([^']+)'", mesh_match.group(2))
+        if not axis_items or not selected_axes:
+            raise ValueError(f"malformed mesh {name} in HLO attributes")
+        axis_names = tuple(item[0] for item in axis_items)
+        axis_sizes = tuple(int(item[1]) for item in axis_items)
+        if len(set(axis_names)) != len(axis_names) or any(
+            size <= 0 for size in axis_sizes
+        ):
+            raise ValueError(f"invalid mesh {name} axes in HLO attributes")
+        if len(set(selected_axes)) != len(selected_axes) or any(
+            axis not in axis_names for axis in selected_axes
+        ):
+            raise ValueError(f"unknown mesh {name} group axis in HLO attributes")
+
+        selected = frozenset(selected_axes)
+        fixed_indices = tuple(
+            index
+            for index, axis in enumerate(axis_names)
+            if axis not in selected
+        )
+        varied_indices = tuple(
+            index
+            for index, axis in enumerate(axis_names)
+            if axis in selected
+        )
+        strides = tuple(
+            math.prod(axis_sizes[index + 1 :])
+            for index in range(len(axis_sizes))
+        )
+        groups = []
+        for fixed_values in product(
+            *(range(axis_sizes[index]) for index in fixed_indices)
+        ):
+            fixed = dict(zip(fixed_indices, fixed_values, strict=True))
+            group = []
+            for varied_values in product(
+                *(range(axis_sizes[index]) for index in varied_indices)
+            ):
+                coordinates = [0] * len(axis_sizes)
+                for index, coordinate in fixed.items():
+                    coordinates[index] = coordinate
+                for index, coordinate in zip(
+                    varied_indices, varied_values, strict=True
+                ):
+                    coordinates[index] = coordinate
+                group.append(
+                    sum(
+                        coordinate * stride
+                        for coordinate, stride in zip(
+                            coordinates, strides, strict=True
+                        )
+                    )
+                )
+            groups.append(tuple(group))
+        return tuple(groups)
     start = attributes.find("{", start + len(marker))
     if start < 0:
         return ()

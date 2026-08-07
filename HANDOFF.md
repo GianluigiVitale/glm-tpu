@@ -1673,3 +1673,28 @@ before adding code. In particular, discriminate `local sum -> psum -> /2048`,
 `local mean -> psum -> /32`, and `local sum/2048 -> psum`, plus the exact BF16 weight-multiply
 boundary. Use an existing artifact or a bounded candidate matrix first; do not rerun the complete
 8K decoder blindly.
+
+## Source-level GSPMD mean is statically identical; repaired-wk precision is next
+
+The accepted vLLM/Torchax source-level q-a RMSNorm expression has now been reproduced as one
+logical-width JAX `mean` under explicit global `NamedSharding`, without importing either execution
+path. On 32 forced CPU devices, the GSPMD result is bitwise identical to the already-measured
+manual `local sum -> psum -> /2048` diagnostic for exact BF16 inputs, including the live fused
+qkv-a companion. The full production geometry compiles with the same one all-reduce / one
+all-gather contract and the optimized HLO retains the `1/2048` scaling after the reduction. This
+rejects source spelling or automatic partitioning as a new arithmetic discriminator. No TPU run,
+DB row, decoder change, Gate-D result, timing, or throughput claim follows.
+
+The HLO parser now also expands current JAX replica syntax such as
+`mesh['stage'=2,'local'=4] {'local'}` into exact physical rank groups, so the diagnostic remains
+fail-closed under the newer printer. Focused forced-32/HLO coverage passes 14/14.
+
+A source/state audit exposes the next concrete dtype boundary. The sealed layer-0 legacy leaf
+`wk_weights_proj.weight` is BF16 `[160,6144]` with byte sum `241456714`; the accepted run explicitly
+repairs both halves from the mirror. Its `wk` repair dequantizes raw FP8 with `out_dtype=w.dtype`
+(BF16), and `_linear_weight_f32` then casts that already-rounded fused leaf to FP32. Greenfield's
+current distributed replacement instead takes prompt keys from a state whose `wk` was dequantized
+directly to FP32. Exact next: reuse immutable DB491 q-residual manifest
+`7518e7ef...d8c16`, replace only its key state with the existing BF16-origin `wk` variant, and run
+the exact local-DCP/one-row scorer matrix on one TPU host. Do not repeat the closed 32-chip q-a
+phase and do not load the complete decoder unless this isolated state restores exact set/order.

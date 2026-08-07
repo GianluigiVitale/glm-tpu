@@ -117,7 +117,14 @@ config provenance; no new scorer, loader, model path, or protection harness is b
 
 DB491 proves that correction reduces exact-local-XLA mean score error about 17x, from `0.0228811`
 to `0.00134283`, while retaining the exact selected set. It still misses 1,408 order positions, so
-epsilon alone is rejected as a sufficient fix. The next reuse-first discriminator is the accepted
-RMSNorm lowering itself: inspect preserved HLO/source for division placement, local sum/mean
-association, and the BF16 norm-weight multiplication boundary before creating or running a new
-candidate.
+epsilon alone is rejected as a sufficient fix. A source-faithful logical-width GSPMD `mean` is
+bitwise identical to the existing manual distributed norm on forced-32 exact BF16 inputs; its
+full-geometry HLO retains the same one all-reduce/all-gather association. It is therefore rejected
+without a redundant TPU launch.
+
+The next reuse-first discriminator is already present in the sealed state and bounded matrix. The
+accepted layer-0 `wk_weights_proj.weight` is BF16 and its OOB repair dequantizes `wk` to that BF16
+dtype before the adapter casts it to FP32. DB491 instead paired the corrected q residual with
+direct-FP32-origin `wk` keys. Reuse DB491's immutable q artifact and the existing BF16-origin key
+state to isolate only that boundary on one TPU host; do not rebuild either the loader or the
+closed 32-chip diagnostic.

@@ -77,6 +77,27 @@ def test_parser_extracts_physical_collective_contract() -> None:
     assert permute.source_target_pairs[0] == (0, 4)
 
 
+def test_parser_expands_current_jax_mesh_replica_groups() -> None:
+    mesh_hlo = GOOD_HLO.replace(
+        "replica_groups={{0,1,2,3},{4,5,6,7}}",
+        "replica_groups=mesh['stage'=2,'local'=4] {'local'}",
+    )
+    reduction = parse_hlo_module(mesh_hlo).collectives[0]
+    assert reduction.replica_groups == ((0, 1, 2, 3), (4, 5, 6, 7))
+
+    strided_hlo = GOOD_HLO.replace(
+        "replica_groups={{0,1,2,3},{4,5,6,7}}",
+        "replica_groups=mesh['stage'=2,'local'=4] {'stage'}",
+    )
+    strided = parse_hlo_module(strided_hlo).collectives[0]
+    assert strided.replica_groups == (
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    )
+
+
 def test_async_collective_start_counts_once_and_done_is_not_double_counted() -> None:
     async_hlo = GOOD_HLO.replace(
         "all-reduce(x)", "all-reduce-start(x)"
