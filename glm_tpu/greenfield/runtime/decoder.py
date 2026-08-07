@@ -735,7 +735,7 @@ def validate_decoder_step_hlo(
         )
         expected_reduction_result_shape_counts = {
             "bf16[1,6144]": (
-                layers + dense_layers + (1 if complete_token_path else 0)
+                layers + dense_layers
             ),
             "bf16[2,1,6144]": sparse_layers,
             "f32[256]": layers,
@@ -746,6 +746,17 @@ def validate_decoder_step_hlo(
                 "f32[8,6144]"
             ] = sparse_layers
         if complete_token_path:
+            embedding_shape = (
+                "bf16[1,1,6144]"
+                if split_residual_state
+                else "bf16[1,6144]"
+            )
+            expected_reduction_result_shape_counts[embedding_shape] = (
+                expected_reduction_result_shape_counts.get(
+                    embedding_shape, 0
+                )
+                + 1
+            )
             if token_observation_candidates == 1:
                 expected_reduction_result_shape_counts.update(
                     {"bf16[4]": 1, "s32[4]": 1}

@@ -4956,3 +4956,26 @@ accounting, and DB provenance. Focused decoder, stage-layer, reference-core, run
 Bash, ShellCheck, and diff checks pass. No TPU workflow was launched and no token, latency, Gate D,
 or throughput claim exists. Next is a clean commit/push and fresh authenticated census immediately
 before one serialized protected 2K exact-token/DSA run with the flag enabled.
+
+## 2026-08-07 14:51 — Split-state metal compile is topology-correct; embedding HLO shape gate corrected
+
+Protected diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T142647912804579Z`
+at `4c2cc0b` passed eight unique pre-census markers, eight exact-pin/artifact sync markers, real
+checkpoint load, and production compile on every host. It failed closed before any execution because
+the complete-token all-reduce result-shape contract expected the default embedding shape
+`bf16[1,6144]`, while split state causes TPU XLA to preserve one additional singleton dimension:
+`bf16[1,1,6144]`. The raw HLO source is exactly the stage-0 conditional embedding `psum`.
+
+This is not a loosened shape wildcard. The revised conditional contract requires exactly one
+singleton embedding reduction, 81 ordinary `bf16[1,6144]` layer/dense reductions, 75 existing
+`bf16[2,1,6144]` sparse reductions, and the unchanged remaining logical shapes. The archived
+production HLO has `219AG/372AR/17CP`, exactly eight `bf16[2,1,6144]` residual permutes, no
+dead/full-pod shape, and passes every contract after the correction. The prior default TPU HLO also
+passes with its original 82 `bf16[1,6144]` reductions and eight `bf16[1,6144]` permutes.
+
+All eight failure logs are byte-identical (`c6387cb0...aaba`); optimized-HLO text SHA is
+`418c75be...0023`. No observer/prefill/model step ran, so there is no token, DSA replay, timing,
+trace, DB row, `SUCCESS`, Gate D, or performance claim. The authenticated failure census is 8/8
+clean and diagnostics are in the approved bucket. Next is focused/offline regression validation,
+commit/push, then one fresh-census serialized retry under the otherwise identical protected flags.

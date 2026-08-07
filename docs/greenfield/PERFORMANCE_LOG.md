@@ -711,3 +711,22 @@ for the disabled default. The protected runner records the flag, HLO dtype/shape
 stage payload, 12,288-byte incremental buffer, fleet agreement, HBM, and DB provenance. CPU tests
 and static checks pass; no TPU run, token correction, timing result, Gate D, or throughput claim is
 made here.
+
+## 2026-08-07 — first split-state protected compile exposes one exact HLO-contract delta
+
+Rejected pre-execution diagnostic
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T142647912804579Z`
+at `4c2cc0b` passed fresh eight-host census and exact-pin sync, loaded the real runtime checkpoint,
+and compiled the production executable identically on all hosts. The HLO gate rejected one logical
+shape delta before model execution: split-state stage-0 embedding lowered to one
+`bf16[1,1,6144]` local all-reduce instead of the default path's `bf16[1,6144]`. All remaining result
+shapes matched, including 75 `bf16[2,1,6144]` MoE reductions; counts were `219AG/372AR/17CP`; and
+the residual contract found exactly eight `bf16[2,1,6144]` permutes with no forbidden full-pod
+tensor. Source metadata binds the singleton reduction to `cond/branch_1_fun/psum` in token
+embedding.
+
+All eight host logs are byte-identical (`c6387cb0...aaba`) and cleanup ended with eight unique
+`CENSUS_OK` markers. No decoder, observer, prefill, token, timing, trace, DB, `SUCCESS`, Gate D, or
+throughput result exists. The contract now pins the singleton embedding form only when split state
+and complete-token execution are both enabled. Revalidation passes the archived split HLO
+(`418c75be...0023`) with zero violations and also passes the prior default TPU HLO unchanged.
