@@ -13,6 +13,7 @@ from scripts.greenfield.compile_short_decoder import (
     _load_short_context_dsa_oracle,
     _materialize_global_array,
     _observer_hlo_isolation_contract,
+    _protected_short_context_label,
     _raw_token_sequence_contract,
     _validate_dsa_observation_step,
     _validate_completed_step_selected_states,
@@ -23,6 +24,9 @@ from scripts.greenfield import compile_short_decoder as compile_module
 
 REPO = Path(__file__).resolve().parents[3]
 PROTECTED_RUNNER = REPO / "scripts/greenfield/run_short_decoder_compile_pp8.sh"
+PROTECTED_8K_RUNNER = (
+    REPO / "scripts/greenfield/run_short_decoder_compile_pp8_8k.sh"
+)
 
 
 def test_protected_runner_pins_fp32_feature_boundary_kernel() -> None:
@@ -32,6 +36,39 @@ def test_protected_runner_pins_fp32_feature_boundary_kernel() -> None:
         '        expected_kernel_counts["greenfield_fp32_to_bf16_r8_h6144"] = 75'
         in source
     )
+
+
+@pytest.mark.parametrize(
+    ("capacity", "label"),
+    ((2048, "2k"), (8192, "8k")),
+)
+def test_protected_short_context_label(capacity: int, label: str) -> None:
+    assert _protected_short_context_label(capacity) == label
+
+
+def test_protected_short_context_label_rejects_unsealed_capacity() -> None:
+    with pytest.raises(ValueError, match="must be 2048 or 8192"):
+        _protected_short_context_label(4096)
+
+
+def test_protected_8k_runner_pins_paired_oracles() -> None:
+    source = PROTECTED_RUNNER.read_text()
+    wrapper = PROTECTED_8K_RUNNER.read_text()
+
+    assert "GLM_GREENFIELD_SHORT_DECODER_PROFILE:-2k" in source
+    assert "PROMPT_TOKEN_COUNT=8155" in source
+    assert "CONTEXT_CAPACITY=8192" in source
+    assert (
+        "SHORT_CONTEXT_ORACLE_MANIFEST_SHA="
+        "e4fbcbdbf0fc8b1969e2f82ee457ab1563db4a8b37d2dea2bc4d1e828a13acf2"
+        in source
+    )
+    assert (
+        "SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA="
+        "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da"
+        in source
+    )
+    assert "export GLM_GREENFIELD_SHORT_DECODER_PROFILE=8k" in wrapper
 
 
 class _Jax:

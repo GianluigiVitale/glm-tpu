@@ -977,6 +977,18 @@ def _delete_arrays(values: tuple[Any, ...]) -> None:
             pass
 
 
+def _protected_short_context_label(context_capacity: int) -> str:
+    """Return the evidence label for an admitted short-context capacity."""
+
+    labels = {2048: "2k", 8192: "8k"}
+    try:
+        return labels[context_capacity]
+    except KeyError as exc:
+        raise ValueError(
+            "protected short decoder capacity must be 2048 or 8192"
+        ) from exc
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--coordinator-address", required=True)
@@ -1046,6 +1058,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    context_label = _protected_short_context_label(args.context_capacity)
     if args.feature_output_tile is None:
         args.feature_output_tile = (
             128 if args.runtime_kind == "reference" else 256
@@ -1084,8 +1097,6 @@ def main() -> int:
         )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
-    if args.context_capacity != 2048:
-        raise ValueError("first production compile is fixed to 2K")
     if args.warmup < 1 or args.iterations < 1:
         raise ValueError("decoder warmup/iterations must be positive")
     if args.trace_steps not in (0, 2):
@@ -1144,7 +1155,9 @@ def main() -> int:
             decode_positions[0] != prompt_token_ids.size
             or decode_positions[-1] >= args.context_capacity
         ):
-            raise ValueError("DSA oracle positions do not align with the 2K prompt")
+            raise ValueError(
+                "DSA oracle positions do not align with the protected prompt"
+            )
         dsa_steps = int(decode_positions.size)
         if args.warmup + args.iterations + args.trace_steps != dsa_steps:
             raise ValueError(
@@ -1656,9 +1669,9 @@ def main() -> int:
             hlo_dir = args.output.parent / "hlo"
             hlo_dir.mkdir(parents=True, exist_ok=True)
             hlo_stem = (
-                "decoder_78layer_2k_token"
+                f"decoder_78layer_{context_label}_token"
                 if args.complete_token_path
-                else "decoder_78layer_2k"
+                else f"decoder_78layer_{context_label}"
             )
             with gzip.open(
                 hlo_dir / f"{hlo_stem}.optimized_hlo.txt.gz",
@@ -1738,19 +1751,28 @@ def main() -> int:
                 hlo_dir = args.output.parent / "hlo"
                 with gzip.open(
                     hlo_dir
-                    / "decoder_78layer_2k_token_dsa_observer.optimized_hlo.txt.gz",
+                    / (
+                        f"decoder_78layer_{context_label}_token_dsa_observer"
+                        ".optimized_hlo.txt.gz"
+                    ),
                     "wt",
                     encoding="utf-8",
                 ) as stream:
                     stream.write(optimized_dsa_observer_hlo)
                 _atomic_json(
                     hlo_dir
-                    / "decoder_78layer_2k_token_dsa_observer.hlo_contract.json",
+                    / (
+                        f"decoder_78layer_{context_label}_token_dsa_observer"
+                        ".hlo_contract.json"
+                    ),
                     dsa_observer_hlo_contract,
                 )
                 _atomic_json(
                     hlo_dir
-                    / "decoder_78layer_2k_token_dsa_observer.isolation_contract.json",
+                    / (
+                        f"decoder_78layer_{context_label}_token_dsa_observer"
+                        ".isolation_contract.json"
+                    ),
                     dsa_observer_isolation_contract,
                 )
             del optimized_dsa_observer_hlo
@@ -1804,13 +1826,15 @@ def main() -> int:
             if jax.process_index() == 0:
                 hlo_dir = args.output.parent / "hlo"
                 with gzip.open(
-                    hlo_dir / "prefill_78layer_2k.optimized_hlo.txt.gz",
+                    hlo_dir
+                    / f"prefill_78layer_{context_label}.optimized_hlo.txt.gz",
                     "wt",
                     encoding="utf-8",
                 ) as stream:
                     stream.write(optimized_prefill_hlo)
                 _atomic_json(
-                    hlo_dir / "prefill_78layer_2k.hlo_contract.json",
+                    hlo_dir
+                    / f"prefill_78layer_{context_label}.hlo_contract.json",
                     prefill_hlo_contract,
                 )
             del optimized_prefill_hlo
@@ -2446,7 +2470,7 @@ def main() -> int:
             local_index_nonzero.append(int(np.count_nonzero(host[:, 0, 0, 0])))
         record = {
             "artifact_kind": (
-                "greenfield_real_78layer_2k_decoder_"
+                f"greenfield_real_78layer_{context_label}_decoder_"
                 + (
                     "token_oracle_"
                     if oracle_mode
