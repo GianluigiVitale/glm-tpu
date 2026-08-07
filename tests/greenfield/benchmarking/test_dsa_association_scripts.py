@@ -24,6 +24,8 @@ def test_distributed_q_a_probe_is_exact_pin_and_collective_bound() -> None:
         "jax.process_count() != 8",
         "jax.local_device_count() != 4",
         "jax.device_count() != 32",
+        '"launch_process_id": args.process_id',
+        '"jax_process_index": jax.process_index()',
         "jax.make_array_from_callback",
         "legacy_tp32_distributed_q_a_norm",
         "distributed_collective_violations",
@@ -32,6 +34,7 @@ def test_distributed_q_a_probe_is_exact_pin_and_collective_bound() -> None:
         "jax.distributed.shutdown",
     ):
         assert required in source
+    assert "jax.process_index() != args.process_id" not in source
     for forbidden in ("import tpu_inference", "from tpu_inference", "import vllm"):
         assert forbidden not in source
     completed = subprocess.run(

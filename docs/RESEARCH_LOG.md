@@ -5172,3 +5172,17 @@ full-geometry HLO tests pass; the complete CPU-only greenfield suite is 412 pass
 332.82 seconds, with two pre-existing SWIG warnings. Static Python/Bash/ShellCheck/diff/line-length
 checks pass. No TPU execution or arithmetic conclusion exists yet. The only authorized next TPU
 action is one serialized bounded association probe from a committed clean pin.
+
+## 2026-08-07 22:02 — First distributed-norm launch fails on known identity remapping
+
+Bounded launch `greenfield_layer0_dsa_association_20260807T220018198481723Z` at `8f56ac6` reached
+the initialized 8-host/32-chip JAX runtime on all ranks, then refused because its new assertion
+equated the TPU-VM launch suffix with `jax.process_index()`. The accepted topology implementation
+already documents that TPU JAX topology-orders those identities independently. No executable,
+q-residual artifact, score comparison, DB row, `SUCCESS` or performance claim exists. Failure
+cleanup is authenticated 8/8 and the partial archive is in the approved bucket.
+
+The narrow fix records launch and JAX identities separately and requires both fleet sets to equal
+0--7, while the existing physical-device check still requires exact IDs 0--31. Focused tests and
+static checks pass. One bounded retry is warranted because the rejected launch never reached the
+arithmetic under test.

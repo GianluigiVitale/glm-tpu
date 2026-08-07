@@ -134,10 +134,9 @@ def main() -> int:
             raise RuntimeError(
                 "distributed q-a norm requires TPU and exact 8x4 process geometry"
             )
-        if jax.process_index() != args.process_id:
-            raise RuntimeError(
-                "JAX process index disagrees with protected launch identity"
-            )
+        # TPU JAX topology-orders processes independently of TPU-VM worker
+        # suffixes. Preserve both identities and validate each fleet bijection;
+        # they are deliberately not required to be equal.
         manifest, arrays = inspect_layer0_dsa_association_input(
             args.input_dir,
             expected_manifest_sha256=args.input_manifest_sha256,
@@ -334,6 +333,7 @@ def main() -> int:
             "code_hash": code_hash,
             "hostname": socket.gethostname(),
             "input_manifest_sha256": manifest["manifest_sha256"],
+            "launch_process_id": args.process_id,
             "jax_process_index": jax.process_index(),
             "local_device_ids": [device.id for device in jax.local_devices()],
             "global_device_count": jax.device_count(),

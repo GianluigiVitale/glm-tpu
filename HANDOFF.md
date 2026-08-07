@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 21:59 UTC
+**Updated:** 2026-08-07 22:02 UTC
 
 ## Authority and isolation
 
@@ -1503,3 +1503,23 @@ one serialized `bash scripts/greenfield/run_layer0_dsa_association_probe.sh`. On
 2,048-position set and order may authorize the smallest one-row production correction and one
 protected 8K Gate-D retry. A failed association is recorded and closed; it must not trigger a blind
 full-model run.
+
+## First distributed-norm launch rejects a worker/JAX identity assumption
+
+Protected bounded launch
+`greenfield_layer0_dsa_association_20260807T220018198481723Z` at `8f56ac6` passed the clean branch,
+global lease, eight-host pre-census, exact-pin sync and approved-bucket input staging. All eight
+processes initialized the 8 x 4 TPU runtime and then failed before compilation because the new
+script required TPU-VM launch worker id to equal `jax.process_index()`. Existing accepted topology
+code explicitly proves JAX topology-orders these identities independently. Therefore this is a
+harness refusal, not an arithmetic or HLO result. There is no q residual, comparison matrix, DB row,
+`SUCCESS`, decoder execution, Gate-D, timing or throughput claim.
+
+Failure capture SHA is `e42fe05b...6155`; the authenticated failure-exit census SHA is
+`9ce2e75a...de4f` and contains eight unique `CENSUS_OK` hosts. Partial evidence is preserved under
+the approved diagnostic prefix. The correction now preserves both launch and JAX process identity,
+requires each to form an independent 0--7 fleet bijection, and retains exact global device coverage
+0--31. The focused 32-test suite and Python/Bash/ShellCheck/diff checks pass.
+
+Exact next: commit/push this narrow identity correction and rerun the serialized bounded probe once.
+Do not interpret the rejected launch as numerical evidence and do not load the full decoder first.

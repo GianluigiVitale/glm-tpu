@@ -175,6 +175,8 @@ distributed_records = [
     for path in sorted((run_dir / "distributed_host_records").glob("*.json"))
 ]
 if len(distributed_records) != 8 or {
+    record["launch_process_id"] for record in distributed_records
+} != set(range(8)) or {
     record["jax_process_index"] for record in distributed_records
 } != set(range(8)) or len({
     record["hostname"] for record in distributed_records
