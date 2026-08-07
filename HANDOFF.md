@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-06 23:48 UTC
+**Updated:** 2026-08-07 00:15 UTC
 
 ## Authority and isolation
 
@@ -854,7 +854,23 @@ remain observer-off. The protected wrapper pins both oracles, requires the exact
 can declare Gate D only after fleet agreement, cache/state, fresh XPlane, wall/HBM, DB/archive, and
 8/8 cleanup pass. Refusal, runtime, syntax, ShellCheck, and HLO coverage passes 20/20.
 
-Exact next: from clean `2dc300c`, launch the protected real-prompt 2K Gate D with complete-token,
+First protected Gate D attempt
+`greenfield_short_decoder_compile_pp8_pallas_feature_linear_ot256_token_oracle_dsa_trace2_20260806T234842911424415Z`
+at `d303186` loaded the fleet and compiled production, observer, and prefill executables, then failed
+closed before first prefill execution. Production and observer HLO pass exact local
+`219AG/297AR/17CP`; observer isolation passes. Prefill has the same counts, exact token ring/shapes,
+one device loop, and no host transfer, but the validator accepted only the direct token-return
+metadata path and rejected the scan-wrapped path
+`jit(execute)/while/body/closed_call/shard_map/ppermute`. This is contract metadata, not a physical
+lowering, token, DSA, or throughput failure. All HLO/log evidence is archived under the failed tag,
+and authenticated failure-exit census is 8/8 clean.
+
+Commit `ff582bd` narrowly allows the two observed exact source paths (direct recurrent and
+scan-wrapped prefill) while retaining exact opcode, singleton shape, 32 ring pairs, local groups,
+one-hot reductions, and collective counts. An unrelated source path still fails. The preserved real
+TPU prefill HLO now passes and the decoder/harness regression passes 15/15.
+
+Exact next: retry protected real-prompt 2K Gate D from clean `ff582bd` with complete-token,
 token-oracle, DSA-oracle, and two-step trace modes enabled. If exact DSA or token comparison fails,
 preserve and localize the first step/event/selected-offset mismatch; do not relax it. If it passes,
 seal the real answer-token rate and optimize the measured recurrent path below 200 ms.
