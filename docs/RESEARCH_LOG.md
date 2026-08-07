@@ -5039,3 +5039,28 @@ Summary/XPlane/DB-snapshot SHAs are `1ba77357...b60`, `0d8ac98d...afa0`, and
 `db_run=484`, and pre/post censuses each prove eight unique `CENSUS_OK` hosts. The required next
 Gate D evidence is 8K under the same split-state numerical contract, followed by PP8 optimization
 before protected 128K/256K promotion.
+
+## 2026-08-07 20:12 — 8K DSA drift is real; bounded layer-0 matrix replaces blind full retries
+
+The protected 8K retry at `...T184154192144771Z` passed the corrected 21/21 scorer linter,
+production/observer/prefill HLO, real load, prompt execution, and exact first token `220`, then
+failed the unchanged DSA gate at position 8,155. Layer 0 preserves the exact selected set but not
+its total order; layer 1 swaps eight cutoff members and later producers swap up to 558. The aligned
+event-0 score error is max/mean/p99 `0.029307/0.021944/0.026596`. The run stopped before timing and
+trace, has no DB row or `SUCCESS`, and ended 8/8 clean. This is numerical trajectory evidence, not
+a linter, transport, selection implementation, or infrastructure failure.
+
+The exact source audit found separable associations: legacy adapts DSA `wq_b/wk` into persistent
+FP32 values, uses divide-by-sqrt key LayerNorm, creates keys in M=2,048 prompt chunks, and scores
+the live row inside M=32/page512/DCP8 shapes. Greenfield currently decodes DSA tiles through BF16,
+uses multiply-by-rsqrt, and executes one-row arithmetic. The 2K pass could not expose score-set
+drift because every causal position fit under top-k.
+
+At builder pin `c30b64d`, the real input was reduced without synthesis to 37 unique embedding rows
+plus all layer-0 indexer leaves. Artifact `greenfield_layer0_dsa_input_20260807T195410522988362Z`
+is 22,679,052 bytes, file SHA `8cc95cf9...daf7`, manifest `577ec8a1...0619`, and binds both sealed
+8K oracles and the exact source index. Pin `1ae70e2` adds four single-variable arithmetic variants,
+legacy page/DCP reconstruction, one-row XLA/Pallas challengers, strict artifact/HLO checks,
+protected lease/census/DB/archive handling, and 12 new focused tests. The complete CPU suite is 392
+passed / 1 skipped. Next is exactly one bounded protected probe; its set/order matrix, not another
+753B run, will select the smallest production correction.

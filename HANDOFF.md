@@ -1317,3 +1317,39 @@ score bodies, fresh
 eight-host XPlanes, profiler-free wall, per-chip HBM, DB/archive linkage, and authenticated 8/8
 zero-work cleanup. Do not claim the first rejected draw and do not continue to 128K if 8K Gate D
 fails.
+
+## The 8K retry exposes real DSA drift; bounded layer-0 association probe is pinned
+
+The one authorized retry,
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260807T184154192144771Z`,
+passed production/observer/prefill HLO including all 21 exact scorer bodies and the unchanged
+`219AG/372AR/17CP` local-only contract. It loaded and executed the real prompt and returned the exact
+prefill first token `220`. It then failed the unrelaxed DSA oracle at position 8,155. Event 0/layer
+0 has the exact selected set but a different order; event 1 already swaps eight positions, and the
+later producer mismatches grow as high as 558. Total legacy-order mismatches are 41,550. The event-0
+aligned score error is max/mean/p99 `0.029307/0.021944/0.026596`. No production timing, trace, DB
+row, `SUCCESS`, Gate D, or token-rate claim exists. All eight logs are byte-identical at
+`4c58289d...d5af`; authenticated failure cleanup is 8/8 `CENSUS_OK`.
+
+Source-level comparison now identifies three real association deltas hidden by the vacuous 2K
+selection (`2,035 < top_k=2,048`): sealed legacy precomputes DSA `wq_b/wk` as FP32 while greenfield
+rounds their decoded tiles to BF16; legacy key LayerNorm divides by `sqrt` while greenfield
+multiplies by `rsqrt`; and legacy forms prompt keys in M=2,048 chunks then scores M=32 rows over
+512-key/DCP pages, whereas production is true one-row. The batch-32 geometry is permitted only in a
+separate diagnostic oracle executable; the production challenger remains one row and its HLO gate
+rejects dead rows.
+
+Builder pin `c30b64d` produced append-only input
+`greenfield_layer0_dsa_input_20260807T195410522988362Z`: only 37 unique real embedding rows and the
+11 exact layer-0 tensors, 22,679,052 bytes, file SHA `8cc95cf9...daf7`, manifest
+`577ec8a1...0619`. Probe pin `1ae70e2ea1882829328b18e60457c878b2f2d7db` independently implements
+FP32/BF16 dequant and divide/rsqrt variants, exact M2,048/M32/page512/DCP8 geometry, and one-row XLA
+and existing-Pallas scorers. Every output is compared against the sealed 2,048-position set/order
+and aligned scores. Full CPU verification is 392 passed / 1 skipped; Python, Bash, ShellCheck, HLO
+unit contracts, artifact readback, and diff checks pass.
+
+Exact next: from a clean branch containing pin `1ae70e2`, acquire the global lease and run exactly
+one serialized `bash scripts/greenfield/run_layer0_dsa_association_probe.sh`. It is bounded
+diagnostic evidence, not decoder performance. Use its exact set/order matrix to choose the smallest
+one-row correction; only after isolated CPU/HLO/TPU proof may one protected 8K Gate-D retry run. Do
+not repeat the full 753B draw blindly and do not proceed to 128K while 8K DSA exactness fails.
