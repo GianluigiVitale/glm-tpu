@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 06:00 UTC
+**Updated:** 2026-08-07 06:31 UTC
 
 ## Authority and isolation
 
@@ -1031,3 +1031,41 @@ layer boundary in independent legacy-oracle and greenfield observer executables.
 divergent boundary before changing more arithmetic. The observer must remain default-off and
 callback-free on device, production HLO/timing must stay isolated, artifacts must bind layer,
 position, trajectory, code/model/checkpoint hashes, and no token/tie gate may be relaxed.
+
+## Callback-free layer-boundary observer is ready for protected capture
+
+Commit `42df9cf` implements the default-off greenfield half of that diagnostic. A separate
+no-donation observer returns BF16 residuals for all 79 boundaries (input to layer 0 through output
+of layer 77), with only the owning four-chip stage writing each boundary. Stage-transition
+boundaries have two independent writers and must agree bitwise; four-lane replication and exact
+zero nonwriters are also mandatory. The host canonicalizer fails closed on shape/dtype, missing or
+duplicate layers/ranks, lane drift, cross-stage writer drift, or nonwriter data and binds the
+canonical byte hash.
+
+The 14-step observer replay remains on the sealed trajectory by replacing only the next token with
+the independent oracle token after every diagnostic step. Actual output tokens and top-16 logits
+are still recorded, so the known position-2,044 raw-token mismatch remains a hard failure and no
+production timing can be claimed. The residual tensor is captured specifically for the computation
+at position 2,044. Its device executable has no host callback; production remains observer-off.
+The protected wrapper uploads and retrieves the residual bundle even on this expected fail-closed
+exit. Verification is 358 passed / 1 skipped for the full greenfield suite, 25/25 focused after the
+final validation hardening, plus Python compile, Bash syntax, ShellCheck, and diff checks.
+
+Exact next command, only after a clean eight-host census, is the serialized protected challenger:
+
+```bash
+GLM_GREENFIELD_FEATURE_RECONSTRUCT_DOWN_FP32=1 \
+GLM_GREENFIELD_COMPLETE_TOKEN_PATH=1 \
+GLM_GREENFIELD_SHORT_CONTEXT_ORACLE=1 \
+GLM_GREENFIELD_SHORT_CONTEXT_DSA_ORACLE=1 \
+GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS=2 \
+GLM_GREENFIELD_LAYER_RESIDUAL_OBSERVER=1 \
+GLM_GREENFIELD_LAYER_RESIDUAL_POSITION=2044 \
+bash scripts/greenfield/run_short_decoder_compile_pp8.sh
+```
+
+Accept this run only as a diagnostic: require the existing first ten exact recurrent tokens, the
+same position-2,044 tie/mismatch, all 14 x 21 DSA contracts, exact residual writer/replication/hash
+contract, preserved HLO/logs/artifacts, and authenticated 8/8 zero-work cleanup. Then add an
+independent observer-only legacy capture at the pinned oracle source, compare corresponding
+boundaries, and isolate the earliest divergent layer/operation before changing arithmetic.
