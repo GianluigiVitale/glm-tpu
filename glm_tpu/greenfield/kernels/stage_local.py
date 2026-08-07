@@ -593,6 +593,7 @@ def stage_local_index_share_fp8_mapped(
     sparse_attention_interpret: bool = False,
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
+    add_residual: bool = True,
 ) -> StageLocalIndexShareFp8Result:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -607,6 +608,8 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("local IndexShare cache has an invalid shape")
     if residual.dtype != jnp.bfloat16 or cache.dtype != jnp.bfloat16:
         raise ValueError("IndexShare residual and cache must remain BF16")
+    if not isinstance(add_residual, bool):
+        raise ValueError("IndexShare residual-add flag must be boolean")
     if contract.num_heads % cache_layout.local_parallel_size:
         raise ValueError("attention heads must divide over the local stage")
     local_heads = contract.num_heads // cache_layout.local_parallel_size
@@ -880,7 +883,7 @@ def stage_local_index_share_fp8_mapped(
         axis_name=axis_name,
         axis_index_groups=groups,
     )
-    output = residual_add(residual, update)
+    output = residual_add(residual, update) if add_residual else update
     return StageLocalIndexShareFp8Result(
         output,
         cache,
@@ -904,6 +907,8 @@ def stage_local_dense_fp8_mapped(
     epsilon: float = 1e-5,
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
+    precomputed_normalized: Any | None = None,
+    add_residual: bool = True,
 ) -> Any:
     """Execute one dense SwiGLU from local raw shards and one local combine."""
 
@@ -917,7 +922,16 @@ def stage_local_dense_fp8_mapped(
         raise ValueError("dense local gate/up shards are invalid")
     if down_bits.shape != (hidden, gate_bits.shape[0]):
         raise ValueError("dense local down shard is invalid")
-    normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
+    if not isinstance(add_residual, bool):
+        raise ValueError("dense residual-add flag must be boolean")
+    if precomputed_normalized is None:
+        normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
+    else:
+        normalized = precomputed_normalized
+        if normalized.shape != residual.shape or (
+            normalized.dtype != residual.dtype
+        ):
+            raise ValueError("dense precomputed normalized input is invalid")
     if linear_backend == "reference":
         gate_weight = dequantize_fp8_bits_block_weight(
             gate_bits, gate_scale, block_shape=block_shape
@@ -956,7 +970,7 @@ def stage_local_dense_fp8_mapped(
         axis_name=axis_name,
         axis_index_groups=groups,
     )
-    return residual_add(residual, update)
+    return residual_add(residual, update) if add_residual else update
 
 
 def stage_local_moe_fp8_mapped(

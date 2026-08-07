@@ -14,13 +14,13 @@ import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
-from glm_tpu.greenfield.kernels.layer import AttentionFp8Weights, DenseFp8Weights, DsaFp8Weights, MoeFp8Weights, stage_local_transformer_layer_fp8_mapped
+from glm_tpu.greenfield.kernels.layer import AttentionFp8Weights, DenseFp8Weights, DsaFp8Weights, MoeFp8Weights, stage_local_transformer_layer_fp8_mapped, stage_local_transformer_layer_fp8_split_mapped
 from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
 from glm_tpu.greenfield.kernels.reference.linear import residual_add
 from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
-from glm_tpu.greenfield.kernels.stage_local import stage_local_dense_fp8_mapped, stage_local_dsa_fp8_mapped, stage_local_index_share_fp8_mapped, stage_local_moe_fp8_mapped
+from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm, rms_norm
+from glm_tpu.greenfield.kernels.stage_local import _stage_fp8_linear, stage_local_dense_fp8_mapped, stage_local_dsa_fp8_mapped, stage_local_index_share_fp8_mapped, stage_local_moe_fp8_mapped
 
 def bits(value):
     return np.asarray(value, dtype=ml_dtypes.float8_e4m3fn).view(np.uint8)
@@ -37,6 +37,7 @@ moe_contract = GlmMoeNumericalContract(hidden_size=8, intermediate_size=8, num_e
 
 host = {
     'residual': np.asarray([[0.5, -0.25, 0.75, 1.0, -1.0, 0.125, 0.25, -0.5]], dtype=ml_dtypes.bfloat16),
+    'split_residual': np.asarray([[-0.375, 0.5, -0.125, 0.25, 0.75, -0.625, 0.5, 0.25]], dtype=ml_dtypes.bfloat16),
     'kv_cache': np.asarray(draw(1, (4, 2, 2, 8)), dtype=ml_dtypes.bfloat16),
     'index_cache': np.asarray(draw(2, (4, 2, 2, 2)), dtype=ml_dtypes.bfloat16),
     'selected': np.full((1, 4), -1, np.int32),
@@ -176,6 +177,27 @@ def component_sparse(x):
     )
     return residual_add(attended.output, update), attended.cache[None], x['index_cache'], x['selected'], x['selected_counts'], routes, route_weights, x['health'] & attended.contract_valid
 
+def split_fused_sparse(x):
+    attention, _, _ = weights(x)
+    result = stage_local_transformer_layer_fp8_split_mapped(
+        x['residual'], x['split_residual'], x['kv_cache'][0], x['index_cache'][0], x['selected'], x['selected_counts'], x['position'], x['tables'], x['lengths'], x['input_norm'], x['post_norm'], attention, None, None, moe_weights(x), x['health'], x['slot'][0], axis_name='stage', indexer_kind='shared', mlp_kind='sparse', dsa_contract=dsa_contract, mla_contract=mla_contract, moe_contract=moe_contract, cache_layout=layout, block_shape=(2, 2)
+    )
+    return result.hidden_states, result.residual, result.kv_cache[None], result.index_cache[None], result.selected_positions, result.selected_valid_counts, result.route_indices, result.route_weights, result.contract_valid
+
+def split_component_sparse(x):
+    attention, _, _ = weights(x)
+    normalized, combined = fused_add_rms_norm(x['residual'], x['split_residual'], x['input_norm'], epsilon=1e-5)
+    q_residual = rms_norm(_stage_fp8_linear(normalized, attention.q_a_bits, attention.q_a_scale, block_shape=(2, 2), backend='reference', interpret=False), attention.q_a_norm_weight, epsilon=1e-6)
+    attended = stage_local_index_share_fp8_mapped(
+        combined, x['kv_cache'][0], x['selected'], x['selected_counts'], x['position'], x['tables'], x['lengths'], x['input_norm'], attention.q_a_bits, attention.q_a_scale, attention.q_a_norm_weight, attention.q_b_bits, attention.q_b_scale, attention.kv_a_bits, attention.kv_a_scale, attention.kv_a_norm_weight, attention.kv_b_bits, attention.kv_b_scale, attention.o_bits, attention.o_scale, x['slot'][0], axis_name='stage', contract=mla_contract, cache_layout=layout, block_shape=(2, 2), precomputed_normalized=normalized, precomputed_q_residual=q_residual, add_residual=False
+    )
+    normalized_mlp, post_residual = fused_add_rms_norm(attended.output, combined, x['post_norm'], epsilon=1e-5)
+    moe = moe_weights(x)
+    next_hidden, routes, route_weights = stage_local_moe_fp8_mapped(
+        normalized_mlp, moe.router_weight, moe.correction_bias, moe.expert_gate_bits, moe.expert_gate_scale, moe.expert_up_bits, moe.expert_up_scale, moe.expert_down_bits, moe.expert_down_scale, moe.shared_gate_bits, moe.shared_gate_scale, moe.shared_up_bits, moe.shared_up_scale, moe.shared_down_bits, moe.shared_down_scale, x['slot'][0], axis_name='stage', contract=moe_contract
+    )
+    return next_hidden, post_residual, attended.cache[None], x['index_cache'], x['selected'], x['selected_counts'], routes, route_weights, x['health'] & attended.contract_valid
+
 out_specs = (P(), P('stage', None, None, None), P('stage', None, None, None), P(), P(), P(), P(), P())
 fused_map = jax.shard_map(fused, mesh=mesh, in_specs=(specs,), out_specs=out_specs, check_vma=False)
 component_map = jax.shard_map(component, mesh=mesh, in_specs=(specs,), out_specs=out_specs, check_vma=False)
@@ -196,6 +218,15 @@ sparse_actual = fused_sparse_compiled(sparse_values)
 sparse_expected = component_sparse_compiled(sparse_values)
 sparse_exact = [bool(jnp.array_equal(left, right)) for left, right in zip(sparse_actual, sparse_expected)]
 
+split_out_specs = (P(), P(), P('stage', None, None, None), P('stage', None, None, None), P(), P(), P(), P(), P())
+split_fused_map = jax.shard_map(split_fused_sparse, mesh=mesh, in_specs=(specs,), out_specs=split_out_specs, check_vma=False)
+split_component_map = jax.shard_map(split_component_sparse, mesh=mesh, in_specs=(specs,), out_specs=split_out_specs, check_vma=False)
+split_fused_compiled = jax.jit(split_fused_map).lower(sparse_values).compile()
+split_component_compiled = jax.jit(split_component_map).lower(sparse_values).compile()
+split_actual = split_fused_compiled(sparse_values)
+split_expected = split_component_compiled(sparse_values)
+split_exact = [bool(jnp.array_equal(left, right)) for left, right in zip(split_actual, split_expected)]
+
 def collectives(hlo):
     return {'ag': hlo.count(' all-gather('), 'ar': hlo.count(' all-reduce('), 'cp': hlo.count(' collective-permute(')}
 
@@ -209,6 +240,10 @@ print(json.dumps({
     'sparse_component_collectives': collectives(component_sparse_compiled.as_text()),
     'sparse_exact': sparse_exact,
     'sparse_health': bool(jnp.all(sparse_actual[-1])),
+    'split_collectives': collectives(split_fused_compiled.as_text()),
+    'split_component_collectives': collectives(split_component_compiled.as_text()),
+    'split_exact': split_exact,
+    'split_health': bool(jnp.all(split_actual[-1])),
 }, sort_keys=True))
 '''
     env = dict(os.environ)
@@ -236,6 +271,14 @@ print(json.dumps({
     assert result["sparse_health"]
     assert result["sparse_collectives"] == {"ag": 4, "ar": 2, "cp": 0}
     assert result["sparse_component_collectives"] == {
+        "ag": 4,
+        "ar": 2,
+        "cp": 0,
+    }
+    assert all(result["split_exact"])
+    assert result["split_health"]
+    assert result["split_collectives"] == {"ag": 4, "ar": 2, "cp": 0}
+    assert result["split_component_collectives"] == {
         "ag": 4,
         "ar": 2,
         "cp": 0,
