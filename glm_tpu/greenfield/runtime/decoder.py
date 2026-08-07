@@ -33,7 +33,12 @@ from ..model.weights import (
     FEATURE_EXPERT_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
 )
-from ..sharding.hlo_contract import parse_hlo_module
+from ..sharding.hlo_contract import (
+    HloInstruction,
+    HloModule,
+    HloShape,
+    parse_hlo_module,
+)
 from ..types import ExecutionPlan
 from .pipeline import (
     PipelineSkeletonConfig,
@@ -61,6 +66,7 @@ class DecoderStepConfig:
     local_rows_per_page: int
     packed_cache_width: int
     index_key_width: int
+    dsa_indexer_heads: int
     vocab_size: int
 
     def __post_init__(self) -> None:
@@ -76,6 +82,7 @@ class DecoderStepConfig:
             "local_rows_per_page",
             "packed_cache_width",
             "index_key_width",
+            "dsa_indexer_heads",
             "vocab_size",
         ):
             value = getattr(self, field)
@@ -85,6 +92,10 @@ class DecoderStepConfig:
             self.local_parallel_size * self.local_rows_per_page
         ):
             raise PlanValidationError("decoder local page geometry is inconsistent")
+        if self.context_capacity % self.local_parallel_size:
+            raise PlanValidationError(
+                "decoder context capacity must shard exactly over the local group"
+            )
 
     @property
     def total_devices(self) -> int:
@@ -430,6 +441,278 @@ def _compact_collective_record(collective: Any) -> dict[str, Any]:
             list(pair) for pair in collective.source_target_pairs
         ],
         "use_global_device_ids": collective.use_global_device_ids,
+    }
+
+
+def _classify_decoder_live_tensor_shapes(
+    module: HloModule,
+    *,
+    config: DecoderStepConfig,
+    full_indexer_layers: int,
+    backend_contract: str,
+) -> dict[str, Any]:
+    """Separate pinned DSA head scores from forbidden batch/full-pod tensors.
+
+    The real GLM geometry has 32 DSA indexer heads and the protected pod has
+    32 devices.  At 8K, each LP4 context shard is also 2,048 positions wide,
+    so the legitimate local scorer matrix ``f32[32,2048]`` collides exactly
+    with the old shape-only dead-row sentinel.  An exception based only on
+    dtype and dimensions would weaken the one-live-row contract.  Instead,
+    admit that matrix only inside the exact TPU DSA scorer dataflow already
+    present in every full-indexer layer: head/key contraction, scale/clamp,
+    bitcast, and head reduction.  Any different producer, dtype, operation,
+    count, or computation remains forbidden.
+    """
+
+    local_context_width = (
+        config.context_capacity // config.local_parallel_size
+    )
+    score_dimensions = (
+        config.dsa_indexer_heads,
+        local_context_width,
+    )
+    score_shape = ("f32", score_dimensions)
+    query_shape = (
+        "f32",
+        (config.dsa_indexer_heads, config.index_key_width),
+    )
+    key_shape = (
+        "bf16",
+        (local_context_width, config.index_key_width),
+    )
+    expanded_score_shape = (
+        "f32",
+        (1, config.dsa_indexer_heads, local_context_width),
+    )
+    reduced_score_shape = ("f32", (local_context_width,))
+
+    def shape_key(shape: HloShape) -> tuple[str, tuple[int, ...]]:
+        return shape.dtype, shape.dimensions
+
+    def has_result(
+        instruction: HloInstruction,
+        expected: tuple[str, tuple[int, ...]],
+    ) -> bool:
+        return any(shape_key(shape) == expected for shape in instruction.result_shapes)
+
+    def has_operand(
+        instruction: HloInstruction,
+        expected: tuple[str, tuple[int, ...]],
+    ) -> bool:
+        return any(shape_key(shape) == expected for shape in instruction.operand_shapes)
+
+    instructions_by_computation: dict[str, list[HloInstruction]] = {}
+    for instruction in module.instructions:
+        instructions_by_computation.setdefault(
+            instruction.computation, []
+        ).append(instruction)
+
+    expected_score_opcode_counts = {
+        "bitcast": 1,
+        "broadcast": 2,
+        "convolution": 1,
+        "maximum": 1,
+        "multiply": 1,
+    }
+
+    def accepted_score_instruction(instruction: HloInstruction) -> bool:
+        op_name = instruction.op_name or ""
+        if instruction.opcode == "convolution":
+            return op_name.endswith(
+                "/shard_map/cond/branch_1_fun/"
+                "rhd,sd->rhs/dot_general"
+            )
+        if instruction.opcode == "broadcast":
+            return re.search(r"/shard_map/broadcast\.[0-9]+$", op_name) is not None
+        if instruction.opcode == "multiply":
+            return op_name.endswith(
+                "/shard_map/cond/branch_1_fun/mul"
+            )
+        if instruction.opcode in ("maximum", "bitcast"):
+            return op_name.endswith(
+                "/shard_map/cond/branch_1_fun/max"
+            )
+        return False
+
+    valid_computations: set[str] = set()
+    body_records = []
+    if backend_contract != "cpu_reference":
+        for computation, instructions in instructions_by_computation.items():
+            contractions = [
+                instruction
+                for instruction in instructions
+                if instruction.opcode == "convolution"
+                and instruction.op_name is not None
+                and instruction.op_name.endswith(
+                    "/shard_map/cond/branch_1_fun/"
+                    "rhd,sd->rhs/dot_general"
+                )
+                and has_result(instruction, score_shape)
+                and has_operand(instruction, query_shape)
+                and has_operand(instruction, key_shape)
+            ]
+            head_weight_broadcasts = [
+                instruction
+                for instruction in instructions
+                if instruction.opcode == "broadcast"
+                and instruction.op_name is not None
+                and instruction.op_name.endswith(
+                    "/shard_map/cond/branch_1_fun/"
+                    "rh,rhs->rs/dot_general"
+                )
+                and has_operand(
+                    instruction,
+                    ("f32", (config.dsa_indexer_heads,)),
+                )
+                and has_result(instruction, expanded_score_shape)
+            ]
+            head_weight_multiplications = [
+                instruction
+                for instruction in instructions
+                if instruction.opcode == "multiply"
+                and instruction.op_name is not None
+                and re.search(
+                    r"/shard_map/multiply\.[0-9]+$",
+                    instruction.op_name,
+                )
+                is not None
+                and sum(
+                    shape_key(shape) == expanded_score_shape
+                    for shape in instruction.operand_shapes
+                )
+                == 2
+                and has_result(instruction, expanded_score_shape)
+            ]
+            reductions = [
+                instruction
+                for instruction in instructions
+                if instruction.opcode == "reduce"
+                and instruction.op_name is not None
+                and instruction.op_name.endswith(
+                    "/shard_map/cond/branch_1_fun/"
+                    "rh,rhs->rs/dot_general"
+                )
+                and has_operand(instruction, expanded_score_shape)
+                and has_result(instruction, reduced_score_shape)
+            ]
+            score_instructions = [
+                instruction
+                for instruction in instructions
+                if any(
+                    shape_key(shape) == score_shape
+                    for shape in (
+                        instruction.operand_shapes
+                        + instruction.result_shapes
+                    )
+                )
+            ]
+            if not contractions and not reductions and not score_instructions:
+                continue
+            opcode_counts = dict(
+                sorted(Counter(item.opcode for item in score_instructions).items())
+            )
+            shape_occurrences = sum(
+                sum(
+                    shape_key(shape) == score_shape
+                    for shape in (
+                        instruction.operand_shapes
+                        + instruction.result_shapes
+                    )
+                )
+                for instruction in score_instructions
+            )
+            valid = (
+                len(contractions) == 1
+                and len(head_weight_broadcasts) == 1
+                and len(head_weight_multiplications) == 1
+                and len(reductions) == 1
+                and opcode_counts == expected_score_opcode_counts
+                and shape_occurrences == 10
+                and all(
+                    accepted_score_instruction(instruction)
+                    for instruction in score_instructions
+                )
+            )
+            body_records.append(
+                {
+                    "computation": computation,
+                    "contraction_count": len(contractions),
+                    "head_weight_broadcast_count": len(
+                        head_weight_broadcasts
+                    ),
+                    "head_weight_multiply_count": len(
+                        head_weight_multiplications
+                    ),
+                    "opcode_counts": opcode_counts,
+                    "reduction_count": len(reductions),
+                    "score_shape_occurrences": shape_occurrences,
+                    "valid": valid,
+                }
+            )
+            if valid:
+                valid_computations.add(computation)
+
+    allowed_dsa_score_shapes = []
+    forbidden_shapes = []
+    hard_forbidden_dimensions = {
+        (config.total_devices, config.hidden_size),
+        (config.total_devices, 1, config.hidden_size),
+        (config.total_devices, 2, 1, config.hidden_size),
+        (config.total_devices, config.selected_width),
+        (config.total_devices, 1, config.selected_width),
+        (
+            config.total_devices,
+            config.dsa_indexer_heads,
+            config.index_key_width,
+        ),
+        (
+            config.total_devices,
+            1,
+            config.dsa_indexer_heads,
+            config.index_key_width,
+        ),
+    }
+    for instruction in module.instructions:
+        for shape in instruction.operand_shapes + instruction.result_shapes:
+            if shape.dimensions not in hard_forbidden_dimensions:
+                continue
+            record = {
+                "computation": instruction.computation,
+                "instruction": instruction.name,
+                "op_name": instruction.op_name,
+                "opcode": instruction.opcode,
+                "shape": shape.to_dict(),
+            }
+            is_pinned_dsa_score = (
+                shape_key(shape) == score_shape
+                and instruction.computation in valid_computations
+                and accepted_score_instruction(instruction)
+            )
+            if is_pinned_dsa_score:
+                allowed_dsa_score_shapes.append(record)
+            else:
+                forbidden_shapes.append(record)
+
+    expected_body_count = (
+        0 if backend_contract == "cpu_reference" else full_indexer_layers
+    )
+    body_violations = []
+    if len(valid_computations) != expected_body_count:
+        body_violations.append(
+            "decoder local DSA score-body contract drifted: "
+            f"expected={expected_body_count} "
+            f"observed={len(valid_computations)}"
+        )
+    return {
+        "allowed_dsa_score_shapes": allowed_dsa_score_shapes,
+        "body_records": body_records,
+        "expected_score_body_count": expected_body_count,
+        "forbidden_shapes": forbidden_shapes,
+        "local_context_width": local_context_width,
+        "passed": not body_violations and not forbidden_shapes,
+        "score_body_count": len(valid_computations),
+        "score_dimensions": list(score_dimensions),
+        "violations": body_violations,
     }
 
 
@@ -904,19 +1187,14 @@ def validate_decoder_step_hlo(
             )
         )
         violations.extend(complete_token_collective_contract["violations"])
-    forbidden_shapes = []
-    for instruction in module.instructions:
-        for shape in instruction.operand_shapes + instruction.result_shapes:
-            if shape.dimensions in (
-                (config.total_devices, config.hidden_size),
-                (config.total_devices, 1, config.hidden_size),
-                (config.total_devices, 2, 1, config.hidden_size),
-                (config.total_devices, config.selected_width),
-                (config.total_devices, 1, config.selected_width),
-            ):
-                forbidden_shapes.append(
-                    {"instruction": instruction.name, "shape": shape.to_dict()}
-                )
+    live_tensor_contract = _classify_decoder_live_tensor_shapes(
+        module,
+        config=config,
+        full_indexer_layers=full_layers,
+        backend_contract=backend_contract,
+    )
+    forbidden_shapes = live_tensor_contract["forbidden_shapes"]
+    violations.extend(live_tensor_contract["violations"])
     if forbidden_shapes:
         violations.append("decoder contains dead-row/full-pod live tensors")
     forbidden_full_vocab = []
@@ -989,6 +1267,7 @@ def validate_decoder_step_hlo(
             expected_reduction_result_shape_counts
         ),
         "forbidden_shapes": forbidden_shapes,
+        "live_tensor_contract": live_tensor_contract,
         "feature_output_tile": feature_output_tile,
         "feature_fuse_route_weighting": feature_fuse_route_weighting,
         "feature_reconstruct_down_fp32": feature_reconstruct_down_fp32,
@@ -1554,6 +1833,7 @@ def build_decoder_step_program(
         local_rows_per_page=state_layout.stages[0].local_rows_per_page,
         packed_cache_width=state_layout.stages[0].packed_kv_width,
         index_key_width=state_layout.stages[0].index_key_width,
+        dsa_indexer_heads=geometry.dsa_indexer_heads,
         vocab_size=geometry.vocab_size,
     )
     skeleton = PipelineSkeletonConfig(

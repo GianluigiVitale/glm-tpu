@@ -10,6 +10,151 @@ import pytest
 from glm_tpu.greenfield.errors import PlanValidationError
 
 
+def _synthetic_8k_dsa_score_hlo() -> str:
+    return '''HloModule dsa_score, replica_count=1, num_partitions=32
+
+%score (q: f32[32,128], key: bf16[2048,128], weight: f32[32]) -> f32[2048] {
+  %q = f32[32,128] parameter(0)
+  %key = bf16[2048,128] parameter(1)
+  %weight = f32[32] parameter(2)
+  %weight_broadcast = f32[1,32,2048] broadcast(%weight), dimensions={1}, metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/rh,rhs->rs/dot_general"}
+  %contraction = f32[32,2048] convolution(%q, %key), dim_labels=bf_oi->bf, metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/rhd,sd->rhs/dot_general"}
+  %scale = f32[] constant(0.0883883461)
+  %scale_broadcast = f32[32,2048] broadcast(%scale), dimensions={}, metadata={op_name="jit(mapped_token)/shard_map/broadcast.19787"}
+  %scaled = f32[32,2048] multiply(%contraction, %scale_broadcast), metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/mul"}
+  %zero = f32[] constant(0)
+  %zero_broadcast = f32[32,2048] broadcast(%zero), dimensions={}, metadata={op_name="jit(mapped_token)/shard_map/broadcast.20646"}
+  %clamped = f32[32,2048] maximum(%scaled, %zero_broadcast), metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/max"}
+  %expanded = f32[1,32,2048] bitcast(%clamped), metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/max"}
+  %weighted = f32[1,32,2048] multiply(%weight_broadcast, %expanded), metadata={op_name="jit(mapped_token)/shard_map/multiply.611"}
+  ROOT %reduced = f32[2048] reduce(%weighted, %zero), dimensions={0,1}, metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/rh,rhs->rs/dot_general"}
+}
+'''
+
+
+def _real_8k_decoder_config():
+    from glm_tpu.greenfield.runtime.decoder import DecoderStepConfig
+
+    return DecoderStepConfig(
+        stage_count=8,
+        local_parallel_size=4,
+        hidden_size=6144,
+        selected_width=2048,
+        context_capacity=8192,
+        maximum_layer_slots=10,
+        maximum_full_indexer_slots=3,
+        logical_page_size=256,
+        local_rows_per_page=64,
+        packed_cache_width=192,
+        index_key_width=128,
+        dsa_indexer_heads=32,
+        vocab_size=154880,
+    )
+
+
+def test_8k_dsa_head_score_shape_requires_exact_dataflow() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _classify_decoder_live_tensor_shapes,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    config = _real_8k_decoder_config()
+    hlo = _synthetic_8k_dsa_score_hlo()
+    record = _classify_decoder_live_tensor_shapes(
+        parse_hlo_module(hlo),
+        config=config,
+        full_indexer_layers=1,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert record["passed"], record
+    assert record["score_body_count"] == 1
+    assert record["score_dimensions"] == [32, 2048]
+    assert len(record["allowed_dsa_score_shapes"]) == 10
+    assert record["forbidden_shapes"] == []
+    assert record["body_records"][0] == {
+        "computation": (
+            "%score (q: f32[32,128], key: bf16[2048,128], "
+            "weight: f32[32]) -> f32[2048]"
+        ),
+        "contraction_count": 1,
+        "head_weight_broadcast_count": 1,
+        "head_weight_multiply_count": 1,
+        "opcode_counts": {
+            "bitcast": 1,
+            "broadcast": 2,
+            "convolution": 1,
+            "maximum": 1,
+            "multiply": 1,
+        },
+        "reduction_count": 1,
+        "score_shape_occurrences": 10,
+        "valid": True,
+    }
+
+    drifted = _classify_decoder_live_tensor_shapes(
+        parse_hlo_module(
+            hlo.replace(
+                'op_name="jit(mapped_token)/shard_map/cond/'
+                'branch_1_fun/mul"',
+                'op_name="jit(mapped_token)/shard_map/batch_rows/mul"',
+            )
+        ),
+        config=config,
+        full_indexer_layers=1,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert not drifted["passed"]
+    assert drifted["score_body_count"] == 0
+    assert drifted["allowed_dsa_score_shapes"] == []
+    assert len(drifted["forbidden_shapes"]) == 10
+    assert drifted["violations"] == [
+        "decoder local DSA score-body contract drifted: expected=1 observed=0"
+    ]
+
+
+def test_8k_dsa_shape_exception_does_not_admit_dead_rows() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _classify_decoder_live_tensor_shapes,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    hlo = _synthetic_8k_dsa_score_hlo() + '''
+ENTRY %main (unrelated: f32[32,2048], wrong_dtype: bf16[32,2048], hidden: bf16[32,6144], dead_query: f32[32,32,128]) -> f32[32,2048] {
+  %unrelated = f32[32,2048] parameter(0)
+  %wrong_dtype = bf16[32,2048] parameter(1)
+  %hidden = bf16[32,6144] parameter(2)
+  %dead_query = f32[32,32,128] parameter(3)
+  ROOT %root = f32[32,2048] copy(%unrelated), metadata={op_name="batch_rows/copy"}
+}
+'''
+    record = _classify_decoder_live_tensor_shapes(
+        parse_hlo_module(hlo),
+        config=_real_8k_decoder_config(),
+        full_indexer_layers=1,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert not record["passed"]
+    assert record["score_body_count"] == 1
+    assert len(record["allowed_dsa_score_shapes"]) == 10
+    assert record["violations"] == []
+    forbidden = {
+        (
+            item["instruction"],
+            item["shape"]["dtype"],
+            tuple(item["shape"]["dimensions"]),
+        )
+        for item in record["forbidden_shapes"]
+    }
+    assert forbidden == {
+        ("%unrelated", "f32", (32, 2048)),
+        ("%wrong_dtype", "bf16", (32, 2048)),
+        ("%hidden", "bf16", (32, 6144)),
+        ("%dead_query", "f32", (32, 32, 128)),
+        ("%root", "f32", (32, 2048)),
+        ("%root", "f32", (32, 2048)),
+    }
+
+
 def test_teacher_forced_prefill_builder_rejects_invalid_contracts() -> None:
     from types import SimpleNamespace
 
