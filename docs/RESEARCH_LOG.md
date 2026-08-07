@@ -4898,3 +4898,35 @@ The wrapper now pins observer distance four, requires the exact warmup-isolation
 one-NPZ/three-HLO-per-host contract. Bash syntax, ShellCheck, and diff checks pass. Next is one clean-
 fleet serialized retry after the greenfield commit is pushed. A second warmup-isolation failure will
 stop repetition and select an opaque device tap or same-input layer-77 sublayer proof instead.
+
+## 2026-08-07 13:46 — Selected boundary outputs are intrinsically perturbing; full-model capture is closed
+
+Protected diagnostic
+`greenfield_legacy_layer_residual_p2044_20260807T123637962992026Z` used greenfield `d573c92`,
+observer `6239d0e80`, and sealed oracle `b3c25df`. Every host passed `1,882/0/312` checkpoint
+verification and the exact `2,455`-leaf / `371110325` state manifest. The repaired HLO recorder
+also produced one fleet-agreeing, callback-free, top-level-alias-free contract per selected
+boundary: boundary 1 `6ef7a835...a0f2`, boundary 77 `68fe79cd...d4cf`, and boundary 78
+`32f3eddf...2627`.
+
+The very first exact observer warmup disagreed with production in `181,592` BF16 elements with
+maximum absolute error `0.140625`. This rejects the selected-output methodology itself: even a
+single naturally sharded returned boundary changes XLA arithmetic. No residual NPZ, accepted
+comparison, DB row, `SUCCESS`, Gate D, timing, or throughput evidence exists. The diagnostic log
+bundle is archived under the approved bucket. The trap recorded eight `STOP_OK` markers, but its
+immediate census still found Ray processes on workers 2 and 3; the later append-only recovery
+census records eight unique `CENSUS_OK` markers and was added to the same archive. Fleet cleanup is
+therefore complete without rewriting the original failed census.
+
+The run paid for all larger bucket compiles before failing because the purported fail-fast check
+was deferred until the one outer flush. Observer commit `78a5fce88` moves the flush into the
+backbone bucket loop at the exact transition where the 32-row observers are queued. A CPU
+regression proves `16 -> 32 -> flush -> 64`, and the focused suite is 14/14. This is diagnostic
+tooling hygiene only; no further full-model run should use the rejected returned-output design.
+
+Next evidence must come from a same-input layer-77 sublayer harness or a truly opaque tap that
+leaves production output bitwise identical. The proof must separate attention/residual, MoE
+routed/shared update, and final boundary reconstruction while binding the common input, cache,
+DSA selection, weights, dtypes, and reduction association. Gate D remains blocked on the first
+position-2,044 arithmetic inversion; the first ten recurrent tokens remain exact and no tok/s
+claim is valid.

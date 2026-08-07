@@ -1232,3 +1232,39 @@ and diff checks pass. Exact next: commit/push this wrapper and evidence, prove a
 then run one serialized protected retry. If warmup isolation fails again, do not repeat the expensive
 draw blindly; use the now-recorded HLO and pursue an opaque device tap or same-input layer-77 sublayer
 equivalence without relaxing production-output equality.
+
+## Third selected-observer attempt proves returned boundaries perturb arithmetic
+
+Protected retry
+`greenfield_legacy_layer_residual_p2044_20260807T123637962992026Z` ran greenfield pin
+`d573c920fc02c86616fb469acbc2c8bd77d7e620`, observer pin
+`6239d0e80d0888ad7177384c03404d494fc544a1`, and unchanged sealed oracle
+`b3c25df47ac98783912dc658878181ec0a8ae16d`. All eight model streams passed the exact checkpoint
+scan (`1,882` verified, zero mismatches, `312` skipped) and state manifest (`2,455` leaves,
+combined `371110325`). All eight hosts also emitted fleet-identical callback-free, alias-free HLO
+contracts for boundaries 1, 77, and 78. Their hashes are respectively
+`6ef7a835...a0f2`, `68fe79cd...d4cf`, and `32f3eddf...2627`.
+
+The first observer warmup then failed the newly exact production-output comparison with
+`181,592` BF16 mismatches and maximum absolute error `0.140625`. Therefore merely returning one
+naturally sharded selected boundary changes the compiled legacy arithmetic; no selected residual
+is admissible, no NPZ was written, and this design must not be rerun. There is no DB result,
+`SUCCESS`, Gate D, timing, or tok/s claim. Failure diagnostics are archived append-only under the
+approved result prefix. The exit trap stopped all eight workers but its immediate census caught
+two lingering Ray processes; the preserved recovery census
+`census_recovery_20260807T_after_failure.txt` subsequently proves eight unique `CENSUS_OK` hosts
+and is also archived to the same approved prefix.
+
+Source audit found a separate honesty defect: `_precompile_backbone_text_only()` queued every
+bucket through 2,048 before `_flush_compilations()` ran the advertised 32-row isolation check.
+Observer commit `78a5fce88fc222feb69357e0bb411e6c9a9b944c` now flushes immediately when the selected observer
+bucket is queued, before any larger token bucket. A regression pins the order
+`queue:16, queue:32, flush, queue:64`; all 14 focused observer tests pass on CPU. This improves only
+diagnostic failure latency and does not rehabilitate the numerically rejected observer.
+
+Exact next: do not update the protected wrapper or launch another full checkpoint draw. Build the
+smallest same-input layer-77 sublayer equivalence proof (or a genuinely opaque device-side tap)
+whose production output remains bitwise unchanged. Compare attention residual, routed/shared MoE
+update, and boundary-78 reconstruction under one common input/cache/DSA state, preserve reduction
+association in the contract, and only then apply the smallest numerical correction before the
+protected 2K Gate-D retry.
