@@ -373,7 +373,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {5}:
+if {record["schema_version"] for record in records} != {6}:
     raise SystemExit("fleet decoder record schema drifted")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
@@ -515,6 +515,7 @@ if short_context_dsa_oracle:
                 "selected_set_against_legacy_is_exact_gate"
             ]
             or len(dsa["observation_artifacts"]) != 14
+            or dsa["token_observation_candidates"] != 16
             or dsa["prefill_token_sequence"] is None
             or not dsa["prefill_token_sequence"]["exact_prefix_match"]
             or dsa["prefill_token_sequence"]["compared_token_count"] != 1
@@ -544,11 +545,25 @@ if short_context_dsa_oracle:
                     "coverage_complete"
                 ]
                 and len(step["observation_sha256"]) == 64
+                and len(step["token_observation_sha256"]) == 64
+                and step["token_observation"]["passed"]
+                and step["token_observation"]["candidate_width"] == 16
+                and len(step["token_observation"]["candidate_ids"]) == 16
+                and len(step["token_observation"]["candidate_scores"]) == 16
+                and step["token_observation"]["lane_replication"]
+                and step["token_observation"][
+                    "inactive_rows_are_sentinel"
+                ]
+                and step["token_observation"]["ids_valid"]
+                and step["token_observation"]["scores_finite"]
+                and step["token_observation"]["order_and_ties_valid"]
+                and step["token_observation"]["winner_matches_output"]
                 for step in steps
             )
             or observer_hlo is None
             or not observer_hlo["passed"]
             or observer_hlo["backend_contract"] != hlo_backend_contract
+            or observer_hlo["token_observation_candidates"] != 16
             or observer_hlo["collective_counts"]
             != record["hlo_contract"]["collective_counts"]
             or isolation is None
@@ -557,6 +572,8 @@ if short_context_dsa_oracle:
             or isolation["input_output_alias_present"]
             or isolation["callback_markers"]
             or not isolation["collective_contract_matches_production"]
+            or not isolation["non_token_result_shapes_match"]
+            or not isolation["token_exchange_shape_difference_allowed"]
             or record["dsa_observer_compile_seconds"] is None
             or record["dsa_observer_hlo_sha256"] is None
             or len(set(record["fleet_dsa_observer_hlo_hashes"])) != 1
@@ -576,12 +593,20 @@ if short_context_dsa_oracle:
         raise SystemExit("DSA observer artifact inventory drifted")
     for record, path in zip(artifact_records, artifact_paths, strict=True):
         with np.load(path) as bundle:
-            if set(bundle.files) != {"decode_position", "observation"}:
+            if set(bundle.files) != {
+                "decode_position",
+                "observation",
+                "token_observation",
+            }:
                 raise SystemExit("DSA observer artifact fields drifted")
             decode_position = np.asarray(bundle["decode_position"])
             observation = np.asarray(bundle["observation"])
+            token_observation = np.asarray(bundle["token_observation"])
         digest = hashlib.sha256(
             np.ascontiguousarray(observation).tobytes()
+        ).hexdigest()
+        token_digest = hashlib.sha256(
+            np.ascontiguousarray(token_observation).tobytes()
         ).hexdigest()
         if (
             decode_position.shape != (1,)
@@ -590,6 +615,9 @@ if short_context_dsa_oracle:
             or observation.shape != (32, 5, 4098)
             or observation.dtype != np.dtype(np.int32)
             or digest != record["observation_sha256"]
+            or token_observation.shape != (32, 32)
+            or token_observation.dtype != np.dtype(np.int32)
+            or token_digest != record["token_observation_sha256"]
         ):
             raise SystemExit("DSA observer artifact tensor/hash drifted")
 else:

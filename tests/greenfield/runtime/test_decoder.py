@@ -87,6 +87,34 @@ ENTRY %main (scores: bf16[4], ids: s32[4], token: s32[1]) -> s32[1] {{
         "jit(execute)/while/body/closed_call/shard_map/ppermute",
     ]
 
+    wide_hlo = hlo.replace("bf16[4]", "bf16[4,16]").replace(
+        "s32[4]", "s32[4,16]"
+    )
+    wide_record = _validate_complete_token_collective_lowering(
+        parse_hlo_module(wide_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        token_observation_candidates=16,
+    )
+    assert wide_record["passed"], wide_record
+    assert wide_record["token_observation_candidates"] == 16
+    assert wide_record["score_exchange"][0]["operand_shapes"] == [
+        "bf16[4,16]"
+    ]
+    assert wide_record["token_id_exchange"][0]["operand_shapes"] == [
+        "s32[4,16]"
+    ]
+
+    wrong_candidate_width = _validate_complete_token_collective_lowering(
+        parse_hlo_module(hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        token_observation_candidates=16,
+    )
+    assert not wrong_candidate_width["passed"]
+
     prefill_record = _validate_complete_token_collective_lowering(
         parse_hlo_module(
             hlo.replace(
@@ -422,6 +450,7 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
 def test_complete_small_decoder_token_step_runs_all_stages_on_forced_cpu() -> None:
     program = r'''
 import json
+from dataclasses import replace
 import jax
 import jax.numpy as jnp
 import ml_dtypes
@@ -432,7 +461,11 @@ from glm_tpu.greenfield.runtime import build_decoder_step_program, build_teacher
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.checkpoint.test_runtime_pack import _small_plan
 
-plan = _small_plan()
+source_plan = _small_plan()
+plan = replace(
+    source_plan,
+    geometry=replace(source_plan.geometry, vocab_size=96),
+)
 schedule = build_pipeline_schedule(plan)
 state = build_decoder_state_layout(plan, schedule, context_capacity=8, logical_page_size=8, packed_kv_width=8)
 weight_layout = build_decoder_runtime_weight_layout(plan, schedule)
@@ -503,6 +536,7 @@ prefilled = prefill_compiled(*prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
 prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
 observation = np.asarray(jax.device_get(observed[8]))
+token_observation = np.asarray(jax.device_get(observed[9]))
 observation_rows = []
 for stage, group in enumerate(groups):
     rows = observation[list(group), 0]
@@ -511,10 +545,16 @@ for stage, group in enumerate(groups):
         'row': rows[0].tolist(),
         'stage': stage,
     })
+token_observation_lanes = token_observation[list(groups[-1])]
+token_candidate_width = observer.config.token_observation_candidates
+token_candidate_scores = token_observation_lanes[
+    0, token_candidate_width:
+].view(np.float32)
 active = np.flatnonzero(metadata[:, 0, decoder.config.active_index] == 1)
 module = parse_hlo_module(compiled.as_text())
 observer_module = parse_hlo_module(observer_compiled.as_text())
 hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True)
+observer_hlo_contract = validate_decoder_step_hlo(observer_compiled.as_text(), config=observer.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, token_observation_candidates=observer.config.token_observation_candidates)
 prefill_hlo_contract = validate_teacher_forced_prefill_hlo(prefill_compiled.as_text(), program=prefill, schedule=schedule, backend_contract='cpu_reference')
 counts = {}
 for item in module.collectives: counts[item.opcode] = counts.get(item.opcode, 0) + 1
@@ -551,8 +591,16 @@ print(json.dumps({
             for opcode in ('all-gather', 'all-reduce', 'collective-permute')
         },
         'host_callback_absent': all(marker not in observer_compiled.as_text().lower() for marker in ('host_callback', 'outside_compilation', 'xla_ffi_python_cpu_callback', 'xla_python_cpu_callback')),
+        'hlo_contract': {key: observer_hlo_contract[key] for key in ('passed', 'token_observation_candidates', 'violations')},
         'production_outputs_exact': all(np.array_equal(np.asarray(jax.device_get(observed[index])), np.asarray(jax.device_get(first[index]))) for index in range(8)),
         'rows': observation_rows,
+        'token_observation': {
+            'candidate_ids': token_observation_lanes[0, :token_candidate_width].tolist(),
+            'candidate_scores': token_candidate_scores.tolist(),
+            'candidate_width': token_candidate_width,
+            'final_stage_lanes_equal': bool(np.all(token_observation_lanes == token_observation_lanes[0])),
+            'inactive_lanes_sentinel': bool(np.all(token_observation[:groups[-1][0]] == -1)),
+        },
     },
     'block_tables_unchanged': bool(np.array_equal(next_blocks, np.asarray([[0]], np.int32))),
     'positions': sorted(set(tuple(row) for row in metadata[active, 0, :4].tolist())),
@@ -611,6 +659,11 @@ print(json.dumps({
             "collective-permute": 17,
         },
         "host_callback_absent": True,
+        "hlo_contract": {
+            "passed": True,
+            "token_observation_candidates": 16,
+            "violations": [],
+        },
         "production_outputs_exact": True,
         "rows": [
             {
@@ -631,6 +684,13 @@ print(json.dumps({
             }
             for stage in range(8)
         ],
+        "token_observation": {
+            "candidate_ids": list(range(16)),
+            "candidate_scores": [8.0] * 16,
+            "candidate_width": 16,
+            "final_stage_lanes_equal": True,
+            "inactive_lanes_sentinel": True,
+        },
     }
     assert result["prefill"] == {
         "next_lengths": [3],

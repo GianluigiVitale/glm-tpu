@@ -587,6 +587,110 @@ def _validate_dsa_observation_step(
     }
 
 
+def _validate_token_observation_step(
+    observation: np.ndarray,
+    *,
+    groups: tuple[tuple[int, ...], ...],
+    candidate_width: int,
+    expected_token_id: int,
+    observed_token_id: int,
+    vocab_size: int,
+) -> dict[str, Any]:
+    """Validate compact global logit candidates from the observer executable."""
+
+    observed = np.asarray(observation)
+    ranks = tuple(rank for group in groups for rank in group)
+    expected_shape = (len(ranks), 2 * candidate_width)
+    if (
+        candidate_width <= 1
+        or observed.shape != expected_shape
+        or observed.dtype != np.dtype(np.int32)
+        or sorted(ranks) != list(range(len(ranks)))
+    ):
+        raise ValueError(
+            "token observer tensor contract drifted: "
+            f"expected={expected_shape}/int32 "
+            f"observed={observed.shape}/{observed.dtype}"
+        )
+    producer_group = groups[-1]
+    lanes = observed[list(producer_group)]
+    lane_replication = bool(np.all(lanes == lanes[0]))
+    inactive_ranks = sorted(set(ranks) - set(producer_group))
+    inactive_rows_are_sentinel = bool(
+        np.all(observed[inactive_ranks] == np.int32(-1))
+    )
+    row = lanes[0]
+    candidate_ids = row[:candidate_width]
+    candidate_scores = np.ascontiguousarray(
+        row[candidate_width:]
+    ).view(np.float32)
+    ids_valid = bool(
+        np.all((candidate_ids >= 0) & (candidate_ids < vocab_size))
+        and np.unique(candidate_ids).size == candidate_width
+    )
+    scores_finite = bool(np.all(np.isfinite(candidate_scores)))
+    canonical_order = np.lexsort(
+        (
+            candidate_ids.astype(np.int64, copy=False),
+            _float32_topk_descending_key(candidate_scores),
+        )
+    )
+    order_and_ties_valid = bool(
+        np.array_equal(
+            canonical_order,
+            np.arange(candidate_width, dtype=np.int64),
+        )
+    )
+    expected_offsets = np.flatnonzero(candidate_ids == expected_token_id)
+    expected_offset = (
+        int(expected_offsets[0]) if expected_offsets.size else None
+    )
+    expected_rank = (
+        expected_offset + 1 if expected_offset is not None else None
+    )
+    expected_score = (
+        float(candidate_scores[expected_offset])
+        if expected_offset is not None
+        else None
+    )
+    winner_matches_output = bool(
+        int(candidate_ids[0]) == int(observed_token_id)
+    )
+    return {
+        "candidate_ids": candidate_ids.tolist(),
+        "candidate_scores": candidate_scores.tolist(),
+        "candidate_width": candidate_width,
+        "expected_in_candidate_set": expected_offset is not None,
+        "expected_offset": expected_offset,
+        "expected_rank": expected_rank,
+        "expected_score": expected_score,
+        "expected_token_id": int(expected_token_id),
+        "inactive_rows_are_sentinel": inactive_rows_are_sentinel,
+        "ids_valid": ids_valid,
+        "lane_replication": lane_replication,
+        "observed_token_id": int(observed_token_id),
+        "order_and_ties_valid": order_and_ties_valid,
+        "passed": bool(
+            lane_replication
+            and inactive_rows_are_sentinel
+            and ids_valid
+            and scores_finite
+            and order_and_ties_valid
+            and winner_matches_output
+        ),
+        "scores_finite": scores_finite,
+        "top1_top2_margin": float(
+            candidate_scores[0] - candidate_scores[1]
+        ),
+        "top1_expected_margin": (
+            float(candidate_scores[0] - expected_score)
+            if expected_score is not None
+            else None
+        ),
+        "winner_matches_output": winner_matches_output,
+    }
+
+
 def _observer_hlo_isolation_contract(
     optimized_hlo: str,
     *,
@@ -615,11 +719,52 @@ def _observer_hlo_isolation_contract(
         "collective_counts",
         "all_reduce_component_count",
         "all_reduce_arity_counts",
-        "all_reduce_result_shape_counts",
     )
-    collective_contract_matches = all(
+    scalar_collective_contract_matches = all(
         observer_contract.get(name) == production_contract.get(name)
         for name in compared_fields
+    )
+
+    def without_token_exchange_shapes(
+        contract: dict[str, Any],
+    ) -> dict[str, int]:
+        counts = {
+            str(name): int(count)
+            for name, count in contract.get(
+                "all_reduce_result_shape_counts", {}
+            ).items()
+        }
+        token_contract = contract.get(
+            "complete_token_collective_contract", {}
+        )
+        for exchange_name in ("score_exchange", "token_id_exchange"):
+            exchanges = token_contract.get(exchange_name, [])
+            if len(exchanges) != 1:
+                return {"__invalid_token_exchange__": 1}
+            result_shapes = exchanges[0].get("result_shapes", [])
+            if len(result_shapes) != 1:
+                return {"__invalid_token_exchange__": 1}
+            shape = str(result_shapes[0])
+            if counts.get(shape, 0) <= 0:
+                return {"__invalid_token_exchange__": 1}
+            counts[shape] -= 1
+            if counts[shape] == 0:
+                del counts[shape]
+        return dict(sorted(counts.items()))
+
+    production_non_token_shapes = without_token_exchange_shapes(
+        production_contract
+    )
+    observer_non_token_shapes = without_token_exchange_shapes(
+        observer_contract
+    )
+    non_token_result_shapes_match = bool(
+        production_non_token_shapes == observer_non_token_shapes
+        and "__invalid_token_exchange__" not in production_non_token_shapes
+        and "__invalid_token_exchange__" not in observer_non_token_shapes
+    )
+    collective_contract_matches = bool(
+        scalar_collective_contract_matches and non_token_result_shapes_match
     )
     return {
         "callback_markers": list(callback_markers),
@@ -627,6 +772,10 @@ def _observer_hlo_isolation_contract(
         "compared_collective_fields": list(compared_fields),
         "donate_argnums": [],
         "input_output_alias_present": input_output_alias_present,
+        "non_token_result_shapes_match": non_token_result_shapes_match,
+        "observer_non_token_result_shape_counts": (
+            observer_non_token_shapes
+        ),
         "passed": bool(
             production_contract.get("passed")
             and observer_contract.get("passed")
@@ -634,6 +783,10 @@ def _observer_hlo_isolation_contract(
             and not callback_markers
             and not input_output_alias_present
         ),
+        "production_non_token_result_shape_counts": (
+            production_non_token_shapes
+        ),
+        "token_exchange_shape_difference_allowed": True,
     }
 
 
@@ -1376,6 +1529,9 @@ def main() -> int:
                     dsa_observer.feature_fuse_route_weighting
                 ),
                 complete_token_path=True,
+                token_observation_candidates=(
+                    dsa_observer.config.token_observation_candidates
+                ),
             )
             dsa_observer_isolation_contract = (
                 _observer_hlo_isolation_contract(
@@ -1535,8 +1691,41 @@ def main() -> int:
                         multihost_utils,
                         observer_result[8],
                     )
+                    token_observation_host = _materialize_global_array(
+                        jax,
+                        multihost_utils,
+                        observer_result[9],
+                    )
+                    observer_token = _materialize_global_array(
+                        jax,
+                        multihost_utils,
+                        observer_result[4],
+                    )[list(groups[0]), 0]
+                    if not np.all(observer_token == observer_token[0]):
+                        raise RuntimeError("DSA observer token lanes disagree")
+                    observed_token_id = int(observer_token[0])
+                    expected_token_id = int(
+                        oracle_generated_token_ids[step + 1]
+                    )
+                    token_observation_contract = (
+                        _validate_token_observation_step(
+                            token_observation_host,
+                            groups=groups,
+                            candidate_width=(
+                                dsa_observer.config.token_observation_candidates
+                            ),
+                            expected_token_id=expected_token_id,
+                            observed_token_id=observed_token_id,
+                            vocab_size=decoder.config.vocab_size,
+                        )
+                    )
                     observation_sha256 = sha256(
                         np.ascontiguousarray(observation_host).tobytes()
+                    ).hexdigest()
+                    token_observation_sha256 = sha256(
+                        np.ascontiguousarray(
+                            token_observation_host
+                        ).tobytes()
                     ).hexdigest()
                     artifact_name = f"step_{step:02d}_position_{decode_position}.npz"
                     if jax.process_index() == 0:
@@ -1548,11 +1737,17 @@ def main() -> int:
                             observation=np.asarray(
                                 observation_host, dtype=np.int32
                             ),
+                            token_observation=np.asarray(
+                                token_observation_host, dtype=np.int32
+                            ),
                         )
                     observer_artifacts.append(
                         {
                             "filename": artifact_name,
                             "observation_sha256": observation_sha256,
+                            "token_observation_sha256": (
+                                token_observation_sha256
+                            ),
                         }
                     )
                     step_contract = _validate_dsa_observation_step(
@@ -1579,12 +1774,19 @@ def main() -> int:
                     )
                     step_contract["next_position"] = next_position.tolist()
                     step_contract["observation_sha256"] = observation_sha256
+                    step_contract["token_observation_sha256"] = (
+                        token_observation_sha256
+                    )
+                    step_contract["token_observation"] = (
+                        token_observation_contract
+                    )
                     step_contract["position_passed"] = bool(
                         next_position.tolist() == [int(decode_position) + 1]
                     )
                     step_contract["passed"] = bool(
                         step_contract["passed"]
                         and step_contract["position_passed"]
+                        and token_observation_contract["passed"]
                     )
                     observer_step_records.append(step_contract)
                     if not step_contract["passed"]:
@@ -1592,19 +1794,12 @@ def main() -> int:
                             "DSA observer device-score/set/tie contract failed: "
                             f"{step_contract}"
                         )
-                    observer_token = _materialize_global_array(
-                        jax,
-                        multihost_utils,
-                        observer_result[4],
-                    )[list(groups[0]), 0]
-                    if not np.all(observer_token == observer_token[0]):
-                        raise RuntimeError("DSA observer token lanes disagree")
-                    observer_tokens.append(int(observer_token[0]))
+                    observer_tokens.append(observed_token_id)
                     if observer_owns_current:
                         _delete_arrays(observer_current)
                     observer_current = tuple(observer_result[:8])
                     observer_owns_current = True
-                    _delete_arrays((observer_result[8],))
+                    _delete_arrays((observer_result[8], observer_result[9]))
                 preserved_prefill_position = np.asarray(
                     jax.device_get(output[5])
                 )
@@ -1659,6 +1854,9 @@ def main() -> int:
                     },
                     "step_records": observer_step_records,
                     "token_oracle_offset": 1,
+                    "token_observation_candidates": (
+                        dsa_observer.config.token_observation_candidates
+                    ),
                     "token_sequence": observer_token_contract,
                 }
                 dsa_observer_contract["passed"] = bool(
@@ -2013,7 +2211,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 5,
+            "schema_version": 6,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

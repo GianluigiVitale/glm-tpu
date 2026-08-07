@@ -12,6 +12,7 @@ from scripts.greenfield.compile_short_decoder import (
     _raw_token_sequence_contract,
     _validate_dsa_observation_step,
     _validate_completed_step_selected_states,
+    _validate_token_observation_step,
 )
 from scripts.greenfield import compile_short_decoder as compile_module
 
@@ -411,17 +412,93 @@ def test_dsa_observer_refuses_lane_order_producer_and_padding_drift() -> None:
     assert record["padded_slot_mismatches"] == [{"slot": 1, "stage": 1}]
 
 
+def _token_observation_fixture() -> tuple[
+    np.ndarray, tuple[tuple[int, ...], ...]
+]:
+    groups = ((0, 1), (2, 3))
+    candidate_ids = np.asarray([3, 1, 4, 2], np.int32)
+    candidate_scores = np.asarray([10.0, 9.0, 9.0, 8.0], np.float32)
+    row = np.concatenate((candidate_ids, candidate_scores.view(np.int32)))
+    observation = np.full((4, 8), -1, np.int32)
+    observation[list(groups[-1])] = row
+    return observation, groups
+
+
+def test_token_observer_validates_rank_margin_ties_and_inactive_lanes() -> None:
+    observation, groups = _token_observation_fixture()
+    record = _validate_token_observation_step(
+        observation,
+        groups=groups,
+        candidate_width=4,
+        expected_token_id=4,
+        observed_token_id=3,
+        vocab_size=8,
+    )
+    assert record["passed"]
+    assert record["candidate_ids"] == [3, 1, 4, 2]
+    assert record["expected_offset"] == 2
+    assert record["expected_rank"] == 3
+    assert record["expected_score"] == 9.0
+    assert record["top1_top2_margin"] == 1.0
+    assert record["top1_expected_margin"] == 1.0
+    assert record["lane_replication"]
+    assert record["inactive_rows_are_sentinel"]
+    assert record["order_and_ties_valid"]
+    assert record["winner_matches_output"]
+
+
+def test_token_observer_refuses_noncanonical_or_corrupt_candidates() -> None:
+    observation, groups = _token_observation_fixture()
+
+    wrong_tie_order = observation.copy()
+    wrong_tie_order[2:4, [1, 2]] = wrong_tie_order[2:4, [2, 1]]
+    record = _validate_token_observation_step(
+        wrong_tie_order,
+        groups=groups,
+        candidate_width=4,
+        expected_token_id=4,
+        observed_token_id=3,
+        vocab_size=8,
+    )
+    assert not record["passed"]
+    assert not record["order_and_ties_valid"]
+
+    corrupt = observation.copy()
+    corrupt[0, 0] = 0
+    corrupt[3, 0] = 7
+    record = _validate_token_observation_step(
+        corrupt,
+        groups=groups,
+        candidate_width=4,
+        expected_token_id=4,
+        observed_token_id=1,
+        vocab_size=8,
+    )
+    assert not record["passed"]
+    assert not record["inactive_rows_are_sentinel"]
+    assert not record["lane_replication"]
+    assert not record["winner_matches_output"]
+
+
 def test_observer_hlo_isolation_requires_no_alias_callback_or_collective_drift(
 ) -> None:
     contract = {
-        "all_reduce_arity_counts": {"1": 1},
-        "all_reduce_component_count": 1,
-        "all_reduce_result_shape_counts": {"s32[1]": 1},
-        "collective_count": 3,
+        "all_reduce_arity_counts": {"1": 3},
+        "all_reduce_component_count": 3,
+        "all_reduce_result_shape_counts": {
+            "bf16[4]": 1,
+            "bf16[8]": 1,
+            "s32[4]": 1,
+        },
+        "collective_count": 5,
         "collective_counts": {
             "all-gather": 1,
-            "all-reduce": 1,
+            "all-reduce": 3,
             "collective-permute": 1,
+        },
+        "complete_token_collective_contract": {
+            "score_exchange": [{"result_shapes": ["bf16[4]"]}],
+            "token_id_exchange": [{"result_shapes": ["s32[4]"]}],
         },
         "passed": True,
     }
@@ -433,6 +510,43 @@ def test_observer_hlo_isolation_requires_no_alias_callback_or_collective_drift(
     )
     assert exact["passed"]
     assert exact["donate_argnums"] == []
+    assert exact["non_token_result_shapes_match"]
+
+    widened = {
+        **contract,
+        "all_reduce_result_shape_counts": {
+            "bf16[8]": 1,
+            "bf16[64]": 1,
+            "s32[64]": 1,
+        },
+        "complete_token_collective_contract": {
+            "score_exchange": [{"result_shapes": ["bf16[64]"]}],
+            "token_id_exchange": [{"result_shapes": ["s32[64]"]}],
+        },
+    }
+    wider_token_exchange = _observer_hlo_isolation_contract(
+        hlo,
+        production_contract=contract,
+        observer_contract=widened,
+    )
+    assert wider_token_exchange["passed"]
+    assert wider_token_exchange["token_exchange_shape_difference_allowed"]
+
+    widened_non_token_drift = {
+        **widened,
+        "all_reduce_result_shape_counts": {
+            "bf16[16]": 1,
+            "bf16[64]": 1,
+            "s32[64]": 1,
+        },
+    }
+    non_token_drift = _observer_hlo_isolation_contract(
+        hlo,
+        production_contract=contract,
+        observer_contract=widened_non_token_drift,
+    )
+    assert not non_token_drift["passed"]
+    assert not non_token_drift["non_token_result_shapes_match"]
 
     aliased = _observer_hlo_isolation_contract(
         "HloModule observer, input_output_alias={ {0}: (1, {}, may-alias) }\n",

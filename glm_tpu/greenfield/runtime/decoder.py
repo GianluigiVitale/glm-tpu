@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from math import prod
 import re
 from typing import Any
 
@@ -43,6 +44,7 @@ from .pipeline import (
 
 REFERENCE_FEATURE_OUTPUT_TILE = 128
 PROMOTED_FEATURE_OUTPUT_TILE = 256
+TOKEN_OBSERVATION_CANDIDATES = 16
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +98,19 @@ class DecoderStepConfig:
     def dsa_observation_width(self) -> int:
         # Position ids, bit-exact FP32 selected-score payload, count, producer.
         return 2 * self.selected_width + 2
+
+    @property
+    def token_observation_candidates(self) -> int:
+        # Never ask local top-k for more entries than a vocabulary shard owns.
+        # The real GLM geometry uses the full diagnostic width; the smaller
+        # value exists only for reduced semantic-test geometries.
+        local_vocab = self.vocab_size // self.local_parallel_size
+        return min(TOKEN_OBSERVATION_CANDIDATES, local_vocab)
+
+    @property
+    def token_observation_width(self) -> int:
+        # Candidate token ids followed by bit-exact FP32-cast logit payloads.
+        return 2 * self.token_observation_candidates
 
     @property
     def count_index(self) -> int:
@@ -385,6 +400,7 @@ def _validate_complete_token_collective_lowering(
     expected_groups: Sequence[Sequence[int]],
     expected_pairs: Sequence[Sequence[int]],
     backend_contract: str,
+    token_observation_candidates: int = 1,
 ) -> dict[str, Any]:
     """Pin TPU's compact top-1 exchange and one-token return lowering."""
 
@@ -410,12 +426,18 @@ def _validate_complete_token_collective_lowering(
     score_exchange = tuple(
         item
         for item in reductions
-        if _hlo_shape_signature(item.result_shapes) == ("bf16[4]",)
+        if len(item.result_shapes) == 1
+        and item.result_shapes[0].dtype == "bf16"
+        and prod(item.result_shapes[0].dimensions)
+        == 4 * token_observation_candidates
     )
     token_id_exchange = tuple(
         item
         for item in reductions
-        if _hlo_shape_signature(item.result_shapes) == ("s32[4]",)
+        if len(item.result_shapes) == 1
+        and item.result_shapes[0].dtype == "s32"
+        and prod(item.result_shapes[0].dimensions)
+        == 4 * token_observation_candidates
     )
     token_return = tuple(
         item
@@ -425,21 +447,26 @@ def _validate_complete_token_collective_lowering(
     violations = []
     if len(score_exchange) != 1:
         violations.append(
-            "complete-token score exchange must be exactly one bf16[4] "
+            "complete-token score exchange must be exactly one local "
+            f"{token_observation_candidates}-candidate "
             f"all-reduce, found {len(score_exchange)}"
         )
     if len(token_id_exchange) != 1:
         violations.append(
-            "complete-token id exchange must be exactly one s32[4] "
+            "complete-token id exchange must be exactly one local "
+            f"{token_observation_candidates}-candidate "
             f"all-reduce, found {len(token_id_exchange)}"
         )
-    for label, candidates, expected_shape in (
-        ("score", score_exchange, "bf16[4]"),
-        ("id", token_id_exchange, "s32[4]"),
+    for label, candidates, expected_dtype in (
+        ("score", score_exchange, "bf16"),
+        ("id", token_id_exchange, "s32"),
     ):
         for collective in candidates:
-            if _hlo_shape_signature(collective.operand_shapes) != (
-                expected_shape,
+            if (
+                len(collective.operand_shapes) != 1
+                or collective.operand_shapes[0].dtype != expected_dtype
+                or prod(collective.operand_shapes[0].dimensions)
+                != 4 * token_observation_candidates
             ):
                 violations.append(
                     f"complete-token {label} exchange operand shape drifted"
@@ -484,6 +511,7 @@ def _validate_complete_token_collective_lowering(
         "applicable": True,
         "backend_contract": backend_contract,
         "lowering": "local_one_hot_all_reduce",
+        "token_observation_candidates": token_observation_candidates,
         "accepted_token_return_op_names": list(
             accepted_token_return_op_names
         ),
@@ -512,6 +540,7 @@ def validate_decoder_step_hlo(
     feature_output_tile: int | None = None,
     feature_fuse_route_weighting: bool = False,
     complete_token_path: bool = False,
+    token_observation_candidates: int = 1,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -538,6 +567,18 @@ def validate_decoder_step_hlo(
         raise PlanValidationError("feature route-weight fusion flag must be boolean")
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
+    if (
+        not isinstance(token_observation_candidates, int)
+        or isinstance(token_observation_candidates, bool)
+        or not 1 <= token_observation_candidates <= 64
+    ):
+        raise PlanValidationError(
+            "token observation candidate width must be in 1..64"
+        )
+    if token_observation_candidates != 1 and not complete_token_path:
+        raise PlanValidationError(
+            "token observation candidates require the complete token path"
+        )
     if (
         backend_contract
         not in (
@@ -640,9 +681,10 @@ def validate_decoder_step_hlo(
             "u32[1,1,128]": layers,
         }
         if complete_token_path:
-            expected_reduction_result_shape_counts.update(
-                {"bf16[4]": 1, "s32[4]": 1}
-            )
+            if token_observation_candidates == 1:
+                expected_reduction_result_shape_counts.update(
+                    {"bf16[4]": 1, "s32[4]": 1}
+                )
 
         reductions = by_opcode.get("all-reduce", ())
         reduction_arity_counts = {
@@ -662,6 +704,26 @@ def validate_decoder_step_hlo(
         )
         reduction_result_shape_counts = dict(sorted(result_shapes.items()))
         reduction_component_count = sum(result_shapes.values())
+        if complete_token_path and token_observation_candidates != 1:
+            for dtype in ("bf16", "s32"):
+                candidate_shapes = [
+                    shape
+                    for item in reductions
+                    for shape in item.result_shapes
+                    if shape.dtype == dtype
+                    and prod(shape.dimensions)
+                    == 4 * token_observation_candidates
+                ]
+                if len(candidate_shapes) == 1:
+                    shape = candidate_shapes[0]
+                    signature = (
+                        f"{shape.dtype}["
+                        + ",".join(
+                            str(dimension) for dimension in shape.dimensions
+                        )
+                        + "]"
+                    )
+                    expected_reduction_result_shape_counts[signature] = 1
     expected_permutes = 2 * config.stage_count + (
         1 if complete_token_path else 0
     )
@@ -738,6 +800,7 @@ def validate_decoder_step_hlo(
                 expected_groups=expected_groups,
                 expected_pairs=canonical_pairs,
                 backend_contract=backend_contract,
+                token_observation_candidates=token_observation_candidates,
             )
         )
         violations.extend(complete_token_collective_contract["violations"])
@@ -827,6 +890,7 @@ def validate_decoder_step_hlo(
         "feature_output_tile": feature_output_tile,
         "feature_fuse_route_weighting": feature_fuse_route_weighting,
         "complete_token_path": complete_token_path,
+        "token_observation_candidates": token_observation_candidates,
         "complete_token_collective_contract": (
             complete_token_collective_contract
         ),
@@ -1250,12 +1314,18 @@ def build_decoder_step_program(
         index_cache = local_index_container[0]
         metadata = local_metadata_container[0]
         dsa_observation = None
+        token_observation = None
         if observe_dsa_events:
             dsa_observation = jnp.full(
                 (
                     config.maximum_full_indexer_slots,
                     config.dsa_observation_width,
                 ),
+                -1,
+                dtype=jnp.int32,
+            )
+            token_observation = jnp.full(
+                (config.token_observation_width,),
                 -1,
                 dtype=jnp.int32,
             )
@@ -1396,84 +1466,210 @@ def build_decoder_step_program(
                     (residual, kv_cache, index_cache, metadata),
                 )
             if complete_token_path and hop == config.stage_count - 1:
+                if observe_dsa_events:
 
-                def sample_token(
-                    values: tuple[Any, Any],
-                ) -> tuple[Any, Any]:
-                    final_residual, final_metadata = values
-                    normalized = final_norm(
-                        final_residual,
-                        weight("global.final_norm"),
-                        epsilon=1e-5,
-                    )
-                    local_logits = vocabulary_logits(
-                        normalized,
-                        weight("global.lm_head"),
-                    )
-                    finite = jnp.all(jnp.isfinite(local_logits))
-                    safe_logits = jnp.where(
-                        jnp.isfinite(local_logits),
-                        local_logits,
-                        jnp.asarray(-jnp.inf, dtype=local_logits.dtype),
-                    )
-                    local_index = jnp.argmax(
-                        safe_logits[0], axis=0
-                    ).astype(jnp.int32)
-                    local_score = safe_logits[0, local_index][None]
-                    global_index = (
-                        local_slot * jnp.int32(local_vocab) + local_index
-                    )[None]
-                    candidate_score = jnp.where(
-                        finite,
-                        local_score,
-                        jnp.asarray([-jnp.inf], dtype=local_score.dtype),
-                    )
-                    candidate_index = jnp.where(
-                        finite,
-                        global_index,
-                        jnp.asarray([config.vocab_size], dtype=jnp.int32),
-                    )
-                    scores = lax.all_gather(
-                        candidate_score,
-                        axis_name,
-                        axis=0,
-                        axis_index_groups=axis_groups,
-                    )
-                    indices = lax.all_gather(
-                        candidate_index,
-                        axis_name,
-                        axis=0,
-                        axis_index_groups=axis_groups,
-                    )
-                    winning_score = jnp.max(scores, axis=0)
-                    chosen = jnp.min(
-                        jnp.where(
-                            scores == winning_score[None, ...],
-                            indices,
-                            jnp.int32(config.vocab_size),
-                        ),
-                        axis=0,
-                    ).astype(jnp.int32)
-                    head_valid = jnp.all(
-                        indices < jnp.int32(config.vocab_size)
-                    )
-                    final_metadata = final_metadata.at[
-                        0, config.health_index
-                    ].set(
+                    def sample_token_observer(
+                        values: tuple[Any, Any, Any],
+                    ) -> tuple[Any, Any, Any]:
                         (
-                            final_metadata[0, config.health_index]
-                            == jnp.int32(1)
+                            final_residual,
+                            final_metadata,
+                            current_token_observation,
+                        ) = values
+                        normalized = final_norm(
+                            final_residual,
+                            weight("global.final_norm"),
+                            epsilon=1e-5,
+                        )
+                        local_logits = vocabulary_logits(
+                            normalized,
+                            weight("global.lm_head"),
+                        )
+                        finite = jnp.all(jnp.isfinite(local_logits))
+                        safe_logits = jnp.where(
+                            jnp.isfinite(local_logits),
+                            local_logits,
+                            jnp.asarray(
+                                -jnp.inf, dtype=local_logits.dtype
+                            ),
+                        )
+                        candidate_width = config.token_observation_candidates
+                        local_scores, local_indices = lax.top_k(
+                            safe_logits[0], candidate_width
+                        )
+                        local_indices = local_indices.astype(jnp.int32)
+                        global_indices = (
+                            local_slot * jnp.int32(local_vocab)
+                            + local_indices
+                        )
+                        candidate_score = jnp.where(
+                            finite,
+                            local_scores,
+                            jnp.full_like(local_scores, -jnp.inf),
+                        )
+                        candidate_index = jnp.where(
+                            finite,
+                            global_indices,
+                            jnp.full_like(
+                                global_indices,
+                                jnp.int32(config.vocab_size),
+                            ),
+                        )
+                        scores = lax.all_gather(
+                            candidate_score,
+                            axis_name,
+                            axis=0,
+                            axis_index_groups=axis_groups,
+                        )
+                        indices = lax.all_gather(
+                            candidate_index,
+                            axis_name,
+                            axis=0,
+                            axis_index_groups=axis_groups,
+                        )
+                        flat_scores = scores.reshape(
+                            1,
+                            config.local_parallel_size * candidate_width,
+                        )
+                        flat_indices = indices.reshape(
+                            1,
+                            config.local_parallel_size * candidate_width,
+                        )
+                        index_order = jnp.argsort(
+                            flat_indices, axis=1, stable=True
+                        )
+                        sorted_scores = jnp.take_along_axis(
+                            flat_scores, index_order, axis=1
+                        )
+                        sorted_indices = jnp.take_along_axis(
+                            flat_indices, index_order, axis=1
+                        )
+                        selected_scores, selected_slots = lax.top_k(
+                            sorted_scores, candidate_width
+                        )
+                        selected_indices = jnp.take_along_axis(
+                            sorted_indices, selected_slots, axis=1
                         ).astype(jnp.int32)
-                        * head_valid.astype(jnp.int32)
-                    )
-                    return chosen, final_metadata
+                        chosen = selected_indices[0, :1]
+                        current_token_observation = jnp.concatenate(
+                            (
+                                selected_indices[0],
+                                lax.bitcast_convert_type(
+                                    selected_scores[0].astype(jnp.float32),
+                                    jnp.int32,
+                                ),
+                            )
+                        )
+                        head_valid = jnp.all(
+                            indices < jnp.int32(config.vocab_size)
+                        )
+                        final_metadata = final_metadata.at[
+                            0, config.health_index
+                        ].set(
+                            (
+                                final_metadata[0, config.health_index]
+                                == jnp.int32(1)
+                            ).astype(jnp.int32)
+                            * head_valid.astype(jnp.int32)
+                        )
+                        return (
+                            chosen,
+                            final_metadata,
+                            current_token_observation,
+                        )
 
-                next_token, metadata = lax.cond(
-                    should_execute,
-                    sample_token,
-                    lambda values: (next_token, values[1]),
-                    (residual, metadata),
-                )
+                    assert token_observation is not None
+                    next_token, metadata, token_observation = lax.cond(
+                        should_execute,
+                        sample_token_observer,
+                        lambda values: (next_token, values[1], values[2]),
+                        (residual, metadata, token_observation),
+                    )
+                else:
+
+                    def sample_token(
+                        values: tuple[Any, Any],
+                    ) -> tuple[Any, Any]:
+                        final_residual, final_metadata = values
+                        normalized = final_norm(
+                            final_residual,
+                            weight("global.final_norm"),
+                            epsilon=1e-5,
+                        )
+                        local_logits = vocabulary_logits(
+                            normalized,
+                            weight("global.lm_head"),
+                        )
+                        finite = jnp.all(jnp.isfinite(local_logits))
+                        safe_logits = jnp.where(
+                            jnp.isfinite(local_logits),
+                            local_logits,
+                            jnp.asarray(
+                                -jnp.inf, dtype=local_logits.dtype
+                            ),
+                        )
+                        local_index = jnp.argmax(
+                            safe_logits[0], axis=0
+                        ).astype(jnp.int32)
+                        local_score = safe_logits[0, local_index][None]
+                        global_index = (
+                            local_slot * jnp.int32(local_vocab) + local_index
+                        )[None]
+                        candidate_score = jnp.where(
+                            finite,
+                            local_score,
+                            jnp.asarray(
+                                [-jnp.inf], dtype=local_score.dtype
+                            ),
+                        )
+                        candidate_index = jnp.where(
+                            finite,
+                            global_index,
+                            jnp.asarray(
+                                [config.vocab_size], dtype=jnp.int32
+                            ),
+                        )
+                        scores = lax.all_gather(
+                            candidate_score,
+                            axis_name,
+                            axis=0,
+                            axis_index_groups=axis_groups,
+                        )
+                        indices = lax.all_gather(
+                            candidate_index,
+                            axis_name,
+                            axis=0,
+                            axis_index_groups=axis_groups,
+                        )
+                        winning_score = jnp.max(scores, axis=0)
+                        chosen = jnp.min(
+                            jnp.where(
+                                scores == winning_score[None, ...],
+                                indices,
+                                jnp.int32(config.vocab_size),
+                            ),
+                            axis=0,
+                        ).astype(jnp.int32)
+                        head_valid = jnp.all(
+                            indices < jnp.int32(config.vocab_size)
+                        )
+                        final_metadata = final_metadata.at[
+                            0, config.health_index
+                        ].set(
+                            (
+                                final_metadata[0, config.health_index]
+                                == jnp.int32(1)
+                            ).astype(jnp.int32)
+                            * head_valid.astype(jnp.int32)
+                        )
+                        return chosen, final_metadata
+
+                    next_token, metadata = lax.cond(
+                        should_execute,
+                        sample_token,
+                        lambda values: (next_token, values[1]),
+                        (residual, metadata),
+                    )
             residual = lax.ppermute(residual, axis_name, canonical_pairs)
             metadata = lax.ppermute(metadata, axis_name, canonical_pairs)
             if complete_token_path and hop == config.stage_count - 1:
@@ -1493,7 +1689,12 @@ def build_decoder_step_program(
         if not observe_dsa_events:
             return outputs
         assert dsa_observation is not None
-        return (*outputs, dsa_observation[None, ...])
+        assert token_observation is not None
+        return (
+            *outputs,
+            dsa_observation[None, ...],
+            token_observation[None, ...],
+        )
 
     def mapped_body(
         local_weights: Mapping[str, Any],
@@ -1551,6 +1752,7 @@ def build_decoder_step_program(
     metadata_spec = P(axis_name, None, None)
     token_spec = P(axis_name, None)
     dsa_observation_spec = P(axis_name, None, None)
+    token_observation_spec = P(axis_name, None)
     common_specs = (
         weight_specs,
         residual_spec,
@@ -1572,7 +1774,11 @@ def build_decoder_step_program(
             P(),
         )
         if observe_dsa_events:
-            output_specs = (*output_specs, dsa_observation_spec)
+            output_specs = (
+                *output_specs,
+                dsa_observation_spec,
+                token_observation_spec,
+            )
     else:
         input_specs = (*common_specs, P(), P(), P())
         mapped = mapped_body
