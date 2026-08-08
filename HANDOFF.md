@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-07 23:24 UTC
+**Updated:** 2026-08-08 01:50 UTC
 
 ## Authority and isolation
 
@@ -1751,7 +1751,7 @@ a source-backed production correction.
 
 ## Exact DSA internal observer and protected comparison path are sealed
 
-Oracle-only legacy commit `868893780c4f54670cc7897c2abc05735528749d` is a one-commit child of
+Oracle-only legacy commit `83ff4a3576602ca844ea090550139a2ff00b0bb1` is a two-commit child of
 accepted `b3c25df47ac98783912dc658878181ec0a8ae16d`; both branches are clean and pushed. Its
 default-off callback observes only `model.layers.0.self_attn.attn` at position 8155 and writes the
 live normalized hidden, q-a state, query, head weights and current post-RoPE FP32 key. Default-off
@@ -1769,7 +1769,21 @@ the full CPU-only greenfield suite passes 423 with one expected skip and two exi
 warnings. This is readiness evidence only: no TPU capture, DB row, Gate-D result or performance
 claim exists yet.
 
-Exact next: prove an authenticated idle fleet, then run exactly one serialized
-`bash scripts/greenfield/run_capture_legacy_layer0_dsa_internals.sh`. Use the first divergent field
-to derive a source-backed production correction. Do not rerun the rejected BF16-wk matrix or the
-complete greenfield decoder until the captured accepted state identifies that correction.
+The first protected attempt,
+`greenfield_legacy_layer0_dsa_internals_20260808T005359078558816Z`, failed closed during warmup
+tracing before serving. `jnp.asarray(normalized_hidden)` attempted NumPy conversion of a
+`torch.bfloat16` torchax tensor backed by an outer-JIT tracer. No observer file, token, DB row,
+comparison, final `SUCCESS`, or performance result exists. The wrapper stopped its owned runtime
+and authenticated eight `CENSUS_OK` hosts. Eleven diagnostic objects / 2,123,660 bytes are remotely
+verified under the approved bucket's `dsa_internals/8k/failed/` prefix.
+
+Commit `83ff4a357` replaces all observer-operand conversions with the scorer's existing zero-copy
+`as_jax` bridge and adds the missing outer-JIT/torchax regression. Nineteen focused forced-device
+tests pass in 972.44 seconds, including the real DCP wrapper integration; Python compile and diff
+checks pass. The greenfield wrapper is pinned to this two-commit observer and a new detached runtime
+path.
+
+Exact next: after committing the wrapper/docs and proving the fleet idle, run exactly one serialized
+retry of `bash scripts/greenfield/run_capture_legacy_layer0_dsa_internals.sh`. Use the first
+divergent field to derive a source-backed production correction. Do not rerun the rejected BF16-wk
+matrix or the complete greenfield decoder until the captured accepted state identifies it.

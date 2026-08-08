@@ -136,7 +136,8 @@ def test_protected_wrapper_reuses_short_dsa_oracle_stack() -> None:
     ):
         assert required in wrapper_source
     for required in (
-        "OBSERVER_COMMIT_DISTANCE=1",
+        "OBSERVER_COMMIT_DISTANCE=2",
+        "83ff4a3576602ca844ea090550139a2ff00b0bb1",
         "GLM_DSA_DUMP_INTERNALS_LAYER",
         "compare_short_context_dsa_oracles",
         "compare_legacy_layer0_dsa_internals.py",

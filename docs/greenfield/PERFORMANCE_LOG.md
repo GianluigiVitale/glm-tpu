@@ -871,3 +871,11 @@ or throughput result. Partial evidence is retained under the approved diagnostic
 failure-exit census has eight unique `CENSUS_OK` hosts and SHA
 `892250e022e819539c51ee39a2c281b4a32cb16cf13dd787932c459db6ab099d`. This closes the candidate;
 it must not be repeated or used to authorize a Gate-D retry.
+
+## DSA internal observer trace failure — no performance result
+
+Protected attempt `greenfield_legacy_layer0_dsa_internals_20260808T005359078558816Z` failed during
+warmup tracing on an illegal torchax-tracer-to-NumPy conversion. No request executed and no timing,
+token-rate, DB, comparison, or final `SUCCESS` artifact exists. Cleanup ended with eight unique
+`CENSUS_OK` hosts; 11 failure diagnostics / 2,123,660 bytes are verified in the approved bucket.
+Observer fix `83ff4a357` is test evidence only and does not change any latency or ETA claim.

@@ -5412,3 +5412,22 @@ BF16-origin `wk`, direct-FP32 `wq_b`, config epsilon `1e-5` for input/q-a and `1
 LayerNorm. The full CPU-only greenfield suite passes 423/423 runnable tests with one expected skip.
 No TPU arithmetic or performance result follows from this implementation checkpoint. The single
 serialized observer capture is now the only authorized next model workflow.
+
+## 2026-08-08 01:50 — First internal capture fails closed; production torchax boundary fixed
+
+Protected attempt `greenfield_legacy_layer0_dsa_internals_20260808T005359078558816Z` loaded the
+real checkpoint and reached warmup tracing, then refused before serving. The observer passed a
+torchax `torch.bfloat16` wrapper backed by an outer-JIT tracer to `jnp.asarray`; JAX correctly
+rejected the resulting NumPy conversion with `TracerArrayConversionError`. No state file, token,
+DB row, comparison, final `SUCCESS`, or performance result exists. The owned Ray runtime stopped
+and the failure-exit census contains eight unique `CENSUS_OK` hosts. All eleven local diagnostic
+objects (2,123,660 bytes) are remotely verified at
+`gs://driftbench-dsv4-uc/oracles/greenfield/glm52/dsa_internals/8k/failed/greenfield_legacy_layer0_dsa_internals_20260808T005359078558816Z/`.
+
+Oracle-only fix `83ff4a3576602ca844ea090550139a2ff00b0bb1` is pushed as the second commit above
+accepted `b3c25df47`. It routes every callback operand through the scorer's established zero-copy
+`as_jax` bridge and adds an outer-JIT test whose hidden/q-a operands are actual torchax tensors.
+The focused dump plus DCP wrapper matrix passes 19/19 in 972.44 seconds; Python compilation and
+diff checks pass. The shared protected wrapper now pins this exact two-commit observer and a fresh
+pin-specific detached worktree. One clean serialized retry is justified; no model arithmetic
+hypothesis or ETA promotion follows from the failed attempt.

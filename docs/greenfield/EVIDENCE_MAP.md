@@ -290,3 +290,14 @@ XLA sort/top-k, collective, dead row, or unexpected call. Peak HBM, DB snapshot,
 archive/remote `SUCCESS`, and 8/8 cleanup pass. DB 444 is the exact but rejected reduction
 baseline at `59.979532/4.495320 ms` p50. These are standalone selector results, not layer/token
 throughput.
+
+## Rejected layer-0 DSA internal capture attempt
+
+`greenfield_legacy_layer0_dsa_internals_20260808T005359078558816Z` failed during warmup tracing
+before any request because the observer attempted `jnp.asarray` on an outer-JIT torchax tracer.
+It has no observer payload, token, DB row, comparison, final `SUCCESS`, or performance claim. The
+exact runtime was stopped, the failure-exit census is eight-host clean, and 11 diagnostic objects
+(2,123,660 bytes) are verified under the approved bucket's `dsa_internals/8k/failed/` prefix.
+Oracle-only correction `83ff4a357` reuses the scorer's zero-copy `as_jax` boundary and passes
+19 focused forced-device/torchax tests. This is failure/fix evidence only; the corrected protected
+capture is still required.

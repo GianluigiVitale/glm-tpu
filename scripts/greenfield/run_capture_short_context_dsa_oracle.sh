@@ -12,12 +12,12 @@ readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
-  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-868893780
+  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-83ff4a357
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  readonly OBSERVER_COMMIT_DISTANCE=1
+  readonly OBSERVER_COMMIT_DISTANCE=2
   readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
   readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
-  readonly LEGACY_PIN=868893780c4f54670cc7897c2abc05735528749d
+  readonly LEGACY_PIN=83ff4a3576602ca844ea090550139a2ff00b0bb1
 else
   readonly LEGACY_REPO=$ORACLE_REPO
   readonly LEGACY_SOURCE_REPO=$ORACLE_REPO
@@ -230,7 +230,7 @@ MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
   }
 
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  # Materialize the one-commit observer in a pin-specific detached worktree;
+  # Materialize the two-commit observer in a pin-specific detached worktree;
   # the accepted oracle checkout remains untouched on every host.
   # shellcheck disable=SC2016
   sync_observer='set -e; base='"$ORACLE_REPO"'; dest='"$OBSERVER_RUNTIME_REPO"'; pin='"$LEGACY_PIN"'; oracle='"$ORACLE_PIN"'; branch='"$OBSERVER_BRANCH"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then :; elif [ -e "$dest" ]; then echo "SYNC_BAD $(hostname) destination_exists"; exit 0; else git -C "$base" fetch origin "$branch" >/dev/null 2>&1 && git -C "$base" worktree add --detach "$dest" "$pin" >/dev/null 2>&1; fi; code=$(git -C "$dest" rev-parse HEAD); dirty=$(git -C "$dest" status --porcelain | wc -l); commits=$(git -C "$dest" rev-list --count "$oracle..$pin"); ancestor=0; git -C "$dest" merge-base --is-ancestor "$oracle" "$pin" && ancestor=1; if [ "$code" = "$pin" ] && [ "$dirty" -eq 0 ] && [ "$commits" -eq "$distance" ] && [ "$ancestor" -eq 1 ]; then echo "SYNC_OK $(hostname)"; else echo "SYNC_BAD $(hostname) code=$code dirty=$dirty commits=$commits ancestor=$ancestor"; fi'
