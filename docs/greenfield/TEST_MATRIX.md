@@ -47,7 +47,7 @@
 | Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
 | Gate D protected 8K decoder | `e4079ac`: fused load/HLO/prefill and exact first token pass; event 0 set passes but order differs, event 1 has six set swaps; strict refusal before timing/DB | Missing; bounded prompt-cache discriminator required |
-| Gate D prompt index-cache discriminator | DB505/item1788 captured 32 complete accepted snapshots. DB506 rejects production M1 at 4,058 mismatches. DB507 reaches 45 mismatches with M2048 XLA divide/sqrt. DB508's external live chunk regresses to 4,045 mismatches and proves DB507 converted the FP32 `wk` parameter to a BF16 convolution operand; exact HLO/DB/archive/8-host cleanup pass. | Physical projection-weight precision isolated; exact BF16-RHS proof pending |
+| Gate D prompt index-cache discriminator | DB505/item1788 captured 32 complete accepted snapshots. DB506 rejects production M1 at 4,058 mismatches. DB507 reaches 45 mismatches with M2048 XLA divide/sqrt. DB508's external live chunk regresses to 4,045 mismatches. DB509 explicitly proves a physical BF16 `wk` convolution RHS but produces the exact DB508 output; HLO/DB/archive/direct-byte/8-host cleanup pass. | BF16 weight rejected as causal; gather-coupled input-RMS association pending |
 | Gates E–H | Await Gate D | Missing |
 
 Last complete CPU-only suite before the production integration: 441 passed / 1 expected skip

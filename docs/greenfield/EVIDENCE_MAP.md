@@ -476,7 +476,7 @@ capture is still required.
 - Readiness: focused tests pass 27/27. No protected cache artifact/comparison exists yet, so this is
   implementation evidence only and proves no arithmetic cause, decoder result, or performance.
 
-## DB505--508 accepted prompt-cache isolation
+## DB505--509 accepted prompt-cache isolation
 
 - Accepted source: DB505/item1788 captures all 32 final slot-0 snapshots. Corrected parsing proves
   `model=32,dcp=1`, four local/32 physical bitwise replicas, `[24,16,32,128]`, 512-token pages and
@@ -501,6 +501,13 @@ capture is still required.
 - DB508 protection: association manifest `8539a81d...6d07`, compressed HLO `b2e98616...f274`,
   SUCCESS `6a38369a...12e7`, evidence `48776445...214c`, remote objects `11aa387a...34e4`, DB
   snapshot `81bff928...a7be`, approved archive and authenticated 8/8 cleanup pass.
+- DB509/item1794: `...association_20260808T225610150435734Z` at `8f2545c` explicitly rounds the
+  public FP32 `wk`, and HLO `0638f148...9868` proves one physical BF16-RHS convolution plus zero
+  loops/forbidden operations or shapes. Its output is nevertheless byte-identical to DB508:
+  `db2f77d...a7a1`, 4,045 mismatches over 1,058 positions. BF16 `wk` is rejected as causal.
+- DB509 protection: manifest `df0b901e...21c1`, compressed HLO `6e269756...2160`, SUCCESS
+  `0bea72ba...9232`, evidence `652da666...1f99`, remote objects `6378c961...7047`, DB snapshot
+  `3820af70...88f`, direct approved-bucket byte equality and authenticated 8/8 cleanup pass.
 - Decision: diagnostic correctness only. No candidate is exact and no decoder/performance/gate
-  status changes. Next proof keeps the external live `[2048,6144]` interface but explicitly pins a
-  BF16 `wk` convolution operand, without rerunning rejected candidates or the full decoder.
+  status changes. Next proof isolates DB507's gather-coupled input-RMS reduction association;
+  neither the rejected BF16-weight candidate nor the full decoder should be rerun.

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 22:54 UTC
+**Updated:** 2026-08-08 23:02 UTC
 
 ## Authority and isolation
 
@@ -2212,3 +2212,19 @@ census SHA `71bf2d2d...127` is 8/8 clean. The correction requires one shape-spec
 `bf16[128,6144] convert(...)` under any optimized symbol plus the existing public FP32 parameter
 and physical BF16 convolution operand. The probe now persists optimized HLO before validation.
 Re-run only the same bounded profile after focused/static checks and a clean pushed pin.
+
+Protected DB509/item1794,
+`greenfield_layer0_prompt_index_cache_association_20260808T225610150435734Z` at `8f2545c`, rejects
+that BF16-weight hypothesis. The public `wk` remains FP32, HLO performs exactly one explicit
+shape-specific conversion, and the sole M2048 convolution physically consumes BF16. Nevertheless,
+the 8,155x128 output is byte-identical to DB508: SHA `db2f77d...a7a1`, 4,045 mismatches over 1,058
+positions, first position 4, max/mean `0.015625/1.0294302e-5`; it remains only 22 values from the
+DB506 production baseline. Thus DB507's BF16 operand was correlated, not causal.
+
+DB509 HLO SHA is `0638f148...9868` (compressed `6e269756...2160`); association manifest is
+`df0b901e...21c1`. SUCCESS/evidence/remote-object/DB-snapshot SHAs are
+`0bea72ba...9232`, `652da666...1f99`, `6378c961...7047`, and `3820af70...88f`.
+Direct approved-bucket reads match association, tensor, HLO, DB, census and SUCCESS bytes; SQLite
+is `ok`; authenticated pre/post censuses are 8/8 clean. This is diagnostic only. HLO/tensor delta
+now points back to DB507's gather-coupled input-RMS reduction layout; isolate that physical
+association before RoPE. Do not integrate BF16 `wk` or retry the decoder.

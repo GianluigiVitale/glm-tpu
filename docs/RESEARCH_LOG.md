@@ -5775,3 +5775,25 @@ orchestrator SHA is `2b125a9f...7df`; authenticated failure-exit census SHA
 it requires the public FP32 adapted-weight shape, exactly one shape-specific FP32-to-BF16
 conversion under any optimized symbol, and a physically BF16 convolution RHS. It also writes the
 compressed optimized HLO before validation so any later refusal preserves the compiler evidence.
+
+## 2026-08-08 23:02 — DB509 proves BF16 wk was correlation, not cause
+
+Protected DB509/item1794,
+`greenfield_layer0_prompt_index_cache_association_20260808T225610150435734Z` at `8f2545c`, passes
+the repaired physical contract. Its public accepted `wk` is FP32, exactly one shape-specific
+FP32-to-BF16 conversion remains in optimized HLO, and the sole M2048 convolution consumes the
+BF16 producer. There are zero loops, collectives, callbacks, full-prompt hidden tensors or dead
+rows. HLO SHA is `0638f148...9868` and the compressed file is `6e269756...2160`.
+
+The output nevertheless equals DB508 bit-for-bit: SHA `db2f77d...a7a1`, 4,045 mismatches over
+1,058 positions, first at 4, max/mean `0.015625/1.0294302e-5`. It remains only 22 values from the
+DB506 production baseline. Therefore the visible DB507 BF16 convolution input cannot explain its
+45-value near-exact result. The remaining major physical delta is the gather-coupled input-RMS
+reduction: DB507 lowers it inside the mapped body with different TPU tiling/reduction association,
+whereas DB508/509 reduce an external M2048 parameter. The next bounded discriminator must isolate
+that input-RMS producer/association before changing RoPE.
+
+Association manifest `df0b901e...21c1`, SUCCESS `0bea72ba...9232`, evidence
+`652da666...1f99`, remote objects `6378c961...7047`, DB snapshot `3820af70...88f`, direct remote
+byte equality and authenticated 8/8 pre/post cleanup all pass. This is diagnostic correctness
+evidence only; no production integration, decoder, Gate-D or performance claim follows.

@@ -984,12 +984,13 @@ wrote the complete replicated cache then failed its old geometry parser before t
 production comparison. The corrected resume runner records comparison execution time only as
 diagnostic wall and must leave Gate E unchanged regardless of exactness.
 
-## DB506--508 prompt-cache diagnostics — no performance result
+## DB506--509 prompt-cache diagnostics — no performance result
 
-DB506--508 execute bounded one-host cache arithmetic only. Their compile/execute/orchestration
+DB506--509 execute bounded one-host cache arithmetic only. Their compile/execute/orchestration
 times are not token latency, steady decoder wall, XPlane evidence, or throughput. DB506 rejects the
 production M1 scan; DB507 reduces the accepted-cache difference to 45 BF16 values with M2048 XLA
-divide/sqrt. DB508's external live chunk regresses to 4,045 mismatches and exposes the DB507
-loop-invariant FP32-to-BF16 `wk` conversion as the next arithmetic discriminator. No candidate is
-exact. DB484 remains the accepted PP8 decoder result at `244.091151 ms` p50 / `4.096830 tok/s`;
-Gate E remains open.
+divide/sqrt. DB508's external live chunk regresses to 4,045 mismatches. DB509 proves one physical
+BF16-RHS convolution but produces the exact DB508 bytes, rejecting weight precision as causal and
+pointing next to the gather-coupled input-RMS reduction association. No candidate is exact. DB484
+remains the accepted PP8 decoder result at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains
+open.
