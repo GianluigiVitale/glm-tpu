@@ -5395,3 +5395,20 @@ applies the config `1e-5` input RMSNorm. Greenfield already selects the exact ra
 and mirrors that RMSNorm. This statically closes embedding/input construction as a novel remaining
 DSA-order discriminator. The next useful evidence must observe actual accepted query/key/head
 state at the already-proven callback boundary rather than infer another upstream variant.
+
+## 2026-08-08 00:50 — Accepted layer-0 DSA internal capture is implementation-ready
+
+The existing DSA dump callback was extended only in a dedicated oracle worktree at `868893780`,
+one commit above accepted `b3c25df47`. Armed for exactly layer 0 / position 8155, it records the
+actual scorer-boundary normalized hidden, q-a state, query, head weights and current post-RoPE FP32
+key without returning tensors through the model output. Gate-off jaxpr identity, callback failure
+sentinels, exact duplicate handling and a paired two-device armed/unarmed selection test pass.
+
+Greenfield `6af9092` adapts the mature protected 8K oracle wrapper and the existing input/DB491
+artifacts. A protected run must reproduce the exact token source row and every compact DB485 DSA
+event tensor bitwise, gather eight identical internal artifacts, and compare those five fields on
+one local TPU host before the final eight-host clean census. The reconstruction uses accepted
+BF16-origin `wk`, direct-FP32 `wq_b`, config epsilon `1e-5` for input/q-a and `1e-6` for key
+LayerNorm. The full CPU-only greenfield suite passes 423/423 runnable tests with one expected skip.
+No TPU arithmetic or performance result follows from this implementation checkpoint. The single
+serialized observer capture is now the only authorized next model workflow.

@@ -21,6 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
+| DSA internal observer | oracle-only `868893780` child of accepted `b3c25df47` | Default-off one-layer/one-position callback plus independent five-state comparator; no legacy execution import. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
 | Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Rejected as an order discriminator: BF16-origin and direct-FP32-origin `wk` produce identical stored prompt keys. Preserve BF16-origin state identity in production. |
 | Layer-0 input/state | vLLM embedding/model source, TPU OOT embedding and accepted state hashes | Raw BF16 embedding row, model-epsilon input RMSNorm and adapted DSA leaves are pinned; no hidden embedding multiplier or TPU transform exists. |
@@ -144,3 +145,14 @@ nonowners and all-reduces the one nonzero row, while the TPU OOT class delegates
 Layer 0 clones that raw BF16 row as residual and applies the model-epsilon input RMSNorm. The
 greenfield input builder already selects the exact raw checkpoint rows, so embedding/input
 construction is rejected as a remaining unexplained DSA-order hypothesis.
+
+The next diagnostic also reuses rather than replaces the accepted machinery. Oracle-only legacy
+pin `868893780` adds one default-off callback at the already-proven DSA scorer boundary and captures
+only the live layer-0 position-8155 normalized hidden, q-a state, query, head weights and current
+pre-cache key. Greenfield pin `6af9092` extends the existing protected 8K DSA launcher: it syncs a
+detached observer worktree while preserving the accepted checkout, requires exact raw output and
+bitwise-identical DB485 DSA event tensors, validates eight replicated process artifacts, compares
+the five states on one local TPU host against the immutable input/DB491 q-a artifacts, then retains
+the existing DB snapshot, approved archive and authenticated zero-work exit. The 423-test CPU-only
+suite passes with one expected skip and the two pre-existing SWIG warnings. This is
+implementation/readiness evidence only; no observer TPU capture or numerical conclusion exists yet.

@@ -1748,3 +1748,28 @@ through the model output. Implement it default-off in a dedicated oracle-only le
 require unchanged protected raw tokens and exact DSA output, then run one serialized capture. Do
 not rerun the BF16-wk probe or the complete greenfield decoder before the captured state identifies
 a source-backed production correction.
+
+## Exact DSA internal observer and protected comparison path are sealed
+
+Oracle-only legacy commit `868893780c4f54670cc7897c2abc05735528749d` is a one-commit child of
+accepted `b3c25df47ac98783912dc658878181ec0a8ae16d`; both branches are clean and pushed. Its
+default-off callback observes only `model.layers.0.self_attn.attn` at position 8155 and writes the
+live normalized hidden, q-a state, query, head weights and current post-RoPE FP32 key. Default-off
+jaxpr identity and a paired two-device armed/unarmed wrapper passed in the legacy repository.
+
+Greenfield commit `6af9092a733055bc9dc659bd10d0b88ab61a05e0` is clean and pushed. It reuses the
+existing protected 8K DSA capture stack rather than creating a second launcher: exact detached
+observer sync, accepted-checkout preservation, global lease, eight-host pin/env/state/armed/file
+checks, exact token oracle, bitwise DB485 event-tensor comparison, DB snapshot, approved archive
+and authenticated post-census remain mandatory. After the legacy runtime stops, one local TPU host
+independently reconstructs the same five tensors from input manifest `574f3553...73141` and DB491
+q-a manifest `7518e7ef...d8c16`; the comparison records the first divergent field and exact deltas.
+Legacy execution is never imported. The real sealed artifacts reconstruct successfully on CPU;
+the full CPU-only greenfield suite passes 423 with one expected skip and two existing SWIG
+warnings. This is readiness evidence only: no TPU capture, DB row, Gate-D result or performance
+claim exists yet.
+
+Exact next: prove an authenticated idle fleet, then run exactly one serialized
+`bash scripts/greenfield/run_capture_legacy_layer0_dsa_internals.sh`. Use the first divergent field
+to derive a source-backed production correction. Do not rerun the rejected BF16-wk matrix or the
+complete greenfield decoder until the captured accepted state identifies that correction.

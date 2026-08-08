@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "948f98152ba91da6246caee20eea642d177450e3",
+    "greenfield": "6af9092a733055bc9dc659bd10d0b88ab61a05e0",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -114,6 +114,17 @@
       "greenfield_consumers": ["glm_tpu/greenfield/validation/short_context_dsa_oracle.py", "scripts/greenfield/compile_short_decoder.py"],
       "gate": "C-D",
       "reason": "Event identity, selected-set, tie-order, padding and IndexShare checks are reused through sealed portable artifacts, not runtime imports."
+    },
+    {
+      "id": "legacy-dsa-internal-callback",
+      "category": "oracle observability",
+      "source_repo": "tpu-inference oracle-only observer worktree",
+      "source_pin": "868893780c4f54670cc7897c2abc05735528749d / parent b3c25df47ac98783912dc658878181ec0a8ae16d",
+      "source_paths": ["tpu_inference/runner/dsa_topk_dump.py", "tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "tpu_inference/layers/vllm/custom_ops/mla_attention.py"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/legacy_dsa_internals.py", "scripts/greenfield/run_capture_legacy_layer0_dsa_internals.sh"],
+      "gate": "D diagnostic",
+      "reason": "One default-off callback reuses the proven DSA dump boundary to capture only the actual layer-0 position-8155 normalized hidden, q-a state, query, head weights and current pre-cache key. The protected wrapper requires exact raw tokens, bitwise-identical sealed DSA event tensors, eight replicated process artifacts, DB/archive linkage and clean census. It never enters greenfield execution."
     },
     {
       "id": "legacy-code-and-step-fingerprints",
