@@ -22,7 +22,8 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
-| Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Reuse DB491 q residual and existing BF16-origin key state to isolate raw-FP8 -> BF16 fused leaf -> FP32 adapter rounding on one host. |
+| Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Rejected as an order discriminator: BF16-origin and direct-FP32-origin `wk` produce identical stored prompt keys. Preserve BF16-origin state identity in production. |
+| Layer-0 input/state | vLLM embedding/model source, TPU OOT embedding and accepted state hashes | Raw BF16 embedding row, model-epsilon input RMSNorm and adapted DSA leaves are pinned; no hidden embedding multiplier or TPU transform exists. |
 | Exact 8K local scorer | legacy XLA scorer source, DB485 run config and accepted XPlane | Bounded independent `R=32`, `P=512`, three-owned-page DCP scorer association; diagnostic only, never a production dead-row path. |
 | Checkpoint layout | existing greenfield plan/pack/load chain | Gate B is already complete; the 834 GB runtime derivative is the only full PP8 decoder input. |
 | Kernels | legacy DSA/GMM/quantized matmul plus DSV4 paged-attention research | Arithmetic/tiling reference; greenfield implementations remain independent and protected. |
@@ -69,6 +70,8 @@ the base decoder passes Gates D-G, as required by the specification.
 - MoE compute-row narrowing (`b3c25df47`) produced a real but insufficient ~3.395 wall tok/s.
 - Legacy DSA live-row variants are structurally superseded by true batch-one code.
 - The returned full-model residual observer (`78a5fce88`) perturbed arithmetic and is closed.
+- The BF16-origin `wk` discriminator (`948f981`) is closed: its upstream adapted bytes differ, but
+  its prompt keys are elementwise identical after the complete stored-key path.
 - Old collective/XPlane/provenance worktrees are superseded by the broader greenfield versions; their
   tests and failure modes remain evidence, not a second implementation track.
 
@@ -123,10 +126,21 @@ bitwise identical to the existing manual distributed norm on forced-32 exact BF1
 full-geometry HLO retains the same one all-reduce/all-gather association. It is therefore rejected
 without a redundant TPU launch.
 
-The next reuse-first discriminator is already present in the sealed state and bounded matrix. The
-accepted layer-0 `wk_weights_proj.weight` is BF16 and its OOB repair dequantizes `wk` to that BF16
-dtype before the adapter casts it to FP32. DB491 instead paired the corrected q residual with
-direct-FP32-origin `wk` keys. The bounded runner now reuses DB491's immutable q artifact and the
-existing BF16-origin key state to isolate only that boundary on one TPU host. Its wrapper pins the
-artifact manifest/source and omits the closed 32-chip phase; no loader, scorer, or model execution
-path was rebuilt.
+The BF16-origin `wk` launch
+`greenfield_layer0_dsa_association_20260807T235427432046987Z` at `948f981` reused DB491's immutable
+q artifact and omitted the closed 32-chip phase. It stopped at its intended novelty guard because
+the candidate and baseline prompt keys were elementwise identical after projection, key
+LayerNorm, RoPE and BF16 cache storage. There is no scorer matrix, DB row, `SUCCESS`, decoder or
+performance claim. The authenticated failure-exit census contains eight unique `CENSUS_OK` hosts
+and hashes to `892250e0...099d`; partial evidence is archived under the approved diagnostic prefix.
+The candidate is rejected and must not be rerun.
+
+The associated input/state audit is also now durable. Accepted layer-0 state hashes pin raw BF16
+embedding `[154880,6144]` sum `1668496656`, input-norm `[6144]` sum `1006936`, adapted
+`weights_proj` FP32 sum `48158645`, adapted `wk` FP32 sum `193298069`, adapted `wq_b` FP32 sum
+`3765880530`, fused `wk_weights_proj` BF16 sum `241456714`, and q-a norm BF16 sum `305844`.
+Accepted vLLM returns `embed_tokens(input_ids)` without scaling; its vocabulary sharding masks all
+nonowners and all-reduces the one nonzero row, while the TPU OOT class delegates unchanged.
+Layer 0 clones that raw BF16 row as residual and applies the model-epsilon input RMSNorm. The
+greenfield input builder already selects the exact raw checkpoint rows, so embedding/input
+construction is rejected as a remaining unexplained DSA-order hypothesis.

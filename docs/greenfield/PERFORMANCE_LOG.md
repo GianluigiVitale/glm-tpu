@@ -856,3 +856,18 @@ DB489's wrong `1e-6` q-a epsilon, but it does not satisfy the exact order gate. 
 The run is explicitly diagnostic-only: it has no profiler-free timing, decoder execution, Gate-D
 result, or token-rate claim. Production remains at the last accepted DB484 status pending the
 remaining numerical-association proof.
+
+## BF16-origin wk no-op — protected refusal, no DB or performance claim
+
+Protected bounded launch
+`greenfield_layer0_dsa_association_20260807T235427432046987Z` at `948f981` reused the sealed DB491
+q-a artifact and entered only the one-host score phase. Its novelty guard stopped before scorer
+execution because the BF16-origin-`wk` candidate and direct-FP32-origin baseline produced
+elementwise-identical prompt keys. Thus the upstream adapted-weight dtype difference is erased by
+the complete projection/key-LayerNorm/RoPE/BF16-cache boundary and cannot change selected order.
+
+The run intentionally has no runner summary, DB row, final `SUCCESS`, decoder execution, latency,
+or throughput result. Partial evidence is retained under the approved diagnostic prefix. The
+failure-exit census has eight unique `CENSUS_OK` hosts and SHA
+`892250e022e819539c51ee39a2c281b4a32cb16cf13dd787932c459db6ab099d`. This closes the candidate;
+it must not be repeated or used to authorize a Gate-D retry.

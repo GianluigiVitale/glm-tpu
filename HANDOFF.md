@@ -1721,3 +1721,30 @@ exactly one serialized `bash scripts/greenfield/run_layer0_dsa_association_probe
 set and lowest-position order from the BF16-origin-wk local-DCP candidate may authorize the
 production epsilon/wk correction and one protected 8K Gate-D retry. Otherwise record the rejection
 and continue the source/state audit; never run the full decoder blindly.
+
+## BF16-origin wk is closed; capture actual accepted DSA internals next
+
+Protected launch `greenfield_layer0_dsa_association_20260807T235427432046987Z` at exact pin
+`948f98152ba91da6246caee20eea642d177450e3` reused the immutable DB491 q-a artifact and did not
+repeat the closed 32-chip phase. It reached the one-host state matrix and stopped at its intended
+novelty guard: BF16-origin and direct-FP32-origin `wk` produced elementwise-identical prompt keys
+after projection, key LayerNorm, RoPE and BF16 cache storage. The candidate cannot change scores
+or order and is rejected. It has no runner summary, score matrix, DB row, `SUCCESS`, decoder,
+Gate-D, latency or throughput claim. Partial evidence is archived under the approved diagnostic
+prefix; the authenticated eight-host failure-exit census SHA is
+`892250e022e819539c51ee39a2c281b4a32cb16cf13dd787932c459db6ab099d`.
+
+Accepted state identities are now pinned rather than inferred. Layer-0 shape/dtype/byte sums are:
+embedding BF16 `1668496656`, input norm BF16 `1006936`, adapted `weights_proj` FP32 `48158645`,
+adapted `wk` FP32 `193298069`, adapted `wq_b` FP32 `3765880530`, fused `wk_weights_proj` BF16
+`241456714`, and q-a norm BF16 `305844`. The embedding/input audit finds no missing multiplier or
+TPU transformation: accepted vLLM returns the raw selected BF16 row, vocabulary sharding reduces
+one nonzero owner, the TPU OOT layer delegates unchanged, and layer 0 clones the row then applies
+the config `1e-5` input RMSNorm. Greenfield already mirrors those operations.
+
+Exact next: inspect and reuse the already-proven `GLM_DSA_DUMP_TOPK` callback path to capture the
+smallest actual accepted layer-0 event-0 query, head weights and key state without returning tensors
+through the model output. Implement it default-off in a dedicated oracle-only legacy worktree,
+require unchanged protected raw tokens and exact DSA output, then run one serialized capture. Do
+not rerun the BF16-wk probe or the complete greenfield decoder before the captured state identifies
+a source-backed production correction.

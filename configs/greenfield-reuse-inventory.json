@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "ea879a24d196f61e238a22ee5bb393d3b6fa938d",
+    "greenfield": "948f98152ba91da6246caee20eea642d177450e3",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,12 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "ea879a24d196f61e238a22ee5bb393d3b6fa938d",
+      "source_pin": "948f98152ba91da6246caee20eea642d177450e3",
       "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted DB 405-491 artifacts, rejected diagnostics and exact pins prevent repeated experiments and unsupported promotion claims."
+      "reason": "Accepted DB 405-491 artifacts, rejected diagnostics through the no-DB BF16-wk no-op at 948f981, and exact pins prevent repeated experiments and unsupported promotion claims."
     },
     {
       "id": "packed-checkpoint-chain",
@@ -163,12 +163,23 @@
       "id": "legacy-bf16-fused-wk-adapter",
       "category": "numerical association evidence",
       "source_repo": "tpu-inference and protected glm-run evidence",
-      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d / DB485 / DB491",
-      "source_paths": ["tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/source_capture/legacy.log", "/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact"],
-      "disposition": "adapted",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d / DB485 / DB491 / greenfield 948f98152ba91da6246caee20eea642d177450e3",
+      "source_paths": ["tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/source_capture/legacy.log", "/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact", "/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T235427432046987Z"],
+      "disposition": "rejected",
       "greenfield_consumers": ["scripts/greenfield/probe_layer0_dsa_association.py", "scripts/greenfield/run_layer0_dsa_association_probe.sh"],
       "gate": "D",
-      "reason": "The accepted layer-0 fused wk_weights_proj leaf is BF16 and repaired from raw FP8 into that dtype before the DSA adapter casts it to FP32. The bounded candidate reuses immutable DB491 q state and changes only prompt keys to this BF16-origin wk path; the closed 32-chip norm is not repeated."
+      "reason": "The accepted layer-0 fused wk_weights_proj leaf is BF16 and repaired from raw FP8 into that dtype before the DSA adapter casts it to FP32. Protected launch 20260807T235427 proves that BF16-origin and direct-FP32-origin wk produce elementwise-identical prompt keys after projection, key LayerNorm, RoPE and BF16 cache storage. It stopped before scoring by design, has no DB/SUCCESS/performance claim, and ended with authenticated 8/8 cleanup. Preserve the accepted BF16-origin production-state identity, but never rerun it as a DSA-order discriminator."
+    },
+    {
+      "id": "legacy-layer0-input-and-adapted-state",
+      "category": "model-input numerical semantics",
+      "source_repo": "tpu-inference, vLLM reference, and protected glm-run evidence",
+      "source_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d / vLLM a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c / DB485",
+      "source_paths": ["/home/gianl/vllm-build/vllm/model_executor/models/deepseek_v2.py", "/home/gianl/vllm-build/vllm/model_executor/layers/vocab_parallel_embedding.py", "tpu_inference/layers/vllm/custom_ops/embedding.py", "scripts/greenfield/build_layer0_dsa_association_input.py", "/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/source_capture/legacy.log"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/build_layer0_dsa_association_input.py", "glm_tpu/greenfield/kernels/reference/dsa_association.py"],
+      "gate": "D",
+      "reason": "GLM adds no embedding multiplier: layer 0 consumes the raw BF16 selected row, clones it as residual, and applies model-epsilon RMSNorm. Vocab sharding masks nonowners and all-reduces one nonzero BF16 row; the TPU OOT layer delegates unchanged. Greenfield already selects those exact raw rows. Accepted layer-0 byte sums pin embedding 1668496656, input norm 1006936, adapted weights_proj 48158645, adapted wk 193298069, adapted wq_b 3765880530, fused wk_weights_proj 241456714 and q-a norm 305844. The input/embedding path is source-exhausted as an unexplained DSA discriminator."
     },
     {
       "id": "legacy-8k-local-xla-scorer-association",

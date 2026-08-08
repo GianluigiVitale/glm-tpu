@@ -5368,3 +5368,30 @@ only one four-chip host for scoring while retaining the fleet lease, exact eight
 pre/post censuses, DB/archive and SUCCESS gates. Focused tests pass 5/5; compile and shell checks
 pass. This is implementation evidence only. One clean serialized bounded run is the exact next
 step; no decoder correction or performance claim is authorized yet.
+
+## 2026-08-08 00:08 — BF16-origin wk is a stored-key no-op; input state is pinned
+
+Protected launch `greenfield_layer0_dsa_association_20260807T235427432046987Z` at `948f981`
+reused the immutable DB491 q residual and skipped the closed 32-chip phase. It reached the one-host
+state matrix, then its fail-closed novelty assertion proved the BF16-origin and direct-FP32-origin
+`wk` paths produce elementwise-identical prompt keys. The different adapted weights therefore
+collapse to identical values after projection, affine key LayerNorm, RoPE and BF16 cache storage.
+No scorer ran, so there is no DB row, final `SUCCESS`, arithmetic comparison or performance claim.
+The authenticated eight-host failure-exit census SHA is `892250e0...099d`; partial evidence is
+archived. This discriminator is rejected and must not be rerun.
+
+The accepted layer-0 state log removes ambiguity about the reconstructed source weights. Exact
+shape/dtype/byte sums are embedding `[154880,6144]` BF16 / `1668496656`, input norm `[6144]` BF16 /
+`1006936`, adapted `weights_proj [32,6144]` FP32 / `48158645`, adapted `wk [128,6144]` FP32 /
+`193298069`, adapted `wq_b [4096,2048]` FP32 / `3765880530`, fused `wk_weights_proj [160,6144]`
+BF16 / `241456714`, and q-a norm `[2048]` BF16 / `305844`. Direct raw-FP8 reconstruction already
+matches accepted adapted `wq_b`; BF16-origin reconstruction matches accepted `wk` and
+`weights_proj` exactly.
+
+The remaining layer-0 input path has been audited against the accepted vLLM pin. GLM adds no
+embedding scale. Vocab-parallel embedding masks nonowners, gathers the one owning BF16 row through
+an all-reduce, and the TPU OOT class delegates unchanged. Layer 0 clones that row as residual and
+applies the config `1e-5` input RMSNorm. Greenfield already selects the exact raw checkpoint rows
+and mirrors that RMSNorm. This statically closes embedding/input construction as a novel remaining
+DSA-order discriminator. The next useful evidence must observe actual accepted query/key/head
+state at the already-proven callback boundary rather than infer another upstream variant.
