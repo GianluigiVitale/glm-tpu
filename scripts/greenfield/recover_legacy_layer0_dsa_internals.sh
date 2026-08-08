@@ -32,6 +32,7 @@ readonly FIRST_DECODE_POSITION=8155
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_DSA_INTERNALS_RECOVERY_TAG:-greenfield_legacy_layer0_dsa_internals_recovery_$(date -u +%Y%m%dT%H%M%S%NZ)}
+RECOVERED_SOURCE_DIR=${GLM_GREENFIELD_DSA_INTERNALS_RECOVERED_SOURCE_DIR:-}
 RUN_DIR=/home/gianl/glm-run/$TAG
 SOURCE_DIR=$RUN_DIR/source_dumps
 ORACLE_DIR=$RUN_DIR/oracle
@@ -59,6 +60,16 @@ for path in "$RESULTS_DB" "$TOKEN_ORACLE_DIR/manifest.json" \
     exit 2
   }
 done
+if [[ -n $RECOVERED_SOURCE_DIR ]]; then
+  [[ -d $RECOVERED_SOURCE_DIR ]] || {
+    echo "recovered callback source is unavailable: $RECOVERED_SOURCE_DIR" >&2
+    exit 2
+  }
+  find "$RECOVERED_SOURCE_DIR" -type l -print -quit | grep -q . && {
+    echo "recovered callback source contains a symlink" >&2
+    exit 2
+  }
+fi
 
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || {
@@ -152,13 +163,19 @@ has_eight_unique_markers "$RUN_DIR/fleet_source_artifacts.txt" SOURCE_OK || {
 }
 
 say "gathering immutable source callback files"
-for worker in 0 1 2 3 4 5 6 7; do
-  if gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
-      --recurse "$POD:/tmp/$SOURCE_TAG" "$SOURCE_DIR/w$worker" \
-      >/dev/null 2>&1; then
-    echo "$worker" >>"$RUN_DIR/dump_hosts.txt"
-  fi
-done
+if [[ -n $RECOVERED_SOURCE_DIR ]]; then
+  cp -al "$RECOVERED_SOURCE_DIR/." "$SOURCE_DIR/"
+  printf 'local_reuse=%s\n' "$RECOVERED_SOURCE_DIR" \
+    >"$RUN_DIR/dump_hosts.txt"
+else
+  for worker in 0 1 2 3 4 5 6 7; do
+    if gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
+        --recurse "$POD:/tmp/$SOURCE_TAG" "$SOURCE_DIR/w$worker" \
+        >/dev/null 2>&1; then
+      echo "$worker" >>"$RUN_DIR/dump_hosts.txt"
+    fi
+  done
+fi
 [[ $(find "$SOURCE_DIR" -type f -name 'topk.step*.evt*.proc*.npz' |
   wc -l) -eq $EXPECTED_DUMP_COUNT ]] || {
   say "ABORT: recovered top-k dump inventory drifted"
@@ -182,6 +199,10 @@ for name in census_pre.txt census_failure_exit.txt disk_preflight.txt \
 done
 printf 'source_tag=%s\nsource_greenfield_pin=%s\nsealer_pin=%s\n' \
   "$SOURCE_TAG" "$SOURCE_GREENFIELD_PIN" "$PIN" >"$RUN_DIR/source_recovery.txt"
+if [[ -n $RECOVERED_SOURCE_DIR ]]; then
+  printf 'recovered_source_dir=%s\n' "$RECOVERED_SOURCE_DIR" \
+    >>"$RUN_DIR/source_recovery.txt"
+fi
 
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" >"$RUN_DIR/source_identity.json" <<'PY'
 import json
@@ -267,7 +288,13 @@ source.close()
 PY
 
 say "comparing the accepted owner row on one local TPU host"
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+env JAX_PLATFORMS=tpu \
+  TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+  TPU_PROCESS_BOUNDS=1,1,1 \
+  TPU_VISIBLE_DEVICES=0,1,2,3 \
+  PYTHONPATH="$WORKTREE" \
+  timeout --signal=TERM --kill-after=60 1800 \
+  /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/compare_legacy_layer0_dsa_internals.py" \
   --source-dump-dir "$SOURCE_DIR" \
   --layer0-input-dir "$LAYER0_INPUT_DIR" \

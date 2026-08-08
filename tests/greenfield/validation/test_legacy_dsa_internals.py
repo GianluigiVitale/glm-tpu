@@ -160,6 +160,10 @@ def test_protected_wrapper_reuses_short_dsa_oracle_stack() -> None:
         "dsa_event_tensors_exact",
         "topology_sharded_live_row_owner",
         "INTERNAL_OWNER",
+        "TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1",
+        "TPU_PROCESS_BOUNDS=1,1,1",
+        "TPU_VISIBLE_DEVICES=0,1,2,3",
+        "timeout --signal=TERM --kill-after=60 1800",
     ):
         assert required in shared_source
 
@@ -179,6 +183,12 @@ def test_recovery_reuses_source_without_reloading_model() -> None:
         "compare_legacy_layer0_dsa_internals.py",
         "strict_census post",
         "remote_objects.json",
+        "TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1",
+        "TPU_PROCESS_BOUNDS=1,1,1",
+        "TPU_VISIBLE_DEVICES=0,1,2,3",
+        "timeout --signal=TERM --kill-after=60 1800",
+        "GLM_GREENFIELD_DSA_INTERNALS_RECOVERED_SOURCE_DIR",
+        'cp -al "$RECOVERED_SOURCE_DIR/." "$SOURCE_DIR/"',
     ):
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):

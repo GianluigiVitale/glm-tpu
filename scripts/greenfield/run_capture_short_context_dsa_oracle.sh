@@ -473,7 +473,13 @@ stop_owned_runtime
 runtime_started=0
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   say "comparing accepted layer-0 scorer state on one local TPU host"
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+  env JAX_PLATFORMS=tpu \
+    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+    TPU_PROCESS_BOUNDS=1,1,1 \
+    TPU_VISIBLE_DEVICES=0,1,2,3 \
+    PYTHONPATH="$WORKTREE" \
+    timeout --signal=TERM --kill-after=60 1800 \
+    /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/compare_legacy_layer0_dsa_internals.py" \
     --source-dump-dir "$SOURCE_DIR" \
     --layer0-input-dir "$LAYER0_INPUT_DIR" \
