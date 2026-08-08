@@ -1160,6 +1160,20 @@ print(json.dumps({
         'host_transfer_markers': prefill_hlo_contract['host_transfer_markers'],
         'host_transfer_opcodes': prefill_hlo_contract['host_transfer_opcodes'],
         'loop_count': prefill_hlo_contract['loop_count'],
+        'loop_contract': {
+            key: prefill_hlo_contract['loop_contract'][key]
+            for key in (
+                'expected_fused_qkv_internal_loop_count',
+                'expected_total_loop_count',
+                'fused_qkv_internal_loop_count',
+                'loop_count',
+                'outer_loop_count',
+                'passed',
+                'unclassified_loops',
+                'violations',
+            )
+        },
+        'outer_loop_count': prefill_hlo_contract['outer_loop_count'],
         'passed': prefill_hlo_contract['passed'],
         'prompt_shape_present': prefill_hlo_contract['prompt_shape_parameter_count'] > 0,
         'violations': prefill_hlo_contract['violations'],
@@ -1341,6 +1355,17 @@ print(json.dumps({
         "host_transfer_markers": [],
         "host_transfer_opcodes": [],
         "loop_count": 1,
+        "loop_contract": {
+            "expected_fused_qkv_internal_loop_count": 0,
+            "expected_total_loop_count": 1,
+            "fused_qkv_internal_loop_count": 0,
+            "loop_count": 1,
+            "outer_loop_count": 1,
+            "passed": True,
+            "unclassified_loops": [],
+            "violations": [],
+        },
+        "outer_loop_count": 1,
         "passed": True,
         "prompt_shape_present": True,
         "violations": [],

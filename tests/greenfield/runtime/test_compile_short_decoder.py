@@ -54,6 +54,16 @@ def test_protected_runner_exposes_fail_closed_device_roundtrip() -> None:
     assert '["device_roundtrip_bytes"]\n    != expected_roundtrip_bytes' in runner
 
 
+def test_protected_runner_classifies_prefill_loops_fail_closed() -> None:
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert '["outer_loop_count"] != 1' in runner
+    assert '"expected_fused_qkv_internal_loop_count"' in runner
+    assert '"fused_qkv_internal_loop_count"' in runner
+    assert '"unclassified_loops"' in runner
+    assert '["loop_count"] != 1' not in runner
+
+
 @pytest.mark.parametrize(
     ("capacity", "label"),
     ((2048, "2k"), (8192, "8k")),

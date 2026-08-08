@@ -522,6 +522,10 @@ context_capacity = int(context_capacity)
 prompt_token_count = int(prompt_token_count)
 expected_loaded_payload_bytes = int(expected_loaded_payload_bytes)
 verify_device_roundtrip = bool(int(verify_device_roundtrip))
+expected_prefill_fused_qkv_loops = (
+    78 if attention_projection_backend == "fused_n82_convolution" else 0
+)
+expected_prefill_loop_count = 1 + expected_prefill_fused_qkv_loops
 context_name = context_label.upper()
 decode_step_count = warmup + iterations + trace_steps
 decode_end_exclusive = prompt_token_count + decode_step_count
@@ -638,7 +642,22 @@ for record in records:
                 or oracle["prompt_token_count"] != prompt_token_count
                 or record["prefill_hlo_contract"] is None
                 or not record["prefill_hlo_contract"]["passed"]
-                or record["prefill_hlo_contract"]["loop_count"] != 1
+                or record["prefill_hlo_contract"]["outer_loop_count"] != 1
+                or record["prefill_hlo_contract"]["loop_contract"][
+                    "expected_fused_qkv_internal_loop_count"
+                ]
+                != expected_prefill_fused_qkv_loops
+                or record["prefill_hlo_contract"]["loop_contract"][
+                    "fused_qkv_internal_loop_count"
+                ]
+                != expected_prefill_fused_qkv_loops
+                or record["prefill_hlo_contract"]["loop_contract"][
+                    "loop_count"
+                ]
+                != expected_prefill_loop_count
+                or record["prefill_hlo_contract"]["loop_contract"][
+                    "unclassified_loops"
+                ]
                 or record["prefill_compile_seconds"] is None
                 or record["prefill_wall_ms"] is None
             ):

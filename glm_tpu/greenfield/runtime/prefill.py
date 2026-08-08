@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from ..errors import PlanValidationError
 from ..model.schedule import PipelineSchedule
-from ..sharding.hlo_contract import parse_hlo_module
+from ..sharding.hlo_contract import HloModule, parse_hlo_module
 from .decoder import DecoderStepProgram, validate_decoder_step_hlo
 
 
@@ -26,6 +26,118 @@ class TeacherForcedPrefillProgram:
     decoder: DecoderStepProgram
     execute: Any
     prompt_length: int
+
+
+_OUTER_PREFILL_LOOP_OP_NAME = "jit(execute)/while"
+_FUSED_QKV_LOOP_OP_NAME_SUFFIX = (
+    "/one_row_fused_qkv_a_n82_convolution/while"
+)
+
+
+def validate_teacher_forced_prefill_loops(
+    optimized_hlo: str,
+    *,
+    expected_fused_qkv_internal_loops: int,
+) -> dict[str, Any]:
+    """Classify every physical prefill loop and reject unknown control flow.
+
+    XLA lowers each zero-spatial fused qkv-a convolution to a bounded internal
+    ``while`` on TPU.  Those loops are distinct from the single outer prompt
+    scan.  Metadata must prove both identities; count-only exemptions would
+    allow unrelated sequential work to enter the prefill executable.
+    """
+
+    if (
+        not isinstance(expected_fused_qkv_internal_loops, int)
+        or isinstance(expected_fused_qkv_internal_loops, bool)
+        or expected_fused_qkv_internal_loops < 0
+    ):
+        raise PlanValidationError(
+            "expected fused qkv-a internal loop count must be non-negative"
+        )
+    return _classify_teacher_forced_prefill_loops(
+        parse_hlo_module(optimized_hlo),
+        expected_fused_qkv_internal_loops=(
+            expected_fused_qkv_internal_loops
+        ),
+    )
+
+
+def _classify_teacher_forced_prefill_loops(
+    module: HloModule,
+    *,
+    expected_fused_qkv_internal_loops: int,
+) -> dict[str, Any]:
+    loops = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.raw_opcode == "while"
+    )
+    outer_loops = tuple(
+        instruction
+        for instruction in loops
+        if instruction.op_name == _OUTER_PREFILL_LOOP_OP_NAME
+    )
+    fused_qkv_internal_loops = tuple(
+        instruction
+        for instruction in loops
+        if instruction.op_name is not None
+        and instruction.op_name.startswith(
+            f"{_OUTER_PREFILL_LOOP_OP_NAME}/body/"
+        )
+        and instruction.op_name.endswith(_FUSED_QKV_LOOP_OP_NAME_SUFFIX)
+    )
+    classified_indices = {
+        instruction.index
+        for instruction in outer_loops + fused_qkv_internal_loops
+    }
+    unclassified_loops = tuple(
+        instruction
+        for instruction in loops
+        if instruction.index not in classified_indices
+    )
+    violations = []
+    if len(outer_loops) != 1:
+        violations.append(
+            "teacher-forced prefill must lower to exactly one outer device "
+            f"loop, found {len(outer_loops)}"
+        )
+    if len(fused_qkv_internal_loops) != expected_fused_qkv_internal_loops:
+        violations.append(
+            "teacher-forced prefill fused qkv-a internal loop count drifted: "
+            f"expected={expected_fused_qkv_internal_loops} "
+            f"observed={len(fused_qkv_internal_loops)}"
+        )
+    if unclassified_loops:
+        violations.append(
+            "teacher-forced prefill contains unclassified physical loops: "
+            f"{len(unclassified_loops)}"
+        )
+
+    def identities(instructions: tuple[Any, ...]) -> list[dict[str, Any]]:
+        return [
+            {
+                "computation": instruction.computation,
+                "instruction": instruction.name,
+                "op_name": instruction.op_name,
+            }
+            for instruction in instructions
+        ]
+
+    return {
+        "expected_fused_qkv_internal_loop_count": (
+            expected_fused_qkv_internal_loops
+        ),
+        "expected_total_loop_count": 1 + expected_fused_qkv_internal_loops,
+        "fused_qkv_internal_loop_count": len(fused_qkv_internal_loops),
+        "fused_qkv_internal_loops": identities(fused_qkv_internal_loops),
+        "loop_count": len(loops),
+        "outer_loop_count": len(outer_loops),
+        "outer_loops": identities(outer_loops),
+        "passed": not violations,
+        "unclassified_loops": identities(unclassified_loops),
+        "violations": violations,
+    }
 
 
 def validate_teacher_forced_prefill_hlo(
@@ -60,11 +172,17 @@ def validate_teacher_forced_prefill_hlo(
         split_residual_state=decoder.split_residual_state,
     )
     module = parse_hlo_module(optimized_hlo)
-    loops = [
-        instruction
-        for instruction in module.instructions
-        if instruction.raw_opcode == "while"
-    ]
+    expected_fused_qkv_internal_loops = (
+        schedule.layer_count
+        if decoder.attention_projection_backend == "fused_n82_convolution"
+        else 0
+    )
+    loop_contract = _classify_teacher_forced_prefill_loops(
+        module,
+        expected_fused_qkv_internal_loops=(
+            expected_fused_qkv_internal_loops
+        ),
+    )
     prompt_shape_parameter_count = sum(
         shape.dtype == "s32"
         and shape.dimensions == (program.prompt_length,)
@@ -116,11 +234,7 @@ def validate_teacher_forced_prefill_hlo(
         )
     )
     violations = list(decoder_contract["violations"])
-    if len(loops) != 1:
-        violations.append(
-            "teacher-forced prefill must lower to exactly one device loop, "
-            f"found {len(loops)}"
-        )
+    violations.extend(loop_contract["violations"])
     if prompt_shape_parameter_count == 0:
         violations.append(
             "teacher-forced prefill lost its one-dimensional prompt token input"
@@ -139,7 +253,9 @@ def validate_teacher_forced_prefill_hlo(
         "decoder_contract": decoder_contract,
         "host_transfer_markers": list(host_transfer_markers),
         "host_transfer_opcodes": list(host_transfer_opcodes),
-        "loop_count": len(loops),
+        "loop_count": loop_contract["loop_count"],
+        "loop_contract": loop_contract,
+        "outer_loop_count": loop_contract["outer_loop_count"],
         "passed": not violations,
         "prompt_length": program.prompt_length,
         "prompt_shape_parameter_count": prompt_shape_parameter_count,

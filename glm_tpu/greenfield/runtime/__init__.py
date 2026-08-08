@@ -16,6 +16,7 @@ from .prefill import (
     TeacherForcedPrefillProgram,
     build_teacher_forced_prefill_program,
     validate_teacher_forced_prefill_hlo,
+    validate_teacher_forced_prefill_loops,
 )
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     "build_decoder_step_program",
     "build_teacher_forced_prefill_program",
     "validate_teacher_forced_prefill_hlo",
+    "validate_teacher_forced_prefill_loops",
     "validate_decoder_step_hlo",
     "build_pipeline_skeleton",
     "validate_pipeline_skeleton_hlo",
