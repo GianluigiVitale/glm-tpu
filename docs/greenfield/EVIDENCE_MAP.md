@@ -476,7 +476,7 @@ capture is still required.
 - Readiness: focused tests pass 27/27. No protected cache artifact/comparison exists yet, so this is
   implementation evidence only and proves no arithmetic cause, decoder result, or performance.
 
-## DB505--507 accepted prompt-cache isolation
+## DB505--508 accepted prompt-cache isolation
 
 - Accepted source: DB505/item1788 captures all 32 final slot-0 snapshots. Corrected parsing proves
   `model=32,dcp=1`, four local/32 physical bitwise replicas, `[24,16,32,128]`, 512-token pages and
@@ -493,6 +493,14 @@ capture is still required.
   map, sqrt/divide and no forbidden communication/state. Association manifest `7216756c...7cae`,
   SUCCESS `6ce52989...c227`, evidence `affe8424...bcaf`, remote objects `7787dccd...bc0`, DB
   snapshot `b3fb207b...b47`, approved archive and authenticated 8/8 cleanup pass.
+- DB508/item1793: `...association_20260808T221200429613435Z` at `7027cf6b`; the external live
+  M2048 chunk has 4,045 mismatches/1,058 positions and is only 22 values from DB506 production.
+  HLO `fde460cb...52a` has one convolution and zero loops/forbidden operations or shapes. Unlike
+  DB507, it keeps `wk` FP32; DB507 explicitly converts the public FP32 parameter to BF16 once
+  outside its map and uses that BF16 RHS in the convolution.
+- DB508 protection: association manifest `8539a81d...6d07`, compressed HLO `b2e98616...f274`,
+  SUCCESS `6a38369a...12e7`, evidence `48776445...214c`, remote objects `11aa387a...34e4`, DB
+  snapshot `81bff928...a7be`, approved archive and authenticated 8/8 cleanup pass.
 - Decision: diagnostic correctness only. No candidate is exact and no decoder/performance/gate
-  status changes. Next proof is one external live `[2048,6144]` prefill-chunk parameter using the
-  accepted XLA/divide-sqrt/RoPE path, without rerunning rejected candidates or the full decoder.
+  status changes. Next proof keeps the external live `[2048,6144]` interface but explicitly pins a
+  BF16 `wk` convolution operand, without rerunning rejected candidates or the full decoder.

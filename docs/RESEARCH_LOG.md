@@ -5728,3 +5728,26 @@ accepted adapted `wk`, divide/sqrt key norm and RoPE, and be invoked over four c
 compiled program. Its HLO must have one convolution and zero loop/collective/callback/full-8K
 hidden/dead-row shapes. This is a chunk-input association discriminator, not permission to host-
 dispatch production prefill. Only bitwise cache equality can authorize production integration.
+
+## 2026-08-08 22:23 — DB508 rejects chunk input and exposes the physical wk conversion
+
+Protected DB508/item1793 at `7027cf6b` executes the required already-live BF16 M2048 chunk through
+the XLA divide/sqrt path. It does not preserve DB507's near-exact output: 4,045 elements across
+1,058 positions differ from accepted, with max/mean `0.015625/1.0294302e-5` and output SHA
+`db2f77d...a7a1`. It is only 22 BF16 values away from DB506's production M1 baseline. The external
+chunk therefore rejects the compiled unique-row gather as the cause of DB507's improvement.
+
+The preserved optimized HLO identifies the new discriminator without inference from output alone.
+DB507's public `wk` is FP32, but the outer mapped program converts it once to
+`bf16[128,6144]` and carries that BF16 value through its loop into the convolution. DB508 retains
+the same public FP32 value as a physical `f32[128,6144]` convolution operand. Both have one
+M2048 `bf_oi->bf` convolution and the same input/key normalization and RoPE source. Thus the
+near-exact 45-value result is associated with compiler-selected BF16 projection weight precision,
+not chunk size or the embedding gather.
+
+HLO `fde460cb...52a`, semantic manifest `8539a81d...6d07`, SUCCESS `6a38369a...12e7`, evidence
+`48776445...214c`, DB snapshot `81bff928...a7be`, approved archive and authenticated 8/8 cleanup
+pass. This has no performance or decoder standing. The next bounded candidate keeps the true
+external M2048 chunk and explicitly converts only adapted `wk` to BF16, with a fail-closed BF16-RHS
+HLO contract. Only after it reproduces the 45-value regime should RoPE association be isolated;
+no full-decoder retry is authorized.

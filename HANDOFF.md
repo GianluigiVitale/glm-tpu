@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 22:02 UTC
+**Updated:** 2026-08-08 22:23 UTC
 
 ## Authority and isolation
 
@@ -2159,3 +2159,34 @@ gather from the compiled map while retaining one physical M2048 convolution, div
 loop/collective/callback and no full 8K hidden tensor. If it matches the accepted cache bitwise,
 integrate that chunk-local prefill key path while keeping decode M1; otherwise inspect the exact
 source RoPE/input-RMS association. Do not rerun DB507's rejected candidates or the full decoder.
+
+## DB508 rejects the external-chunk interface and exposes a BF16 weight lowering
+
+Protected DB508/item1793,
+`greenfield_layer0_prompt_index_cache_association_20260808T221200429613435Z` at exact pin
+`7027cf6b655d76751f7c166b38e0780428918a9e`, executes the required external live
+`bf16[2048,6144]` hidden chunk plus `s32[2048]` absolute positions. The result is nonexact and
+regresses to the production neighborhood: 4,045 element mismatches over 1,058 positions, first at
+position 4, max/mean `0.015625/1.0294302e-5`, SHA `db2f77d...a7a1`. It differs from DB506's
+production baseline by only 22 values/22 positions, max/mean `0.001953125/6.36644e-9`.
+
+The optimized HLO `fde460cb...52a` passes the declared interface contract: one physical
+`f32[2048,128] convolution ... bf_oi->bf`, zero loop/collective/callback/full-prompt-hidden/dead-row
+shapes. It also provides the decisive physical delta. DB507 accepts the same FP32 `wk` public
+parameter but inserts one loop-invariant `f32[128,6144] -> bf16[128,6144]` conversion before the
+mapped convolution. DB508 keeps the convolution weight FP32. Therefore the 45-mismatch DB507
+result was not caused by the artificial embedding gather or external-chunk boundary; its
+near-exactness is associated with BF16 projection weights selected by the mapped lowering.
+
+Association manifest `8539a81d...6d07`, compressed-HLO file `b2e98616...f274`, tensor
+`10eeec43...c726`, SUCCESS `6a38369a...12e7`, evidence `48776445...214c`, remote objects
+`11aa387a...34e4`, DB snapshot `81bff928...a7be`, approved archive and authenticated 8/8 pre/post
+zero-work censuses all pass. This remains bounded diagnostic correctness evidence with no decoder,
+Gate-D, latency or throughput claim.
+
+Exact next: preserve the real external chunk interface and compile one candidate that explicitly
+converts only the accepted adapted `wk` to BF16 before the M2048 convolution. Its HLO must pin a
+BF16 convolution RHS, one convolution, zero loop/communication/callback/full-prompt/dead-row
+shapes, and the same divide/sqrt norm. If that reproduces DB507's 45 rotary-half mismatches, isolate
+the source-faithful RoPE association next. Do not retry the full decoder before bitwise cache
+equality.
