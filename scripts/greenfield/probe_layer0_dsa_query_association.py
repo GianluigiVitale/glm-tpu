@@ -30,6 +30,10 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (  # noqa: E402
 from glm_tpu.greenfield.kernels.reference.fp8 import (  # noqa: E402
     dequantize_fp8_bits_block_weight,
 )
+from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (  # noqa: E402
+    Fp8BlockMatmulConfig,
+    fp8_block_matmul_f32,
+)
 from glm_tpu.greenfield.validation.layer0_dsa_association import (  # noqa: E402
     inspect_distributed_q_a_norm_artifact,
     inspect_layer0_dsa_association_input,
@@ -217,6 +221,59 @@ def _candidate_functions() -> dict[str, Callable[[Any, Any, Any], Any]]:
     }
 
 
+def _pallas_query(
+    q_state: Any,
+    weight_bits: Any,
+    weight_scale: Any,
+    positions: Any,
+    *,
+    groups: int,
+) -> Any:
+    """Run the current production raw-FP8 query kernel at one/LP4 ownership."""
+
+    geometry = Layer0DsaProbeGeometry()
+    output_width = geometry.heads * geometry.head_dim
+    if output_width % groups or weight_scale.shape[0] % groups:
+        raise ValueError("Pallas query weight does not divide into groups")
+    group_width = output_width // groups
+    scale_rows = weight_scale.shape[0] // groups
+    outputs = []
+    for index in range(groups):
+        outputs.append(
+            fp8_block_matmul_f32(
+                q_state[:1],
+                lax.dynamic_slice_in_dim(
+                    weight_bits,
+                    index * group_width,
+                    group_width,
+                    axis=0,
+                ),
+                lax.dynamic_slice_in_dim(
+                    weight_scale,
+                    index * scale_rows,
+                    scale_rows,
+                    axis=0,
+                ),
+                config=Fp8BlockMatmulConfig(
+                    output_tile=128,
+                    contraction_tile=128,
+                ),
+            )
+        )
+    return _apply_query_rope(jnp.concatenate(outputs, axis=-1), positions[:1])
+
+
+def _pallas_candidate_functions() -> dict[str, Callable[..., Any]]:
+    return {
+        "pallas_global_m1_n4096": lambda q, b, s, p: _pallas_query(
+            q, b, s, p, groups=1
+        ),
+        "pallas_lp4_m1_n1024": lambda q, b, s, p: _pallas_query(
+            q, b, s, p, groups=4
+        ),
+    }
+
+
 def _hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
     lowered = hlo.lower()
     forbidden = {
@@ -334,6 +391,22 @@ def main() -> None:
         if not contract["passed"]:
             raise SystemExit(f"query association HLO failed: {name}")
         output = compiled(q_state, dequantized, positions)
+        jax.block_until_ready(output)
+        candidate = np.asarray(output[0], dtype=np.float32)
+        records[name] = {
+            "comparison": _compare(actual_query, candidate),
+            "hlo": contract,
+        }
+        (args.hlo_dir / f"{name}.optimized_hlo.txt").write_text(hlo)
+    for name, function in _pallas_candidate_functions().items():
+        compiled = jax.jit(function).lower(
+            q_state, weight_bits, weight_scale, positions
+        ).compile()
+        hlo = compiled.as_text()
+        contract = _hlo_contract(hlo, candidate=name)
+        if not contract["passed"]:
+            raise SystemExit(f"query association HLO failed: {name}")
+        output = compiled(q_state, weight_bits, weight_scale, positions)
         jax.block_until_ready(output)
         candidate = np.asarray(output[0], dtype=np.float32)
         records[name] = {

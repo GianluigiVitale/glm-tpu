@@ -150,6 +150,8 @@ expected_candidates = {
     "head_unrolled_m1_n128",
     "lp4_unrolled_m32_n1024",
     "lp4_unrolled_m1_n1024",
+    "pallas_global_m1_n4096",
+    "pallas_lp4_m1_n1024",
 }
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("query association status/code identity failed")
@@ -325,4 +327,6 @@ remote_success_sha=$(gcloud storage cat "$REMOTE_PREFIX/SUCCESS" |
 }
 
 trap - EXIT
-say "SUCCESS DB=$(/home/gianl/vllm-env/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))[\"results_db_run_id\"])' "$RUN_DIR/summary.json") exact=$(/home/gianl/vllm-env/bin/python -c 'import json,sys; print(\",\".join(json.load(open(sys.argv[1]))[\"exact_candidates\"]) or \"none\")' "$RUN_DIR/summary.json")"
+db_run=$(sed -n 's/^results_db_run_id=//p' "$RUN_DIR/SUCCESS")
+exact=$(sed -n 's/^exact_candidates=//p' "$RUN_DIR/SUCCESS")
+say "SUCCESS DB=$db_run exact=$exact"

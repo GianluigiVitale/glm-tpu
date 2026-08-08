@@ -46,6 +46,10 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
         "lp4_unrolled_m32_n1024",
         "lp4_unrolled_m1_n1024",
     }
+    assert set(subject._pallas_candidate_functions()) == {
+        "pallas_global_m1_n4096",
+        "pallas_lp4_m1_n1024",
+    }
 
 
 def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
