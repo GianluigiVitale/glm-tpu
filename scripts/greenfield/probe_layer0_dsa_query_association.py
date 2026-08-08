@@ -29,6 +29,16 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (  # noqa: E402
     pack_legacy_fused_qkv_runtime_weights,
     rotary_cos_sin,
 )
+from glm_tpu.greenfield.kernels.layer import (  # noqa: E402
+    AttentionFp8Weights,
+    _project_attention_qkv_a,
+)
+from glm_tpu.greenfield.kernels.reference.attention import (  # noqa: E402
+    MlaNumericalContract,
+)
+from glm_tpu.greenfield.kernels.reference.dsa import (  # noqa: E402
+    DsaNumericalContract,
+)
 from glm_tpu.greenfield.kernels.reference.fp8 import (  # noqa: E402
     dequantize_fp8_bits_block_weight,
 )
@@ -36,6 +46,9 @@ from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (  # noqa: E402
     Fp8BlockMatmulConfig,
     fp8_block_matmul_f32,
     fp8_block_vector_matmul_f32,
+)
+from glm_tpu.greenfield.runtime.decoder import (  # noqa: E402
+    _validate_fused_qkv_a_decoder_association,
 )
 from glm_tpu.greenfield.validation.layer0_dsa_association import (  # noqa: E402
     inspect_distributed_q_a_norm_artifact,
@@ -45,6 +58,9 @@ from glm_tpu.greenfield.validation.layer0_dsa_association import (  # noqa: E402
 
 ARTIFACT_KIND = "glm52_layer0_dsa_query_association"
 Q_A_ARTIFACT_KIND = "glm52_layer0_q_a_association"
+PRODUCTION_QKV_A_ARTIFACT_KIND = (
+    "glm52_layer0_qkv_a_production_association"
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -728,10 +744,267 @@ def _run_q_a_matrix(
     )
 
 
+def _run_production_qkv_a(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+    capture: dict[str, Any],
+    captured_normalized_bits: np.ndarray,
+    captured_q_bits: np.ndarray,
+    input_manifest: dict[str, Any],
+    q_manifest: dict[str, Any],
+    arrays: dict[str, np.ndarray],
+) -> None:
+    """Run the integrated final-layout helper against sealed DB502 outputs."""
+
+    if args.db502_dir is None:
+        raise SystemExit("production qkv-a requires the sealed DB502 artifact")
+    oracle_runner_path = args.db502_dir / "runner.json"
+    oracle_tensor_path = args.db502_dir / "q_a_candidates.npz"
+    if (
+        _file_sha256(oracle_runner_path) != args.db502_runner_sha256
+        or _file_sha256(oracle_tensor_path) != args.db502_tensor_sha256
+    ):
+        raise SystemExit("sealed DB502 production oracle identity drifted")
+    oracle = json.loads(oracle_runner_path.read_text())
+    oracle_candidate = "virtual_lax_map_convolution_shard_sum_m1_n82"
+    if (
+        oracle.get("status") != "SUCCESS"
+        or oracle.get("code_hash") != args.db502_code_hash
+        or oracle_candidate not in oracle.get("exact_candidates", ())
+        or not oracle["candidates"][oracle_candidate]["hlo"]["passed"]
+    ):
+        raise SystemExit("sealed DB502 production oracle contract drifted")
+    with np.load(oracle_tensor_path, allow_pickle=False) as values:
+        oracle_q_bits = np.ascontiguousarray(
+            values["accepted_q_a_bfloat16_bits"]
+        )
+        oracle_companion_bits = np.ascontiguousarray(
+            values[f"companion__{oracle_candidate}"]
+        )
+    if not np.array_equal(oracle_q_bits, captured_q_bits) or (
+        _array_sha256(oracle_companion_bits)
+        != oracle["candidates"][oracle_candidate][
+            "companion_bfloat16_bits_sha256"
+        ]
+    ):
+        raise SystemExit("sealed DB502 tensor payload drifted")
+
+    geometry = Layer0DsaProbeGeometry()
+    normalized = jnp.asarray(
+        captured_normalized_bits.view(ml_dtypes.bfloat16)[None, :]
+    )
+    q_a_bits = jnp.asarray(arrays["self_attn__q_a_proj__weight"])
+    q_a_scale = jnp.asarray(
+        arrays["self_attn__q_a_proj__weight_scale_inv"]
+    )
+    kv_a_bits = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight"]
+    )
+    kv_a_scale = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"]
+    )
+    q_a_norm_weight = jnp.asarray(
+        arrays["self_attn__q_a_layernorm__weight"].view(
+            ml_dtypes.bfloat16
+        )
+    )
+    packed = jax.jit(
+        lambda q_bits, q_scale, kv_bits, kv_scale: (
+            pack_legacy_fused_qkv_runtime_weights(
+                q_bits,
+                q_scale,
+                kv_bits,
+                kv_scale,
+                geometry=geometry,
+            )
+        )
+    )(q_a_bits, q_a_scale, kv_a_bits, kv_a_scale)
+    jax.block_until_ready(packed)
+    packed_bits = lax.bitcast_convert_type(
+        packed.sharded_weight, jnp.uint8
+    )
+    if packed_bits.shape != (32, 6144, 82) or (
+        packed.sharded_scale.shape != (32, 48, 82)
+    ):
+        raise SystemExit("production qkv-a final-layout setup drifted")
+
+    def production(
+        hidden: Any,
+        weight_bits: Any,
+        scale: Any,
+        norm_weight: Any,
+    ) -> tuple[Any, Any]:
+        attention = AttentionFp8Weights(
+            q_a_bits=None,
+            q_a_scale=None,
+            q_a_norm_weight=norm_weight,
+            q_b_bits=None,
+            q_b_scale=None,
+            kv_a_bits=None,
+            kv_a_scale=None,
+            kv_a_norm_weight=None,
+            kv_b_bits=None,
+            kv_b_scale=None,
+            o_bits=None,
+            o_scale=None,
+            qkv_a_bits=weight_bits,
+            qkv_a_scale=scale,
+        )
+        q_residual, companion = _project_attention_qkv_a(
+            hidden,
+            attention,
+            backend="fused_n82_convolution",
+            dsa_contract=DsaNumericalContract(),
+            mla_contract=MlaNumericalContract(),
+            block_shape=(128, 128),
+            epsilon=1e-5,
+            linear_backend="pallas",
+            linear_interpret=False,
+        )
+        assert companion is not None
+        return q_residual, companion
+
+    args.hlo_dir.mkdir(parents=True)
+    name = "production_fused_n82_convolution_shard_sum"
+    function = jax.jit(production)
+    compiled = function.lower(
+        normalized,
+        packed_bits,
+        packed.sharded_scale,
+        q_a_norm_weight,
+    ).compile()
+    hlo = compiled.as_text()
+    (args.hlo_dir / f"{name}.optimized_hlo.txt").write_text(hlo)
+    runtime_contract = _validate_fused_qkv_a_decoder_association(
+        hlo,
+        layers=1,
+    )
+    lowered = hlo.lower()
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    hlo_contract = {
+        **runtime_contract,
+        "candidate": name,
+        "forbidden_operations": forbidden_operations,
+        "hlo_sha256": sha256(hlo.encode()).hexdigest(),
+        "passed": runtime_contract["passed"] and not forbidden_operations,
+    }
+    if not hlo_contract["passed"]:
+        raise SystemExit("production qkv-a HLO contract failed")
+    q_residual, companion = compiled(
+        normalized,
+        packed_bits,
+        packed.sharded_scale,
+        q_a_norm_weight,
+    )
+    jax.block_until_ready((q_residual, companion))
+    candidate_q_bits = np.ascontiguousarray(
+        np.asarray(q_residual)[0]
+    ).view(np.uint16)
+    candidate_companion_bits = np.ascontiguousarray(
+        np.asarray(companion)[0]
+    ).view(np.uint16)
+    q_comparison = _compare_bfloat16_bits(
+        captured_q_bits,
+        candidate_q_bits,
+    )
+    companion_comparison = _compare_bfloat16_bits(
+        oracle_companion_bits,
+        candidate_companion_bits,
+    )
+    restored = (
+        q_comparison["elementwise_exact"]
+        and companion_comparison["elementwise_exact"]
+    )
+    records = {
+        name: {
+            "comparison": q_comparison,
+            "companion_comparison": companion_comparison,
+            "hlo": hlo_contract,
+        }
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "qkv_a_production.npz"
+    np.savez(
+        tensor_path,
+        accepted_q_a_bfloat16_bits=captured_q_bits,
+        accepted_db502_companion_bfloat16_bits=oracle_companion_bits,
+        production_q_a_bfloat16_bits=candidate_q_bits,
+        production_companion_bfloat16_bits=candidate_companion_bits,
+    )
+    result = {
+        "artifact_kind": PRODUCTION_QKV_A_ARTIFACT_KIND,
+        "association_restored": restored,
+        "backend": jax.default_backend(),
+        "candidates": records,
+        "capture": {
+            "comparison_sha256": args.capture_comparison_sha256,
+            "normalized_hidden_sha256": _array_sha256(
+                captured_normalized_bits
+            ),
+            "owner_actual_sha256": capture["owner_actual_sha256"],
+            "q_a_sha256": _array_sha256(captured_q_bits),
+            "tensors_sha256": args.capture_tensors_sha256,
+        },
+        "claim_scope": (
+            "Bounded production qkv-a helper arithmetic/HLO only; no "
+            "checkpoint, decoder, Gate-D, latency, or token-rate claim."
+        ),
+        "code_hash": code_hash,
+        "db502": {
+            "candidate": oracle_candidate,
+            "code_hash": args.db502_code_hash,
+            "runner_sha256": args.db502_runner_sha256,
+            "tensor_sha256": args.db502_tensor_sha256,
+        },
+        "device_count": jax.device_count(),
+        "device_kind": sorted(
+            {device.device_kind for device in jax.devices()}
+        ),
+        "diagnostic_only": True,
+        "exact_candidates": [name] if restored else [],
+        "final_layout_inputs": {
+            "scale_shape": [32, 48, 82],
+            "weight_bits_shape": [32, 6144, 82],
+        },
+        "format_version": 1,
+        "input_manifest_sha256": input_manifest["manifest_sha256"],
+        "local_output_width": 82,
+        "one_live_row": True,
+        "performance_claim": False,
+        "production_helper": True,
+        "q_a_manifest_sha256": q_manifest["manifest_sha256"],
+        "status": "SUCCESS",
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+        "virtual_tensor_shards": 32,
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--target", choices=("query", "q_a"), default="query"
+        "--target",
+        choices=("query", "q_a", "qkv_a_production"),
+        default="query",
     )
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--capture-dir", type=Path, required=True)
@@ -742,6 +1015,10 @@ def main() -> None:
     parser.add_argument("--distributed-q-a-norm-dir", type=Path, required=True)
     parser.add_argument("--q-a-manifest-sha256", required=True)
     parser.add_argument("--q-a-code-hash", required=True)
+    parser.add_argument("--db502-dir", type=Path)
+    parser.add_argument("--db502-code-hash")
+    parser.add_argument("--db502-runner-sha256")
+    parser.add_argument("--db502-tensor-sha256")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     args = parser.parse_args()
@@ -799,6 +1076,25 @@ def main() -> None:
 
     if args.target == "q_a":
         _run_q_a_matrix(
+            args=args,
+            code_hash=code_hash,
+            capture=capture,
+            captured_normalized_bits=captured_normalized_bits,
+            captured_q_bits=captured_q_bits,
+            input_manifest=input_manifest,
+            q_manifest=q_manifest,
+            arrays=arrays,
+        )
+        return
+    if args.target == "qkv_a_production":
+        required_db502 = (
+            args.db502_code_hash,
+            args.db502_runner_sha256,
+            args.db502_tensor_sha256,
+        )
+        if any(value is None for value in required_db502):
+            raise SystemExit("production qkv-a DB502 identities are incomplete")
+        _run_production_qkv_a(
             args=args,
             code_hash=code_hash,
             capture=capture,

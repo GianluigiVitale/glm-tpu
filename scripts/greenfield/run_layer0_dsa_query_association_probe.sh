@@ -18,10 +18,15 @@ readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e
 readonly DISTRIBUTED_Q_A_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact
 readonly DISTRIBUTED_Q_A_MANIFEST_SHA=7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c43dcded7d809120e30d8c16
 readonly DISTRIBUTED_Q_A_CODE_HASH=ea879a24d196f61e238a22ee5bb393d3b6fa938d
+readonly DB502_DIR=/home/gianl/glm-run/greenfield_layer0_q_a_association_20260808T124434046623046Z
+readonly DB502_CODE_HASH=c230c11d2c852b52bbbf4b76791bb4dc80c598ba
+readonly DB502_RUNNER_SHA=2a77d75d27ae06128084f0d3956b0ea5b2886ae2b3a5ecbe896acc9bd43075c4
+readonly DB502_TENSOR_SHA=d9b14bdd47b5def0169b0b25157a8d472bc0017391030b0d7842b794fae8f76e
+readonly DB502_SUCCESS_SHA=de2e080d3eae672569acc4dada7eb41501c6f3508ac0e1747291041d95087dab
 readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
 
-[[ $TARGET == query || $TARGET == q_a ]] || {
-  echo "DSA association target must be query or q_a" >&2
+[[ $TARGET == query || $TARGET == q_a || $TARGET == qkv_a_production ]] || {
+  echo "DSA association target must be query, q_a, or qkv_a_production" >&2
   exit 2
 }
 
@@ -29,6 +34,9 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 if [[ $TARGET == q_a ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_q_a_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=q_a_association
+elif [[ $TARGET == qkv_a_production ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_qkv_a_production_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=qkv_a_production_association
 else
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=dsa_query_association
@@ -61,6 +69,30 @@ done
   echo "sealed capture SUCCESS identity drifted" >&2
   exit 2
 }
+if [[ $TARGET == qkv_a_production ]]; then
+  for path in "$DB502_DIR/runner.json" "$DB502_DIR/q_a_candidates.npz" \
+    "$DB502_DIR/SUCCESS"; do
+    [[ -r $path ]] || {
+      echo "production qkv-a DB502 input is unavailable: $path" >&2
+      exit 2
+    }
+  done
+  [[ $(sha256sum "$DB502_DIR/runner.json" | awk '{print $1}') == \
+    "$DB502_RUNNER_SHA" ]] || {
+    echo "sealed DB502 runner identity drifted" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DB502_DIR/q_a_candidates.npz" | awk '{print $1}') == \
+    "$DB502_TENSOR_SHA" ]] || {
+    echo "sealed DB502 tensor identity drifted" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DB502_DIR/SUCCESS" | awk '{print $1}') == \
+    "$DB502_SUCCESS_SHA" ]] || {
+    echo "sealed DB502 SUCCESS identity drifted" >&2
+    exit 2
+  }
+fi
 
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || {
@@ -134,6 +166,10 @@ env JAX_PLATFORMS=tpu \
   --distributed-q-a-norm-dir "$DISTRIBUTED_Q_A_DIR" \
   --q-a-manifest-sha256 "$DISTRIBUTED_Q_A_MANIFEST_SHA" \
   --q-a-code-hash "$DISTRIBUTED_Q_A_CODE_HASH" \
+  --db502-dir "$DB502_DIR" \
+  --db502-code-hash "$DB502_CODE_HASH" \
+  --db502-runner-sha256 "$DB502_RUNNER_SHA" \
+  --db502-tensor-sha256 "$DB502_TENSOR_SHA" \
   --output "$RUN_DIR/runner.json" \
   --hlo-dir "$RUN_DIR/hlo" >"$RUN_DIR/runner.log" 2>&1
 elapsed=$(( $(date +%s) - started ))
@@ -158,6 +194,10 @@ if target == "q_a":
         for norm in (
             "logical_mean", "shard_sum", "left_fold", "topology_tree"
         )
+    }
+elif target == "qkv_a_production":
+    expected_candidates = {
+        "production_fused_n82_convolution_shard_sum",
     }
 else:
     expected_candidates = {
@@ -191,7 +231,7 @@ if runner["performance_claim"] is not False or not runner["diagnostic_only"]:
     raise SystemExit("query association made a performance claim")
 if any(not value["hlo"]["passed"] for value in runner["candidates"].values()):
     raise SystemExit("query association HLO contract failed")
-if target == "q_a":
+if target in ("q_a", "qkv_a_production"):
     tensor = run_dir / runner["tensor_file"]["filename"]
     from hashlib import sha256
     if (
@@ -204,6 +244,25 @@ if target == "q_a":
         != runner["tensor_file"]["sha256"]
     ):
         raise SystemExit("q-a association tensor/one-row contract failed")
+if target == "qkv_a_production":
+    candidate = runner["candidates"][
+        "production_fused_n82_convolution_shard_sum"
+    ]
+    hlo = candidate["hlo"]
+    if (
+        not runner["production_helper"]
+        or runner["final_layout_inputs"]["weight_bits_shape"]
+        != [32, 6144, 82]
+        or runner["final_layout_inputs"]["scale_shape"] != [32, 48, 82]
+        or not candidate["comparison"]["elementwise_exact"]
+        or not candidate["companion_comparison"]["elementwise_exact"]
+        or hlo["convolution_count"] != 1
+        or hlo["expected_convolution_count"] != 1
+        or hlo["forbidden_operations"]
+        or hlo["forbidden_shapes"]
+        or not all(hlo["required_shapes"].values())
+    ):
+        raise SystemExit("production qkv-a arithmetic/HLO contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -213,9 +272,13 @@ run_id = pv.start_run(
     connection,
     model=f"zai-org/GLM-5.2-FP8:greenfield-layer0-{target}-association",
     revision=(
-        f"bounded-real-layer0-v2-{target}-association"
-        if target == "q_a"
-        else f"bounded-real-layer0-v1-{target}-association"
+        f"bounded-real-layer0-v3-{target}-association"
+        if target == "qkv_a_production"
+        else (
+            f"bounded-real-layer0-v2-{target}-association"
+            if target == "q_a"
+            else f"bounded-real-layer0-v1-{target}-association"
+        )
     ),
     env={
         "GLM_ENGINE": f"greenfield_layer0_{target}_association",
@@ -227,7 +290,11 @@ run_id = pv.start_run(
         "q_a_manifest_sha256": runner["q_a_manifest_sha256"],
         "device_kind": runner["device_kind"],
     },
-    note=f"Protected layer-0 8K DSA {target} association diagnostic.",
+    note=(
+        "Protected integrated layer-0 qkv-a production-helper diagnostic."
+        if target == "qkv_a_production"
+        else f"Protected layer-0 8K DSA {target} association diagnostic."
+    ),
     harness_repo=repo,
     fork_repo=None,
 )
@@ -236,8 +303,16 @@ pv.record_item(
     run_id,
     benchmark=f"greenfield_layer0_{target}_association",
     item_id=f"layer0_position8155_{target}",
-    prompt=f"Sealed accepted layer-0 {target} state and source weights.",
-    gold=f"Elementwise-exact accepted {target} association.",
+    prompt=(
+        "Sealed accepted layer-0 q-a, DB502 kv-a companion, and source weights."
+        if target == "qkv_a_production"
+        else f"Sealed accepted layer-0 {target} state and source weights."
+    ),
+    gold=(
+        "Exact accepted q-a and exact sealed DB502 fused kv-a companion."
+        if target == "qkv_a_production"
+        else f"Elementwise-exact accepted {target} association."
+    ),
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=json.dumps(runner["exact_candidates"], sort_keys=True),
     correct=bool(runner["association_restored"]),
@@ -291,6 +366,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   find hlo -type f -print0 | sort -z | xargs -0 sha256sum
   if [[ -f q_a_candidates.npz ]]; then
     sha256sum q_a_candidates.npz
+  fi
+  if [[ -f qkv_a_production.npz ]]; then
+    sha256sum qkv_a_production.npz
   fi
   sha256sum runner.json runner.log summary.json results_ckpt.db \
     census_pre.txt census_post.txt orchestrator.sealed.log
@@ -350,7 +428,11 @@ values = {
     "artifact_kind": (
         "glm52_layer0_q_a_association"
         if sys.argv[4] == "q_a"
-        else "glm52_layer0_dsa_query_association"
+        else (
+            "glm52_layer0_qkv_a_production_association"
+            if sys.argv[4] == "qkv_a_production"
+            else "glm52_layer0_dsa_query_association"
+        )
     ),
     "code_hash": sys.argv[3],
     "results_db_run_id": summary["results_db_run_id"],

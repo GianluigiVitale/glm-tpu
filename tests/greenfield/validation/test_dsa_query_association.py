@@ -132,7 +132,26 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "GLM_GREENFIELD_DSA_ASSOCIATION_TARGET",
         "--target \"$TARGET\"",
         "q_a_candidates.npz",
+        "qkv_a_production.npz",
+        "qkv_a_production_association",
+        "DB502_CODE_HASH=c230c11",
+        "DB502_RUNNER_SHA=2a77d75d",
+        "DB502_TENSOR_SHA=d9b14bdd",
+        "DB502_SUCCESS_SHA=de2e080d",
     ):
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):
         assert forbidden not in source
+
+
+def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
+    source = SCRIPT.read_text()
+    for required in (
+        "_project_attention_qkv_a",
+        "_validate_fused_qkv_a_decoder_association",
+        'choices=("query", "q_a", "qkv_a_production")',
+        "production_fused_n82_convolution_shard_sum",
+        "companion_comparison",
+        "fused_n82_convolution",
+    ):
+        assert required in source
