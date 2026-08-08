@@ -447,3 +447,31 @@ capture is still required.
   independently. Preserved old/new HLO pass as `1+0` and `1+78`; 39 focused tests plus the
   forced-32 complete prefill regression pass. This authorizes one retry but proves no Gate-D/E
   result.
+
+## Loop-corrected fused 8K DSA refusal
+
+- Refused run: exact code `e4079ac410f976476812e0a86ac9352e1407dc9d`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_qkva_loopfix_trace2_20260808T161834055154820Z`.
+- Passed scope: complete fused final-layout load, decoder/observer/isolation/prefill HLO contracts,
+  full teacher-forced prefill, exact first token `101252`, rank 1, score `22.5`, margin `6.75`.
+- Refusal: event 0 exact set but first order difference at offset 8; event 1 expected-only
+  `[1052,2024,3853,6256,6787,7473]`, observed-only
+  `[825,3889,4899,5536,6113,6951]`; refused before warmup/timing/trace/DB/final `SUCCESS`.
+- Seals: DSA NPZ `4647de15...6ac`, token observation `e5e35f3b...03c`, eight identical logs
+  `63a29050...566e`, pre/failure census `c1e5f109...7d0` / `a7b172cb...ede`; critical remote
+  bytes match, SQLite is `ok`, and the tag has no DB row.
+- Decision: preserved correctness failure only. It cannot change Gate D/E and forbids another blind
+  full-decoder retry.
+
+## Prompt index-cache discriminator readiness
+
+- Implementation pin: `e5a699177cd0164d62aa202729011631c324e447`.
+- Oracle boundary: accepted default-off `dcp_cache_dump.py`; final step-4/chunk-2011 slot 0 only;
+  exact eight DCP owners and four identical model replicas per owner; live block-table recovery of
+  all 8,155 logical BF16 keys.
+- Independent comparison: production raw-FP8 `wk`, input RMSNorm, key LayerNorm/RoPE and BF16
+  writes execute in a one-row greenfield scan after the legacy runtime stops.
+- HLO refusal contract: one raw-FP8 key kernel and one outer scan; no collective, callback,
+  transport, decoded overlay, full-prompt hidden materialization, or `[32,6144]` dead row.
+- Readiness: focused tests pass 27/27. No protected cache artifact/comparison exists yet, so this is
+  implementation evidence only and proves no arithmetic cause, decoder result, or performance.

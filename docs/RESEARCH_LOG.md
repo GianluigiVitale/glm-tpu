@@ -5654,3 +5654,25 @@ fails on missing/extra outer loops, missing/extra fused-qkv internals, internals
 body, or any unknown loop. Offline, the preserved old prefill passes `1 outer + 0 internal` and the
 new one passes `1 outer + 78 internal`; 39 focused tests and the 72.70-second forced-32 complete
 prefill regression pass. One like-for-like protected retry is now authorized.
+
+## 2026-08-08 19:31 — Exact first token, DSA refusal, and prompt-cache discriminator
+
+The loop-corrected protected 8K run at `e4079ac`, tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_qkva_loopfix_trace2_20260808T161834055154820Z`,
+passed final-layout load, every decoder/observer/prefill HLO contract, full teacher-forced prefill,
+and exact first token `101252`. It then refused before warmup/timing/trace/DB because the first
+device-resident DSA comparison was not exact. Event 0 preserves the complete 2,048-member set but
+first changes score order at offset 8; event 1 has six expected-only and six observed-only
+positions. This is execution/correctness evidence only, never a Gate-D/E or performance result.
+The run has no final `SUCCESS` or DB row, all eight logs are byte-identical, approved-bucket
+diagnostics match, SQLite remains `ok`, and authenticated pre/failure censuses are 8/8 clean.
+
+Blind decoder retries stop here. Existing accepted `dcp_cache_dump.py` observability is the
+narrowest source of truth for the state consumed by event 0. Greenfield `e5a6991` arms that
+default-off oracle only for the final prompt slot, requires all eight DCP owners and exact
+four-replica model equality, reconstructs the logical 8,155-by-128 BF16 layer-0 key cache through
+the live block table, and seals it. Only after the accepted runtime exits, an independent
+single-host probe computes the same keys with the actual production raw-FP8 `wk` and one-row scan.
+Its HLO forbids collectives, callbacks, transport, decoded overlays, full-prompt hidden state and
+dead batch rows. Focused coverage passes 27/27; this remains readiness, not proof, until one
+serialized protected capture and exact comparison completes.

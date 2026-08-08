@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 15:31 UTC
+**Updated:** 2026-08-08 19:31 UTC
 
 ## Authority and isolation
 
@@ -2052,3 +2052,44 @@ not decoder or performance evidence.
 Exact next: seal this diagnostic pin, prove the fleet idle, and run exactly one serialized
 protected 8K retry with the same fused runtime, paired token/DSA oracles, warmup 2, iterations 10
 and trace 2. Any execution-time DSA/token/HBM/HLO/wall failure remains a stop condition.
+
+## Loop-corrected 8K executes exactly, then refuses DSA before timing
+
+The like-for-like retry
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_qkva_loopfix_trace2_20260808T161834055154820Z`
+ran from 16:18--18:24 UTC at exact code
+`e4079ac410f976476812e0a86ac9352e1407dc9d`. It passed the complete fused checkpoint load,
+decoder/observer/prefill HLO contracts, teacher-forced 8K prefill, and the exact first token
+`101252` at rank 1 with score `22.5` and top-two margin `6.75`. The device-resident observer then
+failed closed before warmup, timing, trace, DB insertion, or final `SUCCESS`.
+
+Event 0 has the exact 2,048-member set but its score order first differs at offset 8 (expected
+position 8,089; observed 8,150). Event 1 already has six set swaps: expected-only
+`[1052,2024,3853,6256,6787,7473]`, observed-only
+`[825,3889,4899,5536,6113,6951]`. Downstream differences grow, so another blind full-decoder
+retry is forbidden. The DSA NPZ SHA is `4647de15...6ac`; token observation SHA is
+`e5e35f3b...03c`; all eight logs are identical at `63a29050...566e`. Pre/failure census SHAs
+`c1e5f109...7d0` / `a7b172cb...ede` each contain eight unique `CENSUS_OK` hosts. Approved-bucket
+critical bytes match, SQLite integrity is `ok`, and the tag occurs zero times in the DB.
+
+## Accepted prompt-cache reuse and bounded production comparator are pinned
+
+Commit `e5a699177cd0164d62aa202729011631c324e447` reuses the accepted runtime's existing default-off
+`dcp_cache_dump.py` boundary instead of adding a new legacy execution path. The capture requires
+the exact final step-4/chunk-2011 slot-0 dumps from all eight processes, reconstructs the 8,155
+logical BF16 layer-0 index keys from the live block table, and proves exact four-way model-replica
+identity for each DCP owner before sealing source/checkpoint/token hashes.
+
+After the accepted runtime stops, an independent one-host greenfield probe runs the actual
+production raw-FP8 `wk`, input RMSNorm, index-key LayerNorm/RoPE, and BF16 cache write in a one-row
+`lax.scan`. Its fail-closed HLO contract requires exactly one
+`greenfield_fp8_block_matmul_f32_m8_k6144_n128`, one outer scan, no collective/callback/transport,
+no decoded weight overlay, no full-prompt hidden materialization, and no dead `[32,6144]` row.
+Focused prompt-cache/oracle tests pass 27/27; Python compilation, Bash syntax, ShellCheck and diff
+checks pass. Two broader CPU suites were manually stopped after unrelated existing forced-JAX
+tests stopped advancing, so they are explicitly not suite-pass claims.
+
+Exact next: commit this evidence seal, verify an idle fleet, and run exactly one serialized
+`scripts/greenfield/run_capture_legacy_prompt_index_cache.sh`. Preserve and diagnose any capture,
+replica, logical-page, production-HLO, or bit-comparison refusal; do not weaken the contract or
+retry the full decoder until this bounded discriminator identifies the first cache-state cause.

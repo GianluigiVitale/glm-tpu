@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-08T16:16:00Z",
+  "captured_utc": "2026-08-08T19:31:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "1f110133bc4411d6a3bcc1d2c69a8334f915a8fb",
+    "greenfield": "e5a699177cd0164d62aa202729011631c324e447",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,12 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "1f110133bc4411d6a3bcc1d2c69a8334f915a8fb",
+      "source_pin": "e5a699177cd0164d62aa202729011631c324e447",
       "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted protected artifacts through DB504 and the later failed fused-prefill diagnostic, including rejected diagnostics, the fused checkpoint and its direct device-roundtrip/full-HLO proof, are pinned to prevent repeated experiments and unsupported promotion claims."
+      "reason": "Accepted protected artifacts through DB504, the failed fused-prefill diagnostic, and the later e4079ac exact-token/DSA refusal are pinned with rejected diagnostics and the fused checkpoint proof to prevent repeated experiments and unsupported promotion claims. The e5a6991 cache discriminator is readiness only until protected evidence exists."
     },
     {
       "id": "greenfield-prefill-loop-classifier",
@@ -125,6 +125,17 @@
       "greenfield_consumers": ["glm_tpu/greenfield/validation/short_context_dsa_oracle.py", "scripts/greenfield/compile_short_decoder.py"],
       "gate": "C-D",
       "reason": "Event identity, selected-set, tie-order, padding and IndexShare checks are reused through sealed portable artifacts, not runtime imports."
+    },
+    {
+      "id": "legacy-dcp-prompt-index-cache",
+      "category": "oracle observability",
+      "source_repo": "tpu-inference accepted oracle and glm-tpu greenfield",
+      "source_pin": "legacy b3c25df47ac98783912dc658878181ec0a8ae16d / greenfield e5a699177cd0164d62aa202729011631c324e447",
+      "source_paths": ["tpu_inference/runner/dcp_cache_dump.py", "tests/runner/test_dcp_cache_dump.py", "tpu_inference/runner/tpu_runner.py", "/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/prompt_index_cache.py", "scripts/greenfield/capture_legacy_prompt_index_cache.py", "scripts/greenfield/probe_layer0_prompt_index_cache.py", "scripts/greenfield/run_capture_legacy_prompt_index_cache.sh"],
+      "gate": "D diagnostic",
+      "reason": "The existing default-off cache boundary captures the accepted final prompt slot without a new model observer. Greenfield independently validates DCP/model replicas and logical pages, then compares the actual one-row production raw-FP8 key path after the legacy runtime exits. No legacy execution path is imported."
     },
     {
       "id": "legacy-dsa-internal-callback",

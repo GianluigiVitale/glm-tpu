@@ -25,7 +25,7 @@
 | Complete PP8 plan/layout/pack | 118,629 source leaves; 32 base + 4 MTP owners; exact byte/hash reconciliation; manifest `08694931...78f1` | Pass |
 | Complete PP8 direct load | DB 420: all 32 chips / 8 stages, 750,122,559,744 bytes, exact identities, device round trip, peak weights-only HBM, archive/cleanup | Pass |
 | Gate B base layout | Complete plan-aware checkpoint manifest/packer/direct loader and fail-closed corruption handling | Pass |
-| Gate B fused qkv-a derivative | `0082bac`: exact N82 transforms, one-pass feature+attention pack, real 78-layer byte/layout reconstruction, small 32-file pack/verifier round trip | Implementation pass; protected artifact/direct-load reclosure pending |
+| Gate B fused qkv-a derivative | Pack `7d5dfb9` plus DB504: 32 final-owner files / 834,369,271,808 bytes; exact device round trip; 78 fused convolutions; zero runtime reshards/concat/dequantization | Pass; Gate B re-closed |
 | Gate C reference kernels | Dense/norm/RoPE, FP32 DSA/top-k, compact IndexShare, stage-local KV, sparse MLA and LSE merge; full-width FP32/BF16 legacy comparisons exact | Pass on CPU/reference |
 | Real Gate C oracle | 31 raw layer-2/3 tensors; 2,304-token full scorer; 2,048 exact positions; 8,192-byte IndexShare; dense/sparse-attention outputs; manifest `54262529...4a9f` | Pass (correctness artifact) |
 | Bounded Gate C final-owner pack | Exact protected-layout subset; 31 raw hashes; 413,810,816 source bytes; four equal PP8 owners; manifest `3c5c48da...2a8a`; local/remote integrity | Pass (layout mechanism) |
@@ -44,14 +44,18 @@
 | Gate D feature-body XPlane | DB 442: one clean wall sample then 8 files/64 cores/2 trace steps; 58,804.003 ms wall; dequant gather 7,317.698 ms/core x 8 serial stages = 58,541.584 ms; exact HLO/HBM/DB/archive/cleanup | Attribution pass; performance rejected; compact permute duration is pipeline wait, not bandwidth |
 | Pallas DSA scorer | DB 443: production one-row 256K/LP4 shard; one kernel/no per-head overlay/dead rows/collectives; score max error 2.861e-6; exact 2,048 positions/order; 0.326595/0.350320 ms p50/p99 | Standalone Section 7.2 item 5 pass; layer integration pending |
 | Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
-| Gate D fused qkv-a implementation | `0082bac`/`f715039`; DB503 runs the actual production selector with final U8/FP32 state: exact q-a and kv-a, one physical `f32[1,82]` convolution, no collective/callback/dead row; DB/archive/8-host cleanup pass | Production helper pass; protected artifact/direct load pending |
+| Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
-| Gate D protected 8K decoder | `f129e63` first token/event 0 exact, then event-1 DSA drift; all-event observer localizes earliest error to layer-0 q-a. DB502/503 fix and metal-prove the isolated production arithmetic. | Missing; packed fused artifact/direct load must pass before retry |
+| Gate D protected 8K decoder | `e4079ac`: fused load/HLO/prefill and exact first token pass; event 0 set passes but order differs, event 1 has six set swaps; strict refusal before timing/DB | Missing; bounded prompt-cache discriminator required |
+| Gate D prompt index-cache discriminator | `e5a6991`: reuses default-off accepted slot-0 dump, proves DCP/model replicas and logical pages, then bit-compares an independent one-row production key scan under exact HLO | Implementation ready; protected capture/comparison missing |
 | Gates E–H | Await Gate D | Missing |
 
 Last complete CPU-only suite before the production integration: 441 passed / 1 expected skip
 (2026-08-08). Latest fused-qkv arithmetic/checkpoint/runtime/HLO/stage suite: 57 passed in
 135.25 seconds at `0082bac`; Python/Bash/ShellCheck/JSON/diff checks pass.
+Latest prompt-cache/oracle focused suite: 27 passed at `e5a6991`. Two broader CPU suite attempts
+were manually stopped after unrelated existing forced-JAX tests stopped advancing and are not
+suite-pass claims.
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the

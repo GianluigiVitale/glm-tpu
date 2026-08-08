@@ -21,6 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py` plus its runner integration/tests | Default-off accepted-runtime cache capture; greenfield reconstructs exact DCP/model replicas into logical BF16 layer-0 keys and compares an independent one-row production scan. |
 | DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -80,6 +81,10 @@ the base decoder passes Gates D-G, as required by the specification.
   Its HLO supplies the reusable positive discriminator: 78 exact fused-qkv internal loops under
   one outer prompt scan. Commit `1f11013` adapts the existing parser to pin those identities while
   rejecting any unknown loop.
+- The loop-corrected 8K attempt at `e4079ac` is a preserved DSA refusal, not performance evidence.
+  It proves full prefill and exact first-token execution but rejects event-0 order and event-1 set
+  drift before timing. Do not repeat another full decoder until a bounded prompt-cache comparison
+  identifies whether the stored layer-0 key state differs.
 - Old collective/XPlane/provenance worktrees are superseded by the broader greenfield versions; their
   tests and failure modes remain evidence, not a second implementation track.
 
@@ -226,3 +231,18 @@ new checkpoint path. Every one of the 10,880 final tensors is directly loaded an
 device-round-tripped, with zero reshard/concat/dequantization, while the full body
 retains exactly 78 one-row convolutions. Gate B is re-closed; reuse this same
 artifact and loader for the protected 8K retry.
+
+The loop-corrected retry at `e4079ac` passed load, all decoder/observer/prefill HLO contracts,
+teacher-forced prefill, and exact first token `101252`, then failed the first device-resident DSA
+observer before timing. Event 0 keeps the exact 2,048-member set but differs first at score-order
+offset 8; event 1 has six set swaps. This rules out another blind decoder retry.
+
+The next diagnostic reuses the accepted legacy `dcp_cache_dump.py` rather than adding another
+model observer. Greenfield pin `e5a6991` arms it only for slot 0 on the sealed 8K oracle, requires
+four post-forward dumps per host and exact eight-process/four-model-replica coverage, maps the live
+block table back to 8,155 logical BF16 keys, and seals source/checkpoint/token hashes. After the
+legacy runtime stops, an independent one-host program runs the actual production raw-FP8 `wk`,
+input RMSNorm, key LayerNorm/RoPE, and BF16 write inside a one-row `lax.scan`. Its HLO must contain
+one raw-FP8 key kernel and one outer scan, with no collective, callback, decoded weight overlay,
+full-prompt hidden materialization, or dead `[32,6144]` row. This is readiness only until one
+serialized protected capture completes; it imports no legacy/vLLM execution into greenfield.

@@ -964,3 +964,13 @@ latency/throughput standing. Preserved HLO proves exactly 78 identified qkv inte
 outer prefill scan and no unknown loop. Commit `1f11013` corrects only this fail-closed
 classification. DB484 therefore remains the accepted PP8 performance point at `244.091151 ms` p50
 and `4.096830 tok/s`; Gate E remains open.
+
+## Loop-corrected fused 8K DSA refusal — no performance result
+
+The 16:18 UTC retry at `e4079ac` completed full 8K prefill and produced the exact first token, but
+the strict device-resident DSA observer rejected event-0 order and event-1 set drift before any
+warmup, timed iteration, XPlane, DB row, or final `SUCCESS`. Its roughly two-hour elapsed time is
+load/compile/prefill/diagnostic orchestration and has no latency or throughput standing. DB484
+remains the only accepted PP8 decoder performance point at `244.091151 ms` p50 and
+`4.096830 tok/s`; Gate E remains open. The `e5a6991` prompt-cache capture/comparator is likewise a
+correctness discriminator and cannot produce a performance claim.
