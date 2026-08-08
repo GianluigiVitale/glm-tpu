@@ -383,3 +383,15 @@ capture is still required.
   `815cc6a3...8f59`, remote objects `6a1d78e8...9257`, SUCCESS `de2e080d...dab`.
 - Scope: arithmetic only, not a decoder or performance result. Next evidence is the default-off
   production path plus plan-aware packed N82 checkpoint and complete-layer/8K validation.
+
+## Fused qkv-a production integration readiness
+
+- Code pin: `0082bac0f74fa4cac631c8a3085576d3bd10e6ef`.
+- Local evidence: 57 focused tests pass, including byte-exact N82 weight/scale transforms, a full
+  small 32-file artifact pack/verifier round trip, production arithmetic equivalence, backend/layout
+  refusals, zero obsolete Pallas-call counts, and fused HLO shape/count linting.
+- Real-manifest reconstruction: separate layout hash remains `ba21c4ec...c9e`; fused layout
+  `523afb1d...cb4`, semantic manifest `8bd08068...6f9`, payload `834,369,271,808`, and
+  `26,074,039,744` runtime bytes/chip.
+- Scope: readiness only. No protected fused artifact, production TPU helper/layer, Gate-B
+  reclosure, Gate-D retry, or performance result exists.

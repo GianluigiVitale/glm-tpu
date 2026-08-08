@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 12:50 UTC
+**Updated:** 2026-08-08 13:52 UTC
 
 ## Authority and isolation
 
@@ -1926,3 +1926,28 @@ backend, consume its kv-a companion rather than projecting kv-a twice, and exten
 checkpoint manifest/packer/direct loader to store the N82 weight and expanded scale tensors.
 Gate B is reopened for this derived final layout. Do not pack N82 inside every decode step and do
 not rerun the full 8K decoder until the packed layout, production HLO, and exact layer path pass.
+
+## Fused qkv-a production path and final-layout derivative are implementation-ready
+
+Commit `0082bac0f74fa4cac631c8a3085576d3bd10e6ef` integrates DB502 behind the default-off
+`fused_n82_convolution` backend. The decoder now loads only final-layout
+`u8[32,6144,82]` weights and `f32[32,48,82]` expanded scales, emits one live-row zero-spatial
+convolution per layer, reuses the fused 576-wide kv-a companion, and requires zero legacy q-a/kv-a
+Pallas calls. Backend/layout mismatch, separate source state, dead `[32,6144]` rows, old weight or
+scale shapes, and convolution-count drift all fail before execution.
+
+The feature-expert and fused-attention transforms share one streaming pass over the already-sealed
+base runtime artifact; no intermediate 834 GB checkpoint is created. Reconstructing the real
+78-layer manifests preserves the historical separate layout hash `ba21c4ec...c9e` exactly. The
+fused derivative has layout hash `523afb1d...cb4`, layout-manifest hash `8bd08068...6f9`, 32 files,
+`834,369,271,808` payload bytes, and `26,074,039,744` runtime bytes/chip--only `5,997,312`
+bytes/chip above the accepted feature layout. The additional bytes reconcile as expanded live
+scale state plus declared padding; source ownership remains unchanged.
+
+Focused arithmetic, layout, full artifact verifier, runtime, HLO, and production-shaped stage
+coverage passes 57/57 in 135.25 seconds with forced CPU. Python compilation, Bash syntax,
+ShellCheck, JSON and diff checks pass. This is implementation/layout reconstruction evidence only:
+no fused production TPU layer, packed artifact, Gate-B reclosure, decoder token, HBM, latency, or
+performance claim exists yet. Exact next is a bounded production-helper layer-0 TPU comparison
+against DB502 with exact q-a and kv-a plus physical HLO; only then pack and verify the full fused
+artifact before retrying protected 8K.

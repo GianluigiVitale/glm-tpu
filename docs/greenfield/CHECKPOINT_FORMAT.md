@@ -112,3 +112,29 @@ hashed 4,855,045,080-byte files own experts `0:128`/`128:256` and shared-interme
 width `0:1024`/`1024:2048`. DB 418 directly loads those two owners with 28 transfers,
 12 on-device dequantizations, zero host dequant/global concat, and no runtime repartition. This also
 remains bounded mechanism evidence; DB 420, not this layer artifact, satisfies Gate B.
+
+## Fused qkv-a feature-runtime derivative
+
+Production pin `0082bac` defines attention layout
+`fused_qkv_a_virtual_tp32_n82_v1`. For every live attention slot it replaces
+the four separate q-a/kv-a leaves with:
+
+- `qkv_a.weight_bits`: U8/FP8 `[32,6144,82]`, with each virtual shard ordered
+  as 64 q-a outputs followed by 18 kv-a outputs;
+- `qkv_a.scale_inv`: FP32 `[32,48,82]`, expanding only the source output-scale
+  blocks offline before the same shard-major reorder.
+
+The two derived tensors retain their original physical device owner. Feature
+expert redistribution and qkv-a fusion are executed in one bounded streaming
+pass from the protected base runtime artifact, so no full intermediate artifact
+or decode-time repack exists. Source tensor hashes, both transform names,
+derived/padding bytes, output tensor/file hashes, and the nondefault attention
+layout are bound by the semantic layout, sidecars, control, manifest, and
+loader verifier.
+
+Reconstruction against the real protected manifests yields layout hash
+`523afb1d...cb4`, semantic manifest `8bd08068...6f9`, 32 files,
+`834,369,271,808` payload bytes, and `26,074,039,744` bytes/chip. These are
+pre-pack layout facts. Gate B remains reopened until the 32 payloads are
+written, independently verified, archived, directly loaded, and protected by
+the full failure/cleanup contract.

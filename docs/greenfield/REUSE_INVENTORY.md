@@ -208,3 +208,10 @@ bitwise with one live row and local, collective-free HLO. The production adaptat
 the direct convolution plus its fused kv-a companion. The diagnostic pack function itself is not
 the runtime design: the plan-aware offline packer must emit N82 weights and expanded scales in the
 final device layout so decode never repacks q-a/kv-a state.
+
+Production pin `0082bac` now consumes this evidence in
+`kernels/reference/qkv_a.py`, `kernels/layer.py`, the runtime decoder, and the
+feature-runtime pack/load chain. The adaptation preserves only the proven
+arithmetic and packed-state definition; it does not import the diagnostic or
+legacy execution path. Protected production-helper and full packed-artifact
+proofs remain mandatory before promotion.

@@ -40,6 +40,12 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   reuse the fused 576-wide kv-a companion, retain the physical
   `f32[1,82] convolution`, and never perform q-a/kv-a packing per decode step.
   This bounded result does not prove later layers, the decoder, or performance.
+- Production pin `0082bac` implements that contract without importing the
+  diagnostic execution path. It accepts only final-layout U8/FP32 packed
+  tensors, performs no runtime q-a/kv-a concatenation, and supplies the fused
+  kv-a result directly to IndexShare. Separate and fused projection state are
+  mutually exclusive. This remains unpromoted until a protected production
+  helper/layer proof and the complete packed derivative pass.
 - The accepted fused residual-add/RMSNorm boundary first adds the two BF16
   inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
   the independently carried residual is the same sum rounded to BF16. A

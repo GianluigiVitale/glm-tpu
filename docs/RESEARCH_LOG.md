@@ -5566,3 +5566,26 @@ This proves only bounded layer-0 q-a arithmetic. Production must receive already
 weights/scales from a plan-aware final-layout checkpoint and reuse the fused kv-a companion. A
 per-token q-a/kv-a pack would preserve the wrong runtime architecture. Gate B is therefore reopened
 for the derived layout before the next protected 8K Gate-D attempt.
+
+## 2026-08-08 13:52 — DB502 production integration is pinned; real final-layout math reconciles
+
+Commit `0082bac0f74fa4cac631c8a3085576d3bd10e6ef` adapts the exact DB502 primitive into the isolated
+decoder behind a default-off backend. It consumes offline-packed shard-major N82 U8 weights and
+expanded FP32 scales, returns normalized q-a plus the fused kv-a companion, and prevents the
+separate q-a/kv-a state or its two Pallas calls from coexisting with the fused path. The production
+HLO linter now requires 78 physical `f32[1,82] convolution ... bf_io->bf` instructions for the
+full body, one-row state, exact packed shapes, no old q-a/kv-a weights/scales, and no dead row.
+
+The plan-aware transform combines feature-expert redistribution and qkv-a fusion in one streaming
+pass from the sealed base runtime checkpoint. An actual 78-layer manifest reconstruction (no TPU
+and no payload writes) preserves the accepted separate layout hash `ba21c4ec...c9e`; the fused
+layout is `523afb1d...cb4`, its semantic manifest is `8bd08068...6f9`, total payload is
+`834,369,271,808` bytes, and runtime state is `26,074,039,744` bytes/chip. The increase over the
+accepted feature artifact is exactly `5,997,312` bytes/chip and reconciles expanded scales plus
+padded slots. Full small-artifact pack/verify round trip and 57 focused tests pass; Python, Bash,
+ShellCheck, JSON and diff checks also pass.
+
+This is not Gate-B reclosure or TPU arithmetic evidence. The next serialized model action remains
+bounded: run the production helper itself on the sealed DB502 input, require bitwise q-a and kv-a,
+physical one-row convolution HLO, no collective/dead row, archive/DB/cleanup, and only then create
+the protected 32-file derivative.

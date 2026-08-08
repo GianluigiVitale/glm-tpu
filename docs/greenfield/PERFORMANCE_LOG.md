@@ -930,3 +930,10 @@ Its 21-second elapsed value includes compilation and protected orchestration on 
 does not generate tokens and has no timed decoder window, XPlane, wall tok/s, Gate-D, or Gate-E
 claim. DB484 remains the accepted PP8 performance point at `244.091151 ms` p50 and
 `4.096830 tok/s`.
+
+## Fused qkv-a production integration — no performance result
+
+Commit `0082bac` integrates the DB502 arithmetic and reconstructs the full fused final layout, but
+has not executed the production helper or decoder on TPU. The 57-test CPU duration and the
+manifest reconstruction time are not latency measurements. DB484 remains the accepted PP8 point
+at `244.091151 ms` p50 and `4.096830 tok/s`; Gate E remains open.
