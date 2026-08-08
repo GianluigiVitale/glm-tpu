@@ -354,6 +354,47 @@ def _raw_lookup_query(
     return _apply_query_rope(jnp.concatenate(outputs, axis=-1), positions[:1])
 
 
+def _raw_materialized_query(
+    q_state: Any,
+    weight_bits: Any,
+    weight_scale: Any,
+    positions: Any,
+    *,
+    groups: int,
+) -> Any:
+    """Dequantize one complete owner shard behind an explicit boundary."""
+
+    geometry = Layer0DsaProbeGeometry()
+    output_width = geometry.heads * geometry.head_dim
+    if output_width % groups or weight_scale.shape[0] % groups:
+        raise ValueError("Materialized weight does not divide into groups")
+    group_width = output_width // groups
+    scale_rows = weight_scale.shape[0] // groups
+    outputs = []
+    for index in range(groups):
+        bits = lax.dynamic_slice_in_dim(
+            weight_bits,
+            index * group_width,
+            group_width,
+            axis=0,
+        )
+        scale = lax.dynamic_slice_in_dim(
+            weight_scale,
+            index * scale_rows,
+            scale_rows,
+            axis=0,
+        )
+        decoded = lax.optimization_barrier(
+            dequantize_fp8_bits_block_weight(
+                bits,
+                scale,
+                output_dtype=jnp.float32,
+            )
+        )
+        outputs.append(_dot_rows(q_state[:1], decoded))
+    return _apply_query_rope(jnp.concatenate(outputs, axis=-1), positions[:1])
+
+
 def _pallas_candidate_functions() -> dict[str, Callable[..., Any]]:
     return {
         "pallas_global_m1_n4096": lambda q, b, s, p: _pallas_query(
@@ -373,6 +414,12 @@ def _pallas_candidate_functions() -> dict[str, Callable[..., Any]]:
         ),
         "raw_lookup_lp4_m1_n128_tiles": lambda q, b, s, p: (
             _raw_lookup_query(q, b, s, p, groups=4)
+        ),
+        "raw_materialized_global_m1_n4096": lambda q, b, s, p: (
+            _raw_materialized_query(q, b, s, p, groups=1)
+        ),
+        "raw_materialized_lp4_m1_n1024": lambda q, b, s, p: (
+            _raw_materialized_query(q, b, s, p, groups=4)
         ),
     }
 
