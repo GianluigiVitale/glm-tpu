@@ -922,3 +922,11 @@ one-row N82 candidate. Its 31-second elapsed value includes compilation and orch
 not decoder latency. There is no token generation, timed window, XPlane, wall tok/s, Gate-D, or
 Gate-E result. DB484 remains the accepted PP8 performance point at `244.091151 ms` p50 and
 `4.096830 tok/s`.
+
+## DB502 exact q-a convolution — no performance result
+
+DB502 at `c230c11` proves a one-row N82 convolution matches the accepted layer-0 q-a state bitwise.
+Its 21-second elapsed value includes compilation and protected orchestration on one local host. It
+does not generate tokens and has no timed decoder window, XPlane, wall tok/s, Gate-D, or Gate-E
+claim. DB484 remains the accepted PP8 performance point at `244.091151 ms` p50 and
+`4.096830 tok/s`.

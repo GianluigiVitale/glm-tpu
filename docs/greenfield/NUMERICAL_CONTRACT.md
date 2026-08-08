@@ -31,8 +31,15 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   and FP32 norm reductions produce the same 376-mismatch BF16 result. Its TPU
   HLO lowers M1 dot to multiply/reduce, whereas the exact accepted DB491 local
   body is a zero-spatial `convolution` with `bf_io->bf` labels. A direct
-  one-row convolution is the only current source-backed challenger; restoring
-  an external `[32,6144]` decode bucket remains forbidden.
+  one-row convolution is therefore required; restoring an external
+  `[32,6144]` decode bucket remains forbidden.
+- Protected DB502 proves the direct one-row N82 convolution bitwise for the
+  accepted layer-0 q-a state under all four tested norm associations. Production
+  may use this mechanism only behind a default-off backend, with already-packed
+  shard-major `[32,6144,82]` FP8 weights and `[32,48,82]` FP32 scales. It must
+  reuse the fused 576-wide kv-a companion, retain the physical
+  `f32[1,82] convolution`, and never perform q-a/kv-a packing per decode step.
+  This bounded result does not prove later layers, the decoder, or performance.
 - The accepted fused residual-add/RMSNorm boundary first adds the two BF16
   inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
   the independently carried residual is the same sum rounded to BF16. A

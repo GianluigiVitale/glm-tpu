@@ -202,3 +202,9 @@ The v2 protected matrix implements only that new primitive and retains the four 
 Its extra HLO check requires `f32[1,82] convolution` with `bf_io->bf`; this prevents a source-level
 convolution label from hiding another multiply/reduce lowering. DB501's old 12 variants remain
 archived negative evidence and are deliberately excluded from the new run.
+
+DB502 accepts the discriminator: all four convolution/norm variants match the accepted q-a state
+bitwise with one live row and local, collective-free HLO. The production adaptation is therefore
+the direct convolution plus its fused kv-a companion. The diagnostic pack function itself is not
+the runtime design: the plan-aware offline packer must emit N82 weights and expanded scales in the
+final device layout so decode never repacks q-a/kv-a state.

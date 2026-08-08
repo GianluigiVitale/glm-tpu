@@ -1903,3 +1903,26 @@ plus norm variants enter the v2 protected matrix; DB501's 12 rejected dot varian
 The HLO gate additionally requires a physical `f32[1,82] convolution` with `bf_io->bf` labels.
 Focused CPU, Python, Bash, ShellCheck, line-length and diff checks pass. Exact next: commit/push and
 run one serialized v2 matrix; no full decoder is authorized first.
+
+## DB502 proves the exact one-row q-a convolution; packed production integration is next
+
+Protected bounded run
+`greenfield_layer0_q_a_association_20260808T124434046623046Z` at exact pin `c230c11` completed as
+DB run 502. All four direct-convolution candidates match the accepted layer-0 q-a BF16 state
+bitwise: 0/2,048 mismatches and SHA `c9fbac05...c70c`. Each optimized TPU HLO contains the required
+physical `f32[1,82] convolution` with `bf_io->bf`, accepts one external `[1,6144]` live row, and
+contains shard-major FP8 `[32,6144,82]` weights plus FP32 `[32,48,82]` scales without a collective,
+callback, or dead token-row shape. The fused 576-wide kv-a companion is identical for all four
+norm associations (`cf288bc2...e790`). This is the first source-backed production correction.
+
+Local and approved-bucket `SUCCESS`, DB snapshot, six byte-for-byte critical remote objects, and
+authenticated 8/8 pre/post zero-work censuses pass. Runner, summary, candidate NPZ, evidence,
+remote-object and SUCCESS SHAs are `2a77d75d...75c4`, `75de66b6...040b`, `d9b14bdd...f76e`,
+`815cc6a3...8f59`, `6a1d78e8...9257`, and `de2e080d...dab`. DB502 is bounded arithmetic evidence:
+it has no decoder, token, latency, XPlane, Gate-D, or Gate-E claim.
+
+Exact next: integrate the direct one-row fused q-a/kv-a convolution behind a default-off greenfield
+backend, consume its kv-a companion rather than projecting kv-a twice, and extend the final-layout
+checkpoint manifest/packer/direct loader to store the N82 weight and expanded scale tensors.
+Gate B is reopened for this derived final layout. Do not pack N82 inside every decode step and do
+not rerun the full 8K decoder until the packed layout, production HLO, and exact layer path pass.

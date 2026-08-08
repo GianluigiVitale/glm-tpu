@@ -5544,3 +5544,25 @@ only this new projection with the four explicit norm associations; it does not r
 closed dot variants. Its TPU HLO must contain `f32[1,82] convolution` and `bf_io->bf`, while all
 existing no-collective, one-row and N82 checks remain mandatory. Focused tests pass 23/23 with
 Python/Bash/ShellCheck/diff checks green. This is readiness evidence only.
+
+## 2026-08-08 13:05 — DB502 restores layer-0 q-a exactly with a true one-row convolution
+
+Protected run `greenfield_layer0_q_a_association_20260808T124434046623046Z` at `c230c11` completed
+as DB 502. All four explicit norm associations wrapped around the direct N82 convolution are
+bitwise exact against the accepted 2,048-wide BF16 q-a state: 0 mismatches and SHA
+`c9fbac05...c70c`. Their fused kv-a companion is also invariant (`cf288bc2...e790`). The decisive
+change from DB501 is the physical projection lowering, not a hidden token bucket: optimized TPU HLO
+retains `f32[1,82] convolution ... dim_labels=bf_io->bf` with one external live row and no
+collective, callback, or forbidden `[32,...]` token shape.
+
+HLO SHAs for left-fold, logical-mean, shard-sum and topology-tree are respectively
+`df171d6a...1286`, `5cfbf27b...e9a1`, `b47c617e...3acd`, and `124e4ce2...c45`. Runner, summary,
+NPZ, evidence list, remote-object list and SUCCESS seals are `2a77d75d...75c4`,
+`75de66b6...040b`, `d9b14bdd...f76e`, `815cc6a3...8f59`, `6a1d78e8...9257`, and
+`de2e080d...dab`; six critical remote objects match local bytes and the authenticated fleet is
+8/8 clean before and after.
+
+This proves only bounded layer-0 q-a arithmetic. Production must receive already-packed N82
+weights/scales from a plan-aware final-layout checkpoint and reuse the fused kv-a companion. A
+per-token q-a/kv-a pack would preserve the wrong runtime architecture. Gate B is therefore reopened
+for the derived layout before the next protected 8K Gate-D attempt.

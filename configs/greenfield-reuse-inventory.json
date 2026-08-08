@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-08T12:50:00Z",
+  "captured_utc": "2026-08-08T13:05:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "fdd2f99005f02332f48920137b969d7557d5acf7",
+    "greenfield": "c230c11d2c852b52bbbf4b76791bb4dc80c598ba",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -141,12 +141,12 @@
       "id": "greenfield-production-layer0-q-a-divergence",
       "category": "numerical association evidence",
       "source_repo": "protected greenfield observer plus accepted legacy capture",
-      "source_pin": "greenfield 380659a8323caabf1c84c8f7a79216f825997d4b / legacy 83ff4a3576602ca844ea090550139a2ff00b0bb1 / DB491 ea879a24d196f61e238a22ee5bb393d3b6fa938d",
-      "source_paths": ["/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_dsa_internal_trace2_20260808T093721804151742Z", "/home/gianl/glm-run/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z", "/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact"],
+      "source_pin": "greenfield DB502 c230c11d2c852b52bbbf4b76791bb4dc80c598ba / observer 380659a8323caabf1c84c8f7a79216f825997d4b / legacy 83ff4a3576602ca844ea090550139a2ff00b0bb1 / DB491 ea879a24d196f61e238a22ee5bb393d3b6fa938d",
+      "source_paths": ["/home/gianl/glm-run/greenfield_layer0_q_a_association_20260808T124434046623046Z", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_dsa_internal_trace2_20260808T093721804151742Z", "/home/gianl/glm-run/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z", "/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "scripts/greenfield/probe_layer0_dsa_query_association.py", "scripts/greenfield/run_layer0_dsa_query_association_probe.sh", "docs/greenfield/NUMERICAL_CONTRACT.md"],
       "gate": "D diagnostic",
-      "reason": "The all-21 observer reproduces the sealed failed-run DSA payload bitwise and proves the earliest production divergence is layer-0 q-a: normalized hidden is exact, q-a differs in 494/2048 BF16 values (max 0.015625), and the downstream query differs in all 4096 values. DB501 rejects all 12 ordinary M1 N82 mapping/norm variants: each has 376/2048 mismatches. Preserved DB491 HLO supplies the next positive discriminator: the exact physical local body is convolution-shaped while DB501 M1 dot becomes multiply/reduce. Greenfield independently adapts a direct one-row zero-spatial convolution in a v2 bounded matrix and excludes the closed DB501 variants; full-pod collectives and the external M32 bucket remain forbidden. No TPU result or production correction is claimed yet."
+      "reason": "The all-21 observer proves the earliest production divergence is layer-0 q-a. DB501 rejects all 12 ordinary M1 N82 dot/mapping/norm variants. DB502 then proves all four direct one-row zero-spatial convolution variants bitwise: 0/2048 q-a mismatches, physical f32[1,82] convolution, and no collective, callback, or dead token row. The adapted production mechanism must consume offline-packed shard-major N82 weights/scales and reuse its fused kv-a companion; runtime packing, full-pod collectives, and an external M32 bucket remain forbidden. DB502 is arithmetic-only and makes no decoder or performance claim."
     },
     {
       "id": "legacy-code-and-step-fingerprints",

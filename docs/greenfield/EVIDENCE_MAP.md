@@ -369,3 +369,17 @@ capture is still required.
   `convolution ... bf_io->bf` while DB501's M1 dot lowers to multiply/reduce. No 8K rerun first.
 - Implementation readiness: the v2 matrix runs only four new convolution/norm candidates and
   requires an optimized physical `f32[1,82] convolution`; DB501's rejected 12 are not repeated.
+
+## DB502 exact one-row q-a convolution
+
+- Protected DB 502: `greenfield_layer0_q_a_association_20260808T124434046623046Z` at `c230c11`;
+  local/remote `SUCCESS`, DB snapshot, six critical remote SHA equalities, and 8/8 clean pre/post
+  censuses pass.
+- Result: all four direct-convolution/norm candidates are exact, 0/2,048 BF16 mismatches, accepted
+  SHA `c9fbac05...c70c`; fused kv-a companion SHA `cf288bc2...e790` is common to all four.
+- Structure: each HLO contains `f32[1,82] convolution ... bf_io->bf`, one live row, packed N82
+  state, and no collective/callback/dead token-row shape.
+- Seals: runner `2a77d75d...75c4`, summary `75de66b6...040b`, NPZ `d9b14bdd...f76e`, evidence
+  `815cc6a3...8f59`, remote objects `6a1d78e8...9257`, SUCCESS `de2e080d...dab`.
+- Scope: arithmetic only, not a decoder or performance result. Next evidence is the default-off
+  production path plus plan-aware packed N82 checkpoint and complete-layer/8K validation.
