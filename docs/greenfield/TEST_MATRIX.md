@@ -47,13 +47,13 @@
 | Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
 | Gate D protected 8K decoder | `e4079ac`: fused load/HLO/prefill and exact first token pass; event 0 set passes but order differs, event 1 has six set swaps; strict refusal before timing/DB | Missing; bounded prompt-cache discriminator required |
-| Gate D prompt index-cache discriminator | `e5a6991`: reuses default-off accepted slot-0 dump, proves DCP/model replicas and logical pages, then bit-compares an independent one-row production key scan under exact HLO | Implementation ready; protected capture/comparison missing |
+| Gate D prompt index-cache discriminator | DB505/item1788 captured 32 complete accepted snapshots; corrected `52c69df` contract proves four local/32 physical replicas, `model=32,dcp=1`, `[24,16,32,128]` and 512-token pages. Protected resume pins local/remote source hashes and runs only the independent one-row scan. | Accepted source complete; protected greenfield comparison pending |
 | Gates E–H | Await Gate D | Missing |
 
 Last complete CPU-only suite before the production integration: 441 passed / 1 expected skip
 (2026-08-08). Latest fused-qkv arithmetic/checkpoint/runtime/HLO/stage suite: 57 passed in
 135.25 seconds at `0082bac`; Python/Bash/ShellCheck/JSON/diff checks pass.
-Latest prompt-cache/oracle focused suite: 27 passed at `e5a6991`. Two broader CPU suite attempts
+Latest prompt-cache/oracle/reuse focused suite: 31 passed at the corrected resume candidate. Two broader CPU suite attempts
 were manually stopped after unrelated existing forced-JAX tests stopped advancing and are not
 suite-pass claims.
 CPU/HLO reference tests prove semantics/mechanisms only.

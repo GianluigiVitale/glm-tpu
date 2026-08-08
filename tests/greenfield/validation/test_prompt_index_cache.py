@@ -205,9 +205,13 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
     entrypoint = repo / (
         "scripts/greenfield/run_capture_legacy_prompt_index_cache.sh"
     )
+    resume = repo / (
+        "scripts/greenfield/run_prompt_index_cache_comparison.sh"
+    )
     probe_source = probe.read_text()
     wrapper_source = wrapper.read_text()
     entrypoint_source = entrypoint.read_text()
+    resume_source = resume.read_text()
     for required in (
         "fp8_block_matmul_f32",
         "dsa_index_keys_from_projection",
@@ -242,6 +246,29 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "run_capture_short_context_dsa_oracle.sh",
     ):
         assert required in entrypoint_source
+    for required in (
+        "SOURCE_RUN_ID=505",
+        "SOURCE_ITEM_ROW_ID=1788",
+        "SOURCE_GLOBAL_CACHE_SHA=c65552a6",
+        "SOURCE_BLOCK_TABLE_SHA=eedb3f92",
+        "SOURCE_LOGICAL_CACHE_SHA=3808d502",
+        "source_cache_files.sha256",
+        "remote_source_final_files.sha256",
+        "capture_legacy_prompt_index_cache.py",
+        "probe_layer0_prompt_index_cache.py",
+        "greenfield_layer0_prompt_index_cache_comparison",
+        "strict_census post",
+        '"performance_claim": "false"',
+        "TPU_VISIBLE_DEVICES=0,1,2,3",
+    ):
+        assert required in resume_source
+    for forbidden in (
+        "import tpu_inference",
+        "from tpu_inference",
+        "import vllm",
+        "from vllm",
+    ):
+        assert forbidden not in resume_source
     completed = subprocess.run(
         [sys.executable, "-m", "py_compile", str(probe)],
         text=True,

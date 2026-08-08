@@ -974,3 +974,12 @@ load/compile/prefill/diagnostic orchestration and has no latency or throughput s
 remains the only accepted PP8 decoder performance point at `244.091151 ms` p50 and
 `4.096830 tok/s`; Gate E remains open. The `e5a6991` prompt-cache capture/comparator is likewise a
 correctness discriminator and cannot produce a performance claim.
+
+## Accepted prompt-cache capture/parser refusal — no performance result
+
+DB505/item1788 is the accepted legacy oracle source for the bounded cache discriminator, not a
+greenfield performance measurement. Its roughly 53-minute setup and 27.6-second benchmark include
+legacy load/compile/orchestration and cannot be compared with decoder token latency. The capture
+wrote the complete replicated cache then failed its old geometry parser before the independent
+production comparison. The corrected resume runner records comparison execution time only as
+diagnostic wall and must leave Gate E unchanged regardless of exactness.

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 19:31 UTC
+**Updated:** 2026-08-08 21:02 UTC
 
 ## Authority and isolation
 
@@ -2093,3 +2093,32 @@ Exact next: commit this evidence seal, verify an idle fleet, and run exactly one
 `scripts/greenfield/run_capture_legacy_prompt_index_cache.sh`. Preserve and diagnose any capture,
 replica, logical-page, production-HLO, or bit-comparison refusal; do not weaken the contract or
 retry the full decoder until this bounded discriminator identifies the first cache-state cause.
+
+## Accepted cache capture is complete; corrected protected resume is ready
+
+The serialized accepted capture
+`greenfield_legacy_layer0_prompt_index_cache_20260808T193700214955997Z` completed the real 8K
+oracle as DB505/item1788: exact passkey, 8,155 prompt tokens, 20 generated tokens, sealed 294-event
+DSA oracle, all 32 cache snapshots, owned-runtime stop, and 8/8 clean failure census. It then
+failed closed before the independent greenfield comparison because the initial parser expected
+the wrong mesh/page geometry. There is no final `SUCCESS` or greenfield comparison/DB claim.
+
+Inspection of all eight final files proves the accepted cache is fully replicated: exact mesh
+`model=32,dcp=1`, four addressable copies/process, 32 bitwise-identical physical copies, physical
+shape `[24,16,32,128]`, and 512-token logical pages. Global-cache, full-block-table and logical
+8,155-key SHAs are respectively `c65552a6...dad9`, `eedb3f92...b8a84`, and
+`3808d502...859d1`. Commit `52c69df` corrects only this source contract and focused coverage passes
+31/31 with two existing SWIG warnings.
+
+`scripts/greenfield/run_prompt_index_cache_comparison.sh` now resumes from that immutable source
+without reloading the accepted 753B model. It pins DB505/item1788, source/oracle/fleet/census
+hashes, all 32 local cache hashes, and byte-identical approved-bucket copies of the eight final
+snapshots. It re-seals the compact cache at the current code pin, runs only the four-chip
+production one-row scan, accepts either exact or nonexact comparison as a diagnostic outcome,
+links a new DB row, archives all derived evidence, and requires 8/8 zero work. Offline real-source
+reconstruction and Python/Bash/ShellCheck/JSON/diff checks pass.
+
+Exact next: commit/push this runner from a clean branch and run exactly one serialized
+`scripts/greenfield/run_prompt_index_cache_comparison.sh`. Use its first mismatch (or exact result)
+to choose the next source-backed arithmetic boundary. Do not repeat the accepted model load or
+the full greenfield 8K decoder first.

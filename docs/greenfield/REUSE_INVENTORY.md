@@ -21,7 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| Prompt index-cache oracle | legacy `dcp_cache_dump.py` plus its runner integration/tests | Default-off accepted-runtime cache capture; greenfield reconstructs exact DCP/model replicas into logical BF16 layer-0 keys and compares an independent one-row production scan. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py` plus its runner integration/tests | Default-off accepted-runtime cache capture; greenfield validates 32 physical replicas, reconstructs logical BF16 layer-0 keys, and compares an independent one-row production scan. A protected resume wrapper reuses a hash-bound archived capture after parser-only refusal without rerunning the model. |
 | DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -246,3 +246,11 @@ input RMSNorm, key LayerNorm/RoPE, and BF16 write inside a one-row `lax.scan`. I
 one raw-FP8 key kernel and one outer scan, with no collective, callback, decoded weight overlay,
 full-prompt hidden materialization, or dead `[32,6144]` row. This is readiness only until one
 serialized protected capture completes; it imports no legacy/vLLM execution into greenfield.
+
+The first protected capture completed the accepted DB505/item1788 oracle and wrote all 32 cache
+snapshots, but the old parser refused the real `model=32,dcp=1` fully replicated layout before the
+greenfield comparison. The corrected contract requires four local and 32 physical bitwise-equal
+replicas, physical shape `[24,16,32,128]`, and 512-token logical pages. The resume wrapper binds
+the source row, capture/oracle/census hashes, all local cache-file hashes, and byte-identical
+approved-bucket copies of the eight final snapshots. It then runs only the independent one-host
+production comparison; the 753B accepted model load is deliberately not repeated.

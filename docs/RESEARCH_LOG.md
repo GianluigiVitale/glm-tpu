@@ -5676,3 +5676,25 @@ single-host probe computes the same keys with the actual production raw-FP8 `wk`
 Its HLO forbids collectives, callbacks, transport, decoded overlays, full-prompt hidden state and
 dead batch rows. Focused coverage passes 27/27; this remains readiness, not proof, until one
 serialized protected capture and exact comparison completes.
+
+## 2026-08-08 21:02 — Real accepted cache geometry and protected resume
+
+The accepted prompt-cache draw completed DB505/item1788 and preserved all requested state before
+the old greenfield parser refused it. The refusal was correct for the declared assumption but the
+assumption was wrong: the runtime mesh is `model=32,dcp=1`, not model replicas within DCP owners.
+Each of eight process files contains four full `[24,16,32,128]` BF16-bit shards, and all 32
+physical payloads are bitwise identical. The complete cache SHA is `c65552a6...dad9`; all process
+block tables are identical at `eedb3f92...b8a84`; the page packing is 16x32=512 tokens. The live
+table maps positions 0--8,154 through 16 unique pages and produces logical-key SHA
+`3808d502...859d1`.
+
+This preserves the original failure rather than relabeling it: the source run has exact oracle and
+cleanup evidence but no final `SUCCESS`, greenfield comparison, or performance standing. The
+corrected parser requires exact four-local/32-physical replication, mesh identity, physical device
+coverage and 512-token pages. An offline reconstruction against the real files passes.
+
+The new protected resume wrapper avoids another 53-minute legacy load. It binds the append-only
+source DB row, capture/oracle/fleet/census hashes, every local cache file, and direct SHA-256 reads
+of the eight approved-bucket final snapshots before a one-host TPU scan. Either exactness outcome
+is recorded honestly as a diagnostic DB item; no elapsed value is decoder performance. The next
+evidence-producing action is this one bounded comparison, not a full-decoder retry.

@@ -313,9 +313,11 @@ def _load_source_cache(
     if not np.isfinite(prompt_bits.view(ml_dtypes.bfloat16)).all():
         raise ValueError("prompt-cache live keys contain non-finite values")
     details = {
+        "block_tables_sha256": _array_sha256(block_tables),
         "global_cache_bfloat16_sha256": _array_sha256(cache_bits),
         "global_cache_shape": list(cache_bits.shape),
         "live_block_table": live_table.tolist(),
+        "live_block_table_sha256": _array_sha256(live_table),
         "logical_block_count": logical_blocks,
         "local_replication_per_process": config.expected_local_replication,
         "mesh_shape": expected_mesh,
