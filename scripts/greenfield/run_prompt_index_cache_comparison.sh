@@ -31,6 +31,7 @@ readonly SOURCE_BLOCK_TABLE_SHA=eedb3f9250bd5c915ce67ac4041d9d0c4242dd8264de1dd0
 readonly SOURCE_LOGICAL_CACHE_SHA=3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
+readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_PROMPT_CACHE_COMPARISON_TAG:-greenfield_layer0_prompt_index_cache_comparison_$(date -u +%Y%m%dT%H%M%S%NZ)}
@@ -148,7 +149,7 @@ for contract in \
   "$SOURCE_CACHE_INTEGRITY_SHA $SOURCE_RUN_DIR/fleet_prompt_cache_integrity.txt" \
   "$SOURCE_ORACLE_MANIFEST_SHA $SOURCE_RUN_DIR/oracle/manifest.json" \
   "$SOURCE_ORACLE_ROW_SHA $SOURCE_RUN_DIR/oracle/source_row.json" \
-  "$INPUT_MANIFEST_SHA $INPUT_DIR/manifest.json"; do
+  "$INPUT_MANIFEST_FILE_SHA $INPUT_DIR/manifest.json"; do
   expected=${contract%% *}
   path=${contract#* }
   [[ $(sha256sum "$path" | awk '{print $1}') == "$expected" ]] || {
