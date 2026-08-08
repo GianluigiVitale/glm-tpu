@@ -5698,3 +5698,33 @@ source DB row, capture/oracle/fleet/census hashes, every local cache file, and d
 of the eight approved-bucket final snapshots before a one-host TPU scan. Either exactness outcome
 is recorded honestly as a diagnostic DB item; no elapsed value is decoder performance. The next
 evidence-producing action is this one bounded comparison, not a full-decoder retry.
+
+## 2026-08-08 21:51 — DB506/507 reduce accepted prompt-cache drift to 45 rotary-half values
+
+DB506/item1789 at `cee8bda` resumes the immutable accepted DB505 cache without another 753B load.
+The source has 32 bitwise-equal physical replicas and logical BF16 SHA `3808d502...859d1`. The
+actual production one-row raw-FP8 scan differs in 4,058 elements over 1,071 positions, max/mean
+`0.015625/1.02996e-5`; token 374 accounts for 1,019 mismatched rows and dimensions 70/79/86 differ
+at every occurrence. HLO `e7e66d4e...849e` proves one raw kernel/outer scan/live row with no
+collective, callback, decoded overlay, full-prompt hidden materialization, or dead row. DB506,
+approved archive, terminal SUCCESS `f3b1f327...264c`, and 8/8 cleanup pass. It is diagnostic only.
+
+DB507/items1790--1792 at `31a23b8` then reuses that exact cache/baseline. Pallas M1 divide/sqrt
+still has 4,050 mismatches; changing norm association alone is rejected. Accepted M2048 XLA plus
+multiply/rsqrt has 55 mismatches. Accepted M2048 XLA plus divide/sqrt has only 45 mismatches over
+45 positions, first at 113, max/mean `0.015625/3.1539646e-8`, output SHA `52bf55ed...cd8a`.
+Every remaining mismatch is in dimensions 0--63, while the unrotated 64--127 half is bitwise
+exact. Its HLO `93596359...36fd` contains one physical `f32[2048,128] convolution ... bf_oi->bf`,
+one chunk map and exact sqrt/divide identity without forbidden state or communication. DB507's
+semantic manifest is `7216756c...7cae`; SUCCESS/evidence/remote-object/DB-snapshot SHAs are
+`6ce52989...c227`, `affe8424...bcaf`, `7787dccd...bc0`, and `b3fb207b...b47`; both censuses are
+8/8 clean. No exact candidate means no production or Gate-D claim.
+
+The narrow result changes the causal search. The diagnostic currently gathers 2,048 rows from 37
+unique embeddings inside an outer compiled map, whereas the real prefill executable receives an
+already-live BF16 hidden chunk. The next candidate must therefore accept one external
+`bf16[2048,6144]` chunk plus absolute positions, run the same source-faithful input RMSNorm,
+accepted adapted `wk`, divide/sqrt key norm and RoPE, and be invoked over four chunks outside the
+compiled program. Its HLO must have one convolution and zero loop/collective/callback/full-8K
+hidden/dead-row shapes. This is a chunk-input association discriminator, not permission to host-
+dispatch production prefill. Only bitwise cache equality can authorize production integration.

@@ -983,3 +983,11 @@ legacy load/compile/orchestration and cannot be compared with decoder token late
 wrote the complete replicated cache then failed its old geometry parser before the independent
 production comparison. The corrected resume runner records comparison execution time only as
 diagnostic wall and must leave Gate E unchanged regardless of exactness.
+
+## DB506/507 prompt-cache diagnostics — no performance result
+
+DB506 and DB507 execute bounded one-host cache arithmetic only. Their compile/execute/orchestration
+times are not token latency, steady decoder wall, XPlane evidence, or throughput. DB506 rejects the
+production M1 scan; DB507 reduces the accepted-cache difference to 45 BF16 values with M2048 XLA
+divide/sqrt but has no exact candidate. DB484 remains the accepted PP8 decoder result at
+`244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.

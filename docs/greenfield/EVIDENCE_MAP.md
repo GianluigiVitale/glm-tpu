@@ -475,3 +475,24 @@ capture is still required.
   transport, decoded overlay, full-prompt hidden materialization, or `[32,6144]` dead row.
 - Readiness: focused tests pass 27/27. No protected cache artifact/comparison exists yet, so this is
   implementation evidence only and proves no arithmetic cause, decoder result, or performance.
+
+## DB505--507 accepted prompt-cache isolation
+
+- Accepted source: DB505/item1788 captures all 32 final slot-0 snapshots. Corrected parsing proves
+  `model=32,dcp=1`, four local/32 physical bitwise replicas, `[24,16,32,128]`, 512-token pages and
+  logical 8,155x128 BF16 SHA `3808d502...859d1`.
+- DB506/item1789: `...comparison_20260808T210743348875130Z` at `cee8bda`; production M1 raw-FP8
+  scan differs in 4,058 elements/1,071 positions. HLO `e7e66d4e...849e` passes one-kernel,
+  one-scan, one-row and no-communication/overlay/dead-row contracts. SUCCESS `f3b1f327...264c`,
+  approved archive, DB and 8/8 cleanup pass.
+- DB507/items1790--1792: `...association_20260808T214925579370178Z` at `31a23b8`. Pallas M1
+  divide/sqrt has 4,050 mismatches; XLA M2048 multiply/rsqrt has 55; XLA M2048 divide/sqrt has 45
+  over 45 positions with mean `3.15396e-8` and SHA `52bf55ed...cd8a`. All 45 are in rotary
+  dimensions 0--63; dimensions 64--127 are exact.
+- DB507 structure/protection: best HLO `93596359...36fd` has one physical M2048 convolution, one
+  map, sqrt/divide and no forbidden communication/state. Association manifest `7216756c...7cae`,
+  SUCCESS `6ce52989...c227`, evidence `affe8424...bcaf`, remote objects `7787dccd...bc0`, DB
+  snapshot `b3fb207b...b47`, approved archive and authenticated 8/8 cleanup pass.
+- Decision: diagnostic correctness only. No candidate is exact and no decoder/performance/gate
+  status changes. Next proof is one external live `[2048,6144]` prefill-chunk parameter using the
+  accepted XLA/divide-sqrt/RoPE path, without rerunning rejected candidates or the full decoder.

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 21:02 UTC
+**Updated:** 2026-08-08 22:02 UTC
 
 ## Authority and isolation
 
@@ -2122,3 +2122,40 @@ Exact next: commit/push this runner from a clean branch and run exactly one seri
 `scripts/greenfield/run_prompt_index_cache_comparison.sh`. Use its first mismatch (or exact result)
 to choose the next source-backed arithmetic boundary. Do not repeat the accepted model load or
 the full greenfield 8K decoder first.
+
+## DB506/507 isolate prompt-cache production drift to the chunk-input boundary
+
+Protected DB506/item1789,
+`greenfield_layer0_prompt_index_cache_comparison_20260808T210743348875130Z` at `cee8bda`, resumes
+DB505 without reloading the accepted model. It verifies all 32 source snapshots and eight archived
+final snapshots byte-for-byte, reconstructs the exact accepted 8,155x128 BF16 cache SHA
+`3808d502...859d1`, and executes the independent production M1 raw-FP8 scan. That scan is nonexact:
+4,058 element mismatches over 1,071 positions, first at position 4, max/mean
+`0.015625/1.02996e-5`. Every occurrence of token 374 differs in dimensions 70/79/86, placing the
+cause upstream of scoring/top-k. Its HLO `e7e66d4e...849e` has one raw-FP8 kernel, one outer scan,
+one live row, and no collective/callback/full prompt hidden/dead row. DB/archive/SUCCESS and 8/8
+cleanup pass; this is diagnostic only.
+
+Protected DB507/items1790--1792,
+`greenfield_layer0_prompt_index_cache_association_20260808T214925579370178Z` at `31a23b8`, reuses
+DB506 and tests only three new associations. Pallas M1 plus divide/sqrt remains far away at 4,050
+mismatches. Accepted M2048 XLA projection plus multiply/rsqrt leaves 55 mismatches. M2048 XLA plus
+divide/sqrt is the decisive near-exact path: only 45 values/45 positions differ, first at 113,
+mean `3.15396e-8`; its SHA is `52bf55ed...cd8a`. All 45 mismatches are confined to rotary
+dimensions 0--63; dimensions 64--127 are bitwise exact. HLO `93596359...36fd` has exactly one
+`f32[2048,128] convolution ... bf_oi->bf`, one chunk map, physical sqrt/divide, no collective,
+callback, full-prompt hidden tensor, or dead row. Association manifest `7216756c...7cae`, SUCCESS
+`6ce52989...c227`, DB/archive and 8/8 pre/post cleanup pass. No candidate is yet exact, so no
+production correction or full-decoder retry is authorized.
+
+The first wrapper attempt `...association_20260808T214555292086140Z` expanded a local census
+variable under `set -u` and refused before census/TPU/DB work. Its append-only local log is
+preserved; `31a23b8` fixes that failure class and the successful DB507 supersedes it.
+
+Exact next: compile one source-faithful `prefill_chunk` whose public inputs are the already-live
+BF16 `[2048,6144]` hidden chunk and `[2048]` absolute positions. Run the same executable over the
+four host-prepared chunks only in a bounded diagnostic. This removes the artificial unique-row
+gather from the compiled map while retaining one physical M2048 convolution, divide/sqrt, no
+loop/collective/callback and no full 8K hidden tensor. If it matches the accepted cache bitwise,
+integrate that chunk-local prefill key path while keeping decode M1; otherwise inspect the exact
+source RoPE/input-RMS association. Do not rerun DB507's rejected candidates or the full decoder.
