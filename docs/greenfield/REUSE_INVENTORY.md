@@ -215,5 +215,9 @@ feature-runtime pack/load chain. The adaptation preserves only the proven
 arithmetic and packed-state definition; it does not import the diagnostic or
 legacy execution path. DB503 at `f715039` now proves that actual integrated
 production helper is bitwise exact for q-a and kv-a with one physical one-row N82
-convolution and no collective/dead row. The full packed-artifact/direct-load
-proof remains mandatory before promotion or another 8K run.
+convolution and no collective/dead row. The protected fused pack and DB504 at
+`c16b37f` now extend the existing plan-aware pack/loader rather than introducing a
+new checkpoint path. Every one of the 10,880 final tensors is directly loaded and
+device-round-tripped, with zero reshard/concat/dequantization, while the full body
+retains exactly 78 one-row convolutions. Gate B is re-closed; reuse this same
+artifact and loader for the protected 8K retry.

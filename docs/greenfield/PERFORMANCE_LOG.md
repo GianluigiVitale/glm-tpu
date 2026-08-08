@@ -945,3 +945,12 @@ plus its one-convolution TPU HLO contract. The probe's 19-second elapsed value i
 orchestration, evidence sealing, and cleanup; it is not a token step, timed decoder window, XPlane,
 or wall-throughput measurement. DB484 therefore remains the only accepted PP8 decoder performance
 point at `244.091151 ms` p50 and `4.096830 tok/s`; Gate E remains open.
+
+## DB504 fused checkpoint direct-load/full-HLO proof — no performance result
+
+DB504 at `c16b37f` directly loads and device-round-trips the complete fused 834 GB PP8 runtime,
+executes the real 78-layer body once after one warmup, and passes the exact 78-convolution/local-
+collective HLO, HBM, DB/archive and cleanup contracts. Its single `774.192188 ms` body sample has
+no token path, correctness oracle, DSA observer, trace, or warmed distribution and is explicitly
+not performance evidence. It re-closes Gate B only. DB484 remains the accepted PP8 performance
+point at `244.091151 ms` p50 and `4.096830 tok/s`; Gate E remains open pending protected 8K.

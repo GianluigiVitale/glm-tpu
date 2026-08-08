@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 14:06 UTC
+**Updated:** 2026-08-08 15:31 UTC
 
 ## Authority and isolation
 
@@ -1976,3 +1976,48 @@ or Gate-E evidence. It closes the prerequisite for creating the protected fused 
 derivative. Exact next: pack and verify that append-only artifact, prove direct final-layout load
 and the full 78-convolution production HLO, then retry protected 8K once. Gate B remains reopened
 until the fused artifact/direct-load proof passes.
+
+## Fused final-layout artifact and DB504 reclose Gate B
+
+Protected pack
+`greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z` completed at exact pack pin
+`7d5dfb9ded22f1f7d66801a9ea63eabaaf36b4b7`. Its 32 final-owner files contain
+`834,369,271,808` payload bytes / 10,880 tensors and reconcile to source payload
+`750,122,559,744` plus declared transforms/padding. Runtime manifest identity is
+`12339490...699a`, layout `523afb1d...cb4`, semantic layout manifest `8bd08068...6f9`, and the
+mounted verifier records `verified=true`. Checkpoint/result SUCCESS files match locally and
+remotely at SHA `368ef308...5b24`; authenticated pre/post pack censuses are 8/8 clean.
+
+Commit `c16b37f38afed80a25fa2b234e3a8a4129353227` exposes the existing loader's per-tensor device
+round trip through the protected decoder and fails fleet finalization unless verified bytes equal
+the complete loaded payload. Focused tests pass 38 with one expected skip; Python compilation,
+Bash syntax, ShellCheck and diff checks pass.
+
+Protected DB 504,
+`greenfield_short_decoder_compile_pp8_2k_pallas_feature_linear_ot256_downf32_splitres_qkva_roundtrip_hlo_20260808T150900Z`,
+then directly loaded the fused artifact on all eight hosts. Every host verifies exactly
+`104,296,158,976` loaded and device-round-tripped bytes / 1,360 tensors, giving the exact complete
+artifact totals. Runtime checkpoint reshards, host global concatenations, and host/device FP8
+dequantizations are all zero. All 32 chips retain final ownership; measured maximum peak HBM is
+`26,143,616,000` bytes/chip, leaving `6,870,797,312` bytes against the observed
+`33,014,413,312` capacity.
+
+Optimized HLO SHA `710942ec...d69c` passes every contract and contains exactly 78 physical
+one-row `f32[1,82]` fused qkv-a convolutions, zero old q-a/kv-a linear calls, the exact selected
+feature-MoE/stage-linear kernel counts, no forbidden shape/overlay, and only explicit four-chip
+stage-local repeated groups plus the 16 intended transport permutes. Summary/HLO-contract/HLO/
+DB-snapshot/evidence/SUCCESS SHAs are `ed342ece...ca2`, `1c1a8dc9...9375`,
+`266b1ed9...499e`, `2820fd82...4681`, `63c6b494...6420`, and `3b2dec6d...2f5f`; critical
+approved-bucket bytes match, SQLite integrity is `ok`, and authenticated pre/post censuses are
+8/8 clean. This re-closes Gate B for the fused runtime.
+
+DB504 is a body-only mechanism proof with one measured sample after one warmup and no token,
+oracle, DSA, XPlane, Gate-D, or performance claim; its `774.192188 ms` sample must not be used as
+latency evidence. The preceding `...T152000Z` launch used invalid `warmup=0`, so all hosts refused
+before JAX initialization; it has no DB/final SUCCESS and ended with an 8/8 clean failure census.
+
+Exact next: commit and push this evidence seal, then run one protected 8K Gate-D retry against
+runtime manifest `12339490...699a` with warmup 2, iterations 10, trace 2, exact raw-token and DSA
+oracles, FP32 routed-down reconstruction and split residual state. Device round-trip is disabled
+for that performance run because DB504 already closed it. Stop on any token/DSA/HLO/HBM/wall or
+cleanup failure; only a complete accepted run may change Gate D/E status.

@@ -5611,3 +5611,23 @@ This is production arithmetic/HLO evidence only. The 19-second probe elapsed tim
 compilation and orchestration and is not decoder latency. The bounded proof authorizes the
 append-only full fused pack; Gate B remains reopened until its 32 files are written, verified and
 directly loaded. No protected 8K retry is authorized before that artifact and full-body HLO pass.
+
+## 2026-08-08 15:31 — DB504 directly loads fused final layout and re-closes Gate B
+
+Protected pack `greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z` at `7d5dfb9`
+writes 32 final-owner files / `834,369,271,808` payload bytes / 10,880 tensors. Runtime manifest
+`12339490...699a`, layout `523afb1d...cb4`, semantic manifest `8bd08068...6f9`, mounted
+`verified=true`, local/remote SUCCESS `368ef308...5b24`, and 8/8 clean pre/post censuses pass.
+
+The protected decoder now reuses the loader's existing per-tensor device round trip behind a
+default-off flag at `c16b37f`. DB504 runs that flag on all eight hosts: each directly loads and
+round-trips `104,296,158,976` bytes / 1,360 tensors. The fleet total exactly equals the manifest;
+runtime reshard, host concat, and host/device FP8 dequantization counts are zero. Peak HBM is
+`26,143,616,000` bytes/chip, leaving `6,870,797,312` bytes measured headroom.
+
+Full optimized HLO `710942ec...d69c` has exactly 78 physical one-row N82 convolutions, zero old
+q-a/kv-a linear calls, exact feature/stage-linear kernel counts, no forbidden overlay/shape, and
+only the declared four-chip repeated groups plus transport. DB 504, approved archive, critical
+remote SHA equality, SQLite integrity, and 8/8 clean post-census pass. The one-sample body value is
+mechanism-only and has no performance standing. Gate B is re-closed; the next authorized model
+run is one protected 8K token/DSA/trace retry with device round trip disabled.

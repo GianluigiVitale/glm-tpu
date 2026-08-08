@@ -410,3 +410,23 @@ capture is still required.
   equality, terminal SUCCESS `5d458cb8...03e`, and authenticated 8/8 pre/post cleanup pass.
 - Scope: bounded production arithmetic/HLO only. The protected fused checkpoint/direct load,
   complete decoder, HBM, XPlane, latency, Gate D, and Gate E remain unproved.
+
+## Fused PP8 final layout and DB504 Gate-B reclosure
+
+- Packed artifact: `greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z` at pack
+  pin `7d5dfb9`; 32 files, 10,880 tensors, `834,369,271,808` payload bytes, runtime manifest
+  `12339490...699a`, layout `523afb1d...cb4`, semantic manifest `8bd08068...6f9`.
+- Pack protection: mounted full verifier `verified=true`; checkpoint/result SUCCESS
+  `368ef308...5b24`; approved bucket and authenticated 8/8 pre/post cleanup pass.
+- Protected direct load: DB504 at `c16b37f`, run
+  `greenfield_short_decoder_compile_pp8_2k_pallas_feature_linear_ot256_downf32_splitres_qkva_roundtrip_hlo_20260808T150900Z`.
+- Load proof: eight hosts each load and device-round-trip `104,296,158,976` bytes / 1,360 tensors;
+  zero runtime reshards, host concats, host FP8 dequantizations or device FP8 dequantizations.
+- Device/HLO proof: maximum peak HBM `26,143,616,000` bytes/chip; optimized HLO
+  `710942ec...d69c`; 78 exact one-row N82 convolutions; zero obsolete q-a/kv-a calls; every
+  local-collective/transport/feature/stage-linear contract passes with no forbidden shape/overlay.
+- Seals: summary `ed342ece...ca2`, HLO contract `1c1a8dc9...9375`, compressed HLO
+  `266b1ed9...499e`, DB snapshot `2820fd82...4681`, evidence `63c6b494...6420`, SUCCESS
+  `3b2dec6d...2f5f`; critical remote bytes, DB integrity, and 8/8 pre/post census pass.
+- Gate decision: Gate B is re-closed. This body-only one-sample run has no token/DSA/trace or
+  performance claim; protected 8K Gate D/E remains next.
