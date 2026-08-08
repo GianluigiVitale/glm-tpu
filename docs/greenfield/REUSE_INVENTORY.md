@@ -190,3 +190,10 @@ tests projection (`lax.map`/`vmap`/unrolled) against four explicit norm associat
 DB499 one-host protected wrapper is parameterized for this q-a target rather than duplicated. CPU
 tests prove shape/failure/HLO plumbing only; one serialized bounded TPU run must choose an exact
 candidate before any production integration or full 8K retry.
+
+DB501 rejects that first virtual family: all 12 M1 dot/mapping/norm candidates collapse to one
+376-mismatch BF16 output despite different HLO hashes. The reusable positive clue is the already
+preserved DB491 HLO: its exact physical local body is `convolution ... bf_io->bf`, whereas DB501's
+M1 `dot_general` becomes multiply/reduce. The next adaptation must call the JAX zero-spatial
+convolution primitive directly with one external row and enforce its optimized HLO. Padding the
+public decode input back to 32 rows is rejected by the greenfield contract.

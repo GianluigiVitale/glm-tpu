@@ -27,6 +27,12 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   The 32-way diagnostic collective itself remains forbidden in production.
   Projection and norm association stay default-off until a bounded TPU probe
   matches the accepted BF16 q-a state elementwise.
+- DB501 rejects ordinary M1 N82 dot association: all tested projection mappings
+  and FP32 norm reductions produce the same 376-mismatch BF16 result. Its TPU
+  HLO lowers M1 dot to multiply/reduce, whereas the exact accepted DB491 local
+  body is a zero-spatial `convolution` with `bf_io->bf` labels. A direct
+  one-row convolution is the only current source-backed challenger; restoring
+  an external `[32,6144]` decode bucket remains forbidden.
 - The accepted fused residual-add/RMSNorm boundary first adds the two BF16
   inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
   the independently carried residual is the same sum rounded to BF16. A

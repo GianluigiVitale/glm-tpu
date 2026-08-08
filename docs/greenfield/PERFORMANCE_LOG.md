@@ -914,3 +914,11 @@ not the later DB499 `wq_b` projection. The layer-1 comparison is downstream and 
 There is no latency distribution, tok/s, DB row, `SUCCESS`, or Gate-D result. The parent artifacts
 and comparison are hash-sealed in the approved bucket and cleanup is 8/8 clean. DB484 remains the
 only accepted PP8 decoder performance result; Gate E remains open.
+
+## DB501 bounded q-a rejection — no performance result
+
+DB501 at `b4488076` ran one local four-chip host for an arithmetic-only matrix and found no exact
+one-row N82 candidate. Its 31-second elapsed value includes compilation and orchestration and is
+not decoder latency. There is no token generation, timed window, XPlane, wall tok/s, Gate-D, or
+Gate-E result. DB484 remains the accepted PP8 performance point at `244.091151 ms` p50 and
+`4.096830 tok/s`.

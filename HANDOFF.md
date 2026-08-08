@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 12:16 UTC
+**Updated:** 2026-08-08 12:40 UTC
 
 ## Authority and isolation
 
@@ -1872,3 +1872,26 @@ CPU suite passes 441 with one expected skip and two pre-existing SWIG warnings. 
 ShellCheck, JSON and diff checks pass. These are readiness facts only. Exact next: commit/push,
 prove the fleet idle, and run exactly one serialized bounded q-a matrix. Only a bitwise candidate
 with passing one-row/local HLO may be integrated into production before another 8K attempt.
+
+## DB501 rejects M1 dot/norm virtualization and exposes the next HLO discriminator
+
+Protected bounded run
+`greenfield_layer0_q_a_association_20260808T123220826430916Z` at exact pin `b4488076` completed as
+DB run 501 / item 1784. Local and approved-bucket `SUCCESS`, DB snapshot, byte-for-byte critical
+object verification, and authenticated eight-host pre/post zero-work censuses pass. Runner,
+candidate tensor, evidence-list, remote-object, and SUCCESS SHAs are `70745455...52de`,
+`f755bcb1...568b`, `86520324...aae4`, `69f3d576...6a86`, and `a5f1c67c...14f7`.
+
+None of the 12 true-row/local candidates is exact. All three projection mappings and all four norm
+associations collapse to the same BF16 result SHA `439a4d54...d553`: 376/2,048 mismatches, max
+`0.0078125`, mean `0.0000967367`, signed mean `+0.0000043714`, p99 `0.001953125`. Every optimized
+HLO has the required `[1,6144]` input, `[1,2048]` output, shard-major FP8 `[32,6144,82]` weights,
+FP32 `[32,48,82]` scales, and no collective/callback or dead token-row shape. This closes ordinary
+M1 dot mapping and norm reassociation; it does not authorize a production change or 8K retry.
+
+The accepted DB491 physical local body lowers its `bf16[32,6144] x bf16[6144,82]` projection to an
+XLA `convolution` with `dim_labels=bf_io->bf`. DB501's M1 dot is instead optimized to an explicit
+FP32 multiply/reduce. The next bounded discriminator is therefore a directly expressed zero-spatial
+convolution whose public input/output remain exactly `[1,6144] -> [1,82]`. It must retain that
+convolution in optimized TPU HLO and the same no-collective/no-dead-row contract before one
+serialized comparison. Do not emulate the accepted kernel by restoring 31 dead decode rows.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-08T12:16:10Z",
+  "captured_utc": "2026-08-08T12:40:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "380659a8323caabf1c84c8f7a79216f825997d4b",
+    "greenfield": "b4488076d99a8e387df4d9febbab2f5f1388ae9e",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -146,7 +146,7 @@
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "scripts/greenfield/probe_layer0_dsa_query_association.py", "scripts/greenfield/run_layer0_dsa_query_association_probe.sh", "docs/greenfield/NUMERICAL_CONTRACT.md"],
       "gate": "D diagnostic",
-      "reason": "The all-21 observer reproduces the sealed failed-run DSA payload bitwise and proves the earliest production divergence is layer-0 q-a: normalized hidden is exact, q-a differs in 494/2048 BF16 values (max 0.015625), and the downstream query differs in all 4096 values. The accepted source mechanism already captured by DB491 is 32 shard-major fused N=82 dots (64 q-a plus 18 kv-a columns) followed by distributed q-a RMSNorm. Greenfield reuses only the packing/arithmetic semantics in a default-off one-row stage-local virtualized matrix; full-pod collectives and the legacy M32 bucket remain forbidden. No exact TPU candidate or production correction is claimed yet."
+      "reason": "The all-21 observer reproduces the sealed failed-run DSA payload bitwise and proves the earliest production divergence is layer-0 q-a: normalized hidden is exact, q-a differs in 494/2048 BF16 values (max 0.015625), and the downstream query differs in all 4096 values. DB501 rejects all 12 ordinary M1 N82 mapping/norm variants: each has 376/2048 mismatches. Preserved DB491 HLO supplies the next positive discriminator: the exact physical local body is convolution-shaped while DB501 M1 dot becomes multiply/reduce. Greenfield may adapt a direct one-row zero-spatial convolution only; full-pod collectives and the external M32 bucket remain forbidden. No production correction is claimed yet."
     },
     {
       "id": "legacy-code-and-step-fingerprints",

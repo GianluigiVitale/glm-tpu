@@ -5514,3 +5514,25 @@ associations are compiled and compared bitwise to the accepted q-a state. Focuse
 one expected skip and two pre-existing SWIG warnings. Python compilation, Bash syntax, ShellCheck,
 JSON and diff checks pass. This is readiness only. Exact next: commit/push and run one serialized
 bounded q-a matrix; only an exact one-row/local-HLO candidate may enter production.
+
+## 2026-08-08 12:40 — DB501 rejects M1 dot/norm variants; exact HLO is convolution-shaped
+
+Protected bounded run `greenfield_layer0_q_a_association_20260808T123220826430916Z` at
+`b4488076` completed as DB 501 / item 1784 with local/remote `SUCCESS`, integrity-checked DB
+snapshot, critical remote bytes verified, and authenticated 8/8 pre/post clean censuses. Runner,
+candidate NPZ, evidence, remote-object, and SUCCESS SHAs are `70745455...52de`,
+`f755bcb1...568b`, `86520324...aae4`, `69f3d576...6a86`, and `a5f1c67c...14f7`.
+
+All 12 one-row N82 candidates produce the same BF16 q-a SHA `439a4d54...d553`, regardless of
+`lax.map`/`vmap`/unrolled projection mapping or logical/shard/left-fold/topology-tree norm order.
+The result misses 376/2,048 accepted values with max/mean/signed/p99
+`0.0078125/0.0000967367/+0.0000043714/0.001953125`. Every HLO contract passes: external live-row
+shapes, shard-major FP8 `[32,6144,82]`, FP32 scales `[32,48,82]`, and no collective, callback or
+dead token row. No production correction, decoder, Gate-D, timing, or throughput claim follows.
+
+The physical arithmetic difference is visible in preserved HLO. Accepted DB491 lowers the local
+M32 N82 body to `convolution ... dim_labels=bf_io->bf`; DB501 lowers M1 `dot_general` to a fused
+multiply/reduce. Reintroducing the legacy `[32,6144]` input would violate the architecture. The
+next new discriminator instead expresses the same zero-spatial convolution primitive directly on
+one row and requires optimized TPU HLO to retain it. This is a bounded association test, not a
+new execution architecture.

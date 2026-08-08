@@ -353,3 +353,17 @@ capture is still required.
 - Next evidence: one bounded one-host q-a association matrix reusing DB491's fused `N=82`
   shard-major semantics, with one live row, no collective/callback, exact BF16 comparison, DB,
   archive, and authenticated cleanup. No full decoder retry is authorized before it passes.
+
+## DB501 one-row q-a association rejection
+
+- Protected DB 501 / item 1784: `greenfield_layer0_q_a_association_20260808T123220826430916Z` at
+  `b4488076`; local/remote `SUCCESS`, DB snapshot, critical remote SHA equality and 8/8 clean
+  pre/post censuses pass.
+- Result: no exact candidate. All 12 mapping/norm variants have candidate SHA `439a4d54...d553`,
+  376/2,048 BF16 mismatches, max/mean `0.0078125/0.0000967367`.
+- Structure: all HLOs retain one live input/output row and shard-major N82 input state, with no
+  collective/callback or dead `[32,...]` token tensor.
+- Seals: runner `70745455...52de`, NPZ `f755bcb1...568b`, evidence `86520324...aae4`, remote objects
+  `69f3d576...6a86`, SUCCESS `a5f1c67c...14f7`.
+- Next evidence: direct one-row zero-spatial convolution, because accepted DB491 uses
+  `convolution ... bf_io->bf` while DB501's M1 dot lowers to multiply/reduce. No 8K rerun first.
