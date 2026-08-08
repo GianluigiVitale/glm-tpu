@@ -350,6 +350,7 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "from tpu_inference",
         "import vllm",
         "from vllm",
+        'local label=$1 out=',
     ):
         assert forbidden not in resume_source
     for required in (
@@ -379,6 +380,7 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
     ):
         assert forbidden not in association_probe_source
         assert forbidden not in association_wrapper_source
+    assert 'local label=$1 out=' not in association_wrapper_source
     for script in (probe, association_probe):
         completed = subprocess.run(
             [sys.executable, "-m", "py_compile", str(script)],
