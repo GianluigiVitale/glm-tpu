@@ -513,9 +513,13 @@ def fp8_block_vector_matmul_f32(
     # participates in arithmetic; the padding is outside the reduction and
     # therefore cannot turn the operation back into an M=8 MXU matmul.
     padded_lhs = jnp.pad(lhs, ((0, 7), (0, 0)))
+    aligned_output_tiles = _ceil_div(output_tiles, 8) * 8
     scale_table = jnp.pad(
         scale,
-        ((0, 0), (0, 128 - contraction_blocks)),
+        (
+            (0, aligned_output_tiles - output_tiles),
+            (0, 128 - contraction_blocks),
+        ),
     )
 
     def kernel(
@@ -527,8 +531,20 @@ def fp8_block_vector_matmul_f32(
         weight = lax.bitcast_convert_type(
             weight_ref[...], jnp.float8_e4m3fn
         ).astype(jnp.float32)
+        scale_row_ids = lax.broadcasted_iota(
+            jnp.int32, (8, 128), 0
+        )
+        selected_scale = jnp.sum(
+            jnp.where(
+                scale_row_ids == pl.program_id(0) % jnp.int32(8),
+                scale_ref[...],
+                jnp.float32(0.0),
+            ),
+            axis=0,
+            dtype=jnp.float32,
+        )
         scale_vector = jnp.repeat(
-            scale_ref[0, :contraction_blocks],
+            selected_scale[:contraction_blocks],
             block_contraction,
             axis=0,
         )
@@ -555,7 +571,7 @@ def fp8_block_vector_matmul_f32(
         return output_index, 0
 
     def scale_index(output_index: Any) -> tuple[Any, int]:
-        return output_index, 0
+        return output_index // jnp.int32(8), 0
 
     def output_index(output_index_value: Any) -> tuple[int, Any]:
         return 0, output_index_value
@@ -567,7 +583,7 @@ def fp8_block_vector_matmul_f32(
         in_specs=(
             pl.BlockSpec((8, contraction), lhs_index),
             pl.BlockSpec((block_output, contraction), weight_index),
-            pl.BlockSpec((1, 128), scale_index),
+            pl.BlockSpec((8, 128), scale_index),
         ),
         out_specs=pl.BlockSpec((8, block_output), output_index),
         compiler_params=pltpu.CompilerParams(
