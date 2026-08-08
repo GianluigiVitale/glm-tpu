@@ -299,7 +299,8 @@ ENTRY main {
   %hidden = bf16[2048,6144]{1,0} parameter(0)
   %positions = s32[2048]{0} parameter(1)
   %wk_weight.1 = f32[128,6144]{1,0} parameter(2)
-  %wk_bf16 = bf16[128,6144]{1,0} convert(%wk_weight.1)
+  %wk_copy = f32[128,6144]{1,0} copy(%wk_weight.1)
+  %wk_bf16 = bf16[128,6144]{1,0} convert(%wk_copy)
   %projection = f32[2048,128]{1,0} convolution(%hidden, %wk_bf16), dim_labels=bf_oi->bf
   %root = f32[1]{0} sqrt(%projection)
   %normalized = f32[1]{0} divide(%projection, %root)

@@ -5758,3 +5758,20 @@ existing protected wrapper adds a third profile and hash/DB/remote validation of
 contract requires one explicit FP32-to-BF16 `wk` conversion, one M2048 convolution, zero loops and
 all prior no-communication/full-prompt/dead-row conditions. Focused tests pass 32/32 and all static
 checks are green. The next evidence action is one clean-pinned serialized run of that profile.
+
+## 2026-08-08 22:54 — First BF16-weight compile fails only the symbol-specific HLO guard
+
+The first protected attempt,
+`greenfield_layer0_prompt_index_cache_association_20260808T224854448693338Z` at `d4884bd`, reached
+the one-host TPU compile and failed before execution. Its in-memory contract reported one M2048
+convolution, a physical BF16 convolution RHS, zero loops, and no forbidden operation or shape.
+The sole violation was zero matches for a direct `convert(%wk_weight...)` regex. Optimized fusion
+and copy boundaries rename operands, so source-variable identity is not a valid physical-HLO
+requirement. No arithmetic, cache comparison, DB row, SUCCESS or performance claim exists.
+
+The wrapper archived the bounded diagnostic under the approved run prefix. Local and remote
+orchestrator SHA is `2b125a9f...7df`; authenticated failure-exit census SHA
+`71bf2d2d...127` is 8/8 clean. The repaired contract still fails closed on the actual arithmetic:
+it requires the public FP32 adapted-weight shape, exactly one shape-specific FP32-to-BF16
+conversion under any optimized symbol, and a physically BF16 convolution RHS. It also writes the
+compressed optimized HLO before validation so any later refusal preserves the compiler evidence.

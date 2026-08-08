@@ -435,6 +435,9 @@ def main() -> int:
         compiled = jax.jit(function).lower(*arguments).compile()
         compile_seconds = time.monotonic() - started
         hlo = compiled.as_text()
+        hlo_path = hlo_dir / f"{name}.optimized_hlo.txt.gz"
+        with gzip.open(hlo_path, "wt", encoding="utf-8") as stream:
+            stream.write(hlo)
         contract = validate_prompt_index_key_association_hlo(
             hlo,
             candidate=name,
@@ -442,6 +445,10 @@ def main() -> int:
             unique_token_count=int(unique_ids.size),
         )
         if not contract["passed"]:
+            contract_path = hlo_dir / f"{name}.hlo_contract_failure.json"
+            contract_path.write_text(
+                json.dumps(contract, indent=2, sort_keys=True) + "\n"
+            )
             raise RuntimeError(f"prompt-key association HLO failed: {name}: {contract}")
         started = time.monotonic()
         result = compiled(*arguments)
@@ -475,9 +482,6 @@ def main() -> int:
         candidate_tensors[f"{name}_bfloat16_bits"] = bits
         comparison = compare_prompt_index_key_bits(expected_bits, bits)
         baseline_delta = compare_prompt_index_key_bits(baseline_bits, bits)
-        hlo_path = hlo_dir / f"{name}.optimized_hlo.txt.gz"
-        with gzip.open(hlo_path, "wt", encoding="utf-8") as stream:
-            stream.write(hlo)
         candidate_records[name] = {
             "comparison_to_accepted": comparison,
             "comparison_to_production_baseline": baseline_delta,

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 22:47 UTC
+**Updated:** 2026-08-08 22:54 UTC
 
 ## Authority and isolation
 
@@ -2200,3 +2200,15 @@ cache-validation tests pass 32/32; Python compilation, Bash syntax, ShellCheck, 
 checks pass. Exact next: commit/push from a clean pin, prove the fleet idle, then run only
 `GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE=chunk_bf16_weight
 scripts/greenfield/run_prompt_index_cache_association_probe.sh`.
+
+The first protected compile at `d4884bd`, tag
+`greenfield_layer0_prompt_index_cache_association_20260808T224854448693338Z`, failed closed before
+arithmetic because the HLO linter tied the required conversion to the source symbol
+`%wk_weight`. Optimized TPU HLO already proved exactly one M2048 convolution with a physical BF16
+RHS, zero loops and no forbidden operation/shape, but fusion/copy renaming produced zero matches
+for that source-name regex. There is no DB row, SUCCESS, cache comparison or performance claim.
+The remote diagnostic matches local orchestrator SHA `2b125a9f...7df`; authenticated failure-exit
+census SHA `71bf2d2d...127` is 8/8 clean. The correction requires one shape-specific
+`bf16[128,6144] convert(...)` under any optimized symbol plus the existing public FP32 parameter
+and physical BF16 convolution operand. The probe now persists optimized HLO before validation.
+Re-run only the same bounded profile after focused/static checks and a clean pushed pin.

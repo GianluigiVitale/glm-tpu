@@ -760,7 +760,7 @@ def validate_prompt_index_key_association_hlo(
             line
             for line in lowered.splitlines()
             if re.search(
-                r"= bf16\[128,6144\].*convert\(%wk_weight(?:\.[0-9]+)?\)",
+                r"= bf16\[128,6144\].*convert\(%[^)]+\)",
                 line,
             )
         ]
