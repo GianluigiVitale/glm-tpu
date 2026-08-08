@@ -27,6 +27,13 @@ from .layer0_dsa_association import (
     inspect_distributed_q_a_norm_artifact,
     inspect_layer0_dsa_association_input,
 )
+from .prompt_index_cache import (
+    LegacyPromptIndexCacheConfig,
+    capture_legacy_prompt_index_cache,
+    compare_prompt_index_key_bits,
+    inspect_legacy_prompt_index_cache,
+    validate_prompt_index_key_probe_hlo,
+)
 from .short_context_oracle import (
     ShortContextOracleConfig,
     capture_short_context_oracle,
@@ -52,11 +59,14 @@ __all__ = (
     "LegacyResidualComparisonConfig",
     "LegacyDsaInternalCaptureConfig",
     "LegacyDsaInternalComparisonConfig",
+    "LegacyPromptIndexCacheConfig",
     "ShortContextOracleConfig",
     "ShortContextDsaOracleConfig",
     "ShortContextLogprobOracleConfig",
     "capture_gate_c_oracle",
     "capture_one_layer_oracle",
+    "capture_legacy_prompt_index_cache",
+    "compare_prompt_index_key_bits",
     "compare_accepted_greenfield_dsa_internal_observation",
     "compare_legacy_residuals",
     "compare_legacy_dsa_internals",
@@ -70,6 +80,8 @@ __all__ = (
     "inspect_distributed_q_a_norm_artifact",
     "inspect_layer0_dsa_association_input",
     "inspect_one_layer_oracle",
+    "inspect_legacy_prompt_index_cache",
+    "validate_prompt_index_key_probe_hlo",
     "inspect_short_context_oracle",
     "inspect_short_context_dsa_oracle",
     "inspect_short_context_logprob_oracle",

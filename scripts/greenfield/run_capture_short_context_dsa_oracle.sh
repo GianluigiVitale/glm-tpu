@@ -10,7 +10,12 @@ readonly HARNESS_REPO=/home/gianl/glm-tpu
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
+readonly PROMPT_CACHE_CAPTURE=${GLM_GREENFIELD_PROMPT_CACHE_CAPTURE:-0}
 readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
+[[ $PROMPT_CACHE_CAPTURE == 0 || $PROMPT_CACHE_CAPTURE == 1 ]] || {
+  echo "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE must be 0 or 1" >&2
+  exit 2
+}
 if [[ ! $INTERNAL_LAYER_ID =~ ^[0-9]+$ ]] ||
   ! ((INTERNAL_LAYER_ID <= 2 || (INTERNAL_LAYER_ID >= 6 && INTERNAL_LAYER_ID < 78 && (INTERNAL_LAYER_ID - 6) % 4 == 0))); then
   echo "DSA internal layer must be a full-indexer producer" >&2
@@ -109,6 +114,9 @@ ORACLE_DIR=$RUN_DIR/oracle
 REMOTE_PREFIX=${GLM_GREENFIELD_SHORT_DSA_REMOTE_PREFIX:-$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/$PROFILE/$TAG}
 DUMP_PREFIX=/tmp/$TAG/topk.npz
 INTERNAL_DUMP_PREFIX=/tmp/$TAG/internals.npz
+PROMPT_CACHE_DUMP_PREFIX=/tmp/$TAG/index_cache.npz
+PROMPT_CACHE_RESULT_DIR=$RUN_DIR/prompt_index_cache
+PROMPT_CACHE_COMPARISON_DIR=$RUN_DIR/prompt_index_cache_comparison
 if [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -239,7 +247,11 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
-say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER"
+say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE"
+if [[ $PROMPT_CACHE_CAPTURE == 1 && $PROFILE != 8k ]]; then
+  say "ABORT: prompt index-cache capture is defined only for the sealed 8K profile"
+  exit 2
+fi
 strict_census pre || {
   say "ABORT: fleet is not eight-host zero work"
   exit 1
@@ -286,6 +298,9 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
 fi
 
 COMMON_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"' GLM_DSA_DUMP_TOPK_EVENTS=all GLM_DSA_DUMP_TOPK_SKIP_WARMUP=1 GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"
+if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+  COMMON_ENVS="$COMMON_ENVS GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=0"
+fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$FIRST_DECODE_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
 fi
@@ -311,6 +326,16 @@ has_eight_unique_markers "$RUN_DIR/raylet_env.txt" ENV_OK || {
   say "ABORT: eight-host raylet environment mismatch"
   exit 1
 }
+if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+  # shellcheck disable=SC2016
+  cache_env_check='p=$(pgrep -x raylet | head -1); f=/tmp/prompt_cache_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP_CACHE_DUMP='"$PROMPT_CACHE_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_LAYERS=0" "$f"; then echo "CACHE_ENV_OK $(hostname)"; else echo "CACHE_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$cache_env_check" >"$RUN_DIR/raylet_cache_env.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/raylet_cache_env.txt" CACHE_ENV_OK || {
+    say "ABORT: eight-host prompt-cache environment mismatch"
+    exit 1
+  }
+fi
 
 say "running one exact $PROFILE raw passkey item"
 (
@@ -365,6 +390,19 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     exit 1
   }
 fi
+if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+  # The host-side hook is outside the model JIT. Each process must write one
+  # post-forward snapshot for each of the four 2,048-token prefill chunks;
+  # decode-only steps are intentionally skipped by the inherited observer.
+  # shellcheck disable=SC2016
+  cache_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DCP_CACHE_DUMP] ARMED" "$logs" 2>/dev/null | tail -1); failures=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "GLM_DCP_CACHE_DUMP failed" "$logs" 2>/dev/null | wc -l); files=$(find /tmp/'"$TAG"' -type f -name "index_cache.postfwd.step*.proc*.npz" 2>/dev/null | wc -l); final=$(find /tmp/'"$TAG"' -type f -name "index_cache.postfwd.step0004.proc*.npz" 2>/dev/null | wc -l); printf "%s\nfiles=%s final=%s failures=%s\n" "$armed" "$files" "$final" "$failures"; if [ -n "$armed" ] && [ "$files" -eq 4 ] && [ "$final" -eq 1 ] && [ "$failures" -eq 0 ]; then echo "CACHE_OK $(hostname)"; else echo "CACHE_BAD $(hostname)"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$cache_integrity" >"$RUN_DIR/fleet_prompt_cache_integrity.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/fleet_prompt_cache_integrity.txt" CACHE_OK || {
+    say "ABORT: layer-0 prompt-cache observer coverage is incomplete"
+    exit 1
+  }
+fi
 
 run_id=$(sed -n 's/.*\[longctx\] run_id=\([0-9][0-9]*\).*/\1/p' \
   "$RUN_DIR/legacy.log" | tail -1)
@@ -396,6 +434,17 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     -name "internals.*.position${FIRST_DECODE_POSITION}.proc*.npz" | wc -l)
   [[ $internal_count -eq 1 ]] || {
     say "ABORT: expected one DCP-owner DSA internal file, found $internal_count"
+    exit 1
+  }
+fi
+prompt_cache_source_count=0
+if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+  prompt_cache_source_count=$(find "$SOURCE_DIR" -type f \
+    -name 'index_cache.postfwd.step*.proc*.npz' | wc -l)
+  prompt_cache_final_count=$(find "$SOURCE_DIR" -type f \
+    -name 'index_cache.postfwd.step0004.proc*.npz' | wc -l)
+  [[ $prompt_cache_source_count -eq 32 && $prompt_cache_final_count -eq 8 ]] || {
+    say "ABORT: prompt-cache source coverage drifted total=$prompt_cache_source_count final=$prompt_cache_final_count"
     exit 1
   }
 fi
@@ -477,6 +526,21 @@ value = compare_short_context_dsa_oracles(Path(sys.argv[1]), Path(sys.argv[2]))
 print(json.dumps(value, indent=2, sort_keys=True))
 PY
 fi
+if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+  say "sealing accepted logical layer-0 prompt index cache"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_legacy_prompt_index_cache.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$PROMPT_CACHE_RESULT_DIR" \
+    --expected-code-hash "$PIN" \
+    --legacy-repository-pin "$LEGACY_PIN" \
+    --run-tag "$TAG" \
+    --source-run-id "$run_id" \
+    --source-item-row-id "$item_row_id" \
+    --layer0-input-dir "$LAYER0_INPUT_DIR" \
+    --layer0-input-manifest-sha256 "$LAYER0_INPUT_MANIFEST_SHA" \
+    >"$RUN_DIR/prompt_index_cache_capture.json"
+fi
 
 # Snapshot the append-only provenance DB at the exact source row.
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$RUN_DIR/results_ckpt.db" <<'PY'
@@ -493,6 +557,28 @@ PY
 
 stop_owned_runtime
 runtime_started=0
+if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+  prompt_cache_manifest_sha=$(/home/gianl/vllm-env/bin/python -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
+    "$PROMPT_CACHE_RESULT_DIR/manifest.json")
+  say "comparing production one-row layer-0 prompt keys on one local TPU host"
+  env JAX_PLATFORMS=tpu \
+    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+    TPU_PROCESS_BOUNDS=1,1,1 \
+    TPU_VISIBLE_DEVICES=0,1,2,3 \
+    PYTHONPATH="$WORKTREE" \
+    timeout --signal=TERM --kill-after=60 1800 \
+    /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/probe_layer0_prompt_index_cache.py" \
+    --expected-code-hash "$PIN" \
+    --run-tag "$TAG" \
+    --input-dir "$LAYER0_INPUT_DIR" \
+    --input-manifest-sha256 "$LAYER0_INPUT_MANIFEST_SHA" \
+    --prompt-cache-dir "$PROMPT_CACHE_RESULT_DIR" \
+    --prompt-cache-manifest-sha256 "$prompt_cache_manifest_sha" \
+    --output "$PROMPT_CACHE_COMPARISON_DIR" \
+    >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
+fi
 if [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   say "comparing accepted layer-0 scorer state on one local TPU host"
   env JAX_PLATFORMS=tpu \
@@ -624,7 +710,8 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
   "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" \
-  "$INTERNAL_CAPTURE" "$internal_count" "$INTERNAL_COMPARE_LAYER0" <<'PY'
+  "$INTERNAL_CAPTURE" "$internal_count" "$INTERNAL_COMPARE_LAYER0" \
+  "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -669,6 +756,49 @@ if sys.argv[8] == "1":
         ),
         "dsa_event_tensors_exact": str(exact_dsa["exact"]).lower(),
         "accepted_oracle_pin": comparison["oracle_pin"],
+    })
+if sys.argv[11] == "1":
+    prompt_cache = json.loads(
+        (root / "prompt_index_cache" / "manifest.json").read_text()
+    )
+    lines.update({
+        "prompt_index_cache_capture": "true",
+        "prompt_index_cache_manifest_sha256": prompt_cache[
+            "manifest_sha256"
+        ],
+        "prompt_index_cache_bfloat16_sha256": prompt_cache[
+            "prompt_index_key_bfloat16_sha256"
+        ],
+        "prompt_index_cache_source_file_count": sys.argv[12],
+    })
+    prompt_comparison = json.loads(
+        (root / "prompt_index_cache_comparison" / "comparison.json").read_text()
+    )
+    if (
+        prompt_comparison["prompt_cache_manifest_sha256"]
+        != prompt_cache["manifest_sha256"]
+        or not prompt_comparison["hlo"]["contract"]["passed"]
+        or prompt_comparison["status"] != "SUCCESS"
+    ):
+        raise SystemExit("prompt index-cache comparison identity drifted")
+    lines.update({
+        "prompt_index_cache_production_comparison_manifest_sha256": (
+            prompt_comparison["manifest_sha256"]
+        ),
+        "prompt_index_cache_production_elementwise_exact": str(
+            prompt_comparison["comparison"]["elementwise_exact"]
+        ).lower(),
+        "prompt_index_cache_production_first_mismatch_position": (
+            "none"
+            if prompt_comparison["comparison"]["first_mismatch_position"] is None
+            else prompt_comparison["comparison"]["first_mismatch_position"]
+        ),
+        "prompt_index_cache_production_mismatch_count": (
+            prompt_comparison["comparison"]["mismatch_count"]
+        ),
+        "prompt_index_cache_production_hlo_sha256": (
+            prompt_comparison["hlo"]["optimized_hlo_sha256"]
+        ),
     })
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in lines.items())

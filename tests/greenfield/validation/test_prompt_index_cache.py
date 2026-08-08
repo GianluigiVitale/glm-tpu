@@ -1,0 +1,247 @@
+from __future__ import annotations
+
+from hashlib import sha256
+from pathlib import Path
+import subprocess
+import sys
+
+import numpy as np
+
+from glm_tpu.greenfield.validation.prompt_index_cache import (
+    LegacyPromptIndexCacheConfig,
+    capture_legacy_prompt_index_cache,
+    compare_prompt_index_key_bits,
+    inspect_legacy_prompt_index_cache,
+    validate_prompt_index_key_probe_hlo,
+)
+
+
+def _write_dump(
+    path: Path,
+    *,
+    process_index: int,
+    global_bits: np.ndarray,
+    context_slice: slice,
+    corrupt_replica: bool = False,
+) -> None:
+    shard = global_bits[:, context_slice, :, :].copy()
+    duplicate = shard.copy()
+    if corrupt_replica:
+        duplicate.flat[0] ^= np.uint16(1)
+    index = (
+        slice(None, None, None),
+        context_slice,
+        slice(None, None, None),
+        slice(None, None, None),
+    )
+    np.savez(
+        path,
+        step_index=np.asarray(2, dtype=np.int64),
+        phase=np.asarray("postfwd"),
+        num_scheduled_tokens=np.asarray(2, dtype=np.int64),
+        process_index=np.asarray(process_index, dtype=np.int64),
+        process_count=np.asarray(2, dtype=np.int64),
+        layer_indices=np.asarray([0], dtype=np.int64),
+        mesh_shape=np.asarray(
+            "{'data': 1, 'model': 2, 'dcp': 2}"
+        ),
+        meta__block_tables=np.asarray([1, 2, 0, 0], dtype=np.int32),
+        meta__seq_lens=np.asarray([66], dtype=np.int32),
+        layer0__sharding=np.asarray("P(None, 'dcp')"),
+        layer0__shape=np.asarray(global_bits.shape, dtype=np.int64),
+        layer0__dtype=np.asarray("bfloat16"),
+        layer0__nshards=np.asarray(2, dtype=np.int64),
+        layer0__shard0__data=shard,
+        layer0__shard0__index=np.asarray(str(index)),
+        layer0__shard0__device=np.asarray(f"TPU_{process_index * 2}"),
+        layer0__shard1__data=duplicate,
+        layer0__shard1__index=np.asarray(str(index)),
+        layer0__shard1__device=np.asarray(f"TPU_{process_index * 2 + 1}"),
+    )
+
+
+def _config(source: Path, output: Path) -> LegacyPromptIndexCacheConfig:
+    return LegacyPromptIndexCacheConfig(
+        source_dump_dir=source,
+        output_dir=output,
+        capture_code_hash="a" * 40,
+        legacy_repository_pin="b" * 40,
+        run_tag="unit",
+        source_run_id=1,
+        source_item_row_id=2,
+        layer0_input_manifest_sha256="c" * 64,
+        prompt_token_ids_sha256="d" * 64,
+        expected_process_count=2,
+        expected_model_replication=2,
+        expected_step_index=2,
+        expected_last_chunk_tokens=2,
+        expected_prompt_tokens=66,
+        expected_physical_pages=3,
+        expected_logical_page_size=64,
+        expected_head_dim=4,
+    )
+
+
+def test_reconstructs_replicated_dcp_cache_in_logical_order(tmp_path: Path) -> None:
+    import ml_dtypes
+
+    source = tmp_path / "source"
+    source.mkdir()
+    # The portable dump keeps a fixed packing of 32; page size 64 -> dim1=2.
+    values = np.arange(3 * 64 * 4, dtype=np.float32).reshape(3, 64, 4)
+    values = (values / 100).astype(ml_dtypes.bfloat16)
+    global_bits = values.view(np.uint16).reshape(3, 2, 32, 4)
+    _write_dump(
+        source / "index_cache.postfwd.step0002.proc0.npz",
+        process_index=0,
+        global_bits=global_bits,
+        context_slice=slice(0, 1),
+    )
+    _write_dump(
+        source / "index_cache.postfwd.step0002.proc1.npz",
+        process_index=1,
+        global_bits=global_bits,
+        context_slice=slice(1, 2),
+    )
+    manifest = capture_legacy_prompt_index_cache(
+        _config(source, tmp_path / "artifact")
+    )
+    inspected, bits = inspect_legacy_prompt_index_cache(
+        tmp_path / "artifact",
+        expected_manifest_sha256=manifest["manifest_sha256"],
+    )
+    expected = np.concatenate((global_bits[1].reshape(64, 4),
+                               global_bits[2].reshape(64, 4)[:2]))
+    np.testing.assert_array_equal(bits, expected)
+    assert inspected["source_layout"]["model_replication"] == 2
+    assert inspected["source_layout"]["live_block_table"] == [1, 2]
+    assert inspected["prompt_index_key_bfloat16_sha256"] == sha256(
+        expected.tobytes()
+    ).hexdigest()
+
+
+def test_rejects_disagreeing_model_replicas(tmp_path: Path) -> None:
+    import pytest
+
+    source = tmp_path / "source"
+    source.mkdir()
+    global_bits = np.zeros((3, 2, 32, 4), dtype=np.uint16)
+    _write_dump(
+        source / "index_cache.postfwd.step0002.proc0.npz",
+        process_index=0,
+        global_bits=global_bits,
+        context_slice=slice(0, 1),
+        corrupt_replica=True,
+    )
+    _write_dump(
+        source / "index_cache.postfwd.step0002.proc1.npz",
+        process_index=1,
+        global_bits=global_bits,
+        context_slice=slice(1, 2),
+    )
+    with pytest.raises(ValueError, match="replicas disagree"):
+        capture_legacy_prompt_index_cache(
+            _config(source, tmp_path / "artifact")
+        )
+
+
+def test_exact_bit_comparison_reports_first_position() -> None:
+    expected = np.zeros((3, 4), dtype=np.uint16)
+    observed = expected.copy()
+    observed[1, 2] = np.uint16(0x3F80)
+    result = compare_prompt_index_key_bits(expected, observed)
+    assert result["elementwise_exact"] is False
+    assert result["first_mismatch_position"] == 1
+    assert result["mismatch_count"] == 1
+    assert result["mismatched_position_count"] == 1
+
+
+def test_prompt_key_probe_hlo_requires_one_row_scan_and_raw_wk() -> None:
+    hlo = """
+ENTRY main {
+  %embeddings = bf16[37,6144]{1,0} parameter(0)
+  %rows = s32[8155]{0} parameter(1)
+  %wk = u8[128,6144]{1,0} parameter(2)
+  %scale = f32[1,48]{1,0} parameter(3)
+  %row = bf16[1,6144]{1,0} dynamic-slice(%embeddings)
+  %keys = bf16[8155,128]{1,0} while(%row)
+  ROOT %call = f32[8,128]{1,0} custom-call(%row, %wk, %scale), custom_call_target="tpu_custom_call", backend_config="greenfield_fp8_block_matmul_f32_m8_k6144_n128"
+}
+"""
+    result = validate_prompt_index_key_probe_hlo(hlo)
+    assert result["passed"] is True
+    assert result["key_kernel_count"] == 1
+    assert result["outer_scan_while_count"] == 1
+
+
+def test_prompt_key_probe_hlo_rejects_collective_and_dead_rows() -> None:
+    hlo = """
+ENTRY main {
+  %embeddings = bf16[37,6144]{1,0} parameter(0)
+  %rows = s32[8155]{0} parameter(1)
+  %wk = u8[128,6144]{1,0} parameter(2)
+  %scale = f32[1,48]{1,0} parameter(3)
+  %dead = bf16[32,6144]{1,0} all-gather(%embeddings)
+  %keys = bf16[8155,128]{1,0} while(%dead)
+  ROOT %call = f32[8,128]{1,0} custom-call(%dead, %wk, %scale), custom_call_target="tpu_custom_call", backend_config="greenfield_fp8_block_matmul_f32_m8_k6144_n128"
+}
+"""
+    result = validate_prompt_index_key_probe_hlo(hlo)
+    assert result["passed"] is False
+    assert result["forbidden_operations"]["all-gather"] == 1
+    assert "bf16[32,6144]" in result["forbidden_shapes"]
+
+
+def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
+    repo = Path(__file__).resolve().parents[3]
+    probe = repo / "scripts/greenfield/probe_layer0_prompt_index_cache.py"
+    wrapper = repo / (
+        "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
+    )
+    entrypoint = repo / (
+        "scripts/greenfield/run_capture_legacy_prompt_index_cache.sh"
+    )
+    probe_source = probe.read_text()
+    wrapper_source = wrapper.read_text()
+    entrypoint_source = entrypoint.read_text()
+    for required in (
+        "fp8_block_matmul_f32",
+        "dsa_index_keys_from_projection",
+        "lax.scan",
+        "compare_prompt_index_key_bits",
+        "validate_prompt_index_key_probe_hlo",
+        '"one_live_row": True',
+        '"performance_claim": False',
+    ):
+        assert required in probe_source
+    for forbidden in (
+        "import tpu_inference",
+        "from tpu_inference",
+        "import vllm",
+        "from vllm",
+    ):
+        assert forbidden not in probe_source
+    for required in (
+        "GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX",
+        "GLM_DCP_CACHE_DUMP_LAYERS=0",
+        "prompt_cache_source_count -eq 32",
+        "capture_legacy_prompt_index_cache.py",
+        "probe_layer0_prompt_index_cache.py",
+        "strict_census post",
+        "prompt_index_cache_production_elementwise_exact",
+        "TPU_VISIBLE_DEVICES=0,1,2,3",
+    ):
+        assert required in wrapper_source
+    for required in (
+        "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE=1",
+        "GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE=8k",
+        "run_capture_short_context_dsa_oracle.sh",
+    ):
+        assert required in entrypoint_source
+    completed = subprocess.run(
+        [sys.executable, "-m", "py_compile", str(probe)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
