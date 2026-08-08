@@ -1119,6 +1119,98 @@ def layer0_decode_normalized_hidden(
     )
 
 
+def layer0_prompt_index_keys_chunked(
+    unique_embeddings: Any,
+    prompt_embedding_rows: Any,
+    input_norm_weight: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+    key_norm_mode: KeyNormMode = "divide_sqrt",
+) -> Any:
+    """Build layer-0 prompt keys with the accepted 2,048-row association.
+
+    Only row indices are padded before the four-chunk map.  Each map body
+    gathers and normalizes one prompt chunk, so this helper never creates a
+    full ``[prompt, hidden]`` materialization.  It is a bounded prefill
+    discriminator; decode remains a true one-row program.
+    """
+
+    expected_shapes = {
+        "unique_embeddings": (
+            unique_embeddings.shape[0],
+            geometry.hidden_size,
+        ),
+        "prompt_embedding_rows": (geometry.prompt_tokens,),
+        "input_norm_weight": (geometry.hidden_size,),
+        "wk_weight": (geometry.head_dim, geometry.hidden_size),
+        "key_norm_weight": (geometry.head_dim,),
+        "key_norm_bias": (geometry.head_dim,),
+    }
+    values = {
+        "unique_embeddings": unique_embeddings,
+        "prompt_embedding_rows": prompt_embedding_rows,
+        "input_norm_weight": input_norm_weight,
+        "wk_weight": wk_weight,
+        "key_norm_weight": key_norm_weight,
+        "key_norm_bias": key_norm_bias,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 chunked prompt-key {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if unique_embeddings.dtype != jnp.bfloat16 or (
+        input_norm_weight.dtype != jnp.bfloat16
+    ) or key_norm_weight.dtype != jnp.bfloat16 or (
+        key_norm_bias.dtype != jnp.bfloat16
+    ):
+        raise ValueError("layer-0 chunked embeddings/norms must remain BF16")
+    if prompt_embedding_rows.dtype != jnp.int32:
+        raise ValueError("layer-0 chunked prompt rows must remain int32")
+    if wk_weight.dtype != jnp.float32:
+        raise ValueError("layer-0 accepted adapted wk must remain FP32")
+
+    padded_tokens = (
+        (geometry.prompt_tokens + geometry.prompt_chunk - 1)
+        // geometry.prompt_chunk
+        * geometry.prompt_chunk
+    )
+    padded_rows = jnp.pad(
+        prompt_embedding_rows,
+        (0, padded_tokens - geometry.prompt_tokens),
+    ).reshape(-1, geometry.prompt_chunk)
+    position_chunks = jnp.arange(padded_tokens, dtype=jnp.int32).reshape(
+        -1, geometry.prompt_chunk
+    )
+
+    def prompt_key_chunk(inputs: tuple[Any, Any]) -> Any:
+        embedding_rows, positions = inputs
+        hidden = jnp.take(unique_embeddings, embedding_rows, axis=0)
+        normalized = rms_norm(
+            hidden,
+            input_norm_weight,
+            epsilon=geometry.rms_norm_epsilon,
+        )
+        return _project_keys(
+            normalized,
+            positions,
+            wk_weight,
+            key_norm_weight,
+            key_norm_bias,
+            geometry=geometry,
+            key_norm_mode=key_norm_mode,
+        )
+
+    return lax.map(
+        prompt_key_chunk,
+        (padded_rows, position_chunks),
+    ).reshape(padded_tokens, geometry.head_dim)[: geometry.prompt_tokens]
+
+
 def layer0_dsa_state(
     unique_embeddings: Any,
     prompt_embedding_rows: Any,

@@ -20,6 +20,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     affine_key_layer_norm,
     bfloat16_from_uint16_bits,
     layer0_dsa_state,
+    layer0_prompt_index_keys_chunked,
     layer0_dsa_state_from_q_residual,
     legacy_local_dcp_score_inputs,
     legacy_local_dcp_xla_scores,
@@ -81,6 +82,69 @@ def test_key_norm_modes_are_explicit_and_finite() -> None:
     assert divided.dtype == jnp.float32
     assert np.isfinite(np.asarray(divided)).all()
     assert np.isfinite(np.asarray(multiplied)).all()
+
+
+def test_chunked_prompt_keys_keep_only_live_rows() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=3,
+        hidden_size=8,
+        q_lora_rank=4,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    rng = np.random.default_rng(29)
+
+    def bf16(shape: tuple[int, ...]) -> jnp.ndarray:
+        return jnp.asarray(
+            rng.normal(size=shape).astype(ml_dtypes.bfloat16)
+        )
+
+    arguments = (
+        bf16((3, 8)),
+        jnp.asarray([0, 1, 2, 1, 0], dtype=jnp.int32),
+        bf16((8,)),
+        jnp.asarray(rng.normal(size=(4, 8)), dtype=jnp.float32),
+        bf16((4,)),
+        bf16((4,)),
+    )
+    divided = layer0_prompt_index_keys_chunked(
+        *arguments,
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+    )
+    multiplied = layer0_prompt_index_keys_chunked(
+        *arguments,
+        geometry=geometry,
+        key_norm_mode="multiply_rsqrt",
+    )
+    assert divided.shape == (5, 4)
+    assert divided.dtype == jnp.bfloat16
+    assert multiplied.shape == divided.shape
+    assert multiplied.dtype == divided.dtype
+    assert np.isfinite(np.asarray(divided, dtype=np.float32)).all()
+    assert np.isfinite(np.asarray(multiplied, dtype=np.float32)).all()
+    state = layer0_dsa_state(
+        arguments[0],
+        arguments[1],
+        jnp.asarray([2], dtype=jnp.int32),
+        arguments[2],
+        bf16((4, 8)),
+        bf16((4,)),
+        jnp.asarray(rng.normal(size=(8, 4)), dtype=jnp.float32),
+        arguments[3],
+        arguments[4],
+        arguments[5],
+        bf16((2, 8)),
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+    )
+    np.testing.assert_array_equal(
+        np.asarray(divided), np.asarray(state.index_keys[:5])
+    )
 
 
 def test_layer0_state_preserves_chunk_and_decode_geometry() -> None:

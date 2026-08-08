@@ -12,6 +12,7 @@ from glm_tpu.greenfield.validation.prompt_index_cache import (
     capture_legacy_prompt_index_cache,
     compare_prompt_index_key_bits,
     inspect_legacy_prompt_index_cache,
+    validate_prompt_index_key_association_hlo,
     validate_prompt_index_key_probe_hlo,
 )
 
@@ -196,6 +197,80 @@ ENTRY main {
     assert "bf16[32,6144]" in result["forbidden_shapes"]
 
 
+def test_prompt_key_association_hlo_accepts_pallas_divide_sqrt() -> None:
+    hlo = """
+ENTRY main {
+  %embeddings = bf16[37,6144]{1,0} parameter(0)
+  %rows = s32[8155]{0} parameter(1)
+  %wk = u8[128,6144]{1,0} parameter(2)
+  %scale = f32[1,48]{1,0} parameter(3)
+  %row = bf16[1,6144]{1,0} dynamic-slice(%embeddings)
+  %root = f32[1]{0} sqrt(%scale)
+  %normalized = f32[1]{0} divide(%scale, %root)
+  %keys = bf16[8155,128]{1,0} while(%row)
+  ROOT %call = f32[8,128]{1,0} custom-call(%row, %wk, %scale), custom_call_target="tpu_custom_call", backend_config="greenfield_fp8_block_matmul_f32_m8_k6144_n128"
+}
+"""
+    result = validate_prompt_index_key_association_hlo(
+        hlo, candidate="production_pallas_m1_divide_sqrt"
+    )
+    assert result["passed"] is True
+    assert result["association"]["mode"] == "divide_sqrt"
+
+
+def test_prompt_key_association_hlo_accepts_xla_modes() -> None:
+    common = """
+ENTRY main {
+  %embeddings = bf16[37,6144]{1,0} parameter(0)
+  %rows = s32[8155]{0} parameter(1)
+  %wk = f32[128,6144]{1,0} parameter(2)
+  %chunk = bf16[2048,6144]{1,0} dynamic-slice(%embeddings)
+  %projection = f32[2048,128]{1,0} convolution(%chunk, %wk), dim_labels=bf_oi->bf
+  %keys = bf16[8155,128]{1,0} while(%projection)
+  ASSOCIATION
+}
+"""
+    divide = common.replace(
+        "ASSOCIATION",
+        "%root = f32[1]{0} sqrt(%projection)\n"
+        "  ROOT %normalized = f32[1]{0} divide(%projection, %root)",
+    )
+    result = validate_prompt_index_key_association_hlo(
+        divide, candidate="accepted_xla_m2048_divide_sqrt"
+    )
+    assert result["passed"] is True
+    multiplied = common.replace(
+        "ASSOCIATION",
+        "%input_norm = f32[1]{0} rsqrt(%projection)\n"
+        "  ROOT %key_norm = f32[1]{0} rsqrt(%projection)",
+    )
+    result = validate_prompt_index_key_association_hlo(
+        multiplied, candidate="accepted_xla_m2048_multiply_rsqrt"
+    )
+    assert result["passed"] is True
+
+
+def test_prompt_key_association_hlo_rejects_full_prompt_hidden() -> None:
+    hlo = """
+ENTRY main {
+  %embeddings = bf16[37,6144]{1,0} parameter(0)
+  %rows = s32[8155]{0} parameter(1)
+  %wk = f32[128,6144]{1,0} parameter(2)
+  %chunk = bf16[2048,6144]{1,0} parameter(3)
+  %dead = bf16[4,2048,6144]{2,1,0} parameter(4)
+  %projection = f32[2048,128]{1,0} convolution(%chunk, %wk), dim_labels=bf_oi->bf
+  %keys = bf16[8155,128]{1,0} while(%projection)
+  %root = f32[1]{0} sqrt(%projection)
+  ROOT %normalized = f32[1]{0} divide(%projection, %root)
+}
+"""
+    result = validate_prompt_index_key_association_hlo(
+        hlo, candidate="accepted_xla_m2048_divide_sqrt"
+    )
+    assert result["passed"] is False
+    assert "bf16[4,2048,6144]" in result["forbidden_shapes"]
+
+
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
     repo = Path(__file__).resolve().parents[3]
     probe = repo / "scripts/greenfield/probe_layer0_prompt_index_cache.py"
@@ -208,10 +283,18 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
     resume = repo / (
         "scripts/greenfield/run_prompt_index_cache_comparison.sh"
     )
+    association_probe = repo / (
+        "scripts/greenfield/probe_layer0_prompt_index_cache_association.py"
+    )
+    association_wrapper = repo / (
+        "scripts/greenfield/run_prompt_index_cache_association_probe.sh"
+    )
     probe_source = probe.read_text()
     wrapper_source = wrapper.read_text()
     entrypoint_source = entrypoint.read_text()
     resume_source = resume.read_text()
+    association_probe_source = association_probe.read_text()
+    association_wrapper_source = association_wrapper.read_text()
     for required in (
         "fp8_block_matmul_f32",
         "dsa_index_keys_from_projection",
@@ -269,10 +352,38 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "from vllm",
     ):
         assert forbidden not in resume_source
-    completed = subprocess.run(
-        [sys.executable, "-m", "py_compile", str(probe)],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+    for required in (
+        "production_pallas_m1_divide_sqrt",
+        "accepted_xla_m2048_divide_sqrt",
+        "accepted_xla_m2048_multiply_rsqrt",
+        "layer0_prompt_index_keys_chunked",
+        "validate_prompt_index_key_association_hlo",
+        '"performance_claim": False',
+    ):
+        assert required in association_probe_source
+    for required in (
+        "SOURCE_RUN_ID=506",
+        "SOURCE_ITEM_ROW_ID=1789",
+        "SOURCE_CACHE_MANIFEST_SHA=d869f6cf",
+        "SOURCE_COMPARISON_MANIFEST_SHA=b1822e71",
+        "probe_layer0_prompt_index_cache_association.py",
+        "strict_census post",
+        '"performance_claim": "false"',
+    ):
+        assert required in association_wrapper_source
+    for forbidden in (
+        "import tpu_inference",
+        "from tpu_inference",
+        "import vllm",
+        "from vllm",
+    ):
+        assert forbidden not in association_probe_source
+        assert forbidden not in association_wrapper_source
+    for script in (probe, association_probe):
+        completed = subprocess.run(
+            [sys.executable, "-m", "py_compile", str(script)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stdout + completed.stderr

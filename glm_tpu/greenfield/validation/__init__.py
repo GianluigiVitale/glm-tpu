@@ -32,6 +32,7 @@ from .prompt_index_cache import (
     capture_legacy_prompt_index_cache,
     compare_prompt_index_key_bits,
     inspect_legacy_prompt_index_cache,
+    validate_prompt_index_key_association_hlo,
     validate_prompt_index_key_probe_hlo,
 )
 from .short_context_oracle import (
@@ -81,6 +82,7 @@ __all__ = (
     "inspect_layer0_dsa_association_input",
     "inspect_one_layer_oracle",
     "inspect_legacy_prompt_index_cache",
+    "validate_prompt_index_key_association_hlo",
     "validate_prompt_index_key_probe_hlo",
     "inspect_short_context_oracle",
     "inspect_short_context_dsa_oracle",

@@ -582,3 +582,148 @@ def validate_prompt_index_key_probe_hlo(
         "required_shapes": required_shapes,
         "violations": violations,
     }
+
+
+def validate_prompt_index_key_association_hlo(
+    optimized_hlo: str,
+    *,
+    candidate: str,
+    prompt_token_count: int = 8155,
+    prompt_chunk: int = 2048,
+    unique_token_count: int = 37,
+) -> dict[str, Any]:
+    """Pin the bounded key-LayerNorm/projection association candidates."""
+
+    candidates = {
+        "production_pallas_m1_divide_sqrt": ("pallas", "divide_sqrt"),
+        "accepted_xla_m2048_divide_sqrt": ("xla", "divide_sqrt"),
+        "accepted_xla_m2048_multiply_rsqrt": (
+            "xla",
+            "multiply_rsqrt",
+        ),
+    }
+    if candidate not in candidates:
+        raise ValueError(f"unsupported prompt-key association {candidate!r}")
+    backend, norm_mode = candidates[candidate]
+    if backend == "pallas":
+        result = validate_prompt_index_key_probe_hlo(
+            optimized_hlo,
+            prompt_token_count=prompt_token_count,
+            unique_token_count=unique_token_count,
+        )
+    else:
+        lowered = optimized_hlo.lower()
+        convolution_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(
+                rf"= f32\[{prompt_chunk},128\].* convolution\(", line
+            )
+            and "dim_labels=bf_oi->bf" in line
+        ]
+        while_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(r"\bwhile\(", line)
+        ]
+        forbidden_operations = {
+            name: lowered.count(name)
+            for name in (
+                "all-reduce",
+                "all-gather",
+                "all-to-all",
+                "collective-permute",
+                "reduce-scatter",
+                "host_callback",
+                "xla_python_cpu_callback",
+                "tpu_custom_call",
+            )
+            if name in lowered
+        }
+        forbidden_shapes = [
+            shape
+            for shape in (
+                "bf16[32,6144]",
+                "f32[32,6144]",
+                f"bf16[{prompt_token_count},6144]",
+                f"f32[{prompt_token_count},6144]",
+                "bf16[8192,6144]",
+                "f32[8192,6144]",
+                "bf16[4,2048,6144]",
+                "f32[4,2048,6144]",
+            )
+            if shape in lowered
+        ]
+        required_shapes = {
+            "accepted_adapted_wk": "f32[128,6144]" in lowered,
+            "chunk_hidden": f"bf16[{prompt_chunk},6144]" in lowered,
+            "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
+            "prompt_key_output": (
+                f"bf16[{prompt_token_count},128]" in lowered
+            ),
+            "prompt_row_indices": f"s32[{prompt_token_count}]" in lowered,
+            "unique_embedding_rows": (
+                f"bf16[{unique_token_count},6144]" in lowered
+            ),
+        }
+        violations: list[str] = []
+        if len(convolution_lines) != 1:
+            violations.append(
+                "expected one accepted M2048 wk convolution, "
+                f"found {len(convolution_lines)}"
+            )
+        if len(while_lines) != 1:
+            violations.append(
+                f"expected one chunk map loop, found {len(while_lines)}"
+            )
+        if forbidden_operations:
+            violations.append(
+                f"forbidden operations: {forbidden_operations}"
+            )
+        if forbidden_shapes:
+            violations.append(
+                f"forbidden hidden/dead-row shapes: {forbidden_shapes}"
+            )
+        missing = sorted(
+            name for name, present in required_shapes.items() if not present
+        )
+        if missing:
+            violations.append(f"missing association HLO shapes: {missing}")
+        result = {
+            "accepted_convolution_count": len(convolution_lines),
+            "forbidden_operations": forbidden_operations,
+            "forbidden_shapes": forbidden_shapes,
+            "outer_map_while_count": len(while_lines),
+            "passed": not violations,
+            "required_shapes": required_shapes,
+            "violations": violations,
+        }
+
+    lowered = optimized_hlo.lower()
+    sqrt_count = len(re.findall(r"\bsqrt\(", lowered))
+    divide_count = len(re.findall(r"\bdivide\(", lowered))
+    rsqrt_count = len(re.findall(r"\brsqrt\(", lowered))
+    association_violations: list[str] = []
+    if norm_mode == "divide_sqrt":
+        if sqrt_count < 1 or divide_count < 1:
+            association_violations.append(
+                "divide/sqrt key LayerNorm is absent"
+            )
+    elif sqrt_count != 0 or divide_count != 0 or rsqrt_count < 2:
+        association_violations.append(
+            "multiply/rsqrt key LayerNorm identity drifted"
+        )
+    result["association"] = {
+        "backend": backend,
+        "divide_count": divide_count,
+        "mode": norm_mode,
+        "rsqrt_count": rsqrt_count,
+        "sqrt_count": sqrt_count,
+    }
+    if association_violations:
+        result["violations"] = [
+            *result.get("violations", []),
+            *association_violations,
+        ]
+        result["passed"] = False
+    return result
