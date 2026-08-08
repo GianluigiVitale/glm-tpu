@@ -7,13 +7,35 @@ readonly ZONE=us-central2-b
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly HARNESS_REPO=/home/gianl/glm-tpu
-readonly LEGACY_REPO=/home/gianl/tpu-inference
-readonly LEGACY_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
+readonly ORACLE_REPO=/home/gianl/tpu-inference
+readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
+readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
+  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-868893780
+  readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
+  readonly OBSERVER_COMMIT_DISTANCE=1
+  readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
+  readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
+  readonly LEGACY_PIN=868893780c4f54670cc7897c2abc05735528749d
+else
+  readonly LEGACY_REPO=$ORACLE_REPO
+  readonly LEGACY_SOURCE_REPO=$ORACLE_REPO
+  readonly LEGACY_PIN=$ORACLE_PIN
+fi
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly DISK_MIN_FREE_GB=10
 readonly DISK_WARN_FREE_GB=15
+readonly MODEL_ID=zai-org/GLM-5.2-FP8
+readonly REFERENCE_8K_DSA_ORACLE=/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle
+readonly LAYER0_INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
+readonly LAYER0_INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
+readonly DISTRIBUTED_Q_A_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact
+readonly DISTRIBUTED_Q_A_MANIFEST_SHA=7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c43dcded7d809120e30d8c16
+readonly DISTRIBUTED_Q_A_CODE_HASH=ea879a24d196f61e238a22ee5bb393d3b6fa938d
+readonly INTERNAL_LAYER=model.layers.0.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
 case "$PROFILE" in
@@ -67,13 +89,15 @@ readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 HARNESS_PIN=$(git -C "$HARNESS_REPO" rev-parse HEAD)
 HARNESS_SHORT=$(git -C "$HARNESS_REPO" rev-parse --short HEAD)
-LEGACY_SHORT=$(git -C "$LEGACY_REPO" rev-parse --short HEAD)
+LEGACY_SHORT=$(git -C "$LEGACY_SOURCE_REPO" rev-parse --short HEAD)
 TAG=${GLM_GREENFIELD_SHORT_DSA_ORACLE_TAG:-${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 SOURCE_DIR=$RUN_DIR/source_dumps
 ORACLE_DIR=$RUN_DIR/oracle
-REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/$PROFILE/$TAG
+REMOTE_PREFIX=${GLM_GREENFIELD_SHORT_DSA_REMOTE_PREFIX:-$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/$PROFILE/$TAG}
 DUMP_PREFIX=/tmp/$TAG/topk.npz
+INTERNAL_DUMP_PREFIX=/tmp/$TAG/internals.npz
+INTERNAL_COMPARISON_DIR=$RUN_DIR/internal_comparison
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing DSA oracle outside $BRANCH" >&2
@@ -87,18 +111,46 @@ DUMP_PREFIX=/tmp/$TAG/topk.npz
   echo "tracked harness files are dirty" >&2
   exit 2
 }
-[[ $(git -C "$LEGACY_REPO" rev-parse HEAD) == "$LEGACY_PIN" ]] || {
+[[ $(git -C "$LEGACY_SOURCE_REPO" rev-parse HEAD) == "$LEGACY_PIN" ]] || {
   echo "legacy repository pin changed" >&2
   exit 2
 }
-[[ -z $(git -C "$LEGACY_REPO" status --porcelain --untracked-files=no) ]] || {
+[[ -z $(git -C "$LEGACY_SOURCE_REPO" status --porcelain --untracked-files=no) ]] || {
   echo "tracked legacy files are dirty" >&2
   exit 2
 }
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  [[ $(git -C "$ORACLE_REPO" rev-parse HEAD) == "$ORACLE_PIN" ]] || {
+    echo "accepted legacy oracle pin changed" >&2
+    exit 2
+  }
+  [[ -z $(git -C "$ORACLE_REPO" status --porcelain --untracked-files=no) ]] || {
+    echo "accepted legacy oracle worktree is dirty" >&2
+    exit 2
+  }
+  git -C "$LEGACY_SOURCE_REPO" merge-base --is-ancestor \
+    "$ORACLE_PIN" "$LEGACY_PIN" || {
+      echo "legacy observer does not descend from the accepted oracle" >&2
+      exit 2
+    }
+  [[ $(git -C "$LEGACY_SOURCE_REPO" rev-list --count \
+    "$ORACLE_PIN..$LEGACY_PIN") -eq $OBSERVER_COMMIT_DISTANCE ]] || {
+      echo "legacy observer commit distance drifted" >&2
+      exit 2
+    }
+fi
 [[ -r $RESULTS_DB && -r $TOKEN_ORACLE_DIR/manifest.json ]] || {
   echo "source DB or sealed token oracle is unavailable" >&2
   exit 2
 }
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  [[ -r $REFERENCE_8K_DSA_ORACLE/manifest.json &&
+     -r $LAYER0_INPUT_DIR/manifest.json &&
+     -r $DISTRIBUTED_Q_A_DIR/manifest.json ]] || {
+    echo "sealed DSA/internal comparison prerequisites are unavailable" >&2
+    exit 2
+  }
+fi
 [[ ! -e $RUN_DIR ]] || {
   echo "append-only run directory exists: $RUN_DIR" >&2
   exit 2
@@ -177,18 +229,44 @@ MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
     exit 1
   }
 
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  # Materialize the one-commit observer in a pin-specific detached worktree;
+  # the accepted oracle checkout remains untouched on every host.
+  # shellcheck disable=SC2016
+  sync_observer='set -e; base='"$ORACLE_REPO"'; dest='"$OBSERVER_RUNTIME_REPO"'; pin='"$LEGACY_PIN"'; oracle='"$ORACLE_PIN"'; branch='"$OBSERVER_BRANCH"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then :; elif [ -e "$dest" ]; then echo "SYNC_BAD $(hostname) destination_exists"; exit 0; else git -C "$base" fetch origin "$branch" >/dev/null 2>&1 && git -C "$base" worktree add --detach "$dest" "$pin" >/dev/null 2>&1; fi; code=$(git -C "$dest" rev-parse HEAD); dirty=$(git -C "$dest" status --porcelain | wc -l); commits=$(git -C "$dest" rev-list --count "$oracle..$pin"); ancestor=0; git -C "$dest" merge-base --is-ancestor "$oracle" "$pin" && ancestor=1; if [ "$code" = "$pin" ] && [ "$dirty" -eq 0 ] && [ "$commits" -eq "$distance" ] && [ "$ancestor" -eq 1 ]; then echo "SYNC_OK $(hostname)"; else echo "SYNC_BAD $(hostname) code=$code dirty=$dirty commits=$commits ancestor=$ancestor"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$sync_observer" >"$RUN_DIR/sync_observer.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/sync_observer.txt" SYNC_OK || {
+    say "ABORT: exact DSA internal observer is unavailable on all hosts"
+    exit 1
+  }
+fi
+
 # All hosts must carry the exact clean legacy tree, golden state file, and
 # approved read-only OOB checkpoint mirror used by the PWAL self-healer.
 # shellcheck disable=SC2016
-prereq='code=$(git -C /home/gianl/tpu-inference rev-parse HEAD); dirty=$(git -C /home/gianl/tpu-inference status --porcelain --untracked-files=no | wc -l); mount_source=$(findmnt -T '"$OOB_DIR"' -n -o SOURCE 2>/dev/null); mount_type=$(findmnt -T '"$OOB_DIR"' -n -o FSTYPE 2>/dev/null); if [ "$code" = '"$LEGACY_PIN"' ] && [ "$dirty" -eq 0 ] && [ -r /tmp/golden.json ] && [ -r '"$OOB_DIR"'/model.safetensors.index.json ] && [ "$mount_source" = driftbench-dsv4-uc ] && [ "$mount_type" = fuse.gcsfuse ] && [ ! -e /tmp/'"$TAG"' ]; then echo "PREREQ_OK $(hostname)"; else echo "PREREQ_BAD $(hostname) code=$code dirty=$dirty mount_source=$mount_source mount_type=$mount_type"; fi'
+prereq='code=$(git -C '"$LEGACY_REPO"' rev-parse HEAD); dirty=$(git -C '"$LEGACY_REPO"' status --porcelain --untracked-files=no | wc -l); mount_source=$(findmnt -T '"$OOB_DIR"' -n -o SOURCE 2>/dev/null); mount_type=$(findmnt -T '"$OOB_DIR"' -n -o FSTYPE 2>/dev/null); if [ "$code" = '"$LEGACY_PIN"' ] && [ "$dirty" -eq 0 ] && [ -r /tmp/golden.json ] && [ -r '"$OOB_DIR"'/model.safetensors.index.json ] && [ "$mount_source" = driftbench-dsv4-uc ] && [ "$mount_type" = fuse.gcsfuse ] && [ ! -e /tmp/'"$TAG"' ]; then echo "PREREQ_OK $(hostname)"; else echo "PREREQ_BAD $(hostname) code=$code dirty=$dirty mount_source=$mount_source mount_type=$mount_type"; fi'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$prereq" >"$RUN_DIR/prereq.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/prereq.txt" PREREQ_OK || {
   say "ABORT: exact legacy/golden/OOB/dump prerequisite failed"
   exit 1
 }
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  # shellcheck disable=SC2016
+  oracle_prereq='code=$(git -C '"$ORACLE_REPO"' rev-parse HEAD); dirty=$(git -C '"$ORACLE_REPO"' status --porcelain --untracked-files=no | wc -l); if [ "$code" = '"$ORACLE_PIN"' ] && [ "$dirty" -eq 0 ]; then echo "ORACLE_OK $(hostname)"; else echo "ORACLE_BAD $(hostname) code=$code dirty=$dirty"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$oracle_prereq" >"$RUN_DIR/oracle_prereq.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/oracle_prereq.txt" ORACLE_OK || {
+    say "ABORT: accepted legacy oracle checkout drifted on the fleet"
+    exit 1
+  }
+fi
 
 COMMON_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"' GLM_DSA_DUMP_TOPK_EVENTS=all GLM_DSA_DUMP_TOPK_SKIP_WARMUP=1 GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$FIRST_DECODE_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
+fi
 RAYLET_ENVS="$COMMON_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
 DRIVER_ENVS='NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=1 JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=120000 '"$COMMON_ENVS"
 
@@ -201,6 +279,10 @@ runtime_started=1
 # Verify every raylet inherited every source-defining flag.
 # shellcheck disable=SC2016
 env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_oracle_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP=1" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_DCP_SCATTER_IMPL=flat" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=all" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  # shellcheck disable=SC2016
+  env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_internal_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS='"$INTERNAL_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_LAYER='"$INTERNAL_LAYER"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_POSITION='"$FIRST_DECODE_POSITION"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_RUN_TAG='"$TAG"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_CODE_HASH='"$LEGACY_PIN"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
+fi
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$env_check" >"$RUN_DIR/raylet_env.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/raylet_env.txt" ENV_OK || {
@@ -242,6 +324,17 @@ has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
   say "ABORT: load/final-state integrity is not exact on all eight hosts"
   exit 1
 }
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  # Every JAX process must trace, arm, and write the same one-row observer.
+  # shellcheck disable=SC2016
+  internal_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] first state file written" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$FIRST_DECODE_POSITION"'.proc*.npz" 2>/dev/null | wc -l); errors=$(find /tmp/'"$TAG"' -type f -name "*.INTERNAL.ERROR.*" 2>/dev/null | wc -l); printf "%s\n%s\nfiles=%s errors=%s\n" "$armed" "$wrote" "$files" "$errors"; if [ -n "$armed" ] && [ -n "$wrote" ] && [ "$files" -eq 1 ] && [ "$errors" -eq 0 ]; then echo "INTERNAL_OK $(hostname)"; else echo "INTERNAL_BAD $(hostname)"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$internal_integrity" >"$RUN_DIR/fleet_internal_integrity.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/fleet_internal_integrity.txt" INTERNAL_OK || {
+    say "ABORT: layer-0 DSA internal capture is incomplete on the fleet"
+    exit 1
+  }
+fi
 
 run_id=$(sed -n 's/.*\[longctx\] run_id=\([0-9][0-9]*\).*/\1/p' \
   "$RUN_DIR/legacy.log" | tail -1)
@@ -267,6 +360,15 @@ dump_count=$(find "$SOURCE_DIR" -type f -name 'topk.step*.evt*.proc*.npz' | wc -
   say "ABORT: incomplete DSA source capture files=$dump_count"
   exit 1
 }
+internal_count=0
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  internal_count=$(find "$SOURCE_DIR" -type f \
+    -name "internals.*.position${FIRST_DECODE_POSITION}.proc*.npz" | wc -l)
+  [[ $internal_count -eq 8 ]] || {
+    say "ABORT: expected eight DSA internal files, found $internal_count"
+    exit 1
+  }
+fi
 
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$run_id" \
   "$EXPECTED_PROMPT_TOKENS" "$EXPECTED_GENERATED_TOKENS" \
@@ -331,6 +433,21 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --first-decode-position "$FIRST_DECODE_POSITION" \
   --selected-width 2048 >"$RUN_DIR/capture.json"
 
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+    "$REFERENCE_8K_DSA_ORACLE" "$ORACLE_DIR" \
+    >"$RUN_DIR/dsa_exact_comparison.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+from glm_tpu.greenfield.validation import compare_short_context_dsa_oracles
+
+value = compare_short_context_dsa_oracles(Path(sys.argv[1]), Path(sys.argv[2]))
+print(json.dumps(value, indent=2, sort_keys=True))
+PY
+fi
+
 # Snapshot the append-only provenance DB at the exact source row.
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$RUN_DIR/results_ckpt.db" <<'PY'
 import sqlite3
@@ -346,6 +463,26 @@ PY
 
 stop_owned_runtime
 runtime_started=0
+if [[ $INTERNAL_CAPTURE == 1 ]]; then
+  say "comparing accepted layer-0 scorer state on one local TPU host"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/compare_legacy_layer0_dsa_internals.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --layer0-input-dir "$LAYER0_INPUT_DIR" \
+    --distributed-q-a-norm-dir "$DISTRIBUTED_Q_A_DIR" \
+    --output "$INTERNAL_COMPARISON_DIR" \
+    --run-tag "$TAG" \
+    --greenfield-code-hash "$PIN" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --input-manifest-sha256 "$LAYER0_INPUT_MANIFEST_SHA" \
+    --q-a-manifest-sha256 "$DISTRIBUTED_Q_A_MANIFEST_SHA" \
+    --q-a-code-hash "$DISTRIBUTED_Q_A_CODE_HASH" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$FIRST_DECODE_POSITION" \
+    --process-count 8 >"$RUN_DIR/internal_comparison_summary.json"
+fi
 strict_census post || {
   say "ABORT: post-run census is not eight-host zero work"
   exit 1
@@ -435,7 +572,8 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
   "$REMOTE_PREFIX/remote_objects.json" >/dev/null
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
-  "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" <<'PY'
+  "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" \
+  "$INTERNAL_CAPTURE" "$internal_count" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -456,6 +594,23 @@ lines = {
     "remote_objects_sha256": sha256((root / "remote_objects.json").read_bytes()).hexdigest(),
     "remote_prefix": remote,
 }
+if sys.argv[8] == "1":
+    comparison = json.loads(
+        (root / "internal_comparison" / "comparison.json").read_text()
+    )
+    exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
+    lines.update({
+        "dsa_internal_capture": "true",
+        "dsa_internal_file_count": sys.argv[9],
+        "dsa_internal_actual_sha256": comparison[
+            "replicated_actual_sha256"
+        ],
+        "dsa_internal_first_divergent_field": comparison[
+            "first_divergent_field"
+        ] or "none",
+        "dsa_event_tensors_exact": str(exact_dsa["exact"]).lower(),
+        "accepted_oracle_pin": comparison["oracle_pin"],
+    })
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in lines.items())
 )

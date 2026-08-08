@@ -11,6 +11,7 @@ import pytest
 from glm_tpu.greenfield.validation.short_context_dsa_oracle import (
     ShortContextDsaOracleConfig,
     capture_short_context_dsa_oracle,
+    compare_short_context_dsa_oracles,
     inspect_short_context_dsa_oracle,
 )
 from glm_tpu.greenfield.validation.short_context_oracle import (
@@ -213,6 +214,13 @@ def test_short_context_dsa_oracle_roundtrip_and_append_only(
     assert inspect_short_context_dsa_oracle(config.output_dir) == manifest
     assert manifest["event_contract"]["producer_layer_ids"] == [0, 4]
     assert len(manifest["source_dump_files"]) == 4
+    comparison = compare_short_context_dsa_oracles(
+        config.output_dir, config.output_dir
+    )
+    assert comparison["exact"] is True
+    assert all(
+        value["elementwise_exact"] for value in comparison["arrays"].values()
+    )
     with pytest.raises(FileExistsError, match="append-only"):
         capture_short_context_dsa_oracle(config)
 

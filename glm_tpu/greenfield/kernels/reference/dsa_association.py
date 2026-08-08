@@ -162,6 +162,14 @@ class Layer0DsaState(NamedTuple):
     qkv_a_companion: Any
 
 
+class Layer0DsaScorerInternals(NamedTuple):
+    """Actual source-level tensors entering the layer-0 DSA scorer."""
+
+    query: Any
+    head_weights: Any
+    current_keys: Any
+
+
 class LegacyFusedQkvRuntimeWeights(NamedTuple):
     """Raw-FP8 runtime layouts produced by the sealed TP32 loader."""
 
@@ -732,6 +740,128 @@ def _project_keys(
     return jnp.concatenate(
         (rotated, keys[:, geometry.rotary_dim :]), axis=-1
     ).astype(jnp.bfloat16)
+
+
+def layer0_dsa_scorer_internals(
+    normalized_hidden: Any,
+    q_residual: Any,
+    positions: Any,
+    wq_b_weight: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    head_weight: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> Layer0DsaScorerInternals:
+    """Reproduce the three adapted tensors at the accepted scorer boundary.
+
+    Unlike :func:`_project_keys`, ``current_keys`` intentionally remains
+    FP32.  The accepted callback observes the post-RoPE value before its
+    separate BF16 cache write, which makes this a narrow arithmetic
+    discriminator rather than a reconstructed prompt-cache claim.
+    """
+
+    expected_shapes = {
+        "normalized_hidden": (geometry.decode_rows, geometry.hidden_size),
+        "q_residual": (geometry.decode_rows, geometry.q_lora_rank),
+        "positions": (geometry.decode_rows,),
+        "wq_b_weight": (
+            geometry.heads * geometry.head_dim,
+            geometry.q_lora_rank,
+        ),
+        "wk_weight": (geometry.head_dim, geometry.hidden_size),
+        "key_norm_weight": (geometry.head_dim,),
+        "key_norm_bias": (geometry.head_dim,),
+        "head_weight": (geometry.heads, geometry.hidden_size),
+    }
+    values = {
+        "normalized_hidden": normalized_hidden,
+        "q_residual": q_residual,
+        "positions": positions,
+        "wq_b_weight": wq_b_weight,
+        "wk_weight": wk_weight,
+        "key_norm_weight": key_norm_weight,
+        "key_norm_bias": key_norm_bias,
+        "head_weight": head_weight,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 scorer internal {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if normalized_hidden.dtype != jnp.bfloat16 or (
+        q_residual.dtype != jnp.bfloat16
+    ):
+        raise ValueError("layer-0 scorer hidden/q state must be BF16")
+    if positions.dtype != jnp.int32:
+        raise ValueError("layer-0 scorer positions must be int32")
+    for name in (
+        "wq_b_weight",
+        "wk_weight",
+        "key_norm_weight",
+        "key_norm_bias",
+        "head_weight",
+    ):
+        if values[name].dtype != jnp.float32:
+            raise ValueError(f"layer-0 scorer {name} must be FP32")
+
+    query = _dot_out_in(
+        q_residual.astype(jnp.float32),
+        wq_b_weight,
+        output_dtype=jnp.float32,
+    ).reshape(geometry.decode_rows, geometry.heads, geometry.head_dim)
+    query_cos, query_sin = rotary_cos_sin(
+        positions,
+        rotary_dim=geometry.rotary_dim,
+        theta=geometry.theta,
+        dtype=jnp.float32,
+    )
+    rotated_query = apply_rotary(
+        query[:, :, : geometry.rotary_dim],
+        query_cos[:, None, :],
+        query_sin[:, None, :],
+        interleaved=True,
+    )
+    query = jnp.concatenate(
+        (rotated_query, query[:, :, geometry.rotary_dim :]), axis=-1
+    ).astype(jnp.float32)
+
+    hidden_f32 = normalized_hidden.astype(jnp.float32)
+    head_weights = _dot_out_in(
+        hidden_f32,
+        head_weight,
+        output_dtype=jnp.float32,
+    ) * jnp.float32(geometry.heads**-0.5)
+    key_pre = _dot_out_in(
+        hidden_f32,
+        wk_weight,
+        output_dtype=jnp.float32,
+    )
+    current_keys = affine_key_layer_norm(
+        key_pre,
+        key_norm_weight,
+        key_norm_bias,
+        epsilon=geometry.key_norm_epsilon,
+        mode="divide_sqrt",
+    )
+    key_cos, key_sin = rotary_cos_sin(
+        positions,
+        rotary_dim=geometry.rotary_dim,
+        theta=geometry.theta,
+        dtype=jnp.float32,
+    )
+    rotated_keys = apply_rotary(
+        current_keys[:, : geometry.rotary_dim],
+        key_cos,
+        key_sin,
+        interleaved=True,
+    )
+    current_keys = jnp.concatenate(
+        (rotated_keys, current_keys[:, geometry.rotary_dim :]), axis=-1
+    ).astype(jnp.float32)
+    return Layer0DsaScorerInternals(query, head_weights, current_keys)
 
 
 def layer0_decode_normalized_hidden(

@@ -743,3 +743,55 @@ def inspect_short_context_dsa_oracle(output_dir: Path) -> dict[str, Any]:
         ):
             raise ValueError("short-context DSA padded-row provenance drifted")
     return manifest
+
+
+def compare_short_context_dsa_oracles(
+    reference_dir: Path,
+    candidate_dir: Path,
+) -> dict[str, Any]:
+    """Require exact event tensors while allowing capture provenance to differ."""
+
+    from safetensors import safe_open
+
+    reference_dir = Path(reference_dir)
+    candidate_dir = Path(candidate_dir)
+    reference = inspect_short_context_dsa_oracle(reference_dir)
+    candidate = inspect_short_context_dsa_oracle(candidate_dir)
+    if reference["event_contract"] != candidate["event_contract"] or (
+        reference.get("token_oracle") != candidate.get("token_oracle")
+    ):
+        raise ValueError("short-context DSA oracle semantic contract drifted")
+
+    def load(path: Path) -> dict[str, np.ndarray]:
+        with safe_open(path / "dsa_events.safetensors", framework="np") as handle:
+            return {name: handle.get_tensor(name).copy() for name in handle.keys()}
+
+    reference_arrays = load(reference_dir)
+    candidate_arrays = load(candidate_dir)
+    if set(reference_arrays) != set(candidate_arrays):
+        raise ValueError("short-context DSA oracle array keys drifted")
+    arrays: dict[str, dict[str, Any]] = {}
+    for name in sorted(reference_arrays):
+        expected = reference_arrays[name]
+        observed = candidate_arrays[name]
+        exact = (
+            expected.shape == observed.shape
+            and expected.dtype == observed.dtype
+            and np.array_equal(expected, observed)
+        )
+        arrays[name] = {
+            "candidate_sha256": _array_sha256(observed),
+            "dtype": str(expected.dtype),
+            "elementwise_exact": exact,
+            "reference_sha256": _array_sha256(expected),
+            "shape": list(expected.shape),
+        }
+        if not exact:
+            raise ValueError(f"short-context DSA oracle {name} drifted")
+    return {
+        "artifact_kind": "greenfield_short_context_dsa_oracle_exact_comparison",
+        "candidate_manifest_sha256": candidate["manifest_sha256"],
+        "reference_manifest_sha256": reference["manifest_sha256"],
+        "arrays": arrays,
+        "exact": True,
+    }

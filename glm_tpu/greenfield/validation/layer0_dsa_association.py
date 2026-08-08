@@ -215,6 +215,72 @@ def inspect_layer0_dsa_association_input(
     return manifest, arrays
 
 
+def inspect_distributed_q_a_norm_artifact(
+    artifact_dir: Path,
+    *,
+    expected_manifest_sha256: str,
+    expected_code_hash: str,
+    expected_input_manifest_sha256: str,
+) -> tuple[dict[str, Any], np.ndarray]:
+    """Verify and load the immutable DB491 distributed q-a result."""
+
+    from safetensors import safe_open
+
+    artifact_dir = Path(artifact_dir)
+    manifest = json.loads((artifact_dir / "manifest.json").read_text())
+    if manifest.get("artifact_kind") != "greenfield_distributed_q_a_norm" or (
+        manifest.get("format_version") != 1
+        or manifest.get("diagnostic_only") is not True
+    ):
+        raise ValueError("unsupported distributed q-a norm artifact")
+    if manifest.get("manifest_sha256") != _manifest_hash(manifest) or (
+        manifest.get("manifest_sha256") != expected_manifest_sha256
+    ):
+        raise ValueError("distributed q-a norm manifest checksum mismatch")
+    if manifest.get("code_hash") != expected_code_hash or (
+        manifest.get("input_manifest_sha256")
+        != expected_input_manifest_sha256
+    ):
+        raise ValueError("distributed q-a norm provenance drifted")
+    if manifest.get("model_config") != {
+        "path": "reference/hf-repo/config.json",
+        "sha256": (
+            "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff"
+        ),
+        "rms_norm_eps": 1e-5,
+    } or manifest.get("numerical_geometry") != {
+        "input_rms_norm_epsilon": 1e-5,
+        "q_a_rms_norm_epsilon": 1e-5,
+        "key_layer_norm_epsilon": 1e-6,
+    }:
+        raise ValueError("distributed q-a norm numerical provenance drifted")
+    file_record = manifest.get("file", {})
+    if file_record.get("filename") != "distributed_q_a_norm.safetensors":
+        raise ValueError("distributed q-a norm filename drifted")
+    tensor_path = artifact_dir / file_record["filename"]
+    if tensor_path.stat().st_size != file_record.get("byte_count") or (
+        _sha256_file(tensor_path) != file_record.get("sha256")
+    ):
+        raise ValueError("distributed q-a norm tensor integrity failed")
+    with safe_open(tensor_path, framework="np") as handle:
+        if handle.metadata() != {
+            "artifact_kind": "greenfield_distributed_q_a_norm",
+            "format_version": "1",
+        } or list(handle.keys()) != ["q_residual_bfloat16_bits"]:
+            raise ValueError("distributed q-a norm tensor metadata drifted")
+        q_bits = handle.get_tensor("q_residual_bfloat16_bits").copy()
+    q_record = manifest.get("q_residual", {})
+    if q_bits.shape != (32, 2048) or q_bits.dtype != np.uint16 or (
+        q_record.get("shape") != [32, 2048]
+        or q_record.get("dtype") != "bfloat16"
+        or q_record.get("byte_count") != q_bits.nbytes
+        or q_record.get("sha256")
+        != sha256(q_bits.view(np.uint8)).hexdigest()
+    ):
+        raise ValueError("distributed q-a norm tensor contract drifted")
+    return manifest, q_bits
+
+
 def compare_dsa_association_scores(
     scores: np.ndarray,
     expected_positions: np.ndarray,
