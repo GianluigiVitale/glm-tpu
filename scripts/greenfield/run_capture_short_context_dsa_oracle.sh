@@ -325,13 +325,21 @@ has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
   exit 1
 }
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  # Every JAX process must trace, arm, and write the same one-row observer.
+  # Every JAX process must trace and arm the callback. The decode token row is
+  # DCP-sharded, so exactly its owner (process 0 for this sealed one-request
+  # workload) observes position 8155 and writes the state artifact. Requiring
+  # eight files would require a new full-pod gather in the diagnostic itself.
   # shellcheck disable=SC2016
-  internal_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] first state file written" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$FIRST_DECODE_POSITION"'.proc*.npz" 2>/dev/null | wc -l); errors=$(find /tmp/'"$TAG"' -type f -name "*.INTERNAL.ERROR.*" 2>/dev/null | wc -l); printf "%s\n%s\nfiles=%s errors=%s\n" "$armed" "$wrote" "$files" "$errors"; if [ -n "$armed" ] && [ -n "$wrote" ] && [ "$files" -eq 1 ] && [ "$errors" -eq 0 ]; then echo "INTERNAL_OK $(hostname)"; else echo "INTERNAL_BAD $(hostname)"; fi'
+  internal_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] first state file written" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$FIRST_DECODE_POSITION"'.proc*.npz" 2>/dev/null | wc -l); owner=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$FIRST_DECODE_POSITION"'.proc0.npz" 2>/dev/null | head -1); errors=$(find /tmp/'"$TAG"' -type f -name "*.INTERNAL.ERROR.*" 2>/dev/null | wc -l); printf "%s\n%s\nfiles=%s errors=%s\n" "$armed" "$wrote" "$files" "$errors"; if [ -z "$armed" ] || [ "$errors" -ne 0 ] || [ "$files" -gt 1 ]; then echo "INTERNAL_BAD $(hostname)"; elif [ "$files" -eq 1 ] && [ -n "$wrote" ] && [ -n "$owner" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_OWNER $(hostname)"; elif [ "$files" -eq 0 ] && [ -z "$wrote" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_NONOWNER $(hostname)"; else echo "INTERNAL_BAD $(hostname)"; fi'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$internal_integrity" >"$RUN_DIR/fleet_internal_integrity.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/fleet_internal_integrity.txt" INTERNAL_OK || {
-    say "ABORT: layer-0 DSA internal capture is incomplete on the fleet"
+    say "ABORT: layer-0 DSA internal callback did not arm cleanly fleet-wide"
+    exit 1
+  }
+  [[ $(grep -c '^INTERNAL_OWNER ' "$RUN_DIR/fleet_internal_integrity.txt") -eq 1 && \
+      $(grep -c '^INTERNAL_NONOWNER ' "$RUN_DIR/fleet_internal_integrity.txt") -eq 7 ]] || {
+    say "ABORT: layer-0 DSA internal owner coverage drifted"
     exit 1
   }
 fi
@@ -364,8 +372,8 @@ internal_count=0
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   internal_count=$(find "$SOURCE_DIR" -type f \
     -name "internals.*.position${FIRST_DECODE_POSITION}.proc*.npz" | wc -l)
-  [[ $internal_count -eq 8 ]] || {
-    say "ABORT: expected eight DSA internal files, found $internal_count"
+  [[ $internal_count -eq 1 ]] || {
+    say "ABORT: expected one DCP-owner DSA internal file, found $internal_count"
     exit 1
   }
 fi
@@ -481,7 +489,8 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     --model-id "$MODEL_ID" \
     --layer-name "$INTERNAL_LAYER" \
     --position "$FIRST_DECODE_POSITION" \
-    --process-count 8 >"$RUN_DIR/internal_comparison_summary.json"
+    --process-count 8 \
+    --capture-process-indices 0 >"$RUN_DIR/internal_comparison_summary.json"
 fi
 strict_census post || {
   say "ABORT: post-run census is not eight-host zero work"
@@ -599,11 +608,16 @@ if sys.argv[8] == "1":
         (root / "internal_comparison" / "comparison.json").read_text()
     )
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
+    if comparison["capture_layout"] != "topology_sharded_live_row_owner":
+        raise SystemExit("DSA internal capture layout drifted")
+    if comparison["capture_process_indices"] != [0]:
+        raise SystemExit("DSA internal owner process drifted")
     lines.update({
         "dsa_internal_capture": "true",
+        "dsa_internal_capture_layout": comparison["capture_layout"],
         "dsa_internal_file_count": sys.argv[9],
-        "dsa_internal_actual_sha256": comparison[
-            "replicated_actual_sha256"
+        "dsa_internal_owner_actual_sha256": comparison[
+            "owner_actual_sha256"
         ],
         "dsa_internal_first_divergent_field": comparison[
             "first_divergent_field"

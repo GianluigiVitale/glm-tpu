@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -45,7 +46,7 @@ def _write_process_files(
     values = _arrays()
     config.source_dump_dir.mkdir(parents=True)
     safe_layer = config.expected_layer_name.replace(".", "_")
-    for process_index in range(config.expected_process_count):
+    for process_index in config.expected_capture_process_indices:
         process_values = {name: value.copy() for name, value in values.items()}
         if process_index == drift_process:
             process_values["query"][0, 0] += np.float32(1)
@@ -75,7 +76,7 @@ def _write_process_files(
     return values
 
 
-def test_capture_is_fleet_exact_and_writes_bounded_comparison(
+def test_owner_capture_writes_bounded_comparison(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config = _config(tmp_path)
@@ -98,7 +99,9 @@ def test_capture_is_fleet_exact_and_writes_bounded_comparison(
     result = subject.compare_legacy_dsa_internals(config)
     assert result["all_fields_elementwise_exact"] is True
     assert result["first_divergent_field"] is None
-    assert len(result["process_files"]) == 8
+    assert len(result["process_files"]) == 1
+    assert result["capture_layout"] == "topology_sharded_live_row_owner"
+    assert result["capture_process_indices"] == [0]
     assert (config.output_dir / "comparison.json").is_file()
     assert (config.output_dir / "internals.npz").is_file()
     with pytest.raises(FileExistsError, match="append-only"):
@@ -106,9 +109,21 @@ def test_capture_is_fleet_exact_and_writes_bounded_comparison(
 
 
 def test_capture_refuses_cross_process_state_drift(tmp_path: Path) -> None:
-    config = _config(tmp_path)
-    _write_process_files(config, drift_process=7)
+    config = replace(
+        _config(tmp_path), expected_capture_process_indices=(0, 1)
+    )
+    _write_process_files(config, drift_process=1)
     with pytest.raises(ValueError, match="replicated legacy query disagrees"):
+        subject._load_legacy_capture(config)
+
+
+def test_capture_refuses_wrong_owner_process(tmp_path: Path) -> None:
+    config = replace(
+        _config(tmp_path), expected_capture_process_indices=(1,)
+    )
+    _write_process_files(config)
+    config = replace(config, expected_capture_process_indices=(0,))
+    with pytest.raises(ValueError, match="owner-process coverage"):
         subject._load_legacy_capture(config)
 
 
@@ -143,5 +158,28 @@ def test_protected_wrapper_reuses_short_dsa_oracle_stack() -> None:
         "compare_legacy_layer0_dsa_internals.py",
         "strict_census post",
         "dsa_event_tensors_exact",
+        "topology_sharded_live_row_owner",
+        "INTERNAL_OWNER",
     ):
         assert required in shared_source
+
+
+def test_recovery_reuses_source_without_reloading_model() -> None:
+    recovery = REPO_ROOT / (
+        "scripts/greenfield/recover_legacy_layer0_dsa_internals.sh"
+    )
+    source = recovery.read_text()
+    for required in (
+        "greenfield_legacy_layer0_dsa_internals_20260808T015254078767454Z",
+        "SOURCE_GREENFIELD_PIN=46fd672220fb4d974dcf49730f362c77d6e38dfe",
+        "EXPECTED_DUMP_COUNT=483",
+        "SOURCE_OWNER",
+        "capture_short_context_dsa_oracle.py",
+        "compare_short_context_dsa_oracles",
+        "compare_legacy_layer0_dsa_internals.py",
+        "strict_census post",
+        "remote_objects.json",
+    ):
+        assert required in source
+    for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):
+        assert forbidden not in source

@@ -55,6 +55,22 @@ class LegacyDsaInternalComparisonConfig:
     expected_layer_name: str = "model.layers.0.self_attn.attn"
     expected_position: int = 8155
     expected_process_count: int = 8
+    expected_capture_process_indices: tuple[int, ...] = (0,)
+
+    def __post_init__(self) -> None:
+        capture_indices = tuple(self.expected_capture_process_indices)
+        object.__setattr__(self, "expected_capture_process_indices", capture_indices)
+        if self.expected_process_count <= 0:
+            raise ValueError("expected_process_count must be positive")
+        if not capture_indices or len(set(capture_indices)) != len(
+            capture_indices
+        ):
+            raise ValueError("capture process indices must be non-empty and unique")
+        if any(
+            process_index < 0 or process_index >= self.expected_process_count
+            for process_index in capture_indices
+        ):
+            raise ValueError("capture process index is outside the fleet")
 
 
 def _file_sha256(path: Path) -> str:
@@ -98,10 +114,11 @@ def _load_legacy_capture(
     safe_layer = config.expected_layer_name.replace("/", "_").replace(".", "_")
     pattern = f"*.{safe_layer}.position{config.expected_position}.proc*.npz"
     paths = sorted(config.source_dump_dir.rglob(pattern))
-    if len(paths) != config.expected_process_count:
+    expected_capture_count = len(config.expected_capture_process_indices)
+    if len(paths) != expected_capture_count:
         raise ValueError(
             f"legacy DSA internal file count {len(paths)} != "
-            f"{config.expected_process_count}"
+            f"{expected_capture_count}"
         )
 
     expected_keys = {
@@ -184,10 +201,10 @@ def _load_legacy_capture(
                     "sha256": _file_sha256(path),
                 }
             )
-    if process_indices != set(range(config.expected_process_count)) or (
+    if process_indices != set(config.expected_capture_process_indices) or (
         canonical is None
     ):
-        raise ValueError("legacy DSA internal process coverage is incomplete")
+        raise ValueError("legacy DSA internal owner-process coverage is incomplete")
     digest = sha256()
     for name in FIELD_ORDER:
         digest.update(name.encode("ascii"))
@@ -405,7 +422,11 @@ def compare_legacy_dsa_internals(
         "layer_name": config.expected_layer_name,
         "position": config.expected_position,
         "process_count": config.expected_process_count,
-        "replicated_actual_sha256": actual_sha,
+        "owner_actual_sha256": actual_sha,
+        "capture_layout": "topology_sharded_live_row_owner",
+        "capture_process_indices": list(
+            config.expected_capture_process_indices
+        ),
         "process_files": process_records,
         "runtime": runtime,
         "fields": comparisons,

@@ -38,7 +38,13 @@ def main() -> None:
     )
     parser.add_argument("--position", type=int, default=8155)
     parser.add_argument("--process-count", type=int, default=8)
+    parser.add_argument("--capture-process-indices", default="0")
     args = parser.parse_args()
+    capture_process_indices = tuple(
+        int(value.strip())
+        for value in args.capture_process_indices.split(",")
+        if value.strip()
+    )
 
     result = compare_legacy_dsa_internals(
         LegacyDsaInternalComparisonConfig(
@@ -57,6 +63,7 @@ def main() -> None:
             expected_layer_name=args.layer_name,
             expected_position=args.position,
             expected_process_count=args.process_count,
+            expected_capture_process_indices=capture_process_indices,
         )
     )
     print(
@@ -67,9 +74,7 @@ def main() -> None:
                 ],
                 "divergent_fields": result["divergent_fields"],
                 "first_divergent_field": result["first_divergent_field"],
-                "replicated_actual_sha256": result[
-                    "replicated_actual_sha256"
-                ],
+                "owner_actual_sha256": result["owner_actual_sha256"],
             },
             sort_keys=True,
         )
