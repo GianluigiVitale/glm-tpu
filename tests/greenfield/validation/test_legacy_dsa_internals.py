@@ -183,3 +183,5 @@ def test_recovery_reuses_source_without_reloading_model() -> None:
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):
         assert forbidden not in source
+    assert 'local label=$1 out=' not in source
+    assert 'local label=$1\n  local out=' in source
