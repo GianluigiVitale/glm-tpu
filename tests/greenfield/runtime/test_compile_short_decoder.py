@@ -8,6 +8,7 @@ import pytest
 from ml_dtypes import bfloat16
 
 from scripts.greenfield.compile_short_decoder import (
+    _canonicalize_dsa_internal_observation,
     _canonicalize_layer_residual_observation,
     _encode_bfloat16_bits,
     _load_short_context_dsa_oracle,
@@ -257,6 +258,119 @@ def test_layer_residual_observer_rejects_shape_and_dtype_drift() -> None:
             groups=groups,
             schedule=schedule,
             hidden_size=3,
+        )
+
+
+def _dsa_internal_observation_fixture() -> tuple[
+    SimpleNamespace,
+    tuple[tuple[int, ...], ...],
+    tuple[tuple[int, ...], ...],
+]:
+    groups = ((0, 1), (2, 3))
+    producers = ((0, 1), (6,))
+    normalized_hidden = np.zeros((4, 2, 3), dtype=bfloat16)
+    q_a_state = np.zeros((4, 2, 2), dtype=bfloat16)
+    query = np.zeros((4, 2, 2, 2), dtype=np.float32)
+    head_weights = np.zeros((4, 2, 2), dtype=np.float32)
+    current_key = np.zeros((4, 2, 2), dtype=np.float32)
+    producer_layer_ids = np.full((4, 2), -1, dtype=np.int32)
+    fields = (
+        normalized_hidden,
+        q_a_state,
+        query,
+        head_weights,
+        current_key,
+    )
+    for stage, (group, stage_producers) in enumerate(
+        zip(groups, producers, strict=True)
+    ):
+        for slot, producer in enumerate(stage_producers):
+            producer_layer_ids[list(group), slot] = producer
+            for field_index, value in enumerate(fields, start=1):
+                value[list(group), slot] = field_index * 10 + producer
+    return (
+        SimpleNamespace(
+            normalized_hidden=normalized_hidden,
+            q_a_state=q_a_state,
+            query=query,
+            head_weights=head_weights,
+            current_key=current_key,
+            producer_layer_ids=producer_layer_ids,
+        ),
+        groups,
+        producers,
+    )
+
+
+def test_dsa_internal_observer_canonicalizes_stage_slots() -> None:
+    observation, groups, producers = _dsa_internal_observation_fixture()
+
+    canonical, contract = _canonicalize_dsa_internal_observation(
+        observation,
+        groups=groups,
+        stage_producer_layer_ids=producers,
+        hidden_size=3,
+        q_lora_rank=2,
+        num_heads=2,
+        head_dim=2,
+    )
+
+    assert contract["passed"]
+    assert contract["event_count"] == 3
+    assert contract["producer_layer_ids"] == [0, 1, 6]
+    assert contract["lane_mismatches"] == []
+    assert contract["padded_slot_mismatches"] == []
+    np.testing.assert_array_equal(
+        canonical["producer_layer_ids"], np.asarray([0, 1, 6], np.int32)
+    )
+    assert canonical["normalized_hidden"].shape == (3, 3)
+    assert canonical["normalized_hidden"].dtype.name == "bfloat16"
+    assert canonical["q_a_state"].shape == (3, 2)
+    assert canonical["query"].shape == (3, 2, 2)
+    assert canonical["head_weights"].shape == (3, 2)
+    assert canonical["current_key"].shape == (3, 2)
+
+
+@pytest.mark.parametrize("mutation", ("lane", "padded"))
+def test_dsa_internal_observer_fails_closed_on_slot_drift(
+    mutation: str,
+) -> None:
+    observation, groups, producers = _dsa_internal_observation_fixture()
+    if mutation == "lane":
+        observation.query[1, 0, 0, 0] += 1.0
+    else:
+        observation.current_key[2, 1, 0] = 1.0
+
+    _, contract = _canonicalize_dsa_internal_observation(
+        observation,
+        groups=groups,
+        stage_producer_layer_ids=producers,
+        hidden_size=3,
+        q_lora_rank=2,
+        num_heads=2,
+        head_dim=2,
+    )
+
+    assert not contract["passed"]
+    assert contract[
+        "lane_mismatches" if mutation == "lane" else "padded_slot_mismatches"
+    ]
+
+
+def test_dsa_internal_observer_rejects_shape_and_dtype_drift() -> None:
+    observation, groups, producers = _dsa_internal_observation_fixture()
+    observation.normalized_hidden = observation.normalized_hidden.astype(
+        np.float32
+    )
+    with pytest.raises(RuntimeError, match="normalized_hidden contract drifted"):
+        _canonicalize_dsa_internal_observation(
+            observation,
+            groups=groups,
+            stage_producer_layer_ids=producers,
+            hidden_size=3,
+            q_lora_rank=2,
+            num_heads=2,
+            head_dim=2,
         )
 
 

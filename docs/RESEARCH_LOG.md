@@ -5457,3 +5457,32 @@ then executes true M=1 projection. HLO SHA `ea5e5c56...6c89` has no global
 `dd0a0d58...dcf6`, `c6992dbf...9fb2`, and `6532da49...c46`; results DB id is 499 and cleanup is
 8/8. This authorizes only the narrow production correction plus model-config q-a/kv-a epsilon
 `1e-5`; the protected 8K decoder remains the next proof.
+
+## 2026-08-08 07:57 — Corrected 8K reaches exact first token and localizes event-1 state drift
+
+The corrected PP8 attempt
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260808T041407656729112Z`
+at `f129e63` spent 04:14--06:28 UTC in the protected load/compile/prefill path and stopped exactly
+where required: the separate DSA observer rejected the first decode step before any timing.
+Generated token `101252` is exact with a 6.125 top-1 margin. Layer-0 event 0 preserves the exact
+2,048-member set but not order; score max/mean/p99 error is
+`0.00597572/0.001217406/0.003442`. Layer-1 event 1 has 2,041 common members, seven swaps, and
+aligned common-score max/mean/signed error `0.27013397/0.18290268/-0.18290268`; event 2 has nine
+swaps. The almost uniform event-1 offset is the first strong boundary signal and points to the
+layer-0 output entering layer-1 normalized/q-a/key state rather than layer-0 query projection.
+
+The failure is durable but is not performance evidence: there is no timed window, DB row, final
+`SUCCESS`, HLO promotion record, or Gate-D result. The eight logs are byte-identical, DSA NPZ SHA
+is `3e54254c...b053`, failure-ledger SHAs are `18501db9...6051` and `ef7688d...c715`, and all
+eight failure-exit censuses are clean.
+
+The existing accepted callback has now been generalized to any full-indexer producer without
+returning tensors through legacy execution. A separate greenfield observer exports the five
+already-live states for all 21 producer events; it is default-off, mutually exclusive with the
+rejected residual observer, and must reproduce both the sealed failed-run DSA event payload and
+the accepted layer-0 query. A hash-pinned append-only comparator aligns an accepted layer capture
+with its exact greenfield event. Targeted runtime/validation tests pass 46/46, affected kernel
+tests pass 2/2, and the complete CPU-only greenfield suite passes 437 with one expected skip and
+two existing SWIG warnings in 340.85 seconds. Next: clean commit/push, one accepted layer-1
+capture, one greenfield observer run, then a correction limited to the first field proved
+divergent.

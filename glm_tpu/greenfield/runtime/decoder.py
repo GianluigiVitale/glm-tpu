@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from math import prod
 import re
-from typing import Any
+from typing import Any, NamedTuple
 
 from ..errors import PlanValidationError
 from ..kernels.layer import (
@@ -51,6 +51,17 @@ from .pipeline import (
 REFERENCE_FEATURE_OUTPUT_TILE = 128
 PROMOTED_FEATURE_OUTPUT_TILE = 256
 TOKEN_OBSERVATION_CANDIDATES = 16
+
+
+class DsaInternalObservation(NamedTuple):
+    """Per-stage slots for already-live full-indexer diagnostic values."""
+
+    normalized_hidden: Any
+    q_a_state: Any
+    query: Any
+    head_weights: Any
+    current_key: Any
+    producer_layer_ids: Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +176,7 @@ class DecoderStepProgram:
     dsa_query_backend: StageLinearBackend
     complete_token_path: bool
     observe_dsa_events: bool
+    observe_dsa_internals: bool
     observe_layer_residuals: bool
     split_residual_state: bool
 
@@ -1476,6 +1488,7 @@ def _execute_stage(
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
     dsa_observation: Any | None = None,
+    dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
 ) -> tuple[Any, ...]:
     import jax.numpy as jnp
@@ -1590,6 +1603,28 @@ def _execute_stage(
                 dsa_observation = dsa_observation.at[
                     current_full_slot, 2 * config.selected_width + 1
                 ].set(jnp.int32(layer.layer_id))
+            if dsa_internal_observation is not None:
+                internals = result.dsa_internals
+                dsa_internal_observation = DsaInternalObservation(
+                    dsa_internal_observation.normalized_hidden.at[
+                        current_full_slot
+                    ].set(internals.normalized_hidden[0]),
+                    dsa_internal_observation.q_a_state.at[
+                        current_full_slot
+                    ].set(internals.q_a_state[0]),
+                    dsa_internal_observation.query.at[
+                        current_full_slot
+                    ].set(internals.query[0]),
+                    dsa_internal_observation.head_weights.at[
+                        current_full_slot
+                    ].set(internals.head_weights[0]),
+                    dsa_internal_observation.current_key.at[
+                        current_full_slot
+                    ].set(internals.current_key[0]),
+                    dsa_internal_observation.producer_layer_ids.at[
+                        current_full_slot
+                    ].set(jnp.int32(layer.layer_id)),
+                )
         metadata = metadata.at[:, : config.selected_width].set(
             result.selected_positions
         )
@@ -1608,6 +1643,8 @@ def _execute_stage(
     values = (residual, kv_cache, index_cache, metadata)
     if dsa_observation is not None:
         values = (*values, dsa_observation)
+    if dsa_internal_observation is not None:
+        values = (*values, dsa_internal_observation)
     if layer_residual_observation is not None:
         values = (*values, layer_residual_observation)
     return values
@@ -1637,6 +1674,7 @@ def _execute_stage_split(
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
     dsa_observation: Any | None = None,
+    dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
 ) -> tuple[Any, ...]:
     """Execute one stage with the accepted hidden/residual state association."""
@@ -1764,6 +1802,28 @@ def _execute_stage_split(
                 dsa_observation = dsa_observation.at[
                     current_full_slot, 2 * config.selected_width + 1
                 ].set(jnp.int32(layer.layer_id))
+            if dsa_internal_observation is not None:
+                internals = result.dsa_internals
+                dsa_internal_observation = DsaInternalObservation(
+                    dsa_internal_observation.normalized_hidden.at[
+                        current_full_slot
+                    ].set(internals.normalized_hidden[0]),
+                    dsa_internal_observation.q_a_state.at[
+                        current_full_slot
+                    ].set(internals.q_a_state[0]),
+                    dsa_internal_observation.query.at[
+                        current_full_slot
+                    ].set(internals.query[0]),
+                    dsa_internal_observation.head_weights.at[
+                        current_full_slot
+                    ].set(internals.head_weights[0]),
+                    dsa_internal_observation.current_key.at[
+                        current_full_slot
+                    ].set(internals.current_key[0]),
+                    dsa_internal_observation.producer_layer_ids.at[
+                        current_full_slot
+                    ].set(jnp.int32(layer.layer_id)),
+                )
         metadata = metadata.at[:, : config.selected_width].set(
             result.selected_positions
         )
@@ -1787,6 +1847,8 @@ def _execute_stage_split(
     )
     if dsa_observation is not None:
         outputs = (*outputs, dsa_observation)
+    if dsa_internal_observation is not None:
+        outputs = (*outputs, dsa_internal_observation)
     if layer_residual_observation is not None:
         outputs = (*outputs, layer_residual_observation)
     return outputs
@@ -1810,6 +1872,7 @@ def build_decoder_step_program(
     dsa_query_backend: StageLinearBackend | None = None,
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
+    observe_dsa_internals: bool = False,
     observe_layer_residuals: bool = False,
     split_residual_state: bool = False,
 ) -> DecoderStepProgram:
@@ -1870,6 +1933,8 @@ def build_decoder_step_program(
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(observe_dsa_events, bool):
         raise PlanValidationError("DSA event-observation flag must be boolean")
+    if not isinstance(observe_dsa_internals, bool):
+        raise PlanValidationError("DSA internal-observation flag must be boolean")
     if not isinstance(observe_layer_residuals, bool):
         raise PlanValidationError("layer residual-observation flag must be boolean")
     if not isinstance(split_residual_state, bool):
@@ -1881,6 +1946,14 @@ def build_decoder_step_program(
     if observe_layer_residuals and not observe_dsa_events:
         raise PlanValidationError(
             "layer residual observation requires the isolated DSA observer"
+        )
+    if observe_dsa_internals and not observe_dsa_events:
+        raise PlanValidationError(
+            "DSA internal observation requires the isolated DSA observer"
+        )
+    if observe_dsa_internals and observe_layer_residuals:
+        raise PlanValidationError(
+            "DSA internal and layer-residual diagnostics must be isolated"
         )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
@@ -2025,6 +2098,7 @@ def build_decoder_step_program(
         index_cache = local_index_container[0]
         metadata = local_metadata_container[0]
         dsa_observation = None
+        dsa_internal_observation = None
         token_observation = None
         layer_residual_observation = None
         if observe_dsa_events:
@@ -2041,6 +2115,32 @@ def build_decoder_step_program(
                 -1,
                 dtype=jnp.int32,
             )
+            if observe_dsa_internals:
+                slots = config.maximum_full_indexer_slots
+                dsa_internal_observation = DsaInternalObservation(
+                    jnp.zeros(
+                        (slots, config.hidden_size), dtype=residual.dtype
+                    ),
+                    jnp.zeros(
+                        (slots, dsa_contract.q_lora_rank),
+                        dtype=residual.dtype,
+                    ),
+                    jnp.zeros(
+                        (
+                            slots,
+                            dsa_contract.num_heads,
+                            dsa_contract.head_dim,
+                        ),
+                        dtype=jnp.float32,
+                    ),
+                    jnp.zeros(
+                        (slots, dsa_contract.num_heads), dtype=jnp.float32
+                    ),
+                    jnp.zeros(
+                        (slots, dsa_contract.head_dim), dtype=jnp.float32
+                    ),
+                    jnp.full((slots,), -1, dtype=jnp.int32),
+                )
             if observe_layer_residuals:
                 layer_residual_observation = jnp.zeros(
                     (geometry.num_layers + 1, geometry.hidden_size),
@@ -2187,6 +2287,56 @@ def build_decoder_step_program(
                             metadata,
                             dsa_observation,
                             layer_residual_observation,
+                        ),
+                    )
+                elif observe_dsa_internals:
+                    assert dsa_internal_observation is not None
+                    (
+                        residual,
+                        kv_cache,
+                        index_cache,
+                        metadata,
+                        dsa_observation,
+                        dsa_internal_observation,
+                    ) = lax.cond(
+                        should_execute,
+                        lambda values, stage=stage: execute_stage(
+                            stage,
+                            values[:4],
+                            weight=weight,
+                            local_slot=local_slot,
+                            position=position,
+                            block_tables=block_tables,
+                            context_lengths=context_lengths,
+                            axis_name=axis_name,
+                            axis_groups=axis_groups,
+                            config=config,
+                            dsa_contract=dsa_contract,
+                            mla_contract=mla_contract,
+                            moe_contract=moe_contract,
+                            cache_layout=cache_layout,
+                            block_shape=geometry.fp8_block_shape,
+                            sparse_moe_backend=sparse_moe_backend,
+                            pallas_moe_config=pallas_moe_config,
+                            pallas_moe_fuse_route_weighting=(
+                                feature_fuse_route_weighting
+                            ),
+                            pallas_moe_reconstruct_down_fp32=(
+                                feature_reconstruct_down_fp32
+                            ),
+                            linear_backend=linear_backend,
+                            dsa_query_backend=dsa_query_backend,
+                            dsa_observation=values[4],
+                            dsa_internal_observation=values[5],
+                        ),
+                        lambda values: values,
+                        (
+                            residual,
+                            kv_cache,
+                            index_cache,
+                            metadata,
+                            dsa_observation,
+                            dsa_internal_observation,
                         ),
                     )
                 else:
@@ -2491,7 +2641,15 @@ def build_decoder_step_program(
             token_observation[None, ...],
         )
         if not observe_layer_residuals:
-            return observation_outputs
+            if not observe_dsa_internals:
+                return observation_outputs
+            assert dsa_internal_observation is not None
+            return (
+                *observation_outputs,
+                DsaInternalObservation(
+                    *(value[None, ...] for value in dsa_internal_observation)
+                ),
+            )
         assert layer_residual_observation is not None
         return (
             *observation_outputs,
@@ -2560,6 +2718,14 @@ def build_decoder_step_program(
     dsa_observation_spec = P(axis_name, None, None)
     token_observation_spec = P(axis_name, None)
     layer_residual_observation_spec = P(axis_name, None, None)
+    dsa_internal_observation_spec = DsaInternalObservation(
+        P(axis_name, None, None),
+        P(axis_name, None, None),
+        P(axis_name, None, None, None),
+        P(axis_name, None, None),
+        P(axis_name, None, None),
+        P(axis_name, None),
+    )
     common_specs = (
         weight_specs,
         residual_spec,
@@ -2591,6 +2757,11 @@ def build_decoder_step_program(
                     *output_specs,
                     layer_residual_observation_spec,
                 )
+            elif observe_dsa_internals:
+                output_specs = (
+                    *output_specs,
+                    dsa_internal_observation_spec,
+                )
     else:
         input_specs = (*common_specs, P(), P(), P())
         mapped = mapped_body
@@ -2621,6 +2792,7 @@ def build_decoder_step_program(
         dsa_query_backend=dsa_query_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
+        observe_dsa_internals=observe_dsa_internals,
         observe_layer_residuals=observe_layer_residuals,
         split_residual_state=split_residual_state,
     )

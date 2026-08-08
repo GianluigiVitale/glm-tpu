@@ -696,6 +696,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             observe_dsa_events=1,  # type: ignore[arg-type]
         )
+    with pytest.raises(PlanValidationError, match="internal-observation flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            observe_dsa_internals=1,  # type: ignore[arg-type]
+        )
     with pytest.raises(PlanValidationError, match="complete-token path"):
         build_decoder_step_program(
             source_plan,
@@ -737,6 +747,30 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             complete_token_path=True,
             observe_layer_residuals=True,
         )
+    with pytest.raises(PlanValidationError, match="isolated DSA observer"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=True,
+            observe_dsa_internals=True,
+        )
+    with pytest.raises(PlanValidationError, match="must be isolated"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=True,
+            observe_dsa_events=True,
+            observe_dsa_internals=True,
+            observe_layer_residuals=True,
+        )
 
 
 def test_complete_small_decoder_token_step_runs_all_stages_on_forced_cpu() -> None:
@@ -766,6 +800,7 @@ pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in 
 decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
 explicit_default = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=False, split_residual_state=False)
 observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True)
+internal_observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True)
 split = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, split_residual_state=True)
 prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
 split_prefill = build_teacher_forced_prefill_program(split, prompt_length=2)
@@ -824,7 +859,9 @@ explicit_default_stablehlo = jax.jit(explicit_default.execute).lower(*inputs).as
 compiled = lowered.compile()
 split_compiled = jax.jit(split.execute).lower(*split_inputs).compile()
 observer_compiled = jax.jit(observer.execute).lower(*inputs).compile()
+internal_observer_compiled = jax.jit(internal_observer.execute).lower(*inputs).compile()
 observed = observer_compiled(*inputs)
+internal_observed = internal_observer_compiled(*inputs)
 first = compiled(*inputs)
 second = compiled(weights, *first)
 split_first = split_compiled(*split_inputs)
@@ -852,6 +889,14 @@ split_prefill_values = list(map(np.asarray, jax.device_get(split_prefilled)))
 observation = np.asarray(jax.device_get(observed[8]))
 token_observation = np.asarray(jax.device_get(observed[9]))
 layer_residual_observation = np.asarray(jax.device_get(observed[10]))
+internal_observation = {
+    name: np.asarray(jax.device_get(value))
+    for name, value in zip(
+        internal_observed[10]._fields,
+        internal_observed[10],
+        strict=True,
+    )
+}
 observation_rows = []
 for stage, group in enumerate(groups):
     rows = observation[list(group), 0]
@@ -868,9 +913,11 @@ token_candidate_scores = token_observation_lanes[
 active = np.flatnonzero(metadata[:, 0, decoder.config.active_index] == 1)
 module = parse_hlo_module(compiled.as_text())
 observer_module = parse_hlo_module(observer_compiled.as_text())
+internal_observer_module = parse_hlo_module(internal_observer_compiled.as_text())
 hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True)
 split_hlo_contract = validate_decoder_step_hlo(split_compiled.as_text(), config=split.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, split_residual_state=True)
 observer_hlo_contract = validate_decoder_step_hlo(observer_compiled.as_text(), config=observer.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, token_observation_candidates=observer.config.token_observation_candidates)
+internal_observer_hlo_contract = validate_decoder_step_hlo(internal_observer_compiled.as_text(), config=internal_observer.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, token_observation_candidates=internal_observer.config.token_observation_candidates)
 prefill_hlo_contract = validate_teacher_forced_prefill_hlo(prefill_compiled.as_text(), program=prefill, schedule=schedule, backend_contract='cpu_reference')
 split_prefill_hlo_contract = validate_teacher_forced_prefill_hlo(split_prefill_compiled.as_text(), program=split_prefill, schedule=schedule, backend_contract='cpu_reference')
 counts = {}
@@ -932,6 +979,33 @@ print(json.dumps({
             'final_stage_lanes_equal': bool(np.all(token_observation_lanes == token_observation_lanes[0])),
             'inactive_lanes_sentinel': bool(np.all(token_observation[:groups[-1][0]] == -1)),
         },
+    },
+    'internal_observer': {
+        'collective_counts': {
+            opcode: sum(item.opcode == opcode for item in internal_observer_module.collectives)
+            for opcode in ('all-gather', 'all-reduce', 'collective-permute')
+        },
+        'dtypes': {name: value.dtype.name for name, value in internal_observation.items()},
+        'finite': all(np.all(np.isfinite(value)) for name, value in internal_observation.items() if name != 'producer_layer_ids'),
+        'hlo_contract': {key: internal_observer_hlo_contract[key] for key in ('passed', 'token_observation_candidates', 'violations')},
+        'host_callback_absent': all(marker not in internal_observer_compiled.as_text().lower() for marker in ('host_callback', 'outside_compilation', 'xla_ffi_python_cpu_callback', 'xla_python_cpu_callback')),
+        'producer_layer_ids': [
+            internal_observation['producer_layer_ids'][group[0], 0].item()
+            for group in groups
+        ],
+        'production_outputs_exact': all(np.array_equal(np.asarray(jax.device_get(internal_observed[index])), np.asarray(jax.device_get(first[index]))) for index in range(8)),
+        'program_flag': internal_observer.observe_dsa_internals,
+        'shapes': {name: list(value.shape) for name, value in internal_observation.items()},
+        'stage_lane_replication': all(
+            all(
+                np.array_equal(
+                    value[list(group)],
+                    np.broadcast_to(value[group[0]], value[list(group)].shape),
+                )
+                for value in internal_observation.values()
+            )
+            for group in groups
+        ),
     },
     'block_tables_unchanged': bool(np.array_equal(next_blocks, np.asarray([[0]], np.int32))),
     'positions': sorted(set(tuple(row) for row in metadata[active, 0, :4].tolist())),
@@ -1078,6 +1152,40 @@ print(json.dumps({
             "final_stage_lanes_equal": True,
             "inactive_lanes_sentinel": True,
         },
+    }
+    assert result["internal_observer"] == {
+        "collective_counts": {
+            "all-gather": 58,
+            "all-reduce": 17,
+            "collective-permute": 17,
+        },
+        "dtypes": {
+            "current_key": "float32",
+            "head_weights": "float32",
+            "normalized_hidden": "bfloat16",
+            "producer_layer_ids": "int32",
+            "q_a_state": "bfloat16",
+            "query": "float32",
+        },
+        "finite": True,
+        "hlo_contract": {
+            "passed": True,
+            "token_observation_candidates": 16,
+            "violations": [],
+        },
+        "host_callback_absent": True,
+        "producer_layer_ids": list(range(8)),
+        "production_outputs_exact": True,
+        "program_flag": True,
+        "shapes": {
+            "current_key": [32, 1, 2],
+            "head_weights": [32, 1, 4],
+            "normalized_hidden": [32, 1, 8],
+            "producer_layer_ids": [32, 1],
+            "q_a_state": [32, 1, 4],
+            "query": [32, 1, 4, 2],
+        },
+        "stage_lane_replication": True,
     }
     assert result["prefill"] == {
         "next_lengths": [3],

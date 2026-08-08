@@ -39,7 +39,10 @@ def _arrays() -> dict[str, np.ndarray]:
 
 
 def _write_process_files(
-    config: subject.LegacyDsaInternalComparisonConfig,
+    config: (
+        subject.LegacyDsaInternalCaptureConfig
+        | subject.LegacyDsaInternalComparisonConfig
+    ),
     *,
     drift_process: int | None = None,
 ) -> dict[str, np.ndarray]:
@@ -108,6 +111,113 @@ def test_owner_capture_writes_bounded_comparison(
         subject.compare_legacy_dsa_internals(config)
 
 
+def test_generic_owner_capture_is_sealed_without_layer0_reconstruction(
+    tmp_path: Path,
+) -> None:
+    config = subject.LegacyDsaInternalCaptureConfig(
+        source_dump_dir=tmp_path / "source",
+        output_dir=tmp_path / "output",
+        expected_run_tag="protected-layer1-internal-test",
+        expected_legacy_code_hash="2" * 40,
+        expected_oracle_pin="3" * 40,
+        expected_layer_name="model.layers.1.self_attn.attn",
+    )
+    expected = _write_process_files(config)
+    result = subject.inspect_legacy_dsa_internal_capture(config)
+    assert result["artifact_kind"] == subject.CAPTURE_KIND
+    assert result["layer_name"] == config.expected_layer_name
+    assert result["capture_process_indices"] == [0]
+    assert result["fields"]["query"]["sha256"] == subject._array_sha256(
+        expected["query"]
+    )
+    assert (config.output_dir / "capture.json").is_file()
+    assert (config.output_dir / "internals.npz").is_file()
+    with pytest.raises(FileExistsError, match="append-only"):
+        subject.inspect_legacy_dsa_internal_capture(config)
+
+
+def test_sealed_observer_comparison_aligns_the_requested_producer(
+    tmp_path: Path,
+) -> None:
+    capture_config = subject.LegacyDsaInternalCaptureConfig(
+        source_dump_dir=tmp_path / "source",
+        output_dir=tmp_path / "capture",
+        expected_run_tag="protected-layer1-internal-test",
+        expected_legacy_code_hash="2" * 40,
+        expected_oracle_pin="3" * 40,
+        expected_layer_name="model.layers.1.self_attn.attn",
+    )
+    expected = _write_process_files(capture_config)
+    subject.inspect_legacy_dsa_internal_capture(capture_config)
+
+    event_count = len(subject.FULL_DSA_PRODUCER_LAYER_IDS)
+    event_index = subject.FULL_DSA_PRODUCER_LAYER_IDS.index(1)
+    observer_path = tmp_path / "observer.npz"
+    observed = {
+        "normalized_hidden_bfloat16_bits": np.zeros(
+            (event_count, 6144), dtype=np.uint16
+        ),
+        "q_a_state_bfloat16_bits": np.zeros(
+            (event_count, 2048), dtype=np.uint16
+        ),
+        "query": np.zeros((event_count, 32, 128), dtype=np.float32),
+        "head_weights": np.zeros((event_count, 32), dtype=np.float32),
+        "current_key": np.zeros((event_count, 128), dtype=np.float32),
+    }
+    observed["normalized_hidden_bfloat16_bits"][event_index] = expected[
+        "normalized_hidden"
+    ]
+    observed["q_a_state_bfloat16_bits"][event_index] = expected["q_a_state"]
+    for name in ("query", "head_weights", "current_key"):
+        observed[name][event_index] = expected[name]
+    np.savez(
+        observer_path,
+        **observed,
+        producer_layer_ids=np.asarray(
+            subject.FULL_DSA_PRODUCER_LAYER_IDS, dtype=np.int32
+        ),
+        decode_position=np.asarray([8155], dtype=np.int32),
+    )
+    config = subject.AcceptedGreenfieldDsaInternalComparisonConfig(
+        accepted_capture_dir=capture_config.output_dir,
+        greenfield_observation_path=observer_path,
+        output_dir=tmp_path / "comparison",
+        expected_capture_manifest_sha256=subject._file_sha256(
+            capture_config.output_dir / "capture.json"
+        ),
+        expected_greenfield_observation_sha256=subject._file_sha256(
+            observer_path
+        ),
+        expected_greenfield_code_hash="1" * 40,
+        expected_legacy_code_hash=capture_config.expected_legacy_code_hash,
+        expected_layer_id=1,
+    )
+    result = subject.compare_accepted_greenfield_dsa_internal_observation(
+        config
+    )
+    assert result["all_fields_elementwise_exact"] is True
+    assert result["event_index"] == event_index
+    assert result["first_divergent_field"] is None
+    assert (config.output_dir / "comparison.json").is_file()
+    assert (config.output_dir / "internals.npz").is_file()
+    with pytest.raises(FileExistsError, match="append-only"):
+        subject.compare_accepted_greenfield_dsa_internal_observation(config)
+
+
+def test_observer_comparison_rejects_nonproducer_layer(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="not a full DSA producer"):
+        subject.AcceptedGreenfieldDsaInternalComparisonConfig(
+            accepted_capture_dir=tmp_path / "capture",
+            greenfield_observation_path=tmp_path / "observer.npz",
+            output_dir=tmp_path / "comparison",
+            expected_capture_manifest_sha256="1" * 64,
+            expected_greenfield_observation_sha256="2" * 64,
+            expected_greenfield_code_hash="3" * 40,
+            expected_legacy_code_hash="4" * 40,
+            expected_layer_id=3,
+        )
+
+
 def test_capture_refuses_cross_process_state_drift(tmp_path: Path) -> None:
     config = replace(
         _config(tmp_path), expected_capture_process_indices=(0, 1)
@@ -138,12 +248,16 @@ def test_capture_refuses_error_sentinel(tmp_path: Path) -> None:
 
 
 def test_protected_wrapper_reuses_short_dsa_oracle_stack() -> None:
-    wrapper = REPO_ROOT / (
+    layer0_wrapper = REPO_ROOT / (
         "scripts/greenfield/run_capture_legacy_layer0_dsa_internals.sh"
     )
+    wrapper = REPO_ROOT / "scripts/greenfield/run_capture_legacy_dsa_internals.sh"
     shared = REPO_ROOT / "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
+    layer0_source = layer0_wrapper.read_text()
     wrapper_source = wrapper.read_text()
     shared_source = shared.read_text()
+    assert "GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID=0" in layer0_source
+    assert "run_capture_legacy_dsa_internals.sh" in layer0_source
     for required in (
         "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE=1",
         "GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE=8k",
@@ -154,8 +268,10 @@ def test_protected_wrapper_reuses_short_dsa_oracle_stack() -> None:
         "OBSERVER_COMMIT_DISTANCE=2",
         "83ff4a3576602ca844ea090550139a2ff00b0bb1",
         "GLM_DSA_DUMP_INTERNALS_LAYER",
+        "GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID",
         "compare_short_context_dsa_oracles",
         "compare_legacy_layer0_dsa_internals.py",
+        "inspect_legacy_dsa_internals.py",
         "strict_census post",
         "dsa_event_tensors_exact",
         "topology_sharded_live_row_owner",

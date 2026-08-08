@@ -21,6 +21,11 @@ readonly COMPLETE_TOKEN_PATH=${GLM_GREENFIELD_COMPLETE_TOKEN_PATH:-0}
 readonly SPLIT_RESIDUAL_STATE=${GLM_GREENFIELD_SPLIT_RESIDUAL_STATE:-0}
 readonly SHORT_CONTEXT_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE:-0}
 readonly SHORT_CONTEXT_DSA_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_DSA_ORACLE:-0}
+readonly DSA_INTERNAL_OBSERVER=${GLM_GREENFIELD_DSA_INTERNAL_OBSERVER:-0}
+readonly DSA_INTERNAL_BASELINE_NPZ=/home/gianl/gcs-models/results/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260808T041407656729112Z/dsa_observer/step_00_position_8155.npz
+readonly DSA_INTERNAL_BASELINE_SHA=3e54254cfb48fbcca62f48484242196d1b1d3ffc6e2482377a569439fd65b053
+readonly DSA_INTERNAL_LAYER0_REFERENCE_NPZ=/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/recovery/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z/internal_comparison/internals.npz
+readonly DSA_INTERNAL_LAYER0_REFERENCE_SHA=0a724bada77d93ddc524368ac3b6e3c7f70442aba59ed96da5abde3dbe75fa39
 case "$PROFILE" in
   2k)
     CONTEXT_LABEL=2k
@@ -104,6 +109,10 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
   echo "layer residual observer flag must be 0 or 1" >&2
   exit 2
 }
+[[ $DSA_INTERNAL_OBSERVER == 0 || $DSA_INTERNAL_OBSERVER == 1 ]] || {
+  echo "DSA internal observer flag must be 0 or 1" >&2
+  exit 2
+}
 [[ $LAYER_RESIDUAL_POSITION =~ ^[0-9]+$ ]] || {
   echo "layer residual position must be an integer" >&2
   exit 2
@@ -139,6 +148,28 @@ if [[ $LAYER_RESIDUAL_OBSERVER == 1 ]]; then
   }
   ((LAYER_RESIDUAL_POSITION >= PROMPT_TOKEN_COUNT && LAYER_RESIDUAL_POSITION < PROMPT_TOKEN_COUNT + 14)) || {
     echo "layer residual position must be in the sealed $PROMPT_TOKEN_COUNT..$((PROMPT_TOKEN_COUNT + 13)) window" >&2
+    exit 2
+  }
+fi
+if [[ $DSA_INTERNAL_OBSERVER == 1 ]]; then
+  [[ $PROFILE == 8k && $SHORT_CONTEXT_DSA_ORACLE == 1 ]] || {
+    echo "DSA internal observer requires the protected 8K DSA/token oracle" >&2
+    exit 2
+  }
+  [[ $LAYER_RESIDUAL_OBSERVER == 0 ]] || {
+    echo "DSA internal and residual observers must be isolated" >&2
+    exit 2
+  }
+  [[ -r $DSA_INTERNAL_BASELINE_NPZ && -r $DSA_INTERNAL_LAYER0_REFERENCE_NPZ ]] || {
+    echo "DSA internal observer inputs are unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DSA_INTERNAL_BASELINE_NPZ" | awk '{print $1}') == "$DSA_INTERNAL_BASELINE_SHA" ]] || {
+    echo "DSA internal baseline observation hash drifted" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DSA_INTERNAL_LAYER0_REFERENCE_NPZ" | awk '{print $1}') == "$DSA_INTERNAL_LAYER0_REFERENCE_SHA" ]] || {
+    echo "DSA internal layer-0 reference hash drifted" >&2
     exit 2
   }
 fi
@@ -229,7 +260,12 @@ if [[ $LAYER_RESIDUAL_OBSERVER == 1 ]]; then
   RESIDUAL_SUFFIX=_residual_p${LAYER_RESIDUAL_POSITION}
 fi
 readonly RESIDUAL_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+DSA_INTERNAL_SUFFIX=
+if [[ $DSA_INTERNAL_OBSERVER == 1 ]]; then
+  DSA_INTERNAL_SUFFIX=_dsa_internal
+fi
+readonly DSA_INTERNAL_SUFFIX
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}${DSA_INTERNAL_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -271,7 +307,7 @@ fi
 }
 mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/host_logs" "$RUN_DIR/hlo" \
   "$RUN_DIR/traces" "$RUN_DIR/dsa_observer" \
-  "$RUN_DIR/layer_residual_observer"
+  "$RUN_DIR/layer_residual_observer" "$RUN_DIR/dsa_internal_observer"
 
 say() {
   echo "[short-decoder-pp8 $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
@@ -318,7 +354,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -327,7 +363,7 @@ strict_census pre || {
 
 say "syncing exact code and runtime/source artifacts"
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_runtime_root='"$SOURCE_RUNTIME_ROOT"'; runtime_root='"$RUNTIME_ROOT"'; oracle_mode='"$SHORT_CONTEXT_ORACLE"'; oracle_root='"$SHORT_CONTEXT_ORACLE_ROOT"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; dsa_oracle_mode='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_root='"$SHORT_CONTEXT_DSA_ORACLE_ROOT"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; if [[ ${HOSTNAME##*-w-} == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; oracle_ok=1; if [[ $oracle_mode == 1 ]]; then [[ -r "$oracle_root/SUCCESS" && -r "$oracle_dir/manifest.json" && -r "$oracle_dir/tokens.safetensors" ]] && findmnt -T "$oracle_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" || oracle_ok=0; fi; dsa_oracle_ok=1; if [[ $dsa_oracle_mode == 1 ]]; then [[ -r "$dsa_oracle_root/SUCCESS" && -r "$dsa_oracle_dir/manifest.json" && -r "$dsa_oracle_dir/dsa_events.safetensors" ]] && findmnt -T "$dsa_oracle_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" || dsa_oracle_ok=0; fi; [[ $oracle_ok == 1 && $dsa_oracle_ok == 1 ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source_root/SUCCESS" ]] && [[ -r "$source_runtime_root/SUCCESS" ]] && [[ -r "$runtime_root/SUCCESS" ]] && findmnt -T "$source_runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_runtime_root='"$SOURCE_RUNTIME_ROOT"'; runtime_root='"$RUNTIME_ROOT"'; oracle_mode='"$SHORT_CONTEXT_ORACLE"'; oracle_root='"$SHORT_CONTEXT_ORACLE_ROOT"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; dsa_oracle_mode='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_root='"$SHORT_CONTEXT_DSA_ORACLE_ROOT"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; internal_mode='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; if [[ ${HOSTNAME##*-w-} == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; oracle_ok=1; if [[ $oracle_mode == 1 ]]; then [[ -r "$oracle_root/SUCCESS" && -r "$oracle_dir/manifest.json" && -r "$oracle_dir/tokens.safetensors" ]] && findmnt -T "$oracle_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" || oracle_ok=0; fi; dsa_oracle_ok=1; if [[ $dsa_oracle_mode == 1 ]]; then [[ -r "$dsa_oracle_root/SUCCESS" && -r "$dsa_oracle_dir/manifest.json" && -r "$dsa_oracle_dir/dsa_events.safetensors" ]] && findmnt -T "$dsa_oracle_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" || dsa_oracle_ok=0; fi; internal_ok=1; if [[ $internal_mode == 1 ]]; then [[ -r "$internal_baseline" && -r "$internal_ref" && $(sha256sum "$internal_baseline" | awk "{print \$1}") == "$internal_baseline_sha" && $(sha256sum "$internal_ref" | awk "{print \$1}") == "$internal_ref_sha" ]] || internal_ok=0; fi; [[ $oracle_ok == 1 && $dsa_oracle_ok == 1 && $internal_ok == 1 ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source_root/SUCCESS" ]] && [[ -r "$source_runtime_root/SUCCESS" ]] && [[ -r "$runtime_root/SUCCESS" ]] && findmnt -T "$source_runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
@@ -344,22 +380,27 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer $CONTEXT_NAME load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
 if [[ $execute_status -ne 0 ]] || \
   ! has_eight_unique_markers "$RUN_DIR/execute.txt" DECODER_HOST_OK; then
+  say "retrieving fail-closed decoder diagnostic artifacts"
+  gcloud storage cp "$REMOTE_PREFIX/host_records/*" \
+    "$RUN_DIR/host_logs/" >"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
+  gcloud storage cp "$REMOTE_PREFIX/hlo/*" \
+    "$RUN_DIR/hlo/" >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
+  gcloud storage cp "$REMOTE_PREFIX/dsa_observer/*" \
+    "$RUN_DIR/dsa_observer/" >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
   if [[ $LAYER_RESIDUAL_OBSERVER == 1 ]]; then
-    say "retrieving fail-closed residual diagnostic artifacts"
-    gcloud storage cp "$REMOTE_PREFIX/host_records/*" \
-      "$RUN_DIR/host_logs/" >"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
-    gcloud storage cp "$REMOTE_PREFIX/hlo/*" \
-      "$RUN_DIR/hlo/" >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
-    gcloud storage cp "$REMOTE_PREFIX/dsa_observer/*" \
-      "$RUN_DIR/dsa_observer/" >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
     gcloud storage cp "$REMOTE_PREFIX/layer_residual_observer/*" \
       "$RUN_DIR/layer_residual_observer/" \
+      >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
+  fi
+  if [[ $DSA_INTERNAL_OBSERVER == 1 ]]; then
+    gcloud storage cp "$REMOTE_PREFIX/dsa_internal_observer/*" \
+      "$RUN_DIR/dsa_internal_observer/" \
       >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
   fi
   say "ABORT: real decoder load/compile did not pass 8/8"
@@ -382,6 +423,10 @@ fi
 if [[ $LAYER_RESIDUAL_OBSERVER == 1 ]]; then
   gcloud storage cp "$REMOTE_PREFIX/layer_residual_observer/*" \
     "$RUN_DIR/layer_residual_observer/" >/dev/null
+fi
+if [[ $DSA_INTERNAL_OBSERVER == 1 ]]; then
+  gcloud storage cp "$REMOTE_PREFIX/dsa_internal_observer/*" \
+    "$RUN_DIR/dsa_internal_observer/" >/dev/null
 fi
 
 say "validating fleet agreement and recording diagnostic DB linkage"
@@ -1194,7 +1239,7 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
   find host_records host_logs hlo traces dsa_observer \
-    layer_residual_observer -type f -print0 | \
+    layer_residual_observer dsa_internal_observer -type f -print0 | \
     sort -z | xargs -0 sha256sum
   sha256sum summary.json xplane_summary.json results_ckpt.db census_pre.txt census_post.txt \
     sync.txt execute.txt orchestrator.sealed.log

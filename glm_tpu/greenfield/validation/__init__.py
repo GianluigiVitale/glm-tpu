@@ -15,8 +15,12 @@ from .legacy_residuals import (
     compare_legacy_residuals,
 )
 from .legacy_dsa_internals import (
+    AcceptedGreenfieldDsaInternalComparisonConfig,
+    LegacyDsaInternalCaptureConfig,
     LegacyDsaInternalComparisonConfig,
+    compare_accepted_greenfield_dsa_internal_observation,
     compare_legacy_dsa_internals,
+    inspect_legacy_dsa_internal_capture,
 )
 from .layer0_dsa_association import (
     compare_dsa_association_scores,
@@ -44,15 +48,19 @@ from .short_context_logprob_oracle import (
 __all__ = (
     "GateCOracleConfig",
     "OneLayerOracleConfig",
+    "AcceptedGreenfieldDsaInternalComparisonConfig",
     "LegacyResidualComparisonConfig",
+    "LegacyDsaInternalCaptureConfig",
     "LegacyDsaInternalComparisonConfig",
     "ShortContextOracleConfig",
     "ShortContextDsaOracleConfig",
     "ShortContextLogprobOracleConfig",
     "capture_gate_c_oracle",
     "capture_one_layer_oracle",
+    "compare_accepted_greenfield_dsa_internal_observation",
     "compare_legacy_residuals",
     "compare_legacy_dsa_internals",
+    "inspect_legacy_dsa_internal_capture",
     "capture_short_context_oracle",
     "capture_short_context_dsa_oracle",
     "compare_short_context_dsa_oracles",

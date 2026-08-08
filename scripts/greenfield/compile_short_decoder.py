@@ -272,6 +272,126 @@ def _canonicalize_layer_residual_observation(
     return canonical, contract
 
 
+def _canonicalize_dsa_internal_observation(
+    observation: Any,
+    *,
+    groups: tuple[tuple[int, ...], ...],
+    stage_producer_layer_ids: tuple[tuple[int, ...], ...],
+    hidden_size: int,
+    q_lora_rank: int,
+    num_heads: int,
+    head_dim: int,
+) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    """Collapse exact stage replicas into the ordered full-indexer stream."""
+
+    fields = {
+        "normalized_hidden": np.asarray(observation.normalized_hidden),
+        "q_a_state": np.asarray(observation.q_a_state),
+        "query": np.asarray(observation.query),
+        "head_weights": np.asarray(observation.head_weights),
+        "current_key": np.asarray(observation.current_key),
+        "producer_layer_ids": np.asarray(observation.producer_layer_ids),
+    }
+    flat_ranks = tuple(rank for group in groups for rank in group)
+    maximum_slots = max(len(values) for values in stage_producer_layer_ids)
+    shapes = {
+        "normalized_hidden": (len(flat_ranks), maximum_slots, hidden_size),
+        "q_a_state": (len(flat_ranks), maximum_slots, q_lora_rank),
+        "query": (
+            len(flat_ranks),
+            maximum_slots,
+            num_heads,
+            head_dim,
+        ),
+        "head_weights": (len(flat_ranks), maximum_slots, num_heads),
+        "current_key": (len(flat_ranks), maximum_slots, head_dim),
+        "producer_layer_ids": (len(flat_ranks), maximum_slots),
+    }
+    expected_dtypes = {
+        "normalized_hidden": "bfloat16",
+        "q_a_state": "bfloat16",
+        "query": "float32",
+        "head_weights": "float32",
+        "current_key": "float32",
+        "producer_layer_ids": "int32",
+    }
+    for name, value in fields.items():
+        if value.shape != shapes[name] or value.dtype.name != expected_dtypes[name]:
+            raise RuntimeError(
+                f"DSA internal observer {name} contract drifted: "
+                f"expected={shapes[name]}/{expected_dtypes[name]} "
+                f"observed={value.shape}/{value.dtype}"
+            )
+    if sorted(flat_ranks) != list(range(len(flat_ranks))) or len(groups) != len(
+        stage_producer_layer_ids
+    ):
+        raise RuntimeError("DSA internal observer stage mapping drifted")
+
+    canonical_lists: dict[str, list[np.ndarray]] = {
+        name: [] for name in fields if name != "producer_layer_ids"
+    }
+    canonical_producers: list[int] = []
+    lane_mismatches: list[dict[str, Any]] = []
+    padded_slot_mismatches: list[dict[str, Any]] = []
+    for stage, (group, producers) in enumerate(
+        zip(groups, stage_producer_layer_ids, strict=True)
+    ):
+        for slot in range(maximum_slots):
+            live = slot < len(producers)
+            expected_producer = producers[slot] if live else -1
+            for name, value in fields.items():
+                lanes = value[list(group), slot]
+                if not np.all(lanes == lanes[0]):
+                    lane_mismatches.append(
+                        {"field": name, "slot": slot, "stage": stage}
+                    )
+            observed_producer = int(fields["producer_layer_ids"][group[0], slot])
+            if observed_producer != expected_producer:
+                padded_slot_mismatches.append(
+                    {
+                        "expected_producer": expected_producer,
+                        "observed_producer": observed_producer,
+                        "slot": slot,
+                        "stage": stage,
+                    }
+                )
+            if live:
+                canonical_producers.append(expected_producer)
+                for name in canonical_lists:
+                    canonical_lists[name].append(fields[name][group[0], slot])
+            else:
+                for name in canonical_lists:
+                    if np.any(fields[name][group[0], slot] != 0):
+                        padded_slot_mismatches.append(
+                            {"field": name, "slot": slot, "stage": stage}
+                        )
+
+    canonical = {
+        name: np.stack(values, axis=0)
+        for name, values in canonical_lists.items()
+    }
+    canonical["producer_layer_ids"] = np.asarray(
+        canonical_producers, dtype=np.int32
+    )
+    field_records = {}
+    for name, value in canonical.items():
+        contiguous = np.ascontiguousarray(value)
+        field_records[name] = {
+            "dtype": value.dtype.name,
+            "sha256": sha256(contiguous.tobytes(order="C")).hexdigest(),
+            "shape": list(value.shape),
+        }
+    contract = {
+        "event_count": len(canonical_producers),
+        "field_records": field_records,
+        "lane_mismatches": lane_mismatches,
+        "padded_slot_mismatches": padded_slot_mismatches,
+        "passed": not lane_mismatches and not padded_slot_mismatches,
+        "producer_layer_ids": canonical_producers,
+    }
+    return canonical, contract
+
+
 def _validate_completed_step_selected_states(
     active_metadata: np.ndarray,
     *,
@@ -971,6 +1091,9 @@ def _make_global_array(
 
 def _delete_arrays(values: tuple[Any, ...]) -> None:
     for value in values:
+        if isinstance(value, (tuple, list)):
+            _delete_arrays(tuple(value))
+            continue
         try:
             value.delete()
         except (AttributeError, RuntimeError):
@@ -1051,6 +1174,18 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--observe-dsa-internals",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
+    parser.add_argument(
+        "--dsa-internal-baseline-observation-npz", type=Path
+    )
+    parser.add_argument("--dsa-internal-baseline-observation-sha256")
+    parser.add_argument("--dsa-internal-layer0-reference-npz", type=Path)
+    parser.add_argument("--dsa-internal-layer0-reference-sha256")
     parser.add_argument("--layer-residual-position", type=int, default=2044)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
@@ -1072,6 +1207,7 @@ def main() -> int:
     args.complete_token_path = bool(args.complete_token_path)
     args.split_residual_state = bool(args.split_residual_state)
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
+    args.observe_dsa_internals = bool(args.observe_dsa_internals)
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
         args.short_context_oracle_manifest_sha256 is not None
@@ -1095,6 +1231,28 @@ def main() -> int:
         raise ValueError(
             "layer residual observation requires the sealed DSA/token oracle"
         )
+    internal_prerequisites = (
+        args.dsa_internal_baseline_observation_npz,
+        args.dsa_internal_baseline_observation_sha256,
+        args.dsa_internal_layer0_reference_npz,
+        args.dsa_internal_layer0_reference_sha256,
+    )
+    internal_prerequisite_presence = tuple(
+        value is not None for value in internal_prerequisites
+    )
+    if (
+        any(internal_prerequisite_presence)
+        and not all(internal_prerequisite_presence)
+    ) or args.observe_dsa_internals != all(internal_prerequisite_presence):
+        raise ValueError(
+            "DSA internal observation requires both pinned diagnostic inputs"
+        )
+    if args.observe_dsa_internals and not dsa_oracle_mode:
+        raise ValueError(
+            "DSA internal observation requires the sealed DSA/token oracle"
+        )
+    if args.observe_dsa_internals and args.observe_layer_residuals:
+        raise ValueError("DSA internal and residual observers must be isolated")
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.warmup < 1 or args.iterations < 1:
@@ -1108,6 +1266,8 @@ def main() -> int:
     oracle_generated_token_ids = None
     dsa_oracle_manifest = None
     dsa_oracle_tensors = None
+    dsa_internal_baseline = None
+    dsa_internal_layer0_reference = None
     if oracle_mode:
         assert args.short_context_oracle_dir is not None
         assert args.short_context_oracle_manifest_sha256 is not None
@@ -1172,6 +1332,43 @@ def main() -> int:
             raise ValueError(
                 "layer residual position is outside the sealed observer window"
             )
+    if args.observe_dsa_internals:
+        assert args.dsa_internal_baseline_observation_npz is not None
+        assert args.dsa_internal_baseline_observation_sha256 is not None
+        assert args.dsa_internal_layer0_reference_npz is not None
+        assert args.dsa_internal_layer0_reference_sha256 is not None
+        if _sha256_file(args.dsa_internal_baseline_observation_npz) != (
+            args.dsa_internal_baseline_observation_sha256
+        ):
+            raise ValueError("DSA internal baseline observation hash drifted")
+        if _sha256_file(args.dsa_internal_layer0_reference_npz) != (
+            args.dsa_internal_layer0_reference_sha256
+        ):
+            raise ValueError("DSA internal layer-0 reference hash drifted")
+        with np.load(
+            args.dsa_internal_baseline_observation_npz, allow_pickle=False
+        ) as payload:
+            if "observation" not in payload.files:
+                raise ValueError("DSA internal baseline has no observation")
+            dsa_internal_baseline = np.asarray(
+                payload["observation"], dtype=np.int32
+            )
+        with np.load(
+            args.dsa_internal_layer0_reference_npz, allow_pickle=False
+        ) as payload:
+            required = {
+                "actual__normalized_hidden",
+                "actual__q_a_state",
+                "actual__query",
+                "actual__head_weights",
+                "actual__current_key",
+            }
+            if not required.issubset(payload.files):
+                raise ValueError("DSA internal layer-0 reference is incomplete")
+            dsa_internal_layer0_reference = {
+                name.removeprefix("actual__"): np.asarray(payload[name])
+                for name in sorted(required)
+            }
     if args.runtime_kind in ("pallas_feature", "pallas_feature_linear") and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
@@ -1439,6 +1636,7 @@ def main() -> int:
                 dsa_query_backend=dsa_query_backend,
                 complete_token_path=True,
                 observe_dsa_events=True,
+                observe_dsa_internals=args.observe_dsa_internals,
                 observe_layer_residuals=args.observe_layer_residuals,
                 split_residual_state=args.split_residual_state,
             )
@@ -1857,6 +2055,7 @@ def main() -> int:
         prefill_token_oracle_contract = None
         dsa_observer_contract = None
         layer_residual_contract = None
+        dsa_internal_contract = None
         if oracle_mode:
             assert compiled_prefill is not None and prefill_inputs is not None
             prefill_started = time.perf_counter_ns()
@@ -1924,6 +2123,177 @@ def main() -> int:
                         multihost_utils,
                         observer_result[9],
                     )
+                    if args.observe_dsa_internals and step == 0:
+                        assert dsa_internal_baseline is not None
+                        assert dsa_internal_layer0_reference is not None
+                        internal_value = observer_result[10]
+                        internal_host = SimpleNamespace(
+                            **{
+                                name: _materialize_global_array(
+                                    jax, multihost_utils, value
+                                )
+                                for name, value in zip(
+                                    internal_value._fields,
+                                    internal_value,
+                                    strict=True,
+                                )
+                            }
+                        )
+                        (
+                            canonical_dsa_internals,
+                            dsa_internal_contract,
+                        ) = _canonicalize_dsa_internal_observation(
+                            internal_host,
+                            groups=groups,
+                            stage_producer_layer_ids=stage_dsa_producers,
+                            hidden_size=execution_plan.geometry.hidden_size,
+                            q_lora_rank=execution_plan.geometry.q_lora_rank,
+                            num_heads=execution_plan.geometry.dsa_indexer_heads,
+                            head_dim=(
+                                execution_plan.geometry.dsa_indexer_head_dim
+                            ),
+                        )
+                        baseline_exact = bool(
+                            observation_host.shape == dsa_internal_baseline.shape
+                            and np.array_equal(
+                                observation_host, dsa_internal_baseline
+                            )
+                        )
+                        dsa_internal_contract["baseline_observation"] = {
+                            "actual_sha256": sha256(
+                                np.ascontiguousarray(
+                                    observation_host
+                                ).tobytes(order="C")
+                            ).hexdigest(),
+                            "elementwise_exact": baseline_exact,
+                            "expected_sha256": sha256(
+                                np.ascontiguousarray(
+                                    dsa_internal_baseline
+                                ).tobytes(order="C")
+                            ).hexdigest(),
+                            "shape": list(observation_host.shape),
+                        }
+                        layer0_comparisons = {}
+                        for name in (
+                            "normalized_hidden",
+                            "q_a_state",
+                            "query",
+                            "head_weights",
+                            "current_key",
+                        ):
+                            actual = canonical_dsa_internals[name][0]
+                            reference = dsa_internal_layer0_reference[name]
+                            if actual.dtype.name == "bfloat16":
+                                actual_storage = _encode_bfloat16_bits(actual)
+                            else:
+                                actual_storage = np.ascontiguousarray(actual)
+                            reference_storage = np.ascontiguousarray(reference)
+                            shape_equal = actual_storage.shape == reference_storage.shape
+                            exact = bool(
+                                shape_equal
+                                and actual_storage.dtype == reference_storage.dtype
+                                and np.array_equal(
+                                    actual_storage, reference_storage
+                                )
+                            )
+                            if shape_equal:
+                                delta = (
+                                    actual.astype(np.float32)
+                                    - (
+                                        reference_storage.view(
+                                            np.dtype("<u2")
+                                        ).view(ml_dtypes.bfloat16).astype(
+                                            np.float32
+                                        )
+                                        if actual.dtype.name == "bfloat16"
+                                        else reference_storage.astype(np.float32)
+                                    )
+                                )
+                                max_abs = float(
+                                    np.max(np.abs(delta), initial=0.0)
+                                )
+                                mismatch_count = int(
+                                    np.count_nonzero(
+                                        actual_storage != reference_storage
+                                    )
+                                )
+                            else:
+                                max_abs = None
+                                mismatch_count = None
+                            layer0_comparisons[name] = {
+                                "actual_sha256": sha256(
+                                    actual_storage.tobytes(order="C")
+                                ).hexdigest(),
+                                "elementwise_exact": exact,
+                                "expected_sha256": sha256(
+                                    reference_storage.tobytes(order="C")
+                                ).hexdigest(),
+                                "max_abs": max_abs,
+                                "mismatch_count": mismatch_count,
+                                "shape": list(actual_storage.shape),
+                            }
+                        dsa_internal_contract["layer0_reference"] = (
+                            layer0_comparisons
+                        )
+                        dsa_internal_contract["decode_position"] = int(
+                            decode_position
+                        )
+                        dsa_internal_contract["baseline_observation_exact"] = (
+                            baseline_exact
+                        )
+                        dsa_internal_contract["layer0_query_exact"] = bool(
+                            layer0_comparisons["query"]["elementwise_exact"]
+                        )
+                        dsa_internal_contract["passed"] = bool(
+                            dsa_internal_contract["passed"]
+                            and baseline_exact
+                            and dsa_internal_contract["layer0_query_exact"]
+                        )
+                        if jax.process_index() == 0:
+                            internal_dir = (
+                                args.output.parent / "dsa_internal_observer"
+                            )
+                            _atomic_npz(
+                                internal_dir
+                                / f"position_{int(decode_position)}_internals.npz",
+                                normalized_hidden_bfloat16_bits=(
+                                    _encode_bfloat16_bits(
+                                        canonical_dsa_internals[
+                                            "normalized_hidden"
+                                        ]
+                                    )
+                                ),
+                                q_a_state_bfloat16_bits=(
+                                    _encode_bfloat16_bits(
+                                        canonical_dsa_internals["q_a_state"]
+                                    )
+                                ),
+                                query=np.asarray(
+                                    canonical_dsa_internals["query"],
+                                    dtype=np.float32,
+                                ),
+                                head_weights=np.asarray(
+                                    canonical_dsa_internals["head_weights"],
+                                    dtype=np.float32,
+                                ),
+                                current_key=np.asarray(
+                                    canonical_dsa_internals["current_key"],
+                                    dtype=np.float32,
+                                ),
+                                producer_layer_ids=np.asarray(
+                                    canonical_dsa_internals[
+                                        "producer_layer_ids"
+                                    ],
+                                    dtype=np.int32,
+                                ),
+                                decode_position=np.asarray(
+                                    [decode_position], dtype=np.int32
+                                ),
+                            )
+                            _atomic_json(
+                                internal_dir / "contract.json",
+                                dsa_internal_contract,
+                            )
                     if (
                         args.observe_layer_residuals
                         and int(decode_position) == args.layer_residual_position
@@ -2062,6 +2432,11 @@ def main() -> int:
                     step_contract["token_observation"] = (
                         token_observation_contract
                     )
+                    step_contract["dsa_internal_observation"] = (
+                        dsa_internal_contract
+                        if args.observe_dsa_internals and step == 0
+                        else None
+                    )
                     step_contract["position_passed"] = bool(
                         next_position.tolist() == [int(decode_position) + 1]
                     )
@@ -2069,6 +2444,14 @@ def main() -> int:
                         step_contract["passed"]
                         and step_contract["position_passed"]
                         and token_observation_contract["passed"]
+                        and (
+                            not args.observe_dsa_internals
+                            or step != 0
+                            or (
+                                dsa_internal_contract is not None
+                                and dsa_internal_contract["passed"]
+                            )
+                        )
                     )
                     observer_step_records.append(step_contract)
                     if not step_contract["passed"]:
@@ -2144,6 +2527,7 @@ def main() -> int:
                     "prefill_token_sequence": prefill_token_oracle_contract,
                     "production_executable_observer_enabled": False,
                     "layer_residual_observation": layer_residual_contract,
+                    "dsa_internal_observation": dsa_internal_contract,
                     "teacher_forced_input_token_ids": (
                         teacher_forced_input_tokens
                         if args.observe_layer_residuals
@@ -2183,6 +2567,13 @@ def main() -> int:
                             == oracle_generated_token_ids[
                                 1 : 1 + len(teacher_forced_input_tokens)
                             ].tolist()
+                        )
+                    )
+                    and (
+                        not args.observe_dsa_internals
+                        or (
+                            dsa_internal_contract is not None
+                            and dsa_internal_contract["passed"]
                         )
                     )
                 )

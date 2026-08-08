@@ -1,4 +1,4 @@
-"""Validate and localize a sealed legacy layer-0 DSA scorer-state capture."""
+"""Validate sealed legacy DSA scorer-state captures and comparisons."""
 
 from __future__ import annotations
 
@@ -18,8 +18,13 @@ from .layer0_dsa_association import (
 
 
 ARTIFACT_KIND = "glm52_legacy_dsa_internal_state"
+CAPTURE_KIND = "glm52_legacy_dsa_internal_capture"
 COMPARISON_KIND = "glm52_legacy_greenfield_dsa_internal_comparison"
+OBSERVER_COMPARISON_KIND = (
+    "glm52_accepted_greenfield_dsa_internal_observer_comparison"
+)
 MODEL_ID = "zai-org/GLM-5.2-FP8"
+FULL_DSA_PRODUCER_LAYER_IDS = (0, 1, 2, *range(6, 78, 4))
 FIELD_ORDER = (
     "normalized_hidden",
     "q_a_state",
@@ -34,6 +39,37 @@ FIELD_CONTRACT = {
     "head_weights": ((32,), "float32", np.dtype(np.float32)),
     "current_key": ((128,), "float32", np.dtype(np.float32)),
 }
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyDsaInternalCaptureConfig:
+    """Immutable identities for one accepted-oracle internal-state capture."""
+
+    source_dump_dir: Path
+    output_dir: Path
+    expected_run_tag: str
+    expected_legacy_code_hash: str
+    expected_oracle_pin: str
+    expected_model_id: str = MODEL_ID
+    expected_layer_name: str = "model.layers.0.self_attn.attn"
+    expected_position: int = 8155
+    expected_process_count: int = 8
+    expected_capture_process_indices: tuple[int, ...] = (0,)
+
+    def __post_init__(self) -> None:
+        capture_indices = tuple(self.expected_capture_process_indices)
+        object.__setattr__(self, "expected_capture_process_indices", capture_indices)
+        if self.expected_process_count <= 0:
+            raise ValueError("expected_process_count must be positive")
+        if not capture_indices or len(set(capture_indices)) != len(
+            capture_indices
+        ):
+            raise ValueError("capture process indices must be non-empty and unique")
+        if any(
+            process_index < 0 or process_index >= self.expected_process_count
+            for process_index in capture_indices
+        ):
+            raise ValueError("capture process index is outside the fleet")
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +109,25 @@ class LegacyDsaInternalComparisonConfig:
             raise ValueError("capture process index is outside the fleet")
 
 
+@dataclass(frozen=True, slots=True)
+class AcceptedGreenfieldDsaInternalComparisonConfig:
+    """Pinned inputs for one accepted-vs-greenfield observer comparison."""
+
+    accepted_capture_dir: Path
+    greenfield_observation_path: Path
+    output_dir: Path
+    expected_capture_manifest_sha256: str
+    expected_greenfield_observation_sha256: str
+    expected_greenfield_code_hash: str
+    expected_legacy_code_hash: str
+    expected_layer_id: int
+    expected_position: int = 8155
+
+    def __post_init__(self) -> None:
+        if self.expected_layer_id not in FULL_DSA_PRODUCER_LAYER_IDS:
+            raise ValueError("expected layer is not a full DSA producer")
+
+
 def _file_sha256(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as stream:
@@ -106,7 +161,7 @@ def _decode_bfloat16(bits: np.ndarray) -> np.ndarray:
 
 
 def _load_legacy_capture(
-    config: LegacyDsaInternalComparisonConfig,
+    config: LegacyDsaInternalCaptureConfig | LegacyDsaInternalComparisonConfig,
 ) -> tuple[dict[str, np.ndarray], list[dict[str, Any]], str]:
     errors = sorted(config.source_dump_dir.rglob("*.INTERNAL.ERROR.*"))
     if errors:
@@ -214,6 +269,244 @@ def _load_legacy_capture(
         sorted(records, key=lambda value: value["process_index"]),
         digest.hexdigest(),
     )
+
+
+def inspect_legacy_dsa_internal_capture(
+    config: LegacyDsaInternalCaptureConfig,
+) -> dict[str, Any]:
+    """Validate and seal one generic accepted-oracle scorer-state row."""
+
+    for name, value in (
+        ("legacy code hash", config.expected_legacy_code_hash),
+        ("oracle pin", config.expected_oracle_pin),
+    ):
+        _require_digest(value, name=name)
+    if config.output_dir.exists():
+        raise FileExistsError(f"append-only capture exists: {config.output_dir}")
+
+    actual, process_records, actual_sha = _load_legacy_capture(config)
+    config.output_dir.mkdir(parents=True)
+    tensor_path = config.output_dir / "internals.npz"
+    np.savez(tensor_path, **actual)
+    fields = {
+        name: {
+            "sha256": _array_sha256(actual[name]),
+            "shape": list(actual[name].shape),
+            "storage_dtype": str(actual[name].dtype),
+            "value_dtype": FIELD_CONTRACT[name][1],
+        }
+        for name in FIELD_ORDER
+    }
+    capture = {
+        "artifact_kind": CAPTURE_KIND,
+        "capture_layout": "topology_sharded_live_row_owner",
+        "capture_process_indices": list(
+            config.expected_capture_process_indices
+        ),
+        "diagnostic_only": True,
+        "fields": fields,
+        "format_version": 1,
+        "layer_name": config.expected_layer_name,
+        "legacy_code_hash": config.expected_legacy_code_hash,
+        "model_id": config.expected_model_id,
+        "oracle_pin": config.expected_oracle_pin,
+        "owner_actual_sha256": actual_sha,
+        "performance_claim": False,
+        "position": config.expected_position,
+        "process_count": config.expected_process_count,
+        "process_files": process_records,
+        "run_tag": config.expected_run_tag,
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+    }
+    (config.output_dir / "capture.json").write_text(
+        json.dumps(capture, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+    return capture
+
+
+def _load_sealed_accepted_capture(
+    config: AcceptedGreenfieldDsaInternalComparisonConfig,
+) -> tuple[dict[str, np.ndarray], dict[str, Any], str]:
+    manifest_path = config.accepted_capture_dir / "capture.json"
+    if _file_sha256(manifest_path) != config.expected_capture_manifest_sha256:
+        raise ValueError("accepted DSA internal capture manifest hash drifted")
+    manifest = json.loads(manifest_path.read_text())
+    expected_layer_name = (
+        f"model.layers.{config.expected_layer_id}.self_attn.attn"
+    )
+    expected_values = {
+        "artifact_kind": CAPTURE_KIND,
+        "format_version": 1,
+        "layer_name": expected_layer_name,
+        "legacy_code_hash": config.expected_legacy_code_hash,
+        "model_id": MODEL_ID,
+        "performance_claim": False,
+        "position": config.expected_position,
+    }
+    for name, expected in expected_values.items():
+        if manifest.get(name) != expected:
+            raise ValueError(
+                f"accepted DSA internal capture {name} drifted: "
+                f"{manifest.get(name)!r} != {expected!r}"
+            )
+    tensor_record = manifest.get("tensor_file")
+    if not isinstance(tensor_record, dict) or set(tensor_record) != {
+        "byte_count",
+        "filename",
+        "sha256",
+    }:
+        raise ValueError("accepted DSA internal tensor record drifted")
+    tensor_path = config.accepted_capture_dir / str(tensor_record["filename"])
+    if (
+        tensor_path.name != "internals.npz"
+        or tensor_path.stat().st_size != tensor_record["byte_count"]
+        or _file_sha256(tensor_path) != tensor_record["sha256"]
+    ):
+        raise ValueError("accepted DSA internal tensor file drifted")
+    with np.load(tensor_path, allow_pickle=False) as payload:
+        if set(payload.files) != set(FIELD_ORDER):
+            raise ValueError("accepted DSA internal tensor keys drifted")
+        fields = {
+            name: np.ascontiguousarray(payload[name]) for name in FIELD_ORDER
+        }
+    for name, value in fields.items():
+        expected_shape, _, expected_dtype = FIELD_CONTRACT[name]
+        if value.shape != expected_shape or value.dtype != expected_dtype:
+            raise ValueError(
+                f"accepted DSA internal {name} storage contract drifted"
+            )
+    return fields, manifest, _file_sha256(manifest_path)
+
+
+def _load_greenfield_observation(
+    config: AcceptedGreenfieldDsaInternalComparisonConfig,
+) -> tuple[dict[str, np.ndarray], int, str]:
+    path = config.greenfield_observation_path
+    if _file_sha256(path) != config.expected_greenfield_observation_sha256:
+        raise ValueError("greenfield DSA internal observation hash drifted")
+    field_names = {
+        "normalized_hidden": "normalized_hidden_bfloat16_bits",
+        "q_a_state": "q_a_state_bfloat16_bits",
+        "query": "query",
+        "head_weights": "head_weights",
+        "current_key": "current_key",
+    }
+    expected_keys = set(field_names.values()) | {
+        "decode_position",
+        "producer_layer_ids",
+    }
+    with np.load(path, allow_pickle=False) as payload:
+        if set(payload.files) != expected_keys:
+            raise ValueError("greenfield DSA internal observation keys drifted")
+        producer_layer_ids = np.ascontiguousarray(
+            payload["producer_layer_ids"]
+        )
+        decode_position = np.ascontiguousarray(payload["decode_position"])
+        if (
+            producer_layer_ids.dtype != np.int32
+            or producer_layer_ids.shape != (len(FULL_DSA_PRODUCER_LAYER_IDS),)
+            or tuple(int(value) for value in producer_layer_ids)
+            != FULL_DSA_PRODUCER_LAYER_IDS
+        ):
+            raise ValueError("greenfield DSA producer schedule drifted")
+        if (
+            decode_position.dtype != np.int32
+            or decode_position.shape != (1,)
+            or int(decode_position[0]) != config.expected_position
+        ):
+            raise ValueError("greenfield DSA internal position drifted")
+        event = FULL_DSA_PRODUCER_LAYER_IDS.index(config.expected_layer_id)
+        fields = {
+            name: np.ascontiguousarray(payload[source_name][event])
+            for name, source_name in field_names.items()
+        }
+    for name, value in fields.items():
+        expected_shape, _, expected_dtype = FIELD_CONTRACT[name]
+        if value.shape != expected_shape or value.dtype != expected_dtype:
+            raise ValueError(
+                f"greenfield DSA internal {name} storage contract drifted"
+            )
+    return fields, event, _file_sha256(path)
+
+
+def compare_accepted_greenfield_dsa_internal_observation(
+    config: AcceptedGreenfieldDsaInternalComparisonConfig,
+) -> dict[str, Any]:
+    """Align and compare one accepted producer with one greenfield event."""
+
+    for name, value in (
+        ("capture manifest", config.expected_capture_manifest_sha256),
+        (
+            "greenfield observation",
+            config.expected_greenfield_observation_sha256,
+        ),
+        ("greenfield code hash", config.expected_greenfield_code_hash),
+        ("legacy code hash", config.expected_legacy_code_hash),
+    ):
+        _require_digest(value, name=name)
+    if config.output_dir.exists():
+        raise FileExistsError(
+            f"append-only observer comparison exists: {config.output_dir}"
+        )
+
+    accepted, capture, capture_sha = _load_sealed_accepted_capture(config)
+    greenfield, event_index, observation_sha = _load_greenfield_observation(
+        config
+    )
+    comparisons = {
+        name: _comparison_record(
+            accepted[name],
+            greenfield[name],
+            value_dtype=FIELD_CONTRACT[name][1],
+        )
+        for name in FIELD_ORDER
+    }
+    divergent = [
+        name for name in FIELD_ORDER if not comparisons[name]["elementwise_exact"]
+    ]
+    comparison = {
+        "artifact_kind": OBSERVER_COMPARISON_KIND,
+        "accepted_capture_manifest_sha256": capture_sha,
+        "accepted_run_tag": capture["run_tag"],
+        "all_fields_elementwise_exact": not divergent,
+        "diagnostic_only": True,
+        "divergent_fields": divergent,
+        "event_index": event_index,
+        "fields": comparisons,
+        "first_divergent_field": divergent[0] if divergent else None,
+        "format_version": 1,
+        "greenfield_code_hash": config.expected_greenfield_code_hash,
+        "greenfield_observation_sha256": observation_sha,
+        "layer_id": config.expected_layer_id,
+        "layer_name": capture["layer_name"],
+        "legacy_code_hash": config.expected_legacy_code_hash,
+        "model_id": MODEL_ID,
+        "performance_claim": False,
+        "position": config.expected_position,
+    }
+    config.output_dir.mkdir(parents=True)
+    tensor_path = config.output_dir / "internals.npz"
+    np.savez(
+        tensor_path,
+        **{f"accepted__{name}": accepted[name] for name in FIELD_ORDER},
+        **{f"greenfield__{name}": greenfield[name] for name in FIELD_ORDER},
+        event_index=np.asarray(event_index, dtype=np.int32),
+        layer_id=np.asarray(config.expected_layer_id, dtype=np.int32),
+        position=np.asarray(config.expected_position, dtype=np.int32),
+    )
+    comparison["tensor_file"] = {
+        "byte_count": tensor_path.stat().st_size,
+        "filename": tensor_path.name,
+        "sha256": _file_sha256(tensor_path),
+    }
+    (config.output_dir / "comparison.json").write_text(
+        json.dumps(comparison, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+    return comparison
 
 
 def _reconstruct_greenfield(

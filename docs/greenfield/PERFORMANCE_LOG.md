@@ -1,8 +1,9 @@
 # Greenfield performance and mechanism log
 
-No greenfield full-decoder model-performance measurement exists yet. The real-layer result below is
-checkpoint-backed model compute; all other results are protected synthetic TPU mechanisms. None
-reports token speed.
+Protected PP8 2K full-decoder evidence exists at DB484: p50 `244.091151 ms` and
+`4.096830 tok/s`, with exact tokens/DSA and complete protections. It passes 2K Gate-D correctness
+but not Gate E. No accepted 8K, 128K, 256K, PP16 full-decoder, or WS32 full-decoder performance
+measurement exists yet. Bounded layer/kernel/diagnostic results below are not token-speed proof.
 
 ## 2026-08-06 — complete feature-runtime checkpoint, not performance
 
@@ -890,3 +891,15 @@ reconstruction. DB495--DB498 Pallas/streamed alternatives retain 4,096 down to 1
 and are rejected. DB/archive/remote SUCCESS and 8/8 cleanup pass. These bounded runs deliberately
 record `performance_claim=false`; no latency, Gate-D, or token-rate result follows. The next
 performance-admissible evidence is the corrected protected 8K complete decoder.
+
+## Corrected 8K DSA-observer refusal — no performance result
+
+Protected attempt
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260808T041407656729112Z`
+at `f129e63` stopped before its measured window because the first decode-step DSA event stream was
+not exact. Token `101252` is correct and event 0 retains the accepted set, but event 1 has seven
+selected-set swaps and an aligned common-score mean/signed delta of
+`0.18290268/-0.18290268`. The run contains no profiler-free latency distribution, tok/s, DB row,
+final `SUCCESS`, or Gate-D result. Its eight logs agree byte-for-byte and cleanup is 8/8 clean.
+The last accepted PP8 decoder performance therefore remains DB484 at `244.091151 ms` p50 and
+`4.096830 tok/s`; Gate E is still not passed.

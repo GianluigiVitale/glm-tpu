@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-07T21:20:00Z",
+  "captured_utc": "2026-08-08T07:57:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -122,9 +122,9 @@
       "source_pin": "83ff4a3576602ca844ea090550139a2ff00b0bb1 / parent b3c25df47ac98783912dc658878181ec0a8ae16d",
       "source_paths": ["tpu_inference/runner/dsa_topk_dump.py", "tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "tpu_inference/layers/vllm/custom_ops/mla_attention.py"],
       "disposition": "oracle_only",
-      "greenfield_consumers": ["glm_tpu/greenfield/validation/legacy_dsa_internals.py", "scripts/greenfield/run_capture_legacy_layer0_dsa_internals.sh"],
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/legacy_dsa_internals.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/run_capture_legacy_dsa_internals.sh", "scripts/greenfield/compare_accepted_greenfield_dsa_internals.py"],
       "gate": "D diagnostic",
-      "reason": "One default-off callback reuses the proven DSA dump boundary to capture only the actual layer-0 position-8155 normalized hidden, q-a state, query, head weights and current pre-cache key. Its second oracle-only commit uses the scorer's existing zero-copy torchax-to-JAX bridge, regression-tested under an outer JIT. The protected wrapper requires exact raw tokens, bitwise-identical sealed DSA event tensors, eight replicated process artifacts, DB/archive linkage and clean census. It never enters greenfield execution."
+      "reason": "One default-off callback reuses the proven DSA dump boundary to capture only one selected full-indexer producer's position-8155 normalized hidden, q-a state, query, head weights and current pre-cache key. Its second oracle-only commit uses the scorer's existing zero-copy torchax-to-JAX bridge, regression-tested under an outer JIT. Greenfield independently exposes the same already-live values for all 21 producer events only in an isolated observer and aligns them through a hash-pinned offline comparator. The protected wrappers require exact raw tokens, bitwise-identical sealed DSA event tensors, DB/archive linkage and clean census. Legacy execution never enters greenfield execution."
     },
     {
       "id": "legacy-dsa-query-association",

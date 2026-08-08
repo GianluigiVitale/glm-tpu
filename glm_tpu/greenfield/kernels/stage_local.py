@@ -58,6 +58,17 @@ class StageLocalDsaFp8Result(NamedTuple):
     valid_counts: Any
     selected_scores: Any
     contract_valid: Any
+    internals: "StageLocalDsaFp8Internals"
+
+
+class StageLocalDsaFp8Internals(NamedTuple):
+    """Already-live full-indexer values exposed only to diagnostics."""
+
+    normalized_hidden: Any
+    q_a_state: Any
+    query: Any
+    head_weights: Any
+    current_key: Any
 
 
 class StageLocalIndexShareFp8Result(NamedTuple):
@@ -469,14 +480,14 @@ def stage_local_dsa_fp8_mapped(
         wk_weight = dequantize_fp8_bits_block_weight(
             wk_bits, wk_scale, block_shape=block_shape
         )
-        current_key = dsa_index_keys(
+        current_key_f32 = dsa_index_keys(
             normalized,
             wk_weight,
             key_norm_weight,
             key_norm_bias,
             position,
             contract=contract,
-        ).astype(index_cache.dtype)
+        ).astype(jnp.float32)
     else:
         projected_key = fp8_block_matmul_f32(
             normalized,
@@ -489,13 +500,14 @@ def stage_local_dsa_fp8_mapped(
             ),
             interpret=linear_interpret,
         )
-        current_key = dsa_index_keys_from_projection(
+        current_key_f32 = dsa_index_keys_from_projection(
             projected_key,
             key_norm_weight,
             key_norm_bias,
             position,
             contract=contract,
-        ).astype(index_cache.dtype)
+        ).astype(jnp.float32)
+    current_key = current_key_f32.astype(index_cache.dtype)
 
     def write_current(value: Any) -> Any:
         return value.at[physical_page, local_row].set(current_key[0])
@@ -566,6 +578,13 @@ def stage_local_dsa_fp8_mapped(
         selected.valid_counts,
         selected.scores,
         metadata_valid & selection_valid,
+        StageLocalDsaFp8Internals(
+            normalized,
+            q_residual,
+            query,
+            gathered_head_weights,
+            current_key_f32,
+        ),
     )
 
 

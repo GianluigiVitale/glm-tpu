@@ -10,6 +10,17 @@ readonly HARNESS_REPO=/home/gianl/glm-tpu
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
+readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
+if [[ ! $INTERNAL_LAYER_ID =~ ^[0-9]+$ ]] ||
+  ! ((INTERNAL_LAYER_ID <= 2 || (INTERNAL_LAYER_ID >= 6 && INTERNAL_LAYER_ID < 78 && (INTERNAL_LAYER_ID - 6) % 4 == 0))); then
+  echo "DSA internal layer must be a full-indexer producer" >&2
+  exit 2
+fi
+if [[ $INTERNAL_LAYER_ID == 0 ]]; then
+  readonly INTERNAL_COMPARE_LAYER0=1
+else
+  readonly INTERNAL_COMPARE_LAYER0=0
+fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-83ff4a357
@@ -35,7 +46,7 @@ readonly LAYER0_INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38
 readonly DISTRIBUTED_Q_A_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact
 readonly DISTRIBUTED_Q_A_MANIFEST_SHA=7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c43dcded7d809120e30d8c16
 readonly DISTRIBUTED_Q_A_CODE_HASH=ea879a24d196f61e238a22ee5bb393d3b6fa938d
-readonly INTERNAL_LAYER=model.layers.0.self_attn.attn
+readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
 case "$PROFILE" in
@@ -97,7 +108,12 @@ ORACLE_DIR=$RUN_DIR/oracle
 REMOTE_PREFIX=${GLM_GREENFIELD_SHORT_DSA_REMOTE_PREFIX:-$APPROVED_BUCKET/oracles/greenfield/glm52/short_context_dsa/$PROFILE/$TAG}
 DUMP_PREFIX=/tmp/$TAG/topk.npz
 INTERNAL_DUMP_PREFIX=/tmp/$TAG/internals.npz
-INTERNAL_COMPARISON_DIR=$RUN_DIR/internal_comparison
+if [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
+else
+  INTERNAL_RESULT_DIR=$RUN_DIR/internal_capture
+fi
+readonly INTERNAL_RESULT_DIR
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing DSA oracle outside $BRANCH" >&2
@@ -144,12 +160,17 @@ fi
   exit 2
 }
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  [[ -r $REFERENCE_8K_DSA_ORACLE/manifest.json &&
-     -r $LAYER0_INPUT_DIR/manifest.json &&
-     -r $DISTRIBUTED_Q_A_DIR/manifest.json ]] || {
-    echo "sealed DSA/internal comparison prerequisites are unavailable" >&2
+  [[ -r $REFERENCE_8K_DSA_ORACLE/manifest.json ]] || {
+    echo "sealed DSA oracle comparison prerequisite is unavailable" >&2
     exit 2
   }
+  if [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
+    [[ -r $LAYER0_INPUT_DIR/manifest.json &&
+       -r $DISTRIBUTED_Q_A_DIR/manifest.json ]] || {
+      echo "sealed layer-0 comparison prerequisites are unavailable" >&2
+      exit 2
+    }
+  fi
 fi
 [[ ! -e $RUN_DIR ]] || {
   echo "append-only run directory exists: $RUN_DIR" >&2
@@ -217,7 +238,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
-say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX"
+say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER"
 strict_census pre || {
   say "ABORT: fleet is not eight-host zero work"
   exit 1
@@ -471,7 +492,7 @@ PY
 
 stop_owned_runtime
 runtime_started=0
-if [[ $INTERNAL_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   say "comparing accepted layer-0 scorer state on one local TPU host"
   env JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
@@ -484,7 +505,7 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     --source-dump-dir "$SOURCE_DIR" \
     --layer0-input-dir "$LAYER0_INPUT_DIR" \
     --distributed-q-a-norm-dir "$DISTRIBUTED_Q_A_DIR" \
-    --output "$INTERNAL_COMPARISON_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
     --run-tag "$TAG" \
     --greenfield-code-hash "$PIN" \
     --legacy-code-hash "$LEGACY_PIN" \
@@ -497,6 +518,20 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     --position "$FIRST_DECODE_POSITION" \
     --process-count 8 \
     --capture-process-indices 0 >"$RUN_DIR/internal_comparison_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 ]]; then
+  say "sealing accepted $INTERNAL_LAYER scorer state"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/inspect_legacy_dsa_internals.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$FIRST_DECODE_POSITION" \
+    --process-count 8 \
+    --capture-process-indices 0 >"$RUN_DIR/internal_capture_summary.json"
 fi
 strict_census post || {
   say "ABORT: post-run census is not eight-host zero work"
@@ -588,7 +623,7 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
   "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" \
-  "$INTERNAL_CAPTURE" "$internal_count" <<'PY'
+  "$INTERNAL_CAPTURE" "$internal_count" "$INTERNAL_COMPARE_LAYER0" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -610,9 +645,10 @@ lines = {
     "remote_prefix": remote,
 }
 if sys.argv[8] == "1":
-    comparison = json.loads(
-        (root / "internal_comparison" / "comparison.json").read_text()
-    )
+    compare_layer0 = sys.argv[10] == "1"
+    result_name = "internal_comparison" if compare_layer0 else "internal_capture"
+    record_name = "comparison.json" if compare_layer0 else "capture.json"
+    comparison = json.loads((root / result_name / record_name).read_text())
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     if comparison["capture_layout"] != "topology_sharded_live_row_owner":
         raise SystemExit("DSA internal capture layout drifted")
@@ -625,9 +661,11 @@ if sys.argv[8] == "1":
         "dsa_internal_owner_actual_sha256": comparison[
             "owner_actual_sha256"
         ],
-        "dsa_internal_first_divergent_field": comparison[
-            "first_divergent_field"
-        ] or "none",
+        "dsa_internal_layer_name": comparison["layer_name"],
+        "dsa_internal_first_divergent_field": (
+            (comparison["first_divergent_field"] or "none")
+            if compare_layer0 else "not_compared"
+        ),
         "dsa_event_tensors_exact": str(exact_dsa["exact"]).lower(),
         "accepted_oracle_pin": comparison["oracle_pin"],
     })

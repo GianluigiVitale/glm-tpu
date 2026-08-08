@@ -315,3 +315,25 @@ capture is still required.
   4,096--1,208 mismatches.
 - Scope: exact layer-0 query arithmetic only. Protected 8K tokens/DSA/state/cache/HBM/wall/trace
   evidence is still required before Gate D or performance promotion.
+
+## Corrected 8K refusal and next-boundary observer
+
+- Rejected run:
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260808T041407656729112Z`
+  at `f129e636499d31c1c82c47727523c6527b3ee979`.
+- Positive evidence: exact first token `101252`; event-0 selected set exact; DB499 layer-0 query
+  correction remains active; eight byte-identical host logs; authenticated 8/8 clean failure exit.
+- Refusal evidence: event 1 has 2,041 common positions / seven swaps and aligned score
+  max/mean/signed error `0.27013397/0.18290268/-0.18290268`; no timing, DB row, `SUCCESS`, Gate D,
+  or performance claim.
+- Artifact identities: DSA NPZ `3e54254c...b053`; failure ledgers `18501db9...6051` and
+  `ef7688d...c715`; host-log SHA `8066a555...4d63`.
+- Diagnostic implementation: generic accepted full-producer callback, independent all-21-event
+  greenfield five-state observer, and append-only hash-pinned accepted/greenfield comparator.
+  Every path is default-off and does not enter the measured executable.
+- Readiness evidence: 46/46 targeted runtime/validation tests, 2/2 affected layer-kernel tests,
+  and 437 passed / 1 expected skip across the complete CPU-only greenfield suite; Python
+  compilation, Bash syntax, ShellCheck, JSON and diff checks pass. CPU/HLO readiness is not TPU
+  arithmetic proof.
+- Exact next evidence: one protected accepted layer-1 capture and one greenfield observer capture,
+  followed by direct field alignment before another 8K decoder retry.

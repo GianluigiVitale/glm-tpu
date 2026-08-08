@@ -21,7 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off one-layer/one-position callback plus independent five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
+| DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
 | Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Rejected as an order discriminator: BF16-origin and direct-FP32-origin `wk` produce identical stored prompt keys. Preserve BF16-origin state identity in production. |
@@ -172,3 +172,14 @@ source search: both preadapted and raw-FP8 materialized PP8-owner candidates are
 accepted production boundary is only local `f32[1024,2048]` (8 MiB) before a true-row dot; HLO
 `ea5e5c56...6c89` contains no global `f32[4096,2048]` table. Production adapts this boundary only
 for DSA `wq_b`; q-a, wk, attention, dense, and MoE remain on their existing selected backends.
+
+The corrected 8K refusal at `f129e63` now supplies the next concrete reuse boundary. Its exact
+first token and exact event-0 set preserve DB499, while event 1 introduces seven swaps and a nearly
+uniform `-0.18290268` aligned score shift. The legacy callback already accepts a generic target
+layer through `GLM_DSA_DUMP_INTERNALS_LAYER`; only the wrapper/validator target had been fixed to
+layer 0. That existing callback is now reused for layer 1, and the greenfield program exposes the
+same five already-live values for all 21 producer events only when a default-off diagnostic flag
+is armed. The prior returned-residual observers remain rejected because they changed arithmetic.
+The new offline comparator consumes sealed hashes and aligns producer IDs directly; it does not
+invent another execution path or relax exact DSA. One accepted layer-1 capture plus one greenfield
+observer run is the only current authorized model workflow.

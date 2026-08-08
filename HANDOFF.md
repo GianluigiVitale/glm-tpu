@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 01:50 UTC
+**Updated:** 2026-08-08 07:57 UTC
 
 ## Authority and isolation
 
@@ -1812,3 +1812,35 @@ boundary per full-indexer layer, rejects any global query table, and removes exa
 Pallas `wq_b` calls while preserving all other Pallas calls. Exact next: finish the clean test/doc
 pin, then run one serialized protected 8K Gate-D decoder with tokens, DSA, HLO, HBM, traces, DB,
 archive, and clean-fleet gates. Do not use the catastrophic all-reference feature runtime.
+
+## Corrected 8K run localizes the next boundary; internal observer is ready
+
+Protected 8K attempt
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260808T041407656729112Z`
+at `f129e636499d31c1c82c47727523c6527b3ee979` ran from 04:14 to 06:28 UTC and failed closed in
+the isolated DSA observer before timing. The first generated token is exactly `101252` with the
+accepted top-1 rank and a 6.125 logit margin. Layer-0 event 0 retains the exact selected set, so
+DB499's query correction is effective, but its score row still has max/mean/p99 error
+`0.00597572/0.001217406/0.003442` and non-exact order. Layer-1 event 1 is the first sharp change:
+2,041 positions remain common, seven swap, and the aligned common scores have
+max/mean/signed error `0.27013397/0.18290268/-0.18290268`. Event 2 has nine swaps and later
+events grow. The near-uniform negative event-1 shift identifies the next causal boundary as the
+layer-0 output entering layer-1 normalization/q-a/key state, not the already-exact layer-0 query.
+
+This run has no timing, DB row, final `SUCCESS`, Gate-D, or performance claim. Eight host logs are
+byte-identical (`8066a555...4d63`); the DSA payload is `3e54254c...b053`, failure ledgers are
+`18501db9...6051` and `ef7688d...c715`, and all eight authenticated failure censuses report
+`CENSUS_OK`.
+
+The next diagnostic is now isolated and default-off. The existing oracle-only zero-copy callback
+targets any full-indexer producer layer, while the greenfield executable returns the already-live
+normalized hidden, q-a state, query, head weights and current FP32 key for all 21 producer events.
+It requires exact reproduction of the sealed failed-run DSA observation and the accepted layer-0
+query before writing an append-only artifact. A new hash-pinned offline comparator aligns any
+accepted producer capture with the corresponding greenfield event and reports the first divergent
+field. Targeted runtime/validation coverage passes 46/46, affected layer-kernel coverage 2/2, and
+the complete CPU-only greenfield suite passes 437 with one expected skip and two existing SWIG
+warnings in 340.85 seconds. Bash syntax, ShellCheck, Python compilation, JSON and diff checks pass.
+These are readiness facts only. Exact next: commit/push the clean pin, capture accepted layer 1
+once, run the greenfield all-event observer once, compare the five states, and change only the
+first source-backed divergent boundary before retrying protected 8K.

@@ -14,6 +14,7 @@ from .reference.linear import residual_add
 from .reference.moe import GlmMoeNumericalContract
 from .reference.rmsnorm import fused_add_rms_norm, rms_norm
 from .stage_local import (
+    StageLocalDsaFp8Internals,
     StageLinearBackend,
     _stage_fp8_linear,
     stage_local_dense_fp8_mapped,
@@ -87,6 +88,7 @@ class StageLocalLayerFp8Result(NamedTuple):
     route_indices: Any
     route_weights: Any
     contract_valid: Any
+    dsa_internals: StageLocalDsaFp8Internals
 
 
 class StageLocalSplitLayerFp8Result(NamedTuple):
@@ -100,6 +102,25 @@ class StageLocalSplitLayerFp8Result(NamedTuple):
     route_indices: Any
     route_weights: Any
     contract_valid: Any
+    dsa_internals: StageLocalDsaFp8Internals
+
+
+def _empty_dsa_internals(
+    normalized_input: Any,
+    q_residual: Any,
+    contract: DsaNumericalContract,
+) -> StageLocalDsaFp8Internals:
+    """Shape-stable sentinel for a layer that reuses IndexShare state."""
+
+    return StageLocalDsaFp8Internals(
+        normalized_input,
+        q_residual,
+        jnp.zeros(
+            (1, contract.num_heads, contract.head_dim), dtype=jnp.float32
+        ),
+        jnp.zeros((1, contract.num_heads), dtype=jnp.float32),
+        jnp.zeros((1, contract.head_dim), dtype=jnp.float32),
+    )
 
 
 def stage_local_transformer_layer_fp8_mapped(
@@ -247,6 +268,7 @@ def stage_local_transformer_layer_fp8_mapped(
         selected_valid_counts = dsa_result.valid_counts
         selected_scores = dsa_result.selected_scores
         dsa_valid = dsa_result.contract_valid
+        dsa_internals = dsa_result.internals
     else:
         selected_scores = jnp.full(
             selected_positions.shape,
@@ -254,6 +276,9 @@ def stage_local_transformer_layer_fp8_mapped(
             dtype=jnp.float32,
         )
         dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
+        dsa_internals = _empty_dsa_internals(
+            normalized_input, q_residual, dsa_contract
+        )
 
     attention_result = stage_local_index_share_fp8_mapped(
         residual,
@@ -380,6 +405,7 @@ def stage_local_transformer_layer_fp8_mapped(
             & dsa_valid
             & attention_result.contract_valid
         ),
+        dsa_internals,
     )
 
 
@@ -531,11 +557,15 @@ def stage_local_transformer_layer_fp8_split_mapped(
         selected_valid_counts = dsa_result.valid_counts
         selected_scores = dsa_result.selected_scores
         dsa_valid = dsa_result.contract_valid
+        dsa_internals = dsa_result.internals
     else:
         selected_scores = jnp.full(
             selected_positions.shape, -jnp.inf, dtype=jnp.float32
         )
         dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
+        dsa_internals = _empty_dsa_internals(
+            normalized_input, q_residual, dsa_contract
+        )
 
     attention_result = stage_local_index_share_fp8_mapped(
         combined_residual,
@@ -661,4 +691,5 @@ def stage_local_transformer_layer_fp8_split_mapped(
         route_indices,
         route_weights,
         incoming_contract_valid & dsa_valid & attention_result.contract_valid,
+        dsa_internals,
     )
