@@ -532,6 +532,15 @@ def _q_a_hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
         ),
         "shard_major_n82_scale": "f32[32,48,82]" in lowered,
     }
+    if "lax_map_convolution" in candidate:
+        convolution_lines = [
+            line
+            for line in lowered.splitlines()
+            if " convolution(" in line and "dim_labels=bf_io->bf" in line
+        ]
+        required_shapes["one_row_n82_convolution"] = any(
+            "f32[1,82]" in line for line in convolution_lines
+        )
     return {
         "candidate": candidate,
         "forbidden_operations": forbidden,
@@ -550,8 +559,7 @@ def _q_a_hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
 
 def _q_a_candidate_modes() -> tuple[tuple[str, str], ...]:
     return tuple(
-        (projection_mode, norm_mode)
-        for projection_mode in ("lax_map", "vmap", "unrolled")
+        ("lax_map_convolution", norm_mode)
         for norm_mode in (
             "logical_mean",
             "shard_sum",
@@ -701,7 +709,7 @@ def _run_q_a_matrix(
         ),
         "diagnostic_only": True,
         "exact_candidates": exact,
-        "format_version": 1,
+        "format_version": 2,
         "input_manifest_sha256": input_manifest["manifest_sha256"],
         "local_output_width": 82,
         "one_live_row": True,

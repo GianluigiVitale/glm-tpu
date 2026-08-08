@@ -367,3 +367,5 @@ capture is still required.
   `69f3d576...6a86`, SUCCESS `a5f1c67c...14f7`.
 - Next evidence: direct one-row zero-spatial convolution, because accepted DB491 uses
   `convolution ... bf_io->bf` while DB501's M1 dot lowers to multiply/reduce. No 8K rerun first.
+- Implementation readiness: the v2 matrix runs only four new convolution/norm candidates and
+  requires an optimized physical `f32[1,82] convolution`; DB501's rejected 12 are not repeated.

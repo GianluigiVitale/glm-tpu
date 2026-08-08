@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 12:40 UTC
+**Updated:** 2026-08-08 12:50 UTC
 
 ## Authority and isolation
 
@@ -1895,3 +1895,11 @@ FP32 multiply/reduce. The next bounded discriminator is therefore a directly exp
 convolution whose public input/output remain exactly `[1,6144] -> [1,82]`. It must retain that
 convolution in optimized TPU HLO and the same no-collective/no-dead-row contract before one
 serialized comparison. Do not emulate the accepted kernel by restoring 31 dead decode rows.
+
+That discriminator is now implementation-ready. The independent reference dequantizes each raw
+FP8/FP32-scale N82 shard to BF16 exactly as before, but calls `lax.conv_general_dilated` with zero
+spatial dimensions and `NC x IO -> NC` labels on the one live row. Only the four new convolution
+plus norm variants enter the v2 protected matrix; DB501's 12 rejected dot variants are not rerun.
+The HLO gate additionally requires a physical `f32[1,82] convolution` with `bf_io->bf` labels.
+Focused CPU, Python, Bash, ShellCheck, line-length and diff checks pass. Exact next: commit/push and
+run one serialized v2 matrix; no full decoder is authorized first.

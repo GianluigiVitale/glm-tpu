@@ -27,7 +27,12 @@ QaProjectionMode = Literal[
     "legacy_runtime_fused_qkv_a_global",
     "legacy_runtime_fused_qkv_a_sharded",
 ]
-VirtualQaProjectionMode = Literal["lax_map", "vmap", "unrolled"]
+VirtualQaProjectionMode = Literal[
+    "lax_map",
+    "vmap",
+    "unrolled",
+    "lax_map_convolution",
+]
 VirtualQaNormMode = Literal[
     "logical_mean",
     "shard_sum",
@@ -353,6 +358,35 @@ def _legacy_runtime_fp8_dot(lhs: Any, weight: Any, scale: Any) -> Any:
     return output.astype(lhs.dtype)
 
 
+def _legacy_runtime_fp8_convolution(
+    lhs: Any, weight: Any, scale: Any
+) -> Any:
+    """Keep the accepted zero-spatial convolution primitive for one row."""
+
+    if lhs.ndim != 2 or weight.ndim != 2 or scale.ndim != 2:
+        raise ValueError("legacy FP8 convolution requires rank-2 operands")
+    if weight.shape[0] != lhs.shape[1] or scale.shape[1] != weight.shape[1]:
+        raise ValueError("legacy FP8 convolution dimensions drifted")
+    if weight.shape[0] % scale.shape[0]:
+        raise ValueError("legacy FP8 convolution scale is ragged")
+    if weight.dtype != jnp.float8_e4m3fn or scale.dtype != jnp.float32:
+        raise ValueError("legacy FP8 convolution dtype contract drifted")
+    block = weight.shape[0] // scale.shape[0]
+    expanded_scale = jnp.repeat(scale, block, axis=0)[: weight.shape[0]]
+    decoded = (
+        weight.astype(jnp.float32) * expanded_scale.astype(jnp.float32)
+    ).astype(lhs.dtype)
+    output = lax.conv_general_dilated(
+        lhs,
+        decoded,
+        window_strides=(),
+        padding=(),
+        dimension_numbers=("NC", "IO", "NC"),
+        preferred_element_type=jnp.float32,
+    )
+    return output.astype(lhs.dtype)
+
+
 def one_row_virtual_tp32_fused_qkv_a_rms_norm(
     normalized_hidden: Any,
     sharded_qkv_weight: Any,
@@ -417,7 +451,12 @@ def one_row_virtual_tp32_fused_qkv_a_rms_norm(
         q_a_norm_weight.dtype != jnp.bfloat16
     ):
         raise ValueError("one-row virtual q-a dtype contract drifted")
-    if projection_mode not in ("lax_map", "vmap", "unrolled"):
+    if projection_mode not in (
+        "lax_map",
+        "vmap",
+        "unrolled",
+        "lax_map_convolution",
+    ):
         raise ValueError("one-row virtual q-a projection mode is unknown")
     if norm_mode not in (
         "logical_mean",
@@ -431,7 +470,12 @@ def one_row_virtual_tp32_fused_qkv_a_rms_norm(
 
     def project(weight_scale: tuple[Any, Any]) -> Any:
         weight, scale = weight_scale
-        return _legacy_runtime_fp8_dot(
+        projection = (
+            _legacy_runtime_fp8_convolution
+            if projection_mode == "lax_map_convolution"
+            else _legacy_runtime_fp8_dot
+        )
+        return projection(
             normalized_hidden,
             weight,
             scale,
@@ -441,7 +485,7 @@ def one_row_virtual_tp32_fused_qkv_a_rms_norm(
         f"one_row_virtual_tp32_qkv_n{local_output}_{projection_mode}"
     ):
         operands = (sharded_qkv_weight, sharded_qkv_scale)
-        if projection_mode == "lax_map":
+        if projection_mode in ("lax_map", "lax_map_convolution"):
             projected = lax.map(project, operands)
         elif projection_mode == "vmap":
             projected = jax.vmap(project)(operands)

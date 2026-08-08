@@ -5536,3 +5536,11 @@ multiply/reduce. Reintroducing the legacy `[32,6144]` input would violate the ar
 next new discriminator instead expresses the same zero-spatial convolution primitive directly on
 one row and requires optimized TPU HLO to retain it. This is a bounded association test, not a
 new execution architecture.
+
+The direct primitive is now independently implemented. It keeps the public operands/results at
+`bf16[1,6144]` and `bf16[1,82]`, performs the same raw-FP8/FP32-scale-to-BF16 conversion, and calls
+zero-spatial `lax.conv_general_dilated` with `NC x IO -> NC` dimension labels. The v2 matrix contains
+only this new projection with the four explicit norm associations; it does not repeat DB501's
+closed dot variants. Its TPU HLO must contain `f32[1,82] convolution` and `bf_io->bf`, while all
+existing no-collective, one-row and N82 checks remain mandatory. Focused tests pass 23/23 with
+Python/Bash/ShellCheck/diff checks green. This is readiness evidence only.

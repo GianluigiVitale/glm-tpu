@@ -154,7 +154,7 @@ runner = json.loads((run_dir / "runner.json").read_text())
 if target == "q_a":
     expected_candidates = {
         f"virtual_{projection}_{norm}_m1_n82"
-        for projection in ("lax_map", "vmap", "unrolled")
+        for projection in ("lax_map_convolution",)
         for norm in (
             "logical_mean", "shard_sum", "left_fold", "topology_tree"
         )
@@ -212,7 +212,11 @@ connection = pv.connect(db_path)
 run_id = pv.start_run(
     connection,
     model=f"zai-org/GLM-5.2-FP8:greenfield-layer0-{target}-association",
-    revision=f"bounded-real-layer0-v1-{target}-association",
+    revision=(
+        f"bounded-real-layer0-v2-{target}-association"
+        if target == "q_a"
+        else f"bounded-real-layer0-v1-{target}-association"
+    ),
     env={
         "GLM_ENGINE": f"greenfield_layer0_{target}_association",
         "greenfield_code_hash": pin,

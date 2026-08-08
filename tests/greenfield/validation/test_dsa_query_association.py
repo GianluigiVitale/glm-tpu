@@ -61,8 +61,7 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
 
 def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
     assert set(subject._q_a_candidate_modes()) == {
-        (projection, norm)
-        for projection in ("lax_map", "vmap", "unrolled")
+        ("lax_map_convolution", norm)
         for norm in (
             "logical_mean",
             "shard_sum",
@@ -101,6 +100,18 @@ def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
         candidate="virtual_vmap_shard_sum_m1_n82",
     )
     assert not collective["passed"]
+    convolution = subject._q_a_hlo_contract(
+        hlo
+        + "\n%convolution = f32[1,82] convolution(foo), "
+        "dim_labels=bf_io->bf",
+        candidate="virtual_lax_map_convolution_shard_sum_m1_n82",
+    )
+    assert convolution["passed"]
+    missing_convolution = subject._q_a_hlo_contract(
+        hlo,
+        candidate="virtual_lax_map_convolution_shard_sum_m1_n82",
+    )
+    assert not missing_convolution["passed"]
 
 
 def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:

@@ -197,3 +197,8 @@ preserved DB491 HLO: its exact physical local body is `convolution ... bf_io->bf
 M1 `dot_general` becomes multiply/reduce. The next adaptation must call the JAX zero-spatial
 convolution primitive directly with one external row and enforce its optimized HLO. Padding the
 public decode input back to 32 rows is rejected by the greenfield contract.
+
+The v2 protected matrix implements only that new primitive and retains the four norm associations.
+Its extra HLO check requires `f32[1,82] convolution` with `bf_io->bf`; this prevents a source-level
+convolution label from hiding another multiply/reduce lowering. DB501's old 12 variants remain
+archived negative evidence and are deliberately excluded from the new run.

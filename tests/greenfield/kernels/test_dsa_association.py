@@ -243,7 +243,12 @@ def test_one_row_virtual_tp32_q_a_preserves_shard_major_n82_contract() -> None:
         rng.uniform(0.75, 1.25, size=(64,)).astype(ml_dtypes.bfloat16)
     )
     outputs = []
-    for projection_mode in ("lax_map", "vmap", "unrolled"):
+    for projection_mode in (
+        "lax_map",
+        "vmap",
+        "unrolled",
+        "lax_map_convolution",
+    ):
         output = one_row_virtual_tp32_fused_qkv_a_rms_norm(
             hidden,
             packed.sharded_weight,
