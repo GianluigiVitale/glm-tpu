@@ -33,6 +33,7 @@ from glm_tpu.greenfield.kernels.reference.fp8 import (  # noqa: E402
 from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (  # noqa: E402
     Fp8BlockMatmulConfig,
     fp8_block_matmul_f32,
+    fp8_block_vector_matmul_f32,
 )
 from glm_tpu.greenfield.validation.layer0_dsa_association import (  # noqa: E402
     inspect_distributed_q_a_norm_artifact,
@@ -263,6 +264,44 @@ def _pallas_query(
     return _apply_query_rope(jnp.concatenate(outputs, axis=-1), positions[:1])
 
 
+def _pallas_vector_query(
+    q_state: Any,
+    weight_bits: Any,
+    weight_scale: Any,
+    positions: Any,
+    *,
+    groups: int,
+) -> Any:
+    """Run the one-row raw-FP8 vector reduction at global/LP4 ownership."""
+
+    geometry = Layer0DsaProbeGeometry()
+    output_width = geometry.heads * geometry.head_dim
+    if output_width % groups or weight_scale.shape[0] % groups:
+        raise ValueError("Pallas vector weight does not divide into groups")
+    group_width = output_width // groups
+    scale_rows = weight_scale.shape[0] // groups
+    outputs = []
+    for index in range(groups):
+        outputs.append(
+            fp8_block_vector_matmul_f32(
+                q_state[:1],
+                lax.dynamic_slice_in_dim(
+                    weight_bits,
+                    index * group_width,
+                    group_width,
+                    axis=0,
+                ),
+                lax.dynamic_slice_in_dim(
+                    weight_scale,
+                    index * scale_rows,
+                    scale_rows,
+                    axis=0,
+                ),
+            )
+        )
+    return _apply_query_rope(jnp.concatenate(outputs, axis=-1), positions[:1])
+
+
 def _pallas_candidate_functions() -> dict[str, Callable[..., Any]]:
     return {
         "pallas_global_m1_n4096": lambda q, b, s, p: _pallas_query(
@@ -270,6 +309,12 @@ def _pallas_candidate_functions() -> dict[str, Callable[..., Any]]:
         ),
         "pallas_lp4_m1_n1024": lambda q, b, s, p: _pallas_query(
             q, b, s, p, groups=4
+        ),
+        "pallas_vector_global_m1_n4096": lambda q, b, s, p: (
+            _pallas_vector_query(q, b, s, p, groups=1)
+        ),
+        "pallas_vector_lp4_m1_n1024": lambda q, b, s, p: (
+            _pallas_vector_query(q, b, s, p, groups=4)
         ),
     }
 

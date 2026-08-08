@@ -10,6 +10,7 @@ from glm_tpu.greenfield.kernels.pallas import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
     fp8_block_matmul_f32,
+    fp8_block_vector_matmul_f32,
     fp8_block_up_gate,
     fp8_fused_block_swiglu,
     fp8_fused_selected_moe,
@@ -180,6 +181,49 @@ def test_fp8_block_matmul_f32_interpret_matches_dsa_reference(
     np.testing.assert_allclose(
         np.asarray(actual), np.asarray(expected), rtol=2e-3, atol=2e-3
     )
+
+
+def test_fp8_block_vector_matmul_f32_interpret_matches_exact_reduction() -> None:
+    lhs = jnp.asarray(
+        np.linspace(-0.375, 0.625, 128, dtype=np.float32)[None, :],
+        dtype=jnp.bfloat16,
+    )
+    weight_values = np.arange(128 * 128, dtype=np.float32).reshape(128, 128)
+    weight_bits = _bits(jnp.asarray(np.sin(weight_values * 0.009) * 0.375))
+    scale = jnp.asarray([[0.625]], dtype=jnp.float32)
+    decoded = dequantize_fp8_bits_block_weight(
+        weight_bits, scale, output_dtype=jnp.float32
+    )
+    expected = jnp.sum(
+        lhs.astype(jnp.float32) * decoded.astype(jnp.float32),
+        axis=1,
+        dtype=jnp.float32,
+    )[None, :]
+    actual = fp8_block_vector_matmul_f32(
+        lhs, weight_bits, scale, interpret=True
+    )
+    assert actual.dtype == jnp.float32
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+
+
+def test_fp8_block_vector_matmul_f32_rejects_non_dsa_shapes() -> None:
+    lhs = jnp.ones((1, 128), dtype=jnp.bfloat16)
+    bits = jnp.zeros((128, 128), dtype=jnp.uint8)
+    scale = jnp.ones((1, 1), dtype=jnp.float32)
+    with pytest.raises(ValueError, match="one exact decode row"):
+        fp8_block_vector_matmul_f32(
+            jnp.ones((2, 128), dtype=jnp.bfloat16),
+            bits,
+            scale,
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="block-aligned"):
+        fp8_block_vector_matmul_f32(
+            lhs[:, :127],
+            bits[:, :127],
+            scale,
+            interpret=True,
+        )
 
 
 @pytest.mark.parametrize("shape", [(1, 128, 128), (1, 130, 135)])

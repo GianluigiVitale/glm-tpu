@@ -478,6 +478,121 @@ def fp8_block_matmul_f32(
     )
 
 
+def fp8_block_vector_matmul_f32(
+    lhs: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    block_shape: tuple[int, int] = (128, 128),
+    interpret: bool = False,
+) -> Any:
+    """Return the exact one-row FP32 reduction without a decoded overlay.
+
+    TPU XLA lowers the accepted GLM DSA ``M=1`` query projection to a fused
+    FP32 elementwise multiply/reduce rather than an MXU matmul.  This kernel
+    preserves that numerical shape while streaming one 128-output raw-FP8
+    tile into VMEM.  It is intentionally restricted to the aligned DSA query
+    geometry; the general MXU kernel remains the high-throughput path.
+    """
+
+    config = Fp8BlockMatmulConfig(block_shape=block_shape)
+    rows, contraction, output = _validate_inputs(
+        lhs, weight_bits, scale, config
+    )
+    block_output, block_contraction = block_shape
+    if rows != 1:
+        raise ValueError("FP8 vector matmul requires one exact decode row")
+    if contraction % block_contraction or output % block_output:
+        raise ValueError("FP8 vector matmul requires block-aligned dimensions")
+    contraction_blocks = contraction // block_contraction
+    output_tiles = output // block_output
+    if contraction_blocks > 128:
+        raise ValueError("FP8 vector matmul supports at most 128 scale blocks")
+
+    # Pallas TPU DMA tiles use eight rows and 128 scale lanes.  Only row zero
+    # participates in arithmetic; the padding is outside the reduction and
+    # therefore cannot turn the operation back into an M=8 MXU matmul.
+    padded_lhs = jnp.pad(lhs, ((0, 7), (0, 0)))
+    scale_table = jnp.pad(
+        scale,
+        ((0, 0), (0, 128 - contraction_blocks)),
+    )
+
+    def kernel(
+        lhs_ref: Any,
+        weight_ref: Any,
+        scale_ref: Any,
+        output_ref: Any,
+    ) -> None:
+        weight = lax.bitcast_convert_type(
+            weight_ref[...], jnp.float8_e4m3fn
+        ).astype(jnp.float32)
+        scale_vector = jnp.repeat(
+            scale_ref[0, :contraction_blocks],
+            block_contraction,
+            axis=0,
+        )
+        products = (
+            weight
+            * scale_vector[None, :].astype(jnp.float32)
+            * lhs_ref[0, :][None, :].astype(jnp.float32)
+        )
+        reduced = jnp.sum(products, axis=1, dtype=jnp.float32)
+        row_ids = lax.broadcasted_iota(
+            jnp.int32, (8, block_output), 0
+        )
+        output_ref[...] = jnp.where(
+            row_ids == 0,
+            jnp.broadcast_to(reduced[None, :], (8, block_output)),
+            jnp.float32(0.0),
+        )
+
+    def lhs_index(output_index: Any) -> tuple[int, int]:
+        del output_index
+        return 0, 0
+
+    def weight_index(output_index: Any) -> tuple[Any, int]:
+        return output_index, 0
+
+    def scale_index(output_index: Any) -> tuple[Any, int]:
+        return output_index, 0
+
+    def output_index(output_index_value: Any) -> tuple[int, Any]:
+        return 0, output_index_value
+
+    call = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct((8, output), jnp.float32),
+        grid=(output_tiles,),
+        in_specs=(
+            pl.BlockSpec((8, contraction), lhs_index),
+            pl.BlockSpec((block_output, contraction), weight_index),
+            pl.BlockSpec((1, 128), scale_index),
+        ),
+        out_specs=pl.BlockSpec((8, block_output), output_index),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel",),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_fp8_block_vector_matmul_f32_"
+            f"m1_k{contraction}_n{output}"
+        ),
+        cost_estimate=pl.CostEstimate(
+            flops=2 * contraction * output,
+            bytes_accessed=(
+                contraction * 2
+                + contraction * output
+                + output_tiles * 128 * 4
+                + output * 4
+            ),
+            transcendentals=0,
+        ),
+    )
+    return call(padded_lhs, weight_bits, scale_table)[:1]
+
+
 def fp32_to_bf16_pallas_boundary(
     value: Any,
     *,
