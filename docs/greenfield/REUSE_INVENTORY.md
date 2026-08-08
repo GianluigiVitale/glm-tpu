@@ -22,6 +22,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off one-layer/one-position callback plus independent five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
+| DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
 | Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Rejected as an order discriminator: BF16-origin and direct-FP32-origin `wk` produce identical stored prompt keys. Preserve BF16-origin state identity in production. |
 | Layer-0 input/state | vLLM embedding/model source, TPU OOT embedding and accepted state hashes | Raw BF16 embedding row, model-epsilon input RMSNorm and adapted DSA leaves are pinned; no hidden embedding multiplier or TPU transform exists. |
@@ -158,3 +159,16 @@ the five states on one local TPU host against the immutable input/DB491 q-a arti
 the existing DB snapshot, approved archive and authenticated zero-work exit. The 423-test CPU-only
 suite passes with one expected skip and the two pre-existing SWIG warnings. This is
 implementation/readiness evidence only; no observer TPU capture or numerical conclusion exists yet.
+
+The corrected observer subsequently produced source DB493, and authenticated recovery artifact
+`greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z` sealed one
+topology-owned live row. Its independent comparison is bitwise exact for normalized hidden and q-a
+state and identifies `query` as the first divergent field. DB495 proves the production Pallas MXU
+query is exactly the observed M=32 drift (`4,096` mismatches, max `0.009170532`). DB496--DB498
+reduce the error with streamed/unrolled raw-FP8 association but retain 2,840/1,208 mismatches.
+
+DB499 / `greenfield_layer0_dsa_query_association_20260808T034636385240375Z` at `b41c3ab` closes the
+source search: both preadapted and raw-FP8 materialized PP8-owner candidates are bitwise exact. The
+accepted production boundary is only local `f32[1024,2048]` (8 MiB) before a true-row dot; HLO
+`ea5e5c56...6c89` contains no global `f32[4096,2048]` table. Production adapts this boundary only
+for DSA `wq_b`; q-a, wk, attention, dense, and MoE remain on their existing selected backends.

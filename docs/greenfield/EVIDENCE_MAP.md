@@ -301,3 +301,17 @@ exact runtime was stopped, the failure-exit census is eight-host clean, and 11 d
 Oracle-only correction `83ff4a357` reuses the scorer's zero-copy `as_jax` boundary and passes
 19 focused forced-device/torchax tests. This is failure/fix evidence only; the corrected protected
 capture is still required.
+
+## DSA query association
+
+- Accepted live-state source: source DB493 plus authenticated recovery artifact
+  `greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z`; normalized hidden
+  and q-a state exact, first divergence `query`.
+- Exact bounded correction: DB499 / item linked in `bench/results.db`, run
+  `greenfield_layer0_dsa_query_association_20260808T034636385240375Z`, code `b41c3ab`.
+- Numerical proof: raw-materialized PP8 local owner has zero/4,096 mismatches; HLO
+  `ea5e5c56...6c89` contains `f32[1024,2048]` and no global `f32[4096,2048]` table.
+- Negative proof: DB495--DB498 reject production MXU and streamed/raw-lookup associations with
+  4,096--1,208 mismatches.
+- Scope: exact layer-0 query arithmetic only. Protected 8K tokens/DSA/state/cache/HBM/wall/trace
+  evidence is still required before Gate D or performance promotion.

@@ -879,3 +879,14 @@ warmup tracing on an illegal torchax-tracer-to-NumPy conversion. No request exec
 token-rate, DB, comparison, or final `SUCCESS` artifact exists. Cleanup ended with eight unique
 `CENSUS_OK` hosts; 11 failure diagnostics / 2,123,660 bytes are verified in the approved bucket.
 Observer fix `83ff4a357` is test evidence only and does not change any latency or ETA claim.
+
+## DB499 exact DSA query association — correctness only
+
+Protected DB499 / `greenfield_layer0_dsa_query_association_20260808T034636385240375Z` at
+`b41c3ab` proves the accepted layer-0 query bitwise from the raw final-owner FP8 state when the
+complete local FP32 `wq_b` shard exists before the M=1 dot. The PP8 candidate has shape
+`f32[1024,2048]` (8 MiB), HLO SHA `ea5e5c56...6c89`, zero mismatches and no global weight
+reconstruction. DB495--DB498 Pallas/streamed alternatives retain 4,096 down to 1,208 mismatches
+and are rejected. DB/archive/remote SUCCESS and 8/8 cleanup pass. These bounded runs deliberately
+record `performance_claim=false`; no latency, Gate-D, or token-rate result follows. The next
+performance-admissible evidence is the corrected protected 8K complete decoder.

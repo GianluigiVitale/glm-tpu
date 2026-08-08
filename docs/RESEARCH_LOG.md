@@ -5431,3 +5431,29 @@ The focused dump plus DCP wrapper matrix passes 19/19 in 972.44 seconds; Python 
 diff checks pass. The shared protected wrapper now pins this exact two-commit observer and a fresh
 pin-specific detached worktree. One clean serialized retry is justified; no model arithmetic
 hypothesis or ETA promotion follows from the failed attempt.
+
+## 2026-08-08 03:09--03:46 — accepted query captured; DB499 restores exact local association
+
+The corrected legacy observer completed as source DB493, and the separate authenticated recovery
+artifact retained its exact token/DSA protections while reconstructing only the topology-owned
+layer-0 live row. Normalized hidden and q-a state match bitwise; `query` is the first divergent
+field. Actual query SHA is `1ff2c2ec...12a`. Its 4,096-value comparison to the greenfield
+production Pallas projection has 4,096 mismatches, max `0.009170532`, mean `0.001282731`, while
+head weights and current keys are already within the expected narrow boundary. This turns the
+remaining search from an upstream-state problem into a bounded `wq_b` dot-association problem.
+
+DB495 proves both existing production Pallas variants equal the captured M=32 association and are
+nonexact. Direct TPU-v4 sublane reduction is unsupported; the failed compile attempts ended with
+authenticated clean censuses. DB496 streams Pallas dequant tiles through XLA reduction and leaves
+2,840 mismatches/max `1.43e-6`. DB497 static unrolling reaches 1,208/max `9.54e-7`; DB498 proves
+Pallas-streamed and native raw-lookup N=128 forms converge to that same nonexact result. All remain
+rejected for exactness and have no decoder/performance claim.
+
+DB499 at `b41c3ab` evaluates the decisive complete-owner boundary. The raw-materialized global and
+PP8-local candidates both match all 4,096 accepted query elements bitwise. The local candidate
+dequantizes only raw final-owner bits/scales to `f32[1024,2048]`, applies an optimization barrier,
+then executes true M=1 projection. HLO SHA `ea5e5c56...6c89` has no global
+`f32[4096,2048]` reconstruction. SUCCESS/evidence/remote SHAs are
+`dd0a0d58...dcf6`, `c6992dbf...9fb2`, and `6532da49...c46`; results DB id is 499 and cleanup is
+8/8. This authorizes only the narrow production correction plus model-config q-a/kv-a epsilon
+`1e-5`; the protected 8K decoder remains the next proof.

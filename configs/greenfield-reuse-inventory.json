@@ -127,6 +127,17 @@
       "reason": "One default-off callback reuses the proven DSA dump boundary to capture only the actual layer-0 position-8155 normalized hidden, q-a state, query, head weights and current pre-cache key. Its second oracle-only commit uses the scorer's existing zero-copy torchax-to-JAX bridge, regression-tested under an outer JIT. The protected wrapper requires exact raw tokens, bitwise-identical sealed DSA event tensors, eight replicated process artifacts, DB/archive linkage and clean census. It never enters greenfield execution."
     },
     {
+      "id": "legacy-dsa-query-association",
+      "category": "numerical association evidence",
+      "source_repo": "oracle-only tpu-inference observer and protected greenfield probes",
+      "source_pin": "legacy 83ff4a3576602ca844ea090550139a2ff00b0bb1 / greenfield DB499 b41c3abceccde90c8ab2419f8b3f8f58b0b140b8",
+      "source_paths": ["/home/gianl/glm-run/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z", "/home/gianl/glm-run/greenfield_layer0_dsa_query_association_20260808T034636385240375Z"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/runtime/decoder.py", "docs/greenfield/NUMERICAL_CONTRACT.md"],
+      "gate": "C-D",
+      "reason": "The protected capture localizes the first accepted-state divergence to query while normalized hidden and q-a state are bitwise exact. DB499 proves that raw FP8 bits/scales produce the exact accepted query only when the complete topology-local FP32 wq_b owner shard is materialized before the true M=1 projection. The PP8 shard is f32[1024,2048] (8 MiB); the global f32[4096,2048] table remains forbidden. Pallas MXU and streamed N=128 candidates from DB495-DB498 are rejected for exactness."
+    },
+    {
       "id": "legacy-code-and-step-fingerprints",
       "category": "protection",
       "source_repo": "tpu-inference",

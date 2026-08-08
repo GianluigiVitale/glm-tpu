@@ -1787,3 +1787,28 @@ Exact next: after committing the wrapper/docs and proving the fleet idle, run ex
 retry of `bash scripts/greenfield/run_capture_legacy_layer0_dsa_internals.sh`. Use the first
 divergent field to derive a source-backed production correction. Do not rerun the rejected BF16-wk
 matrix or the complete greenfield decoder until the captured accepted state identifies it.
+
+## DB499 closes the layer-0 DSA query association; production seal is in progress
+
+The corrected protected observer completed as source DB493. Authenticated recovery artifact
+`greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z` preserves exact sealed
+tokens/events and localizes the first independently reconstructed state divergence to `query`:
+normalized hidden and q-a state are bitwise exact. The accepted query SHA is
+`1ff2c2ec...12a`; adapted `wq_b` remains the exact FP32 `[4096,2048]` state with byte sum
+`3765880530`, so the remaining issue is projection association rather than checkpoint identity.
+
+Protected DB499 / `greenfield_layer0_dsa_query_association_20260808T034636385240375Z` at
+`b41c3abceccde90c8ab2419f8b3f8f58b0b140b8` proves the raw-FP8 materialized PP8 candidate
+bitwise: zero of 4,096 query values differ. Its HLO `ea5e5c56...6c89` contains only the complete
+local `f32[1024,2048]` owner shard (8 MiB), never the global `f32[4096,2048]` table. DB495's
+production Pallas MXU path has 4,096 mismatches/max `0.009170532`; DB496--DB498 streamed/unrolled
+paths improve to 2,840/1,208 mismatches but are still rejected. DB499 has DB/archive/SUCCESS and
+authenticated 8/8 cleanup; it is bounded correctness evidence, not a decoder or performance claim.
+
+Production now keeps the fast feature-MoE and stage-linear Pallas runtime but routes only DSA
+`wq_b` through that exact local FP32 boundary. q-a/kv-a model epsilon is restored to `1e-5`; the
+separate key affine LayerNorm stays `1e-6`. The HLO contract requires at least one local owner
+boundary per full-indexer layer, rejects any global query table, and removes exactly the 21 old
+Pallas `wq_b` calls while preserving all other Pallas calls. Exact next: finish the clean test/doc
+pin, then run one serialized protected 8K Gate-D decoder with tokens, DSA, HLO, HBM, traces, DB,
+archive, and clean-fleet gates. Do not use the catastrophic all-reference feature runtime.
