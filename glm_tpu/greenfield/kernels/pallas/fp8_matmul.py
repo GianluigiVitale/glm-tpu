@@ -600,11 +600,10 @@ def fp8_block_vector_matmul_f32(
             preferred_element_type=jnp.float32,
         )
 
-    projected = lax.map(
-        project_tile,
-        jnp.arange(output_tiles, dtype=jnp.int32),
+    projected = tuple(
+        project_tile(jnp.int32(index)) for index in range(output_tiles)
     )
-    return projected.reshape(1, output)
+    return jnp.concatenate(projected, axis=1)
 
 
 def fp32_to_bf16_pallas_boundary(
