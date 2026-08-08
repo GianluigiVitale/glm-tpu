@@ -302,6 +302,58 @@ def _pallas_vector_query(
     return _apply_query_rope(jnp.concatenate(outputs, axis=-1), positions[:1])
 
 
+def _raw_lookup_query(
+    q_state: Any,
+    weight_bits: Any,
+    weight_scale: Any,
+    positions: Any,
+    *,
+    groups: int,
+) -> Any:
+    """Run source-faithful raw-FP8 lookup/dequant in unrolled N=128 tiles."""
+
+    geometry = Layer0DsaProbeGeometry()
+    output_width = geometry.heads * geometry.head_dim
+    if output_width % groups or weight_scale.shape[0] % groups:
+        raise ValueError("Raw lookup weight does not divide into groups")
+    group_width = output_width // groups
+    scale_rows = weight_scale.shape[0] // groups
+    outputs = []
+    for group_index in range(groups):
+        group_bits = lax.dynamic_slice_in_dim(
+            weight_bits,
+            group_index * group_width,
+            group_width,
+            axis=0,
+        )
+        group_scale = lax.dynamic_slice_in_dim(
+            weight_scale,
+            group_index * scale_rows,
+            scale_rows,
+            axis=0,
+        )
+        for tile_index in range(group_width // 128):
+            tile_bits = lax.dynamic_slice_in_dim(
+                group_bits,
+                tile_index * 128,
+                128,
+                axis=0,
+            )
+            tile_scale = lax.dynamic_slice_in_dim(
+                group_scale,
+                tile_index,
+                1,
+                axis=0,
+            )
+            decoded = dequantize_fp8_bits_block_weight(
+                tile_bits,
+                tile_scale,
+                output_dtype=jnp.float32,
+            )
+            outputs.append(_dot_rows(q_state[:1], decoded))
+    return _apply_query_rope(jnp.concatenate(outputs, axis=-1), positions[:1])
+
+
 def _pallas_candidate_functions() -> dict[str, Callable[..., Any]]:
     return {
         "pallas_global_m1_n4096": lambda q, b, s, p: _pallas_query(
@@ -315,6 +367,12 @@ def _pallas_candidate_functions() -> dict[str, Callable[..., Any]]:
         ),
         "pallas_vector_lp4_m1_n1024": lambda q, b, s, p: (
             _pallas_vector_query(q, b, s, p, groups=4)
+        ),
+        "raw_lookup_global_m1_n128_tiles": lambda q, b, s, p: (
+            _raw_lookup_query(q, b, s, p, groups=1)
+        ),
+        "raw_lookup_lp4_m1_n128_tiles": lambda q, b, s, p: (
+            _raw_lookup_query(q, b, s, p, groups=4)
         ),
     }
 
@@ -340,7 +398,9 @@ def _hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
         for shape in ("f32[1024,2048]", "f32[4096,2048]")
         if shape in lowered
     ]
-    vector_candidate = "pallas_vector" in candidate
+    streamed_candidate = (
+        "pallas_vector" in candidate or "raw_lookup" in candidate
+    )
     has_vector_dequantizer = (
         "greenfield_fp8_dequantize_f32_n128_k2048" in lowered
     )
@@ -353,8 +413,10 @@ def _hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
         "hlo_sha256": sha256(hlo.encode()).hexdigest(),
         "passed": (
             not forbidden
-            and (not vector_candidate or has_vector_dequantizer)
-            and (not vector_candidate or not decoded_overlay_shapes)
+            and (
+                "pallas_vector" not in candidate or has_vector_dequantizer
+            )
+            and (not streamed_candidate or not decoded_overlay_shapes)
         ),
     }
 

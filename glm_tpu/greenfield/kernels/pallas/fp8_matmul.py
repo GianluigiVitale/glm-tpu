@@ -601,7 +601,8 @@ def fp8_block_vector_matmul_f32(
         )
 
     projected = tuple(
-        project_tile(jnp.int32(index)) for index in range(output_tiles)
+        lax.optimization_barrier(project_tile(jnp.int32(index)))
+        for index in range(output_tiles)
     )
     return jnp.concatenate(projected, axis=1)
 

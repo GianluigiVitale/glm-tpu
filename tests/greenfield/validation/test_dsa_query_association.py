@@ -51,6 +51,8 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
         "pallas_lp4_m1_n1024",
         "pallas_vector_global_m1_n4096",
         "pallas_vector_lp4_m1_n1024",
+        "raw_lookup_global_m1_n128_tiles",
+        "raw_lookup_lp4_m1_n128_tiles",
     }
 
 

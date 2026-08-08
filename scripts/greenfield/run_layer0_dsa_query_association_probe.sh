@@ -154,6 +154,8 @@ expected_candidates = {
     "pallas_lp4_m1_n1024",
     "pallas_vector_global_m1_n4096",
     "pallas_vector_lp4_m1_n1024",
+    "raw_lookup_global_m1_n128_tiles",
+    "raw_lookup_lp4_m1_n128_tiles",
 }
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("query association status/code identity failed")
