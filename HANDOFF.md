@@ -2021,3 +2021,34 @@ runtime manifest `12339490...699a` with warmup 2, iterations 10, trace 2, exact 
 oracles, FP32 routed-down reconstruction and split residual state. Device round-trip is disabled
 for that performance run because DB504 already closed it. Stop on any token/DSA/HLO/HBM/wall or
 cleanup failure; only a complete accepted run may change Gate D/E status.
+
+## Fused 8K prefill refusal is source-explained; exact loop classifier is pinned
+
+The authorized retry,
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_qkva_trace2_20260808T153500Z`,
+ran at exact pin `3058dc8` from 15:32--15:51 UTC and stopped before prefill execution. The old
+prefill linter counted every physical `while` and rejected `79` rather than `1`. No token, DSA
+event, timed iteration, XPlane, DB row, final `SUCCESS`, Gate-D result, or performance result
+exists. All eight logs are byte-identical (`93cb2c80...4725`) and the authenticated pre/failure
+censuses each contain eight unique `CENSUS_OK` hosts.
+
+The archived optimized HLO (`9f8c2a7d...964e`) makes the cause exact: 78 instructions have
+metadata ending in `one_row_fused_qkv_a_n82_convolution/while` inside the outer prefill body, and
+exactly one instruction has `op_name="jit(execute)/while"`. There are no other loops. The decoder,
+DSA-observer, fused-convolution, local-collective, transport and dead-row contracts all pass; only
+the unclassified total-count assumption failed. Direct approved-bucket hashes match locally for
+the decoder contract/HLO (`a406a211...8cc0` / `bc4320f7...4602`), prefill contract/HLO
+(`9b43281f...3c67` / `9f8c2a7d...964e`), censuses and log. SQLite remains `ok` and the run tag is
+absent from every DB evidence table, as required for this refusal.
+
+Commit `1f110133bc4411d6a3bcc1d2c69a8334f915a8fb` replaces the count exemption with a fail-closed
+identity classifier. The fused backend requires exactly one outer loop, exactly 78 qkv-a internal
+loops under that outer body and zero unclassified loops; the separate backend still requires
+exactly one total loop. The preserved old and fused HLOs pass respectively as `1+0` and `1+78`.
+Focused tests pass 39/39, the forced-32 complete prefill regression passes in 72.70 seconds, and
+Python compilation, Bash syntax, ShellCheck and diff checks pass. These are linter-readiness facts,
+not decoder or performance evidence.
+
+Exact next: seal this diagnostic pin, prove the fleet idle, and run exactly one serialized
+protected 8K retry with the same fused runtime, paired token/DSA oracles, warmup 2, iterations 10
+and trace 2. Any execution-time DSA/token/HBM/HLO/wall failure remains a stop condition.

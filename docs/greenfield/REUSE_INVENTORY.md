@@ -29,6 +29,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Layer-0 input/state | vLLM embedding/model source, TPU OOT embedding and accepted state hashes | Raw BF16 embedding row, model-epsilon input RMSNorm and adapted DSA leaves are pinned; no hidden embedding multiplier or TPU transform exists. |
 | Exact 8K local scorer | legacy XLA scorer source, DB485 run config and accepted XPlane | Bounded independent `R=32`, `P=512`, three-owned-page DCP scorer association; diagnostic only, never a production dead-row path. |
 | Checkpoint layout | existing greenfield plan/pack/load chain | Gate B is already complete; the 834 GB runtime derivative is the only full PP8 decoder input. |
+| Prefill HLO control-flow proof | existing greenfield HLO parser and preserved old/fused 8K executables | Classify one outer prompt scan, exact fused-qkv compiler internals and every unknown physical loop; never exempt a total count. |
 | Kernels | legacy DSA/GMM/quantized matmul plus DSV4 paged-attention research | Arithmetic/tiling reference; greenfield implementations remain independent and protected. |
 | Parity | `moe-tpu/parity` and existing GLM parity harnesses | Random-checkpoint transplant, real-layer differentials and cache/chunk tests, adapted to GLM. |
 
@@ -75,6 +76,10 @@ the base decoder passes Gates D-G, as required by the specification.
 - The returned full-model residual observer (`78a5fce88`) perturbed arithmetic and is closed.
 - The BF16-origin `wk` discriminator (`948f981`) is closed: its upstream adapted bytes differ, but
   its prompt keys are elementwise identical after the complete stored-key path.
+- The fused 8K attempt at `3058dc8` is a preserved linter refusal, not a decoder failure or result.
+  Its HLO supplies the reusable positive discriminator: 78 exact fused-qkv internal loops under
+  one outer prompt scan. Commit `1f11013` adapts the existing parser to pin those identities while
+  rejecting any unknown loop.
 - Old collective/XPlane/provenance worktrees are superseded by the broader greenfield versions; their
   tests and failure modes remain evidence, not a second implementation track.
 

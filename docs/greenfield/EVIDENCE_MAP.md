@@ -430,3 +430,20 @@ capture is still required.
   `3b2dec6d...2f5f`; critical remote bytes, DB integrity, and 8/8 pre/post census pass.
 - Gate decision: Gate B is re-closed. This body-only one-sample run has no token/DSA/trace or
   performance claim; protected 8K Gate D/E remains next.
+
+## Failed fused 8K prefill and exact loop-classification correction
+
+- Refused run: exact pin `3058dc8`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_qkva_trace2_20260808T153500Z`;
+  stopped before prefill execution with no token/DSA/timing/trace/DB/final `SUCCESS` or gate claim.
+- Preserved structure: prefill optimized HLO `9f8c2a7d...964e`; 79 physical loops resolve to 78
+  exact fused-qkv internal identities under the outer body plus one exact outer prompt scan, with
+  zero unclassified loops. Decoder contract `a406a211...8cc0` and HLO `bc4320f7...4602` pass their
+  fused-qkv/local-group/transport/dead-row checks.
+- Failure protection: eight identical logs `93cb2c80...4725`; pre-census `eb996b06...5a84` and
+  failure census `d6d0c090...21b1` each prove eight unique clean hosts; critical GCS bytes match;
+  SQLite integrity is `ok` and no evidence table contains the tag.
+- Correction: `1f110133bc4411d6a3bcc1d2c69a8334f915a8fb` classifies outer, fused internal and unknown loops
+  independently. Preserved old/new HLO pass as `1+0` and `1+78`; 39 focused tests plus the
+  forced-32 complete prefill regression pass. This authorizes one retry but proves no Gate-D/E
+  result.

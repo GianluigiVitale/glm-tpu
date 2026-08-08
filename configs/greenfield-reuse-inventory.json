@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-08T15:31:00Z",
+  "captured_utc": "2026-08-08T16:16:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "c16b37f38afed80a25fa2b234e3a8a4129353227",
+    "greenfield": "1f110133bc4411d6a3bcc1d2c69a8334f915a8fb",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,23 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "c16b37f38afed80a25fa2b234e3a8a4129353227",
+      "source_pin": "1f110133bc4411d6a3bcc1d2c69a8334f915a8fb",
       "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted protected artifacts through DB504, including rejected diagnostics, the fused checkpoint and its direct device-roundtrip/full-HLO proof, are pinned to prevent repeated experiments and unsupported promotion claims."
+      "reason": "Accepted protected artifacts through DB504 and the later failed fused-prefill diagnostic, including rejected diagnostics, the fused checkpoint and its direct device-roundtrip/full-HLO proof, are pinned to prevent repeated experiments and unsupported promotion claims."
+    },
+    {
+      "id": "greenfield-prefill-loop-classifier",
+      "category": "HLO protection",
+      "source_repo": "glm-tpu greenfield and preserved protected HLO",
+      "source_pin": "1f110133bc4411d6a3bcc1d2c69a8334f915a8fb / failed executable 3058dc8e0a9fd8974eba6c550ed3413c69802b1b",
+      "source_paths": ["glm_tpu/greenfield/runtime/prefill.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_qkva_trace2_20260808T153500Z/hlo/prefill_78layer_8k.optimized_hlo.txt.gz"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["protected short-context and long-context prefill HLO gates"],
+      "gate": "D-H",
+      "reason": "The preserved fused executable proves XLA emits one physical internal loop per exact one-row qkv-a convolution. The adapted classifier requires one outer prompt scan, the exact backend-dependent internal count rooted under that body, and zero unclassified loops; count-only exemptions remain forbidden."
     },
     {
       "id": "packed-checkpoint-chain",

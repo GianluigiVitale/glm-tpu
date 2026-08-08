@@ -5631,3 +5631,26 @@ only the declared four-chip repeated groups plus transport. DB 504, approved arc
 remote SHA equality, SQLite integrity, and 8/8 clean post-census pass. The one-sample body value is
 mechanism-only and has no performance standing. Gate B is re-closed; the next authorized model
 run is one protected 8K token/DSA/trace retry with device round trip disabled.
+
+## 2026-08-08 16:16 — Failed fused prefill HLO proves 78 internal loops plus one outer scan
+
+The first fused 8K retry at `3058dc8`, tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_qkva_trace2_20260808T153500Z`,
+failed closed before execution because the prefill contract treated all physical `while`
+instructions as prompt scans. The preserved prefill HLO SHA `9f8c2a7d...964e` contains exactly 79:
+78 are compiler-lowered internals whose op metadata is rooted under the outer prefill body and
+ends in `one_row_fused_qkv_a_n82_convolution/while`; one is the actual
+`jit(execute)/while`. No loop is unclassified. The decoder portion of the same prefill contract and
+the separate decoder/DSA-observer HLO contracts pass, including all 78 required convolutions,
+local groups, transfers and forbidden-shape checks.
+
+This is a linter false assumption, not evidence that model execution passed: prefill never ran and
+there is no token, DSA, timing, trace, DB row, final `SUCCESS`, Gate D or Gate E claim. Eight host
+logs are identical at `93cb2c80...4725`; direct approved-bucket hashes match the local decoder and
+prefill HLO/contract objects; authenticated pre/failure cleanup is 8/8 clean.
+
+Commit `1f110133bc4411d6a3bcc1d2c69a8334f915a8fb` now classifies loops by exact HLO metadata and
+fails on missing/extra outer loops, missing/extra fused-qkv internals, internals outside the outer
+body, or any unknown loop. Offline, the preserved old prefill passes `1 outer + 0 internal` and the
+new one passes `1 outer + 78 internal`; 39 focused tests and the 72.70-second forced-32 complete
+prefill regression pass. One like-for-like protected retry is now authorized.

@@ -954,3 +954,13 @@ collective HLO, HBM, DB/archive and cleanup contracts. Its single `774.192188 ms
 no token path, correctness oracle, DSA observer, trace, or warmed distribution and is explicitly
 not performance evidence. It re-closes Gate B only. DB484 remains the accepted PP8 performance
 point at `244.091151 ms` p50 and `4.096830 tok/s`; Gate E remains open pending protected 8K.
+
+## Fused 8K prefill-linter refusal — no performance result
+
+The 15:32 UTC fused 8K attempt at `3058dc8` stopped after load/compilation and before prefill
+execution because the old linter counted 78 compiler-internal fused-qkv loops as extra prompt
+loops. It has no token, DSA event, timed window, XPlane, DB row, final `SUCCESS`, Gate-D result, or
+latency/throughput standing. Preserved HLO proves exactly 78 identified qkv internals plus one
+outer prefill scan and no unknown loop. Commit `1f11013` corrects only this fail-closed
+classification. DB484 therefore remains the accepted PP8 performance point at `244.091151 ms` p50
+and `4.096830 tok/s`; Gate E remains open.
