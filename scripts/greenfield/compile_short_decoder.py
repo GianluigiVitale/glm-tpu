@@ -37,6 +37,8 @@ from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     verify_runtime_packed_checkpoint,
 )
 from glm_tpu.greenfield.model import (  # noqa: E402
+    FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+    SEPARATE_QKV_A_RUNTIME_LAYOUT,
     build_decoder_state_layout,
     build_pipeline_schedule,
 )
@@ -1411,7 +1413,21 @@ def main() -> int:
     )
     if not isinstance(runtime_manifest, dict):
         raise RuntimeError("runtime manifest is not an object")
+    attention_projection_layout = runtime_manifest.get(
+        "attention_projection_layout",
+        SEPARATE_QKV_A_RUNTIME_LAYOUT,
+    )
+    if attention_projection_layout == SEPARATE_QKV_A_RUNTIME_LAYOUT:
+        attention_projection_backend = "separate"
+    elif attention_projection_layout == FUSED_QKV_A_N82_RUNTIME_LAYOUT:
+        attention_projection_backend = "fused_n82_convolution"
+    else:
+        raise ValueError("runtime attention projection layout is unknown")
     if args.runtime_kind == "reference":
+        if attention_projection_backend != "separate":
+            raise ValueError(
+                "reference runtime cannot consume fused qkv-a state"
+            )
         context_args = SimpleNamespace(
             source_checkpoint_root=args.source_checkpoint_root,
             source_packed_manifest_sha256=args.source_packed_manifest_sha256,
@@ -1468,6 +1484,9 @@ def main() -> int:
                 args.source_runtime_manifest_sha256
             ),
             destination=runtime_manifest["destination"],
+            fused_qkv_a=(
+                attention_projection_backend == "fused_n82_convolution"
+            ),
         )
         pack_context = _build_feature_context(
             context_args,
@@ -1611,6 +1630,7 @@ def main() -> int:
             ),
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             split_residual_state=args.split_residual_state,
         )
@@ -1634,6 +1654,9 @@ def main() -> int:
                 ),
                 linear_backend=linear_backend,
                 dsa_query_backend=dsa_query_backend,
+                attention_projection_backend=(
+                    attention_projection_backend
+                ),
                 complete_token_path=True,
                 observe_dsa_events=True,
                 observe_dsa_internals=args.observe_dsa_internals,
@@ -1867,6 +1890,9 @@ def main() -> int:
                 decoder.feature_reconstruct_down_fp32
             ),
             dsa_query_backend=decoder.dsa_query_backend,
+            attention_projection_backend=(
+                decoder.attention_projection_backend
+            ),
             complete_token_path=decoder.complete_token_path,
             split_residual_state=decoder.split_residual_state,
         )
@@ -1940,6 +1966,9 @@ def main() -> int:
                     dsa_observer.feature_reconstruct_down_fp32
                 ),
                 dsa_query_backend=dsa_observer.dsa_query_backend,
+                attention_projection_backend=(
+                    dsa_observer.attention_projection_backend
+                ),
                 complete_token_path=True,
                 token_observation_candidates=(
                     dsa_observer.config.token_observation_candidates
@@ -2959,6 +2988,9 @@ def main() -> int:
             ),
             "linear_backend": decoder.linear_backend,
             "dsa_query_backend": decoder.dsa_query_backend,
+            "attention_projection_backend": (
+                decoder.attention_projection_backend
+            ),
             "complete_token_path": decoder.complete_token_path,
             "token_contract": token_contract,
             "token_passed": token_passed,

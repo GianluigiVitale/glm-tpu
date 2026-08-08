@@ -30,6 +30,10 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     one_row_virtual_tp32_fused_qkv_a_rms_norm,
     pack_legacy_fused_qkv_runtime_weights,
 )
+from glm_tpu.greenfield.kernels.reference.qkv_a import (
+    FusedQkvAContract,
+    one_row_fused_qkv_a_convolution,
+)
 from glm_tpu.greenfield.validation.layer0_dsa_association import (
     compare_dsa_association_scores,
 )
@@ -265,6 +269,65 @@ def test_one_row_virtual_tp32_q_a_preserves_shard_major_n82_contract() -> None:
         outputs.append(np.asarray(output.q_residual).view(np.uint16))
     for output in outputs[1:]:
         np.testing.assert_array_equal(output, outputs[0])
+
+
+def test_production_fused_qkv_a_matches_proven_convolution_association() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=2,
+        hidden_size=128,
+        q_lora_rank=4,
+        qkv_a_companion_rank=2,
+        legacy_tensor_shards=2,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    rng = np.random.default_rng(29)
+    packed = pack_legacy_fused_qkv_runtime_weights(
+        jnp.asarray(rng.integers(0x20, 0x48, size=(4, 128), dtype=np.uint8)),
+        jnp.asarray([[0.0125]], dtype=jnp.float32),
+        jnp.asarray(rng.integers(0x20, 0x48, size=(2, 128), dtype=np.uint8)),
+        jnp.asarray([[0.0075]], dtype=jnp.float32),
+        geometry=geometry,
+    )
+    hidden = jnp.asarray(
+        rng.normal(size=(1, 128)).astype(ml_dtypes.bfloat16)
+    )
+    norm_weight = jnp.asarray(
+        rng.uniform(0.75, 1.25, size=(4,)).astype(ml_dtypes.bfloat16)
+    )
+    expected = one_row_virtual_tp32_fused_qkv_a_rms_norm(
+        hidden,
+        packed.sharded_weight,
+        packed.sharded_scale,
+        norm_weight,
+        projection_mode="lax_map_convolution",
+        norm_mode="shard_sum",
+        geometry=geometry,
+    )
+    production = one_row_fused_qkv_a_convolution(
+        hidden,
+        jax.lax.bitcast_convert_type(packed.sharded_weight, jnp.uint8),
+        packed.sharded_scale,
+        norm_weight,
+        contract=FusedQkvAContract(
+            hidden_size=128,
+            q_lora_rank=4,
+            kv_a_width=2,
+            virtual_shards=2,
+        ),
+    )
+    np.testing.assert_array_equal(
+        np.asarray(production.q_residual).view(np.uint16),
+        np.asarray(expected.q_residual).view(np.uint16),
+    )
+    np.testing.assert_array_equal(
+        np.asarray(production.kv_a_projection).view(np.uint16),
+        np.asarray(expected.qkv_a_companion).view(np.uint16),
+    )
 
 
 def test_one_row_virtual_tp32_q_a_rejects_dead_decode_rows() -> None:

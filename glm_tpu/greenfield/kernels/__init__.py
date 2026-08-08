@@ -7,6 +7,7 @@ dependency of this tree.
 
 from .layer import (
     AttentionFp8Weights,
+    AttentionProjectionBackend,
     DenseFp8Weights,
     DsaFp8Weights,
     MoeFp8Weights,
@@ -16,6 +17,7 @@ from .layer import (
 
 __all__ = (
     "AttentionFp8Weights",
+    "AttentionProjectionBackend",
     "DenseFp8Weights",
     "DsaFp8Weights",
     "MoeFp8Weights",

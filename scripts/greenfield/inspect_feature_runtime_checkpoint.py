@@ -16,6 +16,9 @@ if str(REPO) not in sys.path:
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     verify_feature_runtime_packed_checkpoint,
 )
+from glm_tpu.greenfield.model import (  # noqa: E402
+    FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+)
 from scripts.greenfield.pack_feature_runtime_checkpoint import (  # noqa: E402
     _build_context,
     _mapping_hash,
@@ -56,6 +59,10 @@ def main() -> int:
         source_runtime_root=args.source_runtime_root,
         source_runtime_manifest_sha256=args.source_runtime_manifest_sha256,
         destination=manifest["destination"],
+        fused_qkv_a=(
+            manifest.get("attention_projection_layout")
+            == FUSED_QKV_A_N82_RUNTIME_LAYOUT
+        ),
     )
     context = _build_context(context_args, manifest["pack_code_hash"])
     expectation = build_load_expectation(manifest)
@@ -73,6 +80,9 @@ def main() -> int:
         "plan_hash": expectation.plan_hash,
         "plan_id": expectation.plan_id,
         "routed_expert_layout": context.layout.routed_expert_layout,
+        "attention_projection_layout": (
+            context.layout.attention_projection_layout
+        ),
         "runtime_file_bytes": manifest["runtime_file_bytes"],
         "runtime_layout_hash": expectation.runtime_layout_hash,
         "runtime_layout_manifest_sha256": (expectation.runtime_layout_manifest_sha256),

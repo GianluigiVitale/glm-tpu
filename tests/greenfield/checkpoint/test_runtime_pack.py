@@ -20,7 +20,10 @@ from glm_tpu.greenfield.checkpoint import (
 from glm_tpu.greenfield.errors import CheckpointValidationError, PlanValidationError
 from glm_tpu.greenfield.model import (
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FUSED_QKV_A_N82_RUNTIME_LAYOUT,
     build_decoder_feature_runtime_weight_layout,
+    build_decoder_feature_fused_qkv_runtime_weight_layout,
+    build_decoder_fused_qkv_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
 )
@@ -359,6 +362,122 @@ def test_feature_runtime_layout_rejects_partial_fp8_scale_blocks() -> None:
             target_schedule,
             source_layout,
         )
+
+
+def test_fused_qkv_runtime_layout_replaces_separate_projection_state() -> None:
+    source_plan = _small_plan()
+    source_plan = replace(
+        source_plan,
+        geometry=replace(
+            source_plan.geometry,
+            hidden_size=6144,
+            q_lora_rank=2048,
+            kv_lora_rank=512,
+            qk_nope_head_dim=192,
+            qk_rope_head_dim=64,
+            v_head_dim=256,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
+    schedule = build_pipeline_schedule(source_plan)
+    source_layout = build_decoder_runtime_weight_layout(source_plan, schedule)
+    target_layout = build_decoder_fused_qkv_runtime_weight_layout(
+        source_plan,
+        schedule,
+        source_layout,
+    )
+
+    specs = {spec.name: spec for spec in target_layout.specs}
+    assert target_layout.attention_projection_layout == (
+        FUSED_QKV_A_N82_RUNTIME_LAYOUT
+    )
+    assert specs["attention.slot_00.qkv_a.weight_bits"].shape == (
+        32,
+        6144,
+        82,
+    )
+    assert specs["attention.slot_00.qkv_a.scale_inv"].shape == (
+        32,
+        48,
+        82,
+    )
+    assert not any(
+        name.endswith(
+            (
+                ".q_a.weight_bits",
+                ".q_a.scale_inv",
+                ".kv_a.weight_bits",
+                ".kv_a.scale_inv",
+            )
+        )
+        for name in specs
+    )
+    bindings = {
+        tensor.spec.name: tensor for tensor in target_layout.devices[0].tensors
+    }
+    weight = bindings["attention.slot_00.qkv_a.weight_bits"]
+    scale = bindings["attention.slot_00.qkv_a.scale_inv"]
+    assert weight.transform == "fuse_qkv_a_output_shards"
+    assert scale.transform == "fuse_qkv_a_expanded_scales"
+    assert tuple(source.name for source in weight.sources) == (
+        "attention.slot_00.q_a.weight_bits",
+        "attention.slot_00.kv_a.weight_bits",
+    )
+    assert weight.derived_bytes == 0
+    assert scale.derived_bytes == scale.spec.byte_count - scale.source_byte_count
+    assert target_layout.runtime_bytes_per_chip > source_layout.runtime_bytes_per_chip
+    assert target_layout.to_dict()["attention_projection_layout"] == (
+        FUSED_QKV_A_N82_RUNTIME_LAYOUT
+    )
+
+
+def test_feature_and_fused_qkv_layout_share_one_source_pass() -> None:
+    source_plan = _small_feature_source_plan()
+    source_plan = replace(
+        source_plan,
+        geometry=replace(
+            source_plan.geometry,
+            hidden_size=6144,
+            q_lora_rank=2048,
+            kv_lora_rank=512,
+            qk_nope_head_dim=192,
+            qk_rope_head_dim=64,
+            v_head_dim=256,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
+    source_schedule = build_pipeline_schedule(source_plan)
+    source_layout = build_decoder_runtime_weight_layout(
+        source_plan,
+        source_schedule,
+    )
+    target_plan = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+    target_schedule = build_pipeline_schedule(target_plan)
+    target = build_decoder_feature_fused_qkv_runtime_weight_layout(
+        target_plan,
+        target_schedule,
+        source_layout,
+    )
+
+    assert target.routed_expert_layout == FEATURE_EXPERT_RUNTIME_LAYOUT
+    assert target.attention_projection_layout == FUSED_QKV_A_N82_RUNTIME_LAYOUT
+    sparse_bindings = {
+        tensor.spec.name: tensor for tensor in target.devices[3 * 4].tensors
+    }
+    assert sparse_bindings[
+        "sparse.slot_00.experts.gate_proj.weight_bits"
+    ].transform == "concat_experts_slice_output_transpose"
+    qkv = sparse_bindings["attention.slot_00.qkv_a.weight_bits"]
+    assert qkv.transform == "fuse_qkv_a_output_shards"
+    assert tuple(source.name for source in qkv.sources) == (
+        "attention.slot_00.q_a.weight_bits",
+        "attention.slot_00.kv_a.weight_bits",
+    )
 
 
 def test_runtime_source_file_authentication_is_fail_closed(tmp_path: Path) -> None:

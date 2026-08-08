@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import CheckpointValidationError
-from ..model.weights import DecoderRuntimeWeightLayout
+from ..model.weights import (
+    SEPARATE_QKV_A_RUNTIME_LAYOUT,
+    DecoderRuntimeWeightLayout,
+)
 from .full_loader import _mapping_hash, _read_json, _sha256_file
 from .runtime_feature import (
     FEATURE_RUNTIME_FORMAT_VERSION,
@@ -222,6 +225,10 @@ def verify_feature_runtime_packed_checkpoint(
         "source_runtime_manifest_sha256": (expectation.source_runtime_manifest_sha256),
         **totals,
     }
+    if layout.attention_projection_layout != SEPARATE_QKV_A_RUNTIME_LAYOUT:
+        common["attention_projection_layout"] = (
+            layout.attention_projection_layout
+        )
     for name, value in (("control", control), ("manifest", manifest)):
         for field, expected in common.items():
             if value.get(field) != expected:

@@ -15,18 +15,24 @@ from .state import (
 from .weights import (
     COMPLETE_EXPERT_RUNTIME_LAYOUT,
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+    SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
     DeviceRuntimeTensor,
     DeviceRuntimeWeightLayout,
     RuntimeSourceLeaf,
     RuntimeTensorSpec,
     build_decoder_feature_runtime_weight_layout,
+    build_decoder_feature_fused_qkv_runtime_weight_layout,
+    build_decoder_fused_qkv_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
 )
 
 __all__ = [
     "COMPLETE_EXPERT_RUNTIME_LAYOUT",
     "FEATURE_EXPERT_RUNTIME_LAYOUT",
+    "FUSED_QKV_A_N82_RUNTIME_LAYOUT",
+    "SEPARATE_QKV_A_RUNTIME_LAYOUT",
     "DecoderRuntimeWeightLayout",
     "DecoderStateLayout",
     "DeviceRuntimeTensor",
@@ -39,6 +45,8 @@ __all__ = [
     "StageExecution",
     "StageStateLayout",
     "build_decoder_feature_runtime_weight_layout",
+    "build_decoder_feature_fused_qkv_runtime_weight_layout",
+    "build_decoder_fused_qkv_runtime_weight_layout",
     "build_decoder_runtime_weight_layout",
     "build_decoder_state_layout",
     "build_pipeline_schedule",

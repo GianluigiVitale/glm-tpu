@@ -183,18 +183,18 @@ case "$RUNTIME_KIND" in
     readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_reference
     ;;
   pallas_feature)
-    readonly RUNTIME_TAG=greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z
+    readonly RUNTIME_TAG=${GLM_GREENFIELD_FEATURE_RUNTIME_TAG:-greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z}
     readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/$RUNTIME_TAG
-    readonly RUNTIME_MANIFEST_SHA=54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917
-    readonly RUNTIME_LAYOUT_HASH=ba21c4ec1500837f17a53047da98a7ed7c3a06782ddffe49d8bd796d4d0d1c9e
+    readonly RUNTIME_MANIFEST_SHA=${GLM_GREENFIELD_FEATURE_RUNTIME_MANIFEST_SHA:-54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917}
+    readonly RUNTIME_LAYOUT_HASH=${GLM_GREENFIELD_FEATURE_RUNTIME_LAYOUT_HASH:-ba21c4ec1500837f17a53047da98a7ed7c3a06782ddffe49d8bd796d4d0d1c9e}
     readonly SPARSE_MOE_BACKEND=pallas_feature
     readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_pallas_feature
     ;;
   pallas_feature_linear)
-    readonly RUNTIME_TAG=greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z
+    readonly RUNTIME_TAG=${GLM_GREENFIELD_FEATURE_RUNTIME_TAG:-greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z}
     readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/$RUNTIME_TAG
-    readonly RUNTIME_MANIFEST_SHA=54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917
-    readonly RUNTIME_LAYOUT_HASH=ba21c4ec1500837f17a53047da98a7ed7c3a06782ddffe49d8bd796d4d0d1c9e
+    readonly RUNTIME_MANIFEST_SHA=${GLM_GREENFIELD_FEATURE_RUNTIME_MANIFEST_SHA:-54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917}
+    readonly RUNTIME_LAYOUT_HASH=${GLM_GREENFIELD_FEATURE_RUNTIME_LAYOUT_HASH:-ba21c4ec1500837f17a53047da98a7ed7c3a06782ddffe49d8bd796d4d0d1c9e}
     readonly SPARSE_MOE_BACKEND=pallas_feature
     readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_pallas_feature_linear
     ;;
@@ -203,6 +203,26 @@ case "$RUNTIME_KIND" in
     exit 2
     ;;
 esac
+read -r ATTENTION_PROJECTION_BACKEND EXPECTED_LOADED_PAYLOAD_BYTES < <(
+  /home/gianl/vllm-env/bin/python - "$RUNTIME_ROOT/runtime_manifest.json" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1]))
+layout = manifest.get("attention_projection_layout", "separate_q_a_kv_a_v1")
+backends = {
+    "separate_q_a_kv_a_v1": "separate",
+    "fused_qkv_a_virtual_tp32_n82_v1": "fused_n82_convolution",
+}
+if layout not in backends:
+    raise SystemExit("runtime attention projection layout is unknown")
+payload = manifest["runtime_payload_bytes"]
+if payload % 8:
+    raise SystemExit("runtime payload bytes do not divide over eight hosts")
+print(backends[layout], payload // 8)
+PY
+)
+readonly ATTENTION_PROJECTION_BACKEND EXPECTED_LOADED_PAYLOAD_BYTES
 if [[ $RUNTIME_KIND == reference && $FEATURE_OUTPUT_TILE != 128 ]]; then
   echo "a non-default feature output tile requires a feature runtime" >&2
   exit 2
@@ -434,7 +454,8 @@ say "validating fleet agreement and recording diagnostic DB linkage"
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
   "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SPLIT_RESIDUAL_STATE" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" \
-  "$CONTEXT_LABEL" "$CONTEXT_CAPACITY" "$PROMPT_TOKEN_COUNT" <<'PY'
+  "$CONTEXT_LABEL" "$CONTEXT_CAPACITY" "$PROMPT_TOKEN_COUNT" \
+  "$ATTENTION_PROJECTION_BACKEND" "$EXPECTED_LOADED_PAYLOAD_BYTES" <<'PY'
 from __future__ import annotations
 
 import json
@@ -472,6 +493,8 @@ import numpy as np
     context_label,
     context_capacity,
     prompt_token_count,
+    attention_projection_backend,
+    expected_loaded_payload_bytes,
 ) = sys.argv[1:]
 feature_output_tile = int(feature_output_tile)
 feature_fuse_route_weighting = bool(int(feature_fuse_route_weighting))
@@ -485,6 +508,7 @@ iterations = int(iterations)
 trace_steps = int(trace_steps)
 context_capacity = int(context_capacity)
 prompt_token_count = int(prompt_token_count)
+expected_loaded_payload_bytes = int(expected_loaded_payload_bytes)
 context_name = context_label.upper()
 decode_step_count = warmup + iterations + trace_steps
 decode_end_exclusive = prompt_token_count + decode_step_count
@@ -556,6 +580,10 @@ if {record["linear_backend"] for record in records} != {expected_linear_backend}
     raise SystemExit("fleet FP8 linear backend drifted")
 if {record["dsa_query_backend"] for record in records} != {"reference"}:
     raise SystemExit("fleet DSA query backend drifted")
+if {record["attention_projection_backend"] for record in records} != {
+    attention_projection_backend
+}:
+    raise SystemExit("fleet attention projection backend drifted")
 if {record["runtime_manifest_sha256"] for record in records} != {runtime_manifest_sha256}:
     raise SystemExit("fleet runtime manifest drifted")
 if {record["runtime_layout_hash"] for record in records} != {runtime_layout_hash}:
@@ -867,11 +895,26 @@ for record in records:
         or association["forbidden_global_shapes"]
     ):
         raise SystemExit("local FP32 DSA query-owner contract drifted")
+    fused_qkv = record["hlo_contract"]["fused_qkv_a_contract"]
+    if attention_projection_backend == "fused_n82_convolution":
+        if (
+            fused_qkv["violations"]
+            or fused_qkv["convolution_count"] != 78
+            or fused_qkv["expected_convolution_count"] != 78
+            or not all(fused_qkv["required_shapes"].values())
+            or fused_qkv["forbidden_shapes"]
+        ):
+            raise SystemExit("fused qkv-a HLO contract drifted")
+    elif fused_qkv:
+        raise SystemExit("separate attention unexpectedly has a fused HLO contract")
 if runtime_kind == "pallas_feature_linear":
+    separate_qkv_a_calls = (
+        78 if attention_projection_backend == "separate" else 0
+    )
     expected_linear_kernel_counts = {
-        "greenfield_fp8_block_matmul_m8_k6144_n2048": 78,
+        "greenfield_fp8_block_matmul_m8_k6144_n2048": separate_qkv_a_calls,
         "greenfield_fp8_block_matmul_m8_k2048_n4096": 78,
-        "greenfield_fp8_block_matmul_m8_k6144_n640": 78,
+        "greenfield_fp8_block_matmul_m8_k6144_n640": separate_qkv_a_calls,
         "greenfield_fp8_block_matmul_m8_k4096_n6144": 78,
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": 78,
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": 78,
@@ -884,6 +927,8 @@ if runtime_kind == "pallas_feature_linear":
         if (
             not linear["passed"]
             or linear["dsa_query_backend"] != "reference"
+            or linear["attention_projection_backend"]
+            != attention_projection_backend
             or linear["kernel_counts"] != expected_linear_kernel_counts
             or linear["expected_kernel_counts"]
             != expected_linear_kernel_counts
@@ -898,7 +943,11 @@ if any(record["load_record"]["fp8_host_dequantizations"] != 0 for record in reco
     raise SystemExit("runtime loader performed a host FP8 dequantization")
 if any(record["load_record"]["fp8_device_dequantizations"] != 0 for record in records):
     raise SystemExit("runtime loader performed a device FP8 dequantization")
-if any(record["load_record"]["loaded_payload_bytes"] != 104_272_169_728 for record in records):
+if any(
+    record["load_record"]["loaded_payload_bytes"]
+    != expected_loaded_payload_bytes
+    for record in records
+):
     raise SystemExit("runtime loader payload bytes per host drifted")
 xplane = None
 if trace_steps:

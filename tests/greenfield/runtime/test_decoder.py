@@ -10,6 +10,56 @@ import pytest
 from glm_tpu.greenfield.errors import PlanValidationError
 
 
+def test_fused_qkv_a_hlo_contract_requires_db502_primitive() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_fused_qkv_a_decoder_association,
+    )
+
+    hlo = '''HloModule fused_qkv, replica_count=1, num_partitions=32
+
+ENTRY main {
+  %hidden = bf16[1,6144] parameter(0)
+  %weight = u8[32,6144,82] parameter(1)
+  %scale = f32[32,48,82] parameter(2)
+  ROOT %qkv = f32[1,82] convolution(%weight, %scale), dim_labels=bf_io->bf
+}
+'''
+    contract = _validate_fused_qkv_a_decoder_association(hlo, layers=1)
+    assert contract["passed"], contract
+    assert contract["convolution_count"] == 1
+
+    dead = _validate_fused_qkv_a_decoder_association(
+        hlo.replace(
+            "%weight = u8[32,6144,82] parameter(1)",
+            "%weight = u8[32,6144,82] parameter(1)\n"
+            "  %dead = bf16[32,6144] parameter(3)",
+        ),
+        layers=1,
+    )
+    assert dead["violations"]
+    assert dead["forbidden_shapes"] == ["bf16[32,6144]"]
+
+
+def test_fused_qkv_a_runtime_binding_omits_separate_projection_state() -> None:
+    from glm_tpu.greenfield.runtime.decoder import _attention_weights
+
+    loaded = []
+
+    def weight(name: str) -> str:
+        loaded.append(name)
+        return name
+
+    attention = _attention_weights(weight, 0, "fused_n82_convolution")
+    assert attention.q_a_bits is None
+    assert attention.q_a_scale is None
+    assert attention.kv_a_bits is None
+    assert attention.kv_a_scale is None
+    assert attention.qkv_a_bits == "attention.slot_00.qkv_a.weight_bits"
+    assert attention.qkv_a_scale == "attention.slot_00.qkv_a.scale_inv"
+    assert "attention.slot_00.q_a.weight_bits" not in loaded
+    assert "attention.slot_00.kv_a.weight_bits" not in loaded
+
+
 def _synthetic_8k_dsa_score_hlo() -> str:
     return '''HloModule dsa_score, replica_count=1, num_partitions=32
 
@@ -497,6 +547,35 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         "greenfield_fp8_block_matmul_f32_m8_k2048_n1024"
     ] == 0
 
+    fused_qkv_hlo = "\n".join(
+        line
+        for line in calls
+        if not any(
+            kernel in line
+            for kernel in (
+                "greenfield_fp8_block_matmul_m8_k6144_n2048",
+                "greenfield_fp8_block_matmul_m8_k6144_n640",
+            )
+        )
+    )
+    fused_qkv = _validate_pallas_stage_linear_decoder_calls(
+        fused_qkv_hlo,
+        layers=78,
+        dense_layers=3,
+        full_indexer_layers=21,
+        attention_projection_backend="fused_n82_convolution",
+    )
+    assert fused_qkv["passed"], fused_qkv
+    assert fused_qkv["attention_projection_backend"] == (
+        "fused_n82_convolution"
+    )
+    assert fused_qkv["expected_kernel_counts"][
+        "greenfield_fp8_block_matmul_m8_k6144_n2048"
+    ] == 0
+    assert fused_qkv["expected_kernel_counts"][
+        "greenfield_fp8_block_matmul_m8_k6144_n640"
+    ] == 0
+
     rejected = _validate_pallas_stage_linear_decoder_calls(
         hlo + "\noverlay = bf16[2048,6144] parameter(0)",
         layers=78,
@@ -546,6 +625,7 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
     from glm_tpu.greenfield.errors import PlanValidationError
     from glm_tpu.greenfield.model import (
         FEATURE_EXPERT_RUNTIME_LAYOUT,
+        build_decoder_feature_fused_qkv_runtime_weight_layout,
         build_decoder_feature_runtime_weight_layout,
         build_decoder_runtime_weight_layout,
         build_decoder_state_layout,
@@ -557,6 +637,20 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
     )
 
     source_plan = _small_feature_source_plan()
+    source_plan = replace(
+        source_plan,
+        geometry=replace(
+            source_plan.geometry,
+            hidden_size=128,
+            q_lora_rank=128,
+            kv_lora_rank=30,
+            qk_nope_head_dim=2,
+            qk_rope_head_dim=2,
+            v_head_dim=2,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
     source_schedule = build_pipeline_schedule(source_plan)
     source_state = build_decoder_state_layout(
         source_plan,
@@ -586,6 +680,13 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
         feature_schedule,
         source_layout,
     )
+    fused_feature_layout = (
+        build_decoder_feature_fused_qkv_runtime_weight_layout(
+            feature_plan,
+            feature_schedule,
+            source_layout,
+        )
+    )
     groups = tuple(
         tuple(stage * 4 + slot for slot in range(4)) for stage in range(8)
     )
@@ -594,6 +695,18 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
         for stage in range(8)
         for slot in range(4)
     )
+
+    with pytest.raises(PlanValidationError, match="expected 32 devices"):
+        build_decoder_step_program(
+            feature_plan,
+            feature_schedule,
+            feature_state,
+            fused_feature_layout,
+            groups,
+            pairs,
+            sparse_moe_backend="pallas_feature",
+            attention_projection_backend="fused_n82_convolution",
+        )
 
     with pytest.raises(PlanValidationError, match="backend and runtime"):
         build_decoder_step_program(
@@ -675,6 +788,29 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             dsa_query_backend="unknown",  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="attention backend and runtime"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            attention_projection_backend="fused_n82_convolution",
+        )
+    with pytest.raises(
+        PlanValidationError,
+        match="attention projection backend is unknown",
+    ):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            attention_projection_backend="unknown",  # type: ignore[arg-type]
         )
     with pytest.raises(PlanValidationError, match="token-path flag"):
         build_decoder_step_program(

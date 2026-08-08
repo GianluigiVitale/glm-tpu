@@ -382,6 +382,11 @@ def _transform_contract(
 ) -> tuple[int | None, int | None, int | None, tuple[int, ...] | None]:
     if transform == "identity_runtime_tensor":
         return None, None, None, None
+    if transform in (
+        "fuse_qkv_a_output_shards",
+        "fuse_qkv_a_expanded_scales",
+    ):
+        return None, None, None, None
     axis_and_transpose = {
         "concat_experts_slice_output_transpose": (1, (0, 2, 1)),
         "concat_experts_slice_contraction_transpose": (2, (0, 2, 1)),
@@ -504,6 +509,83 @@ def _transform_expert(
     if transform.endswith("_transpose"):
         selected = selected.T
     return selected.tobytes(order="C")
+
+
+def _transform_qkv_a(
+    q_raw: bytearray,
+    kv_raw: bytearray,
+    *,
+    q_shape: tuple[int, ...],
+    kv_shape: tuple[int, ...],
+    destination_shape: tuple[int, ...],
+    dtype: str,
+    transform: str,
+) -> bytes:
+    """Pack one layer's separate projection state into final shard-major N82."""
+
+    import numpy as np
+
+    if len(q_shape) != 2 or len(kv_shape) != 2 or len(destination_shape) != 3:
+        raise CheckpointValidationError("fused qkv-a tensor ranks drifted")
+    shards, contraction, local_width = destination_shape
+    if transform == "fuse_qkv_a_output_shards":
+        if dtype != "F8_E4M3" or q_shape[1] != contraction or (
+            kv_shape[1] != contraction
+        ):
+            raise CheckpointValidationError(
+                "fused qkv-a weight geometry drifted"
+            )
+        q_value = np.frombuffer(q_raw, dtype=np.uint8).reshape(q_shape)
+        kv_value = np.frombuffer(kv_raw, dtype=np.uint8).reshape(kv_shape)
+        if q_shape[0] % shards or kv_shape[0] % shards or (
+            (q_shape[0] + kv_shape[0]) // shards != local_width
+        ):
+            raise CheckpointValidationError(
+                "fused qkv-a output widths do not reconcile"
+            )
+        q_sharded = q_value.reshape(
+            shards, q_shape[0] // shards, contraction
+        ).transpose(0, 2, 1)
+        kv_sharded = kv_value.reshape(
+            shards, kv_shape[0] // shards, contraction
+        ).transpose(0, 2, 1)
+        packed = np.concatenate((q_sharded, kv_sharded), axis=-1)
+    elif transform == "fuse_qkv_a_expanded_scales":
+        if dtype != "F32" or q_shape[1] != contraction or (
+            kv_shape[1] != contraction
+        ):
+            raise CheckpointValidationError(
+                "fused qkv-a scale geometry drifted"
+            )
+        q_value = np.frombuffer(q_raw, dtype="<f4").reshape(q_shape)
+        kv_value = np.frombuffer(kv_raw, dtype="<f4").reshape(kv_shape)
+        q_width = q_shape[0] * 128
+        total_width = shards * local_width
+        kv_width = total_width - q_width
+        if q_width % shards or kv_width <= 0 or kv_width % shards or (
+            (kv_width + 127) // 128 != kv_shape[0]
+        ):
+            raise CheckpointValidationError(
+                "fused qkv-a scale widths do not reconcile"
+            )
+        q_expanded = np.repeat(q_value, 128, axis=0)[:q_width]
+        kv_expanded = np.repeat(kv_value, 128, axis=0)[:kv_width]
+        q_sharded = q_expanded.reshape(
+            shards, q_width // shards, contraction
+        ).transpose(0, 2, 1)
+        kv_sharded = kv_expanded.reshape(
+            shards, kv_width // shards, contraction
+        ).transpose(0, 2, 1)
+        packed = np.concatenate((q_sharded, kv_sharded), axis=-1)
+    else:
+        raise CheckpointValidationError(
+            f"unsupported fused qkv-a transform {transform!r}"
+        )
+    if packed.shape != destination_shape:
+        raise CheckpointValidationError(
+            "fused qkv-a destination shape does not reconcile"
+        )
+    return packed.tobytes(order="C")
 
 
 def stream_feature_runtime_stage(
@@ -665,44 +747,100 @@ def stream_feature_runtime_stage(
                     "feature runtime transforms differ by destination"
                 )
             transform = next(iter(transforms))
-            for source_slot in range(4):
-                source_tensor = source_tensor_by_slot[source_slot][name]
-                source_shape = source_tensor.spec.shape
-                if len(source_shape) != 3 or source_shape[0] <= 0:
-                    raise CheckpointValidationError(
-                        f"feature runtime routed source shape drifted for {name!r}"
-                    )
-                expert_bytes = source_tensor.byte_count // source_shape[0]
-                if expert_bytes * source_shape[0] != source_tensor.byte_count:
-                    raise CheckpointValidationError(
-                        "feature runtime expert bytes do not reconcile"
-                    )
-                tensor_start = (
-                    len(source_by_slot[source_slot].header)
-                    + source_tensor.data_offset_start
-                )
-                for expert in range(source_shape[0]):
-                    raw = _read_exact_at(
-                        sources[source_slot],
-                        offset=tensor_start + expert * expert_bytes,
-                        byte_count=expert_bytes,
-                    )
-                    for destination_slot in range(4):
-                        value = _transform_expert(
-                            raw,
-                            source_shape=source_shape,
-                            dtype=source_tensor.spec.dtype,
-                            transform=transform,
-                            destination_slot=destination_slot,
-                            stage_size=4,
+            if transform in (
+                "fuse_qkv_a_output_shards",
+                "fuse_qkv_a_expanded_scales",
+            ):
+                for destination_slot, binding in enumerate(bindings):
+                    if len(binding.sources) != 2 or any(
+                        source.source_device_slot != destination_slot
+                        for source in binding.sources
+                    ):
+                        raise CheckpointValidationError(
+                            "fused qkv-a transform moved physical ownership"
                         )
-                        tensor_bytes[destination_slot] += _write(
-                            outputs[destination_slot],
-                            value,
-                            file_digest=file_digests[destination_slot],
-                            tensor_digest=tensor_digests[destination_slot],
+                    source_values = []
+                    for source_leaf in binding.sources:
+                        source_tensor = source_tensor_by_slot[
+                            destination_slot
+                        ][source_leaf.name]
+                        if (
+                            source_tensor.spec.dtype != source_leaf.dtype
+                            or source_tensor.spec.shape != source_leaf.shape
+                        ):
+                            raise CheckpointValidationError(
+                                "fused qkv-a source tensor contract drifted"
+                            )
+                        source_values.append(
+                            _read_exact_at(
+                                sources[destination_slot],
+                                offset=(
+                                    len(
+                                        source_by_slot[
+                                            destination_slot
+                                        ].header
+                                    )
+                                    + source_tensor.data_offset_start
+                                ),
+                                byte_count=source_tensor.byte_count,
+                            )
                         )
-                    del raw
+                    value = _transform_qkv_a(
+                        source_values[0],
+                        source_values[1],
+                        q_shape=binding.sources[0].shape,
+                        kv_shape=binding.sources[1].shape,
+                        destination_shape=destinations[
+                            destination_slot
+                        ].spec.shape,
+                        dtype=destinations[destination_slot].spec.dtype,
+                        transform=transform,
+                    )
+                    tensor_bytes[destination_slot] += _write(
+                        outputs[destination_slot],
+                        value,
+                        file_digest=file_digests[destination_slot],
+                        tensor_digest=tensor_digests[destination_slot],
+                    )
+            else:
+                for source_slot in range(4):
+                    source_tensor = source_tensor_by_slot[source_slot][name]
+                    source_shape = source_tensor.spec.shape
+                    if len(source_shape) != 3 or source_shape[0] <= 0:
+                        raise CheckpointValidationError(
+                            f"feature runtime routed source shape drifted for {name!r}"
+                        )
+                    expert_bytes = source_tensor.byte_count // source_shape[0]
+                    if expert_bytes * source_shape[0] != source_tensor.byte_count:
+                        raise CheckpointValidationError(
+                            "feature runtime expert bytes do not reconcile"
+                        )
+                    tensor_start = (
+                        len(source_by_slot[source_slot].header)
+                        + source_tensor.data_offset_start
+                    )
+                    for expert in range(source_shape[0]):
+                        raw = _read_exact_at(
+                            sources[source_slot],
+                            offset=tensor_start + expert * expert_bytes,
+                            byte_count=expert_bytes,
+                        )
+                        for destination_slot in range(4):
+                            value = _transform_expert(
+                                raw,
+                                source_shape=source_shape,
+                                dtype=source_tensor.spec.dtype,
+                                transform=transform,
+                                destination_slot=destination_slot,
+                                stage_size=4,
+                            )
+                            tensor_bytes[destination_slot] += _write(
+                                outputs[destination_slot],
+                                value,
+                                file_digest=file_digests[destination_slot],
+                                tensor_digest=tensor_digests[destination_slot],
+                            )
+                        del raw
 
         for slot in range(4):
             destination = destinations[slot]

@@ -38,10 +38,14 @@ _RUNTIME_SOURCE_TRANSFORMS = frozenset(
         "concat_experts_slice_contraction_transpose",
         "concat_experts_slice_scale_output",
         "concat_experts_slice_scale_contraction",
+        "fuse_qkv_a_output_shards",
+        "fuse_qkv_a_expanded_scales",
     )
 )
 COMPLETE_EXPERT_RUNTIME_LAYOUT = "complete_expert_identity"
 FEATURE_EXPERT_RUNTIME_LAYOUT = "expert_intermediate_feature_lp4_pallas_kn_v1"
+SEPARATE_QKV_A_RUNTIME_LAYOUT = "separate_q_a_kv_a_v1"
+FUSED_QKV_A_N82_RUNTIME_LAYOUT = "fused_qkv_a_virtual_tp32_n82_v1"
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -235,6 +239,70 @@ class DeviceRuntimeTensor:
                 raise PlanValidationError(
                     "runtime tensor identity requires exactly one source"
                 )
+        elif self.transform in (
+            "fuse_qkv_a_output_shards",
+            "fuse_qkv_a_expanded_scales",
+        ):
+            if len(self.spec.shape) != 3:
+                raise PlanValidationError(
+                    "fused qkv-a destination must have rank three"
+                )
+            if len(self.sources) != 2 or any(
+                source.source_device_slot is None for source in self.sources
+            ):
+                raise PlanValidationError(
+                    "fused qkv-a tensor requires two explicit source owners"
+                )
+            q_source, kv_source = self.sources
+            if q_source.selected_shape is not None or (
+                kv_source.selected_shape is not None
+            ):
+                raise PlanValidationError(
+                    "fused qkv-a sources cannot select partial tensors"
+                )
+            if self.transform == "fuse_qkv_a_output_shards":
+                if self.spec.dtype != "F8_E4M3" or any(
+                    len(source.shape) != 2 for source in self.sources
+                ):
+                    raise PlanValidationError(
+                        "fused qkv-a weights must be FP8 matrices"
+                    )
+                if q_source.shape[1] != kv_source.shape[1]:
+                    raise PlanValidationError(
+                        "fused qkv-a weight contractions disagree"
+                    )
+                shards, hidden, local_width = self.spec.shape
+                if hidden != q_source.shape[1] or (
+                    shards * local_width
+                    != q_source.shape[0] + kv_source.shape[0]
+                ):
+                    raise PlanValidationError(
+                        "fused qkv-a weight shape does not reconcile"
+                    )
+            else:
+                if self.spec.dtype != "F32" or any(
+                    len(source.shape) != 2 for source in self.sources
+                ):
+                    raise PlanValidationError(
+                        "fused qkv-a scales must be FP32 matrices"
+                    )
+                if q_source.shape[1] != kv_source.shape[1]:
+                    raise PlanValidationError(
+                        "fused qkv-a scale contractions disagree"
+                    )
+                shards, scale_rows, local_width = self.spec.shape
+                q_width = q_source.shape[0] * 128
+                total_width = shards * local_width
+                kv_width = total_width - q_width
+                if (
+                    scale_rows != q_source.shape[1]
+                    or kv_width <= 0
+                    or (kv_width + 127) // 128 != kv_source.shape[0]
+                ):
+                    raise PlanValidationError(
+                        "fused qkv-a expanded scale shape does not reconcile"
+                    )
+            expected_shape = self.spec.shape
         else:
             if len(self.sources) < 2 or any(
                 source.source_device_slot is None for source in self.sources
@@ -261,7 +329,7 @@ class DeviceRuntimeTensor:
         )
         if len(set(source_keys)) != len(self.sources):
             raise PlanValidationError("runtime tensor repeats a source leaf")
-        if self.source_byte_count != self.spec.byte_count:
+        if self.source_byte_count + self.derived_bytes != self.spec.byte_count:
             raise PlanValidationError("runtime tensor source bytes do not reconcile")
 
     @property
@@ -271,6 +339,14 @@ class DeviceRuntimeTensor:
     @property
     def source_byte_count(self) -> int:
         return sum(source.selected_byte_count for source in self.sources)
+
+    @property
+    def derived_bytes(self) -> int:
+        if self.is_padding:
+            return 0
+        if self.transform == "fuse_qkv_a_expanded_scales":
+            return self.spec.byte_count - self.source_byte_count
+        return 0
 
     @property
     def padding_bytes(self) -> int:
@@ -285,6 +361,8 @@ class DeviceRuntimeTensor:
         }
         if self.transform != "identity_concat":
             value["transform"] = self.transform
+        if self.derived_bytes:
+            value["derived_bytes"] = self.derived_bytes
         return value
 
 
@@ -330,8 +408,12 @@ class DeviceRuntimeWeightLayout:
     def source_leaf_count(self) -> int:
         return sum(len(tensor.sources) for tensor in self.tensors)
 
+    @property
+    def derived_bytes(self) -> int:
+        return sum(tensor.derived_bytes for tensor in self.tensors)
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        value = {
             "device_id": self.device_id,
             "device_slot": self.device_slot,
             "padding_bytes": self.padding_bytes,
@@ -341,6 +423,9 @@ class DeviceRuntimeWeightLayout:
             "stage_id": self.stage_id,
             "tensors": [tensor.to_dict() for tensor in self.tensors],
         }
+        if self.derived_bytes:
+            value["derived_bytes"] = self.derived_bytes
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -352,6 +437,7 @@ class DecoderRuntimeWeightLayout:
     specs: tuple[RuntimeTensorSpec, ...]
     devices: tuple[DeviceRuntimeWeightLayout, ...]
     routed_expert_layout: str = COMPLETE_EXPERT_RUNTIME_LAYOUT
+    attention_projection_layout: str = SEPARATE_QKV_A_RUNTIME_LAYOUT
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "specs", tuple(self.specs))
@@ -363,6 +449,13 @@ class DecoderRuntimeWeightLayout:
             FEATURE_EXPERT_RUNTIME_LAYOUT,
         ):
             raise PlanValidationError("runtime routed expert layout is invalid")
+        if self.attention_projection_layout not in (
+            SEPARATE_QKV_A_RUNTIME_LAYOUT,
+            FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+        ):
+            raise PlanValidationError(
+                "runtime attention projection layout is invalid"
+            )
         spec_names = tuple(spec.name for spec in self.specs)
         if len(set(spec_names)) != len(spec_names):
             raise PlanValidationError("runtime weight specs are duplicate")
@@ -374,7 +467,12 @@ class DecoderRuntimeWeightLayout:
             )
             if observed != expected:
                 raise PlanValidationError("runtime input tree differs by device")
-            if device.source_bytes + device.padding_bytes != device.runtime_bytes:
+            if (
+                device.source_bytes
+                + device.padding_bytes
+                + device.derived_bytes
+                != device.runtime_bytes
+            ):
                 raise PlanValidationError("runtime device bytes do not reconcile")
         if len({device.device_id for device in self.devices}) != len(self.devices):
             raise PlanValidationError("runtime device ids are duplicate")
@@ -414,6 +512,10 @@ class DecoderRuntimeWeightLayout:
         }
         if self.routed_expert_layout != COMPLETE_EXPERT_RUNTIME_LAYOUT:
             value["routed_expert_layout"] = self.routed_expert_layout
+        if self.attention_projection_layout != SEPARATE_QKV_A_RUNTIME_LAYOUT:
+            value["attention_projection_layout"] = (
+                self.attention_projection_layout
+            )
         return value
 
 
@@ -1023,4 +1125,257 @@ def build_decoder_feature_runtime_weight_layout(
         specs=tuple(target_specs),
         devices=tuple(devices),
         routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+
+
+def build_decoder_fused_qkv_runtime_weight_layout(
+    plan: ExecutionPlan,
+    schedule: PipelineSchedule,
+    source_layout: DecoderRuntimeWeightLayout,
+) -> DecoderRuntimeWeightLayout:
+    """Replace separate q-a/kv-a tensors with DB502's final N82 layout."""
+
+    if schedule.plan_hash != plan.plan_hash or (
+        source_layout.plan_hash != plan.plan_hash
+    ):
+        raise PlanValidationError(
+            "fused qkv-a runtime weights belong to another plan"
+        )
+    if source_layout.schedule_hash != schedule.schedule_hash:
+        raise PlanValidationError(
+            "fused qkv-a runtime source has another schedule"
+        )
+    if (
+        source_layout.attention_projection_layout
+        != SEPARATE_QKV_A_RUNTIME_LAYOUT
+    ):
+        raise PlanValidationError(
+            "fused qkv-a source must retain separate q-a/kv-a tensors"
+        )
+    geometry = plan.geometry
+    virtual_shards = 32
+    q_width = geometry.q_lora_rank
+    kv_width = geometry.kv_lora_rank + geometry.qk_rope_head_dim
+    if q_width % virtual_shards or kv_width % virtual_shards:
+        raise PlanValidationError(
+            "fused qkv-a widths must divide over 32 virtual shards"
+        )
+    hidden = geometry.hidden_size
+    if geometry.fp8_block_shape != (128, 128):
+        raise PlanValidationError(
+            "fused qkv-a v1 requires 128x128 FP8 scale blocks"
+        )
+    contraction_block = geometry.fp8_block_shape[1]
+    if hidden % contraction_block:
+        raise PlanValidationError(
+            "fused qkv-a contraction must contain complete scale blocks"
+        )
+    packed_width = (q_width + kv_width) // virtual_shards
+    source_specs = {spec.name: spec for spec in source_layout.specs}
+    target_specs: list[RuntimeTensorSpec] = []
+    for spec in source_layout.specs:
+        if spec.name.endswith(".q_a.weight_bits"):
+            kv_name = spec.name.replace(".q_a.weight_bits", ".kv_a.weight_bits")
+            kv_spec = source_specs.get(kv_name)
+            if kv_spec is None or spec.shape != (q_width, hidden) or (
+                kv_spec.shape != (kv_width, hidden)
+            ):
+                raise PlanValidationError(
+                    "fused qkv-a source weight geometry drifted"
+                )
+            target_specs.append(
+                replace(
+                    spec,
+                    name=spec.name.replace(".q_a.", ".qkv_a."),
+                    shape=(virtual_shards, hidden, packed_width),
+                )
+            )
+        elif spec.name.endswith(".q_a.scale_inv"):
+            kv_name = spec.name.replace(".q_a.scale_inv", ".kv_a.scale_inv")
+            kv_spec = source_specs.get(kv_name)
+            expected_q_scale = _scale_shape(
+                (q_width, hidden), geometry.fp8_block_shape
+            )
+            expected_kv_scale = _scale_shape(
+                (kv_width, hidden), geometry.fp8_block_shape
+            )
+            if kv_spec is None or spec.shape != expected_q_scale or (
+                kv_spec.shape != expected_kv_scale
+            ):
+                raise PlanValidationError(
+                    "fused qkv-a source scale geometry drifted"
+                )
+            target_specs.append(
+                replace(
+                    spec,
+                    name=spec.name.replace(".q_a.", ".qkv_a."),
+                    shape=(
+                        virtual_shards,
+                        hidden // contraction_block,
+                        packed_width,
+                    ),
+                )
+            )
+        elif spec.name.endswith((".kv_a.weight_bits", ".kv_a.scale_inv")):
+            continue
+        else:
+            target_specs.append(spec)
+
+    target_names = tuple(spec.name for spec in target_specs)
+    if len(set(target_names)) != len(target_names):
+        raise PlanValidationError("fused qkv-a target specs are duplicate")
+    devices = []
+    for source_device in source_layout.devices:
+        source_by_name = {
+            tensor.spec.name: tensor for tensor in source_device.tensors
+        }
+        tensors = []
+        for target_spec in target_specs:
+            if ".qkv_a." not in target_spec.name:
+                source = source_by_name[target_spec.name]
+                if source.is_padding:
+                    tensors.append(DeviceRuntimeTensor(target_spec, ()))
+                else:
+                    tensors.append(
+                        DeviceRuntimeTensor(
+                            target_spec,
+                            (
+                                RuntimeSourceLeaf(
+                                    name=target_spec.name,
+                                    dtype=target_spec.dtype,
+                                    shape=target_spec.shape,
+                                    source_device_slot=(
+                                        source_device.device_slot
+                                    ),
+                                ),
+                            ),
+                            transform="identity_runtime_tensor",
+                        )
+                    )
+                continue
+            q_name = target_spec.name.replace(".qkv_a.", ".q_a.")
+            kv_name = target_spec.name.replace(".qkv_a.", ".kv_a.")
+            q_source = source_by_name[q_name]
+            kv_source = source_by_name[kv_name]
+            if q_source.is_padding != kv_source.is_padding:
+                raise PlanValidationError(
+                    "fused qkv-a source liveness differs within one layer"
+                )
+            if q_source.is_padding:
+                tensors.append(DeviceRuntimeTensor(target_spec, ()))
+                continue
+            tensors.append(
+                DeviceRuntimeTensor(
+                    target_spec,
+                    (
+                        RuntimeSourceLeaf(
+                            name=q_name,
+                            dtype=q_source.spec.dtype,
+                            shape=q_source.spec.shape,
+                            source_device_slot=source_device.device_slot,
+                        ),
+                        RuntimeSourceLeaf(
+                            name=kv_name,
+                            dtype=kv_source.spec.dtype,
+                            shape=kv_source.spec.shape,
+                            source_device_slot=source_device.device_slot,
+                        ),
+                    ),
+                    transform=(
+                        "fuse_qkv_a_expanded_scales"
+                        if target_spec.value_class == "fp8_scale"
+                        else "fuse_qkv_a_output_shards"
+                    ),
+                )
+            )
+        devices.append(
+            DeviceRuntimeWeightLayout(
+                stage_id=source_device.stage_id,
+                device_slot=source_device.device_slot,
+                device_id=source_device.device_id,
+                tensors=tuple(tensors),
+            )
+        )
+    return DecoderRuntimeWeightLayout(
+        plan_hash=plan.plan_hash,
+        schedule_hash=schedule.schedule_hash,
+        specs=tuple(target_specs),
+        devices=tuple(devices),
+        routed_expert_layout=source_layout.routed_expert_layout,
+        attention_projection_layout=FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+    )
+
+
+def build_decoder_feature_fused_qkv_runtime_weight_layout(
+    plan: ExecutionPlan,
+    schedule: PipelineSchedule,
+    source_layout: DecoderRuntimeWeightLayout,
+) -> DecoderRuntimeWeightLayout:
+    """Derive feature experts and fused N82 attention in one offline pass."""
+
+    feature_layout = build_decoder_feature_runtime_weight_layout(
+        plan,
+        schedule,
+        source_layout,
+    )
+    source_plan = replace(
+        plan,
+        expert_layout=f"complete_expert_identity_lp{plan.local_parallel_size}",
+    )
+    source_schedule = build_pipeline_schedule(source_plan)
+    fused_attention_layout = build_decoder_fused_qkv_runtime_weight_layout(
+        source_plan,
+        source_schedule,
+        source_layout,
+    )
+    feature_specs = {spec.name: spec for spec in feature_layout.specs}
+    specs = tuple(
+        spec if ".qkv_a." in spec.name else feature_specs[spec.name]
+        for spec in fused_attention_layout.specs
+    )
+    devices = []
+    for feature_device, qkv_device in zip(
+        feature_layout.devices,
+        fused_attention_layout.devices,
+        strict=True,
+    ):
+        if (
+            feature_device.stage_id,
+            feature_device.device_slot,
+            feature_device.device_id,
+        ) != (
+            qkv_device.stage_id,
+            qkv_device.device_slot,
+            qkv_device.device_id,
+        ):
+            raise PlanValidationError(
+                "feature and fused qkv-a device ownership disagree"
+            )
+        feature_tensors = {
+            tensor.spec.name: tensor for tensor in feature_device.tensors
+        }
+        qkv_tensors = {
+            tensor.spec.name: tensor for tensor in qkv_device.tensors
+        }
+        tensors = tuple(
+            qkv_tensors[spec.name]
+            if ".qkv_a." in spec.name
+            else feature_tensors[spec.name]
+            for spec in specs
+        )
+        devices.append(
+            DeviceRuntimeWeightLayout(
+                stage_id=feature_device.stage_id,
+                device_slot=feature_device.device_slot,
+                device_id=feature_device.device_id,
+                tensors=tensors,
+            )
+        )
+    return DecoderRuntimeWeightLayout(
+        plan_hash=plan.plan_hash,
+        schedule_hash=schedule.schedule_hash,
+        specs=specs,
+        devices=tuple(devices),
+        routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+        attention_projection_layout=FUSED_QKV_A_N82_RUNTIME_LAYOUT,
     )

@@ -39,7 +39,9 @@ from glm_tpu.greenfield.checkpoint.runtime_feature import (  # noqa: E402
 )
 from glm_tpu.greenfield.model import (  # noqa: E402
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
+    build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_feature_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
@@ -189,11 +191,18 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
     )
     target_schedule = build_pipeline_schedule(target_plan)
-    layout = build_decoder_feature_runtime_weight_layout(
-        target_plan,
-        target_schedule,
-        source_layout,
-    )
+    if getattr(args, "fused_qkv_a", False):
+        layout = build_decoder_feature_fused_qkv_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            source_layout,
+        )
+    else:
+        layout = build_decoder_feature_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            source_layout,
+        )
     layout_document = build_feature_runtime_layout_document(layout)
     layout_bytes = (
         json.dumps(layout_document, indent=2, sort_keys=True) + "\n"
@@ -229,6 +238,10 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         "source_tensor_count": layout.source_leaf_count,
         "tensor_count": len(layout.specs) * len(layout.devices),
     }
+    if layout.attention_projection_layout != SEPARATE_QKV_A_RUNTIME_LAYOUT:
+        common["attention_projection_layout"] = (
+            layout.attention_projection_layout
+        )
     control: dict[str, Any] = {
         "artifact_kind": FEATURE_RUNTIME_PACK_CONTROL_KIND,
         **common,
@@ -731,6 +744,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--process-index", type=int)
     parser.add_argument("--topology-capture", type=Path)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--fused-qkv-a", action="store_true")
     return parser.parse_args()
 
 

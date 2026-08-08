@@ -53,6 +53,9 @@ def validate_teacher_forced_prefill_hlo(
             decoder.feature_reconstruct_down_fp32
         ),
         dsa_query_backend=decoder.dsa_query_backend,
+        attention_projection_backend=(
+            decoder.attention_projection_backend
+        ),
         complete_token_path=True,
         split_residual_state=decoder.split_residual_state,
     )

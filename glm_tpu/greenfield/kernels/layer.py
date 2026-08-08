@@ -12,6 +12,10 @@ from .reference.attention import MlaNumericalContract, StageLocalKvLayout
 from .reference.dsa import DsaNumericalContract
 from .reference.linear import residual_add
 from .reference.moe import GlmMoeNumericalContract
+from .reference.qkv_a import (
+    FusedQkvAContract,
+    one_row_fused_qkv_a_convolution,
+)
 from .reference.rmsnorm import fused_add_rms_norm, rms_norm
 from .stage_local import (
     StageLocalDsaFp8Internals,
@@ -25,6 +29,7 @@ from .stage_local import (
 )
 
 SparseMoeBackend = Literal["reference", "pallas_feature"]
+AttentionProjectionBackend = Literal["separate", "fused_n82_convolution"]
 
 
 class AttentionFp8Weights(NamedTuple):
@@ -40,6 +45,8 @@ class AttentionFp8Weights(NamedTuple):
     kv_b_scale: Any
     o_bits: Any
     o_scale: Any
+    qkv_a_bits: Any | None = None
+    qkv_a_scale: Any | None = None
 
 
 class DsaFp8Weights(NamedTuple):
@@ -123,6 +130,77 @@ def _empty_dsa_internals(
     )
 
 
+def _project_attention_qkv_a(
+    normalized_input: Any,
+    attention: AttentionFp8Weights,
+    *,
+    backend: AttentionProjectionBackend,
+    dsa_contract: DsaNumericalContract,
+    mla_contract: MlaNumericalContract,
+    block_shape: tuple[int, int],
+    epsilon: float,
+    linear_backend: StageLinearBackend,
+    linear_interpret: bool,
+) -> tuple[Any, Any | None]:
+    """Produce q-a and, for the DB502 path, its fused kv-a companion."""
+
+    if backend == "separate":
+        if attention.qkv_a_bits is not None or attention.qkv_a_scale is not None:
+            raise ValueError("separate attention cannot consume fused qkv-a state")
+        if (
+            attention.q_a_bits is None
+            or attention.q_a_scale is None
+            or attention.kv_a_bits is None
+            or attention.kv_a_scale is None
+        ):
+            raise ValueError("separate attention requires q-a and kv-a state")
+        q_residual = rms_norm(
+            _stage_fp8_linear(
+                normalized_input,
+                attention.q_a_bits,
+                attention.q_a_scale,
+                block_shape=block_shape,
+                backend=linear_backend,
+                interpret=linear_interpret,
+            ),
+            attention.q_a_norm_weight,
+            epsilon=epsilon,
+        )
+        return q_residual, None
+    if backend != "fused_n82_convolution":
+        raise ValueError("layer attention projection backend is unknown")
+    if attention.qkv_a_bits is None or attention.qkv_a_scale is None:
+        raise ValueError("fused attention requires packed qkv-a state")
+    if block_shape != (128, 128):
+        raise ValueError("fused attention requires 128x128 FP8 scale blocks")
+    if any(
+        value is not None
+        for value in (
+            attention.q_a_bits,
+            attention.q_a_scale,
+            attention.kv_a_bits,
+            attention.kv_a_scale,
+        )
+    ):
+        raise ValueError("fused attention must not retain separate q-a/kv-a state")
+    projected = one_row_fused_qkv_a_convolution(
+        normalized_input,
+        attention.qkv_a_bits,
+        attention.qkv_a_scale,
+        attention.q_a_norm_weight,
+        contract=FusedQkvAContract(
+            hidden_size=dsa_contract.hidden_size,
+            q_lora_rank=dsa_contract.q_lora_rank,
+            kv_a_width=(
+                mla_contract.kv_lora_rank
+                + mla_contract.qk_rope_head_dim
+            ),
+            epsilon=epsilon,
+        ),
+    )
+    return projected.q_residual, projected.kv_a_projection
+
+
 def stage_local_transformer_layer_fp8_mapped(
     residual: Any,
     kv_cache: Any,
@@ -159,6 +237,7 @@ def stage_local_transformer_layer_fp8_mapped(
     pallas_moe_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
+    attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
     """Execute exact DSA/IndexShare, sparse MLA, and dense or MoE MLP."""
@@ -217,17 +296,16 @@ def stage_local_transformer_layer_fp8_mapped(
     normalized_input = rms_norm(
         residual, input_norm_weight, epsilon=rms_norm_epsilon
     )
-    q_residual = rms_norm(
-        _stage_fp8_linear(
-            normalized_input,
-            attention.q_a_bits,
-            attention.q_a_scale,
-            block_shape=block_shape,
-            backend=linear_backend,
-            interpret=linear_interpret,
-        ),
-        attention.q_a_norm_weight,
+    q_residual, current_kv = _project_attention_qkv_a(
+        normalized_input,
+        attention,
+        backend=attention_projection_backend,
+        dsa_contract=dsa_contract,
+        mla_contract=mla_contract,
+        block_shape=block_shape,
         epsilon=lora_norm_epsilon,
+        linear_backend=linear_backend,
+        linear_interpret=linear_interpret,
     )
 
     if indexer_kind == "full":
@@ -312,6 +390,7 @@ def stage_local_transformer_layer_fp8_mapped(
         rope_theta=rope_theta,
         precomputed_normalized=normalized_input,
         precomputed_q_residual=q_residual,
+        precomputed_kv_a=current_kv,
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
     )
@@ -446,6 +525,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     pallas_moe_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
+    attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalSplitLayerFp8Result:
     """Execute one layer while preserving legacy hidden/residual association."""
@@ -506,17 +586,16 @@ def stage_local_transformer_layer_fp8_split_mapped(
         input_norm_weight,
         epsilon=rms_norm_epsilon,
     )
-    q_residual = rms_norm(
-        _stage_fp8_linear(
-            normalized_input,
-            attention.q_a_bits,
-            attention.q_a_scale,
-            block_shape=block_shape,
-            backend=linear_backend,
-            interpret=linear_interpret,
-        ),
-        attention.q_a_norm_weight,
+    q_residual, current_kv = _project_attention_qkv_a(
+        normalized_input,
+        attention,
+        backend=attention_projection_backend,
+        dsa_contract=dsa_contract,
+        mla_contract=mla_contract,
+        block_shape=block_shape,
         epsilon=lora_norm_epsilon,
+        linear_backend=linear_backend,
+        linear_interpret=linear_interpret,
     )
 
     if indexer_kind == "full":
@@ -599,6 +678,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
         rope_theta=rope_theta,
         precomputed_normalized=normalized_input,
         precomputed_q_residual=q_residual,
+        precomputed_kv_a=current_kv,
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
         add_residual=False,

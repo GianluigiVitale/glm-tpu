@@ -24,8 +24,11 @@ from glm_tpu.greenfield.checkpoint import (
     verify_runtime_packed_checkpoint,
 )
 from glm_tpu.greenfield.errors import CheckpointValidationError
+from glm_tpu.greenfield.checkpoint.runtime_feature import _transform_qkv_a
 from glm_tpu.greenfield.model import (
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    SEPARATE_QKV_A_RUNTIME_LAYOUT,
+    build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_feature_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
@@ -45,6 +48,55 @@ FEATURE_PACK_CODE_HASH = "5" * 40
 FEATURE_DESTINATION = (
     "gs://driftbench-dsv4-uc/checkpoints/greenfield/test/runtime-feature"
 )
+
+
+def test_fused_qkv_a_transform_matches_shard_major_n82_semantics() -> None:
+    q = np.arange(64 * 128, dtype=np.uint8).reshape(64, 128)
+    kv = (np.arange(32 * 128, dtype=np.uint8) + np.uint8(17)).reshape(
+        32, 128
+    )
+    observed = np.frombuffer(
+        _transform_qkv_a(
+            bytearray(q.tobytes()),
+            bytearray(kv.tobytes()),
+            q_shape=q.shape,
+            kv_shape=kv.shape,
+            destination_shape=(32, 128, 3),
+            dtype="F8_E4M3",
+            transform="fuse_qkv_a_output_shards",
+        ),
+        dtype=np.uint8,
+    ).reshape(32, 128, 3)
+    expected = np.concatenate(
+        (
+            q.reshape(32, 2, 128).transpose(0, 2, 1),
+            kv.reshape(32, 1, 128).transpose(0, 2, 1),
+        ),
+        axis=-1,
+    )
+    np.testing.assert_array_equal(observed, expected)
+
+    q_scale = np.asarray([[2.0]], dtype="<f4")
+    kv_scale = np.asarray([[5.0]], dtype="<f4")
+    observed_scale = np.frombuffer(
+        _transform_qkv_a(
+            bytearray(q_scale.tobytes()),
+            bytearray(kv_scale.tobytes()),
+            q_shape=q_scale.shape,
+            kv_shape=kv_scale.shape,
+            destination_shape=(32, 1, 5),
+            dtype="F32",
+            transform="fuse_qkv_a_expanded_scales",
+        ),
+        dtype="<f4",
+    ).reshape(32, 1, 5)
+    np.testing.assert_array_equal(
+        observed_scale,
+        np.broadcast_to(
+            np.asarray([2.0, 2.0, 2.0, 2.0, 5.0], dtype=np.float32),
+            (32, 1, 5),
+        ),
+    )
 
 
 def _runtime_stage() -> tuple[object, tuple[object, ...], dict[int, bytes], dict]:
@@ -232,6 +284,127 @@ def test_feature_runtime_stage_streams_exact_final_owner_transforms() -> None:
     assert all(source.transpose_axes == (0, 2, 1) for source in gate_record.sources)
 
 
+def test_feature_runtime_stage_streams_fused_qkv_a_from_base_files() -> None:
+    source_plan = _small_feature_source_plan()
+    source_plan = replace(
+        source_plan,
+        geometry=replace(
+            source_plan.geometry,
+            hidden_size=128,
+            q_lora_rank=128,
+            kv_lora_rank=30,
+            qk_nope_head_dim=2,
+            qk_rope_head_dim=2,
+            v_head_dim=2,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
+    source_schedule = build_pipeline_schedule(source_plan)
+    source_layout = build_decoder_runtime_weight_layout(
+        source_plan,
+        source_schedule,
+    )
+    packed_plans = _source_plans(source_layout)
+    runtime_plans = build_runtime_destination_file_plans(
+        source_layout,
+        packed_plans,
+        source_packed_manifest_sha256="a" * 64,
+    )
+    packed_by_owner = {
+        (plan.stage_id, plan.device_slot): plan for plan in packed_plans
+    }
+    source_stage = tuple(
+        plan for plan in runtime_plans if plan.stage_id == 3
+    )
+    source_bytes = {}
+    source_evidence = {}
+    for runtime_plan in source_stage:
+        packed = packed_by_owner[(3, runtime_plan.device_slot)]
+        packed_bytes = _source_file(packed)
+        output = BytesIO()
+        evidence = stream_runtime_weight_file(
+            source_plan=packed,
+            runtime_plan=runtime_plan,
+            source=BytesIO(packed_bytes),
+            output=output,
+            verified_source_file_sha256=sha256(packed_bytes).hexdigest(),
+            chunk_bytes=4096,
+        )
+        source_bytes[runtime_plan.device_slot] = output.getvalue()
+        source_evidence[runtime_plan.filename] = evidence
+
+    target_plan = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+    target_schedule = build_pipeline_schedule(target_plan)
+    target_layout = build_decoder_feature_fused_qkv_runtime_weight_layout(
+        target_plan,
+        target_schedule,
+        source_layout,
+    )
+    destination_stage = tuple(
+        plan
+        for plan in build_feature_runtime_destination_file_plans(
+            target_layout,
+            runtime_plans,
+            source_runtime_manifest_sha256="b" * 64,
+        )
+        if plan.stage_id == 3
+    )
+    outputs = {slot: BytesIO() for slot in range(4)}
+    evidence = stream_feature_runtime_stage(
+        source_plans=source_stage,
+        destination_plans=destination_stage,
+        sources={
+            slot: BytesIO(value) for slot, value in source_bytes.items()
+        },
+        outputs=outputs,
+        verified_source_file_sha256={
+            plan.filename: source_evidence[plan.filename].sha256
+            for plan in source_stage
+        },
+        source_tensor_sha256={
+            (plan.filename, tensor.name): tensor.sha256
+            for plan in source_stage
+            for tensor in source_evidence[plan.filename].tensors
+        },
+        chunk_bytes=4096,
+    )
+    destination = destination_stage[0]
+    output = outputs[0].getvalue()
+    q_name = "attention.slot_00.q_a.weight_bits"
+    kv_name = "attention.slot_00.kv_a.weight_bits"
+    packed_name = "attention.slot_00.qkv_a.weight_bits"
+    q = np.frombuffer(
+        _tensor_bytes(source_bytes[0], source_stage[0], q_name),
+        dtype=np.uint8,
+    ).reshape(128, 128)
+    kv = np.frombuffer(
+        _tensor_bytes(source_bytes[0], source_stage[0], kv_name),
+        dtype=np.uint8,
+    ).reshape(32, 128)
+    expected = np.concatenate(
+        (
+            q.reshape(32, 4, 128).transpose(0, 2, 1),
+            kv.reshape(32, 1, 128).transpose(0, 2, 1),
+        ),
+        axis=-1,
+    )
+    observed = np.frombuffer(
+        _tensor_bytes(output, destination, packed_name),
+        dtype=np.uint8,
+    ).reshape(32, 128, 5)
+    np.testing.assert_array_equal(observed, expected)
+    record = next(item for item in evidence[0].tensors if item.name == packed_name)
+    assert record.transform == "fuse_qkv_a_output_shards"
+    assert tuple(source.source_tensor_name for source in record.sources) == (
+        q_name,
+        kv_name,
+    )
+
+
 def test_feature_runtime_layout_document_and_header_bind_source() -> None:
     source_plan, _, _, _ = _runtime_stage()
     source_layout = build_decoder_runtime_weight_layout(
@@ -342,8 +515,27 @@ def test_feature_runtime_stage_refuses_truncated_authenticated_source() -> None:
         )
 
 
-def _build_feature_artifact(tmp_path: Path) -> tuple[object, object, object]:
+def _build_feature_artifact(
+    tmp_path: Path,
+    *,
+    fused_qkv_a: bool = False,
+) -> tuple[object, object, object]:
     source_plan = _small_feature_source_plan()
+    if fused_qkv_a:
+        source_plan = replace(
+            source_plan,
+            geometry=replace(
+                source_plan.geometry,
+                hidden_size=128,
+                q_lora_rank=128,
+                kv_lora_rank=30,
+                qk_nope_head_dim=2,
+                qk_rope_head_dim=2,
+                v_head_dim=2,
+                moe_intermediate_size=512,
+                fp8_block_shape=(128, 128),
+            ),
+        )
     source_root = tmp_path / "source-runtime"
     source_layout, source_packed, source_expectation, _ = _build_artifact(
         source_root,
@@ -360,11 +552,18 @@ def _build_feature_artifact(tmp_path: Path) -> tuple[object, object, object]:
         expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
     )
     target_schedule = build_pipeline_schedule(target_plan)
-    target_layout = build_decoder_feature_runtime_weight_layout(
-        target_plan,
-        target_schedule,
-        source_layout,
-    )
+    if fused_qkv_a:
+        target_layout = build_decoder_feature_fused_qkv_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            source_layout,
+        )
+    else:
+        target_layout = build_decoder_feature_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            source_layout,
+        )
     plans = build_feature_runtime_destination_file_plans(
         target_layout,
         source_checkpoint.plans,
@@ -402,6 +601,13 @@ def _build_feature_artifact(tmp_path: Path) -> tuple[object, object, object]:
         "source_tensor_count": target_layout.source_leaf_count,
         "tensor_count": len(target_layout.specs) * len(target_layout.devices),
     }
+    if (
+        target_layout.attention_projection_layout
+        != SEPARATE_QKV_A_RUNTIME_LAYOUT
+    ):
+        common["attention_projection_layout"] = (
+            target_layout.attention_projection_layout
+        )
     control: dict[str, object] = {
         "artifact_kind": FEATURE_RUNTIME_PACK_CONTROL_KIND,
         **common,
@@ -534,3 +740,32 @@ def test_feature_runtime_artifact_verifier_pins_every_transform(
             target_layout,
             source_checkpoint,
         )
+
+
+def test_fused_qkv_feature_runtime_artifact_roundtrips(
+    tmp_path: Path,
+) -> None:
+    target_layout, source_checkpoint, expectation = _build_feature_artifact(
+        tmp_path,
+        fused_qkv_a=True,
+    )
+    target_root = tmp_path / "feature-runtime"
+    verified = verify_feature_runtime_packed_checkpoint(
+        target_root,
+        expectation,
+        target_layout,
+        source_checkpoint,
+    )
+    assert len(verified.plans) == 32
+    manifest = verified.runtime_manifest
+    assert manifest["attention_projection_layout"] == (
+        target_layout.attention_projection_layout
+    )
+    first = verified.evidence_by_filename[verified.plans[0].filename]
+    fused = next(
+        tensor
+        for tensor in first["tensors"]
+        if tensor["name"] == "attention.slot_00.qkv_a.scale_inv"
+    )
+    assert fused["transform"] == "fuse_qkv_a_expanded_scales"
+    assert len(fused["sources"]) == 2

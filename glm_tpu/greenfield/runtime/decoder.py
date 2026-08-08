@@ -12,6 +12,7 @@ from typing import Any, NamedTuple
 from ..errors import PlanValidationError
 from ..kernels.layer import (
     AttentionFp8Weights,
+    AttentionProjectionBackend,
     DenseFp8Weights,
     DsaFp8Weights,
     MoeFp8Weights,
@@ -31,6 +32,8 @@ from ..model.state import DecoderStateLayout
 from ..model.weights import (
     COMPLETE_EXPERT_RUNTIME_LAYOUT,
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+    SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
 )
 from ..sharding.hlo_contract import (
@@ -174,6 +177,7 @@ class DecoderStepProgram:
     feature_reconstruct_down_fp32: bool
     linear_backend: StageLinearBackend
     dsa_query_backend: StageLinearBackend
+    attention_projection_backend: AttentionProjectionBackend
     complete_token_path: bool
     observe_dsa_events: bool
     observe_dsa_internals: bool
@@ -343,6 +347,68 @@ def _validate_pallas_feature_decoder_calls(
     }
 
 
+def _validate_fused_qkv_a_decoder_association(
+    optimized_hlo: str,
+    *,
+    layers: int,
+) -> dict[str, Any]:
+    """Require DB502's physical one-row N82 primitive in every layer."""
+
+    module = parse_hlo_module(optimized_hlo)
+    convolutions = [
+        instruction
+        for instruction in module.instructions
+        if instruction.raw_opcode == "convolution"
+        and any(
+            shape.dtype == "f32" and shape.dimensions == (1, 82)
+            for shape in instruction.result_shapes
+        )
+        and "dim_labels=bf_io->bf" in instruction.raw_line
+    ]
+    lowered = optimized_hlo.lower()
+    required_shapes = {
+        "packed_weight": "u8[32,6144,82]" in lowered,
+        "expanded_scale": "f32[32,48,82]" in lowered,
+        "one_row_input": "bf16[1,6144]" in lowered,
+        "one_row_convolution": bool(convolutions),
+    }
+    forbidden_shapes = tuple(
+        shape
+        for shape in (
+            "u8[2048,6144]",
+            "u8[576,6144]",
+            "f32[16,48]",
+            "f32[5,48]",
+            "bf16[32,6144]",
+            "f32[32,6144]",
+        )
+        if shape in lowered
+    )
+    violations = []
+    if len(convolutions) != layers:
+        violations.append(
+            "fused qkv-a convolution count drifted: "
+            f"expected={layers} observed={len(convolutions)}"
+        )
+    if not all(required_shapes.values()):
+        violations.append(
+            f"fused qkv-a HLO lacks required shapes: {required_shapes}"
+        )
+    if forbidden_shapes:
+        violations.append(
+            "fused qkv-a HLO retains separate/dead-row state: "
+            f"{forbidden_shapes}"
+        )
+    return {
+        "convolution_count": len(convolutions),
+        "expected_convolution_count": layers,
+        "forbidden_shapes": list(forbidden_shapes),
+        "passed": not violations,
+        "required_shapes": required_shapes,
+        "violations": violations,
+    }
+
+
 def _validate_dsa_query_decoder_association(
     optimized_hlo: str,
     *,
@@ -406,13 +472,22 @@ def _validate_pallas_stage_linear_decoder_calls(
     dense_layers: int,
     full_indexer_layers: int,
     dsa_query_backend: StageLinearBackend = "pallas",
+    attention_projection_backend: AttentionProjectionBackend = "separate",
 ) -> dict[str, Any]:
     """Pin every raw-FP8 attention/dense projection replacing an overlay."""
 
+    if attention_projection_backend not in (
+        "separate",
+        "fused_n82_convolution",
+    ):
+        raise PlanValidationError("attention projection HLO backend is unknown")
+    separate_qkv_a_calls = (
+        layers if attention_projection_backend == "separate" else 0
+    )
     expected_kernel_counts = {
-        "greenfield_fp8_block_matmul_m8_k6144_n2048": layers,
+        "greenfield_fp8_block_matmul_m8_k6144_n2048": separate_qkv_a_calls,
         "greenfield_fp8_block_matmul_m8_k2048_n4096": layers,
-        "greenfield_fp8_block_matmul_m8_k6144_n640": layers,
+        "greenfield_fp8_block_matmul_m8_k6144_n640": separate_qkv_a_calls,
         "greenfield_fp8_block_matmul_m8_k4096_n6144": layers,
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": layers,
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": layers,
@@ -484,6 +559,7 @@ def _validate_pallas_stage_linear_decoder_calls(
             f"Pallas: {forbidden_formatted_overlays}"
         )
     return {
+        "attention_projection_backend": attention_projection_backend,
         "expected_kernel_counts": expected_kernel_counts,
         "dsa_query_backend": dsa_query_backend,
         "forbidden_decoded_weight_overlays": forbidden_overlays,
@@ -938,6 +1014,7 @@ def validate_decoder_step_hlo(
     feature_fuse_route_weighting: bool = False,
     feature_reconstruct_down_fp32: bool = False,
     dsa_query_backend: StageLinearBackend | None = None,
+    attention_projection_backend: AttentionProjectionBackend = "separate",
     complete_token_path: bool = False,
     token_observation_candidates: int = 1,
     split_residual_state: bool = False,
@@ -982,6 +1059,13 @@ def validate_decoder_step_hlo(
         )
     if dsa_query_backend not in ("reference", "pallas"):
         raise PlanValidationError("DSA query HLO backend is unknown")
+    if attention_projection_backend not in (
+        "separate",
+        "fused_n82_convolution",
+    ):
+        raise PlanValidationError(
+            "attention projection HLO backend is unknown"
+        )
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(split_residual_state, bool):
@@ -1333,6 +1417,7 @@ def validate_decoder_step_hlo(
                 dense_layers=dense_layers,
                 full_indexer_layers=full_layers,
                 dsa_query_backend=dsa_query_backend,
+                attention_projection_backend=attention_projection_backend,
             )
         )
         violations.extend(pallas_stage_linear_contract["violations"])
@@ -1349,6 +1434,13 @@ def validate_decoder_step_hlo(
             )
         )
         violations.extend(dsa_query_association_contract["violations"])
+    fused_qkv_a_contract: dict[str, Any] = {}
+    if attention_projection_backend == "fused_n82_convolution":
+        fused_qkv_a_contract = _validate_fused_qkv_a_decoder_association(
+            optimized_hlo,
+            layers=layers,
+        )
+        violations.extend(fused_qkv_a_contract["violations"])
     return {
         "backend_contract": backend_contract,
         "collective_count": len(collectives),
@@ -1393,6 +1485,8 @@ def validate_decoder_step_hlo(
         "dsa_query_association_contract": (
             dsa_query_association_contract
         ),
+        "attention_projection_backend": attention_projection_backend,
+        "fused_qkv_a_contract": fused_qkv_a_contract,
         "passed": not violations,
         "violations": violations,
     }
@@ -1401,21 +1495,37 @@ def validate_decoder_step_hlo(
 def _attention_weights(
     weight: Any,
     slot: int,
+    projection_backend: AttentionProjectionBackend,
 ) -> AttentionFp8Weights:
     base = f"attention.slot_{slot:02d}"
+    common = {
+        "q_a_norm_weight": weight(f"{base}.q_a_norm"),
+        "q_b_bits": weight(f"{base}.q_b.weight_bits"),
+        "q_b_scale": weight(f"{base}.q_b.scale_inv"),
+        "kv_a_norm_weight": weight(f"{base}.kv_a_norm"),
+        "kv_b_bits": weight(f"{base}.kv_b.weight_bits"),
+        "kv_b_scale": weight(f"{base}.kv_b.scale_inv"),
+        "o_bits": weight(f"{base}.o.weight_bits"),
+        "o_scale": weight(f"{base}.o.scale_inv"),
+    }
+    if projection_backend == "separate":
+        return AttentionFp8Weights(
+            q_a_bits=weight(f"{base}.q_a.weight_bits"),
+            q_a_scale=weight(f"{base}.q_a.scale_inv"),
+            kv_a_bits=weight(f"{base}.kv_a.weight_bits"),
+            kv_a_scale=weight(f"{base}.kv_a.scale_inv"),
+            **common,
+        )
+    if projection_backend != "fused_n82_convolution":
+        raise ValueError("decoder attention projection backend is unknown")
     return AttentionFp8Weights(
-        weight(f"{base}.q_a.weight_bits"),
-        weight(f"{base}.q_a.scale_inv"),
-        weight(f"{base}.q_a_norm"),
-        weight(f"{base}.q_b.weight_bits"),
-        weight(f"{base}.q_b.scale_inv"),
-        weight(f"{base}.kv_a.weight_bits"),
-        weight(f"{base}.kv_a.scale_inv"),
-        weight(f"{base}.kv_a_norm"),
-        weight(f"{base}.kv_b.weight_bits"),
-        weight(f"{base}.kv_b.scale_inv"),
-        weight(f"{base}.o.weight_bits"),
-        weight(f"{base}.o.scale_inv"),
+        q_a_bits=None,
+        q_a_scale=None,
+        kv_a_bits=None,
+        kv_a_scale=None,
+        qkv_a_bits=weight(f"{base}.qkv_a.weight_bits"),
+        qkv_a_scale=weight(f"{base}.qkv_a.scale_inv"),
+        **common,
     )
 
 
@@ -1487,6 +1597,7 @@ def _execute_stage(
     pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
+    attention_projection_backend: AttentionProjectionBackend,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -1501,7 +1612,11 @@ def _execute_stage(
             layer_residual_observation = layer_residual_observation.at[
                 layer.layer_id
             ].set(residual[0])
-        attention = _attention_weights(weight, layer.stage_slot)
+        attention = _attention_weights(
+            weight,
+            layer.stage_slot,
+            attention_projection_backend,
+        )
         input_norm = weight(
             f"attention.slot_{layer.stage_slot:02d}.input_norm"
         )
@@ -1571,6 +1686,7 @@ def _execute_stage(
             ),
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            attention_projection_backend=attention_projection_backend,
         )
         residual = result.output
         if layer_residual_observation is not None:
@@ -1673,6 +1789,7 @@ def _execute_stage_split(
     pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
+    attention_projection_backend: AttentionProjectionBackend,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -1700,7 +1817,11 @@ def _execute_stage_split(
             layer_residual_observation = layer_residual_observation.at[
                 layer.layer_id
             ].set(combined_boundary()[0])
-        attention = _attention_weights(weight, layer.stage_slot)
+        attention = _attention_weights(
+            weight,
+            layer.stage_slot,
+            attention_projection_backend,
+        )
         input_norm = weight(
             f"attention.slot_{layer.stage_slot:02d}.input_norm"
         )
@@ -1769,6 +1890,7 @@ def _execute_stage_split(
             ),
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            attention_projection_backend=attention_projection_backend,
         )
         hidden_states = result.hidden_states
         residual = result.residual
@@ -1870,6 +1992,7 @@ def build_decoder_step_program(
     feature_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
+    attention_projection_backend: AttentionProjectionBackend = "separate",
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
     observe_dsa_internals: bool = False,
@@ -1929,6 +2052,13 @@ def build_decoder_step_program(
         dsa_query_backend = linear_backend
     if dsa_query_backend not in ("reference", "pallas"):
         raise PlanValidationError("decoder DSA query backend is unknown")
+    if attention_projection_backend not in (
+        "separate",
+        "fused_n82_convolution",
+    ):
+        raise PlanValidationError(
+            "decoder attention projection backend is unknown"
+        )
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(observe_dsa_events, bool):
@@ -1966,6 +2096,18 @@ def build_decoder_step_program(
             f"backend={sparse_moe_backend!r} "
             f"expected={expected_expert_layout!r} "
             f"observed={weight_layout.routed_expert_layout!r}"
+        )
+    expected_attention_layout = (
+        SEPARATE_QKV_A_RUNTIME_LAYOUT
+        if attention_projection_backend == "separate"
+        else FUSED_QKV_A_N82_RUNTIME_LAYOUT
+    )
+    if weight_layout.attention_projection_layout != expected_attention_layout:
+        raise PlanValidationError(
+            "decoder attention backend and runtime layout disagree: "
+            f"backend={attention_projection_backend!r} "
+            f"expected={expected_attention_layout!r} "
+            f"observed={weight_layout.attention_projection_layout!r}"
         )
     hashes = (
         schedule.plan_hash,
@@ -2276,6 +2418,9 @@ def build_decoder_step_program(
                             ),
                             linear_backend=linear_backend,
                             dsa_query_backend=dsa_query_backend,
+                            attention_projection_backend=(
+                                attention_projection_backend
+                            ),
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
                         ),
@@ -2326,6 +2471,9 @@ def build_decoder_step_program(
                             ),
                             linear_backend=linear_backend,
                             dsa_query_backend=dsa_query_backend,
+                            attention_projection_backend=(
+                                attention_projection_backend
+                            ),
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
                         ),
@@ -2374,6 +2522,9 @@ def build_decoder_step_program(
                             ),
                             linear_backend=linear_backend,
                             dsa_query_backend=dsa_query_backend,
+                            attention_projection_backend=(
+                                attention_projection_backend
+                            ),
                             dsa_observation=values[4],
                         ),
                         lambda values: values,
@@ -2414,6 +2565,9 @@ def build_decoder_step_program(
                         ),
                         linear_backend=linear_backend,
                         dsa_query_backend=dsa_query_backend,
+                        attention_projection_backend=(
+                            attention_projection_backend
+                        ),
                     ),
                     lambda values: values,
                     (residual, kv_cache, index_cache, metadata),
@@ -2790,6 +2944,7 @@ def build_decoder_step_program(
         feature_reconstruct_down_fp32=feature_reconstruct_down_fp32,
         linear_backend=linear_backend,
         dsa_query_backend=dsa_query_backend,
+        attention_projection_backend=attention_projection_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
         observe_dsa_internals=observe_dsa_internals,

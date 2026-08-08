@@ -358,7 +358,12 @@ def stage_local_dsa_fp8_mapped(
     local_heads = contract.num_heads // cache_layout.local_parallel_size
     if input_norm_weight.shape != (contract.hidden_size,):
         raise ValueError("DSA input norm shape is invalid")
-    if q_a_bits.shape != (contract.q_lora_rank, contract.hidden_size):
+    if (q_a_bits is None) != (q_a_scale is None):
+        raise ValueError("DSA q_a FP8 weight and scale must be supplied together")
+    if q_a_bits is not None and q_a_bits.shape != (
+        contract.q_lora_rank,
+        contract.hidden_size,
+    ):
         raise ValueError("DSA q_a FP8 shape is invalid")
     if q_a_norm_weight.shape != (contract.q_lora_rank,):
         raise ValueError("DSA q_a norm shape is invalid")
@@ -393,6 +398,8 @@ def stage_local_dsa_fp8_mapped(
     if (precomputed_normalized is None) != (precomputed_q_residual is None):
         raise ValueError("DSA shared q_a intermediates must be supplied together")
     if precomputed_normalized is None:
+        if q_a_bits is None or q_a_scale is None:
+            raise ValueError("DSA q_a FP8 state is required without intermediates")
         normalized = rms_norm(
             residual, input_norm_weight, epsilon=rms_norm_epsilon
         )
@@ -621,6 +628,7 @@ def stage_local_index_share_fp8_mapped(
     rope_theta: float = 8_000_000.0,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,
+    precomputed_kv_a: Any | None = None,
     sparse_attention_backend: Literal["reference", "pallas"] = "reference",
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(),
     sparse_attention_interpret: bool = False,
@@ -652,9 +660,15 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare selected-count shape is invalid")
     if input_norm_weight.shape != (hidden,):
         raise ValueError("IndexShare input norm shape is invalid")
-    if q_a_bits.shape[1:] != (hidden,) or q_a_bits.ndim != 2:
+    if (q_a_bits is None) != (q_a_scale is None):
+        raise ValueError(
+            "IndexShare q_a FP8 weight and scale must be supplied together"
+        )
+    if q_a_bits is not None and (
+        q_a_bits.shape[1:] != (hidden,) or q_a_bits.ndim != 2
+    ):
         raise ValueError("IndexShare q_a FP8 shape is invalid")
-    q_lora_rank = q_a_bits.shape[0]
+    q_lora_rank = q_a_norm_weight.shape[0]
     if q_a_norm_weight.shape != (q_lora_rank,):
         raise ValueError("IndexShare q_a norm shape is invalid")
     if q_b_bits.shape != (
@@ -662,7 +676,11 @@ def stage_local_index_share_fp8_mapped(
         q_lora_rank,
     ):
         raise ValueError("IndexShare local q_b FP8 shape is invalid")
-    if kv_a_bits.shape != (
+    if (kv_a_bits is None) != (kv_a_scale is None):
+        raise ValueError(
+            "IndexShare kv_a FP8 weight and scale must be supplied together"
+        )
+    if kv_a_bits is not None and kv_a_bits.shape != (
         contract.kv_lora_rank + contract.qk_rope_head_dim,
         hidden,
     ):
@@ -697,6 +715,10 @@ def stage_local_index_share_fp8_mapped(
             "IndexShare shared q_a intermediates must be supplied together"
         )
     if precomputed_normalized is None:
+        if q_a_bits is None or q_a_scale is None:
+            raise ValueError(
+                "IndexShare q_a FP8 state is required without intermediates"
+            )
         normalized = rms_norm(
             residual, input_norm_weight, epsilon=rms_norm_epsilon
         )
@@ -748,14 +770,26 @@ def stage_local_index_share_fp8_mapped(
         interleaved=True,
     )
 
-    current_kv = _stage_fp8_linear(
-        normalized,
-        kv_a_bits,
-        kv_a_scale,
-        block_shape=block_shape,
-        backend=linear_backend,
-        interpret=linear_interpret,
-    )
+    if precomputed_kv_a is None:
+        if kv_a_bits is None or kv_a_scale is None:
+            raise ValueError(
+                "IndexShare kv_a FP8 state is required without an intermediate"
+            )
+        current_kv = _stage_fp8_linear(
+            normalized,
+            kv_a_bits,
+            kv_a_scale,
+            block_shape=block_shape,
+            backend=linear_backend,
+            interpret=linear_interpret,
+        )
+    else:
+        current_kv = precomputed_kv_a
+        if current_kv.shape != (
+            1,
+            contract.kv_lora_rank + contract.qk_rope_head_dim,
+        ) or current_kv.dtype != residual.dtype:
+            raise ValueError("IndexShare precomputed kv_a projection is invalid")
     current_latent = rms_norm(
         current_kv[..., : contract.kv_lora_rank],
         kv_a_norm_weight,

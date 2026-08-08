@@ -74,6 +74,11 @@ from .moe import (
     stage_local_moe_from_routes,
 )
 from .rmsnorm import final_norm, fused_add_rms_norm, rms_norm
+from .qkv_a import (
+    FusedQkvAContract,
+    FusedQkvAProjection,
+    one_row_fused_qkv_a_convolution,
+)
 from .rotary import apply_rotary, rotary_cos_sin
 
 __all__ = (
@@ -87,6 +92,8 @@ __all__ = (
     "LegacyLocalDcpScoreInputs",
     "LegacyScoreGeometry",
     "GlmMoeNumericalContract",
+    "FusedQkvAContract",
+    "FusedQkvAProjection",
     "IndexShareSchedule",
     "IndexShareState",
     "MlaNumericalContract",
@@ -133,6 +140,7 @@ __all__ = (
     "restore_index_share_transfer",
     "rms_norm",
     "one_row_pagewise_scores",
+    "one_row_fused_qkv_a_convolution",
     "rotary_cos_sin",
     "route_glm_noaux_tc",
     "route_glm_noaux_tc_logits",
