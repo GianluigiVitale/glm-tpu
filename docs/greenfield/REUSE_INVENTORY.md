@@ -23,6 +23,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
+| Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
 | Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Rejected as an order discriminator: BF16-origin and direct-FP32-origin `wk` produce identical stored prompt keys. Preserve BF16-origin state identity in production. |
 | Layer-0 input/state | vLLM embedding/model source, TPU OOT embedding and accepted state hashes | Raw BF16 embedding row, model-epsilon input RMSNorm and adapted DSA leaves are pinned; no hidden embedding multiplier or TPU transform exists. |
@@ -173,13 +174,19 @@ accepted production boundary is only local `f32[1024,2048]` (8 MiB) before a tru
 `ea5e5c56...6c89` contains no global `f32[4096,2048]` table. Production adapts this boundary only
 for DSA `wq_b`; q-a, wk, attention, dense, and MoE remain on their existing selected backends.
 
-The corrected 8K refusal at `f129e63` now supplies the next concrete reuse boundary. Its exact
-first token and exact event-0 set preserve DB499, while event 1 introduces seven swaps and a nearly
-uniform `-0.18290268` aligned score shift. The legacy callback already accepts a generic target
-layer through `GLM_DSA_DUMP_INTERNALS_LAYER`; only the wrapper/validator target had been fixed to
-layer 0. That existing callback is now reused for layer 1, and the greenfield program exposes the
-same five already-live values for all 21 producer events only when a default-off diagnostic flag
-is armed. The prior returned-residual observers remain rejected because they changed arithmetic.
-The new offline comparator consumes sealed hashes and aligns producer IDs directly; it does not
-invent another execution path or relax exact DSA. One accepted layer-1 capture plus one greenfield
-observer run is the only current authorized model workflow.
+The corrected 8K refusal at `f129e63` supplied the next concrete reuse boundary. Its exact first
+token and exact event-0 set did not prove the full layer-0 producer: DB499 was conditional on the
+accepted q-a input. The completed all-21 observer at `380659a` instead proves production layer-0
+normalized hidden exact while q-a already differs in 494/2,048 BF16 values (max `0.015625`), with
+all 4,096 query values then different. Layer 1 is downstream: normalized hidden differs in
+3,974/6,144 values and all later observed fields differ.
+
+The accepted source mechanism is already preserved by DB491's independent diagnostic: raw FP8
+q-a and kv-a weights are packed into 32 physical output shards, each `N=82` (`64 q-a + 18 kv-a`),
+then q-a normalization reduces the 32 local 64-wide square sums. The new bounded discriminator
+reuses that exact pack and arithmetic while virtualizing the 32 shards on one stage-local device.
+It accepts only `[1,6144]`, rejects dead `[32,...]` token shapes and all collectives/callbacks, and
+tests projection (`lax.map`/`vmap`/unrolled) against four explicit norm associations. The existing
+DB499 one-host protected wrapper is parameterized for this q-a target rather than duplicated. CPU
+tests prove shape/failure/HLO plumbing only; one serialized bounded TPU run must choose an exact
+candidate before any production integration or full 8K retry.

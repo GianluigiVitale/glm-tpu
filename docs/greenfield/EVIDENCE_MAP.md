@@ -337,3 +337,19 @@ capture is still required.
   arithmetic proof.
 - Exact next evidence: one protected accepted layer-1 capture and one greenfield observer capture,
   followed by direct field alignment before another 8K decoder retry.
+
+## Completed all-event observer and corrected layer-0 boundary
+
+- Failed protected run: `...dsa_dsa_internal_trace2_20260808T093721804151742Z` at `380659a`; no
+  timing/DB/`SUCCESS`/Gate-D claim, eight byte-identical logs, authenticated 8/8 clean exit.
+- Observer identity: contract `e9d6b9c4...a19f`, all-21 tensor `0c8b021d...0f4`; sealed baseline
+  DSA observation matches the `f129e63` payload bitwise.
+- Earliest production divergence: layer-0 normalized hidden exact; q-a 494/2,048 BF16 mismatches,
+  max `0.015625`; query 4,096/4,096 mismatches. DB499 is conditional on accepted q-a input.
+- Downstream layer-1 comparison: normalized hidden 3,974/6,144 mismatches, q-a 1,156/2,048, and all
+  query/head/key values differ. Comparison/tensor/seal SHAs are `1bc43a8e...9ad5`,
+  `79b813da...9054`, and `283e5e88...0d5`; approved archive is under the failed parent result's
+  `diagnostic_comparison/layer1/` prefix.
+- Next evidence: one bounded one-host q-a association matrix reusing DB491's fused `N=82`
+  shard-major semantics, with one live row, no collective/callback, exact BF16 comparison, DB,
+  archive, and authenticated cleanup. No full decoder retry is authorized before it passes.

@@ -27,6 +27,13 @@ QaProjectionMode = Literal[
     "legacy_runtime_fused_qkv_a_global",
     "legacy_runtime_fused_qkv_a_sharded",
 ]
+VirtualQaProjectionMode = Literal["lax_map", "vmap", "unrolled"]
+VirtualQaNormMode = Literal[
+    "logical_mean",
+    "shard_sum",
+    "left_fold",
+    "topology_tree",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +193,13 @@ class LegacyTp32QaNormOutput(NamedTuple):
     qkv_a_companion_shard: Any
 
 
+class LegacyVirtualQaNormOutput(NamedTuple):
+    """One-row q-a norm plus the reconstructed fused companion."""
+
+    q_residual: Any
+    qkv_a_companion: Any
+
+
 class LegacyLocalDcpScoreInputs(NamedTuple):
     """One DCP shard's cache and metadata for the exact local XLA scorer."""
 
@@ -337,6 +351,157 @@ def _legacy_runtime_fp8_dot(lhs: Any, weight: Any, scale: Any) -> Any:
         preferred_element_type=jnp.float32,
     )
     return output.astype(lhs.dtype)
+
+
+def one_row_virtual_tp32_fused_qkv_a_rms_norm(
+    normalized_hidden: Any,
+    sharded_qkv_weight: Any,
+    sharded_qkv_scale: Any,
+    q_a_norm_weight: Any,
+    *,
+    projection_mode: VirtualQaProjectionMode,
+    norm_mode: VirtualQaNormMode,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> LegacyVirtualQaNormOutput:
+    """Emulate the accepted shard-major q-a association with one live row.
+
+    The accepted TP32 loader forms 32 independent fused output shards, each
+    containing 64 q-a columns followed by 18 kv-a companion columns.  This
+    function preserves that physical ``N=82`` dot boundary while virtualizing
+    the 32 shards on one stage-local device.  It has no collective and never
+    creates the legacy 32-token decode bucket.
+
+    The projection and norm association are explicit discriminator axes.  No
+    mode is a production default until a protected real layer-0 capture proves
+    its BF16 q-a state bitwise and its optimized HLO passes the local-only,
+    one-row contract.
+    """
+
+    shards = geometry.legacy_tensor_shards
+    if geometry.q_lora_rank % shards or (
+        geometry.qkv_a_companion_rank % shards
+    ):
+        raise ValueError("virtual TP32 fused outputs must divide the shards")
+    q_local = geometry.q_lora_rank // shards
+    companion_local = geometry.qkv_a_companion_rank // shards
+    local_output = q_local + companion_local
+    expected_shapes = {
+        "normalized_hidden": (1, geometry.hidden_size),
+        "sharded_qkv_weight": (
+            shards,
+            geometry.hidden_size,
+            local_output,
+        ),
+        "sharded_qkv_scale": (
+            shards,
+            geometry.hidden_size // 128,
+            local_output,
+        ),
+        "q_a_norm_weight": (geometry.q_lora_rank,),
+    }
+    values = {
+        "normalized_hidden": normalized_hidden,
+        "sharded_qkv_weight": sharded_qkv_weight,
+        "sharded_qkv_scale": sharded_qkv_scale,
+        "q_a_norm_weight": q_a_norm_weight,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"one-row virtual q-a {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if normalized_hidden.dtype != jnp.bfloat16 or (
+        sharded_qkv_weight.dtype != jnp.float8_e4m3fn
+    ) or sharded_qkv_scale.dtype != jnp.float32 or (
+        q_a_norm_weight.dtype != jnp.bfloat16
+    ):
+        raise ValueError("one-row virtual q-a dtype contract drifted")
+    if projection_mode not in ("lax_map", "vmap", "unrolled"):
+        raise ValueError("one-row virtual q-a projection mode is unknown")
+    if norm_mode not in (
+        "logical_mean",
+        "shard_sum",
+        "left_fold",
+        "topology_tree",
+    ):
+        raise ValueError("one-row virtual q-a norm mode is unknown")
+    if norm_mode == "topology_tree" and shards != 32:
+        raise ValueError("topology-tree q-a norm requires 32 virtual shards")
+
+    def project(weight_scale: tuple[Any, Any]) -> Any:
+        weight, scale = weight_scale
+        return _legacy_runtime_fp8_dot(
+            normalized_hidden,
+            weight,
+            scale,
+        )
+
+    with jax.named_scope(
+        f"one_row_virtual_tp32_qkv_n{local_output}_{projection_mode}"
+    ):
+        operands = (sharded_qkv_weight, sharded_qkv_scale)
+        if projection_mode == "lax_map":
+            projected = lax.map(project, operands)
+        elif projection_mode == "vmap":
+            projected = jax.vmap(project)(operands)
+        else:
+            projected = jnp.stack(
+                tuple(
+                    project(
+                        (
+                            sharded_qkv_weight[index],
+                            sharded_qkv_scale[index],
+                        )
+                    )
+                    for index in range(shards)
+                )
+            )
+
+    local_q = projected[:, :, :q_local]
+    companion = jnp.transpose(
+        projected[:, :, q_local:], (1, 0, 2)
+    ).reshape(1, geometry.qkv_a_companion_rank)
+    logical_q = jnp.transpose(local_q, (1, 0, 2)).reshape(
+        1, geometry.q_lora_rank
+    )
+    if norm_mode == "logical_mean":
+        q_residual = rms_norm(
+            logical_q,
+            q_a_norm_weight,
+            epsilon=geometry.q_norm_epsilon,
+        )
+    else:
+        local_square_sum = jnp.sum(
+            jnp.square(local_q.astype(jnp.float32)), axis=-1
+        )
+        if norm_mode == "shard_sum":
+            global_square_sum = jnp.sum(local_square_sum, axis=0)
+        elif norm_mode == "left_fold":
+            global_square_sum = jnp.zeros_like(local_square_sum[0])
+            for index in range(shards):
+                global_square_sum = (
+                    global_square_sum + local_square_sum[index]
+                )
+        else:
+            topology = local_square_sum.reshape(2, 4, 4, 1)
+            global_square_sum = jnp.sum(
+                jnp.sum(jnp.sum(topology, axis=2), axis=1), axis=0
+            )
+        inverse_rms = lax.rsqrt(
+            global_square_sum / jnp.float32(geometry.q_lora_rank)
+            + jnp.float32(geometry.q_norm_epsilon)
+        )
+        local_normalized = (
+            local_q.astype(jnp.float32) * inverse_rms[None, :, None]
+        ).astype(jnp.bfloat16)
+        full_normalized = jnp.transpose(
+            local_normalized, (1, 0, 2)
+        ).reshape(1, geometry.q_lora_rank)
+        q_residual = (
+            full_normalized * q_a_norm_weight
+        ).astype(jnp.bfloat16)
+    return LegacyVirtualQaNormOutput(q_residual, companion)
 
 
 def legacy_tp32_sharded_rms_norm(

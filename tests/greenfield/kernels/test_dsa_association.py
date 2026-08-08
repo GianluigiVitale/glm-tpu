@@ -27,6 +27,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     legacy_tp32_gspmd_fused_qkv_a_rms_norm,
     legacy_pagewise_dcp_scores,
     one_row_pagewise_scores,
+    one_row_virtual_tp32_fused_qkv_a_rms_norm,
     pack_legacy_fused_qkv_runtime_weights,
 )
 from glm_tpu.greenfield.validation.layer0_dsa_association import (
@@ -207,6 +208,91 @@ def test_legacy_runtime_fused_qkv_pack_preserves_part_per_shard_order() -> None:
         np.asarray(packed.sharded_scale[:, 0]),
         np.asarray([[2.0, 2.0, 5.0], [2.0, 2.0, 5.0]], dtype=np.float32),
     )
+
+
+def test_one_row_virtual_tp32_q_a_preserves_shard_major_n82_contract() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=32,
+        hidden_size=128,
+        q_lora_rank=64,
+        qkv_a_companion_rank=32,
+        legacy_tensor_shards=32,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    rng = np.random.default_rng(23)
+    packed = pack_legacy_fused_qkv_runtime_weights(
+        jnp.asarray(
+            rng.integers(0x20, 0x48, size=(64, 128), dtype=np.uint8)
+        ),
+        jnp.asarray([[0.0125]], dtype=jnp.float32),
+        jnp.asarray(
+            rng.integers(0x20, 0x48, size=(32, 128), dtype=np.uint8)
+        ),
+        jnp.asarray([[0.0075]], dtype=jnp.float32),
+        geometry=geometry,
+    )
+    hidden = jnp.asarray(
+        rng.normal(size=(1, 128)).astype(ml_dtypes.bfloat16)
+    )
+    norm_weight = jnp.asarray(
+        rng.uniform(0.75, 1.25, size=(64,)).astype(ml_dtypes.bfloat16)
+    )
+    outputs = []
+    for projection_mode in ("lax_map", "vmap", "unrolled"):
+        output = one_row_virtual_tp32_fused_qkv_a_rms_norm(
+            hidden,
+            packed.sharded_weight,
+            packed.sharded_scale,
+            norm_weight,
+            projection_mode=projection_mode,
+            norm_mode="shard_sum",
+            geometry=geometry,
+        )
+        assert output.q_residual.shape == (1, 64)
+        assert output.qkv_a_companion.shape == (1, 32)
+        assert output.q_residual.dtype == jnp.bfloat16
+        assert output.qkv_a_companion.dtype == jnp.bfloat16
+        outputs.append(np.asarray(output.q_residual).view(np.uint16))
+    for output in outputs[1:]:
+        np.testing.assert_array_equal(output, outputs[0])
+
+
+def test_one_row_virtual_tp32_q_a_rejects_dead_decode_rows() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=5,
+        prompt_chunk=4,
+        decode_rows=32,
+        hidden_size=128,
+        q_lora_rank=64,
+        qkv_a_companion_rank=32,
+        legacy_tensor_shards=32,
+        heads=2,
+        head_dim=4,
+        rotary_dim=2,
+        theta=64.0,
+    )
+    packed = pack_legacy_fused_qkv_runtime_weights(
+        jnp.zeros((64, 128), dtype=jnp.uint8),
+        jnp.ones((1, 1), dtype=jnp.float32),
+        jnp.zeros((32, 128), dtype=jnp.uint8),
+        jnp.ones((1, 1), dtype=jnp.float32),
+        geometry=geometry,
+    )
+    with pytest.raises(ValueError, match="normalized_hidden shape drifted"):
+        one_row_virtual_tp32_fused_qkv_a_rms_norm(
+            jnp.zeros((32, 128), dtype=jnp.bfloat16),
+            packed.sharded_weight,
+            packed.sharded_scale,
+            jnp.ones((64,), dtype=jnp.bfloat16),
+            projection_mode="vmap",
+            norm_mode="logical_mean",
+            geometry=geometry,
+        )
 
 
 def test_layer0_runtime_fp8_global_and_sharded_fused_modes_are_live() -> None:

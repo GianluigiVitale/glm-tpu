@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 07:57 UTC
+**Updated:** 2026-08-08 12:16 UTC
 
 ## Authority and isolation
 
@@ -1844,3 +1844,31 @@ warnings in 340.85 seconds. Bash syntax, ShellCheck, Python compilation, JSON an
 These are readiness facts only. Exact next: commit/push the clean pin, capture accepted layer 1
 once, run the greenfield all-event observer once, compare the five states, and change only the
 first source-backed divergent boundary before retrying protected 8K.
+
+## All-event observer corrects the causal boundary; one-row q-a probe is ready
+
+The serialized PP8 8K internal-observer run
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_dsa_internal_trace2_20260808T093721804151742Z`
+at `380659a` completed its intended fail-closed diagnostic from 09:37--11:50 UTC. Its baseline DSA
+payload is bitwise identical to the prior `f129e63` refusal, the first token remains exact, eight
+host logs are byte-identical (`dabe2c49...7806`), and the authenticated failure census is 8/8
+clean (`3b176396...dfbc`). There is no timing, DB row, `SUCCESS`, Gate-D, or performance claim.
+
+The decisive layer-0 comparison corrects the earlier DB499 interpretation. Production normalized
+hidden is bitwise exact, but q-a already differs in 494/2,048 BF16 values (max `0.015625`); all
+4,096 query values then differ. DB499 therefore proves only the `wq_b` boundary when fed the
+accepted q-a state. Layer 1 is downstream: normalized hidden differs in 3,974/6,144 values, q-a in
+1,156/2,048, and query/head/key all differ. Comparison SHA is `1bc43a8e...9ad5`, tensor SHA
+`79b813da...9054`; its seal `283e5e88...0d5` is verified under the approved parent-run
+`diagnostic_comparison/layer1/` prefix.
+
+The next bounded candidate reuses DB491's accepted source mechanism: 32 shard-major fused
+q-a/kv-a output shards of `N=82` (`64+18`) followed by explicit q-a norm association. It
+virtualizes those shards on one stage-local TPU with a true `[1,6144]` row, no collective, no host
+callback, and no legacy `[32,...]` token bucket. The existing DB499 one-host protected wrapper now
+accepts `GLM_GREENFIELD_DSA_ASSOCIATION_TARGET=q_a` and tests 12 projection/norm associations.
+Focused CPU tests pass 23/23 including the independent forced-32 test; the complete greenfield
+CPU suite passes 441 with one expected skip and two pre-existing SWIG warnings. Python, Bash,
+ShellCheck, JSON and diff checks pass. These are readiness facts only. Exact next: commit/push,
+prove the fleet idle, and run exactly one serialized bounded q-a matrix. Only a bitwise candidate
+with passing one-row/local HLO may be integrated into production before another 8K attempt.

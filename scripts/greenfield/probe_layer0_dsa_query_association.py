@@ -25,6 +25,8 @@ if str(REPO_ROOT) not in sys.path:
 from glm_tpu.greenfield.kernels.reference.dsa_association import (  # noqa: E402
     Layer0DsaProbeGeometry,
     apply_rotary,
+    one_row_virtual_tp32_fused_qkv_a_rms_norm,
+    pack_legacy_fused_qkv_runtime_weights,
     rotary_cos_sin,
 )
 from glm_tpu.greenfield.kernels.reference.fp8 import (  # noqa: E402
@@ -42,6 +44,7 @@ from glm_tpu.greenfield.validation.layer0_dsa_association import (  # noqa: E402
 
 
 ARTIFACT_KIND = "glm52_layer0_dsa_query_association"
+Q_A_ARTIFACT_KIND = "glm52_layer0_q_a_association"
 
 
 def _file_sha256(path: Path) -> str:
@@ -71,6 +74,32 @@ def _compare(actual: np.ndarray, candidate: np.ndarray) -> dict[str, Any]:
         "mismatch_count": int(np.count_nonzero(actual != candidate)),
         "p99_abs": float(np.percentile(absolute, 99)),
         "shape": list(actual.shape),
+    }
+
+
+def _compare_bfloat16_bits(
+    actual: np.ndarray, candidate: np.ndarray
+) -> dict[str, Any]:
+    if actual.shape != candidate.shape or (
+        actual.dtype != np.uint16 or candidate.dtype != np.uint16
+    ):
+        raise ValueError("q-a association comparison contract drifted")
+    actual_value = actual.view(ml_dtypes.bfloat16).astype(np.float32)
+    candidate_value = candidate.view(ml_dtypes.bfloat16).astype(np.float32)
+    delta = candidate_value - actual_value
+    absolute = np.abs(delta)
+    return {
+        "actual_sha256": _array_sha256(actual),
+        "candidate_sha256": _array_sha256(candidate),
+        "elementwise_exact": bool(np.array_equal(actual, candidate)),
+        "max_abs": float(absolute.max(initial=0.0)),
+        "mean_abs": float(absolute.mean()),
+        "mean_signed": float(delta.mean()),
+        "mismatch_count": int(np.count_nonzero(actual != candidate)),
+        "p99_abs": float(np.percentile(absolute, 99)),
+        "shape": list(actual.shape),
+        "storage_dtype": "uint16",
+        "value_dtype": "bfloat16",
     }
 
 
@@ -431,7 +460,9 @@ def _hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
         for name in (
             "all-reduce",
             "all-gather",
+            "all-to-all",
             "collective-permute",
+            "reduce-scatter",
             "host_callback",
             "xla_python_cpu_callback",
         )
@@ -468,8 +499,232 @@ def _hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
     }
 
 
+def _q_a_hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
+    lowered = hlo.lower()
+    forbidden = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    forbidden_dead_row_shapes = [
+        shape
+        for shape in (
+            "bf16[32,6144]",
+            "f32[32,6144]",
+            "bf16[32,2048]",
+            "f32[32,2048]",
+        )
+        if shape in lowered
+    ]
+    required_shapes = {
+        "one_live_hidden_row": "bf16[1,6144]" in lowered,
+        "one_live_q_a_row": "bf16[1,2048]" in lowered,
+        "shard_major_n82_weight": (
+            "f8e4m3fn[32,6144,82]" in lowered
+        ),
+        "shard_major_n82_scale": "f32[32,48,82]" in lowered,
+    }
+    return {
+        "candidate": candidate,
+        "forbidden_operations": forbidden,
+        "forbidden_dead_row_shapes": forbidden_dead_row_shapes,
+        "hlo_sha256": sha256(hlo.encode()).hexdigest(),
+        "one_live_row": True,
+        "required_shapes": required_shapes,
+        "virtual_tensor_shards": 32,
+        "passed": (
+            not forbidden
+            and not forbidden_dead_row_shapes
+            and all(required_shapes.values())
+        ),
+    }
+
+
+def _q_a_candidate_modes() -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (projection_mode, norm_mode)
+        for projection_mode in ("lax_map", "vmap", "unrolled")
+        for norm_mode in (
+            "logical_mean",
+            "shard_sum",
+            "left_fold",
+            "topology_tree",
+        )
+    )
+
+
+def _run_q_a_matrix(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+    capture: dict[str, Any],
+    captured_normalized_bits: np.ndarray,
+    captured_q_bits: np.ndarray,
+    input_manifest: dict[str, Any],
+    q_manifest: dict[str, Any],
+    arrays: dict[str, np.ndarray],
+) -> None:
+    geometry = Layer0DsaProbeGeometry()
+    normalized = jnp.asarray(
+        captured_normalized_bits.view(ml_dtypes.bfloat16)[None, :]
+    )
+    q_a_bits = jnp.asarray(arrays["self_attn__q_a_proj__weight"])
+    q_a_scale = jnp.asarray(
+        arrays["self_attn__q_a_proj__weight_scale_inv"]
+    )
+    kv_a_bits = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight"]
+    )
+    kv_a_scale = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"]
+    )
+    q_a_norm_weight = jnp.asarray(
+        arrays["self_attn__q_a_layernorm__weight"].view(
+            ml_dtypes.bfloat16
+        )
+    )
+    pack_function = jax.jit(
+        lambda q_bits, q_scale, kv_bits, kv_scale: (
+            pack_legacy_fused_qkv_runtime_weights(
+                q_bits,
+                q_scale,
+                kv_bits,
+                kv_scale,
+                geometry=geometry,
+            )
+        )
+    )
+    packed = pack_function(q_a_bits, q_a_scale, kv_a_bits, kv_a_scale)
+    jax.block_until_ready(packed)
+    if packed.sharded_weight.shape != (32, 6144, 82) or (
+        packed.sharded_scale.shape != (32, 48, 82)
+    ):
+        raise SystemExit("virtual q-a shard-major packing drifted")
+
+    args.hlo_dir.mkdir(parents=True)
+    records: dict[str, Any] = {}
+    tensor_payload: dict[str, np.ndarray] = {
+        "accepted_q_a_bfloat16_bits": captured_q_bits,
+        "accepted_normalized_hidden_bfloat16_bits": (
+            captured_normalized_bits
+        ),
+    }
+    for projection_mode, norm_mode in _q_a_candidate_modes():
+        name = f"virtual_{projection_mode}_{norm_mode}_m1_n82"
+        function = jax.jit(
+            lambda hidden, weight, scale, norm_weight,
+            projection_mode=projection_mode,
+            norm_mode=norm_mode: (
+                one_row_virtual_tp32_fused_qkv_a_rms_norm(
+                    hidden,
+                    weight,
+                    scale,
+                    norm_weight,
+                    projection_mode=projection_mode,
+                    norm_mode=norm_mode,
+                    geometry=geometry,
+                )
+            )
+        )
+        compiled = function.lower(
+            normalized,
+            packed.sharded_weight,
+            packed.sharded_scale,
+            q_a_norm_weight,
+        ).compile()
+        hlo = compiled.as_text()
+        contract = _q_a_hlo_contract(hlo, candidate=name)
+        if not contract["passed"]:
+            raise SystemExit(f"q-a association HLO failed: {name}")
+        output = compiled(
+            normalized,
+            packed.sharded_weight,
+            packed.sharded_scale,
+            q_a_norm_weight,
+        )
+        jax.block_until_ready(output)
+        candidate = np.ascontiguousarray(
+            np.asarray(output.q_residual)[0]
+        ).view(np.uint16)
+        companion = np.ascontiguousarray(
+            np.asarray(output.qkv_a_companion)[0]
+        ).view(np.uint16)
+        records[name] = {
+            "comparison": _compare_bfloat16_bits(
+                captured_q_bits, candidate
+            ),
+            "companion_bfloat16_bits_sha256": _array_sha256(companion),
+            "hlo": contract,
+        }
+        tensor_payload[f"candidate__{name}"] = candidate
+        tensor_payload[f"companion__{name}"] = companion
+        (args.hlo_dir / f"{name}.optimized_hlo.txt").write_text(hlo)
+
+    exact = sorted(
+        name
+        for name, record in records.items()
+        if record["comparison"]["elementwise_exact"]
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "q_a_candidates.npz"
+    np.savez(tensor_path, **tensor_payload)
+    result = {
+        "artifact_kind": Q_A_ARTIFACT_KIND,
+        "association_restored": bool(exact),
+        "backend": jax.default_backend(),
+        "candidates": records,
+        "capture": {
+            "comparison_sha256": args.capture_comparison_sha256,
+            "normalized_hidden_sha256": _array_sha256(
+                captured_normalized_bits
+            ),
+            "owner_actual_sha256": capture["owner_actual_sha256"],
+            "q_a_sha256": _array_sha256(captured_q_bits),
+            "tensors_sha256": args.capture_tensors_sha256,
+        },
+        "claim_scope": (
+            "Bounded layer-0 one-row q-a arithmetic only; no decoder, "
+            "Gate-D, latency, or token-rate claim."
+        ),
+        "code_hash": code_hash,
+        "device_count": jax.device_count(),
+        "device_kind": sorted(
+            {device.device_kind for device in jax.devices()}
+        ),
+        "diagnostic_only": True,
+        "exact_candidates": exact,
+        "format_version": 1,
+        "input_manifest_sha256": input_manifest["manifest_sha256"],
+        "local_output_width": 82,
+        "one_live_row": True,
+        "performance_claim": False,
+        "q_a_manifest_sha256": q_manifest["manifest_sha256"],
+        "status": "SUCCESS",
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+        "virtual_tensor_shards": 32,
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--target", choices=("query", "q_a"), default="query"
+    )
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--capture-dir", type=Path, required=True)
     parser.add_argument("--capture-comparison-sha256", required=True)
@@ -510,8 +765,16 @@ def main() -> None:
     with np.load(tensors_path, allow_pickle=False) as payload:
         actual_query = np.asarray(payload["actual__query"], dtype=np.float32)
         captured_q_bits = np.ascontiguousarray(payload["actual__q_a_state"])
+        captured_normalized_bits = np.ascontiguousarray(
+            payload["actual__normalized_hidden"]
+        )
     if actual_query.shape != (32, 128) or captured_q_bits.shape != (2048,):
         raise SystemExit("captured query/q-a shape drifted")
+    if captured_normalized_bits.shape != (6144,) or (
+        captured_normalized_bits.dtype != np.uint16
+        or captured_q_bits.dtype != np.uint16
+    ):
+        raise SystemExit("captured normalized/q-a storage contract drifted")
 
     input_manifest, arrays = inspect_layer0_dsa_association_input(
         args.input_dir,
@@ -525,6 +788,19 @@ def main() -> None:
     )
     if not np.array_equal(q_bits[0], captured_q_bits):
         raise SystemExit("sealed distributed q-a row disagrees with capture")
+
+    if args.target == "q_a":
+        _run_q_a_matrix(
+            args=args,
+            code_hash=code_hash,
+            capture=capture,
+            captured_normalized_bits=captured_normalized_bits,
+            captured_q_bits=captured_q_bits,
+            input_manifest=input_manifest,
+            q_manifest=q_manifest,
+            arrays=arrays,
+        )
+        return
 
     q_state = jnp.asarray(
         np.ascontiguousarray(q_bits).view(ml_dtypes.bfloat16)

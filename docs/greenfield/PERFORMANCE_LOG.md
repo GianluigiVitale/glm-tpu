@@ -903,3 +903,14 @@ selected-set swaps and an aligned common-score mean/signed delta of
 final `SUCCESS`, or Gate-D result. Its eight logs agree byte-for-byte and cleanup is 8/8 clean.
 The last accepted PP8 decoder performance therefore remains DB484 at `244.091151 ms` p50 and
 `4.096830 tok/s`; Gate E is still not passed.
+
+## All-event 8K observer refusal — no performance result
+
+Protected diagnostic
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_dsa_internal_trace2_20260808T093721804151742Z`
+at `380659a` repeated the sealed `f129e63` DSA payload bitwise and stopped before timing. It proves
+the first production divergence is layer-0 q-a state (494/2,048 BF16 mismatches, max `0.015625`),
+not the later DB499 `wq_b` projection. The layer-1 comparison is downstream and diagnostic only.
+There is no latency distribution, tok/s, DB row, `SUCCESS`, or Gate-D result. The parent artifacts
+and comparison are hash-sealed in the approved bucket and cleanup is 8/8 clean. DB484 remains the
+only accepted PP8 decoder performance result; Gate E remains open.

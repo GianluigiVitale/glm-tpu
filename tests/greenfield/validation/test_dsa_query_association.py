@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import ml_dtypes
 import numpy as np
 
 
@@ -58,6 +59,50 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
     }
 
 
+def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
+    assert set(subject._q_a_candidate_modes()) == {
+        (projection, norm)
+        for projection in ("lax_map", "vmap", "unrolled")
+        for norm in (
+            "logical_mean",
+            "shard_sum",
+            "left_fold",
+            "topology_tree",
+        )
+    }
+    accepted = np.asarray(
+        [0.0, 1.0, -2.5], dtype=ml_dtypes.bfloat16
+    ).view(np.uint16)
+    exact = subject._compare_bfloat16_bits(accepted, accepted.copy())
+    assert exact["elementwise_exact"]
+    candidate = accepted.copy()
+    candidate[1] = np.asarray(
+        [1.0078125], dtype=ml_dtypes.bfloat16
+    ).view(np.uint16)[0]
+    divergent = subject._compare_bfloat16_bits(accepted, candidate)
+    assert not divergent["elementwise_exact"]
+    assert divergent["mismatch_count"] == 1
+
+    hlo = (
+        "bf16[1,6144] bf16[1,2048] "
+        "f8e4m3fn[32,6144,82] f32[32,48,82]"
+    )
+    contract = subject._q_a_hlo_contract(
+        hlo, candidate="virtual_vmap_shard_sum_m1_n82"
+    )
+    assert contract["passed"]
+    dead = subject._q_a_hlo_contract(
+        hlo + " bf16[32,6144]",
+        candidate="virtual_vmap_shard_sum_m1_n82",
+    )
+    assert not dead["passed"]
+    collective = subject._q_a_hlo_contract(
+        hlo + " reduce-scatter",
+        candidate="virtual_vmap_shard_sum_m1_n82",
+    )
+    assert not collective["passed"]
+
+
 def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
     source = WRAPPER.read_text()
     for required in (
@@ -73,6 +118,9 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "results_ckpt.db",
         "remote_objects.json",
         "performance_claim",
+        "GLM_GREENFIELD_DSA_ASSOCIATION_TARGET",
+        "--target \"$TARGET\"",
+        "q_a_candidates.npz",
     ):
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):

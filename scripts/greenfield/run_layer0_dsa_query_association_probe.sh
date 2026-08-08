@@ -18,11 +18,23 @@ readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e
 readonly DISTRIBUTED_Q_A_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact
 readonly DISTRIBUTED_Q_A_MANIFEST_SHA=7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c43dcded7d809120e30d8c16
 readonly DISTRIBUTED_Q_A_CODE_HASH=ea879a24d196f61e238a22ee5bb393d3b6fa938d
+readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
+
+[[ $TARGET == query || $TARGET == q_a ]] || {
+  echo "DSA association target must be query or q_a" >&2
+  exit 2
+}
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
+if [[ $TARGET == q_a ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_q_a_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=q_a_association
+else
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=dsa_query_association
+fi
 RUN_DIR=/home/gianl/glm-run/$TAG
-REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/dsa_query_association/8k/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/$REMOTE_KIND/8k/$TAG
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing query association outside $BRANCH" >&2
@@ -58,7 +70,7 @@ flock -n 9 || {
 
 mkdir -p "$RUN_DIR"
 say() {
-  echo "[dsa-query-association $(date -u +%H:%M:%S)] $*" |
+  echo "[dsa-${TARGET}-association $(date -u +%H:%M:%S)] $*" |
     tee -a "$RUN_DIR/orchestrator.log"
 }
 
@@ -76,7 +88,7 @@ strict_census() {
   # shellcheck disable=SC2016
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname)"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; else echo "CENSUS_OK $(hostname)"; fi'
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[c]ompile_short_decoder[.]py|[p]robe_layer0_dsa_query_association[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname)"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
     --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
@@ -96,7 +108,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "PIN=$PIN RUN_DIR=$RUN_DIR"
+say "PIN=$PIN TARGET=$TARGET RUN_DIR=$RUN_DIR"
 say "CAPTURE=$CAPTURE_ROOT REMOTE_PREFIX=$REMOTE_PREFIX"
 strict_census pre || {
   say "ABORT: fleet is not eight-host zero work"
@@ -112,6 +124,7 @@ env JAX_PLATFORMS=tpu \
   timeout --signal=TERM --kill-after=60 1800 \
   /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/probe_layer0_dsa_query_association.py" \
+  --target "$TARGET" \
   --expected-code-hash "$PIN" \
   --capture-dir "$CAPTURE_DIR" \
   --capture-comparison-sha256 "$CAPTURE_COMPARISON_SHA" \
@@ -127,7 +140,7 @@ elapsed=$(( $(date +%s) - started ))
 say "query matrix completed in ${elapsed}s"
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
-  "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" <<'PY'
+  "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$TARGET" <<'PY'
 from __future__ import annotations
 
 import json
@@ -135,30 +148,39 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, db_path, repo, elapsed = sys.argv[1:]
+run_dir, pin, db_path, repo, elapsed, target = sys.argv[1:]
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
-expected_candidates = {
-    "global_m32_n4096",
-    "global_m1_n4096",
-    "head_lax_map_m32_n128",
-    "head_vmap_m32_n128",
-    "head_unrolled_m32_n128",
-    "head_fori_m32_n128",
-    "head_lax_map_highest_m32_n128",
-    "head_lax_map_m1_n128",
-    "head_unrolled_m1_n128",
-    "lp4_unrolled_m32_n1024",
-    "lp4_unrolled_m1_n1024",
-    "pallas_global_m1_n4096",
-    "pallas_lp4_m1_n1024",
-    "pallas_vector_global_m1_n4096",
-    "pallas_vector_lp4_m1_n1024",
-    "raw_lookup_global_m1_n128_tiles",
-    "raw_lookup_lp4_m1_n128_tiles",
-    "raw_materialized_global_m1_n4096",
-    "raw_materialized_lp4_m1_n1024",
-}
+if target == "q_a":
+    expected_candidates = {
+        f"virtual_{projection}_{norm}_m1_n82"
+        for projection in ("lax_map", "vmap", "unrolled")
+        for norm in (
+            "logical_mean", "shard_sum", "left_fold", "topology_tree"
+        )
+    }
+else:
+    expected_candidates = {
+        "global_m32_n4096",
+        "global_m1_n4096",
+        "head_lax_map_m32_n128",
+        "head_vmap_m32_n128",
+        "head_unrolled_m32_n128",
+        "head_fori_m32_n128",
+        "head_lax_map_highest_m32_n128",
+        "head_lax_map_m1_n128",
+        "head_unrolled_m1_n128",
+        "lp4_unrolled_m32_n1024",
+        "lp4_unrolled_m1_n1024",
+        "pallas_global_m1_n4096",
+        "pallas_lp4_m1_n1024",
+        "pallas_vector_global_m1_n4096",
+        "pallas_vector_lp4_m1_n1024",
+        "raw_lookup_global_m1_n128_tiles",
+        "raw_lookup_lp4_m1_n128_tiles",
+        "raw_materialized_global_m1_n4096",
+        "raw_materialized_lp4_m1_n1024",
+    }
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("query association status/code identity failed")
 if runner["backend"] != "tpu" or runner["device_count"] != 4:
@@ -169,6 +191,19 @@ if runner["performance_claim"] is not False or not runner["diagnostic_only"]:
     raise SystemExit("query association made a performance claim")
 if any(not value["hlo"]["passed"] for value in runner["candidates"].values()):
     raise SystemExit("query association HLO contract failed")
+if target == "q_a":
+    tensor = run_dir / runner["tensor_file"]["filename"]
+    from hashlib import sha256
+    if (
+        not runner["one_live_row"]
+        or runner["virtual_tensor_shards"] != 32
+        or runner["local_output_width"] != 82
+        or not tensor.is_file()
+        or tensor.stat().st_size != runner["tensor_file"]["byte_count"]
+        or sha256(tensor.read_bytes()).hexdigest()
+        != runner["tensor_file"]["sha256"]
+    ):
+        raise SystemExit("q-a association tensor/one-row contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -176,10 +211,10 @@ import provenance as pv
 connection = pv.connect(db_path)
 run_id = pv.start_run(
     connection,
-    model="zai-org/GLM-5.2-FP8:greenfield-layer0-dsa-query-association",
-    revision="bounded-real-layer0-v1-query-association",
+    model=f"zai-org/GLM-5.2-FP8:greenfield-layer0-{target}-association",
+    revision=f"bounded-real-layer0-v1-{target}-association",
     env={
-        "GLM_ENGINE": "greenfield_layer0_dsa_query_association",
+        "GLM_ENGINE": f"greenfield_layer0_{target}_association",
         "greenfield_code_hash": pin,
         "capture_owner_actual_sha256": runner["capture"][
             "owner_actual_sha256"
@@ -188,17 +223,17 @@ run_id = pv.start_run(
         "q_a_manifest_sha256": runner["q_a_manifest_sha256"],
         "device_kind": runner["device_kind"],
     },
-    note="Protected layer-0 8K DSA query association diagnostic.",
+    note=f"Protected layer-0 8K DSA {target} association diagnostic.",
     harness_repo=repo,
     fork_repo=None,
 )
 pv.record_item(
     connection,
     run_id,
-    benchmark="greenfield_layer0_dsa_query_association",
-    item_id="layer0_position8155_query",
-    prompt="Sealed exact q-a state, wq_b state, and accepted query.",
-    gold="Elementwise-exact accepted query projection association.",
+    benchmark=f"greenfield_layer0_{target}_association",
+    item_id=f"layer0_position8155_{target}",
+    prompt=f"Sealed accepted layer-0 {target} state and source weights.",
+    gold=f"Elementwise-exact accepted {target} association.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=json.dumps(runner["exact_candidates"], sort_keys=True),
     correct=bool(runner["association_restored"]),
@@ -208,7 +243,7 @@ pv.record_item(
 pv.finalize(
     connection,
     run_id,
-    benchmark="greenfield_layer0_dsa_query_association",
+    benchmark=f"greenfield_layer0_{target}_association",
     metric="diagnostic_completed",
     value=1.0,
     note="No decoder, Gate-D, latency, or token-rate claim.",
@@ -216,6 +251,7 @@ pv.finalize(
 connection.close()
 summary = {
     "status": "SUCCESS",
+    "target": target,
     "code_hash": pin,
     "elapsed_seconds": int(elapsed),
     "results_db_run_id": run_id,
@@ -249,6 +285,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
   find hlo -type f -print0 | sort -z | xargs -0 sha256sum
+  if [[ -f q_a_candidates.npz ]]; then
+    sha256sum q_a_candidates.npz
+  fi
   sha256sum runner.json runner.log summary.json results_ckpt.db \
     census_pre.txt census_post.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
@@ -295,7 +334,7 @@ PY
 gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
   "$REMOTE_PREFIX/remote_objects.json" >/dev/null
 
-/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" <<'PY'
+/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" "$TARGET" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -304,7 +343,11 @@ import sys
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
 values = {
-    "artifact_kind": "glm52_layer0_dsa_query_association",
+    "artifact_kind": (
+        "glm52_layer0_q_a_association"
+        if sys.argv[4] == "q_a"
+        else "glm52_layer0_dsa_query_association"
+    ),
     "code_hash": sys.argv[3],
     "results_db_run_id": summary["results_db_run_id"],
     "association_restored": str(summary["association_restored"]).lower(),

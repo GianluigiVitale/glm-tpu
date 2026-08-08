@@ -14,9 +14,19 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   `1e-6`.
 - The DSA `wq_b` reference path materializes only the complete topology-local
   FP32 owner shard before its true-row projection. Protected DB499 proves this
-  association bitwise against the accepted layer-0 query; streamed N=128 and
+  association bitwise **when its input is the accepted q-a state**; it does not
+  prove that the production q-a producer is exact. Streamed N=128 and
   MXU/Pallas alternatives remain default-off because DB495--DB498 are not
   elementwise exact. PP8 never reconstructs the global `wq_b` matrix.
+- The sealed all-event observer proves production layer-0 normalized hidden is
+  bitwise exact but its q-a state differs in 494/2,048 BF16 values (max
+  `0.015625`). The accepted source uses 32 shard-major fused q-a/kv-a dots with
+  physical width `N=82` (`64 q-a + 18 kv-a`) before distributed RMSNorm.
+  Greenfield may virtualize that association inside one local stage only with
+  a true `[1,6144]` row, no full-pod collective, and no `[32,...]` token bucket.
+  The 32-way diagnostic collective itself remains forbidden in production.
+  Projection and norm association stay default-off until a bounded TPU probe
+  matches the accepted BF16 q-a state elementwise.
 - The accepted fused residual-add/RMSNorm boundary first adds the two BF16
   inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
   the independently carried residual is the same sum rounded to BF16. A

@@ -5486,3 +5486,31 @@ tests pass 2/2, and the complete CPU-only greenfield suite passes 437 with one e
 two existing SWIG warnings in 340.85 seconds. Next: clean commit/push, one accepted layer-1
 capture, one greenfield observer run, then a correction limited to the first field proved
 divergent.
+
+## 2026-08-08 12:16 — All-event observer finds layer-0 q-a first; local one-row discriminator ready
+
+The protected PP8 8K observer at `380659a` completed its intended refusal after 2h13m. Its sealed
+DSA payload is bitwise identical to `f129e63`, first token remains exact, all eight logs are
+byte-identical (`dabe2c49...7806`), and cleanup is 8/8 clean (`3b176396...dfbc`). It has no timed
+window, DB row, final `SUCCESS`, Gate-D, or performance claim.
+
+The layer-0 accepted comparison changes the causal result: normalized hidden is exact, but
+production q-a differs in 494/2,048 BF16 values (max `0.015625`); query then differs in all 4,096
+values. DB499 was evaluated with the already-accepted q-a artifact and therefore proves only its
+local FP32 `wq_b` projection boundary, not the complete production query producer. Layer 1 is
+downstream: normalized hidden differs 3,974/6,144, q-a 1,156/2,048, query 4,096/4,096, head weights
+32/32 and key 128/128. The comparison/tensor/seal SHAs are `1bc43a8e...9ad5`,
+`79b813da...9054`, and `283e5e88...0d5`; all four comparison files were uploaded with no-clobber
+and verified byte-for-byte in the approved parent-run prefix.
+
+The smallest correction search reuses DB491 rather than reconstructing the model. The accepted
+loader forms 32 fused q-a/kv-a output shards, each physical `N=82` (`64 q-a + 18 kv-a`), and
+normalizes the 32 q-a shards. A new default-off reference virtualizes exactly those shards inside
+one stage-local device, requires a true `[1,6144]` row, and exposes projection mapping plus norm
+association explicitly. It rejects all collectives/callbacks and dead `[32,...]` token shapes.
+The existing DB499 protected one-host wrapper is parameterized with target `q_a`; 12 bounded
+associations are compiled and compared bitwise to the accepted q-a state. Focused CPU tests pass
+23/23 including the independent forced-32 case; the complete greenfield CPU suite passes 441 with
+one expected skip and two pre-existing SWIG warnings. Python compilation, Bash syntax, ShellCheck,
+JSON and diff checks pass. This is readiness only. Exact next: commit/push and run one serialized
+bounded q-a matrix; only an exact one-row/local-HLO candidate may enter production.
