@@ -601,6 +601,10 @@ def validate_prompt_index_key_association_hlo(
             "xla",
             "multiply_rsqrt",
         ),
+        "accepted_xla_m2048_chunk_parameter_divide_sqrt": (
+            "xla_chunk",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -611,7 +615,7 @@ def validate_prompt_index_key_association_hlo(
             prompt_token_count=prompt_token_count,
             unique_token_count=unique_token_count,
         )
-    else:
+    elif backend == "xla":
         lowered = optimized_hlo.lower()
         convolution_lines = [
             line
@@ -694,6 +698,88 @@ def validate_prompt_index_key_association_hlo(
             "forbidden_operations": forbidden_operations,
             "forbidden_shapes": forbidden_shapes,
             "outer_map_while_count": len(while_lines),
+            "passed": not violations,
+            "required_shapes": required_shapes,
+            "violations": violations,
+        }
+    else:
+        lowered = optimized_hlo.lower()
+        convolution_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(
+                rf"= f32\[{prompt_chunk},128\].* convolution\(", line
+            )
+            and "dim_labels=bf_oi->bf" in line
+        ]
+        while_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(r"\bwhile\(", line)
+        ]
+        forbidden_operations = {
+            name: lowered.count(name)
+            for name in (
+                "all-reduce",
+                "all-gather",
+                "all-to-all",
+                "collective-permute",
+                "reduce-scatter",
+                "host_callback",
+                "xla_python_cpu_callback",
+                "tpu_custom_call",
+            )
+            if name in lowered
+        }
+        forbidden_shapes = [
+            shape
+            for shape in (
+                "bf16[32,6144]",
+                "f32[32,6144]",
+                f"bf16[{prompt_token_count},6144]",
+                f"f32[{prompt_token_count},6144]",
+                "bf16[8192,6144]",
+                "f32[8192,6144]",
+                "bf16[4,2048,6144]",
+                "f32[4,2048,6144]",
+            )
+            if shape in lowered
+        ]
+        required_shapes = {
+            "accepted_adapted_wk": "f32[128,6144]" in lowered,
+            "chunk_hidden": f"bf16[{prompt_chunk},6144]" in lowered,
+            "chunk_positions": f"s32[{prompt_chunk}]" in lowered,
+            "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
+            "chunk_key_output": f"bf16[{prompt_chunk},128]" in lowered,
+        }
+        violations = []
+        if len(convolution_lines) != 1:
+            violations.append(
+                "expected one chunk-parameter M2048 wk convolution, "
+                f"found {len(convolution_lines)}"
+            )
+        if while_lines:
+            violations.append(
+                f"expected no chunk-program loop, found {len(while_lines)}"
+            )
+        if forbidden_operations:
+            violations.append(
+                f"forbidden operations: {forbidden_operations}"
+            )
+        if forbidden_shapes:
+            violations.append(
+                f"forbidden full-prompt/dead-row shapes: {forbidden_shapes}"
+            )
+        missing = sorted(
+            name for name, present in required_shapes.items() if not present
+        )
+        if missing:
+            violations.append(f"missing chunk-parameter HLO shapes: {missing}")
+        result = {
+            "accepted_convolution_count": len(convolution_lines),
+            "forbidden_operations": forbidden_operations,
+            "forbidden_shapes": forbidden_shapes,
+            "loop_count": len(while_lines),
             "passed": not violations,
             "required_shapes": required_shapes,
             "violations": violations,

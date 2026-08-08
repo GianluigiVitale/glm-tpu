@@ -271,6 +271,26 @@ ENTRY main {
     assert "bf16[4,2048,6144]" in result["forbidden_shapes"]
 
 
+def test_prompt_key_chunk_parameter_hlo_has_no_loop_or_full_prompt() -> None:
+    hlo = """
+ENTRY main {
+  %hidden = bf16[2048,6144]{1,0} parameter(0)
+  %positions = s32[2048]{0} parameter(1)
+  %wk = f32[128,6144]{1,0} parameter(2)
+  %projection = f32[2048,128]{1,0} convolution(%hidden, %wk), dim_labels=bf_oi->bf
+  %root = f32[1]{0} sqrt(%projection)
+  %normalized = f32[1]{0} divide(%projection, %root)
+  ROOT %keys = bf16[2048,128]{1,0} convert(%normalized)
+}
+"""
+    result = validate_prompt_index_key_association_hlo(
+        hlo,
+        candidate="accepted_xla_m2048_chunk_parameter_divide_sqrt",
+    )
+    assert result["passed"] is True
+    assert result["loop_count"] == 0
+
+
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
     repo = Path(__file__).resolve().parents[3]
     probe = repo / "scripts/greenfield/probe_layer0_prompt_index_cache.py"
@@ -357,6 +377,8 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "production_pallas_m1_divide_sqrt",
         "accepted_xla_m2048_divide_sqrt",
         "accepted_xla_m2048_multiply_rsqrt",
+        "accepted_xla_m2048_chunk_parameter_divide_sqrt",
+        "--candidate-set",
         "layer0_prompt_index_keys_chunked",
         "validate_prompt_index_key_association_hlo",
         '"performance_claim": False',
@@ -367,6 +389,11 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "SOURCE_ITEM_ROW_ID=1789",
         "SOURCE_CACHE_MANIFEST_SHA=d869f6cf",
         "SOURCE_COMPARISON_MANIFEST_SHA=b1822e71",
+        "MATRIX_RUN_ID=507",
+        "MATRIX_ASSOCIATION_MANIFEST_SHA=7216756c",
+        "matrix_validation.json",
+        "GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE",
+        '--candidate-set "$PROFILE"',
         "probe_layer0_prompt_index_cache_association.py",
         "strict_census post",
         '"performance_claim": "false"',

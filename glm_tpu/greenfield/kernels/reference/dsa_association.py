@@ -1119,6 +1119,67 @@ def layer0_decode_normalized_hidden(
     )
 
 
+def layer0_prompt_index_key_chunk(
+    hidden_chunk: Any,
+    positions: Any,
+    input_norm_weight: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+    key_norm_mode: KeyNormMode = "divide_sqrt",
+) -> Any:
+    """Build one already-live layer-0 prefill chunk of index keys."""
+
+    expected_shapes = {
+        "hidden_chunk": (geometry.prompt_chunk, geometry.hidden_size),
+        "positions": (geometry.prompt_chunk,),
+        "input_norm_weight": (geometry.hidden_size,),
+        "wk_weight": (geometry.head_dim, geometry.hidden_size),
+        "key_norm_weight": (geometry.head_dim,),
+        "key_norm_bias": (geometry.head_dim,),
+    }
+    values = {
+        "hidden_chunk": hidden_chunk,
+        "positions": positions,
+        "input_norm_weight": input_norm_weight,
+        "wk_weight": wk_weight,
+        "key_norm_weight": key_norm_weight,
+        "key_norm_bias": key_norm_bias,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 prompt-key chunk {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if hidden_chunk.dtype != jnp.bfloat16 or (
+        input_norm_weight.dtype != jnp.bfloat16
+    ) or key_norm_weight.dtype != jnp.bfloat16 or (
+        key_norm_bias.dtype != jnp.bfloat16
+    ):
+        raise ValueError("layer-0 prompt-key chunk hidden/norms must be BF16")
+    if positions.dtype != jnp.int32:
+        raise ValueError("layer-0 prompt-key chunk positions must remain int32")
+    if wk_weight.dtype != jnp.float32:
+        raise ValueError("layer-0 accepted adapted wk must remain FP32")
+    normalized = rms_norm(
+        hidden_chunk,
+        input_norm_weight,
+        epsilon=geometry.rms_norm_epsilon,
+    )
+    return _project_keys(
+        normalized,
+        positions,
+        wk_weight,
+        key_norm_weight,
+        key_norm_bias,
+        geometry=geometry,
+        key_norm_mode=key_norm_mode,
+    )
+
+
 def layer0_prompt_index_keys_chunked(
     unique_embeddings: Any,
     prompt_embedding_rows: Any,
@@ -1190,14 +1251,10 @@ def layer0_prompt_index_keys_chunked(
     def prompt_key_chunk(inputs: tuple[Any, Any]) -> Any:
         embedding_rows, positions = inputs
         hidden = jnp.take(unique_embeddings, embedding_rows, axis=0)
-        normalized = rms_norm(
+        return layer0_prompt_index_key_chunk(
             hidden,
-            input_norm_weight,
-            epsilon=geometry.rms_norm_epsilon,
-        )
-        return _project_keys(
-            normalized,
             positions,
+            input_norm_weight,
             wk_weight,
             key_norm_weight,
             key_norm_bias,

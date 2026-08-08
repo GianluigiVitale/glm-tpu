@@ -32,15 +32,35 @@ readonly SOURCE_CACHE_MANIFEST_SHA=d869f6cf038e708541fa2e5633812ae00accb4fa3f31e
 readonly SOURCE_COMPARISON_MANIFEST_SHA=b1822e71e12cf316e895538caa1dc4680672531c0378bfb7256d0314d6a83151
 readonly SOURCE_LOGICAL_CACHE_SHA=3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1
 readonly SOURCE_OBSERVED_CACHE_SHA=2f48fc061ccb181500fbb137fcb5d781c73df218fc9394fc06768792531fecbe
+readonly MATRIX_TAG=greenfield_layer0_prompt_index_cache_association_20260808T214925579370178Z
+readonly MATRIX_DIR=/home/gianl/glm-run/$MATRIX_TAG
+readonly MATRIX_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_association/8k/$MATRIX_TAG
+readonly MATRIX_CODE_HASH=31a23b8852031bdc3879f0e15acc02ae01fe09fe
+readonly MATRIX_RUN_ID=507
+readonly MATRIX_ASSOCIATION_FILE_SHA=ee0973a0cefd505c8c1d5a02853819216a08c9c3a0b6242a50fb480b076adc04
+readonly MATRIX_SUMMARY_FILE_SHA=dc41b1c64c69acea7ef8b39c131f56d40a99ad684ca4fc1aeade4d4e23cee59f
+readonly MATRIX_SUCCESS_SHA=6ce5298992ef665b89b0cd2dab4c2dcb5263cafca50c72110d3a65a1b7a9c227
+readonly MATRIX_RESULTS_DB_SHA=b3fb207ba5508e96724b1e8104e16b3465bf0f8d9c7a26296b20d3ee62234b47
+readonly MATRIX_EVIDENCE_SHA=affe842436b89686a6231ba83c78554329f70aae85212a1b17ccd5fd5bf3bcaf
+readonly MATRIX_REMOTE_OBJECTS_SHA=7787dccdfda2fded013ab1dba9263e2b550ad465101adc3d5e2418d6e89ecbc0
+readonly MATRIX_PRE_CENSUS_SHA=3d44069a5c345c4837719327209102f88ce47d6a25cbe8000482a5537a7df9ee
+readonly MATRIX_POST_CENSUS_SHA=bb9747afc094835fd8ca3cee0cfd5f9b240c592ad11a0fd1fab66f3128eb51fd
+readonly MATRIX_ASSOCIATION_MANIFEST_SHA=7216756cf364e3461755c65b99961ba50f37fe712914efad98323cca98a97cae
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
+PROFILE=${GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE:-matrix}
 TAG=${GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_TAG:-greenfield_layer0_prompt_index_cache_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_association/8k/$TAG
 ASSOCIATION_DIR=$RUN_DIR/association
+
+[[ $PROFILE == matrix || $PROFILE == chunk_parameter ]] || {
+  echo "unsupported prompt-key association profile: $PROFILE" >&2
+  exit 2
+}
 
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" ]] || {
   echo "refusing prompt-key association from the wrong worktree" >&2
@@ -110,7 +130,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "PIN=$PIN RUN_DIR=$RUN_DIR SOURCE_DB=$SOURCE_RUN_ID/$SOURCE_ITEM_ROW_ID"
+say "PIN=$PIN RUN_DIR=$RUN_DIR PROFILE=$PROFILE SOURCE_DB=$SOURCE_RUN_ID/$SOURCE_ITEM_ROW_ID"
 strict_census pre || {
   say "ABORT: fleet is not eight-host zero work"
   exit 1
@@ -214,6 +234,93 @@ Path(output_path).write_text(json.dumps({
 connection.close()
 PY
 
+if [[ $PROFILE == chunk_parameter ]]; then
+  for contract in \
+    "$MATRIX_ASSOCIATION_FILE_SHA $MATRIX_DIR/association/association.json" \
+    "$MATRIX_SUMMARY_FILE_SHA $MATRIX_DIR/summary.json" \
+    "$MATRIX_SUCCESS_SHA $MATRIX_DIR/SUCCESS" \
+    "$MATRIX_RESULTS_DB_SHA $MATRIX_DIR/results_ckpt.db" \
+    "$MATRIX_EVIDENCE_SHA $MATRIX_DIR/evidence.sha256" \
+    "$MATRIX_REMOTE_OBJECTS_SHA $MATRIX_DIR/remote_objects.json" \
+    "$MATRIX_PRE_CENSUS_SHA $MATRIX_DIR/census_pre.txt" \
+    "$MATRIX_POST_CENSUS_SHA $MATRIX_DIR/census_post.txt"; do
+    expected=${contract%% *}
+    path=${contract#* }
+    [[ $(sha256sum "$path" | awk '{print $1}') == "$expected" ]] || {
+      say "ABORT: sealed DB507 matrix drifted: $path"
+      exit 2
+    }
+  done
+  matrix_remote_success_sha=$(gcloud storage cat \
+    "$MATRIX_REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $matrix_remote_success_sha == "$MATRIX_SUCCESS_SHA" ]] || {
+    say "ABORT: approved DB507 SUCCESS drifted"
+    exit 2
+  }
+  /home/gianl/vllm-env/bin/python - \
+    "$RESULTS_DB" "$MATRIX_DIR" "$RUN_DIR/matrix_validation.json" \
+    "$MATRIX_RUN_ID" "$MATRIX_CODE_HASH" \
+    "$MATRIX_ASSOCIATION_MANIFEST_SHA" <<'PY'
+import json
+from pathlib import Path
+import sqlite3
+import sys
+
+db_path, matrix_path, output_path, run_id, code_hash, manifest_sha = sys.argv[1:]
+run_id = int(run_id)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+    raise SystemExit("DB507 matrix source DB integrity failed")
+run = connection.execute(
+    "SELECT harness_git,env_json,pod FROM runs WHERE run_id=?", (run_id,)
+).fetchone()
+items = connection.execute(
+    "SELECT id,item_id,correct,score FROM items WHERE run_id=? ORDER BY id",
+    (run_id,),
+).fetchall()
+expected_items = [
+    (1790, "accepted_xla_m2048_divide_sqrt", 0, 0.0),
+    (1791, "accepted_xla_m2048_multiply_rsqrt", 0, 0.0),
+    (1792, "production_pallas_m1_divide_sqrt", 0, 0.0),
+]
+if run is None or items != expected_items:
+    raise SystemExit("DB507 matrix rows drifted")
+harness, env_json, pod = run
+env = json.loads(env_json)
+if (
+    harness != code_hash[:7]
+    or pod != "db-v4-64-od"
+    or env.get("association_manifest_sha256") != manifest_sha
+    or env.get("exact_candidates") != []
+    or env.get("classification") != "declared_matrix_not_sufficient"
+):
+    raise SystemExit("DB507 matrix provenance drifted")
+association = json.loads(
+    (Path(matrix_path) / "association/association.json").read_text()
+)
+best = association["candidates"]["accepted_xla_m2048_divide_sqrt"]
+if (
+    association["manifest_sha256"] != manifest_sha
+    or association["conclusion"] != {
+        "classification": "declared_matrix_not_sufficient",
+        "exact_candidates": [],
+    }
+    or best["comparison_to_accepted"]["mismatch_count"] != 45
+    or best["observed_bfloat16_sha256"]
+    != "52bf55ed5e9ea74a59551351a21ae830fb39e289e82eaff636fb9ab84d7dcd8a"
+):
+    raise SystemExit("DB507 matrix artifact drifted")
+Path(output_path).write_text(json.dumps({
+    "status": "SUCCESS",
+    "matrix_run_id": run_id,
+    "matrix_code_hash": code_hash,
+    "matrix_association_manifest_sha256": manifest_sha,
+    "matrix_best_mismatch_count": 45,
+}, indent=2, sort_keys=True) + "\n")
+connection.close()
+PY
+fi
+
 say "syncing exact greenfield pin to all eight hosts"
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && echo "SYNC_OK $(hostname) $pin"'
@@ -242,6 +349,7 @@ env JAX_PLATFORMS=tpu \
   --prompt-cache-manifest-sha256 "$SOURCE_CACHE_MANIFEST_SHA" \
   --baseline-comparison-dir "$SOURCE_DIR/comparison" \
   --baseline-comparison-manifest-sha256 "$SOURCE_COMPARISON_MANIFEST_SHA" \
+  --candidate-set "$PROFILE" \
   --output "$ASSOCIATION_DIR" >"$RUN_DIR/association_summary.json"
 elapsed=$(( $(date +%s) - started ))
 say "association matrix completed in ${elapsed}s"
@@ -249,7 +357,8 @@ say "association matrix completed in ${elapsed}s"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$LEGACY_REPO" \
   "$elapsed" "$SOURCE_RUN_ID" "$SOURCE_ITEM_ROW_ID" \
-  "$SOURCE_CACHE_MANIFEST_SHA" "$SOURCE_COMPARISON_MANIFEST_SHA" <<'PY'
+  "$SOURCE_CACHE_MANIFEST_SHA" "$SOURCE_COMPARISON_MANIFEST_SHA" \
+  "$PROFILE" <<'PY'
 from __future__ import annotations
 
 import json
@@ -258,14 +367,18 @@ import sqlite3
 import sys
 
 (run_path, pin, db_path, repo, legacy_repo, elapsed, source_run_id,
- source_item_id, cache_sha, baseline_sha) = sys.argv[1:]
+ source_item_id, cache_sha, baseline_sha, profile) = sys.argv[1:]
 root = Path(run_path)
 association = json.loads((root / "association/association.json").read_text())
-expected_names = {
-    "production_pallas_m1_divide_sqrt",
-    "accepted_xla_m2048_divide_sqrt",
-    "accepted_xla_m2048_multiply_rsqrt",
-}
+expected_names = (
+    {
+        "production_pallas_m1_divide_sqrt",
+        "accepted_xla_m2048_divide_sqrt",
+        "accepted_xla_m2048_multiply_rsqrt",
+    }
+    if profile == "matrix"
+    else {"accepted_xla_m2048_chunk_parameter_divide_sqrt"}
+)
 if (
     association["status"] != "SUCCESS"
     or association["code_hash"] != pin
@@ -275,6 +388,7 @@ if (
     or association["performance_claim"] is not False
     or association["prompt_cache_manifest_sha256"] != cache_sha
     or association["baseline"]["comparison_manifest_sha256"] != baseline_sha
+    or association["candidate_set"] != profile
     or set(association["candidates"]) != expected_names
     or association["accepted_adapted_wk"]["byte_sum"] != 193298069
 ):
@@ -290,8 +404,10 @@ import provenance as pv
 connection = pv.connect(db_path)
 run_id = pv.start_run(
     connection,
-    model="zai-org/GLM-5.2-FP8:greenfield-layer0-prompt-key-association",
-    revision="bounded-real-layer0-prompt-key-association-v1",
+    model=(
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-prompt-key-association"
+    ),
+    revision=f"bounded-real-layer0-prompt-key-association-{profile}-v1",
     env={
         "GLM_ENGINE": "greenfield_layer0_prompt_index_cache_association",
         "greenfield_code_hash": pin,
@@ -302,6 +418,8 @@ run_id = pv.start_run(
         "association_manifest_sha256": association["manifest_sha256"],
         "exact_candidates": association["conclusion"]["exact_candidates"],
         "classification": association["conclusion"]["classification"],
+        "candidate_set": profile,
+        "matrix_source_run_id": 507 if profile == "chunk_parameter" else None,
     },
     note=(
         "Protected bounded layer-0 prompt-key association matrix. No decoder, "
@@ -351,6 +469,7 @@ summary = {
     "prompt_cache_manifest_sha256": cache_sha,
     "baseline_comparison_manifest_sha256": baseline_sha,
     "association_manifest_sha256": association["manifest_sha256"],
+    "candidate_set": profile,
     "conclusion": association["conclusion"],
     "candidate_comparisons": {
         name: value["comparison_to_accepted"]
@@ -390,6 +509,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   sha256sum association_summary.json source_validation.json summary.json \
     results_ckpt.db census_pre.txt census_post.txt sync.txt \
     orchestrator.sealed.log
+  if [[ -f matrix_validation.json ]]; then
+    sha256sum matrix_validation.json
+  fi
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
   "$REMOTE_PREFIX/" >/dev/null
@@ -461,6 +583,7 @@ values = {
     "association_manifest_sha256": summary[
         "association_manifest_sha256"
     ],
+    "candidate_set": summary["candidate_set"],
     "classification": summary["conclusion"]["classification"],
     "exact_candidates": ",".join(summary["conclusion"]["exact_candidates"]),
     "performance_claim": "false",

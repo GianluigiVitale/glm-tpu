@@ -78,11 +78,21 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--baseline-comparison-manifest-sha256", required=True
     )
+    parser.add_argument(
+        "--candidate-set",
+        choices=("matrix", "chunk_parameter"),
+        default="matrix",
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
 
 def _classify(exact: set[str]) -> str:
+    chunk_parameter = (
+        "accepted_xla_m2048_chunk_parameter_divide_sqrt" in exact
+    )
+    if chunk_parameter:
+        return "chunk_parameter_association_sufficient"
     pallas_divide = "production_pallas_m1_divide_sqrt" in exact
     xla_divide = "accepted_xla_m2048_divide_sqrt" in exact
     xla_rsqrt = "accepted_xla_m2048_multiply_rsqrt" in exact
@@ -124,6 +134,7 @@ def main() -> int:
     from glm_tpu.greenfield.kernels.reference.dsa_association import (
         Layer0DsaProbeGeometry,
         affine_key_layer_norm,
+        layer0_prompt_index_key_chunk,
         layer0_prompt_index_keys_chunked,
     )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
@@ -317,45 +328,87 @@ def main() -> int:
         geometry=geometry,
         key_norm_mode="multiply_rsqrt",
     )
-    definitions = {
-        "production_pallas_m1_divide_sqrt": (
-            pallas_divide_prompt_keys,
-            (
-                unique_embeddings,
-                prompt_rows,
-                input_norm_weight,
-                raw_wk_bits,
-                raw_wk_scale,
-                key_norm_weight,
-                key_norm_bias,
+    chunk_inputs: tuple[tuple[Any, Any], ...] | None = None
+    if args.candidate_set == "matrix":
+        definitions = {
+            "production_pallas_m1_divide_sqrt": (
+                pallas_divide_prompt_keys,
+                (
+                    unique_embeddings,
+                    prompt_rows,
+                    input_norm_weight,
+                    raw_wk_bits,
+                    raw_wk_scale,
+                    key_norm_weight,
+                    key_norm_bias,
+                ),
+                True,
             ),
-            True,
-        ),
-        "accepted_xla_m2048_divide_sqrt": (
-            xla_divide,
-            (
-                unique_embeddings,
-                prompt_rows,
-                input_norm_weight,
-                wk_fp32,
-                key_norm_weight,
-                key_norm_bias,
+            "accepted_xla_m2048_divide_sqrt": (
+                xla_divide,
+                (
+                    unique_embeddings,
+                    prompt_rows,
+                    input_norm_weight,
+                    wk_fp32,
+                    key_norm_weight,
+                    key_norm_bias,
+                ),
+                False,
             ),
-            False,
-        ),
-        "accepted_xla_m2048_multiply_rsqrt": (
-            xla_rsqrt,
-            (
-                unique_embeddings,
-                prompt_rows,
-                input_norm_weight,
-                wk_fp32,
-                key_norm_weight,
-                key_norm_bias,
+            "accepted_xla_m2048_multiply_rsqrt": (
+                xla_rsqrt,
+                (
+                    unique_embeddings,
+                    prompt_rows,
+                    input_norm_weight,
+                    wk_fp32,
+                    key_norm_weight,
+                    key_norm_bias,
+                ),
+                False,
             ),
-            False,
-        ),
-    }
+        }
+    else:
+        padded_tokens = (
+            (prompt_ids.size + geometry.prompt_chunk - 1)
+            // geometry.prompt_chunk
+            * geometry.prompt_chunk
+        )
+        prompt_hidden_host = bf16_host(
+            "unique_embedding_bfloat16_bits"
+        )[prompt_rows_host]
+        prompt_hidden_host = np.pad(
+            prompt_hidden_host,
+            ((0, padded_tokens - prompt_ids.size), (0, 0)),
+        ).reshape(-1, geometry.prompt_chunk, geometry.hidden_size)
+        position_host = np.arange(padded_tokens, dtype=np.int32).reshape(
+            -1, geometry.prompt_chunk
+        )
+        chunk_inputs = tuple(
+            (put(prompt_hidden_host[index]), put(position_host[index]))
+            for index in range(prompt_hidden_host.shape[0])
+        )
+        chunk_function = partial(
+            layer0_prompt_index_key_chunk,
+            geometry=geometry,
+            key_norm_mode="divide_sqrt",
+        )
+        first_hidden, first_positions = chunk_inputs[0]
+        definitions = {
+            "accepted_xla_m2048_chunk_parameter_divide_sqrt": (
+                chunk_function,
+                (
+                    first_hidden,
+                    first_positions,
+                    input_norm_weight,
+                    wk_fp32,
+                    key_norm_weight,
+                    key_norm_bias,
+                ),
+                False,
+            )
+        }
     before_memory = _memory_stats(device)
     candidate_records: dict[str, Any] = {}
     candidate_tensors: dict[str, np.ndarray] = {}
@@ -376,7 +429,22 @@ def main() -> int:
             raise RuntimeError(f"prompt-key association HLO failed: {name}: {contract}")
         started = time.monotonic()
         result = compiled(*arguments)
-        if returns_counter:
+        if chunk_inputs is not None:
+            chunk_results = [result]
+            for hidden_chunk, positions_chunk in chunk_inputs[1:]:
+                chunk_results.append(
+                    compiled(
+                        hidden_chunk,
+                        positions_chunk,
+                        *arguments[2:],
+                    )
+                )
+            jax.block_until_ready(chunk_results)
+            keys = jnp.concatenate(chunk_results, axis=0)[
+                : prompt_ids.size
+            ]
+            jax.block_until_ready(keys)
+        elif returns_counter:
             keys, completed = result
             jax.block_until_ready((keys, completed))
             if int(np.asarray(completed)) != prompt_ids.size:
@@ -434,6 +502,7 @@ def main() -> int:
                 "observed_bfloat16_sha256"
             ],
         },
+        "candidate_set": args.candidate_set,
         "candidates": candidate_records,
         "claim_scope": (
             "Diagnostic layer-0 prompt-key association only; elapsed times "
