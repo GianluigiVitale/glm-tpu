@@ -66,6 +66,26 @@ readonly CHUNK_SOURCE_VALIDATION_SHA=cf9306eab21f030198e9d1195732b0879fb8aba824f
 readonly CHUNK_ASSOCIATION_MANIFEST_SHA=8539a81d5300266f2ea35c2df2d16321e3b964e471ce83f7b8fc80459fcd6d07
 readonly CHUNK_OBSERVED_CACHE_SHA=db2f77d986fa3a452bc60a429b1a7b0a63e5d77a6408e504dc9a9359eb50a7a1
 readonly CHUNK_HLO_FILE_SHA=b2e986161aafaff4823d6d2e527c24fc308de1336c5ebb00d0aa29f33dd2f274
+readonly BF16_TAG=greenfield_layer0_prompt_index_cache_association_20260808T225610150435734Z
+readonly BF16_DIR=/home/gianl/glm-run/$BF16_TAG
+readonly BF16_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_association/8k/$BF16_TAG
+readonly BF16_CODE_HASH=8f2545cf25181f002d939ab704bc251897fa377d
+readonly BF16_RUN_ID=509
+readonly BF16_ITEM_ROW_ID=1794
+readonly BF16_ASSOCIATION_FILE_SHA=f2c21baa1a403ae9fddb4f772a6e5b683f0e0703e173573f74b6cae09556dd21
+readonly BF16_SUMMARY_FILE_SHA=8275006b016b686078e75c655faa9b71754ae7ef5bbdc2b604719ea49f306ab7
+readonly BF16_SUCCESS_SHA=0bea72bac14c8bc59824a30b3c062fd45a489e9db530f3dbbbf75c9b8e459232
+readonly BF16_RESULTS_DB_SHA=3820af70ae5c5fb31cd1e16a5092622268154c132ae8c1d2207e32eabf78d88f
+readonly BF16_EVIDENCE_SHA=652da6663f2fabc3e10676d07e8c3531a145e306f399920eb62e8bcb31ce1f99
+readonly BF16_REMOTE_OBJECTS_SHA=6378c961c177d7c98dc57cb33c1cc5af0a86c5c07f7bc4daf7ee36594c1b7047
+readonly BF16_PRE_CENSUS_SHA=12b5fa792e6cba2298d32761f4ea8b16479a6d0597220551723ea92b0c87306e
+readonly BF16_POST_CENSUS_SHA=b0f6d2a4141d28ebde870b41addad64f26070f6b177b008abb9b4b222c0cfbe7
+readonly BF16_MATRIX_VALIDATION_SHA=667c4b1de614f90821c21f18cbf9866888c6ff01d3fb02aa1fb0b62996421070
+readonly BF16_CHUNK_VALIDATION_SHA=5816cd9e3a1cfc2faf52395d9b90dc660a0ce261771d87f3b2f34c8d02ccaa2c
+readonly BF16_SOURCE_VALIDATION_SHA=cf9306eab21f030198e9d1195732b0879fb8aba824feec02bab93f68d95c547d
+readonly BF16_ASSOCIATION_MANIFEST_SHA=df0b901e9d8f59a9053a52c35fe4b7156ed6814a727ede03c64a5c350c9921c1
+readonly BF16_OBSERVED_CACHE_SHA=db2f77d986fa3a452bc60a429b1a7b0a63e5d77a6408e504dc9a9359eb50a7a1
+readonly BF16_HLO_FILE_SHA=6e2697569b995b395dadc51a72504cefeb4b95cc96e3de6a842822a883632160
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
@@ -78,7 +98,8 @@ REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_assoc
 ASSOCIATION_DIR=$RUN_DIR/association
 
 [[ $PROFILE == matrix || $PROFILE == chunk_parameter || \
-  $PROFILE == chunk_bf16_weight ]] || {
+  $PROFILE == chunk_bf16_weight || \
+  $PROFILE == chunk_gather_bf16_weight ]] || {
   echo "unsupported prompt-key association profile: $PROFILE" >&2
   exit 2
 }
@@ -255,7 +276,8 @@ Path(output_path).write_text(json.dumps({
 connection.close()
 PY
 
-if [[ $PROFILE == chunk_parameter || $PROFILE == chunk_bf16_weight ]]; then
+if [[ $PROFILE == chunk_parameter || $PROFILE == chunk_bf16_weight || \
+  $PROFILE == chunk_gather_bf16_weight ]]; then
   for contract in \
     "$MATRIX_ASSOCIATION_FILE_SHA $MATRIX_DIR/association/association.json" \
     "$MATRIX_BEST_HLO_FILE_SHA $MATRIX_DIR/association/hlo/accepted_xla_m2048_divide_sqrt.optimized_hlo.txt.gz" \
@@ -343,7 +365,8 @@ connection.close()
 PY
 fi
 
-if [[ $PROFILE == chunk_bf16_weight ]]; then
+if [[ $PROFILE == chunk_bf16_weight || \
+  $PROFILE == chunk_gather_bf16_weight ]]; then
   for contract in \
     "$CHUNK_ASSOCIATION_FILE_SHA $CHUNK_DIR/association/association.json" \
     "$CHUNK_HLO_FILE_SHA $CHUNK_DIR/association/hlo/accepted_xla_m2048_chunk_parameter_divide_sqrt.optimized_hlo.txt.gz" \
@@ -434,6 +457,96 @@ connection.close()
 PY
 fi
 
+if [[ $PROFILE == chunk_gather_bf16_weight ]]; then
+  for contract in \
+    "$BF16_ASSOCIATION_FILE_SHA $BF16_DIR/association/association.json" \
+    "$BF16_HLO_FILE_SHA $BF16_DIR/association/hlo/accepted_xla_m2048_chunk_bf16_weight_divide_sqrt.optimized_hlo.txt.gz" \
+    "$BF16_SUMMARY_FILE_SHA $BF16_DIR/summary.json" \
+    "$BF16_SUCCESS_SHA $BF16_DIR/SUCCESS" \
+    "$BF16_RESULTS_DB_SHA $BF16_DIR/results_ckpt.db" \
+    "$BF16_EVIDENCE_SHA $BF16_DIR/evidence.sha256" \
+    "$BF16_REMOTE_OBJECTS_SHA $BF16_DIR/remote_objects.json" \
+    "$BF16_PRE_CENSUS_SHA $BF16_DIR/census_pre.txt" \
+    "$BF16_POST_CENSUS_SHA $BF16_DIR/census_post.txt" \
+    "$BF16_MATRIX_VALIDATION_SHA $BF16_DIR/matrix_validation.json" \
+    "$BF16_CHUNK_VALIDATION_SHA $BF16_DIR/chunk_parameter_validation.json" \
+    "$BF16_SOURCE_VALIDATION_SHA $BF16_DIR/source_validation.json"; do
+    expected=${contract%% *}
+    path=${contract#* }
+    [[ $(sha256sum "$path" | awk '{print $1}') == "$expected" ]] || {
+      say "ABORT: sealed DB509 BF16-weight result drifted: $path"
+      exit 2
+    }
+  done
+  bf16_remote_success_sha=$(gcloud storage cat \
+    "$BF16_REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $bf16_remote_success_sha == "$BF16_SUCCESS_SHA" ]] || {
+    say "ABORT: approved DB509 SUCCESS drifted"
+    exit 2
+  }
+  /home/gianl/vllm-env/bin/python - \
+    "$RESULTS_DB" "$BF16_DIR" \
+    "$RUN_DIR/bf16_weight_validation.json" \
+    "$BF16_RUN_ID" "$BF16_ITEM_ROW_ID" "$BF16_CODE_HASH" \
+    "$BF16_ASSOCIATION_MANIFEST_SHA" "$BF16_OBSERVED_CACHE_SHA" <<'PY'
+import json
+from pathlib import Path
+import sqlite3
+import sys
+
+(db_path, bf16_path, output_path, run_id, item_id, code_hash,
+ manifest_sha, observed_sha) = sys.argv[1:]
+run_id, item_id = int(run_id), int(item_id)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+    raise SystemExit("DB509 BF16-weight source DB integrity failed")
+run = connection.execute(
+    "SELECT harness_git,env_json,pod FROM runs WHERE run_id=?", (run_id,)
+).fetchone()
+item = connection.execute(
+    "SELECT id,item_id,correct,score FROM items WHERE run_id=?", (run_id,)
+).fetchone()
+candidate_name = "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
+expected_item = (item_id, candidate_name, 0, 0.0)
+if run is None or item != expected_item:
+    raise SystemExit("DB509 BF16-weight source row drifted")
+harness, env_json, pod = run
+env = json.loads(env_json)
+if (
+    harness != code_hash[:7]
+    or pod != "db-v4-64-od"
+    or env.get("association_manifest_sha256") != manifest_sha
+    or env.get("candidate_set") != "chunk_bf16_weight"
+    or env.get("association_parent_run_id") != 508
+    or env.get("exact_candidates") != []
+):
+    raise SystemExit("DB509 BF16-weight source provenance drifted")
+root = Path(bf16_path)
+association = json.loads((root / "association/association.json").read_text())
+candidate = association["candidates"][candidate_name]
+hlo = candidate["hlo"]["contract"]
+if (
+    association["manifest_sha256"] != manifest_sha
+    or association["candidate_set"] != "chunk_bf16_weight"
+    or candidate["comparison_to_accepted"]["mismatch_count"] != 4045
+    or candidate["observed_bfloat16_sha256"] != observed_sha
+    or hlo["loop_count"] != 0
+    or hlo["bf16_wk_conversion_count"] != 1
+    or hlo["convolution_weight_bf16"] is not True
+):
+    raise SystemExit("DB509 BF16-weight source artifact drifted")
+Path(output_path).write_text(json.dumps({
+    "status": "SUCCESS",
+    "bf16_weight_run_id": run_id,
+    "bf16_weight_item_row_id": item_id,
+    "bf16_weight_code_hash": code_hash,
+    "bf16_weight_association_manifest_sha256": manifest_sha,
+    "bf16_weight_mismatch_count": 4045,
+}, indent=2, sort_keys=True) + "\n")
+connection.close()
+PY
+fi
+
 say "syncing exact greenfield pin to all eight hosts"
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && echo "SYNC_OK $(hostname) $pin"'
@@ -491,9 +604,13 @@ if profile == "matrix":
     }
 elif profile == "chunk_parameter":
     expected_names = {"accepted_xla_m2048_chunk_parameter_divide_sqrt"}
-else:
+elif profile == "chunk_bf16_weight":
     expected_names = {
         "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
+    }
+else:
+    expected_names = {
+        "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
     }
 if (
     association["status"] != "SUCCESS"
@@ -538,6 +655,7 @@ run_id = pv.start_run(
         "association_parent_run_id": {
             "chunk_parameter": 507,
             "chunk_bf16_weight": 508,
+            "chunk_gather_bf16_weight": 509,
         }.get(profile),
     },
     note=(
@@ -633,6 +751,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   fi
   if [[ -f chunk_parameter_validation.json ]]; then
     sha256sum chunk_parameter_validation.json
+  fi
+  if [[ -f bf16_weight_validation.json ]]; then
+    sha256sum bf16_weight_validation.json
   fi
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \

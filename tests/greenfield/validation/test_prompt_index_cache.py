@@ -334,6 +334,48 @@ ENTRY main {
     )
 
 
+def test_prompt_key_gather_chunk_hlo_pins_input_rms_producer() -> None:
+    hlo = """
+ENTRY main {
+  %unique = bf16[37,6144]{1,0} parameter(0)
+  %rows = s32[2048]{0} parameter(1)
+  %positions = s32[2048]{0} parameter(2)
+  %wk_weight = f32[128,6144]{1,0} parameter(3)
+  %wk_bf16 = bf16[128,6144]{1,0} convert(%wk_weight)
+  %gathered = bf16[2048,6144]{1,0} fusion(%unique, %rows), kind=kCustom, metadata={op_name="jit(probe)/jit(_take)/gather"}
+  %input_rms = f32[2048]{0} fusion(%gathered), kind=kLoop, metadata={op_name="jit(probe)/reduce_sum"}
+  %projection = f32[2048,128]{1,0} convolution(%gathered, %wk_bf16), dim_labels=bf_oi->bf
+  %root = f32[1]{0} sqrt(%projection)
+  %normalized = f32[1]{0} divide(%projection, %root)
+  ROOT %keys = bf16[2048,128]{1,0} convert(%normalized)
+}
+"""
+    candidate = (
+        "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
+    )
+    result = validate_prompt_index_key_association_hlo(
+        hlo,
+        candidate=candidate,
+    )
+    assert result["passed"] is True
+    assert result["loop_count"] == 0
+    assert result["physical_embedding_gather_count"] == 1
+    assert result["gather_coupled_input_rms"] is True
+
+    disconnected = hlo.replace(
+        "%input_rms = f32[2048]{0} fusion(%gathered)",
+        "%input_rms = f32[2048]{0} fusion(%unique)",
+    )
+    rejected = validate_prompt_index_key_association_hlo(
+        disconnected,
+        candidate=candidate,
+    )
+    assert rejected["passed"] is False
+    assert "input RMS reduction does not consume the gather producer" in (
+        rejected["violations"]
+    )
+
+
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
     repo = Path(__file__).resolve().parents[3]
     probe = repo / "scripts/greenfield/probe_layer0_prompt_index_cache.py"
@@ -422,7 +464,9 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "accepted_xla_m2048_multiply_rsqrt",
         "accepted_xla_m2048_chunk_parameter_divide_sqrt",
         "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt",
+        "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt",
         "--candidate-set",
+        "layer0_prompt_index_key_gather_chunk",
         "layer0_prompt_index_keys_chunked",
         "validate_prompt_index_key_association_hlo",
         '"performance_claim": False',
@@ -438,9 +482,14 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "CHUNK_RUN_ID=508",
         "CHUNK_ITEM_ROW_ID=1793",
         "CHUNK_ASSOCIATION_MANIFEST_SHA=8539a81d",
+        "BF16_RUN_ID=509",
+        "BF16_ITEM_ROW_ID=1794",
+        "BF16_ASSOCIATION_MANIFEST_SHA=df0b901e",
         "matrix_validation.json",
         "chunk_parameter_validation.json",
+        "bf16_weight_validation.json",
         "chunk_bf16_weight",
+        "chunk_gather_bf16_weight",
         "GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE",
         '--candidate-set "$PROFILE"',
         "probe_layer0_prompt_index_cache_association.py",

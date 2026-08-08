@@ -1195,6 +1195,58 @@ def layer0_prompt_index_key_chunk(
     )
 
 
+def layer0_prompt_index_key_gather_chunk(
+    unique_embeddings: Any,
+    embedding_rows: Any,
+    positions: Any,
+    input_norm_weight: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+    key_norm_mode: KeyNormMode = "divide_sqrt",
+    projection_weight_mode: KeyProjectionWeightMode = "adapted_fp32",
+) -> Any:
+    """Gather and normalize one live prompt chunk inside the executable."""
+
+    expected_shapes = {
+        "unique_embeddings": (
+            unique_embeddings.shape[0],
+            geometry.hidden_size,
+        ),
+        "embedding_rows": (geometry.prompt_chunk,),
+        "positions": (geometry.prompt_chunk,),
+    }
+    values = {
+        "unique_embeddings": unique_embeddings,
+        "embedding_rows": embedding_rows,
+        "positions": positions,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 prompt-key gather chunk {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if unique_embeddings.dtype != jnp.bfloat16:
+        raise ValueError("layer-0 prompt-key gather embeddings must be BF16")
+    if embedding_rows.dtype != jnp.int32 or positions.dtype != jnp.int32:
+        raise ValueError("layer-0 prompt-key gather indices must remain int32")
+    hidden_chunk = jnp.take(unique_embeddings, embedding_rows, axis=0)
+    return layer0_prompt_index_key_chunk(
+        hidden_chunk,
+        positions,
+        input_norm_weight,
+        wk_weight,
+        key_norm_weight,
+        key_norm_bias,
+        geometry=geometry,
+        key_norm_mode=key_norm_mode,
+        projection_weight_mode=projection_weight_mode,
+    )
+
+
 def layer0_prompt_index_keys_chunked(
     unique_embeddings: Any,
     prompt_embedding_rows: Any,

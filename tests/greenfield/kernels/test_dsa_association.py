@@ -21,6 +21,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     bfloat16_from_uint16_bits,
     layer0_dsa_state,
     layer0_prompt_index_key_chunk,
+    layer0_prompt_index_key_gather_chunk,
     layer0_prompt_index_keys_chunked,
     layer0_dsa_state_from_q_residual,
     legacy_local_dcp_score_inputs,
@@ -169,6 +170,19 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
     assert np.isfinite(
         np.asarray(bf16_weight_chunk, dtype=np.float32)
     ).all()
+    gathered_bf16_weight_chunk = layer0_prompt_index_key_gather_chunk(
+        arguments[0],
+        arguments[1][:4],
+        jnp.arange(4, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        projection_weight_mode="adapted_bf16",
+    )
+    np.testing.assert_array_equal(
+        np.asarray(gathered_bf16_weight_chunk),
+        np.asarray(bf16_weight_chunk),
+    )
 
 
 def test_layer0_state_preserves_chunk_and_decode_geometry() -> None:

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 23:02 UTC
+**Updated:** 2026-08-08 23:16 UTC
 
 ## Authority and isolation
 
@@ -2228,3 +2228,13 @@ Direct approved-bucket reads match association, tensor, HLO, DB, census and SUCC
 is `ok`; authenticated pre/post censuses are 8/8 clean. This is diagnostic only. HLO/tensor delta
 now points back to DB507's gather-coupled input-RMS reduction layout; isolate that physical
 association before RoPE. Do not integrate BF16 `wk` or retry the decoder.
+
+The gather-coupled discriminator is implementation-ready in the existing harness. It feeds only
+the 37 immutable BF16 source embeddings, one `s32[2048]` row-index chunk and one `s32[2048]`
+position chunk; the compiled device program gathers the live `[2048,6144]` rows, applies the same
+input RMSNorm, explicitly retains the already-rejected BF16 weight boundary, and emits one key
+chunk. HLO must contain exactly one physical embedding gather consumed by the input-RMS reduction,
+one BF16-RHS convolution, zero loops and no communication/callback/full-prompt/dead-row shape.
+The wrapper revalidates DB506--DB509 before launch. Focused tests pass 33/33 and Python/Bash/
+ShellCheck/JSON/diff checks pass. Exact next: clean commit/push, then run only profile
+`chunk_gather_bf16_weight`; this tests gather coupling without DB507's outer map.

@@ -80,7 +80,12 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--candidate-set",
-        choices=("matrix", "chunk_parameter", "chunk_bf16_weight"),
+        choices=(
+            "matrix",
+            "chunk_parameter",
+            "chunk_bf16_weight",
+            "chunk_gather_bf16_weight",
+        ),
         default="matrix",
     )
     parser.add_argument("--output", type=Path, required=True)
@@ -88,6 +93,12 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _classify(exact: set[str]) -> str:
+    chunk_gather_bf16_weight = (
+        "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
+        in exact
+    )
+    if chunk_gather_bf16_weight:
+        return "chunk_gather_bf16_weight_association_sufficient"
     chunk_bf16_weight = (
         "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt" in exact
     )
@@ -140,6 +151,7 @@ def main() -> int:
         Layer0DsaProbeGeometry,
         affine_key_layer_norm,
         layer0_prompt_index_key_chunk,
+        layer0_prompt_index_key_gather_chunk,
         layer0_prompt_index_keys_chunked,
     )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
@@ -333,7 +345,7 @@ def main() -> int:
         geometry=geometry,
         key_norm_mode="multiply_rsqrt",
     )
-    chunk_inputs: tuple[tuple[Any, Any], ...] | None = None
+    chunk_inputs: tuple[tuple[Any, ...], ...] | None = None
     if args.candidate_set == "matrix":
         definitions = {
             "production_pallas_m1_divide_sqrt": (
@@ -380,48 +392,74 @@ def main() -> int:
             // geometry.prompt_chunk
             * geometry.prompt_chunk
         )
-        prompt_hidden_host = bf16_host(
-            "unique_embedding_bfloat16_bits"
-        )[prompt_rows_host]
-        prompt_hidden_host = np.pad(
-            prompt_hidden_host,
-            ((0, padded_tokens - prompt_ids.size), (0, 0)),
-        ).reshape(-1, geometry.prompt_chunk, geometry.hidden_size)
         position_host = np.arange(padded_tokens, dtype=np.int32).reshape(
             -1, geometry.prompt_chunk
         )
-        chunk_inputs = tuple(
-            (put(prompt_hidden_host[index]), put(position_host[index]))
-            for index in range(prompt_hidden_host.shape[0])
-        )
-        projection_weight_mode = (
-            "adapted_bf16"
-            if args.candidate_set == "chunk_bf16_weight"
-            else "adapted_fp32"
-        )
-        chunk_function = partial(
-            layer0_prompt_index_key_chunk,
-            geometry=geometry,
-            key_norm_mode="divide_sqrt",
-            projection_weight_mode=projection_weight_mode,
-        )
-        first_hidden, first_positions = chunk_inputs[0]
-        candidate_name = (
-            "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
-            if args.candidate_set == "chunk_bf16_weight"
-            else "accepted_xla_m2048_chunk_parameter_divide_sqrt"
-        )
-        definitions = {
-            candidate_name: (
-                chunk_function,
+        if args.candidate_set == "chunk_gather_bf16_weight":
+            padded_rows_host = np.pad(
+                prompt_rows_host,
+                (0, padded_tokens - prompt_ids.size),
+            ).reshape(-1, geometry.prompt_chunk)
+            chunk_inputs = tuple(
                 (
-                    first_hidden,
-                    first_positions,
+                    unique_embeddings,
+                    put(padded_rows_host[index]),
+                    put(position_host[index]),
                     input_norm_weight,
                     wk_fp32,
                     key_norm_weight,
                     key_norm_bias,
-                ),
+                )
+                for index in range(padded_rows_host.shape[0])
+            )
+            chunk_function = partial(
+                layer0_prompt_index_key_gather_chunk,
+                geometry=geometry,
+                key_norm_mode="divide_sqrt",
+                projection_weight_mode="adapted_bf16",
+            )
+            candidate_name = (
+                "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
+            )
+        else:
+            prompt_hidden_host = bf16_host(
+                "unique_embedding_bfloat16_bits"
+            )[prompt_rows_host]
+            prompt_hidden_host = np.pad(
+                prompt_hidden_host,
+                ((0, padded_tokens - prompt_ids.size), (0, 0)),
+            ).reshape(-1, geometry.prompt_chunk, geometry.hidden_size)
+            projection_weight_mode = (
+                "adapted_bf16"
+                if args.candidate_set == "chunk_bf16_weight"
+                else "adapted_fp32"
+            )
+            chunk_inputs = tuple(
+                (
+                    put(prompt_hidden_host[index]),
+                    put(position_host[index]),
+                    input_norm_weight,
+                    wk_fp32,
+                    key_norm_weight,
+                    key_norm_bias,
+                )
+                for index in range(prompt_hidden_host.shape[0])
+            )
+            chunk_function = partial(
+                layer0_prompt_index_key_chunk,
+                geometry=geometry,
+                key_norm_mode="divide_sqrt",
+                projection_weight_mode=projection_weight_mode,
+            )
+            candidate_name = (
+                "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
+                if args.candidate_set == "chunk_bf16_weight"
+                else "accepted_xla_m2048_chunk_parameter_divide_sqrt"
+            )
+        definitions = {
+            candidate_name: (
+                chunk_function,
+                chunk_inputs[0],
                 False,
             )
         }
@@ -454,14 +492,8 @@ def main() -> int:
         result = compiled(*arguments)
         if chunk_inputs is not None:
             chunk_results = [result]
-            for hidden_chunk, positions_chunk in chunk_inputs[1:]:
-                chunk_results.append(
-                    compiled(
-                        hidden_chunk,
-                        positions_chunk,
-                        *arguments[2:],
-                    )
-                )
+            for chunk_arguments in chunk_inputs[1:]:
+                chunk_results.append(compiled(*chunk_arguments))
             jax.block_until_ready(chunk_results)
             keys = jnp.concatenate(chunk_results, axis=0)[
                 : prompt_ids.size

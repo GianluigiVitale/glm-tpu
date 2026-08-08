@@ -609,6 +609,10 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_bf16_weight",
             "divide_sqrt",
         ),
+        "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt": (
+            "xla_chunk_gather_bf16_weight",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -751,11 +755,33 @@ def validate_prompt_index_key_association_hlo(
         ]
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
-            "chunk_hidden": f"bf16[{prompt_chunk},6144]" in lowered,
-            "chunk_positions": f"s32[{prompt_chunk}]" in lowered,
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
             "chunk_key_output": f"bf16[{prompt_chunk},128]" in lowered,
         }
+        if backend == "xla_chunk_gather_bf16_weight":
+            required_shapes.update(
+                {
+                    "unique_embedding_parameter": bool(
+                        re.search(
+                            rf"bf16\[{unique_token_count},6144\].*parameter\(",
+                            lowered,
+                        )
+                    ),
+                    "chunk_row_and_position_parameters": len(
+                        re.findall(
+                            rf"s32\[{prompt_chunk}\].*parameter\(", lowered
+                        )
+                    )
+                    >= 2,
+                }
+            )
+        else:
+            required_shapes.update(
+                {
+                    "chunk_hidden": f"bf16[{prompt_chunk},6144]" in lowered,
+                    "chunk_positions": f"s32[{prompt_chunk}]" in lowered,
+                }
+            )
         bf16_weight_conversion_lines = [
             line
             for line in lowered.splitlines()
@@ -780,6 +806,36 @@ def validate_prompt_index_key_association_hlo(
                     )
                     for line in lowered.splitlines()
                 )
+        gather_fusion_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(
+                rf"= bf16\[{prompt_chunk},6144\].*fusion\(", line
+            )
+            and "kind=kcustom" in line
+            and "jit(_take)/gather" in line
+        ]
+        raw_gather_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(
+                rf"= bf16\[{prompt_chunk},6144\].*gather\(", line
+            )
+        ]
+        physical_gather_lines = (
+            gather_fusion_lines if gather_fusion_lines else raw_gather_lines
+        )
+        gather_producer_names = []
+        for line in physical_gather_lines:
+            producer = re.match(r"\s*(%[^ ]+)\s*=", line)
+            if producer is not None:
+                gather_producer_names.append(producer.group(1))
+        gather_coupled_input_rms = any(
+            re.search(rf"= f32\[{prompt_chunk}\].*fusion\(", line)
+            and "reduce_sum" in line
+            and any(name in line for name in gather_producer_names)
+            for line in lowered.splitlines()
+        )
         violations = []
         if len(convolution_lines) != 1:
             violations.append(
@@ -790,7 +846,10 @@ def validate_prompt_index_key_association_hlo(
             violations.append(
                 f"expected no chunk-program loop, found {len(while_lines)}"
             )
-        if backend == "xla_chunk_bf16_weight":
+        if backend in (
+            "xla_chunk_bf16_weight",
+            "xla_chunk_gather_bf16_weight",
+        ):
             if len(bf16_weight_conversion_lines) != 1:
                 violations.append(
                     "expected one explicit FP32-to-BF16 wk conversion, "
@@ -803,6 +862,20 @@ def validate_prompt_index_key_association_hlo(
         elif bf16_weight_conversion_lines:
             violations.append(
                 "unexpected FP32-to-BF16 wk conversion in FP32 chunk candidate"
+            )
+        if backend == "xla_chunk_gather_bf16_weight":
+            if len(physical_gather_lines) != 1:
+                violations.append(
+                    "expected one physical M2048 embedding gather, "
+                    f"found {len(physical_gather_lines)}"
+                )
+            if not gather_coupled_input_rms:
+                violations.append(
+                    "input RMS reduction does not consume the gather producer"
+                )
+        elif physical_gather_lines:
+            violations.append(
+                "unexpected embedding gather in external-chunk candidate"
             )
         if forbidden_operations:
             violations.append(
@@ -823,6 +896,8 @@ def validate_prompt_index_key_association_hlo(
                 bf16_weight_conversion_lines
             ),
             "convolution_weight_bf16": convolution_weight_bf16,
+            "gather_coupled_input_rms": gather_coupled_input_rms,
+            "physical_embedding_gather_count": len(physical_gather_lines),
             "forbidden_operations": forbidden_operations,
             "forbidden_shapes": forbidden_shapes,
             "loop_count": len(while_lines),

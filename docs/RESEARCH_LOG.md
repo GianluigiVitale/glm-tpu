@@ -5797,3 +5797,13 @@ Association manifest `df0b901e...21c1`, SUCCESS `0bea72ba...9232`, evidence
 `652da666...1f99`, remote objects `6378c961...7047`, DB snapshot `3820af70...88f`, direct remote
 byte equality and authenticated 8/8 pre/post cleanup all pass. This is diagnostic correctness
 evidence only; no production integration, decoder, Gate-D or performance claim follows.
+
+The next candidate is now isolated without a new protection harness. It moves only the gather back
+inside one compiled M2048 chunk: inputs are the 37 sealed BF16 embedding rows, 2,048 row indices,
+2,048 absolute positions and the existing accepted weights. It retains explicit BF16 `wk` so the
+only novel producer boundary relative to DB509 is the device gather feeding input RMSNorm. The HLO
+contract requires one physical gather whose value is an operand of the FP32 input-RMS reduction,
+one BF16-RHS convolution, zero loops and every prior no-communication/full-prompt/dead-row guard.
+The host invokes the same executable over four chunks only in this bounded diagnostic; this is not
+permission for host-dispatched production prefill. Focused tests pass 33/33 and all static checks
+are green. One clean-pinned serialized run is the exact next evidence action.
