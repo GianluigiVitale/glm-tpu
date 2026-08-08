@@ -46,6 +46,13 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   kv-a result directly to IndexShare. Separate and fused projection state are
   mutually exclusive. This remains unpromoted until a protected production
   helper/layer proof and the complete packed derivative pass.
+- Protected DB503 executes that integrated production selector on TPU and is
+  bitwise exact for both normalized q-a (0/2,048 mismatches) and the fused
+  576-wide kv-a companion. Its optimized HLO has exactly one physical
+  `f32[1,82] convolution ... bf_io->bf`, one live row, and no collective,
+  callback, dead row, or forbidden separate state. This closes production
+  helper arithmetic/HLO only; the full packed derivative, all 78 layers, raw
+  tokens, DSA, HBM, and decoder performance remain separate gates.
 - The accepted fused residual-add/RMSNorm boundary first adds the two BF16
   inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
   the independently carried residual is the same sum rounded to BF16. A

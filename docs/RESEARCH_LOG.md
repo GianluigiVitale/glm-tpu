@@ -5589,3 +5589,25 @@ This is not Gate-B reclosure or TPU arithmetic evidence. The next serialized mod
 bounded: run the production helper itself on the sealed DB502 input, require bitwise q-a and kv-a,
 physical one-row convolution HLO, no collective/dead row, archive/DB/cleanup, and only then create
 the protected 32-file derivative.
+
+## 2026-08-08 14:06 — DB503 proves the integrated fused qkv-a production boundary
+
+Protected run `greenfield_layer0_qkv_a_production_20260808T140131250842069Z` at exact pin
+`f715039399957bbc15f9366a6d947f33861d3c47` completed as DB 503 / item 1786. Unlike DB502's
+candidate matrix, it calls the production layer selector itself with final-layout
+`u8[32,6144,82]` weights and `f32[32,48,82]` expanded scales. The normalized q-a result is
+bitwise exact to the accepted capture (SHA `c9fbac05...c70c`, 0/2,048 mismatches), and its fused
+kv-a companion is bitwise exact to the sealed DB502 result (SHA `cf288bc2...e790`).
+
+The optimized TPU HLO SHA is `1eec1393...509c`; it contains exactly one physical one-row
+`f32[1,82] convolution ... bf_io->bf`, all required packed shapes, and no collective, callback,
+dead row, forbidden shape, or contract violation. The result is linked to the integrity-checked
+append-only DB, archived under the approved bucket, byte-verified for every critical remote
+object, and bounded by authenticated 8/8 clean pre/post censuses. SUCCESS SHA is
+`5d458cb8...03e`; runner/NPZ/summary/evidence/DB-snapshot SHAs are `e7cd9fbb...d5e`,
+`5dff6bb9...2fcb`, `be9192f0...91e`, `7d1396d9...2d61`, and `4292997f...6a`.
+
+This is production arithmetic/HLO evidence only. The 19-second probe elapsed time includes
+compilation and orchestration and is not decoder latency. The bounded proof authorizes the
+append-only full fused pack; Gate B remains reopened until its 32 files are written, verified and
+directly loaded. No protected 8K retry is authorized before that artifact and full-body HLO pass.

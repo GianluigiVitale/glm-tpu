@@ -138,3 +138,9 @@ Reconstruction against the real protected manifests yields layout hash
 pre-pack layout facts. Gate B remains reopened until the 32 payloads are
 written, independently verified, archived, directly loaded, and protected by
 the full failure/cleanup contract.
+
+Protected DB503 confirms that the integrated production helper consumes this
+final tensor contract directly and produces exact q-a/kv-a with one physical
+one-row N82 convolution. It does not write or load the 834 GB derivative and
+therefore does not reclose Gate B; it is the arithmetic/HLO prerequisite that
+authorizes the protected append-only pack.

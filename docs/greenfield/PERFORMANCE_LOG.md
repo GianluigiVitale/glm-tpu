@@ -933,7 +933,15 @@ claim. DB484 remains the accepted PP8 performance point at `244.091151 ms` p50 a
 
 ## Fused qkv-a production integration — no performance result
 
-Commit `0082bac` integrates the DB502 arithmetic and reconstructs the full fused final layout, but
-has not executed the production helper or decoder on TPU. The 57-test CPU duration and the
+At commit `0082bac`, the DB502 arithmetic and full fused final-layout reconstruction had not yet
+executed the production helper or decoder on TPU. The 57-test CPU duration and the
 manifest reconstruction time are not latency measurements. DB484 remains the accepted PP8 point
 at `244.091151 ms` p50 and `4.096830 tok/s`; Gate E remains open.
+
+## DB503 fused qkv-a production helper — no performance result
+
+DB503 at `f715039` executes the integrated one-row production selector and proves exact q-a/kv-a
+plus its one-convolution TPU HLO contract. The probe's 19-second elapsed value includes compilation,
+orchestration, evidence sealing, and cleanup; it is not a token step, timed decoder window, XPlane,
+or wall-throughput measurement. DB484 therefore remains the only accepted PP8 decoder performance
+point at `244.091151 ms` p50 and `4.096830 tok/s`; Gate E remains open.

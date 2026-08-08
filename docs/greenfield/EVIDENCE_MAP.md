@@ -393,5 +393,20 @@ capture is still required.
 - Real-manifest reconstruction: separate layout hash remains `ba21c4ec...c9e`; fused layout
   `523afb1d...cb4`, semantic manifest `8bd08068...6f9`, payload `834,369,271,808`, and
   `26,074,039,744` runtime bytes/chip.
-- Scope: readiness only. No protected fused artifact, production TPU helper/layer, Gate-B
-  reclosure, Gate-D retry, or performance result exists.
+- Scope at `0082bac`: readiness only. DB503 below supersedes the missing production-helper proof;
+  no protected fused artifact, Gate-B reclosure, Gate-D retry, or performance result exists.
+
+## DB503 fused qkv-a production helper
+
+- Protected DB 503 / item 1786:
+  `greenfield_layer0_qkv_a_production_20260808T140131250842069Z` at exact code `f715039`.
+- Arithmetic: production normalized q-a matches the accepted 2,048 BF16 values bitwise, SHA
+  `c9fbac05...c70c`; its fused 576-wide kv-a companion matches sealed DB502 bitwise, SHA
+  `cf288bc2...e790`.
+- Structure: final-layout `u8[32,6144,82]` / `f32[32,48,82]` inputs; optimized HLO SHA
+  `1eec1393...509c`; exactly one physical `f32[1,82] convolution ... bf_io->bf`; no collective,
+  callback, dead row, forbidden shape, or violation.
+- Protection: SQLite integrity and DB snapshot, approved archive, critical local/remote SHA
+  equality, terminal SUCCESS `5d458cb8...03e`, and authenticated 8/8 pre/post cleanup pass.
+- Scope: bounded production arithmetic/HLO only. The protected fused checkpoint/direct load,
+  complete decoder, HBM, XPlane, latency, Gate D, and Gate E remain unproved.

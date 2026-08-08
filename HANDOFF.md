@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 13:52 UTC
+**Updated:** 2026-08-08 14:06 UTC
 
 ## Authority and isolation
 
@@ -1951,3 +1951,28 @@ no fused production TPU layer, packed artifact, Gate-B reclosure, decoder token,
 performance claim exists yet. Exact next is a bounded production-helper layer-0 TPU comparison
 against DB502 with exact q-a and kv-a plus physical HLO; only then pack and verify the full fused
 artifact before retrying protected 8K.
+
+## DB503 seals the fused qkv-a production helper; protected packing is authorized
+
+Protected DB 503 / item 1786,
+`greenfield_layer0_qkv_a_production_20260808T140131250842069Z`, ran the actual integrated
+`_project_attention_qkv_a` production selector at exact code
+`f715039399957bbc15f9366a6d947f33861d3c47`. Its one-row final-layout inputs are
+`u8[32,6144,82]` and `f32[32,48,82]`. The normalized q-a output is bitwise exact to the accepted
+capture (0/2,048 mismatches, SHA `c9fbac05...c70c`), and the fused 576-wide kv-a companion is
+bitwise exact to sealed DB502 (SHA `cf288bc2...e790`).
+
+Optimized TPU HLO SHA `1eec1393...509c` contains exactly one physical
+`f32[1,82] convolution ... bf_io->bf`, the required packed state and one live input row, with no
+collective, callback, forbidden shape, or contract violation. SQLite integrity, DB linkage,
+runner/NPZ/summary/HLO/evidence/DB-snapshot hashes, local/remote byte equality, approved archive,
+and authenticated 8/8 pre/post zero-work censuses pass. Runner, NPZ, summary, evidence,
+remote-object, DB-snapshot, and SUCCESS SHAs are `e7cd9fbb...d5e`, `5dff6bb9...2fcb`,
+`be9192f0...91e`, `7d1396d9...2d61`, `a412b251...5272`, `4292997f...6a`, and
+`5d458cb8...03e`.
+
+DB503 is bounded arithmetic/HLO evidence, not checkpoint, decoder, HBM, latency, XPlane, Gate-D,
+or Gate-E evidence. It closes the prerequisite for creating the protected fused 32-file runtime
+derivative. Exact next: pack and verify that append-only artifact, prove direct final-layout load
+and the full 78-convolution production HLO, then retry protected 8K once. Gate B remains reopened
+until the fused artifact/direct-load proof passes.

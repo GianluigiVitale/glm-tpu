@@ -213,5 +213,7 @@ Production pin `0082bac` now consumes this evidence in
 `kernels/reference/qkv_a.py`, `kernels/layer.py`, the runtime decoder, and the
 feature-runtime pack/load chain. The adaptation preserves only the proven
 arithmetic and packed-state definition; it does not import the diagnostic or
-legacy execution path. Protected production-helper and full packed-artifact
-proofs remain mandatory before promotion.
+legacy execution path. DB503 at `f715039` now proves that actual integrated
+production helper is bitwise exact for q-a and kv-a with one physical one-row N82
+convolution and no collective/dead row. The full packed-artifact/direct-load
+proof remains mandatory before promotion or another 8K run.
