@@ -1127,6 +1127,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--runtime-root", type=Path, required=True)
     parser.add_argument("--runtime-manifest-sha256", required=True)
+    parser.add_argument(
+        "--verify-device-roundtrip",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--source-runtime-root", type=Path)
     parser.add_argument("--source-runtime-manifest-sha256")
     parser.add_argument("--source-checkpoint-root", type=Path, required=True)
@@ -1206,6 +1212,7 @@ def main() -> int:
     args.feature_reconstruct_down_fp32 = bool(
         args.feature_reconstruct_down_fp32
     )
+    args.verify_device_roundtrip = bool(args.verify_device_roundtrip)
     args.complete_token_path = bool(args.complete_token_path)
     args.split_residual_state = bool(args.split_residual_state)
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
@@ -1677,7 +1684,7 @@ def main() -> int:
             expectation,
             pack_context.layout,
             decoder.mesh,
-            verify_device_roundtrip=False,
+            verify_device_roundtrip=args.verify_device_roundtrip,
         )
         load_seconds = time.monotonic() - load_started
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-end")

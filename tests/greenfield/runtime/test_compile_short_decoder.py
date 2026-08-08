@@ -39,6 +39,21 @@ def test_protected_runner_pins_fp32_feature_boundary_kernel() -> None:
     )
 
 
+def test_protected_runner_exposes_fail_closed_device_roundtrip() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert '"--verify-device-roundtrip"' in compiler
+    assert "verify_device_roundtrip=args.verify_device_roundtrip" in compiler
+    assert (
+        "readonly VERIFY_DEVICE_ROUNDTRIP="
+        "${GLM_GREENFIELD_RUNTIME_DEVICE_ROUNDTRIP:-0}" in runner
+    )
+    assert '--verify-device-roundtrip "$verify_device_roundtrip"' in runner
+    assert '["device_roundtrip_verified"]\n    != verify_device_roundtrip' in runner
+    assert '["device_roundtrip_bytes"]\n    != expected_roundtrip_bytes' in runner
+
+
 @pytest.mark.parametrize(
     ("capacity", "label"),
     ((2048, "2k"), (8192, "8k")),
