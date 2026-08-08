@@ -483,6 +483,102 @@ def compare_prompt_index_key_bits(
     }
 
 
+def _classify_chunk_wk_feature_slices(
+    lowered_hlo: str,
+) -> dict[str, Any]:
+    """Recognize TPU streaming slices of the public adapted ``wk`` tensor.
+
+    TPU HLO may stage the 128 output features of ``wk`` as four 32-row
+    transfers and concatenate them before the projection.  Those rows are
+    weight features, not the forbidden batch-32 hidden-state bucket.  Keep the
+    exception deliberately narrow: one source ``wk`` parameter, the complete
+    four-slice partition, one matching ``slice-done`` per transfer, and no
+    other instruction carrying the otherwise-forbidden shape.
+    """
+
+    lines = lowered_hlo.splitlines()
+    shape = "f32[32,6144]"
+    shape_line_indices = {
+        index for index, line in enumerate(lines) if shape in line
+    }
+    if not shape_line_indices:
+        return {
+            "done_count": 0,
+            "shape_line_count": 0,
+            "slice_count": 0,
+            "slice_spans": [],
+            "unclassified_line_count": 0,
+            "valid": True,
+            "wk_parameter_count": 0,
+        }
+
+    wk_parameter_pattern = re.compile(
+        r'^\s*(%\S+)\s*=\s*f32\[128,6144\].*parameter\([^)]*\).*'
+        r'metadata=\{op_name="wk_weight"'
+    )
+    wk_parameter_names = {
+        match.group(1)
+        for line in lines
+        if (match := wk_parameter_pattern.search(line)) is not None
+    }
+    slice_start_pattern = re.compile(
+        r"^\s*(%\S+)\s*=.*f32\[32,6144\].*"
+        r"slice-start\((%\S+)\),\s*"
+        r"slice=\{\[([0-9]+):([0-9]+)\],\s*\[0:6144\]\}"
+    )
+    slice_done_pattern = re.compile(
+        r"^\s*(%\S+)\s*=\s*f32\[32,6144\].*"
+        r"slice-done\((%\S+)\)"
+    )
+
+    starts: list[tuple[int, str, tuple[int, int]]] = []
+    for index, line in enumerate(lines):
+        match = slice_start_pattern.search(line)
+        if match is None or match.group(2) not in wk_parameter_names:
+            continue
+        starts.append(
+            (
+                index,
+                match.group(1),
+                (int(match.group(3)), int(match.group(4))),
+            )
+        )
+    start_names = {name for _, name, _ in starts}
+    dones: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        match = slice_done_pattern.search(line)
+        if match is None or match.group(2) not in start_names:
+            continue
+        dones.append((index, match.group(2)))
+
+    expected_spans = {(0, 32), (32, 64), (64, 96), (96, 128)}
+    classified_indices = {
+        *(index for index, _, _ in starts),
+        *(index for index, _ in dones),
+    }
+    spans = [span for _, _, span in starts]
+    valid = (
+        len(wk_parameter_names) == 1
+        and len(starts) == 4
+        and len(start_names) == 4
+        and set(spans) == expected_spans
+        and len(dones) == 4
+        and {name for _, name in dones} == start_names
+        and classified_indices == shape_line_indices
+    )
+    return {
+        "done_count": len(dones),
+        "shape_line_count": len(shape_line_indices),
+        "slice_count": len(starts),
+        "slice_spans": [list(span) for span in sorted(spans)],
+        "unclassified_line_count": len(
+            shape_line_indices - classified_indices
+        ),
+        "valid": valid,
+        "wk_parameter_count": len(wk_parameter_names),
+    }
+
+
 def validate_prompt_index_key_probe_hlo(
     optimized_hlo: str,
     *,
@@ -712,6 +808,7 @@ def validate_prompt_index_key_association_hlo(
         }
     else:
         lowered = optimized_hlo.lower()
+        wk_feature_slices = _classify_chunk_wk_feature_slices(lowered)
         convolution_lines = [
             line
             for line in lowered.splitlines()
@@ -743,7 +840,6 @@ def validate_prompt_index_key_association_hlo(
             shape
             for shape in (
                 "bf16[32,6144]",
-                "f32[32,6144]",
                 f"bf16[{prompt_token_count},6144]",
                 f"f32[{prompt_token_count},6144]",
                 "bf16[8192,6144]",
@@ -753,6 +849,8 @@ def validate_prompt_index_key_association_hlo(
             )
             if shape in lowered
         ]
+        if not wk_feature_slices["valid"]:
+            forbidden_shapes.append("f32[32,6144]")
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
@@ -904,6 +1002,7 @@ def validate_prompt_index_key_association_hlo(
             "passed": not violations,
             "required_shapes": required_shapes,
             "violations": violations,
+            "wk_feature_slices": wk_feature_slices,
         }
 
     lowered = optimized_hlo.lower()

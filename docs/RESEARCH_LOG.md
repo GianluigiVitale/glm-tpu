@@ -5807,3 +5807,28 @@ one BF16-RHS convolution, zero loops and every prior no-communication/full-promp
 The host invokes the same executable over four chunks only in this bounded diagnostic; this is not
 permission for host-dispatched production prefill. Focused tests pass 33/33 and all static checks
 are green. One clean-pinned serialized run is the exact next evidence action.
+
+## 2026-08-08 23:32 — Gather-coupled HLO passes; generic shape guard refuses weight slices
+
+Protected attempt
+`greenfield_layer0_prompt_index_cache_association_20260808T232010491953822Z` at `3ad7b79`
+compiled the intended one-chunk program. Optimized TPU HLO has one physical embedding gather, and
+the FP32 input-RMS reduction directly consumes that producer. Its reduction config reproduces the
+DB507 discriminator (`iteration_bounds=[16,1]`, `kernel_window_bounds=[16,48]`, estimated 88,032
+cycles). The same HLO has one M2048 convolution, one physical BF16 `wk` conversion/RHS, zero loops
+and no collective, callback or full-prompt hidden tensor.
+
+Execution stopped because the existing dead-row guard matched `f32[32,6144]` as a bare substring.
+All eight matches are source-proven compiler staging for the public FP32 `[128,6144]` `wk`: four
+`slice-start` transfers partition the 128 output features into exact intervals `0:32`, `32:64`,
+`64:96`, `96:128`, and four `slice-done` results feed one `ConcatBitcast` back to
+`f32[128,6144]`. No `[32,6144]` entry parameter or hidden-state producer exists. Consequently this
+attempt has no arithmetic comparison, DB row, SUCCESS, decoder, Gate-D or performance standing.
+
+Compressed HLO SHA is `c019cc08...52f9`; contract failure, orchestrator and authenticated 8/8
+failure-census SHAs are `3ad54503...c45`, `c2e5203e...7cff` and `0fe9712a...895`. Direct reads
+of those approved-bucket diagnostics equal local bytes. The repaired classifier accepts only the
+complete four-slice chain sourced from the metadata-identified public `wk_weight` parameter and
+rejects any extra/unclassified `[32,6144]` line. The saved HLO and all DB507--DB509 optimized HLOs
+pass offline, while an injected dead parameter fails. Focused CPU tests pass 34/34. One clean-pinned
+retry of the same profile is the next evidence-producing action.

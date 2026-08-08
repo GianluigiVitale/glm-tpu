@@ -2238,3 +2238,28 @@ one BF16-RHS convolution, zero loops and no communication/callback/full-prompt/d
 The wrapper revalidates DB506--DB509 before launch. Focused tests pass 33/33 and Python/Bash/
 ShellCheck/JSON/diff checks pass. Exact next: clean commit/push, then run only profile
 `chunk_gather_bf16_weight`; this tests gather coupling without DB507's outer map.
+
+## Gather-coupled compile is valid; exact weight-slice classifier is ready
+
+The first protected gather-coupled attempt,
+`greenfield_layer0_prompt_index_cache_association_20260808T232010491953822Z` at exact pin
+`3ad7b79c77c20b4e9de44557bc9f277b0b1c3f9e`, compiled the intended discriminator but stopped
+before execution. Its optimized HLO proves one physical embedding gather feeding the FP32 input
+RMS reduction, one M2048 convolution with a BF16 `wk` producer, zero loops and no communication,
+callback or full-prompt tensor. The input-RMS TPU window matches DB507's gather-coupled lowering:
+iteration bounds `[16,1]`, kernel window `[16,48]`, estimated 88,032 cycles.
+
+The sole refusal was the generic substring guard finding `f32[32,6144]`. Preserved HLO proves all
+eight occurrences are compiler transfer instructions for the public `wk_weight.1`
+`f32[128,6144]`: four `slice-start` operations cover output-feature intervals `0:32`, `32:64`,
+`64:96`, `96:128`; four matching `slice-done` values are reassembled by `ConcatBitcast` before
+projection. There is no `[32,6144]` parameter or hidden/token-row producer. No arithmetic, cache
+comparison, DB row, SUCCESS, decoder or performance claim exists.
+
+Compressed HLO, contract-failure, orchestrator and failure-census SHAs are
+`c019cc08...52f9`, `3ad54503...c45`, `c2e5203e...7cff`, and `0fe9712a...895`; direct
+approved-bucket reads match local bytes and the last census is authenticated 8/8 clean. The
+validator now permits only that exact complete four-slice provenance and still rejects any extra
+or unrelated `f32[32,6144]` line. The saved attempt and every protected DB507--DB509 HLO pass
+offline; a dead-row mutation fails; focused CPU tests pass 34/34. Exact next: finish static checks,
+commit/push a clean pin, and rerun only `chunk_gather_bf16_weight` once.

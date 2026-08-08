@@ -376,6 +376,64 @@ ENTRY main {
     )
 
 
+def test_prompt_key_gather_chunk_hlo_classifies_wk_feature_slices() -> None:
+    hlo = """
+ENTRY main {
+  %unique = bf16[37,6144]{1,0} parameter(0)
+  %rows = s32[2048]{0} parameter(1)
+  %positions = s32[2048]{0} parameter(2)
+  %wk_weight.1 = f32[128,6144]{1,0} parameter(3), metadata={op_name="wk_weight"}
+  %wk_bf16 = bf16[128,6144]{1,0} convert(%wk_weight.1)
+  %gathered = bf16[2048,6144]{1,0} fusion(%unique, %rows), kind=kCustom, metadata={op_name="jit(probe)/jit(_take)/gather"}
+  %input_rms = f32[2048]{0} fusion(%gathered), kind=kLoop, metadata={op_name="jit(probe)/reduce_sum"}
+  %slice-start = ((f32[128,6144]{1,0}), f32[32,6144]{1,0}, s32[]) slice-start(%wk_weight.1), slice={[0:32], [0:6144]}
+  %slice-start.1 = ((f32[128,6144]{1,0}), f32[32,6144]{1,0}, s32[]) slice-start(%wk_weight.1), slice={[32:64], [0:6144]}
+  %slice-start.2 = ((f32[128,6144]{1,0}), f32[32,6144]{1,0}, s32[]) slice-start(%wk_weight.1), slice={[64:96], [0:6144]}
+  %slice-start.3 = ((f32[128,6144]{1,0}), f32[32,6144]{1,0}, s32[]) slice-start(%wk_weight.1), slice={[96:128], [0:6144]}
+  %slice-done = f32[32,6144]{1,0} slice-done(%slice-start)
+  %slice-done.1 = f32[32,6144]{1,0} slice-done(%slice-start.1)
+  %slice-done.2 = f32[32,6144]{1,0} slice-done(%slice-start.2)
+  %slice-done.3 = f32[32,6144]{1,0} slice-done(%slice-start.3)
+  %wk = f32[128,6144]{1,0} custom-call(%slice-done, %slice-done.1, %slice-done.2, %slice-done.3), custom_call_target="ConcatBitcast"
+  %projection = f32[2048,128]{1,0} convolution(%gathered, %wk_bf16), dim_labels=bf_oi->bf
+  %root = f32[1]{0} sqrt(%projection)
+  %normalized = f32[1]{0} divide(%projection, %root)
+  ROOT %keys = bf16[2048,128]{1,0} convert(%normalized)
+}
+"""
+    candidate = (
+        "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
+    )
+    result = validate_prompt_index_key_association_hlo(
+        hlo,
+        candidate=candidate,
+    )
+    assert result["passed"] is True
+    assert result["forbidden_shapes"] == []
+    assert result["wk_feature_slices"] == {
+        "done_count": 4,
+        "shape_line_count": 8,
+        "slice_count": 4,
+        "slice_spans": [[0, 32], [32, 64], [64, 96], [96, 128]],
+        "unclassified_line_count": 0,
+        "valid": True,
+        "wk_parameter_count": 1,
+    }
+
+    dead_parameter = hlo.replace(
+        "%positions = s32[2048]{0} parameter(2)",
+        "%positions = s32[2048]{0} parameter(2)\n"
+        "  %dead = f32[32,6144]{1,0} parameter(7)",
+    )
+    rejected = validate_prompt_index_key_association_hlo(
+        dead_parameter,
+        candidate=candidate,
+    )
+    assert rejected["passed"] is False
+    assert "f32[32,6144]" in rejected["forbidden_shapes"]
+    assert rejected["wk_feature_slices"]["unclassified_line_count"] == 1
+
+
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
     repo = Path(__file__).resolve().parents[3]
     probe = repo / "scripts/greenfield/probe_layer0_prompt_index_cache.py"
