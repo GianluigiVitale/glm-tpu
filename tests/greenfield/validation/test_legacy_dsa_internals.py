@@ -267,6 +267,7 @@ def test_protected_wrapper_reuses_short_dsa_oracle_stack() -> None:
     for required in (
         "OBSERVER_COMMIT_DISTANCE=2",
         "83ff4a3576602ca844ea090550139a2ff00b0bb1",
+        'source_fork == "$ORACLE_SHORT"',
         "GLM_DSA_DUMP_INTERNALS_LAYER",
         "GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID",
         "compare_short_context_dsa_oracles",
@@ -282,6 +283,7 @@ def test_protected_wrapper_reuses_short_dsa_oracle_stack() -> None:
         "timeout --signal=TERM --kill-after=60 1800",
     ):
         assert required in shared_source
+    assert 'source_fork == "$LEGACY_SHORT"' not in shared_source
 
 
 def test_recovery_reuses_source_without_reloading_model() -> None:
@@ -311,3 +313,32 @@ def test_recovery_reuses_source_without_reloading_model() -> None:
         assert forbidden not in source
     assert 'local label=$1 out=' not in source
     assert 'local label=$1\n  local out=' in source
+
+
+def test_layer1_recovery_is_pinned_and_does_not_reload_model() -> None:
+    recovery = REPO_ROOT / (
+        "scripts/greenfield/recover_legacy_layer1_dsa_internals.sh"
+    )
+    source = recovery.read_text()
+    for required in (
+        "greenfield_legacy_layer1_dsa_internals_20260808T081617553654576Z",
+        "SOURCE_GREENFIELD_PIN=b435c0c663c52d1352540f2c4b504696cd1d6d01",
+        "RUN_ID=500",
+        "ITEM_ROW_ID=1783",
+        "EXPECTED_DUMP_COUNT=483",
+        "INTERNAL_SOURCE_SHA=eb7a250072d23531707130deaabb6906590c6661e70637fe2cedf8069d35a9da",
+        "capture_short_context_dsa_oracle.py",
+        "compare_short_context_dsa_oracles",
+        "inspect_legacy_dsa_internals.py",
+        "strict_census post",
+        "remote_objects.json",
+        'cp -al "$SOURCE_RUN_DIR/source_dumps/." "$SOURCE_DIR/"',
+        "--expected-fork-git b3c25df47",
+    ):
+        assert required in source
+    for forbidden in (
+        "launch_glm_32chip.sh",
+        "glm_longctx.py",
+        "compare_legacy_layer0_dsa_internals.py",
+    ):
+        assert forbidden not in source

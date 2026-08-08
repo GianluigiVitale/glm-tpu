@@ -101,6 +101,7 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 HARNESS_PIN=$(git -C "$HARNESS_REPO" rev-parse HEAD)
 HARNESS_SHORT=$(git -C "$HARNESS_REPO" rev-parse --short HEAD)
 LEGACY_SHORT=$(git -C "$LEGACY_SOURCE_REPO" rev-parse --short HEAD)
+ORACLE_SHORT=$(git -C "$ORACLE_REPO" rev-parse --short HEAD)
 TAG=${GLM_GREENFIELD_SHORT_DSA_ORACLE_TAG:-${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 SOURCE_DIR=$RUN_DIR/source_dumps
@@ -430,7 +431,7 @@ source_harness=$(/home/gianl/vllm-env/bin/python -c \
 source_fork=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["fork_git"])' \
   "$RUN_DIR/source_identity.json")
-[[ $source_harness == "$HARNESS_SHORT" && $source_fork == "$LEGACY_SHORT" ]] || {
+[[ $source_harness == "$HARNESS_SHORT" && $source_fork == "$ORACLE_SHORT" ]] || {
   say "ABORT: DB code provenance drifted"
   exit 1
 }
