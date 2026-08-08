@@ -335,12 +335,27 @@ def _hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
     expected_width = "128" if "n128" in candidate else (
         "1024" if "n1024" in candidate else "4096"
     )
+    decoded_overlay_shapes = [
+        shape
+        for shape in ("f32[1024,2048]", "f32[4096,2048]")
+        if shape in lowered
+    ]
+    vector_candidate = "pallas_vector" in candidate
+    has_vector_dequantizer = (
+        "greenfield_fp8_dequantize_f32_n128_k2048" in lowered
+    )
     return {
         "candidate": candidate,
         "expected_physical_output_width": int(expected_width),
         "forbidden_operations": forbidden,
+        "decoded_overlay_shapes": decoded_overlay_shapes,
+        "has_vector_dequantizer": has_vector_dequantizer,
         "hlo_sha256": sha256(hlo.encode()).hexdigest(),
-        "passed": not forbidden,
+        "passed": (
+            not forbidden
+            and (not vector_candidate or has_vector_dequantizer)
+            and (not vector_candidate or not decoded_overlay_shapes)
+        ),
     }
 
 

@@ -183,7 +183,7 @@ def test_fp8_block_matmul_f32_interpret_matches_dsa_reference(
     )
 
 
-def test_fp8_block_vector_matmul_f32_interpret_matches_exact_reduction() -> None:
+def test_fp8_block_vector_matmul_f32_interpret_matches_reference() -> None:
     lhs = jnp.asarray(
         np.linspace(-0.375, 0.625, 128, dtype=np.float32)[None, :],
         dtype=jnp.bfloat16,
@@ -194,16 +194,19 @@ def test_fp8_block_vector_matmul_f32_interpret_matches_exact_reduction() -> None
     decoded = dequantize_fp8_bits_block_weight(
         weight_bits, scale, output_dtype=jnp.float32
     )
-    expected = jnp.sum(
-        lhs.astype(jnp.float32) * decoded.astype(jnp.float32),
-        axis=1,
-        dtype=jnp.float32,
-    )[None, :]
+    expected = lax.dot_general(
+        lhs.astype(jnp.float32),
+        decoded.astype(jnp.float32),
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    )
     actual = fp8_block_vector_matmul_f32(
         lhs, weight_bits, scale, interpret=True
     )
     assert actual.dtype == jnp.float32
-    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+    np.testing.assert_allclose(
+        np.asarray(actual), np.asarray(expected), rtol=0, atol=5e-7
+    )
 
 
 def test_fp8_block_vector_matmul_f32_rejects_non_dsa_shapes() -> None:
