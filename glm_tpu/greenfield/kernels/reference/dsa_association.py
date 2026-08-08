@@ -21,6 +21,7 @@ from .rotary import apply_rotary, rotary_cos_sin
 
 
 KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
+KeyProjectionWeightMode = Literal["adapted_fp32", "adapted_bf16"]
 QaProjectionMode = Literal[
     "separate_q_a",
     "legacy_fused_qkv_a",
@@ -1129,6 +1130,7 @@ def layer0_prompt_index_key_chunk(
     *,
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
+    projection_weight_mode: KeyProjectionWeightMode = "adapted_fp32",
 ) -> Any:
     """Build one already-live layer-0 prefill chunk of index keys."""
 
@@ -1164,6 +1166,19 @@ def layer0_prompt_index_key_chunk(
         raise ValueError("layer-0 prompt-key chunk positions must remain int32")
     if wk_weight.dtype != jnp.float32:
         raise ValueError("layer-0 accepted adapted wk must remain FP32")
+    if projection_weight_mode == "adapted_fp32":
+        projection_weight = wk_weight
+    elif projection_weight_mode == "adapted_bf16":
+        # DB507's mapped TPU lowering rounds the accepted adapted FP32 state
+        # once to BF16 before the M2048 convolution.  Keep the public state
+        # identity FP32 and make only that physical arithmetic boundary
+        # explicit for the bounded external-chunk discriminator.
+        projection_weight = wk_weight.astype(jnp.bfloat16)
+    else:
+        raise ValueError(
+            "unsupported layer-0 prompt-key projection weight mode "
+            f"{projection_weight_mode!r}"
+        )
     normalized = rms_norm(
         hidden_chunk,
         input_norm_weight,
@@ -1172,7 +1187,7 @@ def layer0_prompt_index_key_chunk(
     return _project_keys(
         normalized,
         positions,
-        wk_weight,
+        projection_weight,
         key_norm_weight,
         key_norm_bias,
         geometry=geometry,

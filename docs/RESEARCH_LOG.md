@@ -5751,3 +5751,10 @@ pass. This has no performance or decoder standing. The next bounded candidate ke
 external M2048 chunk and explicitly converts only adapted `wk` to BF16, with a fail-closed BF16-RHS
 HLO contract. Only after it reproduces the 45-value regime should RoPE association be isolated;
 no full-decoder retry is authorized.
+
+The discriminator is now implemented without creating a new harness. The existing external-chunk
+helper accepts the same FP32 adapted state but can round only its projection operand to BF16; the
+existing protected wrapper adds a third profile and hash/DB/remote validation of DB508. The HLO
+contract requires one explicit FP32-to-BF16 `wk` conversion, one M2048 convolution, zero loops and
+all prior no-communication/full-prompt/dead-row conditions. Focused tests pass 32/32 and all static
+checks are green. The next evidence action is one clean-pinned serialized run of that profile.

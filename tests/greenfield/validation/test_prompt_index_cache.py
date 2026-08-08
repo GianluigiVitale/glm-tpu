@@ -289,6 +289,48 @@ ENTRY main {
     )
     assert result["passed"] is True
     assert result["loop_count"] == 0
+    assert result["bf16_wk_conversion_count"] == 0
+    assert result["convolution_weight_bf16"] is False
+
+
+def test_prompt_key_chunk_bf16_weight_hlo_pins_conversion() -> None:
+    hlo = """
+ENTRY main {
+  %hidden = bf16[2048,6144]{1,0} parameter(0)
+  %positions = s32[2048]{0} parameter(1)
+  %wk_weight.1 = f32[128,6144]{1,0} parameter(2)
+  %wk_bf16 = bf16[128,6144]{1,0} convert(%wk_weight.1)
+  %projection = f32[2048,128]{1,0} convolution(%hidden, %wk_bf16), dim_labels=bf_oi->bf
+  %root = f32[1]{0} sqrt(%projection)
+  %normalized = f32[1]{0} divide(%projection, %root)
+  ROOT %keys = bf16[2048,128]{1,0} convert(%normalized)
+}
+"""
+    result = validate_prompt_index_key_association_hlo(
+        hlo,
+        candidate=(
+            "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
+        ),
+    )
+    assert result["passed"] is True
+    assert result["loop_count"] == 0
+    assert result["bf16_wk_conversion_count"] == 1
+    assert result["convolution_weight_bf16"] is True
+
+    disconnected = hlo.replace(
+        "convolution(%hidden, %wk_bf16)",
+        "convolution(%hidden, %wk_weight.1)",
+    )
+    rejected = validate_prompt_index_key_association_hlo(
+        disconnected,
+        candidate=(
+            "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
+        ),
+    )
+    assert rejected["passed"] is False
+    assert "M2048 convolution does not consume a BF16 wk operand" in (
+        rejected["violations"]
+    )
 
 
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
@@ -378,6 +420,7 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "accepted_xla_m2048_divide_sqrt",
         "accepted_xla_m2048_multiply_rsqrt",
         "accepted_xla_m2048_chunk_parameter_divide_sqrt",
+        "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt",
         "--candidate-set",
         "layer0_prompt_index_keys_chunked",
         "validate_prompt_index_key_association_hlo",
@@ -391,7 +434,12 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "SOURCE_COMPARISON_MANIFEST_SHA=b1822e71",
         "MATRIX_RUN_ID=507",
         "MATRIX_ASSOCIATION_MANIFEST_SHA=7216756c",
+        "CHUNK_RUN_ID=508",
+        "CHUNK_ITEM_ROW_ID=1793",
+        "CHUNK_ASSOCIATION_MANIFEST_SHA=8539a81d",
         "matrix_validation.json",
+        "chunk_parameter_validation.json",
+        "chunk_bf16_weight",
         "GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE",
         '--candidate-set "$PROFILE"',
         "probe_layer0_prompt_index_cache_association.py",

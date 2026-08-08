@@ -80,7 +80,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--candidate-set",
-        choices=("matrix", "chunk_parameter"),
+        choices=("matrix", "chunk_parameter", "chunk_bf16_weight"),
         default="matrix",
     )
     parser.add_argument("--output", type=Path, required=True)
@@ -88,6 +88,11 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _classify(exact: set[str]) -> str:
+    chunk_bf16_weight = (
+        "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt" in exact
+    )
+    if chunk_bf16_weight:
+        return "chunk_bf16_weight_association_sufficient"
     chunk_parameter = (
         "accepted_xla_m2048_chunk_parameter_divide_sqrt" in exact
     )
@@ -389,14 +394,25 @@ def main() -> int:
             (put(prompt_hidden_host[index]), put(position_host[index]))
             for index in range(prompt_hidden_host.shape[0])
         )
+        projection_weight_mode = (
+            "adapted_bf16"
+            if args.candidate_set == "chunk_bf16_weight"
+            else "adapted_fp32"
+        )
         chunk_function = partial(
             layer0_prompt_index_key_chunk,
             geometry=geometry,
             key_norm_mode="divide_sqrt",
+            projection_weight_mode=projection_weight_mode,
         )
         first_hidden, first_positions = chunk_inputs[0]
+        candidate_name = (
+            "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
+            if args.candidate_set == "chunk_bf16_weight"
+            else "accepted_xla_m2048_chunk_parameter_divide_sqrt"
+        )
         definitions = {
-            "accepted_xla_m2048_chunk_parameter_divide_sqrt": (
+            candidate_name: (
                 chunk_function,
                 (
                     first_hidden,

@@ -156,6 +156,19 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
     assert chunk.shape == (4, 4)
     assert chunk.dtype == jnp.bfloat16
     assert np.isfinite(np.asarray(chunk, dtype=np.float32)).all()
+    bf16_weight_chunk = layer0_prompt_index_key_chunk(
+        jnp.take(arguments[0], arguments[1][:4], axis=0),
+        jnp.arange(4, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        projection_weight_mode="adapted_bf16",
+    )
+    assert bf16_weight_chunk.shape == chunk.shape
+    assert bf16_weight_chunk.dtype == chunk.dtype
+    assert np.isfinite(
+        np.asarray(bf16_weight_chunk, dtype=np.float32)
+    ).all()
 
 
 def test_layer0_state_preserves_chunk_and_decode_geometry() -> None:

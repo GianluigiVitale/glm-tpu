@@ -605,6 +605,10 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk",
             "divide_sqrt",
         ),
+        "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt": (
+            "xla_chunk_bf16_weight",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -752,6 +756,30 @@ def validate_prompt_index_key_association_hlo(
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
             "chunk_key_output": f"bf16[{prompt_chunk},128]" in lowered,
         }
+        bf16_weight_conversion_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(
+                r"= bf16\[128,6144\].*convert\(%wk_weight(?:\.[0-9]+)?\)",
+                line,
+            )
+        ]
+        convolution_weight_bf16 = False
+        if len(convolution_lines) == 1:
+            operands = re.search(
+                r"convolution\([^,]+,\s*(%[^,)]+)",
+                convolution_lines[0],
+            )
+            if operands is not None:
+                weight_name = operands.group(1)
+                convolution_weight_bf16 = any(
+                    re.search(
+                        rf"^\s*{re.escape(weight_name)}\s*=\s*"
+                        r"bf16\[128,6144\]",
+                        line,
+                    )
+                    for line in lowered.splitlines()
+                )
         violations = []
         if len(convolution_lines) != 1:
             violations.append(
@@ -761,6 +789,20 @@ def validate_prompt_index_key_association_hlo(
         if while_lines:
             violations.append(
                 f"expected no chunk-program loop, found {len(while_lines)}"
+            )
+        if backend == "xla_chunk_bf16_weight":
+            if len(bf16_weight_conversion_lines) != 1:
+                violations.append(
+                    "expected one explicit FP32-to-BF16 wk conversion, "
+                    f"found {len(bf16_weight_conversion_lines)}"
+                )
+            if not convolution_weight_bf16:
+                violations.append(
+                    "M2048 convolution does not consume a BF16 wk operand"
+                )
+        elif bf16_weight_conversion_lines:
+            violations.append(
+                "unexpected FP32-to-BF16 wk conversion in FP32 chunk candidate"
             )
         if forbidden_operations:
             violations.append(
@@ -777,6 +819,10 @@ def validate_prompt_index_key_association_hlo(
             violations.append(f"missing chunk-parameter HLO shapes: {missing}")
         result = {
             "accepted_convolution_count": len(convolution_lines),
+            "bf16_wk_conversion_count": len(
+                bf16_weight_conversion_lines
+            ),
+            "convolution_weight_bf16": convolution_weight_bf16,
             "forbidden_operations": forbidden_operations,
             "forbidden_shapes": forbidden_shapes,
             "loop_count": len(while_lines),

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Resume DB506 and isolate prompt-key projection/chunk versus norm association.
+# Resume the sealed cache chain and isolate one prompt-key association.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -46,6 +46,26 @@ readonly MATRIX_REMOTE_OBJECTS_SHA=7787dccdfda2fded013ab1dba9263e2b550ad465101ad
 readonly MATRIX_PRE_CENSUS_SHA=3d44069a5c345c4837719327209102f88ce47d6a25cbe8000482a5537a7df9ee
 readonly MATRIX_POST_CENSUS_SHA=bb9747afc094835fd8ca3cee0cfd5f9b240c592ad11a0fd1fab66f3128eb51fd
 readonly MATRIX_ASSOCIATION_MANIFEST_SHA=7216756cf364e3461755c65b99961ba50f37fe712914efad98323cca98a97cae
+readonly MATRIX_BEST_HLO_FILE_SHA=7dbb25c231149e5d8ba811cfaede6bcd8fa692dcc07a4f3fa7d1b9c24440fb89
+readonly CHUNK_TAG=greenfield_layer0_prompt_index_cache_association_20260808T221200429613435Z
+readonly CHUNK_DIR=/home/gianl/glm-run/$CHUNK_TAG
+readonly CHUNK_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_association/8k/$CHUNK_TAG
+readonly CHUNK_CODE_HASH=7027cf6b655d76751f7c166b38e0780428918a9e
+readonly CHUNK_RUN_ID=508
+readonly CHUNK_ITEM_ROW_ID=1793
+readonly CHUNK_ASSOCIATION_FILE_SHA=7ec5737b64117b94e055a264b426824dc377962521ab4986a2793b84939fd3f2
+readonly CHUNK_SUMMARY_FILE_SHA=d5e663c86270a1711c2965bb34e2499de407083677640577a22e84716cb8a8a3
+readonly CHUNK_SUCCESS_SHA=6a38369a4fbe007b0539bba185af49715917738ea995491d23b0a8d287e612e7
+readonly CHUNK_RESULTS_DB_SHA=81bff92804a785ca5991e919441b3139e16aba2f29290a3baa8a36794affa7be
+readonly CHUNK_EVIDENCE_SHA=48776445ce8971afdc8734f81485880686a00704b0471b1ded3fb73b5627214c
+readonly CHUNK_REMOTE_OBJECTS_SHA=11aa387aa711eeba67a83acf12ea1304e17caf0545e3a98a4c5a657fe32034e4
+readonly CHUNK_PRE_CENSUS_SHA=0e31ae7e0b5cc66a618965c673926e8cb76fffd79b17f3a73221a208da008ce7
+readonly CHUNK_POST_CENSUS_SHA=127b69cd3010860a7e00da92fb521140d76baf36b990cc9a167d87081801a911
+readonly CHUNK_MATRIX_VALIDATION_SHA=667c4b1de614f90821c21f18cbf9866888c6ff01d3fb02aa1fb0b62996421070
+readonly CHUNK_SOURCE_VALIDATION_SHA=cf9306eab21f030198e9d1195732b0879fb8aba824feec02bab93f68d95c547d
+readonly CHUNK_ASSOCIATION_MANIFEST_SHA=8539a81d5300266f2ea35c2df2d16321e3b964e471ce83f7b8fc80459fcd6d07
+readonly CHUNK_OBSERVED_CACHE_SHA=db2f77d986fa3a452bc60a429b1a7b0a63e5d77a6408e504dc9a9359eb50a7a1
+readonly CHUNK_HLO_FILE_SHA=b2e986161aafaff4823d6d2e527c24fc308de1336c5ebb00d0aa29f33dd2f274
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
@@ -57,7 +77,8 @@ RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_association/8k/$TAG
 ASSOCIATION_DIR=$RUN_DIR/association
 
-[[ $PROFILE == matrix || $PROFILE == chunk_parameter ]] || {
+[[ $PROFILE == matrix || $PROFILE == chunk_parameter || \
+  $PROFILE == chunk_bf16_weight ]] || {
   echo "unsupported prompt-key association profile: $PROFILE" >&2
   exit 2
 }
@@ -234,9 +255,10 @@ Path(output_path).write_text(json.dumps({
 connection.close()
 PY
 
-if [[ $PROFILE == chunk_parameter ]]; then
+if [[ $PROFILE == chunk_parameter || $PROFILE == chunk_bf16_weight ]]; then
   for contract in \
     "$MATRIX_ASSOCIATION_FILE_SHA $MATRIX_DIR/association/association.json" \
+    "$MATRIX_BEST_HLO_FILE_SHA $MATRIX_DIR/association/hlo/accepted_xla_m2048_divide_sqrt.optimized_hlo.txt.gz" \
     "$MATRIX_SUMMARY_FILE_SHA $MATRIX_DIR/summary.json" \
     "$MATRIX_SUCCESS_SHA $MATRIX_DIR/SUCCESS" \
     "$MATRIX_RESULTS_DB_SHA $MATRIX_DIR/results_ckpt.db" \
@@ -321,6 +343,97 @@ connection.close()
 PY
 fi
 
+if [[ $PROFILE == chunk_bf16_weight ]]; then
+  for contract in \
+    "$CHUNK_ASSOCIATION_FILE_SHA $CHUNK_DIR/association/association.json" \
+    "$CHUNK_HLO_FILE_SHA $CHUNK_DIR/association/hlo/accepted_xla_m2048_chunk_parameter_divide_sqrt.optimized_hlo.txt.gz" \
+    "$CHUNK_SUMMARY_FILE_SHA $CHUNK_DIR/summary.json" \
+    "$CHUNK_SUCCESS_SHA $CHUNK_DIR/SUCCESS" \
+    "$CHUNK_RESULTS_DB_SHA $CHUNK_DIR/results_ckpt.db" \
+    "$CHUNK_EVIDENCE_SHA $CHUNK_DIR/evidence.sha256" \
+    "$CHUNK_REMOTE_OBJECTS_SHA $CHUNK_DIR/remote_objects.json" \
+    "$CHUNK_PRE_CENSUS_SHA $CHUNK_DIR/census_pre.txt" \
+    "$CHUNK_POST_CENSUS_SHA $CHUNK_DIR/census_post.txt" \
+    "$CHUNK_MATRIX_VALIDATION_SHA $CHUNK_DIR/matrix_validation.json" \
+    "$CHUNK_SOURCE_VALIDATION_SHA $CHUNK_DIR/source_validation.json"; do
+    expected=${contract%% *}
+    path=${contract#* }
+    [[ $(sha256sum "$path" | awk '{print $1}') == "$expected" ]] || {
+      say "ABORT: sealed DB508 chunk result drifted: $path"
+      exit 2
+    }
+  done
+  chunk_remote_success_sha=$(gcloud storage cat \
+    "$CHUNK_REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $chunk_remote_success_sha == "$CHUNK_SUCCESS_SHA" ]] || {
+    say "ABORT: approved DB508 SUCCESS drifted"
+    exit 2
+  }
+  /home/gianl/vllm-env/bin/python - \
+    "$RESULTS_DB" "$CHUNK_DIR" \
+    "$RUN_DIR/chunk_parameter_validation.json" \
+    "$CHUNK_RUN_ID" "$CHUNK_ITEM_ROW_ID" "$CHUNK_CODE_HASH" \
+    "$CHUNK_ASSOCIATION_MANIFEST_SHA" "$CHUNK_OBSERVED_CACHE_SHA" <<'PY'
+import json
+from pathlib import Path
+import sqlite3
+import sys
+
+(db_path, chunk_path, output_path, run_id, item_id, code_hash,
+ manifest_sha, observed_sha) = sys.argv[1:]
+run_id, item_id = int(run_id), int(item_id)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+    raise SystemExit("DB508 chunk source DB integrity failed")
+run = connection.execute(
+    "SELECT harness_git,env_json,pod FROM runs WHERE run_id=?", (run_id,)
+).fetchone()
+item = connection.execute(
+    "SELECT id,item_id,correct,score FROM items WHERE run_id=?", (run_id,)
+).fetchone()
+expected_item = (
+    item_id,
+    "accepted_xla_m2048_chunk_parameter_divide_sqrt",
+    0,
+    0.0,
+)
+if run is None or item != expected_item:
+    raise SystemExit("DB508 chunk source row drifted")
+harness, env_json, pod = run
+env = json.loads(env_json)
+if (
+    harness != code_hash[:7]
+    or pod != "db-v4-64-od"
+    or env.get("association_manifest_sha256") != manifest_sha
+    or env.get("candidate_set") != "chunk_parameter"
+    or env.get("exact_candidates") != []
+):
+    raise SystemExit("DB508 chunk source provenance drifted")
+root = Path(chunk_path)
+association = json.loads((root / "association/association.json").read_text())
+candidate = association["candidates"][
+    "accepted_xla_m2048_chunk_parameter_divide_sqrt"
+]
+if (
+    association["manifest_sha256"] != manifest_sha
+    or association["candidate_set"] != "chunk_parameter"
+    or candidate["comparison_to_accepted"]["mismatch_count"] != 4045
+    or candidate["observed_bfloat16_sha256"] != observed_sha
+    or candidate["hlo"]["contract"]["loop_count"] != 0
+):
+    raise SystemExit("DB508 chunk source artifact drifted")
+Path(output_path).write_text(json.dumps({
+    "status": "SUCCESS",
+    "chunk_run_id": run_id,
+    "chunk_item_row_id": item_id,
+    "chunk_code_hash": code_hash,
+    "chunk_association_manifest_sha256": manifest_sha,
+    "chunk_mismatch_count": 4045,
+}, indent=2, sort_keys=True) + "\n")
+connection.close()
+PY
+fi
+
 say "syncing exact greenfield pin to all eight hosts"
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && echo "SYNC_OK $(hostname) $pin"'
@@ -331,7 +444,7 @@ has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
   exit 1
 }
 
-say "running three-candidate association matrix on one TPU-v4 host"
+say "running prompt-key association profile=$PROFILE on one TPU-v4 host"
 started=$(date +%s)
 env JAX_PLATFORMS=tpu \
   TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
@@ -370,15 +483,18 @@ import sys
  source_item_id, cache_sha, baseline_sha, profile) = sys.argv[1:]
 root = Path(run_path)
 association = json.loads((root / "association/association.json").read_text())
-expected_names = (
-    {
+if profile == "matrix":
+    expected_names = {
         "production_pallas_m1_divide_sqrt",
         "accepted_xla_m2048_divide_sqrt",
         "accepted_xla_m2048_multiply_rsqrt",
     }
-    if profile == "matrix"
-    else {"accepted_xla_m2048_chunk_parameter_divide_sqrt"}
-)
+elif profile == "chunk_parameter":
+    expected_names = {"accepted_xla_m2048_chunk_parameter_divide_sqrt"}
+else:
+    expected_names = {
+        "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
+    }
 if (
     association["status"] != "SUCCESS"
     or association["code_hash"] != pin
@@ -419,7 +535,10 @@ run_id = pv.start_run(
         "exact_candidates": association["conclusion"]["exact_candidates"],
         "classification": association["conclusion"]["classification"],
         "candidate_set": profile,
-        "matrix_source_run_id": 507 if profile == "chunk_parameter" else None,
+        "association_parent_run_id": {
+            "chunk_parameter": 507,
+            "chunk_bf16_weight": 508,
+        }.get(profile),
     },
     note=(
         "Protected bounded layer-0 prompt-key association matrix. No decoder, "
@@ -511,6 +630,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
     orchestrator.sealed.log
   if [[ -f matrix_validation.json ]]; then
     sha256sum matrix_validation.json
+  fi
+  if [[ -f chunk_parameter_validation.json ]]; then
+    sha256sum chunk_parameter_validation.json
   fi
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \

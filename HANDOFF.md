@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 22:23 UTC
+**Updated:** 2026-08-08 22:47 UTC
 
 ## Authority and isolation
 
@@ -2190,3 +2190,13 @@ BF16 convolution RHS, one convolution, zero loop/communication/callback/full-pro
 shapes, and the same divide/sqrt norm. If that reproduces DB507's 45 rotary-half mismatches, isolate
 the source-faithful RoPE association next. Do not retry the full decoder before bitwise cache
 equality.
+
+That candidate is now implementation-ready. `layer0_prompt_index_key_chunk` retains the public
+accepted FP32 `wk` state and exposes a diagnostic-only `adapted_bf16` projection boundary. The
+association validator requires exactly one explicit `f32[128,6144] -> bf16[128,6144]` conversion,
+one M2048 convolution and no loop or forbidden operation/shape. The protected wrapper pins and
+revalidates the complete DB506--DB508 local/DB/remote lineage before launch. Focused kernel and
+cache-validation tests pass 32/32; Python compilation, Bash syntax, ShellCheck, JSON and diff
+checks pass. Exact next: commit/push from a clean pin, prove the fleet idle, then run only
+`GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE=chunk_bf16_weight
+scripts/greenfield/run_prompt_index_cache_association_probe.sh`.
