@@ -21,16 +21,15 @@ def _write_dump(
     *,
     process_index: int,
     global_bits: np.ndarray,
-    context_slice: slice,
     corrupt_replica: bool = False,
 ) -> None:
-    shard = global_bits[:, context_slice, :, :].copy()
+    shard = global_bits.copy()
     duplicate = shard.copy()
     if corrupt_replica:
         duplicate.flat[0] ^= np.uint16(1)
     index = (
         slice(None, None, None),
-        context_slice,
+        slice(None, None, None),
         slice(None, None, None),
         slice(None, None, None),
     )
@@ -43,7 +42,8 @@ def _write_dump(
         process_count=np.asarray(2, dtype=np.int64),
         layer_indices=np.asarray([0], dtype=np.int64),
         mesh_shape=np.asarray(
-            "{'data': 1, 'model': 2, 'dcp': 2}"
+            "{'data': 1, 'attn_dp': 1, 'attn_dp_expert': 1, "
+            "'expert': 1, 'model': 4, 'dcp': 1}"
         ),
         meta__block_tables=np.asarray([1, 2, 0, 0], dtype=np.int32),
         meta__seq_lens=np.asarray([66], dtype=np.int32),
@@ -53,10 +53,14 @@ def _write_dump(
         layer0__nshards=np.asarray(2, dtype=np.int64),
         layer0__shard0__data=shard,
         layer0__shard0__index=np.asarray(str(index)),
-        layer0__shard0__device=np.asarray(f"TPU_{process_index * 2}"),
+        layer0__shard0__device=np.asarray(
+            f"TPU_{process_index * 2}(process={process_index},(0,0,0,0))"
+        ),
         layer0__shard1__data=duplicate,
         layer0__shard1__index=np.asarray(str(index)),
-        layer0__shard1__device=np.asarray(f"TPU_{process_index * 2 + 1}"),
+        layer0__shard1__device=np.asarray(
+            f"TPU_{process_index * 2 + 1}(process={process_index},(1,0,0,0))"
+        ),
     )
 
 
@@ -72,7 +76,10 @@ def _config(source: Path, output: Path) -> LegacyPromptIndexCacheConfig:
         layer0_input_manifest_sha256="c" * 64,
         prompt_token_ids_sha256="d" * 64,
         expected_process_count=2,
-        expected_model_replication=2,
+        expected_local_replication=2,
+        expected_physical_replication=4,
+        expected_mesh_model_size=4,
+        expected_mesh_dcp_size=1,
         expected_step_index=2,
         expected_last_chunk_tokens=2,
         expected_prompt_tokens=66,
@@ -95,13 +102,11 @@ def test_reconstructs_replicated_dcp_cache_in_logical_order(tmp_path: Path) -> N
         source / "index_cache.postfwd.step0002.proc0.npz",
         process_index=0,
         global_bits=global_bits,
-        context_slice=slice(0, 1),
     )
     _write_dump(
         source / "index_cache.postfwd.step0002.proc1.npz",
         process_index=1,
         global_bits=global_bits,
-        context_slice=slice(1, 2),
     )
     manifest = capture_legacy_prompt_index_cache(
         _config(source, tmp_path / "artifact")
@@ -113,7 +118,8 @@ def test_reconstructs_replicated_dcp_cache_in_logical_order(tmp_path: Path) -> N
     expected = np.concatenate((global_bits[1].reshape(64, 4),
                                global_bits[2].reshape(64, 4)[:2]))
     np.testing.assert_array_equal(bits, expected)
-    assert inspected["source_layout"]["model_replication"] == 2
+    assert inspected["source_layout"]["physical_replication"] == 4
+    assert inspected["source_layout"]["local_replication_per_process"] == 2
     assert inspected["source_layout"]["live_block_table"] == [1, 2]
     assert inspected["prompt_index_key_bfloat16_sha256"] == sha256(
         expected.tobytes()
@@ -130,14 +136,12 @@ def test_rejects_disagreeing_model_replicas(tmp_path: Path) -> None:
         source / "index_cache.postfwd.step0002.proc0.npz",
         process_index=0,
         global_bits=global_bits,
-        context_slice=slice(0, 1),
         corrupt_replica=True,
     )
     _write_dump(
         source / "index_cache.postfwd.step0002.proc1.npz",
         process_index=1,
         global_bits=global_bits,
-        context_slice=slice(1, 2),
     )
     with pytest.raises(ValueError, match="replicas disagree"):
         capture_legacy_prompt_index_cache(

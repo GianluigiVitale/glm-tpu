@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 from hashlib import sha256
 import json
@@ -73,12 +74,15 @@ class LegacyPromptIndexCacheConfig:
     layer0_input_manifest_sha256: str
     prompt_token_ids_sha256: str
     expected_process_count: int = 8
-    expected_model_replication: int = 4
+    expected_local_replication: int = 4
+    expected_physical_replication: int = 32
+    expected_mesh_model_size: int = 32
+    expected_mesh_dcp_size: int = 1
     expected_step_index: int = 4
     expected_last_chunk_tokens: int = 2011
     expected_prompt_tokens: int = 8155
     expected_physical_pages: int = 24
-    expected_logical_page_size: int = 4096
+    expected_logical_page_size: int = 512
     expected_head_dim: int = 128
 
     def __post_init__(self) -> None:
@@ -99,7 +103,10 @@ class LegacyPromptIndexCacheConfig:
             "source_run_id",
             "source_item_row_id",
             "expected_process_count",
-            "expected_model_replication",
+            "expected_local_replication",
+            "expected_physical_replication",
+            "expected_mesh_model_size",
+            "expected_mesh_dcp_size",
             "expected_step_index",
             "expected_last_chunk_tokens",
             "expected_prompt_tokens",
@@ -110,6 +117,16 @@ class LegacyPromptIndexCacheConfig:
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise ValueError(f"prompt-cache {name} must be positive")
+        if self.expected_physical_replication != (
+            self.expected_process_count * self.expected_local_replication
+        ):
+            raise ValueError("prompt-cache process/replica geometry is inconsistent")
+        if self.expected_physical_replication != (
+            self.expected_mesh_model_size * self.expected_mesh_dcp_size
+        ):
+            raise ValueError("prompt-cache physical/mesh geometry is inconsistent")
+        if self.expected_logical_page_size % 32:
+            raise ValueError("prompt-cache logical page must preserve packing 32")
         if not self.run_tag:
             raise ValueError("prompt-cache run tag must be non-empty")
 
@@ -133,6 +150,7 @@ def _load_source_cache(
     sequence_lengths: np.ndarray | None = None
     source_records: list[dict[str, Any]] = []
     process_indices: set[int] = set()
+    physical_devices: set[str] = set()
     shard_records = 0
 
     for path in paths:
@@ -154,11 +172,19 @@ def _load_source_cache(
                 raise ValueError("prompt-cache final prefill chunk drifted")
             if payload["layer_indices"].tolist() != [0]:
                 raise ValueError("prompt-cache source must contain slot zero only")
-            mesh = str(payload["mesh_shape"])
-            if (
-                f"'model': {config.expected_model_replication}" not in mesh
-                or f"'dcp': {config.expected_process_count}" not in mesh
-            ):
+            try:
+                mesh = ast.literal_eval(str(payload["mesh_shape"]))
+            except (SyntaxError, ValueError) as error:
+                raise ValueError("prompt-cache source mesh is not portable") from error
+            expected_mesh = {
+                "data": 1,
+                "attn_dp": 1,
+                "attn_dp_expert": 1,
+                "expert": 1,
+                "model": config.expected_mesh_model_size,
+                "dcp": config.expected_mesh_dcp_size,
+            }
+            if mesh != expected_mesh:
                 raise ValueError("prompt-cache source mesh drifted")
             if str(payload["layer0__dtype"]) != "bfloat16":
                 raise ValueError("prompt-cache source dtype drifted")
@@ -182,8 +208,8 @@ def _load_source_cache(
 
             assert replica_counts is not None
             shard_count = int(payload["layer0__nshards"])
-            if shard_count <= 0:
-                raise ValueError("prompt-cache source has no addressable shards")
+            if shard_count != config.expected_local_replication:
+                raise ValueError("prompt-cache local replica coverage drifted")
             for shard_index in range(shard_count):
                 key = f"layer0__shard{shard_index}"
                 shard = np.asarray(payload[f"{key}__data"])
@@ -198,6 +224,14 @@ def _load_source_cache(
                 )
                 if shard.shape != expected_shard_shape:
                     raise ValueError("prompt-cache shard extent drifted")
+                if shard.shape != shape:
+                    raise ValueError("prompt-cache source is not fully replicated")
+                device = str(payload[f"{key}__device"])
+                if f"process={process_index}," not in device or (
+                    device in physical_devices
+                ):
+                    raise ValueError("prompt-cache physical device identity drifted")
+                physical_devices.add(device)
                 target = cache_bits[index]
                 counts = replica_counts[index]
                 overlap = counts > 0
@@ -238,10 +272,14 @@ def _load_source_cache(
         raise ValueError("prompt-cache process indices are incomplete")
     assert cache_bits is not None and replica_counts is not None
     assert block_tables is not None and sequence_lengths is not None
-    if int(replica_counts.min()) != config.expected_model_replication or (
-        int(replica_counts.max()) != config.expected_model_replication
+    if int(replica_counts.min()) != config.expected_physical_replication or (
+        int(replica_counts.max()) != config.expected_physical_replication
     ):
         raise ValueError("prompt-cache physical replica coverage drifted")
+    if len(physical_devices) != config.expected_physical_replication or (
+        shard_records != config.expected_physical_replication
+    ):
+        raise ValueError("prompt-cache physical device coverage drifted")
     if sequence_lengths.ndim != 1 or sequence_lengths.size <= 0 or (
         int(sequence_lengths[0]) != config.expected_prompt_tokens
     ) or np.any(sequence_lengths[1:] != 0):
@@ -279,7 +317,10 @@ def _load_source_cache(
         "global_cache_shape": list(cache_bits.shape),
         "live_block_table": live_table.tolist(),
         "logical_block_count": logical_blocks,
-        "model_replication": config.expected_model_replication,
+        "local_replication_per_process": config.expected_local_replication,
+        "mesh_shape": expected_mesh,
+        "physical_device_count": len(physical_devices),
+        "physical_replication": config.expected_physical_replication,
         "physical_shard_record_count": shard_records,
         "sequence_lengths_sha256": _array_sha256(sequence_lengths),
     }
