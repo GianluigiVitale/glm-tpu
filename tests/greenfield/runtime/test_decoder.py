@@ -67,6 +67,7 @@ def test_8k_dsa_head_score_shape_requires_exact_dataflow() -> None:
         backend_contract="tpu_v4_pp8_pallas_feature_linear",
     )
     assert record["passed"], record
+
     assert record["score_body_count"] == 1
     assert record["score_dimensions"] == [32, 2048]
     assert len(record["allowed_dsa_score_shapes"]) == 10
@@ -475,6 +476,27 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     )
     assert record["passed"], record
 
+    reference_dsa_hlo = "\n".join(
+        line
+        for line in calls
+        if "greenfield_fp8_block_matmul_f32_m8_k2048_n1024" not in line
+    )
+    reference_dsa_hlo += "\n" + "\n".join(
+        f"%dsa_owner_{index} = f32[1024,2048] parameter(0)"
+        for index in range(21)
+    )
+    reference_dsa = _validate_pallas_stage_linear_decoder_calls(
+        reference_dsa_hlo,
+        layers=78,
+        dense_layers=3,
+        full_indexer_layers=21,
+        dsa_query_backend="reference",
+    )
+    assert reference_dsa["passed"], reference_dsa
+    assert reference_dsa["expected_kernel_counts"][
+        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024"
+    ] == 0
+
     rejected = _validate_pallas_stage_linear_decoder_calls(
         hlo + "\noverlay = bf16[2048,6144] parameter(0)",
         layers=78,
@@ -492,6 +514,30 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     )
     assert not formatted["passed"]
     assert formatted["forbidden_formatted_weight_overlays"]
+
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_dsa_query_decoder_association,
+    )
+
+    association = _validate_dsa_query_decoder_association(
+        reference_dsa_hlo,
+        full_indexer_layers=21,
+        local_parallel_size=4,
+        dsa_indexer_heads=32,
+        index_key_width=128,
+        backend="reference",
+    )
+    assert association["passed"], association
+    global_owner = _validate_dsa_query_decoder_association(
+        reference_dsa_hlo + "\n%global = f32[4096,2048] parameter(0)",
+        full_indexer_layers=21,
+        local_parallel_size=4,
+        dsa_indexer_heads=32,
+        index_key_width=128,
+        backend="reference",
+    )
+    assert not global_owner["passed"]
+    assert global_owner["forbidden_global_shapes"] == ["f32[4096,2048]"]
 
 
 def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
@@ -619,6 +665,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             linear_backend="unknown",  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="DSA query backend is unknown"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            dsa_query_backend="unknown",  # type: ignore[arg-type]
         )
     with pytest.raises(PlanValidationError, match="token-path flag"):
         build_decoder_step_program(

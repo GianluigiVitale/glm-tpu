@@ -187,7 +187,7 @@ def split_fused_sparse(x):
 def split_component_sparse(x):
     attention, _, _ = weights(x)
     normalized, combined = fused_add_rms_norm(x['residual'], x['split_residual'], x['input_norm'], epsilon=1e-5)
-    q_residual = rms_norm(_stage_fp8_linear(normalized, attention.q_a_bits, attention.q_a_scale, block_shape=(2, 2), backend='reference', interpret=False), attention.q_a_norm_weight, epsilon=1e-6)
+    q_residual = rms_norm(_stage_fp8_linear(normalized, attention.q_a_bits, attention.q_a_scale, block_shape=(2, 2), backend='reference', interpret=False), attention.q_a_norm_weight, epsilon=1e-5)
     attended = stage_local_index_share_fp8_mapped(
         combined, x['kv_cache'][0], x['selected'], x['selected_counts'], x['position'], x['tables'], x['lengths'], x['input_norm'], attention.q_a_bits, attention.q_a_scale, attention.q_a_norm_weight, attention.q_b_bits, attention.q_b_scale, attention.kv_a_bits, attention.kv_a_scale, attention.kv_a_norm_weight, attention.kv_b_bits, attention.kv_b_scale, attention.o_bits, attention.o_scale, x['slot'][0], axis_name='stage', contract=mla_contract, cache_layout=layout, block_shape=(2, 2), precomputed_normalized=normalized, precomputed_q_residual=q_residual, add_residual=False
     )

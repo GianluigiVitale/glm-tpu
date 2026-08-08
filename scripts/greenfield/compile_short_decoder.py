@@ -1317,6 +1317,10 @@ def main() -> int:
             if linear_backend == "pallas"
             else "tpu_v4_pp8_pallas_feature"
         )
+    # DB499 proves that accepted M=1 DSA queries require a complete local
+    # FP32 wq_b owner shard. Keep every other projection on its selected
+    # runtime backend; only this exactness boundary uses the reference path.
+    dsa_query_backend = "reference"
     schedule = build_pipeline_schedule(execution_plan)
     stage_dsa_producers = _stage_dsa_producer_layer_ids(schedule)
     if dsa_oracle_mode:
@@ -1409,6 +1413,7 @@ def main() -> int:
                 args.feature_reconstruct_down_fp32
             ),
             linear_backend=linear_backend,
+            dsa_query_backend=dsa_query_backend,
             complete_token_path=args.complete_token_path,
             split_residual_state=args.split_residual_state,
         )
@@ -1431,6 +1436,7 @@ def main() -> int:
                     args.feature_reconstruct_down_fp32
                 ),
                 linear_backend=linear_backend,
+                dsa_query_backend=dsa_query_backend,
                 complete_token_path=True,
                 observe_dsa_events=True,
                 observe_layer_residuals=args.observe_layer_residuals,
@@ -1662,6 +1668,7 @@ def main() -> int:
             feature_reconstruct_down_fp32=(
                 decoder.feature_reconstruct_down_fp32
             ),
+            dsa_query_backend=decoder.dsa_query_backend,
             complete_token_path=decoder.complete_token_path,
             split_residual_state=decoder.split_residual_state,
         )
@@ -1734,6 +1741,7 @@ def main() -> int:
                 feature_reconstruct_down_fp32=(
                     dsa_observer.feature_reconstruct_down_fp32
                 ),
+                dsa_query_backend=dsa_observer.dsa_query_backend,
                 complete_token_path=True,
                 token_observation_candidates=(
                     dsa_observer.config.token_observation_candidates
@@ -2532,7 +2540,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 8,
+            "schema_version": 9,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
@@ -2559,6 +2567,7 @@ def main() -> int:
                 else 0
             ),
             "linear_backend": decoder.linear_backend,
+            "dsa_query_backend": decoder.dsa_query_backend,
             "complete_token_path": decoder.complete_token_path,
             "token_contract": token_contract,
             "token_passed": token_passed,

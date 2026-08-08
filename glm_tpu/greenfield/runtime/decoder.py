@@ -162,6 +162,7 @@ class DecoderStepProgram:
     feature_fuse_route_weighting: bool
     feature_reconstruct_down_fp32: bool
     linear_backend: StageLinearBackend
+    dsa_query_backend: StageLinearBackend
     complete_token_path: bool
     observe_dsa_events: bool
     observe_layer_residuals: bool
@@ -330,12 +331,69 @@ def _validate_pallas_feature_decoder_calls(
     }
 
 
+def _validate_dsa_query_decoder_association(
+    optimized_hlo: str,
+    *,
+    full_indexer_layers: int,
+    local_parallel_size: int,
+    dsa_indexer_heads: int,
+    index_key_width: int,
+    backend: StageLinearBackend,
+) -> dict[str, Any]:
+    """Pin the exact query projection to a local owner, never a global table."""
+
+    global_output_width = dsa_indexer_heads * index_key_width
+    local_output_width = global_output_width // local_parallel_size
+    local_shape = f"f32[{local_output_width},2048]"
+    global_shapes = tuple(
+        f"{dtype}[{global_output_width},2048]"
+        for dtype in ("bf16", "f32", "f8e4m3fn")
+    )
+    local_shape_occurrences = sum(
+        local_shape in line for line in optimized_hlo.splitlines()
+    )
+    forbidden_global_shapes = [
+        shape for shape in global_shapes if shape in optimized_hlo
+    ]
+    violations = []
+    if global_output_width % local_parallel_size:
+        violations.append("DSA query width does not shard over the local group")
+    if forbidden_global_shapes:
+        violations.append(
+            "decoder reconstructs a global DSA query weight: "
+            f"{forbidden_global_shapes}"
+        )
+    if backend == "reference":
+        if local_shape_occurrences < full_indexer_layers:
+            violations.append(
+                "decoder lost the complete local FP32 DSA owner boundary: "
+                f"shape={local_shape} expected_at_least={full_indexer_layers} "
+                f"observed={local_shape_occurrences}"
+            )
+    elif backend == "pallas":
+        if local_shape_occurrences:
+            violations.append(
+                "Pallas DSA query path retains a decoded local weight overlay"
+            )
+    else:
+        raise PlanValidationError("DSA query HLO backend is unknown")
+    return {
+        "backend": backend,
+        "forbidden_global_shapes": forbidden_global_shapes,
+        "local_owner_shape": local_shape,
+        "local_owner_shape_occurrences": local_shape_occurrences,
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
 def _validate_pallas_stage_linear_decoder_calls(
     optimized_hlo: str,
     *,
     layers: int,
     dense_layers: int,
     full_indexer_layers: int,
+    dsa_query_backend: StageLinearBackend = "pallas",
 ) -> dict[str, Any]:
     """Pin every raw-FP8 attention/dense projection replacing an overlay."""
 
@@ -346,7 +404,9 @@ def _validate_pallas_stage_linear_decoder_calls(
         "greenfield_fp8_block_matmul_m8_k4096_n6144": layers,
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": layers,
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": layers,
-        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": full_indexer_layers,
+        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": (
+            full_indexer_layers if dsa_query_backend == "pallas" else 0
+        ),
         "greenfield_fp8_block_matmul_f32_m8_k6144_n128": full_indexer_layers,
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": (
             dense_layers
@@ -361,20 +421,22 @@ def _validate_pallas_stage_linear_decoder_calls(
         name: sum(name in line for line in custom_calls)
         for name in expected_kernel_counts
     }
+    if dsa_query_backend not in ("reference", "pallas"):
+        raise PlanValidationError("DSA query HLO backend is unknown")
+    decoded_shapes = (
+        "2048,6144",
+        "4096,2048",
+        "576,6144",
+        "6144,4096",
+        "7168,512",
+        "128,6144",
+        "3072,6144",
+        "6144,3072",
+    ) + (() if dsa_query_backend == "reference" else ("1024,2048",))
     forbidden_shapes = tuple(
         f"{dtype}[{shape}]"
         for dtype in ("bf16", "f32")
-        for shape in (
-            "2048,6144",
-            "4096,2048",
-            "576,6144",
-            "6144,4096",
-            "7168,512",
-            "1024,2048",
-            "128,6144",
-            "3072,6144",
-            "6144,3072",
-        )
+        for shape in decoded_shapes
     )
     forbidden_overlays = [
         shape for shape in forbidden_shapes if shape in optimized_hlo
@@ -411,6 +473,7 @@ def _validate_pallas_stage_linear_decoder_calls(
         )
     return {
         "expected_kernel_counts": expected_kernel_counts,
+        "dsa_query_backend": dsa_query_backend,
         "forbidden_decoded_weight_overlays": forbidden_overlays,
         "forbidden_formatted_weight_overlays": forbidden_formatted_overlays,
         "kernel_counts": kernel_counts,
@@ -862,6 +925,7 @@ def validate_decoder_step_hlo(
     feature_output_tile: int | None = None,
     feature_fuse_route_weighting: bool = False,
     feature_reconstruct_down_fp32: bool = False,
+    dsa_query_backend: StageLinearBackend | None = None,
     complete_token_path: bool = False,
     token_observation_candidates: int = 1,
     split_residual_state: bool = False,
@@ -898,6 +962,14 @@ def validate_decoder_step_hlo(
             "feature FP32 reconstruction is incompatible with fused route "
             "weighting"
         )
+    if dsa_query_backend is None:
+        dsa_query_backend = (
+            "pallas"
+            if backend_contract == "tpu_v4_pp8_pallas_feature_linear"
+            else "reference"
+        )
+    if dsa_query_backend not in ("reference", "pallas"):
+        raise PlanValidationError("DSA query HLO backend is unknown")
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(split_residual_state, bool):
@@ -1248,9 +1320,23 @@ def validate_decoder_step_hlo(
                 layers=layers,
                 dense_layers=dense_layers,
                 full_indexer_layers=full_layers,
+                dsa_query_backend=dsa_query_backend,
             )
         )
         violations.extend(pallas_stage_linear_contract["violations"])
+    dsa_query_association_contract: dict[str, Any] = {}
+    if backend_contract != "cpu_reference":
+        dsa_query_association_contract = (
+            _validate_dsa_query_decoder_association(
+                optimized_hlo,
+                full_indexer_layers=full_layers,
+                local_parallel_size=config.local_parallel_size,
+                dsa_indexer_heads=config.dsa_indexer_heads,
+                index_key_width=config.index_key_width,
+                backend=dsa_query_backend,
+            )
+        )
+        violations.extend(dsa_query_association_contract["violations"])
     return {
         "backend_contract": backend_contract,
         "collective_count": len(collectives),
@@ -1292,6 +1378,9 @@ def validate_decoder_step_hlo(
         "num_partitions": module.num_partitions,
         "pallas_feature_contract": pallas_feature_contract,
         "pallas_stage_linear_contract": pallas_stage_linear_contract,
+        "dsa_query_association_contract": (
+            dsa_query_association_contract
+        ),
         "passed": not violations,
         "violations": violations,
     }
@@ -1385,6 +1474,7 @@ def _execute_stage(
     pallas_moe_fuse_route_weighting: bool,
     pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
+    dsa_query_backend: StageLinearBackend,
     dsa_observation: Any | None = None,
     layer_residual_observation: Any | None = None,
 ) -> tuple[Any, ...]:
@@ -1467,6 +1557,7 @@ def _execute_stage(
                 pallas_moe_reconstruct_down_fp32
             ),
             linear_backend=linear_backend,
+            dsa_query_backend=dsa_query_backend,
         )
         residual = result.output
         if layer_residual_observation is not None:
@@ -1544,6 +1635,7 @@ def _execute_stage_split(
     pallas_moe_fuse_route_weighting: bool,
     pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
+    dsa_query_backend: StageLinearBackend,
     dsa_observation: Any | None = None,
     layer_residual_observation: Any | None = None,
 ) -> tuple[Any, ...]:
@@ -1638,6 +1730,7 @@ def _execute_stage_split(
                 pallas_moe_reconstruct_down_fp32
             ),
             linear_backend=linear_backend,
+            dsa_query_backend=dsa_query_backend,
         )
         hidden_states = result.hidden_states
         residual = result.residual
@@ -1714,6 +1807,7 @@ def build_decoder_step_program(
     feature_fuse_route_weighting: bool = False,
     feature_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
+    dsa_query_backend: StageLinearBackend | None = None,
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
     observe_layer_residuals: bool = False,
@@ -1768,6 +1862,10 @@ def build_decoder_step_program(
         )
     if linear_backend not in ("reference", "pallas"):
         raise PlanValidationError("decoder FP8 linear backend is unknown")
+    if dsa_query_backend is None:
+        dsa_query_backend = linear_backend
+    if dsa_query_backend not in ("reference", "pallas"):
+        raise PlanValidationError("decoder DSA query backend is unknown")
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(observe_dsa_events, bool):
@@ -2077,6 +2175,7 @@ def build_decoder_step_program(
                                 feature_reconstruct_down_fp32
                             ),
                             linear_backend=linear_backend,
+                            dsa_query_backend=dsa_query_backend,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
                         ),
@@ -2124,6 +2223,7 @@ def build_decoder_step_program(
                                 feature_reconstruct_down_fp32
                             ),
                             linear_backend=linear_backend,
+                            dsa_query_backend=dsa_query_backend,
                             dsa_observation=values[4],
                         ),
                         lambda values: values,
@@ -2163,6 +2263,7 @@ def build_decoder_step_program(
                             feature_reconstruct_down_fp32
                         ),
                         linear_backend=linear_backend,
+                        dsa_query_backend=dsa_query_backend,
                     ),
                     lambda values: values,
                     (residual, kv_cache, index_cache, metadata),
@@ -2517,6 +2618,7 @@ def build_decoder_step_program(
         feature_fuse_route_weighting=feature_fuse_route_weighting,
         feature_reconstruct_down_fp32=feature_reconstruct_down_fp32,
         linear_backend=linear_backend,
+        dsa_query_backend=dsa_query_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
         observe_layer_residuals=observe_layer_residuals,

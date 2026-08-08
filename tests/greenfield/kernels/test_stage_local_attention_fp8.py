@@ -154,7 +154,7 @@ normalized = rms_norm(residual, input_norm, epsilon=1e-5)
 q_residual = rms_norm(
     linear(normalized, dequantize(q_a_bits, q_a_scale)),
     q_a_norm,
-    epsilon=1e-6,
+    epsilon=1e-5,
 )
 query, query_head_weight = dsa_query_and_head_weights(
     normalized,

@@ -130,13 +130,14 @@ def stage_local_transformer_layer_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
-    lora_norm_epsilon: float = 1e-6,
+    lora_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     pallas_moe_fuse_route_weighting: bool = False,
     pallas_moe_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
+    dsa_query_backend: StageLinearBackend | None = None,
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
     """Execute exact DSA/IndexShare, sparse MLA, and dense or MoE MLP."""
@@ -171,6 +172,8 @@ def stage_local_transformer_layer_fp8_mapped(
         )
     if linear_backend not in ("reference", "pallas"):
         raise ValueError("layer FP8 linear backend is unknown")
+    if dsa_query_backend not in (None, "reference", "pallas"):
+        raise ValueError("layer DSA query backend is unknown")
     if (dsa is None) != (indexer_kind == "shared"):
         raise ValueError("full DSA weights must exist only for a full indexer")
     if (dense is None) != (mlp_kind == "sparse"):
@@ -236,6 +239,7 @@ def stage_local_transformer_layer_fp8_mapped(
             precomputed_normalized=normalized_input,
             precomputed_q_residual=q_residual,
             linear_backend=linear_backend,
+            dsa_query_backend=dsa_query_backend,
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache
@@ -408,13 +412,14 @@ def stage_local_transformer_layer_fp8_split_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
-    lora_norm_epsilon: float = 1e-6,
+    lora_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     pallas_moe_fuse_route_weighting: bool = False,
     pallas_moe_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
+    dsa_query_backend: StageLinearBackend | None = None,
     linear_interpret: bool = False,
 ) -> StageLocalSplitLayerFp8Result:
     """Execute one layer while preserving legacy hidden/residual association."""
@@ -445,6 +450,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
         )
     if linear_backend not in ("reference", "pallas"):
         raise ValueError("layer FP8 linear backend is unknown")
+    if dsa_query_backend not in (None, "reference", "pallas"):
+        raise ValueError("layer DSA query backend is unknown")
     if (dsa is None) != (indexer_kind == "shared"):
         raise ValueError("full DSA weights must exist only for a full indexer")
     if (dense is None) != (mlp_kind == "sparse"):
@@ -516,6 +523,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             precomputed_normalized=normalized_input,
             precomputed_q_residual=q_residual,
             linear_backend=linear_backend,
+            dsa_query_backend=dsa_query_backend,
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache

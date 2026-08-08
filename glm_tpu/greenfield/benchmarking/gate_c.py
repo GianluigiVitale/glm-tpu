@@ -341,7 +341,7 @@ def stage_local_dsa_gate_c(
     mesh: Mesh,
     contract: DsaNumericalContract = DsaNumericalContract(),
     rms_norm_epsilon: float = 1e-5,
-    lora_norm_epsilon: float = 1e-6,
+    lora_norm_epsilon: float = 1e-5,
     axis_name: str = "stage",
 ) -> GateCDsaResult:
     """Score striped context and merge an exact four-owner global top-k."""
@@ -483,7 +483,7 @@ def stage_local_dsa_fp8_gate_c(
     contract: DsaNumericalContract = DsaNumericalContract(),
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
-    lora_norm_epsilon: float = 1e-6,
+    lora_norm_epsilon: float = 1e-5,
     axis_name: str = "stage",
     interpret: bool = False,
 ) -> GateCDsaResult:
@@ -661,7 +661,7 @@ def stage_local_index_share_gate_c(
     contract: MlaNumericalContract = MlaNumericalContract(),
     cache_layout: StageLocalKvLayout = StageLocalKvLayout(),
     rms_norm_epsilon: float = 1e-5,
-    lora_norm_epsilon: float = 1e-6,
+    lora_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     axis_name: str = "stage",
     sparse_attention_backend: Literal["reference", "pallas"] = "reference",

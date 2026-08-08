@@ -52,6 +52,7 @@ def validate_teacher_forced_prefill_hlo(
         feature_reconstruct_down_fp32=(
             decoder.feature_reconstruct_down_fp32
         ),
+        dsa_query_backend=decoder.dsa_query_backend,
         complete_token_path=True,
         split_residual_state=decoder.split_residual_state,
     )

@@ -495,7 +495,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {8}:
+if {record["schema_version"] for record in records} != {9}:
     raise SystemExit("fleet decoder record schema drifted")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
@@ -509,6 +509,8 @@ expected_linear_backend = (
 )
 if {record["linear_backend"] for record in records} != {expected_linear_backend}:
     raise SystemExit("fleet FP8 linear backend drifted")
+if {record["dsa_query_backend"] for record in records} != {"reference"}:
+    raise SystemExit("fleet DSA query backend drifted")
 if {record["runtime_manifest_sha256"] for record in records} != {runtime_manifest_sha256}:
     raise SystemExit("fleet runtime manifest drifted")
 if {record["runtime_layout_hash"] for record in records} != {runtime_layout_hash}:
@@ -810,6 +812,16 @@ if runtime_kind in ("pallas_feature", "pallas_feature_linear"):
             or feature["forbidden_decoded_expert_overlays"]
         ):
             raise SystemExit("feature-Pallas HLO kernel/overlay contract drifted")
+for record in records:
+    association = record["hlo_contract"]["dsa_query_association_contract"]
+    if (
+        not association["passed"]
+        or association["backend"] != "reference"
+        or association["local_owner_shape"] != "f32[1024,2048]"
+        or association["local_owner_shape_occurrences"] < 21
+        or association["forbidden_global_shapes"]
+    ):
+        raise SystemExit("local FP32 DSA query-owner contract drifted")
 if runtime_kind == "pallas_feature_linear":
     expected_linear_kernel_counts = {
         "greenfield_fp8_block_matmul_m8_k6144_n2048": 78,
@@ -818,7 +830,7 @@ if runtime_kind == "pallas_feature_linear":
         "greenfield_fp8_block_matmul_m8_k4096_n6144": 78,
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": 78,
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": 78,
-        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": 21,
+        "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": 0,
         "greenfield_fp8_block_matmul_f32_m8_k6144_n128": 21,
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": 3,
     }
@@ -826,6 +838,7 @@ if runtime_kind == "pallas_feature_linear":
         linear = record["hlo_contract"]["pallas_stage_linear_contract"]
         if (
             not linear["passed"]
+            or linear["dsa_query_backend"] != "reference"
             or linear["kernel_counts"] != expected_linear_kernel_counts
             or linear["expected_kernel_counts"]
             != expected_linear_kernel_counts

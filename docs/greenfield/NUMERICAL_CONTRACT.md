@@ -12,6 +12,11 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   RMSNorm use the pinned model config's epsilon `1e-5`. The indexer key
   affine LayerNorm is a distinct operation and retains its source epsilon
   `1e-6`.
+- The DSA `wq_b` reference path materializes only the complete topology-local
+  FP32 owner shard before its true-row projection. Protected DB499 proves this
+  association bitwise against the accepted layer-0 query; streamed N=128 and
+  MXU/Pallas alternatives remain default-off because DB495--DB498 are not
+  elementwise exact. PP8 never reconstructs the global `wq_b` matrix.
 - The accepted fused residual-add/RMSNorm boundary first adds the two BF16
   inputs in FP32. Its normalization consumes that unrounded FP32 sum, while
   the independently carried residual is the same sum rounded to BF16. A

@@ -309,10 +309,11 @@ def stage_local_dsa_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
-    lora_norm_epsilon: float = 1e-6,
+    lora_norm_epsilon: float = 1e-5,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,
     linear_backend: StageLinearBackend = "reference",
+    dsa_query_backend: StageLinearBackend | None = None,
     linear_interpret: bool = False,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
@@ -325,6 +326,11 @@ def stage_local_dsa_fp8_mapped(
     """
 
     groups = _axis_groups(axis_index_groups)
+    query_backend = (
+        linear_backend if dsa_query_backend is None else dsa_query_backend
+    )
+    if query_backend not in ("reference", "pallas"):
+        raise ValueError("stage-local DSA query backend is unknown")
     if residual.shape != (1, contract.hidden_size):
         raise ValueError("DSA residual must contain one exact hidden row")
     if index_cache.ndim != 3 or index_cache.shape[1:] != (
@@ -400,19 +406,29 @@ def stage_local_dsa_fp8_mapped(
             q_residual.dtype != residual.dtype
         ):
             raise ValueError("DSA precomputed q residual is invalid")
-    if linear_backend == "reference":
-        local_wq_b_weight = dequantize_fp8_bits_block_weight(
-            wq_b_bits, wq_b_scale, block_shape=block_shape
+    if query_backend == "reference":
+        # DB499 proves the accepted M=1 association only when the complete
+        # topology-local owner shard exists as FP32 before projection. The
+        # boundary is 8 MiB for PP8 and never reconstructs the global weight.
+        local_wq_b_weight = lax.optimization_barrier(
+            dequantize_fp8_bits_block_weight(
+                wq_b_bits,
+                wq_b_scale,
+                block_shape=block_shape,
+                output_dtype=jnp.float32,
+            )
         )
-        local_query, local_head_weights = _local_dsa_query(
-            q_residual,
+        projected_query = linear(
+            q_residual, local_wq_b_weight, output_dtype=jnp.float32
+        )
+        local_query, local_head_weights = _local_dsa_query_from_projection(
+            projected_query,
             normalized,
-            local_wq_b_weight,
             head_weight,
             position,
             contract=contract,
         )
-    elif linear_backend == "pallas":
+    elif query_backend == "pallas":
         projected_query = fp8_block_matmul_f32(
             q_residual,
             wq_b_bits,
@@ -431,8 +447,6 @@ def stage_local_dsa_fp8_mapped(
             position,
             contract=contract,
         )
-    else:
-        raise ValueError("stage-local FP8 linear backend is unknown")
     query_width = local_heads * contract.head_dim
     packed_query = jnp.concatenate(
         (local_query.reshape(1, query_width), local_head_weights), axis=-1
@@ -584,7 +598,7 @@ def stage_local_index_share_fp8_mapped(
     axis_index_groups: Sequence[Sequence[int]] | None = None,
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
-    lora_norm_epsilon: float = 1e-6,
+    lora_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,

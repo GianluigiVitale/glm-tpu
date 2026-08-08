@@ -171,7 +171,7 @@ def _run_forced_cpu_gate_c_kernels() -> None:
     q_residual = rms_norm(
         linear(dsa_normalized, jnp.asarray(qa_host)),
         jnp.asarray(qa_norm_host),
-        epsilon=1e-6,
+        epsilon=1e-5,
     )
     query, head_weights = dsa_query_and_head_weights(
         dsa_normalized,
@@ -326,7 +326,7 @@ def _run_forced_cpu_gate_c_kernels() -> None:
     index_q_residual = rms_norm(
         linear(index_normalized, jnp.asarray(index_qa_host)),
         jnp.asarray(index_qa_norm_host),
-        epsilon=1e-6,
+        epsilon=1e-5,
     )
     q_states = linear(index_q_residual, jnp.asarray(qb_host)).reshape(
         1, 4, 4
@@ -346,7 +346,7 @@ def _run_forced_cpu_gate_c_kernels() -> None:
     )
     current_kv = linear(index_normalized, jnp.asarray(kva_host))
     current_latent = rms_norm(
-        current_kv[..., :4], jnp.asarray(kva_norm_host), epsilon=1e-6
+        current_kv[..., :4], jnp.asarray(kva_norm_host), epsilon=1e-5
     )
     current_rope = apply_rotary(
         current_kv[..., 4:][:, None, :],
