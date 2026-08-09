@@ -6067,3 +6067,25 @@ unmotivated arithmetic variants.
   `lax.map`. Require one physical M64 convolution plus one bounded map loop in HLO and bitwise
   equality of projection input, all three producer states and the full 8,155-row BF16 cache. This
   does not alter `decode_batch1` or authorize a full decoder retry unless exact.
+
+## 2026-08-09 11:38 — first M64 map attempt exposes an RHS-precision lowering delta
+
+- Protected attempt `greenfield_layer0_prompt_key_projection_m64_20260809T113734128804822Z` at
+  `50f619d` passed DB515/DB516 identity checks and the eight-host pre-census, then compiled on one
+  four-chip host. It failed closed at the producer HLO contract before any arithmetic comparison,
+  DB append or terminal SUCCESS.
+- The intended geometry is present: one map `while`, one physical `f32[64,128]` convolution,
+  BF16 `[64,6144]` lhs, full M2048 result, exact gather/RMS/RoPE/scatter structure and no forbidden
+  operation or shape. Its emitter is `EmitAllBatchInSublanes` with the same window geometry as
+  DB516 (candidate estimated 1,995 cycles versus accepted 2,003).
+- The isolated `lax.map` lowering converts the adapted FP32 `[128,6144]` `wk` to BF16 and feeds a
+  BF16 RHS. DB516 instead proves a physical FP32 RHS. Contract SHA is
+  `1619ce17...a5`; cache/states/input HLO SHAs are `1eca8254...a6`, `f8a6de41...14` and
+  `9c37522f...82`. Direct approved-bucket diagnostic bytes match locally. Pre/failure censuses are
+  8/8 clean. This is a fail-closed compiler discriminator, not correctness or performance proof.
+- The correction requests `[DEFAULT, HIGHEST]` operand precision only inside the opt-in M64 map,
+  preserving the accepted opportunity for a physical BF16 lhs while preventing the FP32 `wk` RHS
+  downcast. The HLO linter now requires BF16—not BF16-or-FP32—for the physical M64 lhs. Default
+  logical M2048 behavior is untouched; CPU StableHLO pins the mixed request and absence of HIGHEST
+  on the logical path. The 52 focused kernel/cache/lowering tests pass. Final diff confirmation,
+  commit and one serialized protected retry are next.

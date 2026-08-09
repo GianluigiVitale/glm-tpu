@@ -95,6 +95,34 @@ def test_prompt_key_physical_m64_map_matches_logical_reference() -> None:
 
     np.testing.assert_array_equal(np.asarray(physical), np.asarray(logical))
     assert physical.shape == (128, 4)
+    physical_stablehlo = str(
+        jax.jit(
+            partial(
+                layer0_prompt_index_key_chunk,
+                geometry=geometry,
+                projection_weight_mode="adapted_fp32",
+                projection_mapping_mode="physical_m64_lax_map",
+            )
+        )
+        .lower(*arguments)
+        .compiler_ir(dialect="stablehlo")
+    )
+    assert physical_stablehlo.count(
+        "precision = [DEFAULT, HIGHEST]"
+    ) == 1
+    logical_stablehlo = str(
+        jax.jit(
+            partial(
+                layer0_prompt_index_key_chunk,
+                geometry=geometry,
+                projection_weight_mode="adapted_fp32",
+                projection_mapping_mode="logical_m2048",
+            )
+        )
+        .lower(*arguments)
+        .compiler_ir(dialect="stablehlo")
+    )
+    assert "HIGHEST" not in logical_stablehlo
     with pytest.raises(ValueError, match="physical-M64 projection"):
         layer0_prompt_index_key_chunk(
             *arguments,

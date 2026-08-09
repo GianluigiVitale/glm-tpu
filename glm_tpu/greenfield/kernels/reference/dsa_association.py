@@ -884,13 +884,22 @@ def _unpack_legacy_fused_qkv_output(
     return q_a, companion
 
 
-def _dot_out_in(lhs: Any, weight_out_in: Any, *, output_dtype: Any) -> Any:
+def _dot_out_in(
+    lhs: Any,
+    weight_out_in: Any,
+    *,
+    output_dtype: Any,
+    precision: (
+        lax.Precision | tuple[lax.Precision, lax.Precision] | None
+    ) = None,
+) -> Any:
     """Match the legacy ``lhs @ weight.T`` source association."""
 
     result = lax.dot_general(
         lhs,
         weight_out_in,
         dimension_numbers=(((lhs.ndim - 1,), (1,)), ((), ())),
+        precision=precision,
         preferred_element_type=jnp.float32,
     )
     return result.astype(output_dtype)
@@ -993,6 +1002,13 @@ def _project_key_states_f32(
                 partition.astype(jnp.float32),
                 projection_weight,
                 output_dtype=jnp.float32,
+                # The accepted M64 convolution has a BF16 lhs and FP32 rhs.
+                # Preserve only the RHS: constraining both operands could
+                # retain this source-level lhs upcast as physical FP32.
+                precision=(
+                    lax.Precision.DEFAULT,
+                    lax.Precision.HIGHEST,
+                ),
             )
 
         projected = lax.map(project_partition, physical_hidden).reshape(

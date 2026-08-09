@@ -823,6 +823,28 @@ ENTRY main {
     assert result["loop_count"] == 1
     assert result["required_shapes"]["physical_m64_projection"] is True
 
+    downcast_weight = validate_prompt_index_key_association_hlo(
+        hlo.replace(
+            "%wk_weight = f32[128,6144]{1,0} parameter(5)",
+            "%wk_weight = bf16[128,6144]{1,0} parameter(5)",
+        ),
+        candidate=candidate,
+    )
+    assert downcast_weight["passed"] is False
+    assert "M64 convolution does not consume an FP32 wk operand" in (
+        downcast_weight["violations"]
+    )
+
+    fp32_lhs = validate_prompt_index_key_association_hlo(
+        hlo.replace(
+            "%map_hidden = bf16[64,6144]{1,0} dynamic-slice(%gathered)",
+            "%map_hidden = f32[64,6144]{1,0} dynamic-slice(%gathered)",
+        ),
+        candidate=candidate,
+    )
+    assert fp32_lhs["passed"] is False
+    assert "physical_m64_projection_input" in fp32_lhs["violations"][0]
+
     missing_map = validate_prompt_index_key_association_hlo(
         hlo.replace(" while(%projection)", " copy(%projection)"),
         candidate=candidate,

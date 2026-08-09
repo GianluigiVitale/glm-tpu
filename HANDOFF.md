@@ -2582,3 +2582,24 @@ pass. Exact next: finish the explicit-CPU batch, obtain one diff-only Fable comm
 verdict, commit/push, prove the fleet idle, then run exactly one serialized
 `bash scripts/greenfield/run_prompt_key_projection_association_probe.sh`. Do not retry the full 8K
 decoder unless this bounded result is bitwise exact.
+
+## First M64 attempt fails closed on RHS precision; scoped retry is ready
+
+Protected attempt
+`greenfield_layer0_prompt_key_projection_m64_20260809T113734128804822Z` at `50f619d` compiled the
+intended 32×M64 map but stopped at the HLO contract before execution/comparison. Both executables
+contain exactly one map loop and one `bf16[64,6144]` by `[128,6144]` convolution producing
+`f32[64,128]` with `EmitAllBatchInSublanes`. The standalone map nevertheless inserted one
+FP32-to-BF16 conversion for `wk`, so the convolution RHS was BF16 rather than DB516's accepted
+FP32 RHS. The attempt has no arithmetic result, DB row, SUCCESS, decoder, Gate-D or performance
+standing. Pre/failure censuses are authenticated 8/8 clean; the contract and all three HLOs are
+preserved under the approved diagnostic prefix.
+
+The correction requests per-operand `[DEFAULT, HIGHEST]` precision only for the opt-in physical-M64
+dot: the source-derived lhs may return to physical BF16 while `wk` must remain FP32. The logical
+M2048 default and every other projection call retain their prior precision. The HLO linter now
+requires the exact BF16 M64 lhs as well as the FP32 RHS. Forced-CPU StableHLO pins the mixed
+precision request and absence of HIGHEST from the logical path; the focused kernel/cache/lowering
+suite passes 52/52. Exact next: obtain the narrow final Fable confirmation, commit/push, then run
+one clean serialized retry. Do not re-review the already cleared `50f619d` base and do not run the
+full 8K decoder unless the retry is bitwise exact.

@@ -1452,7 +1452,6 @@ def validate_prompt_index_key_association_hlo(
                     "physical_m64_projection": "f32[64,128]" in lowered,
                     "physical_m64_projection_input": (
                         "bf16[64,6144]" in lowered
-                        or "f32[64,6144]" in lowered
                     ),
                 }
             )
@@ -1639,7 +1638,8 @@ def validate_prompt_index_key_association_hlo(
                 )
             if not convolution_weight_bf16:
                 violations.append(
-                    "M2048 convolution does not consume a BF16 wk operand"
+                    f"M{physical_projection_rows} convolution does not "
+                    "consume a BF16 wk operand"
                 )
         elif bf16_weight_conversion_lines:
             violations.append(
@@ -1647,7 +1647,8 @@ def validate_prompt_index_key_association_hlo(
             )
         if fp32_weight_backend and not convolution_weight_f32:
             violations.append(
-                "M2048 convolution does not consume an FP32 wk operand"
+                f"M{physical_projection_rows} convolution does not "
+                "consume an FP32 wk operand"
             )
         if backend in (
             "xla_chunk_gather_bf16_weight",
