@@ -28,7 +28,11 @@ import parse_xplane  # noqa: E402  (repository-local reused parser)
 TARGET_SOURCE = "glm_dsa_indexer.py:1122"
 TARGET_OP = "jit(step_fun_impl)/dot_general:"
 TARGET_HLO_OP = 'op_name="jit(step_fun_impl)/dot_general"'
-TARGET_RESULT = "f32[2048,128]"
+TARGET_LOGICAL_ROWS = 2048
+TARGET_PHYSICAL_ROWS = 64
+TARGET_PHYSICAL_RESULT = "f32[64,128]"
+TARGET_PROFILE_RESULT = TARGET_PHYSICAL_RESULT
+TARGET_PARTITION_COUNT = 32
 TARGET_INVOCATIONS_PER_CORE = 21
 
 
@@ -80,8 +84,6 @@ def _link_profiles(trace_root: Path, output: Path) -> list[dict[str, Any]]:
             # bytes after raw-source reclamation without temporarily doubling
             # the large fleet XPlane footprint on worker 0.
             os.link(source, destination)
-            if _sha256_file(source) != _sha256_file(destination):
-                raise ValueError(f"profile link checksum mismatch: {source}")
             source_stat = source.stat()
             destination_stat = destination.stat()
             if (
@@ -99,7 +101,7 @@ def _projection_signature(stats: dict[str, Any]) -> bool:
     return (
         source.endswith(TARGET_SOURCE)
         and stats.get("tf_op") == TARGET_OP
-        and TARGET_RESULT in shape
+        and TARGET_PROFILE_RESULT in shape
         and stats.get("hlo_category") == "convolution fusion"
     )
 
@@ -184,17 +186,50 @@ def _inspect_xplane(path: Path) -> dict[str, Any]:
     return {"cores": cores, "host": hosts[0], "path": str(path)}
 
 
+def _hlo_section(
+    text: str,
+    heading: str,
+    next_headings: tuple[str, ...],
+) -> str:
+    match = re.search(rf"^{re.escape(heading)}$", text, re.MULTILINE)
+    if match is None:
+        return ""
+    start = match.end()
+    ends = []
+    for next_heading in next_headings:
+        next_match = re.search(
+            rf"^{re.escape(next_heading)}$",
+            text[start:],
+            re.MULTILINE,
+        )
+        if next_match is not None:
+            ends.append(start + next_match.start())
+    return text[start:min(ends) if ends else len(text)]
+
+
 def _parse_hlo_stack_frames(text: str) -> dict[int, tuple[str, int]]:
+    # FileNames and FunctionNames use the same `<id> "value"` spelling.
+    # Parse the named sections rather than allowing later function-name IDs to
+    # overwrite file paths with the same integer ID.
+    file_names_text = _hlo_section(
+        text,
+        "FileNames",
+        ("FunctionNames", "FileLocations"),
+    )
+    locations_text = _hlo_section(text, "FileLocations", ("StackFrames",))
+    frames_text = _hlo_section(text, "StackFrames", ())
     file_names = {
         int(match.group(1)): match.group(2)
-        for match in re.finditer(r'^([0-9]+) "([^"]+)"$', text, re.MULTILINE)
+        for match in re.finditer(
+            r'^([0-9]+) "([^"]+)"$', file_names_text, re.MULTILINE
+        )
     }
     locations = {
         int(match.group(1)): (int(match.group(2)), int(match.group(3)))
         for match in re.finditer(
             r"^([0-9]+) \{file_name_id=([0-9]+) function_name_id=[0-9]+ "
             r"line=([0-9]+) ",
-            text,
+            locations_text,
             re.MULTILINE,
         )
     }
@@ -202,7 +237,7 @@ def _parse_hlo_stack_frames(text: str) -> dict[int, tuple[str, int]]:
         int(match.group(1)): (int(match.group(2)), int(match.group(3)))
         for match in re.finditer(
             r"^([0-9]+) \{file_location_id=([0-9]+) parent_frame_id=([0-9]+)\}$",
-            text,
+            frames_text,
             re.MULTILINE,
         )
     }
@@ -230,7 +265,7 @@ _ASSIGNMENT = re.compile(
     r"^\s*(%[^ ]+) = ((?:bf16|f32)\[[^\]]+\]\{[^}]+\}) ", re.MULTILINE
 )
 _CONVOLUTION = re.compile(
-    r"^\s*(%[^ ]+) = (f32\[2048,128\]\{[^}]+\}) convolution\("
+    r"^\s*(%[^ ]+) = (f32\[64,128\]\{[^}]+\}) convolution\("
     r"(%[^,]+), (%[^)]+)\).*stack_frame_id=([0-9]+)",
 )
 
@@ -238,8 +273,17 @@ _CONVOLUTION = re.compile(
 def _inspect_hlo_text(text: str) -> dict[str, Any] | None:
     if not text.startswith("HloModule jit_step_fun_impl"):
         return None
-    if "is_scheduled=true" not in text or TARGET_RESULT not in text:
+    if "is_scheduled=true" not in text or TARGET_PHYSICAL_RESULT not in text:
         return None
+    partition_match = re.search(r"\bnum_partitions=([0-9]+)\b", text[:200_000])
+    if partition_match is None:
+        raise ValueError("optimized HLO partition count is unavailable")
+    partition_count = int(partition_match.group(1))
+    if partition_count != TARGET_PARTITION_COUNT:
+        raise ValueError(
+            "optimized HLO partition count drifted: "
+            f"{partition_count} != {TARGET_PARTITION_COUNT}"
+        )
     frame_sources = _parse_hlo_stack_frames(text)
     assignments = {match.group(1): match.group(2) for match in _ASSIGNMENT.finditer(text)}
 
@@ -282,7 +326,7 @@ def _inspect_hlo_text(text: str) -> dict[str, Any] | None:
             " fusion(" not in line
             or TARGET_HLO_OP not in line
             or "convolution_algorithm_config" not in line
-            or TARGET_RESULT not in line
+            or TARGET_PHYSICAL_RESULT not in line
         ):
             continue
         frame_match = re.search(r"stack_frame_id=([0-9]+)", line)
@@ -342,6 +386,7 @@ def _inspect_hlo_text(text: str) -> dict[str, Any] | None:
         "emitter": emitter,
         "fusion_output_shape": fusion["output_shape"],
         "megacore_config": fusion["backend_config"].get("megacore_config", {}),
+        "partition_count": partition_count,
         "source": convolutions[0]["source"],
         "window_config": fusion["backend_config"].get("window_config", {}),
     }
@@ -352,24 +397,34 @@ def _copy_and_inspect_hlo(
     output: Path,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     candidates: list[tuple[Path, str, dict[str, Any]]] = []
-    for path in sorted(trace_root.rglob("*.txt")):
+    # after_codegen is the final physical TPU program.  Earlier optimized HLO
+    # still exposes the global M=2048 operation and cannot prove the per-chip
+    # convolution emitter/window association that caused the numerical drift.
+    for path in sorted(trace_root.rglob("*after_codegen.txt")):
         text = path.read_text(errors="replace")
         result = _inspect_hlo_text(text)
         if result is not None:
             candidates.append((path, text, result))
     if not candidates:
-        raise ValueError("no scheduled current-pin M2048 jit_step_fun_impl HLO dump found")
+        raise ValueError(
+            "no scheduled current-pin physical-M64 jit_step_fun_impl HLO dump found"
+        )
 
     variants = {
         json.dumps(result, sort_keys=True, separators=(",", ":"))
         for _, _, result in candidates
     }
     if len(variants) != 1:
-        raise ValueError(f"accepted M2048 HLO differs across dump owners: {len(variants)}")
+        raise ValueError(
+            "accepted physical-M64 HLO differs across dump owners: "
+            f"{len(variants)}"
+        )
 
     records: list[dict[str, Any]] = []
     for index, (source, text, _) in enumerate(candidates):
-        destination = output / f"jit_step_fun_impl.m2048.owner{index}.optimized_hlo.txt.gz"
+        destination = output / (
+            f"jit_step_fun_impl.m64.owner{index}.after_codegen_hlo.txt.gz"
+        )
         with destination.open("wb") as raw:
             with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as stream:
                 stream.write(text.encode())
@@ -382,12 +437,14 @@ def inspect_capture(
     trace_root: Path,
     output: Path,
     code_hash: str,
+    source_capture_code_hash: str | None = None,
     legacy_code_hash: str,
     run_tag: str,
 ) -> dict[str, Any]:
     if output.exists():
         raise FileExistsError(f"append-only output exists: {output}")
     output.mkdir(parents=True)
+    capture_code_hash = source_capture_code_hash or code_hash
 
     profile_records = _link_profiles(trace_root, output)
     xplane_results = [
@@ -414,7 +471,7 @@ def inspect_capture(
 
     hlo_records, hlo = _copy_and_inspect_hlo(trace_root, output)
     summary: dict[str, Any] = {
-        "artifact_kind": "accepted_prompt_projection_lowering_v1",
+        "artifact_kind": "accepted_prompt_projection_lowering_v2",
         "code_hash": code_hash,
         "diagnostic_only": True,
         "hosts": sorted(hosts),
@@ -427,7 +484,15 @@ def inspect_capture(
             "signature": json.loads(next(iter(variants))),
             "steps_per_core": 1,
         },
+        "shape_association": {
+            "logical_row_count": TARGET_LOGICAL_ROWS,
+            "physical_row_count": TARGET_PHYSICAL_ROWS,
+            "profile_physical_result": TARGET_PROFILE_RESULT,
+            "physical_hlo_result": TARGET_PHYSICAL_RESULT,
+            "physical_row_shards": TARGET_PARTITION_COUNT,
+        },
         "run_tag": run_tag,
+        "source_capture_code_hash": capture_code_hash,
         "status": "SUCCESS",
     }
     (output / "summary.json").write_text(
@@ -443,6 +508,7 @@ def inspect_capture(
         "files": records,
         "legacy_code_hash": legacy_code_hash,
         "run_tag": run_tag,
+        "source_capture_code_hash": capture_code_hash,
     }
     manifest_sha256 = sha256(
         json.dumps(
@@ -461,6 +527,7 @@ def main() -> None:
     parser.add_argument("--trace-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expected-code-hash", required=True)
+    parser.add_argument("--source-capture-code-hash")
     parser.add_argument("--legacy-code-hash", required=True)
     parser.add_argument("--run-tag", required=True)
     args = parser.parse_args()
@@ -468,6 +535,7 @@ def main() -> None:
         trace_root=args.trace_root,
         output=args.output,
         code_hash=args.expected_code_hash,
+        source_capture_code_hash=args.source_capture_code_hash,
         legacy_code_hash=args.legacy_code_hash,
         run_tag=args.run_tag,
     )
