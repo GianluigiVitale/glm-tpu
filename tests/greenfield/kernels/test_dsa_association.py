@@ -197,6 +197,32 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
         geometry=geometry,
         key_norm_mode="divide_sqrt",
     )
+    source_rope_cache = layer0_prompt_index_key_gather_cache_chunk(
+        jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),
+        live_block_table,
+        arguments[0],
+        arguments[1][:4],
+        jnp.arange(4, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        rotary_mode="accepted_source",
+    )
+    np.testing.assert_array_equal(
+        np.asarray(source_rope_cache), np.asarray(cache)
+    )
+    with pytest.raises(ValueError, match="rotary association"):
+        layer0_prompt_index_key_gather_cache_chunk(
+            jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),
+            live_block_table,
+            arguments[0],
+            arguments[1][:4],
+            jnp.arange(4, dtype=jnp.int32),
+            *arguments[2:],
+            geometry=geometry,
+            key_norm_mode="divide_sqrt",
+            rotary_mode="unsupported",  # type: ignore[arg-type]
+        )
     cache = layer0_prompt_index_key_gather_cache_chunk(
         cache,
         live_block_table,

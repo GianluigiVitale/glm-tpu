@@ -484,6 +484,44 @@ ENTRY main {
         rejected["violations"]
     )
 
+    source_hlo = hlo.replace(
+        "  %root = f32[1]{0} sqrt(%projection)",
+        """  %theta = f32[] constant(8e+06)
+  %exponent = f32[] constant(0.015625)
+  %theta_row = f32[32]{0} broadcast(%theta), dimensions={}
+  %exponent_row = f32[32]{0} broadcast(%exponent), dimensions={}
+  %rope_power = f32[32]{0} power(%theta_row, %exponent_row)
+  %angles = f32[2048,32]{1,0} broadcast(%rope_power), dimensions={1}
+  %rope_cos = f32[2048,32]{1,0} cosine(%angles)
+  %rope_sin = f32[2048,32]{1,0} sine(%angles)
+  %root = f32[1]{0} sqrt(%projection)""",
+    )
+    source_candidate = (
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_"
+        "divide_sqrt_source_rope"
+    )
+    source_result = validate_prompt_index_key_association_hlo(
+        source_hlo,
+        candidate=source_candidate,
+    )
+    assert source_result["passed"] is True
+    assert source_result["rotary"] == {
+        "cosine_count": 1,
+        "exponent_constant": True,
+        "power_count": 1,
+        "sine_count": 1,
+        "source_literal": True,
+        "theta_constant": True,
+    }
+    source_rejected = validate_prompt_index_key_association_hlo(
+        source_hlo.replace(" sine(%angles)", " tanh(%angles)"),
+        candidate=source_candidate,
+    )
+    assert source_rejected["passed"] is False
+    assert "literal accepted RoPE physical identity drifted" in (
+        source_rejected["violations"]
+    )
+
 
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
     repo = Path(__file__).resolve().parents[3]
@@ -575,6 +613,7 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt",
         "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt",
         "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt",
+        "divide_sqrt_source_rope",
         "--candidate-set",
         "layer0_prompt_index_key_gather_chunk",
         "layer0_prompt_index_key_gather_cache_chunk",
@@ -599,6 +638,9 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "GATHER_RUN_ID=510",
         "GATHER_ITEM_ROW_ID=1795",
         "GATHER_ASSOCIATION_MANIFEST_SHA=3e29aadc",
+        "CACHE_WRITE_RUN_ID=511",
+        "CACHE_WRITE_ITEM_ROW_ID=1796",
+        "CACHE_WRITE_ASSOCIATION_MANIFEST_SHA=6cbe954b",
         "matrix_validation.json",
         "chunk_parameter_validation.json",
         "bf16_weight_validation.json",
@@ -606,6 +648,8 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "chunk_bf16_weight",
         "chunk_gather_bf16_weight",
         "chunk_gather_cache_write_bf16_weight",
+        "chunk_gather_cache_write_source_rope",
+        "cache_write_validation.json",
         "GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE",
         '--candidate-set "$PROFILE"',
         "probe_layer0_prompt_index_cache_association.py",

@@ -86,6 +86,7 @@ def _parse_args() -> argparse.Namespace:
             "chunk_bf16_weight",
             "chunk_gather_bf16_weight",
             "chunk_gather_cache_write_bf16_weight",
+            "chunk_gather_cache_write_source_rope",
         ),
         default="matrix",
     )
@@ -94,6 +95,12 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _classify(exact: set[str]) -> str:
+    source_rope = (
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_"
+        "divide_sqrt_source_rope" in exact
+    )
+    if source_rope:
+        return "source_literal_rope_association_sufficient"
     cache_write = (
         "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt"
         in exact
@@ -420,12 +427,16 @@ def main() -> int:
         if args.candidate_set in (
             "chunk_gather_bf16_weight",
             "chunk_gather_cache_write_bf16_weight",
+            "chunk_gather_cache_write_source_rope",
         ):
             padded_rows_host = np.pad(
                 prompt_rows_host,
                 (0, padded_tokens - prompt_ids.size),
             ).reshape(-1, geometry.prompt_chunk)
-            if args.candidate_set == "chunk_gather_cache_write_bf16_weight":
+            if args.candidate_set in (
+                "chunk_gather_cache_write_bf16_weight",
+                "chunk_gather_cache_write_source_rope",
+            ):
                 initial_cache = put(
                     np.zeros(cache_shape, dtype=ml_dtypes.bfloat16)
                 )
@@ -448,9 +459,19 @@ def main() -> int:
                     layer0_prompt_index_key_gather_cache_chunk,
                     geometry=geometry,
                     key_norm_mode="divide_sqrt",
+                    rotary_mode=(
+                        "accepted_source"
+                        if args.candidate_set
+                        == "chunk_gather_cache_write_source_rope"
+                        else "greenfield_reference"
+                    ),
                 )
                 candidate_name = (
                     "accepted_xla_m2048_gather_cache_write_bf16_weight_"
+                    "divide_sqrt_source_rope"
+                    if args.candidate_set
+                    == "chunk_gather_cache_write_source_rope"
+                    else "accepted_xla_m2048_gather_cache_write_bf16_weight_"
                     "divide_sqrt"
                 )
                 returns_cache = True

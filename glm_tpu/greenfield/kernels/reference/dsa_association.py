@@ -22,6 +22,7 @@ from .rotary import apply_rotary, rotary_cos_sin
 
 KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
 KeyProjectionWeightMode = Literal["adapted_fp32", "adapted_bf16"]
+RotaryAssociationMode = Literal["greenfield_reference", "accepted_source"]
 QaProjectionMode = Literal[
     "separate_q_a",
     "legacy_fused_qkv_a",
@@ -943,6 +944,7 @@ def _project_keys_f32(
     *,
     geometry: Layer0DsaProbeGeometry,
     key_norm_mode: KeyNormMode,
+    rotary_mode: RotaryAssociationMode = "greenfield_reference",
 ) -> Any:
     """Return post-RoPE keys before the accepted BF16 cache-write cast."""
 
@@ -958,18 +960,50 @@ def _project_keys_f32(
         epsilon=geometry.key_norm_epsilon,
         mode=key_norm_mode,
     )
-    cos, sin = rotary_cos_sin(
-        positions,
-        rotary_dim=geometry.rotary_dim,
-        theta=geometry.theta,
-        dtype=jnp.float32,
-    )
-    rotated = apply_rotary(
-        keys[:, : geometry.rotary_dim],
-        cos,
-        sin,
-        interleaved=True,
-    )
+    if rotary_mode == "greenfield_reference":
+        cos, sin = rotary_cos_sin(
+            positions,
+            rotary_dim=geometry.rotary_dim,
+            theta=geometry.theta,
+            dtype=jnp.float32,
+        )
+        rotated = apply_rotary(
+            keys[:, : geometry.rotary_dim],
+            cos,
+            sin,
+            interleaved=True,
+        )
+    elif rotary_mode == "accepted_source":
+        # Keep this diagnostic spelling identical to the accepted oracle's
+        # ``rope_cos_sin`` and interleaved ``apply_rope`` source.  It is not
+        # the legacy function and does not import the legacy execution path.
+        rope_positions = jnp.asarray(positions, dtype=jnp.float32)
+        inverse_frequency = geometry.theta ** (
+            -jnp.arange(
+                0,
+                geometry.rotary_dim,
+                2,
+                dtype=jnp.float32,
+            )
+            / geometry.rotary_dim
+        )
+        frequencies = (
+            rope_positions[:, None] * inverse_frequency[None, :]
+        )
+        cos = jnp.cos(frequencies)
+        sin = jnp.sin(frequencies)
+        rotary_keys = keys[:, : geometry.rotary_dim]
+        first = rotary_keys[..., 0::2]
+        second = rotary_keys[..., 1::2]
+        out_first = first * cos - second * sin
+        out_second = second * cos + first * sin
+        rotated = jnp.stack([out_first, out_second], axis=-1).reshape(
+            rotary_keys.shape
+        )
+    else:
+        raise ValueError(
+            f"unsupported index-key rotary association {rotary_mode!r}"
+        )
     return jnp.concatenate(
         (rotated, keys[:, geometry.rotary_dim :]), axis=-1
     ).astype(jnp.float32)
@@ -1283,6 +1317,7 @@ def layer0_prompt_index_key_gather_cache_chunk(
     *,
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
+    rotary_mode: RotaryAssociationMode = "greenfield_reference",
 ) -> Any:
     """Write one gathered prompt chunk through the accepted flat cache API.
 
@@ -1359,6 +1394,7 @@ def layer0_prompt_index_key_gather_cache_chunk(
         key_norm_bias,
         geometry=geometry,
         key_norm_mode=key_norm_mode,
+        rotary_mode=rotary_mode,
     )
 
     page_size = index_cache.shape[1] * index_cache.shape[2]

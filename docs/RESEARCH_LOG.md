@@ -5882,3 +5882,24 @@ first inspect preserved accepted prompt artifacts for actual RoPE/pre-RoPE HLO o
 none exists should one literal accepted-source RoPE spelling be compiled in the same bounded
 harness. A null result requires an accepted pre-RoPE FP32 capture at position 113, not a matrix of
 unmotivated arithmetic variants.
+## 2026-08-09 01:18 — accepted prompt RoPE audit and literal-source readiness
+
+- The accepted pin `b3c25df47ac98783912dc658878181ec0a8ae16d` uses
+  `tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py::rope_cos_sin/apply_rope`: FP32
+  `theta ** (-arange / rope_dim)`, direct cosine/sine, and interleaved pair arithmetic.
+- No preserved accepted optimized prompt HLO or prompt pre-RoPE tensor exists. DB493 captures only
+  post-RoPE FP32 at decode position 8,155, which is outside the 45 DB511 prompt mismatches; prompt
+  position 8,154 itself is exact.
+- A CPU comparison over prompt positions 0--8,154 makes the literal source spelling bitwise equal
+  to the current greenfield cosine/sine helper, and the StableHLO arithmetic identities agree.
+  This makes a positive result unlikely but leaves one physical TPU lowering question worth
+  resolving before adding a new accepted observer.
+- The default-off `chunk_gather_cache_write_source_rope` profile changes only that spelling inside
+  DB511's exact gather-coupled input RMS, BF16-RHS M2048 convolution and flat BF16 cache scatter.
+  Its fail-closed HLO contract pins one FP32 power/cosine/sine and the accepted constants while
+  retaining all DB511 lineage and no-loop/no-communication/no-dead-row checks.
+- Focused tests pass 35/35, and the saved DB511 optimized HLO passes the new physical RoPE
+  classifier. This is implementation readiness, not TPU correctness or Gate-D evidence.
+- Next: one serialized protected source-literal run. If null, capture the accepted prompt
+  pre-RoPE FP32 key at the first mismatch, position 113, rather than expanding an arithmetic
+  variant matrix.

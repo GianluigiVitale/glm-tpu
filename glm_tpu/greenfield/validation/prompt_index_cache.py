@@ -713,6 +713,13 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight",
             "divide_sqrt",
         ),
+        (
+            "accepted_xla_m2048_gather_cache_write_bf16_weight_"
+            "divide_sqrt_source_rope"
+        ): (
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -855,8 +862,13 @@ def validate_prompt_index_key_association_hlo(
         ]
         if not wk_feature_slices["valid"]:
             forbidden_shapes.append("f32[32,6144]")
-        cache_write_backend = (
-            backend == "xla_chunk_gather_cache_write_bf16_weight"
+        cache_write_backend = backend in (
+            "xla_chunk_gather_cache_write_bf16_weight",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope",
+        )
+        source_rope_backend = (
+            backend
+            == "xla_chunk_gather_cache_write_bf16_weight_source_rope"
         )
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
@@ -893,6 +905,7 @@ def validate_prompt_index_key_association_hlo(
         if backend in (
             "xla_chunk_gather_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope",
         ):
             required_shapes.update(
                 {
@@ -1009,6 +1022,7 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_bf16_weight",
             "xla_chunk_gather_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope",
         ):
             if len(bf16_weight_conversion_lines) != 1:
                 violations.append(
@@ -1026,6 +1040,7 @@ def validate_prompt_index_key_association_hlo(
         if backend in (
             "xla_chunk_gather_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope",
         ):
             if len(physical_gather_lines) != 1:
                 violations.append(
@@ -1054,6 +1069,37 @@ def validate_prompt_index_key_association_hlo(
             violations.append(
                 "unexpected cache scatter in compact-key candidate"
             )
+        rotary_power_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(r"= f32\[32\].*\bpower\(", line)
+        ]
+        rotary_cosine_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(
+                rf"= f32\[{prompt_chunk},32\].*\bcosine\(", line
+            )
+        ]
+        rotary_sine_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(
+                rf"= f32\[{prompt_chunk},32\].*\bsine\(", line
+            )
+        ]
+        rotary_theta_constant = "constant(8e+06)" in lowered
+        rotary_exponent_constant = "constant(0.015625)" in lowered
+        if source_rope_backend and (
+            len(rotary_power_lines) != 1
+            or len(rotary_cosine_lines) != 1
+            or len(rotary_sine_lines) != 1
+            or not rotary_theta_constant
+            or not rotary_exponent_constant
+        ):
+            violations.append(
+                "literal accepted RoPE physical identity drifted"
+            )
         if forbidden_operations:
             violations.append(
                 f"forbidden operations: {forbidden_operations}"
@@ -1077,6 +1123,14 @@ def validate_prompt_index_key_association_hlo(
             "physical_embedding_gather_count": len(physical_gather_lines),
             "physical_cache_scatter_count": len(physical_scatter_lines),
             "cache_scatter_update_bf16": cache_scatter_update_bf16,
+            "rotary": {
+                "cosine_count": len(rotary_cosine_lines),
+                "exponent_constant": rotary_exponent_constant,
+                "power_count": len(rotary_power_lines),
+                "sine_count": len(rotary_sine_lines),
+                "source_literal": source_rope_backend,
+                "theta_constant": rotary_theta_constant,
+            },
             "forbidden_operations": forbidden_operations,
             "forbidden_shapes": forbidden_shapes,
             "loop_count": len(while_lines),

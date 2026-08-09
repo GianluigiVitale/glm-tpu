@@ -108,6 +108,30 @@ readonly GATHER_SOURCE_VALIDATION_SHA=cf9306eab21f030198e9d1195732b0879fb8aba824
 readonly GATHER_ASSOCIATION_MANIFEST_SHA=3e29aadce4851ad4a2f5ab62ab2d77d1474fc04aed988eaf14657d1142c8b0fb
 readonly GATHER_OBSERVED_CACHE_SHA=52bf55ed5e9ea74a59551351a21ae830fb39e289e82eaff636fb9ab84d7dcd8a
 readonly GATHER_HLO_FILE_SHA=cd293af30d94b2f96d205dfa9e13e9e08ad86732309fe2950abadf654a947290
+readonly CACHE_WRITE_TAG=greenfield_layer0_prompt_index_cache_association_20260809T003039938922204Z
+readonly CACHE_WRITE_DIR=/home/gianl/glm-run/$CACHE_WRITE_TAG
+readonly CACHE_WRITE_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_association/8k/$CACHE_WRITE_TAG
+readonly CACHE_WRITE_CODE_HASH=31ab626547edd7b622bb23d7d994a889cd311eeb
+readonly CACHE_WRITE_RUN_ID=511
+readonly CACHE_WRITE_ITEM_ROW_ID=1796
+readonly CACHE_WRITE_ASSOCIATION_FILE_SHA=addefc7e530ad2469cd437305e23f0c19262a8ec44c1a4054b32f8351908ebf8
+readonly CACHE_WRITE_TENSOR_FILE_SHA=64e6df3b65981b765da8e50dbed39c69a6736a1f39bddc7e59911efe793b130f
+readonly CACHE_WRITE_SUMMARY_FILE_SHA=8d420541d4db9358133010a20d463386a6eff1f5f497f38e99c97f6284aae1d2
+readonly CACHE_WRITE_SUCCESS_SHA=ec6a43702a1ae217ae601237abd0fba05fb0d68881830ce995cf0963724e55a7
+readonly CACHE_WRITE_RESULTS_DB_SHA=d71012bb90a2db44ecb82f48f3bec5915472547a9df4b382c40ac604d2d96eae
+readonly CACHE_WRITE_EVIDENCE_SHA=8978b3330fa85e2e78c8d63932a6e0b5f5e8622f13c5e9c44ffe948cdfa6cb25
+readonly CACHE_WRITE_REMOTE_OBJECTS_SHA=5d7bb1f6b3709a00cadf2b535e290af321f94fa3b9fa40fb249b38accbec083f
+readonly CACHE_WRITE_PRE_CENSUS_SHA=1d49893707020ce32e4f075ab501cb86cbdc135ac780d5ab7f4a87ec064bf785
+readonly CACHE_WRITE_POST_CENSUS_SHA=e5d38ffbce7adb88f39115e1b1dad52674c15be35db9448fb771dd1d2c575487
+readonly CACHE_WRITE_MATRIX_VALIDATION_SHA=667c4b1de614f90821c21f18cbf9866888c6ff01d3fb02aa1fb0b62996421070
+readonly CACHE_WRITE_CHUNK_VALIDATION_SHA=5816cd9e3a1cfc2faf52395d9b90dc660a0ce261771d87f3b2f34c8d02ccaa2c
+readonly CACHE_WRITE_BF16_VALIDATION_SHA=4d21da19b35a073a0133f61b692ca5b5ea2c1e91544a7a4f68a350e9dc159e4c
+readonly CACHE_WRITE_GATHER_VALIDATION_SHA=d80163cb19f0f85819ca709a7bb2425e0a6d1f11e3f8fb89a4f38b3f3072665e
+readonly CACHE_WRITE_SOURCE_VALIDATION_SHA=cf9306eab21f030198e9d1195732b0879fb8aba824feec02bab93f68d95c547d
+readonly CACHE_WRITE_ASSOCIATION_MANIFEST_SHA=6cbe954b4bd28161518374897027c91556b5d7030ea4117434d49c19a7f19bb6
+readonly CACHE_WRITE_OBSERVED_CACHE_SHA=52bf55ed5e9ea74a59551351a21ae830fb39e289e82eaff636fb9ab84d7dcd8a
+readonly CACHE_WRITE_OPTIMIZED_HLO_SHA=d396040f171afcc28a1fe6d1ec36e7f11529d72ff0051aabdfca4fe91a4b3938
+readonly CACHE_WRITE_HLO_FILE_SHA=e55cecef0f05142f20748f441df020bb83941bb4770a90903395fb9301babc10
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
@@ -122,7 +146,8 @@ ASSOCIATION_DIR=$RUN_DIR/association
 [[ $PROFILE == matrix || $PROFILE == chunk_parameter || \
   $PROFILE == chunk_bf16_weight || \
   $PROFILE == chunk_gather_bf16_weight || \
-  $PROFILE == chunk_gather_cache_write_bf16_weight ]] || {
+  $PROFILE == chunk_gather_cache_write_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_source_rope ]] || {
   echo "unsupported prompt-key association profile: $PROFILE" >&2
   exit 2
 }
@@ -301,7 +326,8 @@ PY
 
 if [[ $PROFILE == chunk_parameter || $PROFILE == chunk_bf16_weight || \
   $PROFILE == chunk_gather_bf16_weight || \
-  $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
+  $PROFILE == chunk_gather_cache_write_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_source_rope ]]; then
   for contract in \
     "$MATRIX_ASSOCIATION_FILE_SHA $MATRIX_DIR/association/association.json" \
     "$MATRIX_BEST_HLO_FILE_SHA $MATRIX_DIR/association/hlo/accepted_xla_m2048_divide_sqrt.optimized_hlo.txt.gz" \
@@ -391,7 +417,8 @@ fi
 
 if [[ $PROFILE == chunk_bf16_weight || \
   $PROFILE == chunk_gather_bf16_weight || \
-  $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
+  $PROFILE == chunk_gather_cache_write_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_source_rope ]]; then
   for contract in \
     "$CHUNK_ASSOCIATION_FILE_SHA $CHUNK_DIR/association/association.json" \
     "$CHUNK_HLO_FILE_SHA $CHUNK_DIR/association/hlo/accepted_xla_m2048_chunk_parameter_divide_sqrt.optimized_hlo.txt.gz" \
@@ -483,7 +510,8 @@ PY
 fi
 
 if [[ $PROFILE == chunk_gather_bf16_weight || \
-  $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
+  $PROFILE == chunk_gather_cache_write_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_source_rope ]]; then
   for contract in \
     "$BF16_ASSOCIATION_FILE_SHA $BF16_DIR/association/association.json" \
     "$BF16_HLO_FILE_SHA $BF16_DIR/association/hlo/accepted_xla_m2048_chunk_bf16_weight_divide_sqrt.optimized_hlo.txt.gz" \
@@ -573,7 +601,8 @@ connection.close()
 PY
 fi
 
-if [[ $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
+if [[ $PROFILE == chunk_gather_cache_write_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_source_rope ]]; then
   for contract in \
     "$GATHER_ASSOCIATION_FILE_SHA $GATHER_DIR/association/association.json" \
     "$GATHER_TENSOR_FILE_SHA $GATHER_DIR/association/candidate_prompt_index_keys.safetensors" \
@@ -669,6 +698,136 @@ connection.close()
 PY
 fi
 
+if [[ $PROFILE == chunk_gather_cache_write_source_rope ]]; then
+  for contract in \
+    "$CACHE_WRITE_ASSOCIATION_FILE_SHA $CACHE_WRITE_DIR/association/association.json" \
+    "$CACHE_WRITE_TENSOR_FILE_SHA $CACHE_WRITE_DIR/association/candidate_prompt_index_keys.safetensors" \
+    "$CACHE_WRITE_HLO_FILE_SHA $CACHE_WRITE_DIR/association/hlo/accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt.optimized_hlo.txt.gz" \
+    "$CACHE_WRITE_SUMMARY_FILE_SHA $CACHE_WRITE_DIR/summary.json" \
+    "$CACHE_WRITE_SUCCESS_SHA $CACHE_WRITE_DIR/SUCCESS" \
+    "$CACHE_WRITE_RESULTS_DB_SHA $CACHE_WRITE_DIR/results_ckpt.db" \
+    "$CACHE_WRITE_EVIDENCE_SHA $CACHE_WRITE_DIR/evidence.sha256" \
+    "$CACHE_WRITE_REMOTE_OBJECTS_SHA $CACHE_WRITE_DIR/remote_objects.json" \
+    "$CACHE_WRITE_PRE_CENSUS_SHA $CACHE_WRITE_DIR/census_pre.txt" \
+    "$CACHE_WRITE_POST_CENSUS_SHA $CACHE_WRITE_DIR/census_post.txt" \
+    "$CACHE_WRITE_MATRIX_VALIDATION_SHA $CACHE_WRITE_DIR/matrix_validation.json" \
+    "$CACHE_WRITE_CHUNK_VALIDATION_SHA $CACHE_WRITE_DIR/chunk_parameter_validation.json" \
+    "$CACHE_WRITE_BF16_VALIDATION_SHA $CACHE_WRITE_DIR/bf16_weight_validation.json" \
+    "$CACHE_WRITE_GATHER_VALIDATION_SHA $CACHE_WRITE_DIR/gather_validation.json" \
+    "$CACHE_WRITE_SOURCE_VALIDATION_SHA $CACHE_WRITE_DIR/source_validation.json"; do
+    expected=${contract%% *}
+    path=${contract#* }
+    [[ $(sha256sum "$path" | awk '{print $1}') == "$expected" ]] || {
+      say "ABORT: sealed DB511 cache-write result drifted: $path"
+      exit 2
+    }
+  done
+  cache_write_remote_success_sha=$(gcloud storage cat \
+    "$CACHE_WRITE_REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $cache_write_remote_success_sha == "$CACHE_WRITE_SUCCESS_SHA" ]] || {
+    say "ABORT: approved DB511 SUCCESS drifted"
+    exit 2
+  }
+  /home/gianl/vllm-env/bin/python - \
+    "$RESULTS_DB" "$CACHE_WRITE_DIR" \
+    "$RUN_DIR/cache_write_validation.json" \
+    "$CACHE_WRITE_RUN_ID" "$CACHE_WRITE_ITEM_ROW_ID" \
+    "$CACHE_WRITE_CODE_HASH" "$CACHE_WRITE_ASSOCIATION_MANIFEST_SHA" \
+    "$CACHE_WRITE_OBSERVED_CACHE_SHA" \
+    "$CACHE_WRITE_OPTIMIZED_HLO_SHA" <<'PY'
+import gzip
+import json
+from pathlib import Path
+import re
+import sqlite3
+import sys
+
+(db_path, cache_write_path, output_path, run_id, item_id, code_hash,
+ manifest_sha, observed_sha, optimized_hlo_sha) = sys.argv[1:]
+run_id, item_id = int(run_id), int(item_id)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+    raise SystemExit("DB511 cache-write source DB integrity failed")
+run = connection.execute(
+    "SELECT harness_git,env_json,pod FROM runs WHERE run_id=?", (run_id,)
+).fetchone()
+item = connection.execute(
+    "SELECT id,item_id,correct,score FROM items WHERE run_id=?", (run_id,)
+).fetchone()
+candidate_name = (
+    "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt"
+)
+expected_item = (item_id, candidate_name, 0, 0.0)
+if run is None or item != expected_item:
+    raise SystemExit("DB511 cache-write source row drifted")
+harness, env_json, pod = run
+env = json.loads(env_json)
+if (
+    harness != code_hash[:7]
+    or pod != "db-v4-64-od"
+    or env.get("association_manifest_sha256") != manifest_sha
+    or env.get("candidate_set")
+    != "chunk_gather_cache_write_bf16_weight"
+    or env.get("association_parent_run_id") != 510
+    or env.get("exact_candidates") != []
+):
+    raise SystemExit("DB511 cache-write source provenance drifted")
+root = Path(cache_write_path)
+association = json.loads((root / "association/association.json").read_text())
+candidate = association["candidates"][candidate_name]
+hlo = candidate["hlo"]["contract"]
+with gzip.open(
+    root / "association/hlo/accepted_xla_m2048_gather_cache_write_"
+    "bf16_weight_divide_sqrt.optimized_hlo.txt.gz",
+    "rt",
+) as stream:
+    parent_hlo = stream.read().lower()
+parent_rotary = {
+    "cosine_count": len(
+        re.findall(r"= f32\[2048,32\].*\bcosine\(", parent_hlo)
+    ),
+    "exponent_constant": "constant(0.015625)" in parent_hlo,
+    "power_count": len(re.findall(r"= f32\[32\].*\bpower\(", parent_hlo)),
+    "sine_count": len(
+        re.findall(r"= f32\[2048,32\].*\bsine\(", parent_hlo)
+    ),
+    "theta_constant": "constant(8e+06)" in parent_hlo,
+}
+if (
+    association["manifest_sha256"] != manifest_sha
+    or association["candidate_set"]
+    != "chunk_gather_cache_write_bf16_weight"
+    or candidate["comparison_to_accepted"]["mismatch_count"] != 45
+    or candidate["observed_bfloat16_sha256"] != observed_sha
+    or candidate["hlo"]["optimized_hlo_sha256"] != optimized_hlo_sha
+    or hlo["loop_count"] != 0
+    or hlo["physical_embedding_gather_count"] != 1
+    or hlo["gather_coupled_input_rms"] is not True
+    or hlo["physical_cache_scatter_count"] != 1
+    or hlo["cache_scatter_update_bf16"] is not True
+    or parent_rotary != {
+        "cosine_count": 1,
+        "exponent_constant": True,
+        "power_count": 1,
+        "sine_count": 1,
+        "theta_constant": True,
+    }
+):
+    raise SystemExit("DB511 cache-write source artifact drifted")
+Path(output_path).write_text(json.dumps({
+    "status": "SUCCESS",
+    "cache_write_run_id": run_id,
+    "cache_write_item_row_id": item_id,
+    "cache_write_code_hash": code_hash,
+    "cache_write_association_manifest_sha256": manifest_sha,
+    "cache_write_mismatch_count": 45,
+    "cache_write_optimized_hlo_sha256": optimized_hlo_sha,
+    "cache_write_rotary_physical_contract": parent_rotary,
+}, indent=2, sort_keys=True) + "\n")
+connection.close()
+PY
+fi
+
 say "syncing exact greenfield pin to all eight hosts"
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && echo "SYNC_OK $(hostname) $pin"'
@@ -734,6 +893,11 @@ elif profile == "chunk_gather_bf16_weight":
     expected_names = {
         "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
     }
+elif profile == "chunk_gather_cache_write_source_rope":
+    expected_names = {
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_"
+        "divide_sqrt_source_rope"
+    }
 else:
     expected_names = {
         "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt"
@@ -755,6 +919,25 @@ if (
 for name, record in association["candidates"].items():
     if not record["hlo"]["contract"]["passed"]:
         raise SystemExit(f"prompt-key association HLO failed: {name}")
+
+parent_hlo_evidence = {}
+if profile == "chunk_gather_cache_write_source_rope":
+    parent = json.loads((root / "cache_write_validation.json").read_text())
+    current_hlo = next(iter(association["candidates"].values()))["hlo"]
+    current_hlo_sha = current_hlo["optimized_hlo_sha256"]
+    parent_hlo_sha = parent["cache_write_optimized_hlo_sha256"]
+    current_rotary = dict(current_hlo["contract"]["rotary"])
+    current_rotary.pop("source_literal")
+    parent_rotary = parent["cache_write_rotary_physical_contract"]
+    parent_hlo_evidence = {
+        "parent_optimized_hlo_sha256": parent_hlo_sha,
+        "optimized_hlo_identical_to_parent": (
+            current_hlo_sha == parent_hlo_sha
+        ),
+        "rotary_physical_contract_identical_to_parent": (
+            current_rotary == parent_rotary
+        ),
+    }
 
 source_run_id, source_item_id = int(source_run_id), int(source_item_id)
 sys.path.insert(0, str(Path(repo) / "bench"))
@@ -778,11 +961,13 @@ run_id = pv.start_run(
         "exact_candidates": association["conclusion"]["exact_candidates"],
         "classification": association["conclusion"]["classification"],
         "candidate_set": profile,
+        **parent_hlo_evidence,
         "association_parent_run_id": {
             "chunk_parameter": 507,
             "chunk_bf16_weight": 508,
             "chunk_gather_bf16_weight": 509,
             "chunk_gather_cache_write_bf16_weight": 510,
+            "chunk_gather_cache_write_source_rope": 511,
         }.get(profile),
     },
     note=(
@@ -840,6 +1025,7 @@ summary = {
         for name, value in association["candidates"].items()
     },
     "claim_scope": association["claim_scope"],
+    **parent_hlo_evidence,
 }
 (root / "summary.json").write_text(
     json.dumps(summary, indent=2, sort_keys=True) + "\n"
@@ -884,6 +1070,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   fi
   if [[ -f gather_validation.json ]]; then
     sha256sum gather_validation.json
+  fi
+  if [[ -f cache_write_validation.json ]]; then
+    sha256sum cache_write_validation.json
   fi
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \

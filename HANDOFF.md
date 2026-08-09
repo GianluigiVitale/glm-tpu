@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 00:42 UTC
+**Updated:** 2026-08-09 01:19 UTC
 
 ## Authority and isolation
 
@@ -2322,3 +2322,28 @@ Exact next: audit preserved accepted prompt artifacts for a physical pre-/post-R
 optimized source HLO. If no such evidence exists, isolate the literal accepted RoPE source spelling
 inside the same gather/RMS/projection/scatter harness. If that is byte-identical to DB511, capture
 the accepted pre-RoPE FP32 row at the first mismatching position rather than guessing more variants.
+
+## Accepted RoPE evidence audit is closed; one literal discriminator is ready
+
+The preserved accepted artifacts contain no optimized prompt RoPE HLO and no prompt pre-RoPE
+state. DB493's only internal key boundary is post-RoPE FP32 at decode position 8,155; none of
+DB511's 45 mismatches is at that position (the last prompt position, 8,154, is exact), so it cannot
+discriminate the prompt drift. The accepted pin `b3c25df47ac98783912dc658878181ec0a8ae16d`
+spells RoPE in `tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py` as FP32
+`theta ** (-arange / rope_dim)`, direct cosine/sine, and interleaved pair arithmetic. A CPU audit
+over positions 0--8,154 found its cosine/sine arrays bitwise identical to the existing greenfield
+helper; their StableHLO contains the same physical arithmetic, so this is a deliberately
+single-shot lowering discriminator rather than a new numerical hypothesis.
+
+The default-off `chunk_gather_cache_write_source_rope` profile now adapts that literal spelling
+inside the already-proven DB511 gather/RMS/M2048-BF16-projection/flat-cache-scatter path. Its HLO
+contract requires exactly one FP32 `[32]` power, one each FP32 `[2048,32]` cosine and sine, theta
+`8e6`, exponent `0.015625`, and every DB511 invariant. It also revalidates DB511's local, DB and
+remote bytes before launch and records whether the optimized HLO and the physical RoPE contract
+equal the parent. Focused tests pass 35/35; Python compilation, Bash syntax, ShellCheck, JSON,
+saved-DB511 HLO validation and diff checks pass. These are readiness facts only.
+
+Exact next: commit/push this clean default-off discriminator and run exactly one protected
+`GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE=chunk_gather_cache_write_source_rope
+scripts/greenfield/run_prompt_index_cache_association_probe.sh`. If it leaves the same 45 values,
+do not try more RoPE variants: capture the accepted pre-RoPE FP32 key at prompt position 113.
