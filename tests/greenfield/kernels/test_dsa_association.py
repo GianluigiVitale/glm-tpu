@@ -92,8 +92,17 @@ def test_prompt_key_physical_m64_map_matches_logical_reference() -> None:
         projection_weight_mode="adapted_fp32",
         projection_mapping_mode="physical_m64_lax_map",
     )
+    physical_keynorm = layer0_prompt_index_key_chunk(
+        *arguments,
+        geometry=geometry,
+        projection_weight_mode="adapted_fp32",
+        projection_mapping_mode="physical_m64_projection_keynorm_lax_map",
+    )
 
     np.testing.assert_array_equal(np.asarray(physical), np.asarray(logical))
+    np.testing.assert_array_equal(
+        np.asarray(physical_keynorm), np.asarray(logical)
+    )
     assert physical.shape == (128, 4)
     physical_stablehlo = str(
         jax.jit(
@@ -123,23 +132,55 @@ def test_prompt_key_physical_m64_map_matches_logical_reference() -> None:
         .compiler_ir(dialect="stablehlo")
     )
     assert "HIGHEST" not in logical_stablehlo
-    with pytest.raises(ValueError, match="physical-M64 projection"):
-        layer0_prompt_index_key_chunk(
-            *arguments,
-            geometry=Layer0DsaProbeGeometry(
-                prompt_tokens=129,
-                prompt_chunk=128,
-                decode_rows=1,
-                hidden_size=8,
-                q_lora_rank=4,
-                qkv_a_companion_rank=2,
-                legacy_tensor_shards=4,
-                heads=1,
-                head_dim=4,
-                rotary_dim=2,
-            ),
-            projection_mapping_mode="physical_m64_lax_map",
+    physical_keynorm_stablehlo = str(
+        jax.jit(
+            partial(
+                layer0_prompt_index_key_chunk,
+                geometry=geometry,
+                projection_weight_mode="adapted_fp32",
+                projection_mapping_mode=(
+                    "physical_m64_projection_keynorm_lax_map"
+                ),
+            )
         )
+        .lower(*arguments)
+        .compiler_ir(dialect="stablehlo")
+    )
+    assert physical_keynorm_stablehlo.count("stablehlo.while") == 1
+    assert physical_keynorm_stablehlo.count(
+        "precision = [DEFAULT, HIGHEST]"
+    ) == 1
+    assert physical_keynorm_stablehlo.count(
+        "-> tensor<64xf32>"
+    ) == 2
+    keynorm_sqrt_lines = [
+        line
+        for line in physical_keynorm_stablehlo.splitlines()
+        if "stablehlo.sqrt" in line
+    ]
+    assert len(keynorm_sqrt_lines) == 1
+    assert "tensor<64x1xf32>" in keynorm_sqrt_lines[0]
+    for mapping_mode in (
+        "physical_m64_lax_map",
+        "physical_m64_projection_keynorm_lax_map",
+    ):
+        with pytest.raises(ValueError, match="physical-M64 projection"):
+            layer0_prompt_index_key_chunk(
+                *arguments,
+                geometry=Layer0DsaProbeGeometry(
+                    prompt_tokens=129,
+                    prompt_chunk=128,
+                    decode_rows=1,
+                    hidden_size=8,
+                    q_lora_rank=4,
+                    qkv_a_companion_rank=2,
+                    legacy_tensor_shards=4,
+                    heads=1,
+                    head_dim=4,
+                    rotary_dim=2,
+                ),
+                projection_mapping_mode=mapping_mode,
+            )
 
 
 def test_bfloat16_artifact_bits_roundtrip() -> None:

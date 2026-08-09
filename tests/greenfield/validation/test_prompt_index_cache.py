@@ -823,6 +823,49 @@ ENTRY main {
     assert result["loop_count"] == 1
     assert result["required_shapes"]["physical_m64_projection"] is True
 
+    physical_keynorm_hlo = hlo.replace(
+        "  %mapped = (s32[], f32[32,64,128]{2,1,0}) while(%projection)",
+        "\n".join(
+            (
+                "  %key_mean = f32[64]{0} reduce(%projection)",
+                "  %key_sqrt = f32[64]{0} sqrt(%key_mean), "
+                'metadata={op_name="jit(probe)/sqrt"}',
+                "  %key_affine = f32[64,128]{1,0} "
+                "add(%projection, %projection), "
+                'metadata={op_name="jit(probe)/add"}',
+                "  %mapped = (s32[], f32[32,64,128]{2,1,0}) "
+                "while(%key_affine)",
+            )
+        ),
+    )
+    keynorm_candidate = (
+        "accepted_xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+        "fp32_weight_divide_sqrt_source_rope"
+    )
+    physical_keynorm = validate_prompt_index_key_association_hlo(
+        physical_keynorm_hlo,
+        candidate=keynorm_candidate,
+    )
+    assert physical_keynorm["passed"] is True
+    assert physical_keynorm["physical_key_norm"] == {
+        "affine_count": 1,
+        "enabled": True,
+        "grouped_sqrt_count": 0,
+        "sqrt_count": 1,
+    }
+    grouped_keynorm = validate_prompt_index_key_association_hlo(
+        physical_keynorm_hlo.replace(
+            "%key_sqrt = f32[64]{0}",
+            "%key_sqrt = f32[32,64]{1,0}",
+        ),
+        candidate=keynorm_candidate,
+    )
+    assert grouped_keynorm["passed"] is False
+    assert (
+        "physical M64 key LayerNorm retained grouped [32,64] sqrt"
+        in grouped_keynorm["violations"]
+    )
+
     downcast_weight = validate_prompt_index_key_association_hlo(
         hlo.replace(
             "%wk_weight = f32[128,6144]{1,0} parameter(5)",
@@ -1103,12 +1146,18 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
         "SOURCE_CAPTURE_MANIFEST_SHA=64320e97",
         "SOURCE_CACHE_MANIFEST_SHA=acc631e7",
         "LOWERING_MANIFEST_SHA=d9b492ee",
+        "PROJECTION_RUN_ID=517",
+        "PROJECTION_ITEM_ROW_ID=1802",
+        "PROJECTION_MANIFEST_SHA=f3587bd4",
         "--accepted-capture-dir",
         "--projection-weight-mode adapted_fp32",
-        "--projection-mapping-mode physical_m64_lax_map",
+        "--projection-mapping-mode physical_m64_projection_keynorm_lax_map",
         "--capture-mode prompt_key_input",
         "physical_m64_projection",
+        "physical_m64_key_norm_sqrt",
+        "physical_m64_key_norm_affine",
         "convolution_weight_f32",
+        "key_norm_association_restored",
         "google_crc32c",
         "strict_census post",
         '"performance_claim": "false"',

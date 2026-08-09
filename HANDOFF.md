@@ -2603,3 +2603,29 @@ precision request and absence of HIGHEST from the logical path; the focused kern
 suite passes 52/52. Exact next: obtain the narrow final Fable confirmation, commit/push, then run
 one clean serialized retry. Do not re-review the already cleared `50f619d` base and do not run the
 full 8K decoder unless the retry is bitwise exact.
+
+## DB517 makes projection exact and moves the boundary to physical key LayerNorm
+
+Protected DB517/item1802,
+`greenfield_layer0_prompt_key_projection_m64_20260809T115707855267296Z` at `5926b05`, passes the
+DB515/DB516 pins, one-host four-chip execution, DB/archive linkage and authenticated 8/8 pre/post
+cleanup. Both state/cache HLOs contain one loop and one accepted-shape BF16 `[64,6144]` × FP32
+`[128,6144]` convolution with no `wk` downcast or forbidden operation/shape. The position-113
+projection is now bitwise exact: 0/128 mismatches. M64 placement plus mixed operand precision is
+therefore the exact projection correction.
+
+The first difference moves to `pre_rope_key`, so only key LayerNorm remains at that producer
+boundary: 29/128 FP32 values differ, max `1.1920929e-7`. The complete BF16 cache improves from 45
+to 22 mismatches, first at position 114, max `0.001953125`. Comparison manifest is
+`f3587bd4...fecc`; terminal SUCCESS is `79f0ea68...03c0`; local/remote object CRC32C, SQLite
+integrity and DB517 linkage pass. This is diagnostic correctness evidence, not decoder/Gate-D or
+performance proof.
+
+DB516's preserved physical HLO normalizes each `[64,128]` projection inside its partition: mean,
+variance and sqrt are `[64]`, followed by a physical `[64,128]` affine. DB517 instead normalizes
+the mapped output as grouped `[32,64,128]` with `[32,64]` reductions. The next default-off mode
+keeps projection and key LayerNorm in one M64 `lax.map`; its linter requires one loop, exact mixed
+convolution, physical `[64]` sqrt and `[64,128]` affine, and rejects grouped `[32,64]` key-norm
+sqrt. DB517 is now a pinned prerequisite. Exact next: finish local checks, one diff-only Fable
+commit-readiness review, commit/push, then one serialized protected key-LayerNorm discriminator.
+Do not retry the full decoder unless producer states and the entire 8,155-row cache are exact.

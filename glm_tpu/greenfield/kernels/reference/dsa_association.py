@@ -25,6 +25,7 @@ KeyProjectionWeightMode = Literal["adapted_fp32", "adapted_bf16"]
 KeyProjectionMappingMode = Literal[
     "logical_m2048",
     "physical_m64_lax_map",
+    "physical_m64_projection_keynorm_lax_map",
 ]
 RotaryAssociationMode = Literal["greenfield_reference", "accepted_source"]
 QaProjectionMode = Literal[
@@ -974,13 +975,17 @@ def _project_key_states_f32(
     """Return projection, pre-RoPE and post-RoPE FP32 key boundaries."""
 
     projection_weight = wk_weight.astype(jnp.float32)
+    keys = None
     if projection_mapping_mode == "logical_m2048":
         projected = _dot_out_in(
             hidden.astype(jnp.float32),
             projection_weight,
             output_dtype=jnp.float32,
         )
-    elif projection_mapping_mode == "physical_m64_lax_map":
+    elif projection_mapping_mode in (
+        "physical_m64_lax_map",
+        "physical_m64_projection_keynorm_lax_map",
+    ):
         physical_rows = geometry.prompt_chunk // geometry.legacy_tensor_shards
         if (
             hidden.shape != (geometry.prompt_chunk, geometry.hidden_size)
@@ -998,7 +1003,7 @@ def _project_key_states_f32(
         )
 
         def project_partition(partition: Any) -> Any:
-            return _dot_out_in(
+            partition_projection = _dot_out_in(
                 partition.astype(jnp.float32),
                 projection_weight,
                 output_dtype=jnp.float32,
@@ -1010,23 +1015,49 @@ def _project_key_states_f32(
                     lax.Precision.HIGHEST,
                 ),
             )
+            if projection_mapping_mode == (
+                "physical_m64_projection_keynorm_lax_map"
+            ):
+                return partition_projection, affine_key_layer_norm(
+                    partition_projection,
+                    key_norm_weight,
+                    key_norm_bias,
+                    epsilon=geometry.key_norm_epsilon,
+                    mode=key_norm_mode,
+                )
+            return partition_projection
 
-        projected = lax.map(project_partition, physical_hidden).reshape(
-            geometry.prompt_chunk,
-            geometry.head_dim,
-        )
+        mapped = lax.map(project_partition, physical_hidden)
+        if projection_mapping_mode == (
+            "physical_m64_projection_keynorm_lax_map"
+        ):
+            physical_projected, physical_keys = mapped
+            projected = physical_projected.reshape(
+                geometry.prompt_chunk,
+                geometry.head_dim,
+            )
+            keys = physical_keys.reshape(
+                geometry.prompt_chunk,
+                geometry.head_dim,
+            )
+        else:
+            projected = mapped.reshape(
+                geometry.prompt_chunk,
+                geometry.head_dim,
+            )
     else:
         raise ValueError(
             "unsupported index-key projection mapping "
             f"{projection_mapping_mode!r}"
         )
-    keys = affine_key_layer_norm(
-        projected,
-        key_norm_weight,
-        key_norm_bias,
-        epsilon=geometry.key_norm_epsilon,
-        mode=key_norm_mode,
-    )
+    if keys is None:
+        keys = affine_key_layer_norm(
+            projected,
+            key_norm_weight,
+            key_norm_bias,
+            epsilon=geometry.key_norm_epsilon,
+            mode=key_norm_mode,
+        )
     if rotary_mode == "greenfield_reference":
         cos, sin = rotary_cos_sin(
             positions,

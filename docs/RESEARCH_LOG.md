@@ -6089,3 +6089,25 @@ unmotivated arithmetic variants.
   logical M2048 behavior is untouched; CPU StableHLO pins the mixed request and absence of HIGHEST
   on the logical path. The 52 focused kernel/cache/lowering tests pass. Final diff confirmation,
   commit and one serialized protected retry are next.
+
+## 2026-08-09 12:07 — DB517 proves projection and isolates physical key LayerNorm
+
+- Protected DB517/item1802 at `5926b05` passes all DB515/DB516 source pins, physical HLO gates,
+  one-host four-chip execution, DB/archive integrity and authenticated 8/8 pre/post cleanup.
+  SUCCESS SHA is `79f0ea68...03c0`; comparison manifest is `f3587bd4...fecc`; the approved remote
+  ledger contains 16 exact objects / 25,724,044 bytes.
+- Both compiled programs have one map loop and one BF16 `[64,6144]` × FP32 `[128,6144]` -> FP32
+  `[64,128]` convolution, zero `wk` downcasts, exact gather/RMS/RoPE/scatter structure and no
+  forbidden operation/shape. At position 113 the projection is bitwise equal to the accepted
+  capture (0/128 mismatches), while the input remains exact. This accepts the DB516 M64 plus mixed
+  operand correction.
+- The first divergence is now `pre_rope_key`: 29/128 key-LayerNorm values differ, max
+  `1.1920929e-7`. Post-RoPE differs only downstream. Full-cache drift improves from 45 to 22 BF16
+  values, first at position 114, max `0.001953125`. `projection_restored=false` accurately records
+  that the complete producer/cache contract is not yet exact; this is not Gate-D/performance.
+- DB516 physically computes LayerNorm mean/variance/sqrt at `[64]` and affine at `[64,128]` per
+  partition. DB517's standalone program performs the same source formula on grouped
+  `[32,64,128]` / `[32,64]` shapes after the projection map. A new default-off combined map moves
+  only key LayerNorm into the already-proven M64 body, retains the projection-only mode as a
+  control, and fails closed unless the physical `[64]`/`[64,128]` HLO contract appears. DB517
+  becomes an exact pinned prerequisite before one serialized retry.

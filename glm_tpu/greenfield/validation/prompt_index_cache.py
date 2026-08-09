@@ -1274,6 +1274,22 @@ def validate_prompt_index_key_association_hlo(
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
             "divide_sqrt",
         ),
+        (
+            "accepted_xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_divide_sqrt_source_rope"
+        ): (
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope",
+            "divide_sqrt",
+        ),
+        (
+            "accepted_xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_divide_sqrt_source_rope_states"
+        ): (
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope_states",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -1374,8 +1390,34 @@ def validate_prompt_index_key_association_hlo(
     else:
         lowered = optimized_hlo.lower()
         wk_feature_slices = _classify_chunk_wk_feature_slices(lowered)
-        m64_lax_map_backend = backend.startswith("xla_m64_lax_map_")
+        m64_lax_map_backend = backend.startswith(
+            (
+                "xla_m64_lax_map_",
+                "xla_m64_projection_keynorm_lax_map_",
+            )
+        )
+        physical_key_norm_backend = backend.startswith(
+            "xla_m64_projection_keynorm_lax_map_"
+        )
         physical_projection_rows = 64 if m64_lax_map_backend else prompt_chunk
+        physical_key_norm_sqrt_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(r"= f32\[64\].*(?:fusion|sqrt)\(", line)
+            and "/sqrt" in line
+        ]
+        physical_key_norm_affine_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(r"= f32\[64,128\].*(?:fusion|add)\(", line)
+            and "/add" in line
+        ]
+        grouped_key_norm_sqrt_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(r"= f32\[32,64\].*(?:fusion|sqrt)\(", line)
+            and "/sqrt" in line
+        ]
         convolution_lines = [
             line
             for line in lowered.splitlines()
@@ -1427,6 +1469,10 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope_states",
         )
         source_rope_backend = backend in (
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
@@ -1435,13 +1481,15 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope_states",
         )
         state_backend = backend.endswith("_source_rope_states")
         fp32_weight_backend = backend.startswith(
             "xla_chunk_gather_cache_write_fp32_weight"
-        ) or backend.startswith(
-            "xla_m64_lax_map_gather_cache_write_fp32_weight"
-        )
+        ) or backend.startswith("xla_m64_")
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
@@ -1452,6 +1500,17 @@ def validate_prompt_index_key_association_hlo(
                     "physical_m64_projection": "f32[64,128]" in lowered,
                     "physical_m64_projection_input": (
                         "bf16[64,6144]" in lowered
+                    ),
+                }
+            )
+        if physical_key_norm_backend:
+            required_shapes.update(
+                {
+                    "physical_m64_key_norm_sqrt": bool(
+                        physical_key_norm_sqrt_lines
+                    ),
+                    "physical_m64_key_norm_affine": bool(
+                        physical_key_norm_affine_lines
                     ),
                 }
             )
@@ -1500,6 +1559,10 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope_states",
         ):
             required_shapes.update(
                 {
@@ -1624,6 +1687,10 @@ def validate_prompt_index_key_association_hlo(
                 f"expected {expected_loop_count} projection-map loops, "
                 f"found {len(while_lines)}"
             )
+        if physical_key_norm_backend and grouped_key_norm_sqrt_lines:
+            violations.append(
+                "physical M64 key LayerNorm retained grouped [32,64] sqrt"
+            )
         if backend in (
             "xla_chunk_bf16_weight",
             "xla_chunk_gather_bf16_weight",
@@ -1659,6 +1726,10 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
             "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope",
+            "xla_m64_projection_keynorm_lax_map_gather_cache_write_"
+            "fp32_weight_source_rope_states",
         ):
             if len(physical_gather_lines) != 1:
                 violations.append(
@@ -1754,6 +1825,14 @@ def validate_prompt_index_key_association_hlo(
             "forbidden_shapes": forbidden_shapes,
             "loop_count": len(while_lines),
             "passed": not violations,
+            "physical_key_norm": {
+                "affine_count": len(physical_key_norm_affine_lines),
+                "enabled": physical_key_norm_backend,
+                "grouped_sqrt_count": len(
+                    grouped_key_norm_sqrt_lines
+                ),
+                "sqrt_count": len(physical_key_norm_sqrt_lines),
+            },
             "required_shapes": required_shapes,
             "violations": violations,
             "wk_feature_slices": wk_feature_slices,

@@ -100,7 +100,11 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--projection-mapping-mode",
-        choices=("logical_m2048", "physical_m64_lax_map"),
+        choices=(
+            "logical_m2048",
+            "physical_m64_lax_map",
+            "physical_m64_projection_keynorm_lax_map",
+        ),
         default="logical_m2048",
     )
     parser.add_argument(
@@ -397,11 +401,14 @@ def main() -> int:
         if args.projection_weight_mode == "adapted_bf16"
         else "fp32_weight"
     )
-    projection_label = (
-        "m64_lax_map"
-        if args.projection_mapping_mode == "physical_m64_lax_map"
-        else "m2048"
-    )
+    projection_labels = {
+        "logical_m2048": "m2048",
+        "physical_m64_lax_map": "m64_lax_map",
+        "physical_m64_projection_keynorm_lax_map": (
+            "m64_projection_keynorm_lax_map"
+        ),
+    }
+    projection_label = projection_labels[args.projection_mapping_mode]
     candidate_prefix = (
         f"accepted_xla_{projection_label}_gather_cache_write_"
         f"{weight_label}_divide_sqrt_source_rope"
