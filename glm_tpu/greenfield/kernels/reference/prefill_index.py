@@ -13,20 +13,14 @@ from .fp8 import dequantize_fp8_bits_block_weight
 from .rotary import apply_rotary, rotary_cos_sin
 
 
-def materialize_stage_local_prefill_index_wk(
+def decode_stage_local_prefill_index_wk_bf16(
     wk_bits: Any,
     wk_scale: Any,
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),
     fp8_block_shape: tuple[int, int] = (128, 128),
 ) -> Any:
-    """Materialize one final-owner adapted ``wk`` before prefill repair.
-
-    DB518 and DB519 jointly require this to be a completed executable
-    boundary: raw FP8 is decoded to BF16, rounded, and only then promoted to
-    FP32.  The returned value is passed as an independent repair parameter;
-    it must never be fused into the prompt-key projection executable.
-    """
+    """Decode and finish the BF16 half of one final-owner ``wk`` adapter."""
 
     expected_shape = (contract.head_dim, contract.hidden_size)
     if wk_bits.shape != expected_shape or wk_bits.dtype != jnp.uint8:
@@ -46,7 +40,43 @@ def materialize_stage_local_prefill_index_wk(
         wk_scale,
         block_shape=fp8_block_shape,
         output_dtype=jnp.bfloat16,
-    ).astype(jnp.float32)
+    )
+
+
+def promote_stage_local_prefill_index_wk(
+    wk_bf16: Any,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+) -> Any:
+    """Promote an already-completed stage-local BF16 ``wk`` to FP32."""
+
+    expected_shape = (contract.head_dim, contract.hidden_size)
+    if wk_bf16.shape != expected_shape or wk_bf16.dtype != jnp.bfloat16:
+        raise ValueError("prefill repair BF16 wk has an invalid shape/dtype")
+    return wk_bf16.astype(jnp.float32)
+
+
+def materialize_stage_local_prefill_index_wk(
+    wk_bits: Any,
+    wk_scale: Any,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+    fp8_block_shape: tuple[int, int] = (128, 128),
+) -> Any:
+    """Reference composition of the two final-owner adapter phases.
+
+    DB518 and DB519 jointly require this to be a completed executable
+    boundary. Production compiles and completes the two helpers separately;
+    this composition remains useful for CPU reference tests only.
+    """
+
+    decoded = decode_stage_local_prefill_index_wk_bf16(
+        wk_bits,
+        wk_scale,
+        contract=contract,
+        fp8_block_shape=fp8_block_shape,
+    )
+    return promote_stage_local_prefill_index_wk(decoded, contract=contract)
 
 
 def physical_m64_prompt_index_key_chunk(

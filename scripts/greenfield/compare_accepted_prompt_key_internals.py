@@ -256,7 +256,8 @@ def _run_lp4_materialized_repair(
     from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
     from glm_tpu.greenfield.kernels.reference.prefill_index import (
-        materialize_stage_local_prefill_index_wk,
+        decode_stage_local_prefill_index_wk_bf16,
+        promote_stage_local_prefill_index_wk,
         repair_stage_local_prompt_index_cache,
     )
     from glm_tpu.greenfield.runtime import (
@@ -283,23 +284,23 @@ def _run_lp4_materialized_repair(
         sharded_weight,
     )
 
-    def mapped_materializer(local_bits: Any, local_scales: Any) -> Any:
-        return materialize_stage_local_prefill_index_wk(
+    def mapped_bf16_decoder(local_bits: Any, local_scales: Any) -> Any:
+        return decode_stage_local_prefill_index_wk_bf16(
             local_bits[0], local_scales[0]
         )[None, ...]
 
-    materializer = jax.shard_map(
-        mapped_materializer,
+    bf16_decoder = jax.shard_map(
+        mapped_bf16_decoder,
         mesh=mesh,
         in_specs=(P("lp", None, None), P("lp", None, None)),
         out_specs=P("lp", None, None),
         check_vma=False,
     )
     compile_started = time.monotonic()
-    lowered_materializer = jax.jit(materializer).lower(bits, scales)
-    compiled_materializer = lowered_materializer.compile()
-    materializer_compile_seconds = time.monotonic() - compile_started
-    materializer_hlo = compiled_materializer.as_text()
+    lowered_bf16_decoder = jax.jit(bf16_decoder).lower(bits, scales)
+    compiled_bf16_decoder = lowered_bf16_decoder.compile()
+    bf16_decode_compile_seconds = time.monotonic() - compile_started
+    bf16_decode_hlo = compiled_bf16_decoder.as_text()
 
     config = SimpleNamespace(
         hidden_size=6144,
@@ -308,9 +309,10 @@ def _run_lp4_materialized_repair(
         total_devices=4,
     )
     decoder = SimpleNamespace(config=config)
-    materializer_contract = validate_prefill_index_weight_materialization_hlo(
-        materializer_hlo,
+    bf16_decode_contract = validate_prefill_index_weight_materialization_hlo(
+        bf16_decode_hlo,
         decoder=decoder,
+        phase="decode_bf16",
     )
     hlo_dir = output_dir / "hlo"
     hlo_dir.mkdir(parents=True, exist_ok=True)
@@ -330,10 +332,50 @@ def _run_lp4_materialized_repair(
         }
 
     record_hlo(
-        "lp4_wk_materializer", materializer_hlo, materializer_contract
+        "lp4_wk_decode_bf16", bf16_decode_hlo, bf16_decode_contract
     )
-    if not materializer_contract["passed"]:
-        raise RuntimeError("LP4 weight materialization HLO contract failed")
+    if not bf16_decode_contract["passed"]:
+        raise RuntimeError("LP4 BF16 weight decode HLO contract failed")
+
+    execute_started = time.monotonic()
+    decoded_bf16 = compiled_bf16_decoder(bits, scales)
+    jax.block_until_ready(decoded_bf16)
+    bf16_decode_execute_seconds = time.monotonic() - execute_started
+
+    def mapped_fp32_promoter(local_wk_bf16: Any) -> Any:
+        return promote_stage_local_prefill_index_wk(
+            local_wk_bf16[0]
+        )[None, ...]
+
+    fp32_promoter = jax.shard_map(
+        mapped_fp32_promoter,
+        mesh=mesh,
+        in_specs=P("lp", None, None),
+        out_specs=P("lp", None, None),
+        check_vma=False,
+    )
+    compile_started = time.monotonic()
+    lowered_fp32_promoter = jax.jit(fp32_promoter).lower(decoded_bf16)
+    compiled_fp32_promoter = lowered_fp32_promoter.compile()
+    fp32_promote_compile_seconds = time.monotonic() - compile_started
+    fp32_promote_hlo = compiled_fp32_promoter.as_text()
+    fp32_promote_contract = (
+        validate_prefill_index_weight_materialization_hlo(
+            fp32_promote_hlo,
+            decoder=decoder,
+            phase="promote_fp32",
+        )
+    )
+    record_hlo(
+        "lp4_wk_promote_fp32", fp32_promote_hlo, fp32_promote_contract
+    )
+    if not fp32_promote_contract["passed"]:
+        raise RuntimeError("LP4 FP32 weight promotion HLO contract failed")
+
+    execute_started = time.monotonic()
+    materialized = compiled_fp32_promoter(decoded_bf16)
+    jax.block_until_ready(materialized)
+    fp32_promote_execute_seconds = time.monotonic() - execute_started
 
     sentinel = ml_dtypes.bfloat16(-32.0)
     cache_host = np.full((4, 24, 128, 128), sentinel)
@@ -379,10 +421,6 @@ def _run_lp4_materialized_repair(
         out_specs=P("lp", None, None, None),
         check_vma=False,
     )
-    execute_started = time.monotonic()
-    materialized = compiled_materializer(bits, scales)
-    jax.block_until_ready(materialized)
-    materializer_execute_seconds = time.monotonic() - execute_started
     compile_started = time.monotonic()
     lowered_repair = jax.jit(repair).lower(
         cache,
@@ -518,8 +556,10 @@ def _run_lp4_materialized_repair(
         "hlo": hlo_records,
         "local_device_ids": [int(device.id) for device in devices],
         "materialized_shards": materialized_shards,
-        "materializer_compile_seconds": materializer_compile_seconds,
-        "materializer_execute_seconds": materializer_execute_seconds,
+        "bf16_decode_compile_seconds": bf16_decode_compile_seconds,
+        "bf16_decode_execute_seconds": bf16_decode_execute_seconds,
+        "fp32_promote_compile_seconds": fp32_promote_compile_seconds,
+        "fp32_promote_execute_seconds": fp32_promote_execute_seconds,
         "owner_isolation_exact": owner_isolation_exact,
         "per_lane_written_rows": [
             int(changed_rows[lane].sum()) for lane in range(4)

@@ -641,3 +641,17 @@ capture is still required.
   census SHAs are `9fe2527d...d2902` and `a3993b10...33130`, the diagnostic is archived in the
   approved bucket, and fleet cleanup is 8/8. There is no cache equality, DB/SUCCESS, decoder,
   performance or Gate-D standing.
+
+## LP4 combined materializer rejected — split-boundary proof next
+
+- Diagnostic retry `greenfield_layer0_prompt_key_norm_m64_20260809T195128353553953Z` at
+  `e53d1fd` proves all four raw bits/scales shards are bitwise exact and all four output shards are
+  identical. Their common SHA `b6429bf2...6e975` differs from accepted `d680f7b1...83469` in
+  698,727/786,432 FP32 values per lane. Thus placement and lane drift are rejected; the combined
+  adapter executable is causal.
+- Compact diagnostic SHA is `80e20cc8...9a18`; pre/failure census SHAs `22a6f95c...c12d` and
+  `bd7a265b...bb0e4` authenticate 8/8 cleanup, and the approved archive contains it. This is a
+  rejection with no DB/SUCCESS/cache/Gate-D or performance standing.
+- Next evidence is one bounded two-completion adapter: raw FP8 -> BF16 must complete before a
+  separate BF16 -> FP32 promotion, then the unchanged LP4 repair must match the accepted cache
+  bitwise. Separate HLO contracts reject phase fusion, communication and host callbacks.

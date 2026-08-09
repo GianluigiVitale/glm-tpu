@@ -12,8 +12,10 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     layer0_prompt_index_key_chunk,
 )
 from glm_tpu.greenfield.kernels.reference.prefill_index import (
+    decode_stage_local_prefill_index_wk_bf16,
     materialize_stage_local_prefill_index_wk,
     physical_m64_prompt_index_key_chunk,
+    promote_stage_local_prefill_index_wk,
     repair_stage_local_prompt_index_cache,
 )
 from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
@@ -159,6 +161,18 @@ def test_prompt_index_repair_writes_only_each_lp4_owner() -> None:
         contract=contract,
         fp8_block_shape=(2, 2),
     )
+    decoded_wk = decode_stage_local_prefill_index_wk_bf16(
+        wk_bits,
+        wk_scale,
+        contract=contract,
+        fp8_block_shape=(2, 2),
+    )
+    promoted_wk = promote_stage_local_prefill_index_wk(
+        decoded_wk, contract=contract
+    )
+    assert decoded_wk.dtype == jnp.bfloat16
+    assert promoted_wk.dtype == jnp.float32
+    np.testing.assert_array_equal(promoted_wk, wk_weight)
     key_norm = jnp.ones((4,), dtype=jnp.bfloat16)
     key_bias = jnp.asarray([0.0, 0.25, -0.5, 1.0], dtype=jnp.bfloat16)
     repaired = [

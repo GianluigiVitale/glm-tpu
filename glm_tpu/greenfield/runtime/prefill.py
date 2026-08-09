@@ -53,14 +53,17 @@ def validate_prefill_index_weight_materialization_hlo(
     optimized_hlo: str,
     *,
     decoder: DecoderStepProgram,
+    phase: Literal["combined", "decode_bf16", "promote_fp32"] = "combined",
 ) -> dict[str, Any]:
-    """Pin the completed raw-FP8 -> BF16 -> FP32 repair boundary.
+    """Pin one completed stage-local repair-weight adapter phase.
 
     DB519 proves that placing this arithmetic inside the large repair
-    executable changes the result.  This small executable must finish first,
-    without communication, and its FP32 outputs become independent parameters
-    of the prefill repair.
+    executable changes the result.  TPU evidence additionally requires BF16
+    decode and FP32 promotion to finish as separate executables.
     """
+
+    if phase not in ("combined", "decode_bf16", "promote_fp32"):
+        raise ValueError(f"unknown prefill wk materialization phase: {phase}")
 
     module = parse_hlo_module(optimized_hlo)
     slots = decoder.config.maximum_full_indexer_slots
@@ -100,6 +103,15 @@ def validate_prefill_index_weight_materialization_hlo(
         for instruction in module.instructions
         if parameter_matches(instruction, "f32", scale_shape)
     )
+    bf16_parameters = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+        and instruction.raw_opcode == "parameter"
+        and len(instruction.result_shapes) == 1
+        and instruction.result_shapes[0].dtype == "bf16"
+        and weight_value_shape(instruction.result_shapes[0])
+    )
     bf16_round_count = sum(
         sum(
             shape.dtype == "bf16" and weight_value_shape(shape)
@@ -130,38 +142,57 @@ def validate_prefill_index_weight_materialization_hlo(
         if marker in lowered
     )
     violations = []
-    if len(raw_parameters) != slots:
+    expected_raw_parameters = 0 if phase == "promote_fp32" else slots
+    expected_scale_parameters = 0 if phase == "promote_fp32" else slots
+    expected_bf16_parameters = slots if phase == "promote_fp32" else 0
+    if len(raw_parameters) != expected_raw_parameters:
         violations.append(
             "prefill wk materializer raw parameter count drifted: "
-            f"expected={slots} observed={len(raw_parameters)}"
+            f"expected={expected_raw_parameters} observed={len(raw_parameters)}"
         )
-    if len(scale_parameters) != slots:
+    if len(scale_parameters) != expected_scale_parameters:
         violations.append(
             "prefill wk materializer scale parameter count drifted: "
-            f"expected={slots} observed={len(scale_parameters)}"
+            f"expected={expected_scale_parameters} observed={len(scale_parameters)}"
         )
-    if bf16_round_count < slots:
+    if len(bf16_parameters) != expected_bf16_parameters:
+        violations.append(
+            "prefill wk materializer BF16 parameter count drifted: "
+            f"expected={expected_bf16_parameters} "
+            f"observed={len(bf16_parameters)}"
+        )
+    if phase != "promote_fp32" and bf16_round_count < slots:
         violations.append(
             "prefill wk materializer lost its BF16 adaptation rounds: "
             f"expected_at_least={slots} observed={bf16_round_count}"
         )
-    if fp32_promotion_count < slots:
+    if phase == "promote_fp32" and bf16_round_count:
+        violations.append("prefill wk promoter contains a BF16 adaptation round")
+    if phase != "decode_bf16" and fp32_promotion_count < slots:
         violations.append(
             "prefill wk materializer lost its FP32 promotions: "
             f"expected_at_least={slots} observed={fp32_promotion_count}"
         )
+    if phase == "decode_bf16" and fp32_promotion_count:
+        violations.append("prefill wk BF16 decoder contains an FP32 promotion")
     if collectives:
         violations.append("prefill wk materializer contains a collective")
     if host_markers:
         violations.append("prefill wk materializer contains a host callback")
     return {
-        "backend": "external_stage_local_bf16_then_fp32",
+        "backend": {
+            "combined": "external_stage_local_bf16_then_fp32",
+            "decode_bf16": "external_stage_local_raw_fp8_to_bf16",
+            "promote_fp32": "external_stage_local_bf16_to_fp32",
+        }[phase],
         "bf16_round_count": bf16_round_count,
+        "bf16_parameter_count": len(bf16_parameters),
         "collective_count": len(collectives),
         "expected_slot_count": slots,
         "fp32_promotion_count": fp32_promotion_count,
         "host_markers": list(host_markers),
         "passed": not violations,
+        "phase": phase,
         "raw_parameter_count": len(raw_parameters),
         "scale_parameter_count": len(scale_parameters),
         "violations": violations,

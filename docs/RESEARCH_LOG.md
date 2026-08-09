@@ -6347,3 +6347,18 @@ unmotivated arithmetic variants.
 - The next diagnostic-only correction records exact raw bits/scales placement plus compact bitwise
   comparisons for every lane before failing. It changes no device arithmetic. Focused tests and one
   new-diff-only Fable audit precede a single protected retry; the full 8K decoder remains forbidden.
+
+## 2026-08-09 19:52 — all LP4 lanes agree; combined adapter boundary is causal
+
+- Approved diagnostic retry `greenfield_layer0_prompt_key_norm_m64_20260809T195128353553953Z` at
+  pushed `e53d1fd` proves every lane receives exact raw bits/scales and every lane produces the same
+  FP32 result. Placement, input replication and lane-to-lane nondeterminism are therefore rejected.
+- The common output SHA `b6429bf2...6e975` differs from accepted `d680f7b1...83469` in
+  698,727/786,432 values per lane; first `[0,0]`, max `0.0033482313`, mean `0.00006827695`, p99
+  `0.0004185438`. The combined raw-FP8 -> BF16 -> FP32 executable is the remaining causal boundary.
+- Diagnostic SHA is `80e20cc8...9a18`; pre/failure census SHAs are `22a6f95c...c12d` and
+  `bd7a265b...bb0e4`; the same-region partial archive includes the new record and cleanup is 8/8.
+  No cache exactness, DB/SUCCESS, decoder or performance standing exists.
+- The bounded successor separates the accepted association into two completed stage-local
+  executables, BF16 decode then FP32 promotion, each with strict HLO entry/round/communication gates.
+  Repair arithmetic and sharding stay unchanged. Prove this cache exact before production wiring.

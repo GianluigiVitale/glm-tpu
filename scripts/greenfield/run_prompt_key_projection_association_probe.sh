@@ -557,20 +557,34 @@ if weight_source == "materialized_lp4_stage_local":
         )
     ):
         raise SystemExit("LP4 materialized repair ownership/exactness failed")
-    materializer = lp4["hlo"]["lp4_wk_materializer"]["contract"]
+    decoder = lp4["hlo"]["lp4_wk_decode_bf16"]["contract"]
+    promoter = lp4["hlo"]["lp4_wk_promote_fp32"]["contract"]
     repair = lp4["hlo"]["lp4_cache_repair"]["contract"]
     if (
-        not materializer["passed"]
-        or materializer["backend"]
-        != "external_stage_local_bf16_then_fp32"
-        or materializer["expected_slot_count"] != 1
-        or materializer["raw_parameter_count"] != 1
-        or materializer["scale_parameter_count"] != 1
-        or materializer["bf16_round_count"] < 1
-        or materializer["fp32_promotion_count"] < 1
-        or materializer["collective_count"] != 0
-        or materializer["host_markers"]
-        or materializer["violations"]
+        not decoder["passed"]
+        or decoder["phase"] != "decode_bf16"
+        or decoder["backend"] != "external_stage_local_raw_fp8_to_bf16"
+        or decoder["expected_slot_count"] != 1
+        or decoder["raw_parameter_count"] != 1
+        or decoder["scale_parameter_count"] != 1
+        or decoder["bf16_parameter_count"] != 0
+        or decoder["bf16_round_count"] < 1
+        or decoder["fp32_promotion_count"] != 0
+        or decoder["collective_count"] != 0
+        or decoder["host_markers"]
+        or decoder["violations"]
+        or not promoter["passed"]
+        or promoter["phase"] != "promote_fp32"
+        or promoter["backend"] != "external_stage_local_bf16_to_fp32"
+        or promoter["expected_slot_count"] != 1
+        or promoter["raw_parameter_count"] != 0
+        or promoter["scale_parameter_count"] != 0
+        or promoter["bf16_parameter_count"] != 1
+        or promoter["bf16_round_count"] != 0
+        or promoter["fp32_promotion_count"] < 1
+        or promoter["collective_count"] != 0
+        or promoter["host_markers"]
+        or promoter["violations"]
         or not repair["passed"]
         or repair["full_indexer_layer_count"] != 1
         or repair["chunk_count"] != 4
@@ -630,8 +644,11 @@ run_id = pv.start_run(
                 "assembled_cache_sha256": lp4[
                     "assembled_cache_sha256"
                 ],
-                "materializer_hlo_sha256": lp4["hlo"][
-                    "lp4_wk_materializer"
+                "bf16_decode_hlo_sha256": lp4["hlo"][
+                    "lp4_wk_decode_bf16"
+                ]["optimized_hlo_sha256"],
+                "fp32_promote_hlo_sha256": lp4["hlo"][
+                    "lp4_wk_promote_fp32"
                 ]["optimized_hlo_sha256"],
                 "owner_isolation_exact": lp4["owner_isolation_exact"],
                 "per_lane_written_rows": lp4["per_lane_written_rows"],
@@ -828,10 +845,17 @@ values = {
             summary["lp4_materialized_repair"] or {}
         ).get("owner_isolation_exact", False)
     ).lower(),
-    "lp4_materializer_hlo_sha256": (
+    "lp4_bf16_decode_hlo_sha256": (
         (summary["lp4_materialized_repair"] or {}).get(
             "hlo", {}
-        ).get("lp4_wk_materializer", {}).get(
+        ).get("lp4_wk_decode_bf16", {}).get(
+            "optimized_hlo_sha256", "none"
+        )
+    ),
+    "lp4_fp32_promote_hlo_sha256": (
+        (summary["lp4_materialized_repair"] or {}).get(
+            "hlo", {}
+        ).get("lp4_wk_promote_fp32", {}).get(
             "optimized_hlo_sha256", "none"
         )
     ),

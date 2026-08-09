@@ -2869,3 +2869,18 @@ census SHAs are `9fe2527d...d2902` and `a3993b10...33130`. The approved diagnost
 and cleanup is authenticated 8/8. The next narrow batch records raw bits/scales and all four output
 comparisons before refusing; it changes no arithmetic. After focused tests and one Fable audit of
 only that new diff, run one protected diagnostic. Do not rerun the full decoder first.
+
+The approved diagnostic retry
+`greenfield_layer0_prompt_key_norm_m64_20260809T195128353553953Z` at pushed `e53d1fd` resolves
+that ambiguity. All four lanes receive bitwise-exact raw bits SHA `8b18cfb9...c8b5e` and scales SHA
+`463f1b22...8b9ee`; all four then produce the identical wrong FP32 SHA `b6429bf2...6e975` rather
+than accepted `d680f7b1...83469`. Each lane differs in 698,727/786,432 values, first `[0,0]`, max
+`0.0033482313`, mean `0.00006827695`, p99 `0.0004185438`. This rejects placement and lane drift and
+isolates the combined materializer executable as the numerical boundary. Diagnostic JSON SHA is
+`80e20cc8...9a18`; pre/failure census SHAs `22a6f95c...c12d` / `bd7a265b...bb0e4` prove 8/8 clean,
+and the approved archive contains the diagnostic.
+
+Exact next is a bounded two-completion proof: a stage-local raw-FP8-to-BF16 executable must finish,
+then a separate BF16-to-FP32 executable must finish before unchanged repair compilation/execution.
+Each phase has a strict entry/dtype/round/no-communication HLO contract. No production decoder retry
+is authorized until that bounded cache is bitwise exact.

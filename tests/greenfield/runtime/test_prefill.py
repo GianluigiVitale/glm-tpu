@@ -121,6 +121,47 @@ def test_prefill_wk_materialization_hlo_is_external_and_local() -> None:
     assert accepted["fp32_promotion_count"] == 2
     assert accepted["collective_count"] == 0
 
+    decode_hlo = _materialization_hlo().replace(
+        "  %promote.0 = f32[786432] convert(%round.0)\n",
+        "",
+    ).replace(
+        "  %promote.1 = f32[128,6144] convert(%round.1)\n",
+        "",
+    ).replace(
+        "ROOT %output = (f32[786432], f32[128,6144]) "
+        "tuple(%promote.0, %promote.1)",
+        "ROOT %output = (bf16[786432], bf16[128,6144]) "
+        "tuple(%round.0, %round.1)",
+    )
+    decoded = validate_prefill_index_weight_materialization_hlo(
+        decode_hlo,
+        decoder=_materialization_decoder(),
+        phase="decode_bf16",
+    )
+    assert decoded["passed"] is True
+    assert decoded["bf16_round_count"] == 2
+    assert decoded["fp32_promotion_count"] == 0
+
+    promote_hlo = """HloModule promote
+
+ENTRY %main {
+  %wk.0 = bf16[786432] parameter(0)
+  %promote.0 = f32[786432] convert(%wk.0)
+  %wk.1 = bf16[128,6144] parameter(1)
+  %promote.1 = f32[128,6144] convert(%wk.1)
+  ROOT %output = (f32[786432], f32[128,6144]) tuple(%promote.0, %promote.1)
+}
+"""
+    promoted = validate_prefill_index_weight_materialization_hlo(
+        promote_hlo,
+        decoder=_materialization_decoder(),
+        phase="promote_fp32",
+    )
+    assert promoted["passed"] is True
+    assert promoted["bf16_parameter_count"] == 2
+    assert promoted["bf16_round_count"] == 0
+    assert promoted["fp32_promotion_count"] == 2
+
     # Optimized TPU HLO repeats entry values as parameters of nested fusion
     # computations.  Only ENTRY parameters describe the executable boundary.
     assert sum(
