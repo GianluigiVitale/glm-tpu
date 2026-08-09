@@ -13,11 +13,13 @@ from glm_tpu.greenfield.validation.prompt_index_cache import (
     capture_legacy_prompt_index_cache,
     compare_prompt_key_internal_states,
     compare_prompt_index_key_bits,
+    compare_prompt_projection_input,
     inspect_legacy_prompt_key_internal_capture,
     inspect_legacy_prompt_index_cache,
     inspect_prompt_key_internal_capture_artifact,
     validate_prompt_index_key_association_hlo,
     validate_prompt_index_key_probe_hlo,
+    validate_prompt_projection_input_hlo,
 )
 
 
@@ -26,31 +28,39 @@ def _write_prompt_key_internal(
     *,
     process_index: int,
     delta: float = 0.0,
+    capture_mode: str = "prompt_key",
 ) -> None:
     base = np.arange(128, dtype=np.float32) + np.float32(delta)
-    np.savez(
-        path,
-        artifact_kind=np.asarray(
-            "glm52_legacy_dsa_prompt_key_internal_state"
+    values = {
+        "artifact_kind": np.asarray(
+            "glm52_legacy_dsa_prompt_key_input_internal_state"
+            if capture_mode == "prompt_key_input"
+            else "glm52_legacy_dsa_prompt_key_internal_state"
         ),
-        format_version=np.asarray(1, dtype=np.int64),
-        capture_mode=np.asarray("prompt_key"),
-        process_index=np.asarray(process_index, dtype=np.int64),
-        process_count=np.asarray(2, dtype=np.int64),
-        layer_name=np.asarray("model.layers.0.self_attn.attn"),
-        position=np.asarray(113, dtype=np.int32),
-        source_row=np.asarray(113, dtype=np.int32),
-        run_tag=np.asarray("unit-prompt-key"),
-        code_hash=np.asarray("a" * 40),
-        oracle_pin=np.asarray("b" * 40),
-        model_id=np.asarray("zai-org/GLM-5.2-FP8"),
-        pre_layer_norm_key=base,
-        pre_layer_norm_key__dtype=np.asarray("float32"),
-        pre_rope_key=base / np.float32(7),
-        pre_rope_key__dtype=np.asarray("float32"),
-        post_rope_key=base / np.float32(11),
-        post_rope_key__dtype=np.asarray("float32"),
-    )
+        "format_version": np.asarray(1, dtype=np.int64),
+        "capture_mode": np.asarray(capture_mode),
+        "process_index": np.asarray(process_index, dtype=np.int64),
+        "process_count": np.asarray(2, dtype=np.int64),
+        "layer_name": np.asarray("model.layers.0.self_attn.attn"),
+        "position": np.asarray(113, dtype=np.int32),
+        "source_row": np.asarray(113, dtype=np.int32),
+        "run_tag": np.asarray("unit-prompt-key"),
+        "code_hash": np.asarray("a" * 40),
+        "oracle_pin": np.asarray("b" * 40),
+        "model_id": np.asarray("zai-org/GLM-5.2-FP8"),
+        "pre_layer_norm_key": base,
+        "pre_layer_norm_key__dtype": np.asarray("float32"),
+        "pre_rope_key": base / np.float32(7),
+        "pre_rope_key__dtype": np.asarray("float32"),
+        "post_rope_key": base / np.float32(11),
+        "post_rope_key__dtype": np.asarray("float32"),
+    }
+    if capture_mode == "prompt_key_input":
+        values.update(
+            projection_input=np.arange(6144, dtype=np.float32),
+            projection_input__dtype=np.asarray("float32"),
+        )
+    np.savez(path, **values)
 
 
 def test_seals_bitwise_prompt_key_internal_replicas(tmp_path: Path) -> None:
@@ -134,6 +144,47 @@ def test_classifies_first_prompt_key_internal_divergence() -> None:
         "elementwise_exact"
     ] is True
     assert comparison["fields"]["pre_rope_key"]["mismatch_count"] == 1
+
+
+def test_seals_and_compares_prompt_projection_input(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    for process_index in range(2):
+        _write_prompt_key_internal(
+            source
+            / ("internals.model_layers_0_self_attn_attn.position113."
+               f"proc{process_index}.npz"),
+            process_index=process_index,
+            capture_mode="prompt_key_input",
+        )
+    config = LegacyPromptKeyInternalConfig(
+        source_dump_dir=source,
+        output_dir=tmp_path / "capture",
+        expected_run_tag="unit-prompt-key",
+        expected_legacy_code_hash="a" * 40,
+        expected_oracle_pin="b" * 40,
+        expected_process_count=2,
+        expected_capture_mode="prompt_key_input",
+    )
+    manifest, states = inspect_legacy_prompt_key_internal_capture(config)
+    assert manifest["capture_mode"] == "prompt_key_input"
+    assert manifest["fields"]["projection_input"]["shape"] == [6144]
+    _, loaded = inspect_prompt_key_internal_capture_artifact(
+        config.output_dir,
+        expected_manifest_sha256=manifest["manifest_sha256"],
+        expected_capture_mode="prompt_key_input",
+    )
+    comparison = compare_prompt_projection_input(
+        states["projection_input"], loaded["projection_input"]
+    )
+    assert comparison["elementwise_exact"] is True
+    observed = loaded["projection_input"].copy()
+    observed[17] += np.float32(0.5)
+    comparison = compare_prompt_projection_input(
+        states["projection_input"], observed
+    )
+    assert comparison["mismatch_count"] == 1
+    assert comparison["first_mismatch_dimension"] == 17
 
 
 def _write_dump(
@@ -314,6 +365,40 @@ ENTRY main {
     assert result["passed"] is False
     assert result["forbidden_operations"]["all-gather"] == 1
     assert "bf16[32,6144]" in result["forbidden_shapes"]
+
+
+def test_prompt_projection_input_hlo_requires_gather_coupled_rms() -> None:
+    hlo = """
+HloModule prompt_input,
+ entry_computation_layout={(bf16[3,6144],s32[4],bf16[6144])->f32[4,6144]}
+ENTRY main {
+  %embeddings = bf16[3,6144] parameter(0)
+  %rows = s32[4] parameter(1)
+  %weight = bf16[6144] parameter(2)
+  %gather = bf16[4,6144] gather(%embeddings, %rows)
+  %variance = f32[4] fusion(%gather), kind=kLoop, calls=%reduce_sum
+  ROOT %normalized = f32[4,6144] fusion(%gather, %variance, %weight)
+}
+"""
+    result = validate_prompt_projection_input_hlo(
+        hlo, prompt_chunk=4, unique_token_count=3
+    )
+    assert result["passed"] is True
+    assert result["physical_embedding_gather_count"] == 1
+    assert result["gather_coupled_input_rms"] is True
+
+    rejected = validate_prompt_projection_input_hlo(
+        hlo.replace(
+            "%embeddings = bf16[3,6144] parameter(0)",
+            "%embeddings = bf16[3,6144] all-reduce(parameter(0))\n"
+            "  %dead = f32[32,6144] parameter(3)",
+        ),
+        prompt_chunk=4,
+        unique_token_count=3,
+    )
+    assert rejected["passed"] is False
+    assert rejected["dead_row_parameter_count"] == 1
+    assert rejected["forbidden_operations"]["all-reduce"] == 1
 
 
 def test_prompt_key_association_hlo_accepts_pallas_divide_sqrt() -> None:
@@ -858,10 +943,16 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
     projection_wrapper = repo / (
         "scripts/greenfield/run_prompt_key_projection_association_probe.sh"
     )
+    projection_input_entrypoint = repo / (
+        "scripts/greenfield/run_capture_legacy_prompt_projection_input.sh"
+    )
     shared_source = shared.read_text()
     entrypoint_source = entrypoint.read_text()
     comparator_source = comparator.read_text()
     projection_wrapper_source = projection_wrapper.read_text()
+    projection_input_entrypoint_source = (
+        projection_input_entrypoint.read_text()
+    )
     for required in (
         "GLM_GREENFIELD_DSA_INTERNALS_MODE",
         "GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE",
@@ -877,6 +968,15 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
     ):
         assert required in shared_source
     for required in (
+        "OBSERVER_COMMIT_DISTANCE=6",
+        "89fc453b6116ac3df71e666db6f4659775b313c3",
+        "prompt_projection_input_comparison",
+        '--capture-mode "$INTERNAL_MODE"',
+        'mode in ("prompt_key", "prompt_key_input")',
+        '"projection_input"',
+    ):
+        assert required in shared_source
+    for required in (
         "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE=1",
         "GLM_GREENFIELD_DSA_INTERNALS_MODE=prompt_key",
         "GLM_GREENFIELD_DSA_INTERNALS_POSITION=113",
@@ -886,12 +986,25 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
     ):
         assert required in entrypoint_source
     for required in (
+        "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE=1",
+        "GLM_GREENFIELD_DSA_INTERNALS_MODE=prompt_key_input",
+        "GLM_GREENFIELD_DSA_INTERNALS_POSITION=113",
+        "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE=1",
+        "GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE=8k",
+        "prompt_projection_input/8k/$TAG",
+        "run_capture_short_context_dsa_oracle.sh",
+    ):
+        assert required in projection_input_entrypoint_source
+    for required in (
         "inspect_legacy_prompt_key_internal_capture",
         "inspect_prompt_key_internal_capture_artifact",
         "layer0_prompt_index_key_gather_cache_states_chunk",
         "compare_prompt_key_internal_states",
+        "compare_prompt_projection_input",
+        "layer0_prompt_normalized_hidden_gather_chunk",
         "compare_prompt_index_key_bits",
         "validate_prompt_index_key_association_hlo",
+        "validate_prompt_projection_input_hlo",
         "accepted prompt-key observer does not reproduce its cache row",
         '"performance_claim": False',
     ):
@@ -923,6 +1036,13 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
     assert "from tpu_inference" not in projection_wrapper_source
     shell = subprocess.run(
         ["bash", "-n", str(projection_wrapper)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert shell.returncode == 0, shell.stdout + shell.stderr
+    shell = subprocess.run(
+        ["bash", "-n", str(projection_input_entrypoint)],
         text=True,
         capture_output=True,
         check=False,

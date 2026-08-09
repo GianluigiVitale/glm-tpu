@@ -18,10 +18,18 @@ readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
   echo "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE must be 0 or 1" >&2
   exit 2
 }
-[[ $INTERNAL_MODE == scorer || $INTERNAL_MODE == prompt_key ]] || {
-  echo "GLM_GREENFIELD_DSA_INTERNALS_MODE must be scorer or prompt_key" >&2
-  exit 2
-}
+case "$INTERNAL_MODE" in
+  scorer)
+    readonly PROMPT_KEY_CAPTURE=0
+    ;;
+  prompt_key | prompt_key_input)
+    readonly PROMPT_KEY_CAPTURE=1
+    ;;
+  *)
+    echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
+    exit 2
+    ;;
+esac
 [[ $PROMPT_CACHE_CAPTURE == 0 || $PROMPT_CACHE_CAPTURE == 1 ]] || {
   echo "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE must be 0 or 1" >&2
   exit 2
@@ -39,7 +47,11 @@ fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $INTERNAL_MODE == prompt_key ]]; then
+  if [[ $INTERNAL_MODE == prompt_key_input ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-89fc453b6
+    readonly OBSERVER_COMMIT_DISTANCE=6
+    readonly LEGACY_PIN=89fc453b6116ac3df71e666db6f4659775b313c3
+  elif [[ $INTERNAL_MODE == prompt_key ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-9c1d6b3b9
     readonly OBSERVER_COMMIT_DISTANCE=3
     readonly LEGACY_PIN=9c1d6b3b950d5c5dd45bdf885058202517097eba
@@ -123,7 +135,7 @@ INTERNAL_TARGET_POSITION=${INTERNAL_POSITION_OVERRIDE:-$FIRST_DECODE_POSITION}
   echo "DSA internal position must be a nonnegative integer" >&2
   exit 2
 }
-if [[ $INTERNAL_MODE == prompt_key ]]; then
+if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
   [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
      $PROFILE == 8k && $PROMPT_CACHE_CAPTURE == 1 && \
      $INTERNAL_TARGET_POSITION -lt $EXPECTED_PROMPT_TOKENS ]] || {
@@ -149,7 +161,9 @@ INTERNAL_DUMP_PREFIX=/tmp/$TAG/internals.npz
 PROMPT_CACHE_DUMP_PREFIX=/tmp/$TAG/index_cache.npz
 PROMPT_CACHE_RESULT_DIR=$RUN_DIR/prompt_index_cache
 PROMPT_CACHE_COMPARISON_DIR=$RUN_DIR/prompt_index_cache_comparison
-if [[ $INTERNAL_MODE == prompt_key ]]; then
+if [[ $INTERNAL_MODE == prompt_key_input ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/prompt_projection_input_comparison
+elif [[ $INTERNAL_MODE == prompt_key ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_key_comparison
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
@@ -207,7 +221,7 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     echo "sealed DSA oracle comparison prerequisite is unavailable" >&2
     exit 2
   }
-  if [[ $INTERNAL_COMPARE_LAYER0 == 1 || $INTERNAL_MODE == prompt_key ]]; then
+  if [[ $INTERNAL_COMPARE_LAYER0 == 1 || $PROMPT_KEY_CAPTURE == 1 ]]; then
     [[ -r $LAYER0_INPUT_DIR/manifest.json &&
        -r $DISTRIBUTED_Q_A_DIR/manifest.json ]] || {
       echo "sealed layer-0 comparison prerequisites are unavailable" >&2
@@ -406,7 +420,7 @@ has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
   exit 1
 }
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  if [[ $INTERNAL_MODE == prompt_key ]]; then
+  if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     # Prompt prefill is replicated over the accepted model mesh. Permit one
     # independently produced file per JAX process and require every present
     # replica to be sealed bitwise by the post-run inspector.
@@ -427,7 +441,7 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     "$RUN_DIR/fleet_internal_integrity.txt" || true)
   internal_nonowner_count=$(grep -c '^INTERNAL_NONOWNER ' \
     "$RUN_DIR/fleet_internal_integrity.txt" || true)
-  if [[ $INTERNAL_MODE == prompt_key ]]; then
+  if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     ((internal_owner_count >= 1 && internal_owner_count <= 8 &&
       internal_owner_count + internal_nonowner_count == 8)) || {
       say "ABORT: prompt-key internal replica coverage drifted"
@@ -482,7 +496,7 @@ internal_count=0
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   internal_count=$(find "$SOURCE_DIR" -type f \
     -name "internals.*.position${INTERNAL_TARGET_POSITION}.proc*.npz" | wc -l)
-  if [[ $INTERNAL_MODE == prompt_key ]]; then
+  if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     ((internal_count >= 1 && internal_count <= 8)) || {
       say "ABORT: expected 1..8 prompt-key replica files, found $internal_count"
       exit 1
@@ -618,7 +632,7 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   prompt_cache_manifest_sha=$(/home/gianl/vllm-env/bin/python -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
     "$PROMPT_CACHE_RESULT_DIR/manifest.json")
-  if [[ $INTERNAL_MODE != prompt_key ]]; then
+  if [[ $PROMPT_KEY_CAPTURE != 1 ]]; then
     say "comparing production one-row layer-0 prompt keys on one local TPU host"
     env JAX_PLATFORMS=tpu \
       TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
@@ -638,7 +652,7 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_MODE == prompt_key ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $PROMPT_KEY_CAPTURE == 1 ]]; then
   say "comparing accepted prompt-key producer at position $INTERNAL_TARGET_POSITION"
   env JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
@@ -666,6 +680,7 @@ if [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_MODE == prompt_key ]]; then
     --expected-candidate-cache-sha256 "$DB512_PROMPT_CACHE_SHA" \
     --expected-cache-mismatch-count 45 \
     --expected-first-cache-mismatch-position 113 \
+    --capture-mode "$INTERNAL_MODE" \
     >"$RUN_DIR/prompt_key_comparison_summary.json"
 elif [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   say "comparing accepted layer-0 scorer state on one local TPU host"
@@ -823,17 +838,30 @@ lines = {
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode == "prompt_key":
+    if mode in ("prompt_key", "prompt_key_input"):
+        result_name = (
+            "prompt_projection_input_comparison"
+            if mode == "prompt_key_input"
+            else "prompt_key_comparison"
+        )
         comparison = json.loads(
-            (root / "prompt_key_comparison" / "comparison.json").read_text()
+            (root / result_name / "comparison.json").read_text()
         )
         if comparison["status"] != "SUCCESS" or (
             not comparison["hlo"]["states"]["contract"]["passed"]
         ) or not comparison["hlo"]["cache"]["contract"]["passed"]:
             raise SystemExit("prompt-key internal comparison drifted")
+        if mode == "prompt_key_input" and not comparison["hlo"][
+            "projection_input"
+        ]["contract"]["passed"]:
+            raise SystemExit("projection-input HLO contract drifted")
         lines.update({
             "dsa_internal_capture": "true",
-            "dsa_internal_capture_layout": "prompt_key_producer_replicas",
+            "dsa_internal_capture_layout": (
+                "prompt_key_input_producer_replicas"
+                if mode == "prompt_key_input"
+                else "prompt_key_producer_replicas"
+            ),
             "dsa_internal_capture_mode": mode,
             "dsa_internal_capture_process_indices": ",".join(
                 str(value)
@@ -894,9 +922,14 @@ if sys.argv[11] == "1":
         ],
         "prompt_index_cache_source_file_count": sys.argv[12],
     })
-    if sys.argv[13] == "prompt_key":
+    if sys.argv[13] in ("prompt_key", "prompt_key_input"):
+        result_name = (
+            "prompt_projection_input_comparison"
+            if sys.argv[13] == "prompt_key_input"
+            else "prompt_key_comparison"
+        )
         prompt_comparison = json.loads(
-            (root / "prompt_key_comparison" / "comparison.json").read_text()
+            (root / result_name / "comparison.json").read_text()
         )
         if prompt_comparison["accepted_cache"]["manifest_sha256"] != (
             prompt_cache["manifest_sha256"]

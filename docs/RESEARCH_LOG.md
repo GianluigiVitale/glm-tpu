@@ -5961,3 +5961,27 @@ unmotivated arithmetic variants.
 - Exact next is one protected FP32 projection discriminator. Exact producer states plus exact full
   cache authorize the smallest production correction and one 8K retry; a miss requires capturing
   the normalized hidden projection input rather than guessing another projection formula.
+
+## 2026-08-09 04:50 — DB514 rejects FP32 wk; actual projection-input capture is next
+
+- Protected DB514/item1799 at `c5912db` changes only the DB513 gathered M2048 convolution RHS from
+  BF16 to physical FP32. Both state/cache HLO contracts pass with zero BF16 weight conversions.
+- The result is byte-identical to the BF16 reproduction: projection/post-norm/post-RoPE SHAs remain
+  `963269f9...5154`, `8f6184af...094e`, `230dfb0b...dd6d`; cache remains
+  `52bf55ed...cd8a`, 45 mismatches. Adapted-`wk` operand precision is rejected as causal.
+- Comparison/SUCCESS/evidence/remote-object identities are `2c41e2b2...3f7e`,
+  `b2806ee7...69e0`, `50e5daf6...6396`, and `c39e25a7...5204`; DB/archive and 8/8 cleanup pass.
+  The first wrapper attempt failed before TPU because its stored fork abbreviation-width check was
+  too strict; it has no DB/candidate/SUCCESS and the fixed rule accepts an unambiguous 7+ prefix.
+- DB513 raw source dumps were locally reclaimed only after 516/516 remote path, size, generation,
+  CRC32C and SUCCESS verification. Compact evidence remains local and the raw 3,434,645,148 bytes
+  remain exactly recoverable from the approved prefix.
+- Oracle-only pin `89fc453b6` adds a separate default-off `prompt_key_input` mode capturing the
+  actual FP32 6,144-wide `h` passed to `h @ wk.T`. The greenfield capture inspector accepts the new
+  mode without changing DB513 compatibility; its independent M2048 gather/RMS executable has a
+  dedicated no-loop/no-communication/no-projection HLO contract.
+- Focused explicit-CPU capture/kernel tests pass 40/40; Bash, ShellCheck, Python compilation and
+  diff checks pass. The complete explicit-CPU greenfield suite passes 480 with one expected skip
+  and two existing SWIG warnings in 363.45 seconds. Next is one protected accepted capture. A
+  nonexact input localizes the source upstream of projection; an exact input isolates projection
+  lowering/association. No full 8K retry is authorized first.

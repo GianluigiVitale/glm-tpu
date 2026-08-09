@@ -1212,6 +1212,46 @@ def layer0_decode_normalized_hidden(
     )
 
 
+def layer0_prompt_normalized_hidden_gather_chunk(
+    unique_embeddings: Any,
+    embedding_rows: Any,
+    input_norm_weight: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> Any:
+    """Return the actual FP32 M2048 row set entering key projection."""
+
+    if unique_embeddings.ndim != 2 or unique_embeddings.shape[1] != (
+        geometry.hidden_size
+    ):
+        raise ValueError(
+            "layer-0 prompt projection-input embeddings shape drifted"
+        )
+    if embedding_rows.shape != (geometry.prompt_chunk,) or (
+        input_norm_weight.shape != (geometry.hidden_size,)
+    ):
+        raise ValueError(
+            "layer-0 prompt projection-input row/norm shape drifted"
+        )
+    if unique_embeddings.dtype != jnp.bfloat16 or (
+        input_norm_weight.dtype != jnp.bfloat16
+    ):
+        raise ValueError(
+            "layer-0 prompt projection-input embeddings/norm must be BF16"
+        )
+    if embedding_rows.dtype != jnp.int32:
+        raise ValueError(
+            "layer-0 prompt projection-input rows must remain int32"
+        )
+    hidden_chunk = jnp.take(unique_embeddings, embedding_rows, axis=0)
+    normalized = rms_norm(
+        hidden_chunk,
+        input_norm_weight,
+        epsilon=geometry.rms_norm_epsilon,
+    )
+    return normalized.astype(jnp.float32)
+
+
 def layer0_prompt_index_key_chunk(
     hidden_chunk: Any,
     positions: Any,

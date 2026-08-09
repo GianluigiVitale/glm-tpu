@@ -8,7 +8,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -17,11 +17,41 @@ ARTIFACT_KIND = "glm52_legacy_layer0_prompt_index_cache"
 PROMPT_KEY_INTERNAL_ARTIFACT_KIND = (
     "glm52_legacy_dsa_prompt_key_internal_state"
 )
+PROMPT_KEY_INPUT_INTERNAL_ARTIFACT_KIND = (
+    "glm52_legacy_dsa_prompt_key_input_internal_state"
+)
 PROMPT_KEY_INTERNAL_CAPTURE_KIND = (
     "glm52_legacy_prompt_key_internal_capture"
 )
+PROMPT_KEY_INPUT_INTERNAL_CAPTURE_KIND = (
+    "glm52_legacy_prompt_key_input_internal_capture"
+)
 FORMAT_VERSION = 1
 MODEL_ID = "zai-org/GLM-5.2-FP8"
+PromptKeyCaptureMode = Literal["prompt_key", "prompt_key_input"]
+_PROMPT_KEY_FIELDS_BY_MODE: dict[
+    PromptKeyCaptureMode, dict[str, tuple[int, ...]]
+] = {
+    "prompt_key": {
+        "pre_layer_norm_key": (128,),
+        "pre_rope_key": (128,),
+        "post_rope_key": (128,),
+    },
+    "prompt_key_input": {
+        "projection_input": (6144,),
+        "pre_layer_norm_key": (128,),
+        "pre_rope_key": (128,),
+        "post_rope_key": (128,),
+    },
+}
+_PROMPT_KEY_RAW_KIND_BY_MODE = {
+    "prompt_key": PROMPT_KEY_INTERNAL_ARTIFACT_KIND,
+    "prompt_key_input": PROMPT_KEY_INPUT_INTERNAL_ARTIFACT_KIND,
+}
+_PROMPT_KEY_CAPTURE_KIND_BY_MODE = {
+    "prompt_key": PROMPT_KEY_INTERNAL_CAPTURE_KIND,
+    "prompt_key_input": PROMPT_KEY_INPUT_INTERNAL_CAPTURE_KIND,
+}
 _SLICE_RE = re.compile(
     r"slice\((None|-?[0-9]+), (None|-?[0-9]+), (None|-?[0-9]+)\)"
 )
@@ -150,6 +180,7 @@ class LegacyPromptKeyInternalConfig:
     expected_position: int = 113
     expected_process_count: int = 8
     expected_model_id: str = MODEL_ID
+    expected_capture_mode: PromptKeyCaptureMode = "prompt_key"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_dump_dir", Path(self.source_dump_dir))
@@ -164,6 +195,8 @@ class LegacyPromptKeyInternalConfig:
             raise ValueError("prompt-key internal position/process count drifted")
         if not self.expected_run_tag or not self.expected_layer_name:
             raise ValueError("prompt-key internal identity is incomplete")
+        if self.expected_capture_mode not in _PROMPT_KEY_FIELDS_BY_MODE:
+            raise ValueError("prompt-key internal capture mode drifted")
 
 
 def inspect_legacy_prompt_key_internal_capture(
@@ -191,11 +224,10 @@ def inspect_legacy_prompt_key_internal_capture(
             "prompt-key internal process coverage drifted: "
             f"found={len(paths)}"
         )
-    fields = (
-        "pre_layer_norm_key",
-        "pre_rope_key",
-        "post_rope_key",
-    )
+    field_shapes = _PROMPT_KEY_FIELDS_BY_MODE[
+        config.expected_capture_mode
+    ]
+    fields = tuple(field_shapes)
     scalar_keys = {
         "artifact_kind",
         "format_version",
@@ -221,9 +253,11 @@ def inspect_legacy_prompt_key_internal_capture(
             if set(payload.files) != expected_keys:
                 raise ValueError(f"{path}: prompt-key internal keys drifted")
             expected_scalars = {
-                "artifact_kind": PROMPT_KEY_INTERNAL_ARTIFACT_KIND,
+                "artifact_kind": _PROMPT_KEY_RAW_KIND_BY_MODE[
+                    config.expected_capture_mode
+                ],
                 "format_version": FORMAT_VERSION,
-                "capture_mode": "prompt_key",
+                "capture_mode": config.expected_capture_mode,
                 "process_count": config.expected_process_count,
                 "layer_name": config.expected_layer_name,
                 "position": config.expected_position,
@@ -251,7 +285,7 @@ def inspect_legacy_prompt_key_internal_capture(
                 if (
                     str(payload[f"{name}__dtype"].item()) != "float32"
                     or value.dtype != np.float32
-                    or value.shape != (128,)
+                    or value.shape != field_shapes[name]
                     or not np.isfinite(value).all()
                 ):
                     raise ValueError(
@@ -278,15 +312,17 @@ def inspect_legacy_prompt_key_internal_capture(
     tensor_path = config.output_dir / "accepted_prompt_key_states.npz"
     np.savez(tensor_path, **canonical)
     manifest = {
-        "artifact_kind": PROMPT_KEY_INTERNAL_CAPTURE_KIND,
-        "capture_mode": "prompt_key",
+        "artifact_kind": _PROMPT_KEY_CAPTURE_KIND_BY_MODE[
+            config.expected_capture_mode
+        ],
+        "capture_mode": config.expected_capture_mode,
         "capture_process_indices": sorted(process_indices),
         "diagnostic_only": True,
         "fields": {
             name: {
                 "dtype": "float32",
                 "sha256": _array_sha256(canonical[name]),
-                "shape": [128],
+                "shape": list(field_shapes[name]),
             }
             for name in fields
         },
@@ -319,15 +355,22 @@ def inspect_prompt_key_internal_capture_artifact(
     artifact_dir: Path,
     *,
     expected_manifest_sha256: str | None = None,
+    expected_capture_mode: PromptKeyCaptureMode | None = None,
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     """Verify and load an already-sealed accepted prompt-key capture."""
 
     artifact_dir = Path(artifact_dir)
     manifest = json.loads((artifact_dir / "capture.json").read_text())
-    if manifest.get("artifact_kind") != PROMPT_KEY_INTERNAL_CAPTURE_KIND or (
-        manifest.get("format_version") != FORMAT_VERSION
-    ):
+    capture_mode = manifest.get("capture_mode")
+    if capture_mode not in _PROMPT_KEY_FIELDS_BY_MODE or (
+        manifest.get("artifact_kind")
+        != _PROMPT_KEY_CAPTURE_KIND_BY_MODE[capture_mode]
+    ) or manifest.get("format_version") != FORMAT_VERSION:
         raise ValueError("unsupported prompt-key internal capture artifact")
+    if expected_capture_mode is not None and capture_mode != (
+        expected_capture_mode
+    ):
+        raise ValueError("prompt-key internal capture mode identity drifted")
     if manifest.get("model_id") != MODEL_ID or (
         manifest.get("diagnostic_only") is not True
     ) or manifest.get("performance_claim") is not False:
@@ -345,11 +388,8 @@ def inspect_prompt_key_internal_capture_artifact(
         _sha256_file(tensor_path) != record.get("sha256")
     ):
         raise ValueError("prompt-key internal capture tensor integrity failed")
-    fields = (
-        "pre_layer_norm_key",
-        "pre_rope_key",
-        "post_rope_key",
-    )
+    field_shapes = _PROMPT_KEY_FIELDS_BY_MODE[capture_mode]
+    fields = tuple(field_shapes)
     with np.load(tensor_path, allow_pickle=False) as payload:
         if set(payload.files) != set(fields):
             raise ValueError("prompt-key internal capture field set drifted")
@@ -358,19 +398,55 @@ def inspect_prompt_key_internal_capture_artifact(
         }
     for name, value in states.items():
         field = manifest.get("fields", {}).get(name, {})
-        if value.shape != (128,) or value.dtype != np.float32 or (
+        if value.shape != field_shapes[name] or value.dtype != np.float32 or (
             not np.isfinite(value).all()
         ):
             raise ValueError(f"prompt-key internal capture {name} drifted")
         if field != {
             "dtype": "float32",
             "sha256": _array_sha256(value),
-            "shape": [128],
+            "shape": list(field_shapes[name]),
         }:
             raise ValueError(
                 f"prompt-key internal capture {name} manifest drifted"
             )
     return manifest, states
+
+
+def compare_prompt_projection_input(
+    accepted: np.ndarray,
+    observed: np.ndarray,
+) -> dict[str, Any]:
+    """Compare the actual FP32 6,144-wide row entering key projection."""
+
+    expected = np.ascontiguousarray(accepted)
+    actual = np.ascontiguousarray(observed)
+    if expected.shape != (6144,) or actual.shape != (6144,) or (
+        expected.dtype != np.float32 or actual.dtype != np.float32
+    ):
+        raise ValueError("prompt projection-input tensor drifted")
+    if not np.isfinite(expected).all() or not np.isfinite(actual).all():
+        raise ValueError("prompt projection-input tensor is non-finite")
+    mismatch_indices = np.flatnonzero(expected != actual)
+    absolute_error = np.abs(expected.astype(np.float64) - actual)
+    exact = mismatch_indices.size == 0
+    return {
+        "accepted_sha256": _array_sha256(expected),
+        "elementwise_exact": exact,
+        "first_mismatch_dimension": (
+            None if exact else int(mismatch_indices[0])
+        ),
+        "max_absolute_error": float(absolute_error.max(initial=0.0)),
+        "mean_absolute_error": float(absolute_error.mean()),
+        "mismatch_count": int(mismatch_indices.size),
+        "observed_sha256": _array_sha256(actual),
+        "p99_absolute_error": float(
+            np.quantile(absolute_error, 0.99, method="higher")
+        ),
+        "signed_mean_error": float(
+            (actual.astype(np.float64) - expected).mean()
+        ),
+    }
 
 
 def compare_prompt_key_internal_states(
@@ -978,6 +1054,146 @@ def validate_prompt_index_key_probe_hlo(
         "key_kernel_name": kernel_name,
         "outer_scan_while_count": len(while_lines),
         "passed": not violations,
+        "required_shapes": required_shapes,
+        "violations": violations,
+    }
+
+
+def validate_prompt_projection_input_hlo(
+    optimized_hlo: str,
+    *,
+    prompt_chunk: int = 2048,
+    unique_token_count: int = 37,
+) -> dict[str, Any]:
+    """Require one gathered M2048 input-RMS body and its FP32 output."""
+
+    if not isinstance(optimized_hlo, str) or not optimized_hlo.strip():
+        raise ValueError("prompt projection-input HLO must be non-empty text")
+    for name, value in (
+        ("prompt_chunk", prompt_chunk),
+        ("unique_token_count", unique_token_count),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"prompt projection-input {name} must be positive")
+
+    lowered = optimized_hlo.lower()
+    lines = lowered.splitlines()
+    gather_fusion_lines = [
+        line
+        for line in lines
+        if re.search(rf"= bf16\[{prompt_chunk},6144\].*fusion\(", line)
+        and "kind=kcustom" in line
+        and "jit(_take)/gather" in line
+    ]
+    raw_gather_lines = [
+        line
+        for line in lines
+        if re.search(rf"= bf16\[{prompt_chunk},6144\].*gather\(", line)
+    ]
+    physical_gather_lines = (
+        gather_fusion_lines if gather_fusion_lines else raw_gather_lines
+    )
+    gather_producer_names = []
+    for line in physical_gather_lines:
+        producer = re.match(r"\s*(%[^ ]+)\s*=", line)
+        if producer is not None:
+            gather_producer_names.append(producer.group(1))
+    gather_coupled_input_rms = any(
+        re.search(rf"= f32\[{prompt_chunk}\].*fusion\(", line)
+        and "reduce_sum" in line
+        and any(name in line for name in gather_producer_names)
+        for line in lines
+    )
+    while_lines = [line for line in lines if re.search(r"\bwhile\(", line)]
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+            "tpu_custom_call",
+        )
+        if name in lowered
+    }
+    for instruction in ("send(", "recv(", "scatter(", "convolution("):
+        if instruction in lowered:
+            forbidden_operations[instruction[:-1]] = lowered.count(
+                instruction
+            )
+    forbidden_shapes = [
+        shape
+        for shape in (
+            "bf16[8155,6144]",
+            "f32[8155,6144]",
+            "bf16[8192,6144]",
+            "f32[8192,6144]",
+            "bf16[4,2048,6144]",
+            "f32[4,2048,6144]",
+        )
+        if shape in lowered
+    ]
+    dead_row_parameters = [
+        line
+        for line in lines
+        if re.search(r"(?:bf16|f32)\[32,6144\].*parameter\(", line)
+    ]
+    if dead_row_parameters:
+        forbidden_shapes.append("dead_parameter[32,6144]")
+    required_shapes = {
+        "fp32_normalized_chunk_output": bool(
+            re.search(
+                rf"entry_computation_layout=.*->f32\[{prompt_chunk},6144\]",
+                lowered,
+            )
+        ),
+        "input_norm_weight_parameter": bool(
+            re.search(r"bf16\[6144\].*parameter\(", lowered)
+        ),
+        "prompt_row_parameter": bool(
+            re.search(rf"s32\[{prompt_chunk}\].*parameter\(", lowered)
+        ),
+        "unique_embedding_parameter": bool(
+            re.search(
+                rf"bf16\[{unique_token_count},6144\].*parameter\(",
+                lowered,
+            )
+        ),
+    }
+    violations: list[str] = []
+    if len(physical_gather_lines) != 1:
+        violations.append(
+            "expected one physical M2048 embedding gather, "
+            f"found {len(physical_gather_lines)}"
+        )
+    if not gather_coupled_input_rms:
+        violations.append("input RMS reduction does not consume the gather")
+    if while_lines:
+        violations.append(
+            f"expected no projection-input loop, found {len(while_lines)}"
+        )
+    if forbidden_operations:
+        violations.append(f"forbidden operations: {forbidden_operations}")
+    if forbidden_shapes:
+        violations.append(
+            f"forbidden full-prompt/dead-row shapes: {forbidden_shapes}"
+        )
+    missing = sorted(
+        name for name, present in required_shapes.items() if not present
+    )
+    if missing:
+        violations.append(f"missing projection-input HLO shapes: {missing}")
+    return {
+        "dead_row_parameter_count": len(dead_row_parameters),
+        "forbidden_operations": forbidden_operations,
+        "forbidden_shapes": forbidden_shapes,
+        "gather_coupled_input_rms": gather_coupled_input_rms,
+        "loop_count": len(while_lines),
+        "passed": not violations,
+        "physical_embedding_gather_count": len(physical_gather_lines),
         "required_shapes": required_shapes,
         "violations": violations,
     }

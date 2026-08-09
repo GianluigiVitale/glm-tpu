@@ -21,8 +21,8 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py` RoPE source, DB505--513, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves the gather-coupled input-RMS lowering restores DB507 exactly; DB511 rejects the flat BF16 cache scatter; DB512 rejects literal accepted-source RoPE spelling. DB513 captures the actual producer and proves projection output is the first divergent field. The next bounded reuse is accepted FP32 adapted `wk` as the physical M2048 RHS. |
-| DSA internal observer | oracle-only `83ff4a357` scorer observer and `9c1d6b3b9` prompt-key extension, both descendants of accepted `b3c25df47`; protected DB513 | Default-off scorer capture remains unchanged; prompt-key mode reuses the zero-copy callback to expose only projection, post-key-LayerNorm and post-RoPE FP32 row 113. DB513 passes accepted output/cache non-perturbation and classifies projection first. The greenfield FP32-RHS discriminator consumes only the sealed compact capture and never imports legacy execution. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py` RoPE source, DB505--514, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves gather-coupled input RMS; DB511 rejects cache scatter; DB512 rejects literal RoPE; DB513 localizes projection output first; DB514 proves physical FP32 versus BF16 adapted-`wk` RHS is byte-identical and rejects weight precision. The next bounded reuse is the actual accepted FP32 normalized projection input. |
+| DSA internal observer | oracle-only `83ff4a357` scorer, `9c1d6b3b9` prompt-key, and `89fc453b6` prompt-key-input modes, all descendants of accepted `b3c25df47`; protected DB513/514 | Default-off scorer/prompt-key modes remain unchanged. The new isolated mode adds only the actual 6,144-wide FP32 `h` entering projection at row 113. Greenfield seals the replicas and independently reproduces the M2048 gather/RMS input; legacy execution is never imported. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
@@ -288,8 +288,9 @@ coverage passes 478 with one expected skip; this is readiness only until protect
 
 DB513 supplies the protected capture and closes that readiness qualifier. The accepted position-113
 projection is already different before key LayerNorm or RoPE, while both post-RoPE casts reproduce
-their own cache rows. Reuse the accepted source's actual FP32-adapted `wk` operand next: the bounded
-profile changes only DB513's explicit BF16 RHS conversion and requires a physical FP32 convolution
-with every gather/RMS/RoPE/scatter invariant unchanged. Do not reinterpret the earlier BF16-origin
-state result as evidence for this physical convolution boundary; it tested end-state identity under
-a different compiled association.
+their own cache rows. DB514 then changes only DB513's explicit BF16 RHS conversion and proves a
+physical FP32 convolution produces the exact same three state SHAs and 45-mismatch cache. Weight
+precision is rejected. Reuse oracle-only pin `89fc453b6` next to capture the actual 6,144-wide FP32
+normalized input; greenfield independently compiles only the gathered M2048 input-RMS producer. An
+exact input isolates projection lowering, while a mismatch moves the correction upstream. DB513's
+raw source dumps remain recoverable from approved storage after verified local reclamation.

@@ -2442,3 +2442,47 @@ Exact next: commit/push the clean discriminator, then run exactly one serialized
 producer states and the complete 8,155-row BF16 cache are exact, integrate only this projection
 boundary into production and run one protected 8K Gate-D retry. If not, capture/compare the
 normalized hidden row feeding projection before adding another arithmetic variant.
+
+## DB514 rejects FP32 projection-weight precision; input capture is ready
+
+Protected DB514/item1799,
+`greenfield_layer0_prompt_key_projection_association_20260809T042103930425146Z`, completed at
+greenfield pin `c5912db39738bdc802c6728110be036f8c93c176`. The physical M2048 projection consumes
+an FP32 `wk` RHS and has zero FP32-to-BF16 weight conversions, yet all three producer tensors and
+the complete prompt cache are byte-identical to DB513's BF16-RHS reproduction. Projection,
+post-key-LayerNorm and post-RoPE observed SHAs remain `963269f9...5154`, `8f6184af...094e` and
+`230dfb0b...dd6d`; cache SHA remains `52bf55ed...cd8a` with the same 45 mismatches. FP32 versus
+BF16 adapted-`wk` precision is therefore conclusively rejected as the cause.
+
+Comparison manifest is `2c41e2b2...3f7e`; cache/states optimized-HLO SHAs are
+`b6009101...900b` / `1f4dae4e...6bdc`; SUCCESS/evidence/remote-object/DB-snapshot SHAs are
+`b2806ee7...69e0`, `50e5daf6...6396`, `c39e25a7...5204` and `12dc47ca...09ac`. Direct approved-
+bucket bytes, SQLite integrity and authenticated 8/8 pre/post cleanup pass. This is bounded
+diagnostic correctness evidence only, with no decoder, Gate-D, latency or throughput claim. The
+preceding `...T041940...` wrapper attempt failed before TPU use because a valid nine-character
+stored fork abbreviation was compared to a ten-character slice; it has no candidate, DB row or
+SUCCESS and preserves 8/8 clean failure evidence. The wrapper now accepts any unambiguous stored
+abbreviation of at least seven characters.
+
+DB513's 516 raw source-dump files (3,434,645,148 payload bytes) were removed locally only after the
+local and remote object ledgers, terminal remote SUCCESS, exact paths/sizes, generations and
+CRC32C values were verified for all 516 objects. The compact accepted capture, cache, comparison,
+DB and manifests remain local; the raw files are exactly recoverable from the approved DB513
+prefix. Worker 0 has about 17 GiB free.
+
+Oracle-only observer pin `89fc453b6116ac3df71e666db6f4659775b313c3`, six commits above the
+unchanged accepted parent, adds a separate default-off `prompt_key_input` mode. It captures the
+actual FP32 `h = as_jax_f32(hidden_TD)` 6,144-wide row entering `h @ wk.T`, in addition to the
+unchanged three key boundaries. Existing scorer and `prompt_key` modes remain unchanged; focused
+legacy tests pass. Greenfield now seals either capture mode, compiles the independent gathered
+M2048 input-RMS producer with no projection/loop/collective/callback/dead/full-prompt state, and
+classifies either `projection_input_association` or `projection_lowering_association`. Focused
+greenfield capture/kernel tests pass 40/40 on explicit CPU; Python, Bash, ShellCheck and diff checks
+pass. The complete explicit-CPU greenfield suite passes 480 with one expected skip and the same two
+pre-existing SWIG warnings in 363.45 seconds.
+
+Exact next: commit/push the greenfield capture integration, prove the fleet idle, and run exactly
+one serialized `bash scripts/greenfield/run_capture_legacy_prompt_projection_input.sh`. If the
+6,144-wide input differs, correct only that upstream input-norm association. If it is bitwise
+exact, preserve that exclusion and audit the accepted projection lowering/physical association.
+Do not retry the complete 8K decoder before this discriminator produces an exact correction.

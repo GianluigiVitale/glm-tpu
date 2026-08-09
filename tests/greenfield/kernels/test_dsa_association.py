@@ -25,6 +25,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     layer0_prompt_index_key_gather_cache_states_chunk,
     layer0_prompt_index_key_gather_chunk,
     layer0_prompt_index_keys_chunked,
+    layer0_prompt_normalized_hidden_gather_chunk,
     layer0_dsa_state_from_q_residual,
     legacy_local_dcp_score_inputs,
     legacy_local_dcp_xla_scores,
@@ -35,6 +36,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     one_row_virtual_tp32_fused_qkv_a_rms_norm,
     pack_legacy_fused_qkv_runtime_weights,
 )
+from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
 from glm_tpu.greenfield.kernels.reference.qkv_a import (
     FusedQkvAContract,
     one_row_fused_qkv_a_convolution,
@@ -185,6 +187,22 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
         np.asarray(gathered_bf16_weight_chunk),
         np.asarray(bf16_weight_chunk),
     )
+    projection_input = layer0_prompt_normalized_hidden_gather_chunk(
+        arguments[0],
+        arguments[1][:4],
+        arguments[2],
+        geometry=geometry,
+    )
+    expected_projection_input = rms_norm(
+        jnp.take(arguments[0], arguments[1][:4], axis=0),
+        arguments[2],
+        epsilon=geometry.rms_norm_epsilon,
+    ).astype(jnp.float32)
+    np.testing.assert_array_equal(
+        np.asarray(projection_input), np.asarray(expected_projection_input)
+    )
+    assert projection_input.shape == (4, 8)
+    assert projection_input.dtype == jnp.float32
 
     cache = jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16)
     live_block_table = jnp.asarray([1, 2], dtype=jnp.int32)

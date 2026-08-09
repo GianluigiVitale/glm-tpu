@@ -98,6 +98,11 @@ def _parse_args() -> argparse.Namespace:
         choices=("adapted_bf16", "adapted_fp32"),
         default="adapted_bf16",
     )
+    parser.add_argument(
+        "--capture-mode",
+        choices=("prompt_key", "prompt_key_input"),
+        default="prompt_key",
+    )
     return parser.parse_args()
 
 
@@ -124,6 +129,7 @@ def main() -> int:
         Layer0DsaProbeGeometry,
         layer0_prompt_index_key_gather_cache_chunk,
         layer0_prompt_index_key_gather_cache_states_chunk,
+        layer0_prompt_normalized_hidden_gather_chunk,
     )
     from glm_tpu.greenfield.kernels.reference.fp8 import (
         dequantize_fp8_bits_block_weight,
@@ -132,11 +138,13 @@ def main() -> int:
         LegacyPromptKeyInternalConfig,
         compare_prompt_key_internal_states,
         compare_prompt_index_key_bits,
+        compare_prompt_projection_input,
         inspect_layer0_dsa_association_input,
         inspect_legacy_prompt_index_cache,
         inspect_legacy_prompt_key_internal_capture,
         inspect_prompt_key_internal_capture_artifact,
         validate_prompt_index_key_association_hlo,
+        validate_prompt_projection_input_hlo,
     )
 
     if jax.default_backend() != "tpu":
@@ -169,6 +177,7 @@ def main() -> int:
                 expected_position=args.position,
                 expected_process_count=args.process_count,
                 expected_model_id=args.model_id,
+                expected_capture_mode=args.capture_mode,
             )
         )
         capture_source_kind = "raw_observer_dumps"
@@ -181,6 +190,7 @@ def main() -> int:
         capture, accepted_states = inspect_prompt_key_internal_capture_artifact(
             args.accepted_capture_dir,
             expected_manifest_sha256=args.accepted_capture_manifest_sha256,
+            expected_capture_mode=args.capture_mode,
         )
         expected_capture_identity = {
             "legacy_code_hash": args.legacy_code_hash,
@@ -197,6 +207,19 @@ def main() -> int:
         ):
             raise RuntimeError("accepted prompt-key capture lineage drifted")
         capture_source_kind = "sealed_capture_artifact"
+    accepted_projection_input = accepted_states.get("projection_input")
+    accepted_key_states = {
+        name: accepted_states[name]
+        for name in (
+            "pre_layer_norm_key",
+            "pre_rope_key",
+            "post_rope_key",
+        )
+    }
+    if (args.capture_mode == "prompt_key_input") != (
+        accepted_projection_input is not None
+    ):
+        raise RuntimeError("accepted projection-input capture mode drifted")
     input_manifest, arrays = inspect_layer0_dsa_association_input(
         args.input_dir,
         expected_manifest_sha256=args.input_manifest_sha256,
@@ -314,8 +337,25 @@ def main() -> int:
         rotary_mode="accepted_source",
         projection_weight_mode=args.projection_weight_mode,
     )
+    projection_input_function = partial(
+        layer0_prompt_normalized_hidden_gather_chunk,
+        geometry=geometry,
+    )
+    projection_input_arguments = (
+        unique_embeddings,
+        chunk_suffixes[0][2],
+        input_norm_weight,
+    )
 
     before_memory = _memory_stats(device)
+    projection_input_compiled = None
+    projection_input_compile_seconds = None
+    if accepted_projection_input is not None:
+        started = time.monotonic()
+        projection_input_compiled = jax.jit(
+            projection_input_function
+        ).lower(*projection_input_arguments).compile()
+        projection_input_compile_seconds = time.monotonic() - started
     started = time.monotonic()
     states_compiled = jax.jit(states_function, donate_argnums=(0,)).lower(
         *first_arguments
@@ -333,7 +373,16 @@ def main() -> int:
     cache_hlo = cache_compiled.as_text()
     state_hlo_path = hlo_dir / "prompt_key_states.optimized_hlo.txt.gz"
     cache_hlo_path = hlo_dir / "prompt_key_cache.optimized_hlo.txt.gz"
-    for path, text in ((state_hlo_path, state_hlo), (cache_hlo_path, cache_hlo)):
+    hlo_payloads = [(state_hlo_path, state_hlo), (cache_hlo_path, cache_hlo)]
+    projection_input_hlo = None
+    projection_input_hlo_path = None
+    if projection_input_compiled is not None:
+        projection_input_hlo = projection_input_compiled.as_text()
+        projection_input_hlo_path = (
+            hlo_dir / "prompt_projection_input.optimized_hlo.txt.gz"
+        )
+        hlo_payloads.append((projection_input_hlo_path, projection_input_hlo))
+    for path, text in hlo_payloads:
         with gzip.open(path, "wt", encoding="utf-8") as stream:
             stream.write(text)
     weight_label = (
@@ -359,10 +408,23 @@ def main() -> int:
         prompt_token_count=int(prompt_ids.size),
         unique_token_count=int(unique_ids.size),
     )
-    if not state_contract["passed"] or not cache_contract["passed"]:
+    projection_input_contract = None
+    if projection_input_hlo is not None:
+        projection_input_contract = validate_prompt_projection_input_hlo(
+            projection_input_hlo,
+            unique_token_count=int(unique_ids.size),
+        )
+    if not state_contract["passed"] or not cache_contract["passed"] or (
+        projection_input_contract is not None
+        and not projection_input_contract["passed"]
+    ):
         (hlo_dir / "contract_failure.json").write_text(
             json.dumps(
-                {"cache": cache_contract, "states": state_contract},
+                {
+                    "cache": cache_contract,
+                    "projection_input": projection_input_contract,
+                    "states": state_contract,
+                },
                 indent=2,
                 sort_keys=True,
             )
@@ -371,6 +433,17 @@ def main() -> int:
         raise RuntimeError("prompt-key producer HLO contract failed")
 
     started = time.monotonic()
+    observed_projection_input = None
+    if projection_input_compiled is not None:
+        projection_input_result = projection_input_compiled(
+            *projection_input_arguments
+        )
+        projection_input_host = np.ascontiguousarray(
+            np.asarray(projection_input_result, dtype=np.float32)
+        )
+        observed_projection_input = np.ascontiguousarray(
+            projection_input_host[args.position]
+        )
     state_result = states_compiled(*first_arguments)
     jax.block_until_ready(state_result)
     observed_states = {
@@ -428,10 +501,25 @@ def main() -> int:
         )
 
     state_comparison = compare_prompt_key_internal_states(
-        accepted_states, observed_states
+        accepted_key_states, observed_states
     )
+    projection_input_comparison = None
+    if accepted_projection_input is not None:
+        assert observed_projection_input is not None
+        projection_input_comparison = compare_prompt_projection_input(
+            accepted_projection_input,
+            observed_projection_input,
+        )
+    classification = state_comparison["classification"]
+    first_divergent_field = state_comparison["first_divergent_field"]
+    if projection_input_comparison is not None:
+        if not projection_input_comparison["elementwise_exact"]:
+            classification = "projection_input_association"
+            first_divergent_field = "projection_input"
+        elif first_divergent_field == "pre_layer_norm_key":
+            classification = "projection_lowering_association"
     accepted_post_bits = np.ascontiguousarray(
-        accepted_states["post_rope_key"].astype(ml_dtypes.bfloat16)
+        accepted_key_states["post_rope_key"].astype(ml_dtypes.bfloat16)
     ).view(np.uint16)
     observed_post_bits = np.ascontiguousarray(
         observed_states["post_rope_key"].astype(ml_dtypes.bfloat16)
@@ -450,19 +538,29 @@ def main() -> int:
         )
 
     tensor_path = args.output / "prompt_key_internal_comparison.npz"
-    np.savez(
-        tensor_path,
-        accepted_cache_row_bfloat16_bits=accepted_cache_row,
-        accepted_post_rope_bfloat16_bits=accepted_post_bits,
-        accepted_post_rope_key=accepted_states["post_rope_key"],
-        accepted_pre_layer_norm_key=accepted_states["pre_layer_norm_key"],
-        accepted_pre_rope_key=accepted_states["pre_rope_key"],
-        greenfield_cache_row_bfloat16_bits=observed_cache_row,
-        greenfield_post_rope_bfloat16_bits=observed_post_bits,
-        greenfield_post_rope_key=observed_states["post_rope_key"],
-        greenfield_pre_layer_norm_key=observed_states["pre_layer_norm_key"],
-        greenfield_pre_rope_key=observed_states["pre_rope_key"],
-    )
+    tensor_arrays = {
+        "accepted_cache_row_bfloat16_bits": accepted_cache_row,
+        "accepted_post_rope_bfloat16_bits": accepted_post_bits,
+        "accepted_post_rope_key": accepted_key_states["post_rope_key"],
+        "accepted_pre_layer_norm_key": accepted_key_states[
+            "pre_layer_norm_key"
+        ],
+        "accepted_pre_rope_key": accepted_key_states["pre_rope_key"],
+        "greenfield_cache_row_bfloat16_bits": observed_cache_row,
+        "greenfield_post_rope_bfloat16_bits": observed_post_bits,
+        "greenfield_post_rope_key": observed_states["post_rope_key"],
+        "greenfield_pre_layer_norm_key": observed_states[
+            "pre_layer_norm_key"
+        ],
+        "greenfield_pre_rope_key": observed_states["pre_rope_key"],
+    }
+    if accepted_projection_input is not None:
+        assert observed_projection_input is not None
+        tensor_arrays.update(
+            accepted_projection_input=accepted_projection_input,
+            greenfield_projection_input=observed_projection_input,
+        )
+    np.savez(tensor_path, **tensor_arrays)
 
     result: dict[str, Any] = {
         "accepted_cache": {
@@ -475,6 +573,7 @@ def main() -> int:
         "accepted_capture": {
             "capture_source_kind": capture_source_kind,
             "capture_process_indices": capture["capture_process_indices"],
+            "capture_mode": capture["capture_mode"],
             "manifest_sha256": capture["manifest_sha256"],
             "tensor_file_sha256": capture["tensor_file"]["sha256"],
             "source_run_tag": capture["run_tag"],
@@ -489,10 +588,8 @@ def main() -> int:
         ),
         "code_hash": code_hash,
         "conclusion": {
-            "classification": state_comparison["classification"],
-            "first_divergent_field": state_comparison[
-                "first_divergent_field"
-            ],
+            "classification": classification,
+            "first_divergent_field": first_divergent_field,
         },
         "device_count": jax.device_count(),
         "device_kind": sorted({item.device_kind for item in jax.devices()}),
@@ -529,6 +626,7 @@ def main() -> int:
         "performance_claim": False,
         "position": args.position,
         "projection_weight_mode": args.projection_weight_mode,
+        "projection_input_comparison": projection_input_comparison,
         "run_tag": args.run_tag,
         "state_comparison": state_comparison,
         "status": "SUCCESS",
@@ -539,6 +637,19 @@ def main() -> int:
         },
         "wk_dequantize_compile_seconds": dequant_compile_seconds,
     }
+    if projection_input_hlo is not None:
+        assert projection_input_hlo_path is not None
+        result["hlo"]["projection_input"] = {
+            "compile_seconds": projection_input_compile_seconds,
+            "contract": projection_input_contract,
+            "filename": projection_input_hlo_path.relative_to(
+                args.output
+            ).as_posix(),
+            "optimized_hlo_sha256": sha256(
+                projection_input_hlo.encode()
+            ).hexdigest(),
+            "sha256": _sha256_file(projection_input_hlo_path),
+        }
     result["manifest_sha256"] = _manifest_hash(result)
     result_path = args.output / "comparison.json"
     result_path.write_text(
