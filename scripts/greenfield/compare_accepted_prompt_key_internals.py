@@ -56,6 +56,55 @@ def _manifest_hash(value: dict[str, Any]) -> str:
     return sha256(encoded).hexdigest()
 
 
+def _bitwise_array_comparison(
+    expected: np.ndarray, observed: np.ndarray
+) -> dict[str, Any]:
+    """Return compact exactness diagnostics without retaining another tensor."""
+
+    expected = np.ascontiguousarray(expected)
+    observed = np.ascontiguousarray(observed)
+    result: dict[str, Any] = {
+        "expected_dtype": str(expected.dtype),
+        "expected_sha256": _array_sha256(expected),
+        "expected_shape": list(expected.shape),
+        "observed_dtype": str(observed.dtype),
+        "observed_sha256": _array_sha256(observed),
+        "observed_shape": list(observed.shape),
+    }
+    if expected.shape != observed.shape or expected.dtype != observed.dtype:
+        return {
+            **result,
+            "elementwise_exact": False,
+            "first_mismatch_index": None,
+            "mismatch_count": None,
+        }
+    item_bytes = expected.dtype.itemsize
+    mismatch = np.any(
+        expected.view(np.uint8).reshape(*expected.shape, item_bytes)
+        != observed.view(np.uint8).reshape(*observed.shape, item_bytes),
+        axis=-1,
+    )
+    mismatch_indices = np.argwhere(mismatch)
+    result.update(
+        elementwise_exact=bool(not mismatch_indices.size),
+        first_mismatch_index=(
+            mismatch_indices[0].tolist() if mismatch_indices.size else None
+        ),
+        mismatch_count=int(mismatch.sum()),
+    )
+    if mismatch_indices.size and np.issubdtype(expected.dtype, np.floating):
+        delta = np.abs(
+            expected[mismatch].astype(np.float64)
+            - observed[mismatch].astype(np.float64)
+        )
+        result.update(
+            mismatch_max_abs=float(np.max(delta)),
+            mismatch_mean_abs=float(np.mean(delta)),
+            mismatch_p99_abs=float(np.quantile(delta, 0.99)),
+        )
+    return result
+
+
 def _memory_stats(device: Any) -> dict[str, int] | None:
     value = device.memory_stats()
     if value is None:
@@ -197,7 +246,7 @@ def _run_lp4_materialized_repair(
     key_norm_weight: np.ndarray,
     key_norm_bias: np.ndarray,
     accepted_cache_bits: np.ndarray,
-    expected_materialized_wk_sha256: str,
+    expected_materialized_wk: np.ndarray,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Run the production materializer and cache repair over four TPU lanes."""
 
@@ -401,17 +450,65 @@ def _run_lp4_materialized_repair(
     if not owner_isolation_exact:
         raise RuntimeError("LP4 prompt repair wrote outside owner rows")
 
+    raw_input_shards = []
+    for bit_shard, scale_shard in zip(
+        bits.addressable_shards, scales.addressable_shards, strict=True
+    ):
+        local_bits = np.ascontiguousarray(
+            np.asarray(jax.device_get(bit_shard.data))[0]
+        )
+        local_scales = np.ascontiguousarray(
+            np.asarray(jax.device_get(scale_shard.data))[0]
+        )
+        raw_input_shards.append(
+            {
+                "bits": _bitwise_array_comparison(raw_wk_bits, local_bits),
+                "device_id": int(bit_shard.device.id),
+                "scales": _bitwise_array_comparison(
+                    raw_wk_scale, local_scales
+                ),
+            }
+        )
+
     materialized_shards = []
     for shard in materialized.addressable_shards:
-        host = np.ascontiguousarray(np.asarray(jax.device_get(shard.data)))
+        shard_host = np.ascontiguousarray(
+            np.asarray(jax.device_get(shard.data), dtype=np.float32)
+        )
+        if shard_host.shape != (1, *expected_materialized_wk.shape):
+            raise RuntimeError("LP4 materialized wk shard shape drifted")
+        host = np.ascontiguousarray(shard_host[0])
         identity = {
             "byte_count": int(host.nbytes),
             "device_id": int(shard.device.id),
             "sha256": _array_sha256(host),
+            "comparison": _bitwise_array_comparison(
+                expected_materialized_wk, host
+            ),
         }
-        if identity["sha256"] != expected_materialized_wk_sha256:
-            raise RuntimeError("LP4 materialized wk differs across owner lanes")
         materialized_shards.append(identity)
+
+    materialized_diagnostic = {
+        "accepted_materialized_wk_sha256": _array_sha256(
+            expected_materialized_wk
+        ),
+        "materialized_shards": materialized_shards,
+        "raw_input_shards": raw_input_shards,
+    }
+    (output_dir / "lp4_materialized_wk_diagnostic.json").write_text(
+        json.dumps(materialized_diagnostic, indent=2, sort_keys=True) + "\n"
+    )
+    if not all(
+        record["bits"]["elementwise_exact"]
+        and record["scales"]["elementwise_exact"]
+        for record in raw_input_shards
+    ):
+        raise RuntimeError("LP4 raw wk placement differs across owner lanes")
+    if not all(
+        record["comparison"]["elementwise_exact"]
+        for record in materialized_shards
+    ):
+        raise RuntimeError("LP4 materialized wk differs from accepted adapter")
 
     return candidate_bits, {
         "assembled_cache_elementwise_exact": bool(
@@ -429,6 +526,7 @@ def _run_lp4_materialized_repair(
         ],
         "repair_compile_seconds": repair_compile_seconds,
         "repair_execute_seconds": repair_execute_seconds,
+        "raw_input_shards": raw_input_shards,
     }
 
 
@@ -923,7 +1021,7 @@ def main() -> int:
                     "self_attn__indexer__k_norm__bias"
                 ),
                 accepted_cache_bits=accepted_cache_bits,
-                expected_materialized_wk_sha256=wk_identity["sha256"],
+                expected_materialized_wk=wk_host,
             )
         )
     else:

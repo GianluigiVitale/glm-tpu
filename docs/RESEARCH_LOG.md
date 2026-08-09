@@ -6331,3 +6331,19 @@ unmotivated arithmetic variants.
   `repair_stage_local_prompt_index_cache`. Production arithmetic, sharding and validator scope are
   unchanged. Focused tests and one Fable review of this new diff are required before one fresh
   bounded retry; the full 8K decoder remains forbidden until LP4 cache equality passes.
+
+## 2026-08-09 19:40 — LP4 repair executes; output weight identity now refuses
+
+- Attempt `greenfield_layer0_prompt_key_norm_m64_20260809T193931471545587Z` at pushed `9cf4119`
+  passes both HLO gates and executes both the completed four-chip materializer and owner-local cache
+  repair. Sentinel ownership isolation passes.
+- Verification then refuses on the first materialized FP32 shard because it does not match accepted
+  adapter SHA `d680f7b1...83469`. The prior error wording overclaimed lane-to-lane disagreement: the
+  loop raised on its first mismatch, so input placement, common arithmetic drift and lane drift are
+  not yet separated. No cache exactness, DB/SUCCESS, decoder or performance evidence exists.
+- Materializer/repair gzip SHAs are `764fe24f...6423b` / `397f04b8...0f085`; the approved partial
+  archive exists and pre/failure census SHAs `9fe2527d...d2902` / `a3993b10...33130` authenticate
+  8/8 zero work.
+- The next diagnostic-only correction records exact raw bits/scales placement plus compact bitwise
+  comparisons for every lane before failing. It changes no device arithmetic. Focused tests and one
+  new-diff-only Fable audit precede a single protected retry; the full 8K decoder remains forbidden.

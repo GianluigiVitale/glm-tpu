@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[3]
@@ -15,6 +18,42 @@ def _contract(hlo: str, source: str) -> dict[str, Any]:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module._projection_weight_source_contract(hlo, source=source)
+
+
+def _comparison(expected: np.ndarray, observed: np.ndarray) -> dict[str, Any]:
+    path = REPO / "scripts/greenfield/compare_accepted_prompt_key_internals.py"
+    spec = importlib.util.spec_from_file_location("prompt_key_compare", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module._bitwise_array_comparison(expected, observed)
+
+
+def test_bitwise_array_comparison_records_exact_and_float_drift() -> None:
+    expected = np.arange(12, dtype=np.float32).reshape(3, 4)
+    exact = _comparison(expected, expected.copy())
+    assert exact["elementwise_exact"] is True
+    assert exact["mismatch_count"] == 0
+    assert exact["observed_sha256"] == sha256(expected.tobytes()).hexdigest()
+
+    observed = expected.copy()
+    observed[1, 2] += np.float32(0.25)
+    drift = _comparison(expected, observed)
+    assert drift["elementwise_exact"] is False
+    assert drift["first_mismatch_index"] == [1, 2]
+    assert drift["mismatch_count"] == 1
+    assert drift["mismatch_max_abs"] == 0.25
+
+
+def test_bitwise_array_comparison_refuses_shape_or_dtype_equivalence() -> None:
+    expected = np.arange(8, dtype=np.uint8)
+    shape_drift = _comparison(expected, expected.reshape(1, 8))
+    assert shape_drift["elementwise_exact"] is False
+    assert shape_drift["mismatch_count"] is None
+
+    dtype_drift = _comparison(expected, expected.astype(np.int16))
+    assert dtype_drift["elementwise_exact"] is False
+    assert dtype_drift["mismatch_count"] is None
 
 
 def test_accepts_materialized_fp32_wk_parameter() -> None:

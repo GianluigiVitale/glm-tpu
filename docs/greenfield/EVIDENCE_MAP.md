@@ -629,3 +629,15 @@ capture is still required.
   `6586bc71...9ebe`; cleanup is authenticated 8/8. There is no cache comparison, DB/SUCCESS,
   decoder, performance or Gate-D result. The correction is only a bounded-wrapper rename; a fresh
   protected LP4 exactness result remains required before another full 8K run.
+
+## LP4 repair execution — materialized output identity refusal
+
+- Attempt `greenfield_layer0_prompt_key_norm_m64_20260809T193931471545587Z` at `9cf4119` passes
+  both HLO gates, executes the four-chip materializer and cache repair, and passes sentinel owner
+  isolation. Its first materialized FP32 shard differs from accepted adapter SHA
+  `d680f7b1...83469`; because the initial verifier stopped immediately, this does not yet prove
+  whether other lanes agree or whether raw input placement is exact.
+- Materializer/repair HLO gzip SHAs are `764fe24f...6423b` and `397f04b8...0f085`. Pre/failure
+  census SHAs are `9fe2527d...d2902` and `a3993b10...33130`, the diagnostic is archived in the
+  approved bucket, and fleet cleanup is 8/8. There is no cache equality, DB/SUCCESS, decoder,
+  performance or Gate-D standing.

@@ -2852,3 +2852,20 @@ correction renames only the bounded wrapper so JAX preserves the semantic repair
 not change arithmetic, sharding, the validator API, or the production decoder's strict scope.
 Exact next: focused tests and one new-diff-only Fable audit, commit/push, then a fresh bounded LP4
 retry. Do not run the full 8K decoder until the assembled LP4 cache is bitwise exact.
+
+## Third LP4 attempt executes repair and exposes materializer-value drift
+
+Fresh bounded attempt
+`greenfield_layer0_prompt_key_norm_m64_20260809T193931471545587Z` at pushed pin `9cf4119` passes
+both corrected HLO gates, executes the four-chip materializer and executes the owner-local cache
+repair. Owner isolation passes, but the harness then refuses because a materialized FP32 `wk`
+shard does not have accepted-adapter SHA `d680f7b1...83469`. The old message said the lanes differed,
+but it stopped on the first lane and therefore does not yet distinguish bad raw placement,
+lane-to-lane drift, or a common combined-materializer arithmetic drift. There is no cache exactness,
+DB row, SUCCESS, decoder, latency or Gate-D result.
+
+Materializer/repair HLO gzip SHAs are `764fe24f...6423b` and `397f04b8...0f085`; pre/failure
+census SHAs are `9fe2527d...d2902` and `a3993b10...33130`. The approved diagnostic archive exists
+and cleanup is authenticated 8/8. The next narrow batch records raw bits/scales and all four output
+comparisons before refusing; it changes no arithmetic. After focused tests and one Fable audit of
+only that new diff, run one protected diagnostic. Do not rerun the full decoder first.
