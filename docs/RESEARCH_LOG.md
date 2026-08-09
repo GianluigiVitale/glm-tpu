@@ -5937,3 +5937,27 @@ unmotivated arithmetic variants.
   flat-scatter and no-communication/no-loop HLO gates.
 - Focused tests pass 48/48; the complete CPU-only suite passes 478 with one expected skip. This is
   readiness only. Exact next is one serialized protected capture, not another full decoder run.
+
+## 2026-08-09 04:10 — DB513 localizes the prompt drift to projection output
+
+- Protected DB513/item1798 at greenfield `00404a0`, observer `9c1d6b3b9`, accepted oracle
+  `b3c25df47` passes exact passkey/raw tokens, all 294 DSA events, checkpoint/state/cache integrity,
+  approved archive and authenticated 8/8 cleanup. Accepted cache SHA remains
+  `3808d502...859d1`; the independently reproduced DB512 cache remains `52bf55ed...cd8a`.
+- The accepted position-113 projection differs first: 79/128 FP32 elements, max
+  `3.5762787e-7`, mean `4.2949978e-8`. The post-key-LayerNorm and post-RoPE boundaries differ only
+  downstream, and both post-RoPE casts exactly reproduce their respective BF16 cache row. The
+  classification is therefore `projection_association`, not key norm, RoPE, or cache scatter.
+- Comparison/capture manifests are `605eeac2...a04c` and `dd361437...591f`; accepted capture tensor
+  SHA is `db26efc4...bb64`. This is diagnostic correctness evidence, not Gate-D/performance proof.
+- Source audit leaves one direct discriminator. Accepted `compute_indexer_keys` executes FP32
+  hidden by FP32 adapted `wk`, whereas the DB513 greenfield reproduction explicitly converts the
+  adapted `wk` operand to BF16 before its M2048 convolution. The new default-off profile removes
+  only that conversion inside the already-proven gather/RMS/norm/RoPE/scatter path.
+- The new HLO contract requires one FP32-RHS M2048 convolution, zero BF16 `wk` conversions, one
+  physical embedding gather feeding RMS, one flat BF16 cache scatter, literal source RoPE and no
+  loop/collective/callback/dead/full-prompt tensor. It reuses the sealed DB513 compact capture
+  artifact, so the 753B model is not loaded. Focused CPU tests pass 38/38.
+- Exact next is one protected FP32 projection discriminator. Exact producer states plus exact full
+  cache authorize the smallest production correction and one 8K retry; a miss requires capturing
+  the normalized hidden projection input rather than guessing another projection formula.

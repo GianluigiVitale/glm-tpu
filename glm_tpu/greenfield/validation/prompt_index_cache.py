@@ -315,6 +315,64 @@ def inspect_legacy_prompt_key_internal_capture(
     return manifest, canonical
 
 
+def inspect_prompt_key_internal_capture_artifact(
+    artifact_dir: Path,
+    *,
+    expected_manifest_sha256: str | None = None,
+) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+    """Verify and load an already-sealed accepted prompt-key capture."""
+
+    artifact_dir = Path(artifact_dir)
+    manifest = json.loads((artifact_dir / "capture.json").read_text())
+    if manifest.get("artifact_kind") != PROMPT_KEY_INTERNAL_CAPTURE_KIND or (
+        manifest.get("format_version") != FORMAT_VERSION
+    ):
+        raise ValueError("unsupported prompt-key internal capture artifact")
+    if manifest.get("model_id") != MODEL_ID or (
+        manifest.get("diagnostic_only") is not True
+    ) or manifest.get("performance_claim") is not False:
+        raise ValueError("prompt-key internal capture scope/model drifted")
+    if manifest.get("manifest_sha256") != _manifest_hash(manifest):
+        raise ValueError("prompt-key internal capture manifest checksum mismatch")
+    if expected_manifest_sha256 is not None and (
+        manifest["manifest_sha256"] != expected_manifest_sha256
+    ):
+        raise ValueError("prompt-key internal capture identity drifted")
+
+    record = manifest.get("tensor_file", {})
+    tensor_path = artifact_dir / str(record.get("filename", ""))
+    if tensor_path.stat().st_size != record.get("byte_count") or (
+        _sha256_file(tensor_path) != record.get("sha256")
+    ):
+        raise ValueError("prompt-key internal capture tensor integrity failed")
+    fields = (
+        "pre_layer_norm_key",
+        "pre_rope_key",
+        "post_rope_key",
+    )
+    with np.load(tensor_path, allow_pickle=False) as payload:
+        if set(payload.files) != set(fields):
+            raise ValueError("prompt-key internal capture field set drifted")
+        states = {
+            name: np.ascontiguousarray(payload[name]) for name in fields
+        }
+    for name, value in states.items():
+        field = manifest.get("fields", {}).get(name, {})
+        if value.shape != (128,) or value.dtype != np.float32 or (
+            not np.isfinite(value).all()
+        ):
+            raise ValueError(f"prompt-key internal capture {name} drifted")
+        if field != {
+            "dtype": "float32",
+            "sha256": _array_sha256(value),
+            "shape": [128],
+        }:
+            raise ValueError(
+                f"prompt-key internal capture {name} manifest drifted"
+            )
+    return manifest, states
+
+
 def compare_prompt_key_internal_states(
     accepted: dict[str, np.ndarray],
     observed: dict[str, np.ndarray],
@@ -972,6 +1030,20 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
             "divide_sqrt",
         ),
+        (
+            "accepted_xla_m2048_gather_cache_write_fp32_weight_"
+            "divide_sqrt_source_rope"
+        ): (
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope",
+            "divide_sqrt",
+        ),
+        (
+            "accepted_xla_m2048_gather_cache_write_fp32_weight_"
+            "divide_sqrt_source_rope_states"
+        ): (
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -1118,12 +1190,19 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
         )
         source_rope_backend = backend in (
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
         )
         state_backend = backend.endswith("_source_rope_states")
+        fp32_weight_backend = backend.startswith(
+            "xla_chunk_gather_cache_write_fp32_weight"
+        )
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
@@ -1169,6 +1248,8 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
         ):
             required_shapes.update(
                 {
@@ -1202,6 +1283,7 @@ def validate_prompt_index_key_association_hlo(
             )
         ]
         convolution_weight_bf16 = False
+        convolution_weight_f32 = False
         if len(convolution_lines) == 1:
             operands = re.search(
                 r"convolution\([^,]+,\s*(%[^,)]+)",
@@ -1213,6 +1295,14 @@ def validate_prompt_index_key_association_hlo(
                     re.search(
                         rf"^\s*{re.escape(weight_name)}\s*=\s*"
                         r"bf16\[128,6144\]",
+                        line,
+                    )
+                    for line in lowered.splitlines()
+                )
+                convolution_weight_f32 = any(
+                    re.search(
+                        rf"^\s*{re.escape(weight_name)}\s*=\s*"
+                        r"f32\[128,6144\]",
                         line,
                     )
                     for line in lowered.splitlines()
@@ -1301,11 +1391,17 @@ def validate_prompt_index_key_association_hlo(
             violations.append(
                 "unexpected FP32-to-BF16 wk conversion in FP32 chunk candidate"
             )
+        if fp32_weight_backend and not convolution_weight_f32:
+            violations.append(
+                "M2048 convolution does not consume an FP32 wk operand"
+            )
         if backend in (
             "xla_chunk_gather_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope",
+            "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
         ):
             if len(physical_gather_lines) != 1:
                 violations.append(
@@ -1384,6 +1480,7 @@ def validate_prompt_index_key_association_hlo(
                 bf16_weight_conversion_lines
             ),
             "convolution_weight_bf16": convolution_weight_bf16,
+            "convolution_weight_f32": convolution_weight_f32,
             "gather_coupled_input_rms": gather_coupled_input_rms,
             "physical_embedding_gather_count": len(physical_gather_lines),
             "physical_cache_scatter_count": len(physical_scatter_lines),

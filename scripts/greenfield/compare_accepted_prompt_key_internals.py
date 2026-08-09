@@ -67,13 +67,17 @@ def _memory_stats(device: Any) -> dict[str, int] | None:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source-dump-dir", type=Path, required=True)
+    capture_source = parser.add_mutually_exclusive_group(required=True)
+    capture_source.add_argument("--source-dump-dir", type=Path)
+    capture_source.add_argument("--accepted-capture-dir", type=Path)
+    parser.add_argument("--accepted-capture-manifest-sha256")
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--input-manifest-sha256", required=True)
     parser.add_argument("--prompt-cache-dir", type=Path, required=True)
     parser.add_argument("--prompt-cache-manifest-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--run-tag", required=True)
+    parser.add_argument("--accepted-run-tag")
     parser.add_argument("--greenfield-code-hash", required=True)
     parser.add_argument("--legacy-code-hash", required=True)
     parser.add_argument("--oracle-pin", required=True)
@@ -84,16 +88,22 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--position", type=int, default=113)
     parser.add_argument("--process-count", type=int, default=8)
     parser.add_argument("--expected-accepted-cache-sha256", required=True)
-    parser.add_argument("--expected-candidate-cache-sha256", required=True)
-    parser.add_argument("--expected-cache-mismatch-count", type=int, default=45)
+    parser.add_argument("--expected-candidate-cache-sha256")
+    parser.add_argument("--expected-cache-mismatch-count", type=int)
     parser.add_argument(
         "--expected-first-cache-mismatch-position", type=int, default=113
+    )
+    parser.add_argument(
+        "--projection-weight-mode",
+        choices=("adapted_bf16", "adapted_fp32"),
+        default="adapted_bf16",
     )
     return parser.parse_args()
 
 
 def main() -> int:
     args = _parse_args()
+    accepted_run_tag = args.accepted_run_tag or args.run_tag
     if REPO != EXPECTED_WORKTREE:
         raise RuntimeError(f"wrong greenfield worktree: {REPO}")
     code_hash = _git_head()
@@ -125,6 +135,7 @@ def main() -> int:
         inspect_layer0_dsa_association_input,
         inspect_legacy_prompt_index_cache,
         inspect_legacy_prompt_key_internal_capture,
+        inspect_prompt_key_internal_capture_artifact,
         validate_prompt_index_key_association_hlo,
     )
 
@@ -141,20 +152,51 @@ def main() -> int:
         raise RuntimeError("prompt-key comparison position must be in chunk zero")
 
     device = jax.local_devices()[0]
-    accepted_capture_dir = args.output / "accepted_capture"
-    capture, accepted_states = inspect_legacy_prompt_key_internal_capture(
-        LegacyPromptKeyInternalConfig(
-            source_dump_dir=args.source_dump_dir,
-            output_dir=accepted_capture_dir,
-            expected_run_tag=args.run_tag,
-            expected_legacy_code_hash=args.legacy_code_hash,
-            expected_oracle_pin=args.oracle_pin,
-            expected_layer_name=args.layer_name,
-            expected_position=args.position,
-            expected_process_count=args.process_count,
-            expected_model_id=args.model_id,
+    if args.source_dump_dir is not None:
+        if args.accepted_capture_manifest_sha256 is not None:
+            raise ValueError(
+                "accepted capture manifest is only valid with an artifact"
+            )
+        accepted_capture_dir = args.output / "accepted_capture"
+        capture, accepted_states = inspect_legacy_prompt_key_internal_capture(
+            LegacyPromptKeyInternalConfig(
+                source_dump_dir=args.source_dump_dir,
+                output_dir=accepted_capture_dir,
+                expected_run_tag=accepted_run_tag,
+                expected_legacy_code_hash=args.legacy_code_hash,
+                expected_oracle_pin=args.oracle_pin,
+                expected_layer_name=args.layer_name,
+                expected_position=args.position,
+                expected_process_count=args.process_count,
+                expected_model_id=args.model_id,
+            )
         )
-    )
+        capture_source_kind = "raw_observer_dumps"
+    else:
+        if args.accepted_capture_manifest_sha256 is None:
+            raise ValueError(
+                "accepted capture artifact requires its manifest identity"
+            )
+        assert args.accepted_capture_dir is not None
+        capture, accepted_states = inspect_prompt_key_internal_capture_artifact(
+            args.accepted_capture_dir,
+            expected_manifest_sha256=args.accepted_capture_manifest_sha256,
+        )
+        expected_capture_identity = {
+            "legacy_code_hash": args.legacy_code_hash,
+            "oracle_pin": args.oracle_pin,
+            "layer_name": args.layer_name,
+            "position": args.position,
+            "process_count": args.process_count,
+            "model_id": args.model_id,
+            "run_tag": accepted_run_tag,
+        }
+        if any(
+            capture.get(name) != expected
+            for name, expected in expected_capture_identity.items()
+        ):
+            raise RuntimeError("accepted prompt-key capture lineage drifted")
+        capture_source_kind = "sealed_capture_artifact"
     input_manifest, arrays = inspect_layer0_dsa_association_input(
         args.input_dir,
         expected_manifest_sha256=args.input_manifest_sha256,
@@ -263,12 +305,14 @@ def main() -> int:
         geometry=geometry,
         key_norm_mode="divide_sqrt",
         rotary_mode="accepted_source",
+        projection_weight_mode=args.projection_weight_mode,
     )
     cache_function = partial(
         layer0_prompt_index_key_gather_cache_chunk,
         geometry=geometry,
         key_norm_mode="divide_sqrt",
         rotary_mode="accepted_source",
+        projection_weight_mode=args.projection_weight_mode,
     )
 
     before_memory = _memory_stats(device)
@@ -292,14 +336,17 @@ def main() -> int:
     for path, text in ((state_hlo_path, state_hlo), (cache_hlo_path, cache_hlo)):
         with gzip.open(path, "wt", encoding="utf-8") as stream:
             stream.write(text)
-    state_candidate = (
-        "accepted_xla_m2048_gather_cache_write_bf16_weight_"
-        "divide_sqrt_source_rope_states"
+    weight_label = (
+        "bf16_weight"
+        if args.projection_weight_mode == "adapted_bf16"
+        else "fp32_weight"
     )
-    cache_candidate = (
-        "accepted_xla_m2048_gather_cache_write_bf16_weight_"
-        "divide_sqrt_source_rope"
+    candidate_prefix = (
+        "accepted_xla_m2048_gather_cache_write_"
+        f"{weight_label}_divide_sqrt_source_rope"
     )
+    state_candidate = f"{candidate_prefix}_states"
+    cache_candidate = candidate_prefix
     state_contract = validate_prompt_index_key_association_hlo(
         state_hlo,
         candidate=state_candidate,
@@ -359,7 +406,9 @@ def main() -> int:
     )
     candidate_bits = candidate_keys.view(np.uint16)
     candidate_sha = _array_sha256(candidate_bits)
-    if candidate_sha != args.expected_candidate_cache_sha256:
+    if args.expected_candidate_cache_sha256 is not None and (
+        candidate_sha != args.expected_candidate_cache_sha256
+    ):
         raise RuntimeError(
             "sealed DB512 candidate cache identity drifted: "
             f"expected={args.expected_candidate_cache_sha256} "
@@ -368,10 +417,11 @@ def main() -> int:
     cache_comparison = compare_prompt_index_key_bits(
         accepted_cache_bits, candidate_bits
     )
-    if cache_comparison["mismatch_count"] != (
-        args.expected_cache_mismatch_count
-    ) or cache_comparison["first_mismatch_position"] != (
-        args.expected_first_cache_mismatch_position
+    if args.expected_cache_mismatch_count is not None and (
+        cache_comparison["mismatch_count"]
+        != args.expected_cache_mismatch_count
+        or cache_comparison["first_mismatch_position"]
+        != args.expected_first_cache_mismatch_position
     ):
         raise RuntimeError(
             f"sealed DB512 mismatch identity drifted: {cache_comparison}"
@@ -423,9 +473,11 @@ def main() -> int:
             ),
         },
         "accepted_capture": {
+            "capture_source_kind": capture_source_kind,
             "capture_process_indices": capture["capture_process_indices"],
             "manifest_sha256": capture["manifest_sha256"],
             "tensor_file_sha256": capture["tensor_file"]["sha256"],
+            "source_run_tag": capture["run_tag"],
         },
         "accepted_adapted_wk": wk_identity,
         "artifact_kind": ARTIFACT_KIND,
@@ -476,6 +528,7 @@ def main() -> int:
         "oracle_pin": args.oracle_pin,
         "performance_claim": False,
         "position": args.position,
+        "projection_weight_mode": args.projection_weight_mode,
         "run_tag": args.run_tag,
         "state_comparison": state_comparison,
         "status": "SUCCESS",

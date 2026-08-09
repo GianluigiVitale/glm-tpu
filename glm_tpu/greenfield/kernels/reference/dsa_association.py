@@ -1353,6 +1353,7 @@ def layer0_prompt_index_key_gather_cache_states_chunk(
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
+    projection_weight_mode: KeyProjectionWeightMode = "adapted_bf16",
 ) -> Layer0PromptKeyStates:
     """Write one chunk and expose its actual FP32 producer boundaries.
 
@@ -1414,6 +1415,15 @@ def layer0_prompt_index_key_gather_cache_states_chunk(
         )
     if wk_weight.dtype != jnp.float32:
         raise ValueError("layer-0 accepted adapted wk must remain FP32")
+    if projection_weight_mode == "adapted_fp32":
+        projection_weight = wk_weight
+    elif projection_weight_mode == "adapted_bf16":
+        projection_weight = wk_weight.astype(jnp.bfloat16)
+    else:
+        raise ValueError(
+            "unsupported layer-0 prompt-key projection weight mode "
+            f"{projection_weight_mode!r}"
+        )
 
     hidden_chunk = jnp.take(unique_embeddings, embedding_rows, axis=0)
     normalized = rms_norm(
@@ -1425,7 +1435,7 @@ def layer0_prompt_index_key_gather_cache_states_chunk(
         _project_key_states_f32(
             normalized,
             positions,
-            wk_weight.astype(jnp.bfloat16),
+            projection_weight,
             key_norm_weight,
             key_norm_bias,
             geometry=geometry,
@@ -1469,6 +1479,7 @@ def layer0_prompt_index_key_gather_cache_chunk(
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
+    projection_weight_mode: KeyProjectionWeightMode = "adapted_bf16",
 ) -> Any:
     """Write one gathered prompt chunk through the accepted flat cache API."""
 
@@ -1485,6 +1496,7 @@ def layer0_prompt_index_key_gather_cache_chunk(
         geometry=geometry,
         key_norm_mode=key_norm_mode,
         rotary_mode=rotary_mode,
+        projection_weight_mode=projection_weight_mode,
     ).index_cache
 
 

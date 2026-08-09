@@ -212,6 +212,22 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
     np.testing.assert_array_equal(
         np.asarray(source_rope_cache), np.asarray(cache)
     )
+    fp32_weight_cache = layer0_prompt_index_key_gather_cache_chunk(
+        jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),
+        live_block_table,
+        arguments[0],
+        arguments[1][:4],
+        jnp.arange(4, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        rotary_mode="accepted_source",
+        projection_weight_mode="adapted_fp32",
+    )
+    np.testing.assert_array_equal(
+        np.asarray(fp32_weight_cache).reshape(3, 4, 4)[1],
+        np.asarray(chunk),
+    )
     states = layer0_prompt_index_key_gather_cache_states_chunk(
         jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),
         live_block_table,
@@ -232,6 +248,21 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
     assert states.pre_layer_norm_key.dtype == jnp.float32
     assert states.pre_rope_key.dtype == jnp.float32
     assert states.post_rope_key.dtype == jnp.float32
+    fp32_states = layer0_prompt_index_key_gather_cache_states_chunk(
+        jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),
+        live_block_table,
+        arguments[0],
+        arguments[1][:4],
+        jnp.arange(4, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        rotary_mode="accepted_source",
+        projection_weight_mode="adapted_fp32",
+    )
+    np.testing.assert_array_equal(
+        np.asarray(fp32_states.index_cache), np.asarray(fp32_weight_cache)
+    )
     with pytest.raises(ValueError, match="rotary association"):
         layer0_prompt_index_key_gather_cache_chunk(
             jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),

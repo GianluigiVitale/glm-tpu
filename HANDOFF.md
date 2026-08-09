@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 02:31 UTC
+**Updated:** 2026-08-09 04:10 UTC
 
 ## Authority and isolation
 
@@ -2400,3 +2400,45 @@ Exact next: commit/push the clean pin, prove an authenticated idle fleet, and ru
 serialized `bash scripts/greenfield/run_capture_legacy_prompt_key_internals.sh`. Use its first
 divergent field to implement only the smallest source-backed correction before one protected 8K
 Gate-D retry. A capture/cache/HLO refusal must be preserved and diagnosed rather than relaxed.
+
+## DB513 isolates projection association; FP32-RHS discriminator is ready
+
+Protected DB513/item1798,
+`greenfield_legacy_layer0_prompt_key_internals_p113_20260809T024848198817596Z`, completed at
+greenfield pin `00404a0cb6ce18c71816cc47e16ddbaa5f1a5fa6`, observer pin
+`9c1d6b3b950d5c5dd45bdf885058202517097eba`, and unchanged accepted oracle
+`b3c25df47ac98783912dc658878181ec0a8ae16d`. The full accepted run retained exact passkey/raw
+tokens, all 294 DSA events, 1,882/0 checkpoint checksum results, 2,455 state leaves, accepted cache
+SHA `3808d502...859d1`, DB/archive linkage and authenticated 8/8 cleanup. Its final manifest is
+`76c8577d...1d9c`; direct approved-bucket `SUCCESS` matches locally.
+
+The one-row producer comparison classifies `pre_layer_norm_key` as the first divergent field.
+At position 113 the projection differs in 79/128 FP32 values, max/mean
+`3.5762787e-7/4.2949978e-8`; post-key-LayerNorm and post-RoPE differ only downstream. Both
+post-RoPE FP32 casts reproduce their own BF16 cache row exactly. This rejects key LayerNorm, RoPE,
+and cache scatter as the first cause. Comparison manifest `605eeac2...a04c`; accepted capture
+manifest/tensor `dd361437...591f` / `db26efc4...bb64`. This is diagnostic correctness evidence,
+not decoder or performance proof.
+
+The first launch attempt stopped before TPU/model load because worker 0 had under 10 GB free. Its
+failure evidence is archived and has no DB/SUCCESS/performance standing. Four local one-layer
+feature-pack payloads (9,716,387,360 bytes total) were then removed only after their SHA/size,
+approved GCS generation/CRC32C and remote `SUCCESS` were verified; they are exactly recoverable
+from the plan-aware checkpoint prefix. The accepted retry then passed. Worker 0 currently has about
+14 GB free because DB513 retains 3.3 GB of fully archived source dumps; preserve the compact
+capture/cache/comparison evidence and verify remote-object coverage before any bounded reclamation.
+
+The accepted source casts hidden and adapted `wk` to FP32 before `h @ wk.T`. The DB513 greenfield
+reproduction instead explicitly rounds adapted `wk` to BF16 at the M2048 convolution. The new
+default-off `adapted_fp32` profile changes only that operand inside the same gather-coupled input
+RMS, divide/sqrt key norm, literal source RoPE and flat BF16 cache scatter. Its HLO linter requires
+one physical FP32-RHS convolution, zero FP32-to-BF16 `wk` conversions, one gather, one scatter and
+no loop/communication/callback/dead/full-prompt state. The wrapper reuses the sealed DB513 capture
+artifact directly and pins its DB row, manifests, local/remote bytes and 8/8 censuses. Focused CPU
+coverage passes 38/38; no TPU conclusion exists yet.
+
+Exact next: commit/push the clean discriminator, then run exactly one serialized
+`bash scripts/greenfield/run_prompt_key_projection_association_probe.sh`. If both the three FP32
+producer states and the complete 8,155-row BF16 cache are exact, integrate only this projection
+boundary into production and run one protected 8K Gate-D retry. If not, capture/compare the
+normalized hidden row feeding projection before adding another arithmetic variant.

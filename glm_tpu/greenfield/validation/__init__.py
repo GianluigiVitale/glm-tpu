@@ -35,6 +35,7 @@ from .prompt_index_cache import (
     compare_prompt_index_key_bits,
     inspect_legacy_prompt_key_internal_capture,
     inspect_legacy_prompt_index_cache,
+    inspect_prompt_key_internal_capture_artifact,
     validate_prompt_index_key_association_hlo,
     validate_prompt_index_key_probe_hlo,
 )
@@ -78,6 +79,7 @@ __all__ = (
     "compare_legacy_dsa_internals",
     "inspect_legacy_dsa_internal_capture",
     "inspect_legacy_prompt_key_internal_capture",
+    "inspect_prompt_key_internal_capture_artifact",
     "capture_short_context_oracle",
     "capture_short_context_dsa_oracle",
     "compare_short_context_dsa_oracles",

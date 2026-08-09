@@ -15,6 +15,7 @@ from glm_tpu.greenfield.validation.prompt_index_cache import (
     compare_prompt_index_key_bits,
     inspect_legacy_prompt_key_internal_capture,
     inspect_legacy_prompt_index_cache,
+    inspect_prompt_key_internal_capture_artifact,
     validate_prompt_index_key_association_hlo,
     validate_prompt_index_key_probe_hlo,
 )
@@ -79,6 +80,15 @@ def test_seals_bitwise_prompt_key_internal_replicas(tmp_path: Path) -> None:
     np.testing.assert_array_equal(
         states["pre_layer_norm_key"], np.arange(128, dtype=np.float32)
     )
+    loaded_manifest, loaded_states = (
+        inspect_prompt_key_internal_capture_artifact(
+            config.output_dir,
+            expected_manifest_sha256=manifest["manifest_sha256"],
+        )
+    )
+    assert loaded_manifest == manifest
+    for name in states:
+        np.testing.assert_array_equal(loaded_states[name], states[name])
 
     corrupt_source = tmp_path / "corrupt"
     corrupt_source.mkdir()
@@ -622,6 +632,34 @@ ENTRY main {
         "source_literal": True,
         "theta_constant": True,
     }
+    fp32_source_hlo = source_hlo.replace(
+        "  %wk_bf16 = bf16[128,6144]{1,0} convert(%wk_weight)\n",
+        "",
+    ).replace(
+        "convolution(%gathered, %wk_bf16)",
+        "convolution(%gathered, %wk_weight)",
+    )
+    fp32_source_candidate = (
+        "accepted_xla_m2048_gather_cache_write_fp32_weight_"
+        "divide_sqrt_source_rope"
+    )
+    fp32_source_result = validate_prompt_index_key_association_hlo(
+        fp32_source_hlo,
+        candidate=fp32_source_candidate,
+    )
+    assert fp32_source_result["passed"] is True
+    assert fp32_source_result["bf16_wk_conversion_count"] == 0
+    assert fp32_source_result["convolution_weight_bf16"] is False
+    assert fp32_source_result["convolution_weight_f32"] is True
+    fp32_state_result = validate_prompt_index_key_association_hlo(
+        fp32_source_hlo.replace(
+            "->bf16[24,16,32,128]}",
+            "->(bf16[24,16,32,128], f32[2048,128], "
+            "f32[2048,128], f32[2048,128])}",
+        ),
+        candidate=fp32_source_candidate + "_states",
+    )
+    assert fp32_state_result["passed"] is True
     state_hlo = source_hlo.replace(
         "->bf16[24,16,32,128]}",
         "->(bf16[24,16,32,128], f32[2048,128], "
@@ -817,9 +855,13 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
     comparator = repo / (
         "scripts/greenfield/compare_accepted_prompt_key_internals.py"
     )
+    projection_wrapper = repo / (
+        "scripts/greenfield/run_prompt_key_projection_association_probe.sh"
+    )
     shared_source = shared.read_text()
     entrypoint_source = entrypoint.read_text()
     comparator_source = comparator.read_text()
+    projection_wrapper_source = projection_wrapper.read_text()
     for required in (
         "GLM_GREENFIELD_DSA_INTERNALS_MODE",
         "GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE",
@@ -845,6 +887,7 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
         assert required in entrypoint_source
     for required in (
         "inspect_legacy_prompt_key_internal_capture",
+        "inspect_prompt_key_internal_capture_artifact",
         "layer0_prompt_index_key_gather_cache_states_chunk",
         "compare_prompt_key_internal_states",
         "compare_prompt_index_key_bits",
@@ -860,6 +903,31 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
         "from vllm",
     ):
         assert forbidden not in comparator_source
+        assert forbidden not in projection_wrapper_source
+    for required in (
+        "SOURCE_RUN_ID=513",
+        "SOURCE_ITEM_ROW_ID=1798",
+        "SOURCE_COMPARISON_MANIFEST_SHA=605eeac2",
+        "SOURCE_CAPTURE_MANIFEST_SHA=dd361437",
+        "SOURCE_CACHE_MANIFEST_SHA=b30ddc72",
+        "--accepted-capture-dir",
+        "--projection-weight-mode adapted_fp32",
+        "convolution_weight_f32",
+        "strict_census post",
+        '"performance_claim": "false"',
+        "results_ckpt.db",
+        "remote_objects.json",
+    ):
+        assert required in projection_wrapper_source
+    assert "import tpu_inference" not in projection_wrapper_source
+    assert "from tpu_inference" not in projection_wrapper_source
+    shell = subprocess.run(
+        ["bash", "-n", str(projection_wrapper)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert shell.returncode == 0, shell.stdout + shell.stderr
     completed = subprocess.run(
         [sys.executable, "-m", "py_compile", str(comparator)],
         text=True,
