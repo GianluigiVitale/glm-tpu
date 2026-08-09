@@ -6219,3 +6219,38 @@ unmotivated arithmetic variants.
   hypothetical future ENTRY hoisting and adding a branch-prefix-only synthetic fixture. None is a
   current blocker. Final diff verification, commit/push, idle census and one protected retry are
   next; no repeated audit of this frozen batch is authorized.
+
+## 2026-08-09 17:50 — integrated repair passes HLO and exposes causal cache drift
+
+- The protected 8K retry at `ff5072e` passes all decoder, DSA-observer and prefill contracts and
+  executes the complete teacher-forced prefill. The repair proves 84 exact physical M64
+  projections, 168 physical key-norm square roots, 189 owner-cache writes, zero repair collectives
+  or callbacks and no full-pod history. The earlier linter-scope blocker is therefore closed.
+- First token `101252` is exact, but the device DSA observer refuses before timing. All 21 full
+  events have valid order/tie/count/producer/lane contracts but wrong selected sets; event 0 swaps
+  4 positions, event 1 swaps 9, and the maximum mismatch is 571. No warmup, wall result, XPlane,
+  DB row or `SUCCESS` exists. Failure cleanup is authenticated 8/8.
+- Comparing the new observation to the prior qkv-a loop-fix run proves the post-scan repair changed
+  every aligned layer-0 selected score bit while leaving the recurrent query program untouched.
+  This makes prompt-cache production, rather than scorer or query, the active boundary.
+- Exact DB518 HLO takes `wk` as an entry `f32[128,6144]` parameter after a separately compiled and
+  completed raw-FP8 -> BF16 -> FP32 adaptation. The integrated HLO instead builds the same-shaped
+  loop-carried operand from an internal dequantization fusion containing FP32 multiply, BF16
+  convert and FP32 convert. Shape/precision checks alone therefore did not reproduce the proven
+  materialization boundary.
+- Next evidence is one bounded DB518-derived one-host discriminator comparing internal raw-FP8
+  materialization and exact LP4 owner scatter against the externally materialized parameter. A
+  second full 8K compile is forbidden until that production repair cache is bitwise exact.
+
+## 2026-08-09 18:16 — bounded weight-source discriminator is commit-approved
+
+- The existing DB518 comparison and protected wrapper now accept one explicit weight source. The
+  historical default remains `materialized_parameter`; the only new arm passes raw FP8 bits/scales
+  into the executable and performs the accepted BF16 round plus FP32 promotion internally.
+- The HLO contract distinguishes an entry FP32 `[128,6144]` parameter from an entry raw-U8
+  `[128,6144]` parameter and requires the latter's exact BF16 weight conversion. Provenance, DB,
+  archive, census and cleanup logic are reused rather than duplicated.
+- Fable's one-time diff audit blocked an initial regex that did not admit TPU layout annotations.
+  The correction accepts tiled layouts, is anchored to the `[128,6144]` weight shape, excludes an
+  unrelated cache cast in its regression, and passes the focused suite. Fable reviewed only that
+  correction and returned `APPROVE COMMIT`; no repeated review is authorized.

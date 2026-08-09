@@ -312,3 +312,9 @@ the rounded split-residual boundary. The recurrent decoder remains the unchanged
 Integration readiness must prove 84 physical M64 calls, exact operands/norm placement, no repair
 collective or host callback, no full-pod history, positive measured HBM headroom, and exact
 tokens/all DSA events before it has Gate-D standing.
+
+The first integrated execution passes those structural gates but fails all 21 exact DSA sets. Its
+HLO shows the large prefill executable internally dequantizing/rounding/promoting `wk`, whereas
+DB518 consumes a completed FP32 materialization as an entry parameter. Reuse the existing DB518
+one-host comparison and protected wrapper for one raw-FP8-inside-executable challenger; do not add
+a second cache oracle or rerun the full decoder until this boundary is bitwise adjudicated.

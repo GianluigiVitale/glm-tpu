@@ -2720,3 +2720,38 @@ HLO currently seeds via the exact top-level branch prefix, guard hypothetical fu
 hoisting, and add a branch-prefix-only synthetic fixture—are below blocker and require no repeated
 review. Exact next is final diff verification, commit/push, authenticated idle-fleet proof and one
 protected retry.
+
+## Integrated repair executes but exact DSA refuses before timing
+
+The protected retry
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_trace2_20260809T154619026858354Z`
+at pushed pin `ff5072e` compiled in the established full-prefill envelope, passed decoder/observer/
+prefill HLO contracts and executed the teacher-forced prefill. The repair contract proves 21 full
+indexers, 84 exact BF16-M64 by FP32-`wk` projections, 168 physical `[64]` square roots, 84+
+physical affines, 189 cache writes, zero grouped square roots, repair collectives, callbacks or
+full-pod history, and 501,043,200 history bytes/device. This closes the preceding linter issue.
+
+The first generated token remains exactly `101252`, but the step-0 device DSA observer refused
+before warmup/timing. All 21 producer events preserve valid score order, ties, lane replication,
+counts and producer identities, yet none preserves the exact selected set: event 0 has four
+expected-only/four observed-only positions, event 1 has nine swaps, and the maximum grows to 571.
+There is no timed distribution, XPlane, DB row, terminal `SUCCESS`, Gate-D or performance standing.
+All eight rank logs are byte-identical; the failure exit is authenticated `CENSUS_OK` on 8/8 hosts.
+
+The failure is narrower than the previous decoder result: repair HLO and execution are proven, and
+the post-scan cache change is causal. Against the preceding qkv-a loop-fix observation, every common
+layer-0 selected score has different FP32 bits even though the recurrent layer-0 query path is
+unchanged. HLO tracing exposes one unproven boundary: exact DB518 receives adapted
+`f32[128,6144] wk` as an executable parameter after a completed raw-FP8 -> BF16 -> FP32
+materialization, whereas the integrated executable fuses raw-FP8 dequantization, BF16 rounding and
+FP32 promotion internally before carrying the result into the same-shaped M64 loop. Exact next:
+reuse the DB518 one-host harness for one bounded internal-versus-materialized `wk`/LP4-scatter
+discriminator. Do not run another full 8K compile until the actual production repair cache is
+bitwise equal to DB518.
+
+The discriminator implementation reuses the DB518 comparator/wrapper and adds only an explicit
+weight-source choice plus a fail-closed entry-parameter/BF16-round HLO contract. Fable's one-time
+diff review caught that the first matcher omitted optimized-HLO layout annotations and would have
+falsely refused the raw-FP8 arm. The matcher is now anchored to layout-tolerant
+`bf16[128,6144]` conversion rather than unrelated cache casts; focused tests pass and Fable's
+narrow blocker-only follow-up returned `APPROVE COMMIT`. Do not re-review this frozen batch.

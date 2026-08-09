@@ -9,6 +9,7 @@ from functools import partial
 from hashlib import sha256
 import json
 from pathlib import Path
+import re
 import subprocess
 import time
 from typing import Any
@@ -99,6 +100,11 @@ def _parse_args() -> argparse.Namespace:
         default="adapted_bf16",
     )
     parser.add_argument(
+        "--projection-weight-source",
+        choices=("materialized_parameter", "raw_fp8_inside_executable"),
+        default="materialized_parameter",
+    )
+    parser.add_argument(
         "--projection-mapping-mode",
         choices=(
             "logical_m2048",
@@ -113,6 +119,63 @@ def _parse_args() -> argparse.Namespace:
         default="prompt_key",
     )
     return parser.parse_args()
+
+
+def _projection_weight_source_contract(
+    optimized_hlo: str,
+    *,
+    source: str,
+) -> dict[str, Any]:
+    """Distinguish DB518's parameter boundary from fused raw-FP8 repair."""
+
+    entry = next(
+        (line for line in optimized_hlo.splitlines() if line.startswith("ENTRY ")),
+        "",
+    )
+    f32_parameter_count = len(re.findall(r"f32\[128,6144\]", entry))
+    raw_fp8_parameter_count = len(re.findall(r"u8\[128,6144\]", entry))
+    bf16_round_count = len(
+        re.findall(
+            r"= bf16\[128,6144\](?:\{[^}\n]*\})? convert\([^\n]+\)"
+            r"[^\n]*op_name=\"[^\"]*convert_element_type",
+            optimized_hlo,
+        )
+    )
+    if source == "materialized_parameter":
+        violations = []
+        if f32_parameter_count != 1:
+            violations.append(
+                "materialized projection must expose one entry FP32 wk parameter"
+            )
+        if raw_fp8_parameter_count:
+            violations.append(
+                "materialized projection must not expose raw FP8 wk at entry"
+            )
+    elif source == "raw_fp8_inside_executable":
+        violations = []
+        if f32_parameter_count:
+            violations.append(
+                "internal projection must not expose an entry FP32 wk parameter"
+            )
+        if raw_fp8_parameter_count != 1:
+            violations.append(
+                "internal projection must expose one raw FP8 wk parameter"
+            )
+        if bf16_round_count < 1:
+            violations.append(
+                "internal projection lost its explicit BF16 adaptation round"
+            )
+    else:
+        raise ValueError(f"unknown projection weight source {source!r}")
+    return {
+        "bf16_round_count": bf16_round_count,
+        "entry": entry,
+        "entry_f32_wk_parameter_count": f32_parameter_count,
+        "entry_raw_fp8_wk_parameter_count": raw_fp8_parameter_count,
+        "passed": not violations,
+        "source": source,
+        "violations": violations,
+    }
 
 
 def main() -> int:
@@ -318,36 +381,109 @@ def main() -> int:
         -1, geometry.prompt_chunk
     )
     initial_cache = put(np.zeros(cache_shape, dtype=ml_dtypes.bfloat16))
-    chunk_suffixes = tuple(
-        (
-            live_block_table,
-            unique_embeddings,
-            put(padded_rows[index]),
-            put(positions[index]),
-            input_norm_weight,
-            wk_fp32,
-            key_norm_weight,
-            key_norm_bias,
+    common_options = {
+        "geometry": geometry,
+        "key_norm_mode": "divide_sqrt",
+        "rotary_mode": "accepted_source",
+        "projection_weight_mode": args.projection_weight_mode,
+        "projection_mapping_mode": args.projection_mapping_mode,
+    }
+    if args.projection_weight_source == "materialized_parameter":
+        chunk_suffixes = tuple(
+            (
+                live_block_table,
+                unique_embeddings,
+                put(padded_rows[index]),
+                put(positions[index]),
+                input_norm_weight,
+                wk_fp32,
+                key_norm_weight,
+                key_norm_bias,
+            )
+            for index in range(padded_rows.shape[0])
         )
-        for index in range(padded_rows.shape[0])
-    )
+        states_function = partial(
+            layer0_prompt_index_key_gather_cache_states_chunk,
+            **common_options,
+        )
+        cache_function = partial(
+            layer0_prompt_index_key_gather_cache_chunk,
+            **common_options,
+        )
+    else:
+        chunk_suffixes = tuple(
+            (
+                live_block_table,
+                unique_embeddings,
+                put(padded_rows[index]),
+                put(positions[index]),
+                input_norm_weight,
+                raw_wk_bits,
+                raw_wk_scale,
+                key_norm_weight,
+                key_norm_bias,
+            )
+            for index in range(padded_rows.shape[0])
+        )
+
+        def adapted_wk(bits: Any, scale: Any) -> Any:
+            return dequantize_fp8_bits_block_weight(
+                bits,
+                scale,
+                output_dtype=jnp.bfloat16,
+            ).astype(jnp.float32)
+
+        def states_function(
+            cache: Any,
+            blocks: Any,
+            embeddings: Any,
+            rows: Any,
+            chunk_positions: Any,
+            norm_weight: Any,
+            bits: Any,
+            scale: Any,
+            key_weight: Any,
+            key_bias: Any,
+        ) -> Any:
+            return layer0_prompt_index_key_gather_cache_states_chunk(
+                cache,
+                blocks,
+                embeddings,
+                rows,
+                chunk_positions,
+                norm_weight,
+                adapted_wk(bits, scale),
+                key_weight,
+                key_bias,
+                **common_options,
+            )
+
+        def cache_function(
+            cache: Any,
+            blocks: Any,
+            embeddings: Any,
+            rows: Any,
+            chunk_positions: Any,
+            norm_weight: Any,
+            bits: Any,
+            scale: Any,
+            key_weight: Any,
+            key_bias: Any,
+        ) -> Any:
+            return layer0_prompt_index_key_gather_cache_chunk(
+                cache,
+                blocks,
+                embeddings,
+                rows,
+                chunk_positions,
+                norm_weight,
+                adapted_wk(bits, scale),
+                key_weight,
+                key_bias,
+                **common_options,
+            )
+
     first_arguments = (initial_cache, *chunk_suffixes[0])
-    states_function = partial(
-        layer0_prompt_index_key_gather_cache_states_chunk,
-        geometry=geometry,
-        key_norm_mode="divide_sqrt",
-        rotary_mode="accepted_source",
-        projection_weight_mode=args.projection_weight_mode,
-        projection_mapping_mode=args.projection_mapping_mode,
-    )
-    cache_function = partial(
-        layer0_prompt_index_key_gather_cache_chunk,
-        geometry=geometry,
-        key_norm_mode="divide_sqrt",
-        rotary_mode="accepted_source",
-        projection_weight_mode=args.projection_weight_mode,
-        projection_mapping_mode=args.projection_mapping_mode,
-    )
     projection_input_function = partial(
         layer0_prompt_normalized_hidden_gather_chunk,
         geometry=geometry,
@@ -433,16 +569,30 @@ def main() -> int:
             projection_input_hlo,
             unique_token_count=int(unique_ids.size),
         )
-    if not state_contract["passed"] or not cache_contract["passed"] or (
-        projection_input_contract is not None
-        and not projection_input_contract["passed"]
+    state_weight_source_contract = _projection_weight_source_contract(
+        state_hlo, source=args.projection_weight_source
+    )
+    cache_weight_source_contract = _projection_weight_source_contract(
+        cache_hlo, source=args.projection_weight_source
+    )
+    if (
+        not state_contract["passed"]
+        or not cache_contract["passed"]
+        or not state_weight_source_contract["passed"]
+        or not cache_weight_source_contract["passed"]
+        or (
+            projection_input_contract is not None
+            and not projection_input_contract["passed"]
+        )
     ):
         (hlo_dir / "contract_failure.json").write_text(
             json.dumps(
                 {
                     "cache": cache_contract,
+                    "cache_weight_source": cache_weight_source_contract,
                     "projection_input": projection_input_contract,
                     "states": state_contract,
+                    "states_weight_source": state_weight_source_contract,
                 },
                 indent=2,
                 sort_keys=True,
@@ -626,6 +776,7 @@ def main() -> int:
                 "filename": cache_hlo_path.relative_to(args.output).as_posix(),
                 "optimized_hlo_sha256": sha256(cache_hlo.encode()).hexdigest(),
                 "sha256": _sha256_file(cache_hlo_path),
+                "weight_source_contract": cache_weight_source_contract,
             },
             "states": {
                 "compile_seconds": states_compile_seconds,
@@ -633,6 +784,7 @@ def main() -> int:
                 "filename": state_hlo_path.relative_to(args.output).as_posix(),
                 "optimized_hlo_sha256": sha256(state_hlo.encode()).hexdigest(),
                 "sha256": _sha256_file(state_hlo_path),
+                "weight_source_contract": state_weight_source_contract,
             },
         },
         "input_manifest_sha256": input_manifest["manifest_sha256"],
@@ -645,6 +797,7 @@ def main() -> int:
         "performance_claim": False,
         "position": args.position,
         "projection_weight_mode": args.projection_weight_mode,
+        "projection_weight_source": args.projection_weight_source,
         "projection_mapping_mode": args.projection_mapping_mode,
         "projection_input_comparison": projection_input_comparison,
         "run_tag": args.run_tag,

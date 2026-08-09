@@ -62,6 +62,7 @@ readonly PROJECTION_PRE_CENSUS_SHA=95dce16ac3a78a3a92462d963a8b182e51cc35d488fc2
 readonly PROJECTION_POST_CENSUS_SHA=7b6d2278094271fe3186e1470a09d5afad65522fcaaf82d475d809729ca8234a
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
+readonly WEIGHT_SOURCE=${GLM_GREENFIELD_PROMPT_KEY_WEIGHT_SOURCE:-materialized_parameter}
 TAG=${GLM_GREENFIELD_PROMPT_KEY_NORM_TAG:-greenfield_layer0_prompt_key_norm_m64_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$TAG
@@ -70,6 +71,11 @@ COMPARISON_DIR=$RUN_DIR/comparison
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" &&
   $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing prompt-key projection probe from wrong branch/worktree" >&2
+  exit 2
+}
+[[ $WEIGHT_SOURCE == materialized_parameter ||
+  $WEIGHT_SOURCE == raw_fp8_inside_executable ]] || {
+  echo "unknown prompt-key weight source: $WEIGHT_SOURCE" >&2
   exit 2
 }
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]] || {
@@ -139,7 +145,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "PIN=$PIN RUN_DIR=$RUN_DIR SOURCE_DB=$SOURCE_RUN_ID/$SOURCE_ITEM_ROW_ID"
+say "PIN=$PIN RUN_DIR=$RUN_DIR SOURCE_DB=$SOURCE_RUN_ID/$SOURCE_ITEM_ROW_ID WEIGHT_SOURCE=$WEIGHT_SOURCE"
 available_bytes=$(df -PB1 /home/gianl | awk 'NR == 2 {print $4}')
 [[ $available_bytes -ge 8000000000 ]] || {
   say "ABORT: worker0 has less than 8 GB free"
@@ -454,6 +460,7 @@ env JAX_PLATFORMS=tpu \
   --oracle-pin "$LEGACY_PIN" \
   --expected-accepted-cache-sha256 "$ACCEPTED_CACHE_SHA" \
   --projection-weight-mode adapted_fp32 \
+  --projection-weight-source "$WEIGHT_SOURCE" \
   --projection-mapping-mode physical_m64_projection_keynorm_lax_map \
   --capture-mode prompt_key_input \
   >"$RUN_DIR/comparison_summary.json"
@@ -466,7 +473,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$SOURCE_COMPARISON_MANIFEST_SHA" "$SOURCE_CAPTURE_MANIFEST_SHA" \
   "$SOURCE_CACHE_MANIFEST_SHA" "$LOWERING_MANIFEST_SHA" \
   "$PROJECTION_RUN_ID" "$PROJECTION_ITEM_ROW_ID" \
-  "$PROJECTION_MANIFEST_SHA" <<'PY'
+  "$PROJECTION_MANIFEST_SHA" "$WEIGHT_SOURCE" <<'PY'
 from __future__ import annotations
 
 import json
@@ -476,7 +483,8 @@ import sys
 
 (run_path, pin, db_path, repo, elapsed, source_run_id, source_item_id,
  source_comparison_sha, capture_sha, cache_sha, lowering_sha,
- projection_run_id, projection_item_id, projection_manifest_sha) = sys.argv[1:]
+ projection_run_id, projection_item_id, projection_manifest_sha,
+ weight_source) = sys.argv[1:]
 root = Path(run_path)
 comparison = json.loads((root / "comparison/comparison.json").read_text())
 if (
@@ -487,6 +495,7 @@ if (
     or comparison["diagnostic_only"] is not True
     or comparison["performance_claim"] is not False
     or comparison["projection_weight_mode"] != "adapted_fp32"
+    or comparison["projection_weight_source"] != weight_source
     or comparison["projection_mapping_mode"]
     != "physical_m64_projection_keynorm_lax_map"
     or comparison["accepted_capture"]["manifest_sha256"] != capture_sha
@@ -495,6 +504,7 @@ if (
     raise SystemExit("physical-M64 key LayerNorm comparison identity failed")
 for name in ("cache", "states"):
     contract = comparison["hlo"][name]["contract"]
+    weight_contract = comparison["hlo"][name]["weight_source_contract"]
     if (
         not contract["passed"]
         or contract["accepted_convolution_count"] != 1
@@ -517,6 +527,8 @@ for name in ("cache", "states"):
         or contract["physical_key_norm"]["grouped_sqrt_count"] != 0
         or contract["physical_key_norm"]["sqrt_count"] < 1
         or contract["physical_key_norm"]["affine_count"] < 1
+        or weight_contract["passed"] is not True
+        or weight_contract["source"] != weight_source
     ):
         raise SystemExit(f"physical-M64 key LayerNorm {name} HLO contract failed")
 projection_input = comparison["projection_input_comparison"]
@@ -551,6 +563,7 @@ run_id = pv.start_run(
             "prompt_index_key_bfloat16_sha256"
         ],
         "projection_weight_mode": "adapted_fp32",
+        "projection_weight_source": weight_source,
         "projection_mapping_mode": (
             "physical_m64_projection_keynorm_lax_map"
         ),
@@ -569,7 +582,7 @@ pv.record_item(
     connection,
     run_id,
     benchmark="greenfield_layer0_prompt_key_norm_association",
-    item_id="adapted_fp32_m64_projection_keynorm_lax_map",
+    item_id=f"adapted_fp32_m64_projection_keynorm_{weight_source}",
     prompt="Sealed DB515 input/cache and DB517 exact projection.",
     gold="Exact producer states at position 113 and exact 8,155-row BF16 cache.",
     raw_output=json.dumps(comparison, sort_keys=True),
@@ -609,6 +622,7 @@ summary = {
     "accepted_projection_lowering_manifest_sha256": lowering_sha,
     "key_norm_association_restored": restored,
     "projection_input_elementwise_exact": True,
+    "projection_weight_source": weight_source,
     "state_elementwise_exact": state_exact,
     "cache_elementwise_exact": cache_exact,
     "candidate_cache_sha256": comparison["greenfield_cache"][
@@ -734,6 +748,7 @@ values = {
     ).lower(),
     "projection_input_elementwise_exact": "true",
     "projection_mapping_mode": "physical_m64_projection_keynorm_lax_map",
+    "projection_weight_source": summary["projection_weight_source"],
     "candidate_cache_sha256": summary["candidate_cache_sha256"],
     "performance_claim": "false",
     "evidence_sha256": sha256(

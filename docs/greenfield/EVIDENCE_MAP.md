@@ -553,3 +553,22 @@ capture is still required.
   producer-to-cache casts, two strict HLO contracts, archive/DB linkage and 8/8 cleanup.
 - Full CPU coverage is 478 passed / 1 skipped. This proves readiness only and does not alter Gate D,
   Gate E, latency or throughput status. The protected serialized capture is the next evidence item.
+
+## DB518 exact prompt cache and integrated-repair refusal
+
+- DB518/item1803 at `8624311` is the accepted bounded arithmetic result: the captured normalized
+  input, all three FP32 producer states and all 8,155 BF16 cache rows are elementwise exact. Cache
+  SHA is `3808d502...859d1`; comparison, DB/archive, direct remote bytes and authenticated 8/8
+  cleanup pass. It is correctness evidence only.
+- Integrated retry
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_trace2_20260809T154619026858354Z`
+  at `ff5072e` passes all HLO contracts and executes prefill. Repair contract SHA is
+  `a076b017...bee0`; prefill HLO gzip is `af72b2d5...d8fa4`; the device DSA observation is
+  `25114ae8...ff0` and failure census is `74637617...2009`.
+- The first token is exact, but all 21 DSA selected sets fail before timing. Event 0 swaps four
+  positions, event 1 swaps nine, and later events reach 571 swaps. There is no DB row, terminal
+  `SUCCESS`, trace or performance standing. Eight rank logs are byte-identical and cleanup is 8/8.
+- HLO provenance differs at one still-unproven boundary: DB518's M64 loop consumes an entry
+  `f32[128,6144] wk` parameter after completed adaptation, while the integrated loop consumes an
+  internally dequantized/rounded/promoted value. One bounded materialization plus LP4-scatter
+  discriminator is required before another full decoder retry.

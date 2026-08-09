@@ -1018,3 +1018,12 @@ accepted-source RoPE spelling keeps the exact DB511 candidate tensor and 45 mism
 time includes compilation/orchestration and has no token loop, warmed wall distribution, XPlane or
 throughput standing. DB484 remains the accepted PP8 decoder result at `244.091151 ms` p50 /
 `4.096830 tok/s`; Gate E remains open.
+
+## Integrated physical-M64 repair DSA refusal — no performance result
+
+The 15:46 UTC protected retry at `ff5072e` spent about two hours compiling and executing the full
+8K prefill, passed the repair/decoder HLO contracts, and produced the exact first token. The strict
+device DSA observer then rejected all 21 full-indexer selected sets before warmup, timed iterations
+or tracing. Compile/prefill elapsed time is not token latency. There is no profiler-free wall rate,
+XPlane, DB row or terminal `SUCCESS`; DB484 remains the only accepted PP8 decoder performance point
+at `244.091151 ms` p50 / `4.096830 tok/s`, and Gate E remains open.
