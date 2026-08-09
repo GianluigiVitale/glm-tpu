@@ -2263,3 +2263,34 @@ validator now permits only that exact complete four-slice provenance and still r
 or unrelated `f32[32,6144]` line. The saved attempt and every protected DB507--DB509 HLO pass
 offline; a dead-row mutation fails; focused CPU tests pass 34/34. Exact next: finish static checks,
 commit/push a clean pin, and rerun only `chunk_gather_bf16_weight` once.
+
+## DB510 restores the gather-coupled 45-value regime; cache-write consumer is next
+
+Protected DB510/item1795,
+`greenfield_layer0_prompt_index_cache_association_20260808T234459065479710Z` at exact pin
+`6286a06341cb1f798c7059490e565e966ba85dc0`, passes the repaired HLO contract and executes the
+gather-coupled candidate. Its 8,155x128 output is byte-identical to DB507's best candidate:
+SHA `52bf55ed...cd8a`, 45 mismatches over 45 positions, first at 113, max/mean
+`0.015625/3.1539646e-8`. All 45 mismatches are in rotary dimensions 0--63; every mismatch affects
+one member of an interleaved pair while the partner and all dimensions 64--127 remain exact.
+
+This proves the gather-coupled input-RMS lowering is causal for eliminating DB508/509's 4,000-value
+drift. HLO `6dba4fbb...9de0` has the one physical gather feeding the matching `[16,1]`/`[16,48]`
+FP32 reduction, one BF16-RHS M2048 convolution, the exact four `wk` feature slices, zero loops and
+no collective/callback/full-prompt/dead-row state. It does not prove RoPE itself is wrong: tiny
+pre-RoPE FP32 differences can be invisible in the directly stored half yet cross BF16 boundaries
+after rotation.
+
+Association manifest `3e29aadc...b0fb`; association/tensor/compressed-HLO/SUCCESS/evidence/
+remote-object/DB-snapshot SHAs are `7d9c12be...e224`, `d896b172...227d`,
+`cd293af3...7290`, `a7660e3e...e165`, `9ed5bdff...5b4f`, `d4663158...5f9e`, and
+`50758ad2...e53`. Direct approved-bucket reads match all critical bytes, SQLite integrity is
+`ok`, and authenticated pre/post censuses are 8/8 clean. This is diagnostic correctness evidence
+only, with no decoder or performance standing.
+
+The remaining source-backed physical delta is the accepted consumer: `compute_indexer_keys`
+returns FP32 keys into the existing flat BF16 paged-cache scatter, whereas this discriminator
+returns a compact BF16 key tensor directly. Exact next: adapt that already-audited cache-write
+interface inside the same bounded harness, using the sealed `[24,16,32,128]` cache and 16-entry
+live block table, require one physical scatter plus all DB510 HLO invariants, and compare once.
+Do not guess at RoPE variants or retry the full decoder first.

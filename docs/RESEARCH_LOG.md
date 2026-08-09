@@ -5832,3 +5832,31 @@ complete four-slice chain sourced from the metadata-identified public `wk_weight
 rejects any extra/unclassified `[32,6144]` line. The saved HLO and all DB507--DB509 optimized HLOs
 pass offline, while an injected dead parameter fails. Focused CPU tests pass 34/34. One clean-pinned
 retry of the same profile is the next evidence-producing action.
+
+## 2026-08-08 23:50 — DB510 proves gather-coupled input RMS causes the near-exact regime
+
+Protected DB510/item1795,
+`greenfield_layer0_prompt_index_cache_association_20260808T234459065479710Z` at `6286a06`,
+executes the intended gather-coupled M2048 program after the exact weight-slice classifier passes.
+The result reproduces DB507 byte-for-byte: output SHA `52bf55ed...cd8a`, 45 BF16 mismatches over
+45 positions, first at 113, max `0.015625`, mean `3.1539646e-8`. This sharply rejects DB508/509's
+external-input reduction lowering as source-faithful and proves the device gather feeding the
+`[16,1]`/`[16,48]` input-RMS reduction is the cause of the 4,000-value improvement.
+
+Every residual mismatch is in dimensions 0--63. Each affects exactly one element of an interleaved
+rotary pair while its partner is bitwise exact; dimensions 64--127 are wholly exact. That pattern
+does not by itself prove different RoPE math: a sub-BF16 pre-RoPE difference can cross a rounding
+boundary only after a rotated linear combination. The source audit identifies a narrower physical
+consumer delta before inventing a math variant. Accepted `compute_indexer_keys` produces FP32 rows
+that are cast by the existing flat write into the paged BF16 cache; DB510 returns compact BF16 rows
+directly. The captured cache is `[24,16,32,128]` with 512-token pages and the sealed 16-entry live
+block table, so this consumer can be isolated without legacy execution or a full-prompt hidden
+tensor.
+
+Optimized/compressed HLO SHAs are `6dba4fbb...9de0` / `cd293af3...7290`; it has one physical
+gather coupled to the input RMS reduction, one BF16-RHS convolution, four provenance-valid `wk`
+feature slices, zero loops and no forbidden operation/state. Manifest `3e29aadc...b0fb`; SUCCESS,
+evidence, remote-object and DB-snapshot SHAs are `a7660e3e...e165`, `9ed5bdff...5b4f`,
+`d4663158...5f9` and `50758ad2...e53`. Critical GCS bytes match, SQLite is `ok`, and pre/post
+censuses are 8/8 clean. DB510 has no decoder/performance claim. The next bounded candidate adds
+only the accepted flat BF16 cache-write consumer and requires its physical scatter before one run.

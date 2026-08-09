@@ -21,7 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, DB505--509, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508 rejects the external-chunk interface; DB509 proves that explicitly reproducing DB507's BF16 convolution RHS still yields DB508's 4,045-mismatch output. Weight precision is rejected as causal; the next discriminator isolates the gather-coupled input-RMS reduction association. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, DB505--510, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves the gather-coupled input-RMS lowering restores DB507 exactly. The next discriminator adapts the accepted flat BF16 paged-cache write consumer before changing RoPE math. |
 | DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -254,3 +254,12 @@ replicas, physical shape `[24,16,32,128]`, and 512-token logical pages. The resu
 the source row, capture/oracle/census hashes, all local cache-file hashes, and byte-identical
 approved-bucket copies of the eight final snapshots. It then runs only the independent one-host
 production comparison; the 753B accepted model load is deliberately not repeated.
+
+DB510 at `6286a06` proves the compiled embedding gather feeding input RMSNorm is causal: it
+reproduces DB507's 45-mismatch output byte-for-byte while retaining a true M2048 chunk, one
+BF16-RHS convolution and no loop/communication/dead row. The remaining 45 values affect one member
+of an interleaved rotary pair, but that does not distinguish RoPE math from sub-BF16 pre-RoPE
+rounding. The already-audited accepted source provides the narrower next interface:
+`compute_indexer_keys` feeds FP32 rows to the flat BF16 paged-cache write. Greenfield will adapt
+only that consumer in the existing protected harness using the sealed cache geometry and block
+table; the legacy function itself remains oracle-only.

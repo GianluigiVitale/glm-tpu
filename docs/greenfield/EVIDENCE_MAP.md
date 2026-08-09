@@ -476,7 +476,7 @@ capture is still required.
 - Readiness: focused tests pass 27/27. No protected cache artifact/comparison exists yet, so this is
   implementation evidence only and proves no arithmetic cause, decoder result, or performance.
 
-## DB505--509 accepted prompt-cache isolation
+## DB505--510 accepted prompt-cache isolation
 
 - Accepted source: DB505/item1788 captures all 32 final slot-0 snapshots. Corrected parsing proves
   `model=32,dcp=1`, four local/32 physical bitwise replicas, `[24,16,32,128]`, 512-token pages and
@@ -508,6 +508,16 @@ capture is still required.
 - DB509 protection: manifest `df0b901e...21c1`, compressed HLO `6e269756...2160`, SUCCESS
   `0bea72ba...9232`, evidence `652da666...1f99`, remote objects `6378c961...7047`, DB snapshot
   `3820af70...88f`, direct approved-bucket byte equality and authenticated 8/8 cleanup pass.
+- DB510/item1795: `...association_20260808T234459065479710Z` at `6286a06` restores the physical
+  device gather as the direct producer of input RMSNorm. It reproduces DB507 exactly:
+  `52bf55ed...cd8a`, 45 values/45 positions, all in rotary dimensions 0--63. Every mismatch affects
+  one member of a pair while its partner and dimensions 64--127 are exact.
+- DB510 structure/protection: HLO `6dba4fbb...9de0` has the coupled gather/reduction, one
+  BF16-RHS M2048 convolution, exact `wk` feature-slice provenance, zero loops and no forbidden
+  operation/state. Manifest `3e29aadc...b0fb`, compressed HLO `cd293af3...7290`, SUCCESS
+  `a7660e3e...e165`, evidence `9ed5bdff...5b4f`, remote objects `d4663158...5f9`, DB snapshot
+  `50758ad2...e53`, direct remote equality and authenticated 8/8 cleanup pass.
 - Decision: diagnostic correctness only. No candidate is exact and no decoder/performance/gate
-  status changes. Next proof isolates DB507's gather-coupled input-RMS reduction association;
-  neither the rejected BF16-weight candidate nor the full decoder should be rerun.
+  status changes. Gather-coupled input RMS is proven causal for the near-exact regime. Next proof
+  isolates the accepted flat BF16 paged-cache write consumer before changing RoPE math; neither a
+  rejected candidate nor the full decoder should be rerun.

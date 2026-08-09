@@ -994,3 +994,11 @@ BF16-RHS convolution but produces the exact DB508 bytes, rejecting weight precis
 pointing next to the gather-coupled input-RMS reduction association. No candidate is exact. DB484
 remains the accepted PP8 decoder result at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains
 open.
+
+## DB510 gather-coupled prompt-cache diagnostic — no performance result
+
+DB510 is another bounded one-host arithmetic comparison, not a decoder benchmark. Its 8-second
+matrix duration includes compile/execute orchestration and has no token loop, steady wall, XPlane,
+or throughput standing. It proves the gather-coupled input-RMS association restores DB507's
+45-value near-exact cache result, but remains nonexact. DB484 therefore remains the accepted PP8
+decoder result at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
