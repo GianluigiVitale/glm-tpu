@@ -6028,3 +6028,20 @@ unmotivated arithmetic variants.
   stops before the second. The protected oracle wrapper can therefore capture exactly one current
   prefill step while a module-filtered XLA dump preserves final `jit_step_fun_impl` HLO. This is the
   next discriminator; no formula/tiling matrix is authorized.
+
+## 2026-08-09 06:27 — current-pin projection-lowering capture is implementation-ready
+
+- The existing protected 8K accepted-oracle launcher now has one default-off diagnostic mode. It
+  preserves the plain accepted `b3c25df47` execution, enables the existing phase profiler for one
+  prefill step, and asks XLA to dump only scheduled `jit_step_fun_impl` modules. Raylet environment
+  propagation is verified on all eight hosts before the request.
+- The independent sealer directly reuses `scripts/analysis/parse_xplane.py`. It requires eight
+  XPlanes, 64 TPU cores, exactly one selected prefill module/core, 21 source-backed line-1122
+  M2048 projection fusions/core, and one uniform scheduled-HLO lowering across all 21 full-indexer
+  layers. It records operand/result layouts, fusion output layout, emitter, megacore and window
+  configuration and fails closed on any ambiguity.
+- Fleet profiles are checksum-verified hard links inside the append-only run directory, avoiding a
+  second local copy while keeping compact evidence alive if fully archived raw source is reclaimed.
+  Focused Bash/ShellCheck/Python and 46 relevant unit/validation tests pass. The standard explicit-
+  CPU suite passes 486 with one expected skip and two existing SWIG warnings in 363.72 seconds. No
+  TPU capture, projection correction, decoder result or performance claim exists yet.

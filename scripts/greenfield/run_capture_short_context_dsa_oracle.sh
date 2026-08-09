@@ -13,6 +13,7 @@ readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
 readonly INTERNAL_MODE=${GLM_GREENFIELD_DSA_INTERNALS_MODE:-scorer}
 readonly INTERNAL_POSITION_OVERRIDE=${GLM_GREENFIELD_DSA_INTERNALS_POSITION:-}
 readonly PROMPT_CACHE_CAPTURE=${GLM_GREENFIELD_PROMPT_CACHE_CAPTURE:-0}
+readonly PREFILL_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE:-0}
 readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
 [[ $INTERNAL_CAPTURE == 0 || $INTERNAL_CAPTURE == 1 ]] || {
   echo "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE must be 0 or 1" >&2
@@ -32,6 +33,10 @@ case "$INTERNAL_MODE" in
 esac
 [[ $PROMPT_CACHE_CAPTURE == 0 || $PROMPT_CACHE_CAPTURE == 1 ]] || {
   echo "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE must be 0 or 1" >&2
+  exit 2
+}
+[[ $PREFILL_PROJECTION_CAPTURE == 0 || $PREFILL_PROJECTION_CAPTURE == 1 ]] || {
+  echo "GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE must be 0 or 1" >&2
   exit 2
 }
 if [[ ! $INTERNAL_LAYER_ID =~ ^[0-9]+$ ]] ||
@@ -143,6 +148,12 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     exit 2
   }
 fi
+if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
+  [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && $PROMPT_CACHE_CAPTURE == 0 ]] || {
+    echo "accepted prefill projection capture requires plain accepted 8K oracle mode" >&2
+    exit 2
+  }
+fi
 readonly INTERNAL_TARGET_POSITION
 readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/$PROFILE/$TOKEN_ORACLE_TAG/oracle
 
@@ -161,6 +172,9 @@ INTERNAL_DUMP_PREFIX=/tmp/$TAG/internals.npz
 PROMPT_CACHE_DUMP_PREFIX=/tmp/$TAG/index_cache.npz
 PROMPT_CACHE_RESULT_DIR=$RUN_DIR/prompt_index_cache
 PROMPT_CACHE_COMPARISON_DIR=$RUN_DIR/prompt_index_cache_comparison
+PREFILL_PROFILE_PREFIX=/tmp/$TAG/prefill_projection_profile
+PREFILL_HLO_PREFIX=/tmp/$TAG/prefill_projection_hlo
+PREFILL_PROJECTION_RESULT_DIR=$RUN_DIR/accepted_prompt_projection_lowering
 if [[ $INTERNAL_MODE == prompt_key_input ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_projection_input_comparison
 elif [[ $INTERNAL_MODE == prompt_key ]]; then
@@ -295,7 +309,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
-say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE"
+say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE PREFILL_PROJECTION_CAPTURE=$PREFILL_PROJECTION_CAPTURE"
 if [[ $PROMPT_CACHE_CAPTURE == 1 && $PROFILE != 8k ]]; then
   say "ABORT: prompt index-cache capture is defined only for the sealed 8K profile"
   exit 2
@@ -352,7 +366,14 @@ fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$INTERNAL_TARGET_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
 fi
-RAYLET_ENVS="$COMMON_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
+PREFILL_PROJECTION_ENVS=
+if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
+  # Keep XLA_FLAGS out of DRIVER_ENVS: quotes introduced by variable expansion
+  # do not protect its spaces. The TPU workers inherit this exact value from
+  # the raylets, which is verified below before the protected request starts.
+  PREFILL_PROJECTION_ENVS=" PHASED_PROFILING_DIR=$PREFILL_PROFILE_PREFIX PHASED_PROFILER_NUM_STEPS_TO_PROFILE_FOR=1 PYTHON_TRACER_LEVEL=0 XLA_FLAGS=\"--xla_dump_to=$PREFILL_HLO_PREFIX --xla_dump_hlo_as_text --xla_dump_hlo_module_re=jit_step_fun_impl\""
+fi
+RAYLET_ENVS="$COMMON_ENVS$PREFILL_PROJECTION_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
 DRIVER_ENVS='NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=1 JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=120000 '"$COMMON_ENVS"
 
 say "launching exact protected legacy runtime"
@@ -381,6 +402,16 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
     --command="$cache_env_check" >"$RUN_DIR/raylet_cache_env.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/raylet_cache_env.txt" CACHE_ENV_OK || {
     say "ABORT: eight-host prompt-cache environment mismatch"
+    exit 1
+  }
+fi
+if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
+  # shellcheck disable=SC2016
+  profile_env_check='p=$(pgrep -x raylet | head -1); f=/tmp/prefill_profile_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PHASED_PROFILING_DIR='"$PREFILL_PROFILE_PREFIX"'" "$f" && grep -qx "PHASED_PROFILER_NUM_STEPS_TO_PROFILE_FOR=1" "$f" && grep -qx "PYTHON_TRACER_LEVEL=0" "$f" && grep -qx "XLA_FLAGS=--xla_dump_to='"$PREFILL_HLO_PREFIX"' --xla_dump_hlo_as_text --xla_dump_hlo_module_re=jit_step_fun_impl" "$f"; then echo "PROFILE_ENV_OK $(hostname)"; else echo "PROFILE_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$profile_env_check" >"$RUN_DIR/raylet_prefill_profile_env.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/raylet_prefill_profile_env.txt" PROFILE_ENV_OK || {
+    say "ABORT: eight-host prefill profile/HLO environment mismatch"
     exit 1
   }
 fi
@@ -467,6 +498,23 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
     exit 1
   }
 fi
+if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
+  # One-step phase profiling writes one XPlane/JSON trace and two composition
+  # records (start and stop) on every host. Binary sharing may leave the
+  # module-filtered optimized HLO on only the compile leader.
+  # shellcheck disable=SC2016
+  profile_integrity='root='"$PREFILL_PROFILE_PREFIX"'; hlo_root='"$PREFILL_HLO_PREFIX"'; xplanes=$(find "$root" -type f -name "*.xplane.pb" 2>/dev/null | wc -l); traces=$(find "$root" -type f -name "*.trace.json.gz" 2>/dev/null | wc -l); stats=$(find "$root" -type f -name "batch_composition_stats_*.json" 2>/dev/null | wc -l); hlo=$(find "$hlo_root" -type f -name "*.txt" -exec grep -l "HloModule jit_step_fun_impl, is_scheduled=true" {} + 2>/dev/null | wc -l); printf "xplanes=%s traces=%s stats=%s hlo=%s\n" "$xplanes" "$traces" "$stats" "$hlo"; if [ "$xplanes" -eq 1 ] && [ "$traces" -eq 1 ] && [ "$stats" -eq 2 ]; then echo "PROFILE_OK $(hostname)"; else echo "PROFILE_BAD $(hostname)"; fi; if [ "$hlo" -ge 1 ]; then echo "HLO_OWNER $(hostname)"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$profile_integrity" >"$RUN_DIR/fleet_prefill_profile_integrity.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/fleet_prefill_profile_integrity.txt" PROFILE_OK || {
+    say "ABORT: accepted one-step prefill profile coverage is incomplete"
+    exit 1
+  }
+  [[ $(grep -c '^HLO_OWNER ' "$RUN_DIR/fleet_prefill_profile_integrity.txt" || true) -ge 1 ]] || {
+    say "ABORT: no accepted scheduled jit_step_fun_impl HLO dump owner exists"
+    exit 1
+  }
+fi
 
 run_id=$(sed -n 's/.*\[longctx\] run_id=\([0-9][0-9]*\).*/\1/p' \
   "$RUN_DIR/legacy.log" | tail -1)
@@ -516,6 +564,22 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
     -name 'index_cache.postfwd.step0004.proc*.npz' | wc -l)
   [[ $prompt_cache_source_count -eq 32 && $prompt_cache_final_count -eq 8 ]] || {
     say "ABORT: prompt-cache source coverage drifted total=$prompt_cache_source_count final=$prompt_cache_final_count"
+    exit 1
+  }
+fi
+prefill_profile_xplane_count=0
+prefill_profile_trace_count=0
+prefill_profile_hlo_count=0
+if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
+  prefill_profile_xplane_count=$(find "$SOURCE_DIR" -type f \
+    -name '*.xplane.pb' | wc -l)
+  prefill_profile_trace_count=$(find "$SOURCE_DIR" -type f \
+    -name '*.trace.json.gz' | wc -l)
+  prefill_profile_hlo_count=$(find "$SOURCE_DIR" -type f -name '*.txt' \
+    -exec grep -l 'HloModule jit_step_fun_impl, is_scheduled=true' {} + | wc -l)
+  [[ $prefill_profile_xplane_count -eq 8 && $prefill_profile_trace_count -eq 8 && \
+     $prefill_profile_hlo_count -ge 1 ]] || {
+    say "ABORT: gathered prefill profile/HLO coverage drifted xplanes=$prefill_profile_xplane_count traces=$prefill_profile_trace_count hlo=$prefill_profile_hlo_count"
     exit 1
   }
 fi
@@ -583,7 +647,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --first-decode-position "$FIRST_DECODE_POSITION" \
   --selected-width 2048 >"$RUN_DIR/capture.json"
 
-if [[ $INTERNAL_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
     "$REFERENCE_8K_DSA_ORACLE" "$ORACLE_DIR" \
     >"$RUN_DIR/dsa_exact_comparison.json" <<'PY'
@@ -628,6 +692,16 @@ PY
 
 stop_owned_runtime
 runtime_started=0
+if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
+  say "sealing accepted M2048 projection XPlane and optimized-HLO association"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/inspect_accepted_prompt_projection_lowering.py" \
+    --trace-root "$SOURCE_DIR" \
+    --output "$PREFILL_PROJECTION_RESULT_DIR" \
+    --expected-code-hash "$PIN" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --run-tag "$TAG" >"$RUN_DIR/accepted_prompt_projection_lowering_summary.json"
+fi
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   prompt_cache_manifest_sha=$(/home/gianl/vllm-env/bin/python -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
@@ -814,7 +888,9 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
   "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" \
   "$INTERNAL_CAPTURE" "$internal_count" "$INTERNAL_COMPARE_LAYER0" \
-  "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" "$INTERNAL_MODE" <<'PY'
+  "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" "$INTERNAL_MODE" \
+  "$PREFILL_PROJECTION_CAPTURE" "$prefill_profile_xplane_count" \
+  "$prefill_profile_trace_count" "$prefill_profile_hlo_count" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -986,6 +1062,34 @@ if sys.argv[11] == "1":
                 prompt_comparison["hlo"]["optimized_hlo_sha256"]
             ),
         })
+if sys.argv[14] == "1":
+    exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
+    lowering_root = root / "accepted_prompt_projection_lowering"
+    lowering = json.loads((lowering_root / "summary.json").read_text())
+    lowering_manifest = json.loads((lowering_root / "manifest.json").read_text())
+    if (
+        not exact_dsa["exact"]
+        or lowering["status"] != "SUCCESS"
+        or lowering["profile"]["file_count"] != 8
+        or lowering["profile"]["core_count"] != 64
+        or lowering["profile"]["steps_per_core"] != 1
+        or lowering["profile"]["invocations_per_core"] != 21
+        or lowering["hlo"]["convolution_count"] != 21
+    ):
+        raise SystemExit("accepted prompt projection lowering evidence drifted")
+    lines.update({
+        "accepted_prompt_projection_capture": "true",
+        "accepted_prompt_projection_diagnostic_only": "true",
+        "accepted_prompt_projection_dsa_event_tensors_exact": "true",
+        "accepted_prompt_projection_emitter": lowering["hlo"]["emitter"],
+        "accepted_prompt_projection_hlo_source_file_count": sys.argv[17],
+        "accepted_prompt_projection_manifest_sha256": lowering_manifest[
+            "manifest_sha256"
+        ],
+        "accepted_prompt_projection_source": lowering["hlo"]["source"],
+        "accepted_prompt_projection_xplane_file_count": sys.argv[15],
+        "accepted_prompt_projection_trace_json_file_count": sys.argv[16],
+    })
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in lines.items())
 )

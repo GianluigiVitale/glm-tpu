@@ -15,7 +15,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Area | Existing source | Greenfield use |
 |---|---|---|
 | Provenance | `bench/provenance.py`, `bench/results.db` | Every protected run links append-only DB rows and a DB snapshot. |
-| Wall/trace truth | `parse_xplane.py`, `extract_steady_decode.py`, and preserved 256K prefill trace | Fresh fleet XPlanes, exact step selection, source/shape attribution, separate profiler-free wall. The old one-host M2048 trace is negative layout evidence only; current accepted proof remains required. |
+| Wall/trace truth | `parse_xplane.py`, `extract_steady_decode.py`, and preserved 256K prefill trace | Fresh fleet XPlanes, exact step selection, source/shape attribution, separate profiler-free wall. The current-pin M2048 capture sealer directly reuses the parser. The old one-host trace is negative layout evidence only. |
 | Fleet safety | E0/resume ownership guards | Lease, exact pin, authenticated census, archive-before-success and clean failure exits in greenfield wrappers. |
 | Quality/long context | `moe-tpu` DSV4 harness and GLM benchmark suite | GLM-specific generation passkey ladder, prompt-length correction, raw output and per-trial provenance. |
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |

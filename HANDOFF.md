@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 04:10 UTC
+**Updated:** 2026-08-09 06:27 UTC
 
 ## Authority and isolation
 
@@ -2530,3 +2530,26 @@ events, state/load integrity, DB/archive linkage and 8/8 cleanup. Extract only s
 window/megacore config and invocation count. Do not try an arithmetic matrix or rerun the full
 greenfield 8K decoder until this source-backed comparison yields a bounded bitwise-exact projection
 correction.
+
+## Current-pin accepted projection-lowering capture is ready
+
+The default-off protected capture required after DB515 is implementation-ready. It runs the plain
+accepted `b3c25df47` 8K oracle, enables the existing phase profiler for exactly one prefill step,
+and uses a module-filtered XLA dump for scheduled `jit_step_fun_impl`. The wrapper verifies the
+profile/HLO environment on all eight raylets before the request, retains exact tokens/all DSA
+events/load/state protections, and requires eight XPlanes plus at least one scheduled-HLO owner.
+
+The independent sealer directly reuses the existing XPlane parser and requires eight unique hosts,
+64 TPU cores, one prefill module/core, exactly 21 line-1122 M2048 projection fusions/core, and a
+uniform physical lowering across all 21 full-indexer layers. It seals input/result/fusion layouts,
+convolution emitter, megacore and window configs. XPlanes/trace JSONs are checksum-verified hard
+links within the append-only run directory, avoiding a second local profile footprint while
+preserving evidence after verified raw-source reclamation. Bash syntax, ShellCheck, Python compile
+and 46 relevant unit/validation tests pass. The standard explicit-CPU suite passes 486 with one
+expected skip and the two existing SWIG warnings in 363.72 seconds. No TPU or arithmetic
+conclusion exists yet.
+
+Exact next: commit/push the clean readiness pin, prove the protected fleet idle, and run exactly
+one serialized `bash scripts/greenfield/run_capture_accepted_prompt_projection_lowering.sh`.
+Compare its current accepted physical association to DB515 before implementing one bounded
+projection correction; do not launch an arithmetic matrix or the full greenfield 8K decoder first.

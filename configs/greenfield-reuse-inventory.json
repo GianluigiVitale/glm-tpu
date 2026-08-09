@@ -34,7 +34,7 @@
       "source_pin": "38d6c96d93ec7e3500a6f8e50b624191bcfe0d1a",
       "source_paths": ["scripts/analysis/parse_xplane.py", "scripts/analysis/extract_steady_decode.py", "/home/gianl/glm-run/xprof256k_20260729T130233Z/prof_sparse/glm-prof/prefill_only/plugins/profile/2026_07_29_16_13_27/t1v-n-6c15e171-w-0.xplane.pb"],
       "disposition": "direct_reuse",
-      "greenfield_consumers": ["scripts/greenfield/run_pipeline_transport_trace.sh", "scripts/greenfield/run_real_one_layer_pp8.sh", "scripts/greenfield/run_short_decoder_compile_pp8.sh"],
+      "greenfield_consumers": ["scripts/greenfield/run_pipeline_transport_trace.sh", "scripts/greenfield/run_real_one_layer_pp8.sh", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "scripts/greenfield/inspect_accepted_prompt_projection_lowering.py"],
       "gate": "A-H",
       "reason": "The parser already attributes TPU operations by source, shape, bytes and FLOPs; the wall extractor already isolates profiler-free steady decode. The preserved legacy-4647a8f one-host M2048 prefill trace records the same visible projection output layout as DB515 and is reused as negative historical evidence, but it cannot replace current accepted eight-host XPlane plus optimized-HLO proof."
     },
