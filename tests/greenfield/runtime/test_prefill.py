@@ -73,6 +73,16 @@ def test_protected_8k_prefill_repair_has_four_chunks_per_layer() -> None:
 def _materialization_hlo() -> str:
     return '''HloModule materialize, num_partitions=32
 
+%raw_copy (nested_bits: u8[128,6144]) -> u8[128,6144] {
+  %nested_bits = u8[128,6144] parameter(0)
+  ROOT %nested_bits_copy = u8[128,6144] copy(%nested_bits)
+}
+
+%scale_copy (nested_scale: f32[1,48]) -> f32[1,48] {
+  %nested_scale = f32[1,48] parameter(0)
+  ROOT %nested_scale_copy = f32[1,48] copy(%nested_scale)
+}
+
 ENTRY %main {
   %bits.0 = u8[128,6144] parameter(0)
   %scale.0 = f32[1,48] parameter(1)
@@ -110,6 +120,13 @@ def test_prefill_wk_materialization_hlo_is_external_and_local() -> None:
     assert accepted["bf16_round_count"] == 2
     assert accepted["fp32_promotion_count"] == 2
     assert accepted["collective_count"] == 0
+
+    # Optimized TPU HLO repeats entry values as parameters of nested fusion
+    # computations.  Only ENTRY parameters describe the executable boundary.
+    assert sum(
+        line.strip().endswith("parameter(0)")
+        for line in _materialization_hlo().splitlines()
+    ) >= 2
 
     no_round = validate_prefill_index_weight_materialization_hlo(
         _materialization_hlo().replace(

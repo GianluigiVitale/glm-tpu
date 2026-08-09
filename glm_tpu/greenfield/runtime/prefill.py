@@ -76,7 +76,8 @@ def validate_prefill_index_weight_materialization_hlo(
 
     def parameter_matches(instruction: Any, dtype: str, tail: tuple[int, ...]) -> bool:
         return (
-            instruction.raw_opcode == "parameter"
+            instruction.computation.startswith("ENTRY ")
+            and instruction.raw_opcode == "parameter"
             and len(instruction.result_shapes) == 1
             and instruction.result_shapes[0].dtype == dtype
             and instruction.result_shapes[0].dimensions[-len(tail) :] == tail

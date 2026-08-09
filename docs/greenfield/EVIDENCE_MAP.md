@@ -603,3 +603,14 @@ capture is still required.
   verifies each lane writes only its 128-row page ownership, and requires the assembled 8,155-row
   cache to match DB518 bitwise. Local focused coverage is 71/71; protected LP4 evidence does not
   exist yet, so another full decoder retry remains forbidden.
+
+## LP4 materializer entry-scope refusal — no arithmetic result
+
+- Attempt `greenfield_layer0_prompt_key_materialized_lp4_20260809T205000Z` at `99ce5ea` compiles
+  the four-chip materializer, proves one BF16 round/FP32 promotion and no communication/callback,
+  then refuses before execution because nested fusion parameters were mistaken for extra entry
+  inputs. HLO gzip SHA is `183f82a8...9a64a`; pre/failure censuses are authenticated 8/8 clean.
+- The exact correction restricts raw/scale parameter counts to parsed `ENTRY ` computations while
+  keeping conversion and forbidden-operation inspection module-wide. Preserved-HLO replay and a
+  nested-fusion regression pass. This is linter evidence only: no DB/SUCCESS, cache comparison,
+  decoder, latency, throughput or Gate-D claim exists.

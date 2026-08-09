@@ -2807,3 +2807,26 @@ reject any non-owner write, and requires all 8,155 assembled rows to equal DB518
 CPU/static coverage passes 71/71. Exact next: finish the affected suite, obtain one Fable review of
 only this new diff, commit/push, then run the bounded LP4 arm. Do not run the full 8K decoder until
 that protected LP4 result is exact.
+
+## First LP4 materializer attempt exposes entry-parameter linter scope
+
+Bounded protected attempt
+`greenfield_layer0_prompt_key_materialized_lp4_20260809T205000Z` at pushed pin `99ce5ea` passed
+the DB515/516/517 source contracts in the DB518-derived harness and authenticated 8/8 pre-census,
+then compiled the
+four-chip stage-local materializer and stopped before executing it. TPU HLO proves one BF16 round,
+one FP32 promotion and zero collective/callback, but the linter counted parameters repeated inside
+nested fusion computations as additional executable inputs: three raw-U8 and two scale parameters
+instead of the single pair in `ENTRY`. There is no repair/cache comparison, DB row, terminal
+`SUCCESS`, decoder, latency or Gate-D standing. Failure cleanup is authenticated 8/8 clean and the
+diagnostics are archived under the approved bucket. Materializer-HLO gzip SHA is
+`183f82a8...9a64a`; pre/failure-census SHAs are `d881b92a...a5276` and
+`25a1d3a1...3c06`.
+
+The narrow correction counts only parameters whose parsed computation begins `ENTRY ` while still
+searching the complete module for BF16/FP32 conversions, collectives and callbacks. Replay of the
+preserved TPU HLO now reports exactly one raw input, one scale input, one BF16 round, one FP32
+promotion and passes. A synthetic nested-fusion regression preserves the same duplicate-parameter
+shape and the focused prefill tests pass 13/13. Exact next: one blocker-only Fable audit of this new
+two-file correction plus evidence notes, commit/push, then one fresh bounded LP4 retry. Do not
+re-review `99ce5ea` and do not launch the full 8K decoder first.

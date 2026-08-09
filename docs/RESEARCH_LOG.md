@@ -6296,3 +6296,18 @@ unmotivated arithmetic variants.
   observable; assembled cache equality, separate HLOs and zero collectives are mandatory. Local
   focused coverage passes 71/71. One new-diff Fable audit and a protected LP4 result are required
   before another full 8K run.
+
+## 2026-08-09 19:20 — LP4 attempt refuses only duplicate nested HLO parameters
+
+- The pushed `99ce5ea` LP4 arm passed all sealed-source and 8/8 pre-census checks and compiled its
+  four-chip materializer. It failed closed before arithmetic because optimized TPU HLO repeats the
+  entry raw weight in two nested fusion parameter lists and the scale in one; the linter counted
+  all computations and observed three raw/two scale parameters instead of the one `ENTRY` pair.
+- Preserved HLO independently reports one BF16 weight round, one FP32 promotion, zero collectives
+  and zero host callbacks. No cache/owner comparison, DB row, `SUCCESS`, decoder or performance
+  result exists. The failure-exit census is 8/8 clean and diagnostics are archived append-only.
+- Parameter identity is now scoped only to parsed `ENTRY ` computations. Conversion and forbidden-
+  operation searches remain module-wide. Preserved-TPU-HLO replay passes with exact 1/1/1/1
+  counts, and a nested-fusion synthetic regression plus the prefill suite pass 13/13.
+- Exact next is a narrow Fable audit of only this correction/evidence note, then commit/push and
+  one fresh bounded LP4 retry. The approved `99ce5ea` batch is not to be re-reviewed.
