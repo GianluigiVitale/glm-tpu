@@ -8,8 +8,11 @@ from typing import Any, Literal
 from ..errors import PlanValidationError
 from ..model.schedule import PipelineSchedule
 from ..sharding.hlo_contract import HloModule, parse_hlo_module
-from .decoder import DecoderStepProgram, validate_decoder_step_hlo
-
+from .decoder import (
+    DecoderStepProgram,
+    _is_prefill_index_repair_op_name,
+    validate_decoder_step_hlo,
+)
 
 PrefillBackendContract = Literal[
     "cpu_reference",
@@ -36,9 +39,6 @@ _FUSED_QKV_LOOP_OP_NAME_SUFFIX = (
 _PREFILL_INDEX_REPAIR_LOOP_OP_NAME_SUFFIX = (
     "/physical_m64_prompt_index_key_chunk/while"
 )
-_PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX = (
-    "jit(execute)/shard_map/cond/branch_"
-)
 _PREFILL_INDEX_REPAIR_CHUNK = 2048
 _PREFILL_INDEX_REPAIR_PHYSICAL_ROWS = 64
 
@@ -47,28 +47,6 @@ def _prefill_index_repair_chunk_count(prompt_length: int) -> int:
     return (
         prompt_length + _PREFILL_INDEX_REPAIR_CHUNK - 1
     ) // _PREFILL_INDEX_REPAIR_CHUNK
-
-
-def _is_prefill_index_repair_op_name(op_name: str | None) -> bool:
-    """Recognize the post-scan repair before and after XLA inlining."""
-
-    if op_name is None:
-        return False
-    if "physical_m64_prompt_index_key_chunk" in op_name or (
-        "repair_stage_local_prompt_index_cache" in op_name
-    ):
-        return True
-    if not op_name.startswith(_PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX):
-        return False
-    branch_and_tail = op_name.removeprefix(
-        _PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX
-    )
-    branch, separator, tail = branch_and_tail.partition("_fun")
-    return bool(
-        separator
-        and branch.isdigit()
-        and (not tail or tail.startswith("/"))
-    )
 
 
 def validate_teacher_forced_prefill_loops(

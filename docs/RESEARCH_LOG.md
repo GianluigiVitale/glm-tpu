@@ -6179,3 +6179,43 @@ unmotivated arithmetic variants.
   No repeat review is authorized for this batch.
 - Exact next is final diff/mechanical verification, commit/push, authenticated idle-fleet proof,
   then exactly one serialized protected 8K PP8 run. No TPU or performance claim exists yet.
+
+## 2026-08-09 15:16 — Protected prefill proves repair HLO and exposes shape-gate scope
+
+- The first integrated protected 8K attempt at `75e4e8f` compiled the complete prefill but stopped
+  before execution on two legacy decoder-wide shape checks. The post-repair SPMD lowering contains
+  560 `f32[32,6144]` slice/custom-call occurrences and a local BF16 `[2048,6144]` chunk, so the old
+  dead-row and decoded-weight-overlay sentinels cannot distinguish them from recurrent tensors.
+- This is not a repair-contract failure. The same optimized HLO proves 84 exact physical
+  BF16 `[64,6144]` by FP32 `[128,6144]` projections, 168 `[64]` square roots, 84 `[64,128]`
+  affines, 189 owner-cache writes, zero grouped `[32,64]` square roots, zero repair collectives,
+  zero forbidden markers, no full-pod prompt history and 501,043,200 bytes/device. It failed before
+  tokens, DSA, cache comparison or timing and has no DB row or SUCCESS. Pre/failure censuses are
+  8/8 clean.
+- The correction follows only computations containing the exact post-scan repair op names and
+  their explicit HLO call-edge descendants. This admits unnamed compiler scaffolding and fusion
+  callees but keeps identical shapes in unrelated computations forbidden. On the preserved TPU
+  HLO it scopes 560 `f32[32,6144]`, 1,624 BF16 `[2048,6144]`, and 3,170 FP32 `[128,6144]`
+  occurrences; the corrected three-file focused suite passes 56/56 on explicit CPU. The complete
+  explicit-CPU suite passes 501 with one expected skip and two pre-existing SWIG warnings in
+  410.89s.
+- A mistakenly under-pinned local test initialized the local TPU and was terminated without being
+  used as evidence; the lock is released. A separate globally forced-32 CPU invocation reached an
+  unrelated test-fixture assumption and is likewise excluded. The valid run explicitly pins CPU
+  without globally altering ordinary device count.
+- Next is static closure and one new-diff-only Fable review. A protected retry is allowed only after
+  approval and a pushed clean pin; all prior arithmetic code remains out of review scope.
+
+## 2026-08-09 15:43 — Fable independently approves repair-scoped shape gate
+
+- The one-time xhigh read-only audit returned `APPROVE COMMIT`. Its artifact replay independently
+  found 1,452 exact repair-scope seed computations and 357 explicit callee descendants, 1,809 of
+  15,736 computations total. ENTRY, the 116K-operation main scan and its 90K-operation nested cond
+  region are outside the set.
+- All 5,354 sensitive occurrences match the Sol counts exactly and are repair-scoped; an empty
+  seed/default-off replay rejects all 5,354. No other forbidden signature is present for the pinned
+  reference-DSA profile. A second affected CPU run passes 24/24 in 115 seconds.
+- Optional no-re-review notes cover documenting the optimized-HLO branch-prefix identity, guarding
+  hypothetical future ENTRY hoisting and adding a branch-prefix-only synthetic fixture. None is a
+  current blocker. Final diff verification, commit/push, idle census and one protected retry are
+  next; no repeated audit of this frozen batch is authorized.

@@ -40,6 +40,171 @@ ENTRY main {
     assert dead["forbidden_shapes"] == ["bf16[32,6144]"]
 
 
+def _repair_scoped_shape_hlo(*, include_unscoped: bool = False) -> str:
+    unrelated = ""
+    if include_unscoped:
+        unrelated = '''
+%unrelated (dead_rows: f32[32,6144], overlay: bf16[2048,6144]) -> bf16[2048,6144] {
+  %dead_rows = f32[32,6144] parameter(0)
+  %overlay = bf16[2048,6144] parameter(1)
+  ROOT %unrelated_root = bf16[2048,6144] copy(%overlay), metadata={op_name="decode/recurrent_overlay"}
+}
+'''
+    return f'''HloModule repair_scope, replica_count=1, num_partitions=32
+
+%repair_weight (wk: f32[128,6144]) -> f32[128,6144] {{
+  %wk = f32[128,6144] parameter(0)
+  ROOT %weight_root = f32[128,6144] copy(%wk)
+}}
+
+%repair (chunk: bf16[2048,6144], rows: f32[32,6144], wk: f32[128,6144]) -> bf16[2048,6144] {{
+  %chunk = bf16[2048,6144] parameter(0)
+  %rows = f32[32,6144] parameter(1)
+  %wk = f32[128,6144] parameter(2)
+  %weight = f32[128,6144] fusion(%wk), kind=kLoop, calls=%repair_weight
+  ROOT %repair_root = bf16[2048,6144] copy(%chunk)
+}}
+{unrelated}
+ENTRY %main (chunk: bf16[2048,6144], rows: f32[32,6144], wk: f32[128,6144]) -> bf16[2048,6144] {{
+  %chunk = bf16[2048,6144] parameter(0)
+  %rows = f32[32,6144] parameter(1)
+  %wk = f32[128,6144] parameter(2)
+  ROOT %repair_call = bf16[2048,6144] fusion(%chunk, %rows, %wk), kind=kLoop, calls=%repair, metadata={{op_name="jit(execute)/shard_map/cond/branch_0_fun/repair_stage_local_prompt_index_cache"}}
+}}
+'''
+
+
+def test_prefill_repair_shape_scope_is_not_a_module_wide_exception() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _classify_decoder_live_tensor_shapes,
+        _validate_pallas_stage_linear_decoder_calls,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    hlo = _repair_scoped_shape_hlo()
+    module = parse_hlo_module(hlo)
+    stage = _validate_pallas_stage_linear_decoder_calls(
+        hlo,
+        layers=0,
+        dense_layers=0,
+        full_indexer_layers=0,
+        dsa_query_backend="reference",
+        prefill_index_repair=True,
+        module=module,
+    )
+    assert stage["passed"], stage
+    assert set(stage["allowed_prefill_index_repair_shape_counts"]) == {
+        "bf16[2048,6144]",
+        "f32[128,6144]",
+    }
+
+    live = _classify_decoder_live_tensor_shapes(
+        module,
+        config=_real_8k_decoder_config(),
+        full_indexer_layers=0,
+        backend_contract="cpu_reference",
+        prefill_index_repair=True,
+    )
+    assert live["passed"], live
+    assert live["allowed_prefill_index_repair_shapes"]
+
+    default_stage = _validate_pallas_stage_linear_decoder_calls(
+        hlo,
+        layers=0,
+        dense_layers=0,
+        full_indexer_layers=0,
+        dsa_query_backend="reference",
+    )
+    assert not default_stage["passed"]
+    assert default_stage["forbidden_decoded_weight_overlays"] == [
+        "bf16[2048,6144]",
+        "f32[128,6144]",
+    ]
+
+    unscoped_hlo = _repair_scoped_shape_hlo(include_unscoped=True)
+    unscoped_module = parse_hlo_module(unscoped_hlo)
+    unscoped_stage = _validate_pallas_stage_linear_decoder_calls(
+        unscoped_hlo,
+        layers=0,
+        dense_layers=0,
+        full_indexer_layers=0,
+        dsa_query_backend="reference",
+        prefill_index_repair=True,
+        module=unscoped_module,
+    )
+    assert not unscoped_stage["passed"]
+    assert unscoped_stage["forbidden_decoded_weight_overlays"] == [
+        "bf16[2048,6144]"
+    ]
+
+    unscoped_live = _classify_decoder_live_tensor_shapes(
+        unscoped_module,
+        config=_real_8k_decoder_config(),
+        full_indexer_layers=0,
+        backend_contract="cpu_reference",
+        prefill_index_repair=True,
+    )
+    assert not unscoped_live["passed"]
+    assert any(
+        item["op_name"] == "decode/recurrent_overlay"
+        or item["computation"].startswith("%unrelated ")
+        for item in unscoped_live["forbidden_shapes"]
+    )
+
+
+def test_fused_qkv_dead_row_gate_scopes_prefill_repair_rows() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_fused_qkv_a_decoder_association,
+    )
+
+    hlo = '''HloModule fused_qkv_repair, num_partitions=32
+
+%repair_rows (rows: f32[32,6144]) -> f32[32,6144] {
+  %rows = f32[32,6144] parameter(0)
+  ROOT %rows_root = f32[32,6144] copy(%rows)
+}
+
+ENTRY %main (hidden: bf16[1,6144], weight: u8[32,6144,82], scale: f32[32,48,82], rows: f32[32,6144]) -> f32[1,82] {
+  %hidden = bf16[1,6144] parameter(0)
+  %weight = u8[32,6144,82] parameter(1)
+  %scale = f32[32,48,82] parameter(2)
+  %rows = f32[32,6144] parameter(3)
+  %repair_call = f32[32,6144] fusion(%rows), kind=kLoop, calls=%repair_rows, metadata={op_name="jit(execute)/shard_map/cond/branch_0_fun/repair_stage_local_prompt_index_cache"}
+  ROOT %qkv = f32[1,82] convolution(%weight, %scale), dim_labels=bf_io->bf
+}
+'''
+    scoped = _validate_fused_qkv_a_decoder_association(
+        hlo,
+        layers=1,
+        prefill_index_repair=True,
+    )
+    assert scoped["passed"], scoped
+    assert scoped["allowed_prefill_index_repair_shape_counts"][
+        "f32[32,6144]"
+    ] > 0
+
+    default = _validate_fused_qkv_a_decoder_association(hlo, layers=1)
+    assert not default["passed"]
+    assert default["forbidden_shapes"] == ["f32[32,6144]"]
+
+    unscoped = hlo.replace(
+        "ENTRY %main",
+        '''%unrelated_rows (rows: f32[32,6144]) -> f32[32,6144] {
+  %rows = f32[32,6144] parameter(0)
+  ROOT %root = f32[32,6144] copy(%rows), metadata={op_name="decode/dead_rows"}
+}
+
+ENTRY %main''',
+    )
+    rejected = _validate_fused_qkv_a_decoder_association(
+        unscoped,
+        layers=1,
+        prefill_index_repair=True,
+    )
+    assert not rejected["passed"]
+    assert rejected["forbidden_shapes"] == ["f32[32,6144]"]
+
+
 def test_fused_qkv_a_runtime_binding_omits_separate_projection_state() -> None:
     from glm_tpu.greenfield.runtime.decoder import _attention_weights
 

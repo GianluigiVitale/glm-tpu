@@ -2673,3 +2673,50 @@ After an authenticated idle-fleet census, launch exactly one serialized protecte
 the accepted split/token/DSA/trace profile and
 `GLM_GREENFIELD_PREFILL_INDEX_REPAIR=1`. Preserve and diagnose any HLO, HBM, token or DSA refusal;
 only a fully protected pass may advance Gate D/E.
+
+## First integrated repair run fails only on linter scope
+
+The serialized protected 8K run
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_trace2_20260809T142231841175528Z`
+at pushed pin `75e4e8f` passed its authenticated 8/8 pre-census and compiled the complete prefill,
+then failed closed before execution because the decoder-wide safety linter classified intentional
+repair tensors as recurrent state: 560 `f32[32,6144]` physical slice records and the local
+`bf16[2048,6144]` prompt chunk. No tokens, DSA comparison, timing, DB row, terminal SUCCESS or
+Gate-D/performance claim exists. The failure-exit census is authenticated 8/8 clean.
+
+The independent repair contract itself passes every physical gate: 21 full-indexer layers, four
+chunks/layer, 84 exact BF16-M64/FP32-weight projections, 168 physical square roots, 84 physical
+affine operations, 189 cache writes, zero grouped square roots, zero collectives, zero forbidden
+markers, no full-pod history and 501,043,200 estimated history bytes/device. Thus the protected
+result supports a linter-scoping defect, not an arithmetic, HBM, token, DSA or latency conclusion.
+Contract/HLO/failure-census SHAs are `c394c81b...9776d`, `c0517774...515c4` and
+`bb0a5592...8335`.
+
+The repair exception is now rooted only in exact repair operation metadata and explicit HLO
+callee edges, covering unnamed TPU SPMD slice/fusion scaffolding without a module-wide shape
+exemption. The preserved physical HLO is accepted for all 560 `f32[32,6144]`, 1,624
+`bf16[2048,6144]` and 3,170 `f32[128,6144]` repair-associated occurrences. Synthetic negative
+tests prove the same shapes in an unrelated computation and the default-off decoder remain
+rejected. Focused runtime/compiler coverage passes 56/56 on explicitly selected CPU in 116.28s;
+the complete explicit-CPU greenfield suite passes 501 with one expected skip and the same two
+pre-existing SWIG warnings in 410.89s.
+
+An earlier local test command omitted `JAX_PLATFORMS=cpu`, initialized the local TPU and was
+interrupted as invalid evidence; the owned process terminated and released the TPU lock. A second
+CPU command incorrectly forced 32 devices globally and exposed an unrelated fixture assumption;
+it is also excluded. Only the explicit-platform, ordinary-device-count pass above is evidence.
+
+Exact next: finish static checks, obtain one Fable xhigh audit of only this new linter-fix diff,
+independently resolve any blocker, commit/push, prove the fleet idle, then run one serialized
+protected 8K retry. Do not re-review the already-cleared arithmetic integration and do not claim
+Gate D before execution, exact tokens/DSA/cache, wall/trace/HBM, DB/archive and cleanup all pass.
+
+Fable's one-time xhigh review returned `APPROVE COMMIT`. Its independent replay found 1,809 of
+15,736 computations in the repair-rooted set (1,452 exact-name seeds plus 357 explicit callees),
+matched all 5,354 admitted sensitive-shape occurrences, proved ENTRY and all 116K main-scan
+operations remain outside the scope, and confirmed flag-off forbids all 5,354. It also reran the
+affected decoder/prefill tests 24/24 on explicit CPU. Three optional notes—document that optimized
+HLO currently seeds via the exact top-level branch prefix, guard hypothetical future ENTRY
+hoisting, and add a branch-prefix-only synthetic fixture—are below blocker and require no repeated
+review. Exact next is final diff verification, commit/push, authenticated idle-fleet proof and one
+protected retry.

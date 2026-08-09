@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from math import prod
-import re
 from typing import Any, NamedTuple
 
 from ..errors import PlanValidationError
@@ -20,6 +20,7 @@ from ..kernels.layer import (
     stage_local_transformer_layer_fp8_mapped,
     stage_local_transformer_layer_fp8_split_mapped,
 )
+from ..kernels.pallas import Fp8BlockMatmulConfig
 from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.linear import vocabulary_logits
@@ -28,7 +29,6 @@ from ..kernels.reference.prefill_index import (
     repair_stage_local_prompt_index_cache,
 )
 from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
-from ..kernels.pallas import Fp8BlockMatmulConfig
 from ..kernels.stage_local import StageLinearBackend
 from ..model.schedule import PipelineSchedule, StageExecution
 from ..model.state import DecoderStateLayout
@@ -53,10 +53,122 @@ from .pipeline import (
     _partition_maps,
 )
 
-
 REFERENCE_FEATURE_OUTPUT_TILE = 128
 PROMOTED_FEATURE_OUTPUT_TILE = 256
 TOKEN_OBSERVATION_CANDIDATES = 16
+_PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX = (
+    "jit(execute)/shard_map/cond/branch_"
+)
+_HLO_CALLEE_PATTERN = re.compile(
+    r"\b(?:body|calls|condition|to_apply)=(%?[^,\s}\]]+)"
+)
+
+
+def _is_prefill_index_repair_op_name(op_name: str | None) -> bool:
+    """Recognize the post-scan repair before and after XLA inlining."""
+
+    if op_name is None:
+        return False
+    if "physical_m64_prompt_index_key_chunk" in op_name or (
+        "repair_stage_local_prompt_index_cache" in op_name
+    ):
+        return True
+    if not op_name.startswith(_PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX):
+        return False
+    branch_and_tail = op_name.removeprefix(
+        _PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX
+    )
+    branch, separator, tail = branch_and_tail.partition("_fun")
+    return bool(
+        separator
+        and branch.isdigit()
+        and (not tail or tail.startswith("/"))
+    )
+
+
+def _hlo_computation_identifier(header: str) -> str:
+    value = header.removeprefix("ENTRY ").split(None, 1)[0]
+    return value.removeprefix("%").split("(", 1)[0]
+
+
+def _prefill_index_repair_computations(module: HloModule) -> set[str]:
+    """Return only computations rooted in exact repair operation metadata.
+
+    TPU SPMD lowering emits unnamed slice/custom-call scaffolding and unnamed
+    fusion callees around otherwise named repair operations.  Following only
+    explicit HLO call edges from computations containing the pinned repair
+    names admits that compiler scaffolding without creating a module-wide
+    shape exception.
+    """
+
+    headers_by_identifier = {
+        _hlo_computation_identifier(instruction.computation): (
+            instruction.computation
+        )
+        for instruction in module.instructions
+    }
+    call_graph: dict[str, set[str]] = {}
+    repair_identifiers: set[str] = set()
+    for instruction in module.instructions:
+        source = _hlo_computation_identifier(instruction.computation)
+        call_graph.setdefault(source, set()).update(
+            match.removeprefix("%")
+            for match in _HLO_CALLEE_PATTERN.findall(instruction.raw_line)
+        )
+        if _is_prefill_index_repair_op_name(instruction.op_name):
+            repair_identifiers.add(source)
+
+    pending = list(repair_identifiers)
+    while pending:
+        source = pending.pop()
+        for target in call_graph.get(source, ()):
+            if target in headers_by_identifier and target not in repair_identifiers:
+                repair_identifiers.add(target)
+                pending.append(target)
+    return {
+        headers_by_identifier[identifier]
+        for identifier in repair_identifiers
+        if identifier in headers_by_identifier
+    }
+
+
+def _classify_scoped_shape_occurrences(
+    module: HloModule,
+    *,
+    forbidden_signatures: set[str],
+    repair_allowed_signatures: set[str],
+    prefill_index_repair: bool,
+) -> tuple[dict[str, int], dict[str, int], int]:
+    """Count forbidden shapes, admitting exact repair-rooted occurrences."""
+
+    repair_computations = (
+        _prefill_index_repair_computations(module)
+        if prefill_index_repair
+        else set()
+    )
+    allowed: Counter[str] = Counter()
+    forbidden: Counter[str] = Counter()
+    for instruction in module.instructions:
+        for shape in instruction.operand_shapes + instruction.result_shapes:
+            signature = (
+                f"{shape.dtype}["
+                + ",".join(str(value) for value in shape.dimensions)
+                + "]"
+            )
+            if signature not in forbidden_signatures:
+                continue
+            if (
+                signature in repair_allowed_signatures
+                and instruction.computation in repair_computations
+            ):
+                allowed[signature] += 1
+            else:
+                forbidden[signature] += 1
+    return (
+        dict(sorted(allowed.items())),
+        dict(sorted(forbidden.items())),
+        len(repair_computations),
+    )
 
 
 class DsaInternalObservation(NamedTuple):
@@ -357,10 +469,12 @@ def _validate_fused_qkv_a_decoder_association(
     *,
     layers: int,
     prefill_index_repair: bool = False,
+    module: HloModule | None = None,
 ) -> dict[str, Any]:
     """Require DB502's physical one-row N82 primitive in every layer."""
 
-    module = parse_hlo_module(optimized_hlo)
+    if module is None:
+        module = parse_hlo_module(optimized_hlo)
     convolutions = [
         instruction
         for instruction in module.instructions
@@ -378,21 +492,25 @@ def _validate_fused_qkv_a_decoder_association(
         "one_row_input": "bf16[1,6144]" in lowered,
         "one_row_convolution": bool(convolutions),
     }
-    forbidden_candidates = [
+    forbidden_candidates = {
         "u8[2048,6144]",
         "u8[576,6144]",
         "f32[16,48]",
         "f32[5,48]",
         "bf16[32,6144]",
         "f32[32,6144]",
-    ]
-    if prefill_index_repair:
-        forbidden_candidates.remove("f32[32,6144]")
-    forbidden_shapes = tuple(
-        shape
-        for shape in forbidden_candidates
-        if shape in lowered
+    }
+    (
+        allowed_repair_shapes,
+        forbidden_shape_counts,
+        repair_computation_count,
+    ) = _classify_scoped_shape_occurrences(
+        module,
+        forbidden_signatures=forbidden_candidates,
+        repair_allowed_signatures={"f32[32,6144]"},
+        prefill_index_repair=prefill_index_repair,
     )
+    forbidden_shapes = tuple(forbidden_shape_counts)
     violations = []
     if len(convolutions) != layers:
         violations.append(
@@ -411,8 +529,10 @@ def _validate_fused_qkv_a_decoder_association(
     return {
         "convolution_count": len(convolutions),
         "expected_convolution_count": layers,
+        "allowed_prefill_index_repair_shape_counts": allowed_repair_shapes,
         "forbidden_shapes": list(forbidden_shapes),
         "prefill_index_repair": prefill_index_repair,
+        "prefill_index_repair_computation_count": repair_computation_count,
         "passed": not violations,
         "required_shapes": required_shapes,
         "violations": violations,
@@ -484,6 +604,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     dsa_query_backend: StageLinearBackend = "pallas",
     attention_projection_backend: AttentionProjectionBackend = "separate",
     prefill_index_repair: bool = False,
+    module: HloModule | None = None,
 ) -> dict[str, Any]:
     """Pin every raw-FP8 attention/dense projection replacing an overlay."""
 
@@ -521,7 +642,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     }
     if dsa_query_backend not in ("reference", "pallas"):
         raise PlanValidationError("DSA query HLO backend is unknown")
-    decoded_shapes = [
+    decoded_dimensions = (
         "2048,6144",
         "4096,2048",
         "576,6144",
@@ -530,36 +651,68 @@ def _validate_pallas_stage_linear_decoder_calls(
         "128,6144",
         "3072,6144",
         "6144,3072",
-    ]
+    )
     if dsa_query_backend != "reference":
-        decoded_shapes.append("1024,2048")
-    if prefill_index_repair:
-        decoded_shapes.remove("128,6144")
-    forbidden_shapes = tuple(
+        decoded_dimensions += ("1024,2048",)
+    forbidden_signatures = {
         f"{dtype}[{shape}]"
         for dtype in ("bf16", "f32")
-        for shape in tuple(decoded_shapes)
-    )
-    forbidden_overlays = [
-        shape for shape in forbidden_shapes if shape in optimized_hlo
-    ]
-    formatted_shapes = [
+        for shape in decoded_dimensions
+    }
+    formatted_dimensions = (
         "2048,6144",
         "4096,2048",
         "6144,4096",
         "7168,512",
         "1024,2048",
         "128,6144",
-    ]
-    if prefill_index_repair:
-        formatted_shapes.remove("128,6144")
-    forbidden_formatted_shapes = tuple(
-        f"f8e4m3fn[{shape}]"
-        for shape in formatted_shapes
     )
-    forbidden_formatted_overlays = [
-        shape for shape in forbidden_formatted_shapes if shape in optimized_hlo
-    ]
+    forbidden_formatted_signatures = {
+        f"f8e4m3fn[{shape}]"
+        for shape in formatted_dimensions
+    }
+    repair_allowed_signatures = {
+        "bf16[2048,6144]",
+        "f32[128,6144]",
+    }
+    if optimized_hlo.lstrip().startswith("HloModule "):
+        if module is None:
+            module = parse_hlo_module(optimized_hlo)
+        (
+            allowed_repair_overlays,
+            forbidden_overlay_counts,
+            repair_computation_count,
+        ) = _classify_scoped_shape_occurrences(
+            module,
+            forbidden_signatures=(
+                forbidden_signatures | forbidden_formatted_signatures
+            ),
+            repair_allowed_signatures=repair_allowed_signatures,
+            prefill_index_repair=prefill_index_repair,
+        )
+        forbidden_overlays = [
+            shape
+            for shape in forbidden_overlay_counts
+            if shape in forbidden_signatures
+        ]
+        forbidden_formatted_overlays = [
+            shape
+            for shape in forbidden_overlay_counts
+            if shape in forbidden_formatted_signatures
+        ]
+    else:
+        # Tiny unit fixtures predate full module parsing. They receive no
+        # repair exception because operation scope cannot be proven.
+        allowed_repair_overlays = {}
+        repair_computation_count = 0
+        forbidden_overlays = sorted(
+            shape for shape in forbidden_signatures if shape in optimized_hlo
+        )
+        forbidden_formatted_overlays = sorted(
+            shape
+            for shape in forbidden_formatted_signatures
+            if shape in optimized_hlo
+        )
     violations = []
     if kernel_counts != expected_kernel_counts:
         violations.append(
@@ -578,7 +731,11 @@ def _validate_pallas_stage_linear_decoder_calls(
         )
     return {
         "attention_projection_backend": attention_projection_backend,
+        "allowed_prefill_index_repair_shape_counts": (
+            allowed_repair_overlays
+        ),
         "prefill_index_repair": prefill_index_repair,
+        "prefill_index_repair_computation_count": repair_computation_count,
         "expected_kernel_counts": expected_kernel_counts,
         "dsa_query_backend": dsa_query_backend,
         "forbidden_decoded_weight_overlays": forbidden_overlays,
@@ -620,6 +777,7 @@ def _classify_decoder_live_tensor_shapes(
     config: DecoderStepConfig,
     full_indexer_layers: int,
     backend_contract: str,
+    prefill_index_repair: bool = False,
 ) -> dict[str, Any]:
     """Separate pinned DSA head scores from forbidden batch/full-pod tensors.
 
@@ -822,6 +980,13 @@ def _classify_decoder_live_tensor_shapes(
             if valid:
                 valid_computations.add(computation)
 
+    repair_computations = (
+        _prefill_index_repair_computations(module)
+        if prefill_index_repair
+        else set()
+    )
+    repair_shape = ("f32", (config.total_devices, config.hidden_size))
+    allowed_prefill_index_repair_shapes = []
     allowed_dsa_score_shapes = []
     forbidden_shapes = []
     hard_forbidden_dimensions = {
@@ -860,6 +1025,11 @@ def _classify_decoder_live_tensor_shapes(
             )
             if is_pinned_dsa_score:
                 allowed_dsa_score_shapes.append(record)
+            elif (
+                shape_key(shape) == repair_shape
+                and instruction.computation in repair_computations
+            ):
+                allowed_prefill_index_repair_shapes.append(record)
             else:
                 forbidden_shapes.append(record)
 
@@ -875,11 +1045,18 @@ def _classify_decoder_live_tensor_shapes(
         )
     return {
         "allowed_dsa_score_shapes": allowed_dsa_score_shapes,
+        "allowed_prefill_index_repair_shapes": (
+            allowed_prefill_index_repair_shapes
+        ),
         "body_records": body_records,
         "expected_score_body_count": expected_body_count,
         "forbidden_shapes": forbidden_shapes,
         "local_context_width": local_context_width,
         "passed": not body_violations and not forbidden_shapes,
+        "prefill_index_repair": prefill_index_repair,
+        "prefill_index_repair_computation_count": len(
+            repair_computations
+        ),
         "score_body_count": len(valid_computations),
         "score_dimensions": list(score_dimensions),
         "violations": body_violations,
@@ -1382,6 +1559,7 @@ def validate_decoder_step_hlo(
         config=config,
         full_indexer_layers=full_layers,
         backend_contract=backend_contract,
+        prefill_index_repair=prefill_index_repair,
     )
     forbidden_shapes = live_tensor_contract["forbidden_shapes"]
     violations.extend(live_tensor_contract["violations"])
@@ -1441,6 +1619,7 @@ def validate_decoder_step_hlo(
                 dsa_query_backend=dsa_query_backend,
                 attention_projection_backend=attention_projection_backend,
                 prefill_index_repair=prefill_index_repair,
+                module=module,
             )
         )
         violations.extend(pallas_stage_linear_contract["violations"])
@@ -1463,6 +1642,7 @@ def validate_decoder_step_hlo(
             optimized_hlo,
             layers=layers,
             prefill_index_repair=prefill_index_repair,
+            module=module,
         )
         violations.extend(fused_qkv_a_contract["violations"])
     return {
