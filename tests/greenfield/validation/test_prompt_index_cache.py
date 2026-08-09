@@ -776,6 +776,63 @@ ENTRY main {
     )
 
 
+def test_prompt_key_m64_lax_map_hlo_pins_physical_projection() -> None:
+    hlo = """
+HloModule cache_write, entry_computation_layout={(bf16[24,16,32,128], s32[16], bf16[37,6144], s32[2048], s32[2048], f32[128,6144])->bf16[24,16,32,128]}
+ENTRY main {
+  %cache = bf16[24,16,32,128]{3,2,1,0} parameter(0)
+  %block_table = s32[16]{0} parameter(1)
+  %unique = bf16[37,6144]{1,0} parameter(2)
+  %rows = s32[2048]{0} parameter(3)
+  %positions = s32[2048]{0} parameter(4)
+  %wk_weight = f32[128,6144]{1,0} parameter(5)
+  %gathered = bf16[2048,6144]{1,0} fusion(%unique, %rows), kind=kCustom, metadata={op_name="jit(probe)/jit(_take)/gather"}
+  %input_rms = f32[2048]{0} fusion(%gathered), kind=kLoop, metadata={op_name="jit(probe)/reduce_sum"}
+  %map_hidden = bf16[64,6144]{1,0} dynamic-slice(%gathered)
+  %projection = f32[64,128]{1,0} convolution(%map_hidden, %wk_weight), dim_labels=bf_oi->bf
+  %mapped = (s32[], f32[32,64,128]{2,1,0}) while(%projection)
+  %projection_full = f32[2048,128]{1,0} reshape(%mapped)
+  %theta = f32[] constant(8e+06)
+  %exponent = f32[] constant(0.015625)
+  %theta_row = f32[32]{0} broadcast(%theta), dimensions={}
+  %exponent_row = f32[32]{0} broadcast(%exponent), dimensions={}
+  %rope_power = f32[32]{0} power(%theta_row, %exponent_row)
+  %angles = f32[2048,32]{1,0} broadcast(%rope_power), dimensions={1}
+  %rope_cos = f32[2048,32]{1,0} cosine(%angles)
+  %rope_sin = f32[2048,32]{1,0} sine(%angles)
+  %root = f32[1]{0} sqrt(%projection_full)
+  %keys_f32 = f32[2048,128]{1,0} divide(%projection_full, %root)
+  %stored = bf16[2048,128]{1,0} convert(%keys_f32)
+  %flat = bf16[12288,128]{1,0} reshape(%cache)
+  %slots = s32[2048]{0} gather(%block_table, %positions)
+  %written = bf16[12288,128]{1,0} scatter(%flat, %slots, %stored)
+  ROOT %result = bf16[24,16,32,128]{3,2,1,0} reshape(%written)
+}
+"""
+    candidate = (
+        "accepted_xla_m64_lax_map_gather_cache_write_fp32_weight_"
+        "divide_sqrt_source_rope"
+    )
+    result = validate_prompt_index_key_association_hlo(
+        hlo,
+        candidate=candidate,
+    )
+    assert result["passed"] is True
+    assert result["accepted_convolution_count"] == 1
+    assert result["convolution_weight_f32"] is True
+    assert result["loop_count"] == 1
+    assert result["required_shapes"]["physical_m64_projection"] is True
+
+    missing_map = validate_prompt_index_key_association_hlo(
+        hlo.replace(" while(%projection)", " copy(%projection)"),
+        candidate=candidate,
+    )
+    assert missing_map["passed"] is False
+    assert "expected 1 projection-map loops, found 0" in (
+        missing_map["violations"]
+    )
+
+
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
     repo = Path(__file__).resolve().parents[3]
     probe = repo / "scripts/greenfield/probe_layer0_prompt_index_cache.py"
@@ -1018,14 +1075,19 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
         assert forbidden not in comparator_source
         assert forbidden not in projection_wrapper_source
     for required in (
-        "SOURCE_RUN_ID=513",
-        "SOURCE_ITEM_ROW_ID=1798",
-        "SOURCE_COMPARISON_MANIFEST_SHA=605eeac2",
-        "SOURCE_CAPTURE_MANIFEST_SHA=dd361437",
-        "SOURCE_CACHE_MANIFEST_SHA=b30ddc72",
+        "SOURCE_RUN_ID=515",
+        "SOURCE_ITEM_ROW_ID=1800",
+        "SOURCE_COMPARISON_MANIFEST_SHA=df048dd7",
+        "SOURCE_CAPTURE_MANIFEST_SHA=64320e97",
+        "SOURCE_CACHE_MANIFEST_SHA=acc631e7",
+        "LOWERING_MANIFEST_SHA=d9b492ee",
         "--accepted-capture-dir",
         "--projection-weight-mode adapted_fp32",
+        "--projection-mapping-mode physical_m64_lax_map",
+        "--capture-mode prompt_key_input",
+        "physical_m64_projection",
         "convolution_weight_f32",
+        "google_crc32c",
         "strict_census post",
         '"performance_claim": "false"',
         "results_ckpt.db",

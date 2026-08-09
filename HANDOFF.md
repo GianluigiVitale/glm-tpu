@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 06:27 UTC
+**Updated:** 2026-08-09 11:21 UTC
 
 ## Authority and isolation
 
@@ -2553,3 +2553,32 @@ Exact next: commit/push the clean readiness pin, prove the protected fleet idle,
 one serialized `bash scripts/greenfield/run_capture_accepted_prompt_projection_lowering.sh`.
 Compare its current accepted physical association to DB515 before implementing one bounded
 projection correction; do not launch an arithmetic matrix or the full greenfield 8K decoder first.
+
+## DB516 seals physical M64; one M64 projection discriminator is ready
+
+Protected DB516/item1801 completed the accepted 8K oracle at capture pin `643d092`: exact passkey
+`881446`/raw tokens, 483 DSA dumps, 1,882/0 load checks, 2,455 state leaves and eight one-step
+XPlanes all passed. The original wrapper was interrupted only while gathering an overbroad XLA
+dump and made no terminal claim. Recovery artifact
+`greenfield_accepted_prompt_projection_lowering_recovery_20260809T105858202006975Z` at sealer
+pin `4786e26` terminally seals the completed run without reloading the model.
+
+All 64 TPU cores observe exactly 21 source-line-1122 projection fusions. Final physical HLO is not
+M2048: each of 32 partitions owns BF16 lhs `[64,6144]`, FP32 rhs `[128,6144]` and FP32 result
+`[64,128]`, using `EmitAllBatchInSublanes`; the logical 2,048 rows are 32 physical M64 shards.
+The lowering manifest is `d9b492ee...fba6`, DSA event tensors are exact, the exact target HLO is
+archived from all eight hosts, and local/remote CRC32C, DB snapshot, terminal SUCCESS and
+authenticated pre/post 8/8 censuses pass. After sealing, 27,195 interrupted raw HLO files /
+10,512,245,600 path-bytes were inventoried and reclaimed locally; the selected HLO remains in
+eight remote source objects and the compressed sealed artifact. The exact remote `/tmp` source tag
+was then removed on 8/8 hosts.
+
+The next default-off discriminator reuses DB515's bitwise-exact normalized input and accepted
+producer/cache plus DB516's physical contract. It maps one 2,048-row prefill chunk as 32 explicit
+64-row projections with `lax.map`, changes no decode path, and requires one physical M64
+convolution, one bounded projection-map loop, exact projection input, exact three producer states
+and exact 8,155-row BF16 cache. Local semantic, HLO-linter, Bash, ShellCheck and compilation checks
+pass. Exact next: finish the explicit-CPU batch, obtain one diff-only Fable commit-readiness
+verdict, commit/push, prove the fleet idle, then run exactly one serialized
+`bash scripts/greenfield/run_prompt_key_projection_association_probe.sh`. Do not retry the full 8K
+decoder unless this bounded result is bitwise exact.

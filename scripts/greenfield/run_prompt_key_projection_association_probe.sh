@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Protected one-host discriminator for the accepted FP32 prompt-key projection.
+# Protected one-host discriminator for the accepted physical-M64 projection.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -11,37 +11,45 @@ readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly LEGACY_REPO=/home/gianl/tpu-inference
 readonly LEGACY_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly OBSERVER_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
-readonly OBSERVER_PIN=9c1d6b3b950d5c5dd45bdf885058202517097eba
-readonly SOURCE_TAG=greenfield_legacy_layer0_prompt_key_internals_p113_20260809T024848198817596Z
+readonly OBSERVER_PIN=89fc453b6116ac3df71e666db6f4659775b313c3
+readonly SOURCE_TAG=greenfield_legacy_layer0_prompt_projection_input_p113_20260809T050055956585082Z
 readonly SOURCE_DIR=/home/gianl/glm-run/$SOURCE_TAG
-readonly SOURCE_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_internals/8k/$SOURCE_TAG
-readonly SOURCE_GREENFIELD_PIN=00404a0cb6ce18c71816cc47e16ddbaa5f1a5fa6
+readonly SOURCE_COMPARISON_DIR=$SOURCE_DIR/prompt_projection_input_comparison
+readonly SOURCE_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_projection_input/8k/$SOURCE_TAG
+readonly SOURCE_GREENFIELD_PIN=b8e30ed41e46816461c7e956e4dd7bc85e96d998
 readonly SOURCE_HARNESS_PIN=a4a17ac4e90b15f1994bd8b26917ef62daa52660
-readonly SOURCE_RUN_ID=513
-readonly SOURCE_ITEM_ROW_ID=1798
-readonly SOURCE_SUCCESS_SHA=28b3c64e643648257b2d055f6490fc7dbdbf2742bfdf91e2ec48003ee0a4a0f5
-readonly SOURCE_REMOTE_OBJECTS_SHA=d4345f53874e85eadae0d63cc86784143a636dafdd135f08dc7b09fd35a828e3
-readonly SOURCE_DB_SHA=a56f3a2f921b5e15831377e230b94d772f8fe0367d526e08c50f173b2bac8f77
-readonly SOURCE_COMPARISON_FILE_SHA=ef20dea7d952a45f0a836c2bc6e5fb21bd62ee3d4d3b8d21680ff9464b8f4e42
-readonly SOURCE_COMPARISON_MANIFEST_SHA=605eeac29ff4278ce4077a194d633d7f9b28c1ed36d94347cefc7920f1b2a04c
-readonly SOURCE_CAPTURE_FILE_SHA=6cd64adc8fcc0a6d3dc7bba01bddfb44a852bb08fa7dd44703a12c16e8721159
-readonly SOURCE_CAPTURE_TENSOR_SHA=db26efc4a0e5de70f13751dd281908dd25f1eca3d7912a9c7f91cfa7fa45bb64
-readonly SOURCE_CAPTURE_MANIFEST_SHA=dd36143747165828c5136ab0948cf87c0fb62a382efbbe231fa6f992f538591f
-readonly SOURCE_CACHE_MANIFEST_FILE_SHA=51767ac2ee068811a6a1a8db849d2feb30c9b177aade9a9e007c9ea0c8bbae59
-readonly SOURCE_CACHE_TENSOR_SHA=bb5dd2a91c0a30f2c0e460737d5ce680c1e638f6974511e24be0bf05a1d970eb
-readonly SOURCE_CACHE_MANIFEST_SHA=b30ddc72481c7e6ece470a8fbb7d0788b5c3ea15cd4c2357fe6f4eec4e7aa0e3
+readonly SOURCE_RUN_ID=515
+readonly SOURCE_ITEM_ROW_ID=1800
+readonly SOURCE_SUCCESS_SHA=048528e3a985807e672305682fd128ef3972676865cc1108085a8175620cad79
+readonly SOURCE_REMOTE_OBJECTS_SHA=06c0b778bbad3eb29045a73d64b5cdf53868ce464d0c5cfd7a192940666a5b6d
+readonly SOURCE_DB_SHA=43fdf1215c8c6981d9430b25d34137b2bafa6c61e4b3a668ffc962c9d0ac01c0
+readonly SOURCE_COMPARISON_FILE_SHA=bf7b49ab57d69470aa3dd253b41df281479600f1319a6e70b5561f974448a0e3
+readonly SOURCE_COMPARISON_MANIFEST_SHA=df048dd7d266c7a393b5efe0835c511665edfadc21521a68f4bb3be7f6b6f258
+readonly SOURCE_CAPTURE_FILE_SHA=b54330ff83726d05aff76767da83bf61f3c9f8046637c811e7c8679d56d2aebb
+readonly SOURCE_CAPTURE_TENSOR_SHA=753e63d947aa94673389117f94bf4c19cc049fa06f6b95f8d50c977d659f8f2d
+readonly SOURCE_CAPTURE_MANIFEST_SHA=64320e979288fa524c495d0436dc6bcf1a908c8b68d976eb014e207866312ef9
+readonly SOURCE_CACHE_MANIFEST_FILE_SHA=372d0ad2503860b6fb826045de7d24ca0f22438b8e945af2515e1c8cf3d69c94
+readonly SOURCE_CACHE_TENSOR_SHA=36303f0638661b4a56d3c9a1d4023a9b39eb19dbfd6d48e0718c29a45c41c07a
+readonly SOURCE_CACHE_MANIFEST_SHA=acc631e71148922448eb03c839f71544c80ca00cea47b639bdd80eb34567fdab
 readonly ACCEPTED_CACHE_SHA=3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1
 readonly SEALED_BF16_CACHE_SHA=52bf55ed5e9ea74a59551351a21ae830fb39e289e82eaff636fb9ab84d7dcd8a
-readonly SOURCE_PRE_CENSUS_SHA=b6e799daaeaeefd02eae09d09690a5cbe1b656dcc632584e224a4e0d261e5b35
-readonly SOURCE_POST_CENSUS_SHA=8fb4dc96debeb1eb4bb526aafd893c45669cf773ca3b075f9927ded3635f5659
+readonly SOURCE_PRE_CENSUS_SHA=d3f0f70f84d09109f0745a042b3da5a3dfff39969d054452a2bbe78b5e6a6eb7
+readonly SOURCE_POST_CENSUS_SHA=2787e4ffd1058910c2e85cfd1470ebc6f4d44f9a22f4468551c4c3868aa408ba
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
+readonly LOWERING_TAG=greenfield_accepted_prompt_projection_lowering_recovery_20260809T105858202006975Z
+readonly LOWERING_DIR=/home/gianl/glm-run/$LOWERING_TAG
+readonly LOWERING_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_projection_lowering/8k/$LOWERING_TAG
+readonly LOWERING_SUCCESS_SHA=6502bbffb880549011fc43bf106d3f3b36b3fa8df3059dd4fcfaa04d8e7353d8
+readonly LOWERING_SUMMARY_SHA=8b8356b12885cd444a6c39cd8edfa36b3b98ef276c04c42791e8d99250415aa8
+readonly LOWERING_MANIFEST_FILE_SHA=222b91d62e422cef8fe9f574bf044567600ba876f577de069f6467d5a56df247
+readonly LOWERING_MANIFEST_SHA=d9b492ee2296deaf9c8acea67f62897809cc283d354a0802d1c26023faeefba6
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_PROMPT_KEY_PROJECTION_TAG:-greenfield_layer0_prompt_key_projection_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_PROMPT_KEY_PROJECTION_TAG:-greenfield_layer0_prompt_key_projection_m64_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
-REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_projection_association/8k/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_projection_m64/8k/$TAG
 COMPARISON_DIR=$RUN_DIR/comparison
 
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" &&
@@ -63,7 +71,8 @@ COMPARISON_DIR=$RUN_DIR/comparison
   echo "accepted observer checkout drifted" >&2
   exit 2
 }
-[[ -r $RESULTS_DB && -d $SOURCE_DIR && -d $INPUT_DIR && ! -e $RUN_DIR ]] || {
+[[ -r $RESULTS_DB && -d $SOURCE_DIR && -d $INPUT_DIR && -d $LOWERING_DIR &&
+  ! -e $RUN_DIR ]] || {
   echo "projection source/DB missing or append-only path exists" >&2
   exit 2
 }
@@ -131,14 +140,17 @@ for contract in \
   "$SOURCE_SUCCESS_SHA $SOURCE_DIR/SUCCESS" \
   "$SOURCE_REMOTE_OBJECTS_SHA $SOURCE_DIR/remote_objects.json" \
   "$SOURCE_DB_SHA $SOURCE_DIR/results_ckpt.db" \
-  "$SOURCE_COMPARISON_FILE_SHA $SOURCE_DIR/prompt_key_comparison/comparison.json" \
-  "$SOURCE_CAPTURE_FILE_SHA $SOURCE_DIR/prompt_key_comparison/accepted_capture/capture.json" \
-  "$SOURCE_CAPTURE_TENSOR_SHA $SOURCE_DIR/prompt_key_comparison/accepted_capture/accepted_prompt_key_states.npz" \
+  "$SOURCE_COMPARISON_FILE_SHA $SOURCE_COMPARISON_DIR/comparison.json" \
+  "$SOURCE_CAPTURE_FILE_SHA $SOURCE_COMPARISON_DIR/accepted_capture/capture.json" \
+  "$SOURCE_CAPTURE_TENSOR_SHA $SOURCE_COMPARISON_DIR/accepted_capture/accepted_prompt_key_states.npz" \
   "$SOURCE_CACHE_MANIFEST_FILE_SHA $SOURCE_DIR/prompt_index_cache/manifest.json" \
   "$SOURCE_CACHE_TENSOR_SHA $SOURCE_DIR/prompt_index_cache/prompt_index_cache.safetensors" \
   "$SOURCE_PRE_CENSUS_SHA $SOURCE_DIR/census_pre.txt" \
   "$SOURCE_POST_CENSUS_SHA $SOURCE_DIR/census_post.txt" \
-  "$INPUT_MANIFEST_FILE_SHA $INPUT_DIR/manifest.json"; do
+  "$INPUT_MANIFEST_FILE_SHA $INPUT_DIR/manifest.json" \
+  "$LOWERING_SUCCESS_SHA $LOWERING_DIR/SUCCESS" \
+  "$LOWERING_SUMMARY_SHA $LOWERING_DIR/accepted_prompt_projection_lowering/summary.json" \
+  "$LOWERING_MANIFEST_FILE_SHA $LOWERING_DIR/accepted_prompt_projection_lowering/manifest.json"; do
   expected=${contract%% *}
   path=${contract#* }
   [[ $(sha256sum "$path" | awk '{print $1}') == "$expected" ]] || {
@@ -151,9 +163,54 @@ has_eight_unique_markers "$SOURCE_DIR/census_post.txt" CENSUS_OK || exit 2
 remote_source_success_sha=$(gcloud storage cat \
   "$SOURCE_REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
 [[ $remote_source_success_sha == "$SOURCE_SUCCESS_SHA" ]] || {
-  say "ABORT: approved DB513 SUCCESS drifted"
+  say "ABORT: approved DB515 SUCCESS drifted"
   exit 2
 }
+remote_lowering_success_sha=$(gcloud storage cat \
+  "$LOWERING_REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
+[[ $remote_lowering_success_sha == "$LOWERING_SUCCESS_SHA" ]] || {
+  say "ABORT: approved DB516 lowering SUCCESS drifted"
+  exit 2
+}
+
+/home/gianl/vllm-env/bin/python - "$LOWERING_DIR" \
+  "$LOWERING_MANIFEST_SHA" >"$RUN_DIR/lowering_validation.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+expected_manifest = sys.argv[2]
+summary = json.loads(
+    (root / "accepted_prompt_projection_lowering/summary.json").read_text()
+)
+manifest = json.loads(
+    (root / "accepted_prompt_projection_lowering/manifest.json").read_text()
+)
+if (
+    manifest.get("manifest_sha256") != expected_manifest
+    or summary.get("status") != "SUCCESS"
+    or summary.get("source_capture_code_hash")
+    != "643d0926030c092ee3742e9bfe3b5c8d2511bed4"
+    or summary["shape_association"] != {
+        "logical_row_count": 2048,
+        "physical_hlo_result": "f32[64,128]",
+        "physical_row_count": 64,
+        "physical_row_shards": 32,
+        "profile_physical_result": "f32[64,128]",
+    }
+    or summary["hlo"]["convolution_count"] != 21
+    or summary["hlo"]["emitter"] != "EmitAllBatchInSublanes"
+    or summary["profile"]["core_count"] != 64
+):
+    raise SystemExit("DB516 physical-M64 lowering identity drifted")
+print(json.dumps({
+    "status": "SUCCESS",
+    "manifest_sha256": manifest["manifest_sha256"],
+    "shape_association": summary["shape_association"],
+    "emitter": summary["hlo"]["emitter"],
+}, indent=2, sort_keys=True))
+PY
 
 /home/gianl/vllm-env/bin/python - \
   "$RESULTS_DB" "$SOURCE_DIR" "$RUN_DIR/source_validation.json" \
@@ -173,7 +230,7 @@ import sys
 run_id, item_id = int(run_id), int(item_id)
 connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-    raise SystemExit("DB513 source DB integrity failed")
+    raise SystemExit("DB515 source DB integrity failed")
 run = connection.execute(
     "SELECT model,harness_git,fork_git,env_json,pod,note FROM runs WHERE run_id=?",
     (run_id,),
@@ -185,7 +242,7 @@ item = connection.execute(
 if run is None or item != (
     item_id, "passkey_L8192_d0.5", "t0", 1, 1.0, 8155, 20,
 ):
-    raise SystemExit("DB513 source row drifted")
+    raise SystemExit("DB515 source row drifted")
 model, harness, fork, env_json, pod, note = run
 env = json.loads(env_json)
 if (
@@ -194,11 +251,11 @@ if (
     or len(fork) < 7
     or not oracle_pin.startswith(fork)
     or pod != "db-v4-64-od"
-    or "prompt_key_internals" not in note
+    or "prompt_projection_input" not in note
     or env["os_env"].get("GLM_DSA_DUMP_INTERNALS_CODE_HASH") != observer_pin
     or env["os_env"].get("GLM_DSA_DUMP_INTERNALS_ORACLE_PIN") != oracle_pin
 ):
-    raise SystemExit("DB513 source provenance drifted")
+    raise SystemExit("DB515 source provenance drifted")
 root = Path(source_path)
 success = dict(
     line.split("=", 1)
@@ -206,10 +263,10 @@ success = dict(
     if "=" in line
 )
 comparison = json.loads(
-    (root / "prompt_key_comparison/comparison.json").read_text()
+    (root / "prompt_projection_input_comparison/comparison.json").read_text()
 )
 capture = json.loads(
-    (root / "prompt_key_comparison/accepted_capture/capture.json").read_text()
+    (root / "prompt_projection_input_comparison/accepted_capture/capture.json").read_text()
 )
 cache = json.loads((root / "prompt_index_cache/manifest.json").read_text())
 if (
@@ -219,19 +276,23 @@ if (
     or success.get("source_item_row_id") != str(item_id)
     or comparison.get("manifest_sha256") != comparison_sha
     or comparison.get("conclusion") != {
-        "classification": "projection_association",
+        "classification": "projection_lowering_association",
         "first_divergent_field": "pre_layer_norm_key",
     }
     or comparison["cache_comparison"]["mismatch_count"] != 45
     or comparison["cache_comparison"]["observed_bfloat16_sha256"]
     != candidate_cache_sha
+    or comparison.get("projection_input_comparison", {}).get(
+        "elementwise_exact"
+    ) is not True
     or capture.get("manifest_sha256") != capture_sha
+    or capture.get("capture_mode") != "prompt_key_input"
     or capture.get("oracle_pin") != oracle_pin
     or capture.get("legacy_code_hash") != observer_pin
     or cache.get("manifest_sha256") != cache_manifest_sha
     or cache.get("prompt_index_key_bfloat16_sha256") != accepted_cache_sha
 ):
-    raise SystemExit("DB513 compact source artifact drifted")
+    raise SystemExit("DB515 compact source artifact drifted")
 Path(output_path).write_text(json.dumps({
     "status": "SUCCESS",
     "source_run_id": run_id,
@@ -246,7 +307,7 @@ Path(output_path).write_text(json.dumps({
 connection.close()
 PY
 
-say "running source-faithful FP32 projection on one four-chip TPU host"
+say "running physical-M64 FP32 projection on one four-chip TPU host"
 started=$(date +%s)
 env JAX_PLATFORMS=tpu \
   TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
@@ -256,7 +317,7 @@ env JAX_PLATFORMS=tpu \
   timeout --signal=TERM --kill-after=60 1800 \
   /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/compare_accepted_prompt_key_internals.py" \
-  --accepted-capture-dir "$SOURCE_DIR/prompt_key_comparison/accepted_capture" \
+  --accepted-capture-dir "$SOURCE_COMPARISON_DIR/accepted_capture" \
   --accepted-capture-manifest-sha256 "$SOURCE_CAPTURE_MANIFEST_SHA" \
   --input-dir "$INPUT_DIR" \
   --input-manifest-sha256 "$INPUT_MANIFEST_SHA" \
@@ -270,6 +331,8 @@ env JAX_PLATFORMS=tpu \
   --oracle-pin "$LEGACY_PIN" \
   --expected-accepted-cache-sha256 "$ACCEPTED_CACHE_SHA" \
   --projection-weight-mode adapted_fp32 \
+  --projection-mapping-mode physical_m64_lax_map \
+  --capture-mode prompt_key_input \
   >"$RUN_DIR/comparison_summary.json"
 elapsed=$(( $(date +%s) - started ))
 say "projection discriminator completed in ${elapsed}s"
@@ -278,7 +341,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" \
   "$SOURCE_RUN_ID" "$SOURCE_ITEM_ROW_ID" \
   "$SOURCE_COMPARISON_MANIFEST_SHA" "$SOURCE_CAPTURE_MANIFEST_SHA" \
-  "$SOURCE_CACHE_MANIFEST_SHA" <<'PY'
+  "$SOURCE_CACHE_MANIFEST_SHA" "$LOWERING_MANIFEST_SHA" <<'PY'
 from __future__ import annotations
 
 import json
@@ -287,7 +350,7 @@ import sqlite3
 import sys
 
 (run_path, pin, db_path, repo, elapsed, source_run_id, source_item_id,
- source_comparison_sha, capture_sha, cache_sha) = sys.argv[1:]
+ source_comparison_sha, capture_sha, cache_sha, lowering_sha) = sys.argv[1:]
 root = Path(run_path)
 comparison = json.loads((root / "comparison/comparison.json").read_text())
 if (
@@ -298,14 +361,16 @@ if (
     or comparison["diagnostic_only"] is not True
     or comparison["performance_claim"] is not False
     or comparison["projection_weight_mode"] != "adapted_fp32"
+    or comparison["projection_mapping_mode"] != "physical_m64_lax_map"
     or comparison["accepted_capture"]["manifest_sha256"] != capture_sha
     or comparison["accepted_cache"]["manifest_sha256"] != cache_sha
 ):
-    raise SystemExit("FP32 projection comparison identity failed")
+    raise SystemExit("physical-M64 projection comparison identity failed")
 for name in ("cache", "states"):
     contract = comparison["hlo"][name]["contract"]
     if (
         not contract["passed"]
+        or contract["accepted_convolution_count"] != 1
         or contract["bf16_wk_conversion_count"] != 0
         or contract["convolution_weight_bf16"] is not False
         or contract["convolution_weight_f32"] is not True
@@ -316,9 +381,14 @@ for name in ("cache", "states"):
         or contract["rotary"]["source_literal"] is not True
         or contract["forbidden_operations"]
         or contract["forbidden_shapes"]
-        or contract["loop_count"] != 0
+        or contract["loop_count"] != 1
+        or contract["required_shapes"]["physical_m64_projection"] is not True
+        or contract["required_shapes"]["physical_m64_projection_input"] is not True
     ):
-        raise SystemExit(f"FP32 projection {name} HLO contract failed")
+        raise SystemExit(f"physical-M64 projection {name} HLO contract failed")
+projection_input = comparison["projection_input_comparison"]
+if projection_input is None or projection_input["elementwise_exact"] is not True:
+    raise SystemExit("DB515 projection input is not bitwise exact")
 state_exact = comparison["state_comparison"]["all_fields_elementwise_exact"]
 cache_exact = comparison["cache_comparison"]["elementwise_exact"]
 restored = bool(state_exact and cache_exact)
@@ -329,8 +399,8 @@ import provenance as pv
 connection = pv.connect(db_path)
 run_id = pv.start_run(
     connection,
-    model="zai-org/GLM-5.2-FP8:greenfield-layer0-prompt-key-projection",
-    revision="bounded-real-layer0-prompt-key-fp32-projection-v1",
+    model="zai-org/GLM-5.2-FP8:greenfield-layer0-prompt-key-projection-m64",
+    revision="bounded-real-layer0-prompt-key-physical-m64-v1",
     env={
         "GLM_ENGINE": "greenfield_layer0_prompt_key_projection_association",
         "greenfield_code_hash": pin,
@@ -339,16 +409,19 @@ run_id = pv.start_run(
         "source_comparison_manifest_sha256": source_comparison_sha,
         "accepted_capture_manifest_sha256": capture_sha,
         "prompt_cache_manifest_sha256": cache_sha,
+        "accepted_projection_lowering_manifest_sha256": lowering_sha,
         "comparison_manifest_sha256": comparison["manifest_sha256"],
         "candidate_cache_sha256": comparison["greenfield_cache"][
             "prompt_index_key_bfloat16_sha256"
         ],
         "projection_weight_mode": "adapted_fp32",
+        "projection_mapping_mode": "physical_m64_lax_map",
+        "projection_input_elementwise_exact": True,
         "state_elementwise_exact": state_exact,
         "cache_elementwise_exact": cache_exact,
     },
     note=(
-        "Protected bounded source-faithful FP32 prompt-key projection "
+        "Protected bounded physical-M64 FP32 prompt-key projection "
         "diagnostic. No decoder, Gate-D, latency, or token-rate claim."
     ),
     harness_repo=repo,
@@ -358,8 +431,8 @@ pv.record_item(
     connection,
     run_id,
     benchmark="greenfield_layer0_prompt_key_projection_association",
-    item_id="adapted_fp32_m2048_gather_cache_source_rope",
-    prompt="Sealed DB513 accepted layer-0 prompt-key producer and cache.",
+    item_id="adapted_fp32_m64_lax_map_gather_cache_source_rope",
+    prompt="Sealed DB515 accepted projection input, producer, and cache.",
     gold="Exact producer states at position 113 and exact 8,155-row BF16 cache.",
     raw_output=json.dumps(comparison, sort_keys=True),
     extracted=json.dumps({
@@ -392,7 +465,9 @@ summary = {
     "source_run_id": int(source_run_id),
     "source_item_row_id": int(source_item_id),
     "comparison_manifest_sha256": comparison["manifest_sha256"],
+    "accepted_projection_lowering_manifest_sha256": lowering_sha,
     "projection_association_restored": restored,
+    "projection_input_elementwise_exact": True,
     "state_elementwise_exact": state_exact,
     "cache_elementwise_exact": cache_exact,
     "candidate_cache_sha256": comparison["greenfield_cache"][
@@ -427,7 +502,8 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   cd "$RUN_DIR"
   find comparison -type f -print0 | sort -z | xargs -0 sha256sum
   sha256sum comparison_summary.json summary.json source_validation.json \
-    results_ckpt.db disk_preflight.txt census_pre.txt census_post.txt \
+    lowering_validation.json results_ckpt.db disk_preflight.txt \
+    census_pre.txt census_post.txt \
     orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
@@ -435,11 +511,14 @@ gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" <<'PY' \
   >"$RUN_DIR/remote_objects.json"
+import base64
 from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import subprocess
 import sys
+
+import google_crc32c
 
 root = Path(sys.argv[1])
 prefix = sys.argv[2]
@@ -449,6 +528,13 @@ paths = [
     if path.is_file() and path.name not in {"SUCCESS", "remote_objects.json"}
 ]
 
+def local_crc32c(path):
+    checksum = google_crc32c.Checksum()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            checksum.update(chunk)
+    return base64.b64encode(checksum.digest()).decode()
+
 def describe(item):
     path, relative = item
     value = json.loads(subprocess.run(
@@ -457,7 +543,10 @@ def describe(item):
         check=True, capture_output=True, text=True,
     ).stdout)
     crc32c = value.get("crc32c_hash") or value.get("crc32c")
-    if int(value["size"]) != path.stat().st_size or not crc32c:
+    if (
+        int(value["size"]) != path.stat().st_size
+        or crc32c != local_crc32c(path)
+    ):
         raise SystemExit(f"remote object verification failed: {relative}")
     return {
         "crc32c": crc32c,
@@ -482,16 +571,21 @@ import sys
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
 values = {
-    "artifact_kind": "glm52_layer0_prompt_key_projection_association",
+    "artifact_kind": "glm52_layer0_prompt_key_projection_physical_m64",
     "code_hash": sys.argv[3],
     "results_db_run_id": summary["results_db_run_id"],
     "results_db_item_row_id": summary["results_db_item_row_id"],
     "source_run_id": summary["source_run_id"],
     "source_item_row_id": summary["source_item_row_id"],
     "comparison_manifest_sha256": summary["comparison_manifest_sha256"],
+    "accepted_projection_lowering_manifest_sha256": summary[
+        "accepted_projection_lowering_manifest_sha256"
+    ],
     "projection_association_restored": str(
         summary["projection_association_restored"]
     ).lower(),
+    "projection_input_elementwise_exact": "true",
+    "projection_mapping_mode": "physical_m64_lax_map",
     "candidate_cache_sha256": summary["candidate_cache_sha256"],
     "performance_claim": "false",
     "evidence_sha256": sha256(

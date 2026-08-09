@@ -99,6 +99,11 @@ def _parse_args() -> argparse.Namespace:
         default="adapted_bf16",
     )
     parser.add_argument(
+        "--projection-mapping-mode",
+        choices=("logical_m2048", "physical_m64_lax_map"),
+        default="logical_m2048",
+    )
+    parser.add_argument(
         "--capture-mode",
         choices=("prompt_key", "prompt_key_input"),
         default="prompt_key",
@@ -329,6 +334,7 @@ def main() -> int:
         key_norm_mode="divide_sqrt",
         rotary_mode="accepted_source",
         projection_weight_mode=args.projection_weight_mode,
+        projection_mapping_mode=args.projection_mapping_mode,
     )
     cache_function = partial(
         layer0_prompt_index_key_gather_cache_chunk,
@@ -336,6 +342,7 @@ def main() -> int:
         key_norm_mode="divide_sqrt",
         rotary_mode="accepted_source",
         projection_weight_mode=args.projection_weight_mode,
+        projection_mapping_mode=args.projection_mapping_mode,
     )
     projection_input_function = partial(
         layer0_prompt_normalized_hidden_gather_chunk,
@@ -390,8 +397,13 @@ def main() -> int:
         if args.projection_weight_mode == "adapted_bf16"
         else "fp32_weight"
     )
+    projection_label = (
+        "m64_lax_map"
+        if args.projection_mapping_mode == "physical_m64_lax_map"
+        else "m2048"
+    )
     candidate_prefix = (
-        "accepted_xla_m2048_gather_cache_write_"
+        f"accepted_xla_{projection_label}_gather_cache_write_"
         f"{weight_label}_divide_sqrt_source_rope"
     )
     state_candidate = f"{candidate_prefix}_states"
@@ -626,6 +638,7 @@ def main() -> int:
         "performance_claim": False,
         "position": args.position,
         "projection_weight_mode": args.projection_weight_mode,
+        "projection_mapping_mode": args.projection_mapping_mode,
         "projection_input_comparison": projection_input_comparison,
         "run_tag": args.run_tag,
         "state_comparison": state_comparison,

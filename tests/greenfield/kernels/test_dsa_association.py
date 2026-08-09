@@ -53,6 +53,67 @@ def test_layer0_probe_geometry_pins_distinct_model_and_key_epsilons() -> None:
     assert geometry.key_norm_epsilon == 1e-6
 
 
+def test_prompt_key_physical_m64_map_matches_logical_reference() -> None:
+    geometry = Layer0DsaProbeGeometry(
+        prompt_tokens=129,
+        prompt_chunk=128,
+        decode_rows=1,
+        hidden_size=8,
+        q_lora_rank=4,
+        qkv_a_companion_rank=2,
+        legacy_tensor_shards=2,
+        heads=1,
+        head_dim=4,
+        rotary_dim=2,
+    )
+    hidden = jnp.asarray(
+        np.arange(128 * 8, dtype=np.float32).reshape(128, 8) / 1024,
+        dtype=jnp.bfloat16,
+    )
+    positions = jnp.arange(128, dtype=jnp.int32)
+    input_norm = jnp.ones((8,), dtype=jnp.bfloat16)
+    wk = jnp.asarray(
+        np.arange(4 * 8, dtype=np.float32).reshape(4, 8) / 64,
+        dtype=jnp.float32,
+    )
+    key_norm = jnp.ones((4,), dtype=jnp.bfloat16)
+    key_bias = jnp.zeros((4,), dtype=jnp.bfloat16)
+    arguments = (hidden, positions, input_norm, wk, key_norm, key_bias)
+
+    logical = layer0_prompt_index_key_chunk(
+        *arguments,
+        geometry=geometry,
+        projection_weight_mode="adapted_fp32",
+        projection_mapping_mode="logical_m2048",
+    )
+    physical = layer0_prompt_index_key_chunk(
+        *arguments,
+        geometry=geometry,
+        projection_weight_mode="adapted_fp32",
+        projection_mapping_mode="physical_m64_lax_map",
+    )
+
+    np.testing.assert_array_equal(np.asarray(physical), np.asarray(logical))
+    assert physical.shape == (128, 4)
+    with pytest.raises(ValueError, match="physical-M64 projection"):
+        layer0_prompt_index_key_chunk(
+            *arguments,
+            geometry=Layer0DsaProbeGeometry(
+                prompt_tokens=129,
+                prompt_chunk=128,
+                decode_rows=1,
+                hidden_size=8,
+                q_lora_rank=4,
+                qkv_a_companion_rank=2,
+                legacy_tensor_shards=4,
+                heads=1,
+                head_dim=4,
+                rotary_dim=2,
+            ),
+            projection_mapping_mode="physical_m64_lax_map",
+        )
+
+
 def test_bfloat16_artifact_bits_roundtrip() -> None:
     expected = np.asarray([0.0, 1.0, -2.5, 0.125], dtype=ml_dtypes.bfloat16)
     bits = expected.view(np.uint16)

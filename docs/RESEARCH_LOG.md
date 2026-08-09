@@ -6045,3 +6045,25 @@ unmotivated arithmetic variants.
   Focused Bash/ShellCheck/Python and 46 relevant unit/validation tests pass. The standard explicit-
   CPU suite passes 486 with one expected skip and two existing SWIG warnings in 363.72 seconds. No
   TPU capture, projection correction, decoder result or performance claim exists yet.
+
+## 2026-08-09 11:21 — DB516 seals physical M64 and authorizes one bounded map
+
+- DB516/item1801 completed the accepted 8K oracle at capture pin `643d092` with exact passkey/raw
+  tokens, all 483 DSA dumps, 1,882/0 load checks, 2,455 state leaves and eight one-step profiles.
+  The original wrapper stopped only in an overbroad HLO gather and made no terminal claim.
+- Recovery `...projection_lowering_recovery_20260809T105858202006975Z` at `4786e26` seals the run
+  without model execution. All 64 cores observe 21 source-line-1122 fusions. Each of 32 partitions
+  physically executes BF16 `[64,6144]` by FP32 `[128,6144]` to FP32 `[64,128]` with
+  `EmitAllBatchInSublanes`; logical M2048 is therefore 32 physical M64 shards, not an M2048
+  convolution on each chip.
+- Lowering manifest `d9b492ee...fba6`, exact DSA comparison, eight exact fleet HLO objects, local
+  versus remote CRC32C, DB snapshot, terminal archive/SUCCESS, and authenticated pre/post 8/8
+  censuses pass. The exact remote source tag cleaned on all hosts.
+- After the selected lowering was remotely and locally sealed, 27,195 interrupted raw HLO files /
+  10,512,245,600 path-bytes were inventoried and reclaimed locally. The selected bytes remain in
+  eight remote source objects and the compressed sealed artifact.
+- The only authorized next arithmetic test is a default-off prefill discriminator: keep DB515's
+  bitwise-exact normalized input and map the M2048 chunk through 32 explicit M64 projections with
+  `lax.map`. Require one physical M64 convolution plus one bounded map loop in HLO and bitwise
+  equality of projection input, all three producer states and the full 8,155-row BF16 cache. This
+  does not alter `decode_batch1` or authorize a full decoder retry unless exact.

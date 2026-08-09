@@ -1260,6 +1260,20 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
             "divide_sqrt",
         ),
+        (
+            "accepted_xla_m64_lax_map_gather_cache_write_fp32_weight_"
+            "divide_sqrt_source_rope"
+        ): (
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
+            "divide_sqrt",
+        ),
+        (
+            "accepted_xla_m64_lax_map_gather_cache_write_fp32_weight_"
+            "divide_sqrt_source_rope_states"
+        ): (
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -1360,11 +1374,14 @@ def validate_prompt_index_key_association_hlo(
     else:
         lowered = optimized_hlo.lower()
         wk_feature_slices = _classify_chunk_wk_feature_slices(lowered)
+        m64_lax_map_backend = backend.startswith("xla_m64_lax_map_")
+        physical_projection_rows = 64 if m64_lax_map_backend else prompt_chunk
         convolution_lines = [
             line
             for line in lowered.splitlines()
             if re.search(
-                rf"= f32\[{prompt_chunk},128\].* convolution\(", line
+                rf"= f32\[{physical_projection_rows},128\].* convolution\(",
+                line,
             )
             and "dim_labels=bf_oi->bf" in line
         ]
@@ -1408,21 +1425,37 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
         )
         source_rope_backend = backend in (
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
         )
         state_backend = backend.endswith("_source_rope_states")
         fp32_weight_backend = backend.startswith(
             "xla_chunk_gather_cache_write_fp32_weight"
+        ) or backend.startswith(
+            "xla_m64_lax_map_gather_cache_write_fp32_weight"
         )
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
         }
+        if m64_lax_map_backend:
+            required_shapes.update(
+                {
+                    "physical_m64_projection": "f32[64,128]" in lowered,
+                    "physical_m64_projection_input": (
+                        "bf16[64,6144]" in lowered
+                        or "f32[64,6144]" in lowered
+                    ),
+                }
+            )
         if cache_write_backend:
             required_shapes.update(
                 {
@@ -1466,6 +1499,8 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
         ):
             required_shapes.update(
                 {
@@ -1580,12 +1615,15 @@ def validate_prompt_index_key_association_hlo(
         violations = []
         if len(convolution_lines) != 1:
             violations.append(
-                "expected one chunk-parameter M2048 wk convolution, "
+                f"expected one physical M{physical_projection_rows} wk "
+                "convolution, "
                 f"found {len(convolution_lines)}"
             )
-        if while_lines:
+        expected_loop_count = 1 if m64_lax_map_backend else 0
+        if len(while_lines) != expected_loop_count:
             violations.append(
-                f"expected no chunk-program loop, found {len(while_lines)}"
+                f"expected {expected_loop_count} projection-map loops, "
+                f"found {len(while_lines)}"
             )
         if backend in (
             "xla_chunk_bf16_weight",
@@ -1618,6 +1656,8 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope",
             "xla_chunk_gather_cache_write_fp32_weight_source_rope_states",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope",
+            "xla_m64_lax_map_gather_cache_write_fp32_weight_source_rope_states",
         ):
             if len(physical_gather_lines) != 1:
                 violations.append(

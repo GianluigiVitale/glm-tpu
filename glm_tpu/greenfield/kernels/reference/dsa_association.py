@@ -22,6 +22,10 @@ from .rotary import apply_rotary, rotary_cos_sin
 
 KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
 KeyProjectionWeightMode = Literal["adapted_fp32", "adapted_bf16"]
+KeyProjectionMappingMode = Literal[
+    "logical_m2048",
+    "physical_m64_lax_map",
+]
 RotaryAssociationMode = Literal["greenfield_reference", "accepted_source"]
 QaProjectionMode = Literal[
     "separate_q_a",
@@ -932,6 +936,7 @@ def _project_keys(
     *,
     geometry: Layer0DsaProbeGeometry,
     key_norm_mode: KeyNormMode,
+    projection_mapping_mode: KeyProjectionMappingMode = "logical_m2048",
 ) -> Any:
     return _project_keys_f32(
         hidden,
@@ -941,6 +946,7 @@ def _project_keys(
         key_norm_bias,
         geometry=geometry,
         key_norm_mode=key_norm_mode,
+        projection_mapping_mode=projection_mapping_mode,
     ).astype(jnp.bfloat16)
 
 
@@ -954,14 +960,50 @@ def _project_key_states_f32(
     geometry: Layer0DsaProbeGeometry,
     key_norm_mode: KeyNormMode,
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
+    projection_mapping_mode: KeyProjectionMappingMode = "logical_m2048",
 ) -> tuple[Any, Any, Any]:
     """Return projection, pre-RoPE and post-RoPE FP32 key boundaries."""
 
-    projected = _dot_out_in(
-        hidden.astype(jnp.float32),
-        wk_weight.astype(jnp.float32),
-        output_dtype=jnp.float32,
-    )
+    projection_weight = wk_weight.astype(jnp.float32)
+    if projection_mapping_mode == "logical_m2048":
+        projected = _dot_out_in(
+            hidden.astype(jnp.float32),
+            projection_weight,
+            output_dtype=jnp.float32,
+        )
+    elif projection_mapping_mode == "physical_m64_lax_map":
+        physical_rows = geometry.prompt_chunk // geometry.legacy_tensor_shards
+        if (
+            hidden.shape != (geometry.prompt_chunk, geometry.hidden_size)
+            or geometry.prompt_chunk % geometry.legacy_tensor_shards
+            or physical_rows != 64
+        ):
+            raise ValueError(
+                "physical-M64 projection requires one complete prompt chunk "
+                "split into 64-row physical partitions"
+            )
+        physical_hidden = hidden.reshape(
+            geometry.legacy_tensor_shards,
+            physical_rows,
+            geometry.hidden_size,
+        )
+
+        def project_partition(partition: Any) -> Any:
+            return _dot_out_in(
+                partition.astype(jnp.float32),
+                projection_weight,
+                output_dtype=jnp.float32,
+            )
+
+        projected = lax.map(project_partition, physical_hidden).reshape(
+            geometry.prompt_chunk,
+            geometry.head_dim,
+        )
+    else:
+        raise ValueError(
+            "unsupported index-key projection mapping "
+            f"{projection_mapping_mode!r}"
+        )
     keys = affine_key_layer_norm(
         projected,
         key_norm_weight,
@@ -1029,6 +1071,7 @@ def _project_keys_f32(
     geometry: Layer0DsaProbeGeometry,
     key_norm_mode: KeyNormMode,
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
+    projection_mapping_mode: KeyProjectionMappingMode = "logical_m2048",
 ) -> Any:
     """Return post-RoPE keys before the accepted BF16 cache-write cast."""
 
@@ -1041,6 +1084,7 @@ def _project_keys_f32(
         geometry=geometry,
         key_norm_mode=key_norm_mode,
         rotary_mode=rotary_mode,
+        projection_mapping_mode=projection_mapping_mode,
     )[2]
 
 
@@ -1263,6 +1307,7 @@ def layer0_prompt_index_key_chunk(
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
     projection_weight_mode: KeyProjectionWeightMode = "adapted_fp32",
+    projection_mapping_mode: KeyProjectionMappingMode = "logical_m2048",
 ) -> Any:
     """Build one already-live layer-0 prefill chunk of index keys."""
 
@@ -1324,6 +1369,7 @@ def layer0_prompt_index_key_chunk(
         key_norm_bias,
         geometry=geometry,
         key_norm_mode=key_norm_mode,
+        projection_mapping_mode=projection_mapping_mode,
     )
 
 
@@ -1339,6 +1385,7 @@ def layer0_prompt_index_key_gather_chunk(
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
     projection_weight_mode: KeyProjectionWeightMode = "adapted_fp32",
+    projection_mapping_mode: KeyProjectionMappingMode = "logical_m2048",
 ) -> Any:
     """Gather and normalize one live prompt chunk inside the executable."""
 
@@ -1376,6 +1423,7 @@ def layer0_prompt_index_key_gather_chunk(
         geometry=geometry,
         key_norm_mode=key_norm_mode,
         projection_weight_mode=projection_weight_mode,
+        projection_mapping_mode=projection_mapping_mode,
     )
 
 
@@ -1394,6 +1442,7 @@ def layer0_prompt_index_key_gather_cache_states_chunk(
     key_norm_mode: KeyNormMode = "divide_sqrt",
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
     projection_weight_mode: KeyProjectionWeightMode = "adapted_bf16",
+    projection_mapping_mode: KeyProjectionMappingMode = "logical_m2048",
 ) -> Layer0PromptKeyStates:
     """Write one chunk and expose its actual FP32 producer boundaries.
 
@@ -1481,6 +1530,7 @@ def layer0_prompt_index_key_gather_cache_states_chunk(
             geometry=geometry,
             key_norm_mode=key_norm_mode,
             rotary_mode=rotary_mode,
+            projection_mapping_mode=projection_mapping_mode,
         )
     )
 
@@ -1520,6 +1570,7 @@ def layer0_prompt_index_key_gather_cache_chunk(
     key_norm_mode: KeyNormMode = "divide_sqrt",
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
     projection_weight_mode: KeyProjectionWeightMode = "adapted_bf16",
+    projection_mapping_mode: KeyProjectionMappingMode = "logical_m2048",
 ) -> Any:
     """Write one gathered prompt chunk through the accepted flat cache API."""
 
@@ -1537,6 +1588,7 @@ def layer0_prompt_index_key_gather_cache_chunk(
         key_norm_mode=key_norm_mode,
         rotary_mode=rotary_mode,
         projection_weight_mode=projection_weight_mode,
+        projection_mapping_mode=projection_mapping_mode,
     ).index_cache
 
 
