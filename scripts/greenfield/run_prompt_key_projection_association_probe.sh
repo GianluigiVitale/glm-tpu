@@ -191,7 +191,8 @@ env = json.loads(env_json)
 if (
     model != "gs://driftbench-dsv4-uc/models/GLM-5.2-FP8"
     or harness != harness_pin[:7]
-    or fork != oracle_pin[:10]
+    or len(fork) < 7
+    or not oracle_pin.startswith(fork)
     or pod != "db-v4-64-od"
     or "prompt_key_internals" not in note
     or env["os_env"].get("GLM_DSA_DUMP_INTERNALS_CODE_HASH") != observer_pin
