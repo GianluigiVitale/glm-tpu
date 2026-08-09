@@ -1750,10 +1750,11 @@ def main() -> int:
         prefill_wk_materialization_state = None
         if args.prefill_index_repair:
             assert prefill_decoder is not None
-            materializer = prefill_decoder.materialize_prefill_index_weights
-            if materializer is None:
+            bf16_decoder = prefill_decoder.decode_prefill_index_weights_bf16
+            fp32_promoter = prefill_decoder.promote_prefill_index_weights_fp32
+            if bf16_decoder is None or fp32_promoter is None:
                 raise RuntimeError(
-                    "prefill index repair weight materializer is unavailable"
+                    "prefill index repair split weight adapter is unavailable"
                 )
             names = prefill_decoder.prefill_index_weight_names
             if len(names) != prefill_decoder.config.maximum_full_indexer_slots:
@@ -1766,71 +1767,119 @@ def main() -> int:
             raw_wk_scales = tuple(
                 loaded.weights[scale_name] for _, scale_name in names
             )
-            materializer_inputs = (raw_wk_bits, raw_wk_scales)
+            decoder_inputs = (raw_wk_bits, raw_wk_scales)
             multihost_utils.sync_global_devices(
                 "greenfield-prefill-wk-materialization-compile-start"
             )
             materializer_compile_started = time.monotonic()
-            lowered_materializer = jax.jit(materializer).lower(
-                *materializer_inputs
+            lowered_bf16_decoder = jax.jit(bf16_decoder).lower(
+                *decoder_inputs
             )
-            compiled_materializer = lowered_materializer.compile()
+            compiled_bf16_decoder = lowered_bf16_decoder.compile()
+            optimized_bf16_decoder_hlo = compiled_bf16_decoder.as_text()
+            bf16_decoder_contract = (
+                validate_prefill_index_weight_materialization_hlo(
+                    optimized_bf16_decoder_hlo,
+                    decoder=prefill_decoder,
+                    phase="decode_bf16",
+                )
+            )
+            if not bf16_decoder_contract["passed"]:
+                raise RuntimeError(
+                    "prefill wk BF16 decode HLO contract failed before "
+                    f"execution: {bf16_decoder_contract['violations']}"
+                )
+            multihost_utils.sync_global_devices(
+                "greenfield-prefill-wk-bf16-decode-execute-start"
+            )
+            bf16_execute_started = time.monotonic()
+            decoded_prefill_index_weights = tuple(
+                compiled_bf16_decoder(*decoder_inputs)
+            )
+            jax.block_until_ready(decoded_prefill_index_weights)
+            bf16_execute_seconds = time.monotonic() - bf16_execute_started
+            multihost_utils.sync_global_devices(
+                "greenfield-prefill-wk-bf16-decode-execute-end"
+            )
+
+            lowered_fp32_promoter = jax.jit(fp32_promoter).lower(
+                decoded_prefill_index_weights
+            )
+            compiled_fp32_promoter = lowered_fp32_promoter.compile()
+            optimized_fp32_promoter_hlo = compiled_fp32_promoter.as_text()
+            fp32_promoter_contract = (
+                validate_prefill_index_weight_materialization_hlo(
+                    optimized_fp32_promoter_hlo,
+                    decoder=prefill_decoder,
+                    phase="promote_fp32",
+                )
+            )
+            if not fp32_promoter_contract["passed"]:
+                raise RuntimeError(
+                    "prefill wk FP32 promotion HLO contract failed before "
+                    f"execution: {fp32_promoter_contract['violations']}"
+                )
             prefill_wk_materialization_compile_seconds = (
                 time.monotonic() - materializer_compile_started
             )
             multihost_utils.sync_global_devices(
                 "greenfield-prefill-wk-materialization-compile-end"
             )
-            optimized_materializer_hlo = compiled_materializer.as_text()
+            fp32_execute_started = time.monotonic()
+            materialized_prefill_index_weights = tuple(
+                compiled_fp32_promoter(decoded_prefill_index_weights)
+            )
+            jax.block_until_ready(materialized_prefill_index_weights)
+            prefill_wk_materialization_execute_seconds = (
+                bf16_execute_seconds
+                + time.monotonic()
+                - fp32_execute_started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-prefill-wk-materialization-execute-end"
+            )
+            bf16_hlo_sha256 = sha256(
+                optimized_bf16_decoder_hlo.encode("utf-8")
+            ).hexdigest()
+            fp32_hlo_sha256 = sha256(
+                optimized_fp32_promoter_hlo.encode("utf-8")
+            ).hexdigest()
             prefill_wk_materialization_hlo_sha256 = sha256(
-                optimized_materializer_hlo.encode("utf-8")
+                f"{bf16_hlo_sha256}:{fp32_hlo_sha256}".encode()
             ).hexdigest()
             fleet_prefill_wk_materialization_hlo_hashes = _fleet_digest(
                 multihost_utils,
                 prefill_wk_materialization_hlo_sha256,
                 num_processes=args.num_processes,
             )
-            prefill_wk_materialization_hlo_contract = (
-                validate_prefill_index_weight_materialization_hlo(
-                    optimized_materializer_hlo,
-                    decoder=prefill_decoder,
-                )
-            )
+            prefill_wk_materialization_hlo_contract = {
+                "bf16_decode": bf16_decoder_contract,
+                "bf16_decode_hlo_sha256": bf16_hlo_sha256,
+                "fp32_promote": fp32_promoter_contract,
+                "fp32_promote_hlo_sha256": fp32_hlo_sha256,
+                "passed": bool(
+                    bf16_decoder_contract["passed"]
+                    and fp32_promoter_contract["passed"]
+                ),
+            }
             if jax.process_index() == 0:
                 hlo_dir = args.output.parent / "hlo"
                 hlo_dir.mkdir(parents=True, exist_ok=True)
-                with gzip.open(
-                    hlo_dir
-                    / "prefill_index_wk_materialization.optimized_hlo.txt.gz",
-                    "wt",
-                    encoding="utf-8",
-                ) as stream:
-                    stream.write(optimized_materializer_hlo)
+                for filename, hlo in (
+                    ("prefill_index_wk_decode_bf16", optimized_bf16_decoder_hlo),
+                    ("prefill_index_wk_promote_fp32", optimized_fp32_promoter_hlo),
+                ):
+                    with gzip.open(
+                        hlo_dir / f"{filename}.optimized_hlo.txt.gz",
+                        "wt",
+                        encoding="utf-8",
+                    ) as stream:
+                        stream.write(hlo)
                 _atomic_json(
                     hlo_dir / "prefill_index_wk_materialization.hlo_contract.json",
                     prefill_wk_materialization_hlo_contract,
                 )
-            del optimized_materializer_hlo
-            if not prefill_wk_materialization_hlo_contract["passed"]:
-                raise RuntimeError(
-                    "prefill wk materialization HLO contract failed before "
-                    "execution: "
-                    f"{prefill_wk_materialization_hlo_contract['violations']}"
-                )
-            multihost_utils.sync_global_devices(
-                "greenfield-prefill-wk-materialization-execute-start"
-            )
-            materializer_execute_started = time.monotonic()
-            materialized_prefill_index_weights = tuple(
-                compiled_materializer(*materializer_inputs)
-            )
-            jax.block_until_ready(materialized_prefill_index_weights)
-            prefill_wk_materialization_execute_seconds = (
-                time.monotonic() - materializer_execute_started
-            )
-            multihost_utils.sync_global_devices(
-                "greenfield-prefill-wk-materialization-execute-end"
-            )
+            del optimized_bf16_decoder_hlo, optimized_fp32_promoter_hlo
             local_materialized_records = []
             for slot, value in enumerate(materialized_prefill_index_weights):
                 for shard in value.addressable_shards:

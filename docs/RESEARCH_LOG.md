@@ -6362,3 +6362,17 @@ unmotivated arithmetic variants.
 - The bounded successor separates the accepted association into two completed stage-local
   executables, BF16 decode then FP32 promotion, each with strict HLO entry/round/communication gates.
   Repair arithmetic and sharding stay unchanged. Prove this cache exact before production wiring.
+
+## 2026-08-09 20:07 — DB520 closes bounded LP4 cache exactness
+
+- DB520/item1805 at `0977022` completes separate four-lane BF16 decode and FP32 promotion
+  executables before unchanged repair. Both phase HLO contracts pass with zero communication or
+  callback; optimized HLO SHAs are `08b6c59f...ab2f9` and `1c107d68...b1f8`.
+- Every output shard is accepted SHA `d680f7b1...83469`; sentinel owner writes are exactly
+  `[2048,2048,2048,2011]`; all 8,155 assembled cache rows and captured producer states are bitwise
+  exact at cache SHA `3808d502...859d1`.
+- Manifest `1e942555...08a59`, SUCCESS `643f80eb...083ca`, DB snapshot `d466adc9...79581`, remote
+  ledger `599ba9f1...affd`, approved archive and authenticated 8/8 pre/post census pass. This closes
+  the bounded arithmetic blocker but contains no decoder or performance result.
+- Production now needs the identical two-completion boundary for its five local slots. After one
+  new-diff Fable audit, a protected full 8K retry is authorized; exact DSA must pass before timing.

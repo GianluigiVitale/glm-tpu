@@ -1248,11 +1248,13 @@ repair_prefill_inputs = (
 repair_wk_names = repair_decoder.prefill_index_weight_names
 repair_wk_bits = tuple(weights[bits_name] for bits_name, _ in repair_wk_names)
 repair_wk_scales = tuple(weights[scale_name] for _, scale_name in repair_wk_names)
-repair_wk_materializer = repair_decoder.materialize_prefill_index_weights
-assert repair_wk_materializer is not None
-repair_wk_materialized = jax.jit(repair_wk_materializer)(
+repair_wk_decoder = repair_decoder.decode_prefill_index_weights_bf16
+repair_wk_promoter = repair_decoder.promote_prefill_index_weights_fp32
+assert repair_wk_decoder is not None and repair_wk_promoter is not None
+repair_wk_decoded = jax.jit(repair_wk_decoder)(
     repair_wk_bits, repair_wk_scales
 )
+repair_wk_materialized = jax.jit(repair_wk_promoter)(repair_wk_decoded)
 repair_prefill_inputs = (*repair_prefill_inputs, repair_wk_materialized)
 repair_prefill_compiled = jax.jit(repair_prefill.execute).lower(*repair_prefill_inputs).compile()
 repair_prefilled = repair_prefill_compiled(*repair_prefill_inputs)

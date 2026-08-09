@@ -655,3 +655,16 @@ capture is still required.
 - Next evidence is one bounded two-completion adapter: raw FP8 -> BF16 must complete before a
   separate BF16 -> FP32 promotion, then the unchanged LP4 repair must match the accepted cache
   bitwise. Separate HLO contracts reject phase fusion, communication and host callbacks.
+
+## DB520 exact split-boundary LP4 repair
+
+- DB520/item1805 at `0977022`, tag
+  `greenfield_layer0_prompt_key_norm_m64_20260809T200559393031635Z`, passes separate BF16-decode and
+  FP32-promotion HLO contracts (optimized SHAs `08b6c59f...ab2f9` / `1c107d68...b1f8`) with zero
+  communication/callbacks, then executes unchanged owner-local repair.
+- All four FP32 shards equal accepted `d680f7b1...83469`; writes are
+  `[2048,2048,2048,2011]`; all 8,155 cache rows and producer states are bitwise exact at
+  `3808d502...859d1`. Manifest `1e942555...08a59`, SUCCESS `643f80eb...083ca`, DB snapshot
+  `d466adc9...79581`, remote ledger `599ba9f1...affd`, approved archive and 8/8 cleanup pass.
+- This is bounded arithmetic evidence, not Gate D or performance proof. It authorizes production
+  split-boundary wiring and one protected full 8K retry after tests and a one-time diff audit.

@@ -892,6 +892,12 @@ if short_context_oracle:
             materializer = record[
                 "prefill_wk_materialization_hlo_contract"
             ]
+            if materializer is None:
+                raise SystemExit(
+                    "external prefill wk materialization contract is absent"
+                )
+            bf16_decoder = materializer["bf16_decode"]
+            fp32_promoter = materializer["fp32_promote"]
             materialized_state = record[
                 "prefill_wk_materialization_state"
             ]
@@ -925,23 +931,40 @@ if short_context_oracle:
             ):
                 raise SystemExit("physical-M64 prefill repair HLO drifted")
             if (
-                materializer is None
-                or not materializer["passed"]
-                or materializer["backend"]
-                != "external_stage_local_bf16_then_fp32"
-                or materializer["expected_slot_count"]
+                not materializer["passed"]
+                or not bf16_decoder["passed"]
+                or bf16_decoder["phase"] != "decode_bf16"
+                or bf16_decoder["backend"]
+                != "external_stage_local_raw_fp8_to_bf16"
+                or bf16_decoder["expected_slot_count"]
                 != expected_materialized_slots
-                or materializer["raw_parameter_count"]
+                or bf16_decoder["raw_parameter_count"]
                 != expected_materialized_slots
-                or materializer["scale_parameter_count"]
+                or bf16_decoder["scale_parameter_count"]
                 != expected_materialized_slots
-                or materializer["bf16_round_count"]
+                or bf16_decoder["bf16_parameter_count"] != 0
+                or bf16_decoder["bf16_round_count"]
                 < expected_materialized_slots
-                or materializer["fp32_promotion_count"]
+                or bf16_decoder["fp32_promotion_count"] != 0
+                or bf16_decoder["collective_count"] != 0
+                or bf16_decoder["host_markers"]
+                or bf16_decoder["violations"]
+                or not fp32_promoter["passed"]
+                or fp32_promoter["phase"] != "promote_fp32"
+                or fp32_promoter["backend"]
+                != "external_stage_local_bf16_to_fp32"
+                or fp32_promoter["expected_slot_count"]
+                != expected_materialized_slots
+                or fp32_promoter["raw_parameter_count"] != 0
+                or fp32_promoter["scale_parameter_count"] != 0
+                or fp32_promoter["bf16_parameter_count"]
+                != expected_materialized_slots
+                or fp32_promoter["bf16_round_count"] != 0
+                or fp32_promoter["fp32_promotion_count"]
                 < expected_materialized_slots
-                or materializer["collective_count"] != 0
-                or materializer["host_markers"]
-                or materializer["violations"]
+                or fp32_promoter["collective_count"] != 0
+                or fp32_promoter["host_markers"]
+                or fp32_promoter["violations"]
                 or record[
                     "prefill_wk_materialization_compile_seconds"
                 ] is None

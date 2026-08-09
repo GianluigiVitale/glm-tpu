@@ -2884,3 +2884,16 @@ Exact next is a bounded two-completion proof: a stage-local raw-FP8-to-BF16 exec
 then a separate BF16-to-FP32 executable must finish before unchanged repair compilation/execution.
 Each phase has a strict entry/dtype/round/no-communication HLO contract. No production decoder retry
 is authorized until that bounded cache is bitwise exact.
+
+DB520/item1805, tag `greenfield_layer0_prompt_key_norm_m64_20260809T200559393031635Z` at
+`0977022`, completes that proof. Both separate TPU executables pass: raw/scale -> BF16 HLO
+`08b6c59f...ab2f9`, then BF16 -> FP32 HLO `1c107d68...b1f8`, with zero collectives/callbacks.
+All four materialized shards equal accepted SHA `d680f7b1...83469`; owner writes are exactly
+`[2048,2048,2048,2011]`; all 8,155 cache rows and producer states are bitwise exact, cache SHA
+`3808d502...859d1`. Comparison manifest is `1e942555...08a59`, SUCCESS `643f80eb...083ca`, DB
+snapshot `d466adc9...79581`, remote ledger `599ba9f1...affd`, approved archive and authenticated
+8/8 pre/post cleanup pass. This is the required bounded arithmetic proof, not performance evidence.
+
+The production successor applies those same two completed programs to the five local full-indexer
+slots before unchanged repair. Exact next: focused tests, one Fable audit of only that production
+diff, commit/push, then one protected full 8K retry through exact DSA and timing gates.

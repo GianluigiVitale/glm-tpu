@@ -97,7 +97,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert 'repair["repair_collectives"]' in runner
     assert 'repair["repair_weight_round_count"] != 0' in runner
     assert "results_db_run_id\": 519" in runner
-    assert "external_stage_local_bf16_then_fp32" in runner
+    assert "external_stage_local_raw_fp8_to_bf16" in runner
+    assert "external_stage_local_bf16_to_fp32" in runner
     assert "prefill_wk_materialization_hlo_contract" in runner
 
 
