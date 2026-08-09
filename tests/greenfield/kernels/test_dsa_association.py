@@ -21,6 +21,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     bfloat16_from_uint16_bits,
     layer0_dsa_state,
     layer0_prompt_index_key_chunk,
+    layer0_prompt_index_key_gather_cache_chunk,
     layer0_prompt_index_key_gather_chunk,
     layer0_prompt_index_keys_chunked,
     layer0_dsa_state_from_q_residual,
@@ -183,6 +184,47 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
         np.asarray(gathered_bf16_weight_chunk),
         np.asarray(bf16_weight_chunk),
     )
+
+    cache = jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16)
+    live_block_table = jnp.asarray([1, 2], dtype=jnp.int32)
+    cache = layer0_prompt_index_key_gather_cache_chunk(
+        cache,
+        live_block_table,
+        arguments[0],
+        arguments[1][:4],
+        jnp.arange(4, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+    )
+    cache = layer0_prompt_index_key_gather_cache_chunk(
+        cache,
+        live_block_table,
+        arguments[0],
+        jnp.asarray([0, 0, 0, 0], dtype=jnp.int32),
+        jnp.arange(4, 8, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+    )
+    cache_rows = np.asarray(cache).reshape(3, 4, 4)
+    np.testing.assert_array_equal(
+        cache_rows[1], np.asarray(gathered_bf16_weight_chunk)
+    )
+    expected_tail = layer0_prompt_index_key_gather_chunk(
+        arguments[0],
+        jnp.asarray([0, 0, 0, 0], dtype=jnp.int32),
+        jnp.arange(4, 8, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        projection_weight_mode="adapted_bf16",
+    )
+    np.testing.assert_array_equal(
+        cache_rows[2, 0], np.asarray(expected_tail[0])
+    )
+    np.testing.assert_array_equal(cache_rows[2, 1:], np.zeros((3, 4)))
+    np.testing.assert_array_equal(cache_rows[0], np.zeros((4, 4)))
 
 
 def test_layer0_state_preserves_chunk_and_decode_geometry() -> None:

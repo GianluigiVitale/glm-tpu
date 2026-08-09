@@ -434,6 +434,57 @@ ENTRY main {
     assert rejected["wk_feature_slices"]["unclassified_line_count"] == 1
 
 
+def test_prompt_key_cache_write_hlo_requires_one_flat_scatter() -> None:
+    hlo = """
+HloModule cache_write, entry_computation_layout={(bf16[24,16,32,128], s32[16], bf16[37,6144], s32[2048], s32[2048], f32[128,6144])->bf16[24,16,32,128]}
+ENTRY main {
+  %cache = bf16[24,16,32,128]{3,2,1,0} parameter(0)
+  %block_table = s32[16]{0} parameter(1)
+  %unique = bf16[37,6144]{1,0} parameter(2)
+  %rows = s32[2048]{0} parameter(3)
+  %positions = s32[2048]{0} parameter(4)
+  %wk_weight = f32[128,6144]{1,0} parameter(5)
+  %wk_bf16 = bf16[128,6144]{1,0} convert(%wk_weight)
+  %gathered = bf16[2048,6144]{1,0} fusion(%unique, %rows), kind=kCustom, metadata={op_name="jit(probe)/jit(_take)/gather"}
+  %input_rms = f32[2048]{0} fusion(%gathered), kind=kLoop, metadata={op_name="jit(probe)/reduce_sum"}
+  %projection = f32[2048,128]{1,0} convolution(%gathered, %wk_bf16), dim_labels=bf_oi->bf
+  %root = f32[1]{0} sqrt(%projection)
+  %keys_f32 = f32[2048,128]{1,0} divide(%projection, %root)
+  %stored = bf16[2048,128]{1,0} convert(%keys_f32)
+  %flat = bf16[12288,128]{1,0} reshape(%cache)
+  %slots = s32[2048]{0} gather(%block_table, %positions)
+  %written = bf16[12288,128]{1,0} scatter(%flat, %slots, %stored)
+  ROOT %result = bf16[24,16,32,128]{3,2,1,0} reshape(%written)
+}
+"""
+    candidate = (
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt"
+    )
+    result = validate_prompt_index_key_association_hlo(
+        hlo,
+        candidate=candidate,
+    )
+    assert result["passed"] is True
+    assert result["physical_embedding_gather_count"] == 1
+    assert result["physical_cache_scatter_count"] == 1
+    assert result["cache_scatter_update_bf16"] is True
+    assert result["required_shapes"]["accepted_cache_parameter"] is True
+    assert result["required_shapes"]["accepted_cache_result"] is True
+    assert result["required_shapes"]["live_block_table_parameter"] is True
+
+    rejected = validate_prompt_index_key_association_hlo(
+        hlo.replace(
+            "%written = bf16[12288,128]{1,0} scatter(%flat, %slots, %stored)",
+            "%written = bf16[12288,128]{1,0} copy(%flat)",
+        ),
+        candidate=candidate,
+    )
+    assert rejected["passed"] is False
+    assert "expected one physical flat BF16 cache scatter, found 0" in (
+        rejected["violations"]
+    )
+
+
 def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> None:
     repo = Path(__file__).resolve().parents[3]
     probe = repo / "scripts/greenfield/probe_layer0_prompt_index_cache.py"
@@ -523,8 +574,10 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "accepted_xla_m2048_chunk_parameter_divide_sqrt",
         "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt",
         "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt",
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt",
         "--candidate-set",
         "layer0_prompt_index_key_gather_chunk",
+        "layer0_prompt_index_key_gather_cache_chunk",
         "layer0_prompt_index_keys_chunked",
         "validate_prompt_index_key_association_hlo",
         '"performance_claim": False',
@@ -543,11 +596,16 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         "BF16_RUN_ID=509",
         "BF16_ITEM_ROW_ID=1794",
         "BF16_ASSOCIATION_MANIFEST_SHA=df0b901e",
+        "GATHER_RUN_ID=510",
+        "GATHER_ITEM_ROW_ID=1795",
+        "GATHER_ASSOCIATION_MANIFEST_SHA=3e29aadc",
         "matrix_validation.json",
         "chunk_parameter_validation.json",
         "bf16_weight_validation.json",
+        "gather_validation.json",
         "chunk_bf16_weight",
         "chunk_gather_bf16_weight",
+        "chunk_gather_cache_write_bf16_weight",
         "GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE",
         '--candidate-set "$PROFILE"',
         "probe_layer0_prompt_index_cache_association.py",

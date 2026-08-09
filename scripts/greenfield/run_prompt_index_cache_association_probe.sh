@@ -86,6 +86,28 @@ readonly BF16_SOURCE_VALIDATION_SHA=cf9306eab21f030198e9d1195732b0879fb8aba824fe
 readonly BF16_ASSOCIATION_MANIFEST_SHA=df0b901e9d8f59a9053a52c35fe4b7156ed6814a727ede03c64a5c350c9921c1
 readonly BF16_OBSERVED_CACHE_SHA=db2f77d986fa3a452bc60a429b1a7b0a63e5d77a6408e504dc9a9359eb50a7a1
 readonly BF16_HLO_FILE_SHA=6e2697569b995b395dadc51a72504cefeb4b95cc96e3de6a842822a883632160
+readonly GATHER_TAG=greenfield_layer0_prompt_index_cache_association_20260808T234459065479710Z
+readonly GATHER_DIR=/home/gianl/glm-run/$GATHER_TAG
+readonly GATHER_REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_index_cache_association/8k/$GATHER_TAG
+readonly GATHER_CODE_HASH=6286a06341cb1f798c7059490e565e966ba85dc0
+readonly GATHER_RUN_ID=510
+readonly GATHER_ITEM_ROW_ID=1795
+readonly GATHER_ASSOCIATION_FILE_SHA=7d9c12bebc59a6e7408050bfa6cf73f02d4a7624b8815fce30ca2e487874e224
+readonly GATHER_TENSOR_FILE_SHA=d896b17229b0564cc9fe79781847d7c03895a32d5fcd346e646638813ed0227d
+readonly GATHER_SUMMARY_FILE_SHA=af65953a35d81adfd796d95c3e6cebd0ac33996f5c64a6a76d8a356c997336e1
+readonly GATHER_SUCCESS_SHA=a7660e3ee812abccced8bc293f3552434cc573088cddd3c52c7439022d71e165
+readonly GATHER_RESULTS_DB_SHA=50758ad281f1ac280807c9499519d714dd339aecd43eba9deabe450b1943de53
+readonly GATHER_EVIDENCE_SHA=9ed5bdfffb5ad9e1ee026aaef3abb28d447e3d5e4c4f0a29bacf064eb8c35b4f
+readonly GATHER_REMOTE_OBJECTS_SHA=d4663158c69b875af9bb00a87d38be0753c6a0f57cd4cb4fc4b21ba07bdc5f9e
+readonly GATHER_PRE_CENSUS_SHA=d05a3822200060f14abad6138871f15d17b2476b892dbd35eb112312f26f967b
+readonly GATHER_POST_CENSUS_SHA=6caec386e35b5d47b9749ea21618799a1e667898b19f4ec788f7f0a765a7f1df
+readonly GATHER_MATRIX_VALIDATION_SHA=667c4b1de614f90821c21f18cbf9866888c6ff01d3fb02aa1fb0b62996421070
+readonly GATHER_CHUNK_VALIDATION_SHA=5816cd9e3a1cfc2faf52395d9b90dc660a0ce261771d87f3b2f34c8d02ccaa2c
+readonly GATHER_BF16_VALIDATION_SHA=4d21da19b35a073a0133f61b692ca5b5ea2c1e91544a7a4f68a350e9dc159e4c
+readonly GATHER_SOURCE_VALIDATION_SHA=cf9306eab21f030198e9d1195732b0879fb8aba824feec02bab93f68d95c547d
+readonly GATHER_ASSOCIATION_MANIFEST_SHA=3e29aadce4851ad4a2f5ab62ab2d77d1474fc04aed988eaf14657d1142c8b0fb
+readonly GATHER_OBSERVED_CACHE_SHA=52bf55ed5e9ea74a59551351a21ae830fb39e289e82eaff636fb9ab84d7dcd8a
+readonly GATHER_HLO_FILE_SHA=cd293af30d94b2f96d205dfa9e13e9e08ad86732309fe2950abadf654a947290
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
@@ -99,7 +121,8 @@ ASSOCIATION_DIR=$RUN_DIR/association
 
 [[ $PROFILE == matrix || $PROFILE == chunk_parameter || \
   $PROFILE == chunk_bf16_weight || \
-  $PROFILE == chunk_gather_bf16_weight ]] || {
+  $PROFILE == chunk_gather_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_bf16_weight ]] || {
   echo "unsupported prompt-key association profile: $PROFILE" >&2
   exit 2
 }
@@ -277,7 +300,8 @@ connection.close()
 PY
 
 if [[ $PROFILE == chunk_parameter || $PROFILE == chunk_bf16_weight || \
-  $PROFILE == chunk_gather_bf16_weight ]]; then
+  $PROFILE == chunk_gather_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
   for contract in \
     "$MATRIX_ASSOCIATION_FILE_SHA $MATRIX_DIR/association/association.json" \
     "$MATRIX_BEST_HLO_FILE_SHA $MATRIX_DIR/association/hlo/accepted_xla_m2048_divide_sqrt.optimized_hlo.txt.gz" \
@@ -366,7 +390,8 @@ PY
 fi
 
 if [[ $PROFILE == chunk_bf16_weight || \
-  $PROFILE == chunk_gather_bf16_weight ]]; then
+  $PROFILE == chunk_gather_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
   for contract in \
     "$CHUNK_ASSOCIATION_FILE_SHA $CHUNK_DIR/association/association.json" \
     "$CHUNK_HLO_FILE_SHA $CHUNK_DIR/association/hlo/accepted_xla_m2048_chunk_parameter_divide_sqrt.optimized_hlo.txt.gz" \
@@ -457,7 +482,8 @@ connection.close()
 PY
 fi
 
-if [[ $PROFILE == chunk_gather_bf16_weight ]]; then
+if [[ $PROFILE == chunk_gather_bf16_weight || \
+  $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
   for contract in \
     "$BF16_ASSOCIATION_FILE_SHA $BF16_DIR/association/association.json" \
     "$BF16_HLO_FILE_SHA $BF16_DIR/association/hlo/accepted_xla_m2048_chunk_bf16_weight_divide_sqrt.optimized_hlo.txt.gz" \
@@ -547,6 +573,102 @@ connection.close()
 PY
 fi
 
+if [[ $PROFILE == chunk_gather_cache_write_bf16_weight ]]; then
+  for contract in \
+    "$GATHER_ASSOCIATION_FILE_SHA $GATHER_DIR/association/association.json" \
+    "$GATHER_TENSOR_FILE_SHA $GATHER_DIR/association/candidate_prompt_index_keys.safetensors" \
+    "$GATHER_HLO_FILE_SHA $GATHER_DIR/association/hlo/accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt.optimized_hlo.txt.gz" \
+    "$GATHER_SUMMARY_FILE_SHA $GATHER_DIR/summary.json" \
+    "$GATHER_SUCCESS_SHA $GATHER_DIR/SUCCESS" \
+    "$GATHER_RESULTS_DB_SHA $GATHER_DIR/results_ckpt.db" \
+    "$GATHER_EVIDENCE_SHA $GATHER_DIR/evidence.sha256" \
+    "$GATHER_REMOTE_OBJECTS_SHA $GATHER_DIR/remote_objects.json" \
+    "$GATHER_PRE_CENSUS_SHA $GATHER_DIR/census_pre.txt" \
+    "$GATHER_POST_CENSUS_SHA $GATHER_DIR/census_post.txt" \
+    "$GATHER_MATRIX_VALIDATION_SHA $GATHER_DIR/matrix_validation.json" \
+    "$GATHER_CHUNK_VALIDATION_SHA $GATHER_DIR/chunk_parameter_validation.json" \
+    "$GATHER_BF16_VALIDATION_SHA $GATHER_DIR/bf16_weight_validation.json" \
+    "$GATHER_SOURCE_VALIDATION_SHA $GATHER_DIR/source_validation.json"; do
+    expected=${contract%% *}
+    path=${contract#* }
+    [[ $(sha256sum "$path" | awk '{print $1}') == "$expected" ]] || {
+      say "ABORT: sealed DB510 gather result drifted: $path"
+      exit 2
+    }
+  done
+  gather_remote_success_sha=$(gcloud storage cat \
+    "$GATHER_REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $gather_remote_success_sha == "$GATHER_SUCCESS_SHA" ]] || {
+    say "ABORT: approved DB510 SUCCESS drifted"
+    exit 2
+  }
+  /home/gianl/vllm-env/bin/python - \
+    "$RESULTS_DB" "$GATHER_DIR" \
+    "$RUN_DIR/gather_validation.json" \
+    "$GATHER_RUN_ID" "$GATHER_ITEM_ROW_ID" "$GATHER_CODE_HASH" \
+    "$GATHER_ASSOCIATION_MANIFEST_SHA" "$GATHER_OBSERVED_CACHE_SHA" <<'PY'
+import json
+from pathlib import Path
+import sqlite3
+import sys
+
+(db_path, gather_path, output_path, run_id, item_id, code_hash,
+ manifest_sha, observed_sha) = sys.argv[1:]
+run_id, item_id = int(run_id), int(item_id)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+    raise SystemExit("DB510 gather source DB integrity failed")
+run = connection.execute(
+    "SELECT harness_git,env_json,pod FROM runs WHERE run_id=?", (run_id,)
+).fetchone()
+item = connection.execute(
+    "SELECT id,item_id,correct,score FROM items WHERE run_id=?", (run_id,)
+).fetchone()
+candidate_name = (
+    "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
+)
+expected_item = (item_id, candidate_name, 0, 0.0)
+if run is None or item != expected_item:
+    raise SystemExit("DB510 gather source row drifted")
+harness, env_json, pod = run
+env = json.loads(env_json)
+if (
+    harness != code_hash[:7]
+    or pod != "db-v4-64-od"
+    or env.get("association_manifest_sha256") != manifest_sha
+    or env.get("candidate_set") != "chunk_gather_bf16_weight"
+    or env.get("association_parent_run_id") != 509
+    or env.get("exact_candidates") != []
+):
+    raise SystemExit("DB510 gather source provenance drifted")
+root = Path(gather_path)
+association = json.loads((root / "association/association.json").read_text())
+candidate = association["candidates"][candidate_name]
+hlo = candidate["hlo"]["contract"]
+if (
+    association["manifest_sha256"] != manifest_sha
+    or association["candidate_set"] != "chunk_gather_bf16_weight"
+    or candidate["comparison_to_accepted"]["mismatch_count"] != 45
+    or candidate["observed_bfloat16_sha256"] != observed_sha
+    or hlo["loop_count"] != 0
+    or hlo["physical_embedding_gather_count"] != 1
+    or hlo["gather_coupled_input_rms"] is not True
+    or hlo["bf16_wk_conversion_count"] != 1
+    or hlo["convolution_weight_bf16"] is not True
+):
+    raise SystemExit("DB510 gather source artifact drifted")
+Path(output_path).write_text(json.dumps({
+    "status": "SUCCESS",
+    "gather_run_id": run_id,
+    "gather_item_row_id": item_id,
+    "gather_code_hash": code_hash,
+    "gather_association_manifest_sha256": manifest_sha,
+    "gather_mismatch_count": 45,
+}, indent=2, sort_keys=True) + "\n")
+connection.close()
+PY
+fi
+
 say "syncing exact greenfield pin to all eight hosts"
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$GREENFIELD_ORIGIN"'; wt='"$WORKTREE"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository path $wt" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && echo "SYNC_OK $(hostname) $pin"'
@@ -608,9 +730,13 @@ elif profile == "chunk_bf16_weight":
     expected_names = {
         "accepted_xla_m2048_chunk_bf16_weight_divide_sqrt"
     }
-else:
+elif profile == "chunk_gather_bf16_weight":
     expected_names = {
         "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
+    }
+else:
+    expected_names = {
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt"
     }
 if (
     association["status"] != "SUCCESS"
@@ -656,6 +782,7 @@ run_id = pv.start_run(
             "chunk_parameter": 507,
             "chunk_bf16_weight": 508,
             "chunk_gather_bf16_weight": 509,
+            "chunk_gather_cache_write_bf16_weight": 510,
         }.get(profile),
     },
     note=(
@@ -754,6 +881,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   fi
   if [[ -f bf16_weight_validation.json ]]; then
     sha256sum bf16_weight_validation.json
+  fi
+  if [[ -f gather_validation.json ]]; then
+    sha256sum gather_validation.json
   fi
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \

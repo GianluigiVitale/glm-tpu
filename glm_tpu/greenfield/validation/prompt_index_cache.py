@@ -709,6 +709,10 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_bf16_weight",
             "divide_sqrt",
         ),
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt": (
+            "xla_chunk_gather_cache_write_bf16_weight",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -851,12 +855,45 @@ def validate_prompt_index_key_association_hlo(
         ]
         if not wk_feature_slices["valid"]:
             forbidden_shapes.append("f32[32,6144]")
+        cache_write_backend = (
+            backend == "xla_chunk_gather_cache_write_bf16_weight"
+        )
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
-            "chunk_key_output": f"bf16[{prompt_chunk},128]" in lowered,
         }
-        if backend == "xla_chunk_gather_bf16_weight":
+        if cache_write_backend:
+            required_shapes.update(
+                {
+                    "accepted_cache_parameter": bool(
+                        re.search(
+                            r"bf16\[24,16,32,128\].*parameter\(",
+                            lowered,
+                        )
+                    ),
+                    "accepted_cache_result": bool(
+                        re.search(
+                            r"entry_computation_layout=.*->"
+                            r"bf16\[24,16,32,128\]",
+                            lowered,
+                        )
+                    ),
+                    "live_block_table_parameter": bool(
+                        re.search(r"s32\[16\].*parameter\(", lowered)
+                    ),
+                    "post_rope_fp32_chunk": (
+                        f"f32[{prompt_chunk},128]" in lowered
+                    ),
+                }
+            )
+        else:
+            required_shapes["chunk_key_output"] = (
+                f"bf16[{prompt_chunk},128]" in lowered
+            )
+        if backend in (
+            "xla_chunk_gather_bf16_weight",
+            "xla_chunk_gather_cache_write_bf16_weight",
+        ):
             required_shapes.update(
                 {
                     "unique_embedding_parameter": bool(
@@ -923,6 +960,30 @@ def validate_prompt_index_key_association_hlo(
         physical_gather_lines = (
             gather_fusion_lines if gather_fusion_lines else raw_gather_lines
         )
+        physical_scatter_lines = [
+            line
+            for line in lowered.splitlines()
+            if re.search(r"\bscatter\(", line)
+        ]
+        cache_scatter_update_bf16 = False
+        if len(physical_scatter_lines) == 1:
+            operands = re.search(
+                r"scatter\(([^)]+)\)", physical_scatter_lines[0]
+            )
+            if operands is not None:
+                operand_names = re.findall(
+                    r"%[a-z0-9_.-]+", operands.group(1)
+                )
+                if operand_names:
+                    update_name = operand_names[-1]
+                    cache_scatter_update_bf16 = any(
+                        re.search(
+                            rf"^\s*{re.escape(update_name)}\s*=\s*"
+                            rf"bf16\[{prompt_chunk},128\]",
+                            line,
+                        )
+                        for line in lowered.splitlines()
+                    )
         gather_producer_names = []
         for line in physical_gather_lines:
             producer = re.match(r"\s*(%[^ ]+)\s*=", line)
@@ -947,6 +1008,7 @@ def validate_prompt_index_key_association_hlo(
         if backend in (
             "xla_chunk_bf16_weight",
             "xla_chunk_gather_bf16_weight",
+            "xla_chunk_gather_cache_write_bf16_weight",
         ):
             if len(bf16_weight_conversion_lines) != 1:
                 violations.append(
@@ -961,7 +1023,10 @@ def validate_prompt_index_key_association_hlo(
             violations.append(
                 "unexpected FP32-to-BF16 wk conversion in FP32 chunk candidate"
             )
-        if backend == "xla_chunk_gather_bf16_weight":
+        if backend in (
+            "xla_chunk_gather_bf16_weight",
+            "xla_chunk_gather_cache_write_bf16_weight",
+        ):
             if len(physical_gather_lines) != 1:
                 violations.append(
                     "expected one physical M2048 embedding gather, "
@@ -974,6 +1039,20 @@ def validate_prompt_index_key_association_hlo(
         elif physical_gather_lines:
             violations.append(
                 "unexpected embedding gather in external-chunk candidate"
+            )
+        if cache_write_backend:
+            if len(physical_scatter_lines) != 1:
+                violations.append(
+                    "expected one physical flat BF16 cache scatter, "
+                    f"found {len(physical_scatter_lines)}"
+                )
+            elif not cache_scatter_update_bf16:
+                violations.append(
+                    "flat cache scatter does not consume BF16 chunk updates"
+                )
+        elif physical_scatter_lines:
+            violations.append(
+                "unexpected cache scatter in compact-key candidate"
             )
         if forbidden_operations:
             violations.append(
@@ -996,6 +1075,8 @@ def validate_prompt_index_key_association_hlo(
             "convolution_weight_bf16": convolution_weight_bf16,
             "gather_coupled_input_rms": gather_coupled_input_rms,
             "physical_embedding_gather_count": len(physical_gather_lines),
+            "physical_cache_scatter_count": len(physical_scatter_lines),
+            "cache_scatter_update_bf16": cache_scatter_update_bf16,
             "forbidden_operations": forbidden_operations,
             "forbidden_shapes": forbidden_shapes,
             "loop_count": len(while_lines),

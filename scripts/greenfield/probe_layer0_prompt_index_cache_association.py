@@ -85,6 +85,7 @@ def _parse_args() -> argparse.Namespace:
             "chunk_parameter",
             "chunk_bf16_weight",
             "chunk_gather_bf16_weight",
+            "chunk_gather_cache_write_bf16_weight",
         ),
         default="matrix",
     )
@@ -93,6 +94,12 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _classify(exact: set[str]) -> str:
+    cache_write = (
+        "accepted_xla_m2048_gather_cache_write_bf16_weight_divide_sqrt"
+        in exact
+    )
+    if cache_write:
+        return "chunk_gather_cache_write_association_sufficient"
     chunk_gather_bf16_weight = (
         "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
         in exact
@@ -151,6 +158,7 @@ def main() -> int:
         Layer0DsaProbeGeometry,
         affine_key_layer_norm,
         layer0_prompt_index_key_chunk,
+        layer0_prompt_index_key_gather_cache_chunk,
         layer0_prompt_index_key_gather_chunk,
         layer0_prompt_index_keys_chunked,
     )
@@ -222,6 +230,17 @@ def main() -> int:
         "manifest_sha256"
     ]:
         raise RuntimeError("prompt cache and layer-0 input disagree")
+    cache_shape = tuple(cache_manifest["source_layout"]["global_cache_shape"])
+    live_block_table_host = np.asarray(
+        cache_manifest["source_layout"]["live_block_table"],
+        dtype=np.int32,
+    )
+    if cache_shape != (24, 16, 32, 128) or (
+        live_block_table_host.shape != (16,)
+    ) or np.any(live_block_table_host < 0) or (
+        np.any(live_block_table_host >= cache_shape[0])
+    ):
+        raise RuntimeError("accepted prompt-cache geometry drifted")
 
     unique_ids = arrays["unique_token_ids"]
     prompt_ids = arrays["prompt_token_ids"]
@@ -360,6 +379,7 @@ def main() -> int:
                     key_norm_bias,
                 ),
                 True,
+                False,
             ),
             "accepted_xla_m2048_divide_sqrt": (
                 xla_divide,
@@ -371,6 +391,7 @@ def main() -> int:
                     key_norm_weight,
                     key_norm_bias,
                 ),
+                False,
                 False,
             ),
             "accepted_xla_m2048_multiply_rsqrt": (
@@ -384,6 +405,7 @@ def main() -> int:
                     key_norm_bias,
                 ),
                 False,
+                False,
             ),
         }
     else:
@@ -395,32 +417,67 @@ def main() -> int:
         position_host = np.arange(padded_tokens, dtype=np.int32).reshape(
             -1, geometry.prompt_chunk
         )
-        if args.candidate_set == "chunk_gather_bf16_weight":
+        if args.candidate_set in (
+            "chunk_gather_bf16_weight",
+            "chunk_gather_cache_write_bf16_weight",
+        ):
             padded_rows_host = np.pad(
                 prompt_rows_host,
                 (0, padded_tokens - prompt_ids.size),
             ).reshape(-1, geometry.prompt_chunk)
-            chunk_inputs = tuple(
-                (
-                    unique_embeddings,
-                    put(padded_rows_host[index]),
-                    put(position_host[index]),
-                    input_norm_weight,
-                    wk_fp32,
-                    key_norm_weight,
-                    key_norm_bias,
+            if args.candidate_set == "chunk_gather_cache_write_bf16_weight":
+                initial_cache = put(
+                    np.zeros(cache_shape, dtype=ml_dtypes.bfloat16)
                 )
-                for index in range(padded_rows_host.shape[0])
-            )
-            chunk_function = partial(
-                layer0_prompt_index_key_gather_chunk,
-                geometry=geometry,
-                key_norm_mode="divide_sqrt",
-                projection_weight_mode="adapted_bf16",
-            )
-            candidate_name = (
-                "accepted_xla_m2048_gather_chunk_bf16_weight_divide_sqrt"
-            )
+                live_block_table = put(live_block_table_host)
+                chunk_inputs = tuple(
+                    (
+                        initial_cache,
+                        live_block_table,
+                        unique_embeddings,
+                        put(padded_rows_host[index]),
+                        put(position_host[index]),
+                        input_norm_weight,
+                        wk_fp32,
+                        key_norm_weight,
+                        key_norm_bias,
+                    )
+                    for index in range(padded_rows_host.shape[0])
+                )
+                chunk_function = partial(
+                    layer0_prompt_index_key_gather_cache_chunk,
+                    geometry=geometry,
+                    key_norm_mode="divide_sqrt",
+                )
+                candidate_name = (
+                    "accepted_xla_m2048_gather_cache_write_bf16_weight_"
+                    "divide_sqrt"
+                )
+                returns_cache = True
+            else:
+                chunk_inputs = tuple(
+                    (
+                        unique_embeddings,
+                        put(padded_rows_host[index]),
+                        put(position_host[index]),
+                        input_norm_weight,
+                        wk_fp32,
+                        key_norm_weight,
+                        key_norm_bias,
+                    )
+                    for index in range(padded_rows_host.shape[0])
+                )
+                chunk_function = partial(
+                    layer0_prompt_index_key_gather_chunk,
+                    geometry=geometry,
+                    key_norm_mode="divide_sqrt",
+                    projection_weight_mode="adapted_bf16",
+                )
+                candidate_name = (
+                    "accepted_xla_m2048_gather_chunk_bf16_weight_"
+                    "divide_sqrt"
+                )
+                returns_cache = False
         else:
             prompt_hidden_host = bf16_host(
                 "unique_embedding_bfloat16_bits"
@@ -456,11 +513,13 @@ def main() -> int:
                 if args.candidate_set == "chunk_bf16_weight"
                 else "accepted_xla_m2048_chunk_parameter_divide_sqrt"
             )
+            returns_cache = False
         definitions = {
             candidate_name: (
                 chunk_function,
                 chunk_inputs[0],
                 False,
+                returns_cache,
             )
         }
     before_memory = _memory_stats(device)
@@ -468,9 +527,15 @@ def main() -> int:
     candidate_tensors: dict[str, np.ndarray] = {}
     hlo_dir = args.output / "hlo"
     hlo_dir.mkdir()
-    for name, (function, arguments, returns_counter) in definitions.items():
+    for name, (
+        function,
+        arguments,
+        returns_counter,
+        returns_cache,
+    ) in definitions.items():
         started = time.monotonic()
-        compiled = jax.jit(function).lower(*arguments).compile()
+        jit_options = {"donate_argnums": (0,)} if returns_cache else {}
+        compiled = jax.jit(function, **jit_options).lower(*arguments).compile()
         compile_seconds = time.monotonic() - started
         hlo = compiled.as_text()
         hlo_path = hlo_dir / f"{name}.optimized_hlo.txt.gz"
@@ -490,7 +555,30 @@ def main() -> int:
             raise RuntimeError(f"prompt-key association HLO failed: {name}: {contract}")
         started = time.monotonic()
         result = compiled(*arguments)
-        if chunk_inputs is not None:
+        if chunk_inputs is not None and returns_cache:
+            paged_cache = result
+            for chunk_arguments in chunk_inputs[1:]:
+                paged_cache = compiled(paged_cache, *chunk_arguments[1:])
+            jax.block_until_ready(paged_cache)
+            cache_host = np.ascontiguousarray(np.asarray(paged_cache))
+            cache_bits = cache_host.view(np.uint16)
+            flat_cache = cache_host.reshape(
+                cache_shape[0], cache_shape[1] * cache_shape[2], cache_shape[3]
+            )
+            live_positions = np.arange(prompt_ids.size, dtype=np.int32)
+            physical_pages = live_block_table_host[
+                live_positions // (cache_shape[1] * cache_shape[2])
+            ]
+            keys = np.ascontiguousarray(
+                flat_cache[
+                    physical_pages,
+                    live_positions % (cache_shape[1] * cache_shape[2]),
+                ]
+            )
+            candidate_tensors[f"{name}_paged_cache_bfloat16_bits"] = (
+                cache_bits
+            )
+        elif chunk_inputs is not None:
             chunk_results = [result]
             for chunk_arguments in chunk_inputs[1:]:
                 chunk_results.append(compiled(*chunk_arguments))

@@ -923,6 +923,29 @@ def _project_keys(
     geometry: Layer0DsaProbeGeometry,
     key_norm_mode: KeyNormMode,
 ) -> Any:
+    return _project_keys_f32(
+        hidden,
+        positions,
+        wk_weight,
+        key_norm_weight,
+        key_norm_bias,
+        geometry=geometry,
+        key_norm_mode=key_norm_mode,
+    ).astype(jnp.bfloat16)
+
+
+def _project_keys_f32(
+    hidden: Any,
+    positions: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry,
+    key_norm_mode: KeyNormMode,
+) -> Any:
+    """Return post-RoPE keys before the accepted BF16 cache-write cast."""
+
     projected = _dot_out_in(
         hidden.astype(jnp.float32),
         wk_weight.astype(jnp.float32),
@@ -949,7 +972,7 @@ def _project_keys(
     )
     return jnp.concatenate(
         (rotated, keys[:, geometry.rotary_dim :]), axis=-1
-    ).astype(jnp.bfloat16)
+    ).astype(jnp.float32)
 
 
 def layer0_dsa_scorer_internals(
@@ -1245,6 +1268,113 @@ def layer0_prompt_index_key_gather_chunk(
         key_norm_mode=key_norm_mode,
         projection_weight_mode=projection_weight_mode,
     )
+
+
+def layer0_prompt_index_key_gather_cache_chunk(
+    index_cache: Any,
+    live_block_table: Any,
+    unique_embeddings: Any,
+    embedding_rows: Any,
+    positions: Any,
+    input_norm_weight: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+    key_norm_mode: KeyNormMode = "divide_sqrt",
+) -> Any:
+    """Write one gathered prompt chunk through the accepted flat cache API.
+
+    The accepted runtime keeps post-RoPE keys in FP32 until
+    ``write_indexer_keys`` casts them at its flat paged-cache scatter.  This
+    bounded helper adapts only that consumer boundary; it does not import the
+    legacy implementation or introduce a full-prompt hidden tensor.
+    """
+
+    if index_cache.ndim != 4 or index_cache.shape[-1] != geometry.head_dim:
+        raise ValueError(
+            "layer-0 prompt index cache must be rank-4 with the exact head dim"
+        )
+    if index_cache.dtype != jnp.bfloat16:
+        raise ValueError("layer-0 prompt index cache must remain BF16")
+    if live_block_table.ndim != 1 or live_block_table.dtype != jnp.int32:
+        raise ValueError("layer-0 live block table must be rank-1 int32")
+    if live_block_table.shape[0] <= 0:
+        raise ValueError("layer-0 live block table cannot be empty")
+
+    expected_shapes = {
+        "unique_embeddings": (
+            unique_embeddings.shape[0],
+            geometry.hidden_size,
+        ),
+        "embedding_rows": (geometry.prompt_chunk,),
+        "positions": (geometry.prompt_chunk,),
+        "input_norm_weight": (geometry.hidden_size,),
+        "wk_weight": (geometry.head_dim, geometry.hidden_size),
+        "key_norm_weight": (geometry.head_dim,),
+        "key_norm_bias": (geometry.head_dim,),
+    }
+    values = {
+        "unique_embeddings": unique_embeddings,
+        "embedding_rows": embedding_rows,
+        "positions": positions,
+        "input_norm_weight": input_norm_weight,
+        "wk_weight": wk_weight,
+        "key_norm_weight": key_norm_weight,
+        "key_norm_bias": key_norm_bias,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 prompt cache-write {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if unique_embeddings.dtype != jnp.bfloat16 or (
+        input_norm_weight.dtype != jnp.bfloat16
+    ) or key_norm_weight.dtype != jnp.bfloat16 or (
+        key_norm_bias.dtype != jnp.bfloat16
+    ):
+        raise ValueError(
+            "layer-0 prompt cache-write embeddings/norms must be BF16"
+        )
+    if embedding_rows.dtype != jnp.int32 or positions.dtype != jnp.int32:
+        raise ValueError(
+            "layer-0 prompt cache-write indices must remain int32"
+        )
+    if wk_weight.dtype != jnp.float32:
+        raise ValueError("layer-0 accepted adapted wk must remain FP32")
+
+    hidden_chunk = jnp.take(unique_embeddings, embedding_rows, axis=0)
+    normalized = rms_norm(
+        hidden_chunk,
+        input_norm_weight,
+        epsilon=geometry.rms_norm_epsilon,
+    )
+    keys_f32 = _project_keys_f32(
+        normalized,
+        positions,
+        wk_weight.astype(jnp.bfloat16),
+        key_norm_weight,
+        key_norm_bias,
+        geometry=geometry,
+        key_norm_mode=key_norm_mode,
+    )
+
+    page_size = index_cache.shape[1] * index_cache.shape[2]
+    flat_cache = index_cache.reshape(-1, geometry.head_dim)
+    logical_blocks = positions // jnp.int32(page_size)
+    physical_pages = jnp.take(live_block_table, logical_blocks, mode="clip")
+    slots = physical_pages * jnp.int32(page_size) + positions % jnp.int32(
+        page_size
+    )
+    valid = positions < jnp.int32(geometry.prompt_tokens)
+    slots = jnp.where(valid, slots, jnp.int32(flat_cache.shape[0]))
+    flat_cache = flat_cache.at[slots].set(
+        keys_f32.astype(index_cache.dtype),
+        mode="drop",
+    )
+    return flat_cache.reshape(index_cache.shape)
 
 
 def layer0_prompt_index_keys_chunked(
