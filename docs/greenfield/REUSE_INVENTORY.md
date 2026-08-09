@@ -21,7 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, DB505--510, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves the gather-coupled input-RMS lowering restores DB507 exactly. The bounded challenger now adapts the accepted FP32-key-to-flat-BF16 paged-cache scatter and awaits one protected comparison before any RoPE change. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, DB505--511, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves the gather-coupled input-RMS lowering restores DB507 exactly; DB511 proves the accepted flat BF16 paged-cache scatter leaves those 45 values unchanged and rejects it as causal. Audit preserved RoPE/pre-RoPE evidence before one source-literal discriminator. |
 | DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -265,3 +265,10 @@ only that consumer in the existing protected harness: the exact `[24,16,32,128]`
 across four chunks, padding writes are dropped, and the HLO contract requires one physical
 scatter plus every DB510 gather/reduction invariant. One protected result is still required;
 the legacy function itself remains oracle-only.
+
+DB511 at `31ab626` supplies that protected result. Its exact physical BF16 scatter and accepted
+flat page addressing reproduce DB510 byte-for-byte, so cache-write association is rejected and the
+adaptation remains diagnostic-only. The next reuse audit targets already-preserved accepted
+RoPE/pre-RoPE artifacts; one literal source-spelling probe is warranted only if those artifacts do
+not already resolve the physical producer. A null probe must lead to a bounded accepted pre-RoPE
+capture rather than further speculative variants.

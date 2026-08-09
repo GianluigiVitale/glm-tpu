@@ -1002,3 +1002,11 @@ matrix duration includes compile/execute orchestration and has no token loop, st
 or throughput standing. It proves the gather-coupled input-RMS association restores DB507's
 45-value near-exact cache result, but remains nonexact. DB484 therefore remains the accepted PP8
 decoder result at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
+
+## DB511 cache-scatter diagnostic — no performance result
+
+DB511 executes one bounded one-host prompt-key/cache-write comparison. Its seven-second elapsed
+value includes compilation/orchestration and is not a token loop, warmed decoder distribution,
+XPlane, or wall-throughput measurement. The exact physical BF16 cache scatter leaves DB510's 45
+mismatches unchanged and is rejected as causal. DB484 remains the accepted PP8 decoder result at
+`244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.

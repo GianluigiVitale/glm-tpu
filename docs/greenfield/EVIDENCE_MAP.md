@@ -476,7 +476,7 @@ capture is still required.
 - Readiness: focused tests pass 27/27. No protected cache artifact/comparison exists yet, so this is
   implementation evidence only and proves no arithmetic cause, decoder result, or performance.
 
-## DB505--510 accepted prompt-cache isolation
+## DB505--511 accepted prompt-cache isolation
 
 - Accepted source: DB505/item1788 captures all 32 final slot-0 snapshots. Corrected parsing proves
   `model=32,dcp=1`, four local/32 physical bitwise replicas, `[24,16,32,128]`, 512-token pages and
@@ -517,7 +517,19 @@ capture is still required.
   operation/state. Manifest `3e29aadc...b0fb`, compressed HLO `cd293af3...7290`, SUCCESS
   `a7660e3e...e165`, evidence `9ed5bdff...5b4f`, remote objects `d4663158...5f9`, DB snapshot
   `50758ad2...e53`, direct remote equality and authenticated 8/8 cleanup pass.
+- DB511/item1796: `...association_20260809T003039938922204Z` at `31ab626` adds the accepted flat
+  BF16 paged-cache scatter while preserving every DB510 producer. Its logical output is unchanged:
+  `52bf55ed...cd8a`, 45 values/45 positions, first 113. This rejects cache address/cast/scatter
+  association as causal.
+- DB511 structure/protection: optimized HLO `d396040f...3938` has exactly one BF16 physical scatter
+  on flat `[12288,128]` cache state, exact aliased `[24,16,32,128]` cache input/output and
+  `s32[16]` table, one gather-coupled RMS producer, one BF16-RHS M2048 convolution, and no
+  loop/communication/callback/forbidden state. Manifest `6cbe954b...bb6`, compressed HLO
+  `e55cecef...c10`, tensor `64e6df3b...130f`, SUCCESS `ec6a4370...a7`, evidence
+  `8978b333...cb25`, remote objects `5d7bb1f6...083f`, DB snapshot `d71012bb...6eae`, direct
+  remote equality and authenticated 8/8 cleanup pass.
 - Decision: diagnostic correctness only. No candidate is exact and no decoder/performance/gate
-  status changes. Gather-coupled input RMS is proven causal for the near-exact regime. Next proof
-  isolates the accepted flat BF16 paged-cache write consumer before changing RoPE math; neither a
+  status changes. Gather-coupled input RMS is proven causal for the near-exact regime; the accepted
+  cache consumer is now rejected. Audit preserved accepted RoPE/pre-RoPE evidence, then run at most
+  one source-literal RoPE discriminator before requiring a new accepted pre-RoPE capture. Neither a
   rejected candidate nor the full decoder should be rerun.

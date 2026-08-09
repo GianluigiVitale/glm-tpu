@@ -5860,3 +5860,25 @@ evidence, remote-object and DB-snapshot SHAs are `a7660e3e...e165`, `9ed5bdff...
 `d4663158...5f9` and `50758ad2...e53`. Critical GCS bytes match, SQLite is `ok`, and pre/post
 censuses are 8/8 clean. DB510 has no decoder/performance claim. The next bounded candidate adds
 only the accepted flat BF16 cache-write consumer and requires its physical scatter before one run.
+
+## 2026-08-09 00:42 — DB511 rejects cache-scatter association; 45 values remain
+
+Protected DB511/item1796 at `31ab626` carries the exact `[24,16,32,128]` accepted cache geometry
+and `s32[16]` live block table through four gather-coupled chunks. It computes post-RoPE keys in
+FP32, addresses the flat 512-token pages, drops padding writes, casts only the scatter update to
+BF16 and reconstructs the 8,155 live logical rows. The result is byte-identical to DB510/DB507:
+SHA `52bf55ed...cd8a`, 45 values at 45 positions, first 113, max `0.015625`, mean
+`3.1539646e-8`. Thus the physical paged-cache write/cast/addressing consumer is not the cause.
+
+HLO `d396040f...3938` contains one BF16 physical scatter, one aliased cache input/output, one live
+block-table input, one embedding gather feeding the accepted input-RMS lowering, one BF16-RHS
+M2048 convolution, exact `wk` slices, and no loop/communication/callback/dead-row/full-prompt
+state. Manifest `6cbe954b...bb6`; compressed HLO `e55cecef...c10`; SUCCESS `ec6a4370...a7`;
+evidence `8978b333...cb25`; DB snapshot `d71012bb...6eae`. DB integrity, direct GCS byte checks,
+approved archive and authenticated 8/8 pre/post cleanup pass.
+
+This removes the last known consumer-side physical delta. The next evidence search is upstream:
+first inspect preserved accepted prompt artifacts for actual RoPE/pre-RoPE HLO or state. Only if
+none exists should one literal accepted-source RoPE spelling be compiled in the same bounded
+harness. A null result requires an accepted pre-RoPE FP32 capture at position 113, not a matrix of
+unmotivated arithmetic variants.

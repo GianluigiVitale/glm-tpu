@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-08 23:16 UTC
+**Updated:** 2026-08-09 00:42 UTC
 
 ## Authority and isolation
 
@@ -2294,3 +2294,31 @@ returns a compact BF16 key tensor directly. Exact next: adapt that already-audit
 interface inside the same bounded harness, using the sealed `[24,16,32,128]` cache and 16-entry
 live block table, require one physical scatter plus all DB510 HLO invariants, and compare once.
 Do not guess at RoPE variants or retry the full decoder first.
+
+## DB511 rejects the accepted flat BF16 cache-write consumer
+
+Protected DB511/item1796,
+`greenfield_layer0_prompt_index_cache_association_20260809T003039938922204Z` at exact pin
+`31ab626547edd7b622bb23d7d994a889cd311eeb`, executes the gather-coupled M2048 candidate through
+the real flat paged-cache addressing and BF16 scatter. Its reconstructed 8,155x128 logical cache is
+byte-identical to DB510/DB507: SHA `52bf55ed...cd8a`, 45 mismatches over 45 positions, first at
+113, max/mean `0.015625/3.1539646e-8`. The accepted cache-write consumer is therefore rejected as
+causal; do not integrate it as a correction or retry the full decoder from this result.
+
+Optimized HLO `d396040f...3938` has exactly one physical BF16 scatter on flat
+`[12288,128]` cache state with a BF16 `[2048,128]` update, the exact `[24,16,32,128]` aliased cache
+input/output and `s32[16]` live block table, one embedding gather feeding the DB510-matched input
+RMS reduction, one BF16-RHS M2048 convolution, exact four-slice `wk` provenance, and zero loops,
+collectives, callbacks or forbidden dead-row/full-prompt state. Compressed HLO SHA is
+`e55cecef...c10` and manifest is `6cbe954b...bb6`.
+
+Association/tensor/summary/SUCCESS/evidence/remote-object/DB-snapshot SHAs are
+`addefc7e...8ebf8`, `64e6df3b...130f`, `8d420541...e1d2`, `ec6a4370...a7`,
+`8978b333...cb25`, `5d7bb1f6...083f`, and `d71012bb...6eae`. Direct approved-bucket reads of
+those objects, HLO, both censuses and terminal SUCCESS equal local bytes; SQLite integrity is
+`ok`; authenticated pre/post censuses are 8/8 clean. This is diagnostic correctness evidence only.
+
+Exact next: audit preserved accepted prompt artifacts for a physical pre-/post-RoPE boundary or
+optimized source HLO. If no such evidence exists, isolate the literal accepted RoPE source spelling
+inside the same gather/RMS/projection/scatter harness. If that is byte-identical to DB511, capture
+the accepted pre-RoPE FP32 row at the first mismatching position rather than guessing more variants.
