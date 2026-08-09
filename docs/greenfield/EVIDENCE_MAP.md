@@ -572,3 +572,14 @@ capture is still required.
   `f32[128,6144] wk` parameter after completed adaptation, while the integrated loop consumes an
   internally dequantized/rounded/promoted value. One bounded materialization plus LP4-scatter
   discriminator is required before another full decoder retry.
+- Bounded attempt `greenfield_layer0_prompt_key_weight_source_internal_20260809T181800Z` at
+  `8dee6b8` compiled the raw-entry arm and passed all existing arithmetic/communication HLO gates,
+  but stopped before execution because TPU flattened the explicit BF16 weight round to
+  `bf16[786432]`; the initial linter admitted only `bf16[128,6144]`. It has no DB/SUCCESS or
+  arithmetic/performance standing. Optimized HLO and the refusal are archived under the approved
+  diagnostic prefix; pre/failure censuses are 8/8 clean.
+- The narrow correction accepts exactly the logical or equivalent flat weight-round shape, retains
+  one raw-U8/zero FP32 entry-weight requirements, and replays as one exact round on both preserved
+  TPU HLOs. Focused tests pass 23/23 and the one-time Fable review returned `APPROVE COMMIT`.
+  One fresh bounded retry is required before choosing an externally materialized repair or moving
+  to the separate LP4-scatter discriminator; no full 8K retry is authorized yet.

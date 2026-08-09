@@ -33,7 +33,7 @@ def test_accepts_materialized_fp32_wk_parameter() -> None:
 def test_accepts_internal_raw_fp8_with_explicit_bf16_round() -> None:
     result = _contract(
         "ENTRY %main (wk: u8[128,6144]) -> bf16[1] {\n"
-        "  %round = bf16[128,6144]{1,0:T(8,128)(2,1)} convert(%mul), "
+        "  %round = bf16[786432]{0:T(1024)(128)(2,1)} convert(%mul), "
         "metadata={op_name=\"convert_element_type\"}\n"
         "  %cache_cast = bf16[24,128,128]{2,1,0} convert(%keys), "
         "metadata={op_name=\"convert_element_type\"}\n"

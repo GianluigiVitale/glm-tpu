@@ -136,7 +136,8 @@ def _projection_weight_source_contract(
     raw_fp8_parameter_count = len(re.findall(r"u8\[128,6144\]", entry))
     bf16_round_count = len(
         re.findall(
-            r"= bf16\[128,6144\](?:\{[^}\n]*\})? convert\([^\n]+\)"
+            r"= bf16\[(?:128,6144|786432)\]"
+            r"(?:\{[^}\n]*\})? convert\([^\n]+\)"
             r"[^\n]*op_name=\"[^\"]*convert_element_type",
             optimized_hlo,
         )

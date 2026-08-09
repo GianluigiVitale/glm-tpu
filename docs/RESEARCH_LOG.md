@@ -6254,3 +6254,24 @@ unmotivated arithmetic variants.
   The correction accepts tiled layouts, is anchored to the `[128,6144]` weight shape, excludes an
   unrelated cache cast in its regression, and passes the focused suite. Fable reviewed only that
   correction and returned `APPROVE COMMIT`; no repeated review is authorized.
+
+## 2026-08-09 18:22 — TPU flattens the internal BF16 round; narrow correction approved
+
+- Bounded attempt `greenfield_layer0_prompt_key_weight_source_internal_20260809T181800Z` at
+  `8dee6b8` passed DB518 lineage, 8/8 pre-census, and one-host four-chip compilation. Existing
+  projection-input, M64 projection/key-norm, RoPE, scatter and no-communication contracts pass.
+- The new raw-weight gate correctly finds one entry `u8[128,6144]` and zero entry
+  `f32[128,6144]` parameters, but the initial logical-shape matcher reports zero BF16 rounds.
+  Preserved optimized HLO proves the round exists as a flattened chain:
+  `f32[786432] multiply -> bf16[786432] convert -> f32[786432] convert`, followed by reshape to
+  `[128,6144]`. Arithmetic did not execute, so there is no comparison, DB row, SUCCESS, Gate-D or
+  performance claim.
+- The approved diagnostic prefix contains all three optimized HLOs, the refusal contract and both
+  authenticated censuses; failure cleanup is 8/8 clean. The correction admits only the equivalent
+  logical or flat weight shape while retaining the exact BF16-convert metadata and entry-parameter
+  gates. Replay against both real TPU modules finds exactly one round; unrelated cache casts do not
+  collide. Focused tests pass 23/23.
+- Fable's one-time narrow review independently followed the flat producer back through the raw-U8
+  gather/dequant/scale chain and returned `APPROVE COMMIT`. Next is commit/push and one fresh-tag
+  bounded retry. This probe discriminates materialization arithmetic, not yet production LP4
+  scatter, and it does not authorize a full 8K retry by itself.

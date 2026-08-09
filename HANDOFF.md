@@ -2755,3 +2755,30 @@ diff review caught that the first matcher omitted optimized-HLO layout annotatio
 falsely refused the raw-FP8 arm. The matcher is now anchored to layout-tolerant
 `bf16[128,6144]` conversion rather than unrelated cache casts; focused tests pass and Fable's
 narrow blocker-only follow-up returned `APPROVE COMMIT`. Do not re-review this frozen batch.
+
+## First internal-weight discriminator stops only on flattened BF16-round HLO
+
+Bounded protected attempt
+`greenfield_layer0_prompt_key_weight_source_internal_20260809T181800Z` at pushed pin `8dee6b8`
+passed DB518 source/lowering identity, the authenticated 8/8 pre-census, and one-host four-chip
+compilation of the projection-input, cache and producer-state programs. Every existing M64
+projection, physical key-LayerNorm, RoPE, cache-scatter and no-communication contract passes. The
+new raw-weight contract also sees exactly one entry `u8[128,6144]` parameter and zero entry
+`f32[128,6144]` parameters.
+
+It stopped before arithmetic because optimized TPU HLO flattens the explicit adapted-weight round:
+`f32[786432] multiply -> bf16[786432] convert -> f32[786432] convert -> reshape[128,6144]`.
+The initial linter admitted only the logically shaped `bf16[128,6144]` form and therefore reported
+zero rounds. No cache/producer comparison, DB row, terminal `SUCCESS`, decoder, Gate-D, latency or
+performance conclusion exists. The exact HLO/contract diagnostics are archived under the approved
+`diagnostic_local` prefix and the failure-exit census is authenticated 8/8 `CENSUS_OK`.
+
+The correction admits only the two equivalent weight shapes, `[128,6144]` or flat `[786432]`, on a
+single-line BF16 convert with the existing convert metadata; raw-entry and materialized-entry
+discriminators remain unchanged. Replay against both preserved TPU HLOs finds exactly one round and
+passes, while cache casts have different shapes. Focused tests pass 23/23, diff checks pass, and
+Fable's one-time narrow review independently traced the flat value to the raw `wk` dequantization
+chain and returned `APPROVE COMMIT`. Exact next: commit/push this two-file correction, prove the
+fleet idle, and rerun the bounded raw-internal probe with a fresh append-only tag. This comparator
+tests internal materialization arithmetic; it is not yet a production LP4-scatter proof. Do not
+launch another full 8K decoder first.
