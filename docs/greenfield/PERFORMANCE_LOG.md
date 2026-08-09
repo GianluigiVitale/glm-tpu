@@ -1035,3 +1035,12 @@ materialization changes every cache position, but its elapsed time includes comp
 orchestration and cache comparison. It has no decoder loop, warmed wall distribution, XPlane or
 token-rate standing. DB484 remains the accepted PP8 point at `244.091151 ms` p50 and
 `4.096830 tok/s`; Gate E remains open.
+
+## DB520 and split-boundary full retry — no performance result
+
+DB520 is an 11-second bounded four-chip arithmetic/HLO proof, not decoder latency. The following
+full 8K run at `5a41bb2` spent 2h15 on distributed load, compilation and 8,155-token prefill, then
+failed the first DSA observer step before warmup, timing or tracing. Token `101252` and event-0 set
+are exact; event 1 has seven swaps. There is no wall distribution, XPlane, DB row or `SUCCESS`.
+DB484 therefore remains the only accepted PP8 decoder point at `244.091151 ms` p50 /
+`4.096830 tok/s`; Gate E remains open pending the fused-qkv plus repair composition.

@@ -64,6 +64,27 @@ def test_protected_runner_classifies_prefill_loops_fail_closed() -> None:
     assert '["loop_count"] != 1' not in runner
 
 
+def test_selected_linear_runtime_defaults_to_fused_qkv_gate_b_artifact() -> None:
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert (
+        "greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z"
+        in runner
+    )
+    assert (
+        "123394906a153238e464fc096b626c77996b7cf22b95077b9377b8dcafbe699a"
+        in runner
+    )
+    assert (
+        "523afb1dc1ff2b954a9795c4deabdc4fd599c244c0bf1a9e3b8f971700548cb4"
+        in runner
+    )
+    assert (
+        "protected prefill repair requires the Gate-B-approved fused qkv-a runtime"
+        in runner
+    )
+
+
 def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
     runner = PROTECTED_RUNNER.read_text()
@@ -97,6 +118,10 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert 'repair["repair_collectives"]' in runner
     assert 'repair["repair_weight_round_count"] != 0' in runner
     assert "results_db_run_id\": 519" in runner
+    assert "results_db_run_id\": 520" in runner
+    assert "greenfield_layer0_prompt_key_norm_m64_20260809T200559393031635Z" in runner
+    assert "prefill_index_weight_split_prerequisite" in runner
+    assert "DB520 direct remote SUCCESS hash drifted" in runner
     assert "external_stage_local_raw_fp8_to_bf16" in runner
     assert "external_stage_local_bf16_to_fp32" in runner
     assert "prefill_wk_materialization_hlo_contract" in runner

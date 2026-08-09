@@ -321,3 +321,10 @@ production path therefore completes only the five padded stage-local `wk` slots 
 raw-FP8 -> BF16 -> FP32 executable and passes them into repair. The existing DB518 wrapper is
 extended for the required four-lane owner/scatter proof; no second cache oracle is added and no full
 decoder may run until that protected cache is bitwise exact.
+
+DB520 now supplies that exact four-lane cache proof with separate completed BF16-decode and
+FP32-promotion executables. The subsequent full retry restores event-0 membership but used the old
+separate-qkv artifact and reproduces the old event-1 seven-swap set. Reuse the existing DB502--504
+fused N82 runtime together with DB520 repair next; do not create another qkv kernel or cache
+oracle. The protected launcher must default the selected linear engine to fused runtime
+`12339490...699a`, reject repair on a separate-qkv layout, and pin DB520 before fleet work.

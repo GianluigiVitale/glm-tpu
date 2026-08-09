@@ -215,10 +215,10 @@ case "$RUNTIME_KIND" in
     readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_pallas_feature
     ;;
   pallas_feature_linear)
-    readonly RUNTIME_TAG=${GLM_GREENFIELD_FEATURE_RUNTIME_TAG:-greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z}
+    readonly RUNTIME_TAG=${GLM_GREENFIELD_FEATURE_RUNTIME_TAG:-greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z}
     readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/$RUNTIME_TAG
-    readonly RUNTIME_MANIFEST_SHA=${GLM_GREENFIELD_FEATURE_RUNTIME_MANIFEST_SHA:-54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917}
-    readonly RUNTIME_LAYOUT_HASH=${GLM_GREENFIELD_FEATURE_RUNTIME_LAYOUT_HASH:-ba21c4ec1500837f17a53047da98a7ed7c3a06782ddffe49d8bd796d4d0d1c9e}
+    readonly RUNTIME_MANIFEST_SHA=${GLM_GREENFIELD_FEATURE_RUNTIME_MANIFEST_SHA:-123394906a153238e464fc096b626c77996b7cf22b95077b9377b8dcafbe699a}
+    readonly RUNTIME_LAYOUT_HASH=${GLM_GREENFIELD_FEATURE_RUNTIME_LAYOUT_HASH:-523afb1dc1ff2b954a9795c4deabdc4fd599c244c0bf1a9e3b8f971700548cb4}
     readonly SPARSE_MOE_BACKEND=pallas_feature
     readonly HLO_BACKEND_CONTRACT=tpu_v4_pp8_pallas_feature_linear
     ;;
@@ -247,6 +247,10 @@ print(backends[layout], payload // 8)
 PY
 )
 readonly ATTENTION_PROJECTION_BACKEND EXPECTED_LOADED_PAYLOAD_BYTES
+if [[ $PREFILL_INDEX_REPAIR == 1 && $ATTENTION_PROJECTION_BACKEND != fused_n82_convolution ]]; then
+  echo "protected prefill repair requires the Gate-B-approved fused qkv-a runtime" >&2
+  exit 2
+fi
 if [[ $RUNTIME_KIND == reference && $FEATURE_OUTPUT_TILE != 128 ]]; then
   echo "a non-default feature output tile requires a feature runtime" >&2
   exit 2
@@ -269,7 +273,11 @@ if [[ $PREFILL_INDEX_REPAIR == 1 ]]; then
   readonly PREFILL_REPAIR_PREREQUISITE_DIR=/home/gianl/glm-run/$PREFILL_REPAIR_PREREQUISITE_TAG
   readonly PREFILL_REPAIR_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$PREFILL_REPAIR_PREREQUISITE_TAG
   readonly PREFILL_REPAIR_PREREQUISITE_SUCCESS_SHA=a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee
-  /home/gianl/vllm-env/bin/python - "$PREFILL_REPAIR_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
+  readonly PREFILL_SPLIT_PREREQUISITE_TAG=greenfield_layer0_prompt_key_norm_m64_20260809T200559393031635Z
+  readonly PREFILL_SPLIT_PREREQUISITE_DIR=/home/gianl/glm-run/$PREFILL_SPLIT_PREREQUISITE_TAG
+  readonly PREFILL_SPLIT_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$PREFILL_SPLIT_PREREQUISITE_TAG
+  readonly PREFILL_SPLIT_PREREQUISITE_SUCCESS_SHA=643f80eb8699e18714213bb828a72df8a9f89ba2db1e798ad598dd914a2083ca
+  /home/gianl/vllm-env/bin/python - "$PREFILL_REPAIR_PREREQUISITE_DIR" "$RESULTS_DB" "$PREFILL_SPLIT_PREREQUISITE_DIR" <<'PY'
 from __future__ import annotations
 
 from hashlib import sha256
@@ -281,6 +289,7 @@ import sys
 
 run_dir = Path(sys.argv[1])
 db_path = Path(sys.argv[2])
+split_run_dir = Path(sys.argv[3])
 hashes = {
     "SUCCESS": "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee",
     "summary.json": "8a8823de3dff03bc8827daef4cd38f5b09a80ad691ddea9aed0372808627a210",
@@ -339,6 +348,63 @@ for name in ("census_pre.txt", "census_post.txt"):
     workers = re.findall(r"^CENSUS_OK .*?-w-([0-7])$", (run_dir / name).read_text(), re.M)
     if sorted(workers) != list("01234567"):
         raise SystemExit(f"DB518 prerequisite {name} is not 8/8 clean")
+split_hashes = {
+    "SUCCESS": "643f80eb8699e18714213bb828a72df8a9f89ba2db1e798ad598dd914a2083ca",
+    "summary.json": "260b7e2a2adabe4456604ecd6d832d377604e3149ad12417ad3db4a6280e911e",
+    "comparison/comparison.json": "e0c637db7fc9add403ad16231b4c19e23ac06f5c8178034500e1c06bb3766ee9",
+    "results_ckpt.db": "d466adc91aaca62e09c669f877b8577d9ee65b3f9959e01588730dc32d279581",
+    "remote_objects.json": "599ba9f1270f6ca93c8f3d823b0209bfaa51c61d350ac2efde7569aed22daffd",
+    "census_pre.txt": "c03e0acb293823a042d9c01742a6b75e9f2bbf856e89fd6539f6eeb5bafcaed9",
+    "census_post.txt": "9c352ab39032bdf774a8cfbe9027e3800d893aae6aa5d2ce89ed37298fb21e90",
+    "evidence.sha256": "b60f6627c3cf8265c155168afedbf6499336132929444b779c06abee0dd93add",
+}
+for relative, expected in split_hashes.items():
+    path = split_run_dir / relative
+    if not path.is_file() or sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"DB520 prerequisite hash drifted: {relative}")
+split_summary = json.loads((split_run_dir / "summary.json").read_text())
+lp4 = split_summary.get("lp4_materialized_repair", {})
+phase_hlo = lp4.get("hlo", {})
+if (
+    split_summary.get("status") != "SUCCESS"
+    or split_summary.get("results_db_run_id") != 520
+    or split_summary.get("results_db_item_row_id") != 1805
+    or split_summary.get("code_hash") != "097702266d025f2887418e06898eae781615972c"
+    or split_summary.get("comparison_manifest_sha256") != "1e94255557c475dac4335a0120f3448e8754135c44dde747a888cb3c2de08a59"
+    or not split_summary.get("cache_elementwise_exact")
+    or not split_summary.get("state_elementwise_exact")
+    or not lp4.get("assembled_cache_elementwise_exact")
+    or lp4.get("assembled_cache_sha256") != "3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1"
+    or not lp4.get("owner_isolation_exact")
+    or lp4.get("per_lane_written_rows") != [2048, 2048, 2048, 2011]
+    or len(lp4.get("materialized_shards", ())) != 4
+    or not all(
+        shard.get("comparison", {}).get("elementwise_exact")
+        and shard.get("sha256") == "d680f7b1c2fed426174c41ee9153d9db47f5db8ec0e803e20d8853ec1f483469"
+        for shard in lp4.get("materialized_shards", ())
+    )
+):
+    raise SystemExit("DB520 prerequisite summary drifted")
+for name, backend, hlo_sha in (
+    ("lp4_wk_decode_bf16", "external_stage_local_raw_fp8_to_bf16", "08b6c59f96be27dc723337c24ba047d5501e20abfc150f07c3568bdf2b2ab2f9"),
+    ("lp4_wk_promote_fp32", "external_stage_local_bf16_to_fp32", "1c107d68ee21356711f6b0ead7b721104e2266754c9d668fcd93516b81e5b1f8"),
+):
+    record = phase_hlo.get(name, {})
+    contract = record.get("contract", {})
+    if (
+        not contract.get("passed")
+        or contract.get("backend") != backend
+        or contract.get("collective_count") != 0
+        or contract.get("host_markers")
+        or record.get("optimized_hlo_sha256") != hlo_sha
+    ):
+        raise SystemExit(f"DB520 prerequisite {name} HLO drifted")
+for name in ("census_pre.txt", "census_post.txt"):
+    workers = re.findall(
+        r"^CENSUS_OK .*?-w-([0-7])$", (split_run_dir / name).read_text(), re.M
+    )
+    if sorted(workers) != list("01234567"):
+        raise SystemExit(f"DB520 prerequisite {name} is not 8/8 clean")
 with sqlite3.connect(db_path) as conn:
     if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
         raise SystemExit("live results DB integrity failed")
@@ -347,6 +413,12 @@ with sqlite3.connect(db_path) as conn:
     ).fetchone()
     item = conn.execute(
         "SELECT run_id,benchmark,item_id,correct,score,n_prompt_tokens FROM items WHERE id=1803"
+    ).fetchone()
+    split_run = conn.execute(
+        "SELECT model,harness_git,pod FROM runs WHERE run_id=520"
+    ).fetchone()
+    split_item = conn.execute(
+        "SELECT run_id,benchmark,item_id,correct,score,n_prompt_tokens FROM items WHERE id=1805"
     ).fetchone()
 if run != (
     "zai-org/GLM-5.2-FP8:greenfield-layer0-prompt-key-norm-m64",
@@ -361,10 +433,28 @@ if run != (
     8155,
 ):
     raise SystemExit("live DB518/item1803 prerequisite linkage drifted")
+if split_run != (
+    "zai-org/GLM-5.2-FP8:greenfield-layer0-prompt-key-norm-m64",
+    "0977022",
+    "db-v4-64-od",
+) or split_item != (
+    520,
+    "greenfield_layer0_prompt_key_norm_association",
+    "adapted_fp32_m64_projection_keynorm_materialized_lp4_stage_local",
+    1,
+    1.0,
+    8155,
+):
+    raise SystemExit("live DB520/item1805 prerequisite linkage drifted")
 PY
   remote_success_sha=$(gcloud storage cat "$PREFILL_REPAIR_PREREQUISITE_REMOTE/SUCCESS" | sha256sum | awk '{print $1}')
   [[ $remote_success_sha == "$PREFILL_REPAIR_PREREQUISITE_SUCCESS_SHA" ]] || {
     echo "DB518 direct remote SUCCESS hash drifted" >&2
+    exit 2
+  }
+  split_remote_success_sha=$(gcloud storage cat "$PREFILL_SPLIT_PREREQUISITE_REMOTE/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $split_remote_success_sha == "$PREFILL_SPLIT_PREREQUISITE_SUCCESS_SHA" ]] || {
+    echo "DB520 direct remote SUCCESS hash drifted" >&2
     exit 2
   }
 fi
@@ -1451,6 +1541,18 @@ summary = {
             "comparison_manifest_sha256": "b96697994106a2a0058a800d2c4de9ec4b45e382c181541041fcead548848d42",
             "results_db_item_row_id": 1804,
             "results_db_run_id": 519,
+        }
+        if prefill_index_repair
+        else None
+    ),
+    "prefill_index_weight_split_prerequisite": (
+        {
+            "candidate_cache_sha256": "3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1",
+            "code_hash": "097702266d025f2887418e06898eae781615972c",
+            "comparison_manifest_sha256": "1e94255557c475dac4335a0120f3448e8754135c44dde747a888cb3c2de08a59",
+            "results_db_item_row_id": 1805,
+            "results_db_run_id": 520,
+            "success_sha256": "643f80eb8699e18714213bb828a72df8a9f89ba2db1e798ad598dd914a2083ca",
         }
         if prefill_index_repair
         else None

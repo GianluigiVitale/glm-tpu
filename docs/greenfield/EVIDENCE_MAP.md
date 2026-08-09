@@ -668,3 +668,20 @@ capture is still required.
   `d466adc9...79581`, remote ledger `599ba9f1...affd`, approved archive and 8/8 cleanup pass.
 - This is bounded arithmetic evidence, not Gate D or performance proof. It authorizes production
   split-boundary wiring and one protected full 8K retry after tests and a one-time diff audit.
+
+## Split-boundary full 8K refusal and missing fused composition
+
+- Refused run: `5a41bb2`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_trace2_20260809T201759614361573Z`,
+  20:18--22:33 UTC. Complete load/compile and 8,155-token prefill pass; five-slot split
+  materialization and repair HLO contracts pass with zero communication/callback.
+- Correctness: token `101252` and event-0 selected set are exact. Event 1 is the first failure at
+  seven swaps, identical to the separate-qkv/no-repair baseline; later events diverge. The run
+  refuses before warmup/timing/trace/DB/final `SUCCESS` and has no Gate-D/E standing.
+- Seals: observation `4fb4b087...2fc7c`, NPZ `427329b0...a6f`, token JSON
+  `e5e35f3b...03c`, eight identical logs `c0296290...b83e`, pre/failure censuses
+  `2140efa1...4580` / `56f8622d...b2a8`; failure cleanup is authenticated 8/8.
+- Configuration finding: runtime `54e2f89b...d9917` was the old separate-qkv artifact. It does not
+  test the fused N82 runtime `12339490...699a` together with DB520 repair. DB502--504 and DB520
+  independently prove those two boundaries, so their protected composition is the exact next
+  integration result after the launcher-safety diff passes tests and one review.

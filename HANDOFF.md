@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 11:21 UTC
+**Updated:** 2026-08-09 22:55 UTC
 
 ## Authority and isolation
 
@@ -2897,3 +2897,33 @@ snapshot `d466adc9...79581`, remote ledger `599ba9f1...affd`, approved archive a
 The production successor applies those same two completed programs to the five local full-indexer
 slots before unchanged repair. Exact next: focused tests, one Fable audit of only that production
 diff, commit/push, then one protected full 8K retry through exact DSA and timing gates.
+
+## Split-boundary 8K retry closes the repair regression; selected-runtime guard is next
+
+Protected run
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_trace2_20260809T201759614361573Z`
+ran from 20:18--22:33 UTC at pushed pin `5a41bb2`. It loaded the complete checkpoint, compiled the
+78-layer prefill/decoder/observer, executed all 8,155 teacher-forced prompt tokens, and passed the
+split materializer HLO contract: five stage-local slots, separate BF16 decode and FP32 promotion,
+zero materializer collectives/callbacks, and zero repair-side weight round.
+
+The first token remains exact at `101252`. Event 0 again has the exact 2,048-member selected set,
+so the bad four-swap result from the combined materializer is removed. The observer still refuses
+before warmup/timing: event 1 is the earliest set failure at seven swaps, identical in membership
+to the pre-repair separate-qkv baseline, and later events diverge. There is no XPlane, wall
+distribution, DB row, terminal `SUCCESS`, Gate-D or performance claim. Observation payload SHA is
+`4fb4b087...2fc7c`; NPZ SHA is `427329b0...a6f`; eight logs are byte-identical at
+`c0296290...b83e`; pre/failure censuses `2140efa1...4580` / `56f8622d...b2a8` authenticate 8/8
+clean hosts.
+
+The run used runtime manifest `54e2f89b...d9917`, the older separate q-a/kv-a artifact. It did not
+exercise the already-proven fused N82 checkpoint (`12339490...699a`) together with the repaired
+prompt-cache path. The fused-only full run had improved event 1 from seven to six swaps; DB502--504
+prove its q-a/kv-a arithmetic, final layout, direct load and 78 physical convolutions, while
+DB520 proves the repair's split materialization and layer-0 LP4 cache exactly. Their composition is
+the next evidence-backed integration candidate, not a new arithmetic hypothesis.
+
+The current narrow launch-safety batch makes the fused Gate-B artifact the selected linear-runtime
+default, refuses protected repair with a separate-qkv runtime, and pins local/DB/remote DB520
+evidence before fleet work. Exact next: focused/static tests, one new-diff-only Fable approval,
+commit/push, idle-fleet proof, then one combined fused-qkv plus split-repair protected 8K run.

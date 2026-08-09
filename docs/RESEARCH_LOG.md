@@ -6376,3 +6376,26 @@ unmotivated arithmetic variants.
   the bounded arithmetic blocker but contains no decoder or performance result.
 - Production now needs the identical two-completion boundary for its five local slots. After one
   new-diff Fable audit, a protected full 8K retry is authorized; exact DSA must pass before timing.
+
+## 2026-08-09 22:55 — Full repair retry restores baseline but exposes stale runtime selection
+
+- The protected 8K retry at `5a41bb2`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_trace2_20260809T201759614361573Z`,
+  ran for 2h15. It loaded/compiled the 78-layer programs, executed the 8,155-token prefill, and
+  passed the five-slot two-completion materializer plus repair HLO gates.
+- Token `101252` and event-0 selected membership are exact. Event 1 is the first selected-set
+  failure at seven swaps, exactly the same membership delta as the old separate-qkv/no-repair
+  baseline. This proves the split boundary removes the earlier four-swap event-0 regression but
+  does not solve the independent q-a trajectory boundary.
+- The run stopped before warmup/timing/trace/DB/SUCCESS. The DSA observation SHA is
+  `4fb4b087...2fc7c`, NPZ `427329b0...a6f`, identical rank logs `c0296290...b83e`, and the
+  authenticated failure census is 8/8 clean at `56f8622d...b2a8`.
+- The launcher selected old runtime `54e2f89b...d9917`. The already Gate-B-proven fused runtime
+  `12339490...699a` was therefore not combined with the new repair. Fused-only evidence reduces
+  event 1 to six swaps; DB502--504 and DB520 independently close the two arithmetic/layout
+  boundaries. The next protected candidate is their first composition.
+- The narrow safety correction defaults `pallas_feature_linear` to the fused artifact, rejects
+  protected repair on a separate-qkv layout, and verifies DB520 local hashes, exact LP4 summary,
+  HLO phase identities, DB520/item1805 linkage, remote SUCCESS and 8/8 cleanup before launch. Run
+  focused tests and one new-diff Fable audit before commit/deployment; cleared arithmetic is not
+  reviewed again.
