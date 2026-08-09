@@ -14,6 +14,12 @@ import numpy as np
 
 
 ARTIFACT_KIND = "glm52_legacy_layer0_prompt_index_cache"
+PROMPT_KEY_INTERNAL_ARTIFACT_KIND = (
+    "glm52_legacy_dsa_prompt_key_internal_state"
+)
+PROMPT_KEY_INTERNAL_CAPTURE_KIND = (
+    "glm52_legacy_prompt_key_internal_capture"
+)
 FORMAT_VERSION = 1
 MODEL_ID = "zai-org/GLM-5.2-FP8"
 _SLICE_RE = re.compile(
@@ -129,6 +135,245 @@ class LegacyPromptIndexCacheConfig:
             raise ValueError("prompt-cache logical page must preserve packing 32")
         if not self.run_tag:
             raise ValueError("prompt-cache run tag must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyPromptKeyInternalConfig:
+    """Immutable identities for one accepted prompt-key producer row."""
+
+    source_dump_dir: Path
+    output_dir: Path
+    expected_run_tag: str
+    expected_legacy_code_hash: str
+    expected_oracle_pin: str
+    expected_layer_name: str = "model.layers.0.self_attn.attn"
+    expected_position: int = 113
+    expected_process_count: int = 8
+    expected_model_id: str = MODEL_ID
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "source_dump_dir", Path(self.source_dump_dir))
+        object.__setattr__(self, "output_dir", Path(self.output_dir))
+        for name in ("expected_legacy_code_hash", "expected_oracle_pin"):
+            value = getattr(self, name)
+            if len(value) != 40 or any(
+                character not in "0123456789abcdef" for character in value
+            ):
+                raise ValueError(f"invalid prompt-key internal digest: {name}")
+        if self.expected_position < 0 or self.expected_process_count <= 0:
+            raise ValueError("prompt-key internal position/process count drifted")
+        if not self.expected_run_tag or not self.expected_layer_name:
+            raise ValueError("prompt-key internal identity is incomplete")
+
+
+def inspect_legacy_prompt_key_internal_capture(
+    config: LegacyPromptKeyInternalConfig,
+) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+    """Validate and seal every replica of one accepted FP32 key row."""
+
+    if config.output_dir.exists():
+        raise FileExistsError(
+            f"append-only prompt-key capture exists: {config.output_dir}"
+        )
+    errors = sorted(config.source_dump_dir.rglob("*.INTERNAL.ERROR.*"))
+    if errors:
+        raise ValueError(f"prompt-key observer error exists: {errors[0]}")
+    safe_layer = config.expected_layer_name.replace("/", "_").replace(
+        ".", "_"
+    )
+    paths = sorted(
+        config.source_dump_dir.rglob(
+            f"*.{safe_layer}.position{config.expected_position}.proc*.npz"
+        )
+    )
+    if not paths or len(paths) > config.expected_process_count:
+        raise ValueError(
+            "prompt-key internal process coverage drifted: "
+            f"found={len(paths)}"
+        )
+    fields = (
+        "pre_layer_norm_key",
+        "pre_rope_key",
+        "post_rope_key",
+    )
+    scalar_keys = {
+        "artifact_kind",
+        "format_version",
+        "capture_mode",
+        "process_index",
+        "process_count",
+        "layer_name",
+        "position",
+        "source_row",
+        "run_tag",
+        "code_hash",
+        "oracle_pin",
+        "model_id",
+    }
+    expected_keys = scalar_keys | set(fields) | {
+        f"{name}__dtype" for name in fields
+    }
+    canonical: dict[str, np.ndarray] | None = None
+    process_indices: set[int] = set()
+    records: list[dict[str, Any]] = []
+    for path in paths:
+        with np.load(path, allow_pickle=False) as payload:
+            if set(payload.files) != expected_keys:
+                raise ValueError(f"{path}: prompt-key internal keys drifted")
+            expected_scalars = {
+                "artifact_kind": PROMPT_KEY_INTERNAL_ARTIFACT_KIND,
+                "format_version": FORMAT_VERSION,
+                "capture_mode": "prompt_key",
+                "process_count": config.expected_process_count,
+                "layer_name": config.expected_layer_name,
+                "position": config.expected_position,
+                "source_row": config.expected_position,
+                "run_tag": config.expected_run_tag,
+                "code_hash": config.expected_legacy_code_hash,
+                "oracle_pin": config.expected_oracle_pin,
+                "model_id": config.expected_model_id,
+            }
+            for name, expected in expected_scalars.items():
+                value = payload[name]
+                if value.shape != () or value.item() != expected:
+                    raise ValueError(
+                        f"{path}: {name} identity drifted"
+                    )
+            process_index = int(payload["process_index"].item())
+            if not 0 <= process_index < config.expected_process_count or (
+                process_index in process_indices
+            ):
+                raise ValueError(f"{path}: prompt-key process identity drifted")
+            process_indices.add(process_index)
+            current: dict[str, np.ndarray] = {}
+            for name in fields:
+                value = np.ascontiguousarray(payload[name])
+                if (
+                    str(payload[f"{name}__dtype"].item()) != "float32"
+                    or value.dtype != np.float32
+                    or value.shape != (128,)
+                    or not np.isfinite(value).all()
+                ):
+                    raise ValueError(
+                        f"{path}: prompt-key {name} tensor drifted"
+                    )
+                current[name] = value
+            if canonical is None:
+                canonical = current
+            elif any(
+                not np.array_equal(current[name], canonical[name])
+                for name in fields
+            ):
+                raise ValueError("prompt-key replicas are not bitwise equal")
+            records.append(
+                {
+                    "byte_count": path.stat().st_size,
+                    "path": path.relative_to(config.source_dump_dir).as_posix(),
+                    "process_index": process_index,
+                    "sha256": _sha256_file(path),
+                }
+            )
+    assert canonical is not None
+    config.output_dir.mkdir(parents=True)
+    tensor_path = config.output_dir / "accepted_prompt_key_states.npz"
+    np.savez(tensor_path, **canonical)
+    manifest = {
+        "artifact_kind": PROMPT_KEY_INTERNAL_CAPTURE_KIND,
+        "capture_mode": "prompt_key",
+        "capture_process_indices": sorted(process_indices),
+        "diagnostic_only": True,
+        "fields": {
+            name: {
+                "dtype": "float32",
+                "sha256": _array_sha256(canonical[name]),
+                "shape": [128],
+            }
+            for name in fields
+        },
+        "format_version": FORMAT_VERSION,
+        "layer_name": config.expected_layer_name,
+        "legacy_code_hash": config.expected_legacy_code_hash,
+        "model_id": config.expected_model_id,
+        "oracle_pin": config.expected_oracle_pin,
+        "performance_claim": False,
+        "position": config.expected_position,
+        "process_count": config.expected_process_count,
+        "process_files": sorted(
+            records, key=lambda value: value["process_index"]
+        ),
+        "run_tag": config.expected_run_tag,
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _sha256_file(tensor_path),
+        },
+    }
+    manifest["manifest_sha256"] = _manifest_hash(manifest)
+    (config.output_dir / "capture.json").write_text(
+        json.dumps(manifest, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+    return manifest, canonical
+
+
+def compare_prompt_key_internal_states(
+    accepted: dict[str, np.ndarray],
+    observed: dict[str, np.ndarray],
+) -> dict[str, Any]:
+    """Compare the three ordered FP32 prompt-key producer boundaries."""
+
+    fields = (
+        "pre_layer_norm_key",
+        "pre_rope_key",
+        "post_rope_key",
+    )
+    if set(accepted) != set(fields) or set(observed) != set(fields):
+        raise ValueError("prompt-key comparison field set drifted")
+    records: dict[str, Any] = {}
+    first_divergent_field: str | None = None
+    for name in fields:
+        expected = np.ascontiguousarray(accepted[name])
+        actual = np.ascontiguousarray(observed[name])
+        if expected.shape != (128,) or actual.shape != (128,) or (
+            expected.dtype != np.float32 or actual.dtype != np.float32
+        ):
+            raise ValueError(f"prompt-key comparison tensor drifted: {name}")
+        if not np.isfinite(expected).all() or not np.isfinite(actual).all():
+            raise ValueError(f"prompt-key comparison tensor is non-finite: {name}")
+        mismatch = expected != actual
+        mismatch_indices = np.flatnonzero(mismatch)
+        absolute_error = np.abs(expected.astype(np.float64) - actual)
+        exact = mismatch_indices.size == 0
+        if not exact and first_divergent_field is None:
+            first_divergent_field = name
+        records[name] = {
+            "accepted_sha256": _array_sha256(expected),
+            "elementwise_exact": exact,
+            "first_mismatch_dimension": (
+                None if exact else int(mismatch_indices[0])
+            ),
+            "max_absolute_error": float(absolute_error.max(initial=0.0)),
+            "mean_absolute_error": float(absolute_error.mean()),
+            "mismatch_count": int(mismatch_indices.size),
+            "observed_sha256": _array_sha256(actual),
+            "p99_absolute_error": float(
+                np.quantile(absolute_error, 0.99, method="higher")
+            ),
+            "signed_mean_error": float(
+                (actual.astype(np.float64) - expected).mean()
+            ),
+        }
+    classification = {
+        "pre_layer_norm_key": "projection_association",
+        "pre_rope_key": "key_layer_norm_association",
+        "post_rope_key": "rope_association",
+        None: "producer_states_elementwise_exact",
+    }[first_divergent_field]
+    return {
+        "all_fields_elementwise_exact": first_divergent_field is None,
+        "classification": classification,
+        "fields": records,
+        "first_divergent_field": first_divergent_field,
+    }
 
 
 def _load_source_cache(
@@ -720,6 +965,13 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
             "divide_sqrt",
         ),
+        (
+            "accepted_xla_m2048_gather_cache_write_bf16_weight_"
+            "divide_sqrt_source_rope_states"
+        ): (
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
+            "divide_sqrt",
+        ),
     }
     if candidate not in candidates:
         raise ValueError(f"unsupported prompt-key association {candidate!r}")
@@ -865,11 +1117,13 @@ def validate_prompt_index_key_association_hlo(
         cache_write_backend = backend in (
             "xla_chunk_gather_cache_write_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
         )
-        source_rope_backend = (
-            backend
-            == "xla_chunk_gather_cache_write_bf16_weight_source_rope"
+        source_rope_backend = backend in (
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
         )
+        state_backend = backend.endswith("_source_rope_states")
         required_shapes = {
             "accepted_adapted_wk": "f32[128,6144]" in lowered,
             "chunk_projection": f"f32[{prompt_chunk},128]" in lowered,
@@ -885,8 +1139,16 @@ def validate_prompt_index_key_association_hlo(
                     ),
                     "accepted_cache_result": bool(
                         re.search(
-                            r"entry_computation_layout=.*->"
-                            r"bf16\[24,16,32,128\]",
+                            (
+                                r"entry_computation_layout=.*->\("
+                                r"bf16\[24,16,32,128\].*"
+                                r"f32\[2048,128\].*"
+                                r"f32\[2048,128\].*"
+                                r"f32\[2048,128\]"
+                                if state_backend
+                                else r"entry_computation_layout=.*->"
+                                r"bf16\[24,16,32,128\]"
+                            ),
                             lowered,
                         )
                     ),
@@ -906,6 +1168,7 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
         ):
             required_shapes.update(
                 {
@@ -1023,6 +1286,7 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
         ):
             if len(bf16_weight_conversion_lines) != 1:
                 violations.append(
@@ -1041,6 +1305,7 @@ def validate_prompt_index_key_association_hlo(
             "xla_chunk_gather_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight",
             "xla_chunk_gather_cache_write_bf16_weight_source_rope",
+            "xla_chunk_gather_cache_write_bf16_weight_source_rope_states",
         ):
             if len(physical_gather_lines) != 1:
                 violations.append(

@@ -10,8 +10,18 @@ readonly HARNESS_REPO=/home/gianl/glm-tpu
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
+readonly INTERNAL_MODE=${GLM_GREENFIELD_DSA_INTERNALS_MODE:-scorer}
+readonly INTERNAL_POSITION_OVERRIDE=${GLM_GREENFIELD_DSA_INTERNALS_POSITION:-}
 readonly PROMPT_CACHE_CAPTURE=${GLM_GREENFIELD_PROMPT_CACHE_CAPTURE:-0}
 readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
+[[ $INTERNAL_CAPTURE == 0 || $INTERNAL_CAPTURE == 1 ]] || {
+  echo "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE must be 0 or 1" >&2
+  exit 2
+}
+[[ $INTERNAL_MODE == scorer || $INTERNAL_MODE == prompt_key ]] || {
+  echo "GLM_GREENFIELD_DSA_INTERNALS_MODE must be scorer or prompt_key" >&2
+  exit 2
+}
 [[ $PROMPT_CACHE_CAPTURE == 0 || $PROMPT_CACHE_CAPTURE == 1 ]] || {
   echo "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE must be 0 or 1" >&2
   exit 2
@@ -21,19 +31,25 @@ if [[ ! $INTERNAL_LAYER_ID =~ ^[0-9]+$ ]] ||
   echo "DSA internal layer must be a full-indexer producer" >&2
   exit 2
 fi
-if [[ $INTERNAL_LAYER_ID == 0 ]]; then
+if [[ $INTERNAL_LAYER_ID == 0 && $INTERNAL_MODE == scorer ]]; then
   readonly INTERNAL_COMPARE_LAYER0=1
 else
   readonly INTERNAL_COMPARE_LAYER0=0
 fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
-  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-83ff4a357
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  readonly OBSERVER_COMMIT_DISTANCE=2
+  if [[ $INTERNAL_MODE == prompt_key ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-9c1d6b3b9
+    readonly OBSERVER_COMMIT_DISTANCE=3
+    readonly LEGACY_PIN=9c1d6b3b950d5c5dd45bdf885058202517097eba
+  else
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-83ff4a357
+    readonly OBSERVER_COMMIT_DISTANCE=2
+    readonly LEGACY_PIN=83ff4a3576602ca844ea090550139a2ff00b0bb1
+  fi
   readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
   readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
-  readonly LEGACY_PIN=83ff4a3576602ca844ea090550139a2ff00b0bb1
 else
   readonly LEGACY_REPO=$ORACLE_REPO
   readonly LEGACY_SOURCE_REPO=$ORACLE_REPO
@@ -51,6 +67,8 @@ readonly LAYER0_INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38
 readonly DISTRIBUTED_Q_A_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact
 readonly DISTRIBUTED_Q_A_MANIFEST_SHA=7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c43dcded7d809120e30d8c16
 readonly DISTRIBUTED_Q_A_CODE_HASH=ea879a24d196f61e238a22ee5bb393d3b6fa938d
+readonly ACCEPTED_PROMPT_CACHE_SHA=3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1
+readonly DB512_PROMPT_CACHE_SHA=52bf55ed5e9ea74a59551351a21ae830fb39e289e82eaff636fb9ab84d7dcd8a
 readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
@@ -100,6 +118,20 @@ readonly BENCHMARK_DEPTH BENCHMARK_MAX_LEN BENCHMARK_MAX_BATCHED_TOKENS
 readonly BENCHMARK_NUM_BLOCKS EXPECTED_BENCHMARK EXPECTED_PROMPT_TOKENS
 readonly EXPECTED_GENERATED_TOKENS EXPECTED_SEED EXPECTED_GOLD
 readonly FIRST_SOURCE_STEP FIRST_DECODE_POSITION TAG_PREFIX
+INTERNAL_TARGET_POSITION=${INTERNAL_POSITION_OVERRIDE:-$FIRST_DECODE_POSITION}
+[[ $INTERNAL_TARGET_POSITION =~ ^[0-9]+$ ]] || {
+  echo "DSA internal position must be a nonnegative integer" >&2
+  exit 2
+}
+if [[ $INTERNAL_MODE == prompt_key ]]; then
+  [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
+     $PROFILE == 8k && $PROMPT_CACHE_CAPTURE == 1 && \
+     $INTERNAL_TARGET_POSITION -lt $EXPECTED_PROMPT_TOKENS ]] || {
+    echo "prompt-key capture requires layer 0, 8K, prompt cache, and a prompt position" >&2
+    exit 2
+  }
+fi
+readonly INTERNAL_TARGET_POSITION
 readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/$PROFILE/$TOKEN_ORACLE_TAG/oracle
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
@@ -117,7 +149,9 @@ INTERNAL_DUMP_PREFIX=/tmp/$TAG/internals.npz
 PROMPT_CACHE_DUMP_PREFIX=/tmp/$TAG/index_cache.npz
 PROMPT_CACHE_RESULT_DIR=$RUN_DIR/prompt_index_cache
 PROMPT_CACHE_COMPARISON_DIR=$RUN_DIR/prompt_index_cache_comparison
-if [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
+if [[ $INTERNAL_MODE == prompt_key ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/prompt_key_comparison
+elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_capture
@@ -173,7 +207,7 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     echo "sealed DSA oracle comparison prerequisite is unavailable" >&2
     exit 2
   }
-  if [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
+  if [[ $INTERNAL_COMPARE_LAYER0 == 1 || $INTERNAL_MODE == prompt_key ]]; then
     [[ -r $LAYER0_INPUT_DIR/manifest.json &&
        -r $DISTRIBUTED_Q_A_DIR/manifest.json ]] || {
       echo "sealed layer-0 comparison prerequisites are unavailable" >&2
@@ -247,7 +281,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
-say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE"
+say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE"
 if [[ $PROMPT_CACHE_CAPTURE == 1 && $PROFILE != 8k ]]; then
   say "ABORT: prompt index-cache capture is defined only for the sealed 8K profile"
   exit 2
@@ -264,7 +298,7 @@ MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
   }
 
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  # Materialize the two-commit observer in a pin-specific detached worktree;
+  # Materialize the exact observer in a pin-specific detached worktree;
   # the accepted oracle checkout remains untouched on every host.
   # shellcheck disable=SC2016
   sync_observer='set -e; base='"$ORACLE_REPO"'; dest='"$OBSERVER_RUNTIME_REPO"'; pin='"$LEGACY_PIN"'; oracle='"$ORACLE_PIN"'; branch='"$OBSERVER_BRANCH"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then :; elif [ -e "$dest" ]; then echo "SYNC_BAD $(hostname) destination_exists"; exit 0; else git -C "$base" fetch origin "$branch" >/dev/null 2>&1 && git -C "$base" worktree add --detach "$dest" "$pin" >/dev/null 2>&1; fi; code=$(git -C "$dest" rev-parse HEAD); dirty=$(git -C "$dest" status --porcelain | wc -l); commits=$(git -C "$dest" rev-list --count "$oracle..$pin"); ancestor=0; git -C "$dest" merge-base --is-ancestor "$oracle" "$pin" && ancestor=1; if [ "$code" = "$pin" ] && [ "$dirty" -eq 0 ] && [ "$commits" -eq "$distance" ] && [ "$ancestor" -eq 1 ]; then echo "SYNC_OK $(hostname)"; else echo "SYNC_BAD $(hostname) code=$code dirty=$dirty commits=$commits ancestor=$ancestor"; fi'
@@ -302,7 +336,7 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   COMMON_ENVS="$COMMON_ENVS GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=0"
 fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$FIRST_DECODE_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
+  COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$INTERNAL_TARGET_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
 fi
 RAYLET_ENVS="$COMMON_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
 DRIVER_ENVS='NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=1 JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=120000 '"$COMMON_ENVS"
@@ -318,7 +352,7 @@ runtime_started=1
 env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_oracle_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP=1" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_DCP_SCATTER_IMPL=flat" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=all" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
-  env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_internal_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS='"$INTERNAL_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_LAYER='"$INTERNAL_LAYER"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_POSITION='"$FIRST_DECODE_POSITION"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_RUN_TAG='"$TAG"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_CODE_HASH='"$LEGACY_PIN"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_internal_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS='"$INTERNAL_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_MODE='"$INTERNAL_MODE"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_LAYER='"$INTERNAL_LAYER"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_POSITION='"$INTERNAL_TARGET_POSITION"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_RUN_TAG='"$TAG"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_CODE_HASH='"$LEGACY_PIN"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
 fi
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$env_check" >"$RUN_DIR/raylet_env.txt" 2>&1
@@ -372,23 +406,39 @@ has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
   exit 1
 }
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  # Every JAX process must trace and arm the callback. The decode token row is
-  # DCP-sharded, so exactly its owner (process 0 for this sealed one-request
-  # workload) observes position 8155 and writes the state artifact. Requiring
-  # eight files would require a new full-pod gather in the diagnostic itself.
-  # shellcheck disable=SC2016
-  internal_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] first state file written" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$FIRST_DECODE_POSITION"'.proc*.npz" 2>/dev/null | wc -l); owner=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$FIRST_DECODE_POSITION"'.proc0.npz" 2>/dev/null | head -1); errors=$(find /tmp/'"$TAG"' -type f -name "*.INTERNAL.ERROR.*" 2>/dev/null | wc -l); printf "%s\n%s\nfiles=%s errors=%s\n" "$armed" "$wrote" "$files" "$errors"; if [ -z "$armed" ] || [ "$errors" -ne 0 ] || [ "$files" -gt 1 ]; then echo "INTERNAL_BAD $(hostname)"; elif [ "$files" -eq 1 ] && [ -n "$wrote" ] && [ -n "$owner" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_OWNER $(hostname)"; elif [ "$files" -eq 0 ] && [ -z "$wrote" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_NONOWNER $(hostname)"; else echo "INTERNAL_BAD $(hostname)"; fi'
+  if [[ $INTERNAL_MODE == prompt_key ]]; then
+    # Prompt prefill is replicated over the accepted model mesh. Permit one
+    # independently produced file per JAX process and require every present
+    # replica to be sealed bitwise by the post-run inspector.
+    # shellcheck disable=SC2016
+    internal_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] first state file written" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$INTERNAL_TARGET_POSITION"'.proc*.npz" 2>/dev/null | wc -l); errors=$(find /tmp/'"$TAG"' -type f -name "*.INTERNAL.ERROR.*" 2>/dev/null | wc -l); printf "%s\n%s\nfiles=%s errors=%s\n" "$armed" "$wrote" "$files" "$errors"; if [ -z "$armed" ] || [ "$errors" -ne 0 ] || [ "$files" -gt 1 ]; then echo "INTERNAL_BAD $(hostname)"; elif [ "$files" -eq 1 ] && [ -n "$wrote" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_OWNER $(hostname)"; elif [ "$files" -eq 0 ] && [ -z "$wrote" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_NONOWNER $(hostname)"; else echo "INTERNAL_BAD $(hostname)"; fi'
+  else
+    # The decode token row is DCP-sharded, so exactly process 0 owns it.
+    # shellcheck disable=SC2016
+    internal_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] first state file written" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$INTERNAL_TARGET_POSITION"'.proc*.npz" 2>/dev/null | wc -l); owner=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$INTERNAL_TARGET_POSITION"'.proc0.npz" 2>/dev/null | head -1); errors=$(find /tmp/'"$TAG"' -type f -name "*.INTERNAL.ERROR.*" 2>/dev/null | wc -l); printf "%s\n%s\nfiles=%s errors=%s\n" "$armed" "$wrote" "$files" "$errors"; if [ -z "$armed" ] || [ "$errors" -ne 0 ] || [ "$files" -gt 1 ]; then echo "INTERNAL_BAD $(hostname)"; elif [ "$files" -eq 1 ] && [ -n "$wrote" ] && [ -n "$owner" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_OWNER $(hostname)"; elif [ "$files" -eq 0 ] && [ -z "$wrote" ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_NONOWNER $(hostname)"; else echo "INTERNAL_BAD $(hostname)"; fi'
+  fi
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$internal_integrity" >"$RUN_DIR/fleet_internal_integrity.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/fleet_internal_integrity.txt" INTERNAL_OK || {
     say "ABORT: layer-0 DSA internal callback did not arm cleanly fleet-wide"
     exit 1
   }
-  [[ $(grep -c '^INTERNAL_OWNER ' "$RUN_DIR/fleet_internal_integrity.txt") -eq 1 && \
-      $(grep -c '^INTERNAL_NONOWNER ' "$RUN_DIR/fleet_internal_integrity.txt") -eq 7 ]] || {
-    say "ABORT: layer-0 DSA internal owner coverage drifted"
-    exit 1
-  }
+  internal_owner_count=$(grep -c '^INTERNAL_OWNER ' \
+    "$RUN_DIR/fleet_internal_integrity.txt" || true)
+  internal_nonowner_count=$(grep -c '^INTERNAL_NONOWNER ' \
+    "$RUN_DIR/fleet_internal_integrity.txt" || true)
+  if [[ $INTERNAL_MODE == prompt_key ]]; then
+    ((internal_owner_count >= 1 && internal_owner_count <= 8 &&
+      internal_owner_count + internal_nonowner_count == 8)) || {
+      say "ABORT: prompt-key internal replica coverage drifted"
+      exit 1
+    }
+  else
+    [[ $internal_owner_count -eq 1 && $internal_nonowner_count -eq 7 ]] || {
+      say "ABORT: layer-0 DSA internal owner coverage drifted"
+      exit 1
+    }
+  fi
 fi
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   # The host-side hook is outside the model JIT. Each process must write one
@@ -431,11 +481,18 @@ dump_count=$(find "$SOURCE_DIR" -type f -name 'topk.step*.evt*.proc*.npz' | wc -
 internal_count=0
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   internal_count=$(find "$SOURCE_DIR" -type f \
-    -name "internals.*.position${FIRST_DECODE_POSITION}.proc*.npz" | wc -l)
-  [[ $internal_count -eq 1 ]] || {
-    say "ABORT: expected one DCP-owner DSA internal file, found $internal_count"
-    exit 1
-  }
+    -name "internals.*.position${INTERNAL_TARGET_POSITION}.proc*.npz" | wc -l)
+  if [[ $INTERNAL_MODE == prompt_key ]]; then
+    ((internal_count >= 1 && internal_count <= 8)) || {
+      say "ABORT: expected 1..8 prompt-key replica files, found $internal_count"
+      exit 1
+    }
+  else
+    [[ $internal_count -eq 1 ]] || {
+      say "ABORT: expected one DCP-owner DSA internal file, found $internal_count"
+      exit 1
+    }
+  fi
 fi
 prompt_cache_source_count=0
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
@@ -561,7 +618,28 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   prompt_cache_manifest_sha=$(/home/gianl/vllm-env/bin/python -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
     "$PROMPT_CACHE_RESULT_DIR/manifest.json")
-  say "comparing production one-row layer-0 prompt keys on one local TPU host"
+  if [[ $INTERNAL_MODE != prompt_key ]]; then
+    say "comparing production one-row layer-0 prompt keys on one local TPU host"
+    env JAX_PLATFORMS=tpu \
+      TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+      TPU_PROCESS_BOUNDS=1,1,1 \
+      TPU_VISIBLE_DEVICES=0,1,2,3 \
+      PYTHONPATH="$WORKTREE" \
+      timeout --signal=TERM --kill-after=60 1800 \
+      /home/gianl/vllm-env/bin/python \
+      "$WORKTREE/scripts/greenfield/probe_layer0_prompt_index_cache.py" \
+      --expected-code-hash "$PIN" \
+      --run-tag "$TAG" \
+      --input-dir "$LAYER0_INPUT_DIR" \
+      --input-manifest-sha256 "$LAYER0_INPUT_MANIFEST_SHA" \
+      --prompt-cache-dir "$PROMPT_CACHE_RESULT_DIR" \
+      --prompt-cache-manifest-sha256 "$prompt_cache_manifest_sha" \
+      --output "$PROMPT_CACHE_COMPARISON_DIR" \
+      >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
+  fi
+fi
+if [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_MODE == prompt_key ]]; then
+  say "comparing accepted prompt-key producer at position $INTERNAL_TARGET_POSITION"
   env JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
     TPU_PROCESS_BOUNDS=1,1,1 \
@@ -569,17 +647,27 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
     PYTHONPATH="$WORKTREE" \
     timeout --signal=TERM --kill-after=60 1800 \
     /home/gianl/vllm-env/bin/python \
-    "$WORKTREE/scripts/greenfield/probe_layer0_prompt_index_cache.py" \
-    --expected-code-hash "$PIN" \
-    --run-tag "$TAG" \
+    "$WORKTREE/scripts/greenfield/compare_accepted_prompt_key_internals.py" \
+    --source-dump-dir "$SOURCE_DIR" \
     --input-dir "$LAYER0_INPUT_DIR" \
     --input-manifest-sha256 "$LAYER0_INPUT_MANIFEST_SHA" \
     --prompt-cache-dir "$PROMPT_CACHE_RESULT_DIR" \
     --prompt-cache-manifest-sha256 "$prompt_cache_manifest_sha" \
-    --output "$PROMPT_CACHE_COMPARISON_DIR" \
-    >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
-fi
-if [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --greenfield-code-hash "$PIN" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    --expected-accepted-cache-sha256 "$ACCEPTED_PROMPT_CACHE_SHA" \
+    --expected-candidate-cache-sha256 "$DB512_PROMPT_CACHE_SHA" \
+    --expected-cache-mismatch-count 45 \
+    --expected-first-cache-mismatch-position 113 \
+    >"$RUN_DIR/prompt_key_comparison_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   say "comparing accepted layer-0 scorer state on one local TPU host"
   env JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
@@ -602,7 +690,7 @@ if [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
     --q-a-code-hash "$DISTRIBUTED_Q_A_CODE_HASH" \
     --model-id "$MODEL_ID" \
     --layer-name "$INTERNAL_LAYER" \
-    --position "$FIRST_DECODE_POSITION" \
+    --position "$INTERNAL_TARGET_POSITION" \
     --process-count 8 \
     --capture-process-indices 0 >"$RUN_DIR/internal_comparison_summary.json"
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
@@ -616,7 +704,7 @@ elif [[ $INTERNAL_CAPTURE == 1 ]]; then
     --oracle-pin "$ORACLE_PIN" \
     --model-id "$MODEL_ID" \
     --layer-name "$INTERNAL_LAYER" \
-    --position "$FIRST_DECODE_POSITION" \
+    --position "$INTERNAL_TARGET_POSITION" \
     --process-count 8 \
     --capture-process-indices 0 >"$RUN_DIR/internal_capture_summary.json"
 fi
@@ -711,7 +799,7 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
   "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" \
   "$INTERNAL_CAPTURE" "$internal_count" "$INTERNAL_COMPARE_LAYER0" \
-  "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" <<'PY'
+  "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" "$INTERNAL_MODE" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -733,30 +821,65 @@ lines = {
     "remote_prefix": remote,
 }
 if sys.argv[8] == "1":
-    compare_layer0 = sys.argv[10] == "1"
-    result_name = "internal_comparison" if compare_layer0 else "internal_capture"
-    record_name = "comparison.json" if compare_layer0 else "capture.json"
-    comparison = json.loads((root / result_name / record_name).read_text())
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
-    if comparison["capture_layout"] != "topology_sharded_live_row_owner":
-        raise SystemExit("DSA internal capture layout drifted")
-    if comparison["capture_process_indices"] != [0]:
-        raise SystemExit("DSA internal owner process drifted")
-    lines.update({
-        "dsa_internal_capture": "true",
-        "dsa_internal_capture_layout": comparison["capture_layout"],
-        "dsa_internal_file_count": sys.argv[9],
-        "dsa_internal_owner_actual_sha256": comparison[
-            "owner_actual_sha256"
-        ],
-        "dsa_internal_layer_name": comparison["layer_name"],
-        "dsa_internal_first_divergent_field": (
-            (comparison["first_divergent_field"] or "none")
-            if compare_layer0 else "not_compared"
-        ),
-        "dsa_event_tensors_exact": str(exact_dsa["exact"]).lower(),
-        "accepted_oracle_pin": comparison["oracle_pin"],
-    })
+    mode = sys.argv[13]
+    if mode == "prompt_key":
+        comparison = json.loads(
+            (root / "prompt_key_comparison" / "comparison.json").read_text()
+        )
+        if comparison["status"] != "SUCCESS" or (
+            not comparison["hlo"]["states"]["contract"]["passed"]
+        ) or not comparison["hlo"]["cache"]["contract"]["passed"]:
+            raise SystemExit("prompt-key internal comparison drifted")
+        lines.update({
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_layout": "prompt_key_producer_replicas",
+            "dsa_internal_capture_mode": mode,
+            "dsa_internal_capture_process_indices": ",".join(
+                str(value)
+                for value in comparison["accepted_capture"][
+                    "capture_process_indices"
+                ]
+            ),
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": comparison["layer_name"],
+            "dsa_internal_first_divergent_field": (
+                comparison["conclusion"]["first_divergent_field"] or "none"
+            ),
+            "dsa_internal_classification": comparison["conclusion"][
+                "classification"
+            ],
+            "dsa_internal_manifest_sha256": comparison["manifest_sha256"],
+            "dsa_event_tensors_exact": str(exact_dsa["exact"]).lower(),
+            "accepted_oracle_pin": comparison["oracle_pin"],
+        })
+    else:
+        compare_layer0 = sys.argv[10] == "1"
+        result_name = (
+            "internal_comparison" if compare_layer0 else "internal_capture"
+        )
+        record_name = "comparison.json" if compare_layer0 else "capture.json"
+        comparison = json.loads((root / result_name / record_name).read_text())
+        if comparison["capture_layout"] != "topology_sharded_live_row_owner":
+            raise SystemExit("DSA internal capture layout drifted")
+        if comparison["capture_process_indices"] != [0]:
+            raise SystemExit("DSA internal owner process drifted")
+        lines.update({
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_layout": comparison["capture_layout"],
+            "dsa_internal_capture_mode": mode,
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_owner_actual_sha256": comparison[
+                "owner_actual_sha256"
+            ],
+            "dsa_internal_layer_name": comparison["layer_name"],
+            "dsa_internal_first_divergent_field": (
+                (comparison["first_divergent_field"] or "none")
+                if compare_layer0 else "not_compared"
+            ),
+            "dsa_event_tensors_exact": str(exact_dsa["exact"]).lower(),
+            "accepted_oracle_pin": comparison["oracle_pin"],
+        })
 if sys.argv[11] == "1":
     prompt_cache = json.loads(
         (root / "prompt_index_cache" / "manifest.json").read_text()
@@ -771,35 +894,65 @@ if sys.argv[11] == "1":
         ],
         "prompt_index_cache_source_file_count": sys.argv[12],
     })
-    prompt_comparison = json.loads(
-        (root / "prompt_index_cache_comparison" / "comparison.json").read_text()
-    )
-    if (
-        prompt_comparison["prompt_cache_manifest_sha256"]
-        != prompt_cache["manifest_sha256"]
-        or not prompt_comparison["hlo"]["contract"]["passed"]
-        or prompt_comparison["status"] != "SUCCESS"
-    ):
-        raise SystemExit("prompt index-cache comparison identity drifted")
-    lines.update({
-        "prompt_index_cache_production_comparison_manifest_sha256": (
-            prompt_comparison["manifest_sha256"]
-        ),
-        "prompt_index_cache_production_elementwise_exact": str(
-            prompt_comparison["comparison"]["elementwise_exact"]
-        ).lower(),
-        "prompt_index_cache_production_first_mismatch_position": (
-            "none"
-            if prompt_comparison["comparison"]["first_mismatch_position"] is None
-            else prompt_comparison["comparison"]["first_mismatch_position"]
-        ),
-        "prompt_index_cache_production_mismatch_count": (
-            prompt_comparison["comparison"]["mismatch_count"]
-        ),
-        "prompt_index_cache_production_hlo_sha256": (
-            prompt_comparison["hlo"]["optimized_hlo_sha256"]
-        ),
-    })
+    if sys.argv[13] == "prompt_key":
+        prompt_comparison = json.loads(
+            (root / "prompt_key_comparison" / "comparison.json").read_text()
+        )
+        if prompt_comparison["accepted_cache"]["manifest_sha256"] != (
+            prompt_cache["manifest_sha256"]
+        ):
+            raise SystemExit("prompt-key comparison cache identity drifted")
+        lines.update({
+            "prompt_index_cache_internal_comparison_manifest_sha256": (
+                prompt_comparison["manifest_sha256"]
+            ),
+            "prompt_index_cache_internal_candidate_sha256": (
+                prompt_comparison["greenfield_cache"][
+                    "prompt_index_key_bfloat16_sha256"
+                ]
+            ),
+            "prompt_index_cache_internal_mismatch_count": (
+                prompt_comparison["cache_comparison"]["mismatch_count"]
+            ),
+        })
+    else:
+        prompt_comparison = json.loads(
+            (
+                root
+                / "prompt_index_cache_comparison"
+                / "comparison.json"
+            ).read_text()
+        )
+        if (
+            prompt_comparison["prompt_cache_manifest_sha256"]
+            != prompt_cache["manifest_sha256"]
+            or not prompt_comparison["hlo"]["contract"]["passed"]
+            or prompt_comparison["status"] != "SUCCESS"
+        ):
+            raise SystemExit("prompt index-cache comparison identity drifted")
+        lines.update({
+            "prompt_index_cache_production_comparison_manifest_sha256": (
+                prompt_comparison["manifest_sha256"]
+            ),
+            "prompt_index_cache_production_elementwise_exact": str(
+                prompt_comparison["comparison"]["elementwise_exact"]
+            ).lower(),
+            "prompt_index_cache_production_first_mismatch_position": (
+                "none"
+                if prompt_comparison["comparison"][
+                    "first_mismatch_position"
+                ] is None
+                else prompt_comparison["comparison"][
+                    "first_mismatch_position"
+                ]
+            ),
+            "prompt_index_cache_production_mismatch_count": (
+                prompt_comparison["comparison"]["mismatch_count"]
+            ),
+            "prompt_index_cache_production_hlo_sha256": (
+                prompt_comparison["hlo"]["optimized_hlo_sha256"]
+            ),
+        })
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in lines.items())
 )

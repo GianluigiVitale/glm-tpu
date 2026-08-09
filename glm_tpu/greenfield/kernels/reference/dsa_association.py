@@ -184,6 +184,15 @@ class Layer0DsaScorerInternals(NamedTuple):
     current_keys: Any
 
 
+class Layer0PromptKeyStates(NamedTuple):
+    """Actual FP32 key boundaries plus the carried BF16 cache."""
+
+    index_cache: Any
+    pre_layer_norm_key: Any
+    pre_rope_key: Any
+    post_rope_key: Any
+
+
 class LegacyFusedQkvRuntimeWeights(NamedTuple):
     """Raw-FP8 runtime layouts produced by the sealed TP32 loader."""
 
@@ -935,7 +944,7 @@ def _project_keys(
     ).astype(jnp.bfloat16)
 
 
-def _project_keys_f32(
+def _project_key_states_f32(
     hidden: Any,
     positions: Any,
     wk_weight: Any,
@@ -945,8 +954,8 @@ def _project_keys_f32(
     geometry: Layer0DsaProbeGeometry,
     key_norm_mode: KeyNormMode,
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
-) -> Any:
-    """Return post-RoPE keys before the accepted BF16 cache-write cast."""
+) -> tuple[Any, Any, Any]:
+    """Return projection, pre-RoPE and post-RoPE FP32 key boundaries."""
 
     projected = _dot_out_in(
         hidden.astype(jnp.float32),
@@ -1004,9 +1013,35 @@ def _project_keys_f32(
         raise ValueError(
             f"unsupported index-key rotary association {rotary_mode!r}"
         )
-    return jnp.concatenate(
+    post_rope = jnp.concatenate(
         (rotated, keys[:, geometry.rotary_dim :]), axis=-1
     ).astype(jnp.float32)
+    return projected.astype(jnp.float32), keys.astype(jnp.float32), post_rope
+
+
+def _project_keys_f32(
+    hidden: Any,
+    positions: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry,
+    key_norm_mode: KeyNormMode,
+    rotary_mode: RotaryAssociationMode = "greenfield_reference",
+) -> Any:
+    """Return post-RoPE keys before the accepted BF16 cache-write cast."""
+
+    return _project_key_states_f32(
+        hidden,
+        positions,
+        wk_weight,
+        key_norm_weight,
+        key_norm_bias,
+        geometry=geometry,
+        key_norm_mode=key_norm_mode,
+        rotary_mode=rotary_mode,
+    )[2]
 
 
 def layer0_dsa_scorer_internals(
@@ -1304,7 +1339,7 @@ def layer0_prompt_index_key_gather_chunk(
     )
 
 
-def layer0_prompt_index_key_gather_cache_chunk(
+def layer0_prompt_index_key_gather_cache_states_chunk(
     index_cache: Any,
     live_block_table: Any,
     unique_embeddings: Any,
@@ -1318,8 +1353,8 @@ def layer0_prompt_index_key_gather_cache_chunk(
     geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
     key_norm_mode: KeyNormMode = "divide_sqrt",
     rotary_mode: RotaryAssociationMode = "greenfield_reference",
-) -> Any:
-    """Write one gathered prompt chunk through the accepted flat cache API.
+) -> Layer0PromptKeyStates:
+    """Write one chunk and expose its actual FP32 producer boundaries.
 
     The accepted runtime keeps post-RoPE keys in FP32 until
     ``write_indexer_keys`` casts them at its flat paged-cache scatter.  This
@@ -1386,15 +1421,17 @@ def layer0_prompt_index_key_gather_cache_chunk(
         input_norm_weight,
         epsilon=geometry.rms_norm_epsilon,
     )
-    keys_f32 = _project_keys_f32(
-        normalized,
-        positions,
-        wk_weight.astype(jnp.bfloat16),
-        key_norm_weight,
-        key_norm_bias,
-        geometry=geometry,
-        key_norm_mode=key_norm_mode,
-        rotary_mode=rotary_mode,
+    pre_layer_norm_key, pre_rope_key, post_rope_key = (
+        _project_key_states_f32(
+            normalized,
+            positions,
+            wk_weight.astype(jnp.bfloat16),
+            key_norm_weight,
+            key_norm_bias,
+            geometry=geometry,
+            key_norm_mode=key_norm_mode,
+            rotary_mode=rotary_mode,
+        )
     )
 
     page_size = index_cache.shape[1] * index_cache.shape[2]
@@ -1407,10 +1444,48 @@ def layer0_prompt_index_key_gather_cache_chunk(
     valid = positions < jnp.int32(geometry.prompt_tokens)
     slots = jnp.where(valid, slots, jnp.int32(flat_cache.shape[0]))
     flat_cache = flat_cache.at[slots].set(
-        keys_f32.astype(index_cache.dtype),
+        post_rope_key.astype(index_cache.dtype),
         mode="drop",
     )
-    return flat_cache.reshape(index_cache.shape)
+    return Layer0PromptKeyStates(
+        flat_cache.reshape(index_cache.shape),
+        pre_layer_norm_key,
+        pre_rope_key,
+        post_rope_key,
+    )
+
+
+def layer0_prompt_index_key_gather_cache_chunk(
+    index_cache: Any,
+    live_block_table: Any,
+    unique_embeddings: Any,
+    embedding_rows: Any,
+    positions: Any,
+    input_norm_weight: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+    key_norm_mode: KeyNormMode = "divide_sqrt",
+    rotary_mode: RotaryAssociationMode = "greenfield_reference",
+) -> Any:
+    """Write one gathered prompt chunk through the accepted flat cache API."""
+
+    return layer0_prompt_index_key_gather_cache_states_chunk(
+        index_cache,
+        live_block_table,
+        unique_embeddings,
+        embedding_rows,
+        positions,
+        input_norm_weight,
+        wk_weight,
+        key_norm_weight,
+        key_norm_bias,
+        geometry=geometry,
+        key_norm_mode=key_norm_mode,
+        rotary_mode=rotary_mode,
+    ).index_cache
 
 
 def layer0_prompt_index_keys_chunked(

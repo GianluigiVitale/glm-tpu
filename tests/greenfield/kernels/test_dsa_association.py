@@ -22,6 +22,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     layer0_dsa_state,
     layer0_prompt_index_key_chunk,
     layer0_prompt_index_key_gather_cache_chunk,
+    layer0_prompt_index_key_gather_cache_states_chunk,
     layer0_prompt_index_key_gather_chunk,
     layer0_prompt_index_keys_chunked,
     layer0_dsa_state_from_q_residual,
@@ -211,6 +212,26 @@ def test_chunked_prompt_keys_keep_only_live_rows() -> None:
     np.testing.assert_array_equal(
         np.asarray(source_rope_cache), np.asarray(cache)
     )
+    states = layer0_prompt_index_key_gather_cache_states_chunk(
+        jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),
+        live_block_table,
+        arguments[0],
+        arguments[1][:4],
+        jnp.arange(4, dtype=jnp.int32),
+        *arguments[2:],
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        rotary_mode="accepted_source",
+    )
+    np.testing.assert_array_equal(
+        np.asarray(states.index_cache), np.asarray(source_rope_cache)
+    )
+    assert states.pre_layer_norm_key.shape == (4, 4)
+    assert states.pre_rope_key.shape == (4, 4)
+    assert states.post_rope_key.shape == (4, 4)
+    assert states.pre_layer_norm_key.dtype == jnp.float32
+    assert states.pre_rope_key.dtype == jnp.float32
+    assert states.post_rope_key.dtype == jnp.float32
     with pytest.raises(ValueError, match="rotary association"):
         layer0_prompt_index_key_gather_cache_chunk(
             jnp.zeros((3, 1, 4, 4), dtype=jnp.bfloat16),

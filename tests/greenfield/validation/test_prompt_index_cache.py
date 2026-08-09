@@ -8,13 +8,122 @@ import sys
 import numpy as np
 
 from glm_tpu.greenfield.validation.prompt_index_cache import (
+    LegacyPromptKeyInternalConfig,
     LegacyPromptIndexCacheConfig,
     capture_legacy_prompt_index_cache,
+    compare_prompt_key_internal_states,
     compare_prompt_index_key_bits,
+    inspect_legacy_prompt_key_internal_capture,
     inspect_legacy_prompt_index_cache,
     validate_prompt_index_key_association_hlo,
     validate_prompt_index_key_probe_hlo,
 )
+
+
+def _write_prompt_key_internal(
+    path: Path,
+    *,
+    process_index: int,
+    delta: float = 0.0,
+) -> None:
+    base = np.arange(128, dtype=np.float32) + np.float32(delta)
+    np.savez(
+        path,
+        artifact_kind=np.asarray(
+            "glm52_legacy_dsa_prompt_key_internal_state"
+        ),
+        format_version=np.asarray(1, dtype=np.int64),
+        capture_mode=np.asarray("prompt_key"),
+        process_index=np.asarray(process_index, dtype=np.int64),
+        process_count=np.asarray(2, dtype=np.int64),
+        layer_name=np.asarray("model.layers.0.self_attn.attn"),
+        position=np.asarray(113, dtype=np.int32),
+        source_row=np.asarray(113, dtype=np.int32),
+        run_tag=np.asarray("unit-prompt-key"),
+        code_hash=np.asarray("a" * 40),
+        oracle_pin=np.asarray("b" * 40),
+        model_id=np.asarray("zai-org/GLM-5.2-FP8"),
+        pre_layer_norm_key=base,
+        pre_layer_norm_key__dtype=np.asarray("float32"),
+        pre_rope_key=base / np.float32(7),
+        pre_rope_key__dtype=np.asarray("float32"),
+        post_rope_key=base / np.float32(11),
+        post_rope_key__dtype=np.asarray("float32"),
+    )
+
+
+def test_seals_bitwise_prompt_key_internal_replicas(tmp_path: Path) -> None:
+    import pytest
+
+    source = tmp_path / "source"
+    source.mkdir()
+    for process_index in range(2):
+        _write_prompt_key_internal(
+            source
+            / ("internals.model_layers_0_self_attn_attn.position113."
+               f"proc{process_index}.npz"),
+            process_index=process_index,
+        )
+    config = LegacyPromptKeyInternalConfig(
+        source_dump_dir=source,
+        output_dir=tmp_path / "capture",
+        expected_run_tag="unit-prompt-key",
+        expected_legacy_code_hash="a" * 40,
+        expected_oracle_pin="b" * 40,
+        expected_process_count=2,
+    )
+    manifest, states = inspect_legacy_prompt_key_internal_capture(config)
+    assert manifest["capture_process_indices"] == [0, 1]
+    assert manifest["position"] == 113
+    assert manifest["manifest_sha256"]
+    np.testing.assert_array_equal(
+        states["pre_layer_norm_key"], np.arange(128, dtype=np.float32)
+    )
+
+    corrupt_source = tmp_path / "corrupt"
+    corrupt_source.mkdir()
+    for process_index in range(2):
+        _write_prompt_key_internal(
+            corrupt_source
+            / ("internals.model_layers_0_self_attn_attn.position113."
+               f"proc{process_index}.npz"),
+            process_index=process_index,
+            delta=float(process_index),
+        )
+    with pytest.raises(ValueError, match="not bitwise equal"):
+        inspect_legacy_prompt_key_internal_capture(
+            LegacyPromptKeyInternalConfig(
+                source_dump_dir=corrupt_source,
+                output_dir=tmp_path / "rejected",
+                expected_run_tag="unit-prompt-key",
+                expected_legacy_code_hash="a" * 40,
+                expected_oracle_pin="b" * 40,
+                expected_process_count=2,
+            )
+        )
+
+
+def test_classifies_first_prompt_key_internal_divergence() -> None:
+    base = np.arange(128, dtype=np.float32)
+    accepted = {
+        "pre_layer_norm_key": base,
+        "pre_rope_key": base / np.float32(7),
+        "post_rope_key": base / np.float32(11),
+    }
+    exact = compare_prompt_key_internal_states(accepted, accepted)
+    assert exact["all_fields_elementwise_exact"] is True
+    assert exact["classification"] == "producer_states_elementwise_exact"
+
+    observed = {name: value.copy() for name, value in accepted.items()}
+    observed["pre_rope_key"][9] += np.float32(0.25)
+    observed["post_rope_key"][3] += np.float32(0.5)
+    comparison = compare_prompt_key_internal_states(accepted, observed)
+    assert comparison["first_divergent_field"] == "pre_rope_key"
+    assert comparison["classification"] == "key_layer_norm_association"
+    assert comparison["fields"]["pre_layer_norm_key"][
+        "elementwise_exact"
+    ] is True
+    assert comparison["fields"]["pre_rope_key"]["mismatch_count"] == 1
 
 
 def _write_dump(
@@ -513,6 +622,27 @@ ENTRY main {
         "source_literal": True,
         "theta_constant": True,
     }
+    state_hlo = source_hlo.replace(
+        "->bf16[24,16,32,128]}",
+        "->(bf16[24,16,32,128], f32[2048,128], "
+        "f32[2048,128], f32[2048,128])}",
+    )
+    state_candidate = source_candidate + "_states"
+    state_result = validate_prompt_index_key_association_hlo(
+        state_hlo,
+        candidate=state_candidate,
+    )
+    assert state_result["passed"] is True
+    assert state_result["required_shapes"]["accepted_cache_result"] is True
+    rejected_state = validate_prompt_index_key_association_hlo(
+        state_hlo.replace(
+            "f32[2048,128], f32[2048,128])}",
+            "f32[2048,128])}",
+        ),
+        candidate=state_candidate,
+    )
+    assert rejected_state["passed"] is False
+    assert rejected_state["required_shapes"]["accepted_cache_result"] is False
     source_rejected = validate_prompt_index_key_association_hlo(
         source_hlo.replace(" sine(%angles)", " tanh(%angles)"),
         candidate=source_candidate,
@@ -674,3 +804,66 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
             check=False,
         )
         assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
+    repo = Path(__file__).resolve().parents[3]
+    shared = repo / (
+        "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
+    )
+    entrypoint = repo / (
+        "scripts/greenfield/run_capture_legacy_prompt_key_internals.sh"
+    )
+    comparator = repo / (
+        "scripts/greenfield/compare_accepted_prompt_key_internals.py"
+    )
+    shared_source = shared.read_text()
+    entrypoint_source = entrypoint.read_text()
+    comparator_source = comparator.read_text()
+    for required in (
+        "GLM_GREENFIELD_DSA_INTERNALS_MODE",
+        "GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE",
+        "INTERNAL_TARGET_POSITION",
+        "OBSERVER_COMMIT_DISTANCE=3",
+        "9c1d6b3b950d5c5dd45bdf885058202517097eba",
+        "ACCEPTED_PROMPT_CACHE_SHA=3808d502",
+        "DB512_PROMPT_CACHE_SHA=52bf55ed",
+        "compare_accepted_prompt_key_internals.py",
+        "prompt_key_producer_replicas",
+        "dsa_internal_classification",
+        "strict_census post",
+    ):
+        assert required in shared_source
+    for required in (
+        "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE=1",
+        "GLM_GREENFIELD_DSA_INTERNALS_MODE=prompt_key",
+        "GLM_GREENFIELD_DSA_INTERNALS_POSITION=113",
+        "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE=1",
+        "GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE=8k",
+        "run_capture_short_context_dsa_oracle.sh",
+    ):
+        assert required in entrypoint_source
+    for required in (
+        "inspect_legacy_prompt_key_internal_capture",
+        "layer0_prompt_index_key_gather_cache_states_chunk",
+        "compare_prompt_key_internal_states",
+        "compare_prompt_index_key_bits",
+        "validate_prompt_index_key_association_hlo",
+        "accepted prompt-key observer does not reproduce its cache row",
+        '"performance_claim": False',
+    ):
+        assert required in comparator_source
+    for forbidden in (
+        "import tpu_inference",
+        "from tpu_inference",
+        "import vllm",
+        "from vllm",
+    ):
+        assert forbidden not in comparator_source
+    completed = subprocess.run(
+        [sys.executable, "-m", "py_compile", str(comparator)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
