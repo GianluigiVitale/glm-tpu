@@ -5919,3 +5919,21 @@ unmotivated arithmetic variants.
 - This closes source-level RoPE variants. Next evidence must be the accepted pre-RoPE FP32 key at
   prompt position 113, captured through the existing default-off observer and checked for
   non-perturbation.
+
+## 2026-08-09 02:31 — prompt-key producer capture is protected-run ready
+
+- Oracle-only pin `9c1d6b3b9` extends the existing zero-copy callback with a separate
+  `prompt_key` mode at the actual `compute_indexer_keys` producer. It captures only position 113's
+  FP32 projection, post-key-LayerNorm and post-RoPE rows; default-off and scorer-mode tests retain
+  the accepted execution surface.
+- The existing 8K protected capture wrapper now chooses observer pin/distance by explicit mode,
+  requires unchanged raw tokens and all 294 DSA events, captures the accepted prompt cache in the
+  same run, permits 1--8 process replicas, and seals them only when bitwise equal.
+- The independent greenfield comparator exposes the same three DB512 producer boundaries, requires
+  its carried cache to retain SHA `52bf55ed...cd8a`, and requires the accepted cache to retain
+  `3808d502...859d1`. Each post-RoPE cast must reproduce cache row 113 before classification.
+- The first differing ordered field maps to projection, key LayerNorm or RoPE association. The
+  state and cache executables each retain the exact gather/RMS, BF16 convolution, literal RoPE,
+  flat-scatter and no-communication/no-loop HLO gates.
+- Focused tests pass 48/48; the complete CPU-only suite passes 478 with one expected skip. This is
+  readiness only. Exact next is one serialized protected capture, not another full decoder run.

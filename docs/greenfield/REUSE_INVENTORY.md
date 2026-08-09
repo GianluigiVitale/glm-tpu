@@ -22,7 +22,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py` RoPE source, DB505--512, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves the gather-coupled input-RMS lowering restores DB507 exactly; DB511 rejects the flat BF16 cache scatter; DB512 rejects literal accepted-source RoPE spelling. The next reusable boundary is one accepted pre-RoPE FP32 row at position 113 through the existing observer machinery. |
-| DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
+| DSA internal observer | oracle-only `83ff4a357` scorer observer and `9c1d6b3b9` prompt-key extension, both descendants of accepted `b3c25df47` | Default-off scorer capture remains unchanged; prompt-key mode reuses the zero-copy callback to expose only projection, post-key-LayerNorm and post-RoPE FP32 row 113. The protected comparator independently reconstructs DB512 and never imports legacy execution. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
@@ -278,3 +278,10 @@ and has the same physical power/cosine/sine contract despite a different optimiz
 source spelling is closed. Reuse the existing default-off legacy observer/capture protections for
 one pre-RoPE FP32 layer-0 key at prompt position 113; do not create a new execution path or expand
 the arithmetic candidate matrix.
+
+Observer pin `9c1d6b3b950d5c5dd45bdf885058202517097eba` now adapts that exact boundary without
+changing the accepted checkout. The greenfield path requires unchanged 8K tokens, all 294 DSA
+events, accepted cache SHA `3808d502...859d1`, 1--8 bitwise-equal producer replicas, and two
+local/no-loop HLO contracts. It classifies the first unequal field across projection, key
+LayerNorm, and RoPE while requiring each post-RoPE cast to reproduce its cache row. Full CPU
+coverage passes 478 with one expected skip; this is readiness only until protected capture.

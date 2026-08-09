@@ -543,3 +543,13 @@ capture is still required.
   cache consumer and literal-source RoPE spelling are rejected. The next required evidence is a
   bounded accepted pre-RoPE FP32 capture at position 113. Neither a rejected candidate nor the full
   decoder should be rerun.
+
+## Prompt-key producer capture readiness — no protected result yet
+
+- Oracle-only observer pin `9c1d6b3b9` captures projection, post-key-LayerNorm and post-RoPE FP32
+  row 113 at the live accepted producer; the accepted checkout remains unchanged.
+- The greenfield comparison path requires exact 8K tokens, 294 DSA events, accepted cache SHA
+  `3808d502...859d1`, DB512 candidate SHA `52bf55ed...cd8a`, bitwise producer replicas, exact
+  producer-to-cache casts, two strict HLO contracts, archive/DB linkage and 8/8 cleanup.
+- Full CPU coverage is 478 passed / 1 skipped. This proves readiness only and does not alter Gate D,
+  Gate E, latency or throughput status. The protected serialized capture is the next evidence item.

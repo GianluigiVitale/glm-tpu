@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 01:24 UTC
+**Updated:** 2026-08-09 02:31 UTC
 
 ## Authority and isolation
 
@@ -2373,3 +2373,30 @@ only if needed to make the producer self-identifying). Bind it to the immutable 
 checkpoint and cache evidence, prove the observer does not perturb accepted output/cache state,
 then compare against the already-sealed greenfield input. No wider tensor or formula matrix is
 authorized.
+
+## Accepted prompt-key producer capture is implementation-ready
+
+Oracle-only observer pin `9c1d6b3b950d5c5dd45bdf885058202517097eba`, three commits above the
+unchanged accepted pin, captures only layer-0 prompt position 113 at the actual key producer. It
+records FP32 projection, post-key-LayerNorm and post-RoPE rows through the existing zero-copy,
+default-off DSA callback. The prior scorer observer remains pinned separately at `83ff4a357`.
+
+The greenfield comparator returns the same three already-computed DB512 boundaries from one
+bounded M2048 state executable, carries its BF16 cache through the remaining three chunks, and
+requires final SHA `52bf55ed...cd8a`. The accepted run simultaneously captures the full prompt
+cache and must retain SHA `3808d502...859d1`, exact tokens, all 294 DSA events, checkpoint/state
+integrity, DB/archive linkage and authenticated 8/8 cleanup. Both accepted and greenfield
+post-RoPE FP32 casts must reproduce cache row 113 before the comparison can classify projection,
+key LayerNorm or RoPE as the first divergent field. HLO requires the DB512 gather/RMS,
+BF16-RHS convolution, literal RoPE and flat-scatter identities with no loop, communication,
+callback, full-prompt hidden tensor or dead row.
+
+Focused coverage passes 48/48 and the complete CPU-only greenfield suite passes 478 with one
+expected skip and two existing SWIG warnings. Bash syntax, ShellCheck, Python compilation, JSON,
+line-length and diff checks pass. This is readiness evidence only: no protected capture,
+arithmetic conclusion, decoder retry, Gate-D change or performance claim exists yet.
+
+Exact next: commit/push the clean pin, prove an authenticated idle fleet, and run exactly one
+serialized `bash scripts/greenfield/run_capture_legacy_prompt_key_internals.sh`. Use its first
+divergent field to implement only the smallest source-backed correction before one protected 8K
+Gate-D retry. A capture/cache/HLO refusal must be preserved and diagnosed rather than relaxed.
