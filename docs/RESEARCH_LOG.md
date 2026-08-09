@@ -5985,3 +5985,46 @@ unmotivated arithmetic variants.
   and two existing SWIG warnings in 363.45 seconds. Next is one protected accepted capture. A
   nonexact input localizes the source upstream of projection; an exact input isolates projection
   lowering/association. No full 8K retry is authorized first.
+
+## 2026-08-09 06:06 — DB515 excludes projection input and isolates physical projection lowering
+
+- Protected DB515/item1800 at greenfield `b8e30ed`, observer `89fc453b6`, accepted parent
+  `b3c25df47` passes the full 8K passkey/raw-token run, all 294 DSA events, checkpoint/state/cache
+  protections, approved archive and authenticated 8/8 cleanup.
+- The actual accepted FP32 normalized projection input at layer 0 / position 113 is bitwise equal
+  to the independent greenfield gather/RMS producer: SHA `d0edbfa0...59566`, 0/6,144 mismatches,
+  zero max/mean error. Embedding selection, input RMS arithmetic and its gather-coupled lowering
+  are excluded at the first divergent row.
+- Projection output still differs in 79/128 FP32 values (max `3.5762787e-7`, mean
+  `4.2949978e-8`), and the complete prompt cache retains the same 45 BF16 mismatches. With DB514's
+  FP32/BF16 operand-precision exclusion, the surviving classification is
+  `projection_lowering_association`, not an upstream input or weight-precision cause.
+- Comparison/capture manifests are `df048dd7...f258` / `64320e97...2ef9`; terminal SUCCESS is
+  `048528e3...d79`, evidence is `637ebad0...156d`, and remote-object ledger is
+  `06c0b778...5b6d`. DB/archive/direct remote bytes and 8/8 cleanup pass. This is diagnostic
+  correctness evidence only, not Gate-D or performance proof.
+- All 516 raw source files (3,434,670,354 bytes) were locally reclaimed only after exact ledger
+  path/size, generation/CRC32C presence and remote SUCCESS equality were independently verified.
+  Compact evidence remains local and the raw bytes remain recoverable from the approved prefix.
+- Next: inspect accepted compiler/XPlane/HLO evidence and exact existing projection primitives for
+  the physical association of `h @ wk.T`. Do not guess a formula/tiling matrix or retry full 8K
+  until one bounded projection reproduction is bitwise exact.
+
+## 2026-08-09 06:31 — historical M2048 XPlane is reused but cannot close the current lowering
+
+- The preserved sparse 256K prefill trace under
+  `/home/gianl/glm-run/xprof256k_20260729T130233Z` was inspected before creating another capture.
+  It is legacy pin `4647a8fbcd49`, not the accepted `b3c25df47` pin, and only worker 0 remains
+  locally.
+- Its unchanged projection source at then-line 978 records 21 M2048 convolution-fusion instances
+  per core with physical tuple shape
+  `(f32[2048]{0:T(1024)S(3)}, f32[2048,128]{0,1:T(8,128)S(3)})`. That visible projection layout is
+  the same as DB515's candidate, so output minor-to-major layout alone is no longer a supported
+  correction hypothesis.
+- XPlane does not expose the convolution emitter or input/window backend config, and the older pin
+  lacks current protected provenance. It is negative historical evidence, not a replacement for a
+  current accepted trace.
+- The existing phase profiler starts before the first M2048 prefill execution and, with one step,
+  stops before the second. The protected oracle wrapper can therefore capture exactly one current
+  prefill step while a module-filtered XLA dump preserves final `jit_step_fun_impl` HLO. This is the
+  next discriminator; no formula/tiling matrix is authorized.

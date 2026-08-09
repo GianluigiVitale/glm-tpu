@@ -2486,3 +2486,47 @@ one serialized `bash scripts/greenfield/run_capture_legacy_prompt_projection_inp
 6,144-wide input differs, correct only that upstream input-norm association. If it is bitwise
 exact, preserve that exclusion and audit the accepted projection lowering/physical association.
 Do not retry the complete 8K decoder before this discriminator produces an exact correction.
+
+## DB515 proves the normalized projection input is exact; projection lowering remains
+
+Protected DB515/item1800,
+`greenfield_legacy_layer0_prompt_projection_input_p113_20260809T050055956585082Z`, completed at
+greenfield pin `b8e30ed41e46816461c7e956e4dd7bc85e96d998`, observer pin
+`89fc453b6116ac3df71e666db6f4659775b313c3`, and unchanged accepted parent
+`b3c25df47ac98783912dc658878181ec0a8ae16d`. The full accepted 8K run retained exact passkey/raw
+tokens, all 294 DSA events, checkpoint/state/cache integrity, DB/archive linkage and authenticated
+8/8 cleanup. Accepted cache SHA remains `3808d502...859d1`; the bounded greenfield reproduction
+remains `52bf55ed...cd8a` with the same 45 BF16 mismatches.
+
+The actual accepted FP32 normalized 6,144-wide projection input at layer 0 / prompt position 113
+is bitwise identical to the independently gathered greenfield input: SHA
+`d0edbfa0...59566`, 0/6,144 mismatches and zero absolute error. The following projection is still
+the first divergent field: 79/128 FP32 values differ, max/mean
+`3.5762787e-7/4.2949978e-8`. This excludes embedding selection, input RMSNorm arithmetic and its
+physical gather-coupled lowering at the captured row. Together with DB514, it also excludes
+adapted-`wk` FP32 versus BF16 operand precision. The remaining classification is specifically
+`projection_lowering_association`; no upstream input correction is authorized.
+
+Comparison/capture manifests are `df048dd7...f258` / `64320e97...2ef9`; comparison, accepted
+tensor, projection-input HLO, DB snapshot, evidence, remote-object and SUCCESS SHAs are
+`bf7b49ab...a0e3`, `753e63d9...8f2d`, `6236cb8f...d2d2`, `43fdf121...01c0`,
+`637ebad0...156d`, `06c0b778...5b6d` and `048528e3...d79`. Direct approved-bucket SUCCESS and
+remote-object bytes match locally. The 516 raw source files / 3,434,670,354 bytes were reclaimed
+locally only after exact path/size plus nonempty generation/CRC32C verification for all 516 ledger
+entries and remote SUCCESS equality; compact capture/cache/comparison/HLO/DB evidence remains and
+the raw files are exactly recoverable from the approved DB515 prefix.
+
+A preserved 256K prefill XPlane at legacy pin `4647a8fbcd49` was also audited before scheduling new
+TPU work. Its unchanged `h @ wk.T` source lowers at M2048 to a convolution fusion with tuple shape
+`(f32[2048]{0:T(1024)S(3)}, f32[2048,128]{0,1:T(8,128)S(3)})`, the same visible output layout as
+DB515's bounded candidate. It is useful negative historical evidence but cannot substitute for the
+current accepted `b3c25df47` compiler association: it is an older code/config pin, one host was
+preserved locally, and XPlane does not expose the convolution emitter or operand windows.
+
+Exact next: capture one protected current-pin 8K prefill step with eight-host XPlanes and a
+module-filtered final optimized HLO dump for `jit_step_fun_impl`. Require exact tokens, all DSA
+events, state/load integrity, DB/archive linkage and 8/8 cleanup. Extract only source
+`glm_dsa_indexer.py:1122` at M2048, including physical output/input layouts, convolution emitter,
+window/megacore config and invocation count. Do not try an arithmetic matrix or rerun the full
+greenfield 8K decoder until this source-backed comparison yields a bounded bitwise-exact projection
+correction.
