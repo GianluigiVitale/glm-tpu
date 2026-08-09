@@ -5,11 +5,14 @@ from types import SimpleNamespace
 import pytest
 
 from glm_tpu.greenfield.errors import PlanValidationError
-from glm_tpu.greenfield.runtime import validate_teacher_forced_prefill_loops
+from glm_tpu.greenfield.runtime import (
+    validate_prefill_index_weight_materialization_hlo,
+    validate_stage_local_prefill_index_repair_hlo,
+    validate_teacher_forced_prefill_loops,
+)
 from glm_tpu.greenfield.runtime.prefill import (
     PrefillBackendContract,
     _prefill_index_repair_chunk_count,
-    _validate_physical_m64_prefill_index_repair_hlo,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 
@@ -65,6 +68,69 @@ def test_prefill_loop_contract_classifies_physical_m64_repair() -> None:
 def test_protected_8k_prefill_repair_has_four_chunks_per_layer() -> None:
     assert _prefill_index_repair_chunk_count(8155) == 4
     assert 21 * _prefill_index_repair_chunk_count(8155) == 84
+
+
+def _materialization_hlo() -> str:
+    return '''HloModule materialize, num_partitions=32
+
+ENTRY %main {
+  %bits.0 = u8[128,6144] parameter(0)
+  %scale.0 = f32[1,48] parameter(1)
+  %mul.0 = f32[786432] multiply(%scale.0, %scale.0)
+  %round.0 = bf16[786432] convert(%mul.0)
+  %promote.0 = f32[786432] convert(%round.0)
+  %bits.1 = u8[128,6144] parameter(2)
+  %scale.1 = f32[1,48] parameter(3)
+  %mul.1 = f32[128,6144] multiply(%scale.1, %scale.1)
+  %round.1 = bf16[128,6144] convert(%mul.1)
+  %promote.1 = f32[128,6144] convert(%round.1)
+  ROOT %output = (f32[786432], f32[128,6144]) tuple(%promote.0, %promote.1)
+}
+'''
+
+
+def _materialization_decoder() -> SimpleNamespace:
+    return SimpleNamespace(
+        config=SimpleNamespace(
+            hidden_size=6144,
+            index_key_width=128,
+            maximum_full_indexer_slots=2,
+            total_devices=4,
+        )
+    )
+
+
+def test_prefill_wk_materialization_hlo_is_external_and_local() -> None:
+    accepted = validate_prefill_index_weight_materialization_hlo(
+        _materialization_hlo(), decoder=_materialization_decoder()
+    )
+    assert accepted["passed"] is True
+    assert accepted["raw_parameter_count"] == 2
+    assert accepted["scale_parameter_count"] == 2
+    assert accepted["bf16_round_count"] == 2
+    assert accepted["fp32_promotion_count"] == 2
+    assert accepted["collective_count"] == 0
+
+    no_round = validate_prefill_index_weight_materialization_hlo(
+        _materialization_hlo().replace(
+            "%round.1 = bf16[128,6144] convert(%mul.1)",
+            "%round.1 = f32[128,6144] copy(%mul.1)",
+        ),
+        decoder=_materialization_decoder(),
+    )
+    assert no_round["passed"] is False
+    assert any("BF16 adaptation rounds" in item for item in no_round["violations"])
+
+    collective = validate_prefill_index_weight_materialization_hlo(
+        _materialization_hlo().replace(
+            "%promote.1 = f32[128,6144] convert(%round.1)",
+            "%promote.1 = f32[128,6144] all-reduce(%round.1), "
+            "replica_groups={{0,1,2,3}}",
+        ),
+        decoder=_materialization_decoder(),
+    )
+    assert collective["passed"] is False
+    assert collective["collective_count"] == 1
 
 
 @pytest.mark.parametrize(
@@ -175,7 +241,7 @@ def _repair_contract(
             ),
         )
     )
-    return _validate_physical_m64_prefill_index_repair_hlo(
+    return validate_stage_local_prefill_index_repair_hlo(
         parse_hlo_module(hlo),
         program=program,
         schedule=schedule,
@@ -193,6 +259,8 @@ def test_physical_m64_prefill_repair_hlo_is_exact_and_fail_closed() -> None:
     assert accepted["cache_write_count"] == 1
     assert accepted["grouped_sqrt_count"] == 0
     assert accepted["repair_collectives"] == []
+    assert accepted["materialized_wk_parameter_count"] == 1
+    assert accepted["repair_weight_round_count"] == 0
 
     bf16_rhs = _repair_contract(
         _repair_hlo().replace(
@@ -221,6 +289,19 @@ def test_physical_m64_prefill_repair_hlo_is_exact_and_fail_closed() -> None:
     )
     assert collective["passed"] is False
     assert collective["repair_collectives"]
+
+    internal_round = _repair_contract(
+        _repair_hlo().replace(
+            "  %projection = f32[64,128] convolution",
+            "  %round = bf16[128,6144] convert(%wk), "
+            'metadata={op_name="jit(execute)/shard_map/cond/branch_0_fun/'
+            'materialize_stage_local_prefill_index_wk"}\n'
+            "  %projection = f32[64,128] convolution",
+        )
+    )
+    assert internal_round["passed"] is False
+    assert internal_round["repair_weight_round_count"] == 1
+    assert any("rematerializes raw wk" in item for item in internal_round["violations"])
 
     full_pod_history = _repair_contract(
         _repair_hlo().replace(

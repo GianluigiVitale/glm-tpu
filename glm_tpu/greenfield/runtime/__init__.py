@@ -15,6 +15,8 @@ from .decoder import (
 from .prefill import (
     TeacherForcedPrefillProgram,
     build_teacher_forced_prefill_program,
+    validate_prefill_index_weight_materialization_hlo,
+    validate_stage_local_prefill_index_repair_hlo,
     validate_teacher_forced_prefill_hlo,
     validate_teacher_forced_prefill_loops,
 )
@@ -27,6 +29,8 @@ __all__ = [
     "TeacherForcedPrefillProgram",
     "build_decoder_step_program",
     "build_teacher_forced_prefill_program",
+    "validate_prefill_index_weight_materialization_hlo",
+    "validate_stage_local_prefill_index_repair_hlo",
     "validate_teacher_forced_prefill_hlo",
     "validate_teacher_forced_prefill_loops",
     "validate_decoder_step_hlo",

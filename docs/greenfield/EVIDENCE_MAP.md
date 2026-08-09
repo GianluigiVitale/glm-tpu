@@ -583,3 +583,23 @@ capture is still required.
   TPU HLOs. Focused tests pass 23/23 and the one-time Fable review returned `APPROVE COMMIT`.
   One fresh bounded retry is required before choosing an externally materialized repair or moving
   to the separate LP4-scatter discriminator; no full 8K retry is authorized yet.
+
+## DB519 internal-materialization rejection and LP4 readiness
+
+- DB519/item1804, tag
+  `greenfield_layer0_prompt_key_weight_source_internal_20260809T182400Z`, code `5e1cbb5`, proves
+  the internal raw-FP8 -> BF16 -> FP32 arm executes with its exact HLO boundary but produces
+  298,532 BF16 mismatches across every one of 8,155 positions. Candidate SHA is
+  `8fd4a8c2...d5df08`; accepted SHA remains `3808d502...859d1`.
+- Comparison manifest `b9669799...48d42`, SUCCESS `027d68ef...7220`, evidence
+  `d40b57e8...42425`, remote ledger `e08d2c85...bc0b`, SQLite integrity, direct remote bytes and
+  authenticated 8/8 cleanup pass. This rejects internal materialization and has no performance or
+  Gate-D standing.
+- The local successor uses one separate stage-local materializer and passes its completed FP32
+  outputs to repair. The fleet linter requires five raw/scale inputs, BF16 rounds/promotions, zero
+  communication/callback, zero repair-side rematerialization, final-owner shard identities and
+  15,728,640 bytes/device.
+- A bounded four-chip extension of the existing DB518 harness runs these production functions,
+  verifies each lane writes only its 128-row page ownership, and requires the assembled 8,155-row
+  cache to match DB518 bitwise. Local focused coverage is 71/71; protected LP4 evidence does not
+  exist yet, so another full decoder retry remains forbidden.

@@ -1245,6 +1245,15 @@ repair_prefill_inputs = (
     jnp.asarray([5, 6], dtype=jnp.int32),
     *split_inputs[6:9],
 )
+repair_wk_names = repair_decoder.prefill_index_weight_names
+repair_wk_bits = tuple(weights[bits_name] for bits_name, _ in repair_wk_names)
+repair_wk_scales = tuple(weights[scale_name] for _, scale_name in repair_wk_names)
+repair_wk_materializer = repair_decoder.materialize_prefill_index_weights
+assert repair_wk_materializer is not None
+repair_wk_materialized = jax.jit(repair_wk_materializer)(
+    repair_wk_bits, repair_wk_scales
+)
+repair_prefill_inputs = (*repair_prefill_inputs, repair_wk_materialized)
 repair_prefill_compiled = jax.jit(repair_prefill.execute).lower(*repair_prefill_inputs).compile()
 repair_prefilled = repair_prefill_compiled(*repair_prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))

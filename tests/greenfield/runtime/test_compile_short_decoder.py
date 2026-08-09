@@ -64,7 +64,7 @@ def test_protected_runner_classifies_prefill_loops_fail_closed() -> None:
     assert '["loop_count"] != 1' not in runner
 
 
-def test_prefill_index_repair_is_default_off_and_db518_pinned() -> None:
+def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
     runner = PROTECTED_RUNNER.read_text()
 
@@ -84,8 +84,8 @@ def test_prefill_index_repair_is_default_off_and_db518_pinned() -> None:
     assert (
         "prefill index repair must remain isolated from diagnostics" in compiler
     )
-    assert '"schema_version": 10' in compiler
-    assert 'record["schema_version"] for record in records} != {10}' in runner
+    assert '"schema_version": 11' in compiler
+    assert 'record["schema_version"] for record in records} != {11}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
@@ -95,6 +95,10 @@ def test_prefill_index_repair_is_default_off_and_db518_pinned() -> None:
     assert 'repair["expected_call_count"] != 84' in runner
     assert 'repair["physical_sqrt_count"] != 168' in runner
     assert 'repair["repair_collectives"]' in runner
+    assert 'repair["repair_weight_round_count"] != 0' in runner
+    assert "results_db_run_id\": 519" in runner
+    assert "external_stage_local_bf16_then_fp32" in runner
+    assert "prefill_wk_materialization_hlo_contract" in runner
 
 
 @pytest.mark.parametrize(

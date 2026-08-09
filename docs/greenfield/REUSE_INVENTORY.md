@@ -21,7 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--518, and existing association helpers | DB506--515 isolate the drift, DB516 seals the 32-way physical M64 lowering, DB517 makes projection exact, and DB518 makes all producer states plus the complete 8,155-row BF16 cache exact. Production reuses the proven RMS/LayerNorm/RoPE/FP8 helpers in one default-off stage-local prefill repair; recurrent decode and legacy execution stay untouched. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--519, and existing association helpers | DB506--515 isolate the drift, DB516 seals physical M64, DB517 makes projection exact, DB518 makes the full cache exact, and DB519 rejects fused internal weight materialization. Production now separates the small stage-local weight materializer from repair; recurrent decode and legacy execution stay untouched. |
 | DSA internal observer | oracle-only `83ff4a357` scorer, `9c1d6b3b9` prompt-key, and `89fc453b6` prompt-key-input modes, all descendants of accepted `b3c25df47`; protected DB513--515 | Default-off scorer/prompt-key modes remain unchanged. DB515 seals the actual 6,144-wide FP32 `h` entering projection at row 113 and proves it bitwise equal to the independent M2048 gather/RMS producer. Legacy execution is never imported; the observer is now preserved evidence, not a reason to recapture the input. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -315,6 +315,9 @@ tokens/all DSA events before it has Gate-D standing.
 
 The first integrated execution passes those structural gates but fails all 21 exact DSA sets. Its
 HLO shows the large prefill executable internally dequantizing/rounding/promoting `wk`, whereas
-DB518 consumes a completed FP32 materialization as an entry parameter. Reuse the existing DB518
-one-host comparison and protected wrapper for one raw-FP8-inside-executable challenger; do not add
-a second cache oracle or rerun the full decoder until this boundary is bitwise adjudicated.
+DB518 consumes a completed FP32 materialization as an entry parameter. DB519 executes that internal
+arm and rejects it decisively: 298,532 BF16 mismatches span every prompt position. The adapted
+production path therefore completes only the five padded stage-local `wk` slots in a separate
+raw-FP8 -> BF16 -> FP32 executable and passes them into repair. The existing DB518 wrapper is
+extended for the required four-lane owner/scatter proof; no second cache oracle is added and no full
+decoder may run until that protected cache is bitwise exact.

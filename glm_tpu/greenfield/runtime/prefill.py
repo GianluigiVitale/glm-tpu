@@ -49,6 +49,124 @@ def _prefill_index_repair_chunk_count(prompt_length: int) -> int:
     ) // _PREFILL_INDEX_REPAIR_CHUNK
 
 
+def validate_prefill_index_weight_materialization_hlo(
+    optimized_hlo: str,
+    *,
+    decoder: DecoderStepProgram,
+) -> dict[str, Any]:
+    """Pin the completed raw-FP8 -> BF16 -> FP32 repair boundary.
+
+    DB519 proves that placing this arithmetic inside the large repair
+    executable changes the result.  This small executable must finish first,
+    without communication, and its FP32 outputs become independent parameters
+    of the prefill repair.
+    """
+
+    module = parse_hlo_module(optimized_hlo)
+    slots = decoder.config.maximum_full_indexer_slots
+    weight_shape = (
+        decoder.config.index_key_width,
+        decoder.config.hidden_size,
+    )
+    flat_weight_shape = (weight_shape[0] * weight_shape[1],)
+    global_flat_weight_shape = (
+        decoder.config.total_devices * flat_weight_shape[0],
+    )
+    scale_shape = tuple((dimension + 127) // 128 for dimension in weight_shape)
+
+    def parameter_matches(instruction: Any, dtype: str, tail: tuple[int, ...]) -> bool:
+        return (
+            instruction.raw_opcode == "parameter"
+            and len(instruction.result_shapes) == 1
+            and instruction.result_shapes[0].dtype == dtype
+            and instruction.result_shapes[0].dimensions[-len(tail) :] == tail
+        )
+
+    def weight_value_shape(shape: Any) -> bool:
+        return (
+            shape.dimensions[-2:] == weight_shape
+            or shape.dimensions
+            in (flat_weight_shape, global_flat_weight_shape)
+        )
+
+    raw_parameters = tuple(
+        instruction
+        for instruction in module.instructions
+        if parameter_matches(instruction, "u8", weight_shape)
+    )
+    scale_parameters = tuple(
+        instruction
+        for instruction in module.instructions
+        if parameter_matches(instruction, "f32", scale_shape)
+    )
+    bf16_round_count = sum(
+        sum(
+            shape.dtype == "bf16" and weight_value_shape(shape)
+            for shape in instruction.result_shapes
+        )
+        for instruction in module.instructions
+        if instruction.raw_opcode in ("convert", "fusion")
+    )
+    fp32_promotion_count = sum(
+        sum(
+            shape.dtype == "f32" and weight_value_shape(shape)
+            for shape in instruction.result_shapes
+        )
+        for instruction in module.instructions
+        if instruction.raw_opcode in ("convert", "fusion")
+        and any(shape.dtype == "bf16" for shape in instruction.operand_shapes)
+    )
+    collectives = tuple(module.collectives)
+    lowered = optimized_hlo.lower()
+    host_markers = tuple(
+        marker
+        for marker in (
+            "host_callback",
+            "outside_compilation",
+            "xla_ffi_python_cpu_callback",
+            "xla_python_cpu_callback",
+        )
+        if marker in lowered
+    )
+    violations = []
+    if len(raw_parameters) != slots:
+        violations.append(
+            "prefill wk materializer raw parameter count drifted: "
+            f"expected={slots} observed={len(raw_parameters)}"
+        )
+    if len(scale_parameters) != slots:
+        violations.append(
+            "prefill wk materializer scale parameter count drifted: "
+            f"expected={slots} observed={len(scale_parameters)}"
+        )
+    if bf16_round_count < slots:
+        violations.append(
+            "prefill wk materializer lost its BF16 adaptation rounds: "
+            f"expected_at_least={slots} observed={bf16_round_count}"
+        )
+    if fp32_promotion_count < slots:
+        violations.append(
+            "prefill wk materializer lost its FP32 promotions: "
+            f"expected_at_least={slots} observed={fp32_promotion_count}"
+        )
+    if collectives:
+        violations.append("prefill wk materializer contains a collective")
+    if host_markers:
+        violations.append("prefill wk materializer contains a host callback")
+    return {
+        "backend": "external_stage_local_bf16_then_fp32",
+        "bf16_round_count": bf16_round_count,
+        "collective_count": len(collectives),
+        "expected_slot_count": slots,
+        "fp32_promotion_count": fp32_promotion_count,
+        "host_markers": list(host_markers),
+        "passed": not violations,
+        "raw_parameter_count": len(raw_parameters),
+        "scale_parameter_count": len(scale_parameters),
+        "violations": violations,
+    }
+
+
 def validate_teacher_forced_prefill_loops(
     optimized_hlo: str,
     *,
@@ -202,7 +320,7 @@ def _classify_teacher_forced_prefill_loops(
     }
 
 
-def _validate_physical_m64_prefill_index_repair_hlo(
+def validate_stage_local_prefill_index_repair_hlo(
     module: HloModule,
     *,
     program: TeacherForcedPrefillProgram,
@@ -327,6 +445,35 @@ def _validate_physical_m64_prefill_index_repair_hlo(
         for instruction in module.collectives
         if _is_prefill_index_repair_op_name(instruction.op_name)
     )
+    materialized_wk_parameters = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.raw_opcode == "parameter"
+        and len(instruction.result_shapes) == 1
+        and instruction.result_shapes[0].dtype == "f32"
+        and instruction.result_shapes[0].dimensions[-2:]
+        == (decoder.config.index_key_width, decoder.config.hidden_size)
+    )
+    repair_weight_rounds = tuple(
+        instruction
+        for instruction in scoped
+        if instruction.raw_opcode in ("convert", "fusion")
+        and any(
+            shape.dtype == "bf16"
+            and shape.dimensions
+            in (
+                (
+                    decoder.config.index_key_width,
+                    decoder.config.hidden_size,
+                ),
+                (
+                    decoder.config.index_key_width
+                    * decoder.config.hidden_size,
+                ),
+            )
+            for shape in instruction.result_shapes
+        )
+    )
     history_shape_values = {
         (shape.dtype, shape.dimensions): shape
         for instruction in module.instructions
@@ -409,6 +556,18 @@ def _validate_physical_m64_prefill_index_repair_hlo(
         )
     if repair_collectives:
         violations.append("prefill index repair contains a collective")
+    if len(materialized_wk_parameters) < (
+        decoder.config.maximum_full_indexer_slots
+    ):
+        violations.append(
+            "prefill index repair lost its external FP32 wk parameters: "
+            f"expected_at_least={decoder.config.maximum_full_indexer_slots} "
+            f"observed={len(materialized_wk_parameters)}"
+        )
+    if repair_weight_rounds:
+        violations.append(
+            "prefill index repair rematerializes raw wk inside the executable"
+        )
     if not history_shapes:
         violations.append("prefill index repair lost its stage-local history")
     if full_pod_history_shapes:
@@ -450,12 +609,14 @@ def _validate_physical_m64_prefill_index_repair_hlo(
             * 2
         ),
         "history_shapes": list(history_shapes),
+        "materialized_wk_parameter_count": len(materialized_wk_parameters),
         "passed": not violations,
         "physical_affine_count": len(physical_affine),
         "physical_sqrt_count": len(physical_sqrt),
         "projection_count": len(projections),
         "projections": identities(projections),
         "repair_collectives": identities(repair_collectives),
+        "repair_weight_round_count": len(repair_weight_rounds),
         "violations": violations,
     }
 
@@ -532,7 +693,7 @@ def validate_teacher_forced_prefill_hlo(
     }
     if index_repair_enabled:
         index_repair_contract = (
-            _validate_physical_m64_prefill_index_repair_hlo(
+            validate_stage_local_prefill_index_repair_hlo(
                 module,
                 program=program,
                 schedule=schedule,
@@ -668,6 +829,7 @@ def build_teacher_forced_prefill_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        materialized_index_wk: tuple[Any, ...] | None = None,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         if tuple(prompt_tokens.shape) != (prompt_length,):
             raise PlanValidationError(
@@ -747,11 +909,16 @@ def build_teacher_forced_prefill_program(
                 raise PlanValidationError(
                     "prefill index repair executable is unavailable"
                 )
+            if materialized_index_wk is None:
+                raise PlanValidationError(
+                    "prefill index repair requires externally materialized wk"
+                )
             final = (
                 final[0],
                 final[1],
                 decoder.repair_prefill_index_cache(
                     weights,
+                    materialized_index_wk,
                     final[2],
                     prompt_index_inputs,
                     final[5],
@@ -761,6 +928,10 @@ def build_teacher_forced_prefill_program(
                 final[5],
                 final[6],
                 final[7],
+            )
+        elif materialized_index_wk is not None:
+            raise PlanValidationError(
+                "default prefill must not receive materialized repair weights"
             )
         return (
             final[0],

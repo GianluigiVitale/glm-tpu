@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -20,7 +21,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[2]
 EXPECTED_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
 ARTIFACT_KIND = "greenfield_accepted_prompt_key_internal_comparison"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 ACCEPTED_ADAPTED_WK_BYTE_SUM = 193_298_069
 
 
@@ -101,7 +102,11 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--projection-weight-source",
-        choices=("materialized_parameter", "raw_fp8_inside_executable"),
+        choices=(
+            "materialized_lp4_stage_local",
+            "materialized_parameter",
+            "raw_fp8_inside_executable",
+        ),
         default="materialized_parameter",
     )
     parser.add_argument(
@@ -142,7 +147,10 @@ def _projection_weight_source_contract(
             optimized_hlo,
         )
     )
-    if source == "materialized_parameter":
+    if source in (
+        "materialized_lp4_stage_local",
+        "materialized_parameter",
+    ):
         violations = []
         if f32_parameter_count != 1:
             violations.append(
@@ -176,6 +184,251 @@ def _projection_weight_source_contract(
         "passed": not violations,
         "source": source,
         "violations": violations,
+    }
+
+
+def _run_lp4_materialized_repair(
+    *,
+    output_dir: Path,
+    raw_wk_bits: np.ndarray,
+    raw_wk_scale: np.ndarray,
+    normalized_history: np.ndarray,
+    live_block_table: np.ndarray,
+    key_norm_weight: np.ndarray,
+    key_norm_bias: np.ndarray,
+    accepted_cache_bits: np.ndarray,
+    expected_materialized_wk_sha256: str,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Run the production materializer and cache repair over four TPU lanes."""
+
+    import jax
+    import ml_dtypes
+    from jax import lax
+    from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+
+    from glm_tpu.greenfield.kernels.reference.prefill_index import (
+        materialize_stage_local_prefill_index_wk,
+        repair_stage_local_prompt_index_cache,
+    )
+    from glm_tpu.greenfield.runtime import (
+        validate_prefill_index_weight_materialization_hlo,
+        validate_stage_local_prefill_index_repair_hlo,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    devices = np.asarray(jax.local_devices(), dtype=object)
+    if devices.shape != (4,):
+        raise RuntimeError("LP4 prompt repair requires four local TPU devices")
+    if normalized_history.shape != (accepted_cache_bits.shape[0], 6144):
+        raise RuntimeError("LP4 prompt repair normalized history drifted")
+    mesh = Mesh(devices, ("lp",))
+    sharded_weight = NamedSharding(mesh, P("lp", None, None))
+    replicated = NamedSharding(mesh, P())
+
+    bits = jax.device_put(
+        np.broadcast_to(raw_wk_bits, (4, *raw_wk_bits.shape)).copy(),
+        sharded_weight,
+    )
+    scales = jax.device_put(
+        np.broadcast_to(raw_wk_scale, (4, *raw_wk_scale.shape)).copy(),
+        sharded_weight,
+    )
+
+    def mapped_materializer(local_bits: Any, local_scales: Any) -> Any:
+        return materialize_stage_local_prefill_index_wk(
+            local_bits[0], local_scales[0]
+        )[None, ...]
+
+    materializer = jax.shard_map(
+        mapped_materializer,
+        mesh=mesh,
+        in_specs=(P("lp", None, None), P("lp", None, None)),
+        out_specs=P("lp", None, None),
+        check_vma=False,
+    )
+    compile_started = time.monotonic()
+    lowered_materializer = jax.jit(materializer).lower(bits, scales)
+    compiled_materializer = lowered_materializer.compile()
+    materializer_compile_seconds = time.monotonic() - compile_started
+    materializer_hlo = compiled_materializer.as_text()
+
+    config = SimpleNamespace(
+        hidden_size=6144,
+        index_key_width=128,
+        maximum_full_indexer_slots=1,
+        total_devices=4,
+    )
+    decoder = SimpleNamespace(config=config)
+    materializer_contract = validate_prefill_index_weight_materialization_hlo(
+        materializer_hlo,
+        decoder=decoder,
+    )
+    hlo_dir = output_dir / "hlo"
+    hlo_dir.mkdir(parents=True, exist_ok=True)
+    hlo_records = {}
+
+    def record_hlo(
+        name: str, hlo: str, contract: dict[str, Any]
+    ) -> None:
+        path = hlo_dir / f"{name}.optimized_hlo.txt.gz"
+        with gzip.open(path, "wt", encoding="utf-8") as stream:
+            stream.write(hlo)
+        hlo_records[name] = {
+            "contract": contract,
+            "filename": path.relative_to(output_dir).as_posix(),
+            "optimized_hlo_sha256": sha256(hlo.encode()).hexdigest(),
+            "sha256": _sha256_file(path),
+        }
+
+    record_hlo(
+        "lp4_wk_materializer", materializer_hlo, materializer_contract
+    )
+    if not materializer_contract["passed"]:
+        raise RuntimeError("LP4 weight materialization HLO contract failed")
+
+    sentinel = ml_dtypes.bfloat16(-32.0)
+    cache_host = np.full((4, 24, 128, 128), sentinel)
+    cache = jax.device_put(
+        cache_host,
+        NamedSharding(mesh, P("lp", None, None, None)),
+    )
+    history = jax.device_put(normalized_history, replicated)
+    blocks = jax.device_put(live_block_table[None, :], replicated)
+    norm_weight = jax.device_put(key_norm_weight, replicated)
+    norm_bias = jax.device_put(key_norm_bias, replicated)
+
+    def mapped_repair(
+        local_cache: Any,
+        local_history: Any,
+        local_blocks: Any,
+        local_wk: Any,
+        local_norm_weight: Any,
+        local_norm_bias: Any,
+    ) -> Any:
+        repaired = repair_stage_local_prompt_index_cache(
+            local_cache[0],
+            local_history,
+            local_blocks,
+            local_wk[0],
+            local_norm_weight,
+            local_norm_bias,
+            lax.axis_index("lp"),
+        )
+        return repaired[None, ...]
+
+    repair = jax.shard_map(
+        mapped_repair,
+        mesh=mesh,
+        in_specs=(
+            P("lp", None, None, None),
+            P(),
+            P(),
+            P("lp", None, None),
+            P(),
+            P(),
+        ),
+        out_specs=P("lp", None, None, None),
+        check_vma=False,
+    )
+    execute_started = time.monotonic()
+    materialized = compiled_materializer(bits, scales)
+    jax.block_until_ready(materialized)
+    materializer_execute_seconds = time.monotonic() - execute_started
+    compile_started = time.monotonic()
+    lowered_repair = jax.jit(repair).lower(
+        cache,
+        history,
+        blocks,
+        materialized,
+        norm_weight,
+        norm_bias,
+    )
+    compiled_repair = lowered_repair.compile()
+    repair_compile_seconds = time.monotonic() - compile_started
+    repair_hlo = compiled_repair.as_text()
+
+    program = SimpleNamespace(
+        decoder=decoder,
+        prompt_length=int(normalized_history.shape[0]),
+    )
+    schedule = SimpleNamespace(
+        stages=(
+            SimpleNamespace(
+                layers=(SimpleNamespace(indexer_kind="full"),)
+            ),
+        )
+    )
+    repair_contract = validate_stage_local_prefill_index_repair_hlo(
+        parse_hlo_module(repair_hlo),
+        program=program,
+        schedule=schedule,
+        backend_contract="tpu_v4_spmd",
+    )
+    record_hlo("lp4_cache_repair", repair_hlo, repair_contract)
+    if not repair_contract["passed"]:
+        raise RuntimeError("LP4 cache repair HLO contract failed")
+
+    execute_started = time.monotonic()
+    repaired = compiled_repair(
+        cache,
+        history,
+        blocks,
+        materialized,
+        norm_weight,
+        norm_bias,
+    )
+    jax.block_until_ready(repaired)
+    repair_execute_seconds = time.monotonic() - execute_started
+    repaired_host = np.ascontiguousarray(np.asarray(repaired))
+    repaired_bits = repaired_host.view(np.uint16)
+    sentinel_bits = np.asarray(sentinel).view(np.uint16).item()
+    changed_rows = np.any(repaired_bits != sentinel_bits, axis=-1)
+    expected_changed_rows = np.zeros((4, 24, 128), dtype=np.bool_)
+    candidate_bits = np.empty_like(accepted_cache_bits)
+    for position in range(accepted_cache_bits.shape[0]):
+        logical_page, page_row = divmod(position, 512)
+        physical_page = int(live_block_table[logical_page])
+        owner, local_row = divmod(page_row, 128)
+        if physical_page < 0 or physical_page >= 24:
+            raise RuntimeError("LP4 prompt repair block table is invalid")
+        expected_changed_rows[owner, physical_page, local_row] = True
+        candidate_bits[position] = repaired_bits[
+            owner, physical_page, local_row
+        ]
+    owner_isolation_exact = bool(
+        np.array_equal(changed_rows, expected_changed_rows)
+    )
+    if not owner_isolation_exact:
+        raise RuntimeError("LP4 prompt repair wrote outside owner rows")
+
+    materialized_shards = []
+    for shard in materialized.addressable_shards:
+        host = np.ascontiguousarray(np.asarray(jax.device_get(shard.data)))
+        identity = {
+            "byte_count": int(host.nbytes),
+            "device_id": int(shard.device.id),
+            "sha256": _array_sha256(host),
+        }
+        if identity["sha256"] != expected_materialized_wk_sha256:
+            raise RuntimeError("LP4 materialized wk differs across owner lanes")
+        materialized_shards.append(identity)
+
+    return candidate_bits, {
+        "assembled_cache_elementwise_exact": bool(
+            np.array_equal(candidate_bits, accepted_cache_bits)
+        ),
+        "assembled_cache_sha256": _array_sha256(candidate_bits),
+        "hlo": hlo_records,
+        "local_device_ids": [int(device.id) for device in devices],
+        "materialized_shards": materialized_shards,
+        "materializer_compile_seconds": materializer_compile_seconds,
+        "materializer_execute_seconds": materializer_execute_seconds,
+        "owner_isolation_exact": owner_isolation_exact,
+        "per_lane_written_rows": [
+            int(changed_rows[lane].sum()) for lane in range(4)
+        ],
+        "repair_compile_seconds": repair_compile_seconds,
+        "repair_execute_seconds": repair_execute_seconds,
     }
 
 
@@ -389,7 +642,10 @@ def main() -> int:
         "projection_weight_mode": args.projection_weight_mode,
         "projection_mapping_mode": args.projection_mapping_mode,
     }
-    if args.projection_weight_source == "materialized_parameter":
+    if args.projection_weight_source in (
+        "materialized_lp4_stage_local",
+        "materialized_parameter",
+    ):
         chunk_suffixes = tuple(
             (
                 live_block_table,
@@ -604,6 +860,7 @@ def main() -> int:
 
     started = time.monotonic()
     observed_projection_input = None
+    projection_input_host = None
     if projection_input_compiled is not None:
         projection_input_result = projection_input_compiled(
             *projection_input_arguments
@@ -627,27 +884,73 @@ def main() -> int:
             np.asarray(state_result.post_rope_key[args.position])
         ),
     }
-    candidate_cache = state_result.index_cache
-    for suffix in chunk_suffixes[1:]:
-        candidate_cache = cache_compiled(candidate_cache, *suffix)
-    jax.block_until_ready(candidate_cache)
-    execute_seconds = time.monotonic() - started
-
-    candidate_cache_host = np.ascontiguousarray(np.asarray(candidate_cache))
-    flat_cache = candidate_cache_host.reshape(
-        cache_shape[0], cache_shape[1] * cache_shape[2], cache_shape[3]
-    )
-    live_positions = np.arange(prompt_ids.size, dtype=np.int32)
-    physical_pages = live_block_table_host[
-        live_positions // (cache_shape[1] * cache_shape[2])
-    ]
-    candidate_keys = np.ascontiguousarray(
-        flat_cache[
-            physical_pages,
-            live_positions % (cache_shape[1] * cache_shape[2]),
+    lp4_materialized_repair = None
+    if args.projection_weight_source == "materialized_lp4_stage_local":
+        if projection_input_compiled is None or projection_input_host is None:
+            raise RuntimeError("LP4 prompt repair requires projection inputs")
+        normalized_chunks = [
+            projection_input_host.astype(ml_dtypes.bfloat16)
         ]
-    )
-    candidate_bits = candidate_keys.view(np.uint16)
+        for suffix in chunk_suffixes[1:]:
+            normalized_chunks.append(
+                np.ascontiguousarray(
+                    np.asarray(
+                        projection_input_compiled(
+                            unique_embeddings,
+                            suffix[2],
+                            input_norm_weight,
+                        ),
+                        dtype=np.float32,
+                    )
+                ).astype(ml_dtypes.bfloat16)
+            )
+        normalized_history = np.ascontiguousarray(
+            np.concatenate(normalized_chunks, axis=0)[: prompt_ids.size]
+        )
+        candidate_bits, lp4_materialized_repair = (
+            _run_lp4_materialized_repair(
+                output_dir=args.output,
+                raw_wk_bits=arrays["self_attn__indexer__wk__weight"],
+                raw_wk_scale=arrays[
+                    "self_attn__indexer__wk__weight_scale_inv"
+                ],
+                normalized_history=normalized_history,
+                live_block_table=live_block_table_host,
+                key_norm_weight=bf16_host(
+                    "self_attn__indexer__k_norm__weight"
+                ),
+                key_norm_bias=bf16_host(
+                    "self_attn__indexer__k_norm__bias"
+                ),
+                accepted_cache_bits=accepted_cache_bits,
+                expected_materialized_wk_sha256=wk_identity["sha256"],
+            )
+        )
+    else:
+        candidate_cache = state_result.index_cache
+        for suffix in chunk_suffixes[1:]:
+            candidate_cache = cache_compiled(candidate_cache, *suffix)
+        jax.block_until_ready(candidate_cache)
+        candidate_cache_host = np.ascontiguousarray(
+            np.asarray(candidate_cache)
+        )
+        flat_cache = candidate_cache_host.reshape(
+            cache_shape[0],
+            cache_shape[1] * cache_shape[2],
+            cache_shape[3],
+        )
+        live_positions = np.arange(prompt_ids.size, dtype=np.int32)
+        physical_pages = live_block_table_host[
+            live_positions // (cache_shape[1] * cache_shape[2])
+        ]
+        candidate_keys = np.ascontiguousarray(
+            flat_cache[
+                physical_pages,
+                live_positions % (cache_shape[1] * cache_shape[2]),
+            ]
+        )
+        candidate_bits = candidate_keys.view(np.uint16)
+    execute_seconds = time.monotonic() - started
     candidate_sha = _array_sha256(candidate_bits)
     if args.expected_candidate_cache_sha256 is not None and (
         candidate_sha != args.expected_candidate_cache_sha256
@@ -791,6 +1094,7 @@ def main() -> int:
         "input_manifest_sha256": input_manifest["manifest_sha256"],
         "layer_name": args.layer_name,
         "legacy_code_hash": args.legacy_code_hash,
+        "lp4_materialized_repair": lp4_materialized_repair,
         "memory_after": _memory_stats(device),
         "memory_before": before_memory,
         "model_id": args.model_id,

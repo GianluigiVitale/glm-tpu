@@ -30,6 +30,20 @@ def test_accepts_materialized_fp32_wk_parameter() -> None:
     assert result["entry_raw_fp8_wk_parameter_count"] == 0
 
 
+def test_accepts_lp4_stage_local_materialized_fp32_wk_parameter() -> None:
+    result = _contract(
+        "ENTRY %main (wk: f32[128,6144]) -> bf16[1] {\n"
+        "  ROOT %value = bf16[1] parameter(0)\n"
+        "}\n",
+        "materialized_lp4_stage_local",
+    )
+
+    assert result["passed"] is True
+    assert result["source"] == "materialized_lp4_stage_local"
+    assert result["entry_f32_wk_parameter_count"] == 1
+    assert result["entry_raw_fp8_wk_parameter_count"] == 0
+
+
 def test_accepts_internal_raw_fp8_with_explicit_bf16_round() -> None:
     result = _contract(
         "ENTRY %main (wk: u8[128,6144]) -> bf16[1] {\n"

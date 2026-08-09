@@ -1027,3 +1027,11 @@ device DSA observer then rejected all 21 full-indexer selected sets before warmu
 or tracing. Compile/prefill elapsed time is not token latency. There is no profiler-free wall rate,
 XPlane, DB row or terminal `SUCCESS`; DB484 remains the only accepted PP8 decoder performance point
 at `244.091151 ms` p50 / `4.096830 tok/s`, and Gate E remains open.
+
+## DB519 weight-source discriminator — no performance result
+
+DB519 is a bounded one-host prompt-cache diagnostic. It proves that internal raw-FP8 weight
+materialization changes every cache position, but its elapsed time includes compilation,
+orchestration and cache comparison. It has no decoder loop, warmed wall distribution, XPlane or
+token-rate standing. DB484 remains the accepted PP8 point at `244.091151 ms` p50 and
+`4.096830 tok/s`; Gate E remains open.

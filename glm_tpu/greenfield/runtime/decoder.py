@@ -26,6 +26,7 @@ from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.linear import vocabulary_logits
 from ..kernels.reference.moe import GlmMoeNumericalContract
 from ..kernels.reference.prefill_index import (
+    materialize_stage_local_prefill_index_wk,
     repair_stage_local_prompt_index_cache,
 )
 from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
@@ -298,6 +299,8 @@ class DecoderStepProgram:
     observe_dsa_internals: bool
     observe_layer_residuals: bool
     observe_prefill_index_inputs: bool
+    prefill_index_weight_names: tuple[tuple[str, str], ...]
+    materialize_prefill_index_weights: Any | None
     repair_prefill_index_cache: Any | None
     split_residual_state: bool
 
@@ -3156,6 +3159,7 @@ def build_decoder_step_program(
 
     def mapped_prefill_index_repair(
         local_weights: Mapping[str, Any],
+        local_materialized_wk: tuple[Any, ...],
         local_index_container: Any,
         local_history_container: Any,
         block_tables: Any,
@@ -3181,8 +3185,7 @@ def build_decoder_step_program(
                         repaired[full_slot],
                         prompt_history[:, full_slot],
                         block_tables,
-                        dsa.wk_bits,
-                        dsa.wk_scale,
+                        local_materialized_wk[full_slot][0],
                         dsa.key_norm_weight,
                         dsa.key_norm_bias,
                         local_slot,
@@ -3191,7 +3194,6 @@ def build_decoder_step_program(
                         local_rows_per_page=config.local_rows_per_page,
                         prompt_chunk=2048,
                         physical_rows=64,
-                        fp8_block_shape=geometry.fp8_block_shape,
                     )
                     repaired = repaired.at[full_slot].set(layer_cache)
                     full_slot += 1
@@ -3202,6 +3204,33 @@ def build_decoder_step_program(
         branches = tuple(stage_branch(stage) for stage in schedule.stages)
         index_cache = lax.switch(stage_id, branches, index_cache)
         return index_cache[None, ...]
+
+    maximum_full_indexer_slots = config.maximum_full_indexer_slots
+
+    prefill_index_weight_names = tuple(
+        (
+            f"indexer.slot_{full_slot:02d}.wk.weight_bits",
+            f"indexer.slot_{full_slot:02d}.wk.scale_inv",
+        )
+        for full_slot in range(maximum_full_indexer_slots)
+    )
+
+    def mapped_prefill_index_weight_materialization(
+        local_wk_bits: tuple[Any, ...],
+        local_wk_scales: tuple[Any, ...],
+    ) -> tuple[Any, ...]:
+        values = []
+        for wk_bits, wk_scale in zip(
+            local_wk_bits, local_wk_scales, strict=True
+        ):
+            materialized = materialize_stage_local_prefill_index_wk(
+                wk_bits[0],
+                wk_scale[0],
+                contract=dsa_contract,
+                fp8_block_shape=geometry.fp8_block_shape,
+            )
+            values.append(materialized[None, ...])
+        return tuple(values)
 
     weight_specs = {
         spec.name: P(axis_name, *(None for _ in spec.shape))
@@ -3278,12 +3307,33 @@ def build_decoder_step_program(
         check_vma=False,
     )
     repair_prefill_index_cache = None
+    materialize_prefill_index_weights = None
     if observe_prefill_index_inputs:
+        materialized_wk_specs = tuple(
+            P(axis_name, None, None)
+            for _ in range(maximum_full_indexer_slots)
+        )
+        raw_wk_specs = tuple(
+            P(axis_name, None, None)
+            for _ in range(maximum_full_indexer_slots)
+        )
+        raw_wk_scale_specs = tuple(
+            P(axis_name, None, None)
+            for _ in range(maximum_full_indexer_slots)
+        )
+        materialize_prefill_index_weights = jax.shard_map(
+            mapped_prefill_index_weight_materialization,
+            mesh=mesh,
+            in_specs=(raw_wk_specs, raw_wk_scale_specs),
+            out_specs=materialized_wk_specs,
+            check_vma=False,
+        )
         repair_prefill_index_cache = jax.shard_map(
             mapped_prefill_index_repair,
             mesh=mesh,
             in_specs=(
                 weight_specs,
+                materialized_wk_specs,
                 index_spec,
                 P(None, axis_name, None, None),
                 P(),
@@ -3314,6 +3364,14 @@ def build_decoder_step_program(
         observe_dsa_internals=observe_dsa_internals,
         observe_layer_residuals=observe_layer_residuals,
         observe_prefill_index_inputs=observe_prefill_index_inputs,
+        prefill_index_weight_names=(
+            prefill_index_weight_names
+            if observe_prefill_index_inputs
+            else ()
+        ),
+        materialize_prefill_index_weights=(
+            materialize_prefill_index_weights
+        ),
         repair_prefill_index_cache=repair_prefill_index_cache,
         split_residual_state=split_residual_state,
     )

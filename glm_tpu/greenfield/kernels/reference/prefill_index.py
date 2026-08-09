@@ -13,6 +13,42 @@ from .fp8 import dequantize_fp8_bits_block_weight
 from .rotary import apply_rotary, rotary_cos_sin
 
 
+def materialize_stage_local_prefill_index_wk(
+    wk_bits: Any,
+    wk_scale: Any,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+    fp8_block_shape: tuple[int, int] = (128, 128),
+) -> Any:
+    """Materialize one final-owner adapted ``wk`` before prefill repair.
+
+    DB518 and DB519 jointly require this to be a completed executable
+    boundary: raw FP8 is decoded to BF16, rounded, and only then promoted to
+    FP32.  The returned value is passed as an independent repair parameter;
+    it must never be fused into the prompt-key projection executable.
+    """
+
+    expected_shape = (contract.head_dim, contract.hidden_size)
+    if wk_bits.shape != expected_shape or wk_bits.dtype != jnp.uint8:
+        raise ValueError("prefill repair wk bits have an invalid shape/dtype")
+    expected_scale_shape = tuple(
+        (dimension + block - 1) // block
+        for dimension, block in zip(
+            expected_shape, fp8_block_shape, strict=True
+        )
+    )
+    if wk_scale.shape != expected_scale_shape or (
+        wk_scale.dtype != jnp.float32
+    ):
+        raise ValueError("prefill repair wk scales have an invalid shape/dtype")
+    return dequantize_fp8_bits_block_weight(
+        wk_bits,
+        wk_scale,
+        block_shape=fp8_block_shape,
+        output_dtype=jnp.bfloat16,
+    ).astype(jnp.float32)
+
+
 def physical_m64_prompt_index_key_chunk(
     normalized_chunk: Any,
     positions: Any,
@@ -110,8 +146,7 @@ def repair_stage_local_prompt_index_cache(
     index_cache: Any,
     prompt_normalized_inputs: Any,
     block_tables: Any,
-    wk_bits: Any,
-    wk_scale: Any,
+    wk_weight: Any,
     key_norm_weight: Any,
     key_norm_bias: Any,
     local_slot: Any,
@@ -121,7 +156,6 @@ def repair_stage_local_prompt_index_cache(
     local_rows_per_page: int = 128,
     prompt_chunk: int = 2048,
     physical_rows: int = 64,
-    fp8_block_shape: tuple[int, int] = (128, 128),
 ) -> Any:
     """Overwrite one final-owner cache with exact prompt keys.
 
@@ -151,18 +185,12 @@ def repair_stage_local_prompt_index_cache(
         raise ValueError("prompt repair is pinned to the PP8 LP4 page layout")
     if prompt_chunk <= 0 or prompt_chunk % physical_rows:
         raise ValueError("prompt repair chunk must divide into physical rows")
-    if wk_bits.shape != (contract.head_dim, contract.hidden_size):
-        raise ValueError("prompt repair wk bits have an invalid shape")
-
-    # The accepted loader first materializes this adapted leaf as BF16; the
-    # DSA adapter then promotes it to FP32 before the physical convolution.
-    # Preserve that value identity instead of dequantizing directly to FP32.
-    wk_weight = dequantize_fp8_bits_block_weight(
-        wk_bits,
-        wk_scale,
-        block_shape=fp8_block_shape,
-        output_dtype=jnp.bfloat16,
-    ).astype(jnp.float32)
+    if wk_weight.shape != (contract.head_dim, contract.hidden_size) or (
+        wk_weight.dtype != jnp.float32
+    ):
+        raise ValueError(
+            "prompt repair wk must be an externally materialized FP32 owner leaf"
+        )
     prompt_tokens = prompt_normalized_inputs.shape[0]
     padded_tokens = (
         (prompt_tokens + prompt_chunk - 1) // prompt_chunk * prompt_chunk

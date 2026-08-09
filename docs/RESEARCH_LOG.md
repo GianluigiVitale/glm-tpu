@@ -6275,3 +6275,24 @@ unmotivated arithmetic variants.
   gather/dequant/scale chain and returned `APPROVE COMMIT`. Next is commit/push and one fresh-tag
   bounded retry. This probe discriminates materialization arithmetic, not yet production LP4
   scatter, and it does not authorize a full 8K retry by itself.
+
+## 2026-08-09 18:45 — DB519 proves internal materialization is causal
+
+- Protected DB519/item1804 at `5e1cbb5` passes the corrected flattened-round HLO gate and executes
+  the raw-FP8-in-executable arm. It has one raw-U8 entry `wk`, no FP32 entry `wk`, one BF16 round,
+  exact DB515 projection input, approved archive/DB linkage and authenticated 8/8 cleanup.
+- It is decisively nonexact: all 8,155 positions differ, with 298,532 BF16 mismatches, first at
+  position 0, max `0.03125`, mean `0.0008879021`, p99 `0.015625`, and candidate SHA
+  `8fd4a8c2...d5df08`. All 128 position-113 pre-key-norm projection values differ, max
+  `0.0026161075`. Manifest `b9669799...48d42` and SUCCESS `027d68ef...7220` are sealed.
+- This accepts the discriminator and rejects internal materialization as the production boundary.
+  It contains no decoder timing, XPlane, Gate-D or throughput result.
+- The minimal correction materializes only five padded stage-local indexer weights/device in a
+  separate completed executable, then passes the FP32 arrays to repair. Recurrent decode, raw
+  checkpoint ownership and all other model weights stay unchanged. The added state is 15,728,640
+  bytes/device.
+- The bounded DB518 wrapper is extended, rather than duplicated, to execute the production
+  materializer and repair across four local lanes. Sentinel caches make out-of-owner writes
+  observable; assembled cache equality, separate HLOs and zero collectives are mandatory. Local
+  focused coverage passes 71/71. One new-diff Fable audit and a protected LP4 result are required
+  before another full 8K run.

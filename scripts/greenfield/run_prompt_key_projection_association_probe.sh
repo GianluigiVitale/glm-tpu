@@ -73,7 +73,8 @@ COMPARISON_DIR=$RUN_DIR/comparison
   echo "refusing prompt-key projection probe from wrong branch/worktree" >&2
   exit 2
 }
-[[ $WEIGHT_SOURCE == materialized_parameter ||
+[[ $WEIGHT_SOURCE == materialized_lp4_stage_local ||
+  $WEIGHT_SOURCE == materialized_parameter ||
   $WEIGHT_SOURCE == raw_fp8_inside_executable ]] || {
   echo "unknown prompt-key weight source: $WEIGHT_SOURCE" >&2
   exit 2
@@ -489,6 +490,7 @@ root = Path(run_path)
 comparison = json.loads((root / "comparison/comparison.json").read_text())
 if (
     comparison["status"] != "SUCCESS"
+    or comparison["format_version"] != 2
     or comparison["code_hash"] != pin
     or comparison["backend"] != "tpu"
     or comparison["device_count"] != 4
@@ -534,6 +536,59 @@ for name in ("cache", "states"):
 projection_input = comparison["projection_input_comparison"]
 if projection_input is None or projection_input["elementwise_exact"] is not True:
     raise SystemExit("DB515 projection input is not bitwise exact")
+lp4 = comparison["lp4_materialized_repair"]
+if weight_source == "materialized_lp4_stage_local":
+    if (
+        lp4 is None
+        or lp4["assembled_cache_elementwise_exact"] is not True
+        or lp4["assembled_cache_sha256"]
+        != comparison["accepted_cache"][
+            "prompt_index_key_bfloat16_sha256"
+        ]
+        or lp4["owner_isolation_exact"] is not True
+        or lp4["local_device_ids"] != [0, 1, 2, 3]
+        or lp4["per_lane_written_rows"] != [2048, 2048, 2048, 2011]
+        or len(lp4["materialized_shards"]) != 4
+        or any(
+            shard["byte_count"] != 128 * 6144 * 4
+            or shard["sha256"]
+            != comparison["accepted_adapted_wk"]["sha256"]
+            for shard in lp4["materialized_shards"]
+        )
+    ):
+        raise SystemExit("LP4 materialized repair ownership/exactness failed")
+    materializer = lp4["hlo"]["lp4_wk_materializer"]["contract"]
+    repair = lp4["hlo"]["lp4_cache_repair"]["contract"]
+    if (
+        not materializer["passed"]
+        or materializer["backend"]
+        != "external_stage_local_bf16_then_fp32"
+        or materializer["expected_slot_count"] != 1
+        or materializer["raw_parameter_count"] != 1
+        or materializer["scale_parameter_count"] != 1
+        or materializer["bf16_round_count"] < 1
+        or materializer["fp32_promotion_count"] < 1
+        or materializer["collective_count"] != 0
+        or materializer["host_markers"]
+        or materializer["violations"]
+        or not repair["passed"]
+        or repair["full_indexer_layer_count"] != 1
+        or repair["chunk_count"] != 4
+        or repair["expected_call_count"] != 4
+        or repair["projection_count"] != 4
+        or repair["exact_projection_operand_count"] != 4
+        or repair["physical_sqrt_count"] != 8
+        or repair["physical_affine_count"] < 4
+        or repair["cache_write_count"] < 4
+        or repair["materialized_wk_parameter_count"] < 1
+        or repair["repair_weight_round_count"] != 0
+        or repair["repair_collectives"]
+        or repair["forbidden_markers"]
+        or repair["violations"]
+    ):
+        raise SystemExit("LP4 materialized repair HLO contract failed")
+elif lp4 is not None:
+    raise SystemExit("unrequested LP4 materialized repair evidence is present")
 state_exact = comparison["state_comparison"]["all_fields_elementwise_exact"]
 cache_exact = comparison["cache_comparison"]["elementwise_exact"]
 restored = bool(state_exact and cache_exact)
@@ -570,6 +625,23 @@ run_id = pv.start_run(
         "projection_input_elementwise_exact": True,
         "state_elementwise_exact": state_exact,
         "cache_elementwise_exact": cache_exact,
+        "lp4_materialized_repair": (
+            {
+                "assembled_cache_sha256": lp4[
+                    "assembled_cache_sha256"
+                ],
+                "materializer_hlo_sha256": lp4["hlo"][
+                    "lp4_wk_materializer"
+                ]["optimized_hlo_sha256"],
+                "owner_isolation_exact": lp4["owner_isolation_exact"],
+                "per_lane_written_rows": lp4["per_lane_written_rows"],
+                "repair_hlo_sha256": lp4["hlo"][
+                    "lp4_cache_repair"
+                ]["optimized_hlo_sha256"],
+            }
+            if lp4 is not None
+            else None
+        ),
     },
     note=(
         "Protected bounded physical-M64 prompt-key projection plus LayerNorm "
@@ -625,6 +697,7 @@ summary = {
     "projection_weight_source": weight_source,
     "state_elementwise_exact": state_exact,
     "cache_elementwise_exact": cache_exact,
+    "lp4_materialized_repair": lp4,
     "candidate_cache_sha256": comparison["greenfield_cache"][
         "prompt_index_key_bfloat16_sha256"
     ],
@@ -750,6 +823,25 @@ values = {
     "projection_mapping_mode": "physical_m64_projection_keynorm_lax_map",
     "projection_weight_source": summary["projection_weight_source"],
     "candidate_cache_sha256": summary["candidate_cache_sha256"],
+    "lp4_owner_isolation_exact": str(
+        (
+            summary["lp4_materialized_repair"] or {}
+        ).get("owner_isolation_exact", False)
+    ).lower(),
+    "lp4_materializer_hlo_sha256": (
+        (summary["lp4_materialized_repair"] or {}).get(
+            "hlo", {}
+        ).get("lp4_wk_materializer", {}).get(
+            "optimized_hlo_sha256", "none"
+        )
+    ),
+    "lp4_repair_hlo_sha256": (
+        (summary["lp4_materialized_repair"] or {}).get(
+            "hlo", {}
+        ).get("lp4_cache_repair", {}).get(
+            "optimized_hlo_sha256", "none"
+        )
+    ),
     "performance_claim": "false",
     "evidence_sha256": sha256(
         (root / "evidence.sha256").read_bytes()

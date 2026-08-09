@@ -2782,3 +2782,28 @@ chain and returned `APPROVE COMMIT`. Exact next: commit/push this two-file corre
 fleet idle, and rerun the bounded raw-internal probe with a fresh append-only tag. This comparator
 tests internal materialization arithmetic; it is not yet a production LP4-scatter proof. Do not
 launch another full 8K decoder first.
+
+## DB519 rejects in-executable weight materialization; LP4 fix is local
+
+Protected DB519/item1804,
+`greenfield_layer0_prompt_key_weight_source_internal_20260809T182400Z`, ran the corrected raw-FP8
+arm at pushed pin `5e1cbb5`. All source, physical-M64 projection/key-norm, cache-scatter,
+no-communication, DB/archive and authenticated 8/8 cleanup contracts pass. The entry contains one
+raw-U8 `wk`, zero external FP32 `wk`, and one explicit BF16 adaptation round, yet all 8,155 cache
+positions drift: 298,532 BF16 values, first position 0, max `0.03125`, candidate SHA
+`8fd4a8c2...d5df08` versus accepted `3808d502...859d1`. All 128 position-113 projection values
+differ. Comparison manifest is `b9669799...48d42`; SUCCESS is `027d68ef...7220`. This proves the
+internal materialization boundary is causal and rejected; it is diagnostic, not Gate-D or
+performance evidence.
+
+The current batch moves only the five padded full-indexer `wk` slots/device into a separate,
+completed stage-local raw-FP8 -> BF16 -> FP32 executable after direct final-layout load. Prefill
+repair receives those FP32 arrays as independent parameters; recurrent decode and the packed
+checkpoint remain unchanged. The full-fleet contract requires five raw/scale parameters, five
+BF16 rounds/promotions, zero collective/callback, zero repair-side weight round, exact local shard
+ownership and 15,728,640 derived bytes/device. A reused DB518 one-host harness now has a bounded
+LP4 arm that runs the production materializer and repair over four lanes, uses sentinel caches to
+reject any non-owner write, and requires all 8,155 assembled rows to equal DB518 bitwise. Focused
+CPU/static coverage passes 71/71. Exact next: finish the affected suite, obtain one Fable review of
+only this new diff, commit/push, then run the bounded LP4 arm. Do not run the full 8K decoder until
+that protected LP4 result is exact.

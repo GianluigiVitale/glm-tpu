@@ -12,6 +12,7 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     layer0_prompt_index_key_chunk,
 )
 from glm_tpu.greenfield.kernels.reference.prefill_index import (
+    materialize_stage_local_prefill_index_wk,
     physical_m64_prompt_index_key_chunk,
     repair_stage_local_prompt_index_cache,
 )
@@ -152,6 +153,12 @@ def test_prompt_index_repair_writes_only_each_lp4_owner() -> None:
     # E4M3FN 0x38 is exactly 1.0; scales are one for the 2x2 blocks.
     wk_bits = jnp.full((4, 8), 0x38, dtype=jnp.uint8)
     wk_scale = jnp.ones((2, 4), dtype=jnp.float32)
+    wk_weight = materialize_stage_local_prefill_index_wk(
+        wk_bits,
+        wk_scale,
+        contract=contract,
+        fp8_block_shape=(2, 2),
+    )
     key_norm = jnp.ones((4,), dtype=jnp.bfloat16)
     key_bias = jnp.asarray([0.0, 0.25, -0.5, 1.0], dtype=jnp.bfloat16)
     repaired = [
@@ -159,8 +166,7 @@ def test_prompt_index_repair_writes_only_each_lp4_owner() -> None:
             initial,
             history,
             block_tables,
-            wk_bits,
-            wk_scale,
+            wk_weight,
             key_norm,
             key_bias,
             jnp.int32(owner),
@@ -169,7 +175,6 @@ def test_prompt_index_repair_writes_only_each_lp4_owner() -> None:
             local_rows_per_page=2,
             prompt_chunk=8,
             physical_rows=4,
-            fp8_block_shape=(2, 2),
         )
         for owner in range(4)
     ]
@@ -180,7 +185,6 @@ def test_prompt_index_repair_writes_only_each_lp4_owner() -> None:
         local_rows_per_page=2,
         prompt_chunk=8,
         physical_rows=4,
-        fp8_block_shape=(2, 2),
     )
     stablehlo = str(
         jax.jit(repair)
@@ -188,20 +192,31 @@ def test_prompt_index_repair_writes_only_each_lp4_owner() -> None:
             initial,
             history,
             block_tables,
-            wk_bits,
-            wk_scale,
+            wk_weight,
             key_norm,
             key_bias,
             jnp.int32(0),
         )
         .compiler_ir(dialect="stablehlo")
     )
-    bf16_origin = stablehlo.index(
+    assert "tensor<4x8xui8>" not in stablehlo
+    assert "tensor<2x4xf32>" not in stablehlo
+
+    materialize = partial(
+        materialize_stage_local_prefill_index_wk,
+        contract=contract,
+        fp8_block_shape=(2, 2),
+    )
+    materialize_stablehlo = str(
+        jax.jit(materialize)
+        .lower(wk_bits, wk_scale)
+        .compiler_ir(dialect="stablehlo")
+    )
+    bf16_origin = materialize_stablehlo.index(
         ": (tensor<4x8xf32>) -> tensor<4x8xbf16>"
     )
-    fp32_adapter = stablehlo.index(
-        ": (tensor<4x8xbf16>) -> tensor<4x8xf32>",
-        bf16_origin,
+    fp32_adapter = materialize_stablehlo.index(
+        ": (tensor<4x8xbf16>) -> tensor<4x8xf32>", bf16_origin
     )
     assert fp32_adapter > bf16_origin
 

@@ -732,7 +732,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {10}:
+if {record["schema_version"] for record in records} != {11}:
     raise SystemExit("fleet decoder record schema drifted")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
@@ -889,6 +889,18 @@ if short_context_oracle:
         ):
             raise SystemExit("prefill HLO/fleet contract drifted")
         if prefill_index_repair:
+            materializer = record[
+                "prefill_wk_materialization_hlo_contract"
+            ]
+            materialized_state = record[
+                "prefill_wk_materialization_state"
+            ]
+            expected_materialized_slots = 5
+            expected_materialized_shard_bytes = 128 * 6144 * 4
+            expected_materialized_bytes = (
+                expected_materialized_slots
+                * expected_materialized_shard_bytes
+            )
             if (
                 not repair["passed"]
                 or repair["backend"] != "physical_m64_chunk"
@@ -906,11 +918,118 @@ if short_context_oracle:
                 or repair["full_pod_history_shapes"]
                 or repair["repair_collectives"]
                 or repair["forbidden_markers"]
+                or repair["materialized_wk_parameter_count"]
+                < expected_materialized_slots
+                or repair["repair_weight_round_count"] != 0
                 or repair["violations"]
             ):
                 raise SystemExit("physical-M64 prefill repair HLO drifted")
+            if (
+                materializer is None
+                or not materializer["passed"]
+                or materializer["backend"]
+                != "external_stage_local_bf16_then_fp32"
+                or materializer["expected_slot_count"]
+                != expected_materialized_slots
+                or materializer["raw_parameter_count"]
+                != expected_materialized_slots
+                or materializer["scale_parameter_count"]
+                != expected_materialized_slots
+                or materializer["bf16_round_count"]
+                < expected_materialized_slots
+                or materializer["fp32_promotion_count"]
+                < expected_materialized_slots
+                or materializer["collective_count"] != 0
+                or materializer["host_markers"]
+                or materializer["violations"]
+                or record[
+                    "prefill_wk_materialization_compile_seconds"
+                ] is None
+                or record[
+                    "prefill_wk_materialization_compile_seconds"
+                ] <= 0
+                or record[
+                    "prefill_wk_materialization_execute_seconds"
+                ] is None
+                or record[
+                    "prefill_wk_materialization_execute_seconds"
+                ] <= 0
+                or not record["prefill_wk_materialization_hlo_sha256"]
+                or len(
+                    set(
+                        record[
+                            "fleet_prefill_wk_materialization_hlo_hashes"
+                        ]
+                    )
+                )
+                != 1
+                or record[
+                    "fleet_prefill_wk_materialization_hlo_hashes"
+                ][0]
+                != record["prefill_wk_materialization_hlo_sha256"]
+                or materialized_state is None
+                or materialized_state["source"]
+                != "completed_stage_local_raw_fp8_to_bf16_to_fp32"
+                or materialized_state["materialized_bytes_per_device"]
+                != expected_materialized_bytes
+            ):
+                raise SystemExit(
+                    "external prefill wk materialization contract drifted"
+                )
+            shards = materialized_state["local_shards"]
+            if len(shards) != 4 * expected_materialized_slots:
+                raise SystemExit(
+                    "external prefill wk materialization shard count drifted"
+                )
+            local_device_ids = {
+                int(value)
+                for value in record[
+                    "fleet_local_device_ids_in_runtime_order"
+                ][record["jax_process_index"]]
+            }
+            if {
+                int(shard["device_id"]) for shard in shards
+            } != local_device_ids:
+                raise SystemExit(
+                    "external prefill wk materialization ownership drifted"
+                )
+            for device_id in local_device_ids:
+                device_shards = [
+                    shard
+                    for shard in shards
+                    if int(shard["device_id"]) == device_id
+                ]
+                if (
+                    {int(shard["slot"]) for shard in device_shards}
+                    != set(range(expected_materialized_slots))
+                    or any(
+                        int(shard["byte_count"])
+                        != expected_materialized_shard_bytes
+                        or len(str(shard["sha256"])) != 64
+                        or int(str(shard["sha256"]), 16) < 0
+                        for shard in device_shards
+                    )
+                ):
+                    raise SystemExit(
+                        "external prefill wk materialization shard identity "
+                        "drifted"
+                    )
         elif repair != {"backend": "none", "passed": True, "violations": []}:
             raise SystemExit("unrequested prefill repair HLO evidence is present")
+        elif any(
+            record[field] is not None
+            for field in (
+                "fleet_prefill_wk_materialization_hlo_hashes",
+                "prefill_wk_materialization_compile_seconds",
+                "prefill_wk_materialization_execute_seconds",
+                "prefill_wk_materialization_hlo_contract",
+                "prefill_wk_materialization_hlo_sha256",
+                "prefill_wk_materialization_state",
+            )
+        ):
+            raise SystemExit(
+                "unrequested prefill wk materialization evidence is present"
+            )
 if short_context_dsa_oracle:
     if len(
         {
@@ -1302,6 +1421,17 @@ summary = {
         if prefill_index_repair
         else None
     ),
+    "prefill_index_weight_materialization_prerequisite": (
+        {
+            "candidate_cache_sha256": "8fd4a8c27602c2f855645c52f2687c62c7b47a47dc9715452f16ca2a1dd5df08",
+            "code_hash": "5e1cbb5e7814eb49a76c0d6446871b6e51b9ea19",
+            "comparison_manifest_sha256": "b96697994106a2a0058a800d2c4de9ec4b45e382c181541041fcead548848d42",
+            "results_db_item_row_id": 1804,
+            "results_db_run_id": 519,
+        }
+        if prefill_index_repair
+        else None
+    ),
     "residual_transport_components": records[0][
         "residual_transport_components"
     ],
@@ -1340,6 +1470,33 @@ summary = {
     ),
     "prefill_hlo_contract": records[0]["prefill_hlo_contract"],
     "prefill_hlo_sha256": records[0]["prefill_hlo_sha256"],
+    "prefill_wk_materialization_compile_seconds_max": (
+        max(
+            record["prefill_wk_materialization_compile_seconds"]
+            for record in records
+        )
+        if prefill_index_repair
+        else None
+    ),
+    "prefill_wk_materialization_execute_seconds_max": (
+        max(
+            record["prefill_wk_materialization_execute_seconds"]
+            for record in records
+        )
+        if prefill_index_repair
+        else None
+    ),
+    "prefill_wk_materialization_hlo_contract": records[0][
+        "prefill_wk_materialization_hlo_contract"
+    ],
+    "prefill_wk_materialization_hlo_sha256": records[0][
+        "prefill_wk_materialization_hlo_sha256"
+    ],
+    "prefill_wk_materialization_states": (
+        [record["prefill_wk_materialization_state"] for record in records]
+        if prefill_index_repair
+        else None
+    ),
     "prefill_used": short_context_oracle,
     "prefill_wall_ms_max": (
         max(record["prefill_wall_ms"] for record in records)
@@ -1404,6 +1561,9 @@ run_id = pv.start_run(
         "greenfield_prefill_index_repair_backend": expected_repair_backend,
         "greenfield_prefill_index_repair_prerequisite_db_run": (
             518 if prefill_index_repair else None
+        ),
+        "greenfield_prefill_index_weight_materialization_prerequisite_db_run": (
+            519 if prefill_index_repair else None
         ),
         "greenfield_short_context_oracle": short_context_oracle,
         "greenfield_short_context_oracle_manifest_sha256": (

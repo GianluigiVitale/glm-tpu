@@ -46,6 +46,7 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     build_decoder_step_program,
     build_teacher_forced_prefill_program,
     validate_decoder_step_hlo,
+    validate_prefill_index_weight_materialization_hlo,
     validate_teacher_forced_prefill_hlo,
 )
 from glm_tpu.greenfield.topology import (  # noqa: E402
@@ -1601,6 +1602,7 @@ def main() -> int:
     loaded = None
     state_values: tuple[Any, ...] = ()
     auxiliary_values: tuple[Any, ...] = ()
+    materialized_prefill_index_weights: tuple[Any, ...] | None = None
     try:
         if (
             jax.process_count() != 8
@@ -1740,6 +1742,129 @@ def main() -> int:
         load_seconds = time.monotonic() - load_started
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-end")
 
+        prefill_wk_materialization_compile_seconds = None
+        prefill_wk_materialization_execute_seconds = None
+        prefill_wk_materialization_hlo_sha256 = None
+        fleet_prefill_wk_materialization_hlo_hashes = None
+        prefill_wk_materialization_hlo_contract = None
+        prefill_wk_materialization_state = None
+        if args.prefill_index_repair:
+            assert prefill_decoder is not None
+            materializer = prefill_decoder.materialize_prefill_index_weights
+            if materializer is None:
+                raise RuntimeError(
+                    "prefill index repair weight materializer is unavailable"
+                )
+            names = prefill_decoder.prefill_index_weight_names
+            if len(names) != prefill_decoder.config.maximum_full_indexer_slots:
+                raise RuntimeError(
+                    "prefill index repair weight-name count drifted"
+                )
+            raw_wk_bits = tuple(
+                loaded.weights[bits_name] for bits_name, _ in names
+            )
+            raw_wk_scales = tuple(
+                loaded.weights[scale_name] for _, scale_name in names
+            )
+            materializer_inputs = (raw_wk_bits, raw_wk_scales)
+            multihost_utils.sync_global_devices(
+                "greenfield-prefill-wk-materialization-compile-start"
+            )
+            materializer_compile_started = time.monotonic()
+            lowered_materializer = jax.jit(materializer).lower(
+                *materializer_inputs
+            )
+            compiled_materializer = lowered_materializer.compile()
+            prefill_wk_materialization_compile_seconds = (
+                time.monotonic() - materializer_compile_started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-prefill-wk-materialization-compile-end"
+            )
+            optimized_materializer_hlo = compiled_materializer.as_text()
+            prefill_wk_materialization_hlo_sha256 = sha256(
+                optimized_materializer_hlo.encode("utf-8")
+            ).hexdigest()
+            fleet_prefill_wk_materialization_hlo_hashes = _fleet_digest(
+                multihost_utils,
+                prefill_wk_materialization_hlo_sha256,
+                num_processes=args.num_processes,
+            )
+            prefill_wk_materialization_hlo_contract = (
+                validate_prefill_index_weight_materialization_hlo(
+                    optimized_materializer_hlo,
+                    decoder=prefill_decoder,
+                )
+            )
+            if jax.process_index() == 0:
+                hlo_dir = args.output.parent / "hlo"
+                hlo_dir.mkdir(parents=True, exist_ok=True)
+                with gzip.open(
+                    hlo_dir
+                    / "prefill_index_wk_materialization.optimized_hlo.txt.gz",
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(optimized_materializer_hlo)
+                _atomic_json(
+                    hlo_dir / "prefill_index_wk_materialization.hlo_contract.json",
+                    prefill_wk_materialization_hlo_contract,
+                )
+            del optimized_materializer_hlo
+            if not prefill_wk_materialization_hlo_contract["passed"]:
+                raise RuntimeError(
+                    "prefill wk materialization HLO contract failed before "
+                    "execution: "
+                    f"{prefill_wk_materialization_hlo_contract['violations']}"
+                )
+            multihost_utils.sync_global_devices(
+                "greenfield-prefill-wk-materialization-execute-start"
+            )
+            materializer_execute_started = time.monotonic()
+            materialized_prefill_index_weights = tuple(
+                compiled_materializer(*materializer_inputs)
+            )
+            jax.block_until_ready(materialized_prefill_index_weights)
+            prefill_wk_materialization_execute_seconds = (
+                time.monotonic() - materializer_execute_started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-prefill-wk-materialization-execute-end"
+            )
+            local_materialized_records = []
+            for slot, value in enumerate(materialized_prefill_index_weights):
+                for shard in value.addressable_shards:
+                    host = np.ascontiguousarray(
+                        np.asarray(jax.device_get(shard.data), dtype=np.float32)
+                    )
+                    if host.shape != (
+                        1,
+                        execution_plan.geometry.dsa_indexer_head_dim,
+                        execution_plan.geometry.hidden_size,
+                    ) or not np.all(np.isfinite(host)):
+                        raise RuntimeError(
+                            "materialized prefill wk shape/finite contract failed"
+                        )
+                    local_materialized_records.append(
+                        {
+                            "byte_count": int(host.nbytes),
+                            "byte_sum": int(host.view(np.uint8).sum(dtype=np.uint64)),
+                            "device_id": int(shard.device.id),
+                            "sha256": sha256(host.tobytes(order="C")).hexdigest(),
+                            "slot": slot,
+                        }
+                    )
+            prefill_wk_materialization_state = {
+                "local_shards": local_materialized_records,
+                "materialized_bytes_per_device": (
+                    prefill_decoder.config.maximum_full_indexer_slots
+                    * execution_plan.geometry.dsa_indexer_head_dim
+                    * execution_plan.geometry.hidden_size
+                    * np.dtype(np.float32).itemsize
+                ),
+                "source": "completed_stage_local_raw_fp8_to_bf16_to_fp32",
+            }
+
         total_devices = decoder.config.total_devices
         kv_shape = state_layout.stages[0].padded_kv_cache_shape
         index_shape = state_layout.stages[0].padded_indexer_cache_shape
@@ -1845,6 +1970,10 @@ def main() -> int:
             )
         auxiliary_values = tuple(
             value for value in (token, prompt) if value is not None
+        ) + (
+            tuple(materialized_prefill_index_weights)
+            if materialized_prefill_index_weights is not None
+            else ()
         )
         position = jax.device_put(
             np.asarray([0], dtype=np.int32),
@@ -1917,6 +2046,15 @@ def main() -> int:
                 block_tables,
                 context_lengths,
             )
+            if args.prefill_index_repair:
+                if materialized_prefill_index_weights is None:
+                    raise RuntimeError(
+                        "prefill repair lost its materialized wk inputs"
+                    )
+                prefill_inputs = (
+                    *prefill_inputs,
+                    materialized_prefill_index_weights,
+                )
         multihost_utils.sync_global_devices("greenfield-short-decoder-compile-start")
         compile_started = time.monotonic()
         lowered = jax.jit(
@@ -2985,6 +3123,9 @@ def main() -> int:
                 fleet_dsa_observer_hlo_hashes
             ),
             "fleet_prefill_hlo_hashes": fleet_prefill_hlo_hashes,
+            "fleet_prefill_wk_materialization_hlo_hashes": (
+                fleet_prefill_wk_materialization_hlo_hashes
+            ),
             "fleet_local_device_ids_in_runtime_order": fleet_local_ids.tolist(),
             "hlo_contract": hlo_contract,
             "hostname": socket.gethostname(),
@@ -3010,6 +3151,21 @@ def main() -> int:
             "prefill_index_repair_backend": (
                 prefill.index_repair_backend if prefill is not None else "none"
             ),
+            "prefill_wk_materialization_compile_seconds": (
+                prefill_wk_materialization_compile_seconds
+            ),
+            "prefill_wk_materialization_execute_seconds": (
+                prefill_wk_materialization_execute_seconds
+            ),
+            "prefill_wk_materialization_hlo_contract": (
+                prefill_wk_materialization_hlo_contract
+            ),
+            "prefill_wk_materialization_hlo_sha256": (
+                prefill_wk_materialization_hlo_sha256
+            ),
+            "prefill_wk_materialization_state": (
+                prefill_wk_materialization_state
+            ),
             "prefill_wall_ms": prefill_wall_ms,
             "prefill_used": oracle_mode,
             "raw_token_claim": bool(
@@ -3022,7 +3178,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 10,
+            "schema_version": 11,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
