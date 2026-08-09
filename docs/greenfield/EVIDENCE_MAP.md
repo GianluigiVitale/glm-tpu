@@ -476,7 +476,7 @@ capture is still required.
 - Readiness: focused tests pass 27/27. No protected cache artifact/comparison exists yet, so this is
   implementation evidence only and proves no arithmetic cause, decoder result, or performance.
 
-## DB505--511 accepted prompt-cache isolation
+## DB505--512 accepted prompt-cache isolation
 
 - Accepted source: DB505/item1788 captures all 32 final slot-0 snapshots. Corrected parsing proves
   `model=32,dcp=1`, four local/32 physical bitwise replicas, `[24,16,32,128]`, 512-token pages and
@@ -528,8 +528,18 @@ capture is still required.
   `e55cecef...c10`, tensor `64e6df3b...130f`, SUCCESS `ec6a4370...a7`, evidence
   `8978b333...cb25`, remote objects `5d7bb1f6...083f`, DB snapshot `d71012bb...6eae`, direct
   remote equality and authenticated 8/8 cleanup pass.
+- DB512/item1797: `...association_20260809T012205182369900Z` at `da7027d` spells the accepted
+  `rope_cos_sin/apply_rope` source literally inside the exact DB511 producer/consumer path. It is
+  byte-identical to DB511: `52bf55ed...cd8a`, 45 values/45 positions, first 113. Literal-source
+  RoPE association is rejected as sufficient.
+- DB512 structure/protection: optimized HLO `c96ecd28...a931` differs bytewise from DB511 but its
+  physical RoPE contract is identical: one FP32 power/cosine/sine and the accepted constants. The
+  gather/RMS, BF16 convolution, flat scatter and no-forbidden-state contracts pass. Manifest
+  `9f037699...2c5`, tensor `20398ae9...9413`, compressed HLO `eb2df033...e9b6`, SUCCESS
+  `01882c1f...3406`, evidence `34d23f22...1c62`, remote objects `9d0e5bbf...5488`, DB snapshot
+  `5ba79f36...6e1`, direct remote equality and authenticated 8/8 cleanup pass.
 - Decision: diagnostic correctness only. No candidate is exact and no decoder/performance/gate
   status changes. Gather-coupled input RMS is proven causal for the near-exact regime; the accepted
-  cache consumer is now rejected. Audit preserved accepted RoPE/pre-RoPE evidence, then run at most
-  one source-literal RoPE discriminator before requiring a new accepted pre-RoPE capture. Neither a
-  rejected candidate nor the full decoder should be rerun.
+  cache consumer and literal-source RoPE spelling are rejected. The next required evidence is a
+  bounded accepted pre-RoPE FP32 capture at position 113. Neither a rejected candidate nor the full
+  decoder should be rerun.

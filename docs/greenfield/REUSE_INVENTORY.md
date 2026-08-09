@@ -21,7 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py` RoPE source, DB505--511, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves the gather-coupled input-RMS lowering restores DB507 exactly; DB511 proves the accepted flat BF16 paged-cache scatter leaves those 45 values unchanged and rejects it as causal. No preserved accepted prompt HLO or pre-RoPE state exists, so the exact source spelling is adapted once in the bounded harness before any new observer. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py` RoPE source, DB505--512, and existing association helpers | Greenfield validates 32 physical replicas and reconstructs logical BF16 layer-0 keys. DB506 rejects current M1; DB507 reaches 45 rotary-half mismatches; DB508/509 reject external-chunk and BF16-weight explanations; DB510 proves the gather-coupled input-RMS lowering restores DB507 exactly; DB511 rejects the flat BF16 cache scatter; DB512 rejects literal accepted-source RoPE spelling. The next reusable boundary is one accepted pre-RoPE FP32 row at position 113 through the existing observer machinery. |
 | DSA internal observer | oracle-only `83ff4a357` two-commit child of accepted `b3c25df47` | Default-off any-full-producer/one-position callback, independent all-21 greenfield observer, and hash-pinned five-state comparator; zero-copy torchax/JAX boundary; no legacy execution import. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -272,3 +272,9 @@ adaptation remains diagnostic-only. The next reuse audit targets already-preserv
 RoPE/pre-RoPE artifacts; one literal source-spelling probe is warranted only if those artifacts do
 not already resolve the physical producer. A null probe must lead to a bounded accepted pre-RoPE
 capture rather than further speculative variants.
+
+DB512 at `da7027d` is that single literal-source probe. It reproduces DB511's exact candidate bytes
+and has the same physical power/cosine/sine contract despite a different optimized-HLO hash. RoPE
+source spelling is closed. Reuse the existing default-off legacy observer/capture protections for
+one pre-RoPE FP32 layer-0 key at prompt position 113; do not create a new execution path or expand
+the arithmetic candidate matrix.

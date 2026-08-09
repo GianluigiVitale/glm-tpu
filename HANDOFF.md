@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 01:19 UTC
+**Updated:** 2026-08-09 01:24 UTC
 
 ## Authority and isolation
 
@@ -2347,3 +2347,29 @@ Exact next: commit/push this clean default-off discriminator and run exactly one
 `GLM_GREENFIELD_PROMPT_CACHE_ASSOCIATION_PROFILE=chunk_gather_cache_write_source_rope
 scripts/greenfield/run_prompt_index_cache_association_probe.sh`. If it leaves the same 45 values,
 do not try more RoPE variants: capture the accepted pre-RoPE FP32 key at prompt position 113.
+
+## DB512 rejects literal accepted-source RoPE spelling
+
+Protected DB512/item1797,
+`greenfield_layer0_prompt_index_cache_association_20260809T012205182369900Z` at exact pin
+`da7027dfc1e76e2d64c8d4c4ee2ecbfa53858995`, produces the exact DB511/DB510 bytes: logical
+8,155x128 BF16 SHA `52bf55ed...cd8a`, 45 values at 45 positions, first 113, max/mean
+`0.015625/3.1539646e-8`. Literal accepted RoPE source spelling is therefore rejected as a
+sufficient cause; do not add more formula variants or retry the full decoder.
+
+Optimized HLO `c96ecd28...a931` differs bytewise from DB511 but has the identical physical RoPE
+contract: one FP32 `[32]` power, one each FP32 `[2048,32]` cosine/sine, theta `8e6`, exponent
+`0.015625`. It also retains one gather-coupled RMS producer, one BF16-RHS M2048 convolution, one
+flat BF16 cache scatter and zero loop/communication/callback/forbidden state. Manifest
+`9f037699...2c5`; tensor file `20398ae9...9413`; compressed HLO `eb2df033...e9b6`; summary
+`890ec592...098`; SUCCESS `01882c1f...3406`; evidence `34d23f22...1c62`; remote objects
+`9d0e5bbf...5488`; DB snapshot `5ba79f36...6e1`. SQLite is `ok`, direct approved-bucket bytes
+match all critical local files, and authenticated pre/post censuses are 8/8 clean. This is bounded
+diagnostic correctness only and leaves DB484/Gate E unchanged.
+
+Exact next: reuse the existing default-off accepted observer machinery to capture only the
+pre-RoPE FP32 layer-0 key row at prompt position 113 (and the adjacent post-key-LayerNorm boundary
+only if needed to make the producer self-identifying). Bind it to the immutable DB505 prompt,
+checkpoint and cache evidence, prove the observer does not perturb accepted output/cache state,
+then compare against the already-sealed greenfield input. No wider tensor or formula matrix is
+authorized.

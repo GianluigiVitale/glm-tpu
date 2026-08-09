@@ -5903,3 +5903,19 @@ unmotivated arithmetic variants.
 - Next: one serialized protected source-literal run. If null, capture the accepted prompt
   pre-RoPE FP32 key at the first mismatch, position 113, rather than expanding an arithmetic
   variant matrix.
+
+## 2026-08-09 01:24 — DB512 rejects literal accepted-source RoPE spelling
+
+- Protected DB512/item1797 at `da7027d` emits exactly the DB511/DB510 candidate SHA
+  `52bf55ed...cd8a`: 45 BF16 mismatches at 45 prompt positions, first 113, max `0.015625`, mean
+  `3.1539646e-8`. The literal accepted source spelling is not sufficient.
+- Optimized HLO `c96ecd28...a931` differs bytewise from DB511, but its physical RoPE contract is
+  identical: one power/cosine/sine with FP32 `[32]`/`[2048,32]` shapes and accepted theta/exponent.
+  The gather-coupled RMS, BF16-RHS M2048 convolution, flat BF16 scatter and all forbidden-operation
+  guards also pass.
+- Manifest `9f037699...2c5`; tensor `20398ae9...9413`; compressed HLO `eb2df033...e9b6`;
+  SUCCESS `01882c1f...3406`; evidence `34d23f22...1c62`; remote objects `9d0e5bbf...5488`; DB
+  snapshot `5ba79f36...6e1`. SQLite, direct approved-bucket byte equality and 8/8 cleanup pass.
+- This closes source-level RoPE variants. Next evidence must be the accepted pre-RoPE FP32 key at
+  prompt position 113, captured through the existing default-off observer and checked for
+  non-perturbation.

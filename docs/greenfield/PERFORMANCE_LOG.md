@@ -1010,3 +1010,11 @@ value includes compilation/orchestration and is not a token loop, warmed decoder
 XPlane, or wall-throughput measurement. The exact physical BF16 cache scatter leaves DB510's 45
 mismatches unchanged and is rejected as causal. DB484 remains the accepted PP8 decoder result at
 `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
+
+## DB512 literal-source RoPE diagnostic — no performance result
+
+DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal
+accepted-source RoPE spelling keeps the exact DB511 candidate tensor and 45 mismatches; its elapsed
+time includes compilation/orchestration and has no token loop, warmed wall distribution, XPlane or
+throughput standing. DB484 remains the accepted PP8 decoder result at `244.091151 ms` p50 /
+`4.096830 tok/s`; Gate E remains open.
