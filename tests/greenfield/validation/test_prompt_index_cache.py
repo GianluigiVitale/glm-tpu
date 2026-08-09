@@ -1130,6 +1130,7 @@ def test_protected_prompt_key_internal_capture_reuses_oracle_stack() -> None:
         "raw_fp8_inside_executable",
         "materialized_lp4_stage_local",
         "materialize_stage_local_prefill_index_wk",
+        "mapped_repair_stage_local_prompt_index_cache",
         "repair_stage_local_prompt_index_cache",
         "validate_stage_local_prefill_index_repair_hlo",
         "_projection_weight_source_contract",

@@ -614,3 +614,18 @@ capture is still required.
   keeping conversion and forbidden-operation inspection module-wide. Preserved-HLO replay and a
   nested-fusion regression pass. This is linter evidence only: no DB/SUCCESS, cache comparison,
   decoder, latency, throughput or Gate-D claim exists.
+
+## LP4 bounded repair root-identity refusal — materializer proven, cache still unexecuted
+
+- Attempt `greenfield_layer0_prompt_key_materialized_lp4_20260809T192658503682737Z` at `2113b0d`
+  passes and executes the external materializer, then compiles but does not execute cache repair.
+  Its generic bounded root emits `jit(mapped_repair)/shard_map/...`, outside the production-specific
+  repair identity recognized by the unchanged strict linter.
+- Preserved TPU HLO contains four exact projections, eight physical square roots, four affines,
+  owner-cache writes, zero grouped square roots, zero collectives and zero repair weight rounds.
+  A semantic root-name-only replay passes the existing contract with projection/exact/sqrt/affine/
+  cache-write counts `4/4/8/4/8`.
+- Repair-HLO gzip SHA is `5576305c...05de`; pre/failure-census SHAs are `b7b38902...5dcf` and
+  `6586bc71...9ebe`; cleanup is authenticated 8/8. There is no cache comparison, DB/SUCCESS,
+  decoder, performance or Gate-D result. The correction is only a bounded-wrapper rename; a fresh
+  protected LP4 exactness result remains required before another full 8K run.

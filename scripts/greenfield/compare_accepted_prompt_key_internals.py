@@ -297,7 +297,7 @@ def _run_lp4_materialized_repair(
     norm_weight = jax.device_put(key_norm_weight, replicated)
     norm_bias = jax.device_put(key_norm_bias, replicated)
 
-    def mapped_repair(
+    def mapped_repair_stage_local_prompt_index_cache(
         local_cache: Any,
         local_history: Any,
         local_blocks: Any,
@@ -317,7 +317,7 @@ def _run_lp4_materialized_repair(
         return repaired[None, ...]
 
     repair = jax.shard_map(
-        mapped_repair,
+        mapped_repair_stage_local_prompt_index_cache,
         mesh=mesh,
         in_specs=(
             P("lp", None, None, None),

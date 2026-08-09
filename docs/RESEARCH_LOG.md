@@ -6311,3 +6311,23 @@ unmotivated arithmetic variants.
   counts, and a nested-fusion synthetic regression plus the prefill suite pass 13/13.
 - Exact next is a narrow Fable audit of only this correction/evidence note, then commit/push and
   one fresh bounded LP4 retry. The approved `99ce5ea` batch is not to be re-reviewed.
+
+## 2026-08-09 19:28 — materializer passes; bounded repair root lacks semantic HLO identity
+
+- Fresh bounded attempt `greenfield_layer0_prompt_key_materialized_lp4_20260809T192658503682737Z`
+  at pushed `2113b0d` passes and executes the separately completed raw-FP8 -> BF16 -> FP32
+  materializer, then compiles the four-lane cache repair. It refuses before repair execution because
+  the direct harness root is generically named `mapped_repair`, so optimized op names begin
+  `jit(mapped_repair)/shard_map/...` and remain outside the unchanged production repair scope.
+- The preserved TPU HLO physically contains four exact BF16 `[64,6144]` by FP32 `[128,6144]`
+  convolutions, eight `[64]` square roots, four `[64,128]` affines, owner-cache scatters, zero
+  grouped square roots, zero collectives and zero internal weight round. Replaying only the semantic
+  root-name substitution makes the existing strict contract pass at `4/4/8/4/8` projection/exact-
+  operand/sqrt/affine/cache-write counts.
+- No cache arithmetic/comparison, DB row, SUCCESS, decoder, timing or gate claim exists. Repair HLO
+  gzip is `5576305c...05de`; pre/failure censuses are `b7b38902...5dcf` and `6586bc71...9ebe`, and
+  cleanup is authenticated 8/8 clean.
+- The narrow correction renames only the bounded wrapper to carry
+  `repair_stage_local_prompt_index_cache`. Production arithmetic, sharding and validator scope are
+  unchanged. Focused tests and one Fable review of this new diff are required before one fresh
+  bounded retry; the full 8K decoder remains forbidden until LP4 cache equality passes.

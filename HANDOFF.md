@@ -2830,3 +2830,25 @@ promotion and passes. A synthetic nested-fusion regression preserves the same du
 shape and the focused prefill tests pass 13/13. Exact next: one blocker-only Fable audit of this new
 two-file correction plus evidence notes, commit/push, then one fresh bounded LP4 retry. Do not
 re-review `99ce5ea` and do not launch the full 8K decoder first.
+
+## Second LP4 attempt proves materialization and exposes bounded root identity
+
+Fresh bounded attempt
+`greenfield_layer0_prompt_key_materialized_lp4_20260809T192658503682737Z` at pushed pin `2113b0d`
+passes the corrected materializer HLO gate, executes the completed materializer, and compiles the
+four-lane cache repair. It stops before repair execution because this direct harness names its JAX
+root `mapped_repair`; optimized HLO consequently uses `jit(mapped_repair)/shard_map/...` instead of
+the production decoder's repair branch metadata. The existing strict repair linter therefore sees
+zero scoped operations even though the preserved module contains exactly four BF16-M64/FP32-wk
+convolutions, eight physical `[64]` square roots, four physical affines, owner-cache scatters, zero
+grouped square roots, zero collectives and zero repair-side weight rounds. A metadata-only replay
+with the bounded root carrying `repair_stage_local_prompt_index_cache` passes the unchanged linter
+with counts `4/4/8/4/8` for projection/exact operands/sqrt/affine/cache writes.
+
+No repair arithmetic, cache comparison, DB row, terminal `SUCCESS`, decoder, latency or Gate-D
+standing exists. Repair-HLO gzip SHA is `5576305c...05de`; pre/failure census SHAs are
+`b7b38902...5dcf` and `6586bc71...9ebe`, with authenticated 8/8 clean failure exit. The minimal
+correction renames only the bounded wrapper so JAX preserves the semantic repair identity; it does
+not change arithmetic, sharding, the validator API, or the production decoder's strict scope.
+Exact next: focused tests and one new-diff-only Fable audit, commit/push, then a fresh bounded LP4
+retry. Do not run the full 8K decoder until the assembled LP4 cache is bitwise exact.
