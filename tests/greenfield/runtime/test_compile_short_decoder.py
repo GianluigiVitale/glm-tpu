@@ -64,6 +64,39 @@ def test_protected_runner_classifies_prefill_loops_fail_closed() -> None:
     assert '["loop_count"] != 1' not in runner
 
 
+def test_prefill_index_repair_is_default_off_and_db518_pinned() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert '"--prefill-index-repair"' in compiler
+    assert "observe_prefill_index_inputs=True" in compiler
+    assert '"prefill_index_repair": args.prefill_index_repair' in compiler
+    assert (
+        "readonly PREFILL_INDEX_REPAIR="
+        "${GLM_GREENFIELD_PREFILL_INDEX_REPAIR:-0}" in runner
+    )
+    assert '--prefill-index-repair "$prefill_index_repair"' in runner
+    assert "prefill index repair requires the protected 8K" in runner
+    assert (
+        "prefill index repair requires the accepted split residual state"
+        in compiler
+    )
+    assert (
+        "prefill index repair must remain isolated from diagnostics" in compiler
+    )
+    assert '"schema_version": 10' in compiler
+    assert 'record["schema_version"] for record in records} != {10}' in runner
+    assert "results_db_run_id\": 518" in runner
+    assert (
+        "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
+        in runner
+    )
+    assert "_prefill_keyfix" in runner
+    assert 'repair["expected_call_count"] != 84' in runner
+    assert 'repair["physical_sqrt_count"] != 168' in runner
+    assert 'repair["repair_collectives"]' in runner
+
+
 @pytest.mark.parametrize(
     ("capacity", "label"),
     ((2048, "2k"), (8192, "8k")),

@@ -25,6 +25,7 @@ class TeacherForcedPrefillProgram:
 
     decoder: DecoderStepProgram
     execute: Any
+    index_repair_backend: Literal["none", "physical_m64_chunk"]
     prompt_length: int
 
 
@@ -32,12 +33,49 @@ _OUTER_PREFILL_LOOP_OP_NAME = "jit(execute)/while"
 _FUSED_QKV_LOOP_OP_NAME_SUFFIX = (
     "/one_row_fused_qkv_a_n82_convolution/while"
 )
+_PREFILL_INDEX_REPAIR_LOOP_OP_NAME_SUFFIX = (
+    "/physical_m64_prompt_index_key_chunk/while"
+)
+_PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX = (
+    "jit(execute)/shard_map/cond/branch_"
+)
+_PREFILL_INDEX_REPAIR_CHUNK = 2048
+_PREFILL_INDEX_REPAIR_PHYSICAL_ROWS = 64
+
+
+def _prefill_index_repair_chunk_count(prompt_length: int) -> int:
+    return (
+        prompt_length + _PREFILL_INDEX_REPAIR_CHUNK - 1
+    ) // _PREFILL_INDEX_REPAIR_CHUNK
+
+
+def _is_prefill_index_repair_op_name(op_name: str | None) -> bool:
+    """Recognize the post-scan repair before and after XLA inlining."""
+
+    if op_name is None:
+        return False
+    if "physical_m64_prompt_index_key_chunk" in op_name or (
+        "repair_stage_local_prompt_index_cache" in op_name
+    ):
+        return True
+    if not op_name.startswith(_PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX):
+        return False
+    branch_and_tail = op_name.removeprefix(
+        _PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX
+    )
+    branch, separator, tail = branch_and_tail.partition("_fun")
+    return bool(
+        separator
+        and branch.isdigit()
+        and (not tail or tail.startswith("/"))
+    )
 
 
 def validate_teacher_forced_prefill_loops(
     optimized_hlo: str,
     *,
     expected_fused_qkv_internal_loops: int,
+    expected_prefill_index_repair_loops: int = 0,
 ) -> dict[str, Any]:
     """Classify every physical prefill loop and reject unknown control flow.
 
@@ -55,10 +93,21 @@ def validate_teacher_forced_prefill_loops(
         raise PlanValidationError(
             "expected fused qkv-a internal loop count must be non-negative"
         )
+    if (
+        not isinstance(expected_prefill_index_repair_loops, int)
+        or isinstance(expected_prefill_index_repair_loops, bool)
+        or expected_prefill_index_repair_loops < 0
+    ):
+        raise PlanValidationError(
+            "expected prefill index-repair loop count must be non-negative"
+        )
     return _classify_teacher_forced_prefill_loops(
         parse_hlo_module(optimized_hlo),
         expected_fused_qkv_internal_loops=(
             expected_fused_qkv_internal_loops
+        ),
+        expected_prefill_index_repair_loops=(
+            expected_prefill_index_repair_loops
         ),
     )
 
@@ -67,6 +116,7 @@ def _classify_teacher_forced_prefill_loops(
     module: HloModule,
     *,
     expected_fused_qkv_internal_loops: int,
+    expected_prefill_index_repair_loops: int = 0,
 ) -> dict[str, Any]:
     loops = tuple(
         instruction
@@ -87,9 +137,24 @@ def _classify_teacher_forced_prefill_loops(
         )
         and instruction.op_name.endswith(_FUSED_QKV_LOOP_OP_NAME_SUFFIX)
     )
+    prefill_index_repair_loops = tuple(
+        instruction
+        for instruction in loops
+        if (
+            instruction.op_name is not None
+            and instruction.op_name.endswith(
+                _PREFILL_INDEX_REPAIR_LOOP_OP_NAME_SUFFIX
+            )
+        )
+        or _is_prefill_index_repair_op_name(instruction.op_name)
+    )
     classified_indices = {
         instruction.index
-        for instruction in outer_loops + fused_qkv_internal_loops
+        for instruction in (
+            outer_loops
+            + fused_qkv_internal_loops
+            + prefill_index_repair_loops
+        )
     }
     unclassified_loops = tuple(
         instruction
@@ -107,6 +172,12 @@ def _classify_teacher_forced_prefill_loops(
             "teacher-forced prefill fused qkv-a internal loop count drifted: "
             f"expected={expected_fused_qkv_internal_loops} "
             f"observed={len(fused_qkv_internal_loops)}"
+        )
+    if len(prefill_index_repair_loops) != expected_prefill_index_repair_loops:
+        violations.append(
+            "teacher-forced prefill index-repair loop count drifted: "
+            f"expected={expected_prefill_index_repair_loops} "
+            f"observed={len(prefill_index_repair_loops)}"
         )
     if unclassified_loops:
         violations.append(
@@ -128,14 +199,285 @@ def _classify_teacher_forced_prefill_loops(
         "expected_fused_qkv_internal_loop_count": (
             expected_fused_qkv_internal_loops
         ),
-        "expected_total_loop_count": 1 + expected_fused_qkv_internal_loops,
+        "expected_total_loop_count": (
+            1
+            + expected_fused_qkv_internal_loops
+            + expected_prefill_index_repair_loops
+        ),
         "fused_qkv_internal_loop_count": len(fused_qkv_internal_loops),
         "fused_qkv_internal_loops": identities(fused_qkv_internal_loops),
         "loop_count": len(loops),
         "outer_loop_count": len(outer_loops),
         "outer_loops": identities(outer_loops),
         "passed": not violations,
+        "prefill_index_repair_loop_count": len(
+            prefill_index_repair_loops
+        ),
+        "prefill_index_repair_loops": identities(
+            prefill_index_repair_loops
+        ),
+        "expected_prefill_index_repair_loop_count": (
+            expected_prefill_index_repair_loops
+        ),
         "unclassified_loops": identities(unclassified_loops),
+        "violations": violations,
+    }
+
+
+def _validate_physical_m64_prefill_index_repair_hlo(
+    module: HloModule,
+    *,
+    program: TeacherForcedPrefillProgram,
+    schedule: PipelineSchedule,
+    backend_contract: PrefillBackendContract,
+) -> dict[str, Any]:
+    """Pin the DB518 repair without weakening the recurrent decoder."""
+
+    decoder = program.decoder
+    full_indexer_layers = sum(
+        layer.indexer_kind == "full"
+        for stage in schedule.stages
+        for layer in stage.layers
+    )
+    chunk_count = _prefill_index_repair_chunk_count(program.prompt_length)
+    expected_calls = full_indexer_layers * chunk_count
+
+    def has_result_shape(
+        instruction: Any, dtype: str, dimensions: tuple[int, ...]
+    ) -> bool:
+        return any(
+            shape.dtype == dtype and shape.dimensions == dimensions
+            for shape in instruction.result_shapes
+        )
+
+    scoped = tuple(
+        instruction
+        for instruction in module.instructions
+        if _is_prefill_index_repair_op_name(instruction.op_name)
+    )
+    projection_opcodes = (
+        ("dot", "convolution")
+        if backend_contract == "cpu_reference"
+        else ("convolution",)
+    )
+    projections = tuple(
+        instruction
+        for instruction in scoped
+        if instruction.raw_opcode in projection_opcodes
+        and has_result_shape(
+            instruction,
+            "f32",
+            (
+                _PREFILL_INDEX_REPAIR_PHYSICAL_ROWS,
+                decoder.config.index_key_width,
+            ),
+        )
+    )
+    exact_projection_operands = tuple(
+        instruction
+        for instruction in projections
+        if len(instruction.operand_shapes) >= 2
+        and instruction.operand_shapes[0].dtype
+        in (
+            ("bf16", "f32")
+            if backend_contract == "cpu_reference"
+            else ("bf16",)
+        )
+        and instruction.operand_shapes[0].dimensions
+        == (
+            _PREFILL_INDEX_REPAIR_PHYSICAL_ROWS,
+            decoder.config.hidden_size,
+        )
+        and instruction.operand_shapes[1].dtype == "f32"
+        and instruction.operand_shapes[1].dimensions
+        == (
+            decoder.config.index_key_width,
+            decoder.config.hidden_size,
+        )
+    )
+    physical_sqrt = tuple(
+        instruction
+        for instruction in scoped
+        if instruction.raw_opcode in ("sqrt", "fusion")
+        and has_result_shape(
+            instruction,
+            "f32",
+            (_PREFILL_INDEX_REPAIR_PHYSICAL_ROWS,),
+        )
+        and instruction.op_name is not None
+        and "/sqrt" in instruction.op_name
+    )
+    physical_affine = tuple(
+        instruction
+        for instruction in scoped
+        if instruction.raw_opcode in ("add", "fusion")
+        and has_result_shape(
+            instruction,
+            "f32",
+            (
+                _PREFILL_INDEX_REPAIR_PHYSICAL_ROWS,
+                decoder.config.index_key_width,
+            ),
+        )
+        and instruction.op_name is not None
+        and "/add" in instruction.op_name
+    )
+    grouped_sqrt = tuple(
+        instruction
+        for instruction in scoped
+        if instruction.raw_opcode in ("sqrt", "fusion")
+        and has_result_shape(
+            instruction,
+            "f32",
+            (
+                _PREFILL_INDEX_REPAIR_CHUNK
+                // _PREFILL_INDEX_REPAIR_PHYSICAL_ROWS,
+                _PREFILL_INDEX_REPAIR_PHYSICAL_ROWS,
+            ),
+        )
+        and instruction.op_name is not None
+        and "/sqrt" in instruction.op_name
+    )
+    cache_writes = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.raw_opcode in ("scatter", "dynamic-update-slice")
+        and _is_prefill_index_repair_op_name(instruction.op_name)
+    )
+    repair_collectives = tuple(
+        instruction
+        for instruction in module.collectives
+        if _is_prefill_index_repair_op_name(instruction.op_name)
+    )
+    history_shape_values = {
+        (shape.dtype, shape.dimensions): shape
+        for instruction in module.instructions
+        for shape in instruction.result_shapes
+        if shape.dtype == "bf16"
+        if program.prompt_length in shape.dimensions
+        and decoder.config.hidden_size in shape.dimensions
+    }
+    history_shapes = tuple(
+        history_shape_values[key].to_dict()
+        for key in sorted(history_shape_values)
+    )
+    full_pod_history_shapes = tuple(
+        shape
+        for shape in history_shapes
+        if backend_contract != "cpu_reference"
+        and decoder.config.total_devices in shape["dimensions"]
+    )
+    lowered = "\n".join(
+        instruction.raw_line.lower() for instruction in scoped
+    )
+    forbidden_markers = tuple(
+        marker
+        for marker in (
+            "host_callback",
+            "outside_compilation",
+            "xla_ffi_python_cpu_callback",
+            "xla_python_cpu_callback",
+        )
+        if marker in lowered
+    )
+    violations: list[str] = []
+    if len(projections) != expected_calls:
+        violations.append(
+            "prefill index repair projection count drifted: "
+            f"expected={expected_calls} observed={len(projections)}"
+        )
+    if len(exact_projection_operands) != expected_calls:
+        lhs_requirement = (
+            "backend-lowered M64"
+            if backend_contract == "cpu_reference"
+            else "BF16-M64"
+        )
+        violations.append(
+            "prefill index repair lost exact "
+            f"{lhs_requirement}/FP32-wk operands: "
+            f"expected={expected_calls} "
+            f"observed={len(exact_projection_operands)}"
+        )
+    if backend_contract != "cpu_reference":
+        if any(
+            "dim_labels=bf_oi->bf" not in instruction.raw_line
+            for instruction in projections
+        ):
+            violations.append(
+                "prefill index repair convolution dimension labels drifted"
+            )
+        expected_physical_sqrt = 2 * expected_calls
+        if len(physical_sqrt) != expected_physical_sqrt:
+            violations.append(
+                "prefill index repair physical key-norm sqrt count drifted: "
+                f"expected={expected_physical_sqrt} "
+                f"observed={len(physical_sqrt)}"
+            )
+        if len(physical_affine) < expected_calls:
+            violations.append(
+                "prefill index repair physical key-norm affine count drifted: "
+                f"expected_at_least={expected_calls} "
+                f"observed={len(physical_affine)}"
+            )
+        if len(cache_writes) < expected_calls:
+            violations.append(
+                "prefill index repair cache-write count drifted: "
+                f"expected_at_least={expected_calls} "
+                f"observed={len(cache_writes)}"
+            )
+    if grouped_sqrt:
+        violations.append(
+            "prefill index repair retained grouped [32,64] key-norm sqrt"
+        )
+    if repair_collectives:
+        violations.append("prefill index repair contains a collective")
+    if not history_shapes:
+        violations.append("prefill index repair lost its stage-local history")
+    if full_pod_history_shapes:
+        violations.append(
+            "prefill index repair materializes full-pod prompt history"
+        )
+    if forbidden_markers:
+        violations.append("prefill index repair contains host callbacks")
+
+    def identities(instructions: tuple[Any, ...]) -> list[dict[str, Any]]:
+        return [
+            {
+                "instruction": instruction.name,
+                "op_name": instruction.op_name,
+                "operand_shapes": [
+                    shape.to_dict() for shape in instruction.operand_shapes
+                ],
+                "result_shapes": [
+                    shape.to_dict() for shape in instruction.result_shapes
+                ],
+            }
+            for instruction in instructions
+        ]
+
+    return {
+        "backend": "physical_m64_chunk",
+        "cache_write_count": len(cache_writes),
+        "chunk_count": chunk_count,
+        "expected_call_count": expected_calls,
+        "exact_projection_operand_count": len(exact_projection_operands),
+        "forbidden_markers": list(forbidden_markers),
+        "full_indexer_layer_count": full_indexer_layers,
+        "full_pod_history_shapes": list(full_pod_history_shapes),
+        "grouped_sqrt_count": len(grouped_sqrt),
+        "history_estimated_bytes_per_device": (
+            program.prompt_length
+            * decoder.config.maximum_full_indexer_slots
+            * decoder.config.hidden_size
+            * 2
+        ),
+        "history_shapes": list(history_shapes),
+        "passed": not violations,
+        "physical_affine_count": len(physical_affine),
+        "physical_sqrt_count": len(physical_sqrt),
+        "projection_count": len(projections),
+        "projections": identities(projections),
+        "repair_collectives": identities(repair_collectives),
         "violations": violations,
     }
 
@@ -150,6 +492,13 @@ def validate_teacher_forced_prefill_hlo(
     """Pin one device loop around one complete, topology-local token step."""
 
     decoder = program.decoder
+    index_repair_enabled = (
+        program.index_repair_backend == "physical_m64_chunk"
+    )
+    if index_repair_enabled != decoder.observe_prefill_index_inputs:
+        raise PlanValidationError(
+            "teacher-forced prefill index-repair identity drifted"
+        )
     decoder_contract = validate_decoder_step_hlo(
         optimized_hlo,
         config=decoder.config,
@@ -170,6 +519,7 @@ def validate_teacher_forced_prefill_hlo(
         ),
         complete_token_path=True,
         split_residual_state=decoder.split_residual_state,
+        prefill_index_repair=index_repair_enabled,
     )
     module = parse_hlo_module(optimized_hlo)
     expected_fused_qkv_internal_loops = (
@@ -177,12 +527,40 @@ def validate_teacher_forced_prefill_hlo(
         if decoder.attention_projection_backend == "fused_n82_convolution"
         else 0
     )
+    full_indexer_layers = sum(
+        layer.indexer_kind == "full"
+        for stage in schedule.stages
+        for layer in stage.layers
+    )
+    expected_prefill_index_repair_loops = (
+        full_indexer_layers
+        * _prefill_index_repair_chunk_count(program.prompt_length)
+        if index_repair_enabled
+        else 0
+    )
     loop_contract = _classify_teacher_forced_prefill_loops(
         module,
         expected_fused_qkv_internal_loops=(
             expected_fused_qkv_internal_loops
         ),
+        expected_prefill_index_repair_loops=(
+            expected_prefill_index_repair_loops
+        ),
     )
+    index_repair_contract: dict[str, Any] = {
+        "backend": "none",
+        "passed": True,
+        "violations": [],
+    }
+    if index_repair_enabled:
+        index_repair_contract = (
+            _validate_physical_m64_prefill_index_repair_hlo(
+                module,
+                program=program,
+                schedule=schedule,
+                backend_contract=backend_contract,
+            )
+        )
     prompt_shape_parameter_count = sum(
         shape.dtype == "s32"
         and shape.dimensions == (program.prompt_length,)
@@ -235,6 +613,7 @@ def validate_teacher_forced_prefill_hlo(
     )
     violations = list(decoder_contract["violations"])
     violations.extend(loop_contract["violations"])
+    violations.extend(index_repair_contract["violations"])
     if prompt_shape_parameter_count == 0:
         violations.append(
             "teacher-forced prefill lost its one-dimensional prompt token input"
@@ -253,6 +632,8 @@ def validate_teacher_forced_prefill_hlo(
         "decoder_contract": decoder_contract,
         "host_transfer_markers": list(host_transfer_markers),
         "host_transfer_opcodes": list(host_transfer_opcodes),
+        "index_repair_backend": program.index_repair_backend,
+        "index_repair_contract": index_repair_contract,
         "loop_count": loop_contract["loop_count"],
         "loop_contract": loop_contract,
         "outer_loop_count": loop_contract["outer_loop_count"],
@@ -336,7 +717,7 @@ def build_teacher_forced_prefill_program(
             carry: tuple[Any, Any, Any, Any, Any, Any, Any, Any],
             prompt_token: Any,
         ) -> tuple[
-            tuple[Any, Any, Any, Any, Any, Any, Any, Any], None
+            tuple[Any, Any, Any, Any, Any, Any, Any, Any], Any | None
         ]:
             (
                 current_residual,
@@ -363,7 +744,7 @@ def build_teacher_forced_prefill_program(
                 current_blocks,
                 current_lengths,
             )
-            return (
+            next_carry = (
                 output[0],
                 output[1],
                 output[2],
@@ -372,9 +753,37 @@ def build_teacher_forced_prefill_program(
                 output[6],
                 output[7],
                 output[4],
-            ), None
+            )
+            observation = (
+                output[8]
+                if decoder.observe_prefill_index_inputs
+                else None
+            )
+            return next_carry, observation
 
-        final, _ = lax.scan(scan_step, initial, prompt_tokens, unroll=1)
+        final, prompt_index_inputs = lax.scan(
+            scan_step, initial, prompt_tokens, unroll=1
+        )
+        if decoder.observe_prefill_index_inputs:
+            if decoder.repair_prefill_index_cache is None:
+                raise PlanValidationError(
+                    "prefill index repair executable is unavailable"
+                )
+            final = (
+                final[0],
+                final[1],
+                decoder.repair_prefill_index_cache(
+                    weights,
+                    final[2],
+                    prompt_index_inputs,
+                    final[5],
+                ),
+                final[3],
+                final[4],
+                final[5],
+                final[6],
+                final[7],
+            )
         return (
             final[0],
             final[1],
@@ -389,5 +798,10 @@ def build_teacher_forced_prefill_program(
     return TeacherForcedPrefillProgram(
         decoder=decoder,
         execute=execute,
+        index_repair_backend=(
+            "physical_m64_chunk"
+            if decoder.observe_prefill_index_inputs
+            else "none"
+        ),
         prompt_length=prompt_length,
     )

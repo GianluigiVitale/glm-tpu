@@ -2629,3 +2629,47 @@ convolution, physical `[64]` sqrt and `[64,128]` affine, and rejects grouped `[3
 sqrt. DB517 is now a pinned prerequisite. Exact next: finish local checks, one diff-only Fable
 commit-readiness review, commit/push, then one serialized protected key-LayerNorm discriminator.
 Do not retry the full decoder unless producer states and the entire 8,155-row cache are exact.
+
+## DB518 is exact; default-off full-prefill repair is locally frozen
+
+Protected DB518/item1803,
+`greenfield_layer0_prompt_key_norm_m64_20260809T122010714691723Z`, closes the bounded producer
+search at greenfield `86243115452920fe4244bb77a9bbf4c44110aeab`. The DB515 normalized input,
+projection, physical key LayerNorm, post-RoPE state and complete 8,155-row BF16 cache are all
+elementwise exact. Accepted/candidate cache SHA is
+`3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1`; comparison manifest is
+`1d80d088561181a63e734a91cd0124c4011cfc4151198488c052740050d66fe5`; terminal SUCCESS is
+`a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee`. DB/archive/direct remote
+bytes and authenticated 8/8 cleanup pass. This authorizes production integration but is not itself
+decoder, Gate-D or performance evidence.
+
+The current uncommitted batch adds a separate default-off prefill decoder. During the existing
+device-resident teacher-forced scan it retains only each stage's exact BF16 normalized projection
+inputs for full-indexer layers. After the scan, each LP4 lane recomputes its stage's prompt keys in
+four M2048 chunks using raw-FP8 BF16-origin adapted `wk`, mixed
+`[DEFAULT,HIGHEST]` M64 projection, physical affine key LayerNorm and RoPE, then overwrites only
+its owned page rows. The production recurrent decoder remains the unchanged true one-row program.
+At 8K the history budget is 501,043,200 bytes/device.
+
+The prefill HLO gate requires 84 repair loops/projections, exact BF16 `[64,6144]` by FP32
+`[128,6144]` operands on TPU, 168 physical `[64]` sqrt records, at least 84 physical affines/cache
+writes, no grouped `[32,64]` norm, repair collective, host callback or full-pod history, and
+positive measured 32-chip HBM headroom. The wrapper pins DB518 local hashes, live DB518/item1803,
+and direct approved-bucket SUCCESS before launch. A forced-32 CPU program compiles and executes all
+eight repair branches with the public eight-output prefill interface unchanged. Fable's one-time
+diff audit found that the first draft recorded the rounded BF16 split-residual boundary even though
+accepted fused RMSNorm consumes its unrounded FP32 sum; layer-0 DB518 cannot expose that difference.
+Independent reproduction confirmed 1,019/6,144 differing values on a nontrivial pair and zero with
+a zero residual. The repair now records `dsa_internals.normalized_hidden` directly, and the
+forced-32 regression proves it equals the split DSA observer while differing from the rounded
+boundary on nontrivial layers. The corrected affected suite passes 56/56 in 119.34 seconds; the
+complete explicit-CPU greenfield suite passes 499 with one expected skip and two existing SWIG
+warnings in 414.04 seconds. No TPU run or performance claim exists for this batch yet.
+
+Fable's narrow xhigh follow-up verified the corrected recording, repair arithmetic, independent
+split observer regression, unchanged 501,043,200-byte budget, LP4 ownership, default-off behavior,
+and recurrent decoder, then returned `APPROVE COMMIT`. Exact next: commit/push this frozen batch.
+After an authenticated idle-fleet census, launch exactly one serialized protected 8K PP8 run with
+the accepted split/token/DSA/trace profile and
+`GLM_GREENFIELD_PREFILL_INDEX_REPAIR=1`. Preserve and diagnose any HLO, HBM, token or DSA refusal;
+only a fully protected pass may advance Gate D/E.

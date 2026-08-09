@@ -73,6 +73,21 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   sine/cosine angles derived in FP32. The accepted interleaved layout pairs
   `(0,1), (2,3), ...` and re-interleaves the result. Half-split pairing remains
   an explicit reference option; it is never selected implicitly.
+- Protected DB518 proves the prompt index-key producer requires each logical
+  M2048 chunk to execute as 32 M64 partitions. Each partition consumes a BF16
+  `[64,6144]` normalized lhs and FP32 `[128,6144]` adapted `wk`, requests mixed
+  `[DEFAULT,HIGHEST]` dot precision, and performs the biased FP32 key LayerNorm
+  before leaving the map. Projection, pre-RoPE, post-RoPE, and the complete
+  8,155-row BF16 cache are elementwise exact under this association.
+- The default-off PP8 prefill adaptation records the exact BF16 normalized
+  projection input already consumed by every full indexer on its owning stage;
+  it must not re-normalize the rounded split-residual boundary. The post-scan
+  repair overwrites only that stage's LP4-owned cache rows. At 8K its fixed
+  history budget is 501,043,200 bytes/device. Admission requires 84 physical
+  M64 calls, no grouped `[32,64]` key-norm reduction, no collective, host
+  callback, full-pod history, or non-positive measured HBM headroom. Recurrent
+  `decode_batch1` remains the unchanged true one-row executable; DB518 is
+  arithmetic evidence, not an integrated Gate-D result.
 
 ## DSA scorer and selected positions
 

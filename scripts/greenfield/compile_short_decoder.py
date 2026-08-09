@@ -1172,6 +1172,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--prefill-index-repair",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1215,6 +1221,7 @@ def main() -> int:
     args.verify_device_roundtrip = bool(args.verify_device_roundtrip)
     args.complete_token_path = bool(args.complete_token_path)
     args.split_residual_state = bool(args.split_residual_state)
+    args.prefill_index_repair = bool(args.prefill_index_repair)
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
     oracle_mode = args.short_context_oracle_dir is not None
@@ -1236,6 +1243,22 @@ def main() -> int:
         )
     if dsa_oracle_mode and not oracle_mode:
         raise ValueError("short-context DSA oracle requires the token oracle")
+    if args.prefill_index_repair and not dsa_oracle_mode:
+        raise ValueError(
+            "prefill index repair requires the sealed DSA/token oracle"
+        )
+    if args.prefill_index_repair and args.context_capacity != 8192:
+        raise ValueError("prefill index repair is admitted only for protected 8K")
+    if args.prefill_index_repair and not args.split_residual_state:
+        raise ValueError(
+            "prefill index repair requires the accepted split residual state"
+        )
+    if args.prefill_index_repair and (
+        args.observe_layer_residuals or args.observe_dsa_internals
+    ):
+        raise ValueError(
+            "prefill index repair must remain isolated from diagnostics"
+        )
     if args.observe_layer_residuals and not dsa_oracle_mode:
         raise ValueError(
             "layer residual observation requires the sealed DSA/token oracle"
@@ -1671,10 +1694,38 @@ def main() -> int:
                 split_residual_state=args.split_residual_state,
             )
         prefill = None
+        prefill_decoder = None
         if oracle_mode:
             assert prompt_token_ids is not None
+            prefill_decoder = decoder
+            if args.prefill_index_repair:
+                prefill_decoder = build_decoder_step_program(
+                    execution_plan,
+                    schedule,
+                    state_layout,
+                    pack_context.layout,
+                    groups,
+                    pairs,
+                    devices=runtime_devices,
+                    sparse_moe_backend=sparse_moe_backend,
+                    feature_output_tile=args.feature_output_tile,
+                    feature_fuse_route_weighting=(
+                        args.feature_fuse_route_weighting
+                    ),
+                    feature_reconstruct_down_fp32=(
+                        args.feature_reconstruct_down_fp32
+                    ),
+                    linear_backend=linear_backend,
+                    dsa_query_backend=dsa_query_backend,
+                    attention_projection_backend=(
+                        attention_projection_backend
+                    ),
+                    complete_token_path=True,
+                    observe_prefill_index_inputs=True,
+                    split_residual_state=args.split_residual_state,
+                )
             prefill = build_teacher_forced_prefill_program(
-                decoder,
+                prefill_decoder,
                 prompt_length=int(prompt_token_ids.size),
             )
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-start")
@@ -2955,6 +3006,10 @@ def main() -> int:
             "prefill_compile_seconds": prefill_compile_seconds,
             "prefill_hlo_contract": prefill_hlo_contract,
             "prefill_hlo_sha256": prefill_hlo_sha256,
+            "prefill_index_repair": args.prefill_index_repair,
+            "prefill_index_repair_backend": (
+                prefill.index_repair_backend if prefill is not None else "none"
+            ),
             "prefill_wall_ms": prefill_wall_ms,
             "prefill_used": oracle_mode,
             "raw_token_claim": bool(
@@ -2967,7 +3022,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 9,
+            "schema_version": 10,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

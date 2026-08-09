@@ -24,6 +24,9 @@ from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayo
 from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.linear import vocabulary_logits
 from ..kernels.reference.moe import GlmMoeNumericalContract
+from ..kernels.reference.prefill_index import (
+    repair_stage_local_prompt_index_cache,
+)
 from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
 from ..kernels.pallas import Fp8BlockMatmulConfig
 from ..kernels.stage_local import StageLinearBackend
@@ -182,6 +185,8 @@ class DecoderStepProgram:
     observe_dsa_events: bool
     observe_dsa_internals: bool
     observe_layer_residuals: bool
+    observe_prefill_index_inputs: bool
+    repair_prefill_index_cache: Any | None
     split_residual_state: bool
 
 
@@ -351,6 +356,7 @@ def _validate_fused_qkv_a_decoder_association(
     optimized_hlo: str,
     *,
     layers: int,
+    prefill_index_repair: bool = False,
 ) -> dict[str, Any]:
     """Require DB502's physical one-row N82 primitive in every layer."""
 
@@ -372,16 +378,19 @@ def _validate_fused_qkv_a_decoder_association(
         "one_row_input": "bf16[1,6144]" in lowered,
         "one_row_convolution": bool(convolutions),
     }
+    forbidden_candidates = [
+        "u8[2048,6144]",
+        "u8[576,6144]",
+        "f32[16,48]",
+        "f32[5,48]",
+        "bf16[32,6144]",
+        "f32[32,6144]",
+    ]
+    if prefill_index_repair:
+        forbidden_candidates.remove("f32[32,6144]")
     forbidden_shapes = tuple(
         shape
-        for shape in (
-            "u8[2048,6144]",
-            "u8[576,6144]",
-            "f32[16,48]",
-            "f32[5,48]",
-            "bf16[32,6144]",
-            "f32[32,6144]",
-        )
+        for shape in forbidden_candidates
         if shape in lowered
     )
     violations = []
@@ -403,6 +412,7 @@ def _validate_fused_qkv_a_decoder_association(
         "convolution_count": len(convolutions),
         "expected_convolution_count": layers,
         "forbidden_shapes": list(forbidden_shapes),
+        "prefill_index_repair": prefill_index_repair,
         "passed": not violations,
         "required_shapes": required_shapes,
         "violations": violations,
@@ -473,6 +483,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     full_indexer_layers: int,
     dsa_query_backend: StageLinearBackend = "pallas",
     attention_projection_backend: AttentionProjectionBackend = "separate",
+    prefill_index_repair: bool = False,
 ) -> dict[str, Any]:
     """Pin every raw-FP8 attention/dense projection replacing an overlay."""
 
@@ -510,7 +521,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     }
     if dsa_query_backend not in ("reference", "pallas"):
         raise PlanValidationError("DSA query HLO backend is unknown")
-    decoded_shapes = (
+    decoded_shapes = [
         "2048,6144",
         "4096,2048",
         "576,6144",
@@ -519,25 +530,32 @@ def _validate_pallas_stage_linear_decoder_calls(
         "128,6144",
         "3072,6144",
         "6144,3072",
-    ) + (() if dsa_query_backend == "reference" else ("1024,2048",))
+    ]
+    if dsa_query_backend != "reference":
+        decoded_shapes.append("1024,2048")
+    if prefill_index_repair:
+        decoded_shapes.remove("128,6144")
     forbidden_shapes = tuple(
         f"{dtype}[{shape}]"
         for dtype in ("bf16", "f32")
-        for shape in decoded_shapes
+        for shape in tuple(decoded_shapes)
     )
     forbidden_overlays = [
         shape for shape in forbidden_shapes if shape in optimized_hlo
     ]
+    formatted_shapes = [
+        "2048,6144",
+        "4096,2048",
+        "6144,4096",
+        "7168,512",
+        "1024,2048",
+        "128,6144",
+    ]
+    if prefill_index_repair:
+        formatted_shapes.remove("128,6144")
     forbidden_formatted_shapes = tuple(
         f"f8e4m3fn[{shape}]"
-        for shape in (
-            "2048,6144",
-            "4096,2048",
-            "6144,4096",
-            "7168,512",
-            "1024,2048",
-            "128,6144",
-        )
+        for shape in formatted_shapes
     )
     forbidden_formatted_overlays = [
         shape for shape in forbidden_formatted_shapes if shape in optimized_hlo
@@ -560,6 +578,7 @@ def _validate_pallas_stage_linear_decoder_calls(
         )
     return {
         "attention_projection_backend": attention_projection_backend,
+        "prefill_index_repair": prefill_index_repair,
         "expected_kernel_counts": expected_kernel_counts,
         "dsa_query_backend": dsa_query_backend,
         "forbidden_decoded_weight_overlays": forbidden_overlays,
@@ -1018,6 +1037,7 @@ def validate_decoder_step_hlo(
     complete_token_path: bool = False,
     token_observation_candidates: int = 1,
     split_residual_state: bool = False,
+    prefill_index_repair: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -1046,6 +1066,8 @@ def validate_decoder_step_hlo(
         raise PlanValidationError(
             "feature FP32 reconstruction flag must be boolean"
         )
+    if not isinstance(prefill_index_repair, bool):
+        raise PlanValidationError("prefill index-repair flag must be boolean")
     if feature_reconstruct_down_fp32 and feature_fuse_route_weighting:
         raise PlanValidationError(
             "feature FP32 reconstruction is incompatible with fused route "
@@ -1418,6 +1440,7 @@ def validate_decoder_step_hlo(
                 full_indexer_layers=full_layers,
                 dsa_query_backend=dsa_query_backend,
                 attention_projection_backend=attention_projection_backend,
+                prefill_index_repair=prefill_index_repair,
             )
         )
         violations.extend(pallas_stage_linear_contract["violations"])
@@ -1439,6 +1462,7 @@ def validate_decoder_step_hlo(
         fused_qkv_a_contract = _validate_fused_qkv_a_decoder_association(
             optimized_hlo,
             layers=layers,
+            prefill_index_repair=prefill_index_repair,
         )
         violations.extend(fused_qkv_a_contract["violations"])
     return {
@@ -1463,6 +1487,7 @@ def validate_decoder_step_hlo(
         "feature_reconstruct_down_fp32": feature_reconstruct_down_fp32,
         "complete_token_path": complete_token_path,
         "split_residual_state": split_residual_state,
+        "prefill_index_repair": prefill_index_repair,
         "residual_transport_dimensions": list(
             residual_transport_dimensions
         ),
@@ -1601,6 +1626,7 @@ def _execute_stage(
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
+    prefill_index_inputs: Any | None = None,
 ) -> tuple[Any, ...]:
     import jax.numpy as jnp
     from jax import lax
@@ -1688,6 +1714,10 @@ def _execute_stage(
             dsa_query_backend=dsa_query_backend,
             attention_projection_backend=attention_projection_backend,
         )
+        if current_full_slot is not None and prefill_index_inputs is not None:
+            prefill_index_inputs = prefill_index_inputs.at[
+                current_full_slot
+            ].set(result.dsa_internals.normalized_hidden[0])
         residual = result.output
         if layer_residual_observation is not None:
             layer_residual_observation = layer_residual_observation.at[
@@ -1763,6 +1793,8 @@ def _execute_stage(
         values = (*values, dsa_internal_observation)
     if layer_residual_observation is not None:
         values = (*values, layer_residual_observation)
+    if prefill_index_inputs is not None:
+        values = (*values, prefill_index_inputs)
     return values
 
 
@@ -1793,6 +1825,7 @@ def _execute_stage_split(
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
+    prefill_index_inputs: Any | None = None,
 ) -> tuple[Any, ...]:
     """Execute one stage with the accepted hidden/residual state association."""
 
@@ -1892,6 +1925,10 @@ def _execute_stage_split(
             dsa_query_backend=dsa_query_backend,
             attention_projection_backend=attention_projection_backend,
         )
+        if current_full_slot is not None and prefill_index_inputs is not None:
+            prefill_index_inputs = prefill_index_inputs.at[
+                current_full_slot
+            ].set(result.dsa_internals.normalized_hidden[0])
         hidden_states = result.hidden_states
         residual = result.residual
         if layer_residual_observation is not None:
@@ -1973,6 +2010,8 @@ def _execute_stage_split(
         outputs = (*outputs, dsa_internal_observation)
     if layer_residual_observation is not None:
         outputs = (*outputs, layer_residual_observation)
+    if prefill_index_inputs is not None:
+        outputs = (*outputs, prefill_index_inputs)
     return outputs
 
 
@@ -1997,6 +2036,7 @@ def build_decoder_step_program(
     observe_dsa_events: bool = False,
     observe_dsa_internals: bool = False,
     observe_layer_residuals: bool = False,
+    observe_prefill_index_inputs: bool = False,
     split_residual_state: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
@@ -2067,6 +2107,10 @@ def build_decoder_step_program(
         raise PlanValidationError("DSA internal-observation flag must be boolean")
     if not isinstance(observe_layer_residuals, bool):
         raise PlanValidationError("layer residual-observation flag must be boolean")
+    if not isinstance(observe_prefill_index_inputs, bool):
+        raise PlanValidationError(
+            "prefill index-input observation flag must be boolean"
+        )
     if not isinstance(split_residual_state, bool):
         raise PlanValidationError("split residual-state flag must be boolean")
     if observe_dsa_events and not complete_token_path:
@@ -2084,6 +2128,18 @@ def build_decoder_step_program(
     if observe_dsa_internals and observe_layer_residuals:
         raise PlanValidationError(
             "DSA internal and layer-residual diagnostics must be isolated"
+        )
+    if observe_prefill_index_inputs and not complete_token_path:
+        raise PlanValidationError(
+            "prefill index-input observation requires the complete-token path"
+        )
+    if observe_prefill_index_inputs and (
+        observe_dsa_events
+        or observe_dsa_internals
+        or observe_layer_residuals
+    ):
+        raise PlanValidationError(
+            "prefill index-input observation must be isolated"
         )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
@@ -2243,6 +2299,15 @@ def build_decoder_step_program(
         dsa_internal_observation = None
         token_observation = None
         layer_residual_observation = None
+        prefill_index_inputs = None
+        if observe_prefill_index_inputs:
+            prefill_index_inputs = jnp.zeros(
+                (
+                    config.maximum_full_indexer_slots,
+                    config.hidden_size,
+                ),
+                dtype=residual.dtype,
+            )
         if observe_dsa_events:
             dsa_observation = jnp.full(
                 (
@@ -2536,6 +2601,56 @@ def build_decoder_step_program(
                             dsa_observation,
                         ),
                     )
+            elif observe_prefill_index_inputs:
+                assert prefill_index_inputs is not None
+                (
+                    residual,
+                    kv_cache,
+                    index_cache,
+                    metadata,
+                    prefill_index_inputs,
+                ) = lax.cond(
+                    should_execute,
+                    lambda values, stage=stage: execute_stage(
+                        stage,
+                        values[:4],
+                        weight=weight,
+                        local_slot=local_slot,
+                        position=position,
+                        block_tables=block_tables,
+                        context_lengths=context_lengths,
+                        axis_name=axis_name,
+                        axis_groups=axis_groups,
+                        config=config,
+                        dsa_contract=dsa_contract,
+                        mla_contract=mla_contract,
+                        moe_contract=moe_contract,
+                        cache_layout=cache_layout,
+                        block_shape=geometry.fp8_block_shape,
+                        sparse_moe_backend=sparse_moe_backend,
+                        pallas_moe_config=pallas_moe_config,
+                        pallas_moe_fuse_route_weighting=(
+                            feature_fuse_route_weighting
+                        ),
+                        pallas_moe_reconstruct_down_fp32=(
+                            feature_reconstruct_down_fp32
+                        ),
+                        linear_backend=linear_backend,
+                        dsa_query_backend=dsa_query_backend,
+                        attention_projection_backend=(
+                            attention_projection_backend
+                        ),
+                        prefill_index_inputs=values[4],
+                    ),
+                    lambda values: values,
+                    (
+                        residual,
+                        kv_cache,
+                        index_cache,
+                        metadata,
+                        prefill_index_inputs,
+                    ),
+                )
             else:
                 residual, kv_cache, index_cache, metadata = lax.cond(
                     should_execute,
@@ -2786,7 +2901,10 @@ def build_decoder_step_program(
             context_lengths + jnp.ones_like(context_lengths),
         )
         if not observe_dsa_events:
-            return outputs
+            if not observe_prefill_index_inputs:
+                return outputs
+            assert prefill_index_inputs is not None
+            return (*outputs, prefill_index_inputs[None, ...])
         assert dsa_observation is not None
         assert token_observation is not None
         observation_outputs = (
@@ -2856,6 +2974,55 @@ def build_decoder_step_program(
             context_lengths,
         )
 
+    def mapped_prefill_index_repair(
+        local_weights: Mapping[str, Any],
+        local_index_container: Any,
+        local_history_container: Any,
+        block_tables: Any,
+    ) -> Any:
+        rank = lax.axis_index(axis_name)
+        stage_id = stage_map[rank]
+        local_slot = slot_map[rank]
+        index_cache = local_index_container[0]
+        prompt_history = local_history_container[:, 0]
+
+        def weight(name: str) -> Any:
+            return local_weights[name][0]
+
+        def stage_branch(stage: StageExecution) -> Any:
+            def repair(value: Any) -> Any:
+                full_slot = 0
+                repaired = value
+                for layer in stage.layers:
+                    if layer.indexer_kind != "full":
+                        continue
+                    dsa = _dsa_weights(weight, full_slot)
+                    layer_cache = repair_stage_local_prompt_index_cache(
+                        repaired[full_slot],
+                        prompt_history[:, full_slot],
+                        block_tables,
+                        dsa.wk_bits,
+                        dsa.wk_scale,
+                        dsa.key_norm_weight,
+                        dsa.key_norm_bias,
+                        local_slot,
+                        contract=dsa_contract,
+                        logical_page_size=config.logical_page_size,
+                        local_rows_per_page=config.local_rows_per_page,
+                        prompt_chunk=2048,
+                        physical_rows=64,
+                        fp8_block_shape=geometry.fp8_block_shape,
+                    )
+                    repaired = repaired.at[full_slot].set(layer_cache)
+                    full_slot += 1
+                return repaired
+
+            return repair
+
+        branches = tuple(stage_branch(stage) for stage in schedule.stages)
+        index_cache = lax.switch(stage_id, branches, index_cache)
+        return index_cache[None, ...]
+
     weight_specs = {
         spec.name: P(axis_name, *(None for _ in spec.shape))
         for spec in weight_layout.specs
@@ -2872,6 +3039,7 @@ def build_decoder_step_program(
     dsa_observation_spec = P(axis_name, None, None)
     token_observation_spec = P(axis_name, None)
     layer_residual_observation_spec = P(axis_name, None, None)
+    prefill_index_input_spec = P(axis_name, None, None)
     dsa_internal_observation_spec = DsaInternalObservation(
         P(axis_name, None, None),
         P(axis_name, None, None),
@@ -2916,6 +3084,8 @@ def build_decoder_step_program(
                     *output_specs,
                     dsa_internal_observation_spec,
                 )
+        elif observe_prefill_index_inputs:
+            output_specs = (*output_specs, prefill_index_input_spec)
     else:
         input_specs = (*common_specs, P(), P(), P())
         mapped = mapped_body
@@ -2927,6 +3097,20 @@ def build_decoder_step_program(
         out_specs=output_specs,
         check_vma=False,
     )
+    repair_prefill_index_cache = None
+    if observe_prefill_index_inputs:
+        repair_prefill_index_cache = jax.shard_map(
+            mapped_prefill_index_repair,
+            mesh=mesh,
+            in_specs=(
+                weight_specs,
+                index_spec,
+                P(None, axis_name, None, None),
+                P(),
+            ),
+            out_specs=index_spec,
+            check_vma=False,
+        )
     return DecoderStepProgram(
         config=config,
         execute=execute,
@@ -2949,5 +3133,7 @@ def build_decoder_step_program(
         observe_dsa_events=observe_dsa_events,
         observe_dsa_internals=observe_dsa_internals,
         observe_layer_residuals=observe_layer_residuals,
+        observe_prefill_index_inputs=observe_prefill_index_inputs,
+        repair_prefill_index_cache=repair_prefill_index_cache,
         split_residual_state=split_residual_state,
     )

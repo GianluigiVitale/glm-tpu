@@ -872,6 +872,40 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             split_residual_state=1,  # type: ignore[arg-type]
         )
+    with pytest.raises(
+        PlanValidationError, match="prefill index-input observation flag"
+    ):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            observe_prefill_index_inputs=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="complete-token path"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            observe_prefill_index_inputs=True,
+        )
+    with pytest.raises(PlanValidationError, match="must be isolated"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=True,
+            observe_dsa_events=True,
+            observe_prefill_index_inputs=True,
+        )
     with pytest.raises(PlanValidationError, match="isolated DSA observer"):
         build_decoder_step_program(
             source_plan,
@@ -938,8 +972,12 @@ explicit_default = build_decoder_step_program(plan, schedule, state, weight_layo
 observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True)
 internal_observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True)
 split = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, split_residual_state=True)
+repair_decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_prefill_index_inputs=True, split_residual_state=True)
+split_boundary_regression = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True, split_residual_state=True)
+split_internal_regression = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True, split_residual_state=True)
 prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
 split_prefill = build_teacher_forced_prefill_program(split, prompt_length=2)
+repair_prefill = build_teacher_forced_prefill_program(repair_decoder, prompt_length=2)
 
 weights = {}
 weight_specs = decoder.input_specs[0]
@@ -955,11 +993,22 @@ for spec in weight_layout.specs:
             value.fill(0)
     weights[spec.name] = jax.device_put(value, NamedSharding(decoder.mesh, weight_specs[spec.name]))
 
+regression_weights = dict(weights)
+for spec in weight_layout.specs:
+    if spec.dtype == 'F8_E4M3' and spec.name.startswith('dense.'):
+        value = np.full((32, *spec.shape), 0x38, np.uint8)
+        regression_weights[spec.name] = jax.device_put(
+            value, NamedSharding(decoder.mesh, weight_specs[spec.name])
+        )
+
 residual_host = np.zeros((32, 1, 8), dtype=ml_dtypes.bfloat16)
 initial_row = np.asarray([[0.5, -0.25, 0.75, 1.0, -1.0, 0.125, 0.25, -0.5]], dtype=ml_dtypes.bfloat16)
 for rank in groups[0]: residual_host[rank] = initial_row
 split_residual_host = np.zeros((32, 2, 1, 8), dtype=ml_dtypes.bfloat16)
-for rank in groups[0]: split_residual_host[rank, 0] = initial_row
+split_addend = np.asarray([[0.1, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7, -0.8]], dtype=ml_dtypes.bfloat16)
+for rank in groups[0]:
+    split_residual_host[rank, 0] = initial_row
+    split_residual_host[rank, 1] = split_addend
 kv_host = np.ones((32, 1, 1, 2, 8), dtype=ml_dtypes.bfloat16)
 index_host = np.ones((32, 1, 1, 2, 2), dtype=ml_dtypes.bfloat16)
 metadata_host = np.full((32, 1, decoder.config.metadata_width), -1, np.int32)
@@ -994,6 +1043,9 @@ default_stablehlo = lowered.as_text()
 explicit_default_stablehlo = jax.jit(explicit_default.execute).lower(*inputs).as_text()
 compiled = lowered.compile()
 split_compiled = jax.jit(split.execute).lower(*split_inputs).compile()
+repair_step_compiled = jax.jit(repair_decoder.execute).lower(*split_inputs).compile()
+split_boundary_regression_compiled = jax.jit(split_boundary_regression.execute).lower(*split_inputs).compile()
+split_internal_regression_compiled = jax.jit(split_internal_regression.execute).lower(*split_inputs).compile()
 observer_compiled = jax.jit(observer.execute).lower(*inputs).compile()
 internal_observer_compiled = jax.jit(internal_observer.execute).lower(*inputs).compile()
 observed = observer_compiled(*inputs)
@@ -1002,6 +1054,10 @@ first = compiled(*inputs)
 second = compiled(weights, *first)
 split_first = split_compiled(*split_inputs)
 split_second = split_compiled(weights, *split_first)
+regression_inputs = (regression_weights, *split_inputs[1:])
+repair_step = repair_step_compiled(*regression_inputs)
+split_boundary_observed = split_boundary_regression_compiled(*regression_inputs)
+split_internal_observed = split_internal_regression_compiled(*regression_inputs)
 prefill_inputs = (
     weights,
     *inputs[1:5],
@@ -1018,10 +1074,34 @@ split_prefill_inputs = (
 )
 split_prefill_compiled = jax.jit(split_prefill.execute).lower(*split_prefill_inputs).compile()
 split_prefilled = split_prefill_compiled(*split_prefill_inputs)
+repair_prefill_inputs = (
+    weights,
+    *split_inputs[1:5],
+    jnp.asarray([5, 6], dtype=jnp.int32),
+    *split_inputs[6:9],
+)
+repair_prefill_compiled = jax.jit(repair_prefill.execute).lower(*repair_prefill_inputs).compile()
+repair_prefilled = repair_prefill_compiled(*repair_prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
 split_residual, split_kv, split_index, split_metadata, split_next_token, split_next_position, split_next_blocks, split_next_lengths = map(np.asarray, jax.device_get(split_second))
 prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
 split_prefill_values = list(map(np.asarray, jax.device_get(split_prefilled)))
+repair_prefill_values = list(map(np.asarray, jax.device_get(repair_prefilled)))
+repair_step_history = np.asarray(jax.device_get(repair_step[8]))
+split_boundary_history = np.asarray(jax.device_get(split_boundary_observed[10]))
+split_internal_history = np.asarray(
+    jax.device_get(split_internal_observed[10].normalized_hidden)
+)
+repair_stage_rows = np.stack([
+    repair_step_history[group[0], 0] for group in groups
+])
+normalized_stage_rows = np.stack([
+    split_internal_history[group[0], 0] for group in groups
+])
+rounded_stage_rows = np.stack([
+    split_boundary_history[group[0], stage]
+    for stage, group in enumerate(groups)
+])
 observation = np.asarray(jax.device_get(observed[8]))
 token_observation = np.asarray(jax.device_get(observed[9]))
 layer_residual_observation = np.asarray(jax.device_get(observed[10]))
@@ -1056,6 +1136,7 @@ observer_hlo_contract = validate_decoder_step_hlo(observer_compiled.as_text(), c
 internal_observer_hlo_contract = validate_decoder_step_hlo(internal_observer_compiled.as_text(), config=internal_observer.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, token_observation_candidates=internal_observer.config.token_observation_candidates)
 prefill_hlo_contract = validate_teacher_forced_prefill_hlo(prefill_compiled.as_text(), program=prefill, schedule=schedule, backend_contract='cpu_reference')
 split_prefill_hlo_contract = validate_teacher_forced_prefill_hlo(split_prefill_compiled.as_text(), program=split_prefill, schedule=schedule, backend_contract='cpu_reference')
+repair_prefill_hlo_contract = validate_teacher_forced_prefill_hlo(repair_prefill_compiled.as_text(), program=repair_prefill, schedule=schedule, backend_contract='cpu_reference')
 counts = {}
 for item in module.collectives: counts[item.opcode] = counts.get(item.opcode, 0) + 1
 local_groups = tuple(tuple(group) for group in groups)
@@ -1178,6 +1259,32 @@ print(json.dumps({
         'prompt_shape_present': prefill_hlo_contract['prompt_shape_parameter_count'] > 0,
         'violations': prefill_hlo_contract['violations'],
     },
+    'prefill_index_repair': {
+        'backend': repair_prefill_hlo_contract['index_repair_backend'],
+        'decoder_contract_passed': repair_prefill_hlo_contract['decoder_contract']['passed'],
+        'exact_projection_operand_count': repair_prefill_hlo_contract['index_repair_contract']['exact_projection_operand_count'],
+        'expected_call_count': repair_prefill_hlo_contract['index_repair_contract']['expected_call_count'],
+        'forbidden_markers': repair_prefill_hlo_contract['index_repair_contract']['forbidden_markers'],
+        'full_pod_history_shapes': repair_prefill_hlo_contract['index_repair_contract']['full_pod_history_shapes'],
+        'history_estimated_bytes_per_device': repair_prefill_hlo_contract['index_repair_contract']['history_estimated_bytes_per_device'],
+        'history_shapes_compact': bool(
+            repair_prefill_hlo_contract['index_repair_contract']['history_shapes']
+            and len(repair_prefill_hlo_contract['index_repair_contract']['history_shapes']) <= 8
+            and all(
+                shape['dtype'] == 'bf16' and 32 not in shape['dimensions']
+                for shape in repair_prefill_hlo_contract['index_repair_contract']['history_shapes']
+            )
+        ),
+        'loop_count': repair_prefill_hlo_contract['loop_contract']['prefill_index_repair_loop_count'],
+        'passed': repair_prefill_hlo_contract['passed'],
+        'production_outputs_exact': all(np.array_equal(repair_prefill_values[index], split_prefill_values[index]) for index in range(8)),
+        'projection_count': repair_prefill_hlo_contract['index_repair_contract']['projection_count'],
+        'recorded_normalized_input_exact': bool(np.array_equal(repair_stage_rows, normalized_stage_rows)),
+        'repair_collectives': repair_prefill_hlo_contract['index_repair_contract']['repair_collectives'],
+        'rounded_boundary_is_distinct': bool(np.any(normalized_stage_rows != rounded_stage_rows)),
+        'split_residual_state': repair_decoder.split_residual_state,
+        'violations': repair_prefill_hlo_contract['violations'],
+    },
     'residual_exact': bool(np.array_equal(residual[active], np.ones((4, 1, 8), dtype=ml_dtypes.bfloat16))),
     'split': {
         'active': np.flatnonzero(split_metadata[:, 0, split.config.active_index] == 1).tolist(),
@@ -1258,6 +1365,25 @@ print(json.dumps({
     assert result["next_tokens"] == [0]
     assert result["next_position"] == [2]
     assert result["next_lengths"] == [3]
+    assert result["prefill_index_repair"] == {
+        "backend": "physical_m64_chunk",
+        "decoder_contract_passed": True,
+        "exact_projection_operand_count": 8,
+        "expected_call_count": 8,
+        "forbidden_markers": [],
+        "full_pod_history_shapes": [],
+        "history_estimated_bytes_per_device": 32,
+        "history_shapes_compact": True,
+        "loop_count": 8,
+        "passed": True,
+        "production_outputs_exact": True,
+        "projection_count": 8,
+        "recorded_normalized_input_exact": True,
+        "repair_collectives": [],
+        "rounded_boundary_is_distinct": True,
+        "split_residual_state": True,
+        "violations": [],
+    }
     assert result["observer"] == {
         "collective_counts": {
             "all-gather": 58,

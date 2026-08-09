@@ -6111,3 +6111,71 @@ unmotivated arithmetic variants.
   only key LayerNorm into the already-proven M64 body, retains the projection-only mode as a
   control, and fails closed unless the physical `[64]`/`[64,128]` HLO contract appears. DB517
   becomes an exact pinned prerequisite before one serialized retry.
+
+## 2026-08-09 13:30 — DB518 closes prompt-key arithmetic; integration is locally frozen
+
+- Protected DB518/item1803 at `8624311` makes the DB515 input and all three FP32 producer states
+  elementwise exact and reproduces all 8,155 BF16 cache rows, SHA `3808d502...859d1`. Comparison
+  manifest `1d80d088...6fe5`, terminal SUCCESS `a8d37016...bfee`, DB/archive/direct remote bytes,
+  and authenticated 8/8 cleanup pass. This is the exact arithmetic prerequisite, not Gate D.
+- The integration reuses existing RMSNorm, affine key LayerNorm, RoPE, FP8 dequantization,
+  teacher-forced prefill, paged-cache layout, HLO parser, protected oracles, provenance and cleanup.
+  A separate default-off prefill decoder records only stage-local BF16 inputs for the 21 full
+  indexers and repairs their owner caches after the scan in four logical M2048 chunks. Recurrent
+  decode remains one row and byte-for-byte default-HLO stable in the forced-device regression.
+- A local audit caught and fixed an 8K-only precedence error that would have expected 104 repair
+  loops instead of 84. The shared chunk-count helper is now directly tested at prompt length
+  8,155. CPU XLA's FP32 lhs promotion is admitted only by the CPU contract; TPU still requires the
+  exact DB518 BF16-M64/FP32-`wk` physical operands.
+- The 56 affected tests and complete 499-test explicit-CPU greenfield suite pass, with one expected
+  skip and two existing SWIG warnings. Mechanical Bash/ShellCheck/heredoc/compile/JSON/diff checks
+  pass. Next is one diff-only Fable xhigh review, commit/push, idle-fleet proof, then one protected
+  8K PP8 launch. No integrated TPU, Gate-D, latency or throughput conclusion exists yet.
+
+## 2026-08-09 14:20 — Fable exposes the split-normalization blind spot
+
+- The one-time xhigh diff audit refused commit because the first repair draft recorded the rounded
+  BF16 `hidden + residual` boundary, then applied ordinary RMSNorm after the scan. The accepted
+  split layer instead normalizes the unrounded FP32 sum and only rounds its separately carried
+  residual. Every DB515--DB518 arithmetic proof is layer 0, where the second addend is zero, so
+  those exact results cannot distinguish the two boundaries.
+- An independent deterministic width-6,144 reproduction confirms 1,019 BF16 normalized-value
+  mismatches for a nontrivial split pair and zero mismatches when the residual addend is zero. No
+  TPU run was launched. The finding is valid and prevents spending the one protected 8K run on a
+  predictable later-layer cache/DSA refusal.
+- Both decoder associations now record the existing
+  `result.dsa_internals.normalized_hidden` value for every full indexer. The repair consumes this
+  exact BF16 projection input directly and removes its rounded-boundary RMSNorm. Shape, sharding,
+  and the 501,043,200-byte 8K history budget are unchanged.
+- The forced-32 regression now uses the mandatory split repair profile and nontrivial dense state.
+  It compares repair history to the independent split DSA-internal observer and also requires at
+  least one row to differ from the rounded-boundary observer. That regression passes. Full affected
+  and repository-suite evidence remains to be rerun before commit readiness.
+
+## 2026-08-09 14:35 — Corrected normalized-input integration is re-frozen
+
+- The affected kernel/runtime/compiler set passes 56/56 in 119.34 seconds. The complete explicit-
+  CPU greenfield suite passes 499 with one expected skip and the same two pre-existing SWIG
+  warnings in 414.04 seconds.
+- The corrected forced-32 program proves all eight split repair branches, exact normalized-input
+  capture versus the independent DSA observer, a nontrivial difference from rounded boundaries,
+  unchanged public eight-output prefill ABI, exact outputs versus the unmodified split prefill,
+  local/no-callback HLO, and unchanged default-off production StableHLO. This is CPU mechanism
+  evidence, not Gate-D or performance proof.
+- Exact next is a narrow Fable confirmation of only the blocker correction, followed by final
+  mechanical checks, commit/push, authenticated idle-fleet proof, and one serialized protected 8K
+  PP8 run. Previously cleared batch context must not be re-reviewed.
+
+## 2026-08-09 14:47 — Narrow blocker confirmation approves commit
+
+- Fable xhigh re-read only the normalized-input correction and its affected tests. It verified both
+  executor recording sites, direct BF16 normalized-input consumption with no second RMSNorm, exact
+  M64/key-norm/RoPE and LP4 ownership, unchanged sharding and 501,043,200-byte budget, the
+  independent split-observer regression, public split-prefill output parity, and default-off
+  recurrent isolation.
+- The explicit verdict is `APPROVE COMMIT`; no blocker remains. Its only below-blocker observation
+  was that the regression's distinctness check compares normalized rows to the raw rounded boundary,
+  while the separate documented width-6,144 reproduction covers rounded-boundary re-normalization.
+  No repeat review is authorized for this batch.
+- Exact next is final diff/mechanical verification, commit/push, authenticated idle-fleet proof,
+  then exactly one serialized protected 8K PP8 run. No TPU or performance claim exists yet.

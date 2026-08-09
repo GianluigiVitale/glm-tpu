@@ -20,6 +20,7 @@ readonly FEATURE_FUSE_ROUTE_WEIGHTING=${GLM_GREENFIELD_FEATURE_FUSE_ROUTE_WEIGHT
 readonly FEATURE_RECONSTRUCT_DOWN_FP32=${GLM_GREENFIELD_FEATURE_RECONSTRUCT_DOWN_FP32:-0}
 readonly COMPLETE_TOKEN_PATH=${GLM_GREENFIELD_COMPLETE_TOKEN_PATH:-0}
 readonly SPLIT_RESIDUAL_STATE=${GLM_GREENFIELD_SPLIT_RESIDUAL_STATE:-0}
+readonly PREFILL_INDEX_REPAIR=${GLM_GREENFIELD_PREFILL_INDEX_REPAIR:-0}
 readonly SHORT_CONTEXT_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE:-0}
 readonly SHORT_CONTEXT_DSA_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_DSA_ORACLE:-0}
 readonly DSA_INTERNAL_OBSERVER=${GLM_GREENFIELD_DSA_INTERNAL_OBSERVER:-0}
@@ -102,6 +103,10 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
   echo "split residual state must be 0 or 1" >&2
   exit 2
 }
+[[ $PREFILL_INDEX_REPAIR == 0 || $PREFILL_INDEX_REPAIR == 1 ]] || {
+  echo "prefill index repair must be 0 or 1" >&2
+  exit 2
+}
 [[ $SHORT_CONTEXT_ORACLE == 0 || $SHORT_CONTEXT_ORACLE == 1 ]] || {
   echo "short-context oracle flag must be 0 or 1" >&2
   exit 2
@@ -143,6 +148,20 @@ if [[ $SHORT_CONTEXT_DSA_ORACLE == 1 ]]; then
   }
   [[ $WARMUP == 2 && $ITERATIONS == 10 && $TRACE_STEPS == 2 ]] || {
     echo "$CONTEXT_NAME Gate D requires warmup=2 iterations=10 trace_steps=2" >&2
+    exit 2
+  }
+fi
+if [[ $PREFILL_INDEX_REPAIR == 1 ]]; then
+  [[ $PROFILE == 8k && $SHORT_CONTEXT_ORACLE == 1 && $SHORT_CONTEXT_DSA_ORACLE == 1 && $COMPLETE_TOKEN_PATH == 1 ]] || {
+    echo "prefill index repair requires the protected 8K token/DSA Gate-D profile" >&2
+    exit 2
+  }
+  [[ $SPLIT_RESIDUAL_STATE == 1 ]] || {
+    echo "prefill index repair requires the accepted split residual state" >&2
+    exit 2
+  }
+  [[ $LAYER_RESIDUAL_OBSERVER == 0 && $DSA_INTERNAL_OBSERVER == 0 ]] || {
+    echo "prefill index repair must remain isolated from diagnostic observers" >&2
     exit 2
   }
 fi
@@ -245,6 +264,111 @@ if [[ $FEATURE_RECONSTRUCT_DOWN_FP32 == 1 && $FEATURE_FUSE_ROUTE_WEIGHTING == 1 
   exit 2
 fi
 
+if [[ $PREFILL_INDEX_REPAIR == 1 ]]; then
+  readonly PREFILL_REPAIR_PREREQUISITE_TAG=greenfield_layer0_prompt_key_norm_m64_20260809T122010714691723Z
+  readonly PREFILL_REPAIR_PREREQUISITE_DIR=/home/gianl/glm-run/$PREFILL_REPAIR_PREREQUISITE_TAG
+  readonly PREFILL_REPAIR_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$PREFILL_REPAIR_PREREQUISITE_TAG
+  readonly PREFILL_REPAIR_PREREQUISITE_SUCCESS_SHA=a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee
+  /home/gianl/vllm-env/bin/python - "$PREFILL_REPAIR_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+from pathlib import Path
+import re
+import sqlite3
+import sys
+
+run_dir = Path(sys.argv[1])
+db_path = Path(sys.argv[2])
+hashes = {
+    "SUCCESS": "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee",
+    "summary.json": "8a8823de3dff03bc8827daef4cd38f5b09a80ad691ddea9aed0372808627a210",
+    "comparison/comparison.json": "c9539e2f59016ee800bb452602d01e9680f5960c608f67af1dec6a98686c8ec7",
+    "results_ckpt.db": "3752990d31011e89d01117c78804b7532dc5cc4153e2fcfdbe39c1e6b99cbd2b",
+    "remote_objects.json": "80dc195b1384b18c2f99be290442887319c741f0e7737a044034052868cf9fa7",
+    "census_pre.txt": "bc2c690ff56d25c62efc5be7e49dd81e01f3e116e96912470a172efbcad86283",
+    "census_post.txt": "76ef7baf344d31ebf2cee778bcd6eb6cb2eca7c548d405c66866466e85c790d7",
+    "evidence.sha256": "29c9b8b4df8637522cc856e4ee842a5ce5824371224429db2569d21506ba9a2a",
+}
+for relative, expected in hashes.items():
+    path = run_dir / relative
+    if not path.is_file() or sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"DB518 prerequisite hash drifted: {relative}")
+summary = json.loads((run_dir / "summary.json").read_text())
+comparison = json.loads((run_dir / "comparison/comparison.json").read_text())
+if (
+    summary["status"] != "SUCCESS"
+    or summary["results_db_run_id"] != 518
+    or summary["results_db_item_row_id"] != 1803
+    or summary["code_hash"] != "86243115452920fe4244bb77a9bbf4c44110aeab"
+    or summary["comparison_manifest_sha256"] != "1d80d088561181a63e734a91cd0124c4011cfc4151198488c052740050d66fe5"
+    or not summary["key_norm_association_restored"]
+    or not summary["projection_input_elementwise_exact"]
+    or not summary["state_elementwise_exact"]
+    or not summary["cache_elementwise_exact"]
+    or summary["candidate_cache_sha256"] != "3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1"
+):
+    raise SystemExit("DB518 prerequisite summary drifted")
+cache = comparison["cache_comparison"]
+state = comparison["state_comparison"]
+for name in ("cache", "states"):
+    contract = comparison["hlo"][name]["contract"]
+    if (
+        not contract["passed"]
+        or contract["accepted_convolution_count"] != 1
+        or not contract["convolution_weight_f32"]
+        or contract["physical_key_norm"]["grouped_sqrt_count"] != 0
+        or not contract["required_shapes"]["physical_m64_projection"]
+        or not contract["required_shapes"]["physical_m64_key_norm_sqrt"]
+        or not contract["required_shapes"]["physical_m64_key_norm_affine"]
+        or contract["forbidden_operations"]
+        or contract["forbidden_shapes"]
+    ):
+        raise SystemExit(f"DB518 prerequisite {name} HLO drifted")
+if (
+    not cache["elementwise_exact"]
+    or cache["mismatch_count"] != 0
+    or cache["shape"] != [8155, 128]
+    or not state["all_fields_elementwise_exact"]
+    or state["classification"] != "producer_states_elementwise_exact"
+    or state["first_divergent_field"] is not None
+):
+    raise SystemExit("DB518 prerequisite tensor evidence drifted")
+for name in ("census_pre.txt", "census_post.txt"):
+    workers = re.findall(r"^CENSUS_OK .*?-w-([0-7])$", (run_dir / name).read_text(), re.M)
+    if sorted(workers) != list("01234567"):
+        raise SystemExit(f"DB518 prerequisite {name} is not 8/8 clean")
+with sqlite3.connect(db_path) as conn:
+    if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        raise SystemExit("live results DB integrity failed")
+    run = conn.execute(
+        "SELECT model,harness_git,pod FROM runs WHERE run_id=518"
+    ).fetchone()
+    item = conn.execute(
+        "SELECT run_id,benchmark,item_id,correct,score,n_prompt_tokens FROM items WHERE id=1803"
+    ).fetchone()
+if run != (
+    "zai-org/GLM-5.2-FP8:greenfield-layer0-prompt-key-norm-m64",
+    "8624311",
+    "db-v4-64-od",
+) or item != (
+    518,
+    "greenfield_layer0_prompt_key_norm_association",
+    "adapted_fp32_m64_projection_keynorm_lax_map",
+    1,
+    1.0,
+    8155,
+):
+    raise SystemExit("live DB518/item1803 prerequisite linkage drifted")
+PY
+  remote_success_sha=$(gcloud storage cat "$PREFILL_REPAIR_PREREQUISITE_REMOTE/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $remote_success_sha == "$PREFILL_REPAIR_PREREQUISITE_SUCCESS_SHA" ]] || {
+    echo "DB518 direct remote SUCCESS hash drifted" >&2
+    exit 2
+  }
+fi
+
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
 TILE_SUFFIX=
@@ -272,6 +396,11 @@ if [[ $SPLIT_RESIDUAL_STATE == 1 ]]; then
   SPLIT_RESIDUAL_SUFFIX=_splitres
 fi
 readonly SPLIT_RESIDUAL_SUFFIX
+PREFILL_REPAIR_SUFFIX=
+if [[ $PREFILL_INDEX_REPAIR == 1 ]]; then
+  PREFILL_REPAIR_SUFFIX=_prefill_keyfix
+fi
+readonly PREFILL_REPAIR_SUFFIX
 ORACLE_SUFFIX=
 if [[ $SHORT_CONTEXT_ORACLE == 1 ]]; then
   ORACLE_SUFFIX=_oracle
@@ -295,7 +424,7 @@ if [[ $VERIFY_DEVICE_ROUNDTRIP == 1 ]]; then
   ROUNDTRIP_SUFFIX=_roundtrip
 fi
 readonly ROUNDTRIP_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}${DSA_INTERNAL_SUFFIX}${ROUNDTRIP_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${PREFILL_REPAIR_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}${DSA_INTERNAL_SUFFIX}${ROUNDTRIP_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -384,7 +513,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -410,7 +539,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer $CONTEXT_NAME load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
@@ -462,7 +591,7 @@ fi
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
-  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SPLIT_RESIDUAL_STATE" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SPLIT_RESIDUAL_STATE" "$PREFILL_INDEX_REPAIR" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" \
   "$CONTEXT_LABEL" "$CONTEXT_CAPACITY" "$PROMPT_TOKEN_COUNT" \
   "$ATTENTION_PROJECTION_BACKEND" "$EXPECTED_LOADED_PAYLOAD_BYTES" \
@@ -490,6 +619,7 @@ import numpy as np
     feature_reconstruct_down_fp32,
     complete_token_path,
     split_residual_state,
+    prefill_index_repair,
     short_context_oracle,
     short_context_oracle_manifest_sha256,
     short_context_dsa_oracle,
@@ -513,6 +643,7 @@ feature_fuse_route_weighting = bool(int(feature_fuse_route_weighting))
 feature_reconstruct_down_fp32 = bool(int(feature_reconstruct_down_fp32))
 complete_token_path = bool(int(complete_token_path))
 split_residual_state = bool(int(split_residual_state))
+prefill_index_repair = bool(int(prefill_index_repair))
 short_context_oracle = bool(int(short_context_oracle))
 short_context_dsa_oracle = bool(int(short_context_dsa_oracle))
 warmup = int(warmup)
@@ -525,7 +656,16 @@ verify_device_roundtrip = bool(int(verify_device_roundtrip))
 expected_prefill_fused_qkv_loops = (
     78 if attention_projection_backend == "fused_n82_convolution" else 0
 )
-expected_prefill_loop_count = 1 + expected_prefill_fused_qkv_loops
+expected_prefill_index_repair_loops = (
+    21 * ((prompt_token_count + 2047) // 2048)
+    if prefill_index_repair
+    else 0
+)
+expected_prefill_loop_count = (
+    1
+    + expected_prefill_fused_qkv_loops
+    + expected_prefill_index_repair_loops
+)
 context_name = context_label.upper()
 decode_step_count = warmup + iterations + trace_steps
 decode_end_exclusive = prompt_token_count + decode_step_count
@@ -577,11 +717,22 @@ if {record["split_residual_state"] for record in records} != {
     split_residual_state
 }:
     raise SystemExit("fleet split residual-state flag drifted")
+if {record["prefill_index_repair"] for record in records} != {
+    prefill_index_repair
+}:
+    raise SystemExit("fleet prefill index-repair flag drifted")
+expected_repair_backend = (
+    "physical_m64_chunk" if prefill_index_repair else "none"
+)
+if {record["prefill_index_repair_backend"] for record in records} != {
+    expected_repair_backend
+}:
+    raise SystemExit("fleet prefill index-repair backend drifted")
 if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {9}:
+if {record["schema_version"] for record in records} != {10}:
     raise SystemExit("fleet decoder record schema drifted")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
@@ -652,6 +803,14 @@ for record in records:
                 ]
                 != expected_prefill_fused_qkv_loops
                 or record["prefill_hlo_contract"]["loop_contract"][
+                    "expected_prefill_index_repair_loop_count"
+                ]
+                != expected_prefill_index_repair_loops
+                or record["prefill_hlo_contract"]["loop_contract"][
+                    "prefill_index_repair_loop_count"
+                ]
+                != expected_prefill_index_repair_loops
+                or record["prefill_hlo_contract"]["loop_contract"][
                     "loop_count"
                 ]
                 != expected_prefill_loop_count
@@ -714,17 +873,44 @@ if any(
 if short_context_oracle:
     for record in records:
         prefill = record["prefill_hlo_contract"]
+        repair = prefill["index_repair_contract"]
         if (
             prefill["backend_contract"] != hlo_backend_contract
             or prefill["prompt_length"] != prompt_token_count
+            or prefill["index_repair_backend"] != expected_repair_backend
             or prefill["decoder_contract"]["split_residual_state"]
             != split_residual_state
+            or prefill["decoder_contract"]["prefill_index_repair"]
+            != prefill_index_repair
             or prefill["violations"]
             or len(set(record["fleet_prefill_hlo_hashes"])) != 1
             or record["fleet_prefill_hlo_hashes"][0]
             != record["prefill_hlo_sha256"]
         ):
             raise SystemExit("prefill HLO/fleet contract drifted")
+        if prefill_index_repair:
+            if (
+                not repair["passed"]
+                or repair["backend"] != "physical_m64_chunk"
+                or repair["chunk_count"] != 4
+                or repair["full_indexer_layer_count"] != 21
+                or repair["expected_call_count"] != 84
+                or repair["projection_count"] != 84
+                or repair["exact_projection_operand_count"] != 84
+                or repair["physical_sqrt_count"] != 168
+                or repair["physical_affine_count"] < 84
+                or repair["cache_write_count"] < 84
+                or repair["grouped_sqrt_count"] != 0
+                or repair["history_estimated_bytes_per_device"] != 501043200
+                or not repair["history_shapes"]
+                or repair["full_pod_history_shapes"]
+                or repair["repair_collectives"]
+                or repair["forbidden_markers"]
+                or repair["violations"]
+            ):
+                raise SystemExit("physical-M64 prefill repair HLO drifted")
+        elif repair != {"backend": "none", "passed": True, "violations": []}:
+            raise SystemExit("unrequested prefill repair HLO evidence is present")
 if short_context_dsa_oracle:
     if len(
         {
@@ -1040,9 +1226,33 @@ def peak(record):
                     break
     return max(values) if values else None
 
+def hbm_headrooms(record):
+    values = []
+    for stats in record["device_memory_after_execute"]:
+        if stats is None or "bytes_limit" not in stats:
+            continue
+        peak_value = next(
+            (
+                stats[key]
+                for key in ("peak_bytes_in_use", "peak_bytes", "bytes_in_use")
+                if key in stats
+            ),
+            None,
+        )
+        if peak_value is not None:
+            values.append(stats["bytes_limit"] - peak_value)
+    return values
+
 fleet_p50 = max(record["profiler_free_body_wall"]["p50_ms"] for record in records)
 fleet_p99 = max(record["profiler_free_body_wall"]["p99_ms"] for record in records)
 peaks = [value for value in map(peak, records) if value is not None]
+headrooms = [
+    value
+    for record in records
+    for value in hbm_headrooms(record)
+]
+if prefill_index_repair and (len(headrooms) != 32 or min(headrooms) <= 0):
+    raise SystemExit("prefill index repair lacks measured positive HBM headroom")
 summary = {
     "artifact_kind": (
         f"greenfield_real_78layer_{context_label}_decoder_"
@@ -1079,6 +1289,19 @@ summary = {
     "feature_fuse_route_weighting": feature_fuse_route_weighting,
     "feature_reconstruct_down_fp32": feature_reconstruct_down_fp32,
     "split_residual_state": split_residual_state,
+    "prefill_index_repair": prefill_index_repair,
+    "prefill_index_repair_backend": expected_repair_backend,
+    "prefill_index_repair_prerequisite": (
+        {
+            "code_hash": "86243115452920fe4244bb77a9bbf4c44110aeab",
+            "comparison_manifest_sha256": "1d80d088561181a63e734a91cd0124c4011cfc4151198488c052740050d66fe5",
+            "results_db_item_row_id": 1803,
+            "results_db_run_id": 518,
+            "success_sha256": "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee",
+        }
+        if prefill_index_repair
+        else None
+    ),
     "residual_transport_components": records[0][
         "residual_transport_components"
     ],
@@ -1105,6 +1328,9 @@ summary = {
     "host_count": 8,
     "iterations": iterations,
     "maximum_peak_hbm_bytes": max(peaks) if peaks else None,
+    "minimum_measured_hbm_headroom_bytes": (
+        min(headrooms) if headrooms else None
+    ),
     "optimized_hlo_sha256": records[0]["optimized_hlo_sha256"],
     "plan_hash": records[0]["plan_hash"],
     "prefill_compile_seconds_max": (
@@ -1174,6 +1400,11 @@ run_id = pv.start_run(
         "GLM_ENGINE": f"greenfield_pp8_decoder_{scope}",
         "greenfield_complete_token_path": complete_token_path,
         "greenfield_split_residual_state": split_residual_state,
+        "greenfield_prefill_index_repair": prefill_index_repair,
+        "greenfield_prefill_index_repair_backend": expected_repair_backend,
+        "greenfield_prefill_index_repair_prerequisite_db_run": (
+            518 if prefill_index_repair else None
+        ),
         "greenfield_short_context_oracle": short_context_oracle,
         "greenfield_short_context_oracle_manifest_sha256": (
             short_context_oracle_manifest_sha256
@@ -1215,6 +1446,7 @@ run_id = pv.start_run(
         f"{feature_fuse_route_weighting}, FP32 routed-down reconstruction "
         f"{feature_reconstruct_down_fp32}; "
         f"split residual state {split_residual_state}; "
+        f"prefill physical-M64 index repair {prefill_index_repair}; "
         f"runtime device round-trip verification {verify_device_roundtrip}; "
         + (
             f"real {prompt_token_count:,}-token prompt with exact raw tokens and "
@@ -1247,6 +1479,7 @@ pv.record_item(
         + ("_downf32" if feature_reconstruct_down_fp32 else "")
         + ("_wsum" if feature_fuse_route_weighting else "")
         + ("_splitres" if split_residual_state else "")
+        + ("_prefill_keyfix" if prefill_index_repair else "")
         + ("_roundtrip" if verify_device_roundtrip else "")
     ),
     item_id=(
@@ -1296,6 +1529,7 @@ pv.finalize(
         + ("_downf32" if feature_reconstruct_down_fp32 else "")
         + ("_wsum" if feature_fuse_route_weighting else "")
         + ("_splitres" if split_residual_state else "")
+        + ("_prefill_keyfix" if prefill_index_repair else "")
         + ("_roundtrip" if verify_device_roundtrip else "")
     ),
     metric="contract_valid",

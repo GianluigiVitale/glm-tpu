@@ -21,7 +21,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
-| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--516, and existing association helpers | DB506--515 isolate the 45-value drift to projection lowering with bitwise-exact normalized input. DB516 seals the accepted 32-way physical M64 lowering. The next reuse is one bounded M64 `lax.map` discriminator; no formula matrix, full-prompt hidden tensor, or legacy execution import is allowed. |
+| Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--518, and existing association helpers | DB506--515 isolate the drift, DB516 seals the 32-way physical M64 lowering, DB517 makes projection exact, and DB518 makes all producer states plus the complete 8,155-row BF16 cache exact. Production reuses the proven RMS/LayerNorm/RoPE/FP8 helpers in one default-off stage-local prefill repair; recurrent decode and legacy execution stay untouched. |
 | DSA internal observer | oracle-only `83ff4a357` scorer, `9c1d6b3b9` prompt-key, and `89fc453b6` prompt-key-input modes, all descendants of accepted `b3c25df47`; protected DB513--515 | Default-off scorer/prompt-key modes remain unchanged. DB515 seals the actual 6,144-wide FP32 `h` entering projection at row 113 and proves it bitwise equal to the independent M2048 gather/RMS producer. Legacy execution is never imported; the observer is now preserved evidence, not a reason to recapture the input. |
 | DSA query association | protected capture recovery plus DB499 at `b41c3ab` | Exact local FP32 `wq_b` owner boundary for M=1; Pallas/streamed alternatives are retained as negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -294,3 +294,21 @@ precision is rejected. Reuse oracle-only pin `89fc453b6` next to capture the act
 normalized input; greenfield independently compiles only the gathered M2048 input-RMS producer. An
 exact input isolates projection lowering, while a mismatch moves the correction upstream. DB513's
 raw source dumps remain recoverable from approved storage after verified local reclamation.
+
+DB516 then proves the accepted logical M2048 projection is physically 32 M64 shards, each with a
+BF16 `[64,6144]` lhs, FP32 `[128,6144]` rhs and FP32 `[64,128]` result. The first bounded map
+attempt is preserved negative evidence because it downcast `wk`; DB517's mixed
+`[DEFAULT,HIGHEST]` operand precision restores the projection exactly. DB518 moves the biased key
+LayerNorm into the same M64 map and is exact for the captured normalized input, all three ordered
+FP32 producer states, and the full 8,155-row BF16 cache. Its cache SHA is
+`3808d502...859d1`; DB/results/archive and authenticated 8/8 cleanup all pass.
+
+The production adaptation therefore reuses the existing fused normalization output, accepted
+`affine_key_layer_norm`, rotary, raw-FP8 dequantization, paged-cache layout, teacher-forced scan,
+HLO parser, protected DSA/token oracle, provenance and cleanup machinery. A separate default-off
+prefill decoder retains each full-indexer layer's exact BF16 normalized projection input only on
+its PP8 stage, then repairs the 21 owner caches in four logical M2048 chunks. It never re-normalizes
+the rounded split-residual boundary. The recurrent decoder remains the unchanged one-row program.
+Integration readiness must prove 84 physical M64 calls, exact operands/norm placement, no repair
+collective or host callback, no full-pod history, positive measured HBM headroom, and exact
+tokens/all DSA events before it has Gate-D standing.
