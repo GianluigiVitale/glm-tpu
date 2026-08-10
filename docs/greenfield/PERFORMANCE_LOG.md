@@ -1054,3 +1054,13 @@ or tracing. The elapsed two hours are orchestration/compile/prefill time, not to
 is no XPlane, wall distribution, DB row or terminal `SUCCESS`. DB484 remains the only accepted PP8
 decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open. The next run is a
 correctness-only internal-boundary observation and cannot produce a throughput claim.
+
+## Current-state internal observation — no performance result
+
+The protected `888cfcb` observation ran for about 2h05 only because it loaded the complete model,
+compiled the 78-layer programs and prefixed all 8,155 prompt tokens before one diagnostic decode.
+It stopped on DSA exactness before warmup, timing or tracing. Its useful result is numerical only:
+layer-0 normalized hidden/q-a are exact and query is first divergent. There is no XPlane, latency
+distribution, DB row, terminal `SUCCESS`, Gate-D/E or throughput result. The following physical
+LP4 query matrix is also a bounded correctness diagnostic and cannot change DB484's accepted
+`244.091151 ms` p50 / `4.096830 tok/s` standing.

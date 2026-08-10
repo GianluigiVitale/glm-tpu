@@ -14,6 +14,8 @@ from typing import Any, Callable
 import jax
 from jax import lax
 import jax.numpy as jnp
+from jax.sharding import Mesh, NamedSharding
+from jax.sharding import PartitionSpec as P
 import ml_dtypes
 import numpy as np
 
@@ -60,6 +62,9 @@ ARTIFACT_KIND = "glm52_layer0_dsa_query_association"
 Q_A_ARTIFACT_KIND = "glm52_layer0_q_a_association"
 PRODUCTION_QKV_A_ARTIFACT_KIND = (
     "glm52_layer0_qkv_a_production_association"
+)
+PHYSICAL_LP4_QUERY_ARTIFACT_KIND = (
+    "glm52_layer0_physical_lp4_dsa_query_association"
 )
 
 
@@ -128,6 +133,62 @@ def _dot_rows(lhs: Any, weight: Any, *, highest: bool = False) -> Any:
         precision=precision,
         preferred_element_type=jnp.float32,
     )
+
+
+def _local_query_projection(
+    q_state: Any,
+    weight: Any,
+    *,
+    head_dim: int,
+    association: str,
+) -> Any:
+    """Project one physical owner's heads with an explicit association."""
+
+    if q_state.ndim != 2 or q_state.shape[0] != 1:
+        raise ValueError("physical query projection requires one live row")
+    if weight.ndim != 2 or weight.shape[1] != q_state.shape[1]:
+        raise ValueError("physical query owner weight has an invalid shape")
+    if weight.shape[0] % head_dim:
+        raise ValueError("physical query owner width does not divide into heads")
+    if association == "owner_dot":
+        return _dot_rows(q_state, weight)
+    if association == "head_unrolled":
+        heads = weight.shape[0] // head_dim
+        head_weight = weight.reshape(heads, head_dim, weight.shape[1])
+        head_major = jnp.stack(
+            tuple(_dot_rows(q_state, head_weight[index]) for index in range(heads))
+        )
+        return jnp.transpose(head_major, (1, 0, 2)).reshape(
+            1, weight.shape[0]
+        )
+    raise ValueError(f"unknown physical query association {association!r}")
+
+
+def _apply_local_query_rope(projected: Any, positions: Any) -> Any:
+    """Apply the accepted RoPE to one physical owner's contiguous heads."""
+
+    geometry = Layer0DsaProbeGeometry()
+    if projected.ndim != 2 or projected.shape[0] != 1:
+        raise ValueError("physical query projection must contain one row")
+    if projected.shape[1] % geometry.head_dim:
+        raise ValueError("physical query width does not divide into heads")
+    local_heads = projected.shape[1] // geometry.head_dim
+    query = projected.reshape(1, local_heads, geometry.head_dim)
+    cos, sin = rotary_cos_sin(
+        positions,
+        rotary_dim=geometry.rotary_dim,
+        theta=geometry.theta,
+        dtype=jnp.float32,
+    )
+    rotated = apply_rotary(
+        query[..., : geometry.rotary_dim],
+        cos[:, None, :],
+        sin[:, None, :],
+        interleaved=True,
+    )
+    return jnp.concatenate(
+        (rotated, query[..., geometry.rotary_dim :]), axis=-1
+    ).astype(jnp.float32)[0]
 
 
 def _apply_query_rope(projected: Any, positions: Any) -> Any:
@@ -513,6 +574,285 @@ def _hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
             and (not streamed_candidate or not decoded_overlay_shapes)
         ),
     }
+
+
+def _physical_lp4_candidate_modes() -> tuple[tuple[str, str, str], ...]:
+    """Return source/association pairs for the real four-device discriminator."""
+
+    return (
+        ("physical_raw_owner_dot_m1_n1024", "raw", "owner_dot"),
+        (
+            "physical_raw_head_unrolled_m1_n128",
+            "raw",
+            "head_unrolled",
+        ),
+        (
+            "physical_predecoded_owner_dot_m1_n1024",
+            "predecoded",
+            "owner_dot",
+        ),
+        (
+            "physical_predecoded_head_unrolled_m1_n128",
+            "predecoded",
+            "head_unrolled",
+        ),
+    )
+
+
+def _physical_lp4_hlo_contract(
+    hlo: str,
+    *,
+    candidate: str,
+    source: str,
+) -> dict[str, Any]:
+    """Require a one-row, one-owner-per-chip program without communication."""
+
+    lowered = hlo.lower()
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    forbidden_global_shapes = [
+        shape
+        for shape in (
+            "u8[4096,2048]",
+            "f32[4096,2048]",
+            "bf16[32,2048]",
+            "f32[32,2048]",
+        )
+        if shape in lowered
+    ]
+    required_shapes = {
+        "one_live_q_a_row": "bf16[1,2048]" in lowered,
+        "local_owner_projection": (
+            "f32[1,1024]" in lowered or "f32[1024]" in lowered
+        ),
+        "local_owner_query": "f32[8,128]" in lowered,
+        "local_fp32_owner": "f32[1024,2048]" in lowered,
+    }
+    if source == "raw":
+        required_shapes.update(
+            {
+                "local_raw_owner": "u8[1024,2048]" in lowered,
+                "local_raw_scale": "f32[8,16]" in lowered,
+            }
+        )
+    elif source != "predecoded":
+        raise ValueError("physical query source is unknown")
+    dot_metadata_count = sum(
+        "metadata={op_name" in line and "dot_general" in line
+        for line in lowered.splitlines()
+    )
+    return {
+        "candidate": candidate,
+        "dot_metadata_count": dot_metadata_count,
+        "forbidden_global_shapes": forbidden_global_shapes,
+        "forbidden_operations": forbidden_operations,
+        "hlo_sha256": sha256(hlo.encode()).hexdigest(),
+        "local_parallel_size": 4,
+        "physical_owner_width": 1024,
+        "required_shapes": required_shapes,
+        "source": source,
+        "passed": (
+            not forbidden_operations
+            and not forbidden_global_shapes
+            and all(required_shapes.values())
+            and dot_metadata_count > 0
+        ),
+    }
+
+
+def _run_physical_lp4_query(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+    capture: dict[str, Any],
+    accepted_query: np.ndarray,
+    current_query: np.ndarray,
+    q_state: Any,
+    weight_bits: Any,
+    weight_scale: Any,
+    dequantized_host: np.ndarray,
+    input_manifest: dict[str, Any],
+    q_manifest: dict[str, Any],
+) -> None:
+    """Run one real owner shard on each of four local TPU chips."""
+
+    geometry = Layer0DsaProbeGeometry()
+    devices = np.asarray(jax.devices(), dtype=object)
+    if devices.shape != (4,):
+        raise SystemExit("physical LP4 query requires exactly four TPU devices")
+    mesh = Mesh(devices, ("lp4",))
+    q_argument = jax.device_put(
+        q_state[:1], NamedSharding(mesh, P())
+    )
+    raw_arguments = (
+        q_argument,
+        jax.device_put(
+            weight_bits, NamedSharding(mesh, P("lp4", None))
+        ),
+        jax.device_put(
+            weight_scale, NamedSharding(mesh, P("lp4", None))
+        ),
+        jax.device_put(
+            jnp.asarray([8155], dtype=jnp.int32),
+            NamedSharding(mesh, P()),
+        ),
+    )
+    predecoded_arguments = (
+        q_argument,
+        jax.device_put(
+            dequantized_host, NamedSharding(mesh, P("lp4", None))
+        ),
+        raw_arguments[-1],
+    )
+
+    args.hlo_dir.mkdir(parents=True)
+    records: dict[str, Any] = {}
+    tensor_payload: dict[str, np.ndarray] = {
+        "accepted_query": accepted_query,
+        "current_production_query": current_query,
+    }
+    for name, source, association in _physical_lp4_candidate_modes():
+        if source == "raw":
+            def local_raw(
+                query: Any,
+                bits: Any,
+                scale: Any,
+                positions: Any,
+                association: str = association,
+            ) -> Any:
+                decoded = lax.optimization_barrier(
+                    dequantize_fp8_bits_block_weight(
+                        bits, scale, output_dtype=jnp.float32
+                    )
+                )
+                projected = _local_query_projection(
+                    query,
+                    decoded,
+                    head_dim=geometry.head_dim,
+                    association=association,
+                )
+                return _apply_local_query_rope(projected, positions)
+
+            mapped = jax.shard_map(
+                local_raw,
+                mesh=mesh,
+                in_specs=(P(), P("lp4", None), P("lp4", None), P()),
+                out_specs=P("lp4", None),
+                check_vma=False,
+            )
+            arguments = raw_arguments
+        else:
+            def local_predecoded(
+                query: Any,
+                weight: Any,
+                positions: Any,
+                association: str = association,
+            ) -> Any:
+                projected = _local_query_projection(
+                    query,
+                    lax.optimization_barrier(weight),
+                    head_dim=geometry.head_dim,
+                    association=association,
+                )
+                return _apply_local_query_rope(projected, positions)
+
+            mapped = jax.shard_map(
+                local_predecoded,
+                mesh=mesh,
+                in_specs=(P(), P("lp4", None), P()),
+                out_specs=P("lp4", None),
+                check_vma=False,
+            )
+            arguments = predecoded_arguments
+        compiled = jax.jit(mapped).lower(*arguments).compile()
+        hlo = compiled.as_text()
+        contract = _physical_lp4_hlo_contract(
+            hlo, candidate=name, source=source
+        )
+        if not contract["passed"]:
+            raise SystemExit(f"physical LP4 query HLO failed: {name}")
+        output = compiled(*arguments)
+        jax.block_until_ready(output)
+        candidate = np.ascontiguousarray(np.asarray(output), dtype=np.float32)
+        if candidate.shape != (geometry.heads, geometry.head_dim):
+            raise SystemExit("physical LP4 query output shape drifted")
+        records[name] = {
+            "accepted_comparison": _compare(accepted_query, candidate),
+            "current_production_comparison": _compare(
+                current_query, candidate
+            ),
+            "hlo": contract,
+        }
+        tensor_payload[f"candidate__{name}"] = candidate
+        (args.hlo_dir / f"{name}.optimized_hlo.txt").write_text(hlo)
+
+    exact = sorted(
+        name
+        for name, record in records.items()
+        if record["accepted_comparison"]["elementwise_exact"]
+    )
+    current_matches = sorted(
+        name
+        for name, record in records.items()
+        if record["current_production_comparison"]["elementwise_exact"]
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "physical_lp4_query_candidates.npz"
+    np.savez(tensor_path, **tensor_payload)
+    result = {
+        "artifact_kind": PHYSICAL_LP4_QUERY_ARTIFACT_KIND,
+        "association_restored": bool(exact),
+        "backend": jax.default_backend(),
+        "candidates": records,
+        "capture": {
+            "comparison_sha256": args.capture_comparison_sha256,
+            "owner_actual_sha256": capture["owner_actual_sha256"],
+            "query_sha256": _array_sha256(accepted_query),
+            "tensors_sha256": args.capture_tensors_sha256,
+        },
+        "claim_scope": (
+            "Bounded physical four-chip layer-0 query arithmetic only; no "
+            "decoder, Gate-D, latency, or token-rate claim."
+        ),
+        "code_hash": code_hash,
+        "current_observer": {
+            "query_sha256": _array_sha256(current_query),
+            "sha256": args.current_internal_sha256,
+        },
+        "current_reproducing_candidates": current_matches,
+        "device_count": jax.device_count(),
+        "device_kind": sorted(
+            {device.device_kind for device in jax.devices()}
+        ),
+        "diagnostic_only": True,
+        "exact_candidates": exact,
+        "format_version": 1,
+        "input_manifest_sha256": input_manifest["manifest_sha256"],
+        "local_parallel_size": 4,
+        "one_live_row": True,
+        "performance_claim": False,
+        "q_a_manifest_sha256": q_manifest["manifest_sha256"],
+        "status": "SUCCESS",
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
 
 
 def _q_a_hlo_contract(hlo: str, *, candidate: str) -> dict[str, Any]:
@@ -1003,7 +1343,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--target",
-        choices=("query", "q_a", "qkv_a_production"),
+        choices=("query", "query_lp4", "q_a", "qkv_a_production"),
         default="query",
     )
     parser.add_argument("--expected-code-hash", required=True)
@@ -1019,6 +1359,8 @@ def main() -> None:
     parser.add_argument("--db502-code-hash")
     parser.add_argument("--db502-runner-sha256")
     parser.add_argument("--db502-tensor-sha256")
+    parser.add_argument("--current-internal-npz", type=Path)
+    parser.add_argument("--current-internal-sha256")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     args = parser.parse_args()
@@ -1124,6 +1466,43 @@ def main() -> None:
     dequantized_host = np.asarray(dequantized)
     if int(dequantized_host.view(np.uint8).sum(dtype=np.uint64)) != 3765880530:
         raise SystemExit("adapted wq_b byte identity drifted")
+
+    if args.target == "query_lp4":
+        if (
+            args.current_internal_npz is None
+            or args.current_internal_sha256 is None
+            or not args.current_internal_npz.is_file()
+            or _file_sha256(args.current_internal_npz)
+            != args.current_internal_sha256
+        ):
+            raise SystemExit("current physical LP4 observer identity drifted")
+        with np.load(args.current_internal_npz, allow_pickle=False) as payload:
+            producer_ids = np.asarray(payload["producer_layer_ids"])
+            decode_position = np.asarray(payload["decode_position"])
+            current_query = np.ascontiguousarray(
+                payload["query"][0], dtype=np.float32
+            )
+        if (
+            producer_ids.shape != (21,)
+            or int(producer_ids[0]) != 0
+            or decode_position.tolist() != [8155]
+            or current_query.shape != actual_query.shape
+        ):
+            raise SystemExit("current physical LP4 observer contract drifted")
+        _run_physical_lp4_query(
+            args=args,
+            code_hash=code_hash,
+            capture=capture,
+            accepted_query=actual_query,
+            current_query=current_query,
+            q_state=q_state,
+            weight_bits=weight_bits,
+            weight_scale=weight_scale,
+            dequantized_host=dequantized_host,
+            input_manifest=input_manifest,
+            q_manifest=q_manifest,
+        )
+        return
 
     geometry = Layer0DsaProbeGeometry()
     positions = jnp.zeros((geometry.decode_rows,), dtype=jnp.int32).at[0].set(

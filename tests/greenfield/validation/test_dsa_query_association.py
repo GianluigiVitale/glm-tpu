@@ -57,6 +57,55 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
         "raw_materialized_global_m1_n4096",
         "raw_materialized_lp4_m1_n1024",
     }
+    assert set(subject._physical_lp4_candidate_modes()) == {
+        ("physical_raw_owner_dot_m1_n1024", "raw", "owner_dot"),
+        (
+            "physical_raw_head_unrolled_m1_n128",
+            "raw",
+            "head_unrolled",
+        ),
+        (
+            "physical_predecoded_owner_dot_m1_n1024",
+            "predecoded",
+            "owner_dot",
+        ),
+        (
+            "physical_predecoded_head_unrolled_m1_n128",
+            "predecoded",
+            "head_unrolled",
+        ),
+    }
+
+
+def test_physical_lp4_query_associations_are_semantically_equal_on_cpu() -> None:
+    q_state = subject.jnp.arange(8, dtype=subject.jnp.float32)[None, :]
+    weight = subject.jnp.arange(48, dtype=subject.jnp.float32).reshape(6, 8)
+    owner = subject._local_query_projection(
+        q_state, weight, head_dim=2, association="owner_dot"
+    )
+    unrolled = subject._local_query_projection(
+        q_state, weight, head_dim=2, association="head_unrolled"
+    )
+    np.testing.assert_array_equal(np.asarray(owner), np.asarray(unrolled))
+
+    hlo = (
+        "bf16[1,2048] u8[1024,2048] f32[8,16] "
+        "f32[1024,2048] f32[1,1024] f32[8,128]\n"
+        "%fusion = f32[1024] fusion(foo), "
+        'metadata={op_name="jit(physical)/dot_general"}'
+    )
+    contract = subject._physical_lp4_hlo_contract(
+        hlo,
+        candidate="physical_raw_owner_dot_m1_n1024",
+        source="raw",
+    )
+    assert contract["passed"]
+    global_weight = subject._physical_lp4_hlo_contract(
+        hlo + " f32[4096,2048]",
+        candidate="physical_raw_owner_dot_m1_n1024",
+        source="raw",
+    )
+    assert not global_weight["passed"]
 
 
 def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
@@ -138,6 +187,9 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "DB502_RUNNER_SHA=2a77d75d",
         "DB502_TENSOR_SHA=d9b14bdd",
         "DB502_SUCCESS_SHA=de2e080d",
+        "CURRENT_INTERNAL_SHA=e1366c58",
+        "physical_lp4_query_candidates.npz",
+        "physical_lp4_dsa_query_association",
     ):
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):
@@ -149,7 +201,7 @@ def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
     for required in (
         "_project_attention_qkv_a",
         "_validate_fused_qkv_a_decoder_association",
-        'choices=("query", "q_a", "qkv_a_production")',
+        'choices=("query", "query_lp4", "q_a", "qkv_a_production")',
         "production_fused_n82_convolution_shard_sum",
         "companion_comparison",
         "fused_n82_convolution",

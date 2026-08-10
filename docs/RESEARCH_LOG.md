@@ -6433,3 +6433,26 @@ unmotivated arithmetic variants.
   `APPROVE COMMIT`: selectable artifacts remain SHA-checked locally, fleet-wide and in Python; the
   observer only adds failure conditions; both features stay default-off; and residual observation
   remains forbidden. No repeat review of this batch is authorized.
+
+## 2026-08-10 03:38--04:02 — q-a is exact; DB499's LP4 proof was virtual
+
+- The protected current-state observer at `888cfcb` reproduced its pinned fused-plus-repair DSA
+  payload bitwise and stopped before timing. Layer-0 normalized hidden and q-a are bitwise exact.
+  Query is the first divergence: all 4,096 FP32 values mismatch, max `0.0101393461`, actual SHA
+  `6fe17a94...355`, accepted `1ff2c2ec...12a`. The internal NPZ is `e1366c58...b50`; all host logs
+  are `03dc8b35...301`; cleanup is 8/8. This localizes the recurrent blocker to `wq_b` projection
+  association and carries no Gate-D/performance standing.
+- DB499's runner records four visible TPU devices, but its query candidates never construct a mesh,
+  sharding, or `shard_map`. The optimized “raw_materialized_lp4” entry remains global
+  `u8[4096,2048]`; it slices four virtual owners and fuses their four reductions in one device
+  program. Production instead has one independent physical `f32[1024,2048] -> f32[1024]`
+  reduction per chip. The old exact result is valid for virtual grouping only and cannot prove the
+  physical production boundary.
+- The bounded successor reuses that harness and sealed inputs with a new true four-device
+  `query_lp4` target. It tests raw versus already-decoded FP32 ownership and one 1,024-wide dot
+  versus eight explicit 128-wide head dots. Each chip receives one owner shard; the output is
+  sharded as eight heads/chip. HLO requires one row/local shapes and rejects communication,
+  callbacks, dead q-a rows, and global query tables. CPU semantics, Python, Bash and ShellCheck are
+  ready; protected arithmetic remains unproven until one serialized run. Focused coverage passes
+  15/15 and the one-time Fable audit independently compiled the real-geometry four-device mapping,
+  verified head order and every evidence gate, and returned `APPROVE COMMIT`.

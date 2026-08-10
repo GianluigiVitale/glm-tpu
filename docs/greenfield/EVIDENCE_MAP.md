@@ -705,3 +705,20 @@ capture is still required.
   `79b813da...9054`, `1bc43a8e...9ad5`, and `283e5e88...10d5`. The next discriminator is the
   existing separate DSA-internal observer against those bytes, not another legacy capture or blind
   full decoder retry.
+
+## Current-state DSA internal refusal and physical-query proof gap
+
+- Refused run: pushed `888cfcb`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z`,
+  01:33--03:38 UTC. Its observation is bitwise equal to the pinned fused-plus-repair baseline.
+- Layer-0 normalized hidden and q-a are exact. Query is the first divergent field with 4,096
+  mismatches/max `0.0101393461`; actual/accepted SHAs are `6fe17a94...355` / `1ff2c2ec...12a`.
+  Internal NPZ/contract/log SHAs are `e1366c58...b50`, `b087aa92...bb2`, `03dc8b35...301`.
+  Cleanup is authenticated 8/8; no timing, trace, DB, SUCCESS, Gate-D/E or performance claim exists.
+- DB499's exact `raw_materialized_lp4` candidate is now scoped correctly: four TPU devices were
+  visible, but the candidate was an unsharded single-device program over a global weight with four
+  virtual owner slices. Its HLO does not reproduce the one-owner-per-chip production reduction.
+- Readiness only: `query_lp4` extends the same bounded harness with a real four-chip `shard_map` and
+  four candidates spanning raw/predecoded owner state and 1,024-wide/eight-by-128 reductions. It
+  pins the accepted/current tensors and rejects communication, global tables, callbacks and dead
+  rows. No physical candidate or production correction is accepted until protected TPU evidence.

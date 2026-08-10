@@ -2963,3 +2963,36 @@ Fable's one-time read-only review returned `APPROVE COMMIT`. It independently co
 new combination only adds fail-closed observer conditions, every selectable artifact remains
 SHA-checked locally/on all hosts/in Python, both features remain default-off, and the residual
 observer ban is unchanged. No repeat review of this batch is authorized.
+
+## Repaired-state observation moves the first divergence to the physical query dot
+
+Protected run
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z`
+at pushed pin `888cfcb` ran from 01:33--03:38 UTC. It reproduced the pinned fused-plus-repair DSA
+observation byte-for-byte (NPZ `34f4fe30...bbf`, semantic SHA `267ffe90...a1e9f`) and refused before
+timing. Layer-0 normalized hidden and q-a are now bitwise exact at SHAs `239e10d5...1765` and
+`c9fbac05...c70c`. Query is the first divergence: 4,096/4,096 FP32 values differ, max
+`0.0101393461`, actual `6fe17a94...355`, accepted `1ff2c2ec...12a`. Head weights and current key are
+downstream. The internal NPZ/contract/log SHAs are `e1366c58...b50`, `b087aa92...bb2`, and
+`03dc8b35...301`; the failure census is authenticated 8/8. There is no timing, trace, DB row,
+`SUCCESS`, Gate-D/E or performance result.
+
+Source/HLO inspection corrects the scope of DB499. Its process exposed four TPU devices but every
+candidate used an ordinary unsharded `jax.jit`; the so-called LP4 candidate sliced four virtual
+owners from entry `u8[4096,2048]` inside one device program. Its exact dot fusion consumes all four
+completed `f32[1024,2048]` siblings together. The real decoder instead lowers one physical owner's
+`f32[1024,2048]` and one 1,024-wide reduction independently per chip. DB499 therefore proves a
+virtual grouped association, not the physical LP4 projection now required.
+
+The existing DB499 harness is extended with `query_lp4`, a true four-device `shard_map`. It pins
+the current observer and accepted q-a, shards raw or predecoded `wq_b` by physical owner, and
+compares the current owner dot against an eight-head unrolled association. HLO rejects
+communication, callbacks, global query weights, and dead rows. Exact next: focused/static tests,
+one new-diff-only Fable approval, commit/push, then this bounded physical matrix. Do not run another
+full decoder until one physical candidate is exact and its production integration is separately
+proved.
+
+Focused validation passes 15/15 with Python, Bash, ShellCheck, JSON and diff checks. Fable's
+one-time read-only review independently compiled the real-geometry mapping on four forced devices,
+verified head order/pins/HLO/DB/archive gates, and returned `APPROVE COMMIT`. Its only actionable
+note was the corrected target-list error wording; no repeat review of this batch is authorized.

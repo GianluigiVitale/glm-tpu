@@ -23,10 +23,13 @@ readonly DB502_CODE_HASH=c230c11d2c852b52bbbf4b76791bb4dc80c598ba
 readonly DB502_RUNNER_SHA=2a77d75d27ae06128084f0d3956b0ea5b2886ae2b3a5ecbe896acc9bd43075c4
 readonly DB502_TENSOR_SHA=d9b14bdd47b5def0169b0b25157a8d472bc0017391030b0d7842b794fae8f76e
 readonly DB502_SUCCESS_SHA=de2e080d3eae672569acc4dada7eb41501c6f3508ac0e1747291041d95087dab
+readonly CURRENT_INTERNAL_NPZ=/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z/dsa_internal_observer/position_8155_internals.npz
+readonly CURRENT_INTERNAL_SHA=e1366c58a5eac8d995e6f56a4a3bb582fa6758b25bf19480b67e8f4c54914b50
 readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
 
-[[ $TARGET == query || $TARGET == q_a || $TARGET == qkv_a_production ]] || {
-  echo "DSA association target must be query, q_a, or qkv_a_production" >&2
+[[ $TARGET == query || $TARGET == query_lp4 || $TARGET == q_a || \
+  $TARGET == qkv_a_production ]] || {
+  echo "DSA association target must be query, query_lp4, q_a, or qkv_a_production" >&2
   exit 2
 }
 
@@ -37,9 +40,23 @@ if [[ $TARGET == q_a ]]; then
 elif [[ $TARGET == qkv_a_production ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_qkv_a_production_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=qkv_a_production_association
+elif [[ $TARGET == query_lp4 ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=physical_lp4_dsa_query_association
 else
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=dsa_query_association
+fi
+if [[ $TARGET == query_lp4 ]]; then
+  [[ -r $CURRENT_INTERNAL_NPZ ]] || {
+    echo "current physical LP4 observer is unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$CURRENT_INTERNAL_NPZ" | awk '{print $1}') == \
+    "$CURRENT_INTERNAL_SHA" ]] || {
+    echo "current physical LP4 observer identity drifted" >&2
+    exit 2
+  }
 fi
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/oracles/greenfield/glm52/$REMOTE_KIND/8k/$TAG
@@ -148,6 +165,13 @@ strict_census pre || {
 }
 
 started=$(date +%s)
+current_args=()
+if [[ $TARGET == query_lp4 ]]; then
+  current_args=(
+    --current-internal-npz "$CURRENT_INTERNAL_NPZ"
+    --current-internal-sha256 "$CURRENT_INTERNAL_SHA"
+  )
+fi
 env JAX_PLATFORMS=tpu \
   TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
   TPU_PROCESS_BOUNDS=1,1,1 \
@@ -170,6 +194,7 @@ env JAX_PLATFORMS=tpu \
   --db502-code-hash "$DB502_CODE_HASH" \
   --db502-runner-sha256 "$DB502_RUNNER_SHA" \
   --db502-tensor-sha256 "$DB502_TENSOR_SHA" \
+  "${current_args[@]}" \
   --output "$RUN_DIR/runner.json" \
   --hlo-dir "$RUN_DIR/hlo" >"$RUN_DIR/runner.log" 2>&1
 elapsed=$(( $(date +%s) - started ))
@@ -179,6 +204,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$TARGET" <<'PY'
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 from pathlib import Path
 import sqlite3
@@ -198,6 +224,13 @@ if target == "q_a":
 elif target == "qkv_a_production":
     expected_candidates = {
         "production_fused_n82_convolution_shard_sum",
+    }
+elif target == "query_lp4":
+    expected_candidates = {
+        "physical_raw_owner_dot_m1_n1024",
+        "physical_raw_head_unrolled_m1_n128",
+        "physical_predecoded_owner_dot_m1_n1024",
+        "physical_predecoded_head_unrolled_m1_n128",
     }
 else:
     expected_candidates = {
@@ -233,7 +266,6 @@ if any(not value["hlo"]["passed"] for value in runner["candidates"].values()):
     raise SystemExit("query association HLO contract failed")
 if target in ("q_a", "qkv_a_production"):
     tensor = run_dir / runner["tensor_file"]["filename"]
-    from hashlib import sha256
     if (
         not runner["one_live_row"]
         or runner["virtual_tensor_shards"] != 32
@@ -263,6 +295,23 @@ if target == "qkv_a_production":
         or not all(hlo["required_shapes"].values())
     ):
         raise SystemExit("production qkv-a arithmetic/HLO contract failed")
+if target == "query_lp4":
+    tensor = run_dir / runner["tensor_file"]["filename"]
+    if (
+        runner["artifact_kind"]
+        != "glm52_layer0_physical_lp4_dsa_query_association"
+        or not runner["one_live_row"]
+        or runner["local_parallel_size"] != 4
+        or not tensor.is_file()
+        or tensor.stat().st_size != runner["tensor_file"]["byte_count"]
+        or sha256(tensor.read_bytes()).hexdigest()
+        != runner["tensor_file"]["sha256"]
+        or any(
+            not candidate["hlo"]["passed"]
+            for candidate in runner["candidates"].values()
+        )
+    ):
+        raise SystemExit("physical LP4 query arithmetic/HLO contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -370,6 +419,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   if [[ -f qkv_a_production.npz ]]; then
     sha256sum qkv_a_production.npz
   fi
+  if [[ -f physical_lp4_query_candidates.npz ]]; then
+    sha256sum physical_lp4_query_candidates.npz
+  fi
   sha256sum runner.json runner.log summary.json results_ckpt.db \
     census_pre.txt census_post.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
@@ -431,7 +483,11 @@ values = {
         else (
             "glm52_layer0_qkv_a_production_association"
             if sys.argv[4] == "qkv_a_production"
-            else "glm52_layer0_dsa_query_association"
+            else (
+                "glm52_layer0_physical_lp4_dsa_query_association"
+                if sys.argv[4] == "query_lp4"
+                else "glm52_layer0_dsa_query_association"
+            )
         )
     ),
     "code_hash": sys.argv[3],

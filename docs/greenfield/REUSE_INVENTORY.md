@@ -337,3 +337,11 @@ DSA-internal observer and the already-sealed accepted layer-1 comparison artifac
 (`79b813da...9054`, comparison `1bc43a8e...9ad5`, seal `283e5e88...10d5`) to identify the first
 remaining field. The returned layer-residual observer remains rejected because it perturbs
 arithmetic; no new legacy capture is warranted.
+
+The current-state observer at `888cfcb` completes that reuse step. Layer-0 normalized hidden and
+q-a are bitwise exact; query is first divergent in all 4,096 values. This also narrows DB499's
+reusable scope: its four visible TPU devices were not used by a mesh or `shard_map`; “LP4” meant
+four virtual owner slices in one device executable, whose reduction fusion differs from the real
+one-owner-per-chip decoder HLO. Preserve DB499 as exact virtual-group evidence, not physical LP4
+proof. Reuse its sealed q-a/weight inputs and protected wrapper for the new `query_lp4` target,
+which compares actual four-chip owner and head-unrolled reductions before any decoder retry.
