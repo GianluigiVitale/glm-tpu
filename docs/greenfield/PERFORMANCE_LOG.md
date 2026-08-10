@@ -1056,6 +1056,14 @@ compilation. It has no recurrent decoder loop, warmed wall distribution, XPlane 
 that elapsed time is not decoder latency. DB484 remains the accepted PP8 performance point at
 `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open pending the protected 8K decoder.
 
+## First exact-query 8K compile refusal — no performance result
+
+The `1824cf8` full-model attempt spent about eight minutes loading and compiling, then stopped at a
+token-return metadata-name linter before prefill or decoder execution. It has no raw tokens, warmed
+wall distribution, XPlane, DB row or `SUCCESS`; elapsed load/compile time is not token latency.
+DB484 remains the accepted PP8 point at `244.091151 ms` p50 / `4.096830 tok/s` and Gate E remains
+open.
+
 ## DB512 literal-source RoPE diagnostic — no performance result
 
 DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal

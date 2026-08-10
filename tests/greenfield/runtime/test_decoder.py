@@ -450,6 +450,36 @@ ENTRY %main (scores: bf16[4], ids: s32[4], token: s32[1]) -> s32[1] {{
         "jit(execute)/while/body/closed_call/shard_map/ppermute",
     ]
 
+    exact_query_hlo = hlo.replace(
+        "jit(mapped_token)/shard_map/ppermute",
+        "jit(mapped_token_exact_query)/shard_map/ppermute",
+    )
+    exact_query_record = _validate_complete_token_collective_lowering(
+        parse_hlo_module(exact_query_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        dsa_query_exact_association=True,
+    )
+    assert exact_query_record["passed"], exact_query_record
+    assert exact_query_record["accepted_token_return_op_names"] == [
+        "jit(mapped_token_exact_query)/shard_map/ppermute",
+        "jit(execute)/while/body/closed_call/shard_map/ppermute",
+    ]
+    assert not _validate_complete_token_collective_lowering(
+        parse_hlo_module(exact_query_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )["passed"]
+    assert not _validate_complete_token_collective_lowering(
+        module,
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        dsa_query_exact_association=True,
+    )["passed"]
+
     wide_hlo = hlo.replace("bf16[4]", "bf16[4,16]").replace(
         "s32[4]", "s32[4,16]"
     )

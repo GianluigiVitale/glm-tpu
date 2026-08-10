@@ -862,3 +862,17 @@ capture is still required.
   bytes and authenticated 8/8 cleanup pass.
 - This closes the bounded pre-8K production-composition gate only. A complete protected 8K run
   must still pass exact tokens/DSA, state/cache/HBM/HLO, fresh trace, wall, DB/archive and cleanup.
+
+## First exact-query full 8K compile — metadata refusal only
+
+- Pushed pin `1824cf8`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_oracle_dsa_trace2_20260810T082522620015034Z`,
+  compiles the complete exact-query decoder/materializers and refuses before execution only because
+  the token-return source name is `mapped_token_exact_query` rather than the linter's default
+  `mapped_token` spelling.
+- The return remains one `s32[1]` permute over the exact 32 lane pairs; local score/id exchanges and
+  all other decoder/materializer HLO gates pass. Decoder HLO gzip/contract SHAs are
+  `86030c36...55cf` / `5a55efd4...da32`.
+- Identical-rank-log SHA is `bc65b0e7...b27e`; pre/failure census SHAs are
+  `5ec2756d...df37` / `05762594...d7fa`. The approved diagnostic archive and authenticated 8/8
+  cleanup pass. No execution, token, DSA, DB, `SUCCESS`, trace, wall or Gate-D/E result exists.

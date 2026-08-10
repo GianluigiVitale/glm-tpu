@@ -6613,3 +6613,21 @@ unmotivated arithmetic variants.
 - The full protected launcher now pins DB525 and DB526 independently before enabling exact query
   association. After focused tests and one review of only that evidence-pin diff, the next
   authorized run is the combined 8K decoder through exact token/DSA and timing gates.
+
+## 2026-08-10 08:25--08:42 — exact-query 8K stops on token-return source metadata only
+
+- The protected `1824cf8` run compiled the complete 78-layer exact-query decoder and both external
+  materializers on all eight hosts, then refused before execution because the complete-token
+  linter did not recognize `jit(mapped_token_exact_query)/shard_map/ppermute`.
+- The preserved contract has one `s32[1]` token-return permute over all 32 exact stage-lane pairs,
+  one local BF16 score exchange and one local S32 id exchange. Every non-name check and every other
+  decoder/materializer contract passes. There is no evidence of arithmetic, topology or state
+  drift.
+- Decoder-HLO-gzip/contract/query-materializer/prefill-materializer SHAs are
+  `86030c36...55cf`, `5a55efd4...da32`, `1ba4d7f7...a37b`, and `9c345ff4...e3df`. Rank logs are
+  identical at `bc65b0e7...b27e`; pre/failure census SHAs `5ec2756d...df37` /
+  `05762594...d7fa` prove 8/8 cleanup, and the diagnostic is archived. No prefill/tokens/timing/DB
+  or Gate-D evidence exists.
+- The correction binds the accepted direct source name to the exact-query flag and rejects the
+  same name in default mode or the default name in exact mode. The exact preserved TPU HLO passes
+  that corrected sub-contract. One diff-only audit and clean commit precede the same 8K retry.

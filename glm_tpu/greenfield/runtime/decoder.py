@@ -1261,6 +1261,7 @@ def _validate_complete_token_collective_lowering(
     expected_pairs: Sequence[Sequence[int]],
     backend_contract: str,
     token_observation_candidates: int = 1,
+    dsa_query_exact_association: bool = False,
 ) -> dict[str, Any]:
     """Pin TPU's compact top-1 exchange and one-token return lowering."""
 
@@ -1351,8 +1352,13 @@ def _validate_complete_token_collective_lowering(
             "complete-token return must be exactly one s32[1] "
             f"collective-permute, found {len(token_return)}"
         )
+    direct_token_return_op_name = (
+        "jit(mapped_token_exact_query)/shard_map/ppermute"
+        if dsa_query_exact_association
+        else "jit(mapped_token)/shard_map/ppermute"
+    )
     accepted_token_return_op_names = (
-        "jit(mapped_token)/shard_map/ppermute",
+        direct_token_return_op_name,
         "jit(execute)/while/body/closed_call/shard_map/ppermute",
     )
     for collective in token_return:
@@ -1751,6 +1757,7 @@ def validate_decoder_step_hlo(
                 expected_pairs=canonical_pairs,
                 backend_contract=backend_contract,
                 token_observation_candidates=token_observation_candidates,
+                dsa_query_exact_association=dsa_query_exact_association,
             )
         )
         violations.extend(complete_token_collective_contract["violations"])

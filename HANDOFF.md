@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-10 08:10 UTC
+**Updated:** 2026-08-10 08:42 UTC
 
 ## Authority and isolation
 
@@ -3206,3 +3206,33 @@ focused/static tests and one new-diff-only Fable approval, commit/push, authenti
 then one protected combined 8K run with fused-qkv, split prefill repair, exact query association,
 token/DSA oracle and trace. That full run is expected to take about two hours; do not call its
 load/compile/prefill elapsed time token latency.
+
+## First exact-query 8K compile passes arithmetic gates and finds one metadata-name omission
+
+Protected tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_oracle_dsa_trace2_20260810T082522620015034Z`
+ran at pushed `1824cf8` from 08:25--08:34 UTC. All eight hosts loaded the complete runtime and
+compiled the 78-layer exact-query decoder. The decoder HLO, five-slot query materializer and split
+prefill-weight materializers were preserved before execution. The run refused before prefill,
+tokens, timing or tracing on exactly one linter violation:
+`complete-token return source operation drifted`.
+
+The return is the intended single `s32[1]` permute over the exact 32 stage-lane pairs, with the
+same one local BF16 score exchange and one local S32 id exchange. Its source metadata is
+`jit(mapped_token_exact_query)/shard_map/ppermute`; the linter admitted only the default direct
+name `jit(mapped_token)/...` and the shared prefill-loop name. Every other decoder contract section
+passes, including the exact query association. This is a feature-name omission, not a topology or
+arithmetic drift.
+
+Decoder-HLO-gzip/contract/query-materializer-contract/prefill-materializer-contract SHAs are
+`86030c36...55cf`, `5a55efd4...da32`, `1ba4d7f7...a37b`, and `9c345ff4...e3df`. All eight rank
+logs are identical at `bc65b0e7...b27e`; pre/failure census SHAs `5ec2756d...df37` /
+`05762594...d7fa` authenticate 8/8 cleanup, and the approved diagnostic archive exists. There is
+no DB row, `SUCCESS`, raw-token, latency, XPlane or Gate-D/E evidence.
+
+The narrow correction makes the accepted direct token-return source name conditional on the
+already-pinned `dsa_query_exact_association` flag. Exact mode accepts only
+`mapped_token_exact_query`; default mode accepts only `mapped_token`; both retain the one shared
+prefill-loop name. Replaying the exact preserved TPU HLO now passes the complete-token sub-contract,
+and cross-mode names fail. Exact next: focused/static tests, one Fable review of only this
+post-`1824cf8` correction, commit/push, then retry the same protected 8K profile.

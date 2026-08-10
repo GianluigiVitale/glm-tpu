@@ -398,3 +398,9 @@ fusion and no communication/global state; the materializer is four-partition/loc
 two known bounded-gather metadata calls. Reuse this exact artifact and DB525 through fail-closed
 launcher pins. The next authorized experiment is the combined protected 8K decoder, not another
 query association or checkpoint variant.
+
+The first such full compile at `1824cf8` passes the query/materializer/topology contracts and
+preserves one correct token-return permute, but the linter rejects the exact-query wrapper's new
+source metadata name before execution. Reuse that preserved HLO to validate the feature-aware name
+correction; do not repeat the full load merely to rediscover the label or weaken any shape/pair/
+collective requirement.

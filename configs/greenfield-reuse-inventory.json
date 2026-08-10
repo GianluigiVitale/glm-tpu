@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-10T06:03:00Z",
+  "captured_utc": "2026-08-10T08:42:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -80,7 +80,7 @@
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted protected artifacts through DB526, the 5a41bb2 separate-qkv refusal, the 6b554c4 fused-plus-repair refusal and the 888cfcb current-state internal observation are pinned with rejected diagnostics to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. DB521 rejects physical wq_b ownership/dot variants. DB522 proves the causal q-a BF16 boundary and rejects HIGHEST. DB523 rejects N128 scheduling. DB524 rejects ordinary GSPMD arithmetic. DB525 proves the exact local four-alias tuple fusion. DB526 proves the actual fused-q-a/materializer/helper production composition. DB484 remains the last protected decoder performance point."
+      "reason": "Accepted protected artifacts through DB526, the 5a41bb2 separate-qkv refusal, the 6b554c4 fused-plus-repair refusal, the 888cfcb current-state internal observation and the 1824cf8 exact-query metadata refusal are pinned to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. DB521 rejects physical wq_b ownership/dot variants. DB522 proves the causal q-a BF16 boundary and rejects HIGHEST. DB523 rejects N128 scheduling. DB524 rejects ordinary GSPMD arithmetic. DB525 proves the exact local four-alias tuple fusion. DB526 proves the actual fused-q-a/materializer/helper production composition. The 1824cf8 full compile passes every arithmetic/topology contract and exposes only the exact-query token-return source-name omission. DB484 remains the last protected decoder performance point."
     },
     {
       "id": "greenfield-prefill-loop-classifier",
