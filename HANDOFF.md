@@ -3017,3 +3017,35 @@ already-approved parent batch is not reviewed again.
 The correction retains 15/15 focused passes and all static checks. Fable's one-time review of only
 this post-`752d36e` diff returned `APPROVE COMMIT`; its suggested logical-or-flattened 128-width
 hardening and evidence wording clarifications are included. Do not re-review this batch.
+
+## DB521 rejects physical dot variants and exposes an elided q-a BF16 boundary
+
+Protected DB521,
+`greenfield_layer0_physical_lp4_dsa_query_association_20260810T042459221979151Z` at pushed
+`88350e3`, completed all four real four-chip candidates in six seconds. Raw versus predecoded
+owner state and one 1,024-wide versus eight 128-wide reductions all produce the same query SHA
+`eee61d94...bb`; none is exact and none reproduces current production. Against accepted, each has
+2,728 FP32 mismatches/max `9.5367432e-7`; against current production it has 4,096 mismatches/max
+`0.0101392269`. Tensor/evidence/SUCCESS SHAs are `7c2cf4c8...feb`, `86423acb...782`, and
+`b2a43f13...852`; DB run 521, approved archive, direct object ledger and authenticated 8/8
+pre/post cleanup pass. This is bounded correctness evidence only, with no decoder/Gate-D or
+performance standing.
+
+A direct selected-tensor audit of fused runtime manifest `12339490...699a` then rules out packed
+state corruption: the four stage-0 slot-0 `wq_b` shards concatenate exactly to source SHA
+`12f9ca94...e0`, scales to `0541bd9a...48d`, and head weights to `4dabc09e...624`; every shard
+matches exactly one same-index source quarter and all mismatch counts are zero. The loader binds
+files by physical device ID and refuses mesh/layout disagreement, so slot permutation is also
+rejected.
+
+The preserved full decoder HLO identifies the production-only boundary. Nominal q-a output is
+correct BF16, but the query reduction consumes the FP32 q-a affine product before its BF16 convert:
+the same fusion returns both `f32[1,2048]` to the query and `bf16[1,2048]` to the observer. DB521
+starts from the latter sealed BF16 tensor. A new bounded `query_lp4_q_a_boundary` target composes
+the proven fused-N82 helper with the physical owner query and tests unrounded default, explicit
+BF16-barrier default, and explicit BF16-barrier HIGHEST associations. It requires exact q-a in
+every arm, explicit StableHLO barrier counts, local-only optimized HLO and no callback/collective.
+The real-shape four-forced-CPU program compiles/executes all arms; affected tests pass 74/74 plus
+Python/Bash/ShellCheck/diff checks. Exact next: one Fable audit of only this new diff, commit/push,
+idle-fleet census and one protected bounded target. Do not change production or retry 8K until the
+unrounded arm reproduces current and a rounded arm is measured against accepted on TPU.

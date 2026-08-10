@@ -27,9 +27,10 @@ readonly CURRENT_INTERNAL_NPZ=/home/gianl/glm-run/greenfield_short_decoder_compi
 readonly CURRENT_INTERNAL_SHA=e1366c58a5eac8d995e6f56a4a3bb582fa6758b25bf19480b67e8f4c54914b50
 readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
 
-[[ $TARGET == query || $TARGET == query_lp4 || $TARGET == q_a || \
+[[ $TARGET == query || $TARGET == query_lp4 || \
+  $TARGET == query_lp4_q_a_boundary || $TARGET == q_a || \
   $TARGET == qkv_a_production ]] || {
-  echo "DSA association target must be query, query_lp4, q_a, or qkv_a_production" >&2
+  echo "DSA association target is unknown: $TARGET" >&2
   exit 2
 }
 
@@ -43,11 +44,14 @@ elif [[ $TARGET == qkv_a_production ]]; then
 elif [[ $TARGET == query_lp4 ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=physical_lp4_dsa_query_association
+elif [[ $TARGET == query_lp4_q_a_boundary ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_q_a_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=physical_lp4_dsa_q_a_boundary_association
 else
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=dsa_query_association
 fi
-if [[ $TARGET == query_lp4 ]]; then
+if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary ]]; then
   [[ -r $CURRENT_INTERNAL_NPZ ]] || {
     echo "current physical LP4 observer is unavailable" >&2
     exit 2
@@ -166,7 +170,7 @@ strict_census pre || {
 
 started=$(date +%s)
 current_args=()
-if [[ $TARGET == query_lp4 ]]; then
+if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary ]]; then
   current_args=(
     --current-internal-npz "$CURRENT_INTERNAL_NPZ"
     --current-internal-sha256 "$CURRENT_INTERNAL_SHA"
@@ -231,6 +235,12 @@ elif target == "query_lp4":
         "physical_raw_head_unrolled_m1_n128",
         "physical_predecoded_owner_dot_m1_n1024",
         "physical_predecoded_head_unrolled_m1_n128",
+    }
+elif target == "query_lp4_q_a_boundary":
+    expected_candidates = {
+        "physical_fused_q_a_unrounded_default_owner_dot_m1_n1024",
+        "physical_fused_q_a_bf16_barrier_default_owner_dot_m1_n1024",
+        "physical_fused_q_a_bf16_barrier_highest_owner_dot_m1_n1024",
     }
 else:
     expected_candidates = {
@@ -312,6 +322,24 @@ if target == "query_lp4":
         )
     ):
         raise SystemExit("physical LP4 query arithmetic/HLO contract failed")
+if target == "query_lp4_q_a_boundary":
+    tensor = run_dir / runner["tensor_file"]["filename"]
+    if (
+        runner["artifact_kind"]
+        != "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"
+        or not runner["one_live_row"]
+        or runner["local_parallel_size"] != 4
+        or set(runner["q_a_exact_candidates"]) != expected_candidates
+        or not tensor.is_file()
+        or tensor.stat().st_size != runner["tensor_file"]["byte_count"]
+        or sha256(tensor.read_bytes()).hexdigest()
+        != runner["tensor_file"]["sha256"]
+        or any(
+            not candidate["hlo"]["passed"]
+            for candidate in runner["candidates"].values()
+        )
+    ):
+        raise SystemExit("physical LP4 q-a boundary contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -422,6 +450,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   if [[ -f physical_lp4_query_candidates.npz ]]; then
     sha256sum physical_lp4_query_candidates.npz
   fi
+  if [[ -f physical_lp4_q_a_boundary.npz ]]; then
+    sha256sum physical_lp4_q_a_boundary.npz
+  fi
   sha256sum runner.json runner.log summary.json results_ckpt.db \
     census_pre.txt census_post.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
@@ -486,7 +517,11 @@ values = {
             else (
                 "glm52_layer0_physical_lp4_dsa_query_association"
                 if sys.argv[4] == "query_lp4"
-                else "glm52_layer0_dsa_query_association"
+                else (
+                    "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"
+                    if sys.argv[4] == "query_lp4_q_a_boundary"
+                    else "glm52_layer0_dsa_query_association"
+                )
             )
         )
     ),

@@ -736,3 +736,25 @@ capture is still required.
   `fd4ed1ac...5710` / `33c967bb...9cad`; the approved partial archive exists.
 - Candidate-specific width validation and pre-validation HLO persistence are readiness corrections
   only. A fresh protected matrix remains required.
+
+## DB521 physical query matrix and q-a execution boundary
+
+- DB521 at pushed `88350e3`, tag
+  `greenfield_layer0_physical_lp4_dsa_query_association_20260810T042459221979151Z`, executes all
+  four true four-device candidates in six seconds. Raw/predecoded owners and owner-wide/eight-head
+  reductions are elementwise identical at SHA `eee61d94...bb`; they differ from accepted in 2,728
+  FP32 values (max `9.5367432e-7`) and from production in all 4,096 values (max `0.0101392269`).
+- Evidence/tensor/SUCCESS SHAs are `86423acb...782`, `7c2cf4c...feb`, and `b2a43f13...852`.
+  The DB snapshot, same-region archive and authenticated 8/8 cleanup pass. This rejects raw versus
+  predecoded ownership and owner-wide versus head-unrolled association; it is not performance
+  evidence.
+- Direct reads of the four stage-0 runtime shards rule out packing or physical-slot corruption.
+  Concatenated `wq_b`, scale and head-weight bytes match the sealed source at SHAs
+  `12f9ca94...e0`, `0541bd9a...48d`, and `4dabc09e...624`; all 4x4 slice-equality matrices are
+  identity matrices with zero global mismatches.
+- Preserved production HLO exposes the remaining discriminator. The fused q-a affine exists as
+  FP32; query consumes that FP32 value before its separate BF16 observer conversion. Thus the
+  recorded bitwise-exact q-a does not prove the query's physical input was rounded. The bounded
+  `query_lp4_q_a_boundary` target composes the actual fused N82 helper with the real four-chip
+  owner query and compares unrounded, BF16-barrier, and BF16-barrier-plus-HIGHEST arms. Production
+  remains unchanged until a protected result selects an exact arm.

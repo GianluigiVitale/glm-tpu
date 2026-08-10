@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-10T04:02:00Z",
+  "captured_utc": "2026-08-10T04:46:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "888cfcb0ce35fdf1d1364a92c540670071b4959c",
+    "greenfield": "88350e376660fd6c8846b793fc0efb2f9f04842a",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,12 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "888cfcb0ce35fdf1d1364a92c540670071b4959c",
+      "source_pin": "88350e376660fd6c8846b793fc0efb2f9f04842a",
       "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted protected artifacts through DB520, the 5a41bb2 separate-qkv refusal, the 6b554c4 fused-plus-repair refusal and the 888cfcb current-state internal observation are pinned with rejected diagnostics to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. The current observer makes layer-0 normalized hidden and q-a exact and localizes the first remaining divergence to the physical wq_b query projection. DB484 remains the last protected decoder performance point."
+      "reason": "Accepted protected artifacts through DB521, the 5a41bb2 separate-qkv refusal, the 6b554c4 fused-plus-repair refusal and the 888cfcb current-state internal observation are pinned with rejected diagnostics to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. The current observer makes layer-0 normalized hidden and q-a exact; DB521 rejects raw/predecoded physical wq_b ownership and owner/head dot association. Preserved production HLO localizes the next discriminator to the fused q-a BF16 execution boundary. DB484 remains the last protected decoder performance point."
     },
     {
       "id": "greenfield-prefill-loop-classifier",
@@ -152,12 +152,12 @@
       "id": "legacy-dsa-query-association",
       "category": "numerical association evidence",
       "source_repo": "oracle-only tpu-inference observer and protected greenfield probes",
-      "source_pin": "legacy 83ff4a3576602ca844ea090550139a2ff00b0bb1 / greenfield DB499 b41c3abceccde90c8ab2419f8b3f8f58b0b140b8",
-      "source_paths": ["/home/gianl/glm-run/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z", "/home/gianl/glm-run/greenfield_layer0_dsa_query_association_20260808T034636385240375Z", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z"],
+      "source_pin": "legacy 83ff4a3576602ca844ea090550139a2ff00b0bb1 / greenfield DB499 b41c3abceccde90c8ab2419f8b3f8f58b0b140b8 / physical DB521 88350e376660fd6c8846b793fc0efb2f9f04842a",
+      "source_paths": ["/home/gianl/glm-run/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z", "/home/gianl/glm-run/greenfield_layer0_dsa_query_association_20260808T034636385240375Z", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_query_association_20260810T042459221979151Z"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/runtime/decoder.py", "docs/greenfield/NUMERICAL_CONTRACT.md"],
       "gate": "C-D",
-      "reason": "The protected accepted capture localizes its independent reconstruction divergence to query while normalized hidden and q-a state are bitwise exact. DB499 proves exact virtual grouped raw-FP8 materialization with the accepted q-a input, but its ordinary unsharded jits slice four logical owners inside one TPU executable; four devices were visible but no mesh or shard_map was used. It therefore does not prove the real one-owner-per-chip PP8 reduction. The 888cfcb observer now supplies an exact production q-a input and finds query first divergent. Reuse DB499 inputs and wrapper for a true physical query_lp4 matrix; the global f32[4096,2048] table remains forbidden and DB495--DB498 stay rejected."
+      "reason": "The protected accepted capture localizes its independent reconstruction divergence to query while normalized hidden and q-a state are bitwise exact. DB499 proves only virtual grouped raw-FP8 materialization. DB521 supplies the true one-owner-per-chip PP8 proof: raw/predecoded state and owner-wide/eight-head reductions are all identical and nonexact, while direct runtime reads match every sealed source shard. Preserved production HLO shows query consumes the fused q-a FP32 affine before its separate BF16 state conversion. Reuse the same wrapper and actual fused N82 helper for the bounded q-a boundary target; the global f32[4096,2048] table remains forbidden and DB495--DB499 variants stay closed."
     },
     {
       "id": "greenfield-production-layer0-q-a-divergence",
@@ -168,7 +168,7 @@
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "glm_tpu/greenfield/kernels/reference/qkv_a.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/model/weights.py", "glm_tpu/greenfield/checkpoint/runtime_feature.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/probe_layer0_dsa_query_association.py", "scripts/greenfield/run_layer0_dsa_query_association_probe.sh", "scripts/greenfield/pack_feature_runtime_checkpoint.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "docs/greenfield/NUMERICAL_CONTRACT.md"],
       "gate": "B-D",
-      "reason": "The all-21 observer originally proved the earliest separate-qkv production divergence was layer-0 q-a. DB501 rejects ordinary M1 dot associations; DB502 proves the one-row convolution arithmetic; DB503 proves the integrated production selector. The fused pack and DB504 prove final-layout ownership and 78 exact production convolutions. The 888cfcb current-state observer now proves that fused q-a correction is effective in the repaired decoder: layer-0 normalized hidden and q-a are bitwise exact, and query is the first divergence. The next bounded target is the real physical LP4 wq_b reduction, not another qkv/cache variant, full decoder, full-pod collective or external M32 bucket."
+      "reason": "The all-21 observer originally proved the earliest separate-qkv production divergence was layer-0 q-a. DB501 rejects ordinary M1 dot associations; DB502 proves the one-row convolution arithmetic; DB503 proves the integrated production selector. The fused pack and DB504 prove final-layout ownership and 78 exact production convolutions. The 888cfcb current-state observer proves normalized hidden and recorded q-a are bitwise exact and query is first divergent. DB521 rejects physical wq_b ownership/dot variants and direct reads prove packed bytes exact. Preserved optimized HLO reveals query bypasses the nominal BF16 q-a return and consumes the FP32 affine, so the next bounded target is that execution boundary, not another checkpoint, cache, full decoder, full-pod collective or external M32 bucket."
     },
     {
       "id": "legacy-code-and-step-fingerprints",

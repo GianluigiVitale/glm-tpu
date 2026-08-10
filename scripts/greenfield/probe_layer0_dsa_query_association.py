@@ -66,6 +66,9 @@ PRODUCTION_QKV_A_ARTIFACT_KIND = (
 PHYSICAL_LP4_QUERY_ARTIFACT_KIND = (
     "glm52_layer0_physical_lp4_dsa_query_association"
 )
+PHYSICAL_LP4_Q_A_BOUNDARY_ARTIFACT_KIND = (
+    "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -599,6 +602,28 @@ def _physical_lp4_candidate_modes() -> tuple[tuple[str, str, str], ...]:
     )
 
 
+def _physical_lp4_q_a_boundary_modes() -> tuple[tuple[str, bool, bool], ...]:
+    """Return fused q-a round/precision candidates for the physical query."""
+
+    return (
+        (
+            "physical_fused_q_a_unrounded_default_owner_dot_m1_n1024",
+            False,
+            False,
+        ),
+        (
+            "physical_fused_q_a_bf16_barrier_default_owner_dot_m1_n1024",
+            True,
+            False,
+        ),
+        (
+            "physical_fused_q_a_bf16_barrier_highest_owner_dot_m1_n1024",
+            True,
+            True,
+        ),
+    )
+
+
 def _physical_lp4_hlo_contract(
     hlo: str,
     *,
@@ -673,6 +698,346 @@ def _physical_lp4_hlo_contract(
             and dot_metadata_count > 0
         ),
     }
+
+
+def _physical_lp4_q_a_boundary_hlo_contract(
+    optimized_hlo: str,
+    stablehlo: str,
+    *,
+    backend: str,
+    candidate: str,
+    enforce_bfloat16_boundary: bool,
+    highest: bool,
+) -> dict[str, Any]:
+    """Require fused q-a plus one physical owner query and its round gate."""
+
+    lowered = optimized_hlo.lower()
+    stable_lowered = stablehlo.lower()
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    forbidden_global_query_weights = [
+        shape
+        for shape in ("u8[4096,2048]", "f32[4096,2048]")
+        if shape in lowered
+    ]
+    required_shapes = {
+        "one_live_normalized_row": "bf16[1,6144]" in lowered,
+        "one_live_q_a_row": "bf16[1,2048]" in lowered,
+        "local_raw_owner": "u8[1024,2048]" in lowered,
+        "local_raw_scale": "f32[8,16]" in lowered,
+        "local_fp32_owner": "f32[1024,2048]" in lowered,
+        "local_owner_projection": (
+            "f32[1,1024]" in lowered or "f32[1024]" in lowered
+        ),
+        "local_owner_query": "f32[8,128]" in lowered,
+    }
+    barrier_count = stable_lowered.count("stablehlo.optimization_barrier")
+    stable_highest = "highest" in stable_lowered
+    fused_qkv_a = _validate_fused_qkv_a_decoder_association(
+        optimized_hlo,
+        layers=1,
+    )
+    if backend not in ("cpu", "tpu"):
+        raise ValueError("physical q-a boundary backend is unknown")
+    expected_barriers = 1 + int(enforce_bfloat16_boundary)
+    return {
+        "backend": backend,
+        "candidate": candidate,
+        "enforce_bfloat16_boundary": enforce_bfloat16_boundary,
+        "forbidden_global_query_weights": forbidden_global_query_weights,
+        "forbidden_operations": forbidden_operations,
+        "fused_qkv_a": fused_qkv_a,
+        "highest": highest,
+        "hlo_sha256": sha256(optimized_hlo.encode()).hexdigest(),
+        "local_parallel_size": 4,
+        "required_shapes": required_shapes,
+        "stablehlo_optimization_barrier_count": barrier_count,
+        "stablehlo_requests_highest": stable_highest,
+        "stablehlo_sha256": sha256(stablehlo.encode()).hexdigest(),
+        "passed": (
+            not forbidden_operations
+            and not forbidden_global_query_weights
+            and all(required_shapes.values())
+            and (backend != "tpu" or fused_qkv_a["passed"])
+            and barrier_count == expected_barriers
+            and stable_highest == highest
+        ),
+    }
+
+
+def _run_physical_lp4_q_a_boundary(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+    capture: dict[str, Any],
+    accepted_query: np.ndarray,
+    current_query: np.ndarray,
+    captured_normalized_bits: np.ndarray,
+    captured_q_bits: np.ndarray,
+    weight_bits: Any,
+    weight_scale: Any,
+    arrays: dict[str, np.ndarray],
+    input_manifest: dict[str, Any],
+    q_manifest: dict[str, Any],
+) -> None:
+    """Reproduce the fused q-a-to-query BF16 materialization boundary."""
+
+    geometry = Layer0DsaProbeGeometry()
+    devices = np.asarray(jax.devices(), dtype=object)
+    if devices.shape != (4,):
+        raise SystemExit("physical LP4 q-a boundary requires four TPU devices")
+    mesh = Mesh(devices, ("lp4",))
+    normalized = jnp.asarray(
+        captured_normalized_bits.view(ml_dtypes.bfloat16)[None, :]
+    )
+    q_a_bits = jnp.asarray(arrays["self_attn__q_a_proj__weight"])
+    q_a_scale = jnp.asarray(
+        arrays["self_attn__q_a_proj__weight_scale_inv"]
+    )
+    kv_a_bits = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight"]
+    )
+    kv_a_scale = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"]
+    )
+    q_a_norm_weight = jnp.asarray(
+        arrays["self_attn__q_a_layernorm__weight"].view(
+            ml_dtypes.bfloat16
+        )
+    )
+    packed = jax.jit(
+        lambda q_bits, q_scale, kv_bits, kv_scale: (
+            pack_legacy_fused_qkv_runtime_weights(
+                q_bits,
+                q_scale,
+                kv_bits,
+                kv_scale,
+                geometry=geometry,
+            )
+        )
+    )(
+        q_a_bits,
+        q_a_scale,
+        kv_a_bits,
+        kv_a_scale,
+    )
+    jax.block_until_ready(packed)
+    packed_bits = lax.bitcast_convert_type(
+        packed.sharded_weight, jnp.uint8
+    )
+    if packed_bits.shape != (32, 6144, 82) or (
+        packed.sharded_scale.shape != (32, 48, 82)
+    ):
+        raise SystemExit("physical fused q-a final-layout setup drifted")
+
+    arguments = (
+        jax.device_put(normalized, NamedSharding(mesh, P())),
+        jax.device_put(packed_bits, NamedSharding(mesh, P())),
+        jax.device_put(packed.sharded_scale, NamedSharding(mesh, P())),
+        jax.device_put(q_a_norm_weight, NamedSharding(mesh, P())),
+        jax.device_put(weight_bits, NamedSharding(mesh, P("lp4", None))),
+        jax.device_put(weight_scale, NamedSharding(mesh, P("lp4", None))),
+        jax.device_put(
+            jnp.asarray([8155], dtype=jnp.int32),
+            NamedSharding(mesh, P()),
+        ),
+    )
+    args.hlo_dir.mkdir(parents=True)
+    records: dict[str, Any] = {}
+    tensor_payload: dict[str, np.ndarray] = {
+        "accepted_query": accepted_query,
+        "accepted_q_a_bfloat16_bits": captured_q_bits,
+        "current_production_query": current_query,
+    }
+    for name, enforce_boundary, highest in _physical_lp4_q_a_boundary_modes():
+        def local_fused_query(
+            normalized_input: Any,
+            qkv_bits: Any,
+            qkv_scale: Any,
+            norm_weight: Any,
+            query_bits: Any,
+            query_scale: Any,
+            positions: Any,
+            enforce_boundary: bool = enforce_boundary,
+            highest: bool = highest,
+        ) -> tuple[Any, Any]:
+            attention = AttentionFp8Weights(
+                q_a_bits=None,
+                q_a_scale=None,
+                q_a_norm_weight=norm_weight,
+                q_b_bits=None,
+                q_b_scale=None,
+                kv_a_bits=None,
+                kv_a_scale=None,
+                kv_a_norm_weight=None,
+                kv_b_bits=None,
+                kv_b_scale=None,
+                o_bits=None,
+                o_scale=None,
+                qkv_a_bits=qkv_bits,
+                qkv_a_scale=qkv_scale,
+            )
+            q_residual, _ = _project_attention_qkv_a(
+                normalized_input,
+                attention,
+                backend="fused_n82_convolution",
+                dsa_contract=DsaNumericalContract(),
+                mla_contract=MlaNumericalContract(),
+                block_shape=(128, 128),
+                epsilon=1e-5,
+                linear_backend="pallas",
+                linear_interpret=False,
+            )
+            query_input = (
+                lax.optimization_barrier(q_residual)
+                if enforce_boundary
+                else q_residual
+            )
+            decoded = lax.optimization_barrier(
+                dequantize_fp8_bits_block_weight(
+                    query_bits,
+                    query_scale,
+                    output_dtype=jnp.float32,
+                )
+            )
+            projected = _dot_rows(
+                query_input,
+                decoded,
+                highest=highest,
+            )
+            return _apply_local_query_rope(projected, positions), q_residual
+
+        mapped = jax.shard_map(
+            local_fused_query,
+            mesh=mesh,
+            in_specs=(
+                P(),
+                P(),
+                P(),
+                P(),
+                P("lp4", None),
+                P("lp4", None),
+                P(),
+            ),
+            out_specs=(P("lp4", None), P()),
+            check_vma=False,
+        )
+        lowered = jax.jit(mapped).lower(*arguments)
+        stablehlo = lowered.as_text()
+        compiled = lowered.compile()
+        optimized_hlo = compiled.as_text()
+        (args.hlo_dir / f"{name}.stablehlo.mlir").write_text(stablehlo)
+        (args.hlo_dir / f"{name}.optimized_hlo.txt").write_text(
+            optimized_hlo
+        )
+        contract = _physical_lp4_q_a_boundary_hlo_contract(
+            optimized_hlo,
+            stablehlo,
+            backend=jax.default_backend(),
+            candidate=name,
+            enforce_bfloat16_boundary=enforce_boundary,
+            highest=highest,
+        )
+        if not contract["passed"]:
+            raise SystemExit(f"physical LP4 q-a boundary HLO failed: {name}")
+        query_output, q_a_output = compiled(*arguments)
+        jax.block_until_ready((query_output, q_a_output))
+        candidate_query = np.ascontiguousarray(
+            np.asarray(query_output), dtype=np.float32
+        )
+        candidate_q_bits = np.ascontiguousarray(
+            np.asarray(q_a_output)
+        ).view(np.uint16)[0]
+        if candidate_query.shape != (geometry.heads, geometry.head_dim) or (
+            candidate_q_bits.shape != captured_q_bits.shape
+        ):
+            raise SystemExit("physical fused q-a/query output shape drifted")
+        records[name] = {
+            "accepted_comparison": _compare(
+                accepted_query, candidate_query
+            ),
+            "current_production_comparison": _compare(
+                current_query, candidate_query
+            ),
+            "hlo": contract,
+            "q_a_comparison": _compare_bfloat16_bits(
+                captured_q_bits, candidate_q_bits
+            ),
+        }
+        tensor_payload[f"query__{name}"] = candidate_query
+        tensor_payload[f"q_a_bfloat16_bits__{name}"] = candidate_q_bits
+
+    exact = sorted(
+        name
+        for name, record in records.items()
+        if record["accepted_comparison"]["elementwise_exact"]
+    )
+    current_matches = sorted(
+        name
+        for name, record in records.items()
+        if record["current_production_comparison"]["elementwise_exact"]
+    )
+    q_a_exact = sorted(
+        name
+        for name, record in records.items()
+        if record["q_a_comparison"]["elementwise_exact"]
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "physical_lp4_q_a_boundary.npz"
+    np.savez(tensor_path, **tensor_payload)
+    result = {
+        "artifact_kind": PHYSICAL_LP4_Q_A_BOUNDARY_ARTIFACT_KIND,
+        "association_restored": bool(exact),
+        "backend": jax.default_backend(),
+        "candidates": records,
+        "capture": {
+            "comparison_sha256": args.capture_comparison_sha256,
+            "owner_actual_sha256": capture["owner_actual_sha256"],
+            "query_sha256": _array_sha256(accepted_query),
+            "tensors_sha256": args.capture_tensors_sha256,
+        },
+        "claim_scope": (
+            "Bounded physical four-chip fused-q-a/query materialization "
+            "boundary only; no decoder, Gate-D, latency, or token-rate claim."
+        ),
+        "code_hash": code_hash,
+        "current_observer": {
+            "query_sha256": _array_sha256(current_query),
+            "sha256": args.current_internal_sha256,
+        },
+        "current_reproducing_candidates": current_matches,
+        "device_count": jax.device_count(),
+        "device_kind": sorted({device.device_kind for device in jax.devices()}),
+        "diagnostic_only": True,
+        "exact_candidates": exact,
+        "format_version": 1,
+        "input_manifest_sha256": input_manifest["manifest_sha256"],
+        "local_parallel_size": 4,
+        "one_live_row": True,
+        "performance_claim": False,
+        "q_a_exact_candidates": q_a_exact,
+        "q_a_manifest_sha256": q_manifest["manifest_sha256"],
+        "status": "SUCCESS",
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
 
 
 def _run_physical_lp4_query(
@@ -1347,7 +1712,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--target",
-        choices=("query", "query_lp4", "q_a", "qkv_a_production"),
+        choices=(
+            "query",
+            "query_lp4",
+            "query_lp4_q_a_boundary",
+            "q_a",
+            "qkv_a_production",
+        ),
         default="query",
     )
     parser.add_argument("--expected-code-hash", required=True)
@@ -1471,7 +1842,7 @@ def main() -> None:
     if int(dequantized_host.view(np.uint8).sum(dtype=np.uint64)) != 3765880530:
         raise SystemExit("adapted wq_b byte identity drifted")
 
-    if args.target == "query_lp4":
+    if args.target in ("query_lp4", "query_lp4_q_a_boundary"):
         if (
             args.current_internal_npz is None
             or args.current_internal_sha256 is None
@@ -1493,19 +1864,35 @@ def main() -> None:
             or current_query.shape != actual_query.shape
         ):
             raise SystemExit("current physical LP4 observer contract drifted")
-        _run_physical_lp4_query(
-            args=args,
-            code_hash=code_hash,
-            capture=capture,
-            accepted_query=actual_query,
-            current_query=current_query,
-            q_state=q_state,
-            weight_bits=weight_bits,
-            weight_scale=weight_scale,
-            dequantized_host=dequantized_host,
-            input_manifest=input_manifest,
-            q_manifest=q_manifest,
-        )
+        if args.target == "query_lp4":
+            _run_physical_lp4_query(
+                args=args,
+                code_hash=code_hash,
+                capture=capture,
+                accepted_query=actual_query,
+                current_query=current_query,
+                q_state=q_state,
+                weight_bits=weight_bits,
+                weight_scale=weight_scale,
+                dequantized_host=dequantized_host,
+                input_manifest=input_manifest,
+                q_manifest=q_manifest,
+            )
+        else:
+            _run_physical_lp4_q_a_boundary(
+                args=args,
+                code_hash=code_hash,
+                capture=capture,
+                accepted_query=actual_query,
+                current_query=current_query,
+                captured_normalized_bits=captured_normalized_bits,
+                captured_q_bits=captured_q_bits,
+                weight_bits=weight_bits,
+                weight_scale=weight_scale,
+                arrays=arrays,
+                input_manifest=input_manifest,
+                q_manifest=q_manifest,
+            )
         return
 
     geometry = Layer0DsaProbeGeometry()

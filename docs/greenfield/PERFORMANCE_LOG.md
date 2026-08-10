@@ -1064,3 +1064,12 @@ layer-0 normalized hidden/q-a are exact and query is first divergent. There is n
 distribution, DB row, terminal `SUCCESS`, Gate-D/E or throughput result. The following physical
 LP4 query matrix is also a bounded correctness diagnostic and cannot change DB484's accepted
 `244.091151 ms` p50 / `4.096830 tok/s` standing.
+
+## DB521 and q-a boundary probe — correctness only
+
+DB521 completes a four-chip physical query-association matrix in six seconds, but it has no decoder
+loop, warmed wall distribution, XPlane, token rate, or Gate-D/E standing. Its result rejects four
+physical dot/weight variants and narrows the next experiment to the fused q-a BF16 execution
+boundary. The `query_lp4_q_a_boundary` successor is likewise a bounded arithmetic/HLO discriminator,
+not a performance benchmark. DB484 remains the only accepted PP8 decoder point at
+`244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.

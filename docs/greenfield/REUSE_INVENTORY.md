@@ -345,3 +345,13 @@ four virtual owner slices in one device executable, whose reduction fusion diffe
 one-owner-per-chip decoder HLO. Preserve DB499 as exact virtual-group evidence, not physical LP4
 proof. Reuse its sealed q-a/weight inputs and protected wrapper for the new `query_lp4` target,
 which compares actual four-chip owner and head-unrolled reductions before any decoder retry.
+
+DB521 at `88350e3` closes those four obvious physical `wq_b` variants without another full decoder:
+raw versus predecoded owner state and owner-wide versus head-unrolled reductions are all identical
+and nonexact. Preserve those rejected candidates and reuse the same protected one-host wrapper;
+do not reconstruct them in a new harness. Selected direct reads also prove every stage-0 slot-0
+runtime `wq_b` shard, scale and head weight matches its sealed source slice, so do not repack or
+recapture that checkpoint. Preserved production HLO shows query consumes the fused q-a FP32 affine
+before the separate BF16 state conversion. The next bounded target therefore reuses the actual
+fused N82 helper, exact sealed inputs, physical four-chip mapping, archive/DB/census protections and
+existing query comparator to test only the BF16 execution boundary and query precision request.

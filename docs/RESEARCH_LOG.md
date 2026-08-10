@@ -6472,3 +6472,25 @@ unmotivated arithmetic variants.
   static checks pass. Fable's one-time review of only this correction returned `APPROVE COMMIT`;
   both logical/flattened 128 shapes are admitted and its evidence wording corrections are included.
   A fresh bounded retry is next.
+
+## 2026-08-10 04:25--04:46 — DB521 rejects physical dot variants; q-a BF16 round is elided
+
+- DB521 at `88350e3` completes all four true four-device LP4 query candidates in six seconds. Raw
+  and predecoded state plus owner-wide and head-unrolled reductions are elementwise identical at
+  SHA `eee61d94...bb`. None is accepted-exact or current-exact: accepted delta is 2,728 values/max
+  `9.5367432e-7`; current delta is 4,096/max `0.0101392269`. DB521, tensor/evidence/SUCCESS,
+  same-region archive and authenticated 8/8 cleanup all pass; no performance claim exists.
+- Selected reads from the 104 GiB stage-0 runtime prove slot-0 state is not corrupt or permuted.
+  Concatenated `wq_b` bits, scales and head weights match the sealed source byte-for-byte at SHAs
+  `12f9ca94...e0`, `0541bd9a...48d`, and `4dabc09e...624`; the 4x4 slice-equality matrices are
+  identity matrices with zero concatenated mismatches.
+- Preserved observer HLO explains why DB521 and production differ despite identical recorded q-a.
+  Fused q-a normalization emits one FP32 affine product; XLA feeds it directly to the query dot
+  while separately converting it to BF16 for the observed q-a state. The code-level BF16 return
+  boundary is therefore not the physical query input boundary.
+- A new bounded target composes the actual fused N82 helper and physical four-chip owner query. It
+  tests the current unrounded path, an explicit BF16 optimization barrier, and barrier plus
+  HIGHEST precision. Every arm must reproduce accepted q-a bits, record StableHLO and optimized
+  HLO, and remain callback/communication-free. Four-forced-CPU real geometry compiles and executes
+  all arms; 74 affected tests and all static checks pass. One new-diff-only Fable review precedes
+  commit and a serialized protected run. Production remains unchanged until that result.

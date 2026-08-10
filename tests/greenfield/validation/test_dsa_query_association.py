@@ -75,6 +75,23 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
             "head_unrolled",
         ),
     }
+    assert set(subject._physical_lp4_q_a_boundary_modes()) == {
+        (
+            "physical_fused_q_a_unrounded_default_owner_dot_m1_n1024",
+            False,
+            False,
+        ),
+        (
+            "physical_fused_q_a_bf16_barrier_default_owner_dot_m1_n1024",
+            True,
+            False,
+        ),
+        (
+            "physical_fused_q_a_bf16_barrier_highest_owner_dot_m1_n1024",
+            True,
+            True,
+        ),
+    }
 
 
 def test_physical_lp4_query_associations_are_semantically_equal_on_cpu() -> None:
@@ -114,6 +131,58 @@ def test_physical_lp4_query_associations_are_semantically_equal_on_cpu() -> None
     )
     assert head["passed"]
     assert head["physical_projection_width"] == 128
+
+
+def test_physical_q_a_boundary_contract_requires_the_requested_barrier(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        subject,
+        "_validate_fused_qkv_a_decoder_association",
+        lambda hlo, layers: {
+            "passed": hlo.startswith("optimized") and layers == 1
+        },
+    )
+    optimized = (
+        "optimized bf16[1,6144] bf16[1,2048] u8[1024,2048] "
+        "f32[8,16] f32[1024,2048] f32[1024] f32[8,128]"
+    )
+    rounded = subject._physical_lp4_q_a_boundary_hlo_contract(
+        optimized,
+        "stablehlo.optimization_barrier stablehlo.optimization_barrier "
+        "stablehlo.dot_general "
+        "precision = [HIGHEST, HIGHEST]",
+        backend="tpu",
+        candidate=(
+            "physical_fused_q_a_bf16_barrier_highest_owner_dot_m1_n1024"
+        ),
+        enforce_bfloat16_boundary=True,
+        highest=True,
+    )
+    assert rounded["passed"]
+    missing = subject._physical_lp4_q_a_boundary_hlo_contract(
+        optimized,
+        "stablehlo.dot_general precision = [HIGHEST, HIGHEST]",
+        backend="tpu",
+        candidate=(
+            "physical_fused_q_a_bf16_barrier_highest_owner_dot_m1_n1024"
+        ),
+        enforce_bfloat16_boundary=True,
+        highest=True,
+    )
+    assert not missing["passed"]
+    unexpected = subject._physical_lp4_q_a_boundary_hlo_contract(
+        optimized,
+        "stablehlo.optimization_barrier stablehlo.optimization_barrier "
+        "stablehlo.dot_general",
+        backend="tpu",
+        candidate=(
+            "physical_fused_q_a_unrounded_default_owner_dot_m1_n1024"
+        ),
+        enforce_bfloat16_boundary=False,
+        highest=False,
+    )
+    assert not unexpected["passed"]
 
 
 def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
@@ -198,6 +267,9 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "CURRENT_INTERNAL_SHA=e1366c58",
         "physical_lp4_query_candidates.npz",
         "physical_lp4_dsa_query_association",
+        "query_lp4_q_a_boundary",
+        "physical_lp4_q_a_boundary.npz",
+        "physical_lp4_dsa_q_a_boundary_association",
     ):
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):
@@ -209,7 +281,7 @@ def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
     for required in (
         "_project_attention_qkv_a",
         "_validate_fused_qkv_a_decoder_association",
-        'choices=("query", "query_lp4", "q_a", "qkv_a_production")',
+        '"query_lp4_q_a_boundary",',
         "production_fused_n82_convolution_shard_sum",
         "companion_comparison",
         "fused_n82_convolution",
