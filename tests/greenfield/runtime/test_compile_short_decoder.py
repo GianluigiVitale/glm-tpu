@@ -103,7 +103,29 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         in compiler
     )
     assert (
-        "prefill index repair must remain isolated from diagnostics" in compiler
+        "prefill index repair must remain isolated from residual observation"
+        in compiler
+    )
+    assert (
+        "readonly DSA_INTERNAL_BASELINE_NPZ="
+        "${GLM_GREENFIELD_DSA_INTERNAL_BASELINE_NPZ:-" in runner
+    )
+    assert (
+        "readonly DSA_INTERNAL_BASELINE_SHA="
+        "${GLM_GREENFIELD_DSA_INTERNAL_BASELINE_SHA:-" in runner
+    )
+    assert (
+        "readonly DSA_INTERNAL_LAYER0_REFERENCE_NPZ="
+        "${GLM_GREENFIELD_DSA_INTERNAL_LAYER0_REFERENCE_NPZ:-" in runner
+    )
+    assert (
+        "readonly DSA_INTERNAL_LAYER0_REFERENCE_SHA="
+        "${GLM_GREENFIELD_DSA_INTERNAL_LAYER0_REFERENCE_SHA:-" in runner
+    )
+    assert "args.prefill_index_repair and args.observe_dsa_internals" not in compiler
+    assert (
+        "LAYER_RESIDUAL_OBSERVER == 0 && $DSA_INTERNAL_OBSERVER == 0"
+        not in runner
     )
     assert '"schema_version": 11' in compiler
     assert 'record["schema_version"] for record in records} != {11}' in runner

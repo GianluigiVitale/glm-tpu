@@ -2927,3 +2927,39 @@ The current narrow launch-safety batch makes the fused Gate-B artifact the selec
 default, refuses protected repair with a separate-qkv runtime, and pins local/DB/remote DB520
 evidence before fleet work. Exact next: focused/static tests, one new-diff-only Fable approval,
 commit/push, idle-fleet proof, then one combined fused-qkv plus split-repair protected 8K run.
+
+## Combined fused-runtime plus repair run isolates the remaining layer boundary
+
+Protected run
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_qkva_oracle_dsa_trace2_20260809T225800140051438Z`
+ran from 22:58--01:03 UTC at pushed pin `6b554c4`. All eight hosts read about 104.812 GB, compiled
+the complete decoder/observer/prefill, and executed all 8,155 teacher-forced prompt tokens. The
+fused runtime manifest is `12339490...699a`; decoder, observer-isolation, prefill and split
+materializer contracts all pass. The repeated decoder contract remains exactly
+`219AG/372AR/17CP` with eight local residual transfers and no forbidden full-pod reconstruction.
+
+Token `101252` and its compact logit observation are exact. The DSA observer refuses before
+warmup/timing: event 0 has exact membership but differs from legacy order first at offset 8; event
+1 is the first set failure, with six expected/observed swaps, and later events diverge. Thus there
+is no XPlane, wall distribution, DB row, terminal `SUCCESS`, Gate-D or performance result. NPZ,
+token JSON, identical-rank-log and pre/failure-census SHAs are `34f4fe30...bbf`,
+`e5e35f3b...03c`, `fb04f32a...cb0`, and `bedaf1bb...ccea` / `55f32a98...6fc`; cleanup is
+authenticated 8/8 and the diagnostic prefix is in the approved bucket.
+
+A direct event-by-event comparison to the earlier fused-only observation at `e4079ac` finds the
+same selected-set membership at all 21 events and the same token observation. The repaired prefill
+changes only small score/order bits and is not the source or solution of the remaining set drift.
+Do not run another blind 8K candidate.
+
+Reuse the existing non-donating all-event DSA-internal observer and the already-sealed accepted
+layer-1 artifact instead of recapturing legacy state. Accepted layer-1 internals/comparison/seal
+SHAs are `79b813da...9054`, `1bc43a8e...9ad5`, and `283e5e88...10d5`. The current batch makes
+the observer baseline hash-selectable and admits it with repaired prefill while preserving the
+residual-observer ban. Exact next: focused tests, one Fable audit of only this diff, commit/push,
+then one serialized current-state internal observation. Compare event 1 to the sealed layer-1
+capture and correct only the first divergent field before any Gate-D retry.
+
+Fable's one-time read-only review returned `APPROVE COMMIT`. It independently confirmed that the
+new combination only adds fail-closed observer conditions, every selectable artifact remains
+SHA-checked locally/on all hosts/in Python, both features remain default-off, and the residual
+observer ban is unchanged. No repeat review of this batch is authorized.

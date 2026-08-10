@@ -6399,3 +6399,37 @@ unmotivated arithmetic variants.
   HLO phase identities, DB520/item1805 linkage, remote SUCCESS and 8/8 cleanup before launch. Run
   focused tests and one new-diff Fable audit before commit/deployment; cleared arithmetic is not
   reviewed again.
+
+## 2026-08-10 01:18 — Fused plus repair composition refuses at the unchanged fused trajectory
+
+- The combined protected 8K run at pushed `6b554c4` completed full-fleet load, compile and 8,155-
+  token prefill in 2h05. It selected fused runtime `12339490...699a` and passed the complete
+  decoder, DSA-observer isolation, prefill and split materializer HLO contracts. All hosts read
+  about 104.812 GB; logs are symmetric and byte-identical.
+- Raw token `101252` and compact logit candidates are exact. Event 0 has the exact selected set but
+  its first legacy-order mismatch is offset 8. Event 1 swaps exactly six selected positions:
+  expected `[1052,2024,3853,6256,6787,7473]`, observed
+  `[825,3889,4899,5536,6113,6951]`. The observer refuses before warmup, timing and tracing, so
+  there is no DB row, `SUCCESS`, Gate-D/E or throughput result.
+- DSA NPZ is `34f4fe30...bbf`; observation semantics are `267ffe90...a1e9f`; token JSON is
+  `e5e35f3b...03c`; eight logs are `fb04f32a...cb0`; pre/failure censuses are
+  `bedaf1bb...ccea` / `55f32a98...6fc` and authenticate 8/8 clean. Decoder/observer/prefill HLO
+  gzip SHAs are `aac53918...02de`, `c8bbf3d2...eb06`, and `64539115...c5f2`.
+- An offline comparison against the loop-corrected fused-only observation finds zero selected-set
+  swaps between the candidates at every one of 21 events and identical token-observation bytes.
+  The repair therefore removes its historical layer-0 cache regression without altering the
+  fused recurrent set trajectory. Another blind 8K retry is forbidden.
+- The existing all-event DSA-internal observer already captures normalized hidden, q-a, query,
+  head weights and current key in a separate non-donating executable. The already-sealed accepted
+  layer-1 artifact is present at
+  `/home/gianl/glm-run/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z` with
+  tensor/comparison/seal SHAs `79b813da...9054`, `1bc43a8e...9ad5`, and `283e5e88...10d5`.
+- The minimal batch makes the observer's pinned production baseline overrideable and permits the
+  internal observer with repaired prefill. It still forbids the rejected returned-residual
+  observer. Exact next is focused validation, one new-diff-only Fable audit, clean commit/push and
+  one current-state internal observation, followed by comparison to the existing layer-1 capture.
+- Focused compiler/prefill/decoder/internal-comparison coverage passes 68/68 in 114.50 seconds;
+  Python, Bash, ShellCheck, JSON and diff checks pass. Fable's one-time read-only audit returned
+  `APPROVE COMMIT`: selectable artifacts remain SHA-checked locally, fleet-wide and in Python; the
+  observer only adds failure conditions; both features stay default-off; and residual observation
+  remains forbidden. No repeat review of this batch is authorized.

@@ -1044,3 +1044,13 @@ failed the first DSA observer step before warmup, timing or tracing. Token `1012
 are exact; event 1 has seven swaps. There is no wall distribution, XPlane, DB row or `SUCCESS`.
 DB484 therefore remains the only accepted PP8 decoder point at `244.091151 ms` p50 /
 `4.096830 tok/s`; Gate E remains open pending the fused-qkv plus repair composition.
+
+## Fused-runtime plus split-repair full retry — no performance result
+
+The combined run at `6b554c4` spent 2h05 on full-fleet checkpoint reads, compilation and the
+8,155-token teacher-forced prefill. It passed all structural HLO gates and generated exact token
+`101252`, then the strict DSA observer rejected event-1 membership before warmup, timed iterations
+or tracing. The elapsed two hours are orchestration/compile/prefill time, not token latency. There
+is no XPlane, wall distribution, DB row or terminal `SUCCESS`. DB484 remains the only accepted PP8
+decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open. The next run is a
+correctness-only internal-boundary observation and cannot produce a throughput claim.

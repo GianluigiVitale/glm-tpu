@@ -24,10 +24,10 @@ readonly PREFILL_INDEX_REPAIR=${GLM_GREENFIELD_PREFILL_INDEX_REPAIR:-0}
 readonly SHORT_CONTEXT_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE:-0}
 readonly SHORT_CONTEXT_DSA_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_DSA_ORACLE:-0}
 readonly DSA_INTERNAL_OBSERVER=${GLM_GREENFIELD_DSA_INTERNAL_OBSERVER:-0}
-readonly DSA_INTERNAL_BASELINE_NPZ=/home/gianl/gcs-models/results/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260808T041407656729112Z/dsa_observer/step_00_position_8155.npz
-readonly DSA_INTERNAL_BASELINE_SHA=3e54254cfb48fbcca62f48484242196d1b1d3ffc6e2482377a569439fd65b053
-readonly DSA_INTERNAL_LAYER0_REFERENCE_NPZ=/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/recovery/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z/internal_comparison/internals.npz
-readonly DSA_INTERNAL_LAYER0_REFERENCE_SHA=0a724bada77d93ddc524368ac3b6e3c7f70442aba59ed96da5abde3dbe75fa39
+readonly DSA_INTERNAL_BASELINE_NPZ=${GLM_GREENFIELD_DSA_INTERNAL_BASELINE_NPZ:-/home/gianl/gcs-models/results/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_oracle_dsa_trace2_20260808T041407656729112Z/dsa_observer/step_00_position_8155.npz}
+readonly DSA_INTERNAL_BASELINE_SHA=${GLM_GREENFIELD_DSA_INTERNAL_BASELINE_SHA:-3e54254cfb48fbcca62f48484242196d1b1d3ffc6e2482377a569439fd65b053}
+readonly DSA_INTERNAL_LAYER0_REFERENCE_NPZ=${GLM_GREENFIELD_DSA_INTERNAL_LAYER0_REFERENCE_NPZ:-/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/recovery/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z/internal_comparison/internals.npz}
+readonly DSA_INTERNAL_LAYER0_REFERENCE_SHA=${GLM_GREENFIELD_DSA_INTERNAL_LAYER0_REFERENCE_SHA:-0a724bada77d93ddc524368ac3b6e3c7f70442aba59ed96da5abde3dbe75fa39}
 case "$PROFILE" in
   2k)
     CONTEXT_LABEL=2k
@@ -160,8 +160,11 @@ if [[ $PREFILL_INDEX_REPAIR == 1 ]]; then
     echo "prefill index repair requires the accepted split residual state" >&2
     exit 2
   }
-  [[ $LAYER_RESIDUAL_OBSERVER == 0 && $DSA_INTERNAL_OBSERVER == 0 ]] || {
-    echo "prefill index repair must remain isolated from diagnostic observers" >&2
+  # DSA internals use the separately compiled non-donating observer and are
+  # guarded by an exact pinned production observation.  Returned residual
+  # boundaries remain incompatible with the repaired prefill state.
+  [[ $LAYER_RESIDUAL_OBSERVER == 0 ]] || {
+    echo "prefill index repair must remain isolated from residual observation" >&2
     exit 2
   }
 fi

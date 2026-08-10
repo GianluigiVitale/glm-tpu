@@ -328,3 +328,12 @@ separate-qkv artifact and reproduces the old event-1 seven-swap set. Reuse the e
 fused N82 runtime together with DB520 repair next; do not create another qkv kernel or cache
 oracle. The protected launcher must default the selected linear engine to fused runtime
 `12339490...699a`, reject repair on a separate-qkv layout, and pin DB520 before fleet work.
+
+The protected fused-plus-repair composition at `6b554c4` now closes that exact next step. It keeps
+event-0 membership exact and reduces event 1 to the fused trajectory's six swaps, but a direct
+comparison finds identical selected-set membership to the earlier fused-only observation at every
+one of 21 events. Do not invent another cache/qkv variant. Reuse the existing separate all-event
+DSA-internal observer and the already-sealed accepted layer-1 comparison artifact
+(`79b813da...9054`, comparison `1bc43a8e...9ad5`, seal `283e5e88...10d5`) to identify the first
+remaining field. The returned layer-residual observer remains rejected because it perturbs
+arithmetic; no new legacy capture is warranted.

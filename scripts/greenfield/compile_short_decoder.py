@@ -1254,11 +1254,13 @@ def main() -> int:
         raise ValueError(
             "prefill index repair requires the accepted split residual state"
         )
-    if args.prefill_index_repair and (
-        args.observe_layer_residuals or args.observe_dsa_internals
-    ):
+    # The DSA-internal path is a separately compiled, non-donating executable
+    # whose selected output must match a pinned production observation.  The
+    # residual observer instead changes the returned recurrent boundary and
+    # remains incompatible with the repaired prefill state.
+    if args.prefill_index_repair and args.observe_layer_residuals:
         raise ValueError(
-            "prefill index repair must remain isolated from diagnostics"
+            "prefill index repair must remain isolated from residual observation"
         )
     if args.observe_layer_residuals and not dsa_oracle_mode:
         raise ValueError(

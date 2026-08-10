@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-09T22:55:00Z",
+  "captured_utc": "2026-08-10T01:18:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "5a41bb2a21db158f67e582267b0691806f742d60",
+    "greenfield": "6b554c42cb946d88ed120a2d5d51488f5b1affa8",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,12 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "5a41bb2a21db158f67e582267b0691806f742d60",
+      "source_pin": "6b554c42cb946d88ed120a2d5d51488f5b1affa8",
       "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted protected artifacts through DB520 and the 5a41bb2 full-repair refusal are pinned with rejected diagnostics and the fused checkpoint proof to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary; the full retry used the old separate-qkv runtime and leaves the fused-plus-repair composition untested. DB484 remains the last protected decoder performance point."
+      "reason": "Accepted protected artifacts through DB520, the 5a41bb2 separate-qkv refusal and the 6b554c4 fused-plus-repair refusal are pinned with rejected diagnostics to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. The fused composition retains exactly the fused-only selected-set trajectory at all 21 events, so the next action reuses the existing all-event internal observer and sealed accepted layer-1 artifact. DB484 remains the last protected decoder performance point."
     },
     {
       "id": "greenfield-prefill-loop-classifier",
@@ -146,7 +146,7 @@
       "disposition": "oracle_only",
       "greenfield_consumers": ["glm_tpu/greenfield/validation/legacy_dsa_internals.py", "glm_tpu/greenfield/validation/prompt_index_cache.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/run_capture_legacy_dsa_internals.sh", "scripts/greenfield/run_capture_legacy_prompt_key_internals.sh", "scripts/greenfield/run_capture_legacy_prompt_projection_input.sh", "scripts/greenfield/compare_accepted_greenfield_dsa_internals.py", "scripts/greenfield/compare_accepted_prompt_key_internals.py"],
       "gate": "D diagnostic",
-      "reason": "The original default-off callback captures one selected full-indexer scorer producer at position 8155. Its prompt-key extension reuses the zero-copy torchax-to-JAX bridge at the actual compute_indexer_keys producer and captures only one configured row's projection, post-key-LayerNorm and post-RoPE FP32 values. Protected DB513 passes exact raw tokens, all DSA events, DB/archive/cache integrity and clean census, then classifies projection output first. DB514 rejects adapted-wk operand precision. DB515 uses the separate default-off prompt-key-input mode to prove the actual FP32 6,144-wide h entering projection is bitwise exact; previous modes remain unchanged. Legacy execution never enters greenfield execution."
+      "reason": "The original default-off callback captures one selected full-indexer scorer producer at position 8155. Its prompt-key extension reuses the zero-copy torchax-to-JAX bridge at the actual compute_indexer_keys producer and captures only one configured row's projection, post-key-LayerNorm and post-RoPE FP32 values. Protected DB513 passes exact raw tokens, all DSA events, DB/archive/cache integrity and clean census, then classifies projection output first. DB514 rejects adapted-wk operand precision. DB515 proves the actual FP32 6,144-wide h entering projection is bitwise exact. The sealed accepted layer-1 artifact at greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z is reused for the post-6b554c4 discriminator; no new legacy capture is required. Legacy execution never enters greenfield execution."
     },
     {
       "id": "legacy-dsa-query-association",
@@ -168,7 +168,7 @@
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "glm_tpu/greenfield/kernels/reference/qkv_a.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/model/weights.py", "glm_tpu/greenfield/checkpoint/runtime_feature.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/probe_layer0_dsa_query_association.py", "scripts/greenfield/run_layer0_dsa_query_association_probe.sh", "scripts/greenfield/pack_feature_runtime_checkpoint.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "docs/greenfield/NUMERICAL_CONTRACT.md"],
       "gate": "B-D",
-      "reason": "The all-21 observer proves the earliest production divergence is layer-0 q-a. DB501 rejects ordinary M1 dot associations; DB502 proves the one-row convolution arithmetic; DB503 proves the integrated production selector. The fused pack and DB504 then prove complete final-layout ownership, byte-exact device round trips and exactly 78 production convolutions with no old q-a/kv-a calls, reshard, concat, dequantization, dead row or forbidden state. Full-pod collectives and an external M32 bucket remain forbidden."
+      "reason": "The all-21 observer originally proved the earliest separate-qkv production divergence was layer-0 q-a. DB501 rejects ordinary M1 dot associations; DB502 proves the one-row convolution arithmetic; DB503 proves the integrated production selector. The fused pack and DB504 prove complete final-layout ownership, byte-exact device round trips and exactly 78 production convolutions with no old q-a/kv-a calls, reshard, concat, dequantization, dead row or forbidden state. The 6b554c4 fused-plus-repair run still has the fused-only selected-set trajectory, so the same non-donating observer is reused once against the sealed accepted layer-1 state to locate the new earliest field. Full-pod collectives and an external M32 bucket remain forbidden."
     },
     {
       "id": "legacy-code-and-step-fingerprints",

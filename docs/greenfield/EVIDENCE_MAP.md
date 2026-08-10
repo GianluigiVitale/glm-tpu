@@ -685,3 +685,23 @@ capture is still required.
   test the fused N82 runtime `12339490...699a` together with DB520 repair. DB502--504 and DB520
   independently prove those two boundaries, so their protected composition is the exact next
   integration result after the launcher-safety diff passes tests and one review.
+
+## Combined fused-runtime and split-repair 8K refusal
+
+- Refused run: pushed `6b554c4`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_qkva_oracle_dsa_trace2_20260809T225800140051438Z`,
+  22:58--01:03 UTC. Full eight-host load/compile and 8,155-token prefill pass with runtime
+  `12339490...699a`; decoder/observer/prefill/materializer HLO contracts all pass.
+- Token `101252` is exact. Event 0 membership is exact; event 1 is the first set failure at six
+  swaps. No warmup, timing, XPlane, DB row, terminal `SUCCESS`, Gate D or Gate E result exists.
+- NPZ/token/log/pre/failure seals are `34f4fe30...bbf`, `e5e35f3b...03c`,
+  `fb04f32a...cb0`, `bedaf1bb...ccea` and `55f32a98...6fc`; the same-region diagnostic archive
+  exists and authenticated cleanup is 8/8.
+- Direct comparison with the earlier fused-only refusal finds identical selected-set membership
+  for all 21 events and identical compact token observation. This rejects the fused-plus-repair
+  composition as a further correctness improvement: the remaining recurrent divergence is
+  unchanged.
+- Reuse checkpoint: accepted layer-1 internals/comparison/seal already exist at SHAs
+  `79b813da...9054`, `1bc43a8e...9ad5`, and `283e5e88...10d5`. The next discriminator is the
+  existing separate DSA-internal observer against those bytes, not another legacy capture or blind
+  full decoder retry.
