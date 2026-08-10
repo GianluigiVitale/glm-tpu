@@ -631,10 +631,13 @@ def _physical_lp4_hlo_contract(
         )
         if shape in lowered
     ]
+    head_unrolled = "head_unrolled" in candidate
     required_shapes = {
         "one_live_q_a_row": "bf16[1,2048]" in lowered,
         "local_owner_projection": (
-            "f32[1,1024]" in lowered or "f32[1024]" in lowered
+            ("f32[1,128]" in lowered or "f32[128]" in lowered)
+            if head_unrolled
+            else ("f32[1,1024]" in lowered or "f32[1024]" in lowered)
         ),
         "local_owner_query": "f32[8,128]" in lowered,
         "local_fp32_owner": "f32[1024,2048]" in lowered,
@@ -659,6 +662,7 @@ def _physical_lp4_hlo_contract(
         "forbidden_operations": forbidden_operations,
         "hlo_sha256": sha256(hlo.encode()).hexdigest(),
         "local_parallel_size": 4,
+        "physical_projection_width": 128 if head_unrolled else 1024,
         "physical_owner_width": 1024,
         "required_shapes": required_shapes,
         "source": source,
@@ -777,6 +781,7 @@ def _run_physical_lp4_query(
             arguments = predecoded_arguments
         compiled = jax.jit(mapped).lower(*arguments).compile()
         hlo = compiled.as_text()
+        (args.hlo_dir / f"{name}.optimized_hlo.txt").write_text(hlo)
         contract = _physical_lp4_hlo_contract(
             hlo, candidate=name, source=source
         )
@@ -795,7 +800,6 @@ def _run_physical_lp4_query(
             "hlo": contract,
         }
         tensor_payload[f"candidate__{name}"] = candidate
-        (args.hlo_dir / f"{name}.optimized_hlo.txt").write_text(hlo)
 
     exact = sorted(
         name

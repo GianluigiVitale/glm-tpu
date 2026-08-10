@@ -2996,3 +2996,24 @@ Focused validation passes 15/15 with Python, Bash, ShellCheck, JSON and diff che
 one-time read-only review independently compiled the real-geometry mapping on four forced devices,
 verified head order/pins/HLO/DB/archive gates, and returned `APPROVE COMMIT`. Its only actionable
 note was the corrected target-list error wording; no repeat review of this batch is authorized.
+
+The first protected launch at `752d36e`, tag
+`greenfield_layer0_physical_lp4_dsa_query_association_20260810T041439079476028Z`, passes both 8/8
+idle censuses and compiles the physical raw owner-dot candidate. Its HLO SHA `0a8ba57c...8472`
+proves local entry `u8[1024,2048]`/`f32[8,16]`, local completed `f32[1024,2048]`, output
+`f32[8,128]`, four partitions and no communication/global table. The matrix then refuses before
+the head-unrolled arm executes or any candidate result is persisted because the shared HLO linter
+incorrectly requires a 1,024-wide intermediate for that arm, whose intended physical intermediate
+is 128-wide. No candidate result artifact, DB row, `SUCCESS` or correctness/performance result
+exists. Pre/failure census SHAs are
+`fd4ed1ac...5710` / `33c967bb...9cad`; the partial diagnostic is in the approved bucket.
+
+The narrow fail-closed correction makes the required projection width candidate-specific
+(1,024 for owner dot, 128 for head-unrolled) and writes each optimized HLO before validation so a
+future refusal preserves its exact cause. Arithmetic, sharding, tensors and evidence semantics are
+unchanged. Run focused checks and one review of only this correction before a fresh-tag retry; the
+already-approved parent batch is not reviewed again.
+
+The correction retains 15/15 focused passes and all static checks. Fable's one-time review of only
+this post-`752d36e` diff returned `APPROVE COMMIT`; its suggested logical-or-flattened 128-width
+hardening and evidence wording clarifications are included. Do not re-review this batch.

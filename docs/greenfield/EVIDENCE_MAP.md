@@ -722,3 +722,17 @@ capture is still required.
   four candidates spanning raw/predecoded owner state and 1,024-wide/eight-by-128 reductions. It
   pins the accepted/current tensors and rejects communication, global tables, callbacks and dead
   rows. No physical candidate or production correction is accepted until protected TPU evidence.
+
+### First physical-query HLO refusal
+
+- Attempt `greenfield_layer0_physical_lp4_dsa_query_association_20260810T041439079476028Z` at
+  `752d36e` passes 8/8 idle checks and executes the raw owner-dot arm transiently. It also compiles
+  the head-unrolled arm before its old linter refuses, but that HLO was not yet persisted. Owner HLO SHA
+  `0a8ba57c...8472` proves four partitions and exact local raw/scale/materialized/output shapes with
+  no forbidden operation or global table.
+- The next head-unrolled arm refuses before arithmetic because the linter asks every candidate for
+  the owner-dot's 1,024-wide intermediate instead of its intentional 128-wide head intermediate.
+  No DB/SUCCESS/query output/exactness/performance evidence exists. Pre/failure census SHAs are
+  `fd4ed1ac...5710` / `33c967bb...9cad`; the approved partial archive exists.
+- Candidate-specific width validation and pre-validation HLO persistence are readiness corrections
+  only. A fresh protected matrix remains required.

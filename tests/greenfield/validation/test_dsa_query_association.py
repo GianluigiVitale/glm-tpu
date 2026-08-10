@@ -106,6 +106,14 @@ def test_physical_lp4_query_associations_are_semantically_equal_on_cpu() -> None
         source="raw",
     )
     assert not global_weight["passed"]
+    head_hlo = hlo.replace("f32[1,1024]", "f32[128]")
+    head = subject._physical_lp4_hlo_contract(
+        head_hlo,
+        candidate="physical_raw_head_unrolled_m1_n128",
+        source="raw",
+    )
+    assert head["passed"]
+    assert head["physical_projection_width"] == 128
 
 
 def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:

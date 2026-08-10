@@ -6456,3 +6456,19 @@ unmotivated arithmetic variants.
   ready; protected arithmetic remains unproven until one serialized run. Focused coverage passes
   15/15 and the one-time Fable audit independently compiled the real-geometry four-device mapping,
   verified head order and every evidence gate, and returned `APPROVE COMMIT`.
+
+## 2026-08-10 04:15 — physical query attempt refuses on candidate-specific HLO width
+
+- The pushed `752d36e` target passes 8/8 pre-census and compiles the real raw owner-dot program.
+  HLO `0a8ba57c...8472` has four partitions, local raw/scale/FP32-owner/output shapes and no
+  communication or global query table. This independently confirms the new mapping is physical.
+- Validation then refuses the head-unrolled program before execution because the common contract
+  requires an owner-wide 1,024 projection even though that candidate deliberately creates eight
+  128-wide projections. No query candidate output, DB row, SUCCESS, exactness or performance result
+  exists. The approved partial archive is present; pre/failure censuses are 8/8 clean at
+  `fd4ed1ac...5710` / `33c967bb...9cad`.
+- The minimal correction requires 1,024 only for owner-dot and 128 only for head-unrolled, and
+  preserves HLO before testing its contract. No arithmetic or sharding changes. Focused tests and
+  static checks pass. Fable's one-time review of only this correction returned `APPROVE COMMIT`;
+  both logical/flattened 128 shapes are admitted and its evidence wording corrections are included.
+  A fresh bounded retry is next.
