@@ -440,3 +440,12 @@ protected wrapper. Do not recapture legacy state, repack weights, or revive the 
 perturbing returned-residual observer. The bounded successor executes layer 0 only and changes the
 precision of the attention-output and dense-down LP4 combines in a four-arm matrix. Its result
 chooses the next production correction; it cannot establish decoder performance.
+
+The first `fab59c3` discriminator compile produces no numerical arms because TPU XLA moves each
+plain BF16 cast into the requested FP32 `psum`, leaving seven BF16-result hidden reductions. Do
+not accept BF16 reductions, add another boundary kernel, rerun the full decoder, or redesign the
+diagnostic. Reuse the existing feature-MoE `fp32_to_bf16_pallas_boundary`, whose opaque
+device-only conversion was created for this exact cast-motion behavior. Apply it only after the
+two candidate Pallas FP32 LP4 combines, and retain a fail-closed HLO requirement for both the
+named boundary kernels and physical `f32[1,6144]` reductions. The corrected bounded retry remains
+the only authorized successor and still cannot establish decoder performance.

@@ -2348,6 +2348,7 @@ def validate_layer0_residual_discriminator_hlo(
         "m8_h6144_i3072_o6144"
     )
     dense_f32_name = f"{dense_bf16_name}_downf32"
+    fp32_boundary_name = "greenfield_fp32_to_bf16_r8_h6144"
     kernel_counts = {
         attention_bf16_name: sum(
             attention_bf16_name in line
@@ -2362,6 +2363,9 @@ def validate_layer0_residual_discriminator_hlo(
             for line in custom_calls
         ),
         dense_f32_name: sum(dense_f32_name in line for line in custom_calls),
+        fp32_boundary_name: sum(
+            fp32_boundary_name in line for line in custom_calls
+        ),
     }
     host_markers = sorted(
         marker
@@ -2405,6 +2409,10 @@ def validate_layer0_residual_discriminator_hlo(
         violations.append("layer-0 discriminator lost BF16 dense control")
     if not 1 <= kernel_counts[dense_f32_name] <= 2:
         violations.append("layer-0 discriminator lost FP32 dense arm")
+    if not 2 <= kernel_counts[fp32_boundary_name] <= 4:
+        violations.append(
+            "layer-0 discriminator lost opaque FP32-to-BF16 boundaries"
+        )
     if sum(
         count
         for shape, count in result_shapes.items()

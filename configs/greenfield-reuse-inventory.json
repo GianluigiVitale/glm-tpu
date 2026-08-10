@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-10T08:42:00Z",
+  "captured_utc": "2026-08-10T19:54:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "70f549eb05e413109c142b0b0bb2fdd2db376437",
+    "greenfield": "fab59c396d9135a649a38b58916adbf9a3ae1ca2",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,12 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "70f549eb05e413109c142b0b0bb2fdd2db376437",
-      "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
+      "source_pin": "fab59c396d9135a649a38b58916adbf9a3ae1ca2 / failed discriminator HLO 32dc4bb2e8378263d9052d16c33d18bd779aac79354be53d929c8b06cfd78bfa",
+      "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T193624683891804Z"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted protected artifacts through DB526, the 5a41bb2 separate-qkv refusal, the 6b554c4 fused-plus-repair refusal, the 888cfcb current-state internal observation and the 1824cf8 exact-query metadata refusal are pinned to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. DB521 rejects physical wq_b ownership/dot variants. DB522 proves the causal q-a BF16 boundary and rejects HIGHEST. DB523 rejects N128 scheduling. DB524 rejects ordinary GSPMD arithmetic. DB525 proves the exact local four-alias tuple fusion. DB526 proves the actual fused-q-a/materializer/helper production composition. The 1824cf8 full compile passes every arithmetic/topology contract and exposes only the exact-query token-return source-name omission. DB484 remains the last protected decoder performance point."
+      "reason": "Accepted protected artifacts through DB529 and every later compile/refusal are pinned to prevent repeated experiments and unsupported promotion claims. The 0312cf5 protected 8K run closes the exact layer-0 DSA chain and localizes the first recurrent divergence to the layer-0 residual entering layer 1. The fab59c3 four-arm discriminator produces no numerical result: its fail-closed HLO contract proves TPU XLA commuted plain BF16 casts into the requested FP32 LP4 reductions. Reuse the existing feature-MoE fp32_to_bf16_pallas_boundary and retry only the bounded discriminator; do not accept BF16 demotion or launch the full decoder first. DB484 remains the last protected decoder performance point."
     },
     {
       "id": "greenfield-prefill-loop-classifier",

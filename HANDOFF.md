@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-10 19:20 UTC
+**Updated:** 2026-08-10 19:54 UTC
 
 ## Authority and isolation
 
@@ -3301,3 +3301,29 @@ the sealed layer-1 reference to the approved bucket, then run one serialized pro
 discriminator. If one arm is exact, integrate only that causal
 association; if none is exact, inspect legacy TP32 subshard reduction association without another
 blind full-decoder retry.
+
+## First residual-discriminator compile exposes FP32 cast motion
+
+Protected tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T193624683891804Z`
+ran from 19:36--19:45 UTC at pushed `fab59c3`. All eight ranks loaded and compiled the production
+decoder and the separate layer-0 discriminator. The production decoder contract passed, but the
+discriminator refused before prefill or arithmetic because TPU XLA commuted the plain downstream
+BF16 casts into both requested FP32 `psum`s. All seven hidden-width reductions therefore returned
+`bf16[1,6144]`, even though one FP32 attention kernel and two FP32 dense kernels survived. This is
+a compiler-association refusal, not evidence for or against any of the four numerical arms.
+
+Discriminator optimized-HLO/contract/rank-log SHAs are
+`32dc4bb2...8bfa`, `270cffa1...6170`, and `efed2231...6765`. Pre/failure census SHAs are
+`21ba4f73...4fa6` / `714e7abf...843`; the diagnostic is archived and authenticated 8/8 cleanup
+passes. There is no variant tensor, token, DSA comparison, timing, trace, DB row or `SUCCESS`.
+DB484 remains the only accepted decoder performance point.
+
+The correction reuses the existing opaque device-only `fp32_to_bf16_pallas_boundary` already used
+by the feature-MoE FP32 reconstruction path. It is inserted after the attention and dense FP32 LP4
+reductions only in Pallas mode; reference/CPU execution keeps the ordinary cast. The discriminator
+contract now requires two to four named boundary kernels in addition to at least two physical
+`f32[1,6144]` reductions, so another optimizer demotion fails before model execution. The affected
+explicit-CPU batch passes 105 tests; compileall, JSON, and diff checks pass. The one new-diff-only
+Fable review found no blocker and returned `APPROVE COMMIT`. Exact next: independently verify,
+commit/push, and retry only the same discriminator. Do not launch the full 8K decoder first.

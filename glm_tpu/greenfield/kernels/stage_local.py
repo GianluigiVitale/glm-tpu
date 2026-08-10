@@ -1079,7 +1079,19 @@ def stage_local_index_share_fp8_mapped(
         axis_index_groups=groups,
     )
     if reconstruct_output_fp32:
-        update = update.astype(residual.dtype)
+        if linear_backend == "pallas":
+            # A plain cast is commuted into the psum by TPU XLA, changing
+            # the requested FP32 collective into a BF16-result collective.
+            # Keep the cast behind the same opaque boundary already used by
+            # the feature-MoE FP32 reconstruction path.
+            update = fp32_to_bf16_pallas_boundary(
+                update,
+                row_tile=8,
+                output_tile=block_shape[0],
+                interpret=linear_interpret,
+            )
+        else:
+            update = update.astype(residual.dtype)
     output = residual_add(residual, update) if add_residual else update
     return StageLocalIndexShareFp8Result(
         output,
@@ -1182,7 +1194,15 @@ def stage_local_dense_fp8_mapped(
         axis_index_groups=groups,
     )
     if reconstruct_down_fp32:
-        update = update.astype(residual.dtype)
+        if linear_backend == "pallas":
+            update = fp32_to_bf16_pallas_boundary(
+                update,
+                row_tile=8,
+                output_tile=block_shape[0],
+                interpret=linear_interpret,
+            )
+        else:
+            update = update.astype(residual.dtype)
     return residual_add(residual, update) if add_residual else update
 
 

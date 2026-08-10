@@ -1175,3 +1175,13 @@ failure before warmup, timed iterations or XPlane. Its useful output is a layer-
 localization, not latency. The new four-arm layer-0 residual discriminator is likewise explicitly
 diagnostic-only and will stop before timing. DB484 remains the only accepted PP8 decoder point at
 `244.091151 ms` p50 / `4.096830 tok/s`; protected 8K Gate D and Gate E remain open.
+
+## First residual-discriminator compile refusal — no performance result
+
+The protected `fab59c3` discriminator attempt ran for about nine minutes only because all eight
+hosts loaded and compiled the complete decoder plus the separate layer-0 program. It stopped at
+the fail-closed HLO contract before prefill, arithmetic execution, warmup, timing or XPlane: TPU
+XLA had demoted both requested FP32 hidden-width reductions by commuting their downstream BF16
+casts. There is no variant tensor, token, DSA comparison, wall distribution, DB row or `SUCCESS`.
+The elapsed time is load/compile latency, not token latency. DB484 remains the only accepted PP8
+decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gates D and E remain open.

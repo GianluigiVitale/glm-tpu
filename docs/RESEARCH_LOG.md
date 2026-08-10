@@ -6682,3 +6682,26 @@ unmotivated arithmetic variants.
   tracing covers the real stage-0 two-layer schedule and the four-row output. The affected suite
   passes 97/97 with Python/Bash/ShellCheck/JSON/diff checks green. Exact next is one new-diff-only
   Fable approval, commit/push, sealed-reference upload, and one serialized protected run.
+
+## 2026-08-10 19:36--19:54 — first residual discriminator refuses FP32 cast motion
+
+- The pushed `fab59c3` discriminator run loaded and compiled the complete production decoder and
+  separate four-arm layer-0 executable on all eight hosts. It refused before prefill, arithmetic,
+  tensor comparison, timing or trace because every physical hidden-width reduction was
+  `bf16[1,6144]`; the contract correctly reported `layer-0 discriminator lost FP32 local combines`.
+- Optimized HLO proves the FP32 producers survived: one
+  `greenfield_fp8_block_matmul_f32_m8_k4096_n6144` and two FP32 dense-down kernels remain. TPU XLA
+  commuted each following plain BF16 cast into its `psum`, however, so the requested FP32
+  association was never executed. The four numerical arms therefore have no result and none may
+  be accepted or rejected from this run.
+- Optimized-HLO/contract/rank-log SHAs are `32dc4bb2...8bfa`, `270cffa1...6170`, and
+  `efed2231...6765`. Pre/failure census SHAs `21ba4f73...4fa6` / `714e7abf...843` prove
+  authenticated 8/8 cleanup; the diagnostic is archived. There is no DB row or terminal
+  `SUCCESS`, and DB484 remains the only decoder performance result.
+- The existing feature-MoE path already solved this exact optimizer behavior with the opaque
+  device-only `fp32_to_bf16_pallas_boundary`. Reuse it after the attention and dense FP32 LP4
+  reductions instead of adding a kernel or weakening the contract. The successor requires two to
+  four named boundaries and at least two physical `f32[1,6144]` reductions before it may execute.
+  The affected explicit-CPU batch passes 105 tests, with compileall/JSON/diff checks green. The
+  one new-diff-only Fable audit found no blocker and returned `APPROVE COMMIT`. After independent
+  verification and a clean pushed pin, retry only this discriminator—not the full decoder.

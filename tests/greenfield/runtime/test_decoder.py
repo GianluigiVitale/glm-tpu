@@ -497,6 +497,12 @@ def _layer0_residual_discriminator_hlo() -> str:
             'custom_call_target="tpu_custom_call", '
             'backend_config="greenfield_fp8_fused_block_swiglu_'
             'm8_h6144_i3072_o6144_downf32"',
+            '  %boundary.0 = bf16[1,6144] custom-call(%f), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp32_to_bf16_r8_h6144"',
+            '  %boundary.1 = bf16[1,6144] custom-call(%f), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp32_to_bf16_r8_h6144"',
         )
     )
     return f'''HloModule layer0_variants, replica_count=1, num_partitions=32
@@ -540,7 +546,18 @@ def test_layer0_residual_discriminator_hlo_is_local_and_pins_four_arms() -> None
         "greenfield_fp8_block_matmul_f32_m8_k4096_n6144": 1,
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": 1,
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144_downf32": 1,
+        "greenfield_fp32_to_bf16_r8_h6144": 2,
     }
+
+    demoted = validate_layer0_residual_discriminator_hlo(
+        hlo.replace("f32[1,6144] all-reduce", "bf16[1,6144] all-reduce"),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+    )
+    assert not demoted["passed"]
+    assert "layer-0 discriminator lost FP32 local combines" in demoted[
+        "violations"
+    ]
 
     escaped = validate_layer0_residual_discriminator_hlo(
         hlo.replace("{0,1,2,3}", "{0,1,2,4}"),
