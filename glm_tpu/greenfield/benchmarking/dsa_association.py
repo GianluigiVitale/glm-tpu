@@ -20,6 +20,8 @@ AssociationPhase = Literal[
     "legacy_score",
     "legacy_local_dcp_xla_score",
     "one_row_score",
+    "local_wide_score",
+    "local_pagewise_score",
 ]
 
 
@@ -163,6 +165,20 @@ def validate_dsa_association_hlo(
             f"f32[1,{heads}]",
             f"f32[{context}]",
         ),
+        "local_wide_score": (
+            f"f32[1,{heads},{head_dim}]",
+            f"bf16[{context},{head_dim}]",
+            f"f32[1,{heads}]",
+            f"f32[1,{context}]",
+        ),
+        "local_pagewise_score": (
+            f"f32[1,{heads},{head_dim}]",
+            f"bf16[{context},{head_dim}]",
+            f"f32[1,{heads}]",
+            f"f32[{context}]",
+            f"f32[{context // page_size},{page_size}]",
+            " while(",
+        ),
     }
     if phase not in required_by_phase:
         raise ValueError(f"unsupported DSA association HLO phase {phase!r}")
@@ -190,6 +206,24 @@ def validate_dsa_association_hlo(
             "hd,pd->hp/dot_general",
             "h,hp->p/dot_general",
         )
+    elif phase == "local_wide_score":
+        score_intermediate_candidates = (
+            f"f32[{heads},{context}]",
+            f"f32[{context},{heads}]",
+        )
+        score_source_markers = (
+            "rhd,sd->rhs/dot_general",
+            "rh,rhs->rs/dot_general",
+        )
+    elif phase == "local_pagewise_score":
+        score_intermediate_candidates = (
+            f"f32[{heads},{page_size}]",
+            f"f32[{page_size},{heads}]",
+        )
+        score_source_markers = (
+            "hd,pd->hp/dot_general",
+            "h,hp->p/dot_general",
+        )
     score_intermediate_shapes = [
         shape
         for shape in score_intermediate_candidates
@@ -198,6 +232,18 @@ def validate_dsa_association_hlo(
     missing_score_markers = [
         marker for marker in score_source_markers if marker not in optimized_hlo
     ]
+    page_map_input_candidates: tuple[str, ...] = ()
+    page_map_input_shapes: list[str] = []
+    if phase == "local_pagewise_score":
+        page_map_input_candidates = (
+            f"bf16[{context // page_size},{page_size},{head_dim}]",
+            f"f32[{context // page_size},{page_size},{head_dim}]",
+        )
+        page_map_input_shapes = [
+            shape
+            for shape in page_map_input_candidates
+            if shape in optimized_hlo
+        ]
     fused_qkv_candidates: tuple[str, ...] = ()
     if phase == "legacy_fused_qkv_state":
         fused_qkv_candidates = (
@@ -351,8 +397,13 @@ def validate_dsa_association_hlo(
                     named_multiply_reduce_operand
                 ),
             }
+    one_row_phases = (
+        "one_row_score",
+        "local_wide_score",
+        "local_pagewise_score",
+    )
     forbidden_dead_rows = []
-    if phase == "one_row_score":
+    if phase in one_row_phases:
         forbidden_dead_rows = [
             shape
             for shape in (
@@ -361,6 +412,34 @@ def validate_dsa_association_hlo(
             )
             if shape in optimized_hlo
         ]
+    forbidden_score_shapes: list[str] = []
+    map_trip_count: int | None = None
+    if phase == "local_wide_score":
+        forbidden_score_shapes = [
+            shape
+            for shape in (
+                f"f32[{heads},{page_size}]",
+                f"f32[1,{heads},{page_size}]",
+            )
+            if shape in optimized_hlo
+        ]
+    elif phase == "local_pagewise_score":
+        forbidden_score_shapes = [
+            shape
+            for shape in (
+                f"f32[{heads},{context}]",
+                f"f32[1,{heads},{context}]",
+            )
+            if shape in optimized_hlo
+        ]
+        if context % page_size:
+            forbidden_score_shapes.append("context_not_page_aligned")
+        else:
+            map_trip_count = context // page_size
+            if " while(" not in optimized_hlo:
+                forbidden_score_shapes.append(
+                    f"missing_page_map_loop_{map_trip_count}"
+                )
     violations: list[str] = []
     if missing_shapes:
         violations.append(
@@ -375,6 +454,11 @@ def validate_dsa_association_hlo(
         violations.append(
             f"DSA association {phase} lost score source markers: "
             f"{missing_score_markers}"
+        )
+    if page_map_input_candidates and not page_map_input_shapes:
+        violations.append(
+            f"DSA association {phase} lacks an exact page-map input: "
+            f"{list(page_map_input_candidates)}"
         )
     if fused_qkv_candidates and not fused_qkv_intermediate_shapes:
         violations.append(
@@ -392,12 +476,18 @@ def validate_dsa_association_hlo(
             f"one-row DSA challenger contains legacy dead rows: "
             f"{forbidden_dead_rows}"
         )
+    if forbidden_score_shapes:
+        violations.append(
+            f"DSA association {phase} score geometry drifted: "
+            f"{forbidden_score_shapes}"
+        )
     return {
         "phase": phase,
         "required_shapes": list(required_shapes),
         "missing_shapes": missing_shapes,
         "score_intermediate_shapes": score_intermediate_shapes,
         "missing_score_markers": missing_score_markers,
+        "page_map_input_shapes": page_map_input_shapes,
         "fused_qkv_intermediate_shapes": fused_qkv_intermediate_shapes,
         "forbidden_operations": forbidden_operations,
         "distributed_collective_contract": distributed_collective_contract,
@@ -405,7 +495,9 @@ def validate_dsa_association_hlo(
             distributed_collective_violations
         ),
         "forbidden_dead_rows": forbidden_dead_rows,
-        "diagnostic_batch32_allowed": phase != "one_row_score",
+        "forbidden_score_shapes": forbidden_score_shapes,
+        "map_trip_count": map_trip_count,
+        "diagnostic_batch32_allowed": phase not in one_row_phases,
         "passed": not violations,
         "violations": violations,
     }

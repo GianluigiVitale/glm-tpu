@@ -15,6 +15,12 @@ DISTRIBUTED_PROBE = (
 )
 STATE_PROBE = REPO / "scripts/greenfield/probe_layer0_dsa_association.py"
 WRAPPER = REPO / "scripts/greenfield/run_layer0_dsa_association_probe.sh"
+SCORER_PROBE = (
+    REPO / "scripts/greenfield/probe_layer0_dsa_scorer_association.py"
+)
+SCORER_WRAPPER = (
+    REPO / "scripts/greenfield/run_layer0_dsa_scorer_association_probe.sh"
+)
 
 
 def test_distributed_q_a_probe_is_exact_pin_and_collective_bound() -> None:
@@ -179,6 +185,74 @@ def test_protected_wrapper_reuses_db491_for_bf16_wk_discriminator() -> None:
         assert forbidden not in source
     completed = subprocess.run(
         ["bash", "-n", str(WRAPPER)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_scorer_association_probe_reuses_sealed_breakpoints() -> None:
+    source = SCORER_PROBE.read_text()
+    for required in (
+        "inspect_greenfield_layer0_dsa_internal_observation",
+        "inspect_greenfield_layer0_dsa_selected_observation",
+        "inspect_legacy_prompt_index_cache",
+        "pack_stage_local_index_keys",
+        "stitch_stage_local_scores",
+        "dsa_scores",
+        "one_row_pagewise_scores",
+        'phase="local_wide_score"',
+        'phase="local_pagewise_score"',
+        "current-wide scorer failed to reproduce",
+        '"candidate_restored"',
+        '"profiler_free_timing": False',
+    ):
+        assert required in source
+    for forbidden in (
+        "import tpu_inference",
+        "from tpu_inference",
+        "import vllm",
+        "jax.distributed.initialize",
+    ):
+        assert forbidden not in source
+    completed = subprocess.run(
+        [sys.executable, "-m", "py_compile", str(SCORER_PROBE)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_scorer_association_wrapper_is_protected_and_bounded() -> None:
+    source = SCORER_WRAPPER.read_text()
+    for required in (
+        ".glm_pod_workload.lock",
+        "strict_census pre",
+        "strict_census post",
+        "syncing exact reviewed pin to all eight hosts",
+        "probe_layer0_dsa_scorer_association.py",
+        "ASSOCIATION_MANIFEST_SHA",
+        "PROMPT_CACHE_MANIFEST_SHA",
+        "INTERNAL_CONTRACT_SHA",
+        "INTERNAL_TENSOR_SHA",
+        "SELECTED_OBSERVATION_SHA",
+        "bounded-wide2048-vs-pagewise512-v1",
+        "current-wide protected control did not reproduce",
+        "bench/results.db",
+        "--no-clobber",
+        "REMOTE_PREFIX/SUCCESS",
+    ):
+        assert required in source
+    for forbidden in (
+        "compile_short_decoder.py",
+        "run_short_decoder_compile_pp8",
+        "jax.distributed.initialize",
+    ):
+        assert forbidden not in source
+    completed = subprocess.run(
+        ["bash", "-n", str(SCORER_WRAPPER)],
         text=True,
         capture_output=True,
         check=False,

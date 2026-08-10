@@ -281,6 +281,279 @@ def inspect_distributed_q_a_norm_artifact(
     return manifest, q_bits
 
 
+def inspect_greenfield_layer0_dsa_internal_observation(
+    artifact_dir: Path,
+    *,
+    expected_contract_sha256: str,
+    expected_tensor_sha256: str,
+) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+    """Verify the sealed all-event observer and its exact layer-0 boundary."""
+
+    artifact_dir = Path(artifact_dir)
+    contract_path = artifact_dir / "contract.json"
+    tensor_path = artifact_dir / "position_8155_internals.npz"
+    if _sha256_file(contract_path) != expected_contract_sha256:
+        raise ValueError("greenfield DSA internal contract identity drifted")
+    if _sha256_file(tensor_path) != expected_tensor_sha256:
+        raise ValueError("greenfield DSA internal tensor identity drifted")
+    contract = json.loads(contract_path.read_text())
+    expected_keys = {
+        "current_key",
+        "decode_position",
+        "head_weights",
+        "normalized_hidden_bfloat16_bits",
+        "producer_layer_ids",
+        "q_a_state_bfloat16_bits",
+        "query",
+    }
+    with np.load(tensor_path, allow_pickle=False) as bundle:
+        if set(bundle.files) != expected_keys:
+            raise ValueError("greenfield DSA internal tensor keys drifted")
+        arrays = {name: np.asarray(bundle[name]).copy() for name in bundle.files}
+    event_count = 21
+    storage_contract = {
+        "normalized_hidden": (
+            "normalized_hidden_bfloat16_bits",
+            (event_count, 6144),
+            np.dtype(np.uint16),
+            "bfloat16",
+        ),
+        "q_a_state": (
+            "q_a_state_bfloat16_bits",
+            (event_count, 2048),
+            np.dtype(np.uint16),
+            "bfloat16",
+        ),
+        "query": (
+            "query",
+            (event_count, 32, 128),
+            np.dtype(np.float32),
+            "float32",
+        ),
+        "head_weights": (
+            "head_weights",
+            (event_count, 32),
+            np.dtype(np.float32),
+            "float32",
+        ),
+        "current_key": (
+            "current_key",
+            (event_count, 128),
+            np.dtype(np.float32),
+            "float32",
+        ),
+        "producer_layer_ids": (
+            "producer_layer_ids",
+            (event_count,),
+            np.dtype(np.int32),
+            "int32",
+        ),
+    }
+    if contract.get("decode_position") != 8155 or (
+        contract.get("event_count") != event_count
+        or arrays["decode_position"].shape != (1,)
+        or arrays["decode_position"].dtype != np.dtype(np.int32)
+        or arrays["decode_position"].tolist() != [8155]
+    ):
+        raise ValueError("greenfield DSA internal event geometry drifted")
+    for logical_name, (
+        storage_name,
+        shape,
+        dtype,
+        logical_dtype,
+    ) in storage_contract.items():
+        value = np.ascontiguousarray(arrays[storage_name])
+        record = contract.get("field_records", {}).get(logical_name, {})
+        if value.shape != shape or value.dtype != dtype or record != {
+            "dtype": logical_dtype,
+            "sha256": sha256(value.tobytes(order="C")).hexdigest(),
+            "shape": list(shape),
+        }:
+            raise ValueError(
+                f"greenfield DSA internal field drifted: {logical_name}"
+            )
+    producers = arrays["producer_layer_ids"]
+    if producers.tolist() != contract.get("producer_layer_ids") or (
+        np.flatnonzero(producers == 0).tolist() != [0]
+    ):
+        raise ValueError("greenfield DSA internal producer identity drifted")
+    layer0 = contract.get("layer0_reference", {})
+    for logical_name, (storage_name, _, _, _) in storage_contract.items():
+        if logical_name == "producer_layer_ids":
+            continue
+        value = np.ascontiguousarray(arrays[storage_name][0])
+        digest = sha256(value.tobytes(order="C")).hexdigest()
+        reference = layer0.get(logical_name, {})
+        if (
+            reference.get("elementwise_exact") is not True
+            or reference.get("mismatch_count") != 0
+            or reference.get("max_abs") != 0.0
+            or reference.get("actual_sha256") != digest
+            or reference.get("expected_sha256") != digest
+            or reference.get("shape") != list(value.shape)
+        ):
+            raise ValueError(
+                f"greenfield layer-0 DSA reference is not exact: {logical_name}"
+            )
+    if contract.get("layer0_query_exact") is not True or (
+        contract.get("lane_mismatches") != []
+        or contract.get("padded_slot_mismatches") != []
+    ):
+        raise ValueError("greenfield layer-0 DSA observer contract drifted")
+    return contract, arrays
+
+
+def inspect_greenfield_layer0_dsa_selected_observation(
+    artifact_path: Path,
+    *,
+    expected_sha256: str,
+    local_parallel_size: int = 4,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the current protected layer-0 positions/scores after validation."""
+
+    artifact_path = Path(artifact_path)
+    if _sha256_file(artifact_path) != expected_sha256:
+        raise ValueError("greenfield selected-score observation identity drifted")
+    if (
+        not isinstance(local_parallel_size, int)
+        or isinstance(local_parallel_size, bool)
+        or local_parallel_size <= 0
+    ):
+        raise ValueError("local parallel size must be positive")
+    with np.load(artifact_path, allow_pickle=False) as bundle:
+        if set(bundle.files) != {
+            "decode_position",
+            "observation",
+            "token_observation",
+        }:
+            raise ValueError("greenfield selected-score fields drifted")
+        decode_position = np.asarray(bundle["decode_position"])
+        observation = np.asarray(bundle["observation"])
+        token_observation = np.asarray(bundle["token_observation"])
+    if (
+        decode_position.shape != (1,)
+        or decode_position.dtype != np.dtype(np.int32)
+        or decode_position.tolist() != [8155]
+        or observation.shape != (32, 5, 4098)
+        or observation.dtype != np.dtype(np.int32)
+        or token_observation.shape != (32, 32)
+        or token_observation.dtype != np.dtype(np.int32)
+    ):
+        raise ValueError("greenfield selected-score tensor contract drifted")
+    lanes = observation[:local_parallel_size]
+    if not np.all(lanes == lanes[0]):
+        raise ValueError("greenfield layer-0 selected-score lanes disagree")
+    row = lanes[0, 0]
+    positions = row[:2048].copy()
+    scores = np.ascontiguousarray(row[2048:4096]).view(np.float32).copy()
+    if int(row[4096]) != 2048 or int(row[4097]) != 0:
+        raise ValueError("greenfield layer-0 selected-score identity drifted")
+    if (
+        np.unique(positions).size != positions.size
+        or np.any(positions < 0)
+        or np.any(positions > 8155)
+        or not np.isfinite(scores).all()
+        or not np.array_equal(
+            np.lexsort((positions, -scores)),
+            np.arange(positions.size),
+        )
+    ):
+        raise ValueError("greenfield layer-0 selected-score order drifted")
+    return positions, scores
+
+
+def pack_stage_local_index_keys(
+    prompt_bfloat16_bits: np.ndarray,
+    current_key: np.ndarray,
+    *,
+    logical_page_size: int = 512,
+    local_parallel_size: int = 4,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Append the current key and pack exact LP4 page-striped cache lanes."""
+
+    import ml_dtypes
+
+    prompt = np.asarray(prompt_bfloat16_bits)
+    current = np.asarray(current_key, dtype=np.float32)
+    if (
+        prompt.ndim != 2
+        or prompt.dtype != np.dtype(np.uint16)
+        or current.shape != (prompt.shape[1],)
+        or not np.isfinite(current).all()
+        or not isinstance(logical_page_size, int)
+        or isinstance(logical_page_size, bool)
+        or not isinstance(local_parallel_size, int)
+        or isinstance(local_parallel_size, bool)
+        or logical_page_size <= 0
+        or local_parallel_size <= 0
+        or logical_page_size % local_parallel_size
+    ):
+        raise ValueError("stage-local index-key packing contract drifted")
+    current_bits = np.ascontiguousarray(
+        current.astype(ml_dtypes.bfloat16)
+    ).view(np.uint16)
+    global_bits = np.concatenate((prompt, current_bits[None, :]), axis=0)
+    context = global_bits.shape[0]
+    local_rows = logical_page_size // local_parallel_size
+    page_count = (context + logical_page_size - 1) // logical_page_size
+    lane_width = page_count * local_rows
+    row = np.arange(local_rows, dtype=np.int32)
+    lanes = np.zeros(
+        (local_parallel_size, lane_width, prompt.shape[1]),
+        dtype=np.uint16,
+    )
+    positions = np.full(
+        (local_parallel_size, lane_width), -1, dtype=np.int32
+    )
+    for lane in range(local_parallel_size):
+        global_positions = (
+            np.arange(page_count, dtype=np.int32)[:, None]
+            * np.int32(logical_page_size)
+            + np.int32(lane * local_rows)
+            + row[None, :]
+        ).reshape(-1)
+        valid = global_positions < context
+        positions[lane, valid] = global_positions[valid]
+        lanes[lane, valid] = global_bits[global_positions[valid]]
+    live_positions = positions[positions >= 0]
+    if not np.array_equal(np.sort(live_positions), np.arange(context)):
+        raise ValueError("stage-local index-key packing lost context positions")
+    return global_bits, lanes, positions
+
+
+def stitch_stage_local_scores(
+    lane_scores: np.ndarray,
+    lane_positions: np.ndarray,
+    *,
+    context: int,
+) -> np.ndarray:
+    """Stitch fixed-width LP4 score lanes into one logical score row."""
+
+    scores = np.asarray(lane_scores, dtype=np.float32)
+    positions = np.asarray(lane_positions)
+    if (
+        scores.ndim != 2
+        or positions.shape != scores.shape
+        or positions.dtype != np.dtype(np.int32)
+        or not isinstance(context, int)
+        or isinstance(context, bool)
+        or context <= 0
+    ):
+        raise ValueError("stage-local score stitching contract drifted")
+    valid = positions >= 0
+    live_positions = positions[valid]
+    if (
+        np.any(positions[~valid] != -1)
+        or np.any(live_positions >= context)
+        or not np.isfinite(scores[valid]).all()
+        or not np.array_equal(np.sort(live_positions), np.arange(context))
+    ):
+        raise ValueError("stage-local score positions are incomplete")
+    logical = np.empty((context,), dtype=np.float32)
+    logical[live_positions] = scores[valid]
+    return logical
+
+
 def compare_dsa_association_scores(
     scores: np.ndarray,
     expected_positions: np.ndarray,

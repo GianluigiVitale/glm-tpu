@@ -2279,21 +2279,23 @@ def one_row_pagewise_scores(
     scale = jnp.float32(head_dim**-0.5)
 
     def score_page(key_block: Any) -> Any:
-        per_head = jnp.maximum(
-            jnp.einsum(
-                "hd,pd->hp",
-                query[0],
-                key_block.astype(jnp.float32),
+        with jax.default_matmul_precision("highest"):
+            per_head = jnp.maximum(
+                jnp.einsum(
+                    "hd,pd->hp",
+                    query[0],
+                    key_block.astype(jnp.float32),
+                    preferred_element_type=jnp.float32,
+                )
+                * scale,
+                jnp.float32(0.0),
+            )
+            scores = jnp.einsum(
+                "h,hp->p",
+                head_weights[0],
+                per_head,
                 preferred_element_type=jnp.float32,
             )
-            * scale,
-            jnp.float32(0.0),
-        )
-        return jnp.einsum(
-            "h,hp->p",
-            head_weights[0],
-            per_head,
-            preferred_element_type=jnp.float32,
-        )
+        return scores
 
     return lax.map(score_page, keys).reshape(padded)[:context]

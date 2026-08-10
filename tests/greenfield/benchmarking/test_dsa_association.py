@@ -154,6 +154,93 @@ def test_one_row_hlo_rejects_legacy_dead_rows() -> None:
     assert result["forbidden_dead_rows"] == ["f32[32,32,128]"]
 
 
+def test_local_wide_and_pagewise_hlo_pin_distinct_score_geometry() -> None:
+    wide = "\n".join(
+        (
+            "f32[1,32,128]",
+            "bf16[2048,128]",
+            "f32[1,32]",
+            "f32[1,2048]",
+            "f32[32,2048]",
+            "rhd,sd->rhs/dot_general",
+            "rh,rhs->rs/dot_general",
+        )
+    )
+    wide_result = validate_dsa_association_hlo(
+        wide, phase="local_wide_score", context=2048
+    )
+    assert wide_result["passed"] is True
+    assert wide_result["map_trip_count"] is None
+    assert wide_result["diagnostic_batch32_allowed"] is False
+
+    pagewise = "\n".join(
+        (
+            "f32[1,32,128]",
+            "bf16[2048,128]",
+            "f32[1,32]",
+            "f32[2048]",
+            "bf16[4,512,128]",
+            "f32[4,512]",
+            "f32[32,512]",
+            "hd,pd->hp/dot_general",
+            "h,hp->p/dot_general",
+            " while(",
+            'backend_config={"known_trip_count":{"n":"4"}}',
+        )
+    )
+    pagewise_result = validate_dsa_association_hlo(
+        pagewise, phase="local_pagewise_score", context=2048
+    )
+    assert pagewise_result["passed"] is True
+    assert pagewise_result["map_trip_count"] == 4
+    assert pagewise_result["diagnostic_batch32_allowed"] is False
+
+
+def test_local_wide_hlo_rejects_pagewise_body() -> None:
+    wide_with_pagewise_body = "\n".join(
+        (
+            "f32[1,32,128]",
+            "bf16[2048,128]",
+            "f32[1,32]",
+            "f32[1,2048]",
+            "f32[32,2048]",
+            "f32[32,512]",
+            "rhd,sd->rhs/dot_general",
+            "rh,rhs->rs/dot_general",
+        )
+    )
+    result = validate_dsa_association_hlo(
+        wide_with_pagewise_body, phase="local_wide_score", context=2048
+    )
+    assert result["passed"] is False
+    assert result["forbidden_score_shapes"] == ["f32[32,512]"]
+
+
+def test_local_pagewise_hlo_rejects_wide_body_or_wrong_map_geometry() -> None:
+    pagewise = "\n".join(
+        (
+            "f32[1,32,128]",
+            "bf16[2048,128]",
+            "f32[1,32]",
+            "f32[2048]",
+            "bf16[4,512,128]",
+            "f32[8,512]",
+            "f32[32,512]",
+            "f32[32,2048]",
+            "hd,pd->hp/dot_general",
+            "h,hp->p/dot_general",
+            " while(",
+            'backend_config={"known_trip_count":{"n":"8"}}',
+        )
+    )
+    result = validate_dsa_association_hlo(
+        pagewise, phase="local_pagewise_score", context=2048
+    )
+    assert result["passed"] is False
+    assert result["forbidden_score_shapes"] == ["f32[32,2048]"]
+    assert "f32[4,512]" in result["missing_shapes"]
+
+
 def test_association_hlo_rejects_collective() -> None:
     hlo = "\n".join(
         (

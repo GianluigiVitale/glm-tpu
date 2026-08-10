@@ -25,7 +25,11 @@ from .legacy_dsa_internals import (
 from .layer0_dsa_association import (
     compare_dsa_association_scores,
     inspect_distributed_q_a_norm_artifact,
+    inspect_greenfield_layer0_dsa_internal_observation,
+    inspect_greenfield_layer0_dsa_selected_observation,
     inspect_layer0_dsa_association_input,
+    pack_stage_local_index_keys,
+    stitch_stage_local_scores,
 )
 from .prompt_index_cache import (
     LegacyPromptKeyInternalConfig,
@@ -90,6 +94,8 @@ __all__ = (
     "compare_dsa_association_scores",
     "inspect_gate_c_oracle",
     "inspect_distributed_q_a_norm_artifact",
+    "inspect_greenfield_layer0_dsa_internal_observation",
+    "inspect_greenfield_layer0_dsa_selected_observation",
     "inspect_layer0_dsa_association_input",
     "inspect_one_layer_oracle",
     "inspect_legacy_prompt_index_cache",
@@ -100,4 +106,6 @@ __all__ = (
     "inspect_short_context_dsa_oracle",
     "inspect_short_context_logprob_oracle",
     "normalize_sample_logprobs",
+    "pack_stage_local_index_keys",
+    "stitch_stage_local_scores",
 )
