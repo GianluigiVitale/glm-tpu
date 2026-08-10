@@ -845,3 +845,20 @@ capture is still required.
 - The approved partial archive exists and pre/failure census SHAs `ce3f1293...e3e31` /
   `08b777ac...2f7e` authenticate 8/8 cleanup. There is no tensor result, DB row, `SUCCESS` or
   performance standing. A corrected contract and fresh bounded retry remain required.
+
+## DB526 exact production composition
+
+- DB526/item1811 at pushed `3aa9f9c`, tag
+  `greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T080508327295662Z`, passes the
+  actual fused-q-a/materializer/tuple4 production composition. Q-a SHA `c9fbac05...cc70c` and query
+  SHA `1ff2c2ec...cb12a` are bitwise exact with zero mismatches.
+- Production StableHLO/optimized HLO SHAs are `4e7f3dc3...190f` / `78c29674...069c`; the program
+  contains one scoped 16-KiB tuple4 fusion, four partitions, one row and no collective/global query
+  table. Materializer HLO `2cc9283a...44b3` completes 8 MiB/chip with no forbidden target, host
+  marker, collective or global state.
+- SUCCESS/evidence/runner/summary/tensor/results-DB/remote-ledger SHAs are
+  `b3cff36b...3b11`, `82219191...2b7d`, `497dd606...96f2`, `890a9d8e...212e`,
+  `b371ad77...d247`, `caa8ff3f...03dd`, and `980f4f78...e4e3`; approved archive, direct remote
+  bytes and authenticated 8/8 cleanup pass.
+- This closes the bounded pre-8K production-composition gate only. A complete protected 8K run
+  must still pass exact tokens/DSA, state/cache/HBM/HLO, fresh trace, wall, DB/archive and cleanup.

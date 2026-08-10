@@ -6595,3 +6595,21 @@ unmotivated arithmetic variants.
   custom kernels/callbacks/collectives/global shapes/partition drift, and writes the contract JSON
   before refusing. Replay of the exact TPU HLO passes; an injected `tpu_custom_call` fails. One
   new-diff-only review and commit precede a same-target retry.
+
+## 2026-08-10 08:05--08:10 — DB526 proves the exact production query composition
+
+- DB526/item1811 at pushed `3aa9f9c`, tag
+  `greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T080508327295662Z`, completes
+  the four-chip production target in 19 seconds. Actual fused q-a and accepted query are both
+  bitwise exact; query mismatches are zero of 4,096.
+- Production StableHLO/optimized HLO SHAs are `4e7f3dc3...190f` / `78c29674...069c`. The latter
+  contains one scoped tuple4 16-KiB fusion, four partitions, one live row and no communication or
+  global query table. The 8-MiB/chip materializer completes separately; its HLO
+  `2cc9283a...44b3` is local-only and contains only the two approved bounded-gather metadata calls.
+- SUCCESS/evidence/runner/summary/tensor/results-DB/remote-ledger SHAs are
+  `b3cff36b...3b11`, `82219191...2b7d`, `497dd606...96f2`, `890a9d8e...212e`,
+  `b371ad77...d247`, `caa8ff3f...03dd`, and `980f4f78...e4e3`. Archive, DB, remote `SUCCESS` and
+  authenticated 8/8 cleanup pass. This is correctness/HLO evidence, not performance.
+- The full protected launcher now pins DB525 and DB526 independently before enabling exact query
+  association. After focused tests and one review of only that evidence-pin diff, the next
+  authorized run is the combined 8K decoder through exact token/DSA and timing gates.

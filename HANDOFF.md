@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-10 07:13 UTC
+**Updated:** 2026-08-10 08:10 UTC
 
 ## Authority and isolation
 
@@ -3179,3 +3179,30 @@ drift. It also persists the complete materializer HLO contract before refusal. T
 TPU HLO now passes that corrected contract; a synthetic `tpu_custom_call` remains rejected. Exact
 next: affected/static tests and one Fable review of only this post-`7f636ed` correction, then
 commit/push and retry only the same bounded target. Do not launch the full 8K decoder first.
+
+## DB526 closes production composition and authorizes the protected 8K retry
+
+Protected DB526/item1811,
+`greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T080508327295662Z`, ran at
+pushed `3aa9f9c` and completed the actual production composition in 19 seconds. The fused N82 q-a
+output is bitwise exact at SHA `c9fbac05...cc70c`; the completed local materializer plus four-alias
+tuple helper produces accepted query SHA `1ff2c2ec...cb12a` with zero of 4,096 mismatches.
+
+Production StableHLO/optimized HLO SHAs are `4e7f3dc3...190f` / `78c29674...069c`. The optimized
+program has one scoped tuple-valued four-reduction fusion, four partitions, one live row and no
+collective/global query table. The local materializer completed 8 MiB/chip; its optimized HLO SHA
+is `2cc9283a...44b3`, uses four partitions, and has only the two approved bounded-gather metadata
+calls with no host marker, collective or global owner state.
+
+SUCCESS/evidence/runner/summary/tensor/results-DB/remote-ledger SHAs are
+`b3cff36b...3b11`, `82219191...2b7d`, `497dd606...96f2`, `890a9d8e...212e`,
+`b371ad77...d247`, `caa8ff3f...03dd`, and `980f4f78...e4e3`. The same-region archive, direct
+remote `SUCCESS`, DB integrity and authenticated 8/8 pre/post cleanup pass. This is bounded
+correctness/HLO evidence only, not decoder latency or Gate D/E.
+
+The current batch pins both DB525 mechanism evidence and DB526 production-composition evidence in
+the full launcher, including local/DB/remote hashes and materializer/query contracts. Exact next:
+focused/static tests and one new-diff-only Fable approval, commit/push, authenticated idle fleet,
+then one protected combined 8K run with fused-qkv, split prefill repair, exact query association,
+token/DSA oracle and trace. That full run is expected to take about two hours; do not call its
+load/compile/prefill elapsed time token latency.

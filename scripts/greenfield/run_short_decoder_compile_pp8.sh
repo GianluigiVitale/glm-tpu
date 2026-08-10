@@ -537,6 +537,90 @@ PY
     echo "DB525 direct remote SUCCESS hash drifted" >&2
     exit 2
   }
+  readonly DSA_QUERY_PRODUCTION_PREREQUISITE_TAG=greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T080508327295662Z
+  readonly DSA_QUERY_PRODUCTION_PREREQUISITE_DIR=/home/gianl/glm-run/$DSA_QUERY_PRODUCTION_PREREQUISITE_TAG
+  readonly DSA_QUERY_PRODUCTION_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/physical_lp4_dsa_query_production_exact/8k/$DSA_QUERY_PRODUCTION_PREREQUISITE_TAG
+  /home/gianl/vllm-env/bin/python - "$DSA_QUERY_PRODUCTION_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
+from hashlib import sha256
+import json
+from pathlib import Path
+import sqlite3
+import sys
+
+run_dir = Path(sys.argv[1])
+db_path = Path(sys.argv[2])
+expected_hashes = {
+    "SUCCESS": "b3cff36beaff7eaaf71c30349007c8c5acb8c7423ae46fb82c40339061a23b11",
+    "evidence.sha256": "8221919110485a3d9f6f70fcd7086012aa73666a96df1146f890aefacfb52b7d",
+    "runner.json": "497dd6066c8480c643018f251c48566d84b00317372ccfd2543ed302cd2c96f2",
+    "summary.json": "890a9d8e9ac4415fffad93f3b778ec1e79f9ca463e5d375239f1c720aff2212e",
+    "physical_lp4_production_exact.npz": "b371ad77313c085268470c950f231a0cf23c4d17c7c7104b9c791cfc9f49d247",
+}
+for name, expected in expected_hashes.items():
+    if sha256((run_dir / name).read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"DB526 prerequisite {name} drifted")
+summary = json.loads((run_dir / "summary.json").read_text())
+runner = json.loads((run_dir / "runner.json").read_text())
+candidate = runner["candidates"][
+    "physical_production_fused_q_a_tuple4_exact_m1_n1024"
+]
+materializer = runner["materializer"]
+if (
+    summary.get("code_hash")
+    != "3aa9f9ca5fedc9e5b6b67aca00b9be10ff5f0dc1"
+    or summary.get("results_db_run_id") != 526
+    or summary.get("exact_candidates")
+    != ["physical_production_fused_q_a_tuple4_exact_m1_n1024"]
+    or not runner.get("production_helper")
+    or not candidate["accepted_comparison"]["elementwise_exact"]
+    or candidate["accepted_comparison"]["mismatch_count"] != 0
+    or not candidate["q_a_comparison"]["elementwise_exact"]
+    or candidate["q_a_comparison"]["mismatch_count"] != 0
+    or candidate["input_weight_aliases"] != 4
+    or candidate["hlo"]["tuple4_reduction_fusion_count"] != 1
+    or candidate["hlo"]["hlo_sha256"]
+    != "78c296746c1ee5bef3c2183256671fa5b2cd5dffd1d884217ee50b2fcf53069c"
+    or candidate["hlo"]["stablehlo"]["stablehlo_sha256"]
+    != "4e7f3dc3300c0aaf19ec7a11e0ed057bc521ad30cd8ddf4544932f9475c4190f"
+    or not materializer["completed"]
+    or not materializer["hlo"]["passed"]
+    or materializer["local_fp32_bytes"] != 8 * 1024 * 1024
+    or materializer["hlo"]["num_partitions"] != 4
+    or materializer["hlo"]["custom_call_targets"]
+    != ["AssumeGatherIndicesInBound", "GatherScatterIndicesBitpacked"]
+    or materializer["hlo"]["forbidden_custom_call_targets"]
+    or materializer["hlo"]["forbidden_operations"]
+    or materializer["hlo"]["forbidden_global_shapes"]
+    or materializer["hlo"]["host_markers"]
+):
+    raise SystemExit("DB526 production composition prerequisite drifted")
+with sqlite3.connect(db_path) as connection:
+    if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        raise SystemExit("live results DB integrity failed")
+    run = connection.execute(
+        "SELECT model,harness_git,pod FROM runs WHERE run_id=526"
+    ).fetchone()
+    item = connection.execute(
+        "SELECT run_id,benchmark,item_id,correct,score FROM items WHERE id=1811"
+    ).fetchone()
+if run != (
+    "zai-org/GLM-5.2-FP8:greenfield-layer0-query_lp4_production_exact-association",
+    "3aa9f9c",
+    "db-v4-64-od",
+) or item != (
+    526,
+    "greenfield_layer0_query_lp4_production_exact_association",
+    "layer0_position8155_query_lp4_production_exact",
+    1,
+    1.0,
+):
+    raise SystemExit("DB526 prerequisite DB linkage drifted")
+PY
+  production_remote_success_sha=$(gcloud storage cat "$DSA_QUERY_PRODUCTION_PREREQUISITE_REMOTE/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $production_remote_success_sha == b3cff36beaff7eaaf71c30349007c8c5acb8c7423ae46fb82c40339061a23b11 ]] || {
+    echo "DB526 direct remote SUCCESS hash drifted" >&2
+    exit 2
+  }
 fi
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
@@ -1699,6 +1783,18 @@ summary = {
         if dsa_query_exact_association
         else None
     ),
+    "dsa_query_exact_association_production_prerequisite": (
+        {
+            "code_hash": "3aa9f9ca5fedc9e5b6b67aca00b9be10ff5f0dc1",
+            "exact_candidate": "physical_production_fused_q_a_tuple4_exact_m1_n1024",
+            "optimized_hlo_sha256": "78c296746c1ee5bef3c2183256671fa5b2cd5dffd1d884217ee50b2fcf53069c",
+            "results_db_item_row_id": 1811,
+            "results_db_run_id": 526,
+            "success_sha256": "b3cff36beaff7eaaf71c30349007c8c5acb8c7423ae46fb82c40339061a23b11",
+        }
+        if dsa_query_exact_association
+        else None
+    ),
     "prefill_index_repair_backend": expected_repair_backend,
     "prefill_index_repair_prerequisite": (
         {
@@ -1887,6 +1983,9 @@ run_id = pv.start_run(
         ),
         "greenfield_dsa_query_exact_association_prerequisite_db_run": (
             525 if dsa_query_exact_association else None
+        ),
+        "greenfield_dsa_query_exact_association_production_prerequisite_db_run": (
+            526 if dsa_query_exact_association else None
         ),
         "greenfield_prefill_index_repair_backend": expected_repair_backend,
         "greenfield_prefill_index_repair_prerequisite_db_run": (

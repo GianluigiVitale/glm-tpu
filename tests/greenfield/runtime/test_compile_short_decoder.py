@@ -153,6 +153,14 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "dsa_observer.input_specs[5]" not in compiler
     assert "results_db_run_id\": 525" in runner
     assert "physical_owner_tuple4_barrier_m1_n1024" in runner
+    assert "results_db_run_id\": 526" in runner
+    assert "physical_production_fused_q_a_tuple4_exact_m1_n1024" in runner
+    assert (
+        "greenfield_layer0_physical_lp4_dsa_query_production_exact_"
+        "20260810T080508327295662Z" in runner
+    )
+    assert "DB526 direct remote SUCCESS hash drifted" in runner
+    assert "dsa_query_exact_association_production_prerequisite" in runner
     assert "_queryexact" in runner
     assert "DB520 direct remote SUCCESS hash drifted" in runner
     assert "external_stage_local_raw_fp8_to_bf16" in runner

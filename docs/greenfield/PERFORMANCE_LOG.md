@@ -1049,6 +1049,13 @@ arithmetic. It produced no query tensor, timing distribution, XPlane, DB row or 
 Its elapsed orchestration time is not latency evidence. DB484 remains the accepted PP8 decoder
 point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
 
+## DB526 production composition — correctness only
+
+DB526 completes the bounded four-chip production q-a/query composition in 19 seconds, including
+compilation. It has no recurrent decoder loop, warmed wall distribution, XPlane or token rate, so
+that elapsed time is not decoder latency. DB484 remains the accepted PP8 performance point at
+`244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open pending the protected 8K decoder.
+
 ## DB512 literal-source RoPE diagnostic — no performance result
 
 DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal

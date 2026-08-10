@@ -23,7 +23,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--519, and existing association helpers | DB506--515 isolate the drift, DB516 seals physical M64, DB517 makes projection exact, DB518 makes the full cache exact, and DB519 rejects fused internal weight materialization. Production now separates the small stage-local weight materializer from repair; recurrent decode and legacy execution stay untouched. |
 | DSA internal observer | oracle-only `83ff4a357` scorer, `9c1d6b3b9` prompt-key, and `89fc453b6` prompt-key-input modes, all descendants of accepted `b3c25df47`; protected DB513--515 | Default-off scorer/prompt-key modes remain unchanged. DB515 seals the actual 6,144-wide FP32 `h` entering projection at row 113 and proves it bitwise equal to the independent M2048 gather/RMS producer. Legacy execution is never imported; the observer is now preserved evidence, not a reason to recapture the input. |
-| DSA query association | protected capture, DB499 and physical DB521--525 | DB525's exact four-alias local tuple fusion is adapted behind a default-off production materializer; rejected variants remain negative evidence. |
+| DSA query association | protected capture, DB499 and physical DB521--526 | DB525's exact four-alias local tuple fusion and DB526's exact production composition are adapted default-off; rejected variants remain negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
 | Distributed q-a norm | legacy FP8 linear/sharding source, vLLM RMSNorm source and accepted E0 XPlane | Bounded independent TP32 diagnostic with one FP32 variance all-reduce and one BF16 rank-3 all-gather; never a production architecture. |
 | Fused wk precision | accepted OOB repair/adapter source and layer-0 state hash | Rejected as an order discriminator: BF16-origin and direct-FP32-origin `wk` produce identical stored prompt keys. Preserve BF16-origin state identity in production. |
@@ -390,3 +390,11 @@ times at decoder entry. Do not add another query kernel, checkpoint layout, phys
 global logical path. Before full-model deployment, reuse the existing protected probe once to
 prove the actual fused q-a/materializer/helper composition bitwise; then pin that result in the
 full launcher.
+
+DB526 at `3aa9f9c` closes that deployment prerequisite. The completed local materializer, actual
+fused N82 q-a helper, explicit BF16 boundary, four query aliases and production tuple4 helper match
+both accepted q-a and query bitwise. Optimized HLO retains one scoped tuple-valued 16-KiB reduction
+fusion and no communication/global state; the materializer is four-partition/local with only the
+two known bounded-gather metadata calls. Reuse this exact artifact and DB525 through fail-closed
+launcher pins. The next authorized experiment is the combined protected 8K decoder, not another
+query association or checkpoint variant.

@@ -99,6 +99,12 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   key cache is `[context,128]`. Query/key projections, biased key LayerNorm,
   per-head dots, ReLU, signed head weighting, and the final head sum are FP32
   with JAX matmul precision pinned to `highest`.
+- For the default-off exact PP8 reference path, fused q-a must complete at a BF16 barrier before
+  query projection. Each physical owner materializes its local `wq_b` shard to FP32 once, and the
+  same local owner value is supplied through four aliases so TPU retains one tuple-valued four-dot
+  N1024 reduction fusion; only the first result stays live. DB526 proves the complete production
+  composition matches accepted q-a and query bitwise with no collective/global owner state. The
+  feature remains disabled unless DB525 mechanism and DB526 composition artifacts are pinned.
 - The first 64 query/key dimensions use accepted interleaved RoPE. Per-head
   dots are scaled by `128**-0.5`, ReLU occurs before signed head weighting,
   and head weights are scaled by `32**-0.5`.
