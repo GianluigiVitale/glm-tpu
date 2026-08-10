@@ -666,6 +666,7 @@ def _physical_lp4_head_geometry_modes() -> tuple[str, ...]:
         "physical_single_head_sweep_m1_n128",
         "physical_owner_serial_while_m1_n128",
         "physical_global_gspmd_m1_n4096",
+        "physical_owner_tuple4_barrier_m1_n1024",
     )
 
 
@@ -833,6 +834,7 @@ def _physical_lp4_head_geometry_hlo_contract(
     lowered = hlo.lower()
     serial = "serial_while" in candidate
     global_gspmd = "global_gspmd" in candidate
+    tuple4_barrier = "tuple4_barrier" in candidate
     forbidden_operations = {
         name: lowered.count(name)
         for name in (
@@ -859,17 +861,17 @@ def _physical_lp4_head_geometry_hlo_contract(
         "one_live_q_a_row": "bf16[1,2048]" in lowered,
         "physical_head_projection": (
             ("f32[1,1024]" in lowered or "f32[1024]" in lowered)
-            if global_gspmd
+            if global_gspmd or tuple4_barrier
             else ("f32[1,128]" in lowered or "f32[128]" in lowered)
         ),
         "local_output": (
             ("f32[1,8,128]" in lowered or "f32[8,128]" in lowered)
-            if serial or global_gspmd
+            if serial or global_gspmd or tuple4_barrier
             else ("f32[1,128]" in lowered or "f32[128]" in lowered)
         ),
         "local_weight": (
             "f32[1024,2048]" in lowered
-            if serial or global_gspmd
+            if serial or global_gspmd or tuple4_barrier
             else "f32[128,2048]" in lowered
         ),
     }
@@ -880,6 +882,15 @@ def _physical_lp4_head_geometry_hlo_contract(
         for line in lowered.splitlines()
     )
     expected_while_count = 1 if serial else 0
+    tuple4_reduction_group = (
+        (
+            'megacore_allreduce_bytes":"16384"' in lowered
+            if "megacore_config" in lowered
+            else dot_metadata_count >= 4
+        )
+        if tuple4_barrier
+        else True
+    )
     return {
         "candidate": candidate,
         "dot_metadata_count": dot_metadata_count,
@@ -892,6 +903,8 @@ def _physical_lp4_head_geometry_hlo_contract(
         "global_logical_gspmd": global_gspmd,
         "local_parallel_size": 4,
         "required_shapes": required_shapes,
+        "tuple4_barrier": tuple4_barrier,
+        "tuple4_reduction_group": tuple4_reduction_group,
         "while_count": while_count,
         "passed": (
             not forbidden_operations
@@ -900,6 +913,7 @@ def _physical_lp4_head_geometry_hlo_contract(
             and dot_metadata_count > 0
             and while_count == expected_while_count
             and (not global_gspmd or explicit_four_partitions)
+            and tuple4_reduction_group
         ),
     }
 
@@ -955,6 +969,32 @@ def _physical_global_gspmd_stablehlo_contract(
             and explicit_four_partitions
             and sharding_annotation_count >= 3
         ),
+    }
+
+
+def _physical_tuple4_stablehlo_contract(stablehlo: str) -> dict[str, Any]:
+    """Require four owner aliases to survive through one local barrier."""
+
+    lowered = stablehlo.lower()
+    required = {
+        "explicit_four_partitions": "mhlo.num_partitions = 4" in lowered,
+        "four_global_logical_weight_aliases": (
+            lowered.count("tensor<4096x2048xf32>") >= 4
+        ),
+        "four_local_owner_parameters": (
+            lowered.count("tensor<1024x2048xf32>") >= 4
+        ),
+        "four_dots": lowered.count("stablehlo.dot_general") == 4,
+        "one_live_q_a_row": "tensor<1x2048xbf16>" in lowered,
+        "one_barrier": lowered.count("stablehlo.optimization_barrier") == 1,
+        "manual_lp4": (
+            "sdy.manual_computation" in lowered and '"lp4"' in lowered
+        ),
+    }
+    return {
+        "required": required,
+        "stablehlo_sha256": sha256(stablehlo.encode()).hexdigest(),
+        "passed": all(required.values()),
     }
 
 
@@ -1277,6 +1317,23 @@ def _run_physical_lp4_head_geometry(
         )
         return _apply_local_query_rope(projected, positions)
 
+    def local_tuple4_barrier(
+        query: Any,
+        weight0: Any,
+        weight1: Any,
+        weight2: Any,
+        weight3: Any,
+        positions: Any,
+    ) -> Any:
+        grouped = jnp.stack(
+            tuple(
+                _dot_rows(query, weight)
+                for weight in (weight0, weight1, weight2, weight3)
+            )
+        )
+        projected = lax.optimization_barrier(grouped)[0]
+        return _apply_local_query_rope(projected, positions)
+
     sweep_mapped = jax.shard_map(
         local_single_head,
         mesh=mesh,
@@ -1291,6 +1348,20 @@ def _run_physical_lp4_head_geometry(
         out_specs=P("lp4", None),
         check_vma=False,
     )
+    tuple4_mapped = jax.shard_map(
+        local_tuple4_barrier,
+        mesh=mesh,
+        in_specs=(
+            P(),
+            P("lp4", None),
+            P("lp4", None),
+            P("lp4", None),
+            P("lp4", None),
+            P(),
+        ),
+        out_specs=P("lp4", None),
+        check_vma=False,
+    )
     args.hlo_dir.mkdir(parents=True)
     records: dict[str, Any] = {}
     tensor_payload: dict[str, np.ndarray] = {
@@ -1298,7 +1369,7 @@ def _run_physical_lp4_head_geometry(
         "current_production_query": current_query,
     }
 
-    sweep_name, serial_name, global_name = (
+    sweep_name, serial_name, global_name, tuple4_name = (
         _physical_lp4_head_geometry_modes()
     )
     sweep_compiled = jax.jit(sweep_mapped).lower(
@@ -1412,6 +1483,60 @@ def _run_physical_lp4_head_geometry(
         "hlo": global_contract,
     }
     tensor_payload[f"query__{global_name}"] = global_candidate
+
+    tuple4_lowered = jax.jit(tuple4_mapped).lower(
+        q_argument,
+        owner_weight_argument,
+        owner_weight_argument,
+        owner_weight_argument,
+        owner_weight_argument,
+        position_argument,
+    )
+    tuple4_stablehlo = tuple4_lowered.as_text()
+    tuple4_compiled = tuple4_lowered.compile()
+    tuple4_hlo = tuple4_compiled.as_text()
+    (args.hlo_dir / f"{tuple4_name}.stablehlo.mlir").write_text(
+        tuple4_stablehlo
+    )
+    (args.hlo_dir / f"{tuple4_name}.optimized_hlo.txt").write_text(
+        tuple4_hlo
+    )
+    tuple4_contract = _physical_lp4_head_geometry_hlo_contract(
+        tuple4_hlo, candidate=tuple4_name
+    )
+    tuple4_stable_contract = _physical_tuple4_stablehlo_contract(
+        tuple4_stablehlo
+    )
+    tuple4_contract["stablehlo"] = tuple4_stable_contract
+    tuple4_contract["passed"] = bool(
+        tuple4_contract["passed"] and tuple4_stable_contract["passed"]
+    )
+    if not tuple4_contract["passed"]:
+        raise SystemExit("physical tuple4-barrier query HLO failed")
+    tuple4_output = tuple4_compiled(
+        q_argument,
+        owner_weight_argument,
+        owner_weight_argument,
+        owner_weight_argument,
+        owner_weight_argument,
+        position_argument,
+    )
+    jax.block_until_ready(tuple4_output)
+    tuple4_candidate = np.ascontiguousarray(
+        np.asarray(tuple4_output), dtype=np.float32
+    )
+    if tuple4_candidate.shape != (geometry.heads, geometry.head_dim):
+        raise SystemExit("physical tuple4-barrier output shape drifted")
+    records[tuple4_name] = {
+        "accepted_comparison": _compare(accepted_query, tuple4_candidate),
+        "current_production_comparison": _compare(
+            current_query, tuple4_candidate
+        ),
+        "executions": 1,
+        "input_weight_aliases": 4,
+        "hlo": tuple4_contract,
+    }
+    tensor_payload[f"query__{tuple4_name}"] = tuple4_candidate
 
     exact = sorted(
         name

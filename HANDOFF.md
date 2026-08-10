@@ -3101,3 +3101,28 @@ fully unrolled global output. The remaining bounded discriminator therefore uses
 Forced-four-CPU compilation already satisfies that structural contract. Exact next: finish this
 coherent batch, run the affected suite and one new-diff-only Fable audit, commit/push, then execute
 one protected bounded matrix. Do not retry the full decoder unless this candidate is exact.
+
+## DB524 rejects four-way GSPMD partitioning; tuple-fused local reduction is next
+
+Protected DB524,
+`greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T054953335423347Z`, ran at pushed
+`70f549e` and completed in six seconds. Its explicitly four-way-sharded global-logical candidate
+produces DB521 SHA `eee61d94...0bb`: 2,728 accepted mismatches/max `9.5367432e-7`. Thus ordinary
+GSPMD preserves local ownership and zero communication but still lowers arithmetic as one physical
+N1024 reduction; it does not preserve DB499's exact unpartitioned association. Optimized HLO SHA
+`0ec1e68b...303` contains only `f32[1024,2048] -> f32[1,8,128]`, four partitions and no
+collective/global table. StableHLO SHA `5a912167...f1c` proves the intended logical sharding.
+
+SUCCESS/evidence/tensor/runner/results-DB SHAs are `e9e6de5f...df0`, `d6b6f4e9...8ae`,
+`2f185e99...85c`, `aaa7e996...4e0`, and `6e22ccfd...9df`; DB524, approved archive,
+direct-object ledger and authenticated 8/8 cleanup pass. This is correctness evidence only;
+production and DB484 performance standing remain unchanged.
+
+The causal HLO difference is now concrete. DB524's one-owner fusion requests 4,096 megacore
+reduction bytes; DB499's exact four-owner tuple fusion requests 16,384 and uses a different TPU
+reduction layout. The bounded successor passes the same local owner buffer through four explicit
+aliases, retains all four N1024 reductions behind one optimization barrier, and returns only the
+first local result. It carries no other owner's state, no collective and no global physical table;
+the forced-four-CPU program retains all four dots and the barrier. Exact next: finish tests/docs,
+one audit of only this new diff, commit/push, then one seconds-long protected result. No full model
+retry is authorized first.

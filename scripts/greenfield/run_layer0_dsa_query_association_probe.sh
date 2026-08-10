@@ -252,6 +252,7 @@ elif target == "query_lp4_head_geometry":
         "physical_single_head_sweep_m1_n128",
         "physical_owner_serial_while_m1_n128",
         "physical_global_gspmd_m1_n4096",
+        "physical_owner_tuple4_barrier_m1_n1024",
     }
 else:
     expected_candidates = {

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-10T05:47:00Z",
+  "captured_utc": "2026-08-10T06:03:00Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "a3bd3533049ac5ba2dd6e9cedd3369746d4f2760",
+    "greenfield": "70f549eb05e413109c142b0b0bb2fdd2db376437",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -75,12 +75,12 @@
       "id": "accepted-greenfield-evidence-ledger",
       "category": "evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "a3bd3533049ac5ba2dd6e9cedd3369746d4f2760",
+      "source_pin": "70f549eb05e413109c142b0b0bb2fdd2db376437",
       "source_paths": ["docs/greenfield/EVIDENCE_MAP.md", "docs/greenfield/PERFORMANCE_LOG.md", "/home/gianl/glm-run/greenfield_*"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["all gate decisions"],
       "gate": "A-H",
-      "reason": "Accepted protected artifacts through DB523, the 5a41bb2 separate-qkv refusal, the 6b554c4 fused-plus-repair refusal and the 888cfcb current-state internal observation are pinned with rejected diagnostics to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. DB521 rejects raw/predecoded physical wq_b ownership and owner/head dot association. DB522 proves the causal q-a BF16 boundary and rejects HIGHEST. DB523 rejects physical N128 width/scheduling. DB484 remains the last protected decoder performance point."
+      "reason": "Accepted protected artifacts through DB524, the 5a41bb2 separate-qkv refusal, the 6b554c4 fused-plus-repair refusal and the 888cfcb current-state internal observation are pinned with rejected diagnostics to prevent repeated experiments and unsupported promotion claims. DB520 proves the exact split materialization/cache boundary. DB521 rejects physical wq_b ownership/dot variants. DB522 proves the causal q-a BF16 boundary and rejects HIGHEST. DB523 rejects N128 scheduling. DB524 accepts explicit GSPMD structure but rejects its N1024 arithmetic. DB484 remains the last protected decoder performance point."
     },
     {
       "id": "greenfield-prefill-loop-classifier",
@@ -152,12 +152,12 @@
       "id": "legacy-dsa-query-association",
       "category": "numerical association evidence",
       "source_repo": "oracle-only tpu-inference observer and protected greenfield probes",
-      "source_pin": "legacy 83ff4a3576602ca844ea090550139a2ff00b0bb1 / greenfield DB499 b41c3abceccde90c8ab2419f8b3f8f58b0b140b8 / physical DB521 88350e376660fd6c8846b793fc0efb2f9f04842a / boundary DB522 13123b89bd1a012b6e9d9f66d0e18df561e135ed / geometry DB523 a3bd3533049ac5ba2dd6e9cedd3369746d4f2760",
-      "source_paths": ["/home/gianl/glm-run/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z", "/home/gianl/glm-run/greenfield_layer0_dsa_query_association_20260808T034636385240375Z", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_query_association_20260810T042459221979151Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_q_a_boundary_20260810T051607194401685Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T053345314403882Z"],
+      "source_pin": "legacy 83ff4a3576602ca844ea090550139a2ff00b0bb1 / greenfield DB499 b41c3abceccde90c8ab2419f8b3f8f58b0b140b8 / physical DB521 88350e376660fd6c8846b793fc0efb2f9f04842a / boundary DB522 13123b89bd1a012b6e9d9f66d0e18df561e135ed / geometry DB523 a3bd3533049ac5ba2dd6e9cedd3369746d4f2760 / GSPMD DB524 70f549eb05e413109c142b0b0bb2fdd2db376437",
+      "source_paths": ["/home/gianl/glm-run/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z", "/home/gianl/glm-run/greenfield_layer0_dsa_query_association_20260808T034636385240375Z", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_query_association_20260810T042459221979151Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_q_a_boundary_20260810T051607194401685Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T053345314403882Z", "/home/gianl/glm-run/greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T054953335423347Z"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/runtime/decoder.py", "docs/greenfield/NUMERICAL_CONTRACT.md"],
       "gate": "C-D",
-      "reason": "The protected accepted capture localizes its independent reconstruction divergence to query while normalized hidden and q-a state are bitwise exact. DB499 proves virtual grouped associations. DB521 proves true one-owner-per-chip PP8 variants are identical and near-exact after BF16 input. DB522 proves the causal q-a boundary and rejects HIGHEST. DB523 proves physical one-head N128 sweep and device-resident N128 loop are identical and nonexact. Reuse the same wrapper, sealed q-a and exact owner bytes only for the remaining explicitly four-way-sharded global-logical M1/N4096 discriminator; optimized HLO must reject global physical materialization and communication."
+      "reason": "The protected accepted capture localizes its independent reconstruction divergence to query while normalized hidden and q-a state are bitwise exact. DB499 proves virtual grouped associations. DB521 proves true one-owner-per-chip PP8 variants are near-exact. DB522 proves the causal q-a boundary and rejects HIGHEST. DB523 rejects physical N128 scheduling. DB524 proves explicit GSPMD remains DB521-nonexact while exposing the exact HLO discriminator: DB499 groups four N1024 reductions and DB524 groups one. Reuse the same wrapper, sealed q-a and exact owner bytes only for the four-alias local tuple-fusion test; optimized HLO must reject global physical materialization and communication."
     },
     {
       "id": "greenfield-production-layer0-q-a-divergence",
@@ -168,7 +168,7 @@
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/reference/dsa_association.py", "glm_tpu/greenfield/kernels/reference/qkv_a.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/model/weights.py", "glm_tpu/greenfield/checkpoint/runtime_feature.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/probe_layer0_dsa_query_association.py", "scripts/greenfield/run_layer0_dsa_query_association_probe.sh", "scripts/greenfield/pack_feature_runtime_checkpoint.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "docs/greenfield/NUMERICAL_CONTRACT.md"],
       "gate": "B-D",
-      "reason": "The all-21 observer originally proved the earliest separate-qkv production divergence was layer-0 q-a. DB501 rejects ordinary M1 dot associations; DB502--504 prove fused one-row arithmetic, production selection and final-layout ownership. The 888cfcb observer makes recorded q-a exact and query first divergent. DB521 rejects physical wq_b ownership/dot variants and proves packed bytes exact. DB522 proves the causal BF16 boundary and rejects HIGHEST. DB523 rejects physical N128 head width/scheduling. The remaining target is explicit four-way sharding of the global logical M1/N4096 operation with local-only physical HLO, not another checkpoint, cache, q-a, full decoder, full-pod collective or external M32 bucket."
+      "reason": "The all-21 observer originally proved the earliest separate-qkv production divergence was layer-0 q-a. DB501 rejects ordinary M1 dot associations; DB502--504 prove fused one-row arithmetic, production selection and final-layout ownership. The 888cfcb observer makes recorded q-a exact and query first divergent. DB521 rejects physical wq_b variants and proves packed bytes exact. DB522 proves the causal BF16 boundary. DB523 rejects N128 scheduling. DB524 rejects GSPMD arithmetic and identifies four-reduction tuple fusion as the remaining exact association test, not another checkpoint, cache, q-a, full decoder, full-pod collective or external M32 bucket."
     },
     {
       "id": "legacy-code-and-step-fingerprints",

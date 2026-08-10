@@ -96,6 +96,7 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
         "physical_single_head_sweep_m1_n128",
         "physical_owner_serial_while_m1_n128",
         "physical_global_gspmd_m1_n4096",
+        "physical_owner_tuple4_barrier_m1_n1024",
     }
 
 
@@ -266,6 +267,49 @@ def test_physical_global_gspmd_stablehlo_requires_logical_sharding() -> None:
         stablehlo.replace("mhlo.sharding", "attribute", 1)
         .replace("mhlo.sharding", "attribute", 1)
         .replace("mhlo.sharding", "attribute", 1)
+    )["passed"]
+
+
+def test_physical_tuple4_contract_requires_grouped_reduction_and_barrier() -> None:
+    tuple_hlo = (
+        "bf16[1,2048] f32[1024,2048] f32[1,1024] f32[8,128]\n"
+        + "\n".join(
+            f'%reduce{i} = f32[1024] fusion(foo), '
+            'metadata={op_name="jit(tuple4)/dot_general"}'
+            for i in range(4)
+        )
+        + '\nbackend_config={"megacore_config":'
+        '{"megacore_allreduce_bytes":"16384"}}'
+    )
+    contract = subject._physical_lp4_head_geometry_hlo_contract(
+        tuple_hlo,
+        candidate="physical_owner_tuple4_barrier_m1_n1024",
+    )
+    assert contract["passed"]
+    assert contract["tuple4_reduction_group"]
+    assert not subject._physical_lp4_head_geometry_hlo_contract(
+        tuple_hlo.replace('"16384"', '"4096"'),
+        candidate="physical_owner_tuple4_barrier_m1_n1024",
+    )["passed"]
+
+    stablehlo = (
+        "module attributes {mhlo.num_partitions = 4 : i32}\n"
+        "sdy.mesh @mesh = <[\"lp4\"=4]>\n"
+        "sdy.manual_computation "
+        + " ".join(["tensor<4096x2048xf32>"] * 4)
+        + " ("
+        + " ".join(["tensor<1024x2048xf32>"] * 4)
+        + ") tensor<1x2048xbf16>\n"
+        + "\n".join(
+            "stablehlo.dot_general : tensor<1x1024xf32>"
+            for _ in range(4)
+        )
+        + "\nstablehlo.optimization_barrier"
+    )
+    stable_contract = subject._physical_tuple4_stablehlo_contract(stablehlo)
+    assert stable_contract["passed"]
+    assert not subject._physical_tuple4_stablehlo_contract(
+        stablehlo.replace("stablehlo.optimization_barrier", "stablehlo.add")
     )["passed"]
 
 

@@ -794,3 +794,21 @@ capture is still required.
   sharding; its optimized per-partition HLO must contain only local N1024 weight/eight-head output,
   four partitions, no communication and no global materialization. CPU compilation proves the
   structure only; protected TPU arithmetic remains required.
+
+## DB524 global-logical GSPMD result and tuple-fusion successor
+
+- DB524 at pushed `70f549e`, tag
+  `greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T054953335423347Z`, completes in six
+  seconds. The new GSPMD candidate equals DB521 query SHA `eee61d94...0bb`, with 2,728 accepted
+  mismatches/max `9.5367432e-7`; it is not promoted.
+- StableHLO SHA `5a912167...f1c` proves four partitions, logical `f32[4096,2048]` weight and
+  explicitly sharded `[1,32,128]` output. Optimized HLO SHA `0ec1e68b...303` proves only local
+  `f32[1024,2048]` weight/eight-head output and no collective/global materialization. Structural
+  sharding passes; physical arithmetic remains the same DB521 association.
+- SUCCESS/evidence/tensor/runner/results-DB SHAs are `e9e6de5f...df0`, `d6b6f4e9...8ae`,
+  `2f185e99...85c`, `aaa7e996...4e0`, and `6e22ccfd...9df`; same-region archive, object ledger and
+  authenticated 8/8 cleanup pass. No performance or Gate-D standing exists.
+- Readiness only: exact DB499 HLO groups four N1024 reductions (`megacore_allreduce_bytes=16384`),
+  versus DB524's one (`4096`). The successor passes the same owner buffer as four aliased local
+  inputs and retains four dots through one StableHLO barrier before returning one result. CPU HLO
+  proves mechanism only; protected TPU exactness remains required.

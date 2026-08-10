@@ -1026,6 +1026,13 @@ XPlane or throughput standing. The explicit-sharding GSPMD successor is likewise
 discriminator. DB484 remains the only accepted PP8 decoder point at `244.091151 ms` p50 /
 `4.096830 tok/s`; Gate E remains open.
 
+## DB524 and tuple-fusion successor — correctness only
+
+DB524's six seconds are a bounded four-chip arithmetic/HLO matrix, not decoder latency. Its GSPMD
+candidate is nonexact and has no token loop, warmed wall distribution, XPlane or throughput
+standing. The local tuple-fusion successor is also a correctness discriminator. DB484 remains the
+only accepted PP8 decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
+
 ## DB512 literal-source RoPE diagnostic — no performance result
 
 DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal

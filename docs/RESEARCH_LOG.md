@@ -6529,3 +6529,20 @@ unmotivated arithmetic variants.
   entry is only `f32[1024,2048] -> f32[1,8,128]`, has four partitions, and contains neither a
   collective nor global materialization. Tests, one new-diff-only audit and a protected result
   precede any production correction or full-decoder retry.
+
+## 2026-08-10 05:49--06:03 — DB524 rejects GSPMD; exact HLO uses a four-reduction fusion
+
+- DB524 at pushed `70f549e` completes in six seconds. The explicit global-logical/four-way-sharded
+  candidate equals DB521 SHA `eee61d94...0bb`, leaving 2,728 accepted mismatches/max
+  `9.5367432e-7`. Optimized HLO `0ec1e68b...303` is strictly local N1024/eight-head with zero
+  communication/global materialization; StableHLO `5a912167...f1c` proves the global logical
+  shapes and explicit output/weight sharding. GSPMD structure is accepted but arithmetic is not.
+- SUCCESS/evidence/tensor/runner/results-DB SHAs are `e9e6de5f...df0`, `d6b6f4e9...8ae`,
+  `2f185e99...85c`, `aaa7e996...4e0`, and `6e22ccfd...9df`. DB/archive/direct-object/8-host
+  cleanup pass; there is no decoder or performance claim.
+- The optimized-HLO discriminator is exact: DB524 fuses one N1024 reduction with megacore bytes
+  4,096; DB499's exact LP4-virtual program fuses four N1024 reductions with 16,384. The successor
+  aliases the same physical owner buffer four times and keeps those four dots through one
+  optimization barrier before selecting the first result. Forced-four-CPU HLO retains four local
+  inputs/dots, one barrier, no communication/global physical state and one live row. Tests and one
+  new-diff-only audit precede a bounded TPU run.

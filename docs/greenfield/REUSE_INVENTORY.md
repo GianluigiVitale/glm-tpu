@@ -372,3 +372,11 @@ global logical M1/N4096 compilation as the remaining discriminator. Reuse the sa
 bytes through explicit four-way `NamedSharding`; the logical global shape is allowed only when
 optimized per-partition HLO proves local N1024 ownership, zero communication and no global physical
 materialization. No new checkpoint, oracle capture or full decoder is authorized first.
+
+DB524 at `70f549e` closes ordinary global-logical GSPMD: it preserves explicit four-way ownership
+and zero communication but produces DB521's nonexact N1024 arithmetic. Do not repeat sharding-only
+variants. Its optimized HLO and DB499's exact HLO identify the remaining difference as a one- versus
+four-reduction TPU fusion (`4096` versus `16384` megacore reduction bytes). Reuse the same local
+owner buffer through four argument aliases and one optimization barrier to test that association;
+no extra checkpoint state, other-owner weights, oracle capture, global physical table or full
+decoder is authorized first.
