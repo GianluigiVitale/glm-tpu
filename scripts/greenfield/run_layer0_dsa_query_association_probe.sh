@@ -25,6 +25,11 @@ readonly DB502_TENSOR_SHA=d9b14bdd47b5def0169b0b25157a8d472bc0017391030b0d7842b7
 readonly DB502_SUCCESS_SHA=de2e080d3eae672569acc4dada7eb41501c6f3508ac0e1747291041d95087dab
 readonly CURRENT_INTERNAL_NPZ=/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z/dsa_internal_observer/position_8155_internals.npz
 readonly CURRENT_INTERNAL_SHA=e1366c58a5eac8d995e6f56a4a3bb582fa6758b25bf19480b67e8f4c54914b50
+readonly EXACT_QUERY_INTERNAL_DIR=/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_oracle_dsa_dsa_internal_trace2_20260810T093638877848825Z/dsa_internal_observer
+readonly EXACT_QUERY_INTERNAL_NPZ=$EXACT_QUERY_INTERNAL_DIR/position_8155_internals.npz
+readonly EXACT_QUERY_INTERNAL_SHA=a889b6644b800f4e54a757377e2bd82e928c18742d1ecd4d5103e23df176ed07
+readonly EXACT_QUERY_INTERNAL_CONTRACT=$EXACT_QUERY_INTERNAL_DIR/contract.json
+readonly EXACT_QUERY_INTERNAL_CONTRACT_SHA=fb470de5f3a490a9c2cc4527d530df0cda6140fe8323add8864180e8e6dafb18
 readonly DB525_TAG=greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T060457076587721Z
 readonly DB525_DIR=/home/gianl/glm-run/$DB525_TAG
 readonly DB525_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/physical_lp4_dsa_head_geometry_association/8k/$DB525_TAG
@@ -37,6 +42,7 @@ readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
   $TARGET == query_lp4_q_a_boundary || $TARGET == q_a || \
   $TARGET == query_lp4_head_geometry || \
   $TARGET == query_lp4_production_exact || \
+  $TARGET == query_lp4_head_key_boundary || \
   $TARGET == qkv_a_production ]] || {
   echo "DSA association target is unknown: $TARGET" >&2
   exit 2
@@ -61,19 +67,38 @@ elif [[ $TARGET == query_lp4_head_geometry ]]; then
 elif [[ $TARGET == query_lp4_production_exact ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_query_production_exact_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=physical_lp4_dsa_query_production_exact
+elif [[ $TARGET == query_lp4_head_key_boundary ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_head_key_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=physical_lp4_dsa_head_key_boundary_association
 else
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=dsa_query_association
 fi
+observer_internal_npz=$CURRENT_INTERNAL_NPZ
+observer_internal_sha=$CURRENT_INTERNAL_SHA
+if [[ $TARGET == query_lp4_head_key_boundary ]]; then
+  observer_internal_npz=$EXACT_QUERY_INTERNAL_NPZ
+  observer_internal_sha=$EXACT_QUERY_INTERNAL_SHA
+  [[ -r $EXACT_QUERY_INTERNAL_CONTRACT ]] || {
+    echo "exact-query physical LP4 observer contract is unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$EXACT_QUERY_INTERNAL_CONTRACT" | awk '{print $1}') == \
+    "$EXACT_QUERY_INTERNAL_CONTRACT_SHA" ]] || {
+    echo "exact-query physical LP4 observer contract identity drifted" >&2
+    exit 2
+  }
+fi
 if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary || \
   $TARGET == query_lp4_head_geometry || \
-  $TARGET == query_lp4_production_exact ]]; then
-  [[ -r $CURRENT_INTERNAL_NPZ ]] || {
+  $TARGET == query_lp4_production_exact || \
+  $TARGET == query_lp4_head_key_boundary ]]; then
+  [[ -r $observer_internal_npz ]] || {
     echo "current physical LP4 observer is unavailable" >&2
     exit 2
   }
-  [[ $(sha256sum "$CURRENT_INTERNAL_NPZ" | awk '{print $1}') == \
-    "$CURRENT_INTERNAL_SHA" ]] || {
+  [[ $(sha256sum "$observer_internal_npz" | awk '{print $1}') == \
+    "$observer_internal_sha" ]] || {
     echo "current physical LP4 observer identity drifted" >&2
     exit 2
   }
@@ -210,10 +235,11 @@ started=$(date +%s)
 current_args=()
 if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary || \
   $TARGET == query_lp4_head_geometry || \
-  $TARGET == query_lp4_production_exact ]]; then
+  $TARGET == query_lp4_production_exact || \
+  $TARGET == query_lp4_head_key_boundary ]]; then
   current_args=(
-    --current-internal-npz "$CURRENT_INTERNAL_NPZ"
-    --current-internal-sha256 "$CURRENT_INTERNAL_SHA"
+    --current-internal-npz "$observer_internal_npz"
+    --current-internal-sha256 "$observer_internal_sha"
   )
 fi
 env JAX_PLATFORMS=tpu \
@@ -292,6 +318,14 @@ elif target == "query_lp4_head_geometry":
 elif target == "query_lp4_production_exact":
     expected_candidates = {
         "physical_production_fused_q_a_tuple4_exact_m1_n1024",
+    }
+elif target == "query_lp4_head_key_boundary":
+    expected_candidates = {
+        "physical_unbarriered_raw_pallas_rsqrt",
+        "physical_normalized_barrier_raw_pallas_rsqrt",
+        "physical_normalized_barrier_materialized_rsqrt",
+        "physical_normalized_barrier_materialized_divide_sqrt",
+        "physical_normalized_barrier_materialized_divide_sqrt_tuple4",
     }
 else:
     expected_candidates = {
@@ -435,6 +469,30 @@ if target == "query_lp4_production_exact":
         != runner["tensor_file"]["sha256"]
     ):
         raise SystemExit("physical LP4 production composition contract failed")
+if target == "query_lp4_head_key_boundary":
+    tensor = run_dir / runner["tensor_file"]["filename"]
+    materializer = runner["materializer"]
+    if (
+        runner["artifact_kind"]
+        != "glm52_layer0_physical_lp4_dsa_head_key_boundary_association"
+        or not runner["one_live_row"]
+        or runner["local_parallel_size"] != 4
+        or not materializer["completed"]
+        or not materializer["bf16_decode_hlo"]["passed"]
+        or not materializer["fp32_promote_hlo"]["passed"]
+        or materializer["local_fp32_bytes"] != 128 * 6144 * 4
+        or materializer["output_shape"] != [128, 6144]
+        or not tensor.is_file()
+        or tensor.stat().st_size != runner["tensor_file"]["byte_count"]
+        or sha256(tensor.read_bytes()).hexdigest()
+        != runner["tensor_file"]["sha256"]
+        or any(
+            not candidate["normalized_comparison"]["elementwise_exact"]
+            or not candidate["hlo"]["passed"]
+            for candidate in runner["candidates"].values()
+        )
+    ):
+        raise SystemExit("physical LP4 head/key boundary contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -554,6 +612,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   if [[ -f physical_lp4_production_exact.npz ]]; then
     sha256sum physical_lp4_production_exact.npz
   fi
+  if [[ -f physical_lp4_head_key_boundary.npz ]]; then
+    sha256sum physical_lp4_head_key_boundary.npz
+  fi
   sha256sum runner.json runner.log summary.json results_ckpt.db \
     census_pre.txt census_post.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
@@ -620,6 +681,9 @@ artifact_kinds = {
     ),
     "query_lp4_production_exact": (
         "glm52_layer0_physical_lp4_dsa_query_production_exact"
+    ),
+    "query_lp4_head_key_boundary": (
+        "glm52_layer0_physical_lp4_dsa_head_key_boundary_association"
     ),
     "query": "glm52_layer0_dsa_query_association",
 }

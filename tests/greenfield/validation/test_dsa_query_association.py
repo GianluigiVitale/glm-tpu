@@ -98,6 +98,43 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
         "physical_global_gspmd_m1_n4096",
         "physical_owner_tuple4_barrier_m1_n1024",
     }
+    assert set(subject._physical_lp4_head_key_boundary_modes()) == {
+        (
+            "physical_unbarriered_raw_pallas_rsqrt",
+            False,
+            "raw_pallas",
+            "multiply_rsqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_raw_pallas_rsqrt",
+            True,
+            "raw_pallas",
+            "multiply_rsqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_materialized_rsqrt",
+            True,
+            "materialized",
+            "multiply_rsqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_materialized_divide_sqrt",
+            True,
+            "materialized",
+            "divide_sqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_materialized_divide_sqrt_tuple4",
+            True,
+            "materialized",
+            "divide_sqrt",
+            True,
+        ),
+    }
 
 
 def test_physical_lp4_query_associations_are_semantically_equal_on_cpu() -> None:
@@ -365,6 +402,98 @@ def test_production_exact_contract_requires_composed_q_a_and_tuple4(
     )["passed"]
 
 
+def test_head_key_boundary_contract_pins_barriers_dots_and_locality() -> None:
+    stablehlo = (
+        "module attributes {mhlo.num_partitions = 4 : i32}\n"
+        'sdy.manual_computation @mesh "lp4" '
+        "tensor<1x6144xbf16> tensor<8x6144xbf16> "
+        "tensor<1x128xf32> tensor<128x6144xf32>\n"
+        + "\n".join("stablehlo.dot_general" for _ in range(5))
+        + "\nstablehlo.optimization_barrier"
+        + "\nstablehlo.optimization_barrier"
+    )
+    candidate = (
+        "physical_normalized_barrier_materialized_divide_sqrt_tuple4"
+    )
+    contract = subject._physical_lp4_head_key_boundary_hlo_contract(
+        "bf16[1,6144] bf16[8,6144] f32[1,128] f32[128,6144]",
+        stablehlo,
+        candidate=candidate,
+        normalized_barrier=True,
+        projection_source="materialized",
+        tuple4_anchor=True,
+    )
+    assert contract["passed"]
+    assert contract["stablehlo_dot_count"] == 5
+    assert contract["stablehlo_optimization_barrier_count"] == 2
+    assert not subject._physical_lp4_head_key_boundary_hlo_contract(
+        "bf16[1,6144] bf16[8,6144] f32[1,128] f32[128,6144]",
+        stablehlo.replace("stablehlo.optimization_barrier", "stablehlo.add", 1),
+        candidate=candidate,
+        normalized_barrier=True,
+        projection_source="materialized",
+        tuple4_anchor=True,
+    )["passed"]
+    assert not subject._physical_lp4_head_key_boundary_hlo_contract(
+        "bf16[32,6144] bf16[8,6144] f32[1,128] f32[128,6144]",
+        stablehlo,
+        candidate=candidate,
+        normalized_barrier=True,
+        projection_source="materialized",
+        tuple4_anchor=True,
+    )["passed"]
+
+    decode = subject._physical_lp4_wk_materializer_hlo_contract(
+        "u8[128,6144] f32[1,48] bf16[128,6144]",
+        phase="decode_bf16",
+    )
+    promote = subject._physical_lp4_wk_materializer_hlo_contract(
+        "bf16[128,6144] f32[128,6144]",
+        phase="promote_fp32",
+    )
+    assert decode["passed"] and promote["passed"]
+    assert not subject._physical_lp4_wk_materializer_hlo_contract(
+        "bf16[128,6144] f32[128,6144] all-gather",
+        phase="promote_fp32",
+    )["passed"]
+
+
+def test_current_key_finisher_reuses_existing_norm_associations() -> None:
+    contract = subject.DsaNumericalContract()
+    projected = subject.jnp.linspace(
+        -1.0, 1.0, contract.head_dim, dtype=subject.jnp.float32
+    )[None, :]
+    weight = subject.jnp.ones(
+        (contract.head_dim,), dtype=subject.jnp.bfloat16
+    )
+    bias = subject.jnp.zeros(
+        (contract.head_dim,), dtype=subject.jnp.bfloat16
+    )
+    position = subject.jnp.asarray([8155], dtype=subject.jnp.int32)
+    expected = subject.dsa_index_keys_from_projection(
+        projected, weight, bias, position, contract=contract
+    )
+    actual = subject._current_key_from_projection(
+        projected,
+        weight,
+        bias,
+        position,
+        norm_mode="multiply_rsqrt",
+        contract=contract,
+    )
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+    divided = subject._current_key_from_projection(
+        projected,
+        weight,
+        bias,
+        position,
+        norm_mode="divide_sqrt",
+        contract=contract,
+    )
+    assert divided.shape == (1, contract.head_dim)
+    assert divided.dtype == subject.jnp.float32
+
+
 def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
     assert set(subject._q_a_candidate_modes()) == {
         ("lax_map_convolution", norm)
@@ -445,6 +574,8 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "DB502_TENSOR_SHA=d9b14bdd",
         "DB502_SUCCESS_SHA=de2e080d",
         "CURRENT_INTERNAL_SHA=e1366c58",
+        "EXACT_QUERY_INTERNAL_SHA=a889b664",
+        "EXACT_QUERY_INTERNAL_CONTRACT_SHA=fb470de5",
         "physical_lp4_query_candidates.npz",
         "physical_lp4_dsa_query_association",
         "query_lp4_q_a_boundary",
@@ -456,6 +587,9 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "query_lp4_production_exact",
         "physical_lp4_production_exact.npz",
         "physical_lp4_dsa_query_production_exact",
+        "query_lp4_head_key_boundary",
+        "physical_lp4_head_key_boundary.npz",
+        "physical_lp4_dsa_head_key_boundary_association",
         "DB525_RUNNER_SHA=da7acf8b",
         "DB525_TENSOR_SHA=c55a6638",
         "DB525_SUCCESS_SHA=5b547f24",
@@ -473,7 +607,11 @@ def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
         '"query_lp4_q_a_boundary",',
         '"query_lp4_head_geometry",',
         '"query_lp4_production_exact",',
+        '"query_lp4_head_key_boundary",',
         "_local_dsa_query_tuple4_exact",
+        "decode_stage_local_prefill_index_wk_bf16",
+        "promote_stage_local_prefill_index_wk",
+        "affine_key_layer_norm",
         "validate_dsa_query_weight_materializer_hlo",
         "production_fused_n82_convolution_shard_sum",
         "companion_comparison",

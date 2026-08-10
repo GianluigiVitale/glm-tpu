@@ -26,6 +26,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from glm_tpu.greenfield.kernels.reference.dsa_association import (  # noqa: E402
     Layer0DsaProbeGeometry,
+    affine_key_layer_norm,
     apply_rotary,
     one_row_virtual_tp32_fused_qkv_a_rms_norm,
     pack_legacy_fused_qkv_runtime_weights,
@@ -43,6 +44,7 @@ from glm_tpu.greenfield.kernels.reference.attention import (  # noqa: E402
 )
 from glm_tpu.greenfield.kernels.reference.dsa import (  # noqa: E402
     DsaNumericalContract,
+    dsa_index_keys_from_projection,
 )
 from glm_tpu.greenfield.kernels.reference.fp8 import (  # noqa: E402
     dequantize_fp8_bits_block_weight,
@@ -52,6 +54,12 @@ from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (  # noqa: E402
     fp8_block_matmul_f32,
     fp8_block_vector_matmul_f32,
 )
+from glm_tpu.greenfield.kernels.reference.linear import linear  # noqa: E402
+from glm_tpu.greenfield.kernels.reference.prefill_index import (  # noqa: E402
+    decode_stage_local_prefill_index_wk_bf16,
+    promote_stage_local_prefill_index_wk,
+)
+from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm  # noqa: E402
 from glm_tpu.greenfield.runtime.decoder import (  # noqa: E402
     _validate_fused_qkv_a_decoder_association,
     validate_dsa_query_weight_materializer_hlo,
@@ -78,6 +86,9 @@ PHYSICAL_LP4_HEAD_GEOMETRY_ARTIFACT_KIND = (
 )
 PHYSICAL_LP4_PRODUCTION_EXACT_ARTIFACT_KIND = (
     "glm52_layer0_physical_lp4_dsa_query_production_exact"
+)
+PHYSICAL_LP4_HEAD_KEY_BOUNDARY_ARTIFACT_KIND = (
+    "glm52_layer0_physical_lp4_dsa_head_key_boundary_association"
 )
 
 
@@ -675,6 +686,180 @@ def _physical_lp4_head_geometry_modes() -> tuple[str, ...]:
         "physical_global_gspmd_m1_n4096",
         "physical_owner_tuple4_barrier_m1_n1024",
     )
+
+
+def _physical_lp4_head_key_boundary_modes(
+) -> tuple[tuple[str, bool, str, str, bool], ...]:
+    """Return the five source-backed recurrent head/key discriminators."""
+
+    return (
+        (
+            "physical_unbarriered_raw_pallas_rsqrt",
+            False,
+            "raw_pallas",
+            "multiply_rsqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_raw_pallas_rsqrt",
+            True,
+            "raw_pallas",
+            "multiply_rsqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_materialized_rsqrt",
+            True,
+            "materialized",
+            "multiply_rsqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_materialized_divide_sqrt",
+            True,
+            "materialized",
+            "divide_sqrt",
+            False,
+        ),
+        (
+            "physical_normalized_barrier_materialized_divide_sqrt_tuple4",
+            True,
+            "materialized",
+            "divide_sqrt",
+            True,
+        ),
+    )
+
+
+def _physical_lp4_head_key_boundary_hlo_contract(
+    optimized_hlo: str,
+    stablehlo: str,
+    *,
+    candidate: str,
+    normalized_barrier: bool,
+    projection_source: str,
+    tuple4_anchor: bool,
+) -> dict[str, Any]:
+    """Require one-row, communication-free LP4 head/key candidate lowering."""
+
+    known = {mode[0] for mode in _physical_lp4_head_key_boundary_modes()}
+    if candidate not in known:
+        raise ValueError("physical head/key boundary candidate is unknown")
+    if projection_source not in ("raw_pallas", "materialized"):
+        raise ValueError("physical head/key projection source is unknown")
+    lowered = optimized_hlo.lower()
+    stable_lowered = stablehlo.lower()
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    forbidden_shapes = [
+        shape
+        for shape in (
+            "bf16[32,6144]",
+            "f32[32,6144]",
+            "u8[32,128,6144]",
+            "f32[32,128,6144]",
+        )
+        if shape in lowered
+    ]
+    stable_barriers = stable_lowered.count(
+        "stablehlo.optimization_barrier"
+    )
+    expected_barriers = int(normalized_barrier) + int(tuple4_anchor)
+    stable_dot_count = stable_lowered.count("stablehlo.dot_general")
+    minimum_dots = 5 if tuple4_anchor else (
+        2 if projection_source == "materialized" else 1
+    )
+    required = {
+        "explicit_four_partitions": "mhlo.num_partitions = 4" in stable_lowered,
+        "manual_lp4": (
+            "sdy.manual_computation" in stable_lowered
+            and '"lp4"' in stable_lowered
+        ),
+        "one_live_residual": "tensor<1x6144xbf16>" in stable_lowered,
+        "local_head_weight": "tensor<8x6144xbf16>" in stable_lowered,
+        "one_current_key": "tensor<1x128xf32>" in stable_lowered,
+        "requested_dots": stable_dot_count >= minimum_dots,
+        "requested_barriers": stable_barriers == expected_barriers,
+        "raw_wk_only_when_requested": (
+            "tensor<128x6144xui8>" in stable_lowered
+            if projection_source == "raw_pallas"
+            else "tensor<128x6144xf32>" in stable_lowered
+        ),
+    }
+    return {
+        "candidate": candidate,
+        "forbidden_operations": forbidden_operations,
+        "forbidden_shapes": forbidden_shapes,
+        "hlo_sha256": sha256(optimized_hlo.encode()).hexdigest(),
+        "local_parallel_size": 4,
+        "normalized_barrier": normalized_barrier,
+        "projection_source": projection_source,
+        "required": required,
+        "stablehlo_dot_count": stable_dot_count,
+        "stablehlo_optimization_barrier_count": stable_barriers,
+        "stablehlo_sha256": sha256(stablehlo.encode()).hexdigest(),
+        "tuple4_anchor": tuple4_anchor,
+        "passed": (
+            not forbidden_operations
+            and not forbidden_shapes
+            and all(required.values())
+        ),
+    }
+
+
+def _physical_lp4_wk_materializer_hlo_contract(
+    hlo: str,
+    *,
+    phase: str,
+) -> dict[str, Any]:
+    """Require a completed, communication-free replicated ``wk`` phase."""
+
+    if phase not in ("decode_bf16", "promote_fp32"):
+        raise ValueError("physical wk materializer phase is unknown")
+    lowered = hlo.lower()
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    required = {
+        "owner_shape": (
+            "u8[128,6144]" in lowered
+            if phase == "decode_bf16"
+            else "bf16[128,6144]" in lowered
+        ),
+        "completed_output": (
+            "bf16[128,6144]" in lowered
+            if phase == "decode_bf16"
+            else "f32[128,6144]" in lowered
+        ),
+    }
+    return {
+        "forbidden_operations": forbidden_operations,
+        "hlo_sha256": sha256(hlo.encode()).hexdigest(),
+        "phase": phase,
+        "required": required,
+        "passed": not forbidden_operations and all(required.values()),
+    }
 
 
 def _physical_lp4_hlo_contract(
@@ -1361,6 +1546,399 @@ def _run_physical_lp4_q_a_boundary(
         "one_live_row": True,
         "performance_claim": False,
         "q_a_exact_candidates": q_a_exact,
+        "q_a_manifest_sha256": q_manifest["manifest_sha256"],
+        "status": "SUCCESS",
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+
+
+def _current_key_from_projection(
+    projected: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    position: Any,
+    *,
+    norm_mode: str,
+    contract: DsaNumericalContract,
+) -> Any:
+    """Finish one recurrent key with either observed or accepted norm syntax."""
+
+    if norm_mode == "multiply_rsqrt":
+        return dsa_index_keys_from_projection(
+            projected,
+            key_norm_weight,
+            key_norm_bias,
+            position,
+            contract=contract,
+        )
+    if norm_mode != "divide_sqrt":
+        raise ValueError("physical head/key norm mode is unknown")
+    keys = affine_key_layer_norm(
+        projected,
+        key_norm_weight,
+        key_norm_bias,
+        epsilon=contract.key_layer_norm_epsilon,
+        mode="divide_sqrt",
+    )
+    cos, sin = rotary_cos_sin(
+        position,
+        rotary_dim=contract.rotary_dim,
+        theta=contract.theta,
+        dtype=jnp.float32,
+    )
+    rotated = apply_rotary(
+        keys[..., : contract.rotary_dim],
+        cos,
+        sin,
+        interleaved=contract.interleaved_rotary,
+    )
+    return jnp.concatenate(
+        (rotated, keys[..., contract.rotary_dim :]), axis=-1
+    ).astype(jnp.float32)
+
+
+def _run_physical_lp4_head_key_boundary(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+    capture: dict[str, Any],
+    accepted_normalized_bits: np.ndarray,
+    accepted_head_weights: np.ndarray,
+    accepted_current_key: np.ndarray,
+    current_head_weights: np.ndarray,
+    current_current_key: np.ndarray,
+    arrays: dict[str, np.ndarray],
+    input_manifest: dict[str, Any],
+    q_manifest: dict[str, Any],
+) -> None:
+    """Discriminate the integrated RMSNorm-to-head/key compiler boundary."""
+
+    contract = DsaNumericalContract()
+    devices = np.asarray(jax.devices(), dtype=object)
+    if devices.shape != (4,):
+        raise SystemExit("physical head/key boundary requires four devices")
+    mesh = Mesh(devices, ("lp4",))
+    replicated = NamedSharding(mesh, P())
+    current_token_id = int(arrays["current_token_id"][0])
+    embedding_matches = np.flatnonzero(
+        arrays["unique_token_ids"] == current_token_id
+    )
+    if embedding_matches.size != 1:
+        raise SystemExit("current token embedding ownership drifted")
+    residual_bits = np.ascontiguousarray(
+        arrays["unique_embedding_bfloat16_bits"][embedding_matches[0]]
+    )
+    residual = jax.device_put(
+        residual_bits.view(ml_dtypes.bfloat16)[None, :], replicated
+    )
+    input_norm_weight = jax.device_put(
+        arrays["input_layernorm__weight"].view(ml_dtypes.bfloat16),
+        replicated,
+    )
+    head_weight = jax.device_put(
+        arrays["self_attn__indexer__weights_proj__weight"].view(
+            ml_dtypes.bfloat16
+        ),
+        NamedSharding(mesh, P("lp4", None)),
+    )
+    wk_bits = jax.device_put(
+        arrays["self_attn__indexer__wk__weight"], replicated
+    )
+    wk_scale = jax.device_put(
+        arrays["self_attn__indexer__wk__weight_scale_inv"], replicated
+    )
+    key_norm_weight = jax.device_put(
+        arrays["self_attn__indexer__k_norm__weight"].view(
+            ml_dtypes.bfloat16
+        ),
+        replicated,
+    )
+    key_norm_bias = jax.device_put(
+        arrays["self_attn__indexer__k_norm__bias"].view(
+            ml_dtypes.bfloat16
+        ),
+        replicated,
+    )
+    position = jax.device_put(
+        arrays["decode_position"].astype(np.int32), replicated
+    )
+
+    args.hlo_dir.mkdir(parents=True)
+    decode_mapped = jax.shard_map(
+        lambda bits, scale: decode_stage_local_prefill_index_wk_bf16(
+            bits, scale, contract=contract
+        ),
+        mesh=mesh,
+        in_specs=(P(), P()),
+        out_specs=P(),
+        check_vma=False,
+    )
+    decode_lowered = jax.jit(decode_mapped).lower(wk_bits, wk_scale)
+    decode_compiled = decode_lowered.compile()
+    decode_hlo = decode_compiled.as_text()
+    (args.hlo_dir / "head_key_wk_decode_bf16.optimized_hlo.txt").write_text(
+        decode_hlo
+    )
+    decode_hlo_contract = _physical_lp4_wk_materializer_hlo_contract(
+        decode_hlo, phase="decode_bf16"
+    )
+    if not decode_hlo_contract["passed"]:
+        raise SystemExit("head/key BF16 wk materializer HLO failed")
+    wk_bf16 = decode_compiled(wk_bits, wk_scale)
+    jax.block_until_ready(wk_bf16)
+
+    promote_mapped = jax.shard_map(
+        lambda weight: promote_stage_local_prefill_index_wk(
+            weight, contract=contract
+        ),
+        mesh=mesh,
+        in_specs=P(),
+        out_specs=P(),
+        check_vma=False,
+    )
+    promote_lowered = jax.jit(promote_mapped).lower(wk_bf16)
+    promote_compiled = promote_lowered.compile()
+    promote_hlo = promote_compiled.as_text()
+    (args.hlo_dir / "head_key_wk_promote_fp32.optimized_hlo.txt").write_text(
+        promote_hlo
+    )
+    promote_hlo_contract = _physical_lp4_wk_materializer_hlo_contract(
+        promote_hlo, phase="promote_fp32"
+    )
+    if not promote_hlo_contract["passed"]:
+        raise SystemExit("head/key FP32 wk materializer HLO failed")
+    wk_f32 = promote_compiled(wk_bf16)
+    jax.block_until_ready(wk_f32)
+
+    candidates: dict[str, Any] = {}
+    tensor_values: dict[str, np.ndarray] = {
+        "accepted_normalized_hidden_bfloat16_bits": (
+            accepted_normalized_bits
+        ),
+        "accepted_head_weights": accepted_head_weights,
+        "accepted_current_key": accepted_current_key,
+        "current_observer_head_weights": current_head_weights,
+        "current_observer_current_key": current_current_key,
+        "residual_bfloat16_bits": residual_bits,
+    }
+    exact_candidates: list[str] = []
+    current_reproducing_candidates: list[str] = []
+    pallas_config = Fp8BlockMatmulConfig(
+        block_shape=(128, 128),
+        output_tile=128,
+        contraction_tile=128,
+    )
+    for (
+        candidate,
+        normalized_barrier,
+        projection_source,
+        norm_mode,
+        tuple4_anchor,
+    ) in _physical_lp4_head_key_boundary_modes():
+
+        def local_candidate(
+            residual_input: Any,
+            norm_weight: Any,
+            local_head_weight: Any,
+            wk_operand: Any,
+            scale: Any,
+            k_norm_weight: Any,
+            k_norm_bias: Any,
+            decode_position: Any,
+        ) -> tuple[Any, Any, Any]:
+            normalized = rms_norm(
+                residual_input, norm_weight, epsilon=1e-5
+            )
+            normalized_input = (
+                lax.optimization_barrier(normalized)
+                if normalized_barrier
+                else normalized
+            )
+            head = (
+                linear(
+                    normalized_input,
+                    local_head_weight,
+                    output_dtype=jnp.float32,
+                )
+                * jnp.float32(contract.num_heads**-0.5)
+            ).astype(jnp.float32)
+            if projection_source == "raw_pallas":
+                projected = fp8_block_matmul_f32(
+                    normalized_input,
+                    wk_operand,
+                    scale,
+                    config=pallas_config,
+                    interpret=False,
+                )
+            elif tuple4_anchor:
+                grouped = jnp.stack(
+                    tuple(
+                        linear(
+                            normalized_input,
+                            wk_operand,
+                            output_dtype=jnp.float32,
+                        )
+                        for _ in range(4)
+                    )
+                )
+                projected = lax.optimization_barrier(grouped)[0]
+            else:
+                projected = linear(
+                    normalized_input,
+                    wk_operand,
+                    output_dtype=jnp.float32,
+                )
+            key = _current_key_from_projection(
+                projected,
+                k_norm_weight,
+                k_norm_bias,
+                decode_position,
+                norm_mode=norm_mode,
+                contract=contract,
+            )
+            return normalized, head, key
+
+        mapped = jax.shard_map(
+            local_candidate,
+            mesh=mesh,
+            in_specs=(P(), P(), P("lp4", None), P(), P(), P(), P(), P()),
+            out_specs=(P(), P(None, "lp4"), P()),
+            check_vma=False,
+        )
+        wk_operand = wk_bits if projection_source == "raw_pallas" else wk_f32
+        arguments = (
+            residual,
+            input_norm_weight,
+            head_weight,
+            wk_operand,
+            wk_scale,
+            key_norm_weight,
+            key_norm_bias,
+            position,
+        )
+        lowered = jax.jit(mapped).lower(*arguments)
+        stablehlo = lowered.as_text()
+        compiled = lowered.compile()
+        optimized_hlo = compiled.as_text()
+        (args.hlo_dir / f"{candidate}.stablehlo.mlir").write_text(stablehlo)
+        (args.hlo_dir / f"{candidate}.optimized_hlo.txt").write_text(
+            optimized_hlo
+        )
+        hlo_contract = _physical_lp4_head_key_boundary_hlo_contract(
+            optimized_hlo,
+            stablehlo,
+            candidate=candidate,
+            normalized_barrier=normalized_barrier,
+            projection_source=projection_source,
+            tuple4_anchor=tuple4_anchor,
+        )
+        if not hlo_contract["passed"]:
+            raise SystemExit(f"physical head/key HLO failed for {candidate}")
+        normalized_output, head_output, key_output = compiled(*arguments)
+        jax.block_until_ready((normalized_output, head_output, key_output))
+        normalized_bits = np.ascontiguousarray(
+            np.asarray(normalized_output)
+        ).view(np.uint16)[0]
+        candidate_head = np.ascontiguousarray(
+            np.asarray(head_output)[0], dtype=np.float32
+        )
+        candidate_key = np.ascontiguousarray(
+            np.asarray(key_output)[0], dtype=np.float32
+        )
+        normalized_comparison = _compare_bfloat16_bits(
+            accepted_normalized_bits, normalized_bits
+        )
+        head_comparison = _compare(
+            accepted_head_weights, candidate_head
+        )
+        key_comparison = _compare(accepted_current_key, candidate_key)
+        current_head_comparison = _compare(
+            current_head_weights, candidate_head
+        )
+        current_key_comparison = _compare(
+            current_current_key, candidate_key
+        )
+        if not normalized_comparison["elementwise_exact"]:
+            raise SystemExit(
+                f"physical head/key normalized producer drifted for {candidate}"
+            )
+        if (
+            head_comparison["elementwise_exact"]
+            and key_comparison["elementwise_exact"]
+        ):
+            exact_candidates.append(candidate)
+        if (
+            current_head_comparison["elementwise_exact"]
+            and current_key_comparison["elementwise_exact"]
+        ):
+            current_reproducing_candidates.append(candidate)
+        tensor_values[f"{candidate}__normalized_bfloat16_bits"] = (
+            normalized_bits
+        )
+        tensor_values[f"{candidate}__head_weights"] = candidate_head
+        tensor_values[f"{candidate}__current_key"] = candidate_key
+        candidates[candidate] = {
+            "accepted_current_key_comparison": key_comparison,
+            "accepted_head_weights_comparison": head_comparison,
+            "current_observer_current_key_comparison": (
+                current_key_comparison
+            ),
+            "current_observer_head_weights_comparison": (
+                current_head_comparison
+            ),
+            "hlo": hlo_contract,
+            "key_norm_mode": norm_mode,
+            "normalized_comparison": normalized_comparison,
+        }
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "physical_lp4_head_key_boundary.npz"
+    np.savez(tensor_path, **tensor_values)
+    result = {
+        "artifact_kind": PHYSICAL_LP4_HEAD_KEY_BOUNDARY_ARTIFACT_KIND,
+        "association_restored": bool(exact_candidates),
+        "backend": jax.default_backend(),
+        "candidates": candidates,
+        "capture": {
+            "comparison_sha256": args.capture_comparison_sha256,
+            "owner_actual_sha256": capture["owner_actual_sha256"],
+            "tensors_sha256": args.capture_tensors_sha256,
+        },
+        "claim_scope": (
+            "Bounded physical four-chip layer-0 recurrent head/key "
+            "association only; no decoder, Gate-D, latency, or token-rate "
+            "claim."
+        ),
+        "code_hash": code_hash,
+        "current_observer": {
+            "current_key_sha256": _array_sha256(current_current_key),
+            "head_weights_sha256": _array_sha256(current_head_weights),
+            "sha256": args.current_internal_sha256,
+        },
+        "current_reproducing_candidates": current_reproducing_candidates,
+        "device_count": jax.device_count(),
+        "device_kind": sorted({device.device_kind for device in jax.devices()}),
+        "diagnostic_only": True,
+        "exact_candidates": exact_candidates,
+        "format_version": 1,
+        "input_manifest_sha256": input_manifest["manifest_sha256"],
+        "local_parallel_size": 4,
+        "materializer": {
+            "bf16_decode_hlo": decode_hlo_contract,
+            "completed": True,
+            "fp32_promote_hlo": promote_hlo_contract,
+            "local_fp32_bytes": contract.head_dim * contract.hidden_size * 4,
+            "output_shape": list(wk_f32.shape),
+        },
+        "one_live_row": True,
+        "performance_claim": False,
         "q_a_manifest_sha256": q_manifest["manifest_sha256"],
         "status": "SUCCESS",
         "tensor_file": {
@@ -2722,6 +3300,7 @@ def main() -> None:
             "query_lp4_q_a_boundary",
             "query_lp4_head_geometry",
             "query_lp4_production_exact",
+            "query_lp4_head_key_boundary",
             "q_a",
             "qkv_a_production",
         ),
@@ -2772,12 +3351,22 @@ def main() -> None:
         raise SystemExit("captured DSA query discriminator contract drifted")
     with np.load(tensors_path, allow_pickle=False) as payload:
         actual_query = np.asarray(payload["actual__query"], dtype=np.float32)
+        accepted_head_weights = np.ascontiguousarray(
+            payload["actual__head_weights"], dtype=np.float32
+        )
+        accepted_current_key = np.ascontiguousarray(
+            payload["actual__current_key"], dtype=np.float32
+        )
         captured_q_bits = np.ascontiguousarray(payload["actual__q_a_state"])
         captured_normalized_bits = np.ascontiguousarray(
             payload["actual__normalized_hidden"]
         )
     if actual_query.shape != (32, 128) or captured_q_bits.shape != (2048,):
         raise SystemExit("captured query/q-a shape drifted")
+    if accepted_head_weights.shape != (32,) or (
+        accepted_current_key.shape != (128,)
+    ):
+        raise SystemExit("captured head/key shape drifted")
     if captured_normalized_bits.shape != (6144,) or (
         captured_normalized_bits.dtype != np.uint16
         or captured_q_bits.dtype != np.uint16
@@ -2840,7 +3429,10 @@ def main() -> None:
     )
     dequantized = None
     dequantized_host = None
-    if args.target != "query_lp4_production_exact":
+    if args.target not in (
+        "query_lp4_production_exact",
+        "query_lp4_head_key_boundary",
+    ):
         dequantized = jax.jit(
             lambda bits, scale: dequantize_fp8_bits_block_weight(
                 bits, scale, output_dtype=jnp.float32
@@ -2859,6 +3451,7 @@ def main() -> None:
         "query_lp4_q_a_boundary",
         "query_lp4_head_geometry",
         "query_lp4_production_exact",
+        "query_lp4_head_key_boundary",
     ):
         if (
             args.current_internal_npz is None
@@ -2874,14 +3467,36 @@ def main() -> None:
             current_query = np.ascontiguousarray(
                 payload["query"][0], dtype=np.float32
             )
+            current_head_weights = np.ascontiguousarray(
+                payload["head_weights"][0], dtype=np.float32
+            )
+            current_current_key = np.ascontiguousarray(
+                payload["current_key"][0], dtype=np.float32
+            )
         if (
             producer_ids.shape != (21,)
             or int(producer_ids[0]) != 0
             or decode_position.tolist() != [8155]
             or current_query.shape != actual_query.shape
+            or current_head_weights.shape != accepted_head_weights.shape
+            or current_current_key.shape != accepted_current_key.shape
         ):
             raise SystemExit("current physical LP4 observer contract drifted")
-        if args.target == "query_lp4_production_exact":
+        if args.target == "query_lp4_head_key_boundary":
+            _run_physical_lp4_head_key_boundary(
+                args=args,
+                code_hash=code_hash,
+                capture=capture,
+                accepted_normalized_bits=captured_normalized_bits,
+                accepted_head_weights=accepted_head_weights,
+                accepted_current_key=accepted_current_key,
+                current_head_weights=current_head_weights,
+                current_current_key=current_current_key,
+                arrays=arrays,
+                input_manifest=input_manifest,
+                q_manifest=q_manifest,
+            )
+        elif args.target == "query_lp4_production_exact":
             _run_physical_lp4_production_exact(
                 args=args,
                 code_hash=code_hash,
