@@ -130,6 +130,11 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert '"--observe-layer0-residual-variants"' in compiler
     assert "build_layer0_residual_discriminator" in compiler
     assert "validate_layer0_residual_discriminator_hlo" in compiler
+    assert "decoder.layer0_residual_discriminators" in compiler
+    assert '"four_distinct_hlo_modules"' in compiler
+    assert '"hlo_suite_contract"' in compiler
+    assert "for variant_name, compiled_discriminator in" in compiler
+    assert "*runtime_prefix, *tuple(output)" in compiler
     assert "LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256" in compiler
     assert (
         "readonly LAYER0_RESIDUAL_VARIANTS="

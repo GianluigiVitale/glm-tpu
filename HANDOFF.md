@@ -3327,3 +3327,43 @@ contract now requires two to four named boundary kernels in addition to at least
 explicit-CPU batch passes 105 tests; compileall, JSON, and diff checks pass. The one new-diff-only
 Fable review found no blocker and returned `APPROVE COMMIT`. Exact next: independently verify,
 commit/push, and retry only the same discriminator. Do not launch the full 8K decoder first.
+
+## Corrected four-arm outputs are invalid; isolated successor is implemented
+
+Protected tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T202128342266137Z`
+ran from 20:21--21:08 UTC at pushed `9b53ce2`. It completed all-host load/compile, the 8,155-token
+prefill, exact first token and exact layer-0 selection. Both requested FP32 LP4 combines and three
+opaque boundaries survived. The run then refused because its nominal BF16 control SHA
+`c42642ba...33b5` did not reproduce current production SHA `787c9ba7...153b`: 615/6,144 values
+differ, max `0.0009765625`, mean `1.2867735e-5`.
+
+The optimized HLO explains the changed control. It tuple-combines the two FP32 dense reductions,
+the two BF16 dense reductions, two pairs of layer-1 RMS reductions, and all four normalized
+outputs. HLO raw/gzip/old-contract SHAs are `19fdc1b3...e1e2`, `0d694ce3...a7f`, and
+`b87f5a19...8cfe`; NPZ/variant-contract/rank-log SHAs are `d134609e...cd16`,
+`7aeeb00a...96e1`, and `b2fe159c...7e5`. Pre/failure census SHAs `9576da95...f5e8` /
+`9bd7e5c7...ff7` authenticate 8/8 cleanup. The four accepted-target comparisons are inadmissible;
+there is no DB, `SUCCESS`, latency, trace, Gate-D or performance result.
+
+The successor compiles four independent single-arm executables. Every arm has a per-arm HLO
+contract for its exact kernel/boundary/FP32-combine counts, local-only groups, one-row root and one
+scoped layer-1 norm; tuple-fused hidden rows or scalar RMS reductions refuse. The runner reuses the
+same non-donated post-prefill arrays for all four executions and stacks only the host results. The
+reuse registry now explicitly rejects the stacked program and retains its loader/oracle/protection
+machinery.
+
+Exact next: finish the affected tests and static checks, get one new-diff-only Fable approval,
+independently verify, commit/push, authenticate an idle fleet, then retry only the isolated
+discriminator. A full 8K decoder retry is forbidden until the isolated BF16 control reproduces
+production and one causal arm is adjudicated.
+
+Post-batch status: the affected forced-CPU suite passes 68/68 in 213.61 seconds; compileall, Bash,
+ShellCheck, JSON and diff checks pass. The single Fable review inspected only the diff from cleared
+`9b53ce2`, the affected call graph and launcher artifact handling, found no blocker, and returned
+`APPROVE COMMIT`. Its two low observations are fail-closed only: a carried-over collective floor
+could reject a legitimate single-arm TPU HLO, and tuple-fusion checks are scoped to the named
+layer-1 norm. Independent inspection accepts both because neither can admit contaminated evidence;
+the exact per-arm kernels, combine counts, root shape and local groups remain mandatory. Do not
+request another review of this unchanged batch. Exact next: final mechanical verification,
+commit/push, authenticate idle fleet, and launch only the isolated discriminator.

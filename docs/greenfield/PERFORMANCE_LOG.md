@@ -1185,3 +1185,16 @@ XLA had demoted both requested FP32 hidden-width reductions by commuting their d
 casts. There is no variant tensor, token, DSA comparison, wall distribution, DB row or `SUCCESS`.
 The elapsed time is load/compile latency, not token latency. DB484 remains the only accepted PP8
 decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gates D and E remain open.
+
+## Corrected stacked residual discriminator — no performance result
+
+The protected `9b53ce2` retry ran from 20:21 to 21:08 UTC because it loaded the complete model,
+compiled production plus the diagnostic, and processed all 8,155 prompt tokens. It reached exact
+first-token and layer-0 selection checks and emitted four diagnostic rows, then deliberately
+failed because its BF16 control SHA `c42642ba...33b5` did not reproduce current production SHA
+`787c9ba7...153b`.
+
+Optimized HLO proves the four arms were tuple-fused, so their numerical comparisons are
+inadmissible. The run has no warmup distribution, XPlane, DB row, terminal `SUCCESS`, Gate-D/E or
+throughput standing. Its approximately 46-minute orchestration time is not token latency. DB484
+remains the only accepted PP8 decoder result at `244.091151 ms` p50 / `4.096830 tok/s`.

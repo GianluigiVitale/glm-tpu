@@ -449,3 +449,12 @@ device-only conversion was created for this exact cast-motion behavior. Apply it
 two candidate Pallas FP32 LP4 combines, and retain a fail-closed HLO requirement for both the
 named boundary kernels and physical `f32[1,6144]` reductions. The corrected bounded retry remains
 the only authorized successor and still cannot establish decoder performance.
+
+The corrected `9b53ce2` retry proves those physical FP32 combines and opaque boundaries survive,
+but its four device-side arms are not independent. Optimized HLO tuple-fuses the two BF16 dense
+combines, the two FP32 dense combines, two pairs of layer-1 RMS reductions, and the final four
+normalized outputs. Its nominal BF16 control therefore differs from current production in 615 of
+6,144 values (max `0.0009765625`), so none of the four comparisons is admissible. Preserve the run
+as negative compiler-association evidence. Reuse its exact post-prefill state, sealed layer-1
+target, oracle, loader and protection path through four separately compiled single-arm programs;
+do not stack the arms again or spend another full-decoder retry before the isolated result.

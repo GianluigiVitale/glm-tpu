@@ -6705,3 +6705,37 @@ unmotivated arithmetic variants.
   The affected explicit-CPU batch passes 105 tests, with compileall/JSON/diff checks green. The
   one new-diff-only Fable audit found no blocker and returned `APPROVE COMMIT`. After independent
   verification and a clean pushed pin, retry only this discriminator—not the full decoder.
+
+## 2026-08-10 20:21--21:08 — corrected arms execute, but cross-arm fusion invalidates them
+
+- The protected retry at pushed `9b53ce2` completes full-fleet load, production/discriminator
+  compilation, all 8,155 prefill tokens, exact token `101252` and exact layer-0 DSA selection. Both
+  requested FP32 hidden combines and three opaque boundaries survive. It emits all four layer-1
+  normalized rows, then correctly refuses because the nominal BF16 control SHA
+  `c42642ba...33b5` does not reproduce current production SHA `787c9ba7...153b`.
+- Direct BF16 comparison shows 615/6,144 control mismatches, max `0.0009765625`, mean
+  `1.2867735e-5`. Consequently the four accepted-target mismatch counts (`3970`, `4038`, `3998`,
+  `4034`) cannot choose a production association.
+- Optimized HLO SHA `19fdc1b3...e1e2` supplies the cause. XLA combines two FP32 dense reductions
+  in tuple all-reduce `.18`, two BF16 dense reductions in tuple all-reduce `.19`, two pairs of
+  layer-1 RMS sums in tuple-valued fusions `.3`/`.5`, and all four BF16 normalized rows in
+  `convert_multiply_fusion.4`. Production has one dense combine and one scalar norm reduction, so
+  the diagnostic changed the association it was meant to control.
+- NPZ/contract/HLO-gzip/old-HLO-contract/rank-log SHAs are `d134609e...cd16`,
+  `7aeeb00a...96e1`, `0d694ce3...a7f`, `b87f5a19...8cfe`, and `b2fe159c...7e5`.
+  Pre/failure census SHAs `9576da95...f5e8` / `9bd7e5c7...ff7` prove 8/8 cleanup. There is no DB,
+  `SUCCESS`, timing, trace, Gate-D or performance claim.
+- The implementation now builds four separately compiled one-arm `shard_map` executables. Each
+  has a single `bf16[1,6144]` output and a named layer-1 normalization scope; its per-arm HLO
+  contract pins the exact BF16/FP32 kernel and boundary counts, exact FP32 local-combine count,
+  local replica groups, single-row root, and rejects multi-hidden or multi-scalar tuple fusion.
+  All four reuse the same non-donated post-prefill arrays and are stacked only on the host.
+- Exact next: finish the affected/static tests and evidence registry, obtain one review of only
+  this new diff, commit/push, then run the isolated protected discriminator. Integrate only an arm
+  whose baseline reproduces current production and whose candidate is exact; otherwise inspect
+  the accepted subshard reduction association without another blind full-decoder retry.
+- The final affected suite passes 68/68 in 213.61 seconds with compileall/Bash/ShellCheck/JSON/diff
+  checks green. The one new-diff-only Fable review found no blocker and returned
+  `APPROVE COMMIT`. Its low notes concern only possible fail-closed TPU refusal from the inherited
+  collective floor and scope-limited tuple checks; neither can admit a contaminated result. No
+  repeat review is due before commit/push and the isolated protected run.

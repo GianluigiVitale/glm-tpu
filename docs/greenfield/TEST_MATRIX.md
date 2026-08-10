@@ -46,7 +46,7 @@
 | Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
 | Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
-| Gate D protected 8K decoder | Protected `0312cf5` integration has exact token `101252` and exact layer-0 normalized hidden/q-a/query/head/key/score/set/order. Event 1/layer 1 first diverges because the layer-0 output enters layer-1 normalization with 3,960/6,144 BF16 mismatches, max `0.00390625`. | Missing; four-arm layer-0 residual discriminator pending |
+| Gate D protected 8K decoder | Protected `0312cf5` integration has exact token `101252` and exact layer-0 normalized hidden/q-a/query/head/key/score/set/order. Event 1/layer 1 first diverges because the layer-0 output enters layer-1 normalization with 3,960/6,144 BF16 mismatches, max `0.00390625`. The `9b53ce2` stacked four-arm result is invalidated by cross-arm tuple fusion; its BF16 control does not reproduce production. | Missing; separately compiled layer-0 residual arms pending |
 | Gate D prompt index-cache/scorer discriminator | DB505--518 make the complete 8,155-row cache exact; DB521--527 make current query/head/key exact. DB528 rejects page geometry. DB529's same-shape TPU default-precision arm matches the accepted logical and selected scores/set/order/ties exactly, with pinned HLO/DB/archive/cleanup. | Pass; do not repeat bounded scorer variants |
 | Gates E–H | Await Gate D | Missing |
 
@@ -60,10 +60,11 @@ Latest exact scorer-precision focused suite: 39 passed at the DB528-successor ba
 Python/Bash/ShellCheck/diff checks pass. This is readiness only until protected TPU evidence.
 Latest default-off production scorer-precision integration suite: 65 passed in 177.11 seconds with
 `JAX_PLATFORMS=cpu`; Python/Bash/diff checks pass. Full protected 8K evidence remains pending.
-Latest residual-discriminator affected suite: 97 passed in 207.05 seconds. It traces the real
-two-layer stage-0 schedule on 32 forced CPU devices and passes the four-row shape/local-combine
-contract. Python/Bash/ShellCheck/JSON/diff checks pass; the protected TPU discriminator remains
-pending.
+Latest isolated residual-discriminator affected suite: 68 passed in 213.61 seconds. It traces all
+four separately compiled real stage-0 arms under normal and exact query/head-key signatures,
+validates per-arm single-row HLO/kernel/reduction contracts, and rejects tuple-contaminated arms.
+Python compileall, Bash, ShellCheck, JSON and diff checks pass; the protected TPU discriminator
+remains pending.
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the

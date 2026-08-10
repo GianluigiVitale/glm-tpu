@@ -894,3 +894,23 @@ capture is still required.
   `0c961dd1...5fb0`, `7c7563e7...7678`, `f4d2518c...1310`, `3ea5813f...b5b52`,
   `57a88dc9...76c3`, and `a4bc6797...08f0`; archive and authenticated 8/8 cleanup pass. This
   authorizes the default-off full-decoder integration, not a performance claim.
+
+## Corrected stacked layer-0 residual discriminator — rejected association
+
+- Pushed pin `9b53ce2`, tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T202128342266137Z`,
+  completes full load/compile/prefill, exact first token and exact layer-0 selection before its
+  intended diagnostic refusal. The four-row NPZ/contract SHAs are `d134609e...cd16` /
+  `7aeeb00a...96e1`.
+- The old HLO contract passed locality and FP32-boundary checks, but optimized HLO SHA
+  `19fdc1b3...e1e2` proves cross-arm fusion: tuple-valued BF16 and FP32 dense reductions,
+  two-result RMS reductions and one four-result normalized-output fusion. The BF16 control differs
+  from current production in 615/6,144 values, max `0.0009765625`; all four numerical arms are
+  therefore inadmissible.
+- HLO-gzip/old-contract/rank-log/pre-census/failure-census SHAs are
+  `0d694ce3...a7f`, `b87f5a19...8cfe`, `b2fe159c...7e5`, `9576da95...f5e8`, and
+  `9bd7e5c7...ff7`. Authenticated cleanup is 8/8. There is no DB row, terminal `SUCCESS`, timing,
+  trace, Gate-D or performance result.
+- The successor must compile and validate four single-arm executables independently, reuse the
+  exact same post-prefill arrays for each non-donating execution, and stack only host-side after
+  all arms complete. A full 8K decoder retry is not authorized first.

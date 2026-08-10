@@ -464,7 +464,14 @@ def _real_8k_decoder_config(*, dsa_score_default_precision: bool = False):
     )
 
 
-def _layer0_residual_discriminator_hlo() -> str:
+def _layer0_residual_discriminator_hlo(variant_name: str) -> str:
+    flags = {
+        "baseline_bf16": (False, False),
+        "attention_output_fp32": (True, False),
+        "dense_down_fp32": (False, True),
+        "attention_output_and_dense_down_fp32": (True, True),
+    }
+    attention_fp32, dense_fp32 = flags[variant_name]
     replica_groups = (
         "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
         "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
@@ -475,37 +482,52 @@ def _layer0_residual_discriminator_hlo() -> str:
         "use_global_device_ids=true"
         for index in range(5)
     )
+    reduction_dtypes = (
+        *("f32",) * (int(attention_fp32) + int(dense_fp32)),
+        *("bf16",) * (3 - int(attention_fp32) - int(dense_fp32)),
+    )
     reductions = "\n".join(
-        f"  %ar.{index} = f32[1,6144] all-reduce(%f), "
+        f"  %ar.{index} = {dtype}[1,6144] all-reduce("
+        f"%{'f' if dtype == 'f32' else 'b'}), "
         f"replica_groups={replica_groups}, channel_id={index + 11}, "
         "use_global_device_ids=true, to_apply=%add"
-        for index in range(5)
+        for index, dtype in enumerate(reduction_dtypes)
     )
-    kernels = "\n".join(
-        (
+    kernels = []
+    if attention_fp32:
+        kernels.append(
+            '  %attention = f32[1,6144] custom-call(%f), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp8_block_matmul_f32_m8_k4096_n6144"'
+        )
+    else:
+        kernels.append(
             '  %attention.bf16 = bf16[1,6144] custom-call(%b), '
             'custom_call_target="tpu_custom_call", '
-            'backend_config="greenfield_fp8_block_matmul_m8_k4096_n6144"',
-            '  %attention.f32 = f32[1,6144] custom-call(%f), '
+            'backend_config="greenfield_fp8_block_matmul_m8_k4096_n6144"'
+        )
+    if dense_fp32:
+        kernels.append(
+            '  %dense = f32[1,6144] custom-call(%f), '
             'custom_call_target="tpu_custom_call", '
-            'backend_config="greenfield_fp8_block_matmul_f32_m8_k4096_n6144"',
+            'backend_config="greenfield_fp8_fused_block_swiglu_'
+            'm8_h6144_i3072_o6144_downf32"'
+        )
+    else:
+        kernels.append(
             '  %dense.bf16 = bf16[1,6144] custom-call(%b), '
             'custom_call_target="tpu_custom_call", '
             'backend_config="greenfield_fp8_fused_block_swiglu_'
-            'm8_h6144_i3072_o6144"',
-            '  %dense.f32 = f32[1,6144] custom-call(%f), '
-            'custom_call_target="tpu_custom_call", '
-            'backend_config="greenfield_fp8_fused_block_swiglu_'
-            'm8_h6144_i3072_o6144_downf32"',
-            '  %boundary.0 = bf16[1,6144] custom-call(%f), '
-            'custom_call_target="tpu_custom_call", '
-            'backend_config="greenfield_fp32_to_bf16_r8_h6144"',
-            '  %boundary.1 = bf16[1,6144] custom-call(%f), '
-            'custom_call_target="tpu_custom_call", '
-            'backend_config="greenfield_fp32_to_bf16_r8_h6144"',
+            'm8_h6144_i3072_o6144"'
         )
-    )
-    return f'''HloModule layer0_variants, replica_count=1, num_partitions=32
+    for index in range(int(attention_fp32) + int(dense_fp32)):
+        kernels.append(
+            f'  %boundary.{index} = bf16[1,6144] custom-call(%f), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp32_to_bf16_r8_h6144"'
+        )
+    kernels_text = "\n".join(kernels)
+    return f'''HloModule layer0_{variant_name}, replica_count=1, num_partitions=32
 
 %add (x: f32[], y: f32[]) -> f32[] {{
   %x = f32[] parameter(0)
@@ -513,19 +535,24 @@ def _layer0_residual_discriminator_hlo() -> str:
   ROOT %sum = f32[] add(%x, %y)
 }}
 
-ENTRY %main () -> bf16[1,4,6144] {{
+ENTRY %main () -> (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) {{
   %s = s32[1] constant({{0}})
+  %positions = s32[1,2048] constant({{0}})
+  %scores = f32[1,2048] constant({{0}})
+  %count = s32[1,1] constant({{0}})
+  %valid = pred[1,1] constant({{true}})
   %f = f32[1,6144] constant({{0}})
   %b = bf16[1,6144] constant({{0}})
 {gathers}
 {reductions}
-{kernels}
-  ROOT %variants = bf16[1,4,6144] constant({{0}})
+{kernels_text}
+  %normalized = bf16[1,6144] constant({{0}}), metadata={{op_name="jit(probe)/greenfield_layer1_input_norm_{variant_name}/mul"}}
+  ROOT %result = (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) tuple(%positions, %scores, %count, %normalized, %valid)
 }}
 '''
 
 
-def test_layer0_residual_discriminator_hlo_is_local_and_pins_four_arms() -> None:
+def test_layer0_residual_discriminator_hlo_pins_isolated_arms() -> None:
     from glm_tpu.greenfield.runtime import (
         validate_layer0_residual_discriminator_hlo,
     )
@@ -534,38 +561,80 @@ def test_layer0_residual_discriminator_hlo_is_local_and_pins_four_arms() -> None
         tuple(stage * 4 + slot for slot in range(4))
         for stage in range(8)
     )
-    hlo = _layer0_residual_discriminator_hlo()
-    accepted = validate_layer0_residual_discriminator_hlo(
-        hlo,
-        config=_real_8k_decoder_config(dsa_score_default_precision=True),
-        groups=groups,
+    variant_names = (
+        "baseline_bf16",
+        "attention_output_fp32",
+        "dense_down_fp32",
+        "attention_output_and_dense_down_fp32",
     )
-    assert accepted["passed"], accepted
-    assert accepted["kernel_counts"] == {
-        "greenfield_fp8_block_matmul_m8_k4096_n6144": 1,
-        "greenfield_fp8_block_matmul_f32_m8_k4096_n6144": 1,
-        "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": 1,
-        "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144_downf32": 1,
-        "greenfield_fp32_to_bf16_r8_h6144": 2,
-    }
+    for variant_name in variant_names:
+        hlo = _layer0_residual_discriminator_hlo(variant_name)
+        accepted = validate_layer0_residual_discriminator_hlo(
+            hlo,
+            config=_real_8k_decoder_config(dsa_score_default_precision=True),
+            groups=groups,
+            variant_name=variant_name,
+        )
+        assert accepted["passed"], accepted
+        assert (
+            accepted["kernel_counts"]
+            == accepted["expected_kernel_counts"]
+        )
+        assert accepted["normalization_scope_present"]
+        assert not accepted["multi_hidden_results"]
+        assert not accepted["multi_scalar_reductions"]
 
+    hlo = _layer0_residual_discriminator_hlo("attention_output_fp32")
     demoted = validate_layer0_residual_discriminator_hlo(
         hlo.replace("f32[1,6144] all-reduce", "bf16[1,6144] all-reduce"),
         config=_real_8k_decoder_config(dsa_score_default_precision=True),
         groups=groups,
+        variant_name="attention_output_fp32",
     )
     assert not demoted["passed"]
-    assert "layer-0 discriminator lost FP32 local combines" in demoted[
-        "violations"
-    ]
+    assert any(
+        "FP32 local-combine count drifted" in item
+        for item in demoted["violations"]
+    )
 
     escaped = validate_layer0_residual_discriminator_hlo(
         hlo.replace("{0,1,2,3}", "{0,1,2,4}"),
         config=_real_8k_decoder_config(dsa_score_default_precision=True),
         groups=groups,
+        variant_name="attention_output_fp32",
     )
     assert not escaped["passed"]
     assert escaped["escaped_collectives"]
+
+    contaminated = _layer0_residual_discriminator_hlo(
+        "baseline_bf16"
+    ).replace(
+        "  ROOT %result =",
+        "  %bad.hidden = (bf16[1,6144], bf16[1,6144]) "
+        "tuple(%normalized, %normalized), "
+        "metadata={op_name=\"jit(probe)/"
+        "greenfield_layer1_input_norm_baseline_bf16/mul\"}\n"
+        "  ROOT %result =",
+    )
+    contaminated_contract = validate_layer0_residual_discriminator_hlo(
+        contaminated,
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+        variant_name="baseline_bf16",
+    )
+    assert not contaminated_contract["passed"]
+    assert (
+        "layer-0 discriminator tuple-fused multiple hidden rows"
+        in contaminated_contract["violations"]
+    )
+
+    with pytest.raises(PlanValidationError, match="unknown.*variant"):
+        validate_layer0_residual_discriminator_hlo(
+            hlo,
+            config=_real_8k_decoder_config(dsa_score_default_precision=True),
+            groups=groups,
+            variant_name="unknown",
+        )
 
 
 def test_layer0_residual_discriminator_traces_real_stage0_shape() -> None:
@@ -625,7 +694,22 @@ decoder = build_decoder_step_program(
     split_residual_state=True,
     build_layer0_residual_discriminator=True,
 )
-assert decoder.layer0_residual_discriminator is not None
+assert len(decoder.layer0_residual_discriminators) == 4
+exact_decoder = build_decoder_step_program(
+    plan,
+    schedule,
+    state,
+    weight_layout,
+    groups,
+    pairs,
+    complete_token_path=True,
+    split_residual_state=True,
+    dsa_query_backend="reference",
+    dsa_query_exact_association=True,
+    dsa_head_key_exact_association=True,
+    build_layer0_residual_discriminator=True,
+)
+assert len(exact_decoder.layer0_residual_discriminators) == 4
 
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -657,11 +741,65 @@ inputs = (
     abstract((1, 1), jnp.int32, decoder.input_specs[7]),
     abstract((1,), jnp.int32, decoder.input_specs[8]),
 )
-stablehlo = jax.jit(decoder.layer0_residual_discriminator).lower(*inputs).as_text()
+specs_by_name = {spec.name: spec for spec in weight_layout.specs}
+query_owners = tuple(
+    abstract(
+        (
+            32,
+            *specs_by_name[
+                f"indexer.slot_{slot:02d}.wq_b.weight_bits"
+            ].shape,
+        ),
+        jnp.float32,
+        exact_decoder.input_specs[1][0][0][slot],
+    )
+    for slot in range(exact_decoder.config.maximum_full_indexer_slots)
+)
+query_aliases = (query_owners,) * 4
+wk_owners = tuple(
+    abstract(
+        (
+            32,
+            *specs_by_name[
+                f"indexer.slot_{slot:02d}.wk.weight_bits"
+            ].shape,
+        ),
+        jnp.float32,
+        exact_decoder.input_specs[1][1][slot],
+    )
+    for slot in range(exact_decoder.config.maximum_full_indexer_slots)
+)
+exact_inputs = (weights, (query_aliases, wk_owners), *inputs[1:])
+stablehlos = {
+    name: jax.jit(discriminator).lower(*inputs).as_text()
+    for name, discriminator in decoder.layer0_residual_discriminators
+}
+exact_stablehlos = {
+    name: jax.jit(discriminator).lower(*exact_inputs).as_text()
+    for name, discriminator in exact_decoder.layer0_residual_discriminators
+}
 print(json.dumps({
-    "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
-    "four_variant_output": "tensor<32x4x8xbf16>" in stablehlo,
+    "all_reduce_counts": {
+        name: stablehlo.count("stablehlo.all_reduce")
+        for name, stablehlo in stablehlos.items()
+    },
+    "distinct_stablehlo": len(set(stablehlos.values())),
+    "exact_distinct_stablehlo": len(set(exact_stablehlos.values())),
+    "exact_single_variant_outputs": {
+        name: "tensor<32x8xbf16>" in stablehlo
+        for name, stablehlo in exact_stablehlos.items()
+    },
+    "exact_variant_names": list(exact_stablehlos),
+    "multi_variant_outputs": {
+        name: "tensor<32x4x8xbf16>" in stablehlo
+        for name, stablehlo in stablehlos.items()
+    },
+    "single_variant_outputs": {
+        name: "tensor<32x8xbf16>" in stablehlo
+        for name, stablehlo in stablehlos.items()
+    },
     "stage0_layers": [layer.layer_id for layer in schedule.stages[0].layers],
+    "variant_names": list(stablehlos),
 }, sort_keys=True))
 '''
     env = dict(os.environ)
@@ -681,8 +819,21 @@ print(json.dumps({
     assert completed.returncode == 0, completed.stdout + completed.stderr
     result = json.loads(completed.stdout.strip().splitlines()[-1])
     assert result["stage0_layers"] == [0, 1]
-    assert result["four_variant_output"]
-    assert result["all_reduce_count"] >= 5
+    assert result["variant_names"] == [
+        "baseline_bf16",
+        "attention_output_fp32",
+        "dense_down_fp32",
+        "attention_output_and_dense_down_fp32",
+    ]
+    assert result["distinct_stablehlo"] == 4
+    assert result["exact_distinct_stablehlo"] == 4
+    assert result["exact_variant_names"] == result["variant_names"]
+    assert all(result["exact_single_variant_outputs"].values())
+    assert all(result["single_variant_outputs"].values())
+    assert not any(result["multi_variant_outputs"].values())
+    assert all(
+        count >= 3 for count in result["all_reduce_counts"].values()
+    )
 
 
 def test_8k_dsa_head_score_shape_requires_exact_dataflow() -> None:
@@ -2012,7 +2163,7 @@ print(json.dumps({
     'active': active.tolist(),
     'collectives_local': collectives_local,
     'complete_token_path': decoder.complete_token_path,
-    'layer0_residual_discriminator_built': layer0_discriminator.layer0_residual_discriminator is not None,
+    'layer0_residual_discriminator_built': len(layer0_discriminator.layer0_residual_discriminators) == 4,
     'default_observation_off_stablehlo_identical': default_stablehlo == explicit_default_stablehlo,
     'counts': counts,
     'exact_query': {

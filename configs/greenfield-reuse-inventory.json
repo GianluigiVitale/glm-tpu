@@ -380,6 +380,17 @@
       "reason": "Paged BlockSpec, online softmax, v4 VMEM and selected-segment patterns informed the independent GLM sparse-attention kernel. DSV4 sink/inverse-RoPE math is excluded."
     },
     {
+      "id": "greenfield-layer0-residual-discriminator",
+      "category": "bounded diagnostic evidence",
+      "source_repo": "glm-tpu",
+      "source_pin": "9b53ce2e784e616d6a1bbfdd3cd261dfaff04cbf",
+      "source_paths": ["/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T202128342266137Z", "/home/gianl/glm-run/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py"],
+      "gate": "D",
+      "reason": "The corrected four-arm program proves FP32 combines and opaque boundaries survive, but optimized HLO tuple-fuses the arms' dense reductions and layer-1 RMSNorms, so its numerical outputs are inadmissible. Reuse the same post-prefill state/oracle/protection path through four separately compiled single-arm executables; reject stacked device-side arms and another blind full decoder retry."
+    },
+    {
       "id": "legacy-residual-observer",
       "category": "negative evidence",
       "source_repo": "tpu-inference",
