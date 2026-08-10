@@ -127,8 +127,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         "LAYER_RESIDUAL_OBSERVER == 0 && $DSA_INTERNAL_OBSERVER == 0"
         not in runner
     )
-    assert '"schema_version": 13' in compiler
-    assert 'record["schema_version"] for record in records} != {13}' in runner
+    assert '"schema_version": 14' in compiler
+    assert 'record["schema_version"] for record in records} != {14}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
@@ -183,6 +183,28 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "external_stage_local_raw_fp8_to_bf16" in runner
     assert "external_stage_local_bf16_to_fp32" in runner
     assert "prefill_wk_materialization_hlo_contract" in runner
+    assert '"--dsa-score-default-precision"' in compiler
+    assert (
+        "readonly DSA_SCORE_DEFAULT_PRECISION="
+        "${GLM_GREENFIELD_DSA_SCORE_DEFAULT_PRECISION:-0}" in runner
+    )
+    assert (
+        '--dsa-score-default-precision "$dsa_score_default_precision"'
+        in runner
+    )
+    assert (
+        "args.dsa_score_default_precision = bool(\n"
+        "        args.dsa_score_default_precision\n"
+        "    )"
+        in compiler
+    )
+    assert "default DSA score precision requires the protected 8K" in runner
+    assert "default DSA score precision requires the exact repaired" in runner
+    assert "results_db_run_id\": 529" in runner
+    assert "DB529 direct remote SUCCESS hash drifted" in runner
+    assert "dsa_score_default_precision_prerequisite" in runner
+    assert "highest_precision_contraction_count" in runner
+    assert "_scoredefault" in runner
 
 
 @pytest.mark.parametrize(

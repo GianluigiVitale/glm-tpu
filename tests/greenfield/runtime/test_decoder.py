@@ -429,7 +429,7 @@ def _synthetic_8k_dsa_score_hlo() -> str:
   %key = bf16[2048,128] parameter(1)
   %weight = f32[32] parameter(2)
   %weight_broadcast = f32[1,32,2048] broadcast(%weight), dimensions={1}, metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/rh,rhs->rs/dot_general"}
-  %contraction = f32[32,2048] convolution(%q, %key), dim_labels=bf_oi->bf, metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/rhd,sd->rhs/dot_general"}
+  %contraction = f32[32,2048] convolution(%q, %key), dim_labels=bf_oi->bf, operand_precision={highest,highest}, metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/rhd,sd->rhs/dot_general"}
   %scale = f32[] constant(0.0883883461)
   %scale_broadcast = f32[32,2048] broadcast(%scale), dimensions={}, metadata={op_name="jit(mapped_token)/shard_map/broadcast.19787"}
   %scaled = f32[32,2048] multiply(%contraction, %scale_broadcast), metadata={op_name="jit(mapped_token)/shard_map/cond/branch_1_fun/mul"}
@@ -443,7 +443,7 @@ def _synthetic_8k_dsa_score_hlo() -> str:
 '''
 
 
-def _real_8k_decoder_config():
+def _real_8k_decoder_config(*, dsa_score_default_precision: bool = False):
     from glm_tpu.greenfield.runtime.decoder import DecoderStepConfig
 
     return DecoderStepConfig(
@@ -460,6 +460,7 @@ def _real_8k_decoder_config():
         index_key_width=128,
         dsa_indexer_heads=32,
         vocab_size=154880,
+        dsa_score_default_precision=dsa_score_default_precision,
     )
 
 
@@ -491,6 +492,7 @@ def test_8k_dsa_head_score_shape_requires_exact_dataflow() -> None:
         "contraction_count": 1,
         "head_weight_broadcast_count": 1,
         "head_weight_multiply_count": 1,
+        "highest_precision_contraction_count": 1,
         "opcode_counts": {
             "bitcast": 1,
             "broadcast": 2,
@@ -502,6 +504,41 @@ def test_8k_dsa_head_score_shape_requires_exact_dataflow() -> None:
         "score_shape_occurrences": 10,
         "valid": True,
     }
+    assert record["score_precision"] == "highest"
+
+    default_hlo = hlo.replace(
+        ", operand_precision={highest,highest}", ""
+    )
+    default_record = _classify_decoder_live_tensor_shapes(
+        parse_hlo_module(default_hlo),
+        config=_real_8k_decoder_config(
+            dsa_score_default_precision=True
+        ),
+        full_indexer_layers=1,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert default_record["passed"], default_record
+    assert default_record["score_precision"] == "default"
+    assert default_record["body_records"][0][
+        "highest_precision_contraction_count"
+    ] == 0
+
+    wrong_default = _classify_decoder_live_tensor_shapes(
+        parse_hlo_module(default_hlo),
+        config=config,
+        full_indexer_layers=1,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert not wrong_default["passed"]
+    wrong_highest = _classify_decoder_live_tensor_shapes(
+        parse_hlo_module(hlo),
+        config=_real_8k_decoder_config(
+            dsa_score_default_precision=True
+        ),
+        full_indexer_layers=1,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )
+    assert not wrong_highest["passed"]
 
     drifted = _classify_decoder_live_tensor_shapes(
         parse_hlo_module(
@@ -1313,6 +1350,26 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             dsa_head_key_exact_association=True,
+        )
+    with pytest.raises(PlanValidationError, match="score-precision flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            dsa_score_default_precision=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="requires exact DSA head/key"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            dsa_score_default_precision=True,
         )
     with pytest.raises(PlanValidationError, match="attention backend and runtime"):
         build_decoder_step_program(

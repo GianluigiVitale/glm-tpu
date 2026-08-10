@@ -104,6 +104,7 @@ def dsa_mapped(
         contract=dsa,
         cache_layout=layout,
         block_shape=(2, 2),
+        dsa_score_precision='default',
     )
     return (
         result.index_cache[None],
@@ -178,7 +179,14 @@ global_keys = jnp.asarray(
     np.concatenate([expected_cache[owner, 1] for owner in range(4)], axis=0)
 )
 expected_selection = exact_topk(
-    dsa_scores(query, global_keys, query_head_weight), lengths, top_k=4
+    dsa_scores(
+        query,
+        global_keys,
+        query_head_weight,
+        precision='default',
+    ),
+    lengths,
+    top_k=4,
 )
 bad_dsa_args = list(dsa_args)
 bad_dsa_args[3] = jax.device_put(bad_tables, rep)

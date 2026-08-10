@@ -1192,6 +1192,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--dsa-score-default-precision",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1241,6 +1247,9 @@ def main() -> int:
     )
     args.dsa_head_key_exact_association = bool(
         args.dsa_head_key_exact_association
+    )
+    args.dsa_score_default_precision = bool(
+        args.dsa_score_default_precision
     )
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
@@ -1706,6 +1715,9 @@ def main() -> int:
             dsa_head_key_exact_association=(
                 args.dsa_head_key_exact_association
             ),
+            dsa_score_default_precision=(
+                args.dsa_score_default_precision
+            ),
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             split_residual_state=args.split_residual_state,
@@ -1735,6 +1747,9 @@ def main() -> int:
                 ),
                 dsa_head_key_exact_association=(
                     args.dsa_head_key_exact_association
+                ),
+                dsa_score_default_precision=(
+                    args.dsa_score_default_precision
                 ),
                 attention_projection_backend=(
                     attention_projection_backend
@@ -1774,6 +1789,9 @@ def main() -> int:
                     ),
                     dsa_head_key_exact_association=(
                         args.dsa_head_key_exact_association
+                    ),
+                    dsa_score_default_precision=(
+                        args.dsa_score_default_precision
                     ),
                     attention_projection_backend=(
                         attention_projection_backend
@@ -3427,6 +3445,9 @@ def main() -> int:
             "dsa_head_key_exact_association": (
                 decoder.dsa_head_key_exact_association
             ),
+            "dsa_score_default_precision": (
+                decoder.dsa_score_default_precision
+            ),
             "dsa_query_materialization_compile_seconds": (
                 dsa_query_materialization_compile_seconds
             ),
@@ -3505,7 +3526,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 13,
+            "schema_version": 14,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

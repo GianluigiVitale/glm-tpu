@@ -46,8 +46,8 @@
 | Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
 | Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
-| Gate D protected 8K decoder | Latest protected run has exact token `101252` and exact event-0 selected set but 1,135 order mismatches; the existing internal observer proves normalized hidden/q-a/query/head/current-key exact and refuses before timing/DB. | Missing; scorer precision is the first remaining boundary |
-| Gate D prompt index-cache/scorer discriminator | DB505--518 make the complete 8,155-row cache exact; DB521--527 make current query/head/key exact. DB528's bitwise current-wide control and identical HIGHEST wide/pagewise full-score SHA reject page geometry on those exact inputs. | Cache/input pass; same-shape HIGHEST-vs-default score precision pending |
+| Gate D protected 8K decoder | Latest complete protected run has exact token `101252` but 1,135 order mismatches; its observer proves normalized hidden/q-a/query/head/current-key exact. DB529 now restores the complete layer-0 score row and 2,048-position order exactly by changing only dot precision. | Missing; default-off integration and one protected full retry pending |
+| Gate D prompt index-cache/scorer discriminator | DB505--518 make the complete 8,155-row cache exact; DB521--527 make current query/head/key exact. DB528 rejects page geometry. DB529's same-shape TPU default-precision arm matches the accepted logical and selected scores/set/order/ties exactly, with pinned HLO/DB/archive/cleanup. | Pass; do not repeat bounded scorer variants |
 | Gates E–H | Await Gate D | Missing |
 
 Last complete CPU-only suite before the production integration: 441 passed / 1 expected skip
@@ -58,6 +58,8 @@ were manually stopped after unrelated existing forced-JAX tests stopped advancin
 suite-pass claims.
 Latest exact scorer-precision focused suite: 39 passed at the DB528-successor batch;
 Python/Bash/ShellCheck/diff checks pass. This is readiness only until protected TPU evidence.
+Latest default-off production scorer-precision integration suite: 65 passed in 177.11 seconds with
+`JAX_PLATFORMS=cpu`; Python/Bash/diff checks pass. Full protected 8K evidence remains pending.
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the

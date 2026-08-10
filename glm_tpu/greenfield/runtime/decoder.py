@@ -334,6 +334,7 @@ class DecoderStepConfig:
     index_key_width: int
     dsa_indexer_heads: int
     vocab_size: int
+    dsa_score_default_precision: bool = False
 
     def __post_init__(self) -> None:
         for field in (
@@ -361,6 +362,10 @@ class DecoderStepConfig:
         if self.context_capacity % self.local_parallel_size:
             raise PlanValidationError(
                 "decoder context capacity must shard exactly over the local group"
+            )
+        if not isinstance(self.dsa_score_default_precision, bool):
+            raise PlanValidationError(
+                "decoder DSA score-precision flag must be boolean"
             )
 
     @property
@@ -431,6 +436,7 @@ class DecoderStepProgram:
     dsa_query_backend: StageLinearBackend
     dsa_query_exact_association: bool
     dsa_head_key_exact_association: bool
+    dsa_score_default_precision: bool
     attention_projection_backend: AttentionProjectionBackend
     complete_token_path: bool
     observe_dsa_events: bool
@@ -1435,6 +1441,12 @@ def _classify_decoder_live_tensor_shapes(
                     accepted_score_instruction(instruction)
                     for instruction in score_instructions
                 )
+                and sum(
+                    "operand_precision={highest,highest}"
+                    in instruction.raw_line
+                    for instruction in contractions
+                )
+                == (0 if config.dsa_score_default_precision else 1)
             )
             body_records.append(
                 {
@@ -1449,6 +1461,11 @@ def _classify_decoder_live_tensor_shapes(
                     "opcode_counts": opcode_counts,
                     "reduction_count": len(reductions),
                     "score_shape_occurrences": shape_occurrences,
+                    "highest_precision_contraction_count": sum(
+                        "operand_precision={highest,highest}"
+                        in instruction.raw_line
+                        for instruction in contractions
+                    ),
                     "valid": valid,
                 }
             )
@@ -1559,6 +1576,9 @@ def _classify_decoder_live_tensor_shapes(
         ),
         "score_body_count": len(valid_computations),
         "score_dimensions": list(score_dimensions),
+        "score_precision": (
+            "default" if config.dsa_score_default_precision else "highest"
+        ),
         "violations": body_violations,
     }
 
@@ -1781,6 +1801,13 @@ def validate_decoder_step_hlo(
     if dsa_head_key_exact_association and not dsa_query_exact_association:
         raise PlanValidationError(
             "exact DSA head/key association requires exact DSA query"
+        )
+    if (
+        config.dsa_score_default_precision
+        and not dsa_head_key_exact_association
+    ):
+        raise PlanValidationError(
+            "default DSA score precision requires exact DSA head/key inputs"
         )
     if attention_projection_backend not in (
         "separate",
@@ -2249,6 +2276,9 @@ def validate_decoder_step_hlo(
         "dsa_head_key_exact_association": (
             dsa_head_key_exact_association
         ),
+        "dsa_score_default_precision": (
+            config.dsa_score_default_precision
+        ),
         "dsa_head_key_association_contract": (
             dsa_head_key_association_contract
         ),
@@ -2474,6 +2504,11 @@ def _execute_stage(
             dsa_precomputed_wk_weight=recurrent_wk_weight,
             dsa_head_key_exact_association=(
                 dsa_recurrent_wk_weights is not None
+            ),
+            dsa_score_precision=(
+                "default"
+                if config.dsa_score_default_precision
+                else "highest"
             ),
             attention_projection_backend=attention_projection_backend,
         )
@@ -2707,6 +2742,11 @@ def _execute_stage_split(
             dsa_head_key_exact_association=(
                 dsa_recurrent_wk_weights is not None
             ),
+            dsa_score_precision=(
+                "default"
+                if config.dsa_score_default_precision
+                else "highest"
+            ),
             attention_projection_backend=attention_projection_backend,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -2817,6 +2857,7 @@ def build_decoder_step_program(
     dsa_query_backend: StageLinearBackend | None = None,
     dsa_query_exact_association: bool = False,
     dsa_head_key_exact_association: bool = False,
+    dsa_score_default_precision: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
@@ -2893,6 +2934,14 @@ def build_decoder_step_program(
     if dsa_head_key_exact_association and not dsa_query_exact_association:
         raise PlanValidationError(
             "exact DSA head/key association requires exact DSA query"
+        )
+    if not isinstance(dsa_score_default_precision, bool):
+        raise PlanValidationError(
+            "decoder DSA score-precision flag must be boolean"
+        )
+    if dsa_score_default_precision and not dsa_head_key_exact_association:
+        raise PlanValidationError(
+            "default DSA score precision requires exact DSA head/key inputs"
         )
     if attention_projection_backend not in (
         "separate",
@@ -3006,6 +3055,7 @@ def build_decoder_step_program(
         index_key_width=state_layout.stages[0].index_key_width,
         dsa_indexer_heads=geometry.dsa_indexer_heads,
         vocab_size=geometry.vocab_size,
+        dsa_score_default_precision=dsa_score_default_precision,
     )
     skeleton = PipelineSkeletonConfig(
         config.stage_count,
@@ -4183,6 +4233,7 @@ def build_decoder_step_program(
         dsa_head_key_exact_association=(
             dsa_head_key_exact_association
         ),
+        dsa_score_default_precision=dsa_score_default_precision,
         attention_projection_backend=attention_projection_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,

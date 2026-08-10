@@ -422,3 +422,11 @@ its logical body from wide 2,048 to pagewise 4×512 at the same HIGHEST precisio
 and do not rerun page-size variants. The accepted legacy scorer HLO has default operand precision
 where current production explicitly requests HIGHEST. Reuse DB528's pack/stitch, control, HLO,
 DB/archive and census path for one same-shape precision discriminator before any 8K retry.
+
+DB529 at `0cd3db0` closes that discriminator. The HIGHEST arm reproduces current production
+bitwise; default precision alone restores the accepted full logical score row and all 2,048
+selected scores/positions/order/ties exactly. Do not repeat scorer geometry, page size, input,
+precision or oracle capture variants. Integrate this one numerical choice behind a default-off
+flag, require DB529's hashes/DB/archive/cleanup evidence, and pin production/observer/prefill HLO
+to the selected precision. The next experiment is the complete protected 8K Gate-D retry with the
+existing internal observer enabled once; no new generic debugger or bounded scorer probe is due.

@@ -371,6 +371,7 @@ def stage_local_dsa_fp8_mapped(
     dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
     precomputed_wk_weight: Any | None = None,
     dsa_head_key_exact_association: bool = False,
+    dsa_score_precision: Literal["default", "highest"] = "highest",
     linear_interpret: bool = False,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
@@ -637,7 +638,12 @@ def stage_local_dsa_fp8_mapped(
         page_ok[:, None], global_positions, jnp.int32(-1)
     ).reshape(-1)
     local_keys = logical_cache.reshape(-1, contract.head_dim)
-    local_scores = dsa_scores(query, local_keys, gathered_head_weights)
+    local_scores = dsa_scores(
+        query,
+        local_keys,
+        gathered_head_weights,
+        precision=dsa_score_precision,
+    )
     candidate_scores, candidate_positions = local_topk_candidates(
         local_scores,
         global_positions,

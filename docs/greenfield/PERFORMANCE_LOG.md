@@ -1151,3 +1151,17 @@ five seconds including compilation but has no decoder loop, latency distribution
 rate. DB/archive/evidence hashes and pre/post 8/8 zero-work cleanup pass; the approved archive has
 terminal `SUCCESS`. The remaining single-variable discriminator is same-shape HIGHEST versus
 legacy-default dot precision. DB484 remains the only accepted PP8 performance point.
+
+## DB529 exact scorer-precision discriminator — no performance result
+
+DB529 / `greenfield_layer0_dsa_scorer_association_20260810T164030202890642Z` at
+`0cd3db0` changes only the same-shape layer-0 scorer dot precision. Its HIGHEST control reproduces
+the current protected failure bitwise. TPU default precision produces the accepted logical score
+SHA `529fadba...023`, selected-score SHA `0e715f8b...318`, and exact 2,048-position set, order,
+ties and scores with zero error. The optimized HLO differs only in the pinned precision contract;
+both arms have no collective, callback or dead decode rows.
+
+The four-second elapsed value includes bounded compilation/execution and is not decoder latency.
+There is no recurrent token loop, warmed distribution or XPlane, so DB484 remains the only
+accepted PP8 performance point at `244.091151 ms` p50 / `4.096830 tok/s`. DB529 authorizes one
+default-off production integration followed by the complete protected 8K Gate-D retry.

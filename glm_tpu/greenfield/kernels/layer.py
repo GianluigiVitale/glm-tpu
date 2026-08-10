@@ -240,6 +240,7 @@ def stage_local_transformer_layer_fp8_mapped(
     dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
     dsa_precomputed_wk_weight: Any | None = None,
     dsa_head_key_exact_association: bool = False,
+    dsa_score_precision: Literal["default", "highest"] = "highest",
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
@@ -356,6 +357,7 @@ def stage_local_transformer_layer_fp8_mapped(
             dsa_head_key_exact_association=(
                 dsa_head_key_exact_association
             ),
+            dsa_score_precision=dsa_score_precision,
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache
@@ -545,6 +547,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
     dsa_precomputed_wk_weight: Any | None = None,
     dsa_head_key_exact_association: bool = False,
+    dsa_score_precision: Literal["default", "highest"] = "highest",
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalSplitLayerFp8Result:
@@ -663,6 +666,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             dsa_head_key_exact_association=(
                 dsa_head_key_exact_association
             ),
+            dsa_score_precision=dsa_score_precision,
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache
