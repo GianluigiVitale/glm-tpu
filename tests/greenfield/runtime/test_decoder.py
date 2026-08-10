@@ -311,6 +311,96 @@ ENTRY %main''',
     assert rejected["forbidden_shapes"] == ["f32[32,6144]"]
 
 
+def _exact_wk_feature_slice_hlo(*, include_dead: bool = False) -> str:
+    dead = (
+        "  %dead = f32[32,6144]{1,0} parameter(4)\n"
+        if include_dead
+        else ""
+    )
+    return f'''HloModule exact_wk_feature_slice, num_partitions=32
+
+ENTRY %main (hidden: bf16[1,6144], weight: u8[32,6144,82], scale: f32[32,48,82], wk: f32[128,6144]) -> f32[1,82] {{
+  %hidden = bf16[1,6144] parameter(0)
+  %weight = u8[32,6144,82] parameter(1)
+  %scale = f32[32,48,82] parameter(2)
+  %wk = f32[128,6144] parameter(3)
+{dead}  %slice-start = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[0:32], [0:6144]}}
+  %slice-start.1 = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[32:64], [0:6144]}}
+  %slice-start.2 = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[64:96], [0:6144]}}
+  %slice-start.3 = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[96:128], [0:6144]}}
+  %slice-done = f32[32,6144] slice-done(%slice-start)
+  %slice-done.1 = f32[32,6144] slice-done(%slice-start.1)
+  %slice-done.2 = f32[32,6144] slice-done(%slice-start.2)
+  %slice-done.3 = f32[32,6144] slice-done(%slice-start.3)
+  %restored = f32[128,6144] custom-call(%slice-done, %slice-done.1, %slice-done.2, %slice-done.3), custom_call_target="ConcatBitcast"
+  ROOT %qkv = f32[1,82] convolution(%weight, %scale), dim_labels=bf_io->bf
+}}
+'''
+
+
+def test_exact_wk_feature_slices_are_not_dead_rows() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _classify_decoder_live_tensor_shapes,
+        _validate_fused_qkv_a_decoder_association,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    hlo = _exact_wk_feature_slice_hlo()
+    fused = _validate_fused_qkv_a_decoder_association(
+        hlo,
+        layers=1,
+        dsa_head_key_exact_association=True,
+    )
+    assert fused["passed"], fused
+    assert fused["allowed_exact_wk_feature_slice_shape_counts"] == {
+        "f32[32,6144]": 16
+    }
+    assert fused["exact_wk_feature_slice_contract"]["group_count"] == 1
+
+    module = parse_hlo_module(hlo)
+    live = _classify_decoder_live_tensor_shapes(
+        module,
+        config=_real_8k_decoder_config(),
+        full_indexer_layers=0,
+        backend_contract="cpu_reference",
+        dsa_head_key_exact_association=True,
+    )
+    assert live["passed"], live
+    assert len(live["allowed_exact_wk_feature_slices"]) == 16
+
+    default = _validate_fused_qkv_a_decoder_association(hlo, layers=1)
+    assert not default["passed"]
+    assert default["forbidden_shapes"] == ["f32[32,6144]"]
+
+
+def test_exact_wk_feature_slice_scope_rejects_unrelated_rows() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _classify_decoder_live_tensor_shapes,
+        _validate_fused_qkv_a_decoder_association,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    hlo = _exact_wk_feature_slice_hlo(include_dead=True)
+    fused = _validate_fused_qkv_a_decoder_association(
+        hlo,
+        layers=1,
+        dsa_head_key_exact_association=True,
+    )
+    assert not fused["passed"]
+    assert fused["forbidden_shapes"] == ["f32[32,6144]"]
+
+    live = _classify_decoder_live_tensor_shapes(
+        parse_hlo_module(hlo),
+        config=_real_8k_decoder_config(),
+        full_indexer_layers=0,
+        backend_contract="cpu_reference",
+        dsa_head_key_exact_association=True,
+    )
+    assert not live["passed"]
+    assert len(live["forbidden_shapes"]) == 1
+    assert live["forbidden_shapes"][0]["instruction"] == "%dead"
+
+
 def test_fused_qkv_a_runtime_binding_omits_separate_projection_state() -> None:
     from glm_tpu.greenfield.runtime.decoder import _attention_weights
 

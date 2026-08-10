@@ -141,7 +141,8 @@ def _classify_scoped_shape_occurrences(
     forbidden_signatures: set[str],
     repair_allowed_signatures: set[str],
     prefill_index_repair: bool,
-) -> tuple[dict[str, int], dict[str, int], int]:
+    instruction_allowed_signatures: Mapping[int, set[str]] | None = None,
+) -> tuple[dict[str, int], dict[str, int], dict[str, int], int]:
     """Count forbidden shapes, admitting exact repair-rooted occurrences."""
 
     repair_computations = (
@@ -149,8 +150,10 @@ def _classify_scoped_shape_occurrences(
         if prefill_index_repair
         else set()
     )
-    allowed: Counter[str] = Counter()
+    allowed_repair: Counter[str] = Counter()
+    allowed_instruction: Counter[str] = Counter()
     forbidden: Counter[str] = Counter()
+    instruction_allowed_signatures = instruction_allowed_signatures or {}
     for instruction in module.instructions:
         for shape in instruction.operand_shapes + instruction.result_shapes:
             signature = (
@@ -160,18 +163,149 @@ def _classify_scoped_shape_occurrences(
             )
             if signature not in forbidden_signatures:
                 continue
-            if (
+            if signature in instruction_allowed_signatures.get(
+                instruction.index, set()
+            ):
+                allowed_instruction[signature] += 1
+            elif (
                 signature in repair_allowed_signatures
                 and instruction.computation in repair_computations
             ):
-                allowed[signature] += 1
+                allowed_repair[signature] += 1
             else:
                 forbidden[signature] += 1
     return (
-        dict(sorted(allowed.items())),
+        dict(sorted(allowed_repair.items())),
+        dict(sorted(allowed_instruction.items())),
         dict(sorted(forbidden.items())),
         len(repair_computations),
     )
+
+
+def _exact_wk_feature_slice_instructions(
+    module: HloModule,
+) -> tuple[set[int], dict[str, Any]]:
+    """Recognize TPU's exact local ``wk`` feature-slice scaffolding.
+
+    A local ``f32[128,6144]`` key-projection weight is physically tiled into
+    four ``f32[32,6144]`` feature slices before ``ConcatBitcast`` restores the
+    same local weight. The slice shape happens to equal the historical
+    batch-32 dead-row sentinel. Admit only the complete compiler pattern;
+    any parameter, activation, incomplete slice group, or other consumer with
+    that shape remains forbidden.
+    """
+
+    full_shape = ("f32", (128, 6144))
+    slice_shape = ("f32", (32, 6144))
+    scalar_shape = ("s32", ())
+
+    def shapes(
+        value: Sequence[HloShape],
+    ) -> tuple[tuple[str, tuple[int, ...]], ...]:
+        return tuple((shape.dtype, shape.dimensions) for shape in value)
+
+    by_computation_and_name = {
+        (instruction.computation, instruction.name): instruction
+        for instruction in module.instructions
+    }
+    allowed_indices: set[int] = set()
+    groups: list[dict[str, Any]] = []
+    expected_spans = ((0, 32), (32, 64), (64, 96), (96, 128))
+    span_pattern = re.compile(
+        r"slice=\{\[([0-9]+):([0-9]+)\],\s*\[0:6144\]\}"
+    )
+
+    for concat in module.instructions:
+        if (
+            concat.opcode != "custom-call"
+            or 'custom_call_target="ConcatBitcast"' not in concat.raw_line
+            or shapes(concat.operand_shapes) != (slice_shape,) * 4
+            or shapes(concat.result_shapes) != (full_shape,)
+            or len(concat.operand_names) != 4
+            or len(set(concat.operand_names)) != 4
+        ):
+            continue
+        done_instructions = tuple(
+            by_computation_and_name.get(
+                (concat.computation, operand_name)
+            )
+            for operand_name in concat.operand_names
+        )
+        if any(instruction is None for instruction in done_instructions):
+            continue
+        if any(
+            instruction.opcode != "slice-done"
+            or shapes(instruction.operand_shapes)
+            != (full_shape, slice_shape, scalar_shape)
+            or shapes(instruction.result_shapes) != (slice_shape,)
+            or len(instruction.operand_names) != 1
+            for instruction in done_instructions
+            if instruction is not None
+        ):
+            continue
+        start_instructions = tuple(
+            by_computation_and_name.get(
+                (concat.computation, instruction.operand_names[0])
+            )
+            for instruction in done_instructions
+            if instruction is not None
+        )
+        if len(start_instructions) != 4 or any(
+            instruction is None for instruction in start_instructions
+        ):
+            continue
+        if any(
+            instruction.opcode != "slice-start"
+            or shapes(instruction.operand_shapes) != (full_shape,)
+            or shapes(instruction.result_shapes)
+            != (full_shape, slice_shape, scalar_shape)
+            or len(instruction.operand_names) != 1
+            for instruction in start_instructions
+            if instruction is not None
+        ):
+            continue
+        starts = tuple(
+            instruction
+            for instruction in start_instructions
+            if instruction is not None
+        )
+        matches = tuple(span_pattern.search(item.raw_line) for item in starts)
+        if any(match is None for match in matches):
+            continue
+        spans = tuple(
+            (int(match.group(1)), int(match.group(2)))
+            for match in matches
+            if match is not None
+        )
+        if (
+            spans != expected_spans
+            or len({item.operand_names[0] for item in starts}) != 1
+        ):
+            continue
+        accepted = (concat, *done_instructions, *starts)
+        allowed_indices.update(
+            instruction.index
+            for instruction in accepted
+            if instruction is not None
+        )
+        groups.append(
+            {
+                "computation": _hlo_computation_identifier(
+                    concat.computation
+                ),
+                "concat": concat.name,
+                "input": starts[0].operand_names[0],
+                "spans": [list(span) for span in spans],
+            }
+        )
+
+    return allowed_indices, {
+        "group_count": len(groups),
+        "groups": groups,
+        "instruction_count": len(allowed_indices),
+        "slice_shape": "f32[32,6144]",
+        "source_shape": "f32[128,6144]",
+    }
 
 
 class DsaInternalObservation(NamedTuple):
@@ -479,6 +613,7 @@ def _validate_fused_qkv_a_decoder_association(
     *,
     layers: int,
     prefill_index_repair: bool = False,
+    dsa_head_key_exact_association: bool = False,
     module: HloModule | None = None,
 ) -> dict[str, Any]:
     """Require DB502's physical one-row N82 primitive in every layer."""
@@ -510,8 +645,22 @@ def _validate_fused_qkv_a_decoder_association(
         "bf16[32,6144]",
         "f32[32,6144]",
     }
+    exact_wk_feature_slice_indices: set[int] = set()
+    exact_wk_feature_slice_contract: dict[str, Any] = {
+        "group_count": 0,
+        "groups": [],
+        "instruction_count": 0,
+        "slice_shape": "f32[32,6144]",
+        "source_shape": "f32[128,6144]",
+    }
+    if dsa_head_key_exact_association:
+        (
+            exact_wk_feature_slice_indices,
+            exact_wk_feature_slice_contract,
+        ) = _exact_wk_feature_slice_instructions(module)
     (
         allowed_repair_shapes,
+        allowed_exact_wk_feature_slices,
         forbidden_shape_counts,
         repair_computation_count,
     ) = _classify_scoped_shape_occurrences(
@@ -519,6 +668,10 @@ def _validate_fused_qkv_a_decoder_association(
         forbidden_signatures=forbidden_candidates,
         repair_allowed_signatures={"f32[32,6144]"},
         prefill_index_repair=prefill_index_repair,
+        instruction_allowed_signatures={
+            index: {"f32[32,6144]"}
+            for index in exact_wk_feature_slice_indices
+        },
     )
     forbidden_shapes = tuple(forbidden_shape_counts)
     violations = []
@@ -540,6 +693,12 @@ def _validate_fused_qkv_a_decoder_association(
         "convolution_count": len(convolutions),
         "expected_convolution_count": layers,
         "allowed_prefill_index_repair_shape_counts": allowed_repair_shapes,
+        "allowed_exact_wk_feature_slice_shape_counts": (
+            allowed_exact_wk_feature_slices
+        ),
+        "exact_wk_feature_slice_contract": (
+            exact_wk_feature_slice_contract
+        ),
         "forbidden_shapes": list(forbidden_shapes),
         "prefill_index_repair": prefill_index_repair,
         "prefill_index_repair_computation_count": repair_computation_count,
@@ -991,6 +1150,7 @@ def _validate_pallas_stage_linear_decoder_calls(
             module = parse_hlo_module(optimized_hlo)
         (
             allowed_repair_overlays,
+            _allowed_instruction_overlays,
             forbidden_overlay_counts,
             repair_computation_count,
         ) = _classify_scoped_shape_occurrences(
@@ -1092,6 +1252,7 @@ def _classify_decoder_live_tensor_shapes(
     full_indexer_layers: int,
     backend_contract: str,
     prefill_index_repair: bool = False,
+    dsa_head_key_exact_association: bool = False,
 ) -> dict[str, Any]:
     """Separate pinned DSA head scores from forbidden batch/full-pod tensors.
 
@@ -1300,7 +1461,21 @@ def _classify_decoder_live_tensor_shapes(
         else set()
     )
     repair_shape = ("f32", (config.total_devices, config.hidden_size))
+    exact_wk_feature_slice_indices: set[int] = set()
+    exact_wk_feature_slice_contract: dict[str, Any] = {
+        "group_count": 0,
+        "groups": [],
+        "instruction_count": 0,
+        "slice_shape": "f32[32,6144]",
+        "source_shape": "f32[128,6144]",
+    }
+    if dsa_head_key_exact_association:
+        (
+            exact_wk_feature_slice_indices,
+            exact_wk_feature_slice_contract,
+        ) = _exact_wk_feature_slice_instructions(module)
     allowed_prefill_index_repair_shapes = []
+    allowed_exact_wk_feature_slices = []
     allowed_dsa_score_shapes = []
     forbidden_shapes = []
     hard_forbidden_dimensions = {
@@ -1341,6 +1516,11 @@ def _classify_decoder_live_tensor_shapes(
                 allowed_dsa_score_shapes.append(record)
             elif (
                 shape_key(shape) == repair_shape
+                and instruction.index in exact_wk_feature_slice_indices
+            ):
+                allowed_exact_wk_feature_slices.append(record)
+            elif (
+                shape_key(shape) == repair_shape
                 and instruction.computation in repair_computations
             ):
                 allowed_prefill_index_repair_shapes.append(record)
@@ -1362,8 +1542,14 @@ def _classify_decoder_live_tensor_shapes(
         "allowed_prefill_index_repair_shapes": (
             allowed_prefill_index_repair_shapes
         ),
+        "allowed_exact_wk_feature_slices": (
+            allowed_exact_wk_feature_slices
+        ),
         "body_records": body_records,
         "expected_score_body_count": expected_body_count,
+        "exact_wk_feature_slice_contract": (
+            exact_wk_feature_slice_contract
+        ),
         "forbidden_shapes": forbidden_shapes,
         "local_context_width": local_context_width,
         "passed": not body_violations and not forbidden_shapes,
@@ -1899,6 +2085,9 @@ def validate_decoder_step_hlo(
         full_indexer_layers=full_layers,
         backend_contract=backend_contract,
         prefill_index_repair=prefill_index_repair,
+        dsa_head_key_exact_association=(
+            dsa_head_key_exact_association
+        ),
     )
     forbidden_shapes = live_tensor_contract["forbidden_shapes"]
     violations.extend(live_tensor_contract["violations"])
@@ -2005,6 +2194,9 @@ def validate_decoder_step_hlo(
             optimized_hlo,
             layers=layers,
             prefill_index_repair=prefill_index_repair,
+            dsa_head_key_exact_association=(
+                dsa_head_key_exact_association
+            ),
             module=module,
         )
         violations.extend(fused_qkv_a_contract["violations"])
