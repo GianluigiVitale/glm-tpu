@@ -690,11 +690,37 @@ def validate_dsa_query_weight_materializer_hlo(
                 "all-reduce",
                 "all-to-all",
                 "collective-permute",
-                "custom-call",
                 "outfeed",
                 "reduce-scatter",
             }
         }
+    )
+    custom_call_targets = sorted(
+        set(
+            re.findall(
+                r'custom_call_target="([^"]+)"',
+                optimized_hlo,
+            )
+        )
+    )
+    allowed_metadata_custom_call_targets = (
+        "AssumeGatherIndicesInBound",
+        "GatherScatterIndicesBitpacked",
+    )
+    forbidden_custom_call_targets = sorted(
+        set(custom_call_targets)
+        - set(allowed_metadata_custom_call_targets)
+    )
+    lowered = optimized_hlo.lower()
+    host_markers = sorted(
+        marker
+        for marker in (
+            "host_callback",
+            "outside_compilation",
+            "xla_ffi_python_cpu_callback",
+            "xla_python_cpu_callback",
+        )
+        if marker in lowered
     )
     forbidden_global_shapes = [
         shape
@@ -716,6 +742,16 @@ def validate_dsa_query_weight_materializer_hlo(
             "DSA query materializer contains communication/callbacks: "
             f"{forbidden_operations}"
         )
+    if forbidden_custom_call_targets:
+        violations.append(
+            "DSA query materializer contains an unapproved custom call: "
+            f"{forbidden_custom_call_targets}"
+        )
+    if host_markers:
+        violations.append(
+            "DSA query materializer contains a host callback: "
+            f"{host_markers}"
+        )
     if forbidden_global_shapes:
         violations.append(
             "DSA query materializer reconstructs global state: "
@@ -736,8 +772,14 @@ def validate_dsa_query_weight_materializer_hlo(
         "local_scale_parameter_count": scale_parameter_count,
         "local_fp32_shape": local_fp32_shape,
         "local_fp32_shape_occurrences": fp32_occurrences,
+        "allowed_metadata_custom_call_targets": list(
+            allowed_metadata_custom_call_targets
+        ),
+        "custom_call_targets": custom_call_targets,
+        "forbidden_custom_call_targets": forbidden_custom_call_targets,
         "forbidden_operations": forbidden_operations,
         "forbidden_global_shapes": forbidden_global_shapes,
+        "host_markers": host_markers,
         "num_partitions": module.num_partitions,
         "passed": not violations,
         "violations": violations,

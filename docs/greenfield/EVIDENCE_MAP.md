@@ -831,3 +831,17 @@ capture is still required.
   separate executable and composes the actual fused q-a producer, BF16 barrier and exact helper.
   It must retain one tuple-valued 16-KiB fusion and match both sealed q-a and query bitwise before
   a full 8K Gate-D retry is authorized.
+
+## First production-composition attempt — validator diagnostic only
+
+- Pushed pin `7f636ed`, tag
+  `greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T073812618515497Z`, stopped
+  before materializer execution. Optimized/StableHLO SHAs are `103cd550...a9f71` /
+  `f99669ea...6002d`.
+- The HLO is four-partition and owner-local, with no collective/global table/host callback. Its
+  only custom targets are the known bounded-gather metadata markers
+  `AssumeGatherIndicesInBound` and `GatherScatterIndicesBitpacked`; a validator false positive
+  rejected their generic `custom-call` opcode.
+- The approved partial archive exists and pre/failure census SHAs `ce3f1293...e3e31` /
+  `08b777ac...2f7e` authenticate 8/8 cleanup. There is no tensor result, DB row, `SUCCESS` or
+  performance standing. A corrected contract and fresh bounded retry remain required.

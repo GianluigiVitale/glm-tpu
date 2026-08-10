@@ -3157,3 +3157,25 @@ cleared `a749ff0`, independently resolve any blocker, then commit/push. From an 
 fleet run only `query_lp4_production_exact`: first complete local raw-FP8-to-FP32 materialization,
 then compile/execute the real fused q-a plus production tuple4 helper and require bitwise q-a/query
 exactness with one local 16-KiB tuple fusion. Pin that protected result before any full 8K retry.
+
+## First production-composition launch exposes a validator-only refusal
+
+The production integration passed its one-time Fable review and was pushed as `7f636ed`. Protected
+tag `greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T073812618515497Z` then
+refused before materializer execution or query compilation. Its optimized materializer HLO is a
+four-partition local `u8[1024,2048]`/`f32[8,16] -> f32[1024,2048]` program with no collective,
+host callback or global table. The only custom-call targets are TPU's compiler-internal bounded
+gather markers `AssumeGatherIndicesInBound` and `GatherScatterIndicesBitpacked`; the new validator
+had incorrectly rejected every `custom-call` opcode.
+
+Optimized/StableHLO SHAs are `103cd550...a9f71` / `f99669ea...6002d`; pre/failure census SHAs are
+`ce3f1293...e3e31` / `08b777ac...2f7e`. The diagnostic is in the approved bucket and authenticated
+8/8 cleanup passes. There is no materialized value, query result, DB row, `SUCCESS`, latency or
+Gate-D/E evidence.
+
+The narrow correction allowlists only those two metadata targets while continuing to reject every
+collective, outfeed, host callback, unknown/Pallas custom call, global owner shape and partition
+drift. It also persists the complete materializer HLO contract before refusal. The exact preserved
+TPU HLO now passes that corrected contract; a synthetic `tpu_custom_call` remains rejected. Exact
+next: affected/static tests and one Fable review of only this post-`7f636ed` correction, then
+commit/push and retry only the same bounded target. Do not launch the full 8K decoder first.

@@ -1042,6 +1042,13 @@ target is also a one-row correctness/HLO gate. DB484 remains the only accepted P
 `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open until a complete protected decoder run
 passes exact DSA and reaches timing.
 
+## First production-composition refusal — no performance result
+
+The `7f636ed` bounded attempt stopped at the materializer HLO validator before executing any model
+arithmetic. It produced no query tensor, timing distribution, XPlane, DB row or terminal `SUCCESS`.
+Its elapsed orchestration time is not latency evidence. DB484 remains the accepted PP8 decoder
+point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
+
 ## DB512 literal-source RoPE diagnostic — no performance result
 
 DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal

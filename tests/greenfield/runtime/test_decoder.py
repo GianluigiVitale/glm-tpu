@@ -848,6 +848,41 @@ ENTRY main (raw0: u8[1024,2048], raw1: u8[1024,2048], raw2: u8[1024,2048], scale
         total_devices=32,
     )
     assert contract["passed"], contract
+    metadata_calls = validate_dsa_query_weight_materializer_hlo(
+        hlo.replace(
+            "  ROOT %root",
+            '  %bounded = s32[1] custom-call(), '
+            'custom_call_target="AssumeGatherIndicesInBound"\n'
+            '  %bitpacked = s32[1] custom-call(), '
+            'custom_call_target="GatherScatterIndicesBitpacked"\n'
+            "  ROOT %root",
+        ),
+        full_indexer_slots=3,
+        local_output_width=1024,
+        q_lora_rank=2048,
+        total_devices=32,
+    )
+    assert metadata_calls["passed"], metadata_calls
+    assert metadata_calls["custom_call_targets"] == [
+        "AssumeGatherIndicesInBound",
+        "GatherScatterIndicesBitpacked",
+    ]
+    unknown_call = validate_dsa_query_weight_materializer_hlo(
+        hlo.replace(
+            "  ROOT %root",
+            '  %unknown = f32[1] custom-call(), '
+            'custom_call_target="tpu_custom_call"\n'
+            "  ROOT %root",
+        ),
+        full_indexer_slots=3,
+        local_output_width=1024,
+        q_lora_rank=2048,
+        total_devices=32,
+    )
+    assert not unknown_call["passed"]
+    assert unknown_call["forbidden_custom_call_targets"] == [
+        "tpu_custom_call"
+    ]
     escaped = validate_dsa_query_weight_materializer_hlo(
         hlo.replace(
             "  ROOT %root",

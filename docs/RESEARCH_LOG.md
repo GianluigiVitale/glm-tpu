@@ -6576,3 +6576,22 @@ unmotivated arithmetic variants.
   and fails unless q-a and query are bitwise exact. Affected explicit-CPU coverage passes 75/75.
   One diff-only Fable audit and clean commit/push precede this seconds-long TPU proof; no full
   checkpoint retry is authorized first.
+
+## 2026-08-10 07:38--07:45 — production composition stops on a validator false positive
+
+- The reviewed production batch was pushed as `7f636ed`. Protected bounded tag
+  `greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T073812618515497Z` stopped
+  before arithmetic because the materializer HLO validator classified all custom-call opcodes as
+  callbacks.
+- Preserved optimized HLO `103cd550...a9f71` proves a four-partition local
+  `u8[1024,2048]`/`f32[8,16] -> f32[1024,2048]` program. It contains no collective, host marker or
+  global owner table. Its only custom targets are `AssumeGatherIndicesInBound` and
+  `GatherScatterIndicesBitpacked`, the bounded gather metadata emitted by the existing exact
+  lookup-table FP8 decoder.
+- Pre/failure census SHAs `ce3f1293...e3e31` / `08b777ac...2f7e` prove authenticated 8/8 cleanup;
+  the partial diagnostic is in the approved bucket. No materializer value, query, DB row,
+  `SUCCESS` or performance evidence exists.
+- The fail-closed correction allowlists exactly those two metadata targets, still rejects unknown
+  custom kernels/callbacks/collectives/global shapes/partition drift, and writes the contract JSON
+  before refusing. Replay of the exact TPU HLO passes; an injected `tpu_custom_call` fails. One
+  new-diff-only review and commit precede a same-target retry.

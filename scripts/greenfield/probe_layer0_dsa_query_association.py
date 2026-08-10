@@ -1473,8 +1473,22 @@ def _run_physical_lp4_production_exact(
     materialize_contract["stablehlo_sha256"] = sha256(
         materialize_stablehlo.encode()
     ).hexdigest()
+    (
+        args.hlo_dir / "production_query_materializer.hlo_contract.json"
+    ).write_text(
+        json.dumps(
+            materialize_contract,
+            allow_nan=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
     if not materialize_contract["passed"]:
-        raise SystemExit("production query materializer HLO failed")
+        raise SystemExit(
+            "production query materializer HLO failed: "
+            f"{materialize_contract['violations']}"
+        )
     materialized = materialize_compiled(raw_weight, raw_scale)
     jax.block_until_ready(materialized)
 
