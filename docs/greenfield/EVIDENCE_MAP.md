@@ -775,3 +775,22 @@ capture is still required.
 - The next target changes only physical head schedule: legacy-local one-chip/N128 sweep versus a
   PP8 owner-local device loop containing eight N128 reductions. It reuses accepted q-a and decoded
   owner bytes; it cannot authorize production until a protected arm is accepted-exact.
+
+## DB523 physical head-geometry result and GSPMD successor
+
+- DB523 at pushed `a3bd353`, tag
+  `greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T053345314403882Z`, completes in six
+  seconds. Its physical one-head sweep and single device-resident eight-step loop are identical at
+  SHA `bb4930ff...d3e`; both differ from accepted in 2,840 values/max `1.4305115e-6` and from
+  current production in all 4,096 values/max `0.0101393461`.
+- Sweep/serial HLO SHAs are `11edd83c...0ba` / `6d458b78...583`. The first has zero loops and eight
+  host diagnostic executions; the second has one device execution and exactly one eight-step loop.
+  Both remain local, one-row and communication-free. This rejects local N128 width/scheduling.
+- SUCCESS/evidence/tensor/runner SHAs are `b34dfc6f...874`, `d7c4292b...301`,
+  `f73f773d...de8`, and `e4f4c3bb...a35`; the DB snapshot, same-region archive, object ledger and
+  authenticated 8/8 cleanup pass. No performance or Gate-D standing exists.
+- Readiness only: the successor retains global logical M1/N4096 semantics under explicit four-way
+  GSPMD sharding. Its StableHLO must contain global logical weight/output shapes and explicit
+  sharding; its optimized per-partition HLO must contain only local N1024 weight/eight-head output,
+  four partitions, no communication and no global materialization. CPU compilation proves the
+  structure only; protected TPU arithmetic remains required.

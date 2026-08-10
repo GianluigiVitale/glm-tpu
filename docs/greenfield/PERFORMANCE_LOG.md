@@ -1018,6 +1018,14 @@ token loop, warmed wall distribution, XPlane or throughput standing. The followi
 and device-resident head loop are also arithmetic/HLO discriminators. DB484 remains the only
 accepted PP8 decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
 
+## DB523 and global-logical GSPMD successor — correctness only
+
+DB523's six seconds cover bounded four-chip compilation/execution/comparison, not decoder latency.
+It rejects the physical N128 sweep and device loop but has no token loop, warmed wall distribution,
+XPlane or throughput standing. The explicit-sharding GSPMD successor is likewise an arithmetic/HLO
+discriminator. DB484 remains the only accepted PP8 decoder point at `244.091151 ms` p50 /
+`4.096830 tok/s`; Gate E remains open.
+
 ## DB512 literal-source RoPE diagnostic — no performance result
 
 DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal

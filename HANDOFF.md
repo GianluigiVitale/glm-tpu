@@ -3075,3 +3075,29 @@ versus one loop and no communication/dead rows. Exact next: finish affected test
 notes, obtain one new-diff-only Fable approval, commit/push, then run this bounded head-geometry
 target. The affected suite passes 75/75 in 131.86 seconds and all Python/Bash/ShellCheck/JSON/diff
 checks pass. Do not wire the near-exact barrier or retry the full 8K decoder first.
+
+## DB523 rejects physical N128 scheduling; explicit global-logical GSPMD is next
+
+Protected DB523,
+`greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T053345314403882Z`, ran at pushed
+`a3bd353` and completed in six seconds. The eight-execution physical single-head sweep and the
+single device-resident eight-step loop are elementwise identical at SHA `bb4930ff...d3e`.
+Both remain nonexact: 2,840 accepted mismatches/max `1.4305115e-6`, and all 4,096 values differ
+from current production/max `0.0101393461`. Their HLO SHAs are `11edd83c...0ba` and
+`6d458b78...583`; only the device-resident arm contains one loop. Neither communicates, carries a
+dead row, or materializes a global query table.
+
+SUCCESS/evidence/tensor/runner SHAs are `b34dfc6f...874`, `d7c4292b...301`,
+`f73f773d...de8`, and `e4f4c3bb...a35`. DB523, approved archive, direct-object ledger and
+authenticated 8/8 cleanup pass. This is correctness evidence only; DB484 remains the performance
+point and production is unchanged. The result also equals DB499's virtual single-head/lax-map
+candidate, so local N128 width or loop schedule is rejected.
+
+DB499's accepted-exact candidates instead retained either the global logical M1/N4096 dot or a
+fully unrolled global output. The remaining bounded discriminator therefore uses ordinary
+`jax.jit` with explicit four-way `NamedSharding`: StableHLO must expose logical
+`f32[4096,2048] -> f32[1,32,128]`, while each optimized physical partition must accept only
+`f32[1024,2048]`, emit eight local heads, and contain no collective or global materialization.
+Forced-four-CPU compilation already satisfies that structural contract. Exact next: finish this
+coherent batch, run the affected suite and one new-diff-only Fable audit, commit/push, then execute
+one protected bounded matrix. Do not retry the full decoder unless this candidate is exact.

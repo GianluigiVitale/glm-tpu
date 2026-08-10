@@ -364,3 +364,11 @@ layout discriminator is legacy's one 128-wide head per physical chip versus PP8'
 chip. The successor therefore executes a one-head physical sweep for causal evidence and one
 device-resident eight-step N128 loop for a production-compatible result; it adds no oracle capture,
 checkpoint repack, global query table, full decoder, or second protection path.
+
+DB523 at `a3bd353` closes both N128 candidates: the physical single-head sweep and device-resident
+loop are identical and nonexact, so do not repeat head-width or scheduling variants. Preserve its
+sealed inputs, wrapper, HLO and cleanup evidence. DB499's exact virtual results instead identify
+global logical M1/N4096 compilation as the remaining discriminator. Reuse the same owner-local
+bytes through explicit four-way `NamedSharding`; the logical global shape is allowed only when
+optimized per-partition HLO proves local N1024 ownership, zero communication and no global physical
+materialization. No new checkpoint, oracle capture or full decoder is authorized first.

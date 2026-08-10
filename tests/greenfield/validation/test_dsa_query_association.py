@@ -95,6 +95,7 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
     assert set(subject._physical_lp4_head_geometry_modes()) == {
         "physical_single_head_sweep_m1_n128",
         "physical_owner_serial_while_m1_n128",
+        "physical_global_gspmd_m1_n4096",
     }
 
 
@@ -225,6 +226,46 @@ def test_physical_head_geometry_preserves_owner_head_order() -> None:
     assert not subject._physical_lp4_head_geometry_hlo_contract(
         serial_hlo.replace("%loop = while(foo)", "%loop = add(foo)"),
         candidate="physical_owner_serial_while_m1_n128",
+    )["passed"]
+
+    global_hlo = (
+        "hlo_module physical, num_partitions=4\n"
+        "bf16[1,2048] f32[1024,2048] f32[1,1024] f32[1,8,128]\n"
+        "%reduce = f32[1024] fusion(foo), "
+        'metadata={op_name="jit(global)/dot_general"}'
+    )
+    global_contract = subject._physical_lp4_head_geometry_hlo_contract(
+        global_hlo,
+        candidate="physical_global_gspmd_m1_n4096",
+    )
+    assert global_contract["passed"]
+    assert global_contract["explicit_four_partitions"]
+    assert not subject._physical_lp4_head_geometry_hlo_contract(
+        global_hlo.replace(", num_partitions=4", ""),
+        candidate="physical_global_gspmd_m1_n4096",
+    )["passed"]
+
+
+def test_physical_global_gspmd_stablehlo_requires_logical_sharding() -> None:
+    stablehlo = (
+        "module attributes {mhlo.num_partitions = 4 : i32}\n"
+        'stablehlo.parameter {mhlo.sharding = "{replicated}"} '
+        ": tensor<1x2048xbf16>\n"
+        'stablehlo.parameter {mhlo.sharding = "{devices=[4,1]0,1,2,3}", '
+        'mesh_axis = "lp4"} '
+        ": tensor<4096x2048xf32>\n"
+        'stablehlo.return {mhlo.sharding = "{devices=[1,4,1]0,1,2,3}", '
+        'mesh_axis = "lp4"} '
+        ": tensor<1x32x128xf32>"
+    )
+    contract = subject._physical_global_gspmd_stablehlo_contract(stablehlo)
+    assert contract["passed"]
+    assert contract["sharding_annotation_count"] == 3
+    assert contract["explicit_four_partitions"]
+    assert not subject._physical_global_gspmd_stablehlo_contract(
+        stablehlo.replace("mhlo.sharding", "attribute", 1)
+        .replace("mhlo.sharding", "attribute", 1)
+        .replace("mhlo.sharding", "attribute", 1)
     )["passed"]
 
 

@@ -251,6 +251,7 @@ elif target == "query_lp4_head_geometry":
     expected_candidates = {
         "physical_single_head_sweep_m1_n128",
         "physical_owner_serial_while_m1_n128",
+        "physical_global_gspmd_m1_n4096",
     }
 else:
     expected_candidates = {

@@ -6512,3 +6512,20 @@ unmotivated arithmetic variants.
   production-compatible candidate. Forced-four-CPU compilation retains the required zero/one
   loop shapes without communication; the affected suite passes 75/75 and all static checks pass.
   One new-diff audit and protected result precede any correction.
+
+## 2026-08-10 05:33--05:47 — DB523 rejects N128 scheduling; global-logical GSPMD remains
+
+- DB523 at pushed `a3bd353` completes the physical single-head sweep and device-resident eight-head
+  loop in six seconds. Both produce SHA `bb4930ff...d3e`, with 2,840 accepted mismatches/max
+  `1.4305115e-6`; neither reproduces current production. HLO keeps one row, local N128/N1024
+  weights and zero communication; the serial arm has exactly one loop.
+- SUCCESS/evidence/tensor/runner SHAs are `b34dfc6f...874`, `d7c4292b...301`,
+  `f73f773d...de8`, and `e4f4c3bb...a35`. DB/archive/direct-object/8-host cleanup contracts pass.
+  There is no decoder or performance claim. This same output was DB499's nonexact virtual
+  single-head/lax-map result, rejecting physical head width and scheduling as causal.
+- DB499's exact virtual candidates preserved the global logical M1/N4096 operation. The bounded
+  successor gives ordinary `jax.jit` an explicit four-way sharded logical weight and output.
+  Forced-four-CPU StableHLO exposes `f32[4096,2048] -> f32[1,32,128]`, but each optimized physical
+  entry is only `f32[1024,2048] -> f32[1,8,128]`, has four partitions, and contains neither a
+  collective nor global materialization. Tests, one new-diff-only audit and a protected result
+  precede any production correction or full-decoder retry.

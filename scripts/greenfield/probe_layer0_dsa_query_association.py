@@ -665,6 +665,7 @@ def _physical_lp4_head_geometry_modes() -> tuple[str, ...]:
     return (
         "physical_single_head_sweep_m1_n128",
         "physical_owner_serial_while_m1_n128",
+        "physical_global_gspmd_m1_n4096",
     )
 
 
@@ -831,6 +832,7 @@ def _physical_lp4_head_geometry_hlo_contract(
         raise ValueError("physical head-geometry candidate is unknown")
     lowered = hlo.lower()
     serial = "serial_while" in candidate
+    global_gspmd = "global_gspmd" in candidate
     forbidden_operations = {
         name: lowered.count(name)
         for name in (
@@ -856,20 +858,23 @@ def _physical_lp4_head_geometry_hlo_contract(
     required_shapes = {
         "one_live_q_a_row": "bf16[1,2048]" in lowered,
         "physical_head_projection": (
-            "f32[1,128]" in lowered or "f32[128]" in lowered
+            ("f32[1,1024]" in lowered or "f32[1024]" in lowered)
+            if global_gspmd
+            else ("f32[1,128]" in lowered or "f32[128]" in lowered)
         ),
         "local_output": (
-            "f32[8,128]" in lowered
-            if serial
+            ("f32[1,8,128]" in lowered or "f32[8,128]" in lowered)
+            if serial or global_gspmd
             else ("f32[1,128]" in lowered or "f32[128]" in lowered)
         ),
         "local_weight": (
             "f32[1024,2048]" in lowered
-            if serial
+            if serial or global_gspmd
             else "f32[128,2048]" in lowered
         ),
     }
     while_count = sum(" while(" in line for line in lowered.splitlines())
+    explicit_four_partitions = "num_partitions=4" in lowered
     dot_metadata_count = sum(
         "metadata={op_name" in line and "dot_general" in line
         for line in lowered.splitlines()
@@ -879,10 +884,12 @@ def _physical_lp4_head_geometry_hlo_contract(
         "candidate": candidate,
         "dot_metadata_count": dot_metadata_count,
         "expected_while_count": expected_while_count,
+        "explicit_four_partitions": explicit_four_partitions,
         "forbidden_global_shapes": forbidden_global_shapes,
         "forbidden_operations": forbidden_operations,
         "head_width": 128,
         "hlo_sha256": sha256(hlo.encode()).hexdigest(),
+        "global_logical_gspmd": global_gspmd,
         "local_parallel_size": 4,
         "required_shapes": required_shapes,
         "while_count": while_count,
@@ -892,6 +899,61 @@ def _physical_lp4_head_geometry_hlo_contract(
             and all(required_shapes.values())
             and dot_metadata_count > 0
             and while_count == expected_while_count
+            and (not global_gspmd or explicit_four_partitions)
+        ),
+    }
+
+
+def _physical_global_gspmd_stablehlo_contract(
+    stablehlo: str,
+) -> dict[str, Any]:
+    """Require global logical shapes with explicit four-way output sharding."""
+
+    lowered = stablehlo.lower()
+    lines = lowered.splitlines()
+    sharding_tokens = ("mhlo.sharding", "sdy.sharding")
+    required_shapes = {
+        "global_logical_weight": "tensor<4096x2048xf32>" in lowered,
+        "global_logical_query": "tensor<1x32x128xf32>" in lowered,
+        "one_live_q_a_row": "tensor<1x2048xbf16>" in lowered,
+    }
+    explicitly_sharded = {
+        "global_weight_lp4": any(
+            "tensor<4096x2048xf32>" in line
+            and '"lp4"' in line
+            and any(token in line for token in sharding_tokens)
+            for line in lines
+        ),
+        "global_query_lp4": any(
+            "tensor<1x32x128xf32>" in line
+            and '"lp4"' in line
+            and any(token in line for token in sharding_tokens)
+            for line in lines
+        ),
+        "q_a_annotated": any(
+            "tensor<1x2048xbf16>" in line
+            and any(token in line for token in sharding_tokens)
+            for line in lines
+        ),
+    }
+    explicit_four_partitions = (
+        "mhlo.num_partitions = 4" in lowered
+        or "num_partitions=4" in lowered
+    )
+    sharding_annotation_count = sum(
+        lowered.count(token) for token in sharding_tokens
+    )
+    return {
+        "explicit_four_partitions": explicit_four_partitions,
+        "explicitly_sharded": explicitly_sharded,
+        "required_shapes": required_shapes,
+        "sharding_annotation_count": sharding_annotation_count,
+        "stablehlo_sha256": sha256(stablehlo.encode()).hexdigest(),
+        "passed": (
+            all(required_shapes.values())
+            and all(explicitly_sharded.values())
+            and explicit_four_partitions
+            and sharding_annotation_count >= 3
         ),
     }
 
@@ -1236,7 +1298,9 @@ def _run_physical_lp4_head_geometry(
         "current_production_query": current_query,
     }
 
-    sweep_name, serial_name = _physical_lp4_head_geometry_modes()
+    sweep_name, serial_name, global_name = (
+        _physical_lp4_head_geometry_modes()
+    )
     sweep_compiled = jax.jit(sweep_mapped).lower(
         q_argument, sweep_weights[0], position_argument
     ).compile()
@@ -1296,6 +1360,58 @@ def _run_physical_lp4_head_geometry(
         "hlo": serial_contract,
     }
     tensor_payload[f"query__{serial_name}"] = serial_candidate
+
+    global_function = jax.jit(
+        _global_query_one_row,
+        in_shardings=(
+            NamedSharding(mesh, P()),
+            NamedSharding(mesh, P("lp4", None)),
+            NamedSharding(mesh, P()),
+        ),
+        out_shardings=NamedSharding(mesh, P(None, "lp4", None)),
+    )
+    global_lowered = global_function.lower(
+        q_argument, owner_weight_argument, position_argument
+    )
+    global_stablehlo = global_lowered.as_text()
+    global_compiled = global_lowered.compile()
+    global_hlo = global_compiled.as_text()
+    (args.hlo_dir / f"{global_name}.stablehlo.mlir").write_text(
+        global_stablehlo
+    )
+    (args.hlo_dir / f"{global_name}.optimized_hlo.txt").write_text(
+        global_hlo
+    )
+    global_contract = _physical_lp4_head_geometry_hlo_contract(
+        global_hlo, candidate=global_name
+    )
+    stable_contract = _physical_global_gspmd_stablehlo_contract(
+        global_stablehlo
+    )
+    global_contract["stablehlo"] = stable_contract
+    global_contract["passed"] = bool(
+        global_contract["passed"] and stable_contract["passed"]
+    )
+    if not global_contract["passed"]:
+        raise SystemExit("physical global-logical GSPMD HLO failed")
+    global_output = global_compiled(
+        q_argument, owner_weight_argument, position_argument
+    )
+    jax.block_until_ready(global_output)
+    global_candidate = np.ascontiguousarray(
+        np.asarray(global_output)[0], dtype=np.float32
+    )
+    if global_candidate.shape != (geometry.heads, geometry.head_dim):
+        raise SystemExit("physical global-logical GSPMD output shape drifted")
+    records[global_name] = {
+        "accepted_comparison": _compare(accepted_query, global_candidate),
+        "current_production_comparison": _compare(
+            current_query, global_candidate
+        ),
+        "executions": 1,
+        "hlo": global_contract,
+    }
+    tensor_payload[f"query__{global_name}"] = global_candidate
 
     exact = sorted(
         name
