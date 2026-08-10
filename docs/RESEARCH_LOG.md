@@ -6631,3 +6631,28 @@ unmotivated arithmetic variants.
 - The correction binds the accepted direct source name to the exact-query flag and rejects the
   same name in default mode or the default name in exact mode. The exact preserved TPU HLO passes
   that corrected sub-contract. One diff-only audit and clean commit precede the same 8K retry.
+
+## 2026-08-10 09:36--10:52 — observability finds the recurrent head/key boundary; DB527 is exact
+
+- The reviewed `fb1dea9` full 8K run reaches one device-observed recurrent step after 49 minutes.
+  Exact token `101252`, normalized hidden, q-a and query pass; head weights are 32/32 nonexact and
+  current key is 97/128 nonexact. This is the first failing internal boundary. The DSA observer
+  correctly refuses all-event selected sets before warmup/timing/trace. Internal NPZ/contract SHAs
+  are `a889b664...ed07` / `fb470de5...fb18`; pre/failure cleanup is 8/8. No DB/performance result.
+- This validates the existing observability design from `docs/suggestions.md`: the separately
+  compiled DSA observer, sealed internal tensor oracle, HLO artifacts and bounded replay probe form
+  a reusable breakpoint. No generic new debugger or printf-style instrumentation is needed.
+- DB527/item1812 at `cd15aaf` evaluates five physical four-chip head/key arms in six seconds.
+  Only normalized BF16 barrier + external materialized FP32 wk + divide-by-sqrt LayerNorm is exact:
+  head/key SHAs `ec66b475...725e` / `9f1fb991...dbbc5`, zero mismatches. Raw Pallas + rsqrt exactly
+  reproduces the integrated failure. The tuple4 key anchor is nonexact and rejected.
+- DB527 optimized/StableHLO SHAs are `4dc28823...03a1` / `d9fd33b4...dbcb`; there are two dots, one
+  barrier, four partitions and no collective/global table. SUCCESS/evidence/runner/tensor SHAs are
+  `0c961dd1...5fb0`, `7c7563e7...7678`, `f4d2518c...1310`, `3ea5813f...b5b52`; DB/archive/remote
+  bytes and authenticated cleanup pass. It is arithmetic evidence only.
+- Production now reuses the already-completed five-slot prefill wk materializer, adds a default-off
+  head/key exact flag, and applies the proven association only to full-indexer layers. The existing
+  observer remains enabled on the first integrated run. The affected suite passes 82/82. Review
+  caught and the batch fixes both exact-on prefill flag propagation and repeated-call nested
+  query/WK PyTree propagation; focused regressions cover both and the correction follow-up is
+  `APPROVE COMMIT`. A clean pushed pin precedes the protected 8K retry.

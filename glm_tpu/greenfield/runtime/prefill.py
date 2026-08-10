@@ -688,6 +688,9 @@ def validate_teacher_forced_prefill_hlo(
         dsa_query_exact_association=(
             decoder.dsa_query_exact_association
         ),
+        dsa_head_key_exact_association=(
+            decoder.dsa_head_key_exact_association
+        ),
         attention_projection_backend=(
             decoder.attention_projection_backend
         ),
@@ -924,9 +927,19 @@ def build_teacher_forced_prefill_program(
                     raise PlanValidationError(
                         "exact DSA prefill requires four query aliases"
                     )
+                exact_dsa_weights: Any = dsa_query_weight_aliases
+                if decoder.dsa_head_key_exact_association:
+                    if materialized_index_wk is None:
+                        raise PlanValidationError(
+                            "exact DSA head/key prefill requires FP32 wk owners"
+                        )
+                    exact_dsa_weights = (
+                        dsa_query_weight_aliases,
+                        materialized_index_wk,
+                    )
                 output = decoder.execute(
                     weights,
-                    dsa_query_weight_aliases,
+                    exact_dsa_weights,
                     *decoder_state,
                 )
             else:

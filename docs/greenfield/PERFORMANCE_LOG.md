@@ -1126,3 +1126,12 @@ physical dot/weight variants and narrows the next experiment to the fused q-a BF
 boundary. The `query_lp4_q_a_boundary` successor is likewise a bounded arithmetic/HLO discriminator,
 not a performance benchmark. DB484 remains the only accepted PP8 decoder point at
 `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
+
+## Full internal observation and DB527 — no performance result
+
+The `fb1dea9` protected 8K observation spent 49 minutes on load, compile, full prefill and one
+diagnostic decode. It produced exact token `101252` and isolated the first nonexact recurrent
+boundary to head weights/current key, then stopped before warmup, steady wall or XPlane. DB527's
+six seconds are a bounded five-arm arithmetic/HLO matrix; only the barrier/materialized-wk/divide-
+sqrt arm is bitwise exact. Neither elapsed duration is token latency. DB484 remains the accepted
+PP8 point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate D at protected 8K and Gate E remain open.

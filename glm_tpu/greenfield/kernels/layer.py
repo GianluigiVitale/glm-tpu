@@ -238,6 +238,8 @@ def stage_local_transformer_layer_fp8_mapped(
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
     dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
+    dsa_precomputed_wk_weight: Any | None = None,
+    dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
@@ -275,6 +277,15 @@ def stage_local_transformer_layer_fp8_mapped(
         raise ValueError("layer FP8 linear backend is unknown")
     if dsa_query_backend not in (None, "reference", "pallas"):
         raise ValueError("layer DSA query backend is unknown")
+    if not isinstance(dsa_head_key_exact_association, bool):
+        raise ValueError("layer exact DSA head/key flag must be boolean")
+    if indexer_kind == "full" and (
+        dsa_head_key_exact_association
+        != (dsa_precomputed_wk_weight is not None)
+    ):
+        raise ValueError("full indexer exact head/key wk state drifted")
+    if indexer_kind == "shared" and dsa_precomputed_wk_weight is not None:
+        raise ValueError("shared indexer cannot consume an external wk owner")
     if (dsa is None) != (indexer_kind == "shared"):
         raise ValueError("full DSA weights must exist only for a full indexer")
     if (dense is None) != (mlp_kind == "sparse"):
@@ -341,6 +352,10 @@ def stage_local_transformer_layer_fp8_mapped(
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
             dsa_query_weight_aliases=dsa_query_weight_aliases,
+            precomputed_wk_weight=dsa_precomputed_wk_weight,
+            dsa_head_key_exact_association=(
+                dsa_head_key_exact_association
+            ),
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache
@@ -528,6 +543,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
     dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
+    dsa_precomputed_wk_weight: Any | None = None,
+    dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalSplitLayerFp8Result:
@@ -561,6 +578,15 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer FP8 linear backend is unknown")
     if dsa_query_backend not in (None, "reference", "pallas"):
         raise ValueError("layer DSA query backend is unknown")
+    if not isinstance(dsa_head_key_exact_association, bool):
+        raise ValueError("layer exact DSA head/key flag must be boolean")
+    if indexer_kind == "full" and (
+        dsa_head_key_exact_association
+        != (dsa_precomputed_wk_weight is not None)
+    ):
+        raise ValueError("full indexer exact head/key wk state drifted")
+    if indexer_kind == "shared" and dsa_precomputed_wk_weight is not None:
+        raise ValueError("shared indexer cannot consume an external wk owner")
     if (dsa is None) != (indexer_kind == "shared"):
         raise ValueError("full DSA weights must exist only for a full indexer")
     if (dense is None) != (mlp_kind == "sparse"):
@@ -633,6 +659,10 @@ def stage_local_transformer_layer_fp8_split_mapped(
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
             dsa_query_weight_aliases=dsa_query_weight_aliases,
+            precomputed_wk_weight=dsa_precomputed_wk_weight,
+            dsa_head_key_exact_association=(
+                dsa_head_key_exact_association
+            ),
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache

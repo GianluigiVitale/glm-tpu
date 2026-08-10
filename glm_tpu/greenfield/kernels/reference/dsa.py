@@ -10,7 +10,7 @@ top-k. No approximate selector is used.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import jax
 from jax import lax
@@ -99,6 +99,7 @@ def _affine_layer_norm(
     bias: jax.Array,
     *,
     epsilon: float,
+    mode: Literal["divide_sqrt", "multiply_rsqrt"] = "multiply_rsqrt",
 ) -> jax.Array:
     """FP32 biased LayerNorm used only by the 128-wide indexer key."""
 
@@ -107,9 +108,13 @@ def _affine_layer_norm(
     value_f32 = value.astype(jnp.float32)
     mean = jnp.mean(value_f32, axis=-1, keepdims=True)
     variance = jnp.mean(lax.square(value_f32 - mean), axis=-1, keepdims=True)
-    normalized = (value_f32 - mean) * lax.rsqrt(
-        variance + jnp.float32(epsilon)
-    )
+    denominator = variance + jnp.float32(epsilon)
+    if mode == "divide_sqrt":
+        normalized = (value_f32 - mean) / jnp.sqrt(denominator)
+    elif mode == "multiply_rsqrt":
+        normalized = (value_f32 - mean) * lax.rsqrt(denominator)
+    else:
+        raise ValueError(f"unknown key LayerNorm association {mode!r}")
     return (
         normalized * weight.astype(jnp.float32)
         + bias.astype(jnp.float32)
@@ -217,6 +222,9 @@ def dsa_index_keys_from_projection(
     positions: jax.Array,
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),
+    key_norm_mode: Literal[
+        "divide_sqrt", "multiply_rsqrt"
+    ] = "multiply_rsqrt",
 ) -> jax.Array:
     """Normalize and rotate an already-computed FP32 DSA key projection."""
 
@@ -235,6 +243,7 @@ def dsa_index_keys_from_projection(
         key_norm_weight,
         key_norm_bias,
         epsilon=contract.key_layer_norm_epsilon,
+        mode=key_norm_mode,
     )
     cos, sin = rotary_cos_sin(
         positions,

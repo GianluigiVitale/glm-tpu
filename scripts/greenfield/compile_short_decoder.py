@@ -1186,6 +1186,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--dsa-head-key-exact-association",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1233,6 +1239,9 @@ def main() -> int:
     args.dsa_query_exact_association = bool(
         args.dsa_query_exact_association
     )
+    args.dsa_head_key_exact_association = bool(
+        args.dsa_head_key_exact_association
+    )
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
     oracle_mode = args.short_context_oracle_dir is not None
@@ -1263,6 +1272,14 @@ def main() -> int:
     if args.prefill_index_repair and not args.split_residual_state:
         raise ValueError(
             "prefill index repair requires the accepted split residual state"
+        )
+    if args.dsa_head_key_exact_association and (
+        not args.dsa_query_exact_association
+        or not args.prefill_index_repair
+    ):
+        raise ValueError(
+            "exact DSA head/key association requires exact query and the "
+            "completed prefill wk materializer"
         )
     # The DSA-internal path is a separately compiled, non-donating executable
     # whose selected output must match a pinned production observation.  The
@@ -1686,6 +1703,9 @@ def main() -> int:
             dsa_query_exact_association=(
                 args.dsa_query_exact_association
             ),
+            dsa_head_key_exact_association=(
+                args.dsa_head_key_exact_association
+            ),
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             split_residual_state=args.split_residual_state,
@@ -1712,6 +1732,9 @@ def main() -> int:
                 dsa_query_backend=dsa_query_backend,
                 dsa_query_exact_association=(
                     args.dsa_query_exact_association
+                ),
+                dsa_head_key_exact_association=(
+                    args.dsa_head_key_exact_association
                 ),
                 attention_projection_backend=(
                     attention_projection_backend
@@ -1748,6 +1771,9 @@ def main() -> int:
                     dsa_query_backend=dsa_query_backend,
                     dsa_query_exact_association=(
                         args.dsa_query_exact_association
+                    ),
+                    dsa_head_key_exact_association=(
+                        args.dsa_head_key_exact_association
                     ),
                     attention_projection_backend=(
                         attention_projection_backend
@@ -2221,14 +2247,29 @@ def main() -> int:
         if args.dsa_query_exact_association:
             if dsa_query_weight_aliases is None:
                 raise RuntimeError("exact DSA query aliases were not built")
+            exact_dsa_weights: Any = dsa_query_weight_aliases
+            if args.dsa_head_key_exact_association:
+                if materialized_prefill_index_weights is None:
+                    raise RuntimeError(
+                        "exact DSA head/key execution lost FP32 wk owners"
+                    )
+                exact_dsa_weights = (
+                    dsa_query_weight_aliases,
+                    materialized_prefill_index_weights,
+                )
             common_inputs = (
                 loaded.weights,
-                dsa_query_weight_aliases,
+                exact_dsa_weights,
                 residual,
                 kv,
                 index,
                 metadata,
             )
+        runtime_prefix = (
+            common_inputs[:2]
+            if args.dsa_query_exact_association
+            else common_inputs[:1]
+        )
         donation_shift = int(args.dsa_query_exact_association)
         if args.complete_token_path:
             assert token is not None
@@ -2339,6 +2380,9 @@ def main() -> int:
             dsa_query_exact_association=(
                 decoder.dsa_query_exact_association
             ),
+            dsa_head_key_exact_association=(
+                decoder.dsa_head_key_exact_association
+            ),
             attention_projection_backend=(
                 decoder.attention_projection_backend
             ),
@@ -2417,6 +2461,9 @@ def main() -> int:
                 dsa_query_backend=dsa_observer.dsa_query_backend,
                 dsa_query_exact_association=(
                     dsa_observer.dsa_query_exact_association
+                ),
+                dsa_head_key_exact_association=(
+                    dsa_observer.dsa_head_key_exact_association
                 ),
                 attention_projection_backend=(
                     dsa_observer.attention_projection_backend
@@ -2590,13 +2637,8 @@ def main() -> int:
                 for step, decode_position in enumerate(
                     dsa_oracle_tensors["decode_positions"].tolist()
                 ):
-                    observer_prefix = (
-                        (loaded.weights, dsa_query_weight_aliases)
-                        if args.dsa_query_exact_association
-                        else (loaded.weights,)
-                    )
                     observer_result = compiled_dsa_observer(
-                        *observer_prefix, *observer_current
+                        *runtime_prefix, *observer_current
                     )
                     observer_result[8].block_until_ready()
                     observation_host = _materialize_global_array(
@@ -3086,15 +3128,10 @@ def main() -> int:
         current = output
 
         def run_step(values: tuple[Any, ...]) -> tuple[Any, ...]:
-            prefix = (
-                (loaded.weights, dsa_query_weight_aliases)
-                if args.dsa_query_exact_association
-                else (loaded.weights,)
-            )
             if args.complete_token_path:
-                return compiled(*prefix, *values)
+                return compiled(*runtime_prefix, *values)
             return compiled(
-                *prefix,
+                *runtime_prefix,
                 *values,
                 position,
                 block_tables,
@@ -3387,6 +3424,9 @@ def main() -> int:
             "dsa_query_exact_association": (
                 decoder.dsa_query_exact_association
             ),
+            "dsa_head_key_exact_association": (
+                decoder.dsa_head_key_exact_association
+            ),
             "dsa_query_materialization_compile_seconds": (
                 dsa_query_materialization_compile_seconds
             ),
@@ -3465,7 +3505,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 12,
+            "schema_version": 13,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

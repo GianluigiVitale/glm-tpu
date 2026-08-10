@@ -10,6 +10,112 @@ import pytest
 from glm_tpu.greenfield.errors import PlanValidationError
 
 
+def _exact_head_key_hlo(*, slots: int = 5, layers: int = 21) -> str:
+    parameters = "\n".join(
+        f"  %wk.{slot} = f32[128,6144] parameter({slot})"
+        for slot in range(slots)
+    )
+    operations = []
+    for layer in range(layers):
+        operations.extend(
+            (
+                f"  %normalized.{layer} = f32[1,6144] convert(%hidden), "
+                f'metadata={{op_name="jit(mapped)/shard_map/convert.{layer}"}}',
+                f"  %key.{layer} = (f32[], f32[128]) fusion(%wk.0, "
+                f"%normalized.{layer}), kind=kLoop, calls=%key_projection, "
+                f'metadata={{op_name="jit(mapped)/shard_map/dot_general.{layer}"}}, '
+                'backend_config={"megacore_config":'
+                '{"megacore_allreduce_bytes":"8192"}}',
+                f"  %sqrt.{layer} = f32[] sqrt(%epsilon), "
+                f'metadata={{op_name="jit(mapped)/shard_map/sqrt.{layer}"}}',
+            )
+        )
+    operations_text = "\n".join(operations)
+    return (
+        "HloModule head_key, num_partitions=32\n\n"
+        "%key_projection (wk: f32[128,6144], hidden: f32[1,6144]) "
+        "-> (f32[], f32[128]) {\n"
+        "  %wk = f32[128,6144] parameter(0)\n"
+        "  %hidden = f32[1,6144] parameter(1)\n"
+        "  %zero = f32[] constant(0)\n"
+        "  %key = f32[128] constant({...})\n"
+        "  ROOT %tuple = (f32[], f32[128]) tuple(%zero, %key)\n"
+        "}\n\n"
+        f"ENTRY %main ({', '.join(f'wk.{slot}: f32[128,6144]' for slot in range(slots))}) "
+        "-> f32[] {\n"
+        f"{parameters}\n"
+        "  %hidden = bf16[1,6144] constant({...})\n"
+        "  %epsilon = f32[] constant(1)\n"
+        f"{operations_text}\n"
+        f"  ROOT %out = f32[] copy(%sqrt.{layers - 1})\n"
+        "}\n"
+    )
+
+
+def test_exact_head_key_hlo_contract_pins_db527_mechanism() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_dsa_head_key_decoder_association,
+    )
+
+    hlo = _exact_head_key_hlo()
+    accepted = _validate_dsa_head_key_decoder_association(
+        hlo,
+        full_indexer_layers=21,
+        maximum_full_indexer_slots=5,
+        exact_association=True,
+        prefill_index_repair=True,
+    )
+    assert accepted["passed"], accepted
+    assert accepted["external_wk_parameter_count"] == 5
+    assert accepted["key_projection_count"] == 21
+    assert accepted["key_sqrt_count"] == 21
+    assert accepted["normalized_f32_convert_count"] == 21
+
+    missing_sqrt = _validate_dsa_head_key_decoder_association(
+        hlo.replace(" sqrt(%epsilon)", " copy(%epsilon)", 1),
+        full_indexer_layers=21,
+        maximum_full_indexer_slots=5,
+        exact_association=True,
+    )
+    assert not missing_sqrt["passed"]
+    assert missing_sqrt["key_sqrt_count"] == 20
+
+    escaped = _validate_dsa_head_key_decoder_association(
+        hlo + "\n%escaped = f32[4,128,6144] parameter(99)\n",
+        full_indexer_layers=21,
+        maximum_full_indexer_slots=5,
+        exact_association=True,
+    )
+    assert not escaped["passed"]
+    assert escaped["forbidden_global_shapes"] == ["f32[4,128,6144]"]
+
+
+def test_default_head_key_hlo_allows_only_prefill_repair_state() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_dsa_head_key_decoder_association,
+    )
+
+    prefill_state_only = _exact_head_key_hlo(layers=1).split(
+        "  %normalized.0", 1
+    )[0] + "  ROOT %out = f32[] copy(%epsilon)\n}\n"
+    allowed = _validate_dsa_head_key_decoder_association(
+        prefill_state_only,
+        full_indexer_layers=21,
+        maximum_full_indexer_slots=5,
+        exact_association=False,
+        prefill_index_repair=True,
+    )
+    assert allowed["passed"], allowed
+    rejected = _validate_dsa_head_key_decoder_association(
+        prefill_state_only,
+        full_indexer_layers=21,
+        maximum_full_indexer_slots=5,
+        exact_association=False,
+        prefill_index_repair=False,
+    )
+    assert not rejected["passed"]
+
+
 def test_fused_qkv_a_hlo_contract_requires_db502_primitive() -> None:
     from glm_tpu.greenfield.runtime.decoder import (
         _validate_fused_qkv_a_decoder_association,
@@ -1097,6 +1203,26 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             dsa_query_backend="unknown",  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="head/key association flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            dsa_head_key_exact_association=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="requires exact DSA query"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            dsa_head_key_exact_association=True,
         )
     with pytest.raises(PlanValidationError, match="attention backend and runtime"):
         build_decoder_step_program(

@@ -404,3 +404,13 @@ preserves one correct token-return permute, but the linter rejects the exact-que
 source metadata name before execution. Reuse that preserved HLO to validate the feature-aware name
 correction; do not repeat the full load merely to rediscover the label or weaken any shape/pair/
 collective requirement.
+
+The subsequent `fb1dea9` run demonstrates that the existing observability stack is sufficient:
+the isolated non-donating DSA observer, sealed layer-0 internal oracle, canonical lane checks,
+per-boundary tensor hashes, exact token/DSA comparators, preserved HLO, authenticated census and
+bounded association probe together locate the first divergence without adding ad-hoc logging.
+Reuse these as the Gate-D breakpoint. DB527 proves the exact successor: reuse the already-completed
+five-slot prefill wk materializer, one BF16 normalized boundary and divide-by-sqrt key LayerNorm.
+Do not add a new wk materializer, tuple4 key anchor, oracle capture, generic debugger, checkpoint
+layout, or full-model diagnostic path. Keep the same internal observer enabled once on production
+integration, then let the existing token/DSA/HLO/HBM/XPlane/DB/archive/cleanup gates adjudicate it.

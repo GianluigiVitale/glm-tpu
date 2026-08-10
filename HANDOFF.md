@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-10 08:42 UTC
+**Updated:** 2026-08-10 11:31 UTC
 
 ## Authority and isolation
 
@@ -3236,3 +3236,38 @@ already-pinned `dsa_query_exact_association` flag. Exact mode accepts only
 prefill-loop name. Replaying the exact preserved TPU HLO now passes the complete-token sub-contract,
 and cross-mode names fail. Exact next: focused/static tests, one Fable review of only this
 post-`1824cf8` correction, commit/push, then retry the same protected 8K profile.
+
+## The internal observer isolates head/key; DB527 proves the exact correction
+
+The protected run at pushed `fb1dea9`, tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_oracle_dsa_dsa_internal_trace2_20260810T093638877848825Z`,
+completed full-fleet load/compile, the 8,155-token prefill and one observed recurrent step in 49
+minutes. Token `101252` is exact. The separate device DSA observer then stopped before warmup,
+timing or trace because all-event sets are nonexact. Its layer-0 internal breakpoint proves
+normalized hidden, q-a and query bitwise exact, while head weights differ 32/32 (max
+`2.4797022e-4`) and current key differs 97/128 (max `7.1525574e-7`). Internal NPZ/contract SHAs are
+`a889b664...ed07` / `fb470de5...fb18`; all eight logs share SHA `ddca2f9a...eb2`, and pre/failure
+census SHAs `eacd64d3...1018` / `78e9aba0...90f2` prove clean shutdown. There is no DB row,
+`SUCCESS`, accepted latency or Gate-D/E result.
+
+Protected DB527/item1812 at pushed `cd15aaf`, tag
+`greenfield_layer0_physical_lp4_dsa_head_key_boundary_20260810T104647319991568Z`, replays that
+exact observer input across five physical LP4 arms in six seconds. Exactly
+`physical_normalized_barrier_materialized_divide_sqrt` matches accepted head SHA
+`ec66b475...725e` and key SHA `9f1fb991...dbbc5` with zero mismatches. It uses one BF16 normalized
+boundary, the already-materialized local FP32 wk owner and divide-by-sqrt key LayerNorm. The tuple4
+key anchor is rejected. Its HLO has four partitions, two StableHLO dots, one barrier and no
+collective/global owner table. SUCCESS/evidence/runner/tensor/summary SHAs are
+`0c961dd1...5fb0`, `7c7563e7...7678`, `f4d2518c...1310`, `3ea5813f...b5b52`, and
+`e76e799b...c1ea`; DB/archive/direct-object and authenticated 8/8 cleanup pass.
+
+The current default-off production batch reuses the existing five-slot prefill wk materializer;
+it adds no checkpoint state or new observer. It applies DB527's normalized barrier and divide/sqrt
+only to the 21 full-indexer layers, pins the recurrent HLO counts, and keeps the existing internal
+observer enabled for the first deployment. The full affected suite passes 82/82. Pre-deployment
+review found and corrected two wiring blockers: prefill now forwards the exact head/key HLO flag,
+and observer/warmup/timing/trace calls reuse the same nested query/WK PyTree used at compile time.
+Focused regressions cover both and the correction-only Fable follow-up returned `APPROVE COMMIT`.
+Exact next: commit/push, authenticate the idle fleet, then run the combined protected 8K profile.
+Best case is roughly three hours from clean launch; one evidence-led correction/retry makes the
+realistic Gate-D window four to eight hours.

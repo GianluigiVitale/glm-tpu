@@ -13,6 +13,7 @@ from glm_tpu.greenfield.runtime import (
 from glm_tpu.greenfield.runtime.prefill import (
     PrefillBackendContract,
     _prefill_index_repair_chunk_count,
+    validate_teacher_forced_prefill_hlo,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 
@@ -68,6 +69,53 @@ def test_prefill_loop_contract_classifies_physical_m64_repair() -> None:
 def test_protected_8k_prefill_repair_has_four_chunks_per_layer() -> None:
     assert _prefill_index_repair_chunk_count(8155) == 4
     assert 21 * _prefill_index_repair_chunk_count(8155) == 84
+
+
+def test_prefill_hlo_forwards_exact_head_key_contract(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_decoder_contract(*_args, **kwargs):
+        captured.update(kwargs)
+        return {"passed": True, "violations": []}
+
+    monkeypatch.setattr(
+        "glm_tpu.greenfield.runtime.prefill.validate_decoder_step_hlo",
+        fake_decoder_contract,
+    )
+    decoder = SimpleNamespace(
+        attention_projection_backend="separate",
+        config=SimpleNamespace(total_devices=4),
+        dsa_head_key_exact_association=True,
+        dsa_query_backend="reference",
+        dsa_query_exact_association=True,
+        feature_fuse_route_weighting=False,
+        feature_output_tile=256,
+        feature_reconstruct_down_fp32=True,
+        groups=((0, 1, 2, 3),),
+        observe_prefill_index_inputs=False,
+        pairs=((0, 1),),
+        split_residual_state=True,
+    )
+    program = SimpleNamespace(
+        decoder=decoder,
+        index_repair_backend="none",
+        prompt_length=8,
+    )
+    schedule = SimpleNamespace(layer_count=0, stages=())
+    hlo = _loop_hlo("jit(execute)/while").replace(
+        "%seed = s32[] parameter(0)",
+        "%prompt = s32[8] parameter(0)\n  %seed = s32[] parameter(1)",
+    )
+
+    contract = validate_teacher_forced_prefill_hlo(
+        hlo,
+        program=program,
+        schedule=schedule,
+        backend_contract="cpu_reference",
+    )
+
+    assert captured["dsa_head_key_exact_association"] is True
+    assert contract["passed"] is True
 
 
 def _materialization_hlo() -> str:

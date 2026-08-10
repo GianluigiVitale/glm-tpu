@@ -369,6 +369,8 @@ def stage_local_dsa_fp8_mapped(
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
     dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
+    precomputed_wk_weight: Any | None = None,
+    dsa_head_key_exact_association: bool = False,
     linear_interpret: bool = False,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
@@ -386,6 +388,12 @@ def stage_local_dsa_fp8_mapped(
     )
     if query_backend not in ("reference", "pallas"):
         raise ValueError("stage-local DSA query backend is unknown")
+    if not isinstance(dsa_head_key_exact_association, bool):
+        raise ValueError("exact DSA head/key flag must be boolean")
+    if dsa_head_key_exact_association != (precomputed_wk_weight is not None):
+        raise ValueError(
+            "exact DSA head/key execution requires one external FP32 wk owner"
+        )
     if residual.shape != (1, contract.hidden_size):
         raise ValueError("DSA residual must contain one exact hidden row")
     if index_cache.ndim != 3 or index_cache.shape[1:] != (
@@ -418,6 +426,12 @@ def stage_local_dsa_fp8_mapped(
         raise ValueError("DSA local wq_b FP8 shape is invalid")
     if wk_bits.shape != (contract.head_dim, contract.hidden_size):
         raise ValueError("DSA wk FP8 shape is invalid")
+    if precomputed_wk_weight is not None and (
+        precomputed_wk_weight.shape
+        != (contract.head_dim, contract.hidden_size)
+        or precomputed_wk_weight.dtype != jnp.float32
+    ):
+        raise ValueError("external DSA wk owner must be exact local FP32")
     if key_norm_weight.shape != (contract.head_dim,) or key_norm_bias.shape != (
         contract.head_dim,
     ):
@@ -468,6 +482,11 @@ def stage_local_dsa_fp8_mapped(
             q_residual.dtype != residual.dtype
         ):
             raise ValueError("DSA precomputed q residual is invalid")
+    indexer_normalized = (
+        lax.optimization_barrier(normalized)
+        if dsa_head_key_exact_association
+        else normalized
+    )
     if dsa_query_weight_aliases is not None:
         if query_backend != "reference":
             raise ValueError(
@@ -475,7 +494,7 @@ def stage_local_dsa_fp8_mapped(
             )
         local_query, local_head_weights = _local_dsa_query_tuple4_exact(
             q_residual,
-            normalized,
+            indexer_normalized,
             dsa_query_weight_aliases,
             head_weight,
             position,
@@ -498,7 +517,7 @@ def stage_local_dsa_fp8_mapped(
         )
         local_query, local_head_weights = _local_dsa_query_from_projection(
             projected_query,
-            normalized,
+            indexer_normalized,
             head_weight,
             position,
             contract=contract,
@@ -517,7 +536,7 @@ def stage_local_dsa_fp8_mapped(
         )
         local_query, local_head_weights = _local_dsa_query_from_projection(
             projected_query,
-            normalized,
+            indexer_normalized,
             head_weight,
             position,
             contract=contract,
@@ -540,12 +559,27 @@ def stage_local_dsa_fp8_mapped(
         gathered_query[..., query_width:], (1, 0, 2)
     ).reshape(1, contract.num_heads)
 
-    if linear_backend == "reference":
+    if dsa_head_key_exact_association:
+        assert precomputed_wk_weight is not None
+        projected_key = linear(
+            indexer_normalized,
+            precomputed_wk_weight,
+            output_dtype=jnp.float32,
+        )
+        current_key_f32 = dsa_index_keys_from_projection(
+            projected_key,
+            key_norm_weight,
+            key_norm_bias,
+            position,
+            contract=contract,
+            key_norm_mode="divide_sqrt",
+        ).astype(jnp.float32)
+    elif linear_backend == "reference":
         wk_weight = dequantize_fp8_bits_block_weight(
             wk_bits, wk_scale, block_shape=block_shape
         )
         current_key_f32 = dsa_index_keys(
-            normalized,
+            indexer_normalized,
             wk_weight,
             key_norm_weight,
             key_norm_bias,
@@ -554,7 +588,7 @@ def stage_local_dsa_fp8_mapped(
         ).astype(jnp.float32)
     else:
         projected_key = fp8_block_matmul_f32(
-            normalized,
+            indexer_normalized,
             wk_bits,
             wk_scale,
             config=Fp8BlockMatmulConfig(

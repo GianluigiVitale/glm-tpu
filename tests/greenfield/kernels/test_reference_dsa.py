@@ -129,6 +129,56 @@ def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
     np.testing.assert_allclose(np.asarray(got), expected, rtol=2e-7, atol=2e-7)
 
 
+def test_index_key_norm_exposes_exact_divide_sqrt_association() -> None:
+    contract = small_contract()
+    projected = jnp.asarray(
+        [[0.125, -0.75, 1.25, 0.5]], dtype=jnp.float32
+    )
+    weight = jnp.asarray([1.0, 0.5, -0.25, 1.5], dtype=jnp.float32)
+    bias = jnp.asarray([0.0, 0.1, -0.2, 0.3], dtype=jnp.float32)
+    positions = jnp.asarray([0], dtype=jnp.int32)
+
+    default = dsa_index_keys_from_projection(
+        projected, weight, bias, positions, contract=contract
+    )
+    reciprocal = dsa_index_keys_from_projection(
+        projected,
+        weight,
+        bias,
+        positions,
+        contract=contract,
+        key_norm_mode="multiply_rsqrt",
+    )
+    divided = dsa_index_keys_from_projection(
+        projected,
+        weight,
+        bias,
+        positions,
+        contract=contract,
+        key_norm_mode="divide_sqrt",
+    )
+    np.testing.assert_array_equal(np.asarray(default), np.asarray(reciprocal))
+    centered = np.asarray(projected) - np.asarray(projected).mean(
+        axis=-1, keepdims=True
+    )
+    expected = centered / np.sqrt(
+        np.mean(centered * centered, axis=-1, keepdims=True)
+        + contract.key_layer_norm_epsilon
+    )
+    expected = expected * np.asarray(weight) + np.asarray(bias)
+    np.testing.assert_allclose(np.asarray(divided), expected, rtol=2e-7, atol=2e-7)
+
+    with pytest.raises(ValueError, match="unknown key LayerNorm association"):
+        dsa_index_keys_from_projection(
+            projected,
+            weight,
+            bias,
+            positions,
+            contract=contract,
+            key_norm_mode="unknown",  # type: ignore[arg-type]
+        )
+
+
 def test_dsa_scorer_pins_highest_dot_precision() -> None:
     query = jnp.ones((1, 2, 4), dtype=jnp.float32)
     keys = jnp.ones((3, 4), dtype=jnp.float32)

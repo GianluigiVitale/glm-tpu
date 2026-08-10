@@ -296,6 +296,7 @@ class DecoderStepProgram:
     linear_backend: StageLinearBackend
     dsa_query_backend: StageLinearBackend
     dsa_query_exact_association: bool
+    dsa_head_key_exact_association: bool
     attention_projection_backend: AttentionProjectionBackend
     complete_token_path: bool
     observe_dsa_events: bool
@@ -642,6 +643,118 @@ def _validate_dsa_query_decoder_association(
     }
 
 
+def _validate_dsa_head_key_decoder_association(
+    optimized_hlo: str,
+    *,
+    full_indexer_layers: int,
+    maximum_full_indexer_slots: int,
+    exact_association: bool,
+    prefill_index_repair: bool = False,
+) -> dict[str, Any]:
+    """Pin DB527's external wk, BF16 head boundary, and divide/sqrt path."""
+
+    if not isinstance(exact_association, bool):
+        raise PlanValidationError(
+            "exact DSA head/key association flag must be boolean"
+        )
+    if not isinstance(prefill_index_repair, bool):
+        raise PlanValidationError(
+            "prefill index-repair HLO flag must be boolean"
+        )
+    module = parse_hlo_module(optimized_hlo)
+    local_wk_shape = "f32[128,6144]"
+    external_wk_parameters = sum(
+        instruction.computation.startswith("ENTRY ")
+        and instruction.raw_opcode == "parameter"
+        and len(instruction.result_shapes) == 1
+        and instruction.result_shapes[0].dtype == "f32"
+        and instruction.result_shapes[0].dimensions[-2:] == (128, 6144)
+        for instruction in module.instructions
+    )
+    key_reduction_marker = '"megacore_allreduce_bytes":"8192"'
+    key_projection_count = sum(
+        key_reduction_marker in line
+        and "f32[128]" in line.split(" fusion(", 1)[0]
+        for line in optimized_hlo.splitlines()
+    )
+    key_sqrt_count = sum(
+        " = f32[]" in line
+        and " sqrt(" in line
+        and "/shard_map/" in line
+        for line in optimized_hlo.splitlines()
+    )
+    normalized_f32_convert_count = sum(
+        " = f32[1,6144]" in line
+        and " convert(" in line
+        and "/shard_map/" in line
+        for line in optimized_hlo.splitlines()
+    )
+    forbidden_global_shapes = [
+        shape
+        for shape in ("f32[32,128,6144]", "f32[4,128,6144]")
+        if shape in optimized_hlo
+    ]
+    violations = []
+    if forbidden_global_shapes:
+        violations.append(
+            "exact DSA head/key state escaped its stage-local owner: "
+            f"{forbidden_global_shapes}"
+        )
+    if exact_association:
+        if external_wk_parameters < maximum_full_indexer_slots:
+            violations.append(
+                "decoder lost external FP32 wk owners: "
+                f"expected_at_least={maximum_full_indexer_slots} "
+                f"observed={external_wk_parameters}"
+            )
+        if key_projection_count != full_indexer_layers:
+            violations.append(
+                "decoder lost exact recurrent key projections: "
+                f"expected={full_indexer_layers} "
+                f"observed={key_projection_count}"
+            )
+        if key_sqrt_count != full_indexer_layers:
+            violations.append(
+                "decoder lost divide-by-sqrt recurrent key norms: "
+                f"expected={full_indexer_layers} observed={key_sqrt_count}"
+            )
+        if normalized_f32_convert_count < full_indexer_layers:
+            violations.append(
+                "decoder lost completed BF16 normalized head/key boundaries: "
+                f"expected_at_least={full_indexer_layers} "
+                f"observed={normalized_f32_convert_count}"
+            )
+    elif (
+        (external_wk_parameters and not prefill_index_repair)
+        or key_projection_count
+        or key_sqrt_count
+    ):
+        violations.append(
+            "default decoder unexpectedly enables exact DSA head/key state"
+        )
+    return {
+        "exact_association": exact_association,
+        "external_wk_parameter_count": external_wk_parameters,
+        "expected_external_wk_parameter_count": (
+            maximum_full_indexer_slots if exact_association else 0
+        ),
+        "forbidden_global_shapes": forbidden_global_shapes,
+        "key_projection_count": key_projection_count,
+        "expected_key_projection_count": (
+            full_indexer_layers if exact_association else 0
+        ),
+        "key_sqrt_count": key_sqrt_count,
+        "expected_key_sqrt_count": (
+            full_indexer_layers if exact_association else 0
+        ),
+        "local_wk_shape": local_wk_shape,
+        "normalized_f32_convert_count": normalized_f32_convert_count,
+        "prefill_index_repair": prefill_index_repair,
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
 def validate_dsa_query_weight_materializer_hlo(
     optimized_hlo: str,
     *,
@@ -793,6 +906,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     dense_layers: int,
     full_indexer_layers: int,
     dsa_query_backend: StageLinearBackend = "pallas",
+    dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     prefill_index_repair: bool = False,
     module: HloModule | None = None,
@@ -817,7 +931,9 @@ def _validate_pallas_stage_linear_decoder_calls(
         "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": (
             full_indexer_layers if dsa_query_backend == "pallas" else 0
         ),
-        "greenfield_fp8_block_matmul_f32_m8_k6144_n128": full_indexer_layers,
+        "greenfield_fp8_block_matmul_f32_m8_k6144_n128": (
+            0 if dsa_head_key_exact_association else full_indexer_layers
+        ),
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": (
             dense_layers
         ),
@@ -833,6 +949,8 @@ def _validate_pallas_stage_linear_decoder_calls(
     }
     if dsa_query_backend not in ("reference", "pallas"):
         raise PlanValidationError("DSA query HLO backend is unknown")
+    if not isinstance(dsa_head_key_exact_association, bool):
+        raise PlanValidationError("exact DSA head/key HLO flag must be boolean")
     decoded_dimensions = (
         "2048,6144",
         "4096,2048",
@@ -850,6 +968,8 @@ def _validate_pallas_stage_linear_decoder_calls(
         for dtype in ("bf16", "f32")
         for shape in decoded_dimensions
     }
+    if dsa_head_key_exact_association:
+        forbidden_signatures.discard("f32[128,6144]")
     formatted_dimensions = (
         "2048,6144",
         "4096,2048",
@@ -929,6 +1049,9 @@ def _validate_pallas_stage_linear_decoder_calls(
         "prefill_index_repair_computation_count": repair_computation_count,
         "expected_kernel_counts": expected_kernel_counts,
         "dsa_query_backend": dsa_query_backend,
+        "dsa_head_key_exact_association": (
+            dsa_head_key_exact_association
+        ),
         "forbidden_decoded_weight_overlays": forbidden_overlays,
         "forbidden_formatted_weight_overlays": forbidden_formatted_overlays,
         "kernel_counts": kernel_counts,
@@ -1408,6 +1531,7 @@ def validate_decoder_step_hlo(
     feature_reconstruct_down_fp32: bool = False,
     dsa_query_backend: StageLinearBackend | None = None,
     dsa_query_exact_association: bool = False,
+    dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     complete_token_path: bool = False,
     token_observation_candidates: int = 1,
@@ -1463,6 +1587,14 @@ def validate_decoder_step_hlo(
     if dsa_query_exact_association and dsa_query_backend != "reference":
         raise PlanValidationError(
             "exact DSA query association requires the reference backend"
+        )
+    if not isinstance(dsa_head_key_exact_association, bool):
+        raise PlanValidationError(
+            "decoder exact DSA head/key association flag must be boolean"
+        )
+    if dsa_head_key_exact_association and not dsa_query_exact_association:
+        raise PlanValidationError(
+            "exact DSA head/key association requires exact DSA query"
         )
     if attention_projection_backend not in (
         "separate",
@@ -1824,6 +1956,9 @@ def validate_decoder_step_hlo(
                 dense_layers=dense_layers,
                 full_indexer_layers=full_layers,
                 dsa_query_backend=dsa_query_backend,
+                dsa_head_key_exact_association=(
+                    dsa_head_key_exact_association
+                ),
                 attention_projection_backend=attention_projection_backend,
                 prefill_index_repair=prefill_index_repair,
                 module=module,
@@ -1831,6 +1966,11 @@ def validate_decoder_step_hlo(
         )
         violations.extend(pallas_stage_linear_contract["violations"])
     dsa_query_association_contract: dict[str, Any] = {}
+    dsa_head_key_association_contract: dict[str, Any] = {
+        "applicable": False,
+        "passed": True,
+        "violations": [],
+    }
     if backend_contract != "cpu_reference":
         dsa_query_association_contract = (
             _validate_dsa_query_decoder_association(
@@ -1844,6 +1984,21 @@ def validate_decoder_step_hlo(
             )
         )
         violations.extend(dsa_query_association_contract["violations"])
+        dsa_head_key_association_contract = (
+            _validate_dsa_head_key_decoder_association(
+                optimized_hlo,
+                full_indexer_layers=full_layers,
+                maximum_full_indexer_slots=(
+                    config.maximum_full_indexer_slots
+                ),
+                exact_association=dsa_head_key_exact_association,
+                prefill_index_repair=prefill_index_repair,
+            )
+        )
+        dsa_head_key_association_contract["applicable"] = True
+        violations.extend(
+            dsa_head_key_association_contract["violations"]
+        )
     fused_qkv_a_contract: dict[str, Any] = {}
     if attention_projection_backend == "fused_n82_convolution":
         fused_qkv_a_contract = _validate_fused_qkv_a_decoder_association(
@@ -1899,6 +2054,12 @@ def validate_decoder_step_hlo(
             dsa_query_association_contract
         ),
         "dsa_query_exact_association": dsa_query_exact_association,
+        "dsa_head_key_exact_association": (
+            dsa_head_key_exact_association
+        ),
+        "dsa_head_key_association_contract": (
+            dsa_head_key_association_contract
+        ),
         "attention_projection_backend": attention_projection_backend,
         "fused_qkv_a_contract": fused_qkv_a_contract,
         "passed": not violations,
@@ -2012,6 +2173,7 @@ def _execute_stage(
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
+    dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -2048,12 +2210,18 @@ def _execute_stage(
                     alias[full_slot] for alias in dsa_query_weight_aliases
                 )
             )
+            recurrent_wk_weight = (
+                None
+                if dsa_recurrent_wk_weights is None
+                else dsa_recurrent_wk_weights[full_slot]
+            )
             layer_index_cache = index_cache[full_slot]
             current_full_slot = full_slot
             full_slot += 1
         else:
             dsa = None
             query_weight_aliases = None
+            recurrent_wk_weight = None
             layer_index_cache = index_cache[0]
             current_full_slot = None
         if layer.mlp_kind == "dense":
@@ -2111,6 +2279,10 @@ def _execute_stage(
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
             dsa_query_weight_aliases=query_weight_aliases,
+            dsa_precomputed_wk_weight=recurrent_wk_weight,
+            dsa_head_key_exact_association=(
+                dsa_recurrent_wk_weights is not None
+            ),
             attention_projection_backend=attention_projection_backend,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -2221,6 +2393,7 @@ def _execute_stage_split(
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
+    dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -2270,12 +2443,18 @@ def _execute_stage_split(
                     alias[full_slot] for alias in dsa_query_weight_aliases
                 )
             )
+            recurrent_wk_weight = (
+                None
+                if dsa_recurrent_wk_weights is None
+                else dsa_recurrent_wk_weights[full_slot]
+            )
             layer_index_cache = index_cache[full_slot]
             current_full_slot = full_slot
             full_slot += 1
         else:
             dsa = None
             query_weight_aliases = None
+            recurrent_wk_weight = None
             layer_index_cache = index_cache[0]
             current_full_slot = None
         if layer.mlp_kind == "dense":
@@ -2332,6 +2511,10 @@ def _execute_stage_split(
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
             dsa_query_weight_aliases=query_weight_aliases,
+            dsa_precomputed_wk_weight=recurrent_wk_weight,
+            dsa_head_key_exact_association=(
+                dsa_recurrent_wk_weights is not None
+            ),
             attention_projection_backend=attention_projection_backend,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -2441,6 +2624,7 @@ def build_decoder_step_program(
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
     dsa_query_exact_association: bool = False,
+    dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
@@ -2509,6 +2693,14 @@ def build_decoder_step_program(
     if dsa_query_exact_association and dsa_query_backend != "reference":
         raise PlanValidationError(
             "exact DSA query association requires the reference backend"
+        )
+    if not isinstance(dsa_head_key_exact_association, bool):
+        raise PlanValidationError(
+            "decoder exact DSA head/key association flag must be boolean"
+        )
+    if dsa_head_key_exact_association and not dsa_query_exact_association:
+        raise PlanValidationError(
+            "exact DSA head/key association requires exact DSA query"
         )
     if attention_projection_backend not in (
         "separate",
@@ -2697,9 +2889,7 @@ def build_decoder_step_program(
 
     def mapped_impl(
         local_weights: Mapping[str, Any],
-        local_dsa_query_weight_aliases: (
-            tuple[tuple[Any, ...], ...] | None
-        ),
+        local_exact_dsa_weights: Any | None,
         local_residual_container: Any,
         local_kv_container: Any,
         local_index_container: Any,
@@ -2778,6 +2968,20 @@ def build_decoder_step_program(
         def weight(name: str) -> Any:
             return local_weights[name][0]
 
+        local_dsa_query_weight_aliases = local_exact_dsa_weights
+        local_dsa_recurrent_wk_weights = None
+        if dsa_head_key_exact_association:
+            if (
+                local_exact_dsa_weights is None
+                or len(local_exact_dsa_weights) != 2
+            ):
+                raise PlanValidationError(
+                    "exact DSA head/key execution requires query and wk state"
+                )
+            (
+                local_dsa_query_weight_aliases,
+                local_dsa_recurrent_wk_weights,
+            ) = local_exact_dsa_weights
         dsa_query_weight_aliases = (
             None
             if local_dsa_query_weight_aliases is None
@@ -2786,12 +2990,25 @@ def build_decoder_step_program(
                 for alias in local_dsa_query_weight_aliases
             )
         )
+        dsa_recurrent_wk_weights = (
+            None
+            if local_dsa_recurrent_wk_weights is None
+            else tuple(value[0] for value in local_dsa_recurrent_wk_weights)
+        )
         if dsa_query_exact_association and (
             dsa_query_weight_aliases is None
             or len(dsa_query_weight_aliases) != 4
         ):
             raise PlanValidationError(
                 "exact DSA query execution requires four owner aliases"
+            )
+        if dsa_head_key_exact_association and (
+            dsa_recurrent_wk_weights is None
+            or len(dsa_recurrent_wk_weights)
+            != config.maximum_full_indexer_slots
+        ):
+            raise PlanValidationError(
+                "exact DSA head/key execution lost local wk owners"
             )
 
         execute_stage = (
@@ -2923,6 +3140,9 @@ def build_decoder_step_program(
                             dsa_query_weight_aliases=(
                                 dsa_query_weight_aliases
                             ),
+                            dsa_recurrent_wk_weights=(
+                                dsa_recurrent_wk_weights
+                            ),
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
@@ -2979,6 +3199,9 @@ def build_decoder_step_program(
                             dsa_query_weight_aliases=(
                                 dsa_query_weight_aliases
                             ),
+                            dsa_recurrent_wk_weights=(
+                                dsa_recurrent_wk_weights
+                            ),
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
@@ -3033,6 +3256,9 @@ def build_decoder_step_program(
                             dsa_query_weight_aliases=(
                                 dsa_query_weight_aliases
                             ),
+                            dsa_recurrent_wk_weights=(
+                                dsa_recurrent_wk_weights
+                            ),
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
@@ -3084,6 +3310,7 @@ def build_decoder_step_program(
                         linear_backend=linear_backend,
                         dsa_query_backend=dsa_query_backend,
                         dsa_query_weight_aliases=dsa_query_weight_aliases,
+                        dsa_recurrent_wk_weights=dsa_recurrent_wk_weights,
                         attention_projection_backend=(
                             attention_projection_backend
                         ),
@@ -3128,6 +3355,7 @@ def build_decoder_step_program(
                         linear_backend=linear_backend,
                         dsa_query_backend=dsa_query_backend,
                         dsa_query_weight_aliases=dsa_query_weight_aliases,
+                        dsa_recurrent_wk_weights=dsa_recurrent_wk_weights,
                         attention_projection_backend=(
                             attention_projection_backend
                         ),
@@ -3621,10 +3849,20 @@ def build_decoder_step_program(
     dsa_query_alias_specs = tuple(
         materialized_dsa_query_specs for _ in range(4)
     )
+    materialized_wk_specs = tuple(
+        P(axis_name, None, None)
+        for _ in range(maximum_full_indexer_slots)
+    )
     if dsa_query_exact_association:
+        exact_dsa_weight_specs: Any = dsa_query_alias_specs
+        if dsa_head_key_exact_association:
+            exact_dsa_weight_specs = (
+                dsa_query_alias_specs,
+                materialized_wk_specs,
+            )
         common_specs = (
             weight_specs,
-            dsa_query_alias_specs,
+            exact_dsa_weight_specs,
             residual_spec,
             kv_spec,
             index_spec,
@@ -3697,10 +3935,6 @@ def build_decoder_step_program(
             check_vma=False,
         )
     if observe_prefill_index_inputs:
-        materialized_wk_specs = tuple(
-            P(axis_name, None, None)
-            for _ in range(maximum_full_indexer_slots)
-        )
         raw_wk_specs = tuple(
             P(axis_name, None, None)
             for _ in range(maximum_full_indexer_slots)
@@ -3754,6 +3988,9 @@ def build_decoder_step_program(
         linear_backend=linear_backend,
         dsa_query_backend=dsa_query_backend,
         dsa_query_exact_association=dsa_query_exact_association,
+        dsa_head_key_exact_association=(
+            dsa_head_key_exact_association
+        ),
         attention_projection_backend=attention_projection_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,

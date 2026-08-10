@@ -876,3 +876,21 @@ capture is still required.
 - Identical-rank-log SHA is `bc65b0e7...b27e`; pre/failure census SHAs are
   `5ec2756d...df37` / `05762594...d7fa`. The approved diagnostic archive and authenticated 8/8
   cleanup pass. No execution, token, DSA, DB, `SUCCESS`, trace, wall or Gate-D/E result exists.
+
+## Full 8K internal breakpoint and DB527 recurrent head/key association
+
+- Pushed `fb1dea9` full run
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_oracle_dsa_dsa_internal_trace2_20260810T093638877848825Z`
+  proves exact first token plus exact layer-0 normalized/q-a/query, then exposes 32/32 head and
+  97/128 current-key mismatches. NPZ/contract SHAs `a889b664...ed07` / `fb470de5...fb18`; clean
+  failure census. No DB, timing, trace, `SUCCESS`, Gate-D or Gate-E claim.
+- DB527/item1812 at `cd15aaf`, tag
+  `greenfield_layer0_physical_lp4_dsa_head_key_boundary_20260810T104647319991568Z`, accepts only
+  `physical_normalized_barrier_materialized_divide_sqrt`. Head/key are bitwise exact at SHAs
+  `ec66b475...725e` / `9f1fb991...dbbc5`; HLO/StableHLO SHAs `4dc28823...03a1` /
+  `d9fd33b4...dbcb` prove two local dots, one barrier, four partitions and no communication/global
+  owner state.
+- SUCCESS/evidence/runner/tensor/results-DB/remote-ledger SHAs are
+  `0c961dd1...5fb0`, `7c7563e7...7678`, `f4d2518c...1310`, `3ea5813f...b5b52`,
+  `57a88dc9...76c3`, and `a4bc6797...08f0`; archive and authenticated 8/8 cleanup pass. This
+  authorizes the default-off full-decoder integration, not a performance claim.

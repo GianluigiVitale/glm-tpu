@@ -127,8 +127,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         "LAYER_RESIDUAL_OBSERVER == 0 && $DSA_INTERNAL_OBSERVER == 0"
         not in runner
     )
-    assert '"schema_version": 12' in compiler
-    assert 'record["schema_version"] for record in records} != {12}' in runner
+    assert '"schema_version": 13' in compiler
+    assert 'record["schema_version"] for record in records} != {13}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
@@ -162,6 +162,23 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "DB526 direct remote SUCCESS hash drifted" in runner
     assert "dsa_query_exact_association_production_prerequisite" in runner
     assert "_queryexact" in runner
+    assert '"--dsa-head-key-exact-association"' in compiler
+    assert (
+        "readonly DSA_HEAD_KEY_EXACT_ASSOCIATION="
+        "${GLM_GREENFIELD_DSA_HEAD_KEY_EXACT_ASSOCIATION:-0}" in runner
+    )
+    assert (
+        '--dsa-head-key-exact-association '
+        '"$dsa_head_key_exact_association"' in runner
+    )
+    assert "results_db_run_id\": 527" in runner
+    assert "physical_normalized_barrier_materialized_divide_sqrt" in runner
+    assert "DB527 direct remote SUCCESS hash drifted" in runner
+    assert "dsa_head_key_exact_association_prerequisite" in runner
+    assert "_headkeyexact" in runner
+    assert "runtime_prefix = (" in compiler
+    assert "*runtime_prefix, *observer_current" in compiler
+    assert "return compiled(*runtime_prefix, *values)" in compiler
     assert "DB520 direct remote SUCCESS hash drifted" in runner
     assert "external_stage_local_raw_fp8_to_bf16" in runner
     assert "external_stage_local_bf16_to_fp32" in runner
