@@ -10,6 +10,7 @@ from .decoder import (
     DecoderStepConfig,
     DecoderStepProgram,
     build_decoder_step_program,
+    validate_dsa_query_weight_materializer_hlo,
     validate_decoder_step_hlo,
 )
 from .prefill import (
@@ -29,6 +30,7 @@ __all__ = [
     "TeacherForcedPrefillProgram",
     "build_decoder_step_program",
     "build_teacher_forced_prefill_program",
+    "validate_dsa_query_weight_materializer_hlo",
     "validate_prefill_index_weight_materialization_hlo",
     "validate_stage_local_prefill_index_repair_hlo",
     "validate_teacher_forced_prefill_hlo",

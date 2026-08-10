@@ -685,6 +685,9 @@ def validate_teacher_forced_prefill_hlo(
             decoder.feature_reconstruct_down_fp32
         ),
         dsa_query_backend=decoder.dsa_query_backend,
+        dsa_query_exact_association=(
+            decoder.dsa_query_exact_association
+        ),
         attention_projection_backend=(
             decoder.attention_projection_backend
         ),
@@ -862,6 +865,7 @@ def build_teacher_forced_prefill_program(
         block_tables: Any,
         context_lengths: Any,
         materialized_index_wk: tuple[Any, ...] | None = None,
+        dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None = None,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         if tuple(prompt_tokens.shape) != (prompt_length,):
             raise PlanValidationError(
@@ -905,8 +909,7 @@ def build_teacher_forced_prefill_program(
                 jnp.asarray(prompt_token, dtype=jnp.int32),
                 (total_devices, 1),
             )
-            output = decoder.execute(
-                weights,
+            decoder_state = (
                 current_residual,
                 current_kv,
                 current_index,
@@ -916,6 +919,22 @@ def build_teacher_forced_prefill_program(
                 current_blocks,
                 current_lengths,
             )
+            if decoder.dsa_query_exact_association:
+                if dsa_query_weight_aliases is None:
+                    raise PlanValidationError(
+                        "exact DSA prefill requires four query aliases"
+                    )
+                output = decoder.execute(
+                    weights,
+                    dsa_query_weight_aliases,
+                    *decoder_state,
+                )
+            else:
+                if dsa_query_weight_aliases is not None:
+                    raise PlanValidationError(
+                        "default prefill must not receive query aliases"
+                    )
+                output = decoder.execute(weights, *decoder_state)
             next_carry = (
                 output[0],
                 output[1],

@@ -12,12 +12,16 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   RMSNorm use the pinned model config's epsilon `1e-5`. The indexer key
   affine LayerNorm is a distinct operation and retains its source epsilon
   `1e-6`.
-- The DSA `wq_b` reference path materializes only the complete topology-local
-  FP32 owner shard before its true-row projection. Protected DB499 proves this
-  association bitwise **when its input is the accepted q-a state**; it does not
-  prove that the production q-a producer is exact. Streamed N=128 and
-  MXU/Pallas alternatives remain default-off because DB495--DB498 are not
-  elementwise exact. PP8 never reconstructs the global `wq_b` matrix.
+- The DSA `wq_b` exact path materializes only the complete topology-local FP32
+  owner shard before its true-row projection. DB522 requires the fused q-a BF16
+  result to complete behind an optimization barrier. Protected DB525 then
+  requires four top-level aliases of that same owner, four N1024 reductions
+  retained behind one grouped barrier, and only the first result live. TPU must
+  emit one tuple-valued fusion with `megacore_allreduce_bytes=16384`; ordinary
+  N1024, N128, precision and GSPMD alternatives are rejected by DB521--524.
+  PP8 never reconstructs the global `wq_b` matrix or carries another owner's
+  state. This correction remains default-off until the actual fused-q-a,
+  separate local materializer and helper composition is protected-exact.
 - The sealed all-event observer proves production layer-0 normalized hidden is
   bitwise exact but its q-a state differs in 494/2,048 BF16 values (max
   `0.015625`). The accepted source uses 32 shard-major fused q-a/kv-a dots with

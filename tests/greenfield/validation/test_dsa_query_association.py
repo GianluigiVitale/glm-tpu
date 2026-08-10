@@ -313,6 +313,58 @@ def test_physical_tuple4_contract_requires_grouped_reduction_and_barrier() -> No
     )["passed"]
 
 
+def test_production_exact_contract_requires_composed_q_a_and_tuple4(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        subject,
+        "_validate_fused_qkv_a_decoder_association",
+        lambda hlo, layers: {
+            "passed": hlo.startswith("optimized") and layers == 1
+        },
+    )
+    optimized = (
+        "optimized bf16[1,6144] bf16[1,2048] f32[1024,2048] "
+        "bf16[8,6144] f32[8,128]\n"
+        "%query = (f32[1024],f32[1024],f32[1024],f32[1024]) "
+        "fusion(%value), "
+        'backend_config={"megacore_allreduce_bytes":"16384"}'
+    )
+    stablehlo = (
+        "module attributes {mhlo.num_partitions = 4 : i32}\n"
+        "sdy.mesh @mesh = <[\"lp4\"=4]>\n"
+        "sdy.manual_computation "
+        + " ".join(["tensor<4096x2048xf32>"] * 4)
+        + " ("
+        + " ".join(["tensor<1024x2048xf32>"] * 4)
+        + ") tensor<1x6144xbf16> tensor<1x2048xbf16>\n"
+        + "\n".join("stablehlo.dot_general" for _ in range(5))
+        + "\nstablehlo.optimization_barrier"
+        + "\nstablehlo.optimization_barrier"
+    )
+    contract = subject._physical_production_exact_hlo_contract(
+        optimized,
+        stablehlo,
+        backend="tpu",
+    )
+    assert contract["passed"]
+    assert contract["tuple4_reduction_fusion_count"] == 1
+    assert not subject._physical_production_exact_hlo_contract(
+        optimized.replace('"16384"', '"4096"'),
+        stablehlo,
+        backend="tpu",
+    )["passed"]
+    assert not subject._physical_production_exact_hlo_contract(
+        optimized,
+        stablehlo.replace(
+            "stablehlo.optimization_barrier",
+            "stablehlo.add",
+            1,
+        ),
+        backend="tpu",
+    )["passed"]
+
+
 def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
     assert set(subject._q_a_candidate_modes()) == {
         ("lax_map_convolution", norm)
@@ -401,6 +453,12 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "query_lp4_head_geometry",
         "physical_lp4_head_geometry.npz",
         "physical_lp4_dsa_head_geometry_association",
+        "query_lp4_production_exact",
+        "physical_lp4_production_exact.npz",
+        "physical_lp4_dsa_query_production_exact",
+        "DB525_RUNNER_SHA=da7acf8b",
+        "DB525_TENSOR_SHA=c55a6638",
+        "DB525_SUCCESS_SHA=5b547f24",
     ):
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):
@@ -414,6 +472,9 @@ def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
         "_validate_fused_qkv_a_decoder_association",
         '"query_lp4_q_a_boundary",',
         '"query_lp4_head_geometry",',
+        '"query_lp4_production_exact",',
+        "_local_dsa_query_tuple4_exact",
+        "validate_dsa_query_weight_materializer_hlo",
         "production_fused_n82_convolution_shard_sum",
         "companion_comparison",
         "fused_n82_convolution",

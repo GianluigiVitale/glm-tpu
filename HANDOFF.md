@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-09 22:55 UTC
+**Updated:** 2026-08-10 07:13 UTC
 
 ## Authority and isolation
 
@@ -3126,3 +3126,34 @@ first local result. It carries no other owner's state, no collective and no glob
 the forced-four-CPU program retains all four dots and the barrier. Exact next: finish tests/docs,
 one audit of only this new diff, commit/push, then one seconds-long protected result. No full model
 retry is authorized first.
+
+## DB525 is exact; production composition is the only pre-8K gate
+
+Protected DB525/item1810,
+`greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T060457076587721Z`, ran at pushed
+`a749ff0` and makes `physical_owner_tuple4_barrier_m1_n1024` bitwise equal to accepted query SHA
+`1ff2c2ec...12a` with 0/4,096 mismatches. The same local FP32 owner is passed as four top-level
+aliases; TPU retains one four-result N1024 fusion with `megacore_allreduce_bytes=16384`, then only
+the first result remains live. StableHLO/optimized HLO SHAs are `3b10b7e5...9f7c8` /
+`40d9ef25...4b7d`; there is no collective, callback, dead row, global physical query table or
+other-owner state.
+
+SUCCESS/evidence/tensor/runner/summary/results-DB/remote-ledger SHAs are `5b547f24...a6d582`,
+`35f888c7...17624`, `c55a6638...790ce`, `da7acf8b...1dfc`, `5bba9e4e...1932`,
+`41a43045...ef86`, and `e06bc413...3358`. DB/archive/direct-object linkage and authenticated 8/8
+pre/post cleanup pass. This is bounded correctness evidence only; DB484 remains the only accepted
+decoder performance point and Gate D/E remain open.
+
+The current default-off production batch completes the causal composition: the proven fused-N82
+q-a producer ends at an explicit BF16 barrier; a separate device-only materializer converts the
+five stage-local raw-FP8 `wq_b` owners to FP32 (40 MiB/chip); four aliases of that one physical
+state feed the DB525 helper for all 21 full-indexer layers. The HLO gate counts only tuple-valued
+four-result 16-KiB fusions, not unrelated TPU fusions, and rejects communication/global tables.
+Default execution is unchanged. Decoder plus prefill semantics and affected validation pass 75/75
+on explicit CPU; Python/Bash/ShellCheck/diff checks are green before the final static batch.
+
+Exact next: finish evidence/static checks, obtain one Fable xhigh review of only the diff from
+cleared `a749ff0`, independently resolve any blocker, then commit/push. From an authenticated idle
+fleet run only `query_lp4_production_exact`: first complete local raw-FP8-to-FP32 materialization,
+then compile/execute the real fused q-a plus production tuple4 helper and require bitwise q-a/query
+exactness with one local 16-KiB tuple fusion. Pin that protected result before any full 8K retry.

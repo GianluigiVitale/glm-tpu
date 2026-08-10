@@ -127,8 +127,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         "LAYER_RESIDUAL_OBSERVER == 0 && $DSA_INTERNAL_OBSERVER == 0"
         not in runner
     )
-    assert '"schema_version": 11' in compiler
-    assert 'record["schema_version"] for record in records} != {11}' in runner
+    assert '"schema_version": 12' in compiler
+    assert 'record["schema_version"] for record in records} != {12}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
@@ -143,6 +143,17 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "results_db_run_id\": 520" in runner
     assert "greenfield_layer0_prompt_key_norm_m64_20260809T200559393031635Z" in runner
     assert "prefill_index_weight_split_prerequisite" in runner
+    assert '"--dsa-query-exact-association"' in compiler
+    assert (
+        "readonly DSA_QUERY_EXACT_ASSOCIATION="
+        "${GLM_GREENFIELD_DSA_QUERY_EXACT_ASSOCIATION:-0}" in runner
+    )
+    assert '--dsa-query-exact-association "$dsa_query_exact_association"' in runner
+    assert "dsa_observer.input_specs[state_spec_offset + 4]" in compiler
+    assert "dsa_observer.input_specs[5]" not in compiler
+    assert "results_db_run_id\": 525" in runner
+    assert "physical_owner_tuple4_barrier_m1_n1024" in runner
+    assert "_queryexact" in runner
     assert "DB520 direct remote SUCCESS hash drifted" in runner
     assert "external_stage_local_raw_fp8_to_bf16" in runner
     assert "external_stage_local_bf16_to_fp32" in runner

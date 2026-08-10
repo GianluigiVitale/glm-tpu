@@ -237,6 +237,7 @@ def stage_local_transformer_layer_fp8_mapped(
     pallas_moe_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
+    dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalLayerFp8Result:
@@ -339,6 +340,7 @@ def stage_local_transformer_layer_fp8_mapped(
             precomputed_q_residual=q_residual,
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            dsa_query_weight_aliases=dsa_query_weight_aliases,
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache
@@ -525,6 +527,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     pallas_moe_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
+    dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
 ) -> StageLocalSplitLayerFp8Result:
@@ -629,6 +632,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             precomputed_q_residual=q_residual,
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            dsa_query_weight_aliases=dsa_query_weight_aliases,
             linear_interpret=linear_interpret,
         )
         index_cache = dsa_result.index_cache

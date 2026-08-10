@@ -763,8 +763,14 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         _validate_dsa_query_decoder_association,
     )
 
+    unrelated_16k = (
+        reference_dsa_hlo
+        + '\n%unrelated = bf16[4096] fusion(%value), '
+        + 'backend_config={"megacore_config":'
+        + '{"megacore_allreduce_bytes":"16384"}}'
+    )
     association = _validate_dsa_query_decoder_association(
-        reference_dsa_hlo,
+        unrelated_16k,
         full_indexer_layers=21,
         local_parallel_size=4,
         dsa_indexer_heads=32,
@@ -772,6 +778,36 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         backend="reference",
     )
     assert association["passed"], association
+    tuple_result = "(" + ",".join(["f32[1024]"] * 4) + ")"
+    exact_hlo = unrelated_16k + "\n" + "\n".join(
+        f"%query_tuple_{index} = {tuple_result} fusion(%value), "
+        'backend_config={"megacore_config":'
+        '{"megacore_allreduce_bytes":"16384"}}'
+        for index in range(21)
+    )
+    exact = _validate_dsa_query_decoder_association(
+        exact_hlo,
+        full_indexer_layers=21,
+        local_parallel_size=4,
+        dsa_indexer_heads=32,
+        index_key_width=128,
+        backend="reference",
+        exact_association=True,
+    )
+    assert exact["passed"], exact
+    assert exact["tuple4_reduction_fusion_count"] == 21
+    assert exact["all_16k_reduction_fusion_count"] == 22
+    collapsed = _validate_dsa_query_decoder_association(
+        exact_hlo.replace('"16384"', '"4096"', 2),
+        full_indexer_layers=21,
+        local_parallel_size=4,
+        dsa_indexer_heads=32,
+        index_key_width=128,
+        backend="reference",
+        exact_association=True,
+    )
+    assert not collapsed["passed"]
+    assert "expected=21 observed=20" in collapsed["violations"][0]
     global_owner = _validate_dsa_query_decoder_association(
         reference_dsa_hlo + "\n%global = f32[4096,2048] parameter(0)",
         full_indexer_layers=21,
@@ -782,6 +818,49 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     )
     assert not global_owner["passed"]
     assert global_owner["forbidden_global_shapes"] == ["f32[4096,2048]"]
+
+
+def test_dsa_query_weight_materializer_stays_local() -> None:
+    from glm_tpu.greenfield.runtime import (
+        validate_dsa_query_weight_materializer_hlo,
+    )
+
+    hlo = '''HloModule query_materializer, num_partitions=32
+
+ENTRY main (raw0: u8[1024,2048], raw1: u8[1024,2048], raw2: u8[1024,2048], scale0: f32[8,16], scale1: f32[8,16], scale2: f32[8,16]) -> (f32[1024,2048], f32[1024,2048], f32[1024,2048]) {
+  %raw0 = u8[1024,2048] parameter(0)
+  %raw1 = u8[1024,2048] parameter(1)
+  %raw2 = u8[1024,2048] parameter(2)
+  %scale0 = f32[8,16] parameter(3)
+  %scale1 = f32[8,16] parameter(4)
+  %scale2 = f32[8,16] parameter(5)
+  %out0 = f32[1024,2048] convert(%raw0)
+  %out1 = f32[1024,2048] convert(%raw1)
+  %out2 = f32[1024,2048] convert(%raw2)
+  ROOT %root = (f32[1024,2048], f32[1024,2048], f32[1024,2048]) tuple(%out0, %out1, %out2)
+}
+'''
+    contract = validate_dsa_query_weight_materializer_hlo(
+        hlo,
+        full_indexer_slots=3,
+        local_output_width=1024,
+        q_lora_rank=2048,
+        total_devices=32,
+    )
+    assert contract["passed"], contract
+    escaped = validate_dsa_query_weight_materializer_hlo(
+        hlo.replace(
+            "  ROOT %root",
+            "  %global = f32[4096,2048] broadcast(%out0), dimensions={0,1}\n"
+            "  ROOT %root",
+        ),
+        full_indexer_slots=3,
+        local_output_width=1024,
+        q_lora_rank=2048,
+        total_devices=32,
+    )
+    assert not escaped["passed"]
+    assert escaped["forbidden_global_shapes"] == ["f32[4096,2048]"]
 
 
 def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
@@ -1133,6 +1212,7 @@ weight_layout = build_decoder_runtime_weight_layout(plan, schedule)
 groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8))
 pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in range(8) for slot in range(4))
 decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
+exact_query_decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, dsa_query_backend='reference', dsa_query_exact_association=True)
 explicit_default = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=False, split_residual_state=False)
 observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True)
 internal_observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True)
@@ -1141,6 +1221,7 @@ repair_decoder = build_decoder_step_program(plan, schedule, state, weight_layout
 split_boundary_regression = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True, split_residual_state=True)
 split_internal_regression = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True, split_residual_state=True)
 prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
+exact_query_prefill = build_teacher_forced_prefill_program(exact_query_decoder, prompt_length=2)
 split_prefill = build_teacher_forced_prefill_program(split, prompt_length=2)
 repair_prefill = build_teacher_forced_prefill_program(repair_decoder, prompt_length=2)
 
@@ -1198,6 +1279,16 @@ inputs = (
     put(np.asarray([[0]], np.int32), decoder.input_specs[7]),
     put(np.asarray([1], np.int32), decoder.input_specs[8]),
 )
+query_names = exact_query_decoder.dsa_query_weight_names
+query_bits = tuple(weights[bits_name] for bits_name, _ in query_names)
+query_scales = tuple(weights[scale_name] for _, scale_name in query_names)
+query_materializer = exact_query_decoder.materialize_dsa_query_weights_fp32
+assert query_materializer is not None
+materialized_query_weights = tuple(
+    jax.jit(query_materializer)(query_bits, query_scales)
+)
+query_aliases = (materialized_query_weights,) * 4
+exact_query_inputs = (weights, query_aliases, *inputs[1:])
 split_inputs = (
     weights,
     put(split_residual_host, split.input_specs[1]),
@@ -1207,6 +1298,9 @@ lowered = jax.jit(decoder.execute).lower(*inputs)
 default_stablehlo = lowered.as_text()
 explicit_default_stablehlo = jax.jit(explicit_default.execute).lower(*inputs).as_text()
 compiled = lowered.compile()
+exact_query_lowered = jax.jit(exact_query_decoder.execute).lower(*exact_query_inputs)
+exact_query_stablehlo = exact_query_lowered.as_text()
+exact_query_compiled = exact_query_lowered.compile()
 split_compiled = jax.jit(split.execute).lower(*split_inputs).compile()
 repair_step_compiled = jax.jit(repair_decoder.execute).lower(*split_inputs).compile()
 split_boundary_regression_compiled = jax.jit(split_boundary_regression.execute).lower(*split_inputs).compile()
@@ -1216,6 +1310,7 @@ internal_observer_compiled = jax.jit(internal_observer.execute).lower(*inputs).c
 observed = observer_compiled(*inputs)
 internal_observed = internal_observer_compiled(*inputs)
 first = compiled(*inputs)
+exact_query_first = exact_query_compiled(*exact_query_inputs)
 second = compiled(weights, *first)
 split_first = split_compiled(*split_inputs)
 split_second = split_compiled(weights, *split_first)
@@ -1231,6 +1326,9 @@ prefill_inputs = (
 )
 prefill_compiled = jax.jit(prefill.execute).lower(*prefill_inputs).compile()
 prefilled = prefill_compiled(*prefill_inputs)
+exact_query_prefill_inputs = (*prefill_inputs, None, query_aliases)
+exact_query_prefill_compiled = jax.jit(exact_query_prefill.execute).lower(*exact_query_prefill_inputs).compile()
+exact_query_prefilled = exact_query_prefill_compiled(*exact_query_prefill_inputs)
 split_prefill_inputs = (
     weights,
     *split_inputs[1:5],
@@ -1261,6 +1359,8 @@ repair_prefilled = repair_prefill_compiled(*repair_prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
 split_residual, split_kv, split_index, split_metadata, split_next_token, split_next_position, split_next_blocks, split_next_lengths = map(np.asarray, jax.device_get(split_second))
 prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
+exact_query_values = list(map(np.asarray, jax.device_get(exact_query_first)))
+exact_query_prefill_values = list(map(np.asarray, jax.device_get(exact_query_prefilled)))
 split_prefill_values = list(map(np.asarray, jax.device_get(split_prefilled)))
 repair_prefill_values = list(map(np.asarray, jax.device_get(repair_prefilled)))
 repair_step_history = np.asarray(jax.device_get(repair_step[8]))
@@ -1334,6 +1434,16 @@ print(json.dumps({
     'complete_token_path': decoder.complete_token_path,
     'default_observation_off_stablehlo_identical': default_stablehlo == explicit_default_stablehlo,
     'counts': counts,
+    'exact_query': {
+        'default_outputs_exact': all(np.array_equal(exact_query_values[index], np.asarray(jax.device_get(first[index]))) for index in range(8)),
+        'input_spec_count': len(exact_query_decoder.input_specs),
+        'materialized_slot_count': len(materialized_query_weights),
+        'prefill_outputs_exact': all(np.array_equal(exact_query_prefill_values[index], prefill_values[index]) for index in range(8)),
+        'program_flag': exact_query_decoder.dsa_query_exact_association,
+        'stablehlo_dot_count': exact_query_stablehlo.count('stablehlo.dot_general'),
+        'stablehlo_parameter_alias_count': exact_query_stablehlo.count('tensor<32x2x4xf32>'),
+        'stablehlo_barrier_count': exact_query_stablehlo.count('stablehlo.optimization_barrier'),
+    },
     'health': sorted(set(metadata[active, 0, decoder.config.health_index].tolist())),
     'hlo_contract': {key: hlo_contract[key] for key in ('collective_count', 'collective_counts', 'passed', 'violations')},
     'index_writes': index_writes,
@@ -1507,6 +1617,14 @@ print(json.dumps({
     assert result["residual_exact"]
     assert result["complete_token_path"]
     assert result["default_observation_off_stablehlo_identical"]
+    assert result["exact_query"]["program_flag"]
+    assert result["exact_query"]["input_spec_count"] == 10
+    assert result["exact_query"]["materialized_slot_count"] == 1
+    assert result["exact_query"]["default_outputs_exact"]
+    assert result["exact_query"]["prefill_outputs_exact"]
+    assert result["exact_query"]["stablehlo_dot_count"] >= 4
+    assert result["exact_query"]["stablehlo_parameter_alias_count"] >= 4
+    assert result["exact_query"]["stablehlo_barrier_count"] >= 2
     assert result["split"] == {
         "active": [0, 1, 2, 3],
         "collective_counts": {

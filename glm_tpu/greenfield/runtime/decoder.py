@@ -23,6 +23,7 @@ from ..kernels.layer import (
 from ..kernels.pallas import Fp8BlockMatmulConfig
 from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..kernels.reference.dsa import DsaNumericalContract
+from ..kernels.reference.fp8 import dequantize_fp8_bits_block_weight
 from ..kernels.reference.linear import vocabulary_logits
 from ..kernels.reference.moe import GlmMoeNumericalContract
 from ..kernels.reference.prefill_index import (
@@ -294,6 +295,7 @@ class DecoderStepProgram:
     feature_reconstruct_down_fp32: bool
     linear_backend: StageLinearBackend
     dsa_query_backend: StageLinearBackend
+    dsa_query_exact_association: bool
     attention_projection_backend: AttentionProjectionBackend
     complete_token_path: bool
     observe_dsa_events: bool
@@ -301,6 +303,8 @@ class DecoderStepProgram:
     observe_layer_residuals: bool
     observe_prefill_index_inputs: bool
     prefill_index_weight_names: tuple[tuple[str, str], ...]
+    dsa_query_weight_names: tuple[tuple[str, str], ...]
+    materialize_dsa_query_weights_fp32: Any | None
     decode_prefill_index_weights_bf16: Any | None
     promote_prefill_index_weights_fp32: Any | None
     repair_prefill_index_cache: Any | None
@@ -552,6 +556,7 @@ def _validate_dsa_query_decoder_association(
     dsa_indexer_heads: int,
     index_key_width: int,
     backend: StageLinearBackend,
+    exact_association: bool = False,
 ) -> dict[str, Any]:
     """Pin the exact query projection to a local owner, never a global table."""
 
@@ -568,7 +573,23 @@ def _validate_dsa_query_decoder_association(
     forbidden_global_shapes = [
         shape for shape in global_shapes if shape in optimized_hlo
     ]
+    tuple4_reduction_key = '"megacore_allreduce_bytes":"16384"'
+    all_16k_reduction_fusion_count = optimized_hlo.count(
+        tuple4_reduction_key
+    )
+    tuple4_reduction_fusion_count = sum(
+        tuple4_reduction_key in line
+        and line.split(" fusion(", 1)[0].count(
+            f"f32[{local_output_width}]"
+        )
+        == 4
+        for line in optimized_hlo.splitlines()
+    )
     violations = []
+    if not isinstance(exact_association, bool):
+        raise PlanValidationError(
+            "exact DSA query association flag must be boolean"
+        )
     if global_output_width % local_parallel_size:
         violations.append("DSA query width does not shard over the local group")
     if forbidden_global_shapes:
@@ -583,6 +604,19 @@ def _validate_dsa_query_decoder_association(
                 f"shape={local_shape} expected_at_least={full_indexer_layers} "
                 f"observed={local_shape_occurrences}"
             )
+        if exact_association and (
+            tuple4_reduction_fusion_count != full_indexer_layers
+        ):
+            violations.append(
+                "decoder lost the exact four-reduction DSA query fusion: "
+                f"expected={full_indexer_layers} "
+                f"observed={tuple4_reduction_fusion_count}"
+            )
+        if not exact_association and tuple4_reduction_fusion_count:
+            violations.append(
+                "default decoder unexpectedly enables the exact DSA query "
+                "association"
+            )
     elif backend == "pallas":
         if local_shape_occurrences:
             violations.append(
@@ -595,6 +629,116 @@ def _validate_dsa_query_decoder_association(
         "forbidden_global_shapes": forbidden_global_shapes,
         "local_owner_shape": local_shape,
         "local_owner_shape_occurrences": local_shape_occurrences,
+        "exact_association": exact_association,
+        "all_16k_reduction_fusion_count": (
+            all_16k_reduction_fusion_count
+        ),
+        "tuple4_reduction_fusion_count": tuple4_reduction_fusion_count,
+        "expected_tuple4_reduction_fusion_count": (
+            full_indexer_layers if exact_association else 0
+        ),
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
+def validate_dsa_query_weight_materializer_hlo(
+    optimized_hlo: str,
+    *,
+    full_indexer_slots: int,
+    local_output_width: int,
+    q_lora_rank: int,
+    total_devices: int,
+) -> dict[str, Any]:
+    """Require a local raw-FP8-to-FP32 owner materializer only."""
+
+    if full_indexer_slots <= 0:
+        raise PlanValidationError("DSA query materializer needs local slots")
+    module = parse_hlo_module(optimized_hlo)
+    local_raw_shape = f"u8[{local_output_width},{q_lora_rank}]"
+    scale_rows = (local_output_width + 127) // 128
+    scale_columns = (q_lora_rank + 127) // 128
+    local_scale_shape = f"f32[{scale_rows},{scale_columns}]"
+    local_fp32_shape = f"f32[{local_output_width},{q_lora_rank}]"
+    raw_occurrences = optimized_hlo.count(local_raw_shape)
+    scale_occurrences = optimized_hlo.count(local_scale_shape)
+    fp32_occurrences = optimized_hlo.count(local_fp32_shape)
+
+    def entry_parameter_count(dtype: str, tail: tuple[int, ...]) -> int:
+        return sum(
+            instruction.computation.startswith("ENTRY ")
+            and instruction.raw_opcode == "parameter"
+            and len(instruction.result_shapes) == 1
+            and instruction.result_shapes[0].dtype == dtype
+            and instruction.result_shapes[0].dimensions[-len(tail) :] == tail
+            for instruction in module.instructions
+        )
+
+    raw_parameter_count = entry_parameter_count(
+        "u8", (local_output_width, q_lora_rank)
+    )
+    scale_parameter_count = entry_parameter_count(
+        "f32", (scale_rows, scale_columns)
+    )
+    forbidden_operations = sorted(
+        {
+            instruction.opcode
+            for instruction in module.instructions
+            if instruction.opcode
+            in {
+                "all-gather",
+                "all-reduce",
+                "all-to-all",
+                "collective-permute",
+                "custom-call",
+                "outfeed",
+                "reduce-scatter",
+            }
+        }
+    )
+    forbidden_global_shapes = [
+        shape
+        for shape in (
+            f"u8[{local_output_width * 4},{q_lora_rank}]",
+            f"f32[{local_output_width * 4},{q_lora_rank}]",
+        )
+        if shape in optimized_hlo
+    ]
+    violations = []
+    if raw_parameter_count < full_indexer_slots:
+        violations.append("DSA query materializer lost local raw owners")
+    if scale_parameter_count < full_indexer_slots:
+        violations.append("DSA query materializer lost local scale owners")
+    if fp32_occurrences < full_indexer_slots:
+        violations.append("DSA query materializer lost local FP32 outputs")
+    if forbidden_operations:
+        violations.append(
+            "DSA query materializer contains communication/callbacks: "
+            f"{forbidden_operations}"
+        )
+    if forbidden_global_shapes:
+        violations.append(
+            "DSA query materializer reconstructs global state: "
+            f"{forbidden_global_shapes}"
+        )
+    if module.num_partitions not in (None, total_devices):
+        violations.append(
+            "DSA query materializer partition count drifted: "
+            f"expected={total_devices} observed={module.num_partitions}"
+        )
+    return {
+        "full_indexer_slots": full_indexer_slots,
+        "local_raw_shape": local_raw_shape,
+        "local_raw_shape_occurrences": raw_occurrences,
+        "local_raw_parameter_count": raw_parameter_count,
+        "local_scale_shape": local_scale_shape,
+        "local_scale_shape_occurrences": scale_occurrences,
+        "local_scale_parameter_count": scale_parameter_count,
+        "local_fp32_shape": local_fp32_shape,
+        "local_fp32_shape_occurrences": fp32_occurrences,
+        "forbidden_operations": forbidden_operations,
+        "forbidden_global_shapes": forbidden_global_shapes,
+        "num_partitions": module.num_partitions,
         "passed": not violations,
         "violations": violations,
     }
@@ -1215,6 +1359,7 @@ def validate_decoder_step_hlo(
     feature_fuse_route_weighting: bool = False,
     feature_reconstruct_down_fp32: bool = False,
     dsa_query_backend: StageLinearBackend | None = None,
+    dsa_query_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     complete_token_path: bool = False,
     token_observation_candidates: int = 1,
@@ -1263,6 +1408,14 @@ def validate_decoder_step_hlo(
         )
     if dsa_query_backend not in ("reference", "pallas"):
         raise PlanValidationError("DSA query HLO backend is unknown")
+    if not isinstance(dsa_query_exact_association, bool):
+        raise PlanValidationError(
+            "exact DSA query association flag must be boolean"
+        )
+    if dsa_query_exact_association and dsa_query_backend != "reference":
+        raise PlanValidationError(
+            "exact DSA query association requires the reference backend"
+        )
     if attention_projection_backend not in (
         "separate",
         "fused_n82_convolution",
@@ -1638,6 +1791,7 @@ def validate_decoder_step_hlo(
                 dsa_indexer_heads=config.dsa_indexer_heads,
                 index_key_width=config.index_key_width,
                 backend=dsa_query_backend,
+                exact_association=dsa_query_exact_association,
             )
         )
         violations.extend(dsa_query_association_contract["violations"])
@@ -1695,6 +1849,7 @@ def validate_decoder_step_hlo(
         "dsa_query_association_contract": (
             dsa_query_association_contract
         ),
+        "dsa_query_exact_association": dsa_query_exact_association,
         "attention_projection_backend": attention_projection_backend,
         "fused_qkv_a_contract": fused_qkv_a_contract,
         "passed": not violations,
@@ -1807,6 +1962,7 @@ def _execute_stage(
     pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
+    dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -1836,11 +1992,19 @@ def _execute_stage(
         )
         if layer.indexer_kind == "full":
             dsa = _dsa_weights(weight, full_slot)
+            query_weight_aliases = (
+                None
+                if dsa_query_weight_aliases is None
+                else tuple(
+                    alias[full_slot] for alias in dsa_query_weight_aliases
+                )
+            )
             layer_index_cache = index_cache[full_slot]
             current_full_slot = full_slot
             full_slot += 1
         else:
             dsa = None
+            query_weight_aliases = None
             layer_index_cache = index_cache[0]
             current_full_slot = None
         if layer.mlp_kind == "dense":
@@ -1897,6 +2061,7 @@ def _execute_stage(
             ),
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            dsa_query_weight_aliases=query_weight_aliases,
             attention_projection_backend=attention_projection_backend,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -2006,6 +2171,7 @@ def _execute_stage_split(
     pallas_moe_reconstruct_down_fp32: bool,
     linear_backend: StageLinearBackend,
     dsa_query_backend: StageLinearBackend,
+    dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -2048,11 +2214,19 @@ def _execute_stage_split(
         )
         if layer.indexer_kind == "full":
             dsa = _dsa_weights(weight, full_slot)
+            query_weight_aliases = (
+                None
+                if dsa_query_weight_aliases is None
+                else tuple(
+                    alias[full_slot] for alias in dsa_query_weight_aliases
+                )
+            )
             layer_index_cache = index_cache[full_slot]
             current_full_slot = full_slot
             full_slot += 1
         else:
             dsa = None
+            query_weight_aliases = None
             layer_index_cache = index_cache[0]
             current_full_slot = None
         if layer.mlp_kind == "dense":
@@ -2108,6 +2282,7 @@ def _execute_stage_split(
             ),
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            dsa_query_weight_aliases=query_weight_aliases,
             attention_projection_backend=attention_projection_backend,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -2216,6 +2391,7 @@ def build_decoder_step_program(
     feature_reconstruct_down_fp32: bool = False,
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
+    dsa_query_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
@@ -2277,6 +2453,14 @@ def build_decoder_step_program(
         dsa_query_backend = linear_backend
     if dsa_query_backend not in ("reference", "pallas"):
         raise PlanValidationError("decoder DSA query backend is unknown")
+    if not isinstance(dsa_query_exact_association, bool):
+        raise PlanValidationError(
+            "decoder exact DSA query association flag must be boolean"
+        )
+    if dsa_query_exact_association and dsa_query_backend != "reference":
+        raise PlanValidationError(
+            "exact DSA query association requires the reference backend"
+        )
     if attention_projection_backend not in (
         "separate",
         "fused_n82_convolution",
@@ -2464,6 +2648,9 @@ def build_decoder_step_program(
 
     def mapped_impl(
         local_weights: Mapping[str, Any],
+        local_dsa_query_weight_aliases: (
+            tuple[tuple[Any, ...], ...] | None
+        ),
         local_residual_container: Any,
         local_kv_container: Any,
         local_index_container: Any,
@@ -2541,6 +2728,22 @@ def build_decoder_step_program(
 
         def weight(name: str) -> Any:
             return local_weights[name][0]
+
+        dsa_query_weight_aliases = (
+            None
+            if local_dsa_query_weight_aliases is None
+            else tuple(
+                tuple(value[0] for value in alias)
+                for alias in local_dsa_query_weight_aliases
+            )
+        )
+        if dsa_query_exact_association and (
+            dsa_query_weight_aliases is None
+            or len(dsa_query_weight_aliases) != 4
+        ):
+            raise PlanValidationError(
+                "exact DSA query execution requires four owner aliases"
+            )
 
         execute_stage = (
             _execute_stage_split
@@ -2668,6 +2871,9 @@ def build_decoder_step_program(
                             ),
                             linear_backend=linear_backend,
                             dsa_query_backend=dsa_query_backend,
+                            dsa_query_weight_aliases=(
+                                dsa_query_weight_aliases
+                            ),
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
@@ -2721,6 +2927,9 @@ def build_decoder_step_program(
                             ),
                             linear_backend=linear_backend,
                             dsa_query_backend=dsa_query_backend,
+                            dsa_query_weight_aliases=(
+                                dsa_query_weight_aliases
+                            ),
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
@@ -2772,6 +2981,9 @@ def build_decoder_step_program(
                             ),
                             linear_backend=linear_backend,
                             dsa_query_backend=dsa_query_backend,
+                            dsa_query_weight_aliases=(
+                                dsa_query_weight_aliases
+                            ),
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
@@ -2822,6 +3034,7 @@ def build_decoder_step_program(
                         ),
                         linear_backend=linear_backend,
                         dsa_query_backend=dsa_query_backend,
+                        dsa_query_weight_aliases=dsa_query_weight_aliases,
                         attention_projection_backend=(
                             attention_projection_backend
                         ),
@@ -2865,6 +3078,7 @@ def build_decoder_step_program(
                         ),
                         linear_backend=linear_backend,
                         dsa_query_backend=dsa_query_backend,
+                        dsa_query_weight_aliases=dsa_query_weight_aliases,
                         attention_projection_backend=(
                             attention_projection_backend
                         ),
@@ -3125,6 +3339,7 @@ def build_decoder_step_program(
     ) -> tuple[Any, Any, Any, Any]:
         values = mapped_impl(
             local_weights,
+            None,
             local_residual_container,
             local_kv_container,
             local_index_container,
@@ -3149,6 +3364,57 @@ def build_decoder_step_program(
     ) -> tuple[Any, ...]:
         return mapped_impl(
             local_weights,
+            None,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            local_token_container,
+            position,
+            block_tables,
+            context_lengths,
+        )
+
+    def mapped_body_exact_query(
+        local_weights: Mapping[str, Any],
+        local_query_weight_aliases: tuple[tuple[Any, ...], ...],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, Any, Any, Any]:
+        values = mapped_impl(
+            local_weights,
+            local_query_weight_aliases,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            None,
+            position,
+            block_tables,
+            context_lengths,
+        )
+        return values[:4]
+
+    def mapped_token_exact_query(
+        local_weights: Mapping[str, Any],
+        local_query_weight_aliases: tuple[tuple[Any, ...], ...],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        local_token_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, ...]:
+        return mapped_impl(
+            local_weights,
+            local_query_weight_aliases,
             local_residual_container,
             local_kv_container,
             local_index_container,
@@ -3216,6 +3482,29 @@ def build_decoder_step_program(
         )
         for full_slot in range(maximum_full_indexer_slots)
     )
+    dsa_query_weight_names = tuple(
+        (
+            f"indexer.slot_{full_slot:02d}.wq_b.weight_bits",
+            f"indexer.slot_{full_slot:02d}.wq_b.scale_inv",
+        )
+        for full_slot in range(maximum_full_indexer_slots)
+    )
+
+    def mapped_dsa_query_weight_decode_fp32(
+        local_wq_b_bits: tuple[Any, ...],
+        local_wq_b_scales: tuple[Any, ...],
+    ) -> tuple[Any, ...]:
+        return tuple(
+            dequantize_fp8_bits_block_weight(
+                wq_b_bits[0],
+                wq_b_scale[0],
+                block_shape=geometry.fp8_block_shape,
+                output_dtype=jnp.float32,
+            )[None, ...]
+            for wq_b_bits, wq_b_scale in zip(
+                local_wq_b_bits, local_wq_b_scales, strict=True
+            )
+        )
 
     def mapped_prefill_index_weight_decode_bf16(
         local_wk_bits: tuple[Any, ...],
@@ -3276,9 +3565,29 @@ def build_decoder_step_program(
         index_spec,
         metadata_spec,
     )
+    materialized_dsa_query_specs = tuple(
+        P(axis_name, None, None)
+        for _ in range(maximum_full_indexer_slots)
+    )
+    dsa_query_alias_specs = tuple(
+        materialized_dsa_query_specs for _ in range(4)
+    )
+    if dsa_query_exact_association:
+        common_specs = (
+            weight_specs,
+            dsa_query_alias_specs,
+            residual_spec,
+            kv_spec,
+            index_spec,
+            metadata_spec,
+        )
     if complete_token_path:
         input_specs = (*common_specs, token_spec, P(), P(), P())
-        mapped = mapped_token
+        mapped = (
+            mapped_token_exact_query
+            if dsa_query_exact_association
+            else mapped_token
+        )
         output_specs = (
             residual_spec,
             kv_spec,
@@ -3309,7 +3618,11 @@ def build_decoder_step_program(
             output_specs = (*output_specs, prefill_index_input_spec)
     else:
         input_specs = (*common_specs, P(), P(), P())
-        mapped = mapped_body
+        mapped = (
+            mapped_body_exact_query
+            if dsa_query_exact_association
+            else mapped_body
+        )
         output_specs = (residual_spec, kv_spec, index_spec, metadata_spec)
     execute = jax.shard_map(
         mapped,
@@ -3319,8 +3632,21 @@ def build_decoder_step_program(
         check_vma=False,
     )
     repair_prefill_index_cache = None
+    materialize_dsa_query_weights_fp32 = None
     decode_prefill_index_weights_bf16 = None
     promote_prefill_index_weights_fp32 = None
+    if dsa_query_exact_association:
+        raw_query_weight_specs = tuple(
+            P(axis_name, None, None)
+            for _ in range(maximum_full_indexer_slots)
+        )
+        materialize_dsa_query_weights_fp32 = jax.shard_map(
+            mapped_dsa_query_weight_decode_fp32,
+            mesh=mesh,
+            in_specs=(raw_query_weight_specs, raw_query_weight_specs),
+            out_specs=materialized_dsa_query_specs,
+            check_vma=False,
+        )
     if observe_prefill_index_inputs:
         materialized_wk_specs = tuple(
             P(axis_name, None, None)
@@ -3378,6 +3704,7 @@ def build_decoder_step_program(
         feature_reconstruct_down_fp32=feature_reconstruct_down_fp32,
         linear_backend=linear_backend,
         dsa_query_backend=dsa_query_backend,
+        dsa_query_exact_association=dsa_query_exact_association,
         attention_projection_backend=attention_projection_backend,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
@@ -3388,6 +3715,12 @@ def build_decoder_step_program(
             prefill_index_weight_names
             if observe_prefill_index_inputs
             else ()
+        ),
+        dsa_query_weight_names=(
+            dsa_query_weight_names if dsa_query_exact_association else ()
+        ),
+        materialize_dsa_query_weights_fp32=(
+            materialize_dsa_query_weights_fp32
         ),
         decode_prefill_index_weights_bf16=(
             decode_prefill_index_weights_bf16

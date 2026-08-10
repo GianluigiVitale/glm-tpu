@@ -35,6 +35,9 @@ from glm_tpu.greenfield.kernels.layer import (  # noqa: E402
     AttentionFp8Weights,
     _project_attention_qkv_a,
 )
+from glm_tpu.greenfield.kernels.stage_local import (  # noqa: E402
+    _local_dsa_query_tuple4_exact,
+)
 from glm_tpu.greenfield.kernels.reference.attention import (  # noqa: E402
     MlaNumericalContract,
 )
@@ -51,6 +54,7 @@ from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (  # noqa: E402
 )
 from glm_tpu.greenfield.runtime.decoder import (  # noqa: E402
     _validate_fused_qkv_a_decoder_association,
+    validate_dsa_query_weight_materializer_hlo,
 )
 from glm_tpu.greenfield.validation.layer0_dsa_association import (  # noqa: E402
     inspect_distributed_q_a_norm_artifact,
@@ -71,6 +75,9 @@ PHYSICAL_LP4_Q_A_BOUNDARY_ARTIFACT_KIND = (
 )
 PHYSICAL_LP4_HEAD_GEOMETRY_ARTIFACT_KIND = (
     "glm52_layer0_physical_lp4_dsa_head_geometry_association"
+)
+PHYSICAL_LP4_PRODUCTION_EXACT_ARTIFACT_KIND = (
+    "glm52_layer0_physical_lp4_dsa_query_production_exact"
 )
 
 
@@ -998,6 +1005,111 @@ def _physical_tuple4_stablehlo_contract(stablehlo: str) -> dict[str, Any]:
     }
 
 
+def _physical_production_exact_stablehlo_contract(
+    stablehlo: str,
+) -> dict[str, Any]:
+    """Require the production q-a boundary and four local owner aliases."""
+
+    lowered = stablehlo.lower()
+    required = {
+        "explicit_four_partitions": "mhlo.num_partitions = 4" in lowered,
+        "four_global_logical_weight_aliases": (
+            lowered.count("tensor<4096x2048xf32>") >= 4
+        ),
+        "four_local_owner_parameters": (
+            lowered.count("tensor<1024x2048xf32>") >= 4
+        ),
+        "five_or_more_dots": lowered.count("stablehlo.dot_general") >= 5,
+        "one_live_normalized_row": "tensor<1x6144xbf16>" in lowered,
+        "one_live_q_a_row": "tensor<1x2048xbf16>" in lowered,
+        "two_query_barriers": (
+            lowered.count("stablehlo.optimization_barrier") == 2
+        ),
+        "manual_lp4": (
+            "sdy.manual_computation" in lowered and '"lp4"' in lowered
+        ),
+    }
+    return {
+        "required": required,
+        "stablehlo_sha256": sha256(stablehlo.encode()).hexdigest(),
+        "passed": all(required.values()),
+    }
+
+
+def _physical_production_exact_hlo_contract(
+    optimized_hlo: str,
+    stablehlo: str,
+    *,
+    backend: str,
+) -> dict[str, Any]:
+    """Pin the complete local production q-a/query arithmetic boundary."""
+
+    lowered = optimized_hlo.lower()
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    forbidden_global_query_weights = [
+        shape
+        for shape in ("u8[4096,2048]", "f32[4096,2048]")
+        if shape in lowered
+    ]
+    required_shapes = {
+        "one_live_normalized_row": "bf16[1,6144]" in lowered,
+        "one_live_q_a_row": "bf16[1,2048]" in lowered,
+        "local_fp32_owner": "f32[1024,2048]" in lowered,
+        "local_head_weight": "bf16[8,6144]" in lowered,
+        "local_query": "f32[8,128]" in lowered,
+    }
+    tuple4_reduction_key = '"megacore_allreduce_bytes":"16384"'
+    all_16k_reduction_fusion_count = lowered.count(tuple4_reduction_key)
+    tuple4_reduction_fusion_count = sum(
+        tuple4_reduction_key in line
+        and line.split(" fusion(", 1)[0].count("f32[1024]") == 4
+        for line in lowered.splitlines()
+    )
+    fused_qkv_a = _validate_fused_qkv_a_decoder_association(
+        optimized_hlo,
+        layers=1,
+    )
+    stable_contract = _physical_production_exact_stablehlo_contract(
+        stablehlo
+    )
+    if backend not in ("cpu", "tpu"):
+        raise ValueError("physical production-exact backend is unknown")
+    return {
+        "backend": backend,
+        "forbidden_global_query_weights": forbidden_global_query_weights,
+        "forbidden_operations": forbidden_operations,
+        "fused_qkv_a": fused_qkv_a,
+        "hlo_sha256": sha256(optimized_hlo.encode()).hexdigest(),
+        "local_parallel_size": 4,
+        "required_shapes": required_shapes,
+        "stablehlo": stable_contract,
+        "all_16k_reduction_fusion_count": (
+            all_16k_reduction_fusion_count
+        ),
+        "tuple4_reduction_fusion_count": tuple4_reduction_fusion_count,
+        "passed": (
+            not forbidden_operations
+            and not forbidden_global_query_weights
+            and all(required_shapes.values())
+            and (backend != "tpu" or fused_qkv_a["passed"])
+            and stable_contract["passed"]
+            and tuple4_reduction_fusion_count == 1
+        ),
+    }
+
+
 def _run_physical_lp4_q_a_boundary(
     *,
     args: argparse.Namespace,
@@ -1249,6 +1361,328 @@ def _run_physical_lp4_q_a_boundary(
         "one_live_row": True,
         "performance_claim": False,
         "q_a_exact_candidates": q_a_exact,
+        "q_a_manifest_sha256": q_manifest["manifest_sha256"],
+        "status": "SUCCESS",
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+
+
+def _run_physical_lp4_production_exact(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+    capture: dict[str, Any],
+    accepted_query: np.ndarray,
+    current_query: np.ndarray,
+    captured_normalized_bits: np.ndarray,
+    captured_q_bits: np.ndarray,
+    arrays: dict[str, np.ndarray],
+    input_manifest: dict[str, Any],
+    q_manifest: dict[str, Any],
+) -> None:
+    """Compose the production materializer, fused q-a, and exact query."""
+
+    geometry = Layer0DsaProbeGeometry()
+    devices = np.asarray(jax.devices(), dtype=object)
+    if devices.shape != (4,):
+        raise SystemExit("physical production exactness requires four devices")
+    mesh = Mesh(devices, ("lp4",))
+    normalized = jnp.asarray(
+        captured_normalized_bits.view(ml_dtypes.bfloat16)[None, :]
+    )
+    q_a_bits = jnp.asarray(arrays["self_attn__q_a_proj__weight"])
+    q_a_scale = jnp.asarray(
+        arrays["self_attn__q_a_proj__weight_scale_inv"]
+    )
+    kv_a_bits = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight"]
+    )
+    kv_a_scale = jnp.asarray(
+        arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"]
+    )
+    packed = jax.jit(
+        lambda q_bits, q_scale, kv_bits, kv_scale: (
+            pack_legacy_fused_qkv_runtime_weights(
+                q_bits,
+                q_scale,
+                kv_bits,
+                kv_scale,
+                geometry=geometry,
+            )
+        )
+    )(q_a_bits, q_a_scale, kv_a_bits, kv_a_scale)
+    jax.block_until_ready(packed)
+    packed_bits = lax.bitcast_convert_type(
+        packed.sharded_weight, jnp.uint8
+    )
+    if packed_bits.shape != (32, 6144, 82) or (
+        packed.sharded_scale.shape != (32, 48, 82)
+    ):
+        raise SystemExit("production fused q-a final layout drifted")
+
+    raw_weight = jax.device_put(
+        arrays["self_attn__indexer__wq_b__weight"],
+        NamedSharding(mesh, P("lp4", None)),
+    )
+    raw_scale = jax.device_put(
+        arrays["self_attn__indexer__wq_b__weight_scale_inv"],
+        NamedSharding(mesh, P("lp4", None)),
+    )
+
+    def local_materialize(bits: Any, scale: Any) -> Any:
+        return dequantize_fp8_bits_block_weight(
+            bits,
+            scale,
+            output_dtype=jnp.float32,
+        )
+
+    materialize_mapped = jax.shard_map(
+        local_materialize,
+        mesh=mesh,
+        in_specs=(P("lp4", None), P("lp4", None)),
+        out_specs=P("lp4", None),
+        check_vma=False,
+    )
+    args.hlo_dir.mkdir(parents=True)
+    materialize_lowered = jax.jit(materialize_mapped).lower(
+        raw_weight, raw_scale
+    )
+    materialize_stablehlo = materialize_lowered.as_text()
+    materialize_compiled = materialize_lowered.compile()
+    materialize_hlo = materialize_compiled.as_text()
+    (args.hlo_dir / "production_query_materializer.stablehlo.mlir").write_text(
+        materialize_stablehlo
+    )
+    (args.hlo_dir / "production_query_materializer.optimized_hlo.txt").write_text(
+        materialize_hlo
+    )
+    materialize_contract = validate_dsa_query_weight_materializer_hlo(
+        materialize_hlo,
+        full_indexer_slots=1,
+        local_output_width=1024,
+        q_lora_rank=geometry.q_lora_rank,
+        total_devices=4,
+    )
+    materialize_contract["stablehlo_sha256"] = sha256(
+        materialize_stablehlo.encode()
+    ).hexdigest()
+    if not materialize_contract["passed"]:
+        raise SystemExit("production query materializer HLO failed")
+    materialized = materialize_compiled(raw_weight, raw_scale)
+    jax.block_until_ready(materialized)
+
+    normalized_argument = jax.device_put(
+        normalized, NamedSharding(mesh, P())
+    )
+    qkv_bits_argument = jax.device_put(
+        packed_bits, NamedSharding(mesh, P())
+    )
+    qkv_scale_argument = jax.device_put(
+        packed.sharded_scale, NamedSharding(mesh, P())
+    )
+    q_a_norm_argument = jax.device_put(
+        arrays["self_attn__q_a_layernorm__weight"].view(
+            ml_dtypes.bfloat16
+        ),
+        NamedSharding(mesh, P()),
+    )
+    head_weight_argument = jax.device_put(
+        arrays["self_attn__indexer__weights_proj__weight"].view(
+            ml_dtypes.bfloat16
+        ),
+        NamedSharding(mesh, P("lp4", None)),
+    )
+    position_argument = jax.device_put(
+        jnp.asarray([8155], dtype=jnp.int32),
+        NamedSharding(mesh, P()),
+    )
+
+    def local_production_exact(
+        normalized_input: Any,
+        qkv_bits: Any,
+        qkv_scale: Any,
+        q_a_norm_weight: Any,
+        query_weight0: Any,
+        query_weight1: Any,
+        query_weight2: Any,
+        query_weight3: Any,
+        head_weight: Any,
+        position: Any,
+    ) -> tuple[Any, Any, Any]:
+        attention = AttentionFp8Weights(
+            q_a_bits=None,
+            q_a_scale=None,
+            q_a_norm_weight=q_a_norm_weight,
+            q_b_bits=None,
+            q_b_scale=None,
+            kv_a_bits=None,
+            kv_a_scale=None,
+            kv_a_norm_weight=None,
+            kv_b_bits=None,
+            kv_b_scale=None,
+            o_bits=None,
+            o_scale=None,
+            qkv_a_bits=qkv_bits,
+            qkv_a_scale=qkv_scale,
+        )
+        q_residual, _ = _project_attention_qkv_a(
+            normalized_input,
+            attention,
+            backend="fused_n82_convolution",
+            dsa_contract=DsaNumericalContract(),
+            mla_contract=MlaNumericalContract(),
+            block_shape=(128, 128),
+            epsilon=1e-5,
+            linear_backend="pallas",
+            linear_interpret=False,
+        )
+        query, projected_head_weight = _local_dsa_query_tuple4_exact(
+            q_residual,
+            normalized_input,
+            (
+                query_weight0,
+                query_weight1,
+                query_weight2,
+                query_weight3,
+            ),
+            head_weight,
+            position,
+            contract=DsaNumericalContract(),
+        )
+        return query[0], projected_head_weight, q_residual
+
+    mapped = jax.shard_map(
+        local_production_exact,
+        mesh=mesh,
+        in_specs=(
+            P(),
+            P(),
+            P(),
+            P(),
+            P("lp4", None),
+            P("lp4", None),
+            P("lp4", None),
+            P("lp4", None),
+            P("lp4", None),
+            P(),
+        ),
+        out_specs=(P("lp4", None), P(None, "lp4"), P()),
+        check_vma=False,
+    )
+    arguments = (
+        normalized_argument,
+        qkv_bits_argument,
+        qkv_scale_argument,
+        q_a_norm_argument,
+        materialized,
+        materialized,
+        materialized,
+        materialized,
+        head_weight_argument,
+        position_argument,
+    )
+    lowered = jax.jit(mapped).lower(*arguments)
+    stablehlo = lowered.as_text()
+    compiled = lowered.compile()
+    optimized_hlo = compiled.as_text()
+    candidate_name = "physical_production_fused_q_a_tuple4_exact_m1_n1024"
+    (args.hlo_dir / f"{candidate_name}.stablehlo.mlir").write_text(stablehlo)
+    (args.hlo_dir / f"{candidate_name}.optimized_hlo.txt").write_text(
+        optimized_hlo
+    )
+    contract = _physical_production_exact_hlo_contract(
+        optimized_hlo,
+        stablehlo,
+        backend=jax.default_backend(),
+    )
+    if not contract["passed"]:
+        raise SystemExit("physical production exact query HLO failed")
+    query_output, head_output, q_a_output = compiled(*arguments)
+    jax.block_until_ready((query_output, head_output, q_a_output))
+    candidate_query = np.ascontiguousarray(
+        np.asarray(query_output), dtype=np.float32
+    )
+    candidate_q_bits = np.ascontiguousarray(
+        np.asarray(q_a_output)
+    ).view(np.uint16)[0]
+    if candidate_query.shape != (geometry.heads, geometry.head_dim) or (
+        candidate_q_bits.shape != captured_q_bits.shape
+    ):
+        raise SystemExit("physical production exact output shape drifted")
+    accepted_comparison = _compare(accepted_query, candidate_query)
+    q_a_comparison = _compare_bfloat16_bits(
+        captured_q_bits, candidate_q_bits
+    )
+    if not accepted_comparison["elementwise_exact"] or not q_a_comparison[
+        "elementwise_exact"
+    ]:
+        raise SystemExit("physical production composition is not exact")
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "physical_lp4_production_exact.npz"
+    np.savez(
+        tensor_path,
+        accepted_query=accepted_query,
+        accepted_q_a_bfloat16_bits=captured_q_bits,
+        current_production_query=current_query,
+        query=candidate_query,
+        q_a_bfloat16_bits=candidate_q_bits,
+        projected_head_weights=np.asarray(head_output, dtype=np.float32),
+    )
+    candidates = {
+        candidate_name: {
+            "accepted_comparison": accepted_comparison,
+            "current_production_comparison": _compare(
+                current_query, candidate_query
+            ),
+            "hlo": contract,
+            "input_weight_aliases": 4,
+            "q_a_comparison": q_a_comparison,
+        }
+    }
+    result = {
+        "artifact_kind": PHYSICAL_LP4_PRODUCTION_EXACT_ARTIFACT_KIND,
+        "association_restored": True,
+        "backend": jax.default_backend(),
+        "candidates": candidates,
+        "capture": {
+            "comparison_sha256": args.capture_comparison_sha256,
+            "owner_actual_sha256": capture["owner_actual_sha256"],
+            "query_sha256": _array_sha256(accepted_query),
+            "tensors_sha256": args.capture_tensors_sha256,
+        },
+        "claim_scope": (
+            "Bounded physical four-chip production q-a/query composition "
+            "only; no decoder, Gate-D, latency, or token-rate claim."
+        ),
+        "code_hash": code_hash,
+        "current_observer": {
+            "query_sha256": _array_sha256(current_query),
+            "sha256": args.current_internal_sha256,
+        },
+        "device_count": jax.device_count(),
+        "device_kind": sorted({device.device_kind for device in jax.devices()}),
+        "diagnostic_only": True,
+        "exact_candidates": [candidate_name],
+        "format_version": 1,
+        "input_manifest_sha256": input_manifest["manifest_sha256"],
+        "local_parallel_size": 4,
+        "materializer": {
+            "completed": True,
+            "hlo": materialize_contract,
+            "local_fp32_bytes": 1024 * geometry.q_lora_rank * 4,
+            "output_shape": list(materialized.shape),
+        },
+        "one_live_row": True,
+        "performance_claim": False,
+        "production_helper": True,
         "q_a_manifest_sha256": q_manifest["manifest_sha256"],
         "status": "SUCCESS",
         "tensor_file": {
@@ -2273,6 +2707,7 @@ def main() -> None:
             "query_lp4",
             "query_lp4_q_a_boundary",
             "query_lp4_head_geometry",
+            "query_lp4_production_exact",
             "q_a",
             "qkv_a_production",
         ),
@@ -2389,20 +2824,27 @@ def main() -> None:
     weight_scale = jnp.asarray(
         arrays["self_attn__indexer__wq_b__weight_scale_inv"]
     )
-    dequantized = jax.jit(
-        lambda bits, scale: dequantize_fp8_bits_block_weight(
-            bits, scale, output_dtype=jnp.float32
-        )
-    )(weight_bits, weight_scale)
-    jax.block_until_ready(dequantized)
-    dequantized_host = np.asarray(dequantized)
-    if int(dequantized_host.view(np.uint8).sum(dtype=np.uint64)) != 3765880530:
-        raise SystemExit("adapted wq_b byte identity drifted")
+    dequantized = None
+    dequantized_host = None
+    if args.target != "query_lp4_production_exact":
+        dequantized = jax.jit(
+            lambda bits, scale: dequantize_fp8_bits_block_weight(
+                bits, scale, output_dtype=jnp.float32
+            )
+        )(weight_bits, weight_scale)
+        jax.block_until_ready(dequantized)
+        dequantized_host = np.asarray(dequantized)
+        if (
+            int(dequantized_host.view(np.uint8).sum(dtype=np.uint64))
+            != 3765880530
+        ):
+            raise SystemExit("adapted wq_b byte identity drifted")
 
     if args.target in (
         "query_lp4",
         "query_lp4_q_a_boundary",
         "query_lp4_head_geometry",
+        "query_lp4_production_exact",
     ):
         if (
             args.current_internal_npz is None
@@ -2425,7 +2867,20 @@ def main() -> None:
             or current_query.shape != actual_query.shape
         ):
             raise SystemExit("current physical LP4 observer contract drifted")
-        if args.target == "query_lp4":
+        if args.target == "query_lp4_production_exact":
+            _run_physical_lp4_production_exact(
+                args=args,
+                code_hash=code_hash,
+                capture=capture,
+                accepted_query=actual_query,
+                current_query=current_query,
+                captured_normalized_bits=captured_normalized_bits,
+                captured_q_bits=captured_q_bits,
+                arrays=arrays,
+                input_manifest=input_manifest,
+                q_manifest=q_manifest,
+            )
+        elif args.target == "query_lp4":
             _run_physical_lp4_query(
                 args=args,
                 code_hash=code_hash,
@@ -2455,6 +2910,8 @@ def main() -> None:
                 q_manifest=q_manifest,
             )
         else:
+            if dequantized_host is None:
+                raise SystemExit("physical head weights were not decoded")
             _run_physical_lp4_head_geometry(
                 args=args,
                 code_hash=code_hash,
@@ -2474,6 +2931,8 @@ def main() -> None:
     )
     args.hlo_dir.mkdir(parents=True)
     records: dict[str, Any] = {}
+    if dequantized is None:
+        raise SystemExit("query association weights were not decoded")
     for name, function in _candidate_functions().items():
         compiled = jax.jit(function).lower(
             q_state, dequantized, positions

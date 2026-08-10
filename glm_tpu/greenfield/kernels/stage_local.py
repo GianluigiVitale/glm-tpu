@@ -284,6 +284,49 @@ def _local_dsa_query(
     )
 
 
+def _local_dsa_query_tuple4_exact(
+    q_residual: Any,
+    normalized: Any,
+    query_weight_aliases: tuple[Any, Any, Any, Any],
+    head_weight: Any,
+    position: Any,
+    *,
+    contract: DsaNumericalContract,
+) -> tuple[Any, Any]:
+    """Preserve the accepted TPU-v4 four-reduction query association."""
+
+    expected_shape = (
+        head_weight.shape[0] * contract.head_dim,
+        contract.q_lora_rank,
+    )
+    if len(query_weight_aliases) != 4:
+        raise ValueError("exact DSA query association requires four aliases")
+    if any(
+        weight.shape != expected_shape or weight.dtype != jnp.float32
+        for weight in query_weight_aliases
+    ):
+        raise ValueError("exact DSA query aliases must be local FP32 owners")
+    # DB522 proves the fused q-a producer must complete its BF16 boundary.
+    query_input = lax.optimization_barrier(q_residual)
+    # DB525 proves that four entry aliases and one grouped result barrier make
+    # TPU v4 retain the accepted 16-KiB reduction association. Only the first
+    # result is live; the other three are association anchors, not extra state.
+    grouped = jnp.stack(
+        tuple(
+            linear(query_input, weight, output_dtype=jnp.float32)
+            for weight in query_weight_aliases
+        )
+    )
+    projected_query = lax.optimization_barrier(grouped)[0]
+    return _local_dsa_query_from_projection(
+        projected_query,
+        normalized,
+        head_weight,
+        position,
+        contract=contract,
+    )
+
+
 def _reshape_gathered_heads(
     value: Any,
     *,
@@ -325,6 +368,7 @@ def stage_local_dsa_fp8_mapped(
     precomputed_q_residual: Any | None = None,
     linear_backend: StageLinearBackend = "reference",
     dsa_query_backend: StageLinearBackend | None = None,
+    dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
     linear_interpret: bool = False,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
@@ -424,7 +468,20 @@ def stage_local_dsa_fp8_mapped(
             q_residual.dtype != residual.dtype
         ):
             raise ValueError("DSA precomputed q residual is invalid")
-    if query_backend == "reference":
+    if dsa_query_weight_aliases is not None:
+        if query_backend != "reference":
+            raise ValueError(
+                "exact DSA query aliases require the reference backend"
+            )
+        local_query, local_head_weights = _local_dsa_query_tuple4_exact(
+            q_residual,
+            normalized,
+            dsa_query_weight_aliases,
+            head_weight,
+            position,
+            contract=contract,
+        )
+    elif query_backend == "reference":
         # DB499 proves the accepted M=1 association only when the complete
         # topology-local owner shard exists as FP32 before projection. The
         # boundary is 8 MiB for PP8 and never reconstructs the global weight.

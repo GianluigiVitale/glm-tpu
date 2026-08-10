@@ -46,6 +46,7 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     build_decoder_step_program,
     build_teacher_forced_prefill_program,
     validate_decoder_step_hlo,
+    validate_dsa_query_weight_materializer_hlo,
     validate_prefill_index_weight_materialization_hlo,
     validate_teacher_forced_prefill_hlo,
 )
@@ -1179,6 +1180,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--dsa-query-exact-association",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1223,6 +1230,9 @@ def main() -> int:
     args.complete_token_path = bool(args.complete_token_path)
     args.split_residual_state = bool(args.split_residual_state)
     args.prefill_index_repair = bool(args.prefill_index_repair)
+    args.dsa_query_exact_association = bool(
+        args.dsa_query_exact_association
+    )
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
     oracle_mode = args.short_context_oracle_dir is not None
@@ -1570,6 +1580,13 @@ def main() -> int:
     # FP32 wq_b owner shard. Keep every other projection on its selected
     # runtime backend; only this exactness boundary uses the reference path.
     dsa_query_backend = "reference"
+    if args.dsa_query_exact_association and (
+        attention_projection_backend != "fused_n82_convolution"
+    ):
+        raise ValueError(
+            "exact DSA query association requires the proven fused qkv-a "
+            "runtime"
+        )
     schedule = build_pipeline_schedule(execution_plan)
     stage_dsa_producers = _stage_dsa_producer_layer_ids(schedule)
     if dsa_oracle_mode:
@@ -1605,6 +1622,8 @@ def main() -> int:
     state_values: tuple[Any, ...] = ()
     auxiliary_values: tuple[Any, ...] = ()
     materialized_prefill_index_weights: tuple[Any, ...] | None = None
+    materialized_dsa_query_weights: tuple[Any, ...] | None = None
+    dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None = None
     try:
         if (
             jax.process_count() != 8
@@ -1664,6 +1683,9 @@ def main() -> int:
             ),
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
+            dsa_query_exact_association=(
+                args.dsa_query_exact_association
+            ),
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             split_residual_state=args.split_residual_state,
@@ -1688,6 +1710,9 @@ def main() -> int:
                 ),
                 linear_backend=linear_backend,
                 dsa_query_backend=dsa_query_backend,
+                dsa_query_exact_association=(
+                    args.dsa_query_exact_association
+                ),
                 attention_projection_backend=(
                     attention_projection_backend
                 ),
@@ -1721,6 +1746,9 @@ def main() -> int:
                     ),
                     linear_backend=linear_backend,
                     dsa_query_backend=dsa_query_backend,
+                    dsa_query_exact_association=(
+                        args.dsa_query_exact_association
+                    ),
                     attention_projection_backend=(
                         attention_projection_backend
                     ),
@@ -1743,6 +1771,145 @@ def main() -> int:
         )
         load_seconds = time.monotonic() - load_started
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-end")
+
+        dsa_query_materialization_compile_seconds = None
+        dsa_query_materialization_execute_seconds = None
+        dsa_query_materialization_hlo_sha256 = None
+        fleet_dsa_query_materialization_hlo_hashes = None
+        dsa_query_materialization_hlo_contract = None
+        dsa_query_materialization_state = None
+        if args.dsa_query_exact_association:
+            query_materializer = decoder.materialize_dsa_query_weights_fp32
+            if query_materializer is None:
+                raise RuntimeError("exact DSA query materializer is unavailable")
+            names = decoder.dsa_query_weight_names
+            if len(names) != decoder.config.maximum_full_indexer_slots:
+                raise RuntimeError("DSA query weight-name count drifted")
+            raw_query_bits = tuple(
+                loaded.weights[bits_name] for bits_name, _ in names
+            )
+            raw_query_scales = tuple(
+                loaded.weights[scale_name] for _, scale_name in names
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-dsa-query-materialization-compile-start"
+            )
+            started = time.monotonic()
+            lowered_query_materializer = jax.jit(query_materializer).lower(
+                raw_query_bits, raw_query_scales
+            )
+            compiled_query_materializer = (
+                lowered_query_materializer.compile()
+            )
+            dsa_query_materialization_compile_seconds = (
+                time.monotonic() - started
+            )
+            optimized_query_materializer_hlo = (
+                compiled_query_materializer.as_text()
+            )
+            dsa_query_materialization_hlo_sha256 = sha256(
+                optimized_query_materializer_hlo.encode("utf-8")
+            ).hexdigest()
+            fleet_dsa_query_materialization_hlo_hashes = _fleet_digest(
+                multihost_utils,
+                dsa_query_materialization_hlo_sha256,
+                num_processes=args.num_processes,
+            )
+            dsa_query_materialization_hlo_contract = (
+                validate_dsa_query_weight_materializer_hlo(
+                    optimized_query_materializer_hlo,
+                    full_indexer_slots=(
+                        decoder.config.maximum_full_indexer_slots
+                    ),
+                    local_output_width=(
+                        decoder.config.dsa_indexer_heads
+                        * decoder.config.index_key_width
+                        // decoder.config.local_parallel_size
+                    ),
+                    q_lora_rank=execution_plan.geometry.q_lora_rank,
+                    total_devices=decoder.config.total_devices,
+                )
+            )
+            if not dsa_query_materialization_hlo_contract["passed"]:
+                raise RuntimeError(
+                    "DSA query materializer HLO contract failed: "
+                    f"{dsa_query_materialization_hlo_contract['violations']}"
+                )
+            multihost_utils.sync_global_devices(
+                "greenfield-dsa-query-materialization-execute-start"
+            )
+            started = time.monotonic()
+            materialized_dsa_query_weights = tuple(
+                compiled_query_materializer(
+                    raw_query_bits, raw_query_scales
+                )
+            )
+            jax.block_until_ready(materialized_dsa_query_weights)
+            dsa_query_materialization_execute_seconds = (
+                time.monotonic() - started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-dsa-query-materialization-execute-end"
+            )
+            dsa_query_weight_aliases = (
+                materialized_dsa_query_weights,
+            ) * 4
+            local_query_records = []
+            for slot, value in enumerate(materialized_dsa_query_weights):
+                for shard in value.addressable_shards:
+                    host = np.ascontiguousarray(
+                        np.asarray(jax.device_get(shard.data), dtype=np.float32)
+                    )
+                    expected_shape = (
+                        1,
+                        decoder.config.dsa_indexer_heads
+                        * decoder.config.index_key_width
+                        // decoder.config.local_parallel_size,
+                        execution_plan.geometry.q_lora_rank,
+                    )
+                    if host.shape != expected_shape or not np.all(
+                        np.isfinite(host)
+                    ):
+                        raise RuntimeError(
+                            "materialized DSA query owner shape/finite "
+                            "contract failed"
+                        )
+                    local_query_records.append(
+                        {
+                            "byte_count": int(host.nbytes),
+                            "device_id": int(shard.device.id),
+                            "sha256": sha256(
+                                host.tobytes(order="C")
+                            ).hexdigest(),
+                            "slot": slot,
+                        }
+                    )
+            dsa_query_materialization_state = {
+                "input_alias_count": 4,
+                "local_shards": local_query_records,
+                "materialized_bytes_per_device": sum(
+                    record["byte_count"] for record in local_query_records
+                )
+                // jax.local_device_count(),
+                "slot_count": len(materialized_dsa_query_weights),
+                "source": "completed_stage_local_raw_fp8_to_fp32",
+            }
+            if jax.process_index() == 0:
+                hlo_dir = args.output.parent / "hlo"
+                hlo_dir.mkdir(parents=True, exist_ok=True)
+                with gzip.open(
+                    hlo_dir
+                    / "dsa_query_weight_materializer.optimized_hlo.txt.gz",
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(optimized_query_materializer_hlo)
+                _atomic_json(
+                    hlo_dir
+                    / "dsa_query_weight_materializer.hlo_contract.json",
+                    dsa_query_materialization_hlo_contract,
+                )
+            del optimized_query_materializer_hlo
 
         prefill_wk_materialization_compile_seconds = None
         prefill_wk_materialization_execute_seconds = None
@@ -1975,31 +2142,32 @@ def main() -> int:
                 )
             return value
 
+        state_spec_offset = 2 if args.dsa_query_exact_association else 1
         residual = _make_global_array(
             jax,
             decoder.mesh,
-            decoder.input_specs[1],
+            decoder.input_specs[state_spec_offset],
             residual_shape,
             residual_builder,
         )
         kv = _make_global_array(
             jax,
             decoder.mesh,
-            decoder.input_specs[2],
+            decoder.input_specs[state_spec_offset + 1],
             kv_global_shape,
             zero_bf16,
         )
         index = _make_global_array(
             jax,
             decoder.mesh,
-            decoder.input_specs[3],
+            decoder.input_specs[state_spec_offset + 2],
             index_global_shape,
             zero_bf16,
         )
         metadata = _make_global_array(
             jax,
             decoder.mesh,
-            decoder.input_specs[4],
+            decoder.input_specs[state_spec_offset + 3],
             metadata_shape,
             metadata_builder,
         )
@@ -2008,7 +2176,7 @@ def main() -> int:
             token = _make_global_array(
                 jax,
                 decoder.mesh,
-                decoder.input_specs[5],
+                decoder.input_specs[state_spec_offset + 4],
                 token_shape,
                 token_builder,
             )
@@ -2024,6 +2192,10 @@ def main() -> int:
         ) + (
             tuple(materialized_prefill_index_weights)
             if materialized_prefill_index_weights is not None
+            else ()
+        ) + (
+            tuple(materialized_dsa_query_weights)
+            if materialized_dsa_query_weights is not None
             else ()
         )
         position = jax.device_put(
@@ -2046,6 +2218,18 @@ def main() -> int:
             index,
             metadata,
         )
+        if args.dsa_query_exact_association:
+            if dsa_query_weight_aliases is None:
+                raise RuntimeError("exact DSA query aliases were not built")
+            common_inputs = (
+                loaded.weights,
+                dsa_query_weight_aliases,
+                residual,
+                kv,
+                index,
+                metadata,
+            )
+        donation_shift = int(args.dsa_query_exact_association)
         if args.complete_token_path:
             assert token is not None
             inputs = (
@@ -2065,7 +2249,9 @@ def main() -> int:
                 block_tables,
                 context_lengths,
             )
-            donate_argnums = (1, 2, 3, 4, 5)
+            donate_argnums = tuple(
+                value + donation_shift for value in (1, 2, 3, 4, 5)
+            )
         else:
             inputs = (
                 *common_inputs,
@@ -2082,7 +2268,9 @@ def main() -> int:
                 block_tables,
                 context_lengths,
             )
-            donate_argnums = (1, 2, 3, 4)
+            donate_argnums = tuple(
+                value + donation_shift for value in (1, 2, 3, 4)
+            )
         prefill_inputs = None
         if oracle_mode:
             assert prefill is not None and prompt is not None
@@ -2105,6 +2293,17 @@ def main() -> int:
                 prefill_inputs = (
                     *prefill_inputs,
                     materialized_prefill_index_weights,
+                )
+            if args.dsa_query_exact_association:
+                if dsa_query_weight_aliases is None:
+                    raise RuntimeError(
+                        "prefill lost exact DSA query aliases"
+                    )
+                if not args.prefill_index_repair:
+                    prefill_inputs = (*prefill_inputs, None)
+                prefill_inputs = (
+                    *prefill_inputs,
+                    dsa_query_weight_aliases,
                 )
         multihost_utils.sync_global_devices("greenfield-short-decoder-compile-start")
         compile_started = time.monotonic()
@@ -2137,6 +2336,9 @@ def main() -> int:
                 decoder.feature_reconstruct_down_fp32
             ),
             dsa_query_backend=decoder.dsa_query_backend,
+            dsa_query_exact_association=(
+                decoder.dsa_query_exact_association
+            ),
             attention_projection_backend=(
                 decoder.attention_projection_backend
             ),
@@ -2213,6 +2415,9 @@ def main() -> int:
                     dsa_observer.feature_reconstruct_down_fp32
                 ),
                 dsa_query_backend=dsa_observer.dsa_query_backend,
+                dsa_query_exact_association=(
+                    dsa_observer.dsa_query_exact_association
+                ),
                 attention_projection_backend=(
                     dsa_observer.attention_projection_backend
                 ),
@@ -2385,8 +2590,13 @@ def main() -> int:
                 for step, decode_position in enumerate(
                     dsa_oracle_tensors["decode_positions"].tolist()
                 ):
+                    observer_prefix = (
+                        (loaded.weights, dsa_query_weight_aliases)
+                        if args.dsa_query_exact_association
+                        else (loaded.weights,)
+                    )
                     observer_result = compiled_dsa_observer(
-                        loaded.weights, *observer_current
+                        *observer_prefix, *observer_current
                     )
                     observer_result[8].block_until_ready()
                     observation_host = _materialize_global_array(
@@ -2751,7 +2961,7 @@ def main() -> int:
                         forced_token = _make_global_array(
                             jax,
                             dsa_observer.mesh,
-                            dsa_observer.input_specs[5],
+                            dsa_observer.input_specs[state_spec_offset + 4],
                             (dsa_observer.config.total_devices, 1),
                             teacher_token_builder,
                         )
@@ -2876,10 +3086,15 @@ def main() -> int:
         current = output
 
         def run_step(values: tuple[Any, ...]) -> tuple[Any, ...]:
+            prefix = (
+                (loaded.weights, dsa_query_weight_aliases)
+                if args.dsa_query_exact_association
+                else (loaded.weights,)
+            )
             if args.complete_token_path:
-                return compiled(loaded.weights, *values)
+                return compiled(*prefix, *values)
             return compiled(
-                loaded.weights,
+                *prefix,
                 *values,
                 position,
                 block_tables,
@@ -3169,9 +3384,30 @@ def main() -> int:
             "dsa_observer_isolation_contract": (
                 dsa_observer_isolation_contract
             ),
+            "dsa_query_exact_association": (
+                decoder.dsa_query_exact_association
+            ),
+            "dsa_query_materialization_compile_seconds": (
+                dsa_query_materialization_compile_seconds
+            ),
+            "dsa_query_materialization_execute_seconds": (
+                dsa_query_materialization_execute_seconds
+            ),
+            "dsa_query_materialization_hlo_contract": (
+                dsa_query_materialization_hlo_contract
+            ),
+            "dsa_query_materialization_hlo_sha256": (
+                dsa_query_materialization_hlo_sha256
+            ),
+            "dsa_query_materialization_state": (
+                dsa_query_materialization_state
+            ),
             "fleet_hlo_hashes": fleet_hlo_hashes,
             "fleet_dsa_observer_hlo_hashes": (
                 fleet_dsa_observer_hlo_hashes
+            ),
+            "fleet_dsa_query_materialization_hlo_hashes": (
+                fleet_dsa_query_materialization_hlo_hashes
             ),
             "fleet_prefill_hlo_hashes": fleet_prefill_hlo_hashes,
             "fleet_prefill_wk_materialization_hlo_hashes": (
@@ -3229,7 +3465,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 11,
+            "schema_version": 12,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

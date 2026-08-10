@@ -25,11 +25,19 @@ readonly DB502_TENSOR_SHA=d9b14bdd47b5def0169b0b25157a8d472bc0017391030b0d7842b7
 readonly DB502_SUCCESS_SHA=de2e080d3eae672569acc4dada7eb41501c6f3508ac0e1747291041d95087dab
 readonly CURRENT_INTERNAL_NPZ=/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z/dsa_internal_observer/position_8155_internals.npz
 readonly CURRENT_INTERNAL_SHA=e1366c58a5eac8d995e6f56a4a3bb582fa6758b25bf19480b67e8f4c54914b50
+readonly DB525_TAG=greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T060457076587721Z
+readonly DB525_DIR=/home/gianl/glm-run/$DB525_TAG
+readonly DB525_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/physical_lp4_dsa_head_geometry_association/8k/$DB525_TAG
+readonly DB525_RUNNER_SHA=da7acf8baddd14e276fefac3c466f2a6e0a41acb2ecb60c25cf7a28096d91dfc
+readonly DB525_TENSOR_SHA=c55a6638c5450d62186185813f808e2a082f7368040fccaf05b79fb06df790ce
+readonly DB525_SUCCESS_SHA=5b547f24a360b89411f7773800a5ac5bef56d8cc953e4d141dbf2d498aa6d582
 readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
 
 [[ $TARGET == query || $TARGET == query_lp4 || \
   $TARGET == query_lp4_q_a_boundary || $TARGET == q_a || \
-  $TARGET == query_lp4_head_geometry || $TARGET == qkv_a_production ]] || {
+  $TARGET == query_lp4_head_geometry || \
+  $TARGET == query_lp4_production_exact || \
+  $TARGET == qkv_a_production ]] || {
   echo "DSA association target is unknown: $TARGET" >&2
   exit 2
 }
@@ -50,12 +58,16 @@ elif [[ $TARGET == query_lp4_q_a_boundary ]]; then
 elif [[ $TARGET == query_lp4_head_geometry ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_head_geometry_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=physical_lp4_dsa_head_geometry_association
+elif [[ $TARGET == query_lp4_production_exact ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_query_production_exact_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=physical_lp4_dsa_query_production_exact
 else
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=dsa_query_association
 fi
 if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary || \
-  $TARGET == query_lp4_head_geometry ]]; then
+  $TARGET == query_lp4_head_geometry || \
+  $TARGET == query_lp4_production_exact ]]; then
   [[ -r $CURRENT_INTERNAL_NPZ ]] || {
     echo "current physical LP4 observer is unavailable" >&2
     exit 2
@@ -63,6 +75,28 @@ if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary || \
   [[ $(sha256sum "$CURRENT_INTERNAL_NPZ" | awk '{print $1}') == \
     "$CURRENT_INTERNAL_SHA" ]] || {
     echo "current physical LP4 observer identity drifted" >&2
+    exit 2
+  }
+fi
+if [[ $TARGET == query_lp4_production_exact ]]; then
+  [[ $(sha256sum "$DB525_DIR/runner.json" | awk '{print $1}') == \
+    "$DB525_RUNNER_SHA" ]] || {
+    echo "sealed DB525 runner identity drifted" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DB525_DIR/physical_lp4_head_geometry.npz" | \
+    awk '{print $1}') == "$DB525_TENSOR_SHA" ]] || {
+    echo "sealed DB525 tensor identity drifted" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DB525_DIR/SUCCESS" | awk '{print $1}') == \
+    "$DB525_SUCCESS_SHA" ]] || {
+    echo "sealed DB525 SUCCESS identity drifted" >&2
+    exit 2
+  }
+  [[ $(gcloud storage cat "$DB525_REMOTE/SUCCESS" | sha256sum | \
+    awk '{print $1}') == "$DB525_SUCCESS_SHA" ]] || {
+    echo "remote DB525 SUCCESS identity drifted" >&2
     exit 2
   }
 fi
@@ -175,7 +209,8 @@ strict_census pre || {
 started=$(date +%s)
 current_args=()
 if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary || \
-  $TARGET == query_lp4_head_geometry ]]; then
+  $TARGET == query_lp4_head_geometry || \
+  $TARGET == query_lp4_production_exact ]]; then
   current_args=(
     --current-internal-npz "$CURRENT_INTERNAL_NPZ"
     --current-internal-sha256 "$CURRENT_INTERNAL_SHA"
@@ -253,6 +288,10 @@ elif target == "query_lp4_head_geometry":
         "physical_owner_serial_while_m1_n128",
         "physical_global_gspmd_m1_n4096",
         "physical_owner_tuple4_barrier_m1_n1024",
+    }
+elif target == "query_lp4_production_exact":
+    expected_candidates = {
+        "physical_production_fused_q_a_tuple4_exact_m1_n1024",
     }
 else:
     expected_candidates = {
@@ -371,6 +410,31 @@ if target == "query_lp4_head_geometry":
         )
     ):
         raise SystemExit("physical LP4 head-geometry contract failed")
+if target == "query_lp4_production_exact":
+    tensor = run_dir / runner["tensor_file"]["filename"]
+    candidate = runner["candidates"][
+        "physical_production_fused_q_a_tuple4_exact_m1_n1024"
+    ]
+    materializer = runner["materializer"]
+    if (
+        runner["artifact_kind"]
+        != "glm52_layer0_physical_lp4_dsa_query_production_exact"
+        or not runner["one_live_row"]
+        or runner["local_parallel_size"] != 4
+        or not runner["production_helper"]
+        or not candidate["accepted_comparison"]["elementwise_exact"]
+        or not candidate["q_a_comparison"]["elementwise_exact"]
+        or candidate["input_weight_aliases"] != 4
+        or candidate["hlo"]["tuple4_reduction_fusion_count"] != 1
+        or not materializer["completed"]
+        or not materializer["hlo"]["passed"]
+        or materializer["local_fp32_bytes"] != 8 * 1024 * 1024
+        or not tensor.is_file()
+        or tensor.stat().st_size != runner["tensor_file"]["byte_count"]
+        or sha256(tensor.read_bytes()).hexdigest()
+        != runner["tensor_file"]["sha256"]
+    ):
+        raise SystemExit("physical LP4 production composition contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -487,6 +551,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   if [[ -f physical_lp4_head_geometry.npz ]]; then
     sha256sum physical_lp4_head_geometry.npz
   fi
+  if [[ -f physical_lp4_production_exact.npz ]]; then
+    sha256sum physical_lp4_production_exact.npz
+  fi
   sha256sum runner.json runner.log summary.json results_ckpt.db \
     census_pre.txt census_post.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
@@ -541,28 +608,23 @@ import sys
 
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
-values = {
-    "artifact_kind": (
-        "glm52_layer0_q_a_association"
-        if sys.argv[4] == "q_a"
-        else (
-            "glm52_layer0_qkv_a_production_association"
-            if sys.argv[4] == "qkv_a_production"
-            else (
-                "glm52_layer0_physical_lp4_dsa_query_association"
-                if sys.argv[4] == "query_lp4"
-                else (
-                    "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"
-                    if sys.argv[4] == "query_lp4_q_a_boundary"
-                    else (
-                        "glm52_layer0_physical_lp4_dsa_head_geometry_association"
-                        if sys.argv[4] == "query_lp4_head_geometry"
-                        else "glm52_layer0_dsa_query_association"
-                    )
-                )
-            )
-        )
+artifact_kinds = {
+    "q_a": "glm52_layer0_q_a_association",
+    "qkv_a_production": "glm52_layer0_qkv_a_production_association",
+    "query_lp4": "glm52_layer0_physical_lp4_dsa_query_association",
+    "query_lp4_q_a_boundary": (
+        "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"
     ),
+    "query_lp4_head_geometry": (
+        "glm52_layer0_physical_lp4_dsa_head_geometry_association"
+    ),
+    "query_lp4_production_exact": (
+        "glm52_layer0_physical_lp4_dsa_query_production_exact"
+    ),
+    "query": "glm52_layer0_dsa_query_association",
+}
+values = {
+    "artifact_kind": artifact_kinds[sys.argv[4]],
     "code_hash": sys.argv[3],
     "results_db_run_id": summary["results_db_run_id"],
     "association_restored": str(summary["association_restored"]).lower(),

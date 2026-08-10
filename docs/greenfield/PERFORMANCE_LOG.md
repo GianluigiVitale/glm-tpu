@@ -1033,6 +1033,15 @@ candidate is nonexact and has no token loop, warmed wall distribution, XPlane or
 standing. The local tuple-fusion successor is also a correctness discriminator. DB484 remains the
 only accepted PP8 decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
 
+## DB525 and production exact-query composition — correctness only
+
+DB525 completes a bounded four-chip query arithmetic proof and is bitwise exact, but its six-second
+elapsed time includes compilation/orchestration and is not decoder latency. It has no token loop,
+warmed wall distribution, XPlane or throughput standing. The following production-composition
+target is also a one-row correctness/HLO gate. DB484 remains the only accepted PP8 decoder point at
+`244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open until a complete protected decoder run
+passes exact DSA and reaches timing.
+
 ## DB512 literal-source RoPE diagnostic — no performance result
 
 DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal

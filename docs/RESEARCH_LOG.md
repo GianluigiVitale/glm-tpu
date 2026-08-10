@@ -6546,3 +6546,33 @@ unmotivated arithmetic variants.
   optimization barrier before selecting the first result. Forced-four-CPU HLO retains four local
   inputs/dots, one barrier, no communication/global physical state and one live row. Tests and one
   new-diff-only audit precede a bounded TPU run.
+
+## 2026-08-10 06:04--07:13 — DB525 restores query and production wiring is locally closed
+
+- DB525/item1810 at pushed `a749ff0` completes the protected tuple-fusion candidate. It is bitwise
+  equal to accepted query SHA `1ff2c2ec...12a` with zero of 4,096 mismatches. All preceding
+  physical N1024/N128/GSPMD candidates remain nonexact.
+- The physical program carries one local `f32[1024,2048]` owner through four entry aliases. TPU
+  emits one tuple-valued four-reduction fusion with `megacore_allreduce_bytes=16384`; StableHLO and
+  optimized HLO SHAs are `3b10b7e5...9f7c8` and `40d9ef25...4b7d`. There is no communication,
+  callback, dead row, global physical weight or other-owner state.
+- SUCCESS/evidence/tensor/runner/summary/DB/remote-ledger SHAs are
+  `5b547f24...a6d582`, `35f888c7...17624`, `c55a6638...790ce`, `da7acf8b...1dfc`,
+  `5bba9e4e...1932`, `41a43045...ef86`, and `e06bc413...3358`. The approved archive and
+  authenticated 8/8 pre/post census pass. This is correctness-only evidence.
+- The production adaptation is default-off and small: one separate device-only raw-FP8-to-FP32
+  materializer holds five local owner slots (40 MiB/chip), the existing fused-N82 helper feeds an
+  explicit BF16 completion barrier, and the same materialized tuple is supplied through four
+  decoder-entry aliases. All 21 full indexer layers use that helper; the other kernels and default
+  decoder remain unchanged.
+- An independent audit found and corrected two pre-deployment contract errors: raw counting of all
+  16-KiB TPU fusions would have mistaken 234 unrelated fusions in the preserved decoder HLO for
+  query associations, and the PP8 stage schedule has five maximum local slots rather than the
+  three-slot CPU fixture. The linter now recognizes only a tuple of four local N1024 results, and
+  the state/HBM contract requires five slots / 41,943,040 bytes per chip.
+- The bounded `query_lp4_production_exact` target reuses the existing probe, DB, archive, remote
+  object and census machinery. It completes the materializer as one executable, then separately
+  compiles the actual fused q-a plus production exact-query helper, keeps query/head outputs live,
+  and fails unless q-a and query are bitwise exact. Affected explicit-CPU coverage passes 75/75.
+  One diff-only Fable audit and clean commit/push precede this seconds-long TPU proof; no full
+  checkpoint retry is authorized first.

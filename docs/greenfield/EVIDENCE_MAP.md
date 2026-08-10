@@ -812,3 +812,22 @@ capture is still required.
   versus DB524's one (`4096`). The successor passes the same owner buffer as four aliased local
   inputs and retains four dots through one StableHLO barrier before returning one result. CPU HLO
   proves mechanism only; protected TPU exactness remains required.
+
+## DB525 exact physical tuple fusion and production-composition gate
+
+- DB525/item1810 at pushed `a749ff0`, tag
+  `greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T060457076587721Z`, accepts
+  `physical_owner_tuple4_barrier_m1_n1024`: zero of 4,096 mismatches and exact accepted query SHA
+  `1ff2c2ec...12a`.
+- StableHLO SHA `3b10b7e5...9f7c8` preserves four top-level aliases, four local N1024 dots and one
+  barrier. Optimized HLO SHA `40d9ef25...4b7d` contains one tuple-valued 16-KiB megacore fusion,
+  four local results, four partitions and no communication/global physical table.
+- SUCCESS/evidence/tensor/runner/summary/DB/remote-ledger SHAs are
+  `5b547f24...a6d582`, `35f888c7...17624`, `c55a6638...790ce`, `da7acf8b...1dfc`,
+  `5bba9e4e...1932`, `41a43045...ef86`, and `e06bc413...3358`; same-region archive, DB linkage,
+  direct remote bytes and authenticated 8/8 cleanup pass.
+- This proves the physical arithmetic mechanism only. Production promotion additionally requires
+  one bounded `query_lp4_production_exact` result that completes local raw-FP8-to-FP32 state as a
+  separate executable and composes the actual fused q-a producer, BF16 barrier and exact helper.
+  It must retain one tuple-valued 16-KiB fusion and match both sealed q-a and query bitwise before
+  a full 8K Gate-D retry is authorized.
