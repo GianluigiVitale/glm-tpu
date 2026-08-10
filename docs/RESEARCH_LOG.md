@@ -6494,3 +6494,21 @@ unmotivated arithmetic variants.
   HLO, and remain callback/communication-free. Four-forced-CPU real geometry compiles and executes
   all arms; 74 affected tests and all static checks pass. One new-diff-only Fable review precedes
   commit and a serialized protected run. Production remains unchanged until that result.
+
+## 2026-08-10 05:16--05:25 — DB522 proves the q-a boundary; physical N128 is next
+
+- DB522 at pushed `13123b8` completes all three four-chip arms in 20 seconds. Every q-a state is
+  bitwise exact. The unrounded arm is bitwise equal to current integrated query SHA
+  `6fe17a94...355`; the two explicit-BF16 arms equal DB521 SHA `eee61d94...bb` and remain 2,728
+  values/max `9.5367432e-7` from accepted SHA `1ff2c2ec...12a`.
+- HIGHEST is present only in its StableHLO as required; both rounded arms optimize to identical TPU
+  HLO SHA `a5b6742c...c76`. This accepts the BF16-boundary discriminator, proves it causes the large
+  production drift, and rejects the precision request as the last exactness correction.
+- SUCCESS/evidence/tensor SHAs are `99acefc0...157`, `4acf8eb3...231`, and `6d09ded4...1f2`.
+  DB/archive/direct-object/8-host cleanup contracts pass. There is no decoder or performance claim.
+- Accepted legacy has one 128-wide head per physical TP32 chip; PP8 has eight heads per chip.
+  The minimal successor reuses the exact sealed q-a/weights and wrapper to compare a physical
+  single-head sweep with one device-resident eight-step N128 loop. The latter is the only
+  production-compatible candidate. Forced-four-CPU compilation retains the required zero/one
+  loop shapes without communication; the affected suite passes 75/75 and all static checks pass.
+  One new-diff audit and protected result precede any correction.

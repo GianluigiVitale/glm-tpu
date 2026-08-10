@@ -758,3 +758,20 @@ capture is still required.
   `query_lp4_q_a_boundary` target composes the actual fused N82 helper with the real four-chip
   owner query and compares unrounded, BF16-barrier, and BF16-barrier-plus-HIGHEST arms. Production
   remains unchanged until a protected result selects an exact arm.
+
+## DB522 fused q-a boundary result
+
+- DB522 at `13123b8`, tag
+  `greenfield_layer0_physical_lp4_dsa_q_a_boundary_20260810T051607194401685Z`, passes all protected
+  contracts in 20 seconds. All q-a outputs are bitwise exact. The unrounded arm reproduces current
+  query SHA `6fe17a94...355`; both explicit-BF16 arms reproduce DB521 SHA `eee61d94...bb` and stay
+  2,728 values/max `9.5367432e-7` from accepted.
+- The two rounded StableHLO programs differ by the requested HIGHEST precision attribute but both
+  optimize to HLO SHA `a5b6742c...c76`. The BF16 barrier is causal for the large drift; HIGHEST is
+  rejected as an exactness discriminator. No arm is promoted.
+- SUCCESS/evidence/tensor SHAs are `99acefc0...157`, `4acf8eb3...231`, and `6d09ded4...1f2`.
+  DB522, same-region archive, object ledger and authenticated 8/8 cleanup pass. No performance or
+  Gate-D standing exists.
+- The next target changes only physical head schedule: legacy-local one-chip/N128 sweep versus a
+  PP8 owner-local device loop containing eight N128 reductions. It reuses accepted q-a and decoded
+  owner bytes; it cannot authorize production until a protected arm is accepted-exact.

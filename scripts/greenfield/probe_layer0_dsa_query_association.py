@@ -69,6 +69,9 @@ PHYSICAL_LP4_QUERY_ARTIFACT_KIND = (
 PHYSICAL_LP4_Q_A_BOUNDARY_ARTIFACT_KIND = (
     "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"
 )
+PHYSICAL_LP4_HEAD_GEOMETRY_ARTIFACT_KIND = (
+    "glm52_layer0_physical_lp4_dsa_head_geometry_association"
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -165,6 +168,38 @@ def _local_query_projection(
             1, weight.shape[0]
         )
     raise ValueError(f"unknown physical query association {association!r}")
+
+
+def _serial_head_query_projection(
+    q_state: Any,
+    owner_weight: Any,
+    *,
+    head_dim: int,
+) -> Any:
+    """Project one owner's heads through a device-resident N128 loop."""
+
+    if q_state.ndim != 2 or q_state.shape[0] != 1:
+        raise ValueError("serial physical query requires one live row")
+    if owner_weight.ndim != 2 or owner_weight.shape[1] != q_state.shape[1]:
+        raise ValueError("serial physical query owner weight has an invalid shape")
+    if owner_weight.shape[0] % head_dim:
+        raise ValueError("serial physical query owner width is not head-aligned")
+    heads = owner_weight.shape[0] // head_dim
+    head_weight = owner_weight.reshape(heads, head_dim, owner_weight.shape[1])
+    initial = jnp.zeros((heads, head_dim), dtype=jnp.float32)
+
+    def body(index: Any, output: Any) -> Any:
+        selected = lax.dynamic_index_in_dim(
+            head_weight, index, axis=0, keepdims=False
+        )
+        projected = _dot_rows(q_state, selected)[0]
+        return lax.dynamic_update_index_in_dim(
+            output, projected, index, axis=0
+        )
+
+    return lax.fori_loop(0, heads, body, initial).reshape(
+        1, owner_weight.shape[0]
+    )
 
 
 def _apply_local_query_rope(projected: Any, positions: Any) -> Any:
@@ -624,6 +659,15 @@ def _physical_lp4_q_a_boundary_modes() -> tuple[tuple[str, bool, bool], ...]:
     )
 
 
+def _physical_lp4_head_geometry_modes() -> tuple[str, ...]:
+    """Return legacy-local and production-compatible N128 candidates."""
+
+    return (
+        "physical_single_head_sweep_m1_n128",
+        "physical_owner_serial_while_m1_n128",
+    )
+
+
 def _physical_lp4_hlo_contract(
     hlo: str,
     *,
@@ -772,6 +816,82 @@ def _physical_lp4_q_a_boundary_hlo_contract(
             and (backend != "tpu" or fused_qkv_a["passed"])
             and barrier_count == expected_barriers
             and stable_highest == highest
+        ),
+    }
+
+
+def _physical_lp4_head_geometry_hlo_contract(
+    hlo: str,
+    *,
+    candidate: str,
+) -> dict[str, Any]:
+    """Require a physical N128 dot and only the requested head schedule."""
+
+    if candidate not in _physical_lp4_head_geometry_modes():
+        raise ValueError("physical head-geometry candidate is unknown")
+    lowered = hlo.lower()
+    serial = "serial_while" in candidate
+    forbidden_operations = {
+        name: lowered.count(name)
+        for name in (
+            "all-reduce",
+            "all-gather",
+            "all-to-all",
+            "collective-permute",
+            "reduce-scatter",
+            "host_callback",
+            "xla_python_cpu_callback",
+        )
+        if name in lowered
+    }
+    forbidden_global_shapes = [
+        shape
+        for shape in (
+            "f32[4096,2048]",
+            "bf16[32,2048]",
+            "f32[32,2048]",
+        )
+        if shape in lowered
+    ]
+    required_shapes = {
+        "one_live_q_a_row": "bf16[1,2048]" in lowered,
+        "physical_head_projection": (
+            "f32[1,128]" in lowered or "f32[128]" in lowered
+        ),
+        "local_output": (
+            "f32[8,128]" in lowered
+            if serial
+            else ("f32[1,128]" in lowered or "f32[128]" in lowered)
+        ),
+        "local_weight": (
+            "f32[1024,2048]" in lowered
+            if serial
+            else "f32[128,2048]" in lowered
+        ),
+    }
+    while_count = sum(" while(" in line for line in lowered.splitlines())
+    dot_metadata_count = sum(
+        "metadata={op_name" in line and "dot_general" in line
+        for line in lowered.splitlines()
+    )
+    expected_while_count = 1 if serial else 0
+    return {
+        "candidate": candidate,
+        "dot_metadata_count": dot_metadata_count,
+        "expected_while_count": expected_while_count,
+        "forbidden_global_shapes": forbidden_global_shapes,
+        "forbidden_operations": forbidden_operations,
+        "head_width": 128,
+        "hlo_sha256": sha256(hlo.encode()).hexdigest(),
+        "local_parallel_size": 4,
+        "required_shapes": required_shapes,
+        "while_count": while_count,
+        "passed": (
+            not forbidden_operations
+            and not forbidden_global_shapes
+            and all(required_shapes.values())
+            and dot_metadata_count > 0
+            and while_count == expected_while_count
         ),
     }
 
@@ -1027,6 +1147,201 @@ def _run_physical_lp4_q_a_boundary(
         "one_live_row": True,
         "performance_claim": False,
         "q_a_exact_candidates": q_a_exact,
+        "q_a_manifest_sha256": q_manifest["manifest_sha256"],
+        "status": "SUCCESS",
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+
+
+def _run_physical_lp4_head_geometry(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+    capture: dict[str, Any],
+    accepted_query: np.ndarray,
+    current_query: np.ndarray,
+    q_state: Any,
+    dequantized_host: np.ndarray,
+    input_manifest: dict[str, Any],
+    q_manifest: dict[str, Any],
+) -> None:
+    """Compare one-head physical geometry with an eight-head device loop."""
+
+    geometry = Layer0DsaProbeGeometry()
+    devices = np.asarray(jax.devices(), dtype=object)
+    if devices.shape != (4,):
+        raise SystemExit("physical head geometry requires four TPU devices")
+    mesh = Mesh(devices, ("lp4",))
+    q_argument = jax.device_put(q_state[:1], NamedSharding(mesh, P()))
+    position_argument = jax.device_put(
+        jnp.asarray([8155], dtype=jnp.int32), NamedSharding(mesh, P())
+    )
+    owner_heads = dequantized_host.reshape(
+        4, 8, geometry.head_dim, geometry.q_lora_rank
+    )
+    sweep_weights = tuple(
+        jax.device_put(
+            owner_heads[:, head].reshape(
+                4 * geometry.head_dim, geometry.q_lora_rank
+            ),
+            NamedSharding(mesh, P("lp4", None)),
+        )
+        for head in range(8)
+    )
+    owner_weight_argument = jax.device_put(
+        dequantized_host, NamedSharding(mesh, P("lp4", None))
+    )
+
+    def local_single_head(
+        query: Any, weight: Any, positions: Any
+    ) -> Any:
+        projected = _dot_rows(query, lax.optimization_barrier(weight))
+        return _apply_local_query_rope(projected, positions)
+
+    def local_serial_heads(
+        query: Any, weight: Any, positions: Any
+    ) -> Any:
+        projected = _serial_head_query_projection(
+            query,
+            lax.optimization_barrier(weight),
+            head_dim=geometry.head_dim,
+        )
+        return _apply_local_query_rope(projected, positions)
+
+    sweep_mapped = jax.shard_map(
+        local_single_head,
+        mesh=mesh,
+        in_specs=(P(), P("lp4", None), P()),
+        out_specs=P("lp4", None),
+        check_vma=False,
+    )
+    serial_mapped = jax.shard_map(
+        local_serial_heads,
+        mesh=mesh,
+        in_specs=(P(), P("lp4", None), P()),
+        out_specs=P("lp4", None),
+        check_vma=False,
+    )
+    args.hlo_dir.mkdir(parents=True)
+    records: dict[str, Any] = {}
+    tensor_payload: dict[str, np.ndarray] = {
+        "accepted_query": accepted_query,
+        "current_production_query": current_query,
+    }
+
+    sweep_name, serial_name = _physical_lp4_head_geometry_modes()
+    sweep_compiled = jax.jit(sweep_mapped).lower(
+        q_argument, sweep_weights[0], position_argument
+    ).compile()
+    sweep_hlo = sweep_compiled.as_text()
+    (args.hlo_dir / f"{sweep_name}.optimized_hlo.txt").write_text(sweep_hlo)
+    sweep_contract = _physical_lp4_head_geometry_hlo_contract(
+        sweep_hlo, candidate=sweep_name
+    )
+    if not sweep_contract["passed"]:
+        raise SystemExit("physical single-head sweep HLO failed")
+    sweep_outputs = []
+    for weight in sweep_weights:
+        output = sweep_compiled(q_argument, weight, position_argument)
+        jax.block_until_ready(output)
+        sweep_outputs.append(np.asarray(output, dtype=np.float32))
+    sweep_candidate = np.ascontiguousarray(
+        np.stack(sweep_outputs).transpose(1, 0, 2).reshape(
+            geometry.heads, geometry.head_dim
+        ),
+        dtype=np.float32,
+    )
+    records[sweep_name] = {
+        "accepted_comparison": _compare(accepted_query, sweep_candidate),
+        "current_production_comparison": _compare(
+            current_query, sweep_candidate
+        ),
+        "executions": 8,
+        "hlo": sweep_contract,
+    }
+    tensor_payload[f"query__{sweep_name}"] = sweep_candidate
+
+    serial_compiled = jax.jit(serial_mapped).lower(
+        q_argument, owner_weight_argument, position_argument
+    ).compile()
+    serial_hlo = serial_compiled.as_text()
+    (args.hlo_dir / f"{serial_name}.optimized_hlo.txt").write_text(serial_hlo)
+    serial_contract = _physical_lp4_head_geometry_hlo_contract(
+        serial_hlo, candidate=serial_name
+    )
+    if not serial_contract["passed"]:
+        raise SystemExit("physical serial-head HLO failed")
+    serial_output = serial_compiled(
+        q_argument, owner_weight_argument, position_argument
+    )
+    jax.block_until_ready(serial_output)
+    serial_candidate = np.ascontiguousarray(
+        np.asarray(serial_output), dtype=np.float32
+    )
+    if serial_candidate.shape != (geometry.heads, geometry.head_dim):
+        raise SystemExit("physical serial-head output shape drifted")
+    records[serial_name] = {
+        "accepted_comparison": _compare(accepted_query, serial_candidate),
+        "current_production_comparison": _compare(
+            current_query, serial_candidate
+        ),
+        "executions": 1,
+        "hlo": serial_contract,
+    }
+    tensor_payload[f"query__{serial_name}"] = serial_candidate
+
+    exact = sorted(
+        name
+        for name, record in records.items()
+        if record["accepted_comparison"]["elementwise_exact"]
+    )
+    current_matches = sorted(
+        name
+        for name, record in records.items()
+        if record["current_production_comparison"]["elementwise_exact"]
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "physical_lp4_head_geometry.npz"
+    np.savez(tensor_path, **tensor_payload)
+    result = {
+        "artifact_kind": PHYSICAL_LP4_HEAD_GEOMETRY_ARTIFACT_KIND,
+        "association_restored": bool(exact),
+        "backend": jax.default_backend(),
+        "candidates": records,
+        "capture": {
+            "comparison_sha256": args.capture_comparison_sha256,
+            "owner_actual_sha256": capture["owner_actual_sha256"],
+            "query_sha256": _array_sha256(accepted_query),
+            "tensors_sha256": args.capture_tensors_sha256,
+        },
+        "claim_scope": (
+            "Bounded physical four-chip query head geometry only; no decoder, "
+            "Gate-D, latency, or token-rate claim."
+        ),
+        "code_hash": code_hash,
+        "current_observer": {
+            "query_sha256": _array_sha256(current_query),
+            "sha256": args.current_internal_sha256,
+        },
+        "current_reproducing_candidates": current_matches,
+        "device_count": jax.device_count(),
+        "device_kind": sorted({device.device_kind for device in jax.devices()}),
+        "diagnostic_only": True,
+        "exact_candidates": exact,
+        "format_version": 1,
+        "head_groups_per_owner": 8,
+        "head_width": geometry.head_dim,
+        "input_manifest_sha256": input_manifest["manifest_sha256"],
+        "local_parallel_size": 4,
+        "one_live_row": True,
+        "performance_claim": False,
         "q_a_manifest_sha256": q_manifest["manifest_sha256"],
         "status": "SUCCESS",
         "tensor_file": {
@@ -1716,6 +2031,7 @@ def main() -> None:
             "query",
             "query_lp4",
             "query_lp4_q_a_boundary",
+            "query_lp4_head_geometry",
             "q_a",
             "qkv_a_production",
         ),
@@ -1842,7 +2158,11 @@ def main() -> None:
     if int(dequantized_host.view(np.uint8).sum(dtype=np.uint64)) != 3765880530:
         raise SystemExit("adapted wq_b byte identity drifted")
 
-    if args.target in ("query_lp4", "query_lp4_q_a_boundary"):
+    if args.target in (
+        "query_lp4",
+        "query_lp4_q_a_boundary",
+        "query_lp4_head_geometry",
+    ):
         if (
             args.current_internal_npz is None
             or args.current_internal_sha256 is None
@@ -1878,7 +2198,7 @@ def main() -> None:
                 input_manifest=input_manifest,
                 q_manifest=q_manifest,
             )
-        else:
+        elif args.target == "query_lp4_q_a_boundary":
             _run_physical_lp4_q_a_boundary(
                 args=args,
                 code_hash=code_hash,
@@ -1890,6 +2210,18 @@ def main() -> None:
                 weight_bits=weight_bits,
                 weight_scale=weight_scale,
                 arrays=arrays,
+                input_manifest=input_manifest,
+                q_manifest=q_manifest,
+            )
+        else:
+            _run_physical_lp4_head_geometry(
+                args=args,
+                code_hash=code_hash,
+                capture=capture,
+                accepted_query=actual_query,
+                current_query=current_query,
+                q_state=q_state,
+                dequantized_host=dequantized_host,
                 input_manifest=input_manifest,
                 q_manifest=q_manifest,
             )

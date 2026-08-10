@@ -355,3 +355,12 @@ recapture that checkpoint. Preserved production HLO shows query consumes the fus
 before the separate BF16 state conversion. The next bounded target therefore reuses the actual
 fused N82 helper, exact sealed inputs, physical four-chip mapping, archive/DB/census protections and
 existing query comparator to test only the BF16 execution boundary and query precision request.
+
+DB522 at `13123b8` proves that boundary directly: the unrounded arm reproduces current production,
+while both rounded arms reproduce DB521's near-exact bytes. HIGHEST compiles to the same optimized
+TPU HLO as default, so do not repeat precision-flag or q-a-round candidates. Preserve DB522 and
+reuse its sealed q-a, physical owner weights, HLO checks, wrapper and comparison. The only remaining
+layout discriminator is legacy's one 128-wide head per physical chip versus PP8's eight heads per
+chip. The successor therefore executes a one-head physical sweep for causal evidence and one
+device-resident eight-step N128 loop for a production-compatible result; it adds no oracle capture,
+checkpoint repack, global query table, full decoder, or second protection path.

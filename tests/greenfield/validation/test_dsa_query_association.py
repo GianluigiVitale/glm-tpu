@@ -92,6 +92,10 @@ def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
             True,
         ),
     }
+    assert set(subject._physical_lp4_head_geometry_modes()) == {
+        "physical_single_head_sweep_m1_n128",
+        "physical_owner_serial_while_m1_n128",
+    }
 
 
 def test_physical_lp4_query_associations_are_semantically_equal_on_cpu() -> None:
@@ -185,6 +189,45 @@ def test_physical_q_a_boundary_contract_requires_the_requested_barrier(
     assert not unexpected["passed"]
 
 
+def test_physical_head_geometry_preserves_owner_head_order() -> None:
+    q_state = subject.jnp.arange(8, dtype=subject.jnp.float32)[None, :]
+    weight = subject.jnp.arange(48, dtype=subject.jnp.float32).reshape(6, 8)
+    owner = subject._local_query_projection(
+        q_state, weight, head_dim=2, association="owner_dot"
+    )
+    serial = subject._serial_head_query_projection(
+        q_state, weight, head_dim=2
+    )
+    np.testing.assert_array_equal(np.asarray(owner), np.asarray(serial))
+
+    single_hlo = (
+        "bf16[1,2048] f32[128,2048] f32[1,128]\n"
+        "%reduce = f32[128] fusion(foo), "
+        'metadata={op_name="jit(single)/dot_general"}'
+    )
+    single = subject._physical_lp4_head_geometry_hlo_contract(
+        single_hlo,
+        candidate="physical_single_head_sweep_m1_n128",
+    )
+    assert single["passed"]
+    serial_hlo = (
+        "bf16[1,2048] f32[1024,2048] f32[1,128] f32[8,128]\n"
+        "%loop = while(foo)\n"
+        "%reduce = f32[128] fusion(foo), "
+        'metadata={op_name="jit(serial)/dot_general"}'
+    )
+    serial_contract = subject._physical_lp4_head_geometry_hlo_contract(
+        serial_hlo,
+        candidate="physical_owner_serial_while_m1_n128",
+    )
+    assert serial_contract["passed"]
+    assert serial_contract["while_count"] == 1
+    assert not subject._physical_lp4_head_geometry_hlo_contract(
+        serial_hlo.replace("%loop = while(foo)", "%loop = add(foo)"),
+        candidate="physical_owner_serial_while_m1_n128",
+    )["passed"]
+
+
 def test_q_a_candidate_matrix_is_one_row_and_shard_major() -> None:
     assert set(subject._q_a_candidate_modes()) == {
         ("lax_map_convolution", norm)
@@ -270,6 +313,9 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "query_lp4_q_a_boundary",
         "physical_lp4_q_a_boundary.npz",
         "physical_lp4_dsa_q_a_boundary_association",
+        "query_lp4_head_geometry",
+        "physical_lp4_head_geometry.npz",
+        "physical_lp4_dsa_head_geometry_association",
     ):
         assert required in source
     for forbidden in ("launch_glm_32chip.sh", "glm_longctx.py"):
@@ -282,6 +328,7 @@ def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
         "_project_attention_qkv_a",
         "_validate_fused_qkv_a_decoder_association",
         '"query_lp4_q_a_boundary",',
+        '"query_lp4_head_geometry",',
         "production_fused_n82_convolution_shard_sum",
         "companion_comparison",
         "fused_n82_convolution",

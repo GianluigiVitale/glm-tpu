@@ -29,7 +29,7 @@ readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
 
 [[ $TARGET == query || $TARGET == query_lp4 || \
   $TARGET == query_lp4_q_a_boundary || $TARGET == q_a || \
-  $TARGET == qkv_a_production ]] || {
+  $TARGET == query_lp4_head_geometry || $TARGET == qkv_a_production ]] || {
   echo "DSA association target is unknown: $TARGET" >&2
   exit 2
 }
@@ -47,11 +47,15 @@ elif [[ $TARGET == query_lp4 ]]; then
 elif [[ $TARGET == query_lp4_q_a_boundary ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_q_a_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=physical_lp4_dsa_q_a_boundary_association
+elif [[ $TARGET == query_lp4_head_geometry ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_head_geometry_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=physical_lp4_dsa_head_geometry_association
 else
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=dsa_query_association
 fi
-if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary ]]; then
+if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary || \
+  $TARGET == query_lp4_head_geometry ]]; then
   [[ -r $CURRENT_INTERNAL_NPZ ]] || {
     echo "current physical LP4 observer is unavailable" >&2
     exit 2
@@ -170,7 +174,8 @@ strict_census pre || {
 
 started=$(date +%s)
 current_args=()
-if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary ]]; then
+if [[ $TARGET == query_lp4 || $TARGET == query_lp4_q_a_boundary || \
+  $TARGET == query_lp4_head_geometry ]]; then
   current_args=(
     --current-internal-npz "$CURRENT_INTERNAL_NPZ"
     --current-internal-sha256 "$CURRENT_INTERNAL_SHA"
@@ -241,6 +246,11 @@ elif target == "query_lp4_q_a_boundary":
         "physical_fused_q_a_unrounded_default_owner_dot_m1_n1024",
         "physical_fused_q_a_bf16_barrier_default_owner_dot_m1_n1024",
         "physical_fused_q_a_bf16_barrier_highest_owner_dot_m1_n1024",
+    }
+elif target == "query_lp4_head_geometry":
+    expected_candidates = {
+        "physical_single_head_sweep_m1_n128",
+        "physical_owner_serial_while_m1_n128",
     }
 else:
     expected_candidates = {
@@ -340,6 +350,25 @@ if target == "query_lp4_q_a_boundary":
         )
     ):
         raise SystemExit("physical LP4 q-a boundary contract failed")
+if target == "query_lp4_head_geometry":
+    tensor = run_dir / runner["tensor_file"]["filename"]
+    if (
+        runner["artifact_kind"]
+        != "glm52_layer0_physical_lp4_dsa_head_geometry_association"
+        or not runner["one_live_row"]
+        or runner["local_parallel_size"] != 4
+        or runner["head_groups_per_owner"] != 8
+        or runner["head_width"] != 128
+        or not tensor.is_file()
+        or tensor.stat().st_size != runner["tensor_file"]["byte_count"]
+        or sha256(tensor.read_bytes()).hexdigest()
+        != runner["tensor_file"]["sha256"]
+        or any(
+            not candidate["hlo"]["passed"]
+            for candidate in runner["candidates"].values()
+        )
+    ):
+        raise SystemExit("physical LP4 head-geometry contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -453,6 +482,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   if [[ -f physical_lp4_q_a_boundary.npz ]]; then
     sha256sum physical_lp4_q_a_boundary.npz
   fi
+  if [[ -f physical_lp4_head_geometry.npz ]]; then
+    sha256sum physical_lp4_head_geometry.npz
+  fi
   sha256sum runner.json runner.log summary.json results_ckpt.db \
     census_pre.txt census_post.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
@@ -520,7 +552,11 @@ values = {
                 else (
                     "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"
                     if sys.argv[4] == "query_lp4_q_a_boundary"
-                    else "glm52_layer0_dsa_query_association"
+                    else (
+                        "glm52_layer0_physical_lp4_dsa_head_geometry_association"
+                        if sys.argv[4] == "query_lp4_head_geometry"
+                        else "glm52_layer0_dsa_query_association"
+                    )
                 )
             )
         )

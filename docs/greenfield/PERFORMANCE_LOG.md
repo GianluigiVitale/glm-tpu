@@ -1011,6 +1011,13 @@ XPlane, or wall-throughput measurement. The exact physical BF16 cache scatter le
 mismatches unchanged and is rejected as causal. DB484 remains the accepted PP8 decoder result at
 `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
 
+## DB522 and physical head-geometry successor — correctness only
+
+DB522's 20 seconds cover bounded compile/execution/comparison and are not decoder latency. It has no
+token loop, warmed wall distribution, XPlane or throughput standing. The following one-head sweep
+and device-resident head loop are also arithmetic/HLO discriminators. DB484 remains the only
+accepted PP8 decoder point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate E remains open.
+
 ## DB512 literal-source RoPE diagnostic — no performance result
 
 DB512 is an eight-second bounded one-host arithmetic comparison, not a decoder benchmark. Literal

@@ -3049,3 +3049,29 @@ The real-shape four-forced-CPU program compiles/executes all arms; affected test
 Python/Bash/ShellCheck/diff checks. Exact next: one Fable audit of only this new diff, commit/push,
 idle-fleet census and one protected bounded target. Do not change production or retry 8K until the
 unrounded arm reproduces current and a rounded arm is measured against accepted on TPU.
+
+## DB522 proves the q-a round is causal; legacy physical head width remains
+
+Protected DB522,
+`greenfield_layer0_physical_lp4_dsa_q_a_boundary_20260810T051607194401685Z`, ran at pushed
+`13123b8` and completed its three-arm four-chip matrix in 20 seconds. All three q-a tensors are
+bitwise exact at SHA `c9fbac05...70c`. The unrounded/default arm reproduces the integrated current
+query exactly at SHA `6fe17a94...355`, proving the bounded composition matches production. Both
+explicit-BF16 arms produce DB521 SHA `eee61d94...bb`, reducing the accepted delta to 2,728 values
+and max `9.5367432e-7`; neither is accepted-exact. Default and HIGHEST StableHLO differ as requested,
+but TPU optimizes them to the same HLO SHA `a5b6742c...c76`. Thus the elided BF16 boundary causes
+the large error, while precision flags do not close the residual.
+
+SUCCESS/evidence/tensor SHAs are `99acefc0...157`, `4acf8eb3...231`, and `6d09ded4...1f2`.
+DB522, approved archive, direct-object ledger and authenticated 8/8 pre/post cleanup pass. This is
+correctness evidence only; DB484 remains the performance point and production is unchanged.
+
+The remaining bounded hypothesis follows the actual architecture difference: accepted legacy TP32
+computed one 128-wide query head per chip, whereas PP8 computes eight heads per chip. The existing
+protected wrapper now has only two successors: an eight-execution single-head physical sweep to
+prove the legacy-local N128 association, and one device-resident eight-iteration N128 `while` that
+is production-compatible. The forced-four-CPU real geometry compiles both, retaining exactly zero
+versus one loop and no communication/dead rows. Exact next: finish affected tests and evidence
+notes, obtain one new-diff-only Fable approval, commit/push, then run this bounded head-geometry
+target. The affected suite passes 75/75 in 131.86 seconds and all Python/Bash/ShellCheck/JSON/diff
+checks pass. Do not wire the near-exact barrier or retry the full 8K decoder first.
