@@ -97,7 +97,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN wide=2048 pagewise=4x512"
+say "RUN_DIR=$RUN_DIR PIN=$PIN wide=2048 highest-vs-default"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -113,7 +113,7 @@ has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
   exit 1
 }
 
-say "running bounded current-wide versus pagewise-512 TPU discriminator"
+say "running bounded same-shape highest-versus-default TPU discriminator"
 started=$(date +%s)
 (
   cd "$WORKTREE"
@@ -157,13 +157,11 @@ if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("scorer association runner status/code identity failed")
 if runner["profiler_free_timing"] is not False:
     raise SystemExit("scorer association diagnostic claimed performance")
-for name in ("current_wide_score", "pagewise_512_score"):
+for name in ("current_wide_score", "default_wide_score"):
     if not runner["hlo"][name]["contract"]["passed"]:
         raise SystemExit(f"scorer association HLO failed: {name}")
 wide = runner["current_wide_control"]
-if not wide["comparison"]["passed"] or not wide["score_delta"][
-    "elementwise_exact"
-]:
+if not wide["comparison"]["passed"] or not wide["bitwise_exact"]:
     raise SystemExit("current-wide protected control did not reproduce")
 candidate = bool(runner["candidate_restored"])
 
@@ -174,7 +172,7 @@ conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
     model="zai-org/GLM-5.2-FP8:greenfield-layer0-dsa-scorer-association",
-    revision="bounded-wide2048-vs-pagewise512-v1",
+    revision="bounded-wide-highest-vs-default-v1",
     env={
         "GLM_ENGINE": "greenfield_layer0_dsa_scorer_association",
         "greenfield_code_hash": pin,
@@ -190,12 +188,12 @@ run_id = pv.start_run(
         "current_wide_hlo_sha256": runner["hlo"][
             "current_wide_score"
         ]["sha256"],
-        "pagewise_512_hlo_sha256": runner["hlo"][
-            "pagewise_512_score"
+        "default_wide_hlo_sha256": runner["hlo"][
+            "default_wide_score"
         ]["sha256"],
         "device_kind": runner["device_kind"],
     },
-    note="Protected exact-input layer-0 wide-vs-pagewise scorer diagnostic.",
+    note="Protected exact-input layer-0 highest-vs-default scorer diagnostic.",
     harness_repo=repo,
     fork_repo=None,
 )
@@ -203,14 +201,14 @@ pv.record_item(
     conn,
     run_id,
     benchmark="greenfield_layer0_dsa_scorer_association",
-    item_id="layer0_position8155_wide2048_vs_pagewise512",
+    item_id="layer0_position8155_wide_highest_vs_default",
     prompt="Sealed exact query/head/current-key and DB518 prompt key cache.",
     gold="Exact accepted 2,048 positions, scores, and lowest-position tie order.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=json.dumps(
         {
             "wide_control_exact": True,
-            "pagewise_512_restored": candidate,
+            "default_precision_restored": candidate,
         },
         sort_keys=True,
     ),
@@ -222,7 +220,7 @@ pv.finalize(
     conn,
     run_id,
     benchmark="greenfield_layer0_dsa_scorer_association",
-    metric="pagewise_512_restored",
+    metric="default_precision_restored",
     value=float(candidate),
     note="Diagnostic only; no decoder, Gate-D, latency, or token-rate claim.",
 )
@@ -251,7 +249,7 @@ if sqlite3.connect(run_dir / "results_ckpt.db").execute(
     raise SystemExit("results DB snapshot integrity failed")
 print(
     f"DSA_SCORER_ASSOCIATION_VALID db_run={run_id} "
-    f"pagewise_512_restored={candidate}"
+    f"default_precision_restored={candidate}"
 )
 PY
 

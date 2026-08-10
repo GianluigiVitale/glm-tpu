@@ -21,6 +21,7 @@ AssociationPhase = Literal[
     "legacy_local_dcp_xla_score",
     "one_row_score",
     "local_wide_score",
+    "local_wide_default_score",
     "local_pagewise_score",
 ]
 
@@ -171,6 +172,12 @@ def validate_dsa_association_hlo(
             f"f32[1,{heads}]",
             f"f32[1,{context}]",
         ),
+        "local_wide_default_score": (
+            f"f32[1,{heads},{head_dim}]",
+            f"bf16[{context},{head_dim}]",
+            f"f32[1,{heads}]",
+            f"f32[1,{context}]",
+        ),
         "local_pagewise_score": (
             f"f32[1,{heads},{head_dim}]",
             f"bf16[{context},{head_dim}]",
@@ -206,7 +213,7 @@ def validate_dsa_association_hlo(
             "hd,pd->hp/dot_general",
             "h,hp->p/dot_general",
         )
-    elif phase == "local_wide_score":
+    elif phase in ("local_wide_score", "local_wide_default_score"):
         score_intermediate_candidates = (
             f"f32[{heads},{context}]",
             f"f32[{context},{heads}]",
@@ -400,6 +407,7 @@ def validate_dsa_association_hlo(
     one_row_phases = (
         "one_row_score",
         "local_wide_score",
+        "local_wide_default_score",
         "local_pagewise_score",
     )
     forbidden_dead_rows = []
@@ -414,7 +422,7 @@ def validate_dsa_association_hlo(
         ]
     forbidden_score_shapes: list[str] = []
     map_trip_count: int | None = None
-    if phase == "local_wide_score":
+    if phase in ("local_wide_score", "local_wide_default_score"):
         forbidden_score_shapes = [
             shape
             for shape in (
@@ -481,6 +489,16 @@ def validate_dsa_association_hlo(
             f"DSA association {phase} score geometry drifted: "
             f"{forbidden_score_shapes}"
         )
+    highest_precision_marker = "operand_precision={highest,highest}"
+    score_precision = None
+    if phase in ("local_wide_score", "local_wide_default_score"):
+        score_precision = (
+            "highest" if highest_precision_marker in optimized_hlo else "default"
+        )
+        if phase == "local_wide_score" and score_precision != "highest":
+            violations.append("local wide scorer lost highest dot precision")
+        if phase == "local_wide_default_score" and score_precision != "default":
+            violations.append("local default scorer gained highest dot precision")
     return {
         "phase": phase,
         "required_shapes": list(required_shapes),
@@ -497,6 +515,7 @@ def validate_dsa_association_hlo(
         "forbidden_dead_rows": forbidden_dead_rows,
         "forbidden_score_shapes": forbidden_score_shapes,
         "map_trip_count": map_trip_count,
+        "score_precision": score_precision,
         "diagnostic_batch32_allowed": phase not in one_row_phases,
         "passed": not violations,
         "violations": violations,

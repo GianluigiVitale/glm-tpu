@@ -1135,3 +1135,19 @@ boundary to head weights/current key, then stopped before warmup, steady wall or
 six seconds are a bounded five-arm arithmetic/HLO matrix; only the barrier/materialized-wk/divide-
 sqrt arm is bitwise exact. Neither elapsed duration is token latency. DB484 remains the accepted
 PP8 point at `244.091151 ms` p50 / `4.096830 tok/s`; Gate D at protected 8K and Gate E remain open.
+
+## DB528 exact-input scorer-geometry rejection — no performance result
+
+DB528 / `greenfield_layer0_dsa_scorer_association_20260810T162747267755393Z` at
+`17a6ca0` reuses the sealed DB518 prompt cache and the latest exact layer-0 query, head weights and
+current key. The current wide scorer reproduces the protected nonexact observation bitwise. A
+one-row 4×512 page-map scorer at the same HIGHEST dot precision produces the identical full
+8,156-score SHA `a567a161...fc1f`; it therefore retains all 1,135 accepted-order mismatches and
+the `0.00939178/0.00378697` max/mean score error. This rejects score-page geometry on the now-exact
+inputs; it is not authorization to replace the production scorer.
+
+Both optimized HLO contracts pass with no collective, callback or dead batch rows. The run takes
+five seconds including compilation but has no decoder loop, latency distribution, XPlane or token
+rate. DB/archive/evidence hashes and pre/post 8/8 zero-work cleanup pass; the approved archive has
+terminal `SUCCESS`. The remaining single-variable discriminator is same-shape HIGHEST versus
+legacy-default dot precision. DB484 remains the only accepted PP8 performance point.

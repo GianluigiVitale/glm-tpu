@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Discriminate wide versus pagewise layer-0 DSA score association on TPU."""
+"""Discriminate layer-0 DSA score precision on exact TPU inputs."""
 
 from __future__ import annotations
 
@@ -105,9 +105,6 @@ def main() -> int:
         validate_dsa_association_hlo,
     )
     from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores
-    from glm_tpu.greenfield.kernels.reference.dsa_association import (
-        one_row_pagewise_scores,
-    )
     from glm_tpu.greenfield.validation.layer0_dsa_association import (
         compare_dsa_association_scores,
         inspect_greenfield_layer0_dsa_internal_observation,
@@ -202,10 +199,10 @@ def main() -> int:
         dsa_scores,
         phase="local_wide_score",
     )
-    pagewise_compiled, pagewise_hlo, pagewise_compile_seconds = compile_scorer(
-        "pagewise_512_score",
-        lambda q, k, h: one_row_pagewise_scores(q, k, h, page_size=512),
-        phase="local_pagewise_score",
+    default_compiled, default_hlo, default_compile_seconds = compile_scorer(
+        "default_wide_score",
+        lambda q, k, h: dsa_scores(q, k, h, precision="default"),
+        phase="local_wide_default_score",
     )
 
     def execute_lanes(compiled: Any, *, wide: bool) -> np.ndarray:
@@ -219,12 +216,12 @@ def main() -> int:
         return np.stack(outputs)
 
     wide_lanes = execute_lanes(wide_compiled, wide=True)
-    pagewise_lanes = execute_lanes(pagewise_compiled, wide=False)
+    default_lanes = execute_lanes(default_compiled, wide=True)
     wide_scores = stitch_stage_local_scores(
         wide_lanes, lane_positions, context=8156
     )
-    pagewise_scores = stitch_stage_local_scores(
-        pagewise_lanes, lane_positions, context=8156
+    default_scores = stitch_stage_local_scores(
+        default_lanes, lane_positions, context=8156
     )
     expected_positions = association["expected_selected_positions"]
     expected_scores = association["expected_selected_scores"]
@@ -244,10 +241,10 @@ def main() -> int:
             f"comparison={wide_control} delta={wide_control_delta}"
         )
     accepted_comparison = compare_dsa_association_scores(
-        pagewise_scores, expected_positions, expected_scores
+        default_scores, expected_positions, expected_scores
     )
     accepted_score_delta = _score_delta(
-        pagewise_scores, expected_positions, expected_scores
+        default_scores, expected_positions, expected_scores
     )
     candidate_restored = bool(
         accepted_comparison["passed"]
@@ -261,8 +258,8 @@ def main() -> int:
         "device": str(device),
         "device_kind": device.device_kind,
         "claim_scope": (
-            "bounded layer-0 scorer-geometry diagnostic at the same highest "
-            "dot precision; no decoder, Gate-D, latency, or token-rate claim"
+            "bounded layer-0 same-shape highest-versus-default dot-precision "
+            "diagnostic; no decoder, Gate-D, latency, or token-rate claim"
         ),
         "profiler_free_timing": False,
         "inputs": {
@@ -290,11 +287,11 @@ def main() -> int:
         },
         "hlo": {
             "current_wide_score": wide_hlo,
-            "pagewise_512_score": pagewise_hlo,
+            "default_wide_score": default_hlo,
         },
         "compile_seconds": {
             "current_wide_score": wide_compile_seconds,
-            "pagewise_512_score": pagewise_compile_seconds,
+            "default_wide_score": default_compile_seconds,
         },
         "current_wide_control": {
             "comparison": wide_control,
@@ -302,10 +299,10 @@ def main() -> int:
             "bitwise_exact": wide_control_bitwise,
             "logical_score_sha256": _array_sha256(wide_scores),
         },
-        "pagewise_512_candidate": {
+        "default_precision_candidate": {
             "comparison": accepted_comparison,
             "score_delta": accepted_score_delta,
-            "logical_score_sha256": _array_sha256(pagewise_scores),
+            "logical_score_sha256": _array_sha256(default_scores),
         },
         "candidate_restored": candidate_restored,
         "memory_stats": _memory_stats(device),

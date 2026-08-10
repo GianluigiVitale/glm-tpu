@@ -264,6 +264,8 @@ def dsa_scores(
     query: jax.Array,
     index_keys: jax.Array,
     head_weights: jax.Array,
+    *,
+    precision: Literal["default", "highest"] = "highest",
 ) -> jax.Array:
     """Compute signed FP32 DSA scores ``[query_rows, context]``.
 
@@ -274,10 +276,13 @@ def dsa_scores(
 
     if query.ndim != 3 or index_keys.ndim != 2 or head_weights.ndim != 2:
         raise ValueError("DSA query/key/head-weight ranks must be 3/2/2")
+    if precision not in ("default", "highest"):
+        raise ValueError(f"unsupported DSA score precision {precision!r}")
     rows, heads, head_dim = query.shape
     _require_shape("index_keys", index_keys, (index_keys.shape[0], head_dim))
     _require_shape("head_weights", head_weights, (rows, heads))
-    with jax.default_matmul_precision("highest"):
+
+    def compute() -> jax.Array:
         per_head = jnp.einsum(
             "rhd,sd->rhs",
             query.astype(jnp.float32),
@@ -291,7 +296,12 @@ def dsa_scores(
             per_head,
             preferred_element_type=jnp.float32,
         )
-    return scores.astype(jnp.float32)
+        return scores.astype(jnp.float32)
+
+    if precision == "default":
+        return compute()
+    with jax.default_matmul_precision("highest"):
+        return compute()
 
 
 def exact_topk(

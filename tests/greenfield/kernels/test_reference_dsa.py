@@ -186,6 +186,14 @@ def test_dsa_scorer_pins_highest_dot_precision() -> None:
     hlo = jax.jit(dsa_scores).lower(query, keys, weights).compile().as_text()
     assert "operand_precision={highest,highest}" in hlo
 
+    default_hlo = (
+        jax.jit(lambda q, k, w: dsa_scores(q, k, w, precision="default"))
+        .lower(query, keys, weights)
+        .compile()
+        .as_text()
+    )
+    assert "operand_precision={highest,highest}" not in default_hlo
+
 
 def test_exact_topk_has_lowest_position_ties_and_minus_one_tail() -> None:
     scores = jnp.asarray(

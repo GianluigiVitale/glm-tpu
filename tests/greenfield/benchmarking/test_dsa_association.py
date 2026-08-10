@@ -164,6 +164,7 @@ def test_local_wide_and_pagewise_hlo_pin_distinct_score_geometry() -> None:
             "f32[32,2048]",
             "rhd,sd->rhs/dot_general",
             "rh,rhs->rs/dot_general",
+            "operand_precision={highest,highest}",
         )
     )
     wide_result = validate_dsa_association_hlo(
@@ -171,7 +172,15 @@ def test_local_wide_and_pagewise_hlo_pin_distinct_score_geometry() -> None:
     )
     assert wide_result["passed"] is True
     assert wide_result["map_trip_count"] is None
+    assert wide_result["score_precision"] == "highest"
     assert wide_result["diagnostic_batch32_allowed"] is False
+
+    default_wide = wide.replace("operand_precision={highest,highest}", "")
+    default_result = validate_dsa_association_hlo(
+        default_wide, phase="local_wide_default_score", context=2048
+    )
+    assert default_result["passed"] is True
+    assert default_result["score_precision"] == "default"
 
     pagewise = "\n".join(
         (
@@ -193,6 +202,7 @@ def test_local_wide_and_pagewise_hlo_pin_distinct_score_geometry() -> None:
     )
     assert pagewise_result["passed"] is True
     assert pagewise_result["map_trip_count"] == 4
+    assert pagewise_result["score_precision"] is None
     assert pagewise_result["diagnostic_batch32_allowed"] is False
 
 
@@ -214,6 +224,34 @@ def test_local_wide_hlo_rejects_pagewise_body() -> None:
     )
     assert result["passed"] is False
     assert result["forbidden_score_shapes"] == ["f32[32,512]"]
+
+
+def test_local_wide_precision_phases_refuse_each_other() -> None:
+    hlo = "\n".join(
+        (
+            "f32[1,32,128]",
+            "bf16[2048,128]",
+            "f32[1,32]",
+            "f32[1,2048]",
+            "f32[32,2048]",
+            "rhd,sd->rhs/dot_general",
+            "rh,rhs->rs/dot_general",
+            "operand_precision={highest,highest}",
+        )
+    )
+    wrong_default = validate_dsa_association_hlo(
+        hlo, phase="local_wide_default_score", context=2048
+    )
+    assert wrong_default["passed"] is False
+    assert "gained highest dot precision" in wrong_default["violations"][-1]
+
+    wrong_highest = validate_dsa_association_hlo(
+        hlo.replace("operand_precision={highest,highest}", ""),
+        phase="local_wide_score",
+        context=2048,
+    )
+    assert wrong_highest["passed"] is False
+    assert "lost highest dot precision" in wrong_highest["violations"][-1]
 
 
 def test_local_pagewise_hlo_rejects_wide_body_or_wrong_map_geometry() -> None:

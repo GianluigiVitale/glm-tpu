@@ -414,3 +414,11 @@ five-slot prefill wk materializer, one BF16 normalized boundary and divide-by-sq
 Do not add a new wk materializer, tuple4 key anchor, oracle capture, generic debugger, checkpoint
 layout, or full-model diagnostic path. Keep the same internal observer enabled once on production
 integration, then let the existing token/DSA/HLO/HBM/XPlane/DB/archive/cleanup gates adjudicate it.
+
+DB528 at `17a6ca0` applies that stack without another full-model run. The sealed prompt cache plus
+exact current query/head/key make the current-wide score row bitwise reproducible; changing only
+its logical body from wide 2,048 to pagewise 4×512 at the same HIGHEST precision leaves the entire
+8,156-score row bitwise identical. Preserve DB528 as the exact-input rejection of scorer geometry
+and do not rerun page-size variants. The accepted legacy scorer HLO has default operand precision
+where current production explicitly requests HIGHEST. Reuse DB528's pack/stitch, control, HLO,
+DB/archive and census path for one same-shape precision discriminator before any 8K retry.

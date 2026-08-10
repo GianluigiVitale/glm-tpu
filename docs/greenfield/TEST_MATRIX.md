@@ -46,8 +46,8 @@
 | Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
 | Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
-| Gate D protected 8K decoder | `ff5072e`: repair/decoder HLO and full prefill pass; exact first token; all 21 DSA events preserve order/tie/count/lane contracts but fail exact selected sets (4 swaps at event 0, 9 at event 1, max 571); strict refusal before timing/DB | Missing; bounded production-repair cache discriminator required |
-| Gate D prompt index-cache discriminator | DB505 captures the accepted cache; DB506--512 isolate projection association; DB513--515 capture the exact producer; DB516 proves physical M64; DB517 restores projection; DB518 is bitwise exact for input, producer states and all 8,155 cache rows. The integrated repair HLO instead materializes adapted `wk` inside the large executable and fails DSA after changing the cache. | DB518 arithmetic pass; integrated materialization/LP4 scatter boundary pending |
+| Gate D protected 8K decoder | Latest protected run has exact token `101252` and exact event-0 selected set but 1,135 order mismatches; the existing internal observer proves normalized hidden/q-a/query/head/current-key exact and refuses before timing/DB. | Missing; scorer precision is the first remaining boundary |
+| Gate D prompt index-cache/scorer discriminator | DB505--518 make the complete 8,155-row cache exact; DB521--527 make current query/head/key exact. DB528's bitwise current-wide control and identical HIGHEST wide/pagewise full-score SHA reject page geometry on those exact inputs. | Cache/input pass; same-shape HIGHEST-vs-default score precision pending |
 | Gates E–H | Await Gate D | Missing |
 
 Last complete CPU-only suite before the production integration: 441 passed / 1 expected skip
@@ -56,6 +56,8 @@ Last complete CPU-only suite before the production integration: 441 passed / 1 e
 Latest prompt-cache/association/reuse focused suite: 34 passed at `dcb7096`, plus 9 wrapper-regression tests at `31a23b8`. Two broader CPU suite attempts
 were manually stopped after unrelated existing forced-JAX tests stopped advancing and are not
 suite-pass claims.
+Latest exact scorer-precision focused suite: 39 passed at the DB528-successor batch;
+Python/Bash/ShellCheck/diff checks pass. This is readiness only until protected TPU evidence.
 CPU/HLO reference tests prove semantics/mechanisms only.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the
