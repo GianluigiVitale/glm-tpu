@@ -464,6 +464,210 @@ def _real_8k_decoder_config(*, dsa_score_default_precision: bool = False):
     )
 
 
+def _layer0_residual_discriminator_hlo() -> str:
+    replica_groups = (
+        "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
+        "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
+    )
+    gathers = "\n".join(
+        f"  %ag.{index} = s32[4,1] all-gather(%s), dimensions={{0}}, "
+        f"replica_groups={replica_groups}, channel_id={index + 1}, "
+        "use_global_device_ids=true"
+        for index in range(5)
+    )
+    reductions = "\n".join(
+        f"  %ar.{index} = f32[1,6144] all-reduce(%f), "
+        f"replica_groups={replica_groups}, channel_id={index + 11}, "
+        "use_global_device_ids=true, to_apply=%add"
+        for index in range(5)
+    )
+    kernels = "\n".join(
+        (
+            '  %attention.bf16 = bf16[1,6144] custom-call(%b), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp8_block_matmul_m8_k4096_n6144"',
+            '  %attention.f32 = f32[1,6144] custom-call(%f), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp8_block_matmul_f32_m8_k4096_n6144"',
+            '  %dense.bf16 = bf16[1,6144] custom-call(%b), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp8_fused_block_swiglu_'
+            'm8_h6144_i3072_o6144"',
+            '  %dense.f32 = f32[1,6144] custom-call(%f), '
+            'custom_call_target="tpu_custom_call", '
+            'backend_config="greenfield_fp8_fused_block_swiglu_'
+            'm8_h6144_i3072_o6144_downf32"',
+        )
+    )
+    return f'''HloModule layer0_variants, replica_count=1, num_partitions=32
+
+%add (x: f32[], y: f32[]) -> f32[] {{
+  %x = f32[] parameter(0)
+  %y = f32[] parameter(1)
+  ROOT %sum = f32[] add(%x, %y)
+}}
+
+ENTRY %main () -> bf16[1,4,6144] {{
+  %s = s32[1] constant({{0}})
+  %f = f32[1,6144] constant({{0}})
+  %b = bf16[1,6144] constant({{0}})
+{gathers}
+{reductions}
+{kernels}
+  ROOT %variants = bf16[1,4,6144] constant({{0}})
+}}
+'''
+
+
+def test_layer0_residual_discriminator_hlo_is_local_and_pins_four_arms() -> None:
+    from glm_tpu.greenfield.runtime import (
+        validate_layer0_residual_discriminator_hlo,
+    )
+
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4))
+        for stage in range(8)
+    )
+    hlo = _layer0_residual_discriminator_hlo()
+    accepted = validate_layer0_residual_discriminator_hlo(
+        hlo,
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+    )
+    assert accepted["passed"], accepted
+    assert accepted["kernel_counts"] == {
+        "greenfield_fp8_block_matmul_m8_k4096_n6144": 1,
+        "greenfield_fp8_block_matmul_f32_m8_k4096_n6144": 1,
+        "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": 1,
+        "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144_downf32": 1,
+    }
+
+    escaped = validate_layer0_residual_discriminator_hlo(
+        hlo.replace("{0,1,2,3}", "{0,1,2,4}"),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+    )
+    assert not escaped["passed"]
+    assert escaped["escaped_collectives"]
+
+
+def test_layer0_residual_discriminator_traces_real_stage0_shape() -> None:
+    program = r'''
+import json
+from dataclasses import replace
+import jax
+import jax.numpy as jnp
+import ml_dtypes
+from jax.sharding import NamedSharding
+from glm_tpu.greenfield.model import build_decoder_runtime_weight_layout, build_decoder_state_layout, build_pipeline_schedule
+from glm_tpu.greenfield.runtime import build_decoder_step_program
+from tests.greenfield.checkpoint.test_runtime_pack import _small_plan
+
+base = _small_plan()
+geometry = replace(
+    base.geometry,
+    num_layers=9,
+    mlp_layer_types=("dense", "dense", "dense", *("sparse",) * 6),
+    indexer_types=("full",) * 9,
+)
+assignments = tuple(
+    replace(
+        assignment,
+        layer_start=0 if stage == 0 else stage + 1,
+        layer_end_exclusive=2 if stage == 0 else stage + 2,
+    )
+    for stage, assignment in enumerate(base.stage_assignments)
+)
+plan = replace(base, geometry=geometry, stage_assignments=assignments)
+schedule = build_pipeline_schedule(plan)
+state = build_decoder_state_layout(
+    plan,
+    schedule,
+    context_capacity=8,
+    logical_page_size=8,
+    packed_kv_width=8,
+)
+weight_layout = build_decoder_runtime_weight_layout(plan, schedule)
+groups = tuple(
+    tuple(stage * 4 + slot for slot in range(4))
+    for stage in range(8)
+)
+pairs = tuple(
+    (groups[stage][slot], groups[(stage + 1) % 8][slot])
+    for stage in range(8)
+    for slot in range(4)
+)
+decoder = build_decoder_step_program(
+    plan,
+    schedule,
+    state,
+    weight_layout,
+    groups,
+    pairs,
+    complete_token_path=True,
+    split_residual_state=True,
+    build_layer0_residual_discriminator=True,
+)
+assert decoder.layer0_residual_discriminator is not None
+
+def abstract(shape, dtype, spec):
+    return jax.ShapeDtypeStruct(
+        shape,
+        dtype,
+        sharding=NamedSharding(decoder.mesh, spec),
+    )
+
+weights = {}
+for spec in weight_layout.specs:
+    dtype = {
+        "F8_E4M3": jnp.uint8,
+        "F32": jnp.float32,
+    }.get(spec.dtype, ml_dtypes.bfloat16)
+    weights[spec.name] = abstract(
+        (32, *spec.shape),
+        dtype,
+        decoder.input_specs[0][spec.name],
+    )
+state_shape = state.padded_state_shape_per_device
+inputs = (
+    weights,
+    abstract((32, 2, 1, 8), ml_dtypes.bfloat16, decoder.input_specs[1]),
+    abstract((32, *state_shape["kv"]), ml_dtypes.bfloat16, decoder.input_specs[2]),
+    abstract((32, *state_shape["index_keys"]), ml_dtypes.bfloat16, decoder.input_specs[3]),
+    abstract((32, 1, decoder.config.metadata_width), jnp.int32, decoder.input_specs[4]),
+    abstract((32, 1), jnp.int32, decoder.input_specs[5]),
+    abstract((1,), jnp.int32, decoder.input_specs[6]),
+    abstract((1, 1), jnp.int32, decoder.input_specs[7]),
+    abstract((1,), jnp.int32, decoder.input_specs[8]),
+)
+stablehlo = jax.jit(decoder.layer0_residual_discriminator).lower(*inputs).as_text()
+print(json.dumps({
+    "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
+    "four_variant_output": "tensor<32x4x8xbf16>" in stablehlo,
+    "stage0_layers": [layer.layer_id for layer in schedule.stages[0].layers],
+}, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    existing = env.get("XLA_FLAGS", "").strip()
+    env["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=32".strip()
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["stage0_layers"] == [0, 1]
+    assert result["four_variant_output"]
+    assert result["all_reduce_count"] >= 5
+
+
 def test_8k_dsa_head_score_shape_requires_exact_dataflow() -> None:
     from glm_tpu.greenfield.runtime.decoder import (
         _classify_decoder_live_tensor_shapes,
@@ -1454,6 +1658,26 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             split_residual_state=1,  # type: ignore[arg-type]
         )
+    with pytest.raises(PlanValidationError, match="discriminator flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            build_layer0_residual_discriminator=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(PlanValidationError, match="complete split-token path"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            build_layer0_residual_discriminator=True,
+        )
     with pytest.raises(
         PlanValidationError, match="prefill index-input observation flag"
     ):
@@ -1555,6 +1779,7 @@ explicit_default = build_decoder_step_program(plan, schedule, state, weight_layo
 observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True)
 internal_observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True)
 split = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, split_residual_state=True)
+layer0_discriminator = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, split_residual_state=True, build_layer0_residual_discriminator=True)
 repair_decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_prefill_index_inputs=True, split_residual_state=True)
 split_boundary_regression = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True, split_residual_state=True)
 split_internal_regression = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True, split_residual_state=True)
@@ -1770,6 +1995,7 @@ print(json.dumps({
     'active': active.tolist(),
     'collectives_local': collectives_local,
     'complete_token_path': decoder.complete_token_path,
+    'layer0_residual_discriminator_built': layer0_discriminator.layer0_residual_discriminator is not None,
     'default_observation_off_stablehlo_identical': default_stablehlo == explicit_default_stablehlo,
     'counts': counts,
     'exact_query': {
@@ -1954,6 +2180,7 @@ print(json.dumps({
     assert result["active"] == [0, 1, 2, 3]
     assert result["residual_exact"]
     assert result["complete_token_path"]
+    assert result["layer0_residual_discriminator_built"]
     assert result["default_observation_off_stablehlo_identical"]
     assert result["exact_query"]["program_flag"]
     assert result["exact_query"]["input_spec_count"] == 10

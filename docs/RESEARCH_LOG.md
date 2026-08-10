@@ -6656,3 +6656,29 @@ unmotivated arithmetic variants.
   caught and the batch fixes both exact-on prefill flag propagation and repeated-call nested
   query/WK PyTree propagation; focused regressions cover both and the correction follow-up is
   `APPROVE COMMIT`. A clean pushed pin precedes the protected 8K retry.
+
+## 2026-08-10 17:32--19:20 — score integration is exact; residual arithmetic discriminator ready
+
+- The protected `0312cf5` 8K run reaches the first recurrent step after a complete 8,155-token
+  prefill. Token `101252` and every recorded layer-0 DSA field are exact, including normalized
+  hidden, q-a, query, head weights, current key, full score row and the 2,048 selected positions,
+  scores, order and ties. DB529's default score precision is therefore correct in production.
+- Event 1/layer 1 remains the first selected-set failure at six swaps. Against sealed layer-1
+  artifact `79b813da...9054`, current internal NPZ `b490d667...bbff` first differs at normalized
+  hidden: 3,960/6,144 BF16 values, max `0.00390625`, mean `0.0001455965`, signed mean
+  `-2.6923e-6`, p99 `0.000732421875`. Layer-1 q-a differs in 942/2,048 values, max `0.03125`.
+- The run stopped before warmup/timing/XPlane/DB/SUCCESS and ended with authenticated 8/8 cleanup.
+  It is localization evidence only; DB484 remains the performance point and Gate D 8K is open.
+- Reuse audit rejects another legacy capture, checkpoint pack, generic debugger or returned
+  residual observer. The next discriminator reuses the complete checkpoint/prefill, exact DSA
+  chain, sealed layer-1 target and existing HLO/archive/cleanup machinery, then executes only
+  layer 0 in a separate default-off program.
+- Four arms isolate the two remaining topology-dependent combines: BF16 baseline, FP32 attention
+  output through the LP4 psum, FP32 dense down through the LP4 psum, and both. Every arm preserves
+  BF16 layer boundaries; production remains unchanged. The diagnostic returns four layer-1
+  normalized rows plus exact layer-0 selection and fails closed before performance measurement.
+- The dedicated HLO contract permits only PP8 all-gather/all-reduce groups, requires both BF16 and
+  FP32 attention/dense kernels plus two FP32 local combines, and rejects host execution. Forced-32
+  tracing covers the real stage-0 two-layer schedule and the four-row output. The affected suite
+  passes 97/97 with Python/Bash/ShellCheck/JSON/diff checks green. Exact next is one new-diff-only
+  Fable approval, commit/push, sealed-reference upload, and one serialized protected run.

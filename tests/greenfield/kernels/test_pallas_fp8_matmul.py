@@ -610,6 +610,31 @@ def test_fp8_fused_block_swiglu_interpret_matches_exact_reference() -> None:
     ).astype(jnp.bfloat16)
     np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
 
+    actual_f32 = fp8_fused_block_swiglu(
+        lhs,
+        gate_bits,
+        gate_scale,
+        up_bits,
+        up_scale,
+        down_bits,
+        down_scale,
+        down_result_dtype=jnp.float32,
+        interpret=True,
+    )
+    expected_f32 = lax.dot_general(
+        activated,
+        decoded_down,
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.float32)
+    assert actual_f32.dtype == jnp.float32
+    np.testing.assert_allclose(
+        np.asarray(actual_f32),
+        np.asarray(expected_f32),
+        rtol=0.0,
+        atol=1e-6,
+    )
+
 
 def test_fp8_fused_block_swiglu_rejects_down_contract_drift() -> None:
     lhs = jnp.ones((1, 128), dtype=jnp.bfloat16)
@@ -636,6 +661,18 @@ def test_fp8_fused_block_swiglu_rejects_down_contract_drift() -> None:
             scale,
             bits,
             jnp.ones((1, 2), dtype=jnp.float32),
+            interpret=True,
+        )
+    with pytest.raises(ValueError, match="down result must be BF16 or FP32"):
+        fp8_fused_block_swiglu(
+            lhs,
+            bits,
+            scale,
+            bits,
+            scale,
+            bits,
+            scale,
+            down_result_dtype=jnp.float16,
             interpret=True,
         )
 

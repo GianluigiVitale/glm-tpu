@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-10 11:31 UTC
+**Updated:** 2026-08-10 19:20 UTC
 
 ## Authority and isolation
 
@@ -3271,3 +3271,33 @@ Focused regressions cover both and the correction-only Fable follow-up returned 
 Exact next: commit/push, authenticate the idle fleet, then run the combined protected 8K profile.
 Best case is roughly three hours from clean launch; one evidence-led correction/retry makes the
 realistic Gate-D window four to eight hours.
+
+## Integrated score fix moves the first 8K divergence to the layer-0 residual
+
+Protected tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_dsa_internal_trace2_20260810T173246873119274Z`
+ran from 17:32--18:23 UTC at pushed `0312cf5`. It loaded the complete checkpoint, compiled the
+production decoder/prefill and isolated observer, prefixed all 8,155 tokens, and produced exact
+token `101252`. Layer-0 normalized hidden, q-a, query, head weights, current key, full score row,
+2,048-position set, order and scores are now exact. This closes the DB529 production integration.
+
+Event 1/layer 1 is the first failure, with six expected/observed set swaps. Direct comparison of
+the current internal artifact (`b490d667...bbff`) to the already-sealed accepted layer-1 artifact
+(`79b813da...9054`) proves the first divergent field is the normalized layer input: 3,960/6,144
+BF16 values differ, max `0.00390625`, mean `0.0001455965`, signed mean `-2.6923e-6`, p99
+`0.000732421875`. Layer-1 q-a then differs in 942/2,048 values, max `0.03125`. The run stopped
+before warmup/timing/XPlane/DB/SUCCESS by design; DB484 remains the only decoder performance point.
+Pre/failure census SHAs `4abb1ee5...5b46` / `2c1bfc2a...f6f6` authenticate 8/8 clean hosts.
+
+The next coherent batch reuses the same final-layout checkpoint, prefill result, exact DSA chain,
+sealed layer-1 reference, HLO parser and protected launcher. A separate default-off one-layer
+executable replays layer 0 under exactly four associations: BF16 baseline, FP32 attention-output
+local combine, FP32 dense-down local combine, and both. It emits only the four layer-1 normalized
+rows and exact layer-0 DSA selection, rejects communication outside LP4, host callbacks, missing
+FP32 kernels or dead rows, and deliberately stops before timing. Production execution remains
+unchanged when disabled. The affected CPU suite passes 97/97; Python, Bash, ShellCheck, JSON and
+diff checks pass. Exact next: obtain one Fable review of only this new diff, commit/push, publish
+the sealed layer-1 reference to the approved bucket, then run one serialized protected
+discriminator. If one arm is exact, integrate only that causal
+association; if none is exact, inspect legacy TP32 subshard reduction association without another
+blind full-decoder retry.

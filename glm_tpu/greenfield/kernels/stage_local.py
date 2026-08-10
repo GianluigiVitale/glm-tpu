@@ -732,6 +732,7 @@ def stage_local_index_share_fp8_mapped(
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
     add_residual: bool = True,
+    reconstruct_output_fp32: bool = False,
 ) -> StageLocalIndexShareFp8Result:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -748,6 +749,8 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare residual and cache must remain BF16")
     if not isinstance(add_residual, bool):
         raise ValueError("IndexShare residual-add flag must be boolean")
+    if not isinstance(reconstruct_output_fp32, bool):
+        raise ValueError("IndexShare FP32 output reconstruction flag must be boolean")
     if contract.num_heads % cache_layout.local_parallel_size:
         raise ValueError("attention heads must divide over the local stage")
     local_heads = contract.num_heads // cache_layout.local_parallel_size
@@ -1034,19 +1037,49 @@ def stage_local_index_share_fp8_mapped(
             ),
             interpret=linear_interpret,
         )
-    local_update = _stage_fp8_linear(
-        value_states.reshape(1, local_heads * contract.v_head_dim),
-        o_bits,
-        o_scale,
-        block_shape=block_shape,
-        backend=linear_backend,
-        interpret=linear_interpret,
+    output_input = value_states.reshape(
+        1, local_heads * contract.v_head_dim
     )
+    if reconstruct_output_fp32:
+        if linear_backend == "reference":
+            local_update = lax.dot_general(
+                output_input,
+                dequantize_fp8_bits_block_weight(
+                    o_bits, o_scale, block_shape=block_shape
+                ),
+                dimension_numbers=(((1,), (1,)), ((), ())),
+                preferred_element_type=jnp.float32,
+            )
+        elif linear_backend == "pallas":
+            local_update = fp8_block_matmul_f32(
+                output_input,
+                o_bits,
+                o_scale,
+                config=Fp8BlockMatmulConfig(
+                    block_shape=block_shape,
+                    output_tile=block_shape[0],
+                    contraction_tile=block_shape[1],
+                ),
+                interpret=linear_interpret,
+            )
+        else:
+            raise ValueError("stage-local FP8 linear backend is unknown")
+    else:
+        local_update = _stage_fp8_linear(
+            output_input,
+            o_bits,
+            o_scale,
+            block_shape=block_shape,
+            backend=linear_backend,
+            interpret=linear_interpret,
+        )
     update = lax.psum(
         local_update,
         axis_name=axis_name,
         axis_index_groups=groups,
     )
+    if reconstruct_output_fp32:
+        update = update.astype(residual.dtype)
     output = residual_add(residual, update) if add_residual else update
     return StageLocalIndexShareFp8Result(
         output,
@@ -1073,6 +1106,7 @@ def stage_local_dense_fp8_mapped(
     linear_interpret: bool = False,
     precomputed_normalized: Any | None = None,
     add_residual: bool = True,
+    reconstruct_down_fp32: bool = False,
 ) -> Any:
     """Execute one dense SwiGLU from local raw shards and one local combine."""
 
@@ -1088,6 +1122,8 @@ def stage_local_dense_fp8_mapped(
         raise ValueError("dense local down shard is invalid")
     if not isinstance(add_residual, bool):
         raise ValueError("dense residual-add flag must be boolean")
+    if not isinstance(reconstruct_down_fp32, bool):
+        raise ValueError("dense FP32 down reconstruction flag must be boolean")
     if precomputed_normalized is None:
         normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
     else:
@@ -1110,7 +1146,15 @@ def stage_local_dense_fp8_mapped(
             silu(linear(normalized, gate_weight))
             * linear(normalized, up_weight)
         ).astype(normalized.dtype)
-        local_update = linear(activated, down_weight)
+        if reconstruct_down_fp32:
+            local_update = lax.dot_general(
+                activated,
+                down_weight,
+                dimension_numbers=(((1,), (1,)), ((), ())),
+                preferred_element_type=jnp.float32,
+            )
+        else:
+            local_update = linear(activated, down_weight)
     elif linear_backend == "pallas":
         local_update = fp8_fused_block_swiglu(
             normalized,
@@ -1125,6 +1169,9 @@ def stage_local_dense_fp8_mapped(
                 output_tile=block_shape[0],
                 contraction_tile=block_shape[1],
             ),
+            down_result_dtype=(
+                jnp.float32 if reconstruct_down_fp32 else jnp.bfloat16
+            ),
             interpret=linear_interpret,
         )
     else:
@@ -1134,6 +1181,8 @@ def stage_local_dense_fp8_mapped(
         axis_name=axis_name,
         axis_index_groups=groups,
     )
+    if reconstruct_down_fp32:
+        update = update.astype(residual.dtype)
     return residual_add(residual, update) if add_residual else update
 
 

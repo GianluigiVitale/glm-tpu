@@ -127,6 +127,16 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         "LAYER_RESIDUAL_OBSERVER == 0 && $DSA_INTERNAL_OBSERVER == 0"
         not in runner
     )
+    assert '"--observe-layer0-residual-variants"' in compiler
+    assert "build_layer0_residual_discriminator" in compiler
+    assert "validate_layer0_residual_discriminator_hlo" in compiler
+    assert "LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256" in compiler
+    assert (
+        "readonly LAYER0_RESIDUAL_VARIANTS="
+        "${GLM_GREENFIELD_LAYER0_RESIDUAL_VARIANTS:-0}" in runner
+    )
+    assert '--observe-layer0-residual-variants 1' in runner
+    assert "layer-0 residual variants require the complete exact recurrent" in runner
     assert '"schema_version": 14' in compiler
     assert 'record["schema_version"] for record in records} != {14}' in runner
     assert "results_db_run_id\": 518" in runner

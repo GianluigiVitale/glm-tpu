@@ -1165,3 +1165,13 @@ The four-second elapsed value includes bounded compilation/execution and is not 
 There is no recurrent token loop, warmed distribution or XPlane, so DB484 remains the only
 accepted PP8 performance point at `244.091151 ms` p50 / `4.096830 tok/s`. DB529 authorizes one
 default-off production integration followed by the complete protected 8K Gate-D retry.
+
+## Integrated scorer retry and layer-0 residual discriminator — no performance result
+
+The protected `0312cf5` 8K retry ran for about 50 minutes because it loaded the complete model,
+compiled production/prefill/observer programs and processed all 8,155 prompt tokens. It proves the
+first token and all layer-0 DSA internals/selection are exact, then stops at the first layer-1 set
+failure before warmup, timed iterations or XPlane. Its useful output is a layer-boundary arithmetic
+localization, not latency. The new four-arm layer-0 residual discriminator is likewise explicitly
+diagnostic-only and will stop before timing. DB484 remains the only accepted PP8 decoder point at
+`244.091151 ms` p50 / `4.096830 tok/s`; protected 8K Gate D and Gate E remain open.

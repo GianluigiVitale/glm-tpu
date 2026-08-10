@@ -47,6 +47,7 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     build_teacher_forced_prefill_program,
     validate_decoder_step_hlo,
     validate_dsa_query_weight_materializer_hlo,
+    validate_layer0_residual_discriminator_hlo,
     validate_prefill_index_weight_materialization_hlo,
     validate_teacher_forced_prefill_hlo,
 )
@@ -70,6 +71,9 @@ DSA_CROSS_BACKEND_SCORE_TOLERANCE = TensorTolerance(
     max_abs=0.125,
     p99_abs=0.03125,
     mean_abs=0.01,
+)
+LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256 = (
+    "787c9ba7b39d6fd43b59876f713052b64a3ac2d3ecbc6074795ba5364abe153b"
 )
 
 
@@ -1215,6 +1219,14 @@ def parse_args() -> argparse.Namespace:
         default=0,
     )
     parser.add_argument(
+        "--observe-layer0-residual-variants",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
+    parser.add_argument("--layer1-internal-reference-npz", type=Path)
+    parser.add_argument("--layer1-internal-reference-sha256")
+    parser.add_argument(
         "--dsa-internal-baseline-observation-npz", type=Path
     )
     parser.add_argument("--dsa-internal-baseline-observation-sha256")
@@ -1253,6 +1265,9 @@ def main() -> int:
     )
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
+    args.observe_layer0_residual_variants = bool(
+        args.observe_layer0_residual_variants
+    )
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
         args.short_context_oracle_manifest_sha256 is not None
@@ -1324,6 +1339,38 @@ def main() -> int:
         )
     if args.observe_dsa_internals and args.observe_layer_residuals:
         raise ValueError("DSA internal and residual observers must be isolated")
+    layer0_variant_reference_fields = (
+        args.layer1_internal_reference_npz,
+        args.layer1_internal_reference_sha256,
+    )
+    if args.observe_layer0_residual_variants != all(
+        value is not None for value in layer0_variant_reference_fields
+    ) or (
+        not args.observe_layer0_residual_variants
+        and any(value is not None for value in layer0_variant_reference_fields)
+    ):
+        raise ValueError(
+            "layer-0 residual variants require both pinned layer-1 references"
+        )
+    if args.observe_layer0_residual_variants and not dsa_oracle_mode:
+        raise ValueError(
+            "layer-0 residual variants require the sealed DSA/token oracle"
+        )
+    if args.observe_layer0_residual_variants and (
+        args.observe_dsa_internals or args.observe_layer_residuals
+    ):
+        raise ValueError(
+            "layer-0 residual variants must remain isolated from other observers"
+        )
+    if args.observe_layer0_residual_variants and not (
+        args.prefill_index_repair
+        and args.dsa_query_exact_association
+        and args.dsa_head_key_exact_association
+        and args.dsa_score_default_precision
+    ):
+        raise ValueError(
+            "layer-0 residual variants require every proven 8K DSA correction"
+        )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
     if args.warmup < 1 or args.iterations < 1:
@@ -1339,6 +1386,7 @@ def main() -> int:
     dsa_oracle_tensors = None
     dsa_internal_baseline = None
     dsa_internal_layer0_reference = None
+    layer1_normalized_hidden_reference = None
     if oracle_mode:
         assert args.short_context_oracle_dir is not None
         assert args.short_context_oracle_manifest_sha256 is not None
@@ -1440,6 +1488,35 @@ def main() -> int:
                 name.removeprefix("actual__"): np.asarray(payload[name])
                 for name in sorted(required)
             }
+    if args.observe_layer0_residual_variants:
+        assert args.layer1_internal_reference_npz is not None
+        assert args.layer1_internal_reference_sha256 is not None
+        if _sha256_file(args.layer1_internal_reference_npz) != (
+            args.layer1_internal_reference_sha256
+        ):
+            raise ValueError("layer-1 internal reference hash drifted")
+        with np.load(
+            args.layer1_internal_reference_npz, allow_pickle=False
+        ) as payload:
+            required = {
+                "accepted__normalized_hidden",
+                "event_index",
+                "layer_id",
+                "position",
+            }
+            if not required.issubset(payload.files):
+                raise ValueError("layer-1 internal reference is incomplete")
+            if int(payload["event_index"]) != 1 or int(payload["layer_id"]) != 1:
+                raise ValueError("layer-1 internal reference identity drifted")
+            if int(payload["position"]) != int(
+                dsa_oracle_tensors["decode_positions"][0]
+            ):
+                raise ValueError("layer-1 internal reference position drifted")
+            layer1_normalized_hidden_reference = np.asarray(
+                payload["accepted__normalized_hidden"], dtype=np.uint16
+            )
+            if layer1_normalized_hidden_reference.shape != (6144,):
+                raise ValueError("layer-1 normalized-hidden shape drifted")
     if args.runtime_kind in ("pallas_feature", "pallas_feature_linear") and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
@@ -1720,10 +1797,13 @@ def main() -> int:
             ),
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
+            build_layer0_residual_discriminator=(
+                args.observe_layer0_residual_variants
+            ),
             split_residual_state=args.split_residual_state,
         )
         dsa_observer = None
-        if dsa_oracle_mode:
+        if dsa_oracle_mode and not args.observe_layer0_residual_variants:
             dsa_observer = build_decoder_step_program(
                 execution_plan,
                 schedule,
@@ -2437,7 +2517,7 @@ def main() -> int:
         fleet_dsa_observer_hlo_hashes = None
         dsa_observer_hlo_contract = None
         dsa_observer_isolation_contract = None
-        if dsa_oracle_mode:
+        if dsa_oracle_mode and not args.observe_layer0_residual_variants:
             assert dsa_observer is not None
             multihost_utils.sync_global_devices(
                 "greenfield-short-dsa-observer-compile-start"
@@ -2537,6 +2617,67 @@ def main() -> int:
                 raise RuntimeError(
                     "DSA observer isolation contract failed before execution: "
                     f"{dsa_observer_isolation_contract}"
+                )
+        compiled_layer0_residual_discriminator = None
+        layer0_residual_discriminator_compile_seconds = None
+        layer0_residual_discriminator_hlo_sha256 = None
+        fleet_layer0_residual_discriminator_hlo_hashes = None
+        layer0_residual_discriminator_hlo_contract = None
+        if args.observe_layer0_residual_variants:
+            if decoder.layer0_residual_discriminator is None:
+                raise RuntimeError("layer-0 residual discriminator was not built")
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-residual-discriminator-compile-start"
+            )
+            discriminator_compile_started = time.monotonic()
+            lowered_layer0_residual_discriminator = jax.jit(
+                decoder.layer0_residual_discriminator
+            ).lower(*inputs)
+            compiled_layer0_residual_discriminator = (
+                lowered_layer0_residual_discriminator.compile()
+            )
+            layer0_residual_discriminator_compile_seconds = (
+                time.monotonic() - discriminator_compile_started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-residual-discriminator-compile-end"
+            )
+            optimized_discriminator_hlo = (
+                compiled_layer0_residual_discriminator.as_text()
+            )
+            layer0_residual_discriminator_hlo_sha256 = sha256(
+                optimized_discriminator_hlo.encode("utf-8")
+            ).hexdigest()
+            fleet_layer0_residual_discriminator_hlo_hashes = _fleet_digest(
+                multihost_utils,
+                layer0_residual_discriminator_hlo_sha256,
+                num_processes=args.num_processes,
+            )
+            layer0_residual_discriminator_hlo_contract = (
+                validate_layer0_residual_discriminator_hlo(
+                    optimized_discriminator_hlo,
+                    config=decoder.config,
+                    groups=groups,
+                )
+            )
+            if jax.process_index() == 0:
+                hlo_dir = args.output.parent / "hlo"
+                with gzip.open(
+                    hlo_dir
+                    / "layer0_residual_discriminator.optimized_hlo.txt.gz",
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(optimized_discriminator_hlo)
+                _atomic_json(
+                    hlo_dir / "layer0_residual_discriminator.hlo_contract.json",
+                    layer0_residual_discriminator_hlo_contract,
+                )
+            del optimized_discriminator_hlo
+            if not layer0_residual_discriminator_hlo_contract["passed"]:
+                raise RuntimeError(
+                    "layer-0 residual discriminator HLO contract failed: "
+                    f"{layer0_residual_discriminator_hlo_contract['violations']}"
                 )
         compiled_prefill = None
         prefill_compile_seconds = None
@@ -2639,6 +2780,176 @@ def main() -> int:
         else:
             output = compiled(*inputs)
             output[3].block_until_ready()
+        if args.observe_layer0_residual_variants:
+            assert compiled_layer0_residual_discriminator is not None
+            assert layer0_residual_discriminator_hlo_contract is not None
+            assert layer1_normalized_hidden_reference is not None
+            assert dsa_oracle_tensors is not None
+            discriminator_result = compiled_layer0_residual_discriminator(
+                *runtime_prefix, *tuple(output)
+            )
+            discriminator_result[3].block_until_ready()
+            positions_host, scores_host, counts_host, variants_host, valid_host = (
+                _materialize_global_array(jax, multihost_utils, value)
+                for value in discriminator_result
+            )
+            active_rows = np.asarray(groups[0], dtype=np.int32)
+            inactive_rows = np.asarray(
+                sorted(set(range(decoder.config.total_devices)) - set(groups[0])),
+                dtype=np.int32,
+            )
+            active_positions = positions_host[active_rows]
+            active_scores = scores_host[active_rows]
+            active_counts = counts_host[active_rows]
+            active_variants = variants_host[active_rows]
+            active_valid = valid_host[active_rows]
+            expected_positions = np.asarray(
+                dsa_oracle_tensors["selected_positions"][0, 0],
+                dtype=np.int32,
+            )
+            expected_scores = np.asarray(
+                dsa_oracle_tensors["selected_scores"][0, 0],
+                dtype=np.float32,
+            )
+            expected_count = int(
+                dsa_oracle_tensors["valid_counts"][0, 0]
+            )
+            variants_bits = _encode_bfloat16_bits(active_variants[0])
+            lane_replication = bool(
+                np.all(active_positions == active_positions[0])
+                and np.all(active_scores == active_scores[0])
+                and np.all(active_counts == active_counts[0])
+                and np.all(
+                    _encode_bfloat16_bits(active_variants)
+                    == _encode_bfloat16_bits(active_variants[0])[None, ...]
+                )
+            )
+            selection_exact = bool(
+                np.array_equal(active_positions[0], expected_positions)
+                and np.array_equal(active_scores[0], expected_scores)
+                and int(active_counts[0, 0]) == expected_count
+            )
+            inactive_sentinel = bool(
+                np.all(positions_host[inactive_rows] == -1)
+                and np.all(np.isneginf(scores_host[inactive_rows]))
+                and np.all(counts_host[inactive_rows] == 0)
+                and np.all(
+                    _encode_bfloat16_bits(variants_host[inactive_rows]) == 0
+                )
+                and not np.any(valid_host[inactive_rows])
+            )
+            reference_value = (
+                np.ascontiguousarray(layer1_normalized_hidden_reference)
+                .view(np.dtype("<u2"))
+                .view(ml_dtypes.bfloat16)
+                .astype(np.float32)
+            )
+            variant_names = (
+                "baseline_bf16",
+                "attention_output_fp32",
+                "dense_down_fp32",
+                "attention_output_and_dense_down_fp32",
+            )
+            comparisons = {}
+            for variant_index, variant_name in enumerate(variant_names):
+                actual_bits = np.ascontiguousarray(
+                    variants_bits[variant_index]
+                )
+                actual_value = active_variants[0, variant_index].astype(
+                    np.float32
+                )
+                delta = actual_value - reference_value
+                comparisons[variant_name] = {
+                    "actual_sha256": sha256(
+                        actual_bits.tobytes(order="C")
+                    ).hexdigest(),
+                    "elementwise_exact": bool(
+                        np.array_equal(
+                            actual_bits, layer1_normalized_hidden_reference
+                        )
+                    ),
+                    "max_abs": float(np.max(np.abs(delta), initial=0.0)),
+                    "mean_abs": float(np.mean(np.abs(delta))),
+                    "mismatch_count": int(
+                        np.count_nonzero(
+                            actual_bits != layer1_normalized_hidden_reference
+                        )
+                    ),
+                    "signed_mean": float(np.mean(delta)),
+                }
+            discriminator_contract = {
+                "active_contract_valid": bool(np.all(active_valid)),
+                "decode_position": int(
+                    dsa_oracle_tensors["decode_positions"][0]
+                ),
+                "fleet_hlo_hashes": (
+                    fleet_layer0_residual_discriminator_hlo_hashes
+                ),
+                "hlo_contract": layer0_residual_discriminator_hlo_contract,
+                "hlo_sha256": layer0_residual_discriminator_hlo_sha256,
+                "inactive_rows_are_sentinel": inactive_sentinel,
+                "lane_replication": lane_replication,
+                "current_baseline_expected_sha256": (
+                    LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                ),
+                "layer1_reference_sha256": (
+                    args.layer1_internal_reference_sha256
+                ),
+                "reproduces_current_baseline": bool(
+                    comparisons["baseline_bf16"]["actual_sha256"]
+                    == LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                ),
+                "selection_exact": selection_exact,
+                "variant_comparisons": comparisons,
+                "variant_names": list(variant_names),
+            }
+            discriminator_contract["passed"] = bool(
+                discriminator_contract["active_contract_valid"]
+                and inactive_sentinel
+                and lane_replication
+                and discriminator_contract["reproduces_current_baseline"]
+                and selection_exact
+                and layer0_residual_discriminator_hlo_contract["passed"]
+            )
+            if jax.process_index() == 0:
+                discriminator_dir = (
+                    args.output.parent / "layer0_residual_discriminator"
+                )
+                _atomic_npz(
+                    discriminator_dir
+                    / (
+                        "position_"
+                        f"{discriminator_contract['decode_position']}_variants.npz"
+                    ),
+                    normalized_hidden_bfloat16_bits=np.asarray(
+                        variants_bits, dtype=np.dtype("<u2")
+                    ),
+                    selected_positions=np.asarray(
+                        active_positions[0], dtype=np.int32
+                    ),
+                    selected_scores=np.asarray(
+                        active_scores[0], dtype=np.float32
+                    ),
+                    selected_valid_count=np.asarray(
+                        active_counts[0], dtype=np.int32
+                    ),
+                )
+                _atomic_json(
+                    discriminator_dir / "contract.json",
+                    discriminator_contract,
+                )
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-residual-discriminator-complete"
+            )
+            if not discriminator_contract["passed"]:
+                raise RuntimeError(
+                    "layer-0 residual discriminator contract failed: "
+                    f"{discriminator_contract}"
+                )
+            raise RuntimeError(
+                "layer-0 residual discriminator completed; diagnostic-only "
+                f"comparisons={comparisons}"
+            )
         if dsa_oracle_mode:
             assert compiled_dsa_observer is not None
             assert dsa_oracle_manifest is not None

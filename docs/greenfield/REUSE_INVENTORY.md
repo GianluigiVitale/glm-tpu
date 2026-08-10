@@ -430,3 +430,13 @@ precision or oracle capture variants. Integrate this one numerical choice behind
 flag, require DB529's hashes/DB/archive/cleanup evidence, and pin production/observer/prefill HLO
 to the selected precision. The next experiment is the complete protected 8K Gate-D retry with the
 existing internal observer enabled once; no new generic debugger or bounded scorer probe is due.
+
+The `0312cf5` retry closes that integration: layer-0 normalized hidden, q-a, query, head/key,
+score row and selected set/order are all exact. It moves the first failure to the layer-0 output
+entering layer-1 normalization (3,960/6,144 BF16 mismatches, max `0.00390625`). Reuse the already
+sealed accepted layer-1 artifact `79b813da...9054`, the current internal artifact
+`b490d667...bbff`, complete final-layout checkpoint/prefill, exact DSA chain, HLO parser and
+protected wrapper. Do not recapture legacy state, repack weights, or revive the arithmetic-
+perturbing returned-residual observer. The bounded successor executes layer 0 only and changes the
+precision of the attention-output and dense-down LP4 combines in a four-arm matrix. Its result
+chooses the next production correction; it cannot establish decoder performance.

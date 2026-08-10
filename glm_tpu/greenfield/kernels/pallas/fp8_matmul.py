@@ -1852,13 +1852,15 @@ def fp8_fused_block_swiglu(
     down_scale: Any,
     *,
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    down_result_dtype: Any = jnp.bfloat16,
     interpret: bool = False,
 ) -> Any:
     """Execute raw-FP8 gate/up, exact BF16 SwiGLU, and down in one call.
 
     Complete checkpoint matrices remain raw U8 HBM operands. Gate and up
-    outputs are VMEM scratch shared by two nested Mosaic pipelines, so only
-    the final BF16 projection crosses the Pallas/HBM boundary.
+    outputs are VMEM scratch shared by two nested Mosaic pipelines. The
+    default final projection remains BF16; a diagnostic-only FP32 result can
+    retain the down accumulator through a topology-local reduction.
     """
 
     rows, contraction, intermediate = _validate_inputs(
@@ -1885,6 +1887,12 @@ def fp8_fused_block_swiglu(
             "fused block down FP32 scale shape must be "
             f"{expected_down_scale}, got {down_scale.shape}/{down_scale.dtype}"
         )
+    down_result_dtype = jnp.dtype(down_result_dtype)
+    if down_result_dtype not in (
+        jnp.dtype(jnp.bfloat16),
+        jnp.dtype(jnp.float32),
+    ):
+        raise ValueError("fused block down result must be BF16 or FP32")
 
     padded_rows = _ceil_div(rows, config.row_tile) * config.row_tile
     padded_contraction = (
@@ -2115,7 +2123,7 @@ def fp8_fused_block_swiglu(
             @pl.when(contraction_index == down_contraction_tiles - 1)
             def store_output() -> None:
                 output_ref[...] = accumulator[...].astype(
-                    config.output_dtype
+                    down_result_dtype
                 )
 
         def activation_index(
@@ -2161,7 +2169,7 @@ def fp8_fused_block_swiglu(
     call = pl.pallas_call(
         kernel,
         out_shape=jax.ShapeDtypeStruct(
-            (padded_rows, padded_output), config.output_dtype
+            (padded_rows, padded_output), down_result_dtype
         ),
         grid=(),
         in_specs=(pl.BlockSpec(memory_space=pltpu.HBM),) * 7,
@@ -2192,6 +2200,7 @@ def fp8_fused_block_swiglu(
             "greenfield_fp8_fused_block_swiglu_"
             f"m{padded_rows}_h{padded_contraction}_i{padded_intermediate}"
             f"_o{padded_output}"
+            + ("_downf32" if down_result_dtype == jnp.dtype(jnp.float32) else "")
         ),
         cost_estimate=pl.CostEstimate(
             flops=(
@@ -2204,7 +2213,7 @@ def fp8_fused_block_swiglu(
                 + padded_output * padded_intermediate
                 + 2 * up_output_tiles * up_contraction_tiles * 4
                 + down_output_tiles * down_contraction_tiles * 4
-                + padded_rows * padded_output * 2
+                + padded_rows * padded_output * down_result_dtype.itemsize
             ),
             transcendentals=padded_rows * padded_intermediate,
         ),

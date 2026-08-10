@@ -550,6 +550,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
     dsa_score_precision: Literal["default", "highest"] = "highest",
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
+    reconstruct_attention_output_fp32: bool = False,
+    reconstruct_dense_down_fp32: bool = False,
 ) -> StageLocalSplitLayerFp8Result:
     """Execute one layer while preserving legacy hidden/residual association."""
 
@@ -557,6 +559,12 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer indexer kind must be full or shared")
     if mlp_kind not in ("dense", "sparse"):
         raise ValueError("layer MLP kind must be dense or sparse")
+    if not isinstance(reconstruct_attention_output_fp32, bool):
+        raise ValueError("layer attention FP32 reconstruction flag must be boolean")
+    if not isinstance(reconstruct_dense_down_fp32, bool):
+        raise ValueError("layer dense FP32 reconstruction flag must be boolean")
+    if reconstruct_dense_down_fp32 and mlp_kind != "dense":
+        raise ValueError("dense FP32 reconstruction requires a dense layer")
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise ValueError("layer sparse MoE backend is unknown")
     if not isinstance(pallas_moe_fuse_route_weighting, bool):
@@ -720,6 +728,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
         add_residual=False,
+        reconstruct_output_fp32=reconstruct_attention_output_fp32,
     )
     normalized_mlp, post_attention_residual = fused_add_rms_norm(
         attention_result.output,
@@ -746,6 +755,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             linear_interpret=linear_interpret,
             precomputed_normalized=normalized_mlp,
             add_residual=False,
+            reconstruct_down_fp32=reconstruct_dense_down_fp32,
         )
         route_indices = jnp.full(
             (1, moe_contract.top_k), jnp.int32(-1), dtype=jnp.int32

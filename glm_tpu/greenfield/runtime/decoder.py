@@ -449,6 +449,7 @@ class DecoderStepProgram:
     decode_prefill_index_weights_bf16: Any | None
     promote_prefill_index_weights_fp32: Any | None
     repair_prefill_index_cache: Any | None
+    layer0_residual_discriminator: Any | None
     split_residual_state: bool
 
 
@@ -2289,6 +2290,153 @@ def validate_decoder_step_hlo(
     }
 
 
+def validate_layer0_residual_discriminator_hlo(
+    optimized_hlo: str,
+    *,
+    config: DecoderStepConfig,
+    groups: Sequence[Sequence[int]],
+) -> dict[str, Any]:
+    """Fail closed on the bounded four-arm layer-0 arithmetic probe.
+
+    The production decoder is validated independently by its exact contract.
+    This diagnostic executable has no pipeline transport and may replay only
+    layer 0. Its extra communication must remain inside the same PP8 groups,
+    and both FP32 candidate kernels must survive optimization.
+    """
+
+    skeleton = PipelineSkeletonConfig(
+        config.stage_count,
+        config.local_parallel_size,
+        config.hidden_size,
+        config.selected_width,
+    )
+    canonical_groups = _canonical_groups(groups, skeleton)
+    module = parse_hlo_module(optimized_hlo)
+    collectives = module.collectives
+    allowed_opcodes = {"all-gather", "all-reduce"}
+    unexpected_collectives = [
+        _compact_collective_record(item)
+        for item in collectives
+        if item.opcode not in allowed_opcodes
+    ]
+    escaped_collectives = [
+        _compact_collective_record(item)
+        for item in collectives
+        if item.replica_groups != canonical_groups
+        or item.maximum_group_size != config.local_parallel_size
+    ]
+    by_opcode = Counter(item.opcode for item in collectives)
+    result_shapes = Counter(
+        f"{shape.dtype}["
+        + ",".join(str(value) for value in shape.dimensions)
+        + "]"
+        for item in collectives
+        for shape in item.result_shapes
+    )
+
+    custom_calls = tuple(
+        line.strip()
+        for line in optimized_hlo.splitlines()
+        if 'custom_call_target="tpu_custom_call"' in line
+    )
+    attention_bf16_name = "greenfield_fp8_block_matmul_m8_k4096_n6144"
+    attention_f32_name = (
+        "greenfield_fp8_block_matmul_f32_m8_k4096_n6144"
+    )
+    dense_bf16_name = (
+        "greenfield_fp8_fused_block_swiglu_"
+        "m8_h6144_i3072_o6144"
+    )
+    dense_f32_name = f"{dense_bf16_name}_downf32"
+    kernel_counts = {
+        attention_bf16_name: sum(
+            attention_bf16_name in line
+            and attention_f32_name not in line
+            for line in custom_calls
+        ),
+        attention_f32_name: sum(
+            attention_f32_name in line for line in custom_calls
+        ),
+        dense_bf16_name: sum(
+            dense_bf16_name in line and dense_f32_name not in line
+            for line in custom_calls
+        ),
+        dense_f32_name: sum(dense_f32_name in line for line in custom_calls),
+    }
+    host_markers = sorted(
+        marker
+        for marker in (
+            "host_callback",
+            "xla_python_cpu_callback",
+            "xla_ffi_python_cpu_callback",
+            "outside_compilation",
+        )
+        if marker in optimized_hlo
+    )
+    variant_output_shapes = tuple(
+        shape
+        for shape in ("bf16[4,6144]", "bf16[1,4,6144]")
+        if shape in optimized_hlo
+    )
+    violations = []
+    if module.num_partitions not in (None, config.total_devices):
+        violations.append(
+            "layer-0 discriminator partition count drifted: "
+            f"expected={config.total_devices} observed={module.num_partitions}"
+        )
+    if unexpected_collectives:
+        violations.append(
+            "layer-0 discriminator contains transport/global communication"
+        )
+    if escaped_collectives:
+        violations.append("layer-0 discriminator escaped PP8 local groups")
+    if not 5 <= by_opcode.get("all-gather", 0) <= 20:
+        violations.append(
+            "layer-0 discriminator DSA/attention gather count drifted: "
+            f"{by_opcode.get('all-gather', 0)}"
+        )
+    if by_opcode.get("all-reduce", 0) < 5:
+        violations.append("layer-0 discriminator lost local reductions")
+    if not 1 <= kernel_counts[attention_bf16_name] <= 2:
+        violations.append("layer-0 discriminator lost BF16 attention control")
+    if not 1 <= kernel_counts[attention_f32_name] <= 2:
+        violations.append("layer-0 discriminator lost FP32 attention arm")
+    if not 1 <= kernel_counts[dense_bf16_name] <= 2:
+        violations.append("layer-0 discriminator lost BF16 dense control")
+    if not 1 <= kernel_counts[dense_f32_name] <= 2:
+        violations.append("layer-0 discriminator lost FP32 dense arm")
+    if sum(
+        count
+        for shape, count in result_shapes.items()
+        if shape == "f32[1,6144]"
+    ) < 2:
+        violations.append("layer-0 discriminator lost FP32 local combines")
+    if not variant_output_shapes:
+        violations.append("layer-0 discriminator lost its four-row output")
+    if host_markers:
+        violations.append(
+            f"layer-0 discriminator contains host execution: {host_markers}"
+        )
+    return {
+        "collective_counts": dict(sorted(by_opcode.items())),
+        "collective_result_shape_counts": dict(sorted(result_shapes.items())),
+        "escaped_collectives": escaped_collectives,
+        "host_markers": host_markers,
+        "kernel_counts": kernel_counts,
+        "num_partitions": module.num_partitions,
+        "passed": not violations,
+        "unexpected_collectives": unexpected_collectives,
+        "variant_names": [
+            "baseline_bf16",
+            "attention_output_fp32",
+            "dense_down_fp32",
+            "attention_output_and_dense_down_fp32",
+        ],
+        "variant_output_shapes": list(variant_output_shapes),
+        "violations": violations,
+    }
+
+
 def _attention_weights(
     weight: Any,
     slot: int,
@@ -2864,6 +3012,7 @@ def build_decoder_step_program(
     observe_dsa_internals: bool = False,
     observe_layer_residuals: bool = False,
     observe_prefill_index_inputs: bool = False,
+    build_layer0_residual_discriminator: bool = False,
     split_residual_state: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
@@ -2962,6 +3111,10 @@ def build_decoder_step_program(
         raise PlanValidationError(
             "prefill index-input observation flag must be boolean"
         )
+    if not isinstance(build_layer0_residual_discriminator, bool):
+        raise PlanValidationError(
+            "layer-0 residual discriminator flag must be boolean"
+        )
     if not isinstance(split_residual_state, bool):
         raise PlanValidationError("split residual-state flag must be boolean")
     if observe_dsa_events and not complete_token_path:
@@ -2991,6 +3144,12 @@ def build_decoder_step_program(
     ):
         raise PlanValidationError(
             "prefill index-input observation must be isolated"
+        )
+    if build_layer0_residual_discriminator and not (
+        complete_token_path and split_residual_state
+    ):
+        raise PlanValidationError(
+            "layer-0 residual discriminator requires the complete split-token path"
         )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
@@ -3944,6 +4103,298 @@ def build_decoder_step_program(
             context_lengths,
         )
 
+    def mapped_layer0_residual_discriminator_impl(
+        local_weights: Mapping[str, Any],
+        local_exact_dsa_weights: Any | None,
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        local_token_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, Any, Any, Any, Any]:
+        """Replay only layer 0 under four bounded arithmetic associations."""
+
+        rank = lax.axis_index(axis_name)
+        stage_id = stage_map[rank]
+        local_slot = slot_map[rank]
+        residual_state = local_residual_container[0]
+        kv_cache = local_kv_container[0]
+        index_cache = local_index_container[0]
+        metadata = local_metadata_container[0]
+
+        def weight(name: str) -> Any:
+            return local_weights[name][0]
+
+        token_id = local_token_container[0, 0]
+        local_start = local_slot * jnp.int32(local_vocab)
+        local_end = local_start + jnp.int32(local_vocab)
+        token_valid = (
+            (token_id >= jnp.int32(0))
+            & (token_id < jnp.int32(config.vocab_size))
+        )
+        owns_token = (
+            token_valid
+            & (token_id >= local_start)
+            & (token_id < local_end)
+        )
+        local_id = jnp.clip(
+            token_id - local_start,
+            jnp.int32(0),
+            jnp.int32(local_vocab - 1),
+        )
+        local_row = weight("global.embedding")[local_id][None, :]
+        local_row = jnp.where(
+            owns_token, local_row, jnp.zeros_like(local_row)
+        )
+        embedded = lax.psum(
+            local_row,
+            axis_name,
+            axis_index_groups=axis_groups,
+        )
+
+        selected_positions = jnp.full(
+            (config.selected_width,), -1, dtype=jnp.int32
+        )
+        selected_scores = jnp.full(
+            (config.selected_width,), -jnp.inf, dtype=jnp.float32
+        )
+        selected_count = jnp.zeros((1,), dtype=jnp.int32)
+        variants = jnp.zeros(
+            (4, config.hidden_size), dtype=residual_state.dtype
+        )
+        contract_valid = jnp.zeros((1,), dtype=jnp.bool_)
+
+        local_query_weight_aliases = local_exact_dsa_weights
+        local_recurrent_wk_weights = None
+        if dsa_head_key_exact_association:
+            if (
+                local_exact_dsa_weights is None
+                or len(local_exact_dsa_weights) != 2
+            ):
+                raise PlanValidationError(
+                    "layer-0 discriminator requires query and wk state"
+                )
+            (
+                local_query_weight_aliases,
+                local_recurrent_wk_weights,
+            ) = local_exact_dsa_weights
+        query_weight_aliases = (
+            None
+            if local_query_weight_aliases is None
+            else tuple(
+                tuple(value[0] for value in alias)
+                for alias in local_query_weight_aliases
+            )
+        )
+        recurrent_wk_weights = (
+            None
+            if local_recurrent_wk_weights is None
+            else tuple(value[0] for value in local_recurrent_wk_weights)
+        )
+
+        def execute_layer0(
+            reconstruct_attention_output_fp32: bool,
+            reconstruct_dense_down_fp32: bool,
+        ) -> Any:
+            stage = schedule.stages[0]
+            layer = stage.layers[0]
+            if (
+                layer.layer_id != 0
+                or layer.indexer_kind != "full"
+                or layer.mlp_kind != "dense"
+                or layer.dense_slot is None
+            ):
+                raise PlanValidationError(
+                    "layer-0 discriminator requires the pinned dense/full layer"
+                )
+            attention = _attention_weights(
+                weight,
+                layer.stage_slot,
+                attention_projection_backend,
+            )
+            return stage_local_transformer_layer_fp8_split_mapped(
+                embedded,
+                jnp.zeros_like(embedded),
+                kv_cache[layer.stage_slot],
+                index_cache[0],
+                metadata[:, : config.selected_width],
+                metadata[:, config.count_index],
+                position,
+                block_tables,
+                context_lengths,
+                weight(
+                    f"attention.slot_{layer.stage_slot:02d}.input_norm"
+                ),
+                weight(
+                    f"attention.slot_{layer.stage_slot:02d}.post_norm"
+                ),
+                attention,
+                _dsa_weights(weight, 0),
+                _dense_weights(weight, layer.dense_slot),
+                None,
+                (
+                    metadata[0, config.health_index] == jnp.int32(1)
+                )[None],
+                local_slot,
+                axis_name=axis_name,
+                indexer_kind="full",
+                mlp_kind="dense",
+                dsa_contract=dsa_contract,
+                mla_contract=mla_contract,
+                moe_contract=moe_contract,
+                cache_layout=cache_layout,
+                axis_index_groups=axis_groups,
+                block_shape=geometry.fp8_block_shape,
+                sparse_moe_backend=sparse_moe_backend,
+                pallas_moe_config=pallas_moe_config,
+                pallas_moe_fuse_route_weighting=(
+                    feature_fuse_route_weighting
+                ),
+                pallas_moe_reconstruct_down_fp32=(
+                    feature_reconstruct_down_fp32
+                ),
+                linear_backend=linear_backend,
+                dsa_query_backend=dsa_query_backend,
+                dsa_query_weight_aliases=(
+                    None
+                    if query_weight_aliases is None
+                    else tuple(alias[0] for alias in query_weight_aliases)
+                ),
+                dsa_precomputed_wk_weight=(
+                    None
+                    if recurrent_wk_weights is None
+                    else recurrent_wk_weights[0]
+                ),
+                dsa_head_key_exact_association=(
+                    recurrent_wk_weights is not None
+                ),
+                dsa_score_precision=(
+                    "default"
+                    if config.dsa_score_default_precision
+                    else "highest"
+                ),
+                attention_projection_backend=attention_projection_backend,
+                reconstruct_attention_output_fp32=(
+                    reconstruct_attention_output_fp32
+                ),
+                reconstruct_dense_down_fp32=(
+                    reconstruct_dense_down_fp32
+                ),
+            )
+
+        def stage0_branch(
+            values: tuple[Any, Any, Any, Any, Any],
+        ) -> tuple[Any, Any, Any, Any, Any]:
+            del values
+            candidates = (
+                execute_layer0(False, False),
+                execute_layer0(True, False),
+                execute_layer0(False, True),
+                execute_layer0(True, True),
+            )
+            stage = schedule.stages[0]
+            if len(stage.layers) < 2:
+                raise PlanValidationError(
+                    "layer-0 discriminator requires layer 1 on stage 0"
+                )
+            next_layer = stage.layers[1]
+            next_input_norm = weight(
+                f"attention.slot_{next_layer.stage_slot:02d}.input_norm"
+            )
+            normalized = jnp.stack(
+                tuple(
+                    fused_add_rms_norm(
+                        candidate.hidden_states,
+                        candidate.residual,
+                        next_input_norm,
+                        epsilon=1e-5,
+                    )[0][0]
+                    for candidate in candidates
+                ),
+                axis=0,
+            )
+            baseline = candidates[0]
+            valid = jnp.all(
+                jnp.stack(
+                    tuple(candidate.contract_valid for candidate in candidates)
+                ),
+                axis=0,
+            )
+            return (
+                baseline.selected_positions[0],
+                baseline.selected_scores[0],
+                baseline.selected_valid_counts,
+                normalized,
+                valid & token_valid[None],
+            )
+
+        values = (
+            selected_positions,
+            selected_scores,
+            selected_count,
+            variants,
+            contract_valid,
+        )
+        values = lax.cond(
+            stage_id == jnp.int32(0),
+            stage0_branch,
+            lambda current: current,
+            values,
+        )
+        return tuple(value[None, ...] for value in values)
+
+    def mapped_layer0_residual_discriminator(
+        local_weights: Mapping[str, Any],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        local_token_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, Any, Any, Any, Any]:
+        return mapped_layer0_residual_discriminator_impl(
+            local_weights,
+            None,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            local_token_container,
+            position,
+            block_tables,
+            context_lengths,
+        )
+
+    def mapped_layer0_residual_discriminator_exact_query(
+        local_weights: Mapping[str, Any],
+        local_exact_dsa_weights: Any,
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        local_token_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+    ) -> tuple[Any, Any, Any, Any, Any]:
+        return mapped_layer0_residual_discriminator_impl(
+            local_weights,
+            local_exact_dsa_weights,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            local_token_container,
+            position,
+            block_tables,
+            context_lengths,
+        )
+
     def mapped_prefill_index_repair(
         local_weights: Mapping[str, Any],
         local_materialized_wk: tuple[Any, ...],
@@ -4160,6 +4611,26 @@ def build_decoder_step_program(
         out_specs=output_specs,
         check_vma=False,
     )
+    layer0_residual_discriminator = None
+    if build_layer0_residual_discriminator:
+        discriminator_mapped = (
+            mapped_layer0_residual_discriminator_exact_query
+            if dsa_query_exact_association
+            else mapped_layer0_residual_discriminator
+        )
+        layer0_residual_discriminator = jax.shard_map(
+            discriminator_mapped,
+            mesh=mesh,
+            in_specs=input_specs,
+            out_specs=(
+                P(axis_name, None),
+                P(axis_name, None),
+                P(axis_name, None),
+                P(axis_name, None, None),
+                P(axis_name, None),
+            ),
+            check_vma=False,
+        )
     repair_prefill_index_cache = None
     materialize_dsa_query_weights_fp32 = None
     decode_prefill_index_weights_bf16 = None
@@ -4258,5 +4729,6 @@ def build_decoder_step_program(
             promote_prefill_index_weights_fp32
         ),
         repair_prefill_index_cache=repair_prefill_index_cache,
+        layer0_residual_discriminator=layer0_residual_discriminator,
         split_residual_state=split_residual_state,
     )
