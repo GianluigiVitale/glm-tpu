@@ -1,5 +1,16 @@
 """Synthetic mechanism benchmarks for the topology-first engine."""
 
+from .association_fingerprint import (
+    ACCEPTED_PROMPT_PROJECTION_HLO_SHA256,
+    STRATEGY_ND_ALGORITHM,
+    StrategyNdFingerprintConfig,
+    analyze_strategy_nd_fingerprint,
+    array_sha256,
+    build_strategy_nd_fingerprint,
+    execute_strategy_nd_fingerprint,
+    generate_strategy_nd_input_bits,
+    validate_strategy_nd_fingerprint_hlo,
+)
 from .collective_chain import (
     CollectiveChainConfig,
     CollectiveKind,
@@ -51,6 +62,7 @@ from .paired_transport import (
 )
 
 __all__ = [
+    "ACCEPTED_PROMPT_PROJECTION_HLO_SHA256",
     "CollectiveChainConfig",
     "CollectiveKind",
     "GateCDenseResult",
@@ -60,14 +72,21 @@ __all__ = [
     "PairedTransportConfig",
     "REAL_LAYER_OUTPUT_TOLERANCE",
     "ROUTE_WEIGHT_TOLERANCE",
+    "STRATEGY_ND_ALGORITHM",
+    "StrategyNdFingerprintConfig",
     "TensorTolerance",
     "addressable_checksum",
+    "analyze_strategy_nd_fingerprint",
+    "array_sha256",
     "benchmark_collective_chain",
     "benchmark_paired_transport",
     "build_collective_chain",
+    "build_strategy_nd_fingerprint",
     "build_paired_transport",
     "collective_chain_hlo_policy",
     "compare_bounded_tensor",
+    "execute_strategy_nd_fingerprint",
+    "generate_strategy_nd_input_bits",
     "jax_dtype",
     "latency_distribution",
     "stage_local_dense_gate_c",
@@ -78,6 +97,7 @@ __all__ = [
     "validate_dsa_score_hlo",
     "validate_sparse_attention_hlo",
     "validate_sparse_attention_integration_hlo",
+    "validate_strategy_nd_fingerprint_hlo",
     "TransportChainConfig",
     "TransportKind",
     "benchmark_transport_chain",

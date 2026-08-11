@@ -6776,3 +6776,89 @@ unmotivated arithmetic variants.
   no escaped group. The full affected forced-CPU batch passes 67/67 in 198.84 seconds. Compileall,
   Bash, ShellCheck and diff checks pass. Exact next is one new-diff-only review from cleared
   `12315aa`, commit/push and one serialized protected subshard discriminator.
+
+## 2026-08-11 00:15--01:02 — uniform virtual-TP32 trees are rejected
+
+- Pushed `e19833a` protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_subshard_variants_trace2_20260811T001535466381463Z`
+  executes all four isolated subshard programs after full load/compile and the 8,155-token prefill.
+  Exact token observation and layer-0 selection pass. Every HLO has the required 8xK512 attention
+  and 8xI384 dense kernels, declared local BF16 collectives, one row and no escaped group; the
+  four-module suite contract passes.
+- None matches sealed accepted layer-1 normalized hidden. Mismatch counts are `4200`, `4262`,
+  `4366` and `4317` for dcp/model sequential, dcp/model pairwise, model/dcp sequential and
+  model/dcp pairwise. Mean absolute errors are `1.66656e-4`, `1.68154e-4`, `1.78571e-4` and
+  `1.72628e-4`. Every arm is worse than the integrated baseline's 3,960 mismatches.
+- A direct offline 3-band scan finds no recovered 2,048-column StrategyND band: counts are
+  `1381/1382/1437`, `1405/1424/1433`, `1461/1450/1455` and `1444/1429/1444`.
+  This rejects the whole one-uniform-tree-per-row family, not only four labels.
+- Contract/suite/NPZ/rank-log/pre/failure census SHAs are `5bbc7f29...07c5`,
+  `f9a10221...690`, `2387e412...1eca`, `f1a40474...dd23`, `d54f1431...280d` and
+  `0131ab15...a1e7`. Direct approved-bucket artifacts and authenticated 8/8 cleanup pass. The
+  outer wrapper's generic abort follows the intentional diagnostic exception; `contract.json`
+  itself records `passed=true`. There is no DB/SUCCESS/timing/trace evidence.
+- Three Fable-5-Max and three Opus-5-Max read-only analyses independently inspected the code,
+  source oracle, topology, manifests, HLO and sealed tensors. The cross-model consensus rejects
+  checkpoint/scale/tile ownership and residual/RMS semantics. Direct source-log verification pins
+  the oracle at `model=32,dcp=1`; therefore greenfield's four-way sparse-attention/LSE association
+  is a second real structural difference, while the accepted projection psum is a three-color,
+  three-phase StrategyND association no uniform local-8/LP4 tree can express.
+- Exact next is model-free evidence, not another 8K guess: extend the already-protected collective
+  harness with a deterministic 32-way BF16 association fingerprint, pin the exact StrategyND HLO,
+  and solve/replay its output offline. If projection partials cannot reach the accepted boundary,
+  use one isolated layer-0 ingredients capture to distinguish upstream monolithic attention from
+  projection association. Do not repeat the precision or uniform-tree matrices.
+
+## 2026-08-11 — bounded StrategyND fingerprint implementation
+
+- Reuse audit found that protected Gate A already selected the exact accepted three-color,
+  three-phase StrategyND backend for a 32-way `bf16[1,6144]` reduction. The new default-off mode
+  therefore needs no model/checkpoint and no duplicate launcher: it extends the same global lease,
+  eight-host sync/census, approved-bucket, DB and cleanup path.
+- The executable consumes raw `uint16` BF16 bits sharded by the physical 32-device ring, performs
+  exactly one BF16 `psum`, and returns raw output bits. Its HLO contract pins one full-pod group,
+  shape `bf16[1,6144]`, global ids, and byte-exact `RotatedPincerEmitter/StrategyND` debug config
+  from accepted HLO SHA `51d014de...47f0`. This full-pod operation is diagnostic-only and remains
+  forbidden in repeated greenfield model layers.
+- Thirty-two deterministic cancellation-heavy inputs allow the same output column's association
+  to be tested repeatedly. The offline analyzer covers 54 balanced axis-pincer candidates: both
+  assignments of physical 4-sized axes, all three declared dimension orders and all three balanced
+  four-way pairings per 4-sized dimension. It reports exact union/ambiguity/third/block evidence,
+  explicitly labels the family non-exhaustive, and retains raw arrays for broader replay.
+- Dedicated tests pass 7/7; the affected benchmarking/HLO/topology suite passes 120/120 in 24.50
+  seconds. Full-size offline replay takes about three seconds and recovers a planted candidate on
+  all 6,144 columns. Compileall, Bash, ShellCheck, embedded-wrapper Python and diff checks pass.
+  No TPU output or association conclusion exists until review, commit/push and the protected run.
+
+## 2026-08-11 — six Max consultations and direct HLO audit redirect the discriminator
+
+- Three unique Fable Max and three unique Opus Max read-only consultations inspected distinct
+  arithmetic, source/layout, experiment-design, holistic, HLO, and shortest-path angles. A failed
+  Opus response was replaced rather than counted. Five reports independently identify an upstream
+  blind spot; one proposes relaxing legacy DSA-set equality and is rejected because the objective
+  requires exact selected sets and tie order.
+- Direct inspection confirms the sealed HLO SHA `51d014de...47f0` is a 2,048-row prefill program:
+  entry tensors and row-parallel psums are `bf16[2048,6144]`, scheduler logs say
+  `PREFILL_ONLY`, and the accepted group is iota `{{0,...,31}}`. Position 8,155 is row zero of the
+  separate decode bucket of 32 rows. Its after-codegen HLO was not retained. The StrategyND debug
+  string is reused across accepted scalar and multi-megabyte reductions, so it cannot by itself pin
+  payload chunking or element association.
+- Consequently, the current `bf16[1,6144]` physical-ring probe is not an admissible decoder-tree
+  attribution experiment. It remains a default-off prototype whose positive matches may be useful;
+  it will not be launched or cited for Gate D. This is a provenance rejection before TPU use, not a
+  protected result.
+- The common causal ranking is now: (1) the never-compared 640-wide main latent cache from M8
+  greenfield prefill versus M2048 legacy chunked prefill; (2) four owner-local attention segments,
+  per-owner BF16 normalization/output rounding and FP32 LSE merge versus the legacy monolithic
+  2,048-position online softmax; (3) per-virtual-rank projection partial values; only then (4) the
+  reduction association. The layer-1 normalized row is a saturated endpoint and must not be used to
+  rank more arithmetic guesses.
+- The earlier new-diff Fable audit approved commit. Its validation notes are independently accepted
+  and fixed: analyzer mappings now require a 32-member bijection onto 4x2x4, widths must divide into
+  three bands, and multihost digest errors name HLO/input/output correctly. No duplicate review is
+  due for unchanged logic.
+- Exact next: commit/push this prototype with its explicit non-gating provenance, no TPU launch;
+  then implement one isolated layer-0 ingredients capture using existing observer/protection code.
+  Capture main-cache rows, attention output before W_uv/o_proj, 32 BF16 pre-psum partials plus the
+  post-psum row, and h1/MLP partial/h2 boundaries. Compare each boundary bitwise in dataflow order.
+  No full 8K decoder retry is authorized until the first divergent primitive is named.

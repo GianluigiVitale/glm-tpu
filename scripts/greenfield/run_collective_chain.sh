@@ -21,10 +21,26 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
   exit 2
 }
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_COLLECTIVE_TAG:-greenfield_collectives_$(date -u +%Y%m%dT%H%M%S%NZ)}
-GROUP_SIZES=${GLM_GREENFIELD_COLLECTIVE_GROUPS:-2,4,8,32}
-OPERATIONS=${GLM_GREENFIELD_COLLECTIVE_OPERATIONS:-control,all_reduce,reduce_scatter,all_gather,collective_permute,all_to_all,fused_tuple_all_reduce}
-SHAPE=${GLM_GREENFIELD_COLLECTIVE_SHAPE:-2,6144}
+MODE=${GLM_GREENFIELD_COLLECTIVE_MODE:-chain}
+ASSOCIATION_TRIALS=${GLM_GREENFIELD_COLLECTIVE_ASSOCIATION_TRIALS:-32}
+if [[ $MODE == strategy_nd_fingerprint ]]; then
+  default_tag=greenfield_collective_association_$(date -u +%Y%m%dT%H%M%S%NZ)
+else
+  default_tag=greenfield_collectives_$(date -u +%Y%m%dT%H%M%S%NZ)
+fi
+TAG=${GLM_GREENFIELD_COLLECTIVE_TAG:-$default_tag}
+if [[ $MODE == strategy_nd_fingerprint ]]; then
+  default_groups=32
+  default_operations=all_reduce
+  default_shape=1,6144
+else
+  default_groups=2,4,8,32
+  default_operations=control,all_reduce,reduce_scatter,all_gather,collective_permute,all_to_all,fused_tuple_all_reduce
+  default_shape=2,6144
+fi
+GROUP_SIZES=${GLM_GREENFIELD_COLLECTIVE_GROUPS:-$default_groups}
+OPERATIONS=${GLM_GREENFIELD_COLLECTIVE_OPERATIONS:-$default_operations}
+SHAPE=${GLM_GREENFIELD_COLLECTIVE_SHAPE:-$default_shape}
 DTYPE=${GLM_GREENFIELD_COLLECTIVE_DTYPE:-bfloat16}
 CHAIN_LENGTH=${GLM_GREENFIELD_COLLECTIVE_CHAIN_LENGTH:-75}
 WARMUP=${GLM_GREENFIELD_COLLECTIVE_WARMUP:-200}
@@ -32,6 +48,14 @@ ITERATIONS=${GLM_GREENFIELD_COLLECTIVE_ITERATIONS:-1000}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
+[[ $MODE =~ ^(chain|strategy_nd_fingerprint)$ ]] || {
+  echo "invalid collective mode: $MODE" >&2
+  exit 2
+}
+[[ $ASSOCIATION_TRIALS =~ ^[1-9][0-9]*$ ]] || {
+  echo "invalid association trial count: $ASSOCIATION_TRIALS" >&2
+  exit 2
+}
 [[ $GROUP_SIZES =~ ^(2|4|8|32)(,(2|4|8|32))*$ ]] || {
   echo "invalid groups: $GROUP_SIZES" >&2
   exit 2
@@ -56,8 +80,16 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "protected run requires iterations>=1000" >&2
   exit 2
 }
+if [[ $MODE == strategy_nd_fingerprint ]] && {
+  [[ $GROUP_SIZES != 32 ]] || [[ $OPERATIONS != all_reduce ]] ||
+    [[ $SHAPE != 1,6144 ]] || [[ $DTYPE != bfloat16 ]] ||
+    [[ $ASSOCIATION_TRIALS != 32 ]]
+}; then
+  echo "protected StrategyND fingerprint requires groups=32 operation=all_reduce shape=1,6144 dtype=bfloat16 trials=32" >&2
+  exit 2
+fi
 
-mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/hlo"
+mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/hlo" "$RUN_DIR/association"
 
 say() {
   echo "[collectives $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
@@ -104,7 +136,7 @@ trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR"
 say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN"
-say "MATRIX groups=$GROUP_SIZES operations=$OPERATIONS shape=$SHAPE dtype=$DTYPE chain=$CHAIN_LENGTH warmup=$WARMUP iterations=$ITERATIONS"
+say "MODE=$MODE groups=$GROUP_SIZES operations=$OPERATIONS shape=$SHAPE dtype=$DTYPE chain=$CHAIN_LENGTH warmup=$WARMUP iterations=$ITERATIONS association_trials=$ASSOCIATION_TRIALS"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -130,7 +162,7 @@ coordinator="$coordinator:8476"
 say "launching eight-host dependent chain coordinator=$coordinator"
 
 # shellcheck disable=SC2016
-capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups '"$GROUP_SIZES"' --operations '"$OPERATIONS"' --shape '"$SHAPE"' --dtype '"$DTYPE"' --chain-length '"$CHAIN_LENGTH"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"'; sha256sum "$run/collective.rank${idx}.json" >"$run/collective.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$run/collective.rank${idx}.sha256" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; trap - EXIT; echo "CAPTURE_UPLOAD_OK $(hostname) rank=$idx"'
+capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/association/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/association/* "$remote/diagnostic_association/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode '"$MODE"' --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups '"$GROUP_SIZES"' --operations '"$OPERATIONS"' --shape '"$SHAPE"' --dtype '"$DTYPE"' --chain-length '"$CHAIN_LENGTH"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --association-trials '"$ASSOCIATION_TRIALS"'; sha256sum "$run/collective.rank${idx}.json" >"$run/collective.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$run/collective.rank${idx}.sha256" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/association/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/association/* "$remote/association/" >/dev/null; fi; trap - EXIT; echo "CAPTURE_UPLOAD_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$capture_command" >"$RUN_DIR/capture.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/capture.txt" CAPTURE_UPLOAD_OK || {
@@ -141,6 +173,14 @@ has_eight_unique_markers "$RUN_DIR/capture.txt" CAPTURE_UPLOAD_OK || {
 gcloud storage cp "$REMOTE_PREFIX/host_records/collective.rank*.json" \
   "$RUN_DIR/host_records/" >/dev/null
 gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/hlo/" >/dev/null
+if [[ $MODE == strategy_nd_fingerprint ]]; then
+  gcloud storage cp "$REMOTE_PREFIX/association/*" "$RUN_DIR/association/" >/dev/null
+  /home/gianl/vllm-env/bin/python "$WORKTREE/scripts/greenfield/analyze_collective_association.py" \
+    --input-bits "$RUN_DIR/association/input_bits.npy" \
+    --output-bits "$RUN_DIR/association/output_bits.npy" \
+    --host-record "$RUN_DIR/host_records/collective.rank0.json" \
+    --output "$RUN_DIR/association/analysis.json"
+fi
 say "validating fleet agreement and appending provenance DB rows"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" <<'PY'
@@ -150,6 +190,8 @@ import json
 from pathlib import Path
 import sqlite3
 import sys
+
+import numpy as np
 
 run_dir, pin, oracle_pin, db_path, repo, oracle_repo = sys.argv[1:]
 run_dir = Path(run_dir)
@@ -170,23 +212,116 @@ if {record["code_hash"] for record in records} != {pin}:
 topology_hashes = {record["topology_hash"] for record in records}
 if len(topology_hashes) != 1:
     raise SystemExit(f"fleet topology hashes differ: {sorted(topology_hashes)}")
-case_keys = [
-    (
-        item["config"]["kind"],
-        item["config"]["group_size"],
-        item["config"]["dtype"],
-        item["config"]["rows"],
-        item["config"]["width"],
-    )
-    for item in records[0]["matrix"]
-]
-if not case_keys or len(case_keys) != len(set(case_keys)):
-    raise SystemExit("reference host has an empty or duplicate matrix")
-
+mode_values = {record.get("mode", "chain") for record in records}
+if len(mode_values) != 1:
+    raise SystemExit(f"fleet record modes differ: {sorted(mode_values)}")
+mode = mode_values.pop()
 case_summaries = []
-for case_index, key in enumerate(case_keys):
-    host_items = [record["matrix"][case_index] for record in records]
-    if any(
+association_analysis = None
+if mode == "strategy_nd_fingerprint":
+    if any(record["matrix"] for record in records):
+        raise SystemExit("association fingerprint records must not contain timing cases")
+    host_items = [record.get("association_fingerprint") for record in records]
+    if any(not isinstance(item, dict) for item in host_items):
+        raise SystemExit("fleet association fingerprint record is missing")
+    reference = host_items[0]
+    stable_fields = (
+        "accepted_prompt_projection_hlo_sha256",
+        "capture",
+        "collective_algorithm",
+        "collective_groups",
+        "config",
+        "diagnostic_only",
+        "fleet_hlo_hashes",
+        "fleet_input_bits_hashes",
+        "fleet_output_bits_hashes",
+        "hlo",
+        "member_device_ids",
+        "optimized_hlo_sha256",
+    )
+    for field in stable_fields:
+        if any(item[field] != reference[field] for item in host_items[1:]):
+            raise SystemExit(f"fleet association field differs: {field}")
+    if reference["config"] != {"seed": 1196575821, "trials": 32, "width": 6144}:
+        raise SystemExit(f"unprotected association config: {reference['config']}")
+    if reference["collective_groups"] != [reference["member_device_ids"]]:
+        raise SystemExit("association group/member mapping differs")
+    if sorted(reference["member_device_ids"]) != list(range(32)):
+        raise SystemExit("association member mapping does not cover physical ids 0..31")
+    if not reference["diagnostic_only"]:
+        raise SystemExit("association fingerprint must be marked diagnostic-only")
+    if not reference["hlo"]["valid"] or reference["hlo"]["violations"]:
+        raise SystemExit("association fingerprint HLO contract is invalid")
+    if reference["hlo"]["collective_counts"] != {"all-reduce": 1}:
+        raise SystemExit("association fingerprint does not contain one all-reduce")
+    capture = reference["capture"]
+    for field in (
+        "fleet_hlo_hashes",
+        "fleet_input_bits_hashes",
+        "fleet_output_bits_hashes",
+    ):
+        if len(reference[field]) != 8 or len(set(reference[field])) != 1:
+            raise SystemExit(f"association {field} lacks eight-host agreement")
+    if reference["fleet_hlo_hashes"][0] != reference["optimized_hlo_sha256"]:
+        raise SystemExit("fleet HLO hash differs from recorded optimized HLO")
+    if reference["fleet_input_bits_hashes"][0] != capture["input_bits_sha256"]:
+        raise SystemExit("fleet input hash differs from capture")
+    if reference["fleet_output_bits_hashes"][0] != capture["output_bits_sha256"]:
+        raise SystemExit("fleet output hash differs from capture")
+    replica_hashes = capture["local_replica_output_sha256_by_trial"]
+    if len(replica_hashes) != 32 or any(
+        len(hashes) != 4 or len(set(hashes)) != 1 for hashes in replica_hashes
+    ):
+        raise SystemExit("association local replicas do not agree for every trial")
+    owners = [
+        (record, item)
+        for record, item in zip(records, host_items, strict=True)
+        if item["artifact_manifest"]
+    ]
+    if len(owners) != 1 or owners[0][0]["jax_process_index"] != 0:
+        raise SystemExit("association raw artifacts require exactly one process-zero owner")
+    manifest = json.loads((run_dir / "association" / "manifest.json").read_text())
+    if manifest != owners[0][1]["artifact_manifest"]:
+        raise SystemExit("retrieved association manifest differs from process-zero record")
+    input_bits = np.load(run_dir / "association" / "input_bits.npy", allow_pickle=False)
+    output_bits = np.load(run_dir / "association" / "output_bits.npy", allow_pickle=False)
+    sys.path.insert(0, repo)
+    from glm_tpu.greenfield.benchmarking import array_sha256
+
+    if array_sha256(input_bits) != capture["input_bits_sha256"]:
+        raise SystemExit("retrieved association input bits fail raw checksum")
+    if array_sha256(output_bits) != capture["output_bits_sha256"]:
+        raise SystemExit("retrieved association output bits fail raw checksum")
+    association_analysis = json.loads(
+        (run_dir / "association" / "analysis.json").read_text()
+    )
+    if (
+        association_analysis["input_bits_sha256"] != capture["input_bits_sha256"]
+        or association_analysis["output_bits_sha256"] != capture["output_bits_sha256"]
+        or association_analysis["optimized_hlo_sha256"]
+        != reference["optimized_hlo_sha256"]
+    ):
+        raise SystemExit("offline association analysis is not linked to raw capture/HLO")
+    case_summaries.append(
+        {
+            "analysis": association_analysis,
+            "case": {
+                "dtype": "bfloat16",
+                "group_size": 32,
+                "kind": "strategy_nd_association_fingerprint",
+                "rows": 1,
+                "width": 6144,
+            },
+            "collective_algorithm": reference["collective_algorithm"],
+            "collective_groups": reference["collective_groups"],
+            "diagnostic_only": True,
+            "hlo_sha256": reference["optimized_hlo_sha256"],
+            "input_bits_sha256": capture["input_bits_sha256"],
+            "output_bits_sha256": capture["output_bits_sha256"],
+        }
+    )
+elif mode == "chain":
+    case_keys = [
         (
             item["config"]["kind"],
             item["config"]["group_size"],
@@ -194,46 +329,62 @@ for case_index, key in enumerate(case_keys):
             item["config"]["rows"],
             item["config"]["width"],
         )
-        != key
-        for item in host_items
-    ):
-        raise SystemExit(f"fleet matrix order/config differs at {case_index}")
-    if len({item["optimized_hlo_sha256"] for item in host_items}) != 1:
-        raise SystemExit(f"fleet optimized HLO differs for {key}")
-    for item in host_items:
-        config = item["config"]
-        if (
-            config["chain_length"] != 75
-            or config["warmup_iterations"] < 200
-            or config["measured_iterations"] < 1000
+        for item in records[0]["matrix"]
+    ]
+    if not case_keys or len(case_keys) != len(set(case_keys)):
+        raise SystemExit("reference host has an empty or duplicate matrix")
+    for case_index, key in enumerate(case_keys):
+        host_items = [record["matrix"][case_index] for record in records]
+        if any(
+            (
+                item["config"]["kind"],
+                item["config"]["group_size"],
+                item["config"]["dtype"],
+                item["config"]["rows"],
+                item["config"]["width"],
+            )
+            != key
+            for item in host_items
         ):
-            raise SystemExit(f"unprotected benchmark config for {key}")
-        if item["first_addressable_checksum"] != item["last_addressable_checksum"]:
-            raise SystemExit(f"nondeterministic output for {key}")
-        if not item["hlo"]["valid"] or item["hlo"]["violations"]:
-            raise SystemExit(f"invalid HLO contract for {key}")
-        if len(item["latency"]["samples_ms"]) != config["measured_iterations"]:
-            raise SystemExit(f"incomplete latency distribution for {key}")
-    p50_by_jax_process = {
-        str(record["jax_process_index"]): record["matrix"][case_index]["latency"]["p50_ms"]
-        for record in records
-    }
-    case_summaries.append(
-        {
-            "case": {
-                "dtype": key[2],
-                "group_size": key[1],
-                "kind": key[0],
-                "rows": key[3],
-                "width": key[4],
-            },
-            "collective_groups": host_items[0]["collective_groups"],
-            "hlo_sha256": host_items[0]["optimized_hlo_sha256"],
-            "maximum_host_p50_ms": max(p50_by_jax_process.values()),
-            "minimum_host_p50_ms": min(p50_by_jax_process.values()),
-            "p50_ms_by_jax_process": p50_by_jax_process,
+            raise SystemExit(f"fleet matrix order/config differs at {case_index}")
+        if len({item["optimized_hlo_sha256"] for item in host_items}) != 1:
+            raise SystemExit(f"fleet optimized HLO differs for {key}")
+        for item in host_items:
+            config = item["config"]
+            if (
+                config["chain_length"] != 75
+                or config["warmup_iterations"] < 200
+                or config["measured_iterations"] < 1000
+            ):
+                raise SystemExit(f"unprotected benchmark config for {key}")
+            if item["first_addressable_checksum"] != item["last_addressable_checksum"]:
+                raise SystemExit(f"nondeterministic output for {key}")
+            if not item["hlo"]["valid"] or item["hlo"]["violations"]:
+                raise SystemExit(f"invalid HLO contract for {key}")
+            if len(item["latency"]["samples_ms"]) != config["measured_iterations"]:
+                raise SystemExit(f"incomplete latency distribution for {key}")
+        p50_by_jax_process = {
+            str(record["jax_process_index"]): record["matrix"][case_index]["latency"]["p50_ms"]
+            for record in records
         }
-    )
+        case_summaries.append(
+            {
+                "case": {
+                    "dtype": key[2],
+                    "group_size": key[1],
+                    "kind": key[0],
+                    "rows": key[3],
+                    "width": key[4],
+                },
+                "collective_groups": host_items[0]["collective_groups"],
+                "hlo_sha256": host_items[0]["optimized_hlo_sha256"],
+                "maximum_host_p50_ms": max(p50_by_jax_process.values()),
+                "minimum_host_p50_ms": min(p50_by_jax_process.values()),
+                "p50_ms_by_jax_process": p50_by_jax_process,
+            }
+        )
+else:
+    raise SystemExit(f"unknown fleet record mode: {mode}")
 
 summary = {
     "cases": case_summaries,
@@ -244,9 +395,12 @@ summary = {
         for record in sorted(records, key=lambda item: item["launch_process_id"])
     },
     "mechanism_only": True,
+    "mode": mode,
     "oracle_code_hash": oracle_pin,
     "topology_hash": topology_hashes.pop(),
 }
+if association_analysis is not None:
+    summary["association_analysis"] = association_analysis
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -254,15 +408,27 @@ import provenance as pv
 conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
-    model="zai-org/GLM-5.2-FP8:greenfield-collective-mechanism-only",
+    model=(
+        "zai-org/GLM-5.2-FP8:greenfield-strategy-nd-diagnostic-only"
+        if mode == "strategy_nd_fingerprint"
+        else "zai-org/GLM-5.2-FP8:greenfield-collective-mechanism-only"
+    ),
     revision=None,
     env={
-        "GLM_ENGINE": "greenfield_collective_chain",
+        "GLM_ENGINE": (
+            "greenfield_strategy_nd_fingerprint"
+            if mode == "strategy_nd_fingerprint"
+            else "greenfield_collective_chain"
+        ),
         "greenfield_code_hash": pin,
         "legacy_oracle_code_hash": oracle_pin,
         "topology_hash": summary["topology_hash"],
     },
-    note="Gate-A dependent collective-chain synthetic mechanism benchmark",
+    note=(
+        "Model-free StrategyND association diagnostic; no latency/throughput claim"
+        if mode == "strategy_nd_fingerprint"
+        else "Gate-A dependent collective-chain synthetic mechanism benchmark"
+    ),
     harness_repo=repo,
     fork_repo=oracle_repo,
 )
@@ -275,22 +441,42 @@ for case in case_summaries:
     pv.record_item(
         conn,
         run_id,
-        benchmark="greenfield_collective_chain",
+        benchmark=(
+            "greenfield_strategy_nd_fingerprint"
+            if mode == "strategy_nd_fingerprint"
+            else "greenfield_collective_chain"
+        ),
         item_id=item_id,
-        prompt="Measure one protected 75-operation dependent synthetic collective chain.",
-        gold="Exact optimized HLO, deterministic checksum, complete warmed distribution.",
+        prompt=(
+            "Capture raw BF16 association fingerprints from one byte-pinned 32-way StrategyND reduction."
+            if mode == "strategy_nd_fingerprint"
+            else "Measure one protected 75-operation dependent synthetic collective chain."
+        ),
+        gold=(
+            "Exact StrategyND HLO, eight-host bit agreement, raw input/output integrity, offline replay."
+            if mode == "strategy_nd_fingerprint"
+            else "Exact optimized HLO, deterministic checksum, complete warmed distribution."
+        ),
         raw_output=json.dumps(case, sort_keys=True),
-        extracted=str(case["maximum_host_p50_ms"]),
+        extracted=str(
+            case["analysis"]["union_exact_column_count"]
+            if mode == "strategy_nd_fingerprint"
+            else case["maximum_host_p50_ms"]
+        ),
         correct=True,
         score=None,
     )
 pv.finalize(
     conn,
     run_id,
-    benchmark="greenfield_collective_chain",
+    benchmark=(
+        "greenfield_strategy_nd_fingerprint"
+        if mode == "strategy_nd_fingerprint"
+        else "greenfield_collective_chain"
+    ),
     metric="contract_valid",
     value=1.0,
-    note="Synthetic mechanism only; not model latency or throughput.",
+    note="Synthetic diagnostic/mechanism only; not model latency or throughput.",
 )
 conn.close()
 summary["results_db_run_id"] = run_id
@@ -311,7 +497,7 @@ if check != "ok":
 print(f"COLLECTIVE_PROOF_VALID cases={len(case_summaries)} db_run={run_id}")
 PY
 
-(cd "$RUN_DIR" && find host_records hlo -type f -print0 | sort -z | \
+(cd "$RUN_DIR" && find host_records hlo association -type f -print0 | sort -z | \
   xargs -0 sha256sum >evidence.sha256)
 sha256sum "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db" \
   >>"$RUN_DIR/evidence.sha256"
@@ -326,6 +512,10 @@ gcloud storage cp --no-clobber "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db
   "$RUN_DIR/evidence.sha256" "$RUN_DIR/orchestrator.log" "$RUN_DIR/sync.txt" \
   "$RUN_DIR/capture.txt" "$RUN_DIR/census_pre.txt" "$RUN_DIR/census_post.txt" \
   "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX/" >/dev/null
+if [[ $MODE == strategy_nd_fingerprint ]]; then
+  gcloud storage cp --no-clobber "$RUN_DIR/association/analysis.json" \
+    "$REMOTE_PREFIX/association/" >/dev/null
+fi
 remote_success=$(gcloud storage ls "$REMOTE_PREFIX/SUCCESS" 2>/dev/null || true)
 [[ $remote_success == "$REMOTE_PREFIX/SUCCESS" ]] || {
   say "ABORT: remote SUCCESS marker did not verify"

@@ -1213,3 +1213,28 @@ attention and dense contraction partials per PP8 owner and compares four BF16 re
 associations inside LP4. Even if an arm is exact, it authorizes only a production integration and
 subsequent fully protected 8K run. DB484 remains the accepted PP8 performance point at
 `244.091151 ms` p50 / `4.096830 tok/s`.
+
+## Protected virtual-TP32 discriminator — no performance result
+
+The pushed `e19833a` protected diagnostic ran for about 47 minutes because it loaded the full
+checkpoint, compiled production plus four independent one-layer programs and processed all 8,155
+prompt tokens. All HLO/selection contracts pass, but the four trees are nonexact at
+`4200/4262/4366/4317` mismatches. Its deliberate post-comparison exception produces no warmup
+distribution, XPlane, DB row, terminal `SUCCESS`, Gate-D/E or throughput evidence. The elapsed
+orchestration time is not token latency. DB484 remains the only accepted PP8 decoder result at
+`244.091151 ms` p50 / `4.096830 tok/s`.
+
+## StrategyND fingerprint — explicitly not a performance experiment
+
+The new default-off collective mode executes 32 calls to one model-free `bf16[1,6144]` all-reduce
+solely to recover numerical association. It records no warmed latency distribution, XPlane or
+model throughput and cannot promote Gates D/E. CPU replay time and protected orchestration time
+must not be reported as token latency. DB484 remains the only accepted PP8 performance point.
+
+### Pre-launch disposition
+
+Artifact provenance review proves the pinned backend string comes from a 2,048-row prefill psum,
+while the mismatch occurs in a separate 32-row decode executable and the prototype compiles one
+row. The prototype will not be launched as Gate-D or performance evidence. There is no measurement,
+DB row, trace, throughput, latency, or promotion claim. Work proceeds to a primitive-level layer-0
+ingredients capture before any decoder rerun.

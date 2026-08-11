@@ -3402,3 +3402,100 @@ the requested hidden collective shapes, one live row and no escaped group. The f
 batch passes 67/67 in 198.84 seconds; compileall, Bash, ShellCheck and diff checks pass. Exact next:
 one review of only this new diff from cleared `12315aa`, independent verification, commit/push,
 then one serialized protected subshard discriminator. Do not rerun the rejected precision arms.
+
+## Virtual-TP32 uniform trees are validly rejected; fingerprint the real association
+
+Protected tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_subshard_variants_trace2_20260811T001535466381463Z`
+ran from 00:15--01:02 UTC at pushed pin `e19833a`. All four independent programs passed their
+per-arm optimized-HLO contracts: exactly eight attention K512 and eight dense I384 Pallas kernels,
+the declared local BF16 reduction shapes, distinct modules, one live row, exact layer-0 selection
+and no escaped LP4 collective. Exact first token observation also passes.
+
+All four uniform trees are nonexact versus sealed layer-1 normalized hidden. Mismatch counts are
+`4200` dcp-then-model sequential, `4262` dcp-then-model pairwise, `4366` model-then-dcp
+sequential and `4317` model-then-dcp pairwise. Their mean absolute errors are respectively
+`0.0001666563`, `0.0001681541`, `0.0001785708` and `0.0001726276`; none improves the prior
+production baseline's 3,960 mismatches. Three contiguous 2,048-column mismatch counts are also
+uniform for every arm (`1381/1382/1437`, `1405/1424/1433`, `1461/1450/1455`,
+`1444/1429/1444`), so no arm recovered one visible StrategyND color band.
+
+Contract/suite/NPZ/rank-log/pre-census/failure-census SHAs are `5bbc7f29...07c5`,
+`f9a10221...690`, `2387e412...1eca`, `f1a40474...dd23`, `d54f1431...280d` and
+`0131ab15...a1e7`. All eight logs are byte-identical, direct approved-bucket artifacts were
+retrieved, and authenticated cleanup is 8/8. The intentional diagnostic exception makes the outer
+wrapper print a generic load/compile abort; the persisted contract has `passed=true` and proves
+that arithmetic completed. There is no timing, XPlane, DB row, terminal `SUCCESS`, Gate-D or
+performance result; DB484 remains the only decoder performance point.
+
+Three independent Fable-5-Max and three Opus-5-Max read-only investigations were completed after
+the protected launch. Direct local verification resolves their one material disagreement: the
+sealed accepted oracle used `model=32,dcp=1`, not `model=4,dcp=8`. The useful consensus is that
+checkpoint slicing, FP8 scale ownership, Pallas tail geometry, residual placement and RMSNorm are
+not the defect; the four uniform trees do not span the accepted three-color/three-phase
+`RotatedPincerEmitter/StrategyND` association. The unresolved fork is reduction association versus
+the upstream legacy monolithic sparse-attention schedule, because greenfield uses four local
+context partials plus an LSE merge and the accepted oracle did not.
+
+Do not run another full-checkpoint tree guess or repeat the rejected precision/uniform-tree arms.
+Exact next is one coherent bounded diagnostic batch reusing the Gate-A collective harness and the
+existing isolated layer-0 observer: (1) a model-free 32-way BF16 association fingerprint whose HLO
+must carry the byte-pinned StrategyND config; (2) offline replay/band analysis of the captured
+outputs; and (3), only if needed, one ingredients-not-verdict layer-0 decomposition that separates
+the monolithic-attention input from the 32 projection partials. Review that new diff once after
+tests, then commit/push and run the seconds/minutes-scale fingerprint before any 8K retry.
+
+## StrategyND fingerprint batch is CPU/HLO-ready; protected output is still missing
+
+The existing Gate-A launcher now has a default-off `strategy_nd_fingerprint` mode rather than a
+second protection stack. It compiles exactly one `bf16[1,6144]` 32-way `psum`, bit-pins the accepted
+`RotatedPincerEmitter/StrategyND` algorithm string from source HLO SHA `51d014de...47f0`, and
+rejects every other collective, group, shape or backend. Thirty-two deterministic
+cancellation-heavy trials preserve `uint16` input/output bits; every local replica and all eight
+hosts must agree before raw arrays, manifest, HLO, topology, DB linkage and cleanup can pass.
+
+The offline analyzer is TPU-free and bounded: it replays 54 balanced physical-axis pincer
+candidates covering both possible 4x2x4 coordinate mappings and the three declared phase orders,
+then reports exact per-column union, ambiguity, thirds and 128-column blocks. Raw arrays remain
+archived so a broader replay does not require another TPU run. The family is explicitly marked
+non-exhaustive and this diagnostic makes no latency or model-correctness claim.
+
+Affected benchmarking/HLO/topology tests pass 120/120 in 24.50 seconds; the dedicated suite passes
+7 tests including a forced-32-device CPU executable, exact backend rejection and known-tree
+recovery. Compileall, Bash, ShellCheck, embedded-wrapper Python and diff checks pass. Exact next:
+one new-diff-only Fable audit, independent verification, commit/push, authenticated idle-fleet
+census, and one serialized model-free protected fingerprint. Do not launch another 8K model run.
+
+## Pre-launch provenance audit rejects the one-row fingerprint as Gate-D evidence
+
+Three fresh Fable-5-Max and three fresh Opus-5-Max read-only consultations completed independently
+after the implementation audit. One Opus session failed mid-response and was replaced; six complete
+reports were received. Direct local verification confirms their central artifact finding: accepted
+HLO gzip SHA `51d014de...47f0` is the 2,048-token chunked-prefill executable. Its entry and layer
+projection reductions are `bf16[2048,6144]`, and `legacy.log` records the corresponding batch as
+`PREFILL_ONLY`. Position 8,155 instead runs as row zero of the separate 32-row decode bucket. No
+after-codegen decode HLO survives locally.
+
+The pending diagnostic compiles `bf16[1,6144]` and orders the full group by the physical ring,
+whereas the accepted prefill instruction uses replica group `{{0,...,31}}`. The backend debug
+string is identical across very different accepted payloads and therefore does not pin chunking,
+rotation, implicit member mapping, or per-hop rounding. A match would remain a useful canary; a null
+cannot identify the production decode reduction tree. **Do not launch this mode as Gate-D evidence.**
+It remains default-off and is retained only as a non-gating diagnostic prototype.
+
+The actionable cross-model consensus is upstream: the eight rejected arms all changed reduction
+arithmetic after an unverified main-attention input, then compared at a post-MLP/post-norm boundary
+that saturates small BF16 perturbations. Two earlier primitives are still open: (1) the 640-wide
+main latent cache written by greenfield M8 teacher-forced prefill versus legacy M2048 chunked
+prefill; and (2) legacy monolithic 2,048-position sparse attention versus four owner-local outputs,
+an extra BF16 partial round, and FP32 LSE merge. Exact DSA selected sets remain a hard contract;
+the one consultation proposing to demote legacy-set equality is rejected.
+
+The completed Fable diff audit returned `APPROVE COMMIT`. Its two low validation findings and one
+cosmetic message were fixed: coordinate mappings must be bijective, analyzer width must divide into
+three bands, and fleet-digest failures name the artifact being compared. Exact next is to finish
+tests and commit this batch as a documented non-gating prototype without a TPU launch, then build
+one bounded ingredients capture at pre-norm boundaries: main cache rows, attention context before
+out-projection, 32 BF16 projection partials/post-reduction, and corresponding MLP boundaries. That
+single capture must decide cache versus attention schedule versus partial values versus association
+before any full 8K retry.

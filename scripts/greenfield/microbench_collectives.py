@@ -29,10 +29,17 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
+    ACCEPTED_PROMPT_PROJECTION_HLO_SHA256,
     CollectiveChainConfig,
     CollectiveKind,
+    StrategyNdFingerprintConfig,
+    array_sha256,
     benchmark_collective_chain,
     build_collective_chain,
+    build_strategy_nd_fingerprint,
+    execute_strategy_nd_fingerprint,
+    generate_strategy_nd_input_bits,
+    validate_strategy_nd_fingerprint_hlo,
 )
 from glm_tpu.greenfield.topology import (  # noqa: E402
     collective_groups_for_size,
@@ -52,6 +59,22 @@ def _atomic_write(path: Path, value: dict[str, Any]) -> None:
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     temporary.replace(path)
+
+
+def _atomic_save(path: Path, value: np.ndarray) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
+    with temporary.open("wb") as stream:
+        np.save(stream, value, allow_pickle=False)
+    temporary.replace(path)
+
+
+def _file_sha256(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _csv_ints(value: str) -> tuple[int, ...]:
@@ -85,6 +108,11 @@ def _operations(value: str) -> tuple[CollectiveKind, ...]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        choices=("chain", "strategy_nd_fingerprint"),
+        default="chain",
+    )
     parser.add_argument("--coordinator-address", required=True)
     parser.add_argument("--num-processes", type=int, default=8)
     parser.add_argument("--process-id", type=int, required=True)
@@ -106,12 +134,148 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chain-length", type=int, default=75)
     parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--iterations", type=int, default=1000)
+    parser.add_argument("--association-trials", type=int, default=32)
     parser.add_argument(
         "--allow-unprotected-test-config",
         action="store_true",
         help="permit fewer than the protected 75/200/1000 contract",
     )
     return parser.parse_args()
+
+
+def _run_strategy_nd_fingerprint(
+    args: argparse.Namespace,
+    jax: Any,
+    multihost_utils: Any,
+    topology: Any,
+) -> dict[str, Any]:
+    config = StrategyNdFingerprintConfig(trials=args.association_trials)
+    if not args.allow_unprotected_test_config:
+        config.require_protected_contract()
+    groups = collective_groups_for_size(topology, 32)
+    if len(groups) != 1:
+        raise RuntimeError("StrategyND fingerprint requires one 32-device group")
+    members = groups[0]
+    label = "strategy_nd_association_bfloat16_1x6144"
+    multihost_utils.sync_global_devices(f"greenfield-fingerprint-start-{label}")
+    input_bits = generate_strategy_nd_input_bits(config)
+    compiled = build_strategy_nd_fingerprint(
+        config,
+        members,
+        devices=jax.devices(),
+        enforce_hlo_contract=False,
+    )
+    hlo_sha256 = sha256(compiled.optimized_hlo.encode()).hexdigest()
+    fleet_hlo_hashes = _fleet_digest(
+        multihost_utils,
+        hlo_sha256,
+        label="optimized HLO",
+        num_processes=args.num_processes,
+    )
+    artifact_dir = args.output.parent / "hlo"
+    if jax.process_index() == 0:
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        (artifact_dir / f"{label}.optimized_hlo.txt").write_text(
+            compiled.optimized_hlo
+        )
+    try:
+        hlo_report, algorithm = validate_strategy_nd_fingerprint_hlo(
+            compiled.optimized_hlo, members
+        )
+    except Exception as error:
+        if jax.process_index() == 0:
+            _atomic_write(
+                artifact_dir / f"{label}.hlo_contract.json",
+                {
+                    "accepted_prompt_projection_hlo_sha256": (
+                        ACCEPTED_PROMPT_PROJECTION_HLO_SHA256
+                    ),
+                    "decode_tree_claim": False,
+                    "error": repr(error),
+                    "generic_hlo": compiled.hlo_report.to_dict(),
+                    "source_hlo_role": "prefill_2048_rows",
+                    "valid": False,
+                },
+            )
+        raise
+    if jax.process_index() == 0:
+        _atomic_write(
+            artifact_dir / f"{label}.hlo_contract.json",
+            {
+                "accepted_prompt_projection_hlo_sha256": (
+                    ACCEPTED_PROMPT_PROJECTION_HLO_SHA256
+                ),
+                "collective_algorithm": algorithm,
+                "decode_tree_claim": False,
+                "hlo": hlo_report.to_dict(),
+                "source_hlo_role": "prefill_2048_rows",
+                "valid": True,
+            },
+        )
+    output_bits, capture = execute_strategy_nd_fingerprint(compiled, input_bits)
+    fleet_input_hashes = _fleet_digest(
+        multihost_utils,
+        capture["input_bits_sha256"],
+        label="fingerprint input bits",
+        num_processes=args.num_processes,
+    )
+    fleet_output_hashes = _fleet_digest(
+        multihost_utils,
+        capture["output_bits_sha256"],
+        label="fingerprint output bits",
+        num_processes=args.num_processes,
+    )
+    artifact_manifest: dict[str, Any] = {}
+    if jax.process_index() == 0:
+        association_dir = args.output.parent / "association"
+        input_path = association_dir / "input_bits.npy"
+        output_path = association_dir / "output_bits.npy"
+        _atomic_save(input_path, input_bits)
+        _atomic_save(output_path, output_bits)
+        artifact_manifest = {
+            "input_bits": {
+                "array_sha256": array_sha256(input_bits),
+                "dtype": input_bits.dtype.str,
+                "file": input_path.name,
+                "file_sha256": _file_sha256(input_path),
+                "shape": list(input_bits.shape),
+            },
+            "output_bits": {
+                "array_sha256": array_sha256(output_bits),
+                "dtype": output_bits.dtype.str,
+                "file": output_path.name,
+                "file_sha256": _file_sha256(output_path),
+                "shape": list(output_bits.shape),
+            },
+        }
+        _atomic_write(association_dir / "manifest.json", artifact_manifest)
+    multihost_utils.sync_global_devices(f"greenfield-fingerprint-end-{label}")
+    print(
+        "GREENFIELD_ASSOCIATION_FINGERPRINT_OK "
+        f"launch_process={args.process_id} jax_process={jax.process_index()} "
+        f"trials={config.trials} input={capture['input_bits_sha256']} "
+        f"output={capture['output_bits_sha256']} hlo={hlo_sha256}",
+        flush=True,
+    )
+    return {
+        "accepted_prompt_projection_hlo_sha256": (
+            ACCEPTED_PROMPT_PROJECTION_HLO_SHA256
+        ),
+        "artifact_manifest": artifact_manifest,
+        "capture": capture,
+        "collective_algorithm": algorithm,
+        "collective_groups": [list(group) for group in groups],
+        "config": config.to_dict(),
+        "diagnostic_only": True,
+        "decode_tree_claim": False,
+        "fleet_hlo_hashes": fleet_hlo_hashes,
+        "fleet_input_bits_hashes": fleet_input_hashes,
+        "fleet_output_bits_hashes": fleet_output_hashes,
+        "hlo": hlo_report.to_dict(),
+        "member_device_ids": list(members),
+        "optimized_hlo_sha256": hlo_sha256,
+        "source_hlo_role": "prefill_2048_rows",
+    }
 
 
 def _discover_runtime_topology(
@@ -145,6 +309,7 @@ def _fleet_digest(
     multihost_utils: Any,
     digest_hex: str,
     *,
+    label: str,
     num_processes: int,
 ) -> list[str]:
     digest = np.frombuffer(bytes.fromhex(digest_hex), dtype=np.uint8)
@@ -153,7 +318,7 @@ def _fleet_digest(
     )
     values = [row.tobytes().hex() for row in fleet]
     if len(set(values)) != 1:
-        raise RuntimeError(f"hosts disagree on optimized HLO: {values}")
+        raise RuntimeError(f"hosts disagree on {label}: {values}")
     return values
 
 
@@ -168,6 +333,16 @@ def main() -> int:
         32,
     }:
         raise ValueError("groups must be unique sorted values from 2,4,8,32")
+    if args.mode == "strategy_nd_fingerprint" and (
+        tuple(args.groups) != (32,)
+        or tuple(args.operations) != (CollectiveKind.ALL_REDUCE,)
+        or tuple(args.shape) != (1, 6144)
+        or args.dtype != "bfloat16"
+    ):
+        raise ValueError(
+            "StrategyND fingerprint requires groups=32, operation=all_reduce, "
+            "shape=1,6144, and dtype=bfloat16"
+        )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(
@@ -199,89 +374,97 @@ def main() -> int:
             slice_name=args.slice_name,
             num_processes=args.num_processes,
         )
+        association_fingerprint = None
         matrix = []
-        for group_size in args.groups:
-            groups = collective_groups_for_size(topology, group_size)
-            for kind in args.operations:
-                config = CollectiveChainConfig(
-                    kind=kind,
-                    group_size=group_size,
-                    rows=args.shape[0],
-                    width=args.shape[1],
-                    dtype=args.dtype,
-                    chain_length=args.chain_length,
-                    warmup_iterations=args.warmup,
-                    measured_iterations=args.iterations,
-                )
-                if not args.allow_unprotected_test_config:
-                    config.require_protected_contract()
-                label = (
-                    f"{kind.value}_g{group_size}_{args.dtype}_"
-                    f"{args.shape[0]}x{args.shape[1]}"
-                )
-                multihost_utils.sync_global_devices(f"greenfield-chain-start-{label}")
-                compiled = build_collective_chain(
-                    config,
-                    groups,
-                    devices=jax.devices(),
-                    enforce_hlo_contract=False,
-                )
-                hlo_sha256 = sha256(compiled.optimized_hlo.encode()).hexdigest()
-                fleet_hlo_hashes = _fleet_digest(
-                    multihost_utils,
-                    hlo_sha256,
-                    num_processes=args.num_processes,
-                )
-                if jax.process_index() == 0:
-                    artifact_dir = args.output.parent / "hlo"
-                    artifact_dir.mkdir(parents=True, exist_ok=True)
-                    (artifact_dir / f"{label}.optimized_hlo.txt").write_text(
-                        compiled.optimized_hlo
+        if args.mode == "strategy_nd_fingerprint":
+            association_fingerprint = _run_strategy_nd_fingerprint(
+                args, jax, multihost_utils, topology
+            )
+        else:
+            for group_size in args.groups:
+                groups = collective_groups_for_size(topology, group_size)
+                for kind in args.operations:
+                    config = CollectiveChainConfig(
+                        kind=kind,
+                        group_size=group_size,
+                        rows=args.shape[0],
+                        width=args.shape[1],
+                        dtype=args.dtype,
+                        chain_length=args.chain_length,
+                        warmup_iterations=args.warmup,
+                        measured_iterations=args.iterations,
                     )
-                    _atomic_write(
-                        artifact_dir / f"{label}.hlo_contract.json",
-                        compiled.hlo_report.to_dict(),
+                    if not args.allow_unprotected_test_config:
+                        config.require_protected_contract()
+                    label = (
+                        f"{kind.value}_g{group_size}_{args.dtype}_"
+                        f"{args.shape[0]}x{args.shape[1]}"
                     )
-                if not compiled.hlo_report.valid:
+                    multihost_utils.sync_global_devices(f"greenfield-chain-start-{label}")
+                    compiled = build_collective_chain(
+                        config,
+                        groups,
+                        devices=jax.devices(),
+                        enforce_hlo_contract=False,
+                    )
+                    hlo_sha256 = sha256(compiled.optimized_hlo.encode()).hexdigest()
+                    fleet_hlo_hashes = _fleet_digest(
+                        multihost_utils,
+                        hlo_sha256,
+                        label="optimized HLO",
+                        num_processes=args.num_processes,
+                    )
+                    if jax.process_index() == 0:
+                        artifact_dir = args.output.parent / "hlo"
+                        artifact_dir.mkdir(parents=True, exist_ok=True)
+                        (artifact_dir / f"{label}.optimized_hlo.txt").write_text(
+                            compiled.optimized_hlo
+                        )
+                        _atomic_write(
+                            artifact_dir / f"{label}.hlo_contract.json",
+                            compiled.hlo_report.to_dict(),
+                        )
+                    if not compiled.hlo_report.valid:
+                        print(
+                            "GREENFIELD_COLLECTIVE_HLO_REJECTED "
+                            + json.dumps(
+                                {
+                                    "case": label,
+                                    "collective_counts": compiled.hlo_report.to_dict()[
+                                        "collective_counts"
+                                    ],
+                                    "hlo_sha256": hlo_sha256,
+                                    "violations": [
+                                        violation.to_dict()
+                                        for violation in compiled.hlo_report.violations
+                                    ],
+                                },
+                                sort_keys=True,
+                            ),
+                            flush=True,
+                        )
+                        compiled.hlo_report.raise_for_violations()
+                    measured = benchmark_collective_chain(compiled)
+                    measured.update(
+                        {
+                            "collective_groups": [list(group) for group in groups],
+                            "fleet_hlo_hashes": fleet_hlo_hashes,
+                            "optimized_hlo_sha256": hlo_sha256,
+                        }
+                    )
+                    matrix.append(measured)
                     print(
-                        "GREENFIELD_COLLECTIVE_HLO_REJECTED "
-                        + json.dumps(
-                            {
-                                "case": label,
-                                "collective_counts": compiled.hlo_report.to_dict()[
-                                    "collective_counts"
-                                ],
-                                "hlo_sha256": hlo_sha256,
-                                "violations": [
-                                    violation.to_dict()
-                                    for violation in compiled.hlo_report.violations
-                                ],
-                            },
-                            sort_keys=True,
-                        ),
+                        "GREENFIELD_COLLECTIVE_CASE_OK "
+                        f"launch_process={args.process_id} "
+                        f"jax_process={jax.process_index()} case={label} "
+                        f"p50_ms={measured['latency']['p50_ms']:.6f} "
+                        f"hlo={hlo_sha256}",
                         flush=True,
                     )
-                    compiled.hlo_report.raise_for_violations()
-                measured = benchmark_collective_chain(compiled)
-                measured.update(
-                    {
-                        "collective_groups": [list(group) for group in groups],
-                        "fleet_hlo_hashes": fleet_hlo_hashes,
-                        "optimized_hlo_sha256": hlo_sha256,
-                    }
-                )
-                matrix.append(measured)
-                print(
-                    "GREENFIELD_COLLECTIVE_CASE_OK "
-                    f"launch_process={args.process_id} "
-                    f"jax_process={jax.process_index()} case={label} "
-                    f"p50_ms={measured['latency']['p50_ms']:.6f} "
-                    f"hlo={hlo_sha256}",
-                    flush=True,
-                )
-                multihost_utils.sync_global_devices(f"greenfield-chain-end-{label}")
+                    multihost_utils.sync_global_devices(f"greenfield-chain-end-{label}")
 
         record = {
+            "association_fingerprint": association_fingerprint,
             "captured_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "code_hash": code_hash,
             "fleet_local_device_ids_in_runtime_order": fleet_local_ids.tolist(),
@@ -291,7 +474,8 @@ def main() -> int:
             "launch_process_id": args.process_id,
             "matrix": matrix,
             "mechanism_only": True,
-            "schema_version": 1,
+            "mode": args.mode,
+            "schema_version": 2 if association_fingerprint is not None else 1,
             "topology": topology.to_dict(),
             "topology_hash": topology.topology_hash,
         }

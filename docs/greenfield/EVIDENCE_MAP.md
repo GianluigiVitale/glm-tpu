@@ -933,3 +933,49 @@ capture is still required.
   seven-add BF16 local trees and only LP4 physical reductions. Its affected forced-CPU suite passes
   67/67 in 198.84 seconds with compileall/Bash/ShellCheck/diff checks green. Protected TPU HLO and
   numerical output remain missing until the reviewed batch is committed and launched.
+
+## Protected virtual-TP32 uniform-tree rejection
+
+- Pushed `e19833a` protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_subshard_variants_trace2_20260811T001535466381463Z`
+  completes four isolated arithmetic programs. Every optimized-HLO contract and the four-module
+  suite pass, with exact 8xK512/8xI384 kernel counts, declared LP4 shapes, exact layer-0 selection,
+  one row and no escaped collective.
+- All arms are nonexact versus the sealed layer-1 target: `4200/4262/4366/4317` mismatches. A
+  direct three-band scan is uniformly nonexact for all four, rejecting a single uniform row tree
+  as an emulation of the accepted three-color StrategyND reduction.
+- Contract/suite/NPZ/rank-log/pre/failure census SHAs are `5bbc7f29...07c5`,
+  `f9a10221...690`, `2387e412...1eca`, `f1a40474...dd23`, `d54f1431...280d` and
+  `0131ab15...a1e7`. The contract and artifacts are retrieved from the approved bucket; all eight
+  logs agree and authenticated cleanup is 8/8. No DB/SUCCESS/timing claim exists.
+- Next evidence must reuse the Gate-A protected collective harness to fingerprint the real 32-way
+  BF16 StrategyND association and replay it offline. Another full-checkpoint tree guess is
+  evidence-rejected. If the captured virtual partials cannot reach the accepted boundary, the
+  existing layer-0 observer must isolate the accepted monolithic-attention versus greenfield LP4
+  LSE-merge input before any projection-side integration.
+
+## StrategyND association fingerprint readiness
+
+- A default-off Gate-A launcher mode now compiles one raw-bit-preserving 32-way
+  `bf16[1,6144]` reduction and requires the exact accepted StrategyND algorithm string. It records
+  32 trial inputs/outputs, physical member mapping, per-replica/eight-host checksums, raw manifest,
+  HLO, offline analysis, DB linkage and protected cleanup. No model or checkpoint is touched.
+- Offline replay evaluates a bounded 54-candidate topology-pincer family and preserves raw arrays
+  for later expansion. CPU/HLO/topology tests pass 120/120; a planted association is recovered on
+  all 6,144 columns. These are mechanism/readiness facts only. Protected TPU bits, backend contract,
+  DB row, archive and cleanup remain missing until the reviewed commit is launched.
+
+### Pre-launch provenance disposition
+
+- Six independent Max-effort consultations completed; direct artifact inspection confirms accepted
+  HLO SHA `51d014de...47f0` is the 2,048-row `PREFILL_ONLY` executable, not the 32-row decode
+  executable containing position 8,155.
+- The prototype's `bf16[1,6144]` physical-ring collective therefore cannot establish the decode
+  association from backend-string equality. The accepted prefill psum is `bf16[2048,6144]` with
+  iota group `{{0,...,31}}`; chunking, implicit member mapping and per-hop rounding remain open.
+- Status: retained default-off as a non-gating diagnostic; protected launch rejected before use.
+  No DB, trace, timing, model-correctness or Gate-D standing exists.
+- Next admissible evidence is one isolated layer-0 ingredients capture at unsaturated boundaries:
+  main latent-cache rows, pre-projection attention output, accepted/greenfield 32 BF16 partials and
+  post-reduction row, then MLP boundaries. This separates upstream cache/attention divergence from
+  projection values and association.
