@@ -61,4 +61,4 @@ The fastest correct plan serves at 256K independently of legacy execution, uses 
 checkpoint, has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
 quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
 DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
-Use coherent logged batches; persist exact next before compaction. Fable xhigh audits only the new diff/affected context once, skips cleared code, and approves commit. Verify independently, commit/push, then deploy.
+Use coherent logged batches; persist exact next before compaction. One Sol xhigh subagent audits only the new diff/affected context once, skips cleared code, and approves commit. Verify independently, commit/push, then deploy. Never invoke Claude Code or Fable.

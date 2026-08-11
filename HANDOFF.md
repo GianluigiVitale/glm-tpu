@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 20:19 UTC
+**Updated:** 2026-08-11 21:28 UTC
 
 ## Authority and isolation
 
@@ -181,8 +181,11 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   offset zero and zero-fills the remaining rows. Do not optimize kernels, launch 8K, or start
   another guessed tree first.
   The corrected affected suite passes `121/121` with eight focused tests; Bash, ShellCheck,
-  compileall, JSON, embedded-Python and diff checks pass. One review of only the corrected delta is
-  due before commit; the withdrawn approval for staged SHA `d169d0fe...09fd` is not valid.
+  compileall, JSON, embedded-Python and diff checks pass. One Sol xhigh subagent audited only
+  staged SHA `840d4a4e...0282`, found no high/medium issue and returned `APPROVE COMMIT`; the batch
+  is committed/pushed at `32eb654`. The withdrawn approval for staged SHA `d169d0fe...09fd`
+  remains invalid. Claude Code/Fable is no longer part of the workflow. Exact next is one clean,
+  serialized protected fingerprint run.
 
 ## Historical main-RoPE integration batch
 

@@ -7449,6 +7449,10 @@ unmotivated arithmetic variants.
   `b3c25df`, `_prepare_inputs` sets the sole request's `token_offset=0`, writes its one scheduled
   token first and zero-fills the remainder. Apply only physical row zero from the fingerprint to
   the layer-0 challenger.
-- Exact next: finish the affected test batch, obtain one Fable diff approval, commit/push, then run
-  exactly one protected exact-M32 association fingerprint. Apply its measured physical association
-  to the existing layer-0 discriminator before another complete 8K run.
+- One Sol xhigh subagent audited only staged SHA `840d4a4e...0282`, found no high/medium issue and
+  returned `APPROVE COMMIT`. Independent focused and affected suites pass `8/8` and `121/121`;
+  Bash, ShellCheck and diff checks pass. The batch is committed/pushed at `32eb654`. Per owner
+  direction, Claude Code/Fable is no longer used; future new diffs receive one Sol audit only.
+- Exact next: run exactly one protected exact-M32 association fingerprint. Apply its measured
+  physical row-zero association to the existing layer-0 discriminator before another complete 8K
+  run.
