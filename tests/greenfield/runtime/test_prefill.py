@@ -92,6 +92,7 @@ def test_prefill_hlo_forwards_exact_head_key_contract(monkeypatch) -> None:
         feature_output_tile=256,
         feature_reconstruct_down_fp32=True,
         groups=((0, 1, 2, 3),),
+        main_rope_table_enabled=False,
         observe_prefill_index_inputs=False,
         pairs=((0, 1),),
         split_residual_state=True,
@@ -115,6 +116,7 @@ def test_prefill_hlo_forwards_exact_head_key_contract(monkeypatch) -> None:
     )
 
     assert captured["dsa_head_key_exact_association"] is True
+    assert captured["main_rope_table_enabled"] is False
     assert contract["passed"] is True
 
 

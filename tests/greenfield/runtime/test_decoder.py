@@ -469,6 +469,7 @@ def _main_rope_table_hlo(
     include_forbidden: bool = False,
     round_scope: bool = True,
     duplicate_round: bool = False,
+    round_products_to_bf16: bool = False,
 ) -> str:
     scoped_name = "jit(mapped_token)/shard_map/greenfield_main_rope_table"
     multiplies = "\n".join(
@@ -476,9 +477,20 @@ def _main_rope_table_hlo(
         f'metadata={{op_name="{scoped_name}/mul.{index}"}}'
         for index in range(8)
     )
+    product_rounds = (
+        "\n".join(
+            f"  %mul.round.{index} = bf16[1,32] convert(%mul.{index})\n"
+            f"  %mul.widen.{index} = f32[1,32] convert(%mul.round.{index})"
+            for index in range(8)
+        )
+        if round_products_to_bf16
+        else ""
+    )
+    product_name = "mul.widen" if round_products_to_bf16 else "mul"
     combines = "\n".join(
-        f'  %add.{index} = f32[1,32] add(%mul.{2 * index}, '
-        f'%mul.{2 * index + 1}), metadata={{op_name="{scoped_name}/add.{index}"}}'
+        f'  %add.{index} = f32[1,32] add(%{product_name}.{2 * index}, '
+        f'%{product_name}.{2 * index + 1}), '
+        f'metadata={{op_name="{scoped_name}/add.{index}"}}'
         for index in range(4)
     )
     forbidden = (
@@ -507,6 +519,7 @@ ENTRY %main (main_rope_table: bf16[8192,64]) -> bf16[1,32] {{
   %main_rope_table = bf16[8192,64] parameter(0), metadata={{op_name="main_rope_table"}}
   %f32 = f32[1,32] constant({{...}})
 {multiplies}
+{product_rounds}
 {combines}
 {rounds}
 {duplicate}{forbidden}  ROOT %out = bf16[1,32] copy(%round.0)
@@ -535,6 +548,8 @@ def test_main_rope_table_hlo_contract_is_fail_closed() -> None:
     assert accepted["named_table_parameter_count"] == 1
     assert accepted["fp32_multiply_count"] == 8
     assert accepted["fp32_combine_count"] == 4
+    assert accepted["combines_with_direct_fp32_product_operands"] == 4
+    assert accepted["premature_product_rounds"] == []
     assert accepted["final_round_count"] == 2
     assert accepted["scoped_final_round_count"] == 2
     assert accepted["direct_dataflow_final_round_count"] == 0
@@ -551,6 +566,31 @@ def test_main_rope_table_hlo_contract_is_fail_closed() -> None:
     assert metadata_stripped["scoped_final_round_count"] == 0
     assert metadata_stripped["direct_dataflow_final_round_count"] == 2
     assert metadata_stripped["combines_with_sole_convert_user"] == 2
+
+    premature_product_rounds = _validate_main_rope_table_hlo(
+        parse_hlo_module(
+            _main_rope_table_hlo(round_products_to_bf16=True)
+        ),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not premature_product_rounds["passed"]
+    assert (
+        premature_product_rounds[
+            "combines_with_direct_fp32_product_operands"
+        ]
+        == 0
+    )
+    assert len(premature_product_rounds["premature_product_rounds"]) == 8
+    assert (
+        "main-RoPE FP32 products are rounded before combine"
+        in premature_product_rounds["violations"]
+    )
+    assert (
+        "main-RoPE FP32 combines do not directly consume scoped products"
+        in premature_product_rounds["violations"]
+    )
 
     duplicated = _validate_main_rope_table_hlo(
         parse_hlo_module(

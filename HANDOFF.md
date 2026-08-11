@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 09:11 UTC
+**Updated:** 2026-08-11 10:01 UTC
 
 ## Authority and isolation
 
@@ -21,11 +21,12 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 - The default-off main-RoPE table integration is committed/pushed at
   `d66a4dfe7f88ddfa05f14fd8d6378528da125b03`; its archive-path correction is pushed at
-  `1914c031282325e50f7aeb90fdc50235fe4e356b`. A fail-closed TPU-HLO linter correction is
-  uncommitted pending focused Fable audit.
+  `1914c031282325e50f7aeb90fdc50235fe4e356b`, and its fusion-aware TPU-HLO linter correction is
+  pushed at `d33f9ae17fbd3025d1aa61ae572f0194bb9197e2`. The final fail-closed product-dataflow
+  strengthening is reviewed and ready to commit.
 - It reuses protected DB531 exactly: one host-built BF16 table uses the accepted positive-power /
   reciprocal / NumPy-FP32 trig formula, with the 8K asset pinned to SHA
-  `6a22140f...070101` and position-8,155 row to `67b01e3c...a1d`. The replicated final input is
+  `6a22140f...c80701` and position-8,155 row to `67b01e3c...a1d`. The replicated final input is
   hashed on each local device and looked up device-side; only main-MLA query/cache-key rotary uses
   the proven FP32-final-round primitive. DSA rotary and default execution are unchanged.
 - Decoder, DSA-observer and teacher-forced-prefill paths thread the final table input without
@@ -61,8 +62,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   sole-user evidence, and bumps the decoder record schema to 16. Synthetic fail-close cases pass,
   the preserved TPU HLO passes offline, and the affected suite is `73/73` in `54.92 s`. Fable
   independently replayed the HLO/tests and returned `APPROVE COMMIT`.
-- Exact next: commit/push the HLO-linter correction, then rerun strict fleet census and launch
-  exactly
+- Three fresh Fable-max and three fresh Opus-max reviews independently inspected the mismatch,
+  commits and protected artifacts. All identify main-MLA RoPE as the dominant first divergence;
+  direct DB530 recount is `30,543/30,544` selected-prefill mismatches in the 64-wide RoPE suffix,
+  with one unrelated latent 1-ULP mismatch. Independent source/formula replay proves the accepted
+  patched NumPy producer and the integrated 8,192-row asset are bitwise identical, both SHA
+  `6a22140f...c80701`. One Opus review found a real proof gap: FP32 operations plus final converts
+  could still pass if products were prematurely rounded BF16 and widened before their combines.
+- The pending linter strengthening rejects any FP32-to-BF16 convert directly consuming a scoped
+  product and requires every scoped FP32 combine to consume exactly two same-computation scoped
+  FP32 products. The old linter accepted the adversarial BF16-roundtrip HLO; the new regression
+  passes only when that HLO is rejected. Preserved TPU HLO still passes with `624/312/312`, all `312`
+  combines direct from scoped products, zero premature product rounds and zero violations. The
+  affected suite passes `86/86` with the slow case separate; the forced-32-device complete
+  decoder/prefill proof passes in `157.06 s`.
+- The same focused Fable session independently replayed the preserved TPU HLO, ran 15 focused
+  tests, confirmed the additive contract fields require no runner/schema change, and returned
+  `APPROVE COMMIT`.
+- Exact next: independent static verify, commit/push, then rerun strict fleet census and launch exactly
   one serialized protected complete 8K run with `GLM_GREENFIELD_MAIN_ROPE_TABLE=1`. Accept it only
   if raw tokens, exact DSA, state/load/cache, HLO, HBM, DB/archive and authenticated cleanup all
   pass. If layer-0 output still diverges, use that bounded result to localize the next upstream

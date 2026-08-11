@@ -7077,3 +7077,41 @@ unmotivated arithmetic variants.
   serialized protected retry. Fable independently replayed the preserved TPU HLO and focused tests
   with the same `624/312/312` result and returned `APPROVE COMMIT`. Do not change arithmetic or add
   another observer.
+
+## 2026-08-11 09:15--09:57 — six-review root-cause challenge closes table provenance and strengthens the HLO proof
+
+- At the owner's request, three fresh Fable-max and three fresh Opus-max read-only sessions audited
+  the PP8/legacy layer-0 divergence from distinct numerical, adversarial, experimental, compiler
+  and evidence angles. All six identify main-MLA RoPE as the dominant first divergence. Direct
+  recounts of sealed DB530 agree: `30,543/30,544` selected-prefill cache mismatches lie in columns
+  512--575, position zero is the sole exact selected row, and the only non-RoPE mismatch is one
+  latent 1-ULP value at position 8,145 / column 367. That residual remains a contingency, not a
+  reason to repeat the rejected combine-precision or uniform-tree matrices.
+- The accepted pin's `patch_rotary_cos_sin_cache_numpy` was inspected directly. An independent
+  CPU reproduction of its Torch-FP32 DeepSeek frequency construction, NumPy-FP32 trig and BF16
+  cast matches `build_rotary_table_host` for all `8,192x64` values: zero frequency, angle or table
+  mismatches and identical SHA
+  `6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701`. This closes the
+  single-row table-provenance concern without another TPU or legacy-model run.
+- One Opus compiler review constructed a real counterexample to the current linter: scoped FP32
+  multiplies, BF16 converts, FP32 widens, scoped FP32 combines and final BF16 converts retained all
+  old counts and passed, despite reproducing the forbidden early product rounding. The new
+  fail-closed invariant rejects any FP32-to-BF16 convert that directly consumes a scoped product
+  and requires every scoped combine to consume exactly two same-computation scoped FP32 products.
+  It changes proof only, not arithmetic/runtime/configuration.
+- The adversarial fixture demonstrably passed before the linter change and is now rejected with
+  both explicit violations. The preserved 53 MB TPU HLO replays cleanly: `624` FP32 products,
+  `312` FP32 combines, `312/312` combines with direct scoped-product operands, zero premature
+  product rounds, `312` distinct final rounds, `312` sole-convert users and no violation.
+- A stale prefill unit-test fixture from the already committed table integration lacked the new
+  default-off flag; it now pins `main_rope_table_enabled=False` and asserts that forwarding. The
+  affected suite passes `86/86` with the slow proof deselected, and the separate forced-32-device
+  complete decoder/prefill/table/HLO proof passes in `157.06 s`. PyCompile and diff checks pass.
+- The same focused Fable session independently replayed the preserved HLO with the new validator,
+  ran 15 focused tests, verified default-off/parser/runner behavior, and returned
+  `APPROVE COMMIT`. The two new contract fields are additive; existing fleet records already gate
+  `passed` plus an empty `violations` list, so schema 16 and the runner remain valid.
+- Exact next: independent static verify, commit/push, then exactly one serialized protected
+  complete 8K run at the new pin. A pass must satisfy the full token/DSA/state/cache/HLO/HBM/wall/
+  XPlane/DB/archive/cleanup contract; a sparse failure must be localized to the latent/cache or
+  attention boundary, never another blind combine-tree retry.

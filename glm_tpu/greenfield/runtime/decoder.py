@@ -1880,11 +1880,13 @@ def _validate_main_rope_table_hlo(
             shape.dtype == "bf16" for shape in instruction.result_shapes
         )
     )
-    fp32_multiply_count = sum(
-        instruction.opcode == "multiply"
-        and any(shape.dtype == "f32" for shape in instruction.result_shapes)
+    scoped_fp32_multiplies = tuple(
+        instruction
         for instruction in scoped
+        if instruction.opcode == "multiply"
+        and any(shape.dtype == "f32" for shape in instruction.result_shapes)
     )
+    fp32_multiply_count = len(scoped_fp32_multiplies)
     scoped_fp32_combines = tuple(
         instruction
         for instruction in scoped
@@ -1911,10 +1913,32 @@ def _validate_main_rope_table_hlo(
         (instruction.computation, instruction.name)
         for instruction in scoped_final_rounds
     }
+    scoped_multiply_keys = {
+        (instruction.computation, instruction.name)
+        for instruction in scoped_fp32_multiplies
+    }
     scoped_combine_keys = {
         (instruction.computation, instruction.name)
         for instruction in scoped_fp32_combines
     }
+    combines_with_direct_fp32_product_operands = sum(
+        len(instruction.operand_names) == 2
+        and all(
+            (instruction.computation, operand_name)
+            in scoped_multiply_keys
+            for operand_name in instruction.operand_names
+        )
+        for instruction in scoped_fp32_combines
+    )
+    premature_product_rounds = tuple(
+        instruction.raw_line
+        for instruction in module.instructions
+        if is_final_round(instruction)
+        and scoped_multiply_keys.intersection(
+            (instruction.computation, operand_name)
+            for operand_name in instruction.operand_names
+        )
+    )
     combine_users: dict[tuple[str, str], list[HloInstruction]] = {
         key: [] for key in scoped_combine_keys
     }
@@ -1957,10 +1981,19 @@ def _validate_main_rope_table_hlo(
             violations.append("main-RoPE table scope contains forbidden operations")
         if bf16_arithmetic:
             violations.append("main-RoPE table scope contains BF16 arithmetic")
+        if premature_product_rounds:
+            violations.append("main-RoPE FP32 products are rounded before combine")
         if fp32_multiply_count < layers * 8:
             violations.append("main-RoPE FP32 multiply count is too small")
         if fp32_combine_count < layers * 4:
             violations.append("main-RoPE FP32 combine count is too small")
+        if (
+            combines_with_direct_fp32_product_operands
+            != fp32_combine_count
+        ):
+            violations.append(
+                "main-RoPE FP32 combines do not directly consume scoped products"
+            )
         if final_round_count < layers * 2:
             violations.append("main-RoPE final-round count is too small")
     elif table_parameters or named_table_parameters or scoped:
@@ -1968,6 +2001,9 @@ def _validate_main_rope_table_hlo(
     return {
         "applicable": enabled,
         "bf16_arithmetic": list(bf16_arithmetic),
+        "combines_with_direct_fp32_product_operands": (
+            combines_with_direct_fp32_product_operands
+        ),
         "combines_with_sole_convert_user": (
             combines_with_sole_convert_user
         ),
@@ -1981,6 +2017,7 @@ def _validate_main_rope_table_hlo(
         "fp32_multiply_count": fp32_multiply_count,
         "named_table_parameter_count": len(named_table_parameters),
         "passed": not violations,
+        "premature_product_rounds": list(premature_product_rounds),
         "scoped_instruction_count": len(scoped),
         "scoped_final_round_count": scoped_final_round_count,
         "table_parameter_count": len(table_parameters),
