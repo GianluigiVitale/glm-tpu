@@ -33,6 +33,7 @@ readonly DSA_INTERNAL_LAYER0_REFERENCE_NPZ=${GLM_GREENFIELD_DSA_INTERNAL_LAYER0_
 readonly DSA_INTERNAL_LAYER0_REFERENCE_SHA=${GLM_GREENFIELD_DSA_INTERNAL_LAYER0_REFERENCE_SHA:-0a724bada77d93ddc524368ac3b6e3c7f70442aba59ed96da5abde3dbe75fa39}
 readonly LAYER0_RESIDUAL_VARIANTS=${GLM_GREENFIELD_LAYER0_RESIDUAL_VARIANTS:-0}
 readonly LAYER0_SUBSHARD_VARIANTS=${GLM_GREENFIELD_LAYER0_SUBSHARD_VARIANTS:-0}
+readonly LAYER0_INGREDIENTS=${GLM_GREENFIELD_LAYER0_INGREDIENTS:-0}
 readonly LAYER1_INTERNAL_REFERENCE_NPZ=${GLM_GREENFIELD_LAYER1_INTERNAL_REFERENCE_NPZ:-/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/layer1/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z/internals.npz}
 readonly LAYER1_INTERNAL_REFERENCE_SHA=${GLM_GREENFIELD_LAYER1_INTERNAL_REFERENCE_SHA:-79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054}
 case "$PROFILE" in
@@ -150,8 +151,12 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
   echo "layer-0 subshard variant flag must be 0 or 1" >&2
   exit 2
 }
-[[ $LAYER0_RESIDUAL_VARIANTS == 0 || $LAYER0_SUBSHARD_VARIANTS == 0 ]] || {
-  echo "layer-0 combine and subshard variants must remain isolated" >&2
+[[ $LAYER0_INGREDIENTS == 0 || $LAYER0_INGREDIENTS == 1 ]] || {
+  echo "layer-0 ingredient flag must be 0 or 1" >&2
+  exit 2
+}
+((LAYER0_RESIDUAL_VARIANTS + LAYER0_SUBSHARD_VARIANTS + LAYER0_INGREDIENTS <= 1)) || {
+  echo "layer-0 diagnostic replays must remain mutually isolated" >&2
   exit 2
 }
 LAYER0_DISCRIMINATOR=0
@@ -275,6 +280,28 @@ if [[ $LAYER0_DISCRIMINATOR == 1 ]]; then
   }
   [[ $(sha256sum "$LAYER1_INTERNAL_REFERENCE_NPZ" | awk '{print $1}') == "$LAYER1_INTERNAL_REFERENCE_SHA" ]] || {
     echo "layer-1 internal reference hash drifted" >&2
+    exit 2
+  }
+fi
+if [[ $LAYER0_INGREDIENTS == 1 ]]; then
+  [[ $PROFILE == 8k && $SHORT_CONTEXT_DSA_ORACLE == 1 ]] || {
+    echo "layer-0 ingredients require the protected 8K DSA/token oracle" >&2
+    exit 2
+  }
+  [[ $RUNTIME_KIND == pallas_feature_linear && $COMPLETE_TOKEN_PATH == 1 && $SPLIT_RESIDUAL_STATE == 1 ]] || {
+    echo "layer-0 ingredients require the complete split Pallas-linear path" >&2
+    exit 2
+  }
+  [[ $PREFILL_INDEX_REPAIR == 1 && $DSA_QUERY_EXACT_ASSOCIATION == 1 && $DSA_HEAD_KEY_EXACT_ASSOCIATION == 1 && $DSA_SCORE_DEFAULT_PRECISION == 1 ]] || {
+    echo "layer-0 ingredients require the complete exact recurrent DSA chain" >&2
+    exit 2
+  }
+  [[ $LAYER_RESIDUAL_OBSERVER == 0 ]] || {
+    echo "layer-0 ingredients must remain isolated from residual observation" >&2
+    exit 2
+  }
+  [[ $DSA_INTERNAL_OBSERVER == 0 ]] || {
+    echo "layer-0 ingredients must remain isolated from DSA internals" >&2
     exit 2
   }
 fi
@@ -1004,6 +1031,8 @@ if [[ $LAYER0_RESIDUAL_VARIANTS == 1 ]]; then
   LAYER0_VARIANT_SUFFIX=_layer0_residual_variants
 elif [[ $LAYER0_SUBSHARD_VARIANTS == 1 ]]; then
   LAYER0_VARIANT_SUFFIX=_layer0_subshard_variants
+elif [[ $LAYER0_INGREDIENTS == 1 ]]; then
+  LAYER0_VARIANT_SUFFIX=_layer0_ingredients
 fi
 readonly LAYER0_VARIANT_SUFFIX
 ROUNDTRIP_SUFFIX=
@@ -1101,7 +1130,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS LAYER0_INGREDIENTS=$LAYER0_INGREDIENTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -1127,7 +1156,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer $CONTEXT_NAME load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; dsa_query_exact_association='"$DSA_QUERY_EXACT_ASSOCIATION"'; dsa_head_key_exact_association='"$DSA_HEAD_KEY_EXACT_ASSOCIATION"'; dsa_score_default_precision='"$DSA_SCORE_DEFAULT_PRECISION"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; layer0_variants='"$LAYER0_RESIDUAL_VARIANTS"'; layer0_subshard_variants='"$LAYER0_SUBSHARD_VARIANTS"'; layer1_ref='"$LAYER1_INTERNAL_REFERENCE_NPZ"'; layer1_ref_sha='"$LAYER1_INTERNAL_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer" "$run/layer0_residual_discriminator"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_residual_discriminator/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_residual_discriminator/* "$remote/layer0_residual_discriminator/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; variant_args=(); if [[ $layer0_variants == 1 ]]; then variant_args=(--observe-layer0-residual-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_subshard_variants == 1 ]]; then variant_args=(--observe-layer0-subshard-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --dsa-query-exact-association "$dsa_query_exact_association" --dsa-head-key-exact-association "$dsa_head_key_exact_association" --dsa-score-default-precision "$dsa_score_default_precision" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" "${variant_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; dsa_query_exact_association='"$DSA_QUERY_EXACT_ASSOCIATION"'; dsa_head_key_exact_association='"$DSA_HEAD_KEY_EXACT_ASSOCIATION"'; dsa_score_default_precision='"$DSA_SCORE_DEFAULT_PRECISION"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; layer0_variants='"$LAYER0_RESIDUAL_VARIANTS"'; layer0_subshard_variants='"$LAYER0_SUBSHARD_VARIANTS"'; layer0_ingredients='"$LAYER0_INGREDIENTS"'; layer1_ref='"$LAYER1_INTERNAL_REFERENCE_NPZ"'; layer1_ref_sha='"$LAYER1_INTERNAL_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer" "$run/layer0_residual_discriminator" "$run/layer0_ingredients"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_residual_discriminator/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_residual_discriminator/* "$remote/layer0_residual_discriminator/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_ingredients/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_ingredients/* "$remote/layer0_ingredients/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; variant_args=(); if [[ $layer0_variants == 1 ]]; then variant_args=(--observe-layer0-residual-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_subshard_variants == 1 ]]; then variant_args=(--observe-layer0-subshard-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_ingredients == 1 ]]; then variant_args=(--observe-layer0-ingredients 1); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --dsa-query-exact-association "$dsa_query_exact_association" --dsa-head-key-exact-association "$dsa_head_key_exact_association" --dsa-score-default-precision "$dsa_score_default_precision" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" "${variant_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
@@ -1155,6 +1184,11 @@ if [[ $execute_status -ne 0 ]] || \
       "$RUN_DIR/layer0_residual_discriminator/" \
       >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
   fi
+  if [[ $LAYER0_INGREDIENTS == 1 ]]; then
+    gcloud storage cp "$REMOTE_PREFIX/layer0_ingredients/*" \
+      "$RUN_DIR/layer0_ingredients/" \
+      >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
+  fi
   say "ABORT: real decoder load/compile did not pass 8/8"
   exit 1
 fi
@@ -1179,6 +1213,10 @@ fi
 if [[ $DSA_INTERNAL_OBSERVER == 1 ]]; then
   gcloud storage cp "$REMOTE_PREFIX/dsa_internal_observer/*" \
     "$RUN_DIR/dsa_internal_observer/" >/dev/null
+fi
+if [[ $LAYER0_INGREDIENTS == 1 ]]; then
+  gcloud storage cp "$REMOTE_PREFIX/layer0_ingredients/*" \
+    "$RUN_DIR/layer0_ingredients/" >/dev/null
 fi
 
 say "validating fleet agreement and recording diagnostic DB linkage"

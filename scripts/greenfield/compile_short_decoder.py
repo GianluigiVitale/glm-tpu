@@ -43,11 +43,13 @@ from glm_tpu.greenfield.model import (  # noqa: E402
     build_pipeline_schedule,
 )
 from glm_tpu.greenfield.runtime import (  # noqa: E402
+    LAYER0_INGREDIENT_NAMES,
     build_decoder_step_program,
     build_teacher_forced_prefill_program,
     validate_decoder_step_hlo,
     validate_dsa_query_weight_materializer_hlo,
     validate_layer0_residual_discriminator_hlo,
+    validate_layer0_ingredients_observer_hlo,
     validate_prefill_index_weight_materialization_hlo,
     validate_teacher_forced_prefill_hlo,
 )
@@ -179,6 +181,174 @@ def _encode_bfloat16_bits(value: np.ndarray) -> np.ndarray:
         )
     native_bits = np.ascontiguousarray(observed).view(np.uint16)
     return native_bits.astype(np.dtype("<u2"), copy=False)
+
+
+def _validate_layer0_ingredients(
+    observed: dict[str, np.ndarray],
+    *,
+    groups: tuple[tuple[int, ...], ...],
+    expected_positions: np.ndarray,
+    expected_scores: np.ndarray,
+    expected_count: int,
+    logical_page_size: int,
+) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    """Validate stage-0 ownership/replication and encode a compact artifact."""
+
+    if tuple(observed) != LAYER0_INGREDIENT_NAMES:
+        raise RuntimeError("layer-0 ingredient result names drifted")
+    active_rows = np.asarray(groups[0], dtype=np.int32)
+    inactive_rows = np.asarray(
+        sorted(set(range(len(groups) * len(groups[0]))) - set(groups[0])),
+        dtype=np.int32,
+    )
+    active = {name: np.asarray(value[active_rows]) for name, value in observed.items()}
+
+    sentinel_passed = True
+    negative_infinity_names = {
+        "selected_scores",
+        "sparse_partial_logsumexp",
+        "combined_attention_logsumexp",
+    }
+    negative_one_names = {
+        "selected_positions",
+        "owner_selected_positions",
+    }
+    for name, value in observed.items():
+        inactive = np.asarray(value[inactive_rows])
+        if name in negative_infinity_names:
+            sentinel_passed &= bool(np.all(np.isneginf(inactive)))
+        elif name in negative_one_names:
+            sentinel_passed &= bool(np.all(inactive == -1))
+        elif inactive.dtype.name == "bfloat16":
+            sentinel_passed &= bool(np.all(_encode_bfloat16_bits(inactive) == 0))
+        else:
+            sentinel_passed &= bool(np.all(inactive == 0))
+
+    replicated_names = (
+        "selected_positions",
+        "selected_scores",
+        "selected_valid_counts",
+        "normalized_input",
+        "combined_residual",
+        "current_cache_row",
+        "combined_attention_output",
+        "combined_attention_logsumexp",
+        "combined_attention_valid",
+        "attention_reduced_update",
+        "normalized_mlp",
+        "post_attention_residual",
+        "dense_reduced_update",
+        "next_hidden",
+        "layer1_normalized",
+        "contract_valid",
+    )
+    replication_passed = all(
+        all(np.array_equal(value[0], row) for row in value[1:])
+        for value in (active[name] for name in replicated_names)
+    )
+    selection_exact = bool(
+        np.array_equal(active["selected_positions"][0], expected_positions)
+        and np.array_equal(active["selected_scores"][0], expected_scores)
+        and int(active["selected_valid_counts"][0, 0]) == expected_count
+    )
+
+    owner_positions = active["owner_selected_positions"]
+    owner_counts = active["owner_selected_valid_counts"][:, 0].astype(np.int64)
+    owner_cache = active["owner_selected_cache_values"]
+    local_rows_per_page = logical_page_size // len(groups[0])
+    owner_contracts = []
+    union: list[int] = []
+    for owner, count in enumerate(owner_counts.tolist()):
+        live = owner_positions[owner, :count]
+        tail = owner_positions[owner, count:]
+        owners = (live % logical_page_size) // local_rows_per_page
+        union.extend(int(value) for value in live.tolist())
+        owner_contracts.append(
+            {
+                "cache_tail_zero": bool(np.all(owner_cache[owner, count:] == 0)),
+                "count": int(count),
+                "owner": owner,
+                "positions_have_expected_owner": bool(np.all(owners == owner)),
+                "positions_strictly_ascending": bool(
+                    live.size < 2 or np.all(live[1:] > live[:-1])
+                ),
+                "tail_is_negative_one": bool(np.all(tail == -1)),
+            }
+        )
+    expected_union = np.sort(expected_positions[:expected_count])
+    owner_union_exact = bool(
+        len(union) == expected_count
+        and np.array_equal(np.sort(np.asarray(union, dtype=np.int32)), expected_union)
+    )
+    owner_partition_passed = bool(
+        owner_union_exact
+        and all(
+            record["cache_tail_zero"]
+            and record["positions_have_expected_owner"]
+            and record["positions_strictly_ascending"]
+            and record["tail_is_negative_one"]
+            for record in owner_contracts
+        )
+    )
+    health_passed = bool(
+        np.all(active["contract_valid"])
+        and np.all(active["owner_selected_cache_valid"])
+        and np.all(active["sparse_partial_valid"])
+        and np.all(active["combined_attention_valid"])
+    )
+    finite_names = tuple(
+        name
+        for name, value in active.items()
+        if (
+            value.dtype.name == "bfloat16"
+            or np.issubdtype(value.dtype, np.inexact)
+        )
+        and name not in negative_infinity_names
+    )
+    finite_passed = bool(
+        all(np.all(np.isfinite(active[name])) for name in finite_names)
+    )
+    selected_cache_nonzero = bool(np.any(owner_cache != 0))
+
+    artifact: dict[str, np.ndarray] = {}
+    arrays: dict[str, dict[str, Any]] = {}
+    for name, value in active.items():
+        if value.dtype.name == "bfloat16":
+            artifact_name = f"{name}_bfloat16_bits"
+            encoded = _encode_bfloat16_bits(value)
+        else:
+            artifact_name = name
+            encoded = np.ascontiguousarray(value)
+        artifact[artifact_name] = encoded
+        arrays[artifact_name] = {
+            "dtype": str(encoded.dtype),
+            "sha256": sha256(encoded.tobytes(order="C")).hexdigest(),
+            "shape": list(encoded.shape),
+        }
+    contract = {
+        "active_rows": active_rows.tolist(),
+        "arrays": arrays,
+        "finite_names": list(finite_names),
+        "finite_passed": finite_passed,
+        "health_passed": health_passed,
+        "inactive_rows_are_sentinel": sentinel_passed,
+        "lane_replication_passed": replication_passed,
+        "owner_partition_passed": owner_partition_passed,
+        "owner_records": owner_contracts,
+        "owner_union_exact": owner_union_exact,
+        "selected_cache_nonzero": selected_cache_nonzero,
+        "selection_exact": selection_exact,
+    }
+    contract["passed"] = bool(
+        finite_passed
+        and health_passed
+        and sentinel_passed
+        and replication_passed
+        and owner_partition_passed
+        and selected_cache_nonzero
+        and selection_exact
+    )
+    return artifact, contract
 
 
 def _canonicalize_layer_residual_observation(
@@ -1230,6 +1400,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--observe-layer0-ingredients",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--layer1-internal-reference-npz", type=Path)
     parser.add_argument("--layer1-internal-reference-sha256")
     parser.add_argument(
@@ -1277,12 +1453,19 @@ def main() -> int:
     args.observe_layer0_subshard_variants = bool(
         args.observe_layer0_subshard_variants
     )
+    args.observe_layer0_ingredients = bool(args.observe_layer0_ingredients)
     if (
-        args.observe_layer0_residual_variants
-        and args.observe_layer0_subshard_variants
+        sum(
+            (
+                args.observe_layer0_residual_variants,
+                args.observe_layer0_subshard_variants,
+                args.observe_layer0_ingredients,
+            )
+        )
+        > 1
     ):
         raise ValueError(
-            "layer-0 combine and subshard discriminators must remain isolated"
+            "layer-0 diagnostic replays must remain mutually isolated"
         )
     observe_layer0_discriminator = bool(
         args.observe_layer0_residual_variants
@@ -1381,11 +1564,21 @@ def main() -> int:
         raise ValueError(
             "layer-0 discriminator requires the sealed DSA/token oracle"
         )
+    if args.observe_layer0_ingredients and not dsa_oracle_mode:
+        raise ValueError(
+            "layer-0 ingredient capture requires the sealed DSA/token oracle"
+        )
     if observe_layer0_discriminator and (
         args.observe_dsa_internals or args.observe_layer_residuals
     ):
         raise ValueError(
             "layer-0 discriminator must remain isolated from other observers"
+        )
+    if args.observe_layer0_ingredients and (
+        args.observe_dsa_internals or args.observe_layer_residuals
+    ):
+        raise ValueError(
+            "layer-0 ingredient capture must remain isolated from other observers"
         )
     if observe_layer0_discriminator and not (
         args.prefill_index_repair
@@ -1395,6 +1588,18 @@ def main() -> int:
     ):
         raise ValueError(
             "layer-0 discriminator requires every proven 8K DSA correction"
+        )
+    if args.observe_layer0_ingredients and not (
+        args.prefill_index_repair
+        and args.dsa_query_exact_association
+        and args.dsa_head_key_exact_association
+        and args.dsa_score_default_precision
+        and args.runtime_kind == "pallas_feature_linear"
+        and args.complete_token_path
+        and args.split_residual_state
+    ):
+        raise ValueError(
+            "layer-0 ingredient capture requires the proven 8K production path"
         )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
@@ -1826,10 +2031,15 @@ def main() -> int:
                 observe_layer0_discriminator
             ),
             layer0_residual_discriminator_kind=layer0_discriminator_kind,
+            build_layer0_ingredients_observer=(
+                args.observe_layer0_ingredients
+            ),
             split_residual_state=args.split_residual_state,
         )
         dsa_observer = None
-        if dsa_oracle_mode and not observe_layer0_discriminator:
+        if dsa_oracle_mode and not (
+            observe_layer0_discriminator or args.observe_layer0_ingredients
+        ):
             dsa_observer = build_decoder_step_program(
                 execution_plan,
                 schedule,
@@ -2543,7 +2753,9 @@ def main() -> int:
         fleet_dsa_observer_hlo_hashes = None
         dsa_observer_hlo_contract = None
         dsa_observer_isolation_contract = None
-        if dsa_oracle_mode and not observe_layer0_discriminator:
+        if dsa_oracle_mode and not (
+            observe_layer0_discriminator or args.observe_layer0_ingredients
+        ):
             assert dsa_observer is not None
             multihost_utils.sync_global_devices(
                 "greenfield-short-dsa-observer-compile-start"
@@ -2795,6 +3007,65 @@ def main() -> int:
                     "failed: "
                     f"{layer0_residual_discriminator_suite_contract}; "
                     f"arms={layer0_residual_discriminator_hlo_contracts}"
+                )
+        compiled_layer0_ingredients_observer = None
+        layer0_ingredients_compile_seconds = None
+        layer0_ingredients_hlo_sha256 = None
+        fleet_layer0_ingredients_hlo_hashes = None
+        layer0_ingredients_hlo_contract = None
+        if args.observe_layer0_ingredients:
+            if decoder.layer0_ingredients_observer is None:
+                raise RuntimeError(
+                    "layer-0 ingredient observer executable is unavailable"
+                )
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-ingredients-compile-start"
+            )
+            ingredients_compile_started = time.monotonic()
+            compiled_layer0_ingredients_observer = jax.jit(
+                decoder.layer0_ingredients_observer
+            ).lower(*inputs).compile()
+            layer0_ingredients_compile_seconds = (
+                time.monotonic() - ingredients_compile_started
+            )
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-ingredients-compile-end"
+            )
+            optimized_ingredients_hlo = (
+                compiled_layer0_ingredients_observer.as_text()
+            )
+            layer0_ingredients_hlo_sha256 = sha256(
+                optimized_ingredients_hlo.encode("utf-8")
+            ).hexdigest()
+            fleet_layer0_ingredients_hlo_hashes = _fleet_digest(
+                multihost_utils,
+                layer0_ingredients_hlo_sha256,
+                num_processes=args.num_processes,
+            )
+            layer0_ingredients_hlo_contract = (
+                validate_layer0_ingredients_observer_hlo(
+                    optimized_ingredients_hlo,
+                    config=decoder.config,
+                    groups=groups,
+                )
+            )
+            if jax.process_index() == 0:
+                hlo_dir = args.output.parent / "hlo"
+                with gzip.open(
+                    hlo_dir / "layer0_ingredients.optimized_hlo.txt.gz",
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(optimized_ingredients_hlo)
+                _atomic_json(
+                    hlo_dir / "layer0_ingredients.hlo_contract.json",
+                    layer0_ingredients_hlo_contract,
+                )
+            del optimized_ingredients_hlo
+            if not layer0_ingredients_hlo_contract["passed"]:
+                raise RuntimeError(
+                    "layer-0 ingredient observer HLO contract failed before "
+                    f"execution: {layer0_ingredients_hlo_contract}"
                 )
         compiled_prefill = None
         prefill_compile_seconds = None
@@ -3154,6 +3425,93 @@ def main() -> int:
             raise RuntimeError(
                 "layer-0 residual discriminator completed; diagnostic-only "
                 f"comparisons={comparisons}"
+            )
+        if args.observe_layer0_ingredients:
+            assert compiled_layer0_ingredients_observer is not None
+            assert layer0_ingredients_hlo_contract is not None
+            assert layer0_ingredients_hlo_sha256 is not None
+            assert dsa_oracle_tensors is not None
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-ingredients-execute-start"
+            )
+            ingredients_result = compiled_layer0_ingredients_observer(
+                *runtime_prefix, *tuple(output)
+            )
+            ingredients_result[-1].block_until_ready()
+            observed_ingredients = {
+                name: _materialize_global_array(
+                    jax, multihost_utils, value
+                )
+                for name, value in zip(
+                    LAYER0_INGREDIENT_NAMES,
+                    ingredients_result,
+                    strict=True,
+                )
+            }
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-ingredients-execute-end"
+            )
+            expected_positions = np.asarray(
+                dsa_oracle_tensors["selected_positions"][0, 0],
+                dtype=np.int32,
+            )
+            expected_scores = np.asarray(
+                dsa_oracle_tensors["selected_scores"][0, 0],
+                dtype=np.float32,
+            )
+            expected_count = int(dsa_oracle_tensors["valid_counts"][0, 0])
+            artifact_arrays, ingredients_contract = (
+                _validate_layer0_ingredients(
+                    observed_ingredients,
+                    groups=groups,
+                    expected_positions=expected_positions,
+                    expected_scores=expected_scores,
+                    expected_count=expected_count,
+                    logical_page_size=state_layout.logical_page_size,
+                )
+            )
+            decode_position = int(dsa_oracle_tensors["decode_positions"][0])
+            ingredients_contract.update(
+                {
+                    "code_hash": code_hash,
+                    "compile_seconds": layer0_ingredients_compile_seconds,
+                    "decode_position": decode_position,
+                    "fleet_hlo_hashes": fleet_layer0_ingredients_hlo_hashes,
+                    "hlo_contract": layer0_ingredients_hlo_contract,
+                    "hlo_sha256": layer0_ingredients_hlo_sha256,
+                    "ingredient_names": list(LAYER0_INGREDIENT_NAMES),
+                    "source_state": "post_teacher_forced_prefill",
+                }
+            )
+            ingredients_contract["passed"] = bool(
+                ingredients_contract["passed"]
+                and layer0_ingredients_hlo_contract["passed"]
+            )
+            if jax.process_index() == 0:
+                ingredients_dir = args.output.parent / "layer0_ingredients"
+                _atomic_npz(
+                    ingredients_dir
+                    / f"position_{decode_position}_ingredients.npz",
+                    decode_position=np.asarray(
+                        [decode_position], dtype=np.int32
+                    ),
+                    **artifact_arrays,
+                )
+                _atomic_json(
+                    ingredients_dir / "contract.json", ingredients_contract
+                )
+            multihost_utils.sync_global_devices(
+                "greenfield-layer0-ingredients-complete"
+            )
+            _delete_arrays(ingredients_result)
+            if not ingredients_contract["passed"]:
+                raise RuntimeError(
+                    "layer-0 ingredient observer contract failed: "
+                    f"{ingredients_contract}"
+                )
+            raise RuntimeError(
+                "layer-0 ingredient observer completed; diagnostic-only "
+                f"position={decode_position}"
             )
         if dsa_oracle_mode:
             assert compiled_dsa_observer is not None

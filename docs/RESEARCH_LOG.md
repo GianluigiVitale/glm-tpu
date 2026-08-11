@@ -6862,3 +6862,38 @@ unmotivated arithmetic variants.
   Capture main-cache rows, attention output before W_uv/o_proj, 32 BF16 pre-psum partials plus the
   post-psum row, and h1/MLP partial/h2 boundaries. Compare each boundary bitwise in dataflow order.
   No full 8K decoder retry is authorized until the first divergent primitive is named.
+
+## 2026-08-11 — layer-0 primitive capture implementation
+
+- Reuse inspection found that the existing decoder builder, packed state, teacher-forced prefill,
+  sealed token/DSA oracle, residual discriminator, global-array materializer and protected launcher
+  already supply the expensive and safety-critical machinery. The new batch extends those paths;
+  it does not add another loader, lease, fleet wrapper or model implementation.
+- A static `capture_ingredients=False` path on the stage-local dense layer records generated and
+  selected 640-wide cache values, owner-local sparse-attention numerator/LSE state, combined
+  attention state, value/output-projection inputs, eight K512 output partials, production local and
+  LP4-reduced updates, and eight I384 dense partials plus dense boundaries. Four stage-0 owners give
+  32 separately rounded partials while the production output remains the ordinary BF16 Pallas path.
+- A one-layer shard-map observer emits 29 named device-resident fields. Inactive stages emit typed
+  sentinels; active stage-0 replicas retain owner-local values rather than globally reconstructing
+  them inside the model. The optimized-HLO gate pins the GLM shapes and kernel multiplicities,
+  accepts only all-gather/all-reduce over the eight explicit LP4 groups, and rejects host execution,
+  full-pod transport, FP32 boundaries or loss of the scoped layer-1 normalization.
+- The artifact validator requires exact sealed selection including score bits/order, exact owner
+  union and ownership, zero tails, replicated common state, inactive sentinels, all health flags,
+  nonzero selected cache and finite tensors. BF16 arrays are serialized as little-endian uint16 bits
+  with per-array SHA-256s; only the four active rows are archived. The diagnostic exits intentionally
+  after artifacts and cannot claim timing, DB, trace, Gate-D or performance evidence.
+- The broad explicit-CPU kernel/runtime/HLO suite passes 243/243 in 334.10 seconds. Focused tests,
+  compileall, `git diff --check`, Bash syntax and ShellCheck also pass. The first broad invocation
+  accidentally inherited the local TPU backend and was terminated before evidence; the completed
+  suite explicitly used `JAX_PLATFORMS=cpu`. No protected TPU workflow is active.
+- The one new-diff-only Fable xhigh audit found one blocker: ingredients mode skipped building the
+  ordinary DSA observer but a stale later compile gate still asserted it was present. The minimal
+  correction pairs both gates on the ingredients flag, and a static regression assertion requires
+  the paired expression at both sites. The focused explicit-CPU check, compileall and diff check
+  pass; the same session reviewed only this correction and returned `APPROVE COMMIT`.
+- Exact next: independently verify, commit/push, then run one protected 8K greenfield capture. Add
+  the smallest isolated legacy-oracle capture needed to expose the same boundaries and stop at the
+  first bitwise divergence in dataflow order. Do not repeat the rejected combine-precision or
+  uniform-tree experiments.

@@ -18,7 +18,10 @@ from .reference.qkv_a import (
 )
 from .reference.rmsnorm import fused_add_rms_norm, rms_norm
 from .stage_local import (
+    StageLocalDenseFp8Ingredients,
     StageLocalDsaFp8Internals,
+    StageLocalIndexShareFp8Ingredients,
+    StageLocalIndexShareFp8ObservedResult,
     StageLinearBackend,
     VirtualTp32ReductionAssociation,
     _stage_fp8_linear,
@@ -111,6 +114,25 @@ class StageLocalSplitLayerFp8Result(NamedTuple):
     route_weights: Any
     contract_valid: Any
     dsa_internals: StageLocalDsaFp8Internals
+
+
+class StageLocalSplitLayerFp8Ingredients(NamedTuple):
+    """Layer-0 primitive boundaries returned only by an isolated observer."""
+
+    normalized_input: Any
+    combined_residual: Any
+    attention: StageLocalIndexShareFp8Ingredients
+    normalized_mlp: Any
+    post_attention_residual: Any
+    dense: StageLocalDenseFp8Ingredients
+    next_hidden: Any
+
+
+class StageLocalSplitLayerFp8ObservedResult(NamedTuple):
+    """Ordinary split-layer result paired with diagnostic-only ingredients."""
+
+    result: StageLocalSplitLayerFp8Result
+    ingredients: StageLocalSplitLayerFp8Ingredients
 
 
 def _empty_dsa_internals(
@@ -556,7 +578,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
     virtual_tp32_reduction_association: (
         VirtualTp32ReductionAssociation | None
     ) = None,
-) -> StageLocalSplitLayerFp8Result:
+    capture_ingredients: bool = False,
+) -> StageLocalSplitLayerFp8Result | StageLocalSplitLayerFp8ObservedResult:
     """Execute one layer while preserving legacy hidden/residual association."""
 
     if indexer_kind not in ("full", "shared"):
@@ -567,6 +590,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer attention FP32 reconstruction flag must be boolean")
     if not isinstance(reconstruct_dense_down_fp32, bool):
         raise ValueError("layer dense FP32 reconstruction flag must be boolean")
+    if not isinstance(capture_ingredients, bool):
+        raise ValueError("layer ingredient-capture flag must be boolean")
     if reconstruct_dense_down_fp32 and mlp_kind != "dense":
         raise ValueError("dense FP32 reconstruction requires a dense layer")
     if virtual_tp32_reduction_association is not None and (
@@ -577,6 +602,16 @@ def stage_local_transformer_layer_fp8_split_mapped(
         )
     if virtual_tp32_reduction_association is not None and mlp_kind != "dense":
         raise ValueError("virtual TP32 reduction requires a dense layer")
+    if capture_ingredients and (
+        mlp_kind != "dense"
+        or reconstruct_attention_output_fp32
+        or reconstruct_dense_down_fp32
+        or virtual_tp32_reduction_association is not None
+        or linear_backend != "pallas"
+    ):
+        raise ValueError(
+            "layer ingredient capture requires the production dense BF16 Pallas path"
+        )
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise ValueError("layer sparse MoE backend is unknown")
     if not isinstance(pallas_moe_fuse_route_weighting, bool):
@@ -744,7 +779,16 @@ def stage_local_transformer_layer_fp8_split_mapped(
         virtual_tp32_reduction_association=(
             virtual_tp32_reduction_association
         ),
+        capture_ingredients=capture_ingredients,
     )
+    if capture_ingredients:
+        assert isinstance(
+            attention_result, StageLocalIndexShareFp8ObservedResult
+        )
+        attention_ingredients = attention_result.ingredients
+        attention_result = attention_result.result
+    else:
+        attention_ingredients = None
     normalized_mlp, post_attention_residual = fused_add_rms_norm(
         attention_result.output,
         combined_residual,
@@ -753,7 +797,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     )
     if mlp_kind == "dense":
         assert dense is not None
-        next_hidden = stage_local_dense_fp8_mapped(
+        dense_result = stage_local_dense_fp8_mapped(
             post_attention_residual,
             post_attention_norm_weight,
             dense.gate_bits,
@@ -774,7 +818,14 @@ def stage_local_transformer_layer_fp8_split_mapped(
             virtual_tp32_reduction_association=(
                 virtual_tp32_reduction_association
             ),
+            capture_ingredients=capture_ingredients,
         )
+        if capture_ingredients:
+            next_hidden = dense_result.output
+            dense_ingredients = dense_result.ingredients
+        else:
+            next_hidden = dense_result
+            dense_ingredients = None
         route_indices = jnp.full(
             (1, moe_contract.top_k), jnp.int32(-1), dtype=jnp.int32
         )
@@ -826,7 +877,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
                     reconstruct_down_fp32=pallas_moe_reconstruct_down_fp32,
                 )
             )
-    return StageLocalSplitLayerFp8Result(
+    result = StageLocalSplitLayerFp8Result(
         next_hidden,
         post_attention_residual,
         attention_result.cache,
@@ -838,4 +889,20 @@ def stage_local_transformer_layer_fp8_split_mapped(
         route_weights,
         incoming_contract_valid & dsa_valid & attention_result.contract_valid,
         dsa_internals,
+    )
+    if not capture_ingredients:
+        return result
+    assert attention_ingredients is not None
+    assert dense_ingredients is not None
+    return StageLocalSplitLayerFp8ObservedResult(
+        result,
+        StageLocalSplitLayerFp8Ingredients(
+            normalized_input,
+            combined_residual,
+            attention_ingredients,
+            normalized_mlp,
+            post_attention_residual,
+            dense_ingredients,
+            next_hidden,
+        ),
     )

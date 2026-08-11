@@ -626,6 +626,100 @@ ENTRY %main () -> (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) 
 '''
 
 
+def _layer0_ingredients_hlo() -> str:
+    replica_groups = (
+        "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
+        "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
+    )
+    gathers = "\n".join(
+        f"  %ag.{index} = s32[4,1] all-gather(%s), dimensions={{0}}, "
+        f"replica_groups={replica_groups}, channel_id={index + 1}, "
+        "use_global_device_ids=true"
+        for index in range(5)
+    )
+    reductions = "\n".join(
+        f"  %ar.{index} = bf16[1,6144] all-reduce(%b), "
+        f"replica_groups={replica_groups}, channel_id={index + 11}, "
+        "use_global_device_ids=true, to_apply=%add"
+        for index in range(3)
+    )
+    kernels = [
+        "greenfield_fp8_block_matmul_m8_k4096_n6144",
+        *(["greenfield_fp8_block_matmul_m8_k512_n6144"] * 8),
+        "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144",
+        *(
+            ["greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144"]
+            * 8
+        ),
+    ]
+    kernel_text = "\n".join(
+        f"  %kernel.{index} = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        f'backend_config="{name}"'
+        for index, name in enumerate(kernels)
+    )
+    roots = (
+        ("s32", (1, 2048)),
+        ("f32", (1, 2048)),
+        ("s32", (1, 1)),
+        ("bf16", (1, 6144)),
+        ("bf16", (1, 6144)),
+        ("bf16", (1, 640)),
+        ("s32", (1, 2048)),
+        ("s32", (1, 1)),
+        ("bf16", (1, 2048, 640)),
+        ("pred", (1, 1)),
+        ("bf16", (1, 64, 512)),
+        ("f32", (1, 64)),
+        ("pred", (1, 1)),
+        ("bf16", (1, 64, 512)),
+        ("f32", (1, 64)),
+        ("pred", (1, 1)),
+        ("bf16", (1, 16, 256)),
+        ("bf16", (1, 4096)),
+        ("bf16", (1, 8, 6144)),
+        *(("bf16", (1, 6144)),) * 4,
+        ("bf16", (1, 8, 6144)),
+        *(("bf16", (1, 6144)),) * 4,
+        ("pred", (1, 1)),
+    )
+
+    def shape(dtype: str, dimensions: tuple[int, ...]) -> str:
+        return f"{dtype}[{','.join(str(value) for value in dimensions)}]"
+
+    root_shapes = ", ".join(shape(*item) for item in roots)
+    constants = []
+    for index, item in enumerate(roots):
+        metadata = (
+            ', metadata={op_name="jit(probe)/'
+            'greenfield_layer0_ingredients_layer1_norm/mul"}'
+            if index == 27
+            else ""
+        )
+        constants.append(
+            f"  %root.{index} = {shape(*item)} constant({{0}}){metadata}"
+        )
+    operands = ", ".join(f"%root.{index}" for index in range(len(roots)))
+    return f'''HloModule layer0_ingredients, replica_count=1, num_partitions=32
+
+%add (x: bf16[], y: bf16[]) -> bf16[] {{
+  %x = bf16[] parameter(0)
+  %y = bf16[] parameter(1)
+  ROOT %sum = bf16[] add(%x, %y)
+}}
+
+ENTRY %main () -> ({root_shapes}) {{
+  %s = s32[1] constant({{0}})
+  %b = bf16[1,6144] constant({{0}})
+{gathers}
+{reductions}
+{kernel_text}
+{chr(10).join(constants)}
+  ROOT %result = ({root_shapes}) tuple({operands})
+}}
+'''
+
+
 def test_layer0_residual_discriminator_hlo_pins_isolated_arms() -> None:
     from glm_tpu.greenfield.runtime import (
         validate_layer0_residual_discriminator_hlo,
@@ -709,6 +803,48 @@ def test_layer0_residual_discriminator_hlo_pins_isolated_arms() -> None:
             groups=groups,
             variant_name="unknown",
         )
+
+
+def test_layer0_ingredients_hlo_pins_primitive_capture() -> None:
+    from glm_tpu.greenfield.runtime import (
+        validate_layer0_ingredients_observer_hlo,
+    )
+
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4)) for stage in range(8)
+    )
+    hlo = _layer0_ingredients_hlo()
+    accepted = validate_layer0_ingredients_observer_hlo(
+        hlo,
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+    )
+    assert accepted["passed"], accepted
+    assert accepted["kernel_counts"] == accepted["expected_kernel_counts"]
+    assert len(accepted["ingredient_names"]) == 29
+
+    escaped = validate_layer0_ingredients_observer_hlo(
+        hlo.replace("{0,1,2,3}", "{0,1,2,4}"),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+    )
+    assert not escaped["passed"]
+    assert escaped["escaped_collectives"]
+
+    missing_partial = validate_layer0_ingredients_observer_hlo(
+        hlo.replace(
+            "greenfield_fp8_block_matmul_m8_k512_n6144",
+            "greenfield_fp8_block_matmul_m8_k4096_n6144",
+            1,
+        ),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+    )
+    assert not missing_partial["passed"]
+    assert any(
+        "kernel set drifted" in item
+        for item in missing_partial["violations"]
+    )
 
 
 def test_layer0_virtual_tp32_discriminator_hlo_pins_subshards() -> None:
@@ -1995,6 +2131,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             build_layer0_residual_discriminator=1,  # type: ignore[arg-type]
         )
+    with pytest.raises(PlanValidationError, match="ingredient-observer flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            build_layer0_ingredients_observer=1,  # type: ignore[arg-type]
+        )
     with pytest.raises(PlanValidationError, match="complete split-token path"):
         build_decoder_step_program(
             source_plan,
@@ -2004,6 +2150,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             groups,
             pairs,
             build_layer0_residual_discriminator=True,
+        )
+    with pytest.raises(PlanValidationError, match="proven complete split-token"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            build_layer0_ingredients_observer=True,
         )
     with pytest.raises(
         PlanValidationError, match="prefill index-input observation flag"

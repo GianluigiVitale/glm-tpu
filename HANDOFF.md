@@ -3499,3 +3499,34 @@ one bounded ingredients capture at pre-norm boundaries: main cache rows, attenti
 out-projection, 32 BF16 projection partials/post-reduction, and corresponding MLP boundaries. That
 single capture must decide cache versus attention schedule versus partial values versus association
 before any full 8K retry.
+
+## Layer-0 ingredients observer is CPU/HLO-ready; protected values are pending
+
+The bounded successor is implemented from pushed base `364003332d57c1a1ed79944651e03a09962286c3`
+and remains default-off. It replays only layer 0 on the four stage-0 devices after the existing
+teacher-forced 8K prefill. It records the exact selected positions/scores/count, the generated
+640-wide current cache row, every owner's selected cache rows, owner-local sparse-attention
+output/LSE, the LP4-combined attention output/LSE, value projection state, eight K512 BF16 output
+projection partials per owner, production local/post-LP4 attention updates, and the corresponding
+dense input, eight I384 partials per owner, local/post-LP4 update, next hidden and layer-1 norm.
+Across four active owners this is the requested 32 attention and 32 dense pre-combine partials.
+
+The observer is isolated from the ordinary decoder and all earlier discriminators. Its HLO contract
+requires one production plus eight diagnostic Pallas calls for each projection, exactly one live
+row, only explicit LP4 all-gather/all-reduce groups, stage-0 owner-local outputs, the scoped layer-1
+norm, no FP32 boundary, no host callback and no pipeline/global collective. The host contract
+requires exact sealed DSA scores/order, replicated stage-0 values, inactive-stage sentinels,
+ascending owner subsets whose union is exact, valid/nonzero cache rows, all health bits, finite
+values and portable BF16-bit artifacts. It deliberately exits diagnostic-only after persisting the
+NPZ/JSON/HLO so the protected wrapper cannot create a decoder performance result.
+
+Explicit-CPU kernel/runtime/HLO coverage passes 243/243 in 334.10 seconds; focused observer and
+affected suites also pass, with compileall, Bash, ShellCheck and diff checks green. The one Fable
+xhigh audit found a stale later DSA-observer compile gate that would have asserted after the costly
+main compile because ingredients mode intentionally does not build that observer. The gate now
+matches the builder gate, and a regression assertion pins both occurrences together. The focused
+explicit-CPU check passes; the same audit session verified only the fix and returned
+`APPROVE COMMIT`. No TPU result, legacy comparison or Gate-D correction exists yet. Exact next:
+independently verify, commit/push, authenticate an idle fleet, then run one serialized protected 8K
+ingredient capture. Build the corresponding isolated legacy-oracle capture and compare boundaries
+bitwise in dataflow order before changing production arithmetic or rerunning the decoder.

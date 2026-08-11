@@ -33,6 +33,7 @@ from .reference.attention import (
     StageLocalKvLayout,
     canonicalize_selected_positions,
     combine_stage_local_attention,
+    gather_stage_local_selected_kv,
 )
 from .reference.dsa import (
     DsaNumericalContract,
@@ -79,6 +80,50 @@ class StageLocalIndexShareFp8Result(NamedTuple):
     contract_valid: Any
 
 
+class StageLocalIndexShareFp8Ingredients(NamedTuple):
+    """Unsaturated attention boundaries exposed only by a diagnostic replay."""
+
+    current_cache_row: Any
+    owner_selected_positions: Any
+    owner_selected_valid_counts: Any
+    owner_selected_cache_values: Any
+    owner_selected_cache_valid: Any
+    sparse_partial_output: Any
+    sparse_partial_logsumexp: Any
+    sparse_partial_valid: Any
+    combined_attention_output: Any
+    combined_attention_logsumexp: Any
+    combined_attention_valid: Any
+    value_states: Any
+    output_input: Any
+    virtual_output_partials: Any
+    local_output_update: Any
+    reduced_output_update: Any
+
+
+class StageLocalIndexShareFp8ObservedResult(NamedTuple):
+    """Ordinary attention result paired with diagnostic-only ingredients."""
+
+    result: StageLocalIndexShareFp8Result
+    ingredients: StageLocalIndexShareFp8Ingredients
+
+
+class StageLocalDenseFp8Ingredients(NamedTuple):
+    """Unsaturated dense-MLP boundaries exposed only by a diagnostic replay."""
+
+    normalized_input: Any
+    virtual_down_partials: Any
+    local_down_update: Any
+    reduced_down_update: Any
+
+
+class StageLocalDenseFp8ObservedResult(NamedTuple):
+    """Ordinary dense result paired with diagnostic-only ingredients."""
+
+    output: Any
+    ingredients: StageLocalDenseFp8Ingredients
+
+
 StageLinearBackend = Literal["reference", "pallas"]
 VirtualTp32ReductionAssociation = Literal[
     "dcp_then_model_sequential_bf16",
@@ -95,6 +140,137 @@ VIRTUAL_TP32_REDUCTION_ASSOCIATIONS: tuple[
     "model_then_dcp_pairwise_bf16",
 )
 _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER = 8
+
+
+def _virtual_attention_output_partials(
+    output_input: Any,
+    o_bits: Any,
+    o_scale: Any,
+    *,
+    block_shape: tuple[int, int],
+    linear_interpret: bool,
+) -> Any:
+    """Return eight already-rounded K512 output-projection partials."""
+
+    hidden = o_bits.shape[0]
+    if (
+        hidden != 6144
+        or output_input.shape != (1, 4096)
+        or block_shape != (128, 128)
+    ):
+        raise ValueError(
+            "virtual attention partials require the exact GLM PP8 geometry"
+        )
+    virtual_contraction = (
+        output_input.shape[1] // _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
+    )
+    virtual_scale_contraction = virtual_contraction // block_shape[1]
+    return jnp.stack(
+        tuple(
+            fp8_block_matmul(
+                output_input[
+                    :,
+                    shard * virtual_contraction : (shard + 1)
+                    * virtual_contraction,
+                ],
+                o_bits[
+                    :,
+                    shard * virtual_contraction : (shard + 1)
+                    * virtual_contraction,
+                ],
+                o_scale[
+                    :,
+                    shard
+                    * virtual_scale_contraction : (shard + 1)
+                    * virtual_scale_contraction,
+                ],
+                config=Fp8BlockMatmulConfig(
+                    block_shape=block_shape,
+                    output_tile=block_shape[0],
+                    contraction_tile=block_shape[1],
+                ),
+                interpret=linear_interpret,
+            )
+            for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER)
+        ),
+        axis=0,
+    )
+
+
+def _virtual_dense_down_partials(
+    normalized: Any,
+    gate_bits: Any,
+    gate_scale: Any,
+    up_bits: Any,
+    up_scale: Any,
+    down_bits: Any,
+    down_scale: Any,
+    *,
+    block_shape: tuple[int, int],
+    linear_interpret: bool,
+) -> Any:
+    """Return eight already-rounded I384 fused-SwiGLU down partials."""
+
+    if (
+        normalized.shape != (1, 6144)
+        or gate_bits.shape != (3072, 6144)
+        or block_shape != (128, 128)
+    ):
+        raise ValueError(
+            "virtual dense partials require the exact GLM PP8 geometry"
+        )
+    virtual_intermediate = (
+        gate_bits.shape[0] // _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
+    )
+    virtual_scale_intermediate = virtual_intermediate // block_shape[0]
+    return jnp.stack(
+        tuple(
+            fp8_fused_block_swiglu(
+                normalized,
+                gate_bits[
+                    shard * virtual_intermediate : (shard + 1)
+                    * virtual_intermediate,
+                    :,
+                ],
+                gate_scale[
+                    shard
+                    * virtual_scale_intermediate : (shard + 1)
+                    * virtual_scale_intermediate,
+                    :,
+                ],
+                up_bits[
+                    shard * virtual_intermediate : (shard + 1)
+                    * virtual_intermediate,
+                    :,
+                ],
+                up_scale[
+                    shard
+                    * virtual_scale_intermediate : (shard + 1)
+                    * virtual_scale_intermediate,
+                    :,
+                ],
+                down_bits[
+                    :,
+                    shard * virtual_intermediate : (shard + 1)
+                    * virtual_intermediate,
+                ],
+                down_scale[
+                    :,
+                    shard
+                    * virtual_scale_intermediate : (shard + 1)
+                    * virtual_scale_intermediate,
+                ],
+                config=Fp8BlockMatmulConfig(
+                    block_shape=block_shape,
+                    output_tile=block_shape[0],
+                    contraction_tile=block_shape[1],
+                ),
+                interpret=linear_interpret,
+            )
+            for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER)
+        ),
+        axis=0,
+    )
 
 
 def _sum_virtual_dcp_bf16_partials(
@@ -828,7 +1004,8 @@ def stage_local_index_share_fp8_mapped(
     virtual_tp32_reduction_association: (
         VirtualTp32ReductionAssociation | None
     ) = None,
-) -> StageLocalIndexShareFp8Result:
+    capture_ingredients: bool = False,
+) -> StageLocalIndexShareFp8Result | StageLocalIndexShareFp8ObservedResult:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
     groups = _axis_groups(axis_index_groups)
@@ -846,6 +1023,8 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare residual-add flag must be boolean")
     if not isinstance(reconstruct_output_fp32, bool):
         raise ValueError("IndexShare FP32 output reconstruction flag must be boolean")
+    if not isinstance(capture_ingredients, bool):
+        raise ValueError("IndexShare ingredient-capture flag must be boolean")
     if virtual_tp32_reduction_association is not None and (
         virtual_tp32_reduction_association
         not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
@@ -856,6 +1035,14 @@ def stage_local_index_share_fp8_mapped(
     ):
         raise ValueError(
             "IndexShare virtual TP32 association requires the BF16 Pallas path"
+        )
+    if capture_ingredients and (
+        reconstruct_output_fp32
+        or virtual_tp32_reduction_association is not None
+        or linear_backend != "pallas"
+    ):
+        raise ValueError(
+            "IndexShare ingredient capture requires the production BF16 Pallas path"
         )
     if contract.num_heads % cache_layout.local_parallel_size:
         raise ValueError("attention heads must divide over the local stage")
@@ -1032,6 +1219,19 @@ def stage_local_index_share_fp8_mapped(
         lambda value: value,
         cache,
     )
+    selected = SelectedPositions(selected_positions, selected_valid_counts)
+    owner_selected_cache = (
+        gather_stage_local_selected_kv(
+            cache,
+            block_tables,
+            selected,
+            context_lengths,
+            layout=cache_layout,
+            owner_index=local_slot,
+        )
+        if capture_ingredients
+        else None
+    )
 
     local_weight_uv = None
     if linear_backend == "reference":
@@ -1077,7 +1277,6 @@ def stage_local_index_share_fp8_mapped(
     )
     q_absorbed = full_query[..., : contract.kv_lora_rank]
     full_q_rope = full_query[..., contract.kv_lora_rank :]
-    selected = SelectedPositions(selected_positions, selected_valid_counts)
     partial = stage_local_sparse_mla_kernel(
         q_absorbed,
         full_q_rope,
@@ -1146,48 +1345,24 @@ def stage_local_index_share_fp8_mapped(
     output_input = value_states.reshape(
         1, local_heads * contract.v_head_dim
     )
-    if virtual_tp32_reduction_association is not None:
-        if (
-            hidden != 6144
-            or output_input.shape[1] != 4096
-            or block_shape != (128, 128)
-        ):
-            raise ValueError(
-                "IndexShare virtual TP32 association requires the exact GLM "
-                "PP8 output geometry"
-            )
-        virtual_contraction = (
-            output_input.shape[1] // _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
+    diagnostic_virtual_partials = (
+        _virtual_attention_output_partials(
+            output_input,
+            o_bits,
+            o_scale,
+            block_shape=block_shape,
+            linear_interpret=linear_interpret,
         )
-        virtual_scale_contraction = virtual_contraction // block_shape[1]
-        local_partials = jnp.stack(
-            tuple(
-                fp8_block_matmul(
-                    output_input[
-                        :,
-                        shard * virtual_contraction : (shard + 1)
-                        * virtual_contraction,
-                    ],
-                    o_bits[
-                        :,
-                        shard * virtual_contraction : (shard + 1)
-                        * virtual_contraction,
-                    ],
-                    o_scale[
-                        :,
-                        shard * virtual_scale_contraction : (shard + 1)
-                        * virtual_scale_contraction,
-                    ],
-                    config=Fp8BlockMatmulConfig(
-                        block_shape=block_shape,
-                        output_tile=block_shape[0],
-                        contraction_tile=block_shape[1],
-                    ),
-                    interpret=linear_interpret,
-                )
-                for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER)
-            ),
-            axis=0,
+        if capture_ingredients
+        else None
+    )
+    if virtual_tp32_reduction_association is not None:
+        local_partials = _virtual_attention_output_partials(
+            output_input,
+            o_bits,
+            o_scale,
+            block_shape=block_shape,
+            linear_interpret=linear_interpret,
         )
         update = _reduce_virtual_tp32_bf16_partials(
             local_partials,
@@ -1249,10 +1424,35 @@ def stage_local_index_share_fp8_mapped(
         else:
             update = update.astype(residual.dtype)
     output = residual_add(residual, update) if add_residual else update
-    return StageLocalIndexShareFp8Result(
+    result = StageLocalIndexShareFp8Result(
         output,
         cache,
         metadata_valid & combined.contract_valid,
+    )
+    if not capture_ingredients:
+        return result
+    assert owner_selected_cache is not None
+    assert diagnostic_virtual_partials is not None
+    return StageLocalIndexShareFp8ObservedResult(
+        result,
+        StageLocalIndexShareFp8Ingredients(
+            current_cache_row,
+            owner_selected_cache.positions,
+            owner_selected_cache.valid_counts,
+            owner_selected_cache.values,
+            owner_selected_cache.contract_valid,
+            partial.output,
+            partial.logsumexp,
+            partial.contract_valid,
+            combined.output,
+            combined.logsumexp,
+            combined.contract_valid,
+            value_states,
+            output_input,
+            diagnostic_virtual_partials,
+            local_update,
+            update,
+        ),
     )
 
 
@@ -1278,7 +1478,8 @@ def stage_local_dense_fp8_mapped(
     virtual_tp32_reduction_association: (
         VirtualTp32ReductionAssociation | None
     ) = None,
-) -> Any:
+    capture_ingredients: bool = False,
+) -> Any | StageLocalDenseFp8ObservedResult:
     """Execute one dense SwiGLU from local raw shards and one local combine."""
 
     groups = _axis_groups(axis_index_groups)
@@ -1295,6 +1496,8 @@ def stage_local_dense_fp8_mapped(
         raise ValueError("dense residual-add flag must be boolean")
     if not isinstance(reconstruct_down_fp32, bool):
         raise ValueError("dense FP32 down reconstruction flag must be boolean")
+    if not isinstance(capture_ingredients, bool):
+        raise ValueError("dense ingredient-capture flag must be boolean")
     if virtual_tp32_reduction_association is not None and (
         virtual_tp32_reduction_association
         not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
@@ -1306,6 +1509,14 @@ def stage_local_dense_fp8_mapped(
         raise ValueError(
             "dense virtual TP32 association requires the BF16 Pallas path"
         )
+    if capture_ingredients and (
+        reconstruct_down_fp32
+        or virtual_tp32_reduction_association is not None
+        or linear_backend != "pallas"
+    ):
+        raise ValueError(
+            "dense ingredient capture requires the production BF16 Pallas path"
+        )
     if precomputed_normalized is None:
         normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
     else:
@@ -1314,69 +1525,32 @@ def stage_local_dense_fp8_mapped(
             normalized.dtype != residual.dtype
         ):
             raise ValueError("dense precomputed normalized input is invalid")
+    diagnostic_virtual_partials = (
+        _virtual_dense_down_partials(
+            normalized,
+            gate_bits,
+            gate_scale,
+            up_bits,
+            up_scale,
+            down_bits,
+            down_scale,
+            block_shape=block_shape,
+            linear_interpret=linear_interpret,
+        )
+        if capture_ingredients
+        else None
+    )
     if virtual_tp32_reduction_association is not None:
-        if (
-            hidden != 6144
-            or gate_bits.shape[0] != 3072
-            or block_shape != (128, 128)
-        ):
-            raise ValueError(
-                "dense virtual TP32 association requires the exact GLM PP8 "
-                "geometry"
-            )
-        virtual_intermediate = (
-            gate_bits.shape[0] // _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
-        )
-        virtual_scale_intermediate = (
-            virtual_intermediate // block_shape[0]
-        )
-        local_partials = jnp.stack(
-            tuple(
-                fp8_fused_block_swiglu(
-                    normalized,
-                    gate_bits[
-                        shard * virtual_intermediate : (shard + 1)
-                        * virtual_intermediate,
-                        :,
-                    ],
-                    gate_scale[
-                        shard
-                        * virtual_scale_intermediate : (shard + 1)
-                        * virtual_scale_intermediate,
-                        :,
-                    ],
-                    up_bits[
-                        shard * virtual_intermediate : (shard + 1)
-                        * virtual_intermediate,
-                        :,
-                    ],
-                    up_scale[
-                        shard
-                        * virtual_scale_intermediate : (shard + 1)
-                        * virtual_scale_intermediate,
-                        :,
-                    ],
-                    down_bits[
-                        :,
-                        shard * virtual_intermediate : (shard + 1)
-                        * virtual_intermediate,
-                    ],
-                    down_scale[
-                        :,
-                        shard
-                        * virtual_scale_intermediate : (shard + 1)
-                        * virtual_scale_intermediate,
-                    ],
-                    config=Fp8BlockMatmulConfig(
-                        block_shape=block_shape,
-                        output_tile=block_shape[0],
-                        contraction_tile=block_shape[1],
-                    ),
-                    interpret=linear_interpret,
-                )
-                for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER)
-            ),
-            axis=0,
+        local_partials = _virtual_dense_down_partials(
+            normalized,
+            gate_bits,
+            gate_scale,
+            up_bits,
+            up_scale,
+            down_bits,
+            down_scale,
+            block_shape=block_shape,
+            linear_interpret=linear_interpret,
         )
         update = _reduce_virtual_tp32_bf16_partials(
             local_partials,
@@ -1444,7 +1618,19 @@ def stage_local_dense_fp8_mapped(
             )
         else:
             update = update.astype(residual.dtype)
-    return residual_add(residual, update) if add_residual else update
+    output = residual_add(residual, update) if add_residual else update
+    if not capture_ingredients:
+        return output
+    assert diagnostic_virtual_partials is not None
+    return StageLocalDenseFp8ObservedResult(
+        output,
+        StageLocalDenseFp8Ingredients(
+            normalized,
+            diagnostic_virtual_partials,
+            local_update,
+            update,
+        ),
+    )
 
 
 def stage_local_moe_fp8_mapped(

@@ -18,6 +18,7 @@ from scripts.greenfield.compile_short_decoder import (
     _raw_token_sequence_contract,
     _validate_dsa_observation_step,
     _validate_completed_step_selected_states,
+    _validate_layer0_ingredients,
     _validate_token_observation_step,
 )
 from scripts.greenfield import compile_short_decoder as compile_module
@@ -52,6 +53,133 @@ def test_protected_runner_exposes_fail_closed_device_roundtrip() -> None:
     assert '--verify-device-roundtrip "$verify_device_roundtrip"' in runner
     assert '["device_roundtrip_verified"]\n    != verify_device_roundtrip' in runner
     assert '["device_roundtrip_bytes"]\n    != expected_roundtrip_bytes' in runner
+
+
+def test_layer0_ingredient_capture_is_default_off_and_protected() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert '"--observe-layer0-ingredients"' in compiler
+    assert "build_layer0_ingredients_observer" in compiler
+    assert "validate_layer0_ingredients_observer_hlo" in compiler
+    assert "${GLM_GREENFIELD_LAYER0_INGREDIENTS:-0}" in runner
+    assert "--observe-layer0-ingredients 1" in runner
+    assert "layer0_ingredients.optimized_hlo.txt.gz" in compiler
+    assert "source_state\": \"post_teacher_forced_prefill" in compiler
+    assert '"$remote/layer0_ingredients/"' in runner
+    paired_dsa_observer_gate = (
+        "observe_layer0_discriminator or args.observe_layer0_ingredients"
+    )
+    assert compiler.count(paired_dsa_observer_gate) == 2
+
+
+def test_layer0_ingredient_contract_validates_owner_partition() -> None:
+    names = compile_module.LAYER0_INGREDIENT_NAMES
+    groups = tuple(tuple(range(stage * 4, stage * 4 + 4)) for stage in range(8))
+    expected_positions = np.asarray([0, 1, 128, 129, -1, -1, -1, -1], np.int32)
+    expected_scores = np.asarray([4, 3, 2, 1, -np.inf, -np.inf, -np.inf, -np.inf], np.float32)
+    shapes = {
+        "selected_positions": (8,),
+        "selected_scores": (8,),
+        "selected_valid_counts": (1,),
+        "normalized_input": (6,),
+        "combined_residual": (6,),
+        "current_cache_row": (4,),
+        "owner_selected_positions": (8,),
+        "owner_selected_valid_counts": (1,),
+        "owner_selected_cache_values": (8, 4),
+        "owner_selected_cache_valid": (1,),
+        "sparse_partial_output": (2, 3),
+        "sparse_partial_logsumexp": (2,),
+        "sparse_partial_valid": (1,),
+        "combined_attention_output": (2, 3),
+        "combined_attention_logsumexp": (2,),
+        "combined_attention_valid": (1,),
+        "value_states": (1, 2),
+        "attention_output_input": (2,),
+        "attention_virtual_partials": (2, 6),
+        "attention_local_update": (6,),
+        "attention_reduced_update": (6,),
+        "normalized_mlp": (6,),
+        "post_attention_residual": (6,),
+        "dense_virtual_partials": (2, 6),
+        "dense_local_update": (6,),
+        "dense_reduced_update": (6,),
+        "next_hidden": (6,),
+        "layer1_normalized": (6,),
+        "contract_valid": (1,),
+    }
+    integer_names = {
+        "selected_positions",
+        "selected_valid_counts",
+        "owner_selected_positions",
+        "owner_selected_valid_counts",
+    }
+    boolean_names = {
+        "owner_selected_cache_valid",
+        "sparse_partial_valid",
+        "combined_attention_valid",
+        "contract_valid",
+    }
+    float32_names = {
+        "selected_scores",
+        "sparse_partial_logsumexp",
+        "combined_attention_logsumexp",
+    }
+    observed = {}
+    for name in names:
+        shape = (32, *shapes[name])
+        if name in integer_names:
+            fill = -1 if "positions" in name else 0
+            observed[name] = np.full(shape, fill, dtype=np.int32)
+        elif name in boolean_names:
+            observed[name] = np.zeros(shape, dtype=np.bool_)
+        elif name in float32_names:
+            observed[name] = np.full(shape, -np.inf, dtype=np.float32)
+        else:
+            observed[name] = np.zeros(shape, dtype=bfloat16)
+
+    active = np.asarray(groups[0], dtype=np.int32)
+    for name, value in observed.items():
+        if name in boolean_names:
+            value[active] = True
+        elif name in float32_names:
+            value[active] = 0
+        elif name not in integer_names:
+            value[active] = bfloat16(1)
+    observed["selected_positions"][active] = expected_positions
+    observed["selected_scores"][active] = expected_scores
+    observed["selected_valid_counts"][active] = 4
+    observed["owner_selected_positions"][active[0], :2] = (0, 1)
+    observed["owner_selected_positions"][active[1], :2] = (128, 129)
+    observed["owner_selected_valid_counts"][active[:2]] = 2
+    observed["owner_selected_cache_values"][active] = 0
+    observed["owner_selected_cache_values"][active[0], :2] = bfloat16(1)
+    observed["owner_selected_cache_values"][active[1], :2] = bfloat16(2)
+
+    artifact, contract = _validate_layer0_ingredients(
+        observed,
+        groups=groups,
+        expected_positions=expected_positions,
+        expected_scores=expected_scores,
+        expected_count=4,
+        logical_page_size=512,
+    )
+    assert contract["passed"]
+    assert contract["owner_union_exact"]
+    assert "owner_selected_cache_values_bfloat16_bits" in artifact
+
+    observed["owner_selected_positions"][active[0], 0] = 128
+    _, rejected = _validate_layer0_ingredients(
+        observed,
+        groups=groups,
+        expected_positions=expected_positions,
+        expected_scores=expected_scores,
+        expected_count=4,
+        logical_page_size=512,
+    )
+    assert not rejected["owner_partition_passed"]
+    assert not rejected["passed"]
 
 
 def test_protected_runner_classifies_prefill_loops_fail_closed() -> None:

@@ -9,10 +9,12 @@ from .pipeline import (
 from .decoder import (
     DecoderStepConfig,
     DecoderStepProgram,
+    LAYER0_INGREDIENT_NAMES,
     build_decoder_step_program,
     validate_dsa_query_weight_materializer_hlo,
     validate_decoder_step_hlo,
     validate_layer0_residual_discriminator_hlo,
+    validate_layer0_ingredients_observer_hlo,
 )
 from .prefill import (
     TeacherForcedPrefillProgram,
@@ -28,6 +30,7 @@ __all__ = [
     "PipelineSkeletonConfig",
     "DecoderStepConfig",
     "DecoderStepProgram",
+    "LAYER0_INGREDIENT_NAMES",
     "TeacherForcedPrefillProgram",
     "build_decoder_step_program",
     "build_teacher_forced_prefill_program",
@@ -38,6 +41,7 @@ __all__ = [
     "validate_teacher_forced_prefill_loops",
     "validate_decoder_step_hlo",
     "validate_layer0_residual_discriminator_hlo",
+    "validate_layer0_ingredients_observer_hlo",
     "build_pipeline_skeleton",
     "validate_pipeline_skeleton_hlo",
 ]
