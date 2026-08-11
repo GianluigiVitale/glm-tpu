@@ -81,7 +81,13 @@ from .qkv_a import (
     FusedQkvAProjection,
     one_row_fused_qkv_a_convolution,
 )
-from .rotary import apply_rotary, apply_rotary_fp32_final_round, rotary_cos_sin
+from .rotary import (
+    apply_rotary,
+    apply_rotary_fp32_final_round,
+    build_rotary_table_host,
+    rotary_cos_sin,
+    rotary_table_sha256,
+)
 
 __all__ = (
     "CanonicalSelectedPositions",
@@ -106,6 +112,7 @@ __all__ = (
     "StageLocalKvLayout",
     "apply_rotary",
     "apply_rotary_fp32_final_round",
+    "build_rotary_table_host",
     "affine_key_layer_norm",
     "bfloat16_from_uint16_bits",
     "canonicalize_selected_positions",
@@ -147,6 +154,7 @@ __all__ = (
     "one_row_pagewise_scores",
     "one_row_fused_qkv_a_convolution",
     "rotary_cos_sin",
+    "rotary_table_sha256",
     "route_glm_noaux_tc",
     "route_glm_noaux_tc_logits",
     "selected_positions_for_owner",

@@ -32,6 +32,10 @@ from ..kernels.reference.prefill_index import (
     repair_stage_local_prompt_index_cache,
 )
 from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
+from ..kernels.reference.rotary import (
+    build_rotary_table_host,
+    rotary_table_sha256,
+)
 from ..kernels.stage_local import (
     VIRTUAL_TP32_REDUCTION_ASSOCIATIONS,
     StageLinearBackend,
@@ -410,6 +414,7 @@ class DecoderStepConfig:
     dsa_indexer_heads: int
     vocab_size: int
     dsa_score_default_precision: bool = False
+    main_rope_table_width: int = 64
 
     def __post_init__(self) -> None:
         for field in (
@@ -426,6 +431,7 @@ class DecoderStepConfig:
             "index_key_width",
             "dsa_indexer_heads",
             "vocab_size",
+            "main_rope_table_width",
         ):
             value = getattr(self, field)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
@@ -437,6 +443,10 @@ class DecoderStepConfig:
         if self.context_capacity % self.local_parallel_size:
             raise PlanValidationError(
                 "decoder context capacity must shard exactly over the local group"
+            )
+        if self.main_rope_table_width % 2:
+            raise PlanValidationError(
+                "decoder main-RoPE table width must be even"
             )
         if not isinstance(self.dsa_score_default_precision, bool):
             raise PlanValidationError(
@@ -513,6 +523,10 @@ class DecoderStepProgram:
     dsa_head_key_exact_association: bool
     dsa_score_default_precision: bool
     attention_projection_backend: AttentionProjectionBackend
+    main_rope_table_enabled: bool
+    main_rope_table_host: Any | None
+    main_rope_table_sha256: str | None
+    main_rope_table_bytes_per_device: int
     complete_token_path: bool
     observe_dsa_events: bool
     observe_dsa_internals: bool
@@ -1669,6 +1683,7 @@ def _validate_complete_token_collective_lowering(
     backend_contract: str,
     token_observation_candidates: int = 1,
     dsa_query_exact_association: bool = False,
+    main_rope_table_enabled: bool = False,
 ) -> dict[str, Any]:
     """Pin TPU's compact top-1 exchange and one-token return lowering."""
 
@@ -1759,10 +1774,15 @@ def _validate_complete_token_collective_lowering(
             "complete-token return must be exactly one s32[1] "
             f"collective-permute, found {len(token_return)}"
         )
-    direct_token_return_op_name = (
-        "jit(mapped_token_exact_query)/shard_map/ppermute"
+    mapped_token_name = (
+        "mapped_token_exact_query"
         if dsa_query_exact_association
-        else "jit(mapped_token)/shard_map/ppermute"
+        else "mapped_token"
+    )
+    if main_rope_table_enabled:
+        mapped_token_name += "_main_rope"
+    direct_token_return_op_name = (
+        f"jit({mapped_token_name})/shard_map/ppermute"
     )
     accepted_token_return_op_names = (
         direct_token_return_op_name,
@@ -1802,6 +1822,114 @@ def _validate_complete_token_collective_lowering(
     }
 
 
+def _validate_main_rope_table_hlo(
+    module: HloModule,
+    *,
+    config: DecoderStepConfig,
+    layers: int,
+    enabled: bool,
+) -> dict[str, Any]:
+    """Pin the explicit table input and main-MLA-only FP32 rotary scope."""
+
+    table_shape = (
+        config.context_capacity,
+        config.main_rope_table_width,
+    )
+    table_parameters = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+        and instruction.opcode == "parameter"
+        and any(
+            shape.dtype == "bf16" and shape.dimensions == table_shape
+            for shape in instruction.result_shapes
+        )
+    )
+    named_table_parameters = tuple(
+        instruction
+        for instruction in table_parameters
+        if instruction.op_name is not None
+        and "main_rope_table" in instruction.op_name
+    )
+    scoped = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.op_name is not None
+        and "greenfield_main_rope_table" in instruction.op_name
+    )
+    forbidden_opcodes = {
+        "all-gather",
+        "all-reduce",
+        "all-to-all",
+        "collective-permute",
+        "cosine",
+        "power",
+        "reduce-scatter",
+        "sine",
+    }
+    forbidden = tuple(
+        instruction.raw_line
+        for instruction in scoped
+        if instruction.opcode in forbidden_opcodes
+    )
+    bf16_arithmetic = tuple(
+        instruction.raw_line
+        for instruction in scoped
+        if instruction.opcode in {"add", "multiply", "subtract"}
+        and any(
+            shape.dtype == "bf16" for shape in instruction.result_shapes
+        )
+    )
+    fp32_multiply_count = sum(
+        instruction.opcode == "multiply"
+        and any(shape.dtype == "f32" for shape in instruction.result_shapes)
+        for instruction in scoped
+    )
+    fp32_combine_count = sum(
+        instruction.opcode in {"add", "subtract"}
+        and any(shape.dtype == "f32" for shape in instruction.result_shapes)
+        for instruction in scoped
+    )
+    final_round_count = sum(
+        instruction.opcode == "convert"
+        and any(shape.dtype == "bf16" for shape in instruction.result_shapes)
+        and any(shape.dtype == "f32" for shape in instruction.operand_shapes)
+        for instruction in scoped
+    )
+    violations = []
+    if enabled:
+        if len(table_parameters) != 1 or len(named_table_parameters) != 1:
+            violations.append("main-RoPE table parameter contract drifted")
+        if not scoped:
+            violations.append("main-RoPE table scope is absent")
+        if forbidden:
+            violations.append("main-RoPE table scope contains forbidden operations")
+        if bf16_arithmetic:
+            violations.append("main-RoPE table scope contains BF16 arithmetic")
+        if fp32_multiply_count < layers * 8:
+            violations.append("main-RoPE FP32 multiply count is too small")
+        if fp32_combine_count < layers * 4:
+            violations.append("main-RoPE FP32 combine count is too small")
+        if final_round_count < layers * 2:
+            violations.append("main-RoPE final-round count is too small")
+    elif table_parameters or named_table_parameters or scoped:
+        violations.append("default decoder unexpectedly contains main-RoPE table state")
+    return {
+        "applicable": enabled,
+        "bf16_arithmetic": list(bf16_arithmetic),
+        "expected_table_shape": list(table_shape),
+        "final_round_count": final_round_count,
+        "forbidden_instructions": list(forbidden),
+        "fp32_combine_count": fp32_combine_count,
+        "fp32_multiply_count": fp32_multiply_count,
+        "named_table_parameter_count": len(named_table_parameters),
+        "passed": not violations,
+        "scoped_instruction_count": len(scoped),
+        "table_parameter_count": len(table_parameters),
+        "violations": violations,
+    }
+
+
 def validate_decoder_step_hlo(
     optimized_hlo: str,
     *,
@@ -1821,6 +1949,7 @@ def validate_decoder_step_hlo(
     token_observation_candidates: int = 1,
     split_residual_state: bool = False,
     prefill_index_repair: bool = False,
+    main_rope_table_enabled: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -1851,6 +1980,8 @@ def validate_decoder_step_hlo(
         )
     if not isinstance(prefill_index_repair, bool):
         raise PlanValidationError("prefill index-repair flag must be boolean")
+    if not isinstance(main_rope_table_enabled, bool):
+        raise PlanValidationError("main-RoPE table HLO flag must be boolean")
     if feature_reconstruct_down_fp32 and feature_fuse_route_weighting:
         raise PlanValidationError(
             "feature FP32 reconstruction is incompatible with fused route "
@@ -2181,6 +2312,7 @@ def validate_decoder_step_hlo(
                 backend_contract=backend_contract,
                 token_observation_candidates=token_observation_candidates,
                 dsa_query_exact_association=dsa_query_exact_association,
+                main_rope_table_enabled=main_rope_table_enabled,
             )
         )
         violations.extend(complete_token_collective_contract["violations"])
@@ -2305,6 +2437,13 @@ def validate_decoder_step_hlo(
             module=module,
         )
         violations.extend(fused_qkv_a_contract["violations"])
+    main_rope_table_contract = _validate_main_rope_table_hlo(
+        module,
+        config=config,
+        layers=layers,
+        enabled=main_rope_table_enabled,
+    )
+    violations.extend(main_rope_table_contract["violations"])
     return {
         "backend_contract": backend_contract,
         "collective_count": len(collectives),
@@ -2361,6 +2500,8 @@ def validate_decoder_step_hlo(
             dsa_head_key_association_contract
         ),
         "attention_projection_backend": attention_projection_backend,
+        "main_rope_table_enabled": main_rope_table_enabled,
+        "main_rope_table_contract": main_rope_table_contract,
         "fused_qkv_a_contract": fused_qkv_a_contract,
         "passed": not violations,
         "violations": violations,
@@ -2951,6 +3092,7 @@ def _execute_stage(
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
     dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
+    main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -3065,6 +3207,7 @@ def _execute_stage(
                 else "highest"
             ),
             attention_projection_backend=attention_projection_backend,
+            main_rope_table_row=main_rope_table_row,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
             prefill_index_inputs = prefill_index_inputs.at[
@@ -3176,6 +3319,7 @@ def _execute_stage_split(
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
     dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
+    main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -3302,6 +3446,7 @@ def _execute_stage_split(
                 else "highest"
             ),
             attention_projection_backend=attention_projection_backend,
+            main_rope_table_row=main_rope_table_row,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
             prefill_index_inputs = prefill_index_inputs.at[
@@ -3413,6 +3558,7 @@ def build_decoder_step_program(
     dsa_head_key_exact_association: bool = False,
     dsa_score_default_precision: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
+    main_rope_table_enabled: bool = False,
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
     observe_dsa_internals: bool = False,
@@ -3509,6 +3655,8 @@ def build_decoder_step_program(
         raise PlanValidationError(
             "decoder attention projection backend is unknown"
         )
+    if not isinstance(main_rope_table_enabled, bool):
+        raise PlanValidationError("decoder main-RoPE table flag must be boolean")
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(observe_dsa_events, bool):
@@ -3592,6 +3740,13 @@ def build_decoder_step_program(
             "layer-0 ingredient observer requires the proven complete split-token "
             "BF16 Pallas/DSA/fused-qkv path"
         )
+    if main_rope_table_enabled and (
+        build_layer0_residual_discriminator
+        or build_layer0_ingredients_observer
+    ):
+        raise PlanValidationError(
+            "main-RoPE table execution must remain isolated from layer-0 diagnostics"
+        )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
         if sparse_moe_backend == "reference"
@@ -3655,6 +3810,7 @@ def build_decoder_step_program(
         index_key_width=state_layout.stages[0].index_key_width,
         dsa_indexer_heads=geometry.dsa_indexer_heads,
         vocab_size=geometry.vocab_size,
+        main_rope_table_width=geometry.qk_rope_head_dim,
         dsa_score_default_precision=dsa_score_default_precision,
     )
     skeleton = PipelineSkeletonConfig(
@@ -3726,6 +3882,17 @@ def build_decoder_step_program(
         local_parallel_size=config.local_parallel_size,
         packed_cache_width=config.packed_cache_width,
     )
+    main_rope_table_host = None
+    main_rope_table_digest = None
+    main_rope_table_bytes = 0
+    if main_rope_table_enabled:
+        main_rope_table_host = build_rotary_table_host(
+            config.context_capacity,
+            rotary_dim=geometry.qk_rope_head_dim,
+            theta=8_000_000.0,
+        )
+        main_rope_table_digest = rotary_table_sha256(main_rope_table_host)
+        main_rope_table_bytes = int(main_rope_table_host.nbytes)
 
     local_vocab = geometry.vocab_size // config.local_parallel_size
 
@@ -3740,6 +3907,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        local_main_rope_table: Any | None,
     ) -> tuple[Any, ...]:
         rank = lax.axis_index(axis_name)
         stage_id = stage_map[rank]
@@ -3753,6 +3921,30 @@ def build_decoder_step_program(
         token_observation = None
         layer_residual_observation = None
         prefill_index_inputs = None
+        main_rope_table_row = None
+        if main_rope_table_enabled:
+            if (
+                local_main_rope_table is None
+                or local_main_rope_table.shape
+                != (config.context_capacity, geometry.qk_rope_head_dim)
+                or local_main_rope_table.dtype != jnp.bfloat16
+            ):
+                raise PlanValidationError(
+                    "decoder main-RoPE table asset is invalid"
+                )
+            safe_rope_position = jnp.clip(
+                position[0],
+                jnp.int32(0),
+                jnp.int32(config.context_capacity - 1),
+            )
+            with jax.named_scope("greenfield_main_rope_table_lookup"):
+                main_rope_table_row = local_main_rope_table[
+                    safe_rope_position
+                ]
+        elif local_main_rope_table is not None:
+            raise PlanValidationError(
+                "default decoder cannot consume a main-RoPE table"
+            )
         if observe_prefill_index_inputs:
             prefill_index_inputs = jnp.zeros(
                 (
@@ -3988,6 +4180,7 @@ def build_decoder_step_program(
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
+                            main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
                         ),
@@ -4047,6 +4240,7 @@ def build_decoder_step_program(
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
+                            main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
                         ),
@@ -4104,6 +4298,7 @@ def build_decoder_step_program(
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
+                            main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                         ),
                         lambda values: values,
@@ -4156,6 +4351,7 @@ def build_decoder_step_program(
                         attention_projection_backend=(
                             attention_projection_backend
                         ),
+                        main_rope_table_row=main_rope_table_row,
                         prefill_index_inputs=values[4],
                     ),
                     lambda values: values,
@@ -4201,6 +4397,7 @@ def build_decoder_step_program(
                         attention_projection_backend=(
                             attention_projection_backend
                         ),
+                        main_rope_table_row=main_rope_table_row,
                     ),
                     lambda values: values,
                     (residual, kv_cache, index_cache, metadata),
@@ -4467,6 +4664,7 @@ def build_decoder_step_program(
             position,
             block_tables,
             context_lengths,
+            None,
         )
         return values[:4]
 
@@ -4492,6 +4690,7 @@ def build_decoder_step_program(
             position,
             block_tables,
             context_lengths,
+            None,
         )
 
     def mapped_body_exact_query(
@@ -4516,6 +4715,7 @@ def build_decoder_step_program(
             position,
             block_tables,
             context_lengths,
+            None,
         )
         return values[:4]
 
@@ -4542,6 +4742,113 @@ def build_decoder_step_program(
             position,
             block_tables,
             context_lengths,
+            None,
+        )
+
+    def mapped_body_main_rope(
+        local_weights: Mapping[str, Any],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+        local_main_rope_table: Any,
+    ) -> tuple[Any, Any, Any, Any]:
+        values = mapped_impl(
+            local_weights,
+            None,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            None,
+            position,
+            block_tables,
+            context_lengths,
+            local_main_rope_table,
+        )
+        return values[:4]
+
+    def mapped_token_main_rope(
+        local_weights: Mapping[str, Any],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        local_token_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+        local_main_rope_table: Any,
+    ) -> tuple[Any, ...]:
+        return mapped_impl(
+            local_weights,
+            None,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            local_token_container,
+            position,
+            block_tables,
+            context_lengths,
+            local_main_rope_table,
+        )
+
+    def mapped_body_exact_query_main_rope(
+        local_weights: Mapping[str, Any],
+        local_query_weight_aliases: tuple[tuple[Any, ...], ...],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+        local_main_rope_table: Any,
+    ) -> tuple[Any, Any, Any, Any]:
+        values = mapped_impl(
+            local_weights,
+            local_query_weight_aliases,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            None,
+            position,
+            block_tables,
+            context_lengths,
+            local_main_rope_table,
+        )
+        return values[:4]
+
+    def mapped_token_exact_query_main_rope(
+        local_weights: Mapping[str, Any],
+        local_query_weight_aliases: tuple[tuple[Any, ...], ...],
+        local_residual_container: Any,
+        local_kv_container: Any,
+        local_index_container: Any,
+        local_metadata_container: Any,
+        local_token_container: Any,
+        position: Any,
+        block_tables: Any,
+        context_lengths: Any,
+        local_main_rope_table: Any,
+    ) -> tuple[Any, ...]:
+        return mapped_impl(
+            local_weights,
+            local_query_weight_aliases,
+            local_residual_container,
+            local_kv_container,
+            local_index_container,
+            local_metadata_container,
+            local_token_container,
+            position,
+            block_tables,
+            context_lengths,
+            local_main_rope_table,
         )
 
     def mapped_layer0_residual_discriminator_impl(
@@ -5290,11 +5597,18 @@ def build_decoder_step_program(
         )
     if complete_token_path:
         input_specs = (*common_specs, token_spec, P(), P(), P())
-        mapped = (
-            mapped_token_exact_query
-            if dsa_query_exact_association
-            else mapped_token
-        )
+        if dsa_query_exact_association:
+            mapped = (
+                mapped_token_exact_query_main_rope
+                if main_rope_table_enabled
+                else mapped_token_exact_query
+            )
+        else:
+            mapped = (
+                mapped_token_main_rope
+                if main_rope_table_enabled
+                else mapped_token
+            )
         output_specs = (
             residual_spec,
             kv_spec,
@@ -5325,12 +5639,21 @@ def build_decoder_step_program(
             output_specs = (*output_specs, prefill_index_input_spec)
     else:
         input_specs = (*common_specs, P(), P(), P())
-        mapped = (
-            mapped_body_exact_query
-            if dsa_query_exact_association
-            else mapped_body
-        )
+        if dsa_query_exact_association:
+            mapped = (
+                mapped_body_exact_query_main_rope
+                if main_rope_table_enabled
+                else mapped_body_exact_query
+            )
+        else:
+            mapped = (
+                mapped_body_main_rope
+                if main_rope_table_enabled
+                else mapped_body
+            )
         output_specs = (residual_spec, kv_spec, index_spec, metadata_spec)
+    if main_rope_table_enabled:
+        input_specs = (*input_specs, P())
     execute = jax.shard_map(
         mapped,
         mesh=mesh,
@@ -5490,6 +5813,10 @@ def build_decoder_step_program(
         ),
         dsa_score_default_precision=dsa_score_default_precision,
         attention_projection_backend=attention_projection_backend,
+        main_rope_table_enabled=main_rope_table_enabled,
+        main_rope_table_host=main_rope_table_host,
+        main_rope_table_sha256=main_rope_table_digest,
+        main_rope_table_bytes_per_device=main_rope_table_bytes,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
         observe_dsa_internals=observe_dsa_internals,

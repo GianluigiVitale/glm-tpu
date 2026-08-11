@@ -464,6 +464,92 @@ def _real_8k_decoder_config(*, dsa_score_default_precision: bool = False):
     )
 
 
+def _main_rope_table_hlo(*, include_forbidden: bool = False) -> str:
+    scoped_name = "jit(mapped_token)/shard_map/greenfield_main_rope_table"
+    multiplies = "\n".join(
+        f'  %mul.{index} = f32[1,32] multiply(%f32, %f32), '
+        f'metadata={{op_name="{scoped_name}/mul.{index}"}}'
+        for index in range(8)
+    )
+    combines = "\n".join(
+        f'  %add.{index} = f32[1,32] add(%mul.{2 * index}, '
+        f'%mul.{2 * index + 1}), metadata={{op_name="{scoped_name}/add.{index}"}}'
+        for index in range(4)
+    )
+    forbidden = (
+        f'  %bad = bf16[1,32] multiply(%round.0, %round.1), '
+        f'metadata={{op_name="{scoped_name}/bad"}}\n'
+        if include_forbidden
+        else ""
+    )
+    return f'''HloModule main_rope, num_partitions=32
+
+ENTRY %main (main_rope_table: bf16[8192,64]) -> bf16[1,32] {{
+  %main_rope_table = bf16[8192,64] parameter(0), metadata={{op_name="main_rope_table"}}
+  %f32 = f32[1,32] constant({{...}})
+{multiplies}
+{combines}
+  %round.0 = bf16[1,32] convert(%add.0), metadata={{op_name="{scoped_name}/round.0"}}
+  %round.1 = bf16[1,32] convert(%add.1), metadata={{op_name="{scoped_name}/round.1"}}
+{forbidden}  ROOT %out = bf16[1,32] copy(%round.0)
+}}
+'''
+
+
+def test_main_rope_table_hlo_contract_is_fail_closed() -> None:
+    from dataclasses import replace
+
+    from glm_tpu.greenfield.runtime.decoder import _validate_main_rope_table_hlo
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    config = _real_8k_decoder_config()
+    with pytest.raises(PlanValidationError, match="table width must be even"):
+        replace(config, main_rope_table_width=63)
+    accepted = _validate_main_rope_table_hlo(
+        parse_hlo_module(_main_rope_table_hlo()),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert accepted["passed"], accepted
+    assert accepted["expected_table_shape"] == [8192, 64]
+    assert accepted["table_parameter_count"] == 1
+    assert accepted["named_table_parameter_count"] == 1
+    assert accepted["fp32_multiply_count"] == 8
+    assert accepted["fp32_combine_count"] == 4
+    assert accepted["final_round_count"] == 2
+
+    forbidden = _validate_main_rope_table_hlo(
+        parse_hlo_module(_main_rope_table_hlo(include_forbidden=True)),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not forbidden["passed"]
+    assert forbidden["bf16_arithmetic"]
+
+    unnamed = _validate_main_rope_table_hlo(
+        parse_hlo_module(
+            _main_rope_table_hlo().replace(
+                'metadata={op_name="main_rope_table"}', ""
+            )
+        ),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not unnamed["passed"]
+    assert unnamed["named_table_parameter_count"] == 0
+
+    default = _validate_main_rope_table_hlo(
+        parse_hlo_module(_main_rope_table_hlo()),
+        config=config,
+        layers=1,
+        enabled=False,
+    )
+    assert not default["passed"]
+
+
 def _layer0_residual_discriminator_hlo(variant_name: str) -> str:
     flags = {
         "baseline_bf16": (False, False),
@@ -1279,7 +1365,12 @@ def test_teacher_forced_prefill_builder_rejects_invalid_contracts() -> None:
 
     config = SimpleNamespace(context_capacity=8, total_devices=32)
     body_only = SimpleNamespace(complete_token_path=False, config=config)
-    complete = SimpleNamespace(complete_token_path=True, config=config)
+    complete = SimpleNamespace(
+        complete_token_path=True,
+        config=config,
+        main_rope_table_enabled=False,
+        observe_prefill_index_inputs=False,
+    )
 
     with pytest.raises(PlanValidationError, match="complete-token decoder"):
         build_teacher_forced_prefill_program(body_only, prompt_length=2)
@@ -1288,6 +1379,46 @@ def test_teacher_forced_prefill_builder_rejects_invalid_contracts() -> None:
             build_teacher_forced_prefill_program(complete, prompt_length=value)
     with pytest.raises(PlanValidationError, match="leave capacity"):
         build_teacher_forced_prefill_program(complete, prompt_length=8)
+
+    import jax.numpy as jnp
+
+    disabled = build_teacher_forced_prefill_program(complete, prompt_length=2)
+    with pytest.raises(PlanValidationError, match="table state drifted"):
+        disabled.execute(
+            None,
+            None,
+            None,
+            None,
+            None,
+            jnp.asarray([1, 2], jnp.int32),
+            None,
+            None,
+            None,
+            None,
+            None,
+            jnp.zeros((8, 64), jnp.bfloat16),
+        )
+    enabled = build_teacher_forced_prefill_program(
+        SimpleNamespace(
+            complete_token_path=True,
+            config=config,
+            main_rope_table_enabled=True,
+            observe_prefill_index_inputs=False,
+        ),
+        prompt_length=2,
+    )
+    with pytest.raises(PlanValidationError, match="table state drifted"):
+        enabled.execute(
+            None,
+            None,
+            None,
+            None,
+            None,
+            jnp.asarray([1, 2], jnp.int32),
+            None,
+            None,
+            None,
+        )
 
 
 def test_complete_token_tpu_collective_lowering_is_exact_and_local() -> None:
@@ -1378,6 +1509,62 @@ ENTRY %main (scores: bf16[4], ids: s32[4], token: s32[1]) -> s32[1] {{
         expected_pairs=pairs,
         backend_contract="tpu_v4_pp8_pallas_feature_linear",
         dsa_query_exact_association=True,
+    )["passed"]
+
+    main_rope_hlo = hlo.replace(
+        "jit(mapped_token)/shard_map/ppermute",
+        "jit(mapped_token_main_rope)/shard_map/ppermute",
+    )
+    main_rope_record = _validate_complete_token_collective_lowering(
+        parse_hlo_module(main_rope_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        main_rope_table_enabled=True,
+    )
+    assert main_rope_record["passed"], main_rope_record
+    assert main_rope_record["accepted_token_return_op_names"] == [
+        "jit(mapped_token_main_rope)/shard_map/ppermute",
+        "jit(execute)/while/body/closed_call/shard_map/ppermute",
+    ]
+    assert not _validate_complete_token_collective_lowering(
+        parse_hlo_module(main_rope_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+    )["passed"]
+
+    exact_main_rope_hlo = hlo.replace(
+        "jit(mapped_token)/shard_map/ppermute",
+        "jit(mapped_token_exact_query_main_rope)/shard_map/ppermute",
+    )
+    exact_main_rope_record = _validate_complete_token_collective_lowering(
+        parse_hlo_module(exact_main_rope_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        dsa_query_exact_association=True,
+        main_rope_table_enabled=True,
+    )
+    assert exact_main_rope_record["passed"], exact_main_rope_record
+    assert exact_main_rope_record["accepted_token_return_op_names"] == [
+        "jit(mapped_token_exact_query_main_rope)/shard_map/ppermute",
+        "jit(execute)/while/body/closed_call/shard_map/ppermute",
+    ]
+    assert not _validate_complete_token_collective_lowering(
+        parse_hlo_module(exact_main_rope_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        dsa_query_exact_association=True,
+    )["passed"]
+    assert not _validate_complete_token_collective_lowering(
+        parse_hlo_module(exact_query_hlo),
+        expected_groups=groups,
+        expected_pairs=pairs,
+        backend_contract="tpu_v4_pp8_pallas_feature_linear",
+        dsa_query_exact_association=True,
+        main_rope_table_enabled=True,
     )["passed"]
 
     wide_hlo = hlo.replace("bf16[4]", "bf16[4,16]").replace(
@@ -2048,6 +2235,16 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             attention_projection_backend="fused_n82_convolution",
         )
+    with pytest.raises(PlanValidationError, match="main-RoPE table flag"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            main_rope_table_enabled=1,  # type: ignore[arg-type]
+        )
     with pytest.raises(
         PlanValidationError,
         match="attention projection backend is unknown",
@@ -2151,6 +2348,19 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             build_layer0_residual_discriminator=True,
         )
+    with pytest.raises(PlanValidationError, match="isolated from layer-0"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=True,
+            split_residual_state=True,
+            build_layer0_residual_discriminator=True,
+            main_rope_table_enabled=True,
+        )
     with pytest.raises(PlanValidationError, match="proven complete split-token"):
         build_decoder_step_program(
             source_plan,
@@ -2236,6 +2446,7 @@ def test_complete_small_decoder_token_step_runs_all_stages_on_forced_cpu() -> No
     program = r'''
 import json
 from dataclasses import replace
+from hashlib import sha256
 import jax
 import jax.numpy as jnp
 import ml_dtypes
@@ -2258,6 +2469,7 @@ groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8
 pairs = tuple((groups[stage][slot], groups[(stage + 1) % 8][slot]) for stage in range(8) for slot in range(4))
 decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True)
 exact_query_decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, dsa_query_backend='reference', dsa_query_exact_association=True)
+main_rope_decoder = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, main_rope_table_enabled=True)
 explicit_default = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=False, split_residual_state=False)
 observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_layer_residuals=True)
 internal_observer = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True)
@@ -2268,6 +2480,7 @@ split_boundary_regression = build_decoder_step_program(plan, schedule, state, we
 split_internal_regression = build_decoder_step_program(plan, schedule, state, weight_layout, groups, pairs, complete_token_path=True, observe_dsa_events=True, observe_dsa_internals=True, split_residual_state=True)
 prefill = build_teacher_forced_prefill_program(decoder, prompt_length=2)
 exact_query_prefill = build_teacher_forced_prefill_program(exact_query_decoder, prompt_length=2)
+main_rope_prefill = build_teacher_forced_prefill_program(main_rope_decoder, prompt_length=2)
 split_prefill = build_teacher_forced_prefill_program(split, prompt_length=2)
 repair_prefill = build_teacher_forced_prefill_program(repair_decoder, prompt_length=2)
 
@@ -2325,6 +2538,12 @@ inputs = (
     put(np.asarray([[0]], np.int32), decoder.input_specs[7]),
     put(np.asarray([1], np.int32), decoder.input_specs[8]),
 )
+assert main_rope_decoder.main_rope_table_host is not None
+main_rope_table = put(
+    main_rope_decoder.main_rope_table_host,
+    main_rope_decoder.input_specs[-1],
+)
+main_rope_inputs = (*inputs, main_rope_table)
 query_names = exact_query_decoder.dsa_query_weight_names
 query_bits = tuple(weights[bits_name] for bits_name, _ in query_names)
 query_scales = tuple(weights[scale_name] for _, scale_name in query_names)
@@ -2344,6 +2563,10 @@ lowered = jax.jit(decoder.execute).lower(*inputs)
 default_stablehlo = lowered.as_text()
 explicit_default_stablehlo = jax.jit(explicit_default.execute).lower(*inputs).as_text()
 compiled = lowered.compile()
+main_rope_lowered = jax.jit(main_rope_decoder.execute).lower(
+    *main_rope_inputs
+)
+main_rope_compiled = main_rope_lowered.compile()
 exact_query_lowered = jax.jit(exact_query_decoder.execute).lower(*exact_query_inputs)
 exact_query_stablehlo = exact_query_lowered.as_text()
 exact_query_compiled = exact_query_lowered.compile()
@@ -2356,6 +2579,7 @@ internal_observer_compiled = jax.jit(internal_observer.execute).lower(*inputs).c
 observed = observer_compiled(*inputs)
 internal_observed = internal_observer_compiled(*inputs)
 first = compiled(*inputs)
+main_rope_first = main_rope_compiled(*main_rope_inputs)
 exact_query_first = exact_query_compiled(*exact_query_inputs)
 second = compiled(weights, *first)
 split_first = split_compiled(*split_inputs)
@@ -2372,6 +2596,18 @@ prefill_inputs = (
 )
 prefill_compiled = jax.jit(prefill.execute).lower(*prefill_inputs).compile()
 prefilled = prefill_compiled(*prefill_inputs)
+main_rope_prefill_inputs = (
+    *prefill_inputs,
+    None,
+    None,
+    main_rope_table,
+)
+main_rope_prefill_compiled = jax.jit(main_rope_prefill.execute).lower(
+    *main_rope_prefill_inputs
+).compile()
+main_rope_prefilled = main_rope_prefill_compiled(
+    *main_rope_prefill_inputs
+)
 exact_query_prefill_inputs = (*prefill_inputs, None, query_aliases)
 exact_query_prefill_compiled = jax.jit(exact_query_prefill.execute).lower(*exact_query_prefill_inputs).compile()
 exact_query_prefilled = exact_query_prefill_compiled(*exact_query_prefill_inputs)
@@ -2405,6 +2641,10 @@ repair_prefilled = repair_prefill_compiled(*repair_prefill_inputs)
 residual, kv, index, metadata, next_token, next_position, next_blocks, next_lengths = map(np.asarray, jax.device_get(second))
 split_residual, split_kv, split_index, split_metadata, split_next_token, split_next_position, split_next_blocks, split_next_lengths = map(np.asarray, jax.device_get(split_second))
 prefill_values = list(map(np.asarray, jax.device_get(prefilled)))
+main_rope_values = list(map(np.asarray, jax.device_get(main_rope_first)))
+main_rope_prefill_values = list(
+    map(np.asarray, jax.device_get(main_rope_prefilled))
+)
 exact_query_values = list(map(np.asarray, jax.device_get(exact_query_first)))
 exact_query_prefill_values = list(map(np.asarray, jax.device_get(exact_query_prefilled)))
 split_prefill_values = list(map(np.asarray, jax.device_get(split_prefilled)))
@@ -2453,10 +2693,12 @@ module = parse_hlo_module(compiled.as_text())
 observer_module = parse_hlo_module(observer_compiled.as_text())
 internal_observer_module = parse_hlo_module(internal_observer_compiled.as_text())
 hlo_contract = validate_decoder_step_hlo(compiled.as_text(), config=decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True)
+main_rope_hlo_contract = validate_decoder_step_hlo(main_rope_compiled.as_text(), config=main_rope_decoder.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, main_rope_table_enabled=True)
 split_hlo_contract = validate_decoder_step_hlo(split_compiled.as_text(), config=split.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, split_residual_state=True)
 observer_hlo_contract = validate_decoder_step_hlo(observer_compiled.as_text(), config=observer.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, token_observation_candidates=observer.config.token_observation_candidates)
 internal_observer_hlo_contract = validate_decoder_step_hlo(internal_observer_compiled.as_text(), config=internal_observer.config, schedule=schedule, groups=groups, pairs=pairs, backend_contract='cpu_reference', complete_token_path=True, token_observation_candidates=internal_observer.config.token_observation_candidates)
 prefill_hlo_contract = validate_teacher_forced_prefill_hlo(prefill_compiled.as_text(), program=prefill, schedule=schedule, backend_contract='cpu_reference')
+main_rope_prefill_hlo_contract = validate_teacher_forced_prefill_hlo(main_rope_prefill_compiled.as_text(), program=main_rope_prefill, schedule=schedule, backend_contract='cpu_reference')
 split_prefill_hlo_contract = validate_teacher_forced_prefill_hlo(split_prefill_compiled.as_text(), program=split_prefill, schedule=schedule, backend_contract='cpu_reference')
 repair_prefill_hlo_contract = validate_teacher_forced_prefill_hlo(repair_prefill_compiled.as_text(), program=repair_prefill, schedule=schedule, backend_contract='cpu_reference')
 counts = {}
@@ -2494,6 +2736,44 @@ print(json.dumps({
     'health': sorted(set(metadata[active, 0, decoder.config.health_index].tolist())),
     'hlo_contract': {key: hlo_contract[key] for key in ('collective_count', 'collective_counts', 'passed', 'violations')},
     'index_writes': index_writes,
+    'main_rope_table': {
+        'bytes_per_device': main_rope_decoder.main_rope_table_bytes_per_device,
+        'default_asset_absent': decoder.main_rope_table_host is None and decoder.main_rope_table_sha256 is None and decoder.main_rope_table_bytes_per_device == 0,
+        'device_table_exact': bool(np.array_equal(
+            np.asarray(jax.device_get(main_rope_table)),
+            np.asarray(main_rope_decoder.main_rope_table_host),
+        )),
+        'hlo_contract': {
+            key: main_rope_hlo_contract['main_rope_table_contract'][key]
+            for key in (
+                'bf16_arithmetic',
+                'expected_table_shape',
+                'final_round_count',
+                'forbidden_instructions',
+                'fp32_combine_count',
+                'fp32_multiply_count',
+                'named_table_parameter_count',
+                'passed',
+                'table_parameter_count',
+                'violations',
+            )
+        },
+        'input_spec_delta': len(main_rope_decoder.input_specs) - len(decoder.input_specs),
+        'position_zero_outputs_exact': all(
+            np.array_equal(main_rope_values[index], np.asarray(jax.device_get(first[index])))
+            for index in range(8)
+        ),
+        'prefill_finite': all(np.all(np.isfinite(value)) for value in main_rope_prefill_values[:2]),
+        'prefill_hlo_passed': main_rope_prefill_hlo_contract['passed'],
+        'prefill_table_contract_enabled': main_rope_prefill_hlo_contract['decoder_contract']['main_rope_table_enabled'],
+        'program_flag': main_rope_decoder.main_rope_table_enabled,
+        'shape': list(main_rope_decoder.main_rope_table_host.shape),
+        'sha256_matches': sha256(
+            np.ascontiguousarray(main_rope_decoder.main_rope_table_host)
+            .view(np.uint16)
+            .tobytes()
+        ).hexdigest() == main_rope_decoder.main_rope_table_sha256,
+    },
     'untargeted_owner_cache_unchanged': bool(np.all(kv[[rank for group in groups for rank in group[1:]], 0, 0, 1] == 1)),
     'kv_writes': kv_writes,
     'next_tokens': sorted(set(next_token[active, 0].tolist())),
@@ -2656,7 +2936,7 @@ print(json.dumps({
         text=True,
         capture_output=True,
         check=False,
-        timeout=300,
+        timeout=420,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     result = json.loads(completed.stdout.strip().splitlines()[-1])
@@ -2673,6 +2953,29 @@ print(json.dumps({
     assert result["exact_query"]["stablehlo_dot_count"] >= 4
     assert result["exact_query"]["stablehlo_parameter_alias_count"] >= 4
     assert result["exact_query"]["stablehlo_barrier_count"] >= 2
+    main_rope = result["main_rope_table"]
+    assert main_rope["program_flag"]
+    assert main_rope["default_asset_absent"]
+    assert main_rope["device_table_exact"]
+    assert main_rope["input_spec_delta"] == 1
+    assert main_rope["shape"] == [8, 2]
+    assert main_rope["bytes_per_device"] == 32
+    assert main_rope["sha256_matches"]
+    assert main_rope["position_zero_outputs_exact"]
+    assert main_rope["prefill_finite"]
+    assert main_rope["prefill_hlo_passed"]
+    assert main_rope["prefill_table_contract_enabled"]
+    main_rope_hlo = main_rope["hlo_contract"]
+    assert main_rope_hlo["passed"], main_rope_hlo
+    assert main_rope_hlo["violations"] == []
+    assert main_rope_hlo["expected_table_shape"] == [8, 2]
+    assert main_rope_hlo["table_parameter_count"] == 1
+    assert main_rope_hlo["named_table_parameter_count"] == 1
+    assert main_rope_hlo["fp32_multiply_count"] >= 8 * 8
+    assert main_rope_hlo["fp32_combine_count"] >= 8 * 4
+    assert main_rope_hlo["final_round_count"] >= 8 * 2
+    assert main_rope_hlo["forbidden_instructions"] == []
+    assert main_rope_hlo["bf16_arithmetic"] == []
     assert result["split"] == {
         "active": [0, 1, 2, 3],
         "collective_counts": {

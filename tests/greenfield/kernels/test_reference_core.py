@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from hashlib import sha256
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -8,6 +10,7 @@ import pytest
 from glm_tpu.greenfield.kernels.reference import (
     apply_rotary,
     apply_rotary_fp32_final_round,
+    build_rotary_table_host,
     dense_swiglu,
     embedding_lookup,
     final_norm,
@@ -16,6 +19,7 @@ from glm_tpu.greenfield.kernels.reference import (
     residual_add,
     rms_norm,
     rotary_cos_sin,
+    rotary_table_sha256,
     vocabulary_logits,
 )
 
@@ -168,6 +172,23 @@ def test_rotary_tables_use_glm_frequency_formula() -> None:
     np.testing.assert_allclose(np.asarray(sin), np.sin(angles), rtol=1e-6, atol=1e-6)
 
 
+def test_host_rotary_table_matches_protected_accepted_row() -> None:
+    table = build_rotary_table_host(
+        8192, rotary_dim=64, theta=8_000_000.0
+    )
+    assert table.shape == (8192, 64)
+    assert table.dtype.name == "bfloat16"
+    assert table.flags.c_contiguous
+    row_bits = np.ascontiguousarray(table[8155]).view(np.uint16)
+    assert rotary_table_sha256(table) == (
+        "6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701"
+    )
+    assert rotary_table_sha256(table) == rotary_table_sha256(table.copy())
+    assert sha256(row_bits.tobytes()).hexdigest() == (
+        "67b01e3cab682d5ffd04ac9c8043e7e6825ee1275023428c41f9a1ae412dea1d"
+    )
+
+
 def test_rotary_pair_layouts_are_explicit_and_dot_preserving() -> None:
     value = jnp.asarray([[1.0, 2.0, 3.0, 4.0]], dtype=jnp.float32)
     cos = jnp.asarray([[0.0, 0.0]], dtype=jnp.float32)
@@ -238,6 +259,14 @@ def test_rotary_fp32_final_round_matches_accepted_layer0_cache_row() -> None:
 
 
 def test_rotary_refuses_odd_width_and_noninteger_positions() -> None:
+    with pytest.raises(ValueError, match="capacity"):
+        build_rotary_table_host(0, rotary_dim=64, theta=8_000_000.0)
+    with pytest.raises(ValueError, match="dimension"):
+        build_rotary_table_host(8, rotary_dim=63, theta=8_000_000.0)
+    with pytest.raises(ValueError, match="theta"):
+        build_rotary_table_host(8, rotary_dim=64, theta=0.0)
+    with pytest.raises(ValueError, match="two-dimensional BF16"):
+        rotary_table_sha256(np.zeros((8, 64), dtype=np.float32))
     with pytest.raises(ValueError, match="even"):
         rotary_cos_sin(jnp.asarray([0]), rotary_dim=3, theta=10.0)
     with pytest.raises(ValueError, match="integer"):

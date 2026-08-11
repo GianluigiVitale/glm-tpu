@@ -1372,6 +1372,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--main-rope-table",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1445,6 +1451,7 @@ def main() -> int:
     args.dsa_score_default_precision = bool(
         args.dsa_score_default_precision
     )
+    args.main_rope_table = bool(args.main_rope_table)
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
     args.observe_layer0_residual_variants = bool(
@@ -1957,6 +1964,8 @@ def main() -> int:
     materialized_prefill_index_weights: tuple[Any, ...] | None = None
     materialized_dsa_query_weights: tuple[Any, ...] | None = None
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None = None
+    main_rope_table = None
+    main_rope_table_local_hashes: list[str] = []
     try:
         if (
             jax.process_count() != 8
@@ -2025,6 +2034,7 @@ def main() -> int:
             dsa_score_default_precision=(
                 args.dsa_score_default_precision
             ),
+            main_rope_table_enabled=args.main_rope_table,
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             build_layer0_residual_discriminator=(
@@ -2067,6 +2077,7 @@ def main() -> int:
                 dsa_score_default_precision=(
                     args.dsa_score_default_precision
                 ),
+                main_rope_table_enabled=args.main_rope_table,
                 attention_projection_backend=(
                     attention_projection_backend
                 ),
@@ -2109,6 +2120,7 @@ def main() -> int:
                     dsa_score_default_precision=(
                         args.dsa_score_default_precision
                     ),
+                    main_rope_table_enabled=args.main_rope_table,
                     attention_projection_backend=(
                         attention_projection_backend
                     ),
@@ -2131,6 +2143,51 @@ def main() -> int:
         )
         load_seconds = time.monotonic() - load_started
         multihost_utils.sync_global_devices("greenfield-short-decoder-load-end")
+
+        if args.main_rope_table:
+            if (
+                decoder.main_rope_table_host is None
+                or decoder.main_rope_table_sha256 is None
+                or decoder.main_rope_table_bytes_per_device <= 0
+            ):
+                raise RuntimeError("decoder main-RoPE table asset is unavailable")
+            for related in (dsa_observer, prefill_decoder):
+                if related is not None and (
+                    not related.main_rope_table_enabled
+                    or related.main_rope_table_sha256
+                    != decoder.main_rope_table_sha256
+                    or related.main_rope_table_host is None
+                    or related.main_rope_table_host.shape
+                    != decoder.main_rope_table_host.shape
+                    or related.main_rope_table_bytes_per_device
+                    != decoder.main_rope_table_bytes_per_device
+                ):
+                    raise RuntimeError("decoder main-RoPE table identities disagree")
+            main_rope_table = jax.device_put(
+                decoder.main_rope_table_host,
+                NamedSharding(decoder.mesh, P()),
+            )
+            main_rope_table.block_until_ready()
+            main_rope_table_local_hashes = [
+                sha256(
+                    np.ascontiguousarray(
+                        np.asarray(jax.device_get(shard.data))
+                    ).view(np.uint16).tobytes()
+                ).hexdigest()
+                for shard in main_rope_table.addressable_shards
+            ]
+            if set(main_rope_table_local_hashes) != {
+                decoder.main_rope_table_sha256
+            }:
+                raise RuntimeError("device main-RoPE table identity drifted")
+        elif any(
+            value is not None
+            for value in (
+                decoder.main_rope_table_host,
+                decoder.main_rope_table_sha256,
+            )
+        ) or decoder.main_rope_table_bytes_per_device != 0:
+            raise RuntimeError("default decoder materialized a main-RoPE table")
 
         dsa_query_materialization_compile_seconds = None
         dsa_query_materialization_execute_seconds = None
@@ -2548,7 +2605,9 @@ def main() -> int:
                 NamedSharding(decoder.mesh, P()),
             )
         auxiliary_values = tuple(
-            value for value in (token, prompt) if value is not None
+            value
+            for value in (token, prompt, main_rope_table)
+            if value is not None
         ) + (
             tuple(materialized_prefill_index_weights)
             if materialized_prefill_index_weights is not None
@@ -2646,6 +2705,10 @@ def main() -> int:
             donate_argnums = tuple(
                 value + donation_shift for value in (1, 2, 3, 4)
             )
+        if args.main_rope_table:
+            if main_rope_table is None:
+                raise RuntimeError("main-RoPE table input was not materialized")
+            inputs = (*inputs, main_rope_table)
         prefill_inputs = None
         if oracle_mode:
             assert prefill is not None and prompt is not None
@@ -2680,6 +2743,16 @@ def main() -> int:
                     *prefill_inputs,
                     dsa_query_weight_aliases,
                 )
+            if args.main_rope_table:
+                if main_rope_table is None:
+                    raise RuntimeError("prefill main-RoPE table is unavailable")
+                if not args.prefill_index_repair and not (
+                    args.dsa_query_exact_association
+                ):
+                    prefill_inputs = (*prefill_inputs, None)
+                if not args.dsa_query_exact_association:
+                    prefill_inputs = (*prefill_inputs, None)
+                prefill_inputs = (*prefill_inputs, main_rope_table)
         multihost_utils.sync_global_devices("greenfield-short-decoder-compile-start")
         compile_started = time.monotonic()
         lowered = jax.jit(
@@ -2722,6 +2795,7 @@ def main() -> int:
             ),
             complete_token_path=decoder.complete_token_path,
             split_residual_state=decoder.split_residual_state,
+            main_rope_table_enabled=decoder.main_rope_table_enabled,
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -2809,6 +2883,9 @@ def main() -> int:
                     dsa_observer.config.token_observation_candidates
                 ),
                 split_residual_state=dsa_observer.split_residual_state,
+                main_rope_table_enabled=(
+                    dsa_observer.main_rope_table_enabled
+                ),
             )
             dsa_observer_isolation_contract = (
                 _observer_hlo_isolation_contract(
@@ -3529,9 +3606,10 @@ def main() -> int:
                 for step, decode_position in enumerate(
                     dsa_oracle_tensors["decode_positions"].tolist()
                 ):
-                    observer_result = compiled_dsa_observer(
-                        *runtime_prefix, *observer_current
-                    )
+                    observer_inputs = (*runtime_prefix, *observer_current)
+                    if args.main_rope_table:
+                        observer_inputs = (*observer_inputs, main_rope_table)
+                    observer_result = compiled_dsa_observer(*observer_inputs)
                     observer_result[8].block_until_ready()
                     observation_host = _materialize_global_array(
                         jax,
@@ -4021,14 +4099,18 @@ def main() -> int:
 
         def run_step(values: tuple[Any, ...]) -> tuple[Any, ...]:
             if args.complete_token_path:
-                return compiled(*runtime_prefix, *values)
-            return compiled(
+                step_inputs = (*runtime_prefix, *values)
+            else:
+                step_inputs = (
                 *runtime_prefix,
                 *values,
                 position,
                 block_tables,
                 context_lengths,
-            )
+                )
+            if args.main_rope_table:
+                step_inputs = (*step_inputs, main_rope_table)
+            return compiled(*step_inputs)
 
         def materialize_active_token(
             values: tuple[Any, ...], *, phase: str
@@ -4358,6 +4440,39 @@ def main() -> int:
             "load_seconds": load_seconds,
             "local_index_nonzero_counts": local_index_nonzero,
             "local_kv_nonzero_counts": local_kv_nonzero,
+            "main_rope_table_enabled": decoder.main_rope_table_enabled,
+            "main_rope_table_sha256": decoder.main_rope_table_sha256,
+            "main_rope_table_shape": (
+                list(decoder.main_rope_table_host.shape)
+                if decoder.main_rope_table_host is not None
+                else None
+            ),
+            "main_rope_table_bytes_per_device": (
+                decoder.main_rope_table_bytes_per_device
+            ),
+            "main_rope_table_local_device_sha256": (
+                main_rope_table_local_hashes
+            ),
+            "main_rope_table_prerequisite": (
+                {
+                    "code_hash": (
+                        "ed7c74f423e811f1acfbeb3c075fb8fad37d4f51"
+                    ),
+                    "position_8155_row_sha256": (
+                        "67b01e3cab682d5ffd04ac9c8043e7e6825ee1275023428c41f9a1ae412dea1d"
+                    ),
+                    "results_db_item_row_id": 1816,
+                    "results_db_run_id": 531,
+                    "runner_sha256": (
+                        "d32d03576faa99c882913cf289a32d9aaa7f258a6b83588464058f36a8ad7370"
+                    ),
+                    "success_sha256": (
+                        "8f9763e4e8106db0fe30b9fa3820873f736ede2215edfc8b950fcd311d08b6d7"
+                    ),
+                }
+                if decoder.main_rope_table_enabled
+                else None
+            ),
             "metadata_contract": metadata_contract,
             "metadata_passed": metadata_passed,
             "optimized_hlo_sha256": hlo_sha256,
@@ -4400,7 +4515,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 14,
+            "schema_version": 15,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

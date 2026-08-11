@@ -2,8 +2,75 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
+
 import jax
 import jax.numpy as jnp
+import ml_dtypes
+import numpy as np
+
+
+def build_rotary_table_host(
+    context_capacity: int,
+    *,
+    rotary_dim: int,
+    theta: float,
+) -> np.ndarray:
+    """Build the accepted BF16 cos/sin table as a host runtime asset.
+
+    The accepted GLM runtime constructs positive FP32 powers, takes their
+    reciprocal, evaluates NumPy FP32 cos/sin once, and stores the table in
+    BF16.  Keeping this separate from :func:`rotary_cos_sin` is intentional:
+    the latter remains the established dynamic DSA path.
+    """
+
+    if (
+        not isinstance(context_capacity, int)
+        or isinstance(context_capacity, bool)
+        or context_capacity <= 0
+    ):
+        raise ValueError("rotary table capacity must be a positive integer")
+    if (
+        not isinstance(rotary_dim, int)
+        or isinstance(rotary_dim, bool)
+        or rotary_dim <= 0
+        or rotary_dim % 2
+    ):
+        raise ValueError("rotary table dimension must be positive and even")
+    if (
+        not isinstance(theta, (int, float))
+        or isinstance(theta, bool)
+        or theta <= 0
+    ):
+        raise ValueError("rotary table theta must be positive")
+
+    dimensions = np.arange(0, rotary_dim, 2, dtype=np.float32)
+    frequencies = np.float32(1.0) / np.power(
+        np.float32(theta),
+        dimensions / np.float32(rotary_dim),
+        dtype=np.float32,
+    )
+    positions = np.arange(context_capacity, dtype=np.float32)
+    angles = np.multiply(
+        positions[:, None], frequencies[None, :], dtype=np.float32
+    )
+    table = np.concatenate(
+        (
+            np.cos(angles, dtype=np.float32),
+            np.sin(angles, dtype=np.float32),
+        ),
+        axis=-1,
+    ).astype(ml_dtypes.bfloat16)
+    return np.ascontiguousarray(table)
+
+
+def rotary_table_sha256(table: np.ndarray) -> str:
+    """Hash one contiguous BF16 table in storage order."""
+
+    value = np.ascontiguousarray(table)
+    if value.ndim != 2 or value.dtype != ml_dtypes.bfloat16:
+        raise ValueError("rotary table hash requires a two-dimensional BF16 array")
+    return sha256(value.view(np.uint16).tobytes()).hexdigest()
 
 
 def rotary_cos_sin(

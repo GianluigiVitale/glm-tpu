@@ -20,6 +20,7 @@ from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract, dsa_i
 from glm_tpu.greenfield.kernels.reference.fp8 import dequantize_fp8_bits_block_weight
 from glm_tpu.greenfield.kernels.reference.linear import linear
 from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
+from glm_tpu.greenfield.kernels.reference.rotary import apply_rotary_fp32_final_round
 from glm_tpu.greenfield.kernels.stage_local import stage_local_dsa_fp8_mapped, stage_local_index_share_fp8_mapped
 
 def bits(value):
@@ -253,6 +254,41 @@ def attention_mapped(
     )
     return result.output, result.cache[None], result.contract_valid
 
+def attention_mapped_table(
+    row, cache_container, selection, counts, pos, table, valid_lengths,
+    norm, qa, qa_scale, qa_norm, qb, qb_scale, kva, kva_scale, kva_norm,
+    kvb, kvb_scale, output_weight, output_scale, local_slot, rope_row,
+):
+    result = stage_local_index_share_fp8_mapped(
+        row,
+        cache_container[0],
+        selection,
+        counts,
+        pos,
+        table,
+        valid_lengths,
+        norm,
+        qa,
+        qa_scale,
+        qa_norm,
+        qb,
+        qb_scale,
+        kva,
+        kva_scale,
+        kva_norm,
+        kvb,
+        kvb_scale,
+        output_weight,
+        output_scale,
+        local_slot[0],
+        axis_name='stage',
+        contract=mla,
+        cache_layout=layout,
+        block_shape=(2, 2),
+        main_rope_table_row=rope_row,
+    )
+    return result.output, result.cache[None], result.contract_valid
+
 attention_map = jax.shard_map(
     attention_mapped,
     mesh=mesh,
@@ -261,6 +297,18 @@ attention_map = jax.shard_map(
         P(), P(), P(), P('stage', None), P('stage', None), P(), P(), P(),
         P('stage', None), P('stage', None), P(None, 'stage'), P(None, 'stage'),
         P('stage'),
+    ),
+    out_specs=(P(), P('stage', None, None, None), P()),
+    check_vma=False,
+)
+attention_table_map = jax.shard_map(
+    attention_mapped_table,
+    mesh=mesh,
+    in_specs=(
+        P(), P('stage', None, None, None), P(), P(), P(), P(), P(), P(),
+        P(), P(), P(), P('stage', None), P('stage', None), P(), P(), P(),
+        P('stage', None), P('stage', None), P(None, 'stage'), P(None, 'stage'),
+        P('stage'), P(),
     ),
     out_specs=(P(), P('stage', None, None, None), P()),
     check_vma=False,
@@ -290,6 +338,17 @@ attention_args = (
 )
 attention_compiled = jax.jit(attention_map).lower(*attention_args).compile()
 got_output, got_kv_cache, attention_valid = attention_compiled(*attention_args)
+rope_row = jnp.asarray([0.0, 1.0], jnp.bfloat16)
+attention_table_args = (
+    *attention_args,
+    jax.device_put(rope_row, rep),
+)
+attention_table_compiled = jax.jit(attention_table_map).lower(
+    *attention_table_args
+).compile()
+table_output, table_kv_cache, table_attention_valid = (
+    attention_table_compiled(*attention_table_args)
+)
 expected_attention = stage_local_index_share_gate_c(
     residual,
     jnp.asarray(kv_cache),
@@ -310,6 +369,23 @@ expected_attention = stage_local_index_share_gate_c(
     contract=mla,
     cache_layout=layout,
 )
+current_kv = linear(normalized, dequantize(kv_a_bits, kv_a_scale))
+current_latent = rms_norm(
+    current_kv[..., :4], kv_a_norm, epsilon=1e-5
+)
+current_rope = apply_rotary_fp32_final_round(
+    current_kv[..., 4:6][:, None, :],
+    rope_row[:1][None, None, :],
+    rope_row[1:][None, None, :],
+    interleaved=True,
+)[:, 0, :]
+expected_table_cache = np.array(kv_cache, copy=True)
+expected_table_cache[3, 1, 1] = np.asarray(
+    jnp.concatenate(
+        (current_latent, current_rope, jnp.zeros((1, 2), jnp.bfloat16)),
+        axis=-1,
+    )[0]
+)
 bad_attention_args = list(attention_args)
 bad_attention_args[5] = jax.device_put(bad_tables, rep)
 bad_output, bad_kv_cache, bad_attention_valid = attention_compiled(
@@ -327,6 +403,17 @@ print(json.dumps({
         - expected_attention.output.astype(jnp.float32)
     ))),
     'attention_valid': bool(jnp.all(attention_valid)),
+    'main_rope_table': {
+        'cache_exact': bool(jnp.array_equal(
+            table_kv_cache, jnp.asarray(expected_table_cache)
+        )),
+        'dynamic_trig_absent': all(
+            marker not in attention_table_compiled.as_text().lower()
+            for marker in (' cosine(', ' sine(')
+        ),
+        'output_finite': bool(jnp.all(jnp.isfinite(table_output))),
+        'valid': bool(jnp.all(table_attention_valid)),
+    },
     'bad_attention_cache_unchanged': bool(jnp.array_equal(
         bad_kv_cache, jnp.asarray(kv_cache)
     )),
@@ -374,6 +461,12 @@ print(json.dumps({
     assert result["attention_cache_error"] == 0.0
     assert result["attention_valid"]
     assert result["attention_hlo"] == {"ag": 4, "ar": 1, "cp": 0}
+    assert result["main_rope_table"] == {
+        "cache_exact": True,
+        "dynamic_trig_absent": True,
+        "output_finite": True,
+        "valid": True,
+    }
     assert not result["bad_dsa_valid"]
     assert result["bad_dsa_cache_unchanged"]
     assert not result["bad_attention_valid"]

@@ -280,8 +280,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "isolated residual direct remote contract hash drifted" in runner
     assert '"dcp_then_model_sequential_bf16"' in compiler
     assert '"model_then_dcp_pairwise_bf16"' in compiler
-    assert '"schema_version": 14' in compiler
-    assert 'record["schema_version"] for record in records} != {14}' in runner
+    assert '"schema_version": 15' in compiler
+    assert 'record["schema_version"] for record in records} != {15}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
@@ -331,7 +331,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "_headkeyexact" in runner
     assert "runtime_prefix = (" in compiler
     assert "*runtime_prefix, *observer_current" in compiler
-    assert "return compiled(*runtime_prefix, *values)" in compiler
+    assert "step_inputs = (*runtime_prefix, *values)" in compiler
+    assert "return compiled(*step_inputs)" in compiler
     assert "DB520 direct remote SUCCESS hash drifted" in runner
     assert "external_stage_local_raw_fp8_to_bf16" in runner
     assert "external_stage_local_bf16_to_fp32" in runner
@@ -358,6 +359,38 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "dsa_score_default_precision_prerequisite" in runner
     assert "highest_precision_contraction_count" in runner
     assert "_scoredefault" in runner
+
+
+def test_main_rope_table_is_default_off_and_db531_protected() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert '"--main-rope-table"' in compiler
+    assert "main_rope_table_enabled=args.main_rope_table" in compiler
+    assert '"main_rope_table_enabled": decoder.main_rope_table_enabled' in compiler
+    assert '"main_rope_table_sha256": decoder.main_rope_table_sha256' in compiler
+    assert '"main_rope_table_shape": (' in compiler
+    assert '"main_rope_table_bytes_per_device": (' in compiler
+    assert '"main_rope_table_local_device_sha256": (' in compiler
+    assert "decoder main-RoPE table asset is unavailable" in compiler
+    assert "device main-RoPE table identity drifted" in compiler
+    assert "default decoder materialized a main-RoPE table" in compiler
+    assert (
+        "readonly MAIN_ROPE_TABLE="
+        "${GLM_GREENFIELD_MAIN_ROPE_TABLE:-0}" in runner
+    )
+    assert '--main-rope-table "$main_rope_table"' in runner
+    assert "main-RoPE table requires the protected 8K" in runner
+    assert "main-RoPE table requires the exact repaired recurrent DSA chain" in runner
+    assert "main-RoPE table must remain isolated from layer-0 diagnostics" in runner
+    assert "greenfield_layer0_main_rope_20260811T072231959104598Z" in runner
+    assert "DB531 direct remote SUCCESS hash drifted" in runner
+    assert "expected_main_rope_sha256" in runner
+    assert "validate_main_rope_hlo" in runner
+    assert 'contract["fp32_multiply_count"] < 78 * 8' in runner
+    assert 'contract["fp32_combine_count"] < 78 * 4' in runner
+    assert 'contract["final_round_count"] < 78 * 2' in runner
+    assert "_mainrope" in runner
 
 
 @pytest.mark.parametrize(

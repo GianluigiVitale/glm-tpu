@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 06:57 UTC
+**Updated:** 2026-08-11 08:38 UTC
 
 ## Authority and isolation
 
@@ -16,6 +16,36 @@
 Those tracked branch-local files are authoritative. Main checkout, old worktree, campaign, and
 legacy `AGENTS.md`/`CLAUDE.md`/`HANDOFF.md` files have no authority here. The incremental TP32 plan
 and pipeline-parallelism ban are superseded. Never edit/delete the owner's untracked main files.
+
+## Current Gate-D integration batch
+
+- Branch HEAD is still pushed pin `6acc6e34a5646dae8425a282a7c77b339121a45b`; the default-off
+  main-RoPE table integration is an uncommitted coherent batch approved for commit.
+- It reuses protected DB531 exactly: one host-built BF16 table uses the accepted positive-power /
+  reciprocal / NumPy-FP32 trig formula, with the 8K asset pinned to SHA
+  `6a22140f...070101` and position-8,155 row to `67b01e3c...a1d`. The replicated final input is
+  hashed on each local device and looked up device-side; only main-MLA query/cache-key rotary uses
+  the proven FP32-final-round primitive. DSA rotary and default execution are unchanged.
+- Decoder, DSA-observer and teacher-forced-prefill paths thread the final table input without
+  shifting donated state. HLO contracts require the named BF16 table parameter, aggregate
+  scheduled-layer minima for FP32 products/combines/final rounds, and forbid scoped trig,
+  collectives and BF16 intermediates. The
+  protected wrapper restricts enablement to the exact complete repaired 8K chain and revalidates
+  DB531 local hashes, live DB linkage, clean censuses and direct remote `SUCCESS`.
+- Local evidence: the complete forced-32-device reduced decoder/prefill/table/HLO proof passes in
+  `156.30 s`; the remaining affected suite passes `73` tests with that single slow test deselected.
+  JSON, Bash, ShellCheck and diff checks pass. These are mechanism checks, not TPU correctness or
+  performance proof.
+- Fable xhigh session `4c23bb63-7401-4a45-b082-8743d7ea58b6` found one TPU-only HLO guard bug:
+  the new mapped function names were absent from the token-return operation allowlist. The helper
+  now derives the exact direct name from both query-association and table flags; enabled/disabled
+  synthetic TPU-HLO cases pass, and the affected `73`-test batch passes again in `52.85 s`. The
+  same session independently passed the two focused tests and returned `APPROVE COMMIT`.
+- Exact next: commit/push, rerun strict fleet census, and launch exactly
+  one serialized protected complete 8K run with `GLM_GREENFIELD_MAIN_ROPE_TABLE=1`. Accept it only
+  if raw tokens, exact DSA, state/load/cache, HLO, HBM, DB/archive and authenticated cleanup all
+  pass. If layer-0 output still diverges, use that bounded result to localize the next upstream
+  primitive rather than retrying combine-precision theories.
 
 ## Implemented and verified
 

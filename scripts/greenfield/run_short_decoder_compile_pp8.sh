@@ -24,6 +24,7 @@ readonly PREFILL_INDEX_REPAIR=${GLM_GREENFIELD_PREFILL_INDEX_REPAIR:-0}
 readonly DSA_QUERY_EXACT_ASSOCIATION=${GLM_GREENFIELD_DSA_QUERY_EXACT_ASSOCIATION:-0}
 readonly DSA_HEAD_KEY_EXACT_ASSOCIATION=${GLM_GREENFIELD_DSA_HEAD_KEY_EXACT_ASSOCIATION:-0}
 readonly DSA_SCORE_DEFAULT_PRECISION=${GLM_GREENFIELD_DSA_SCORE_DEFAULT_PRECISION:-0}
+readonly MAIN_ROPE_TABLE=${GLM_GREENFIELD_MAIN_ROPE_TABLE:-0}
 readonly SHORT_CONTEXT_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE:-0}
 readonly SHORT_CONTEXT_DSA_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_DSA_ORACLE:-0}
 readonly DSA_INTERNAL_OBSERVER=${GLM_GREENFIELD_DSA_INTERNAL_OBSERVER:-0}
@@ -127,6 +128,10 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
   echo "DSA score default-precision flag must be 0 or 1" >&2
   exit 2
 }
+[[ $MAIN_ROPE_TABLE == 0 || $MAIN_ROPE_TABLE == 1 ]] || {
+  echo "main-RoPE table flag must be 0 or 1" >&2
+  exit 2
+}
 [[ $SHORT_CONTEXT_ORACLE == 0 || $SHORT_CONTEXT_ORACLE == 1 ]] || {
   echo "short-context oracle flag must be 0 or 1" >&2
   exit 2
@@ -222,6 +227,20 @@ if [[ $DSA_SCORE_DEFAULT_PRECISION == 1 ]]; then
   }
   [[ $SPLIT_RESIDUAL_STATE == 1 && $PREFILL_INDEX_REPAIR == 1 && $DSA_QUERY_EXACT_ASSOCIATION == 1 && $DSA_HEAD_KEY_EXACT_ASSOCIATION == 1 ]] || {
     echo "default DSA score precision requires the exact repaired recurrent DSA chain" >&2
+    exit 2
+  }
+fi
+if [[ $MAIN_ROPE_TABLE == 1 ]]; then
+  [[ $PROFILE == 8k && $SHORT_CONTEXT_ORACLE == 1 && $SHORT_CONTEXT_DSA_ORACLE == 1 && $COMPLETE_TOKEN_PATH == 1 ]] || {
+    echo "main-RoPE table requires the protected 8K token/DSA Gate-D profile" >&2
+    exit 2
+  }
+  [[ $SPLIT_RESIDUAL_STATE == 1 && $PREFILL_INDEX_REPAIR == 1 && $DSA_QUERY_EXACT_ASSOCIATION == 1 && $DSA_HEAD_KEY_EXACT_ASSOCIATION == 1 && $DSA_SCORE_DEFAULT_PRECISION == 1 ]] || {
+    echo "main-RoPE table requires the exact repaired recurrent DSA chain" >&2
+    exit 2
+  }
+  [[ $LAYER0_DISCRIMINATOR == 0 && $LAYER0_INGREDIENTS == 0 ]] || {
+    echo "main-RoPE table must remain isolated from layer-0 diagnostics" >&2
     exit 2
   }
 fi
@@ -960,6 +979,87 @@ PY
     exit 2
   }
 fi
+if [[ $MAIN_ROPE_TABLE == 1 ]]; then
+  readonly MAIN_ROPE_PREREQUISITE_TAG=greenfield_layer0_main_rope_20260811T072231959104598Z
+  readonly MAIN_ROPE_PREREQUISITE_DIR=/home/gianl/glm-run/$MAIN_ROPE_PREREQUISITE_TAG
+  readonly MAIN_ROPE_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$MAIN_ROPE_PREREQUISITE_TAG
+  /home/gianl/vllm-env/bin/python - "$MAIN_ROPE_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
+import json
+from hashlib import sha256
+from pathlib import Path
+import re
+import sqlite3
+import sys
+
+run_dir = Path(sys.argv[1])
+db_path = Path(sys.argv[2])
+expected_hashes = {
+    "SUCCESS": "8f9763e4e8106db0fe30b9fa3820873f736ede2215edfc8b950fcd311d08b6d7",
+    "summary.json": "0998cc0fc95094b2f29afdacee77a505062a962fa7c885a1a6c8784c14f44068",
+    "runner.json": "d32d03576faa99c882913cf289a32d9aaa7f258a6b83588464058f36a8ad7370",
+    "main_rope_candidate.npz": "52d2a36e88cc223f1aac78177d4dd955a5eaf54097117158bd33877668e84145",
+    "hlo/accepted_table_fp32_final_round.optimized_hlo.txt": "c611c74d2316a3ffca2f2233799245cdd508d8130dbd032c3f1e6040fedcf623",
+}
+for relative, expected in expected_hashes.items():
+    path = run_dir / relative
+    if not path.is_file() or sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"DB531 prerequisite hash drifted: {relative}")
+summary = json.loads((run_dir / "summary.json").read_text())
+runner = json.loads((run_dir / "runner.json").read_text())
+candidate = runner["candidates"]["accepted_table_fp32_final_round"]
+if (
+    summary.get("status") != "SUCCESS"
+    or summary.get("results_db_run_id") != 531
+    or summary.get("code_hash")
+    != "ed7c74f423e811f1acfbeb3c075fb8fad37d4f51"
+    or not summary.get("association_restored")
+    or runner.get("position") != 8155
+    or runner.get("table", {}).get("position_row_sha256")
+    != "67b01e3cab682d5ffd04ac9c8043e7e6825ee1275023428c41f9a1ae412dea1d"
+    or not candidate["comparison"]["elementwise_exact"]
+    or candidate["comparison"]["mismatch_count"] != 0
+    or candidate["comparison"]["candidate_sha256"]
+    != "e7c217ec92be8ef7335295bfff9cb1876703ae962242c941edb5c870fc283281"
+    or not candidate["hlo"]["passed"]
+    or candidate["hlo"]["fp32_multiply_count"] != 4
+    or candidate["hlo"]["fp32_combine_count"] != 2
+    or candidate["hlo"]["final_round_count"] != 2
+    or candidate["hlo"]["bf16_arithmetic"]
+    or candidate["hlo"]["forbidden_instructions"]
+):
+    raise SystemExit("DB531 main-RoPE prerequisite drifted")
+for name in ("census_pre.txt", "census_post.txt"):
+    workers = re.findall(
+        r"^CENSUS_OK .*?-w-([0-7])$", (run_dir / name).read_text(), re.M
+    )
+    if sorted(workers) != list("01234567"):
+        raise SystemExit(f"DB531 prerequisite {name} is not 8/8 clean")
+with sqlite3.connect(db_path) as conn:
+    if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        raise SystemExit("live results DB integrity failed")
+    row = conn.execute(
+        "SELECT r.model, r.harness_git, r.pod, i.id, i.benchmark, "
+        "i.item_id, i.correct, i.score FROM runs r JOIN items i "
+        "ON i.run_id = r.run_id WHERE r.run_id = 531"
+    ).fetchone()
+if row != (
+    "zai-org/GLM-5.2-FP8:greenfield-layer0-main_rope-association",
+    "ed7c74f",
+    "db-v4-64-od",
+    1816,
+    "greenfield_layer0_main_rope_association",
+    "layer0_position8155_main_rope",
+    1,
+    1.0,
+):
+    raise SystemExit("DB531 prerequisite DB linkage drifted")
+PY
+  main_rope_remote_success_sha=$(gcloud storage cat "$MAIN_ROPE_PREREQUISITE_REMOTE/SUCCESS" | sha256sum | awk '{print $1}')
+  [[ $main_rope_remote_success_sha == 8f9763e4e8106db0fe30b9fa3820873f736ede2215edfc8b950fcd311d08b6d7 ]] || {
+    echo "DB531 direct remote SUCCESS hash drifted" >&2
+    exit 2
+  }
+fi
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
@@ -1008,6 +1108,11 @@ if [[ $DSA_SCORE_DEFAULT_PRECISION == 1 ]]; then
   DSA_SCORE_PRECISION_SUFFIX=_scoredefault
 fi
 readonly DSA_SCORE_PRECISION_SUFFIX
+MAIN_ROPE_SUFFIX=
+if [[ $MAIN_ROPE_TABLE == 1 ]]; then
+  MAIN_ROPE_SUFFIX=_mainrope
+fi
+readonly MAIN_ROPE_SUFFIX
 ORACLE_SUFFIX=
 if [[ $SHORT_CONTEXT_ORACLE == 1 ]]; then
   ORACLE_SUFFIX=_oracle
@@ -1040,7 +1145,7 @@ if [[ $VERIFY_DEVICE_ROUNDTRIP == 1 ]]; then
   ROUNDTRIP_SUFFIX=_roundtrip
 fi
 readonly ROUNDTRIP_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${PREFILL_REPAIR_SUFFIX}${DSA_QUERY_SUFFIX}${DSA_HEAD_KEY_SUFFIX}${DSA_SCORE_PRECISION_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}${DSA_INTERNAL_SUFFIX}${LAYER0_VARIANT_SUFFIX}${ROUNDTRIP_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${PREFILL_REPAIR_SUFFIX}${DSA_QUERY_SUFFIX}${DSA_HEAD_KEY_SUFFIX}${DSA_SCORE_PRECISION_SUFFIX}${MAIN_ROPE_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}${DSA_INTERNAL_SUFFIX}${LAYER0_VARIANT_SUFFIX}${ROUNDTRIP_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -1130,7 +1235,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS LAYER0_INGREDIENTS=$LAYER0_INGREDIENTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION MAIN_ROPE_TABLE=$MAIN_ROPE_TABLE SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS LAYER0_INGREDIENTS=$LAYER0_INGREDIENTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -1156,7 +1261,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer $CONTEXT_NAME load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; dsa_query_exact_association='"$DSA_QUERY_EXACT_ASSOCIATION"'; dsa_head_key_exact_association='"$DSA_HEAD_KEY_EXACT_ASSOCIATION"'; dsa_score_default_precision='"$DSA_SCORE_DEFAULT_PRECISION"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; layer0_variants='"$LAYER0_RESIDUAL_VARIANTS"'; layer0_subshard_variants='"$LAYER0_SUBSHARD_VARIANTS"'; layer0_ingredients='"$LAYER0_INGREDIENTS"'; layer1_ref='"$LAYER1_INTERNAL_REFERENCE_NPZ"'; layer1_ref_sha='"$LAYER1_INTERNAL_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer" "$run/layer0_residual_discriminator" "$run/layer0_ingredients"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_residual_discriminator/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_residual_discriminator/* "$remote/layer0_residual_discriminator/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_ingredients/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_ingredients/* "$remote/layer0_ingredients/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; variant_args=(); if [[ $layer0_variants == 1 ]]; then variant_args=(--observe-layer0-residual-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_subshard_variants == 1 ]]; then variant_args=(--observe-layer0-subshard-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_ingredients == 1 ]]; then variant_args=(--observe-layer0-ingredients 1); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --dsa-query-exact-association "$dsa_query_exact_association" --dsa-head-key-exact-association "$dsa_head_key_exact_association" --dsa-score-default-precision "$dsa_score_default_precision" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" "${variant_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; dsa_query_exact_association='"$DSA_QUERY_EXACT_ASSOCIATION"'; dsa_head_key_exact_association='"$DSA_HEAD_KEY_EXACT_ASSOCIATION"'; dsa_score_default_precision='"$DSA_SCORE_DEFAULT_PRECISION"'; main_rope_table='"$MAIN_ROPE_TABLE"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; layer0_variants='"$LAYER0_RESIDUAL_VARIANTS"'; layer0_subshard_variants='"$LAYER0_SUBSHARD_VARIANTS"'; layer0_ingredients='"$LAYER0_INGREDIENTS"'; layer1_ref='"$LAYER1_INTERNAL_REFERENCE_NPZ"'; layer1_ref_sha='"$LAYER1_INTERNAL_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer" "$run/layer0_residual_discriminator" "$run/layer0_ingredients"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_residual_discriminator/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_residual_discriminator/* "$remote/layer0_residual_discriminator/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_ingredients/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_ingredients/* "$remote/layer0_ingredients/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; variant_args=(); if [[ $layer0_variants == 1 ]]; then variant_args=(--observe-layer0-residual-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_subshard_variants == 1 ]]; then variant_args=(--observe-layer0-subshard-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_ingredients == 1 ]]; then variant_args=(--observe-layer0-ingredients 1); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --dsa-query-exact-association "$dsa_query_exact_association" --dsa-head-key-exact-association "$dsa_head_key_exact_association" --dsa-score-default-precision "$dsa_score_default_precision" --main-rope-table "$main_rope_table" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" "${variant_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
@@ -1222,7 +1327,7 @@ fi
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
-  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SPLIT_RESIDUAL_STATE" "$PREFILL_INDEX_REPAIR" "$DSA_QUERY_EXACT_ASSOCIATION" "$DSA_HEAD_KEY_EXACT_ASSOCIATION" "$DSA_SCORE_DEFAULT_PRECISION" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SPLIT_RESIDUAL_STATE" "$PREFILL_INDEX_REPAIR" "$DSA_QUERY_EXACT_ASSOCIATION" "$DSA_HEAD_KEY_EXACT_ASSOCIATION" "$DSA_SCORE_DEFAULT_PRECISION" "$MAIN_ROPE_TABLE" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" \
   "$CONTEXT_LABEL" "$CONTEXT_CAPACITY" "$PROMPT_TOKEN_COUNT" \
   "$ATTENTION_PROJECTION_BACKEND" "$EXPECTED_LOADED_PAYLOAD_BYTES" \
@@ -1254,6 +1359,7 @@ import numpy as np
     dsa_query_exact_association,
     dsa_head_key_exact_association,
     dsa_score_default_precision,
+    main_rope_table,
     short_context_oracle,
     short_context_oracle_manifest_sha256,
     short_context_dsa_oracle,
@@ -1281,6 +1387,7 @@ prefill_index_repair = bool(int(prefill_index_repair))
 dsa_query_exact_association = bool(int(dsa_query_exact_association))
 dsa_head_key_exact_association = bool(int(dsa_head_key_exact_association))
 dsa_score_default_precision = bool(int(dsa_score_default_precision))
+main_rope_table = bool(int(main_rope_table))
 short_context_oracle = bool(int(short_context_oracle))
 short_context_dsa_oracle = bool(int(short_context_dsa_oracle))
 warmup = int(warmup)
@@ -1320,6 +1427,7 @@ for field in (
     "code_hash",
     "dsa_observer_hlo_sha256",
     "dsa_query_materialization_hlo_sha256",
+    "main_rope_table_sha256",
     "optimized_hlo_sha256",
     "plan_hash",
     "runtime_layout_hash",
@@ -1371,6 +1479,10 @@ if {record["dsa_score_default_precision"] for record in records} != {
     dsa_score_default_precision
 }:
     raise SystemExit("fleet DSA score-precision flag drifted")
+if {record["main_rope_table_enabled"] for record in records} != {
+    main_rope_table
+}:
+    raise SystemExit("fleet main-RoPE table flag drifted")
 expected_repair_backend = (
     "physical_m64_chunk" if prefill_index_repair else "none"
 )
@@ -1382,8 +1494,86 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {14}:
+if {record["schema_version"] for record in records} != {15}:
     raise SystemExit("fleet decoder record schema drifted")
+
+expected_main_rope_shape = [context_capacity, 64]
+expected_main_rope_bytes = context_capacity * 64 * 2
+expected_main_rope_sha256 = (
+    "6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701"
+)
+expected_main_rope_prerequisite = {
+    "code_hash": "ed7c74f423e811f1acfbeb3c075fb8fad37d4f51",
+    "position_8155_row_sha256": (
+        "67b01e3cab682d5ffd04ac9c8043e7e6825ee1275023428c41f9a1ae412dea1d"
+    ),
+    "results_db_item_row_id": 1816,
+    "results_db_run_id": 531,
+    "runner_sha256": (
+        "d32d03576faa99c882913cf289a32d9aaa7f258a6b83588464058f36a8ad7370"
+    ),
+    "success_sha256": (
+        "8f9763e4e8106db0fe30b9fa3820873f736ede2215edfc8b950fcd311d08b6d7"
+    ),
+}
+
+def validate_main_rope_hlo(executable, *, source):
+    if executable["main_rope_table_enabled"] != main_rope_table:
+        raise SystemExit(f"{source} main-RoPE flag drifted")
+    contract = executable["main_rope_table_contract"]
+    if (
+        not contract["passed"]
+        or contract["applicable"] != main_rope_table
+        or contract["expected_table_shape"] != expected_main_rope_shape
+        or contract["violations"]
+        or contract["forbidden_instructions"]
+        or contract["bf16_arithmetic"]
+    ):
+        raise SystemExit(f"{source} main-RoPE HLO contract failed")
+    if main_rope_table:
+        if (
+            contract["table_parameter_count"] != 1
+            or contract["named_table_parameter_count"] != 1
+            or contract["scoped_instruction_count"] <= 0
+            or contract["fp32_multiply_count"] < 78 * 8
+            or contract["fp32_combine_count"] < 78 * 4
+            or contract["final_round_count"] < 78 * 2
+        ):
+            raise SystemExit(f"{source} main-RoPE arithmetic drifted")
+    elif (
+        contract["table_parameter_count"] != 0
+        or contract["named_table_parameter_count"] != 0
+        or contract["scoped_instruction_count"] != 0
+        or contract["fp32_multiply_count"] != 0
+        or contract["fp32_combine_count"] != 0
+        or contract["final_round_count"] != 0
+    ):
+        raise SystemExit(f"{source} default main-RoPE state is not absent")
+
+for record in records:
+    validate_main_rope_hlo(record["hlo_contract"], source="decoder")
+    if main_rope_table:
+        if (
+            record["main_rope_table_sha256"]
+            != expected_main_rope_sha256
+            or record["main_rope_table_shape"] != expected_main_rope_shape
+            or record["main_rope_table_bytes_per_device"]
+            != expected_main_rope_bytes
+            or record["main_rope_table_prerequisite"]
+            != expected_main_rope_prerequisite
+            or len(record["main_rope_table_local_device_sha256"]) != 4
+            or set(record["main_rope_table_local_device_sha256"])
+            != {expected_main_rope_sha256}
+        ):
+            raise SystemExit("fleet main-RoPE table asset drifted")
+    elif (
+        record["main_rope_table_sha256"] is not None
+        or record["main_rope_table_shape"] is not None
+        or record["main_rope_table_bytes_per_device"] != 0
+        or record["main_rope_table_prerequisite"] is not None
+        or record["main_rope_table_local_device_sha256"]
+    ):
+        raise SystemExit("default decoder materialized main-RoPE table state")
 if short_context_oracle:
     for field in ("prefill_hlo_sha256",):
         values = {record[field] for record in records}
@@ -1412,6 +1602,10 @@ for record in records:
     head_key_contracts = [record["hlo_contract"]]
     if short_context_dsa_oracle:
         head_key_contracts.append(record["dsa_observer_hlo_contract"])
+        validate_main_rope_hlo(
+            record["dsa_observer_hlo_contract"],
+            source="DSA observer",
+        )
     for executable_contract in head_key_contracts:
         live_score = executable_contract["live_tensor_contract"]
         expected_score_precision = (
@@ -1634,6 +1828,10 @@ if any(
 if short_context_oracle:
     for record in records:
         prefill = record["prefill_hlo_contract"]
+        validate_main_rope_hlo(
+            prefill["decoder_contract"],
+            source="teacher-forced prefill",
+        )
         repair = prefill["index_repair_contract"]
         prefill_head_key = prefill["decoder_contract"][
             "dsa_head_key_association_contract"
@@ -2177,7 +2375,7 @@ headrooms = [
     for record in records
     for value in hbm_headrooms(record)
 ]
-if (prefill_index_repair or dsa_query_exact_association) and (
+if (prefill_index_repair or dsa_query_exact_association or main_rope_table) and (
     len(headrooms) != 32 or min(headrooms) <= 0
 ):
     raise SystemExit("materialized exactness state lacks positive HBM headroom")
@@ -2221,6 +2419,15 @@ summary = {
     "dsa_query_exact_association": dsa_query_exact_association,
     "dsa_head_key_exact_association": dsa_head_key_exact_association,
     "dsa_score_default_precision": dsa_score_default_precision,
+    "main_rope_table_enabled": main_rope_table,
+    "main_rope_table_sha256": records[0]["main_rope_table_sha256"],
+    "main_rope_table_shape": records[0]["main_rope_table_shape"],
+    "main_rope_table_bytes_per_device": records[0][
+        "main_rope_table_bytes_per_device"
+    ],
+    "main_rope_table_prerequisite": records[0][
+        "main_rope_table_prerequisite"
+    ],
     "dsa_score_default_precision_prerequisite": (
         {
             "code_hash": "0cd3db063852630c6309f1966020ba3085aa9877",
@@ -2478,6 +2685,13 @@ run_id = pv.start_run(
         "greenfield_dsa_score_default_precision_prerequisite_db_run": (
             529 if dsa_score_default_precision else None
         ),
+        "greenfield_main_rope_table": main_rope_table,
+        "greenfield_main_rope_table_sha256": (
+            records[0]["main_rope_table_sha256"]
+        ),
+        "greenfield_main_rope_table_prerequisite_db_run": (
+            531 if main_rope_table else None
+        ),
         "greenfield_prefill_index_repair_backend": expected_repair_backend,
         "greenfield_prefill_index_repair_prerequisite_db_run": (
             518 if prefill_index_repair else None
@@ -2532,6 +2746,7 @@ run_id = pv.start_run(
         f"{dsa_head_key_exact_association}; "
         f"exact default-precision DSA scorer "
         f"{dsa_score_default_precision}; "
+        f"device-resident main-RoPE table {main_rope_table}; "
         f"runtime device round-trip verification {verify_device_roundtrip}; "
         + (
             f"real {prompt_token_count:,}-token prompt with exact raw tokens and "
@@ -2568,6 +2783,7 @@ pv.record_item(
         + ("_queryexact" if dsa_query_exact_association else "")
         + ("_headkeyexact" if dsa_head_key_exact_association else "")
         + ("_scoredefault" if dsa_score_default_precision else "")
+        + ("_mainrope" if main_rope_table else "")
         + ("_roundtrip" if verify_device_roundtrip else "")
     ),
     item_id=(
@@ -2621,6 +2837,7 @@ pv.finalize(
         + ("_queryexact" if dsa_query_exact_association else "")
         + ("_headkeyexact" if dsa_head_key_exact_association else "")
         + ("_scoredefault" if dsa_score_default_precision else "")
+        + ("_mainrope" if main_rope_table else "")
         + ("_roundtrip" if verify_device_roundtrip else "")
     ),
     metric="contract_valid",

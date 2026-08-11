@@ -48,7 +48,11 @@ from .reference.fp8 import dequantize_fp8_bits_block_weight
 from .reference.linear import linear, residual_add, silu
 from .reference.moe import GlmMoeNumericalContract, route_glm_noaux_tc
 from .reference.rmsnorm import rms_norm
-from .reference.rotary import apply_rotary, rotary_cos_sin
+from .reference.rotary import (
+    apply_rotary,
+    apply_rotary_fp32_final_round,
+    rotary_cos_sin,
+)
 
 
 class StageLocalDsaFp8Result(NamedTuple):
@@ -991,6 +995,7 @@ def stage_local_index_share_fp8_mapped(
     rms_norm_epsilon: float = 1e-5,
     lora_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
+    main_rope_table_row: Any | None = None,
     precomputed_normalized: Any | None = None,
     precomputed_q_residual: Any | None = None,
     precomputed_kv_a: Any | None = None,
@@ -1025,6 +1030,11 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare FP32 output reconstruction flag must be boolean")
     if not isinstance(capture_ingredients, bool):
         raise ValueError("IndexShare ingredient-capture flag must be boolean")
+    if main_rope_table_row is not None and (
+        main_rope_table_row.shape != (2 * (contract.qk_rope_head_dim // 2),)
+        or main_rope_table_row.dtype != jnp.bfloat16
+    ):
+        raise ValueError("IndexShare main-RoPE table row is invalid")
     if virtual_tp32_reduction_association is not None and (
         virtual_tp32_reduction_association
         not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
@@ -1150,18 +1160,30 @@ def stage_local_index_share_fp8_mapped(
     )
     q_nope = q_states[..., : contract.qk_nope_head_dim]
     q_rope_unrotated = q_states[..., contract.qk_nope_head_dim :]
-    cos, sin = rotary_cos_sin(
-        position,
-        rotary_dim=contract.qk_rope_head_dim,
-        theta=rope_theta,
-        dtype=q_rope_unrotated.dtype,
-    )
-    q_rope = apply_rotary(
-        q_rope_unrotated,
-        cos[:, None, :],
-        sin[:, None, :],
-        interleaved=True,
-    )
+    if main_rope_table_row is None:
+        cos, sin = rotary_cos_sin(
+            position,
+            rotary_dim=contract.qk_rope_head_dim,
+            theta=rope_theta,
+            dtype=q_rope_unrotated.dtype,
+        )
+        q_rope = apply_rotary(
+            q_rope_unrotated,
+            cos[:, None, :],
+            sin[:, None, :],
+            interleaved=True,
+        )
+    else:
+        half = contract.qk_rope_head_dim // 2
+        with jax.named_scope("greenfield_main_rope_table"):
+            cos = main_rope_table_row[:half][None, :]
+            sin = main_rope_table_row[half:][None, :]
+            q_rope = apply_rotary_fp32_final_round(
+                q_rope_unrotated,
+                cos[:, None, :],
+                sin[:, None, :],
+                interleaved=True,
+            )
 
     if precomputed_kv_a is None:
         if kv_a_bits is None or kv_a_scale is None:
@@ -1188,16 +1210,26 @@ def stage_local_index_share_fp8_mapped(
         kv_a_norm_weight,
         epsilon=lora_norm_epsilon,
     )
-    current_rope = apply_rotary(
-        current_kv[
-            ...,
-            contract.kv_lora_rank : contract.kv_lora_rank
-            + contract.qk_rope_head_dim,
-        ][:, None, :],
-        cos[:, None, :],
-        sin[:, None, :],
-        interleaved=True,
-    )[:, 0, :]
+    current_rope_input = current_kv[
+        ...,
+        contract.kv_lora_rank : contract.kv_lora_rank
+        + contract.qk_rope_head_dim,
+    ][:, None, :]
+    if main_rope_table_row is None:
+        current_rope = apply_rotary(
+            current_rope_input,
+            cos[:, None, :],
+            sin[:, None, :],
+            interleaved=True,
+        )[:, 0, :]
+    else:
+        with jax.named_scope("greenfield_main_rope_table"):
+            current_rope = apply_rotary_fp32_final_round(
+                current_rope_input,
+                cos[:, None, :],
+                sin[:, None, :],
+                interleaved=True,
+            )[:, 0, :]
     padding = contract.packed_cache_width - (
         contract.kv_lora_rank + contract.qk_rope_head_dim
     )

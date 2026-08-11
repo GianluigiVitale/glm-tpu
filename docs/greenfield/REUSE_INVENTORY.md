@@ -506,3 +506,12 @@ FP32 combines and two TPU-split final 32-lane rounds without trig, callback or c
 the accepted formula, DB531 row/table hash, reference primitive, DB503/DB530 source pins and the
 existing plan/runtime interfaces to build one device-resident main-RoPE table. Do not add another
 observer, recompute dynamic trig in the layer, alter DSA rotary or import legacy execution.
+
+The current default-off Gate-D integration performs that reuse directly: the host builds and hashes
+one plan-sized BF16 table, the replicated final-layout runtime input is verified per local device,
+and each main-MLA layer looks up only its live row before applying the DB531 FP32-final-round
+primitive to query and cache key. DSA rotary and the default dynamic main-MLA path remain unchanged.
+Decoder, DSA-observer and teacher-forced-prefill HLO contracts fail closed on the table parameter,
+scoped FP32 arithmetic, forbidden trig/collectives and BF16 intermediate arithmetic. The protected
+8K wrapper additionally pins DB531's local hashes, live DB row and direct remote `SUCCESS` before
+the integration can execute.

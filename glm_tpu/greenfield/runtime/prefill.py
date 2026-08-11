@@ -697,6 +697,7 @@ def validate_teacher_forced_prefill_hlo(
         complete_token_path=True,
         split_residual_state=decoder.split_residual_state,
         prefill_index_repair=index_repair_enabled,
+        main_rope_table_enabled=decoder.main_rope_table_enabled,
     )
     module = parse_hlo_module(optimized_hlo)
     expected_fused_qkv_internal_loops = (
@@ -869,6 +870,7 @@ def build_teacher_forced_prefill_program(
         context_lengths: Any,
         materialized_index_wk: tuple[Any, ...] | None = None,
         dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None = None,
+        main_rope_table: Any | None = None,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         if tuple(prompt_tokens.shape) != (prompt_length,):
             raise PlanValidationError(
@@ -877,6 +879,10 @@ def build_teacher_forced_prefill_program(
         if prompt_tokens.dtype != jnp.dtype(jnp.int32):
             raise PlanValidationError(
                 "teacher-forced prompt tokens must have dtype int32"
+            )
+        if decoder.main_rope_table_enabled != (main_rope_table is not None):
+            raise PlanValidationError(
+                "teacher-forced prefill main-RoPE table state drifted"
             )
         initial_prediction = jnp.full(
             (total_devices, 1), -1, dtype=jnp.int32
@@ -937,17 +943,23 @@ def build_teacher_forced_prefill_program(
                         dsa_query_weight_aliases,
                         materialized_index_wk,
                     )
-                output = decoder.execute(
+                decoder_inputs = (
                     weights,
                     exact_dsa_weights,
                     *decoder_state,
                 )
+                if decoder.main_rope_table_enabled:
+                    decoder_inputs = (*decoder_inputs, main_rope_table)
+                output = decoder.execute(*decoder_inputs)
             else:
                 if dsa_query_weight_aliases is not None:
                     raise PlanValidationError(
                         "default prefill must not receive query aliases"
                     )
-                output = decoder.execute(weights, *decoder_state)
+                decoder_inputs = (weights, *decoder_state)
+                if decoder.main_rope_table_enabled:
+                    decoder_inputs = (*decoder_inputs, main_rope_table)
+                output = decoder.execute(*decoder_inputs)
             next_carry = (
                 output[0],
                 output[1],

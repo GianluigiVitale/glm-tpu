@@ -6996,3 +6996,39 @@ unmotivated arithmetic variants.
 - Exact next is a separate default-off integration batch: create the plan-aware device BF16 table,
   use the proven FP32-final-round primitive only for main MLA q/k, preserve DSA, prove reference,
   table-integrity and HLO contracts, audit once, then run the complete protected 8K Gate-D retry.
+
+## 2026-08-11 07:24--08:36 — DB531 mechanism integrated default-off; local decoder/prefill proof passes
+
+- The isolated greenfield runtime now builds the accepted main-RoPE table once on the host from
+  FP32 positive powers/reciprocals and NumPy FP32 cos/sin, stores contiguous BF16, and records a
+  byte hash. The full `8192x64` asset is 1,048,576 bytes with SHA
+  `6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701`; its position-8,155 row
+  retains DB531 SHA `67b01e3cab682d5ffd04ac9c8043e7e6825ee1275023428c41f9a1ae412dea1d`.
+- The table is one final replicated runtime input. The compiler verifies identical plan/table
+  identity across decoder, DSA observer and prefill decoder, blocks the device transfer, and hashes
+  every addressable local shard. Donation offsets and existing state positions do not move.
+- Each layer performs a device-side current-position lookup and applies the already-protected
+  FP32-products/FP32-combine/one-final-BF16-round primitive to main-MLA query and cache key only.
+  The existing dynamic rotary path is the exact default-off fallback; DSA rotary is untouched.
+- The decoder and prefill HLO contracts require exactly one named BF16 table parameter, scoped
+  main-RoPE arithmetic in every scheduled layer, no BF16 add/multiply/subtract, and no trig,
+  power or collective in the scope. Default HLO must contain no table parameter or scope. The
+  protected wrapper requires the exact 8K complete/split/repair/query/head-key/score-default token
+  and DSA chain, isolates all layer-0 diagnostics, and pins DB531 artifact hashes, run531/item1816,
+  live SQLite integrity/linkage, two 8/8 censuses and direct remote `SUCCESS`.
+- Forced 32-CPU-device proof compiles and executes both the default and table decoder plus
+  teacher-forced prefill, verifies the table asset/input and HLO, and passes in `156.30 s`. The
+  remaining reference, stage-local, decoder, prefill and protected-runner tests pass `73/73`; the
+  slow test is the only deselection in that batch. JSON, Bash, ShellCheck and diff checks pass.
+  This is local mechanism evidence only.
+- Fable xhigh review session `4c23bb63-7401-4a45-b082-8743d7ea58b6` found one blocker outside the
+  CPU-reference contract: the new `mapped_token[_exact_query]_main_rope` function names were not
+  admitted by the TPU complete-token return op-name guard. The helper now derives the direct HLO
+  name from both feature flags. Regression coverage accepts both enabled names and rejects them
+  with the table flag off, rejects the old name with the flag on, and the affected suite again
+  passes `73/73` in `52.85 s`. No arithmetic/runtime path changed. The same Fable session ran both
+  focused HLO tests independently and returned `APPROVE COMMIT` after the fix.
+- Exact next: commit/push, then run one serialized protected 8K Gate-D attempt with the table
+  enabled. No
+  additional observer, legacy execution import, DSA change or repeat of the four rejected
+  combine-precision theories is justified before that result.
