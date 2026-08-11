@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 14:12 UTC
+**Updated:** 2026-08-11 15:07 UTC
 
 ## Authority and isolation
 
@@ -75,8 +75,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   rank-3 cache operand to either the logical rank-4 result or TPU's flattened rank-3 result while
   retaining the packed-width check. The focused test and both preserved TPU HLO arms pass offline.
   Fable session `4c23bb63-7401-4a45-b082-8743d7ea58b6` independently replayed both real arms,
-  found no high/medium issue and returned `APPROVE COMMIT`. Exact next is independent affected
-  verification, commit/push, then one protected retry; no complete-decoder run is admissible first.
+  found no high/medium issue and returned `APPROVE COMMIT`. The correction is committed/pushed at
+  `1a0f25d4bd177c973e7d00ed30b0903b08f0b0b1`; the full decoder test file passes `23/23`.
+- The protected retry at tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_`
+  `layer0_attention_schedule_variants_trace2_20260811T142025290162247Z` is admissible and rejects
+  attention segmentation as the causal trunk error. The control reproduces exact SHA
+  `6c54c09a...bca` and `3,984/6,144` reference mismatches. Replicated monolithic attention changes
+  the SHA to `619f1b0b...d090` but leaves `3,954/6,144` mismatches: only 30 fewer (`0.75%`), with
+  unchanged `0.00390625` max error and mean error `0.000145840` versus `0.000147384` (`1.05%`
+  lower). Both arms have exact selection, one live row, valid sentinels/lane replication, distinct
+  HLO, exact LP4 groups and passing contracts; challenger HLO contains exactly one scoped and
+  shape-detected `bf16[16,128,640] -> bf16[64,128,640]` gather. Contract/NPZ SHAs are
+  `bacc8a78...b7fbf` / `ad64fff2...f4f64`, remote hashes match, and pre/failure census SHAs
+  `cdea3d12...dea82` / `0d7108e9...62ff0` prove 8/8 cleanup. There is intentionally no timing,
+  trace, DB row or `SUCCESS`. Do not integrate monolithic attention or rerun this fork. Exact next
+  is the isolated layer-0 output-projection/reduction-association discriminator, retaining the
+  table-on owner-split control; do not rerun the complete decoder first.
 - DB484 XPlane reanalysis proves only `0.727 ms/step` of non-permute local collective execution.
   Pallas custom calls are `26.357 ms`, other active work `3.351 ms`, and collective-permute
   start/done waiting is `205.195 ms` per core. Thus `8 x 30.435 = 243.5 ms` closes against the

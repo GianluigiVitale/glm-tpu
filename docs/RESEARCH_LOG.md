@@ -7226,3 +7226,37 @@ unmotivated arithmetic variants.
   do not pre-emptively relax the width/growth invariant.
 - Exact next: independently verify, commit/push, then retry the protected discriminator exactly
   once. Do not run the complete decoder until the two-arm result is admissible and adjudicated.
+
+## 2026-08-11 14:12--15:07 — monolithic attention schedule is causally rejected
+
+- The reviewed TPU-cache-gather canonicalization fix was committed/pushed at
+  `1a0f25d4bd177c973e7d00ed30b0903b08f0b0b1`. The full affected runtime decoder test file passes
+  `23/23` in `165.17 s`; Python and diff checks pass. The protected retry used that exact clean pin.
+- Protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_`
+  `layer0_attention_schedule_variants_trace2_20260811T142025290162247Z` passed the explicit
+  diagnostic contract. The owner-split table-on control reproduces sealed production SHA
+  `6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca` exactly and retains
+  `3,984/6,144` mismatches against the independent accepted layer-1-normalized reference.
+- The replicated-monolithic challenger produces SHA
+  `619f1b0bf5415e15139fb4fc42c64b1e8f728fc132966398453f6711269cd090` and
+  `3,954/6,144` mismatches: 30 fewer than control, a `0.75%` reduction. Max absolute error stays
+  `0.00390625`; mean absolute error changes only from `0.00014738367` to `0.00014583992`, a
+  `1.05%` reduction. This is not material and rejects attention segmentation as the causal trunk
+  error. Retain the diagnostic default-off; do not integrate its full-cache gather.
+- Both arms have exact selection, active contract validity, sentinel inactive rows and replicated
+  lanes. Both HLO contracts and the two-program suite pass with distinct hashes, exact eight LP4
+  groups, no host markers or escaped collectives, and one live output row. Control has the scoped
+  BF16 partial-output gather and no cache gather. Challenger has exactly one independently detected
+  and scoped cache gather, physically `bf16[16,128,640] -> bf16[64,128,640]`, with no owner-split
+  attention gather retained.
+- Contract/NPZ/suite SHAs are `bacc8a78...b7fbf`, `ad64fff2...f4f64`, and
+  `d76660eb...9c689`; direct approved-bucket hashes match. Control/challenger compressed-HLO SHAs
+  are `519608fa...66617` / `8a5455ff...8b025`. Pre/failure census SHAs are
+  `cdea3d12...dea82` / `0d7108e9...62ff0`; all eight host logs are identical at
+  `2da283f5...e9238`, and cleanup is authenticated 8/8. The intentional diagnostic exit has no
+  latency, trace, DB row, `SUCCESS`, Gate-D or performance claim.
+- Exact next: seal this evidence, then reuse the isolated table-on layer-0 discriminator to test
+  output-projection/reduction association. The owner-split control must again reproduce
+  `6c54c09a...bca`; do not rerun attention scheduling or the complete 8K decoder first.
