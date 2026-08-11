@@ -63,7 +63,47 @@ def test_main_rope_row_and_fp32_hlo_contract_are_exact() -> None:
         rounded_contract["fp32_multiply_count"] < 4
         or rounded_contract["final_round_count"] < 1
         or rounded_contract["bf16_arithmetic"]
+        or rounded_contract["final_round_widths"] not in ([64], [32, 32])
     )
+
+
+def test_main_rope_hlo_contract_accepts_tpu_split_final_round() -> None:
+    split_final_round_hlo = r'''HloModule main_rope_split
+
+rotary {
+  x0 = f32[1,32] parameter(0)
+  x1 = f32[1,32] parameter(1)
+  cos = f32[1,32] parameter(2)
+  sin = f32[1,32] parameter(3)
+  mul0 = f32[1,32] multiply(x0, cos)
+  mul1 = f32[1,32] multiply(x1, sin)
+  first = f32[1,32] subtract(mul0, mul1)
+  mul2 = f32[1,32] multiply(x1, cos)
+  mul3 = f32[1,32] multiply(x0, sin)
+  second = f32[1,32] add(mul2, mul3)
+  first_bf16 = bf16[1,32] convert(first)
+  ROOT second_bf16 = bf16[1,32] convert(second)
+}
+
+ENTRY main {
+  value = bf16[1,64] parameter(0)
+  table_cos = bf16[1,32] parameter(1)
+  table_sin = bf16[1,32] parameter(2)
+  ROOT result = bf16[1,64] copy(value)
+}
+'''
+    contract = subject._validate_main_rope_hlo(split_final_round_hlo)
+    assert contract["passed"]
+    assert contract["final_round_widths"] == [32, 32]
+
+    extra_round_hlo = split_final_round_hlo.replace(
+        "  ROOT second_bf16 = bf16[1,32] convert(second)\n",
+        "  second_bf16 = bf16[1,32] convert(second)\n"
+        "  ROOT third_bf16 = bf16[1,32] convert(second)\n",
+    )
+    extra_round_contract = subject._validate_main_rope_hlo(extra_round_hlo)
+    assert not extra_round_contract["passed"]
+    assert extra_round_contract["final_round_widths"] == [32, 32, 32]
 
 
 def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:

@@ -3373,16 +3373,19 @@ def _validate_main_rope_hlo(optimized_hlo: str) -> dict[str, Any]:
         and has_shape(instruction, "f32", {64})
         for instruction in module.instructions
     )
-    final_round_count = sum(
-        instruction.opcode == "convert"
-        and has_shape(instruction, "bf16", {64})
-        and any(
-            shape.dtype == "f32"
-            and shape.dimensions
-            and shape.dimensions[-1] == 64
-            for shape in instruction.operand_shapes
-        )
+    final_round_widths = sorted(
+        result.dimensions[-1]
         for instruction in module.instructions
+        if instruction.opcode == "convert"
+        for result in instruction.result_shapes
+        if result.dtype == "bf16"
+        and result.dimensions
+        and result.dimensions[-1] in {32, 64}
+        and any(
+            operand.dtype == "f32"
+            and operand.dimensions == result.dimensions
+            for operand in instruction.operand_shapes
+        )
     )
     bf16_arithmetic = [
         instruction.raw_line
@@ -3404,13 +3407,14 @@ def _validate_main_rope_hlo(optimized_hlo: str) -> dict[str, Any]:
         and not bf16_arithmetic
         and fp32_multiply_count >= 4
         and fp32_combine_count >= 2
-        and final_round_count >= 1
+        and final_round_widths in ([64], [32, 32])
         and entry_bf16_widths == [32, 32, 64]
     )
     return {
         "bf16_arithmetic": bf16_arithmetic,
         "entry_bf16_widths": entry_bf16_widths,
-        "final_round_count": final_round_count,
+        "final_round_count": len(final_round_widths),
+        "final_round_widths": final_round_widths,
         "forbidden_instructions": forbidden,
         "forbidden_markers": forbidden_markers,
         "fp32_barrier_count": fp32_barrier_count,
