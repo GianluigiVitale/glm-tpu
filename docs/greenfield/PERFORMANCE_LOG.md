@@ -1226,18 +1226,22 @@ orchestration time is not token latency. DB484 remains the only accepted PP8 dec
 
 ## StrategyND fingerprint — explicitly not a performance experiment
 
-The new default-off collective mode executes 32 calls to one model-free `bf16[1,6144]` all-reduce
-solely to recover numerical association. It records no warmed latency distribution, XPlane or
-model throughput and cannot promote Gates D/E. CPU replay time and protected orchestration time
-must not be reported as token latency. DB484 remains the only accepted PP8 performance point.
+The original default-off prototype executed 32 separate `bf16[1,6144]` calls and was correctly
+refused because its only source pin was a 2,048-row prefill executable. DB532/item1817 now seals
+the missing accepted decode instance: 156 row-parallel reductions with exact
+`bf16[32,6144]{1,0:T(8,128)(2,1)S(3)}` results, sorted global ranks 0--31, BF16 add, and one uniform
+`RotatedPincerEmitter/StrategyND` physical config. Eight compile owners produced identical HLO
+gzip SHA `25041bfb...e4c`; manifest SHA is `9257e28b...e487`; exact token/DSA/load/state,
+DB/archive and 8/8 cleanup pass.
 
-### Pre-launch disposition
-
-Artifact provenance review proves the pinned backend string comes from a 2,048-row prefill psum,
-while the mismatch occurs in a separate 32-row decode executable and the prototype compiles one
-row. The prototype will not be launched as Gate-D or performance evidence. There is no measurement,
-DB row, trace, throughput, latency, or promotion claim. Work proceeds to a primitive-level layer-0
-ingredients capture before any decoder rerun.
+The admissible successor reuses one compiled M32 reduction for 32 trial invocations, with each
+trial replicated across all 32 physical rows, then repeats the complete bank. Raw output is
+`[trial,row,width]` and every row is analyzed independently; no row-invariant color schedule is
+assumed. It also records the accepted six-axis `create_device_mesh(1x1x1x1x32x1)` model-axis
+device permutation so later shard-to-leaf mapping is explicit. It still records no warmed latency
+distribution, XPlane or model throughput and cannot
+promote Gates D/E. Its only purpose is to identify the exact physical BF16 association for the
+bounded layer-0 discriminator. DB484 remains the only accepted PP8 performance point.
 
 ## DB530 main-cache localization — no performance result
 

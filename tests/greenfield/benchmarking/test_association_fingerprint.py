@@ -13,6 +13,8 @@ from glm_tpu.greenfield.benchmarking.association_fingerprint import (
     StrategyNdFingerprintConfig,
     _BALANCED_FOUR_WAY_TREES,
     _candidate_output_bits,
+    accepted_tp32_model_axis_device_ids,
+    analyze_m32_strategy_nd_fingerprint,
     analyze_strategy_nd_fingerprint,
     array_sha256,
     bfloat16_bits_to_float32,
@@ -44,8 +46,8 @@ add {{
 }}
 
 ENTRY main {{
-  input = bf16[1,6144] parameter(0)
-  ROOT reduced = bf16[1,6144] all-reduce(input), replica_groups={{{{{group}}}}}, use_global_device_ids=true, to_apply=add, metadata={{op_name="jit(fingerprint)/shard_map/strategy_nd_association_fingerprint/psum"}}, backend_config={backend}
+  input = bf16[32,6144]{{1,0:T(8,128)(2,1)S(3)}} parameter(0)
+  ROOT reduced = bf16[32,6144]{{1,0:T(8,128)(2,1)S(3)}} all-reduce(input), replica_groups={{{{{group}}}}}, use_global_device_ids=true, to_apply=add, metadata={{op_name="jit(fingerprint)/shard_map/strategy_nd_association_fingerprint/psum"}}, backend_config={backend}
 }}
 '''
 
@@ -84,6 +86,17 @@ def test_hlo_contract_pins_exact_strategy_nd_backend() -> None:
             _strategy_nd_hlo(drifted), tuple(range(32))
         )
 
+    with pytest.raises(BenchmarkValidationError, match="sorted global"):
+        validate_strategy_nd_fingerprint_hlo(
+            _strategy_nd_hlo(dict(STRATEGY_ND_ALGORITHM)), tuple(reversed(range(32)))
+        )
+
+    wrong_layout = _strategy_nd_hlo(dict(STRATEGY_ND_ALGORITHM)).replace(
+        "{1,0:T(8,128)(2,1)S(3)}", "{1,0}"
+    )
+    with pytest.raises(BenchmarkValidationError, match="TPU result layout"):
+        validate_strategy_nd_fingerprint_hlo(wrong_layout, tuple(range(32)))
+
 
 def test_offline_analyzer_recovers_known_axis_pincer_family() -> None:
     config = StrategyNdFingerprintConfig(trials=4, width=96, seed=23)
@@ -110,6 +123,46 @@ def test_offline_analyzer_recovers_known_axis_pincer_family() -> None:
     assert analysis["union_exact_column_count"] == 96
     assert analysis["uncovered_columns"] == []
     assert analysis["top_candidates"][0]["exact_columns"] == 96
+
+
+def test_m32_analyzer_replays_every_physical_row_independently() -> None:
+    config = StrategyNdFingerprintConfig(trials=4, width=96, seed=24)
+    inputs = generate_strategy_nd_input_bits(config)
+    decoded = bfloat16_bits_to_float32(inputs)
+    topology_values = np.empty((4, 4, 2, 4, 96), dtype=np.float32)
+    coordinates = _coordinates()
+    for device_id in range(32):
+        x, y, z = coordinates[device_id]
+        topology_values[:, y, x, z, :] = decoded[:, device_id, :]
+    first = _candidate_output_bits(
+        topology_values,
+        (0, 1, 2),
+        {0: _BALANCED_FOUR_WAY_TREES[0], 2: _BALANCED_FOUR_WAY_TREES[1]},
+    )
+    second = _candidate_output_bits(
+        topology_values,
+        (2, 0, 1),
+        {0: _BALANCED_FOUR_WAY_TREES[2], 2: _BALANCED_FOUR_WAY_TREES[0]},
+    )
+    outputs = np.empty((4, 32, 96), dtype=np.uint16)
+    outputs[:, :16, :] = first[:, None, :]
+    outputs[:, 16:, :] = second[:, None, :]
+    analysis = analyze_m32_strategy_nd_fingerprint(
+        inputs,
+        outputs,
+        tuple(range(32)),
+        coordinates,
+        block_width=32,
+    )
+    assert analysis["compile_bucket_rows"] == 32
+    assert analysis["trials_per_physical_row"] == 4
+    assert analysis["unique_row_output_count"] == 2
+    assert analysis["minimum_row_union_exact_column_count"] == 96
+    assert analysis["maximum_row_union_exact_column_count"] == 96
+    assert analysis["rows"][0]["physical_row"] == 0
+    assert analysis["rows"][16]["physical_row"] == 16
+    assert analysis["rows"][0]["top_candidates"][0]["exact_columns"] == 96
+    assert analysis["rows"][16]["top_candidates"][0]["exact_columns"] == 96
 
 
 def test_offline_analyzer_rejects_invalid_band_width_and_coordinate_alias() -> None:
@@ -140,9 +193,12 @@ def test_offline_analyzer_rejects_invalid_band_width_and_coordinate_alias() -> N
 
 def test_forced_cpu_executable_preserves_one_collective_and_raw_bits() -> None:
     program = r'''
+from dataclasses import dataclass, replace
 import json
+import numpy as np
 from glm_tpu.greenfield.benchmarking.association_fingerprint import (
     StrategyNdFingerprintConfig,
+    accepted_tp32_model_axis_device_ids,
     build_strategy_nd_fingerprint,
     execute_strategy_nd_fingerprint,
     generate_strategy_nd_input_bits,
@@ -152,10 +208,42 @@ inputs = generate_strategy_nd_input_bits(config)
 compiled = build_strategy_nd_fingerprint(
     config, tuple(range(32)), enforce_hlo_contract=False
 )
-outputs, capture = execute_strategy_nd_fingerprint(compiled, inputs)
+accepted_model_axis = accepted_tp32_model_axis_device_ids()
+@dataclass(frozen=True)
+class FakeV4Device:
+    id: int
+    coords: tuple[int, int, int]
+    core_on_chip: int = 0
+    device_kind: str = "TPU v4"
+    platform: str = "tpu"
+fake_v4_devices = [
+    FakeV4Device(
+        device_id,
+        (device_id % 2, (device_id // 2) % 4, device_id // 8),
+    )
+    for device_id in range(32)
+]
+accepted_v4_model_axis = accepted_tp32_model_axis_device_ids(fake_v4_devices)
+class CountingExecutable:
+    def __init__(self, inner):
+        self.inner = inner
+        self.calls = 0
+    def __call__(self, value):
+        self.calls += 1
+        return self.inner(value)
+counting = CountingExecutable(compiled.compiled)
+outputs, capture = execute_strategy_nd_fingerprint(
+    replace(compiled, compiled=counting), inputs
+)
 print(json.dumps({
+    "calls": counting.calls,
+    "accepted_model_axis": list(accepted_model_axis),
+    "accepted_v4_model_axis": list(accepted_v4_model_axis),
     "counts": compiled.hlo_report.to_dict()["collective_counts"],
+    "deterministic": capture["repeated_output_bits_sha256"] == capture["output_bits_sha256"],
     "input": capture["input_bits_sha256"],
+    "replica_trials": len(capture["local_replica_output_sha256_by_trial"]),
+    "rows_equal": bool(np.all(outputs == outputs[:, :1, :])),
     "output": capture["output_bits_sha256"],
     "shape": list(outputs.shape),
 }, sort_keys=True))
@@ -171,8 +259,17 @@ print(json.dumps({
         check=True,
     )
     result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["accepted_model_axis"] == list(range(32))
+    assert result["accepted_v4_model_axis"] == [
+        0, 8, 16, 24, 2, 10, 18, 26, 4, 12, 20, 28, 6, 14, 22, 30,
+        1, 9, 17, 25, 3, 11, 19, 27, 5, 13, 21, 29, 7, 15, 23, 31,
+    ]
+    assert result["calls"] == 4  # two M32 trials plus the identical repeat bank
     assert result["counts"] == {"all-reduce": 1}
-    assert result["shape"] == [2, 96]
+    assert result["deterministic"]
+    assert result["replica_trials"] == 2
+    assert result["rows_equal"]
+    assert result["shape"] == [2, 32, 96]
     assert len(result["input"]) == len(result["output"]) == 64
 
 

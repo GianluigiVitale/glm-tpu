@@ -7395,3 +7395,60 @@ unmotivated arithmetic variants.
   returned `APPROVE COMMIT`.
 - Exact next: independently recheck, commit/push, strict fleet census, and one protected M32
   capture. Adapt the existing fingerprint only to the captured exact shape/config afterward.
+
+## 2026-08-11 18:39--19:56 — DB532 seals exact accepted M32 decode association config
+
+- The reviewed capture batch was committed/pushed at
+  `ec114ae91f65c10fc3a77dcffa7ca283fa7be129`. One serialized protected run used tag
+  `greenfield_accepted_decode_projection_lowering_20260811T184908676873350Z`; no second workflow
+  was launched. It completed at DB532/item1817 with exact passkey `881446`, exact raw output and
+  all DSA selected positions/scores/counts across 14 decode steps and 21 events. Load/state
+  protections, DB snapshot, approved archive and authenticated eight-host zero-work cleanup pass.
+- Every host compiled the unique M32 decode bucket. The eight compact HLO files are byte-identical
+  at gzip SHA `25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c`; their preserved raw
+  inventories contain 13,853--13,896 files. The semantic artifact manifest SHA is
+  `9257e28b0ee8d6851d03caaf862717e34db6c8014af5e579a0c44d7d1174e487`, and direct remote
+  streaming reproduces local `SUCCESS`, HLO, summary and manifest hashes.
+- The independent sealer records exactly 156 row-parallel BF16 reductions: 78 attention, three
+  dense-MLP and 75 tuple-MoE. Every variant uses sorted global ranks 0--31, BF16 add, result layout
+  `bf16[32,6144]{1,0:T(8,128)(2,1)S(3)}`, and the same physical algorithm:
+  `RotatedPincerEmitter/StrategyND`, colors/phases 3, cores `{4 2 4}/{2 4 4}/{4 4 2}` and
+  `dim_used={0 1 2}/{1 2 0}/{2 0 1}`. The prior prefill-only ambiguity is closed.
+- The dormant one-row fingerprint is being adapted rather than replaced. Its canonical input stays
+  `[trial,member,width]`; one compiled exact-M32 executable receives 32 trial invocations, each
+  trial replicated across all physical rows, and the complete bank is repeated. Raw output stays
+  `[trial,row,width]`, so the existing repeated-trial analyzer is applied independently to every
+  fixed physical row. This is necessary because StrategyND colors/chunk rotations are
+  element-position-dependent; mapping trial index directly to row would make `all(axis=trial)`
+  compare different trees. The HLO contract pins DB532 source hashes, sorted rank group, exact TPU
+  result layout and full algorithm config. The capture also replays the accepted oracle's logged
+  six-axis `mesh_utils.create_device_mesh((1,1,1,1,32,1),
+  allow_split_physical_axes=True)` recipe and retains the model-axis-to-global-device permutation
+  needed to map greenfield virtual projection shards onto physical leaves. The original M1 calls
+  remain rejected. Replaying that exact recipe under the pinned JAX implementation with the
+  accepted log's `(x,y,z)` coordinates predicts the non-identity model order
+  `0,8,16,24,2,10,...,7,15,23,31`. The existing forced-CPU focused test now pins this physical
+  topology permutation; the protected run must still record and fleet-agree the actual TPU order.
+- The first staged version instead placed the 32 trials into 32 rows of one invocation. Fable's
+  initial review approved staged SHA `d169d0fe...09fd`, but a direct challenge exposed the false
+  row-invariance assumption; the same review explicitly withdrew approval and classified it high
+  severity. That staged method must never be committed or launched. Only the repeated-M32/per-row
+  correction is eligible for fresh delta review after tests.
+- The corrected focused suite passes `8/8`; the complete affected explicit-CPU
+  benchmarking/HLO/topology suite passes `121/121` in `25.36 s`. Bash, ShellCheck, compileall,
+  JSON, embedded-Python and diff checks pass. The new planted-row regression proves two different
+  row associations are recovered independently, while the forced-CPU executable makes exactly
+  `2 * trials` M32 calls, preserves `[trial,32,width]` outputs and repeats the entire bank.
+- DB532 contains no XPlane or warmed decoder loop and makes no latency/throughput claim. DB484
+  remains `244.091151 ms/token` / `4.096830 tok/s`. Its trace supports the serial PP8 model but has
+  no MXU-active or HBM-stall counters. Continue, not deliver: exact 8K, Gate E, PP16/WS32,
+  128K/256K and plan adjudication remain open.
+- The live accepted M32 row is independently pinned before the association run. Sealed DB532
+  event-zero dumps transition from four M2048 prefill steps to `topk.step0005`--`step0023`, each
+  with shape 32, exactly `valid_idx=[0]`, and active positions 8,155--8,173. At oracle pin
+  `b3c25df`, `_prepare_inputs` sets the sole request's `token_offset=0`, writes its one scheduled
+  token first and zero-fills the remainder. Apply only physical row zero from the fingerprint to
+  the layer-0 challenger.
+- Exact next: finish the affected test batch, obtain one Fable diff approval, commit/push, then run
+  exactly one protected exact-M32 association fingerprint. Apply its measured physical association
+  to the existing layer-0 discriminator before another complete 8K run.

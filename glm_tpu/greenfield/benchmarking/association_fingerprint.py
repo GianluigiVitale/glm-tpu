@@ -1,14 +1,17 @@
-"""Model-free canary for one TPU v4 32-way BF16 reduction instance.
+"""Model-free canary for the accepted TPU-v4 M32 projection reduction.
 
-The pinned legacy artifact is a 2,048-row prefill executable whose projection
-uses a three-color ``StrategyND`` all-reduce.  This module feeds a one-row
-collective carrying the same backend label deterministic cancellation-heavy BF16
-inputs, preserves the raw input/output bits, and replays a bounded family of
-topology-shaped pincer trees offline.  Backend-label equality does not prove
-payload chunking, member mapping, or addition association equality with either
-the prefill collective or the separate 32-row decode executable.  It is a
-non-gating diagnostic only: the full-pod collective is never an admissible
-repeated-layer operation in the greenfield engine.
+DB532 seals the accepted decode executable's exact ``bf16[32,6144]`` physical
+all-reduce: sorted global ranks 0--31, the TPU tiled result layout, and the full
+three-color ``StrategyND`` algorithm config.  This module repeatedly executes
+that shape-identical collective.  Each cancellation-heavy trial is replicated
+across all 32 physical rows, so every fixed buffer position receives repeated
+observations even when StrategyND assigns different colors to different rows.
+It preserves the raw input/output bits and replays a bounded family of
+topology-shaped pincer trees separately for every row.
+
+The result is a non-gating numerical-association diagnostic.  It does not make
+the accepted full-pod reduction admissible in the greenfield engine and it does
+not claim model correctness or performance.
 """
 
 from __future__ import annotations
@@ -31,8 +34,20 @@ from ..sharding.hlo_contract import (
 )
 
 
-ACCEPTED_PROMPT_PROJECTION_HLO_SHA256 = (
-    "51d014de3776bae76b9c4068bf9ed3b06b690b2ce65531f68d372738b63d47f0"
+ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256 = (
+    "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775"
+)
+ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256 = (
+    "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c"
+)
+ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256 = (
+    "9257e28b0ee8d6851d03caaf862717e34db6c8014af5e579a0c44d7d1174e487"
+)
+ACCEPTED_DECODE_RESULT_LAYOUT = "{1,0:T(8,128)(2,1)S(3)}"
+ACCEPTED_DECODE_BUCKET_ROWS = 32
+ACCEPTED_TP32_MODEL_AXIS_RECIPE = (
+    "mesh_utils.create_device_mesh:shape=1,1,1,1,32,1:"
+    "allow_split_physical_axes=true:model_axis=4"
 )
 STRATEGY_ND_DEBUG = (
     "\nStrategyND{colors:3 phases:3 cores:{4 2 4},{2 4 4},{4 4 2} "
@@ -101,6 +116,44 @@ def array_sha256(value: np.ndarray) -> str:
     return digest.hexdigest()
 
 
+def accepted_tp32_model_axis_device_ids(
+    devices: Sequence[Any] | None = None,
+) -> tuple[int, ...]:
+    """Replay the accepted oracle's model-axis device-order recipe.
+
+    The pinned oracle's logged six-axis mesh is created with
+    ``mesh_utils.create_device_mesh((1, 1, 1, 1, 32, 1), ...)`` and model is
+    its only nontrivial axis.  Physical association fingerprints are keyed by
+    global device id, while checkpoint projection shards are keyed by model-
+    axis position, so the protected artifact must retain this permutation
+    rather than assume they are equal.
+    """
+
+    import jax
+    from jax.experimental import mesh_utils
+
+    runtime_devices = tuple(jax.devices() if devices is None else devices)
+    by_id = {int(device.id): device for device in runtime_devices}
+    if len(runtime_devices) != 32 or set(by_id) != set(range(32)):
+        raise BenchmarkValidationError(
+            "accepted TP32 model-axis replay requires global device ids 0..31"
+        )
+    ordered = tuple(by_id[index] for index in range(32))
+    mesh_devices = mesh_utils.create_device_mesh(
+        (1, 1, 1, 1, 32, 1),
+        ordered,
+        allow_split_physical_axes=True,
+    )
+    result = tuple(
+        int(device.id) for device in np.asarray(mesh_devices).reshape(-1)
+    )
+    if len(result) != 32 or sorted(result) != list(range(32)):
+        raise BenchmarkValidationError(
+            "accepted TP32 model-axis replay did not produce a device permutation"
+        )
+    return result
+
+
 def bfloat16_bits_to_float32(bits: np.ndarray) -> np.ndarray:
     values = np.asarray(bits, dtype=np.uint16).astype(np.uint32) << 16
     return values.view(np.float32)
@@ -165,9 +218,9 @@ def strategy_nd_fingerprint_hlo_policy(
     member_device_ids: Sequence[int],
 ) -> HloContractPolicy:
     members = tuple(int(device_id) for device_id in member_device_ids)
-    if len(members) != 32 or sorted(members) != list(range(32)):
+    if members != tuple(range(32)):
         raise BenchmarkValidationError(
-            "StrategyND fingerprint member ids must permute physical devices 0..31"
+            "accepted M32 fingerprint requires sorted global member ids 0..31"
         )
     return HloContractPolicy(
         name="strategy-nd-association-fingerprint",
@@ -221,9 +274,22 @@ def validate_strategy_nd_fingerprint_hlo(
         )
     reduction = reductions[0]
     shapes = tuple((shape.dtype, shape.dimensions) for shape in reduction.result_shapes)
-    if shapes != (("bf16", (1, 6144)),):
+    if shapes != (("bf16", (32, 6144)),):
         raise BenchmarkValidationError(
-            f"fingerprint all-reduce result must be bf16[1,6144], got {shapes}"
+            f"fingerprint all-reduce result must be bf16[32,6144], got {shapes}"
+        )
+    operand_shapes = tuple(
+        (shape.dtype, shape.dimensions) for shape in reduction.operand_shapes
+    )
+    if operand_shapes != (("bf16", (32, 6144)),):
+        raise BenchmarkValidationError(
+            "fingerprint all-reduce operand must be bf16[32,6144], "
+            f"got {operand_shapes}"
+        )
+    exact_result = f"bf16[32,6144]{ACCEPTED_DECODE_RESULT_LAYOUT} all-reduce("
+    if exact_result not in reduction.raw_line:
+        raise BenchmarkValidationError(
+            "fingerprint all-reduce does not preserve the accepted M32 TPU result layout"
         )
     backend = _backend_config(reduction)
     algorithm = backend.get("collective_algorithm_config")
@@ -256,7 +322,7 @@ def build_strategy_nd_fingerprint(
     devices: Sequence[Any] | None = None,
     enforce_hlo_contract: bool = True,
 ) -> CompiledStrategyNdFingerprint:
-    """Compile the one-collective fingerprint executable."""
+    """Compile one exact-M32 collective reused by every trial invocation."""
 
     import jax
     from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
@@ -280,7 +346,8 @@ def build_strategy_nd_fingerprint(
     )
     executable = jax.jit(mapped)
     example = jax.device_put(
-        np.zeros((32, 1, config.width), dtype=np.uint16), input_sharding
+        np.zeros((32, ACCEPTED_DECODE_BUCKET_ROWS, config.width), dtype=np.uint16),
+        input_sharding,
     )
     compiled = executable.lower(example).compile()
     optimized_hlo = compiled.as_text()
@@ -309,7 +376,7 @@ def execute_strategy_nd_fingerprint(
     compiled: CompiledStrategyNdFingerprint,
     input_bits: np.ndarray,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    """Execute all trials and return representative replicated output bits."""
+    """Execute and repeat a bank of exact-M32 trial invocations."""
 
     import jax
 
@@ -319,51 +386,63 @@ def execute_strategy_nd_fingerprint(
         raise BenchmarkValidationError(
             f"fingerprint input bits must have shape {expected_shape}, got {bits.shape}"
         )
-    outputs = []
-    local_replica_hashes = []
-    for trial in range(compiled.config.trials):
-        value = jax.device_put(bits[trial, :, None, :], compiled.input_sharding)
-        result = compiled.compiled(value)
-        jax.block_until_ready(result)
-        local = [
-            np.asarray(jax.device_get(shard.data), dtype=np.uint16).reshape(
-                compiled.config.width
-            )
-            for shard in sorted(
-                result.addressable_shards, key=lambda shard: int(shard.device.id)
-            )
-        ]
-        hashes = tuple(array_sha256(item) for item in local)
-        expected_local_replicas = len(compiled.input_sharding.addressable_devices)
-        if len(local) != expected_local_replicas or len(set(hashes)) != 1:
-            raise BenchmarkValidationError(
-                "fingerprint output is not byte-identical on every local replica"
-            )
-        outputs.append(local[0])
-        local_replica_hashes.append(hashes)
+    expected_local_replicas = len(compiled.input_sharding.addressable_devices)
 
-    # A repeated first trial catches nondeterministic network arithmetic.
-    repeated_value = jax.device_put(bits[0, :, None, :], compiled.input_sharding)
-    repeated = compiled.compiled(repeated_value)
-    jax.block_until_ready(repeated)
-    repeated_host = np.asarray(
-        jax.device_get(
-            min(repeated.addressable_shards, key=lambda shard: int(shard.device.id)).data
-        ),
-        dtype=np.uint16,
-    ).reshape(compiled.config.width)
-    output_bits = np.ascontiguousarray(np.stack(outputs))
-    if not np.array_equal(output_bits[0], repeated_host):
+    def execute_bank() -> tuple[np.ndarray, list[tuple[str, ...]]]:
+        outputs = []
+        replica_hashes = []
+        for trial in range(compiled.config.trials):
+            # The canonical artifact remains [trial, member, width].  Repeating
+            # one trial over all rows preserves the exact M32 buffer geometry
+            # while making trial comparisons refer to fixed physical elements.
+            distributed_bits = np.ascontiguousarray(
+                np.broadcast_to(
+                    bits[trial, :, None, :],
+                    (32, ACCEPTED_DECODE_BUCKET_ROWS, compiled.config.width),
+                )
+            )
+            value = jax.device_put(distributed_bits, compiled.input_sharding)
+            result = compiled.compiled(value)
+            jax.block_until_ready(result)
+            local = [
+                np.asarray(jax.device_get(shard.data), dtype=np.uint16).reshape(
+                    ACCEPTED_DECODE_BUCKET_ROWS, compiled.config.width
+                )
+                for shard in sorted(
+                    result.addressable_shards,
+                    key=lambda shard: int(shard.device.id),
+                )
+            ]
+            hashes = tuple(array_sha256(item) for item in local)
+            if len(local) != expected_local_replicas or len(set(hashes)) != 1:
+                raise BenchmarkValidationError(
+                    "fingerprint output is not byte-identical on every local replica"
+                )
+            outputs.append(local[0])
+            replica_hashes.append(hashes)
+        return np.ascontiguousarray(np.stack(outputs)), replica_hashes
+
+    output_bits, local_replica_hashes = execute_bank()
+    repeated_bits, repeated_local_replica_hashes = execute_bank()
+    if not np.array_equal(output_bits, repeated_bits):
         raise BenchmarkValidationError(
-            "repeated StrategyND fingerprint trial produced different BF16 bits"
+            "repeated StrategyND fingerprint bank produced different BF16 bits"
         )
     return output_bits, {
+        "compile_bucket_rows": ACCEPTED_DECODE_BUCKET_ROWS,
+        "determinism_repeat_invocations": compiled.config.trials,
         "input_bits_sha256": array_sha256(bits),
+        "input_rows_replicated": True,
+        "invocation_count": 2 * compiled.config.trials,
         "local_replica_output_sha256_by_trial": [
             list(hashes) for hashes in local_replica_hashes
         ],
+        "measured_trial_invocations": compiled.config.trials,
         "output_bits_sha256": array_sha256(output_bits),
-        "repeated_first_trial_sha256": array_sha256(repeated_host),
+        "repeated_local_replica_output_sha256_by_trial": [
+            list(hashes) for hashes in repeated_local_replica_hashes
+        ],
+        "repeated_output_bits_sha256": array_sha256(repeated_bits),
     }
 
 
@@ -576,5 +655,73 @@ def analyze_strategy_nd_fingerprint(
         "uncovered_columns": np.flatnonzero(~union).astype(int).tolist(),
         "union_exact_column_count": int(union.sum()),
         "union_exact_fraction": float(union.mean()),
+        "width": inputs.shape[2],
+    }
+
+
+def analyze_m32_strategy_nd_fingerprint(
+    input_bits: np.ndarray,
+    output_bits: np.ndarray,
+    member_device_ids: Sequence[int],
+    device_coordinates: Mapping[int, Sequence[int]],
+    *,
+    block_width: int = 128,
+) -> dict[str, Any]:
+    """Replay repeated trials independently at every physical M32 row."""
+
+    inputs = np.asarray(input_bits, dtype=np.uint16)
+    outputs = np.asarray(output_bits, dtype=np.uint16)
+    if inputs.ndim != 3 or inputs.shape[1] != 32:
+        raise BenchmarkValidationError("input_bits must have shape [trial,32,width]")
+    expected_output_shape = (
+        inputs.shape[0],
+        ACCEPTED_DECODE_BUCKET_ROWS,
+        inputs.shape[2],
+    )
+    if outputs.shape != expected_output_shape:
+        raise BenchmarkValidationError(
+            "M32 output_bits must have shape "
+            f"{expected_output_shape}, got {outputs.shape}"
+        )
+
+    rows = []
+    output_groups: dict[str, list[int]] = {}
+    for physical_row in range(ACCEPTED_DECODE_BUCKET_ROWS):
+        row_output = np.ascontiguousarray(outputs[:, physical_row, :])
+        row_analysis = analyze_strategy_nd_fingerprint(
+            inputs,
+            row_output,
+            member_device_ids,
+            device_coordinates,
+            block_width=block_width,
+        )
+        row_analysis["physical_row"] = physical_row
+        row_hash = array_sha256(row_output)
+        row_analysis["row_output_bits_sha256"] = row_hash
+        rows.append(row_analysis)
+        output_groups.setdefault(row_hash, []).append(physical_row)
+
+    union_counts = [row["union_exact_column_count"] for row in rows]
+    return {
+        "analysis_scope": (
+            "per-physical-row bounded balanced four-way axis-pincer trees; "
+            "raw artifacts permit broader replay"
+        ),
+        "block_width": block_width,
+        "candidate_count_per_row": rows[0]["candidate_count"],
+        "candidate_family_exhaustive": False,
+        "compile_bucket_rows": ACCEPTED_DECODE_BUCKET_ROWS,
+        "input_bits_sha256": array_sha256(inputs),
+        "maximum_row_union_exact_column_count": max(union_counts),
+        "minimum_row_union_exact_column_count": min(union_counts),
+        "output_bits_sha256": array_sha256(outputs),
+        "row_output_equivalence_groups": [
+            {"row_output_bits_sha256": digest, "rows": group_rows}
+            for digest, group_rows in sorted(output_groups.items())
+        ],
+        "rows": rows,
+        "total_union_exact_column_count": sum(union_counts),
+        "trials_per_physical_row": inputs.shape[0],
+        "unique_row_output_count": len(output_groups),
         "width": inputs.shape[2],
     }

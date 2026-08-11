@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 18:39 UTC
+**Updated:** 2026-08-11 20:19 UTC
 
 ## Authority and isolation
 
@@ -153,9 +153,36 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   equality, and the compactor preserves a raw filename/size inventory; same-op shape drift and
   remote-compaction failure also refuse clearly. The same session replayed real and short HLO,
   verified staged diff `658286b7...ece5`, found no remaining high/medium issue and returned
-  `APPROVE COMMIT`. Exact next is independent recheck, commit/push, then exactly one serialized
-  protected decode-lowering capture. Its physical config—not another guessed uniform tree—will
-  define the next layer-0 association discriminator.
+  `APPROVE COMMIT`.
+- The reviewed capture implementation was committed/pushed at
+  `ec114ae91f65c10fc3a77dcffa7ca283fa7be129`. Its single protected run, tag
+  `greenfield_accepted_decode_projection_lowering_20260811T184908676873350Z`, completed as
+  DB532/item1817 with exact raw output, all 14x21 DSA events, load/state checks, archived terminal
+  `SUCCESS` and authenticated 8/8 post-census. All eight compile owners produced identical M32
+  HLO gzip SHA `25041bfbcf...e4c`; each raw inventory contains 13,853--13,896 files. The sealer
+  finds exactly 156 BF16 row-parallel reductions: 78 attention, three dense and 75 tuple-MoE,
+  all with result `bf16[32,6144]{1,0:T(8,128)(2,1)S(3)}`, sorted global ranks 0--31 and one
+  `RotatedPincerEmitter/StrategyND` config. Artifact manifest SHA is `9257e28b...e487`; direct
+  remote hashes match. This is correctness/lowering evidence only and makes no performance claim.
+- Exact next is one model-free exact-M32 physical association fingerprint workflow. It must reuse
+  one compiled M32 collective for 32 invocations, replicate each trial over all 32 physical rows,
+  repeat the complete bank, preserve raw `[trial,row,width]` outputs and replay the bounded pincer
+  family separately for every row. This avoids assuming StrategyND colors are row-invariant. The
+  artifact also replays the pinned oracle's logged six-axis
+  `create_device_mesh(1x1x1x1x32x1)` recipe and records the accepted model-axis-to-device
+  permutation. A forced-CPU replay using the accepted logged v4 coordinates predicts the
+  non-identity order `0,8,16,24,2,10,...,7,15,23,31`; the existing focused test now pins that
+  topology behavior, while the protected TPU artifact remains the authority. The old M1 probe
+  remains inadmissible.
+  Apply the recovered association only through the existing table-on layer-0 discriminator at
+  live bucket row zero; then retry complete protected 8K. Row zero is direct evidence: sealed
+  DB532 `topk.step0005` through `step0023` records all have shape 32, exactly `valid_idx=[0]`, and
+  positions 8,155--8,173; pinned oracle input preparation places the sole scheduled token at
+  offset zero and zero-fills the remaining rows. Do not optimize kernels, launch 8K, or start
+  another guessed tree first.
+  The corrected affected suite passes `121/121` with eight focused tests; Bash, ShellCheck,
+  compileall, JSON, embedded-Python and diff checks pass. One review of only the corrected delta is
+  due before commit; the withdrawn approval for staged SHA `d169d0fe...09fd` is not valid.
 
 ## Historical main-RoPE integration batch
 

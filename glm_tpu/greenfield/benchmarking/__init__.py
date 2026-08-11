@@ -1,9 +1,14 @@
 """Synthetic mechanism benchmarks for the topology-first engine."""
 
 from .association_fingerprint import (
-    ACCEPTED_PROMPT_PROJECTION_HLO_SHA256,
+    ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256,
+    ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256,
+    ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256,
+    ACCEPTED_TP32_MODEL_AXIS_RECIPE,
     STRATEGY_ND_ALGORITHM,
     StrategyNdFingerprintConfig,
+    accepted_tp32_model_axis_device_ids,
+    analyze_m32_strategy_nd_fingerprint,
     analyze_strategy_nd_fingerprint,
     array_sha256,
     build_strategy_nd_fingerprint,
@@ -62,7 +67,10 @@ from .paired_transport import (
 )
 
 __all__ = [
-    "ACCEPTED_PROMPT_PROJECTION_HLO_SHA256",
+    "ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256",
+    "ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256",
+    "ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256",
+    "ACCEPTED_TP32_MODEL_AXIS_RECIPE",
     "CollectiveChainConfig",
     "CollectiveKind",
     "GateCDenseResult",
@@ -75,7 +83,9 @@ __all__ = [
     "STRATEGY_ND_ALGORITHM",
     "StrategyNdFingerprintConfig",
     "TensorTolerance",
+    "accepted_tp32_model_axis_device_ids",
     "addressable_checksum",
+    "analyze_m32_strategy_nd_fingerprint",
     "analyze_strategy_nd_fingerprint",
     "array_sha256",
     "benchmark_collective_chain",

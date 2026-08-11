@@ -32,7 +32,7 @@ TAG=${GLM_GREENFIELD_COLLECTIVE_TAG:-$default_tag}
 if [[ $MODE == strategy_nd_fingerprint ]]; then
   default_groups=32
   default_operations=all_reduce
-  default_shape=1,6144
+  default_shape=32,6144
 else
   default_groups=2,4,8,32
   default_operations=control,all_reduce,reduce_scatter,all_gather,collective_permute,all_to_all,fused_tuple_all_reduce
@@ -82,10 +82,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 }
 if [[ $MODE == strategy_nd_fingerprint ]] && {
   [[ $GROUP_SIZES != 32 ]] || [[ $OPERATIONS != all_reduce ]] ||
-    [[ $SHAPE != 1,6144 ]] || [[ $DTYPE != bfloat16 ]] ||
+    [[ $SHAPE != 32,6144 ]] || [[ $DTYPE != bfloat16 ]] ||
     [[ $ASSOCIATION_TRIALS != 32 ]]
 }; then
-  echo "protected StrategyND fingerprint requires groups=32 operation=all_reduce shape=1,6144 dtype=bfloat16 trials=32" >&2
+  echo "protected StrategyND fingerprint requires groups=32 operation=all_reduce shape=32,6144 dtype=bfloat16 trials=32" >&2
   exit 2
 fi
 
@@ -226,11 +226,17 @@ if mode == "strategy_nd_fingerprint":
         raise SystemExit("fleet association fingerprint record is missing")
     reference = host_items[0]
     stable_fields = (
-        "accepted_prompt_projection_hlo_sha256",
+        "accepted_model_axis_device_ids",
+        "accepted_model_axis_recipe",
+        "accepted_decode_projection_hlo_gzip_sha256",
+        "accepted_decode_projection_hlo_raw_sha256",
+        "accepted_decode_projection_manifest_sha256",
         "capture",
         "collective_algorithm",
         "collective_groups",
         "config",
+        "decode_shape_admissible",
+        "decode_tree_claim",
         "diagnostic_only",
         "fleet_hlo_hashes",
         "fleet_input_bits_hashes",
@@ -238,16 +244,35 @@ if mode == "strategy_nd_fingerprint":
         "hlo",
         "member_device_ids",
         "optimized_hlo_sha256",
+        "source_hlo_role",
     )
     for field in stable_fields:
         if any(item[field] != reference[field] for item in host_items[1:]):
             raise SystemExit(f"fleet association field differs: {field}")
     if reference["config"] != {"seed": 1196575821, "trials": 32, "width": 6144}:
         raise SystemExit(f"unprotected association config: {reference['config']}")
+    expected_sources = {
+        "accepted_decode_projection_hlo_gzip_sha256": "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
+        "accepted_decode_projection_hlo_raw_sha256": "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
+        "accepted_decode_projection_manifest_sha256": "9257e28b0ee8d6851d03caaf862717e34db6c8014af5e579a0c44d7d1174e487",
+    }
+    if any(reference[field] != value for field, value in expected_sources.items()):
+        raise SystemExit("association source does not match sealed DB532 decode lowering")
+    if reference["source_hlo_role"] != "decode_32_rows":
+        raise SystemExit("association source role is not the accepted M32 decode executable")
+    if sorted(reference["accepted_model_axis_device_ids"]) != list(range(32)):
+        raise SystemExit("accepted model-axis mapping is not a device-id permutation")
+    if reference["accepted_model_axis_recipe"] != (
+        "mesh_utils.create_device_mesh:shape=1,1,1,1,32,1:"
+        "allow_split_physical_axes=true:model_axis=4"
+    ):
+        raise SystemExit("accepted model-axis mapping recipe drifted")
+    if not reference["decode_shape_admissible"]:
+        raise SystemExit("association did not pass the exact M32 shape/layout contract")
     if reference["collective_groups"] != [reference["member_device_ids"]]:
         raise SystemExit("association group/member mapping differs")
-    if sorted(reference["member_device_ids"]) != list(range(32)):
-        raise SystemExit("association member mapping does not cover physical ids 0..31")
+    if reference["member_device_ids"] != list(range(32)):
+        raise SystemExit("association member mapping is not sorted physical ids 0..31")
     if not reference["diagnostic_only"]:
         raise SystemExit("association fingerprint must be marked diagnostic-only")
     if not reference["hlo"]["valid"] or reference["hlo"]["violations"]:
@@ -255,6 +280,17 @@ if mode == "strategy_nd_fingerprint":
     if reference["hlo"]["collective_counts"] != {"all-reduce": 1}:
         raise SystemExit("association fingerprint does not contain one all-reduce")
     capture = reference["capture"]
+    expected_capture_contract = {
+        "compile_bucket_rows": 32,
+        "determinism_repeat_invocations": 32,
+        "input_rows_replicated": True,
+        "invocation_count": 64,
+        "measured_trial_invocations": 32,
+    }
+    if any(capture.get(field) != value for field, value in expected_capture_contract.items()):
+        raise SystemExit("association capture does not contain two exact replicated-row M32 banks")
+    if capture["repeated_output_bits_sha256"] != capture["output_bits_sha256"]:
+        raise SystemExit("association repeated M32 bank differs from the measured bank")
     for field in (
         "fleet_hlo_hashes",
         "fleet_input_bits_hashes",
@@ -269,10 +305,20 @@ if mode == "strategy_nd_fingerprint":
     if reference["fleet_output_bits_hashes"][0] != capture["output_bits_sha256"]:
         raise SystemExit("fleet output hash differs from capture")
     replica_hashes = capture["local_replica_output_sha256_by_trial"]
-    if len(replica_hashes) != 32 or any(
-        len(hashes) != 4 or len(set(hashes)) != 1 for hashes in replica_hashes
+    repeated_replica_hashes = capture[
+        "repeated_local_replica_output_sha256_by_trial"
+    ]
+    for label, hashes_by_trial in (
+        ("measured", replica_hashes),
+        ("repeated", repeated_replica_hashes),
     ):
-        raise SystemExit("association local replicas do not agree for every trial")
+        if len(hashes_by_trial) != 32 or any(
+            len(hashes) != 4 or len(set(hashes)) != 1
+            for hashes in hashes_by_trial
+        ):
+            raise SystemExit(
+                f"association {label} local replicas do not agree for every trial"
+            )
     owners = [
         (record, item)
         for record, item in zip(records, host_items, strict=True)
@@ -292,16 +338,30 @@ if mode == "strategy_nd_fingerprint":
         raise SystemExit("retrieved association input bits fail raw checksum")
     if array_sha256(output_bits) != capture["output_bits_sha256"]:
         raise SystemExit("retrieved association output bits fail raw checksum")
+    if input_bits.shape != (32, 32, 6144) or output_bits.shape != (32, 32, 6144):
+        raise SystemExit("retrieved association arrays do not preserve trial/member-or-row M32 axes")
     association_analysis = json.loads(
         (run_dir / "association" / "analysis.json").read_text()
     )
     if (
         association_analysis["input_bits_sha256"] != capture["input_bits_sha256"]
         or association_analysis["output_bits_sha256"] != capture["output_bits_sha256"]
+        or association_analysis["accepted_model_axis_device_ids"]
+        != reference["accepted_model_axis_device_ids"]
+        or association_analysis["accepted_model_axis_recipe"]
+        != reference["accepted_model_axis_recipe"]
         or association_analysis["optimized_hlo_sha256"]
         != reference["optimized_hlo_sha256"]
     ):
         raise SystemExit("offline association analysis is not linked to raw capture/HLO")
+    if (
+        association_analysis["compile_bucket_rows"] != 32
+        or association_analysis["trials_per_physical_row"] != 32
+        or len(association_analysis["rows"]) != 32
+        or {row["physical_row"] for row in association_analysis["rows"]}
+        != set(range(32))
+    ):
+        raise SystemExit("offline association analysis does not cover all M32 rows")
     case_summaries.append(
         {
             "analysis": association_analysis,
@@ -309,7 +369,7 @@ if mode == "strategy_nd_fingerprint":
                 "dtype": "bfloat16",
                 "group_size": 32,
                 "kind": "strategy_nd_association_fingerprint",
-                "rows": 1,
+                "rows": 32,
                 "width": 6144,
             },
             "collective_algorithm": reference["collective_algorithm"],
@@ -448,7 +508,7 @@ for case in case_summaries:
         ),
         item_id=item_id,
         prompt=(
-            "Capture raw BF16 association fingerprints from one byte-pinned 32-way StrategyND reduction."
+            "Capture repeated raw BF16 association fingerprints from the exact-shape accepted M32 StrategyND reduction."
             if mode == "strategy_nd_fingerprint"
             else "Measure one protected 75-operation dependent synthetic collective chain."
         ),
@@ -459,7 +519,7 @@ for case in case_summaries:
         ),
         raw_output=json.dumps(case, sort_keys=True),
         extracted=str(
-            case["analysis"]["union_exact_column_count"]
+            case["analysis"]["minimum_row_union_exact_column_count"]
             if mode == "strategy_nd_fingerprint"
             else case["maximum_host_p50_ms"]
         ),

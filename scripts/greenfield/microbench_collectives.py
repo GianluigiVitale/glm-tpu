@@ -29,10 +29,14 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
-    ACCEPTED_PROMPT_PROJECTION_HLO_SHA256,
+    ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256,
+    ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256,
+    ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256,
+    ACCEPTED_TP32_MODEL_AXIS_RECIPE,
     CollectiveChainConfig,
     CollectiveKind,
     StrategyNdFingerprintConfig,
+    accepted_tp32_model_axis_device_ids,
     array_sha256,
     benchmark_collective_chain,
     build_collective_chain,
@@ -152,11 +156,17 @@ def _run_strategy_nd_fingerprint(
     config = StrategyNdFingerprintConfig(trials=args.association_trials)
     if not args.allow_unprotected_test_config:
         config.require_protected_contract()
-    groups = collective_groups_for_size(topology, 32)
-    if len(groups) != 1:
-        raise RuntimeError("StrategyND fingerprint requires one 32-device group")
-    members = groups[0]
-    label = "strategy_nd_association_bfloat16_1x6144"
+    physical_ids = tuple(sorted(device.device_id for device in topology.devices))
+    if physical_ids != tuple(range(32)):
+        raise RuntimeError(
+            "accepted M32 fingerprint requires contiguous physical ids 0..31"
+        )
+    members = physical_ids
+    groups = (members,)
+    accepted_model_axis_device_ids = accepted_tp32_model_axis_device_ids(
+        jax.devices()
+    )
+    label = "strategy_nd_association_bfloat16_32x6144"
     multihost_utils.sync_global_devices(f"greenfield-fingerprint-start-{label}")
     input_bits = generate_strategy_nd_input_bits(config)
     compiled = build_strategy_nd_fingerprint(
@@ -187,13 +197,20 @@ def _run_strategy_nd_fingerprint(
             _atomic_write(
                 artifact_dir / f"{label}.hlo_contract.json",
                 {
-                    "accepted_prompt_projection_hlo_sha256": (
-                        ACCEPTED_PROMPT_PROJECTION_HLO_SHA256
+                    "accepted_decode_projection_hlo_gzip_sha256": (
+                        ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256
                     ),
+                    "accepted_decode_projection_hlo_raw_sha256": (
+                        ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256
+                    ),
+                    "accepted_decode_projection_manifest_sha256": (
+                        ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256
+                    ),
+                    "decode_shape_admissible": False,
                     "decode_tree_claim": False,
                     "error": repr(error),
                     "generic_hlo": compiled.hlo_report.to_dict(),
-                    "source_hlo_role": "prefill_2048_rows",
+                    "source_hlo_role": "decode_32_rows",
                     "valid": False,
                 },
             )
@@ -202,13 +219,20 @@ def _run_strategy_nd_fingerprint(
         _atomic_write(
             artifact_dir / f"{label}.hlo_contract.json",
             {
-                "accepted_prompt_projection_hlo_sha256": (
-                    ACCEPTED_PROMPT_PROJECTION_HLO_SHA256
+                "accepted_decode_projection_hlo_gzip_sha256": (
+                    ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256
+                ),
+                "accepted_decode_projection_hlo_raw_sha256": (
+                    ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256
+                ),
+                "accepted_decode_projection_manifest_sha256": (
+                    ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256
                 ),
                 "collective_algorithm": algorithm,
+                "decode_shape_admissible": True,
                 "decode_tree_claim": False,
                 "hlo": hlo_report.to_dict(),
-                "source_hlo_role": "prefill_2048_rows",
+                "source_hlo_role": "decode_32_rows",
                 "valid": True,
             },
         )
@@ -258,8 +282,16 @@ def _run_strategy_nd_fingerprint(
         flush=True,
     )
     return {
-        "accepted_prompt_projection_hlo_sha256": (
-            ACCEPTED_PROMPT_PROJECTION_HLO_SHA256
+        "accepted_model_axis_device_ids": list(accepted_model_axis_device_ids),
+        "accepted_model_axis_recipe": ACCEPTED_TP32_MODEL_AXIS_RECIPE,
+        "accepted_decode_projection_hlo_gzip_sha256": (
+            ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256
+        ),
+        "accepted_decode_projection_hlo_raw_sha256": (
+            ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256
+        ),
+        "accepted_decode_projection_manifest_sha256": (
+            ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256
         ),
         "artifact_manifest": artifact_manifest,
         "capture": capture,
@@ -267,6 +299,7 @@ def _run_strategy_nd_fingerprint(
         "collective_groups": [list(group) for group in groups],
         "config": config.to_dict(),
         "diagnostic_only": True,
+        "decode_shape_admissible": True,
         "decode_tree_claim": False,
         "fleet_hlo_hashes": fleet_hlo_hashes,
         "fleet_input_bits_hashes": fleet_input_hashes,
@@ -274,7 +307,7 @@ def _run_strategy_nd_fingerprint(
         "hlo": hlo_report.to_dict(),
         "member_device_ids": list(members),
         "optimized_hlo_sha256": hlo_sha256,
-        "source_hlo_role": "prefill_2048_rows",
+        "source_hlo_role": "decode_32_rows",
     }
 
 
@@ -336,12 +369,12 @@ def main() -> int:
     if args.mode == "strategy_nd_fingerprint" and (
         tuple(args.groups) != (32,)
         or tuple(args.operations) != (CollectiveKind.ALL_REDUCE,)
-        or tuple(args.shape) != (1, 6144)
+        or tuple(args.shape) != (32, 6144)
         or args.dtype != "bfloat16"
     ):
         raise ValueError(
             "StrategyND fingerprint requires groups=32, operation=all_reduce, "
-            "shape=1,6144, and dtype=bfloat16"
+            "shape=32,6144, and dtype=bfloat16"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:

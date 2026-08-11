@@ -46,7 +46,7 @@
 | Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
 | Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
-| Gate D protected 8K decoder | Protected `0312cf5` integration has exact token `101252` and exact layer-0 normalized hidden/q-a/query/head/key/score/set/order. Event 1/layer 1 first diverges because the layer-0 output enters layer-1 normalization with 3,960/6,144 BF16 mismatches, max `0.00390625`. Pushed `12315aa` rejects four admissible combine-precision arms (`3960/4008/3998/4034`). Pushed `e19833a` then validly rejects four isolated 32-partial uniform BF16 trees (`4200/4262/4366/4317`), with all subshard/HLO/locality/selection contracts passing. Pre-launch provenance review rejects the one-row StrategyND fingerprint as decoder-tree evidence: its pin is a 2,048-row prefill executable, while position 8,155 uses the separate 32-row decode bucket. The main latent cache and monolithic-versus-LP4-merged attention input remain unverified upstream. | Missing; one primitive-level layer-0 ingredients capture is required before another 8K retry |
+| Gate D protected 8K decoder | Protected `0312cf5` integration localizes the first recurrent mismatch to layer-0 output entering layer 1. Precision, uniform virtual-TP32 output association and monolithic-attention schedule families are protected negative evidence. DB532/item1817 now seals the exact accepted M32 decode lowering: 156 BF16 `32x6144` reductions, ranks 0--31 and one uniform RotatedPincer/StrategyND config, with exact token/DSA/load/state, archive and cleanup. Its shape-32 decode dumps and pinned scheduler code independently prove row zero is the sole live bucket row. | Missing; run one exact-M32 physical association fingerprint, apply physical row zero, then retry complete 8K |
 | Gate D prompt index-cache/scorer discriminator | DB505--518 make the complete 8,155-row cache exact; DB521--527 make current query/head/key exact. DB528 rejects page geometry. DB529's same-shape TPU default-precision arm matches the accepted logical and selected scores/set/order/ties exactly, with pinned HLO/DB/archive/cleanup. | Pass; do not repeat bounded scorer variants |
 | Gates E–H | Await Gate D | Missing |
 
@@ -69,15 +69,15 @@ suite: 67 passed in 198.84 seconds with explicit CPU backend. It validates the t
 trees, four isolated program names, subshard kernel/collective HLO contracts and all existing
 stage-local/decoder behavior. Python compileall, Bash, ShellCheck and diff checks pass; its protected
 TPU discriminator completed at `e19833a` and rejected all four uniform trees under valid contracts.
-Latest StrategyND fingerprint readiness suite: 120 affected benchmarking/HLO/topology tests pass
-in 24.50 seconds, including seven dedicated raw-bit/backend/replay/forced-CPU tests. Protected TPU
-capture remains pending; CPU/HLO output is not numerical evidence for the physical association.
-Pre-launch correction: the mode is retained only as a default-off non-gating prototype and is not
-authorized for a protected Gate-D run. Its pinned HLO is prefill-shaped (`2048x6144`), not the
-decode bucket (`32x6144`, inferred; decode HLO not retained), and the current probe is `1x6144`.
-The next test batch must exercise the existing layer observer at pre-norm cache/attention/projection
-boundaries rather than compare another arithmetic arm at the saturated layer-1 normalized row.
-CPU/HLO reference tests prove semantics/mechanisms only.
+The old StrategyND fingerprint readiness result covered a now-rejected one-row probe. DB532 supplies
+the exact retained decode HLO and authorizes only a repeated-invocation `32x6144` physical
+association diagnostic: each trial is replicated over all rows, the complete bank is repeated and
+all rows are replayed independently. The artifact also retains the accepted model-axis-to-device
+permutation from its pinned six-axis `create_device_mesh` recipe. CPU/HLO tests remain
+semantics/mechanism evidence until that protected TPU capture passes; it will not be decoder
+correctness or performance evidence. The
+corrected affected benchmarking/HLO/topology suite passes `121/121`, including eight focused tests;
+Bash, ShellCheck, compileall, JSON, embedded-Python and diff checks also pass.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the
 fused-routed deployable raw-FP8 PP8 MoE layer but misses its latency budget. None proves full-model correctness,

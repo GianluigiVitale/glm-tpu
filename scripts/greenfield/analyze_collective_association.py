@@ -16,7 +16,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
-    analyze_strategy_nd_fingerprint,
+    analyze_m32_strategy_nd_fingerprint,
 )
 
 
@@ -44,7 +44,7 @@ def main() -> int:
         int(device["device_id"]): tuple(device["coordinates"])
         for device in record["topology"]["devices"]
     }
-    analysis = analyze_strategy_nd_fingerprint(
+    analysis = analyze_m32_strategy_nd_fingerprint(
         input_bits,
         output_bits,
         fingerprint["member_device_ids"],
@@ -54,6 +54,12 @@ def main() -> int:
     analysis.update(
         {
             "code_hash": record["code_hash"],
+            "accepted_model_axis_device_ids": fingerprint[
+                "accepted_model_axis_device_ids"
+            ],
+            "accepted_model_axis_recipe": fingerprint[
+                "accepted_model_axis_recipe"
+            ],
             "optimized_hlo_sha256": fingerprint["optimized_hlo_sha256"],
             "topology_hash": record["topology_hash"],
         }
@@ -64,8 +70,10 @@ def main() -> int:
     temporary.replace(args.output)
     print(
         "GREENFIELD_ASSOCIATION_ANALYSIS_OK "
-        f"candidates={analysis['candidate_count']} "
-        f"covered={analysis['union_exact_column_count']}/{analysis['width']} "
+        f"candidates_per_row={analysis['candidate_count_per_row']} "
+        f"minimum_row_covered={analysis['minimum_row_union_exact_column_count']}/"
+        f"{analysis['width']} "
+        f"unique_row_outputs={analysis['unique_row_output_count']} "
         f"output={args.output}"
     )
     return 0
