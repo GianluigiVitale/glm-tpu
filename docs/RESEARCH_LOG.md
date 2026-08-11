@@ -7325,10 +7325,73 @@ unmotivated arithmetic variants.
   work, while the `205.195 ms` permute region is predominantly backpressure rather than payload
   transfer. The per-core categories sum to `235.630 ms`, leaving about `8.46 ms` unattributed, so
   only the serial model—not the category sum—closes wall. Gate E implies `<=25 ms` active/stage,
-  about `17.9%` below `30.435 ms`. The trace still lacks MXU-active/HBM-stall counters and per-call
-  Pallas decomposition, so it cannot decide compute versus bandwidth limitation.
+  about `17.9%` below `30.435 ms`. The trace lacks MXU-active/HBM-stall counters, so it cannot
+  decide compute versus bandwidth limitation.
+- Direct re-reading of DB484's already sealed `xplane_summary.json` shows 14 custom-call
+  signatures whose times sum exactly to
+  `26.357075 ms`. The fused selected-MoE signature is `14.435602 ms` (`54.77%` of Pallas;
+  `47.43%` of active-stage time) and the M8 K4096->N6144 attention-output matmul is `4.388508 ms`
+  (`16.65%` / `14.42%`); together they are `71.42%` of Pallas and `61.85%` of active-stage time.
+  The trace still cannot separate MXU-active from HBM-stall time, but it does identify the first
+  post-exactness kernel targets without a new profile.
 - The binding decision is continue, not deliver: exact 8K Gate D, Gate E, PP16/WS32 adjudication,
   128K and 256K remain open. Exact next is to read the preserved StrategyND/ingredients evidence
   and choose one non-duplicative projection-subrank/physical-association discriminator. After 8K
-  exactness, first decompose and reduce Pallas work, then measure WS32 as the serious base-latency
-  challenger and PP16 as the mandatory lower-prior comparator; speculation stays after Gate G.
+  exactness, first reduce the sealed dominant Pallas signatures, then measure WS32 as the serious
+  base-latency challenger and PP16 as the mandatory lower-prior comparator; speculation stays
+  after Gate G.
+## 2026-08-11 16:44--17:30 — exact-shape decode lowering capture replaces another guessed tree
+
+- DB484 reanalysis and a fresh Fable review agree that `205.195 ms` of collective-permute regions
+  primarily represent serial PP8 residency/backpressure. The active stage is `26.357 ms` Pallas,
+  `3.351 ms` other work and `0.727 ms` non-permute collectives: `8 x 30.435 = 243.48 ms`, matching
+  the protected `244.091 ms` wall. The trace has no MXU-active/HBM-stall counters. Continue rather
+  than deliver: exact 8K is open and Gate E needs about `<=25 ms/stage`, a `17.9%` active-stage cut.
+- Direct local and sealed remote-object inspection proves recovery artifact
+  `greenfield_accepted_prompt_projection_lowering_recovery_20260809T105858202006975Z` contains
+  only the selected 2,048-row prefill after-codegen HLO. Its source archive uploaded one selected
+  module per host; the other raw compilation buckets were verified and reclaimed. No 32-row
+  decode lowering can be recovered without a new accepted compilation. The sealed accepted log
+  explicitly records prepared token paddings `[32,64,128,256,512,1024,2048]`, making the M32
+  module unique by exact collective shape rather than filename or compilation order.
+- The new default-off capture reuses `run_capture_short_context_dsa_oracle.sh`: one exact accepted
+  8K request, raw token correctness, exact DSA events, load/state checks, DB snapshot, approved
+  archive, global lease and authenticated cleanup. It deliberately omits XPlane profiling and
+  sets short-text, module-filtered XLA dumping with an `after_codegen` pass filter.
+- A small copied-and-hash-verified fleet helper selects the unique module with 156
+  `bf16[32,6144]` row-parallel reductions, emits a reproducible gzip on each compile owner, and
+  only then deletes the exact run-owned raw HLO subtree. Only an absent or empty raw tree is an
+  explicit binary-sharing non-owner; any unmatched raw files refuse while remaining intact for
+  failure diagnosis. This prevents the prior roughly 5 GiB/compile-owner raw dump from being
+  gathered to worker zero without erasing compiler-drift evidence.
+- The independent sealer requires source-backed BF16 reducers, exact global group 0--31, global
+  ids, and category counts `78 attention / 3 dense / 75 tuple-MoE`; it preserves the full physical
+  algorithm config and complete after-codegen HLO. It is diagnostic-only and makes no performance
+  claim. Its parser directly replays the preserved M2048 HLO at exact `78/3/75` with one uniform
+  `RotatedPincerEmitter/StrategyND` config.
+- Local verification passes all 40 unit tests and all 91 validation tests under explicit
+  `JAX_PLATFORMS=cpu`/32 forced CPU devices. Bash, ShellCheck, compileall, JSON, embedded
+  success-manifest Python and diff checks pass. An initial broad invocation omitted the CPU
+  selector, initialized worker 0's local TPU client and waited; no Ray, legacy or model workflow
+  was launched. The owned pytest PID was terminated, its libtpu lock released, and a read-only
+  fleet census returned 8/8 `CENSUS_OK` before the corrected suite.
+- The protected-run disk preflight initially had only 8.7 GiB free on worker 0. Four old
+  worker-0 `/tmp` XPlane scratch trees (`e0cap_sparse_20260803T083052607714673Z`,
+  `e0cap_sparse_20260803T140415172444668Z`, `e0cap_sparse_20260804T091255228524946Z` and
+  `e0cap_sparse_20260804T205838387960340Z`, about 3.2 GB combined) were reclaimed only after
+  their XPlane hashes matched the sealed local manifests, streaming every approved-bucket XPlane
+  and trace-JSON object reproduced all eight
+  local SHA-256 values, and no process held any tree. The remote evidence remains byte-for-byte
+  recoverable; worker-0 now has 12 GB free and the eight-host 10 GiB launch floor passes.
+- Fable session `1132cd8d-0923-4735-817d-5a20b4974817` found two pre-deployment defects in staged
+  diff `3657793a...4976`: short-form XLA text omitted the percent-prefixed names and computation
+  signatures required by the first parser, and compile-owner markers were not reconciled with
+  gathered owner files. The fixed parser accepts both long and genuine ShortParsable conventions,
+  detects a BF16 add reducer from typed parameters/root arithmetic, and rejects same-op shape
+  drift. The runner requires owner-count equality and reports remote compaction failures; the
+  compactor retains a sorted raw filename/size inventory before exact-root deletion. All 131
+  explicit-CPU tests and static checks pass. The same session independently replayed real/short
+  HLO against revised staged diff `658286b7...ece5`, found no remaining high/medium issue and
+  returned `APPROVE COMMIT`.
+- Exact next: independently recheck, commit/push, strict fleet census, and one protected M32
+  capture. Adapt the existing fingerprint only to the captured exact shape/config afterward.

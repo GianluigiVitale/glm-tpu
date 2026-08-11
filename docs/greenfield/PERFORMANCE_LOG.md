@@ -1254,3 +1254,17 @@ the accepted table row plus FP32-final-round mechanism is bitwise exact for the 
 main-RoPE suffix and seals DB/archive/cleanup evidence. It has no warmed decode distribution,
 XPlane, complete cache or token loop, so five-second orchestration is not latency or throughput.
 DB484 remains the only accepted PP8 performance point; protected 8K Gate D and Gate E stay open.
+
+## DB484 Pallas signature decomposition — existing protected trace only
+
+Re-reading the sealed DB484 `xplane_summary.json` does not create a new measurement or change its
+accepted `244.091151 ms/token` and `4.096830 tok/s` standing. Its 14 custom-call signatures sum
+exactly to the recorded `26.357075 ms/stage` Pallas category. The largest signature is fused
+selected MoE at `14.435602 ms/stage` (`54.77%` of Pallas and `47.43%` of the `30.435 ms` active
+stage). The M8 K4096->N6144 attention-output matmul contributes `4.388508 ms/stage` (`16.65%` and
+`14.42%`). Together they account for `71.42%` of Pallas and `61.85%` of active-stage time.
+
+The trace still has no separate MXU-active or HBM-stall counters, so these aggregates do not prove
+whether either kernel is compute- or bandwidth-limited. They do make those two signatures the
+first optimization targets after protected 8K exactness. Gate E still needs about `5.435 ms/stage`
+of active-work reduction, and WS32/PP16 adjudication remains mandatory.

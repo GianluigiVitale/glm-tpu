@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 16:44 UTC
+**Updated:** 2026-08-11 18:39 UTC
 
 ## Authority and isolation
 
@@ -113,9 +113,49 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `244.091 ms` wall: PP8 batch-one latency is a serial stage critical path, not an ICI-bandwidth
   limit. The per-core category sum still leaves about `8.46 ms` unattributed, so it is the serial
   model—not a complete per-core budget—that closes wall. The trace has no separate MXU-active or
-  HBM-stall counters. Gate E requires roughly `<=25 ms` active/stage, a `17.9%` reduction from
-  `30.435 ms`; after 8K exactness, decompose/optimize Pallas and prioritize WS32 as the serious
-  latency challenger. PP16 remains mandatory, and speculation remains after base adjudication.
+  HBM-stall counters, but its sealed signature table exactly decomposes the `26.357075 ms` Pallas
+  total: fused selected MoE is `14.435602 ms` and the K4096->N6144 attention-output matmul is
+  `4.388508 ms`; together they are `71.42%` of Pallas and `61.85%` of the `30.435 ms` active-stage
+  budget. Gate E requires roughly `<=25 ms` active/stage, a `17.9%` reduction. After 8K exactness,
+  optimize those signatures first and prioritize WS32 as the serious latency challenger. PP16
+  remains mandatory, and speculation remains after base adjudication.
+- Direct archive audit proves the accepted lowering recovery retained only the selected
+  `bf16[2048,6144]` prefill after-codegen module; its raw seven-bucket dump was reclaimed and no
+  `bf16[32,6144]` decode module exists locally or in the sealed remote-object ledgers. Therefore
+  the prefill StrategyND string and the unlaunched one-row fingerprint cannot choose decode
+  association. The sealed accepted log independently pins the compiled token paddings to
+  `[32,64,128,256,512,1024,2048]`, so the M32 selector is unique by construction. A bounded
+  accepted-decode capture is now implemented on top of the existing exact
+  8K oracle/DB/archive/cleanup stack. It adds no XPlane: XLA dumps short text for
+  `jit_step_fun_impl`, each compile owner selects the unique M32 module, reproducibly gzips it,
+  then deletes only its validated run-owned raw tree before gather. Only an absent/empty raw tree
+  is a binary-sharing non-owner; unmatched raw files fail while remaining intact for diagnosis.
+  The independent sealer pins
+  78 attention, three dense-MLP and 75 tuple-MoE BF16 row-parallel reductions, exact global group
+  0--31, reducer dtype, source chains and complete physical algorithm config. Synthetic HLO,
+  real preserved M2048 replay, append-only, group-escape, multi-owner, compactor-order, Bash,
+  ShellCheck, embedded-Python, JSON, all 40 unit tests and all 91 explicit-CPU validation tests
+  pass; no protected M32 artifact exists yet. The first broad validation invocation omitted
+  `JAX_PLATFORMS=cpu`, initialized only worker 0's local TPU client and waited; no Ray, legacy or
+  model workflow was launched. Its owned pytest PID was terminated, the libtpu lock released, and
+  a read-only eight-host census returned 8/8 `CENSUS_OK` before the corrected CPU suite.
+  Worker 0 initially had only 8.7 GiB free, below the 10 GiB protected-run floor. Four historical
+  worker-0 `/tmp` XPlane scratch trees from `e0cap_sparse_20260803T083052607714673Z`,
+  `e0cap_sparse_20260803T140415172444668Z`, `e0cap_sparse_20260804T091255228524946Z` and
+  `e0cap_sparse_20260804T205838387960340Z` were
+  removed only after all XPlane SHA-256 values matched their sealed manifests, every remote
+  XPlane and trace-JSON object streamed to the identical local SHA-256 value, and `lsof` found no
+  owner. The exact approved-bucket copies remain recoverable; worker-0 free space is now 12 GB
+  and the eight-host 10 GiB preflight passes. Fable session
+  `1132cd8d-0923-4735-817d-5a20b4974817` found that short-form XLA text removed parser-required
+  percent prefixes/signatures and that compile-owner markers were not reconciled with gathered
+  files. The corrected parser accepts both proven formats, the runner requires exact owner-count
+  equality, and the compactor preserves a raw filename/size inventory; same-op shape drift and
+  remote-compaction failure also refuse clearly. The same session replayed real and short HLO,
+  verified staged diff `658286b7...ece5`, found no remaining high/medium issue and returned
+  `APPROVE COMMIT`. Exact next is independent recheck, commit/push, then exactly one serialized
+  protected decode-lowering capture. Its physical config—not another guessed uniform tree—will
+  define the next layer-0 association discriminator.
 
 ## Historical main-RoPE integration batch
 

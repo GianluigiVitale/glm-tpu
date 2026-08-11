@@ -14,6 +14,7 @@ readonly INTERNAL_MODE=${GLM_GREENFIELD_DSA_INTERNALS_MODE:-scorer}
 readonly INTERNAL_POSITION_OVERRIDE=${GLM_GREENFIELD_DSA_INTERNALS_POSITION:-}
 readonly PROMPT_CACHE_CAPTURE=${GLM_GREENFIELD_PROMPT_CACHE_CAPTURE:-0}
 readonly PREFILL_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE:-0}
+readonly DECODE_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_DECODE_PROJECTION_CAPTURE:-0}
 readonly MAIN_CACHE_CAPTURE=${GLM_GREENFIELD_MAIN_CACHE_CAPTURE:-0}
 readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
 [[ $INTERNAL_CAPTURE == 0 || $INTERNAL_CAPTURE == 1 ]] || {
@@ -38,6 +39,10 @@ esac
 }
 [[ $PREFILL_PROJECTION_CAPTURE == 0 || $PREFILL_PROJECTION_CAPTURE == 1 ]] || {
   echo "GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE must be 0 or 1" >&2
+  exit 2
+}
+[[ $DECODE_PROJECTION_CAPTURE == 0 || $DECODE_PROJECTION_CAPTURE == 1 ]] || {
+  echo "GLM_GREENFIELD_ACCEPTED_DECODE_PROJECTION_CAPTURE must be 0 or 1" >&2
   exit 2
 }
 [[ $MAIN_CACHE_CAPTURE == 0 || $MAIN_CACHE_CAPTURE == 1 ]] || {
@@ -166,14 +171,24 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
   }
 fi
 if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
-  [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && $PROMPT_CACHE_CAPTURE == 0 ]] || {
+  [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && $PROMPT_CACHE_CAPTURE == 0 && \
+     $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
     echo "accepted prefill projection capture requires plain accepted 8K oracle mode" >&2
+    exit 2
+  }
+fi
+if [[ $DECODE_PROJECTION_CAPTURE == 1 ]]; then
+  [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && \
+     $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
+     $MAIN_CACHE_CAPTURE == 0 ]] || {
+    echo "accepted decode projection capture requires isolated accepted 8K oracle mode" >&2
     exit 2
   }
 fi
 if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
   [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && \
-     $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 ]] || {
+     $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
+     $DECODE_PROJECTION_CAPTURE == 0 ]] || {
     echo "main-cache capture requires isolated accepted 8K oracle mode" >&2
     exit 2
   }
@@ -201,6 +216,9 @@ MAIN_CACHE_RESULT_DIR=$RUN_DIR/layer0_main_cache_comparison
 PREFILL_PROFILE_PREFIX=/tmp/$TAG/prefill_projection_profile
 PREFILL_HLO_PREFIX=/tmp/$TAG/prefill_projection_hlo
 PREFILL_PROJECTION_RESULT_DIR=$RUN_DIR/accepted_prompt_projection_lowering
+DECODE_HLO_PREFIX=/tmp/$TAG/decode_projection_hlo_raw
+DECODE_HLO_COMPACT_PREFIX=/tmp/$TAG/decode_projection_hlo
+DECODE_PROJECTION_RESULT_DIR=$RUN_DIR/accepted_decode_projection_lowering
 if [[ $INTERNAL_MODE == prompt_key_input ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_projection_input_comparison
 elif [[ $INTERNAL_MODE == prompt_key ]]; then
@@ -350,7 +368,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
-say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE PREFILL_PROJECTION_CAPTURE=$PREFILL_PROJECTION_CAPTURE MAIN_CACHE_CAPTURE=$MAIN_CACHE_CAPTURE"
+say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE PREFILL_PROJECTION_CAPTURE=$PREFILL_PROJECTION_CAPTURE DECODE_PROJECTION_CAPTURE=$DECODE_PROJECTION_CAPTURE MAIN_CACHE_CAPTURE=$MAIN_CACHE_CAPTURE"
 if [[ $PROMPT_CACHE_CAPTURE == 1 && $PROFILE != 8k ]]; then
   say "ABORT: prompt index-cache capture is defined only for the sealed 8K profile"
   exit 2
@@ -417,7 +435,15 @@ if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
   # the raylets, which is verified below before the protected request starts.
   PREFILL_PROJECTION_ENVS=" PHASED_PROFILING_DIR=$PREFILL_PROFILE_PREFIX PHASED_PROFILER_NUM_STEPS_TO_PROFILE_FOR=1 PYTHON_TRACER_LEVEL=0 XLA_FLAGS=\"--xla_dump_to=$PREFILL_HLO_PREFIX --xla_dump_hlo_as_text --xla_dump_hlo_module_re=jit_step_fun_impl\""
 fi
-RAYLET_ENVS="$COMMON_ENVS$PREFILL_PROJECTION_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
+DECODE_PROJECTION_ENVS=
+if [[ $DECODE_PROJECTION_CAPTURE == 1 ]]; then
+  # Restrict extra pass dumps to the final-codegen selector and use short HLO
+  # text for jit_step_fun_impl. The exact run-owned raw tree is compacted on
+  # its producing host before fleet gather so multi-gigabyte buffer-assignment
+  # files are never copied to worker 0.
+  DECODE_PROJECTION_ENVS=" XLA_FLAGS=\"--xla_dump_to=$DECODE_HLO_PREFIX --xla_dump_hlo_as_text --xla_dump_hlo_as_long_text=false --xla_dump_hlo_module_re=jit_step_fun_impl --xla_dump_hlo_pass_re=after_codegen\""
+fi
+RAYLET_ENVS="$COMMON_ENVS$PREFILL_PROJECTION_ENVS$DECODE_PROJECTION_ENVS LIBTPU_INIT_ARGS=\"--xla_latency_hiding_scheduler_rerun=5 --xla_tpu_rwb_fusion=false\""
 DRIVER_ENVS='NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=1 JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=120000 '"$COMMON_ENVS"
 
 say "launching exact protected legacy runtime"
@@ -459,6 +485,16 @@ if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
     --command="$profile_env_check" >"$RUN_DIR/raylet_prefill_profile_env.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/raylet_prefill_profile_env.txt" PROFILE_ENV_OK || {
     say "ABORT: eight-host prefill profile/HLO environment mismatch"
+    exit 1
+  }
+fi
+if [[ $DECODE_PROJECTION_CAPTURE == 1 ]]; then
+  # shellcheck disable=SC2016
+  decode_hlo_env_check='p=$(pgrep -x raylet | head -1); f=/tmp/decode_hlo_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "XLA_FLAGS=--xla_dump_to='"$DECODE_HLO_PREFIX"' --xla_dump_hlo_as_text --xla_dump_hlo_as_long_text=false --xla_dump_hlo_module_re=jit_step_fun_impl --xla_dump_hlo_pass_re=after_codegen" "$f"; then echo "DECODE_HLO_ENV_OK $(hostname)"; else echo "DECODE_HLO_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$decode_hlo_env_check" >"$RUN_DIR/raylet_decode_hlo_env.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/raylet_decode_hlo_env.txt" DECODE_HLO_ENV_OK || {
+    say "ABORT: eight-host decode-HLO environment mismatch"
     exit 1
   }
 fi
@@ -575,6 +611,36 @@ if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
     exit 1
   }
 fi
+if [[ $DECODE_PROJECTION_CAPTURE == 1 ]]; then
+  # Select the unique M32 decode module on each compile owner, gzip it
+  # reproducibly, and reclaim only this run's raw XLA tree before scp.  A host
+  # with no local compiler output is an admissible binary-sharing non-owner.
+  decode_hlo_compactor=$WORKTREE/scripts/greenfield/compact_accepted_decode_hlo.sh
+  decode_hlo_compactor_sha=$(sha256sum "$decode_hlo_compactor" | cut -d ' ' -f 1)
+  for worker in 0 1 2 3 4 5 6 7; do
+    gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
+      "$decode_hlo_compactor" \
+      "$POD:/tmp/$TAG/compact_accepted_decode_hlo.sh" >/dev/null 2>&1
+  done
+  # shellcheck disable=SC2016
+  decode_hlo_integrity='helper=/tmp/'"$TAG"'/compact_accepted_decode_hlo.sh; actual=$(sha256sum "$helper" | cut -d " " -f 1); if [ "$actual" = '"$decode_hlo_compactor_sha"' ]; then bash "$helper" '"$DECODE_HLO_PREFIX"' '"$DECODE_HLO_COMPACT_PREFIX"'; else echo "DECODE_HLO_BAD $(hostname) helper_sha256=$actual"; fi'
+  if ! gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$decode_hlo_integrity" \
+    >"$RUN_DIR/fleet_decode_hlo_integrity.txt" 2>&1; then
+    say "ABORT: accepted M32 decode HLO remote compaction failed"
+    exit 1
+  fi
+  has_eight_unique_markers "$RUN_DIR/fleet_decode_hlo_integrity.txt" DECODE_HLO_OK || {
+    say "ABORT: accepted M32 decode HLO selection/compaction failed"
+    exit 1
+  }
+  decode_projection_owner_count=$(grep -c '^DECODE_HLO_OWNER ' \
+    "$RUN_DIR/fleet_decode_hlo_integrity.txt" || true)
+  [[ $decode_projection_owner_count -ge 1 ]] || {
+    say "ABORT: no accepted M32 decode HLO compile owner exists"
+    exit 1
+  }
+fi
 
 run_id=$(sed -n 's/.*\[longctx\] run_id=\([0-9][0-9]*\).*/\1/p' \
   "$RUN_DIR/legacy.log" | tail -1)
@@ -657,6 +723,19 @@ if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
     exit 1
   }
 fi
+decode_projection_hlo_count=0
+if [[ $DECODE_PROJECTION_CAPTURE == 1 ]]; then
+  decode_projection_hlo_count=$(find "$SOURCE_DIR" -type f \
+    -name 'accepted_decode.after_codegen.txt.gz' | wc -l)
+  ((decode_projection_hlo_count >= 1 && decode_projection_hlo_count <= 8)) || {
+    say "ABORT: gathered decode HLO owner coverage drifted files=$decode_projection_hlo_count"
+    exit 1
+  }
+  [[ $decode_projection_hlo_count -eq $decode_projection_owner_count ]] || {
+    say "ABORT: gathered decode HLO owner set is incomplete markers=$decode_projection_owner_count files=$decode_projection_hlo_count"
+    exit 1
+  }
+fi
 
 /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$run_id" \
   "$EXPECTED_PROMPT_TOKENS" "$EXPECTED_GENERATED_TOKENS" \
@@ -722,6 +801,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --selected-width 2048 >"$RUN_DIR/capture.json"
 
 if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 || \
+      $DECODE_PROJECTION_CAPTURE == 1 || \
       $MAIN_CACHE_CAPTURE == 1 ]]; then
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
     "$REFERENCE_8K_DSA_ORACLE" "$ORACLE_DIR" \
@@ -794,6 +874,16 @@ if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
     --expected-code-hash "$PIN" \
     --legacy-code-hash "$LEGACY_PIN" \
     --run-tag "$TAG" >"$RUN_DIR/accepted_prompt_projection_lowering_summary.json"
+fi
+if [[ $DECODE_PROJECTION_CAPTURE == 1 ]]; then
+  say "sealing accepted M32 decode projection after-codegen lowering"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/inspect_accepted_decode_projection_lowering.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$DECODE_PROJECTION_RESULT_DIR" \
+    --expected-code-hash "$PIN" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --run-tag "$TAG" >"$RUN_DIR/accepted_decode_projection_lowering_summary.json"
 fi
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   prompt_cache_manifest_sha=$(/home/gianl/vllm-env/bin/python -c \
@@ -984,7 +1074,8 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
   "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" "$INTERNAL_MODE" \
   "$PREFILL_PROJECTION_CAPTURE" "$prefill_profile_xplane_count" \
   "$prefill_profile_trace_count" "$prefill_profile_hlo_count" \
-  "$MAIN_CACHE_CAPTURE" "$main_cache_source_count" <<'PY'
+  "$MAIN_CACHE_CAPTURE" "$main_cache_source_count" \
+  "$DECODE_PROJECTION_CAPTURE" "$decode_projection_hlo_count" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -1209,6 +1300,42 @@ if sys.argv[18] == "1":
         ),
         "layer0_main_cache_manifest_sha256": comparison["manifest_sha256"],
         "layer0_main_cache_source_file_count": sys.argv[19],
+    })
+if sys.argv[20] == "1":
+    exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
+    lowering_root = root / "accepted_decode_projection_lowering"
+    lowering = json.loads((lowering_root / "summary.json").read_text())
+    lowering_manifest = json.loads((lowering_root / "manifest.json").read_text())
+    if (
+        not exact_dsa["exact"]
+        or lowering["artifact_kind"]
+        != "accepted_decode_projection_lowering_v1"
+        or lowering["status"] != "SUCCESS"
+        or lowering["diagnostic_only"] is not True
+        or lowering["performance_claim"] is not False
+        or lowering["protected_request_sequences"] != 1
+        or lowering["compile_owner_count"] != int(sys.argv[21])
+        or lowering["hlo"]["compile_bucket_rows"] != 32
+        or lowering["hlo"]["partition_count"] != 32
+        or lowering["hlo"]["collective_count"] != 156
+        or lowering["hlo"]["category_counts"]
+        != {"attention": 78, "dense_mlp": 3, "moe_tuple": 75}
+        or lowering["hlo"]["replica_group"] != list(range(32))
+        or lowering["hlo"]["reduction_dtype"] != "bf16"
+    ):
+        raise SystemExit("accepted decode projection lowering evidence drifted")
+    algorithm = lowering["hlo"]["collective_algorithm_config"]
+    lines.update({
+        "accepted_decode_projection_capture": "true",
+        "accepted_decode_projection_diagnostic_only": "true",
+        "accepted_decode_projection_dsa_event_tensors_exact": "true",
+        "accepted_decode_projection_emitter": algorithm["emitter"],
+        "accepted_decode_projection_hlo_source_file_count": sys.argv[21],
+        "accepted_decode_projection_manifest_sha256": lowering_manifest[
+            "manifest_sha256"
+        ],
+        "accepted_decode_projection_reduction_dtype": "bf16",
+        "accepted_decode_projection_strategy": algorithm["strategy"],
     })
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in lines.items())

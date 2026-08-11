@@ -24,6 +24,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--519, and existing association helpers | DB506--515 isolate the drift, DB516 seals physical M64, DB517 makes projection exact, DB518 makes the full cache exact, and DB519 rejects fused internal weight materialization. Production now separates the small stage-local weight materializer from repair; recurrent decode and legacy execution stay untouched. |
 | Layer-0 attention schedule | existing stage-local striped cache, sparse-MLA kernel, isolated discriminator, protected table-on DSA observer | Reuse the exact packed checkpoint, post-prefill state, selection, cache layout, kernel, HLO parser and protection wrapper. The default-off challenger changes only one boundary: one LP4 cache gather reconstructs page-major `[pages,512,640]` and runs one monolithic 2,048-position attention schedule per owner. No new loader, cache, oracle or legacy execution path is introduced. |
 | Layer-0 attention-output association | rejected uniform virtual-TP32 projection trees, accepted packed contraction shards, table-on owner-split control, protected attention-schedule result | The protected five-arm run makes every attention-only association worse than the exact control. Preserve the code/HLO/tensor artifacts as negative evidence; do not integrate, rerun or extend uniform association trees. |
+| Accepted decode lowering | accepted 8K oracle/protection stack, XLA dump controls, DB516 HLO parser patterns, and the rejected one-row StrategyND fingerprint | Reuse one exact accepted request to seal only the final 32-row decode `after_codegen` module. Compact it on each compile owner before gather, record all 78 attention/3 dense/75 MoE row-parallel reductions, and use its actual algorithm as the sole input to the next physical-association discriminator. |
 | DSA internal observer | oracle-only `83ff4a357` scorer, `9c1d6b3b9` prompt-key, and `89fc453b6` prompt-key-input modes, all descendants of accepted `b3c25df47`; protected DB513--515 | Default-off scorer/prompt-key modes remain unchanged. DB515 seals the actual 6,144-wide FP32 `h` entering projection at row 113 and proves it bitwise equal to the independent M2048 gather/RMS producer. Legacy execution is never imported; the observer is now preserved evidence, not a reason to recapture the input. |
 | DSA query association | protected capture, DB499 and physical DB521--526 | DB525's exact four-alias local tuple fusion and DB526's exact production composition are adapted default-off; rejected variants remain negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -490,6 +491,18 @@ Preserve NPZ `03450d72...486b`, suite `1f849868...db8df`, the default-off implem
 fleet evidence as a closed negative fork. Do not integrate, rerun, add another uniform tree, or
 revive the older combined attention+dense matrix. Select the next projection-subrank/physical-
 association test only after reading the preserved StrategyND and ingredients evidence.
+
+The preserved DB516 remote-object ledger contains only the selected 2,048-row prefill lowering;
+none of the other raw `jit_step_fun_impl` modules survived verified reclamation. The bounded decode
+capture therefore reuses the same accepted 8K request, exact token/DSA comparison, DB snapshot,
+archive, lease and eight-host cleanup, but omits XPlane profiling. XLA output is limited to
+`jit_step_fun_impl` with short text and an `after_codegen` pass filter. Each compile owner selects
+the unique module containing 156 `bf16[32,6144]` row-parallel psums, writes one reproducible gzip,
+and deletes only its run-owned raw dump tree before fleet gather. An absent/empty tree is an
+explicit binary-sharing non-owner; unmatched raw files refuse and remain preserved. The independent sealer requires
+78 attention, three dense-MLP and 75 tuple-MoE BF16 reductions over exact global ranks 0--31 and
+records the complete physical algorithm config. This is numerical/provenance evidence only; it
+does not revive full-pod reduction in the greenfield model or claim performance.
 
 ## Gate-D layer-0 main-cache boundary reuse
 
