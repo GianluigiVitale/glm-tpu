@@ -1885,16 +1885,67 @@ def _validate_main_rope_table_hlo(
         and any(shape.dtype == "f32" for shape in instruction.result_shapes)
         for instruction in scoped
     )
-    fp32_combine_count = sum(
-        instruction.opcode in {"add", "subtract"}
+    scoped_fp32_combines = tuple(
+        instruction
+        for instruction in scoped
+        if instruction.opcode in {"add", "subtract"}
         and any(shape.dtype == "f32" for shape in instruction.result_shapes)
-        for instruction in scoped
     )
-    final_round_count = sum(
-        instruction.opcode == "convert"
-        and any(shape.dtype == "bf16" for shape in instruction.result_shapes)
-        and any(shape.dtype == "f32" for shape in instruction.operand_shapes)
-        for instruction in scoped
+    fp32_combine_count = len(scoped_fp32_combines)
+
+    def is_final_round(instruction: HloInstruction) -> bool:
+        return (
+            instruction.opcode == "convert"
+            and any(
+                shape.dtype == "bf16" for shape in instruction.result_shapes
+            )
+            and any(
+                shape.dtype == "f32" for shape in instruction.operand_shapes
+            )
+        )
+
+    scoped_final_rounds = tuple(
+        instruction for instruction in scoped if is_final_round(instruction)
+    )
+    scoped_final_round_keys = {
+        (instruction.computation, instruction.name)
+        for instruction in scoped_final_rounds
+    }
+    scoped_combine_keys = {
+        (instruction.computation, instruction.name)
+        for instruction in scoped_fp32_combines
+    }
+    combine_users: dict[tuple[str, str], list[HloInstruction]] = {
+        key: [] for key in scoped_combine_keys
+    }
+    direct_dataflow_round_combine_keys: set[tuple[str, str]] = set()
+    for instruction in module.instructions:
+        consumed_combine_keys = scoped_combine_keys.intersection(
+            (instruction.computation, operand_name)
+            for operand_name in instruction.operand_names
+        )
+        if not consumed_combine_keys:
+            continue
+        for combine_key in consumed_combine_keys:
+            combine_users[combine_key].append(instruction)
+        if (
+            is_final_round(instruction)
+            and (instruction.computation, instruction.name)
+            not in scoped_final_round_keys
+        ):
+            direct_dataflow_round_combine_keys.update(
+                consumed_combine_keys
+            )
+    scoped_final_round_count = len(scoped_final_rounds)
+    direct_dataflow_final_round_count = len(
+        direct_dataflow_round_combine_keys
+    )
+    final_round_count = (
+        scoped_final_round_count + direct_dataflow_final_round_count
+    )
+    combines_with_sole_convert_user = sum(
+        len(users) == 1 and is_final_round(users[0])
+        for users in combine_users.values()
     )
     violations = []
     if enabled:
@@ -1917,6 +1968,12 @@ def _validate_main_rope_table_hlo(
     return {
         "applicable": enabled,
         "bf16_arithmetic": list(bf16_arithmetic),
+        "combines_with_sole_convert_user": (
+            combines_with_sole_convert_user
+        ),
+        "direct_dataflow_final_round_count": (
+            direct_dataflow_final_round_count
+        ),
         "expected_table_shape": list(table_shape),
         "final_round_count": final_round_count,
         "forbidden_instructions": list(forbidden),
@@ -1925,6 +1982,7 @@ def _validate_main_rope_table_hlo(
         "named_table_parameter_count": len(named_table_parameters),
         "passed": not violations,
         "scoped_instruction_count": len(scoped),
+        "scoped_final_round_count": scoped_final_round_count,
         "table_parameter_count": len(table_parameters),
         "violations": violations,
     }

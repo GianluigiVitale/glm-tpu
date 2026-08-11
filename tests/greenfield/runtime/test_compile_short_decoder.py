@@ -280,8 +280,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "isolated residual direct remote contract hash drifted" in runner
     assert '"dcp_then_model_sequential_bf16"' in compiler
     assert '"model_then_dcp_pairwise_bf16"' in compiler
-    assert '"schema_version": 15' in compiler
-    assert 'record["schema_version"] for record in records} != {15}' in runner
+    assert '"schema_version": 16' in compiler
+    assert 'record["schema_version"] for record in records} != {16}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"

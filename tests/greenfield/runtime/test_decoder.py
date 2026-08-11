@@ -464,7 +464,12 @@ def _real_8k_decoder_config(*, dsa_score_default_precision: bool = False):
     )
 
 
-def _main_rope_table_hlo(*, include_forbidden: bool = False) -> str:
+def _main_rope_table_hlo(
+    *,
+    include_forbidden: bool = False,
+    round_scope: bool = True,
+    duplicate_round: bool = False,
+) -> str:
     scoped_name = "jit(mapped_token)/shard_map/greenfield_main_rope_table"
     multiplies = "\n".join(
         f'  %mul.{index} = f32[1,32] multiply(%f32, %f32), '
@@ -482,6 +487,20 @@ def _main_rope_table_hlo(*, include_forbidden: bool = False) -> str:
         if include_forbidden
         else ""
     )
+    rounds = "\n".join(
+        f"  %round.{index} = bf16[1,32] convert(%add.{index})"
+        + (
+            f', metadata={{op_name="{scoped_name}/round.{index}"}}'
+            if round_scope
+            else ""
+        )
+        for index in range(2)
+    )
+    duplicate = (
+        "  %round.duplicate = bf16[1,32] convert(%add.0)\n"
+        if duplicate_round
+        else ""
+    )
     return f'''HloModule main_rope, num_partitions=32
 
 ENTRY %main (main_rope_table: bf16[8192,64]) -> bf16[1,32] {{
@@ -489,9 +508,8 @@ ENTRY %main (main_rope_table: bf16[8192,64]) -> bf16[1,32] {{
   %f32 = f32[1,32] constant({{...}})
 {multiplies}
 {combines}
-  %round.0 = bf16[1,32] convert(%add.0), metadata={{op_name="{scoped_name}/round.0"}}
-  %round.1 = bf16[1,32] convert(%add.1), metadata={{op_name="{scoped_name}/round.1"}}
-{forbidden}  ROOT %out = bf16[1,32] copy(%round.0)
+{rounds}
+{duplicate}{forbidden}  ROOT %out = bf16[1,32] copy(%round.0)
 }}
 '''
 
@@ -518,6 +536,75 @@ def test_main_rope_table_hlo_contract_is_fail_closed() -> None:
     assert accepted["fp32_multiply_count"] == 8
     assert accepted["fp32_combine_count"] == 4
     assert accepted["final_round_count"] == 2
+    assert accepted["scoped_final_round_count"] == 2
+    assert accepted["direct_dataflow_final_round_count"] == 0
+    assert accepted["combines_with_sole_convert_user"] == 2
+
+    metadata_stripped = _validate_main_rope_table_hlo(
+        parse_hlo_module(_main_rope_table_hlo(round_scope=False)),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert metadata_stripped["passed"], metadata_stripped
+    assert metadata_stripped["final_round_count"] == 2
+    assert metadata_stripped["scoped_final_round_count"] == 0
+    assert metadata_stripped["direct_dataflow_final_round_count"] == 2
+    assert metadata_stripped["combines_with_sole_convert_user"] == 2
+
+    duplicated = _validate_main_rope_table_hlo(
+        parse_hlo_module(
+            _main_rope_table_hlo(
+                round_scope=False,
+                duplicate_round=True,
+            )
+        ),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert duplicated["passed"], duplicated
+    assert duplicated["final_round_count"] == 2
+    assert duplicated["direct_dataflow_final_round_count"] == 2
+    assert duplicated["combines_with_sole_convert_user"] == 1
+
+    unrelated_rounds = _main_rope_table_hlo(round_scope=False).replace(
+        "convert(%add.0)", "convert(%f32)"
+    ).replace("convert(%add.1)", "convert(%f32)")
+    unrelated = _validate_main_rope_table_hlo(
+        parse_hlo_module(unrelated_rounds),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not unrelated["passed"]
+    assert unrelated["final_round_count"] == 0
+    assert unrelated["direct_dataflow_final_round_count"] == 0
+
+    cross_computation_round = (
+        "\n%other_round (value: f32[1,32]) -> bf16[1,32] {\n"
+        "  %value = f32[1,32] parameter(0)\n"
+        "  ROOT %round.0 = bf16[1,32] convert(%add.0)\n"
+        "}\n\n"
+    )
+    cross_computation_hlo = _main_rope_table_hlo(round_scope=False).replace(
+        "  %round.0 = bf16[1,32] convert(%add.0)\n",
+        "",
+        1,
+    ).replace(
+        "HloModule main_rope, num_partitions=32\n\n",
+        "HloModule main_rope, num_partitions=32\n"
+        + cross_computation_round,
+    )
+    cross_computation = _validate_main_rope_table_hlo(
+        parse_hlo_module(cross_computation_hlo),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not cross_computation["passed"]
+    assert cross_computation["final_round_count"] == 1
+    assert cross_computation["direct_dataflow_final_round_count"] == 1
 
     forbidden = _validate_main_rope_table_hlo(
         parse_hlo_module(_main_rope_table_hlo(include_forbidden=True)),

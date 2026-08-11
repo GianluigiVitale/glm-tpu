@@ -7047,3 +7047,33 @@ unmotivated arithmetic variants.
   the focused test, Bash, ShellCheck and diff checks pass. The same Fable session independently
   verified the sealed local prefix, corrected remote SHA and missing old URL, then returned
   `APPROVE COMMIT`. Exact next is commit/push, then retry the one protected 8K run.
+
+## 2026-08-11 08:42--09:11 — protected TPU HLO preserves exact rounds but fusion drops their scope metadata
+
+- Archive-path correction pin `1914c031282325e50f7aeb90fdc50235fe4e356b` launched the exact
+  complete 8K chain with only `GLM_GREENFIELD_MAIN_ROPE_TABLE=1` new. Pre-census and eight-host
+  pin/artifact sync passed. All ranks loaded and compiled for about 18 minutes, then stopped
+  uniformly before execution with sole violation `main-RoPE final-round count is too small`.
+- Protected diagnostic tag is
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_trace2_20260811T084255575456454Z`.
+  HLO contract/gzip SHAs are `29b3d43b...c242` / `6820da82...3f98`; pre/failure census SHAs
+  `321a6662...7df` / `ed5046e4...8c12` each prove eight unique clean hosts. The complete failure
+  directory is present under the run's approved `diagnostic_local` prefix. No executable ran and
+  no DB row, token, latency, XPlane, `SUCCESS` or Gate-D claim exists.
+- The failure is a linter false negative, not missing arithmetic. Optimized TPU HLO contains exact
+  `624 = 78x8` scoped FP32 products and `312 = 78x4` scoped FP32 add/sub combines, zero BF16 scoped
+  arithmetic/forbidden ops, and exactly 312 distinct FP32-to-BF16 converts that directly consume
+  those combines in the same fused computations. Every combine has exactly one user and that user
+  is its final convert. Fusion removed only the convert `op_name`, so the old scope-only count was
+  zero. It also proves the earlier token-return name correction passes real TPU HLO.
+- After Fable challenged the invariant, the linter counts the union of scoped conversions and
+  distinct scoped combines consumed directly by non-scoped final converts. It deduplicates repeated
+  converts, requires same-computation operand identity, and reports `combines_with_sole_convert_user`
+  without hard-gating CPU structure. Schema advances to 16. Synthetic scoped, metadata-stripped,
+  duplicate, unrelated and cross-computation cases pass. Offline replay of the preserved TPU HLO
+  now passes with `624/312/312`, sole-user `312`, and no violations; the affected suite passes
+  `73/73` in `54.92 s`.
+- Exact next: one new-diff-only Fable audit, independent static verify, commit/push, then one
+  serialized protected retry. Fable independently replayed the preserved TPU HLO and focused tests
+  with the same `624/312/312` result and returned `APPROVE COMMIT`. Do not change arithmetic or add
+  another observer.

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 08:40 UTC
+**Updated:** 2026-08-11 09:11 UTC
 
 ## Authority and isolation
 
@@ -20,8 +20,9 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 ## Current Gate-D integration batch
 
 - The default-off main-RoPE table integration is committed/pushed at
-  `d66a4dfe7f88ddfa05f14fd8d6378528da125b03`. One two-line protected-path correction is
-  uncommitted pending focused Fable confirmation.
+  `d66a4dfe7f88ddfa05f14fd8d6378528da125b03`; its archive-path correction is pushed at
+  `1914c031282325e50f7aeb90fdc50235fe4e356b`. A fail-closed TPU-HLO linter correction is
+  uncommitted pending focused Fable audit.
 - It reuses protected DB531 exactly: one host-built BF16 table uses the accepted positive-power /
   reciprocal / NumPy-FP32 trig formula, with the 8K asset pinned to SHA
   `6a22140f...070101` and position-8,155 row to `67b01e3c...a1d`. The replicated final input is
@@ -48,7 +49,20 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   exact expected SHA `8f9763e4...b6d7`, and its focused runner test, Bash and ShellCheck pass.
   The same Fable session independently checked both remote paths/hashes and returned
   `APPROVE COMMIT` for the correction.
-- Exact next: commit/push the path correction, rerun strict fleet census, and launch exactly
+- Protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_trace2_20260811T084255575456454Z`
+  then stopped uniformly on all eight ranks before execution because TPU fusion moved the final
+  BF16 converts outside the named scope. Preserved HLO SHA `6820da82...3f98` proves exact
+  `624/312/312` FP32 multiplies/combines/distinct direct final rounds; all 312 combines have one
+  convert user, with zero BF16 scoped arithmetic or forbidden ops. Pre/failure censuses are 8/8
+  clean, diagnostics are archived, and there is no DB, token, timing or Gate-D result.
+- The linter now recognizes distinct same-computation scoped-combine -> FP32-to-BF16 convert
+  dataflow while retaining scoped CPU rounds, deduplicates rematerialized converts, reports the
+  sole-user evidence, and bumps the decoder record schema to 16. Synthetic fail-close cases pass,
+  the preserved TPU HLO passes offline, and the affected suite is `73/73` in `54.92 s`. Fable
+  independently replayed the HLO/tests and returned `APPROVE COMMIT`.
+- Exact next: commit/push the HLO-linter correction, then rerun strict fleet census and launch
+  exactly
   one serialized protected complete 8K run with `GLM_GREENFIELD_MAIN_ROPE_TABLE=1`. Accept it only
   if raw tokens, exact DSA, state/load/cache, HLO, HBM, DB/archive and authenticated cleanup all
   pass. If layer-0 output still diverges, use that bounded result to localize the next upstream

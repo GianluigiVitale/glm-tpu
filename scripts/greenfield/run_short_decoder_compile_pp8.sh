@@ -1494,7 +1494,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {15}:
+if {record["schema_version"] for record in records} != {16}:
     raise SystemExit("fleet decoder record schema drifted")
 
 expected_main_rope_shape = [context_capacity, 64]
