@@ -19,6 +19,7 @@ from scripts.greenfield.compile_short_decoder import (
     _validate_dsa_observation_step,
     _validate_completed_step_selected_states,
     _validate_layer0_ingredients,
+    _validate_strategy_nd_canary_hlo,
     _validate_token_observation_step,
 )
 from scripts.greenfield import compile_short_decoder as compile_module
@@ -464,6 +465,76 @@ def test_layer0_attention_output_discriminator_is_sealed_and_default_off() -> No
         "intentional diagnostic exit" in runner
     )
     assert "_layer0_attention_output_variants" in runner
+
+
+def test_layer0_strategy_nd_row0_discriminator_is_sealed_and_default_off() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert '"--observe-layer0-strategy-nd-row0-association"' in compiler
+    assert '"strategy_nd_row0_control"' in compiler
+    assert '"strategy_nd_row0_both"' in compiler
+    assert '"strategy_nd_row0_association"' in compiler
+    assert '"--strategy-nd-canary-input-bits"' in compiler
+    assert '"--strategy-nd-canary-output-bits"' in compiler
+    assert "stablehlo_optimization_barrier_count" in compiler
+    assert "strategy_nd_canary_contract" in compiler
+    assert "LAYER0_STRATEGY_ND_ROW0:-0" in runner
+    assert "--observe-layer0-strategy-nd-row0-association 1" in runner
+    assert "layer-0 StrategyND row-zero discriminator requires" in runner
+    assert "greenfield_collective_association_20260811T213152133863450Z" in runner
+    assert "e7e34828365ca3d6cae0052f8d0e2e802143c6ca83810153db3116423f994108" in runner
+    assert "3ca82073f69fbe56526e1765594c7e8e9a738c73eb2a62b2df6d9a0c4d3136b7" in runner
+    assert "DB533 direct remote analysis hash drifted" in runner
+    assert "DB533 direct remote summary hash drifted" in runner
+    assert "DB533 direct remote SUCCESS hash drifted" in runner
+    assert "DB533 direct remote canary input hash drifted" in runner
+    assert "DB533 direct remote canary output hash drifted" in runner
+    assert "StrategyND row-zero diagnostic contract is missing" in runner
+    assert "StrategyND row-zero diagnostic contract failed" in runner
+    assert "STRATEGY_ND_ROW0_DIAGNOSTIC_CONTRACT_OK" in runner
+    assert "_layer0_strategy_nd_row0" in runner
+
+
+def test_strategy_nd_canary_hlo_requires_one_scoped_lp4_gather() -> None:
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4))
+        for stage in range(8)
+    )
+    replica_groups = (
+        "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
+        "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
+    )
+    gather = (
+        "  ROOT %gather = bf16[4,8,1,6144] all-gather(%input), "
+        "dimensions={0}, "
+        f"replica_groups={replica_groups}, channel_id=1, "
+        "use_global_device_ids=true, metadata={op_name=\"jit(canary)/"
+        "greenfield_strategy_nd_row0_canary/"
+        "greenfield_strategy_nd_row0_association/"
+        "greenfield_strategy_nd_row0_association_gather/all_gather\"}"
+    )
+    hlo = (
+        "HloModule canary, replica_count=1, num_partitions=32\n\n"
+        "ENTRY main (input: bf16[8,1,6144]) -> bf16[4,8,1,6144] {\n"
+        "  %input = bf16[8,1,6144] parameter(0)\n"
+        f"{gather}\n"
+        "}\n"
+    )
+    passed = _validate_strategy_nd_canary_hlo(hlo, groups=groups)
+    assert passed["passed"], passed
+    assert passed["collective_count"] == 1
+    assert passed["scoped_shaped_gather_count"] == 1
+
+    extra = hlo.replace(
+        gather,
+        gather.replace("ROOT %gather", "%gather")
+        + "\n"
+        + gather.replace("%gather", "%extra").replace("channel_id=1", "channel_id=2"),
+    )
+    rejected = _validate_strategy_nd_canary_hlo(extra, groups=groups)
+    assert not rejected["passed"]
+    assert rejected["collective_count"] == 2
 
 
 @pytest.mark.parametrize(

@@ -7456,3 +7456,45 @@ unmotivated arithmetic variants.
 - Exact next: run exactly one protected exact-M32 association fingerprint. Apply its measured
   physical row-zero association to the existing layer-0 discriminator before another complete 8K
   run.
+
+## 2026-08-11 21:31--21:34 — DB533 uniquely recovers the accepted live-row M32 tree
+
+- The reviewed fingerprint at pin `a9e6307bdad70b883ba82456fbf8f4bdf8db5ac6` completed once as
+  DB533/item1818 under tag `greenfield_collective_association_20260811T213152133863450Z`.
+  Analysis/summary/SUCCESS SHAs are `e7e34828...4108`, `3ca82073...36b7`, and
+  `e3b0c442...b855`; direct approved-bucket hashes, SQLite linkage, exact HLO/backend/layout,
+  raw input/output files and authenticated 8/8 pre/post censuses pass. It loaded no model or
+  checkpoint and makes no decoder/performance claim.
+- All 32 physical rows have exact 6,144/6,144 union coverage and per-column candidate histogram
+  `{'1': 6144}`. Four row-output groups are sealed: rows 0--7 `7239b23e...1dc`, 8--15
+  `36450bf...f9a8`, 16--23 `7e3fb5a1...f5ca`, and 24--31 `f66edca7...8c16`.
+- The accepted model-position to physical-device permutation is
+  `0,8,16,24,2,10,18,26,4,12,20,28,6,14,22,30,1,9,17,25,3,11,19,27,5,13,21,29,7,15,23,31`.
+  For the only live decode row, physical row zero, the exact phase order is `y -> x -> z`. The y
+  four-way tree is `((0+1)+(2+3))` in hidden bands 0--2,047 and 4,096--6,143, and
+  `((0+3)+(1+2))` in 2,048--4,095. The x phase is `(0+1)`. The z tree alternates those two
+  four-way trees every 256 columns, starting with `((0+1)+(2+3))`.
+- The implementation batch now reuses the existing eight K512 attention partials and eight I384
+  dense partials per owner, performs exactly one LP4 gather for each projection, reorders the 32
+  model positions into the sealed physical box, and replays those BF16 trees behind one new
+  default-off two-arm discriminator. The control remains the table-on owner-split production
+  layer; the challenger changes both attention output and dense down. Production decode remains
+  untouched. Direct CPU replay of all 32 DB533 trials is bitwise exact for row zero, and the forced
+  four-device test proves one local gather with lane-replicated output.
+- The first new-diff-only Sol audit found two medium fail-closed gaps: the candidate HLO proved
+  gather/kernel counts but not the exact 82-add-band/tree reducer body, and its scoped gather count
+  could miss an extra unscoped gather with the same shape. The correction compiles and executes a
+  separate device-resident canary using the same reducer against all 32 sealed DB533 trials on all
+  32 lanes, pins 82 StableHLO optimization barriers plus the exact LP4 gather/HLO contract, and
+  requires exactly one separately scoped attention gather and one dense gather among exactly two
+  matching shapes globally. The candidate-control decoder StableHLO delta is pinned to 164
+  barriers. Production decode remains default-off and unchanged.
+- The revised CPU/forced-device suite passes `79/79` in `219.80 s`; current-code replay of the
+  sealed DB533 inputs has `0/196,608` row-zero output mismatches. Python, Bash, ShellCheck, JSON,
+  all 15 embedded-Python blocks and diff checks pass. An exact-mode read-only wrapper preflight
+  validates every prerequisite, including direct local/remote DB533 raw-array hashes, then stops
+  at the intended dirty-worktree guard before census or TPU work.
+- Exact next: the existing Sol reviewer verifies only the two corrected findings. After approval,
+  independently verify, commit/push and launch this one protected discriminator. Control must
+  reproduce `6c54c09a...bca` / 3,984 mismatches. Candidate exactness authorizes the complete
+  protected 8K run; nonexactness is diagnosed from the exact result before any new hypothesis.

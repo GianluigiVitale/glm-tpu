@@ -36,6 +36,12 @@ readonly LAYER0_RESIDUAL_VARIANTS=${GLM_GREENFIELD_LAYER0_RESIDUAL_VARIANTS:-0}
 readonly LAYER0_SUBSHARD_VARIANTS=${GLM_GREENFIELD_LAYER0_SUBSHARD_VARIANTS:-0}
 readonly LAYER0_ATTENTION_VARIANTS=${GLM_GREENFIELD_LAYER0_ATTENTION_VARIANTS:-0}
 readonly LAYER0_ATTENTION_OUTPUT_VARIANTS=${GLM_GREENFIELD_LAYER0_ATTENTION_OUTPUT_VARIANTS:-0}
+readonly LAYER0_STRATEGY_ND_ROW0=${GLM_GREENFIELD_LAYER0_STRATEGY_ND_ROW0:-0}
+readonly STRATEGY_ND_CANARY_ROOT=/home/gianl/gcs-models/results/greenfield_collective_association_20260811T213152133863450Z/association
+readonly STRATEGY_ND_CANARY_INPUT_BITS=$STRATEGY_ND_CANARY_ROOT/input_bits.npy
+readonly STRATEGY_ND_CANARY_INPUT_SHA=1a6c2fb5c8c04b904daad45f751e0b5308919b85cb1f3cf63879c5febf3ea0e9
+readonly STRATEGY_ND_CANARY_OUTPUT_BITS=$STRATEGY_ND_CANARY_ROOT/output_bits.npy
+readonly STRATEGY_ND_CANARY_OUTPUT_SHA=fda0228123392c29db87e1d6dd01cc6830041196409f49e0144628054cc64bd9
 readonly LAYER0_INGREDIENTS=${GLM_GREENFIELD_LAYER0_INGREDIENTS:-0}
 readonly LAYER1_INTERNAL_REFERENCE_NPZ=${GLM_GREENFIELD_LAYER1_INTERNAL_REFERENCE_NPZ:-/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/layer1/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z/internals.npz}
 readonly LAYER1_INTERNAL_REFERENCE_SHA=${GLM_GREENFIELD_LAYER1_INTERNAL_REFERENCE_SHA:-79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054}
@@ -166,16 +172,20 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
   echo "layer-0 attention-output variant flag must be 0 or 1" >&2
   exit 2
 }
+[[ $LAYER0_STRATEGY_ND_ROW0 == 0 || $LAYER0_STRATEGY_ND_ROW0 == 1 ]] || {
+  echo "layer-0 StrategyND row-zero flag must be 0 or 1" >&2
+  exit 2
+}
 [[ $LAYER0_INGREDIENTS == 0 || $LAYER0_INGREDIENTS == 1 ]] || {
   echo "layer-0 ingredient flag must be 0 or 1" >&2
   exit 2
 }
-((LAYER0_RESIDUAL_VARIANTS + LAYER0_SUBSHARD_VARIANTS + LAYER0_ATTENTION_VARIANTS + LAYER0_ATTENTION_OUTPUT_VARIANTS + LAYER0_INGREDIENTS <= 1)) || {
+((LAYER0_RESIDUAL_VARIANTS + LAYER0_SUBSHARD_VARIANTS + LAYER0_ATTENTION_VARIANTS + LAYER0_ATTENTION_OUTPUT_VARIANTS + LAYER0_STRATEGY_ND_ROW0 + LAYER0_INGREDIENTS <= 1)) || {
   echo "layer-0 diagnostic replays must remain mutually isolated" >&2
   exit 2
 }
 LAYER0_DISCRIMINATOR=0
-if [[ $LAYER0_RESIDUAL_VARIANTS == 1 || $LAYER0_SUBSHARD_VARIANTS == 1 || $LAYER0_ATTENTION_VARIANTS == 1 || $LAYER0_ATTENTION_OUTPUT_VARIANTS == 1 ]]; then
+if [[ $LAYER0_RESIDUAL_VARIANTS == 1 || $LAYER0_SUBSHARD_VARIANTS == 1 || $LAYER0_ATTENTION_VARIANTS == 1 || $LAYER0_ATTENTION_OUTPUT_VARIANTS == 1 || $LAYER0_STRATEGY_ND_ROW0 == 1 ]]; then
   LAYER0_DISCRIMINATOR=1
 fi
 readonly LAYER0_DISCRIMINATOR
@@ -321,6 +331,12 @@ fi
 if [[ $LAYER0_ATTENTION_OUTPUT_VARIANTS == 1 ]]; then
   [[ $MAIN_ROPE_TABLE == 1 && $RUNTIME_KIND == pallas_feature_linear && $COMPLETE_TOKEN_PATH == 1 && $SPLIT_RESIDUAL_STATE == 1 ]] || {
     echo "layer-0 attention-output variants require the table-on complete split Pallas-linear path" >&2
+    exit 2
+  }
+fi
+if [[ $LAYER0_STRATEGY_ND_ROW0 == 1 ]]; then
+  [[ $MAIN_ROPE_TABLE == 1 && $RUNTIME_KIND == pallas_feature_linear && $COMPLETE_TOKEN_PATH == 1 && $SPLIT_RESIDUAL_STATE == 1 ]] || {
+    echo "layer-0 StrategyND row-zero discriminator requires the table-on complete split Pallas-linear path" >&2
     exit 2
   }
 fi
@@ -1246,6 +1262,171 @@ PY
     exit 2
   }
 fi
+if [[ $LAYER0_STRATEGY_ND_ROW0 == 1 ]]; then
+  readonly STRATEGY_ND_PREREQUISITE_TAG=greenfield_collective_association_20260811T213152133863450Z
+  readonly STRATEGY_ND_PREREQUISITE_DIR=/home/gianl/glm-run/$STRATEGY_ND_PREREQUISITE_TAG
+  readonly STRATEGY_ND_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$STRATEGY_ND_PREREQUISITE_TAG
+  /home/gianl/vllm-env/bin/python - \
+    "$STRATEGY_ND_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
+from hashlib import sha256
+import json
+from pathlib import Path
+import re
+import sqlite3
+import sys
+
+run_dir = Path(sys.argv[1])
+db_path = Path(sys.argv[2])
+expected_hashes = {
+    "SUCCESS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "association/analysis.json": "e7e34828365ca3d6cae0052f8d0e2e802143c6ca83810153db3116423f994108",
+    "association/input_bits.npy": "1a6c2fb5c8c04b904daad45f751e0b5308919b85cb1f3cf63879c5febf3ea0e9",
+    "association/manifest.json": "9304077e523d705c12f4939501cf4338cc18ffd0cfadfa6c3c1bcf2c903d2060",
+    "association/output_bits.npy": "fda0228123392c29db87e1d6dd01cc6830041196409f49e0144628054cc64bd9",
+    "summary.json": "3ca82073f69fbe56526e1765594c7e8e9a738c73eb2a62b2df6d9a0c4d3136b7",
+    "census_pre.txt": "bc7c68030a30897060b6fe7cd0a42024e4db41a9f6044b65948e614b35c2df13",
+    "census_post.txt": "5f2d54b52b442717ddc448ad2c8c0804ea8c52303fa6d3243deb320d3b02705e",
+    "hlo/strategy_nd_association_bfloat16_32x6144.hlo_contract.json": "966a5dd8be19c409ac616dc194fe8e7dc78ae6c253132c7a73dcdeb8e0c040bc",
+}
+for relative, expected in expected_hashes.items():
+    path = run_dir / relative
+    if not path.is_file() or sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"DB533 StrategyND prerequisite hash drifted: {relative}")
+
+analysis = json.loads((run_dir / "association/analysis.json").read_text())
+summary = json.loads((run_dir / "summary.json").read_text())
+model_to_device = [
+    0, 8, 16, 24, 2, 10, 18, 26, 4, 12, 20, 28, 6, 14, 22, 30,
+    1, 9, 17, 25, 3, 11, 19, 27, 5, 13, 21, 29, 7, 15, 23, 31,
+]
+expected_groups = [
+    (list(range(0, 8)), "7239b23e8ccba21dd74cb11342b3a3cb8e79c9ebff35d03203da2c61898f51dc"),
+    (list(range(8, 16)), "36450bf5c08e95b7c6b7505c3fa1fb23844a6b087aed7a282362c74cb7dcf9a8"),
+    (list(range(16, 24)), "7e3fb5a1921697f49a57ab0431a9799501381f9f47c8b302d9ff68fe64f3f5ca"),
+    (list(range(24, 32)), "f66edca7b9b2b47517f58638af696141cf6dc2f787021b430a4a785291e18c16"),
+]
+observed_groups = {
+    (tuple(item["rows"]), item["row_output_bits_sha256"])
+    for item in analysis["row_output_equivalence_groups"]
+}
+if (
+    analysis.get("code_hash") != "a9e6307bdad70b883ba82456fbf8f4bdf8db5ac6"
+    or analysis.get("compile_bucket_rows") != 32
+    or analysis.get("candidate_count_per_row") != 54
+    or analysis.get("minimum_row_union_exact_column_count") != 6144
+    or analysis.get("maximum_row_union_exact_column_count") != 6144
+    or analysis.get("accepted_model_axis_device_ids") != model_to_device
+    or observed_groups
+    != {(tuple(rows), digest) for rows, digest in expected_groups}
+    or len(analysis.get("rows", [])) != 32
+    or any(
+        row.get("column_candidate_count_histogram") != {"1": 6144}
+        or row.get("union_exact_column_count") != 6144
+        for row in analysis["rows"]
+    )
+):
+    raise SystemExit("DB533 StrategyND association summary drifted")
+
+row0 = analysis["rows"][0]
+if (
+    row0.get("physical_row") != 0
+    or row0.get("row_output_bits_sha256") != expected_groups[0][1]
+    or len(row0.get("blocks", [])) != 48
+):
+    raise SystemExit("DB533 StrategyND row-zero identity drifted")
+for block in row0["blocks"]:
+    start = block["start"]
+    d0 = "((0+3)+(1+2))" if 2048 <= start < 4096 else "((0+1)+(2+3))"
+    d2 = "((0+3)+(1+2))" if (start // 256) % 2 else "((0+1)+(2+3))"
+    expected_id = f"physical_y_x_z:phase=012:d0={d0}:d2={d2}"
+    if (
+        block.get("end") != start + 128
+        or block.get("union_exact_columns") != 128
+        or block.get("top_candidates") != [
+            {"candidate_id": expected_id, "exact_columns": 128}
+        ]
+    ):
+        raise SystemExit(f"DB533 row-zero block schedule drifted at {start}")
+
+if (
+    summary.get("mode") != "strategy_nd_fingerprint"
+    or not summary.get("mechanism_only")
+    or summary.get("results_db_run_id") != 533
+    or summary.get("code_hash") != "a9e6307bdad70b883ba82456fbf8f4bdf8db5ac6"
+    or len(summary.get("cases", [])) != 1
+    or not summary["cases"][0].get("diagnostic_only")
+    or summary["cases"][0].get("collective_groups") != [list(range(32))]
+):
+    raise SystemExit("DB533 StrategyND protected summary drifted")
+for name in ("census_pre.txt", "census_post.txt"):
+    workers = re.findall(
+        r"^CENSUS_OK .*?-w-([0-7])$", (run_dir / name).read_text(), re.M
+    )
+    if sorted(workers) != list("01234567"):
+        raise SystemExit(f"DB533 prerequisite {name} is not 8/8 clean")
+with sqlite3.connect(db_path) as conn:
+    if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        raise SystemExit("live results DB integrity failed")
+    row = conn.execute(
+        "SELECT r.model,r.harness_git,r.pod,i.id,i.benchmark,i.item_id,i.correct,i.score "
+        "FROM runs r JOIN items i ON i.run_id=r.run_id WHERE r.run_id=533"
+    ).fetchone()
+if row != (
+    "zai-org/GLM-5.2-FP8:greenfield-strategy-nd-diagnostic-only",
+    "a9e6307",
+    "db-v4-64-od",
+    1818,
+    "greenfield_strategy_nd_fingerprint",
+    "strategy_nd_association_fingerprint:g32:bfloat16:32x6144",
+    1,
+    None,
+):
+    raise SystemExit("DB533 prerequisite DB linkage drifted")
+PY
+  strategy_nd_remote_analysis_sha=$(
+    gcloud storage cat \
+      "$STRATEGY_ND_PREREQUISITE_REMOTE/association/analysis.json" \
+      | sha256sum | awk '{print $1}'
+  )
+  [[ $strategy_nd_remote_analysis_sha == e7e34828365ca3d6cae0052f8d0e2e802143c6ca83810153db3116423f994108 ]] || {
+    echo "DB533 direct remote analysis hash drifted" >&2
+    exit 2
+  }
+  strategy_nd_remote_summary_sha=$(
+    gcloud storage cat "$STRATEGY_ND_PREREQUISITE_REMOTE/summary.json" \
+      | sha256sum | awk '{print $1}'
+  )
+  [[ $strategy_nd_remote_summary_sha == 3ca82073f69fbe56526e1765594c7e8e9a738c73eb2a62b2df6d9a0c4d3136b7 ]] || {
+    echo "DB533 direct remote summary hash drifted" >&2
+    exit 2
+  }
+  strategy_nd_remote_success_sha=$(
+    gcloud storage cat "$STRATEGY_ND_PREREQUISITE_REMOTE/SUCCESS" \
+      | sha256sum | awk '{print $1}'
+  )
+  [[ $strategy_nd_remote_success_sha == e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ]] || {
+    echo "DB533 direct remote SUCCESS hash drifted" >&2
+    exit 2
+  }
+  strategy_nd_remote_input_sha=$(
+    gcloud storage cat \
+      "$STRATEGY_ND_PREREQUISITE_REMOTE/association/input_bits.npy" \
+      | sha256sum | awk '{print $1}'
+  )
+  [[ $strategy_nd_remote_input_sha == "$STRATEGY_ND_CANARY_INPUT_SHA" ]] || {
+    echo "DB533 direct remote canary input hash drifted" >&2
+    exit 2
+  }
+  strategy_nd_remote_output_sha=$(
+    gcloud storage cat \
+      "$STRATEGY_ND_PREREQUISITE_REMOTE/association/output_bits.npy" \
+      | sha256sum | awk '{print $1}'
+  )
+  [[ $strategy_nd_remote_output_sha == "$STRATEGY_ND_CANARY_OUTPUT_SHA" ]] || {
+    echo "DB533 direct remote canary output hash drifted" >&2
+    exit 2
+  }
+fi
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
@@ -1326,6 +1507,8 @@ elif [[ $LAYER0_ATTENTION_VARIANTS == 1 ]]; then
   LAYER0_VARIANT_SUFFIX=_layer0_attention_schedule_variants
 elif [[ $LAYER0_ATTENTION_OUTPUT_VARIANTS == 1 ]]; then
   LAYER0_VARIANT_SUFFIX=_layer0_attention_output_variants
+elif [[ $LAYER0_STRATEGY_ND_ROW0 == 1 ]]; then
+  LAYER0_VARIANT_SUFFIX=_layer0_strategy_nd_row0
 elif [[ $LAYER0_INGREDIENTS == 1 ]]; then
   LAYER0_VARIANT_SUFFIX=_layer0_ingredients
 fi
@@ -1425,7 +1608,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION MAIN_ROPE_TABLE=$MAIN_ROPE_TABLE SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS LAYER0_ATTENTION_VARIANTS=$LAYER0_ATTENTION_VARIANTS LAYER0_ATTENTION_OUTPUT_VARIANTS=$LAYER0_ATTENTION_OUTPUT_VARIANTS LAYER0_INGREDIENTS=$LAYER0_INGREDIENTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION MAIN_ROPE_TABLE=$MAIN_ROPE_TABLE SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS LAYER0_ATTENTION_VARIANTS=$LAYER0_ATTENTION_VARIANTS LAYER0_ATTENTION_OUTPUT_VARIANTS=$LAYER0_ATTENTION_OUTPUT_VARIANTS LAYER0_STRATEGY_ND_ROW0=$LAYER0_STRATEGY_ND_ROW0 LAYER0_INGREDIENTS=$LAYER0_INGREDIENTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -1441,6 +1624,17 @@ has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
   say "ABORT: eight-host sync/artifact prerequisite failed"
   exit 1
 }
+if [[ $LAYER0_STRATEGY_ND_ROW0 == 1 ]]; then
+  # shellcheck disable=SC2016
+  canary_sync_command='set -euo pipefail; input='"$STRATEGY_ND_CANARY_INPUT_BITS"'; input_sha='"$STRATEGY_ND_CANARY_INPUT_SHA"'; output='"$STRATEGY_ND_CANARY_OUTPUT_BITS"'; output_sha='"$STRATEGY_ND_CANARY_OUTPUT_SHA"'; [[ -r "$input" && -r "$output" ]] && [[ $(sha256sum "$input" | awk "{print \$1}") == "$input_sha" ]] && [[ $(sha256sum "$output" | awk "{print \$1}") == "$output_sha" ]] && findmnt -T "$input" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$output" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "STRATEGY_CANARY_OK $(hostname)"'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$canary_sync_command" >"$RUN_DIR/sync_strategy_canary.txt" 2>&1
+  has_eight_unique_markers \
+    "$RUN_DIR/sync_strategy_canary.txt" STRATEGY_CANARY_OK || {
+    say "ABORT: eight-host DB533 canary prerequisite failed"
+    exit 1
+  }
+fi
 
 coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
   --command="hostname -I" 2>/dev/null | grep -Eo '192\.168\.[0-9]+\.[0-9]+' | head -1)
@@ -1451,7 +1645,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching real 78-layer $CONTEXT_NAME load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; dsa_query_exact_association='"$DSA_QUERY_EXACT_ASSOCIATION"'; dsa_head_key_exact_association='"$DSA_HEAD_KEY_EXACT_ASSOCIATION"'; dsa_score_default_precision='"$DSA_SCORE_DEFAULT_PRECISION"'; main_rope_table='"$MAIN_ROPE_TABLE"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; layer0_variants='"$LAYER0_RESIDUAL_VARIANTS"'; layer0_subshard_variants='"$LAYER0_SUBSHARD_VARIANTS"'; layer0_attention_variants='"$LAYER0_ATTENTION_VARIANTS"'; layer0_attention_output_variants='"$LAYER0_ATTENTION_OUTPUT_VARIANTS"'; layer0_ingredients='"$LAYER0_INGREDIENTS"'; layer1_ref='"$LAYER1_INTERNAL_REFERENCE_NPZ"'; layer1_ref_sha='"$LAYER1_INTERNAL_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer" "$run/layer0_residual_discriminator" "$run/layer0_ingredients"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_residual_discriminator/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_residual_discriminator/* "$remote/layer0_residual_discriminator/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_ingredients/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_ingredients/* "$remote/layer0_ingredients/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; variant_args=(); if [[ $layer0_variants == 1 ]]; then variant_args=(--observe-layer0-residual-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_subshard_variants == 1 ]]; then variant_args=(--observe-layer0-subshard-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_attention_variants == 1 ]]; then variant_args=(--observe-layer0-attention-schedule-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_attention_output_variants == 1 ]]; then variant_args=(--observe-layer0-attention-output-association-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_ingredients == 1 ]]; then variant_args=(--observe-layer0-ingredients 1); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --dsa-query-exact-association "$dsa_query_exact_association" --dsa-head-key-exact-association "$dsa_head_key_exact_association" --dsa-score-default-precision "$dsa_score_default_precision" --main-rope-table "$main_rope_table" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" "${variant_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; dsa_query_exact_association='"$DSA_QUERY_EXACT_ASSOCIATION"'; dsa_head_key_exact_association='"$DSA_HEAD_KEY_EXACT_ASSOCIATION"'; dsa_score_default_precision='"$DSA_SCORE_DEFAULT_PRECISION"'; main_rope_table='"$MAIN_ROPE_TABLE"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; layer0_variants='"$LAYER0_RESIDUAL_VARIANTS"'; layer0_subshard_variants='"$LAYER0_SUBSHARD_VARIANTS"'; layer0_attention_variants='"$LAYER0_ATTENTION_VARIANTS"'; layer0_attention_output_variants='"$LAYER0_ATTENTION_OUTPUT_VARIANTS"'; layer0_strategy_nd_row0='"$LAYER0_STRATEGY_ND_ROW0"'; strategy_nd_canary_input='"$STRATEGY_ND_CANARY_INPUT_BITS"'; strategy_nd_canary_input_sha='"$STRATEGY_ND_CANARY_INPUT_SHA"'; strategy_nd_canary_output='"$STRATEGY_ND_CANARY_OUTPUT_BITS"'; strategy_nd_canary_output_sha='"$STRATEGY_ND_CANARY_OUTPUT_SHA"'; layer0_ingredients='"$LAYER0_INGREDIENTS"'; layer1_ref='"$LAYER1_INTERNAL_REFERENCE_NPZ"'; layer1_ref_sha='"$LAYER1_INTERNAL_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer" "$run/layer0_residual_discriminator" "$run/layer0_ingredients"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_residual_discriminator/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_residual_discriminator/* "$remote/layer0_residual_discriminator/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_ingredients/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_ingredients/* "$remote/layer0_ingredients/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; variant_args=(); if [[ $layer0_variants == 1 ]]; then variant_args=(--observe-layer0-residual-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_subshard_variants == 1 ]]; then variant_args=(--observe-layer0-subshard-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_attention_variants == 1 ]]; then variant_args=(--observe-layer0-attention-schedule-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_attention_output_variants == 1 ]]; then variant_args=(--observe-layer0-attention-output-association-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_strategy_nd_row0 == 1 ]]; then variant_args=(--observe-layer0-strategy-nd-row0-association 1 --strategy-nd-canary-input-bits "$strategy_nd_canary_input" --strategy-nd-canary-input-sha256 "$strategy_nd_canary_input_sha" --strategy-nd-canary-output-bits "$strategy_nd_canary_output" --strategy-nd-canary-output-sha256 "$strategy_nd_canary_output_sha" --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_ingredients == 1 ]]; then variant_args=(--observe-layer0-ingredients 1); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --dsa-query-exact-association "$dsa_query_exact_association" --dsa-head-key-exact-association "$dsa_head_key_exact_association" --dsa-score-default-precision "$dsa_score_default_precision" --main-rope-table "$main_rope_table" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" "${variant_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
@@ -1576,6 +1770,79 @@ if (
 print("ATTENTION_OUTPUT_ASSOCIATION_DIAGNOSTIC_CONTRACT_OK")
 PY
     say "attention-output association diagnostic contract passed; preserving intentional diagnostic exit"
+  fi
+  if [[ $LAYER0_STRATEGY_ND_ROW0 == 1 ]]; then
+    /home/gianl/vllm-env/bin/python - \
+      "$RUN_DIR/layer0_residual_discriminator/contract.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    raise SystemExit("StrategyND row-zero diagnostic contract is missing")
+contract = json.loads(path.read_text())
+expected_names = ["strategy_nd_row0_control", "strategy_nd_row0_both"]
+expected_baseline = (
+    "6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca"
+)
+arms = contract.get("arm_contracts", {})
+suite = contract.get("hlo_suite_contract", {})
+comparisons = contract.get("variant_comparisons", {})
+control = comparisons.get(expected_names[0], {})
+candidate = comparisons.get(expected_names[1], {})
+candidate_hlo = arms.get(expected_names[1], {}).get("hlo_contract", {})
+kernel_counts = candidate_hlo.get("kernel_counts", {})
+canary = contract.get("strategy_nd_canary_contract", {})
+stablehlo = suite.get("strategy_nd_stablehlo_contract", {})
+if (
+    not contract.get("passed")
+    or contract.get("discriminator_kind") != "strategy_nd_row0_association"
+    or contract.get("variant_names") != expected_names
+    or not contract.get("reproduces_current_baseline")
+    or contract.get("current_baseline_expected_sha256") != expected_baseline
+    or control.get("actual_sha256") != expected_baseline
+    or control.get("mismatch_count") != 3984
+    or not isinstance(candidate.get("actual_sha256"), str)
+    or len(candidate["actual_sha256"]) != 64
+    or not isinstance(candidate.get("mismatch_count"), int)
+    or not 0 <= candidate["mismatch_count"] <= 6144
+    or not suite.get("passed")
+    or suite.get("program_count") != 2
+    or not suite.get("all_distinct_hlo_modules")
+    or any(
+        not arms.get(name, {}).get("passed")
+        or not arms[name].get("selection_exact")
+        for name in expected_names
+    )
+    or len(candidate_hlo.get("strategy_nd_gathers", [])) != 2
+    or candidate_hlo.get("strategy_nd_shaped_gather_count") != 2
+    or candidate_hlo.get("strategy_nd_attention_gather_count") != 1
+    or candidate_hlo.get("strategy_nd_dense_gather_count") != 1
+    or candidate_hlo.get("cache_shaped_gathers")
+    or not suite.get("strategy_nd_canary_passed")
+    or not stablehlo.get("passed")
+    or stablehlo.get("observed_delta") != 164
+    or not canary.get("passed")
+    or canary.get("trial_count") != 32
+    or canary.get("lane_count") != 32
+    or canary.get("mismatch_count") != 0
+    or canary.get("first_mismatch") is not None
+    or canary.get("stablehlo_optimization_barrier_count") != 82
+    or not canary.get("hlo_contract", {}).get("passed")
+    or canary.get("input_file_sha256")
+    != "1a6c2fb5c8c04b904daad45f751e0b5308919b85cb1f3cf63879c5febf3ea0e9"
+    or canary.get("output_file_sha256")
+    != "fda0228123392c29db87e1d6dd01cc6830041196409f49e0144628054cc64bd9"
+    or kernel_counts.get("greenfield_fp8_block_matmul_m8_k512_n6144") != 8
+    or kernel_counts.get(
+        "greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144"
+    ) != 8
+):
+    raise SystemExit("StrategyND row-zero diagnostic contract failed")
+print("STRATEGY_ND_ROW0_DIAGNOSTIC_CONTRACT_OK")
+PY
+    say "StrategyND row-zero diagnostic contract passed; preserving intentional diagnostic exit"
   fi
   say "ABORT: real decoder load/compile did not pass 8/8"
   exit 1

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 21:28 UTC
+**Updated:** 2026-08-11 22:33 UTC
 
 ## Authority and isolation
 
@@ -184,8 +184,34 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   compileall, JSON, embedded-Python and diff checks pass. One Sol xhigh subagent audited only
   staged SHA `840d4a4e...0282`, found no high/medium issue and returned `APPROVE COMMIT`; the batch
   is committed/pushed at `32eb654`. The withdrawn approval for staged SHA `d169d0fe...09fd`
-  remains invalid. Claude Code/Fable is no longer part of the workflow. Exact next is one clean,
-  serialized protected fingerprint run.
+  remains invalid. Claude Code/Fable is no longer part of the workflow.
+- The single protected fingerprint completed at pushed pin `a9e6307bdad70b883ba82456fbf8f4bdf8db5ac6`
+  as DB533/item1818 under tag
+  `greenfield_collective_association_20260811T213152133863450Z`. Analysis/summary/SUCCESS SHAs are
+  `e7e34828...4108`, `3ca82073...36b7`, and `e3b0c442...b855`; direct approved-bucket hashes,
+  SQLite linkage and authenticated 8/8 pre/post censuses pass. The accepted model-position to
+  physical-device map is `0,8,16,24,2,10,18,26,4,12,20,28,6,14,22,30,1,9,17,25,3,11,19,27,5,13,21,29,7,15,23,31`.
+  Every row has a unique matching candidate at all 6,144 columns. Live row zero uses physical
+  `y -> x -> z`: y tree `((0+1)+(2+3))` outside hidden 2,048--4,095 and
+  `((0+3)+(1+2))` inside it; x uses `(0+1)`; z alternates those two four-way trees every 256
+  columns. Rows 0--7 share output SHA `7239b23e...1dc`. This is exact association evidence only,
+  not decoder or performance proof.
+- The two-arm table-on layer-0 discriminator is implemented: unchanged owner-split
+  control versus the DB533 row-zero tree applied to both attention-output and dense-down partials.
+  It may add only two LP4 partial gathers, must reproduce control SHA `6c54c09a...bca` and retain
+  exact DSA/one-row/HLO/cache/cleanup contracts. The first new-diff-only Sol audit found two
+  medium fail-closed gaps: the HLO contract did not prove the exact reducer body, and a third
+  unscoped partial gather could escape its scoped count. The correction reuses the production
+  reducer in a sealed DB533 device canary, pins all 32 trials/lanes, 82 BF16-round barriers and the
+  exact LP4 gather, separately scopes the attention/dense gathers, and counts matching shapes
+  globally. The revised affected CPU/forced-device suite passes `79/79` in `219.80 s`; direct
+  DB533 replay has zero mismatches across 196,608 outputs; Python, Bash, ShellCheck, JSON, all 15
+  embedded-Python blocks and diff checks pass. A read-only exact-mode wrapper preflight validates
+  all local/remote prerequisites through DB533 and stops at the expected dirty-worktree guard
+  before census or TPU work. Exact next is the existing Sol reviewer's bounded follow-up on those
+  two fixes, then independent verification, commit/push and one protected run. An exact result
+  authorizes complete protected 8K; a nonexact result must be diagnosed from this source-faithful
+  outcome rather than another guessed reduction tree.
 
 ## Historical main-RoPE integration batch
 

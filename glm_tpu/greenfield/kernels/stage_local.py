@@ -134,6 +134,7 @@ VirtualTp32ReductionAssociation = Literal[
     "dcp_then_model_pairwise_bf16",
     "model_then_dcp_sequential_bf16",
     "model_then_dcp_pairwise_bf16",
+    "strategy_nd_row0_bf16",
 ]
 VIRTUAL_TP32_REDUCTION_ASSOCIATIONS: tuple[
     VirtualTp32ReductionAssociation, ...
@@ -143,7 +144,52 @@ VIRTUAL_TP32_REDUCTION_ASSOCIATIONS: tuple[
     "model_then_dcp_sequential_bf16",
     "model_then_dcp_pairwise_bf16",
 )
+STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION: VirtualTp32ReductionAssociation = (
+    "strategy_nd_row0_bf16"
+)
+_SUPPORTED_VIRTUAL_TP32_REDUCTION_ASSOCIATIONS = (
+    *VIRTUAL_TP32_REDUCTION_ASSOCIATIONS,
+    STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+)
 _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER = 8
+
+# DB533 recovered the accepted M32 model-axis placement.  Indexing the 32
+# model-ordered projection partials by this inverse yields physical device-id
+# order, where device_id = x + 2*y + 8*z on the accepted 2x4x4 slice.
+_STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE = (
+    0,
+    16,
+    4,
+    20,
+    8,
+    24,
+    12,
+    28,
+    1,
+    17,
+    5,
+    21,
+    9,
+    25,
+    13,
+    29,
+    2,
+    18,
+    6,
+    22,
+    10,
+    26,
+    14,
+    30,
+    3,
+    19,
+    7,
+    23,
+    11,
+    27,
+    15,
+    31,
+)
 
 
 def _virtual_attention_output_partials(
@@ -317,6 +363,98 @@ def _sum_virtual_dcp_bf16_partials(
     return values[0]
 
 
+def _strategy_nd_row0_bf16_reduce(model_partials: Any) -> Any:
+    """Replay DB533's exact accepted M32 reduction for live decode row zero."""
+
+    if model_partials.shape != (32, 1, 6144):
+        raise ValueError(
+            "StrategyND row-zero reduction requires 32 model partials"
+        )
+    if model_partials.dtype != jnp.bfloat16:
+        raise ValueError(
+            "StrategyND row-zero partials must already be rounded BF16"
+        )
+
+    def add(left: Any, right: Any) -> Any:
+        return lax.optimization_barrier(
+            (left + right).astype(jnp.bfloat16)
+        )
+
+    def reduce_four(values: Any, *, cross: bool) -> Any:
+        if cross:
+            return add(add(values[0], values[3]), add(values[1], values[2]))
+        return add(add(values[0], values[1]), add(values[2], values[3]))
+
+    physical = jnp.stack(
+        tuple(
+            model_partials[model_position]
+            for model_position in (
+                _STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE
+            )
+        ),
+        axis=0,
+    )
+    # Physical ids are x-fastest in [z, y, x].  DB533 row zero uses phases
+    # y -> x -> z, hence the explicit transpose to [y, x, z, row, hidden].
+    physical_y_x_z = jnp.transpose(
+        physical.reshape(4, 4, 2, 1, 6144),
+        (1, 2, 0, 3, 4),
+    )
+    y_reduced = jnp.concatenate(
+        (
+            reduce_four(physical_y_x_z[..., :2048], cross=False),
+            reduce_four(
+                physical_y_x_z[..., 2048:4096], cross=True
+            ),
+            reduce_four(physical_y_x_z[..., 4096:], cross=False),
+        ),
+        axis=-1,
+    )
+    x_reduced = add(y_reduced[0], y_reduced[1])
+    return jnp.concatenate(
+        tuple(
+            reduce_four(
+                x_reduced[..., start : start + 256],
+                cross=bool((start // 256) % 2),
+            )
+            for start in range(0, 6144, 256)
+        ),
+        axis=-1,
+    )
+
+
+def _reduce_strategy_nd_row0_bf16_partials(
+    local_partials: Any,
+    *,
+    axis_name: str,
+    groups: tuple[tuple[int, ...], ...],
+) -> Any:
+    """Gather four PP8 owners, then replay the accepted row-zero M32 tree."""
+
+    if local_partials.shape != (8, 1, 6144):
+        raise ValueError(
+            "StrategyND row-zero reduction requires eight local partials"
+        )
+    if local_partials.dtype != jnp.bfloat16:
+        raise ValueError(
+            "StrategyND row-zero local partials must be rounded BF16"
+        )
+    with jax.named_scope("greenfield_strategy_nd_row0_association"):
+        with jax.named_scope(
+            "greenfield_strategy_nd_row0_association_gather"
+        ):
+            gathered = lax.all_gather(
+                local_partials,
+                axis_name=axis_name,
+                axis=0,
+                tiled=False,
+                axis_index_groups=groups,
+            )
+        return _strategy_nd_row0_bf16_reduce(
+            gathered.reshape(32, 1, 6144)
+        )
+
+
 def _reduce_virtual_tp32_bf16_partials(
     local_partials: Any,
     *,
@@ -326,10 +464,16 @@ def _reduce_virtual_tp32_bf16_partials(
 ) -> Any:
     """Reduce 8 virtual DCP shards x 4 physical model owners, locally only."""
 
-    if association not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS:
+    if association not in _SUPPORTED_VIRTUAL_TP32_REDUCTION_ASSOCIATIONS:
         raise ValueError("virtual TP32 reduction association is unknown")
     if groups is None or any(len(group) != 4 for group in groups):
         raise ValueError("virtual TP32 reduction requires explicit LP4 groups")
+    if association == STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION:
+        return _reduce_strategy_nd_row0_bf16_partials(
+            local_partials,
+            axis_name=axis_name,
+            groups=groups,
+        )
     dcp_first = association.startswith("dcp_then_model_")
     pairwise = association.endswith("_pairwise_bf16")
     with jax.named_scope(f"greenfield_virtual_tp32_{association}"):
@@ -1042,7 +1186,7 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare main-RoPE table row is invalid")
     if virtual_tp32_reduction_association is not None and (
         virtual_tp32_reduction_association
-        not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+        not in _SUPPORTED_VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
     ):
         raise ValueError("IndexShare virtual TP32 association is unknown")
     if virtual_tp32_reduction_association is not None and (
@@ -1449,12 +1593,26 @@ def stage_local_index_share_fp8_mapped(
             block_shape=block_shape,
             linear_interpret=linear_interpret,
         )
-        update = _reduce_virtual_tp32_bf16_partials(
-            local_partials,
-            axis_name=axis_name,
-            groups=groups,
-            association=virtual_tp32_reduction_association,
-        )
+        if (
+            virtual_tp32_reduction_association
+            == STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+        ):
+            with jax.named_scope(
+                "greenfield_strategy_nd_row0_attention_output"
+            ):
+                update = _reduce_virtual_tp32_bf16_partials(
+                    local_partials,
+                    axis_name=axis_name,
+                    groups=groups,
+                    association=virtual_tp32_reduction_association,
+                )
+        else:
+            update = _reduce_virtual_tp32_bf16_partials(
+                local_partials,
+                axis_name=axis_name,
+                groups=groups,
+                association=virtual_tp32_reduction_association,
+            )
     elif reconstruct_output_fp32:
         if linear_backend == "reference":
             local_update = lax.dot_general(
@@ -1585,7 +1743,7 @@ def stage_local_dense_fp8_mapped(
         raise ValueError("dense ingredient-capture flag must be boolean")
     if virtual_tp32_reduction_association is not None and (
         virtual_tp32_reduction_association
-        not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+        not in _SUPPORTED_VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
     ):
         raise ValueError("dense virtual TP32 association is unknown")
     if virtual_tp32_reduction_association is not None and (
@@ -1637,12 +1795,26 @@ def stage_local_dense_fp8_mapped(
             block_shape=block_shape,
             linear_interpret=linear_interpret,
         )
-        update = _reduce_virtual_tp32_bf16_partials(
-            local_partials,
-            axis_name=axis_name,
-            groups=groups,
-            association=virtual_tp32_reduction_association,
-        )
+        if (
+            virtual_tp32_reduction_association
+            == STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+        ):
+            with jax.named_scope(
+                "greenfield_strategy_nd_row0_dense_down"
+            ):
+                update = _reduce_virtual_tp32_bf16_partials(
+                    local_partials,
+                    axis_name=axis_name,
+                    groups=groups,
+                    association=virtual_tp32_reduction_association,
+                )
+        else:
+            update = _reduce_virtual_tp32_bf16_partials(
+                local_partials,
+                axis_name=axis_name,
+                groups=groups,
+                association=virtual_tp32_reduction_association,
+            )
     elif linear_backend == "reference":
         gate_weight = dequantize_fp8_bits_block_weight(
             gate_bits, gate_scale, block_shape=block_shape

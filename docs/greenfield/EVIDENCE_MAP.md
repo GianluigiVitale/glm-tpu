@@ -954,16 +954,24 @@ capture is still required.
   existing layer-0 observer must isolate the accepted monolithic-attention versus greenfield LP4
   LSE-merge input before any projection-side integration.
 
-## StrategyND association fingerprint readiness
+## DB533 protected StrategyND association fingerprint
 
-- A default-off Gate-A launcher mode now compiles one raw-bit-preserving 32-way
-  `bf16[1,6144]` reduction and requires the exact accepted StrategyND algorithm string. It records
-  32 trial inputs/outputs, physical member mapping, per-replica/eight-host checksums, raw manifest,
-  HLO, offline analysis, DB linkage and protected cleanup. No model or checkpoint is touched.
-- Offline replay evaluates a bounded 54-candidate topology-pincer family and preserves raw arrays
-  for later expansion. CPU/HLO/topology tests pass 120/120; a planted association is recovered on
-  all 6,144 columns. These are mechanism/readiness facts only. Protected TPU bits, backend contract,
-  DB row, archive and cleanup remain missing until the reviewed commit is launched.
+- DB533/item1818 at tag `greenfield_collective_association_20260811T213152133863450Z` seals one
+  repeated exact-M32 fingerprint. Analysis/summary/SUCCESS SHAs are `e7e34828...4108`,
+  `3ca82073...36b7`, and `e3b0c442...b855`; exact HLO/backend/layout, raw arrays, local/remote
+  hashes, DB linkage and clean 8/8 censuses pass. No model/checkpoint or performance claim exists.
+- Every physical row has a unique matching candidate on all 6,144 columns. Row zero uses the
+  accepted model-to-device permutation and physical `y -> x -> z` phases: y changes tree only for
+  hidden 2,048--4,095, x is a two-way add, and z alternates the two proven four-way pincer trees
+  every 256 columns. Rows 0--7 share output SHA `7239b23e...1dc`.
+- This directly authorizes one default-off layer-0 discriminator applying the recovered row-zero
+  schedule to both attention-output and dense-down virtual partials through exactly two LP4
+  gathers. It does not authorize production integration, Gate D, or a performance claim until the
+  table-on control and exact layer-1 boundary pass on TPU.
+- The revised pre-launch contract executes the same reducer as a device canary against all 32
+  sealed trials/lanes, pins 82 BF16-round barriers and one exact LP4 gather, and globally refuses
+  any third matching gather in the decoder. Local replay is exact at `0/196,608` mismatches and
+  the affected suite passes `79/79`; protected TPU boundary evidence is still pending.
 
 ### Pre-launch provenance disposition
 

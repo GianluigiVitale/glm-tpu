@@ -42,6 +42,9 @@ from glm_tpu.greenfield.model import (  # noqa: E402
     build_decoder_state_layout,
     build_pipeline_schedule,
 )
+from glm_tpu.greenfield.kernels.stage_local import (  # noqa: E402
+    _reduce_strategy_nd_row0_bf16_partials,
+)
 from glm_tpu.greenfield.runtime import (  # noqa: E402
     LAYER0_INGREDIENT_NAMES,
     build_decoder_step_program,
@@ -52,6 +55,9 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     validate_layer0_ingredients_observer_hlo,
     validate_prefill_index_weight_materialization_hlo,
     validate_teacher_forced_prefill_hlo,
+)
+from glm_tpu.greenfield.sharding.hlo_contract import (  # noqa: E402
+    parse_hlo_module,
 )
 from glm_tpu.greenfield.topology import (  # noqa: E402
     discover_physical_topology,
@@ -79,6 +85,12 @@ LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256 = (
 )
 LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256 = (
     "6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca"
+)
+STRATEGY_ND_CANARY_MODEL_TO_PHYSICAL = (
+    0, 8, 16, 24, 2, 10, 18, 26,
+    4, 12, 20, 28, 6, 14, 22, 30,
+    1, 9, 17, 25, 3, 11, 19, 27,
+    5, 13, 21, 29, 7, 15, 23, 31,
 )
 
 
@@ -1229,6 +1241,83 @@ def _raw_token_sequence_contract(
     }
 
 
+def _validate_strategy_nd_canary_hlo(
+    optimized_hlo: str,
+    *,
+    groups: tuple[tuple[int, ...], ...],
+) -> dict[str, Any]:
+    """Require one exact-shape LP4 gather in the DB533 canary executable."""
+
+    canonical_groups = tuple(tuple(int(rank) for rank in group) for group in groups)
+    module = parse_hlo_module(optimized_hlo)
+    collectives = module.collectives
+
+    def in_scope(op_name: str | None, scope: str) -> bool:
+        return bool(op_name) and scope in op_name.split("/")
+
+    shaped = tuple(
+        item
+        for item in collectives
+        if item.opcode == "all-gather"
+        and any(
+            shape.dtype == "bf16" and shape.dimensions == (8, 1, 6144)
+            for shape in item.operand_shapes
+        )
+        and any(
+            shape.dtype == "bf16"
+            and shape.dimensions in ((4, 8, 1, 6144), (32, 1, 6144))
+            for shape in item.result_shapes
+        )
+    )
+    scoped = tuple(
+        item
+        for item in shaped
+        if in_scope(item.op_name, "greenfield_strategy_nd_row0_canary")
+        and in_scope(
+            item.op_name,
+            "greenfield_strategy_nd_row0_association_gather",
+        )
+    )
+    violations: list[str] = []
+    if module.num_partitions not in (None, 32):
+        violations.append("StrategyND canary partition count drifted")
+    if len(collectives) != 1:
+        violations.append(
+            "StrategyND canary must contain exactly one collective: "
+            f"{len(collectives)}"
+        )
+    if len(shaped) != 1 or len(scoped) != 1:
+        violations.append(
+            "StrategyND canary lost its exact scoped partial gather"
+        )
+    if any(
+        item.replica_groups != canonical_groups
+        or item.maximum_group_size != 4
+        for item in collectives
+    ):
+        violations.append("StrategyND canary gather escaped exact LP4 groups")
+    host_markers = tuple(
+        marker
+        for marker in (
+            "host_callback",
+            "outside_compilation",
+            "xla_ffi_python_cpu_callback",
+            "xla_python_cpu_callback",
+        )
+        if marker in optimized_hlo
+    )
+    if host_markers:
+        violations.append("StrategyND canary contains host execution")
+    return {
+        "collective_count": len(collectives),
+        "host_markers": list(host_markers),
+        "passed": not violations,
+        "scoped_shaped_gather_count": len(scoped),
+        "shaped_gather_count": len(shaped),
+        "violations": violations,
+    }
+
+
 def _make_global_array(
     jax: Any,
     mesh: Any,
@@ -1422,6 +1511,16 @@ def parse_args() -> argparse.Namespace:
         default=0,
     )
     parser.add_argument(
+        "--observe-layer0-strategy-nd-row0-association",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
+    parser.add_argument("--strategy-nd-canary-input-bits", type=Path)
+    parser.add_argument("--strategy-nd-canary-input-sha256")
+    parser.add_argument("--strategy-nd-canary-output-bits", type=Path)
+    parser.add_argument("--strategy-nd-canary-output-sha256")
+    parser.add_argument(
         "--observe-layer0-ingredients",
         type=int,
         choices=(0, 1),
@@ -1481,6 +1580,9 @@ def main() -> int:
     args.observe_layer0_attention_output_association_variants = bool(
         args.observe_layer0_attention_output_association_variants
     )
+    args.observe_layer0_strategy_nd_row0_association = bool(
+        args.observe_layer0_strategy_nd_row0_association
+    )
     args.observe_layer0_ingredients = bool(args.observe_layer0_ingredients)
     if (
         sum(
@@ -1489,6 +1591,7 @@ def main() -> int:
                 args.observe_layer0_subshard_variants,
                 args.observe_layer0_attention_schedule_variants,
                 args.observe_layer0_attention_output_association_variants,
+                args.observe_layer0_strategy_nd_row0_association,
                 args.observe_layer0_ingredients,
             )
         )
@@ -1502,6 +1605,7 @@ def main() -> int:
         or args.observe_layer0_subshard_variants
         or args.observe_layer0_attention_schedule_variants
         or args.observe_layer0_attention_output_association_variants
+        or args.observe_layer0_strategy_nd_row0_association
     )
     if args.observe_layer0_subshard_variants:
         layer0_discriminator_kind = "virtual_tp32"
@@ -1509,11 +1613,14 @@ def main() -> int:
         layer0_discriminator_kind = "attention_schedule"
     elif args.observe_layer0_attention_output_association_variants:
         layer0_discriminator_kind = "attention_output_association"
+    elif args.observe_layer0_strategy_nd_row0_association:
+        layer0_discriminator_kind = "strategy_nd_row0_association"
     else:
         layer0_discriminator_kind = "combine_precision"
     main_rope_layer0_discriminator = bool(
         args.observe_layer0_attention_schedule_variants
         or args.observe_layer0_attention_output_association_variants
+        or args.observe_layer0_strategy_nd_row0_association
     )
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
@@ -1599,6 +1706,25 @@ def main() -> int:
         raise ValueError(
             "layer-0 discriminator requires both pinned layer-1 references"
         )
+    strategy_nd_canary_fields = (
+        args.strategy_nd_canary_input_bits,
+        args.strategy_nd_canary_input_sha256,
+        args.strategy_nd_canary_output_bits,
+        args.strategy_nd_canary_output_sha256,
+    )
+    strategy_nd_canary_present = tuple(
+        value is not None for value in strategy_nd_canary_fields
+    )
+    if (
+        any(strategy_nd_canary_present)
+        and not all(strategy_nd_canary_present)
+    ) or args.observe_layer0_strategy_nd_row0_association != all(
+        strategy_nd_canary_present
+    ):
+        raise ValueError(
+            "StrategyND row-zero discriminator requires both sealed DB533 "
+            "canary arrays and hashes"
+        )
     if observe_layer0_discriminator and not dsa_oracle_mode:
         raise ValueError(
             "layer-0 discriminator requires the sealed DSA/token oracle"
@@ -1648,6 +1774,16 @@ def main() -> int:
             "layer-0 attention-output association discriminator requires "
             "the protected table-on production path"
         )
+    if args.observe_layer0_strategy_nd_row0_association and not (
+        args.main_rope_table
+        and args.runtime_kind == "pallas_feature_linear"
+        and args.complete_token_path
+        and args.split_residual_state
+    ):
+        raise ValueError(
+            "layer-0 StrategyND row-zero discriminator requires the protected "
+            "table-on production path"
+        )
     if args.observe_layer0_ingredients and not (
         args.prefill_index_repair
         and args.dsa_query_exact_association
@@ -1676,6 +1812,8 @@ def main() -> int:
     dsa_internal_baseline = None
     dsa_internal_layer0_reference = None
     layer1_normalized_hidden_reference = None
+    strategy_nd_canary_input_bits = None
+    strategy_nd_canary_output_bits = None
     if oracle_mode:
         assert args.short_context_oracle_dir is not None
         assert args.short_context_oracle_manifest_sha256 is not None
@@ -1806,6 +1944,34 @@ def main() -> int:
             )
             if layer1_normalized_hidden_reference.shape != (6144,):
                 raise ValueError("layer-1 normalized-hidden shape drifted")
+    if args.observe_layer0_strategy_nd_row0_association:
+        assert args.strategy_nd_canary_input_bits is not None
+        assert args.strategy_nd_canary_input_sha256 is not None
+        assert args.strategy_nd_canary_output_bits is not None
+        assert args.strategy_nd_canary_output_sha256 is not None
+        if _sha256_file(args.strategy_nd_canary_input_bits) != (
+            args.strategy_nd_canary_input_sha256
+        ):
+            raise ValueError("DB533 StrategyND canary input hash drifted")
+        if _sha256_file(args.strategy_nd_canary_output_bits) != (
+            args.strategy_nd_canary_output_sha256
+        ):
+            raise ValueError("DB533 StrategyND canary output hash drifted")
+        strategy_nd_canary_input_bits = np.load(
+            args.strategy_nd_canary_input_bits,
+            allow_pickle=False,
+        )
+        strategy_nd_canary_output_bits = np.load(
+            args.strategy_nd_canary_output_bits,
+            allow_pickle=False,
+        )
+        if (
+            strategy_nd_canary_input_bits.shape != (32, 32, 6144)
+            or strategy_nd_canary_input_bits.dtype != np.dtype("<u2")
+            or strategy_nd_canary_output_bits.shape != (32, 32, 6144)
+            or strategy_nd_canary_output_bits.dtype != np.dtype("<u2")
+        ):
+            raise ValueError("DB533 StrategyND canary array contract drifted")
     if args.runtime_kind in ("pallas_feature", "pallas_feature_linear") and (
         args.source_runtime_root is None
         or args.source_runtime_manifest_sha256 is None
@@ -2990,7 +3156,12 @@ def main() -> int:
         ] = ()
         layer0_residual_discriminator_compile_seconds: dict[str, float] = {}
         layer0_residual_discriminator_hlo_sha256: dict[str, str] = {}
+        layer0_residual_discriminator_stablehlo_sha256: dict[str, str] = {}
+        layer0_residual_discriminator_barrier_counts: dict[str, int] = {}
         fleet_layer0_residual_discriminator_hlo_hashes: dict[
+            str, list[str]
+        ] = {}
+        fleet_layer0_residual_discriminator_stablehlo_hashes: dict[
             str, list[str]
         ] = {}
         layer0_residual_discriminator_hlo_contracts: dict[
@@ -2998,38 +3169,38 @@ def main() -> int:
         ] = {}
         layer0_residual_discriminator_suite_contract = None
         if observe_layer0_discriminator:
-            expected_variant_names = (
-                (
+            if args.observe_layer0_strategy_nd_row0_association:
+                expected_variant_names = (
+                    "strategy_nd_row0_control",
+                    "strategy_nd_row0_both",
+                )
+            elif args.observe_layer0_subshard_variants:
+                expected_variant_names = (
                     "dcp_then_model_sequential_bf16",
                     "dcp_then_model_pairwise_bf16",
                     "model_then_dcp_sequential_bf16",
                     "model_then_dcp_pairwise_bf16",
                 )
-                if args.observe_layer0_subshard_variants
-                else (
-                    (
-                        "attention_output_association_control",
-                        "attention_output_dcp_then_model_sequential_bf16",
-                        "attention_output_dcp_then_model_pairwise_bf16",
-                        "attention_output_model_then_dcp_sequential_bf16",
-                        "attention_output_model_then_dcp_pairwise_bf16",
-                    )
-                    if args.observe_layer0_attention_output_association_variants
-                    else (
-                        (
-                            "attention_schedule_control",
-                            "replicated_monolithic_attention",
-                        )
-                        if args.observe_layer0_attention_schedule_variants
-                        else (
-                            "baseline_bf16",
-                            "attention_output_fp32",
-                            "dense_down_fp32",
-                            "attention_output_and_dense_down_fp32",
-                        )
-                    )
+            elif args.observe_layer0_attention_output_association_variants:
+                expected_variant_names = (
+                    "attention_output_association_control",
+                    "attention_output_dcp_then_model_sequential_bf16",
+                    "attention_output_dcp_then_model_pairwise_bf16",
+                    "attention_output_model_then_dcp_sequential_bf16",
+                    "attention_output_model_then_dcp_pairwise_bf16",
                 )
-            )
+            elif args.observe_layer0_attention_schedule_variants:
+                expected_variant_names = (
+                    "attention_schedule_control",
+                    "replicated_monolithic_attention",
+                )
+            else:
+                expected_variant_names = (
+                    "baseline_bf16",
+                    "attention_output_fp32",
+                    "dense_down_fp32",
+                    "attention_output_and_dense_down_fp32",
+                )
             observed_variant_names = tuple(
                 name for name, _ in decoder.layer0_residual_discriminators
             )
@@ -3047,9 +3218,27 @@ def main() -> int:
                     f"{variant_name}-compile-start"
                 )
                 discriminator_compile_started = time.monotonic()
-                compiled_discriminator = jax.jit(discriminator).lower(
-                    *inputs
-                ).compile()
+                lowered_discriminator = jax.jit(discriminator).lower(*inputs)
+                discriminator_stablehlo = lowered_discriminator.as_text()
+                stablehlo_digest = sha256(
+                    discriminator_stablehlo.encode("utf-8")
+                ).hexdigest()
+                layer0_residual_discriminator_stablehlo_sha256[
+                    variant_name
+                ] = stablehlo_digest
+                fleet_layer0_residual_discriminator_stablehlo_hashes[
+                    variant_name
+                ] = _fleet_digest(
+                    multihost_utils,
+                    stablehlo_digest,
+                    num_processes=args.num_processes,
+                )
+                layer0_residual_discriminator_barrier_counts[
+                    variant_name
+                ] = discriminator_stablehlo.count(
+                    "stablehlo.optimization_barrier"
+                )
+                compiled_discriminator = lowered_discriminator.compile()
                 layer0_residual_discriminator_compile_seconds[
                     variant_name
                 ] = time.monotonic() - discriminator_compile_started
@@ -3093,6 +3282,16 @@ def main() -> int:
                         encoding="utf-8",
                     ) as stream:
                         stream.write(optimized_discriminator_hlo)
+                    with gzip.open(
+                        hlo_dir
+                        / (
+                            "layer0_residual_discriminator."
+                            f"{variant_name}.stablehlo.txt.gz"
+                        ),
+                        "wt",
+                        encoding="utf-8",
+                    ) as stream:
+                        stream.write(discriminator_stablehlo)
                     _atomic_json(
                         hlo_dir
                         / (
@@ -3102,12 +3301,214 @@ def main() -> int:
                         hlo_contract,
                     )
                 del optimized_discriminator_hlo
+                del discriminator_stablehlo
                 compiled_discriminators.append(
                     (variant_name, compiled_discriminator)
                 )
             compiled_layer0_residual_discriminators = tuple(
                 compiled_discriminators
             )
+            strategy_nd_stablehlo_contract = {
+                "applicable": bool(
+                    args.observe_layer0_strategy_nd_row0_association
+                ),
+                "barrier_counts": dict(
+                    layer0_residual_discriminator_barrier_counts
+                ),
+                "expected_candidate_minus_control": 164,
+                "passed": True,
+            }
+            if args.observe_layer0_strategy_nd_row0_association:
+                barrier_delta = (
+                    layer0_residual_discriminator_barrier_counts[
+                        "strategy_nd_row0_both"
+                    ]
+                    - layer0_residual_discriminator_barrier_counts[
+                        "strategy_nd_row0_control"
+                    ]
+                )
+                strategy_nd_stablehlo_contract["observed_delta"] = (
+                    barrier_delta
+                )
+                strategy_nd_stablehlo_contract["passed"] = bool(
+                    barrier_delta == 164
+                )
+
+            strategy_nd_canary_contract = None
+            if args.observe_layer0_strategy_nd_row0_association:
+                assert strategy_nd_canary_input_bits is not None
+                assert strategy_nd_canary_output_bits is not None
+                axis_names = tuple(decoder.mesh.axis_names)
+                if axis_names != ("device",):
+                    raise RuntimeError(
+                        "StrategyND canary requires the explicit device axis"
+                    )
+                model_to_physical = np.asarray(
+                    STRATEGY_ND_CANARY_MODEL_TO_PHYSICAL,
+                    dtype=np.int32,
+                )
+                canary_model_input_bits = np.ascontiguousarray(
+                    strategy_nd_canary_input_bits[:, model_to_physical]
+                )
+
+                def make_canary_input(trial: int) -> Any:
+                    def builder(
+                        rank: int,
+                        shard_shape: tuple[int, ...],
+                    ) -> np.ndarray:
+                        slot = rank % 4
+                        model_bits = canary_model_input_bits[trial]
+                        local_bits = np.ascontiguousarray(
+                            model_bits[slot * 8 : (slot + 1) * 8]
+                        )
+                        local = local_bits.view(ml_dtypes.bfloat16)[
+                            None, :, None, :
+                        ]
+                        if tuple(local.shape) != shard_shape:
+                            raise RuntimeError(
+                                "StrategyND canary shard shape drifted"
+                            )
+                        return local
+
+                    return _make_global_array(
+                        jax,
+                        decoder.mesh,
+                        P("device", None, None, None),
+                        (32, 8, 1, 6144),
+                        builder,
+                    )
+
+                def canary_mapped(local_partials: Any) -> Any:
+                    with jax.named_scope(
+                        "greenfield_strategy_nd_row0_canary"
+                    ):
+                        reduced = _reduce_strategy_nd_row0_bf16_partials(
+                            local_partials[0],
+                            axis_name="device",
+                            groups=groups,
+                        )
+                    return reduced[None, ...]
+
+                canary_execute = jax.shard_map(
+                    canary_mapped,
+                    mesh=decoder.mesh,
+                    in_specs=P("device", None, None, None),
+                    out_specs=P("device", None, None),
+                    check_vma=False,
+                )
+                first_canary_input = make_canary_input(0)
+                multihost_utils.sync_global_devices(
+                    "greenfield-strategy-nd-row0-canary-compile-start"
+                )
+                canary_compile_started = time.monotonic()
+                lowered_canary = jax.jit(canary_execute).lower(
+                    first_canary_input
+                )
+                canary_stablehlo = lowered_canary.as_text()
+                canary_barrier_count = canary_stablehlo.count(
+                    "stablehlo.optimization_barrier"
+                )
+                compiled_canary = lowered_canary.compile()
+                canary_compile_seconds = (
+                    time.monotonic() - canary_compile_started
+                )
+                multihost_utils.sync_global_devices(
+                    "greenfield-strategy-nd-row0-canary-compile-end"
+                )
+                optimized_canary_hlo = compiled_canary.as_text()
+                canary_hlo_sha256 = sha256(
+                    optimized_canary_hlo.encode("utf-8")
+                ).hexdigest()
+                fleet_canary_hlo_hashes = _fleet_digest(
+                    multihost_utils,
+                    canary_hlo_sha256,
+                    num_processes=args.num_processes,
+                )
+                canary_hlo_contract = _validate_strategy_nd_canary_hlo(
+                    optimized_canary_hlo,
+                    groups=groups,
+                )
+                mismatch_count = 0
+                first_mismatch = None
+                actual_row0_sha256: list[str] = []
+                for trial in range(32):
+                    canary_input = (
+                        first_canary_input
+                        if trial == 0
+                        else make_canary_input(trial)
+                    )
+                    canary_output = compiled_canary(canary_input)
+                    canary_output.block_until_ready()
+                    actual = _materialize_global_array(
+                        jax,
+                        multihost_utils,
+                        canary_output,
+                    )
+                    actual_bits = _encode_bfloat16_bits(actual[:, 0])
+                    expected_bits = np.asarray(
+                        strategy_nd_canary_output_bits[trial, 0]
+                    )
+                    mismatches = np.argwhere(
+                        actual_bits != expected_bits[None, :]
+                    )
+                    mismatch_count += int(mismatches.shape[0])
+                    if first_mismatch is None and mismatches.size:
+                        first_mismatch = {
+                            "column": int(mismatches[0, 1]),
+                            "lane": int(mismatches[0, 0]),
+                            "trial": trial,
+                        }
+                    actual_row0_sha256.append(
+                        sha256(actual_bits[0].tobytes()).hexdigest()
+                    )
+                    canary_output.delete()
+                    canary_input.delete()
+                strategy_nd_canary_contract = {
+                    "actual_row0_sha256": actual_row0_sha256,
+                    "compile_seconds": canary_compile_seconds,
+                    "first_mismatch": first_mismatch,
+                    "fleet_hlo_sha256": fleet_canary_hlo_hashes,
+                    "hlo_contract": canary_hlo_contract,
+                    "hlo_sha256": canary_hlo_sha256,
+                    "input_file_sha256": (
+                        args.strategy_nd_canary_input_sha256
+                    ),
+                    "lane_count": 32,
+                    "mismatch_count": mismatch_count,
+                    "output_file_sha256": (
+                        args.strategy_nd_canary_output_sha256
+                    ),
+                    "stablehlo_optimization_barrier_count": (
+                        canary_barrier_count
+                    ),
+                    "trial_count": 32,
+                }
+                strategy_nd_canary_contract["passed"] = bool(
+                    canary_barrier_count == 82
+                    and canary_hlo_contract["passed"]
+                    and mismatch_count == 0
+                    and len(set(actual_row0_sha256)) == 32
+                )
+                if jax.process_index() == 0:
+                    hlo_dir = args.output.parent / "hlo"
+                    with gzip.open(
+                        hlo_dir / "strategy_nd_row0_canary.optimized_hlo.txt.gz",
+                        "wt",
+                        encoding="utf-8",
+                    ) as stream:
+                        stream.write(optimized_canary_hlo)
+                    _atomic_json(
+                        hlo_dir / "strategy_nd_row0_canary.contract.json",
+                        strategy_nd_canary_contract,
+                    )
+                del optimized_canary_hlo
+                del canary_stablehlo
+                del canary_model_input_bits
+                if not strategy_nd_canary_contract["passed"]:
+                    raise RuntimeError(
+                        "StrategyND DB533 canary failed before model execution: "
+                        f"{strategy_nd_canary_contract}"
+                    )
             layer0_residual_discriminator_suite_contract = {
                 "discriminator_kind": layer0_discriminator_kind,
                 "all_hlo_contracts_pass": all(
@@ -3137,6 +3538,15 @@ def main() -> int:
                 "program_count": len(
                     compiled_layer0_residual_discriminators
                 ),
+                "strategy_nd_canary_passed": (
+                    strategy_nd_canary_contract is not None
+                    and strategy_nd_canary_contract["passed"]
+                    if args.observe_layer0_strategy_nd_row0_association
+                    else True
+                ),
+                "strategy_nd_stablehlo_contract": (
+                    strategy_nd_stablehlo_contract
+                ),
                 "variant_names": list(observed_variant_names),
             }
             layer0_residual_discriminator_suite_contract["passed"] = bool(
@@ -3150,6 +3560,10 @@ def main() -> int:
                     "program_count"
                 ]
                 == len(expected_variant_names)
+                and layer0_residual_discriminator_suite_contract[
+                    "strategy_nd_canary_passed"
+                ]
+                and strategy_nd_stablehlo_contract["passed"]
             )
             if jax.process_index() == 0:
                 _atomic_json(
@@ -3352,38 +3766,7 @@ def main() -> int:
                 .view(ml_dtypes.bfloat16)
                 .astype(np.float32)
             )
-            variant_names = (
-                (
-                    "dcp_then_model_sequential_bf16",
-                    "dcp_then_model_pairwise_bf16",
-                    "model_then_dcp_sequential_bf16",
-                    "model_then_dcp_pairwise_bf16",
-                )
-                if args.observe_layer0_subshard_variants
-                else (
-                    (
-                        "attention_output_association_control",
-                        "attention_output_dcp_then_model_sequential_bf16",
-                        "attention_output_dcp_then_model_pairwise_bf16",
-                        "attention_output_model_then_dcp_sequential_bf16",
-                        "attention_output_model_then_dcp_pairwise_bf16",
-                    )
-                    if args.observe_layer0_attention_output_association_variants
-                    else (
-                        (
-                            "attention_schedule_control",
-                            "replicated_monolithic_attention",
-                        )
-                        if args.observe_layer0_attention_schedule_variants
-                        else (
-                            "baseline_bf16",
-                            "attention_output_fp32",
-                            "dense_down_fp32",
-                            "attention_output_and_dense_down_fp32",
-                        )
-                    )
-                )
-            )
+            variant_names = expected_variant_names
             comparisons: dict[str, dict[str, Any]] = {}
             arm_contracts: dict[str, dict[str, Any]] = {}
             variant_bits_by_name: dict[str, np.ndarray] = {}
@@ -3513,11 +3896,20 @@ def main() -> int:
                 "fleet_hlo_hashes": (
                     fleet_layer0_residual_discriminator_hlo_hashes
                 ),
+                "fleet_stablehlo_hashes": (
+                    fleet_layer0_residual_discriminator_stablehlo_hashes
+                ),
                 "hlo_sha256_by_variant": (
                     layer0_residual_discriminator_hlo_sha256
                 ),
+                "stablehlo_sha256_by_variant": (
+                    layer0_residual_discriminator_stablehlo_sha256
+                ),
                 "hlo_suite_contract": (
                     layer0_residual_discriminator_suite_contract
+                ),
+                "strategy_nd_canary_contract": (
+                    strategy_nd_canary_contract
                 ),
                 "current_baseline_expected_sha256": (
                     LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256
@@ -3532,9 +3924,13 @@ def main() -> int:
                     bool(
                         comparisons[
                             (
-                                "attention_output_association_control"
-                                if args.observe_layer0_attention_output_association_variants
-                                else "attention_schedule_control"
+                                "strategy_nd_row0_control"
+                                if args.observe_layer0_strategy_nd_row0_association
+                                else (
+                                    "attention_output_association_control"
+                                    if args.observe_layer0_attention_output_association_variants
+                                    else "attention_schedule_control"
+                                )
                             )
                             if main_rope_layer0_discriminator
                             else "baseline_bf16"

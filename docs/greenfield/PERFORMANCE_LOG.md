@@ -1272,3 +1272,12 @@ The trace still has no separate MXU-active or HBM-stall counters, so these aggre
 whether either kernel is compute- or bandwidth-limited. They do make those two signatures the
 first optimization targets after protected 8K exactness. Gate E still needs about `5.435 ms/stage`
 of active-work reduction, and WS32/PP16 adjudication remains mandatory.
+
+## DB533 StrategyND fingerprint — exact association only, no performance result
+
+DB533/item1818 completed the repeated exact-M32 physical fingerprint with exact HLO/backend/layout,
+raw arrays, DB/archive linkage and 8/8 cleanup. It uniquely resolves all 6,144 columns for live row
+zero and supplies the model-position/physical-device mapping needed by the layer-0 challenger.
+The run has no model, checkpoint, warmed decode distribution, XPlane or token loop. It therefore
+changes no latency or throughput standing: DB484 remains the only accepted PP8 decoder result at
+`244.091151 ms/token` and `4.096830 tok/s`; Gate E remains open.

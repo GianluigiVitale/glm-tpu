@@ -46,7 +46,7 @@
 | Pallas exact DSA top-k | DB 445: exact local 65,536→2,048 plus permuted four-owner merge; TPU/host scores, positions, counts, ties, sentinels exact; 6/2 calls and no XLA sort/top-k/dead rows/collectives; local/merge p50 1.364405/0.337671 ms. DB 444 reduction path exact but rejected at 59.979532/4.495320 ms. | Standalone Section 7.2 item 6 pass; layer integration pending |
 | Gate D fused qkv-a implementation | `0082bac`/DB503 plus DB504: exact isolated q-a/kv-a; protected full final-layout load; 78 physical one-row convolutions; no old calls, forbidden shape, reshard, concat or dequantization | Pass (mechanism) |
 | Gate D protected 2K decoder | DB 484: exact token/DSA/state/cache/local HLO, peak HBM 26,245,004,800 bytes/chip, 244.091151 ms p50 and 4.096830 tok/s | Pass at 2K; below Gate E |
-| Gate D protected 8K decoder | Protected `0312cf5` integration localizes the first recurrent mismatch to layer-0 output entering layer 1. Precision, uniform virtual-TP32 output association and monolithic-attention schedule families are protected negative evidence. DB532/item1817 now seals the exact accepted M32 decode lowering: 156 BF16 `32x6144` reductions, ranks 0--31 and one uniform RotatedPincer/StrategyND config, with exact token/DSA/load/state, archive and cleanup. Its shape-32 decode dumps and pinned scheduler code independently prove row zero is the sole live bucket row. | Missing; run one exact-M32 physical association fingerprint, apply physical row zero, then retry complete 8K |
+| Gate D protected 8K decoder | Protected `0312cf5` integration localizes the first recurrent mismatch to layer-0 output entering layer 1. Precision, uniform virtual-TP32 output association and monolithic-attention schedule families are protected negative evidence. DB532 seals exact M32 lowering and the sole live row; DB533 uniquely recovers all 6,144 live-row association columns plus the model-to-physical permutation. | Missing; finish/test/audit the exact two-arm row-zero discriminator, then run it once before complete 8K |
 | Gate D prompt index-cache/scorer discriminator | DB505--518 make the complete 8,155-row cache exact; DB521--527 make current query/head/key exact. DB528 rejects page geometry. DB529's same-shape TPU default-precision arm matches the accepted logical and selected scores/set/order/ties exactly, with pinned HLO/DB/archive/cleanup. | Pass; do not repeat bounded scorer variants |
 | Gates E–H | Await Gate D | Missing |
 
@@ -69,15 +69,17 @@ suite: 67 passed in 198.84 seconds with explicit CPU backend. It validates the t
 trees, four isolated program names, subshard kernel/collective HLO contracts and all existing
 stage-local/decoder behavior. Python compileall, Bash, ShellCheck and diff checks pass; its protected
 TPU discriminator completed at `e19833a` and rejected all four uniform trees under valid contracts.
-The old StrategyND fingerprint readiness result covered a now-rejected one-row probe. DB532 supplies
-the exact retained decode HLO and authorizes only a repeated-invocation `32x6144` physical
-association diagnostic: each trial is replicated over all rows, the complete bank is repeated and
-all rows are replayed independently. The artifact also retains the accepted model-axis-to-device
-permutation from its pinned six-axis `create_device_mesh` recipe. CPU/HLO tests remain
-semantics/mechanism evidence until that protected TPU capture passes; it will not be decoder
-correctness or performance evidence. The
-corrected affected benchmarking/HLO/topology suite passes `121/121`, including eight focused tests;
-Bash, ShellCheck, compileall, JSON, embedded-Python and diff checks also pass.
+The old one-row StrategyND prototype remains rejected. DB532 authorized the corrected repeated-M32
+capture, and protected DB533 now passes it: every physical row has unique 6,144/6,144 coverage,
+row zero is explicitly recovered, and analysis/summary/SUCCESS plus DB/archive/8-host cleanup are
+sealed. This is association evidence only. The current default-off integration applies row zero to
+both layer-0 projections through two LP4 gathers. Its affected CPU/forced-device suite passes
+`79/79`; direct current-code DB533 replay has `0/196,608` mismatches. Python, Bash, ShellCheck,
+JSON, all 15 embedded-Python blocks and diff checks pass, and the read-only exact-mode wrapper
+preflight reaches the intended dirty-worktree refusal after validating DB533. The corrected HLO
+contract globally pins exactly two separately scoped gathers, while a same-reducer device canary
+pins all 32 sealed trials/lanes and 82 BF16-round barriers. No TPU boundary result exists until the
+existing Sol reviewer's bounded fix confirmation and the protected discriminator.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the
 fused-routed deployable raw-FP8 PP8 MoE layer but misses its latency budget. None proves full-model correctness,

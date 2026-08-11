@@ -974,6 +974,85 @@ def _layer0_attention_output_association_discriminator_hlo(
     )
 
 
+def _layer0_strategy_nd_row0_discriminator_hlo(
+    variant_name: str,
+    *,
+    flattened_gathers: bool = False,
+) -> str:
+    if variant_name not in {
+        "strategy_nd_row0_control",
+        "strategy_nd_row0_both",
+    }:
+        raise ValueError("unknown StrategyND row-zero test variant")
+    hlo = _layer0_attention_schedule_discriminator_hlo(
+        "attention_schedule_control",
+        tpu_rewritten_control=True,
+    ).replace("attention_schedule_control", variant_name)
+    if variant_name == "strategy_nd_row0_control":
+        return hlo
+
+    replica_groups = (
+        "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
+        "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
+    )
+    result_shape = (
+        "bf16[32,1,6144]"
+        if flattened_gathers
+        else "bf16[4,8,1,6144]"
+    )
+    gathers = (
+        "  %strategy.partials = bf16[8,1,6144] constant({0})\n"
+        + "\n".join(
+            f"  %strategy.ag.{index} = {result_shape} all-gather("
+            "%strategy.partials), dimensions={0}, "
+            f"replica_groups={replica_groups}, channel_id={20 + index}, "
+            "use_global_device_ids=true, metadata={op_name=\"jit(probe)/"
+            + (
+                "greenfield_strategy_nd_row0_attention_output/"
+                if index == 0
+                else "greenfield_strategy_nd_row0_dense_down/"
+            )
+            + "greenfield_strategy_nd_row0_association/"
+            "greenfield_strategy_nd_row0_association_gather/all_gather\"}"
+            for index in range(2)
+        )
+        + "\n"
+    )
+    production_attention = (
+        "  %attention = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_block_matmul_m8_k4096_n6144"'
+    )
+    virtual_attention = "\n".join(
+        f"  %attention.{index} = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_block_matmul_m8_k512_n6144"'
+        for index in range(8)
+    )
+    production_dense = (
+        "  %dense = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_fused_block_swiglu_'
+        'm8_h6144_i3072_o6144"'
+    )
+    virtual_dense = "\n".join(
+        f"  %dense.{index} = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_fused_block_swiglu_'
+        'm8_h6144_i384_o6144"'
+        for index in range(8)
+    )
+    return (
+        hlo.replace(
+            "  %normalized =",
+            gathers + "  %normalized =",
+            1,
+        )
+        .replace(production_attention, virtual_attention)
+        .replace(production_dense, virtual_dense)
+    )
+
+
 def _layer0_virtual_tp32_discriminator_hlo(variant_name: str) -> str:
     variants = {
         "dcp_then_model_sequential_bf16",
@@ -1495,6 +1574,137 @@ def test_layer0_attention_output_specs_leave_dense_on_production_path() -> None:
         assert spec[4:6] == (True, False)
 
 
+def test_layer0_strategy_nd_row0_hlo_pins_two_local_partial_gathers() -> None:
+    from glm_tpu.greenfield.runtime import (
+        validate_layer0_residual_discriminator_hlo,
+    )
+
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4))
+        for stage in range(8)
+    )
+    config = _real_8k_decoder_config(dsa_score_default_precision=True)
+    control = validate_layer0_residual_discriminator_hlo(
+        _layer0_strategy_nd_row0_discriminator_hlo(
+            "strategy_nd_row0_control"
+        ),
+        config=config,
+        groups=groups,
+        variant_name="strategy_nd_row0_control",
+        main_rope_table_enabled=True,
+    )
+    assert control["passed"], control
+    assert control["discriminator_kind"] == "strategy_nd_row0_association"
+    assert not control["strategy_nd_gathers"]
+
+    for flattened in (False, True):
+        candidate_hlo = _layer0_strategy_nd_row0_discriminator_hlo(
+            "strategy_nd_row0_both",
+            flattened_gathers=flattened,
+        )
+        candidate = validate_layer0_residual_discriminator_hlo(
+            candidate_hlo,
+            config=config,
+            groups=groups,
+            variant_name="strategy_nd_row0_both",
+            main_rope_table_enabled=True,
+        )
+        assert candidate["passed"], candidate
+        assert len(candidate["strategy_nd_gathers"]) == 2
+        assert candidate["strategy_nd_shaped_gather_count"] == 2
+        assert candidate["strategy_nd_attention_gather_count"] == 1
+        assert candidate["strategy_nd_dense_gather_count"] == 1
+        assert candidate["kernel_counts"][
+            "greenfield_fp8_block_matmul_m8_k512_n6144"
+        ] == 8
+        assert candidate["kernel_counts"][
+            "greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144"
+        ] == 8
+        assert candidate["virtual_tp32_association_scope_present"]
+
+    missing = validate_layer0_residual_discriminator_hlo(
+        _layer0_strategy_nd_row0_discriminator_hlo(
+            "strategy_nd_row0_both"
+        ).replace(
+            "greenfield_strategy_nd_row0_association_gather",
+            "missing_strategy_nd_gather_scope",
+            1,
+        ),
+        config=config,
+        groups=groups,
+        variant_name="strategy_nd_row0_both",
+        main_rope_table_enabled=True,
+    )
+    assert not missing["passed"]
+    assert len(missing["strategy_nd_gathers"]) == 1
+
+    wrong_shape = validate_layer0_residual_discriminator_hlo(
+        _layer0_strategy_nd_row0_discriminator_hlo(
+            "strategy_nd_row0_both"
+        ).replace("bf16[4,8,1,6144]", "bf16[4,7,1,6144]", 1),
+        config=config,
+        groups=groups,
+        variant_name="strategy_nd_row0_both",
+        main_rope_table_enabled=True,
+    )
+    assert not wrong_shape["passed"]
+    assert wrong_shape["strategy_nd_shaped_gather_count"] == 1
+
+    extra_unscoped = validate_layer0_residual_discriminator_hlo(
+        _layer0_strategy_nd_row0_discriminator_hlo(
+            "strategy_nd_row0_both"
+        ).replace(
+            "  %normalized =",
+            "  %extra.strategy.ag = bf16[4,8,1,6144] all-gather("
+            "%strategy.partials), dimensions={0}, "
+            f"replica_groups={{{{0,1,2,3}},{{4,5,6,7}},"
+            "{8,9,10,11},{12,13,14,15},{16,17,18,19},"
+            "{20,21,22,23},{24,25,26,27},{28,29,30,31}}}, "
+            "channel_id=99, use_global_device_ids=true\n"
+            "  %normalized =",
+            1,
+        ),
+        config=config,
+        groups=groups,
+        variant_name="strategy_nd_row0_both",
+        main_rope_table_enabled=True,
+    )
+    assert not extra_unscoped["passed"]
+    assert extra_unscoped["strategy_nd_shaped_gather_count"] == 3
+    assert any(
+        "unscoped partial gather" in violation
+        for violation in extra_unscoped["violations"]
+    )
+
+
+def test_layer0_strategy_nd_row0_specs_apply_to_attention_and_dense() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _layer0_residual_discriminator_specs,
+    )
+
+    specs = _layer0_residual_discriminator_specs(
+        "strategy_nd_row0_association"
+    )
+    assert specs == (
+        (
+            "strategy_nd_row0_control",
+            False,
+            False,
+            None,
+            False,
+            False,
+        ),
+        (
+            "strategy_nd_row0_both",
+            False,
+            False,
+            "strategy_nd_row0_bf16",
+            False,
+            False,
+        ),
+    )
+
+
 def test_layer0_ingredients_hlo_pins_primitive_capture() -> None:
     from glm_tpu.greenfield.runtime import (
         validate_layer0_ingredients_observer_hlo,
@@ -1710,6 +1920,20 @@ attention_output_decoder = build_decoder_step_program(
     layer0_residual_discriminator_kind="attention_output_association",
 )
 assert len(attention_output_decoder.layer0_residual_discriminators) == 5
+strategy_nd_decoder = build_decoder_step_program(
+    plan,
+    schedule,
+    state,
+    weight_layout,
+    groups,
+    pairs,
+    complete_token_path=True,
+    split_residual_state=True,
+    main_rope_table_enabled=True,
+    build_layer0_residual_discriminator=True,
+    layer0_residual_discriminator_kind="strategy_nd_row0_association",
+)
+assert len(strategy_nd_decoder.layer0_residual_discriminators) == 2
 
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -1833,6 +2057,22 @@ print(json.dumps({
             attention_output_decoder.layer0_residual_discriminators
         )
     ],
+    "strategy_nd_discriminator_kind": (
+        strategy_nd_decoder.layer0_residual_discriminator_kind
+    ),
+    "strategy_nd_program_count": len(
+        strategy_nd_decoder.layer0_residual_discriminators
+    ),
+    "strategy_nd_program_objects_distinct": len({
+        id(discriminator)
+        for _, discriminator in (
+            strategy_nd_decoder.layer0_residual_discriminators
+        )
+    }),
+    "strategy_nd_variant_names": [
+        name
+        for name, _ in strategy_nd_decoder.layer0_residual_discriminators
+    ],
     "virtual_discriminator_kind": (
         virtual_decoder.layer0_residual_discriminator_kind
     ),
@@ -1896,6 +2136,15 @@ print(json.dumps({
         "attention_output_dcp_then_model_pairwise_bf16",
         "attention_output_model_then_dcp_sequential_bf16",
         "attention_output_model_then_dcp_pairwise_bf16",
+    ]
+    assert result["strategy_nd_discriminator_kind"] == (
+        "strategy_nd_row0_association"
+    )
+    assert result["strategy_nd_program_count"] == 2
+    assert result["strategy_nd_program_objects_distinct"] == 2
+    assert result["strategy_nd_variant_names"] == [
+        "strategy_nd_row0_control",
+        "strategy_nd_row0_both",
     ]
     assert (
         result["attention_all_gather_counts"][

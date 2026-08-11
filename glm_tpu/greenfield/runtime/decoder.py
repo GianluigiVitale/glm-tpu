@@ -37,6 +37,7 @@ from ..kernels.reference.rotary import (
     rotary_table_sha256,
 )
 from ..kernels.stage_local import (
+    STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
     VIRTUAL_TP32_REDUCTION_ASSOCIATIONS,
     StageLinearBackend,
     VirtualTp32ReductionAssociation,
@@ -78,6 +79,7 @@ Layer0ResidualDiscriminatorKind = Literal[
     "virtual_tp32",
     "attention_schedule",
     "attention_output_association",
+    "strategy_nd_row0_association",
 ]
 LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS = (
     VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
@@ -92,6 +94,10 @@ LAYER0_ATTENTION_OUTPUT_ASSOCIATION_VARIANTS = (
         f"attention_output_{association}"
         for association in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
     ),
+)
+LAYER0_STRATEGY_ND_ROW0_ASSOCIATION_VARIANTS = (
+    "strategy_nd_row0_control",
+    "strategy_nd_row0_both",
 )
 LAYER0_INGREDIENT_NAMES = (
     "selected_positions",
@@ -179,6 +185,25 @@ def _layer0_residual_discriminator_specs(
                     False,
                 )
                 for association in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+            ),
+        )
+    if kind == "strategy_nd_row0_association":
+        return (
+            (
+                "strategy_nd_row0_control",
+                False,
+                False,
+                None,
+                False,
+                False,
+            ),
+            (
+                "strategy_nd_row0_both",
+                False,
+                False,
+                STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+                False,
+                False,
             ),
         )
     raise PlanValidationError(
@@ -2700,6 +2725,15 @@ def validate_layer0_residual_discriminator_hlo(
         virtual_association = variant_name.removeprefix(
             "attention_output_"
         )
+    elif variant_name in LAYER0_STRATEGY_ND_ROW0_ASSOCIATION_VARIANTS:
+        discriminator_kind = "strategy_nd_row0_association"
+        attention_fp32 = False
+        dense_fp32 = False
+        virtual_association = (
+            STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+            if variant_name == "strategy_nd_row0_both"
+            else None
+        )
     else:
         raise PlanValidationError(
             f"unknown layer-0 discriminator variant: {variant_name}"
@@ -2761,6 +2795,55 @@ def validate_layer0_residual_discriminator_hlo(
         item
         for item in collectives
         if in_named_scope(item.op_name, owner_split_gather_scopes[0])
+    )
+    strategy_nd_gather_scope = (
+        "greenfield_strategy_nd_row0_association_gather"
+    )
+    strategy_nd_gathers = tuple(
+        item
+        for item in collectives
+        if in_named_scope(item.op_name, strategy_nd_gather_scope)
+    )
+
+    def is_strategy_nd_partials_gather(item: Any) -> bool:
+        if item.opcode != "all-gather":
+            return False
+        operand_shape = HloShape("bf16", (8, 1, config.hidden_size))
+        logical_result = HloShape(
+            "bf16",
+            (config.local_parallel_size, 8, 1, config.hidden_size),
+        )
+        flattened_result = HloShape(
+            "bf16",
+            (config.local_parallel_size * 8, 1, config.hidden_size),
+        )
+        return bool(
+            operand_shape in item.operand_shapes
+            and any(
+                shape in {logical_result, flattened_result}
+                for shape in item.result_shapes
+            )
+        )
+
+    strategy_nd_shaped_gathers = tuple(
+        item for item in collectives
+        if is_strategy_nd_partials_gather(item)
+    )
+    strategy_nd_attention_gathers = tuple(
+        item
+        for item in strategy_nd_gathers
+        if in_named_scope(
+            item.op_name,
+            "greenfield_strategy_nd_row0_attention_output",
+        )
+    )
+    strategy_nd_dense_gathers = tuple(
+        item
+        for item in strategy_nd_gathers
+        if in_named_scope(
+            item.op_name,
+            "greenfield_strategy_nd_row0_dense_down",
+        )
     )
 
     def is_cache_shaped_gather(item: Any) -> bool:
@@ -2912,7 +2995,10 @@ def validate_layer0_residual_discriminator_hlo(
         > 1
     )
     if discriminator_kind in {"combine_precision", "attention_schedule"} or (
-        discriminator_kind == "attention_output_association"
+        discriminator_kind in {
+            "attention_output_association",
+            "strategy_nd_row0_association",
+        }
         and virtual_association is None
     ):
         expected_kernel_counts = {
@@ -2947,6 +3033,24 @@ def validate_layer0_residual_discriminator_hlo(
         }
         virtual_association_scope = (
             f"greenfield_virtual_tp32_{virtual_association}"
+        )
+        virtual_association_scope_present = (
+            virtual_association_scope in optimized_hlo
+        )
+    elif discriminator_kind == "strategy_nd_row0_association":
+        expected_kernel_counts = {
+            attention_bf16_name: 0,
+            attention_f32_name: 0,
+            dense_bf16_name: 0,
+            dense_f32_name: 0,
+            virtual_attention_name: 8,
+            virtual_dense_name: 8,
+            fp32_boundary_name: 0,
+        }
+        expected_fp32_combines = 0
+        expected_hidden_collective_shapes = None
+        virtual_association_scope = (
+            "greenfield_strategy_nd_row0_association"
         )
         virtual_association_scope_present = (
             virtual_association_scope in optimized_hlo
@@ -2989,7 +3093,11 @@ def validate_layer0_residual_discriminator_hlo(
     minimum_all_gathers = (
         3
         if discriminator_kind
-        in {"attention_schedule", "attention_output_association"}
+        in {
+            "attention_schedule",
+            "attention_output_association",
+            "strategy_nd_row0_association",
+        }
         else 5
     )
     if not minimum_all_gathers <= by_opcode.get("all-gather", 0) <= 20:
@@ -3034,6 +3142,45 @@ def validate_layer0_residual_discriminator_hlo(
             violations.append(
                 "layer-0 discriminator lost its virtual TP32 association scope"
             )
+    expects_strategy_nd_row0 = (
+        variant_name == "strategy_nd_row0_both"
+    )
+    if expects_strategy_nd_row0:
+        if len(strategy_nd_gathers) != 2:
+            violations.append(
+                "layer-0 StrategyND challenger must contain exactly two "
+                f"scoped partial gathers, found {len(strategy_nd_gathers)}"
+            )
+        if len(strategy_nd_shaped_gathers) != 2:
+            violations.append(
+                "layer-0 StrategyND global partial-gather count/shapes drifted: "
+                f"{len(strategy_nd_shaped_gathers)}"
+            )
+        if any(
+            item not in strategy_nd_gathers
+            for item in strategy_nd_shaped_gathers
+        ):
+            violations.append(
+                "layer-0 StrategyND contains an unscoped partial gather"
+            )
+        if len(strategy_nd_attention_gathers) != 1:
+            violations.append(
+                "layer-0 StrategyND attention partial-gather count drifted: "
+                f"{len(strategy_nd_attention_gathers)}"
+            )
+        if len(strategy_nd_dense_gathers) != 1:
+            violations.append(
+                "layer-0 StrategyND dense partial-gather count drifted: "
+                f"{len(strategy_nd_dense_gathers)}"
+            )
+        if not virtual_association_scope_present:
+            violations.append(
+                "layer-0 discriminator lost its StrategyND row-zero scope"
+            )
+    elif strategy_nd_gathers or strategy_nd_shaped_gathers:
+        violations.append(
+            "layer-0 control unexpectedly contains StrategyND partial gathers"
+        )
     if (
         len(entry_roots) != 1
         or entry_roots[0].result_shapes != expected_root_shapes
@@ -3084,6 +3231,7 @@ def validate_layer0_residual_discriminator_hlo(
     elif discriminator_kind in {
         "attention_schedule",
         "attention_output_association",
+        "strategy_nd_row0_association",
     }:
         # TPU SPMD rewrites the LSE all-gather to an unnamed f32[256]
         # all-reduce and removes the validity gather.  The BF16 attention-output
@@ -3136,6 +3284,16 @@ def validate_layer0_residual_discriminator_hlo(
             _compact_collective_record(item)
             for item in owner_split_output_gathers
         ],
+        "strategy_nd_gathers": [
+            _compact_collective_record(item) for item in strategy_nd_gathers
+        ],
+        "strategy_nd_attention_gather_count": len(
+            strategy_nd_attention_gathers
+        ),
+        "strategy_nd_dense_gather_count": len(strategy_nd_dense_gathers),
+        "strategy_nd_shaped_gather_count": len(
+            strategy_nd_shaped_gathers
+        ),
         "expected_kernel_counts": expected_kernel_counts,
         "expected_fp32_local_combine_count": expected_fp32_combines,
         "expected_hidden_collective_shapes": (
@@ -4029,6 +4187,7 @@ def build_decoder_step_program(
         "virtual_tp32",
         "attention_schedule",
         "attention_output_association",
+        "strategy_nd_row0_association",
     ):
         raise PlanValidationError(
             "layer-0 residual discriminator kind is unknown"
@@ -4041,11 +4200,12 @@ def build_decoder_step_program(
             "non-default layer-0 discriminator kind requires its build flag"
         )
     if (
-        layer0_residual_discriminator_kind == "attention_schedule"
+        layer0_residual_discriminator_kind
+        in {"attention_schedule", "strategy_nd_row0_association"}
         and not main_rope_table_enabled
     ):
         raise PlanValidationError(
-            "attention-schedule discriminator requires the proven main-RoPE table"
+            "attention/StrategyND discriminator requires the proven main-RoPE table"
         )
     if (
         layer0_residual_discriminator_kind
@@ -4114,11 +4274,15 @@ def build_decoder_step_program(
         main_rope_table_enabled
         and build_layer0_residual_discriminator
         and layer0_residual_discriminator_kind
-        not in {"attention_schedule", "attention_output_association"}
+        not in {
+            "attention_schedule",
+            "attention_output_association",
+            "strategy_nd_row0_association",
+        }
     ):
         raise PlanValidationError(
             "main-RoPE table execution admits only the isolated attention-"
-            "schedule/output-association discriminator"
+            "schedule/output-association/StrategyND discriminator"
         )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
