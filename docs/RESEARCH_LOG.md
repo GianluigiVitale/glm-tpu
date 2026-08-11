@@ -7293,3 +7293,42 @@ unmotivated arithmetic variants.
   collective shapes refuse the arm, and any replacement of the sealed prerequisite must update
   exact mismatch pins. No repeat review is due. Exact next is independent verification,
   commit/push and exactly one protected attention-output association discriminator.
+
+## 2026-08-11 15:47--16:44 — attention-output association rejected; PP8 decision independently checked
+
+- The reviewed implementation was independently reverified, committed/pushed at
+  `e267ff3da4cde37b7379c313bff6f843f1d67b8e`, and executed once under protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_`
+  `layer0_attention_output_variants_trace2_20260811T154920994057655Z`. The wrapper printed
+  `ATTENTION_OUTPUT_ASSOCIATION_DIAGNOSTIC_CONTRACT_OK` and then took the intentional failure exit;
+  this is diagnostic correctness evidence only.
+- The production control is stable for a third independently compiled protected run: SHA
+  `6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca`, `3,984/6,144`
+  mismatches, max `0.00390625`, mean `0.00014738367`. Every isolated attention-only association is
+  worse. Dcp->model sequential/pairwise produce `4,201/4,124` mismatches with means
+  `0.00016567028/0.00015916927`; model->dcp sequential/pairwise produce `4,343/4,228` with means
+  `0.00017390716/0.00016685593`. Their max errors are respectively
+  `0.00390625/0.005859375/0.0078125/0.005859375`. Reject this uniform output-association family;
+  the result points away from reduction association at this boundary and back toward a physical
+  projection-subrank or upstream operand difference.
+- All arms retain exact selection, valid active rows, sentinel inactive rows, lane replication and
+  exact LP4 groups. Five optimized HLO text hashes are distinct: control `f2a88da5...ea8c7`, dcp
+  pairwise/sequential `969c6d23...a42da` / `7923d5cf...f803`, and model pairwise/sequential
+  `d48b67ce...d370b` / `c25bb442...8d99`. Contract/NPZ/suite SHAs are
+  `3e5fc042...a0b10`, `03450d72...486b`, and `1f849868...db8df`; direct remote hashes match.
+  Pre/failure census SHAs `ec025a44...d3b5` / `d175d0f4...e6a5`, identical eight-rank log SHA
+  `67d312b2...6d74`, no `SUCCESS`, no trace, no decoder rank JSON and zero matching DB rows preserve
+  the negative-evidence contract and authenticated 8/8 cleanup.
+- A fresh read-only Fable review independently verified DB484 and the run artifacts. It agrees that
+  `8 x (26.357 + 3.351 + 0.727) = 243.48 ms` explains the `244.091 ms` wall as serial PP8 stage
+  work, while the `205.195 ms` permute region is predominantly backpressure rather than payload
+  transfer. The per-core categories sum to `235.630 ms`, leaving about `8.46 ms` unattributed, so
+  only the serial model—not the category sum—closes wall. Gate E implies `<=25 ms` active/stage,
+  about `17.9%` below `30.435 ms`. The trace still lacks MXU-active/HBM-stall counters and per-call
+  Pallas decomposition, so it cannot decide compute versus bandwidth limitation.
+- The binding decision is continue, not deliver: exact 8K Gate D, Gate E, PP16/WS32 adjudication,
+  128K and 256K remain open. Exact next is to read the preserved StrategyND/ingredients evidence
+  and choose one non-duplicative projection-subrank/physical-association discriminator. After 8K
+  exactness, first decompose and reduce Pallas work, then measure WS32 as the serious base-latency
+  challenger and PP16 as the mandatory lower-prior comparator; speculation stays after Gate G.

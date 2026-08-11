@@ -425,14 +425,14 @@
     },
     {
       "id": "greenfield-layer0-attention-output-association-discriminator",
-      "category": "bounded diagnostic reuse",
+      "category": "negative evidence",
       "source_repo": "glm-tpu greenfield runtime and protected artifacts",
-      "source_pin": "virtual-subshard implementation/rejection e19833a / table-on attention-schedule evidence f8fd1c1beecfa29059304efb21aa8dbebb27fb3f",
-      "source_paths": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_layer0_attention_schedule_variants_trace2_20260811T142025290162247Z"],
-      "disposition": "adapted",
+      "source_pin": "virtual-subshard implementation/rejection e19833a / table-on attention-schedule evidence f8fd1c1beecfa29059304efb21aa8dbebb27fb3f / isolated implementation e267ff3da4cde37b7379c313bff6f843f1d67b8e / protected contract 3e5fc0422521df1a413573d19fb744a15f1889405776b7ab18e5c252ca7a0b10",
+      "source_paths": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_layer0_attention_schedule_variants_trace2_20260811T142025290162247Z", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_layer0_attention_output_variants_trace2_20260811T154920994057655Z"],
+      "disposition": "rejected",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "tests/greenfield/runtime/test_decoder.py", "tests/greenfield/runtime/test_compile_short_decoder.py"],
       "gate": "D diagnostic",
-      "reason": "Reuse the existing packed K512 attention partials and four pinned BF16 association helpers, but keep dense-down on the production K3072 path. Five separately compiled default-off programs isolate attention output projection only: one sealed table-on owner-split control and four candidate associations. HLO and protected-result contracts require exact LP4 groups, one row, candidate-only 8xK512 attention, production dense, distinct modules, exact selection and control SHA 6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca. No repack, cache gather, new kernel or legacy execution path is introduced."
+      "reason": "Protected control reproduces SHA 6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca and 3,984 mismatches. All four attention-only virtual-TP32 associations are worse at 4,201/4,124/4,343/4,228 mismatches with higher mean error. Preserve the five distinct local-only HLOs, exact-selection contract, NPZ and clean-fleet artifacts as negative evidence; do not integrate, rerun or extend uniform association trees."
     },
     {
       "id": "old-glm-tpu-worktrees",

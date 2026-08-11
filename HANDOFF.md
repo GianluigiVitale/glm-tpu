@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 15:47 UTC
+**Updated:** 2026-08-11 16:44 UTC
 
 ## Authority and isolation
 
@@ -93,26 +93,29 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   trace, DB row or `SUCCESS`. Do not integrate monolithic attention or rerun this fork. Exact next
   is the isolated layer-0 output-projection/reduction-association discriminator, retaining the
   table-on owner-split control; do not rerun the complete decoder first.
-- That exact successor is now implemented locally as five separately compiled default-off arms:
-  one unchanged table-on control and four attention-output-only virtual-TP32 associations. It
-  reuses the existing packed K512 partials and BF16 association helpers, while dense-down remains
-  the production full-width K3072 path. Candidate HLO must contain 8 K512 attention calls, zero
-  K4096 attention calls, one K3072 dense call, zero I384 dense calls, the declared LP4 reduction
-  shapes/scope, one live row and no escaped group. The protected wrapper pins the rejected
-  attention-schedule contract/NPZ locally and remotely, and acknowledges an intentional exit only
-  if the control reproduces `6c54c09a...bca`, all five arm contracts/selection checks pass and all
-  five HLOs are distinct. The affected CPU suite passes `64/64` in `175.14 s`; compileall, JSON,
-  Bash, ShellCheck and diff checks pass. Existing Fable session `4c23bb63...f6` audited only this
-  new diff, found no high/medium issue and returned `APPROVE COMMIT`; its two low notes are
-  intentional fail-closed TPU-shape refusal and sealed-artifact coupling. No TPU run or numerical
-  result exists yet. Exact next is independent verification, commit/push and one protected
-  attention-output discriminator; do not request another review of this unchanged batch.
+- The isolated attention-output successor was reviewed once, committed/pushed at
+  `e267ff3da4cde37b7379c313bff6f843f1d67b8e`, and run under protected tag ending
+  `layer0_attention_output_variants_trace2_20260811T154920994057655Z`. The control again reproduces
+  `6c54c09a...bca` and `3,984/6,144` mismatches. All four attention-only virtual-TP32 associations
+  are worse: dcp->model sequential/pairwise have `4,201/4,124` mismatches and model->dcp
+  sequential/pairwise have `4,343/4,228`; every mean error increases and two max errors increase.
+  All five arms retain exact selection, sentinel inactive rows, lane replication, distinct HLO,
+  exact LP4 groups, and passing arm/suite contracts. Contract/NPZ/suite SHAs are
+  `3e5fc042...a0b10`, `03450d72...486b`, and `1f849868...db8df`; pre/failure census SHAs
+  `ec025a44...d3b5` / `d175d0f4...e6a5` prove 8/8 cleanup, and all rank logs are identical at
+  `67d312b2...6d74`. There is intentionally no timing, trace, DB row or `SUCCESS`. Reject the
+  tested uniform attention-output association family; do not integrate or rerun it. Exact next is
+  to select the non-duplicative projection-subrank/physical-association discriminator from the
+  preserved StrategyND and ingredients evidence before another complete 8K run.
 - DB484 XPlane reanalysis proves only `0.727 ms/step` of non-permute local collective execution.
   Pallas custom calls are `26.357 ms`, other active work `3.351 ms`, and collective-permute
   start/done waiting is `205.195 ms` per core. Thus `8 x 30.435 = 243.5 ms` closes against the
   `244.091 ms` wall: PP8 batch-one latency is a serial stage critical path, not an ICI-bandwidth
-  limit. The trace has no separate MXU-active or HBM-stall counters. After 8K exactness, optimize
-  active kernels and prioritize WS32 as the serious latency challenger; PP16 remains mandatory.
+  limit. The per-core category sum still leaves about `8.46 ms` unattributed, so it is the serial
+  model—not a complete per-core budget—that closes wall. The trace has no separate MXU-active or
+  HBM-stall counters. Gate E requires roughly `<=25 ms` active/stage, a `17.9%` reduction from
+  `30.435 ms`; after 8K exactness, decompose/optimize Pallas and prioritize WS32 as the serious
+  latency challenger. PP16 remains mandatory, and speculation remains after base adjudication.
 
 ## Historical main-RoPE integration batch
 
