@@ -6739,3 +6739,40 @@ unmotivated arithmetic variants.
   `APPROVE COMMIT`. Its low notes concern only possible fail-closed TPU refusal from the inherited
   collective floor and scope-limited tuple checks; neither can admit a contaminated result. No
   repeat review is due before commit/push and the isolated protected run.
+
+## 2026-08-10 22:11--23:55 — independent arms reject combine precision; virtual TP32 successor is ready
+
+- Pushed `12315aa` protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T221121969164909Z`
+  compiles and executes four genuinely separate layer-0 programs after the complete 8,155-token
+  prefill. Every arm passes its own kernel/reduction/root/locality contract and retains exact
+  layer-0 selection. The BF16 control exactly reproduces current production SHA
+  `787c9ba7...153b`, making the comparisons admissible.
+- No combine-precision arm matches sealed accepted layer-1 normalized hidden. Mismatch counts are
+  `3960` baseline, `4008` attention FP32, `3998` dense FP32 and `4034` both FP32. Their output SHAs
+  are respectively `787c9ba7...153b`, `dad86ed9...6cb`, `5f8888cb...8ea5`, and
+  `f2c88e0b...6f63`. Simple LP4 reduction dtype is rejected as the cause; do not repeat it.
+- Contract/suite/NPZ/pre-census/failure-census SHAs are `1d3d270f...b0e`, `31ed0093...75e`,
+  `f7323ea2...45a`, `615dc21d...db9`, and `73d1e1dc...369d`. The direct remote contract has the
+  same SHA, all eight hosts are clean, and the diagnostic intentionally has no DB/SUCCESS/timing/
+  trace standing.
+- Source audit at accepted `tpu-inference` pin `b3c25df47ac98783912dc658878181ec0a8ae16d`
+  closes the next dependency. `layers/common/linear.py` dequantizes raw FP8 into the activation
+  dtype, accumulates each local dot in FP32, casts its result back to BF16, and only then executes
+  the row-parallel `psum`. Accepted after-codegen HLO gzip SHA `51d014de...47f0` contains 32-way
+  BF16 `VllmRowParallelLinear/shard_map/psum` operations using
+  `RotatedPincerEmitter/StrategyND` over physical dimensions `4,2,4`. This is source/physical-HLO
+  evidence for 32 separately rounded partials, not a claim that a host-side sum tree duplicates
+  TPU pincer arithmetic.
+- PP8 packs eight legacy contraction shards into each of four local owners: attention K4096 becomes
+  8xK512; dense I3072 becomes 8xI384. The successor reuses the existing raw-FP8 checkpoint and
+  Pallas block kernels to recover those 32 partials without another pack or legacy execution path.
+  Four default-off isolated programs test local-eight/physical-four ordering and sequential versus
+  pairwise BF16 addition. Seven optimization barriers pin each local eight-way tree; all physical
+  reductions name explicit LP4 groups.
+- The HLO discriminator requires exactly eight attention K512 and eight dense I384 Pallas kernels,
+  no full-width predecessor kernel, zero FP32 boundary/reconstruction kernels, the association's
+  named scope, expected `bf16[1,6144]` versus `bf16[8,1,6144]` collective shapes, one live row and
+  no escaped group. The full affected forced-CPU batch passes 67/67 in 198.84 seconds. Compileall,
+  Bash, ShellCheck and diff checks pass. Exact next is one new-diff-only review from cleared
+  `12315aa`, commit/push and one serialized protected subshard discriminator.

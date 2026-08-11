@@ -1198,3 +1198,18 @@ Optimized HLO proves the four arms were tuple-fused, so their numerical comparis
 inadmissible. The run has no warmup distribution, XPlane, DB row, terminal `SUCCESS`, Gate-D/E or
 throughput standing. Its approximately 46-minute orchestration time is not token latency. DB484
 remains the only accepted PP8 decoder result at `244.091151 ms` p50 / `4.096830 tok/s`.
+
+## Independent combine arms and virtual-TP32 successor — no performance result
+
+The pushed `12315aa` protected discriminator ran for about 47 minutes because it loaded the full
+checkpoint, compiled production plus four isolated one-layer programs and processed all 8,155
+prefill tokens. Its BF16 arm reproduces current production and all four independent HLO/selection
+contracts pass, but none matches the accepted layer-1 normalized hidden (`3960/4008/3998/4034`
+mismatches). There is no warmup distribution, XPlane, DB row, terminal `SUCCESS`, Gate-D/E or
+throughput standing. Elapsed orchestration is not token latency.
+
+The virtual-TP32 successor is also correctness-only. It reconstructs eight separately rounded
+attention and dense contraction partials per PP8 owner and compares four BF16 reduction
+associations inside LP4. Even if an arm is exact, it authorizes only a production integration and
+subsequent fully protected 8K run. DB484 remains the accepted PP8 performance point at
+`244.091151 ms` p50 / `4.096830 tok/s`.

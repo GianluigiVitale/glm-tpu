@@ -80,6 +80,98 @@ class StageLocalIndexShareFp8Result(NamedTuple):
 
 
 StageLinearBackend = Literal["reference", "pallas"]
+VirtualTp32ReductionAssociation = Literal[
+    "dcp_then_model_sequential_bf16",
+    "dcp_then_model_pairwise_bf16",
+    "model_then_dcp_sequential_bf16",
+    "model_then_dcp_pairwise_bf16",
+]
+VIRTUAL_TP32_REDUCTION_ASSOCIATIONS: tuple[
+    VirtualTp32ReductionAssociation, ...
+] = (
+    "dcp_then_model_sequential_bf16",
+    "dcp_then_model_pairwise_bf16",
+    "model_then_dcp_sequential_bf16",
+    "model_then_dcp_pairwise_bf16",
+)
+_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER = 8
+
+
+def _sum_virtual_dcp_bf16_partials(
+    partials: Any,
+    *,
+    pairwise: bool,
+) -> Any:
+    """Sum eight already-rounded legacy DCP partials in a pinned BF16 tree."""
+
+    if partials.ndim != 3 or partials.shape[0] != (
+        _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
+    ):
+        raise ValueError("virtual TP32 reduction requires eight rank-two partials")
+    if partials.dtype != jnp.bfloat16:
+        raise ValueError("virtual TP32 partials must already be rounded BF16")
+    if not isinstance(pairwise, bool):
+        raise ValueError("virtual TP32 reduction-tree flag must be boolean")
+
+    def add(left: Any, right: Any) -> Any:
+        # The explicit barrier prevents XLA from flattening the requested
+        # legacy-association discriminator into one wider reduction.
+        return lax.optimization_barrier(
+            (left + right).astype(jnp.bfloat16)
+        )
+
+    values = tuple(partials[index] for index in range(partials.shape[0]))
+    if not pairwise:
+        result = values[0]
+        for value in values[1:]:
+            result = add(result, value)
+        return result
+
+    while len(values) > 1:
+        if len(values) % 2:
+            raise ValueError("pairwise virtual TP32 reduction lost a power-of-two level")
+        values = tuple(
+            add(values[index], values[index + 1])
+            for index in range(0, len(values), 2)
+        )
+    return values[0]
+
+
+def _reduce_virtual_tp32_bf16_partials(
+    local_partials: Any,
+    *,
+    axis_name: str,
+    groups: tuple[tuple[int, ...], ...] | None,
+    association: VirtualTp32ReductionAssociation,
+) -> Any:
+    """Reduce 8 virtual DCP shards x 4 physical model owners, locally only."""
+
+    if association not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS:
+        raise ValueError("virtual TP32 reduction association is unknown")
+    if groups is None or any(len(group) != 4 for group in groups):
+        raise ValueError("virtual TP32 reduction requires explicit LP4 groups")
+    dcp_first = association.startswith("dcp_then_model_")
+    pairwise = association.endswith("_pairwise_bf16")
+    with jax.named_scope(f"greenfield_virtual_tp32_{association}"):
+        if dcp_first:
+            local_value = _sum_virtual_dcp_bf16_partials(
+                local_partials,
+                pairwise=pairwise,
+            )
+            return lax.psum(
+                local_value,
+                axis_name=axis_name,
+                axis_index_groups=groups,
+            )
+        model_partials = lax.psum(
+            local_partials,
+            axis_name=axis_name,
+            axis_index_groups=groups,
+        )
+        return _sum_virtual_dcp_bf16_partials(
+            model_partials,
+            pairwise=pairwise,
+        )
 
 
 def _stage_fp8_linear(
@@ -733,6 +825,9 @@ def stage_local_index_share_fp8_mapped(
     linear_interpret: bool = False,
     add_residual: bool = True,
     reconstruct_output_fp32: bool = False,
+    virtual_tp32_reduction_association: (
+        VirtualTp32ReductionAssociation | None
+    ) = None,
 ) -> StageLocalIndexShareFp8Result:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -751,6 +846,17 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare residual-add flag must be boolean")
     if not isinstance(reconstruct_output_fp32, bool):
         raise ValueError("IndexShare FP32 output reconstruction flag must be boolean")
+    if virtual_tp32_reduction_association is not None and (
+        virtual_tp32_reduction_association
+        not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+    ):
+        raise ValueError("IndexShare virtual TP32 association is unknown")
+    if virtual_tp32_reduction_association is not None and (
+        reconstruct_output_fp32 or linear_backend != "pallas"
+    ):
+        raise ValueError(
+            "IndexShare virtual TP32 association requires the BF16 Pallas path"
+        )
     if contract.num_heads % cache_layout.local_parallel_size:
         raise ValueError("attention heads must divide over the local stage")
     local_heads = contract.num_heads // cache_layout.local_parallel_size
@@ -1040,7 +1146,56 @@ def stage_local_index_share_fp8_mapped(
     output_input = value_states.reshape(
         1, local_heads * contract.v_head_dim
     )
-    if reconstruct_output_fp32:
+    if virtual_tp32_reduction_association is not None:
+        if (
+            hidden != 6144
+            or output_input.shape[1] != 4096
+            or block_shape != (128, 128)
+        ):
+            raise ValueError(
+                "IndexShare virtual TP32 association requires the exact GLM "
+                "PP8 output geometry"
+            )
+        virtual_contraction = (
+            output_input.shape[1] // _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
+        )
+        virtual_scale_contraction = virtual_contraction // block_shape[1]
+        local_partials = jnp.stack(
+            tuple(
+                fp8_block_matmul(
+                    output_input[
+                        :,
+                        shard * virtual_contraction : (shard + 1)
+                        * virtual_contraction,
+                    ],
+                    o_bits[
+                        :,
+                        shard * virtual_contraction : (shard + 1)
+                        * virtual_contraction,
+                    ],
+                    o_scale[
+                        :,
+                        shard * virtual_scale_contraction : (shard + 1)
+                        * virtual_scale_contraction,
+                    ],
+                    config=Fp8BlockMatmulConfig(
+                        block_shape=block_shape,
+                        output_tile=block_shape[0],
+                        contraction_tile=block_shape[1],
+                    ),
+                    interpret=linear_interpret,
+                )
+                for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER)
+            ),
+            axis=0,
+        )
+        update = _reduce_virtual_tp32_bf16_partials(
+            local_partials,
+            axis_name=axis_name,
+            groups=groups,
+            association=virtual_tp32_reduction_association,
+        )
+    elif reconstruct_output_fp32:
         if linear_backend == "reference":
             local_update = lax.dot_general(
                 output_input,
@@ -1073,11 +1228,12 @@ def stage_local_index_share_fp8_mapped(
             backend=linear_backend,
             interpret=linear_interpret,
         )
-    update = lax.psum(
-        local_update,
-        axis_name=axis_name,
-        axis_index_groups=groups,
-    )
+    if virtual_tp32_reduction_association is None:
+        update = lax.psum(
+            local_update,
+            axis_name=axis_name,
+            axis_index_groups=groups,
+        )
     if reconstruct_output_fp32:
         if linear_backend == "pallas":
             # A plain cast is commuted into the psum by TPU XLA, changing
@@ -1119,6 +1275,9 @@ def stage_local_dense_fp8_mapped(
     precomputed_normalized: Any | None = None,
     add_residual: bool = True,
     reconstruct_down_fp32: bool = False,
+    virtual_tp32_reduction_association: (
+        VirtualTp32ReductionAssociation | None
+    ) = None,
 ) -> Any:
     """Execute one dense SwiGLU from local raw shards and one local combine."""
 
@@ -1136,6 +1295,17 @@ def stage_local_dense_fp8_mapped(
         raise ValueError("dense residual-add flag must be boolean")
     if not isinstance(reconstruct_down_fp32, bool):
         raise ValueError("dense FP32 down reconstruction flag must be boolean")
+    if virtual_tp32_reduction_association is not None and (
+        virtual_tp32_reduction_association
+        not in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+    ):
+        raise ValueError("dense virtual TP32 association is unknown")
+    if virtual_tp32_reduction_association is not None and (
+        reconstruct_down_fp32 or linear_backend != "pallas"
+    ):
+        raise ValueError(
+            "dense virtual TP32 association requires the BF16 Pallas path"
+        )
     if precomputed_normalized is None:
         normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
     else:
@@ -1144,7 +1314,77 @@ def stage_local_dense_fp8_mapped(
             normalized.dtype != residual.dtype
         ):
             raise ValueError("dense precomputed normalized input is invalid")
-    if linear_backend == "reference":
+    if virtual_tp32_reduction_association is not None:
+        if (
+            hidden != 6144
+            or gate_bits.shape[0] != 3072
+            or block_shape != (128, 128)
+        ):
+            raise ValueError(
+                "dense virtual TP32 association requires the exact GLM PP8 "
+                "geometry"
+            )
+        virtual_intermediate = (
+            gate_bits.shape[0] // _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
+        )
+        virtual_scale_intermediate = (
+            virtual_intermediate // block_shape[0]
+        )
+        local_partials = jnp.stack(
+            tuple(
+                fp8_fused_block_swiglu(
+                    normalized,
+                    gate_bits[
+                        shard * virtual_intermediate : (shard + 1)
+                        * virtual_intermediate,
+                        :,
+                    ],
+                    gate_scale[
+                        shard
+                        * virtual_scale_intermediate : (shard + 1)
+                        * virtual_scale_intermediate,
+                        :,
+                    ],
+                    up_bits[
+                        shard * virtual_intermediate : (shard + 1)
+                        * virtual_intermediate,
+                        :,
+                    ],
+                    up_scale[
+                        shard
+                        * virtual_scale_intermediate : (shard + 1)
+                        * virtual_scale_intermediate,
+                        :,
+                    ],
+                    down_bits[
+                        :,
+                        shard * virtual_intermediate : (shard + 1)
+                        * virtual_intermediate,
+                    ],
+                    down_scale[
+                        :,
+                        shard
+                        * virtual_scale_intermediate : (shard + 1)
+                        * virtual_scale_intermediate,
+                    ],
+                    config=Fp8BlockMatmulConfig(
+                        block_shape=block_shape,
+                        output_tile=block_shape[0],
+                        contraction_tile=block_shape[1],
+                    ),
+                    interpret=linear_interpret,
+                )
+                for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER)
+            ),
+            axis=0,
+        )
+        update = _reduce_virtual_tp32_bf16_partials(
+            local_partials,
+            axis_name=axis_name,
+            groups=groups,
+            association=virtual_tp32_reduction_association,
+        )
+    elif linear_backend == "reference":
         gate_weight = dequantize_fp8_bits_block_weight(
             gate_bits, gate_scale, block_shape=block_shape
         )
@@ -1188,11 +1428,12 @@ def stage_local_dense_fp8_mapped(
         )
     else:
         raise ValueError("stage-local FP8 linear backend is unknown")
-    update = lax.psum(
-        local_update,
-        axis_name=axis_name,
-        axis_index_groups=groups,
-    )
+    if virtual_tp32_reduction_association is None:
+        update = lax.psum(
+            local_update,
+            axis_name=axis_name,
+            axis_index_groups=groups,
+        )
     if reconstruct_down_fp32:
         if linear_backend == "pallas":
             update = fp32_to_bf16_pallas_boundary(

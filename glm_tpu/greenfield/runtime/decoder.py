@@ -7,7 +7,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from math import prod
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 from ..errors import PlanValidationError
 from ..kernels.layer import (
@@ -32,7 +32,11 @@ from ..kernels.reference.prefill_index import (
     repair_stage_local_prompt_index_cache,
 )
 from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
-from ..kernels.stage_local import StageLinearBackend
+from ..kernels.stage_local import (
+    VIRTUAL_TP32_REDUCTION_ASSOCIATIONS,
+    StageLinearBackend,
+    VirtualTp32ReductionAssociation,
+)
 from ..model.schedule import PipelineSchedule, StageExecution
 from ..model.state import DecoderStateLayout
 from ..model.weights import (
@@ -65,6 +69,40 @@ LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS = (
     ("dense_down_fp32", False, True),
     ("attention_output_and_dense_down_fp32", True, True),
 )
+Layer0ResidualDiscriminatorKind = Literal[
+    "combine_precision", "virtual_tp32"
+]
+LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS = (
+    VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+)
+
+
+def _layer0_residual_discriminator_specs(
+    kind: Layer0ResidualDiscriminatorKind,
+) -> tuple[
+    tuple[
+        str,
+        bool,
+        bool,
+        VirtualTp32ReductionAssociation | None,
+    ],
+    ...,
+]:
+    if kind == "combine_precision":
+        return tuple(
+            (name, attention_fp32, dense_fp32, None)
+            for name, attention_fp32, dense_fp32 in (
+                LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS
+            )
+        )
+    if kind == "virtual_tp32":
+        return tuple(
+            (name, False, False, name)
+            for name in LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS
+        )
+    raise PlanValidationError(
+        f"unknown layer-0 residual discriminator kind: {kind}"
+    )
 _PREFILL_INDEX_REPAIR_BRANCH_OP_NAME_PREFIX = (
     "jit(execute)/shard_map/cond/branch_"
 )
@@ -456,6 +494,7 @@ class DecoderStepProgram:
     promote_prefill_index_weights_fp32: Any | None
     repair_prefill_index_cache: Any | None
     layer0_residual_discriminators: tuple[tuple[str, Any], ...]
+    layer0_residual_discriminator_kind: Layer0ResidualDiscriminatorKind
     split_residual_state: bool
 
 
@@ -2311,18 +2350,25 @@ def validate_layer0_residual_discriminator_hlo(
     tuple-fusing their hidden reductions or next-layer normalization.
     """
 
-    variant_flags = {
+    combine_variant_flags = {
         name: (attention_fp32, dense_fp32)
         for name, attention_fp32, dense_fp32 in (
             LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS
         )
     }
-    try:
-        attention_fp32, dense_fp32 = variant_flags[variant_name]
-    except KeyError as error:
+    if variant_name in combine_variant_flags:
+        discriminator_kind = "combine_precision"
+        attention_fp32, dense_fp32 = combine_variant_flags[variant_name]
+        virtual_association = None
+    elif variant_name in LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS:
+        discriminator_kind = "virtual_tp32"
+        attention_fp32 = False
+        dense_fp32 = False
+        virtual_association = variant_name
+    else:
         raise PlanValidationError(
             f"unknown layer-0 discriminator variant: {variant_name}"
-        ) from error
+        )
 
     skeleton = PipelineSkeletonConfig(
         config.stage_count,
@@ -2368,6 +2414,13 @@ def validate_layer0_residual_discriminator_hlo(
         "m8_h6144_i3072_o6144"
     )
     dense_f32_name = f"{dense_bf16_name}_downf32"
+    virtual_attention_name = (
+        "greenfield_fp8_block_matmul_m8_k512_n6144"
+    )
+    virtual_dense_name = (
+        "greenfield_fp8_fused_block_swiglu_"
+        "m8_h6144_i384_o6144"
+    )
     fp32_boundary_name = "greenfield_fp32_to_bf16_r8_h6144"
     kernel_counts = {
         attention_bf16_name: sum(
@@ -2383,6 +2436,12 @@ def validate_layer0_residual_discriminator_hlo(
             for line in custom_calls
         ),
         dense_f32_name: sum(dense_f32_name in line for line in custom_calls),
+        virtual_attention_name: sum(
+            virtual_attention_name in line for line in custom_calls
+        ),
+        virtual_dense_name: sum(
+            virtual_dense_name in line for line in custom_calls
+        ),
         fp32_boundary_name: sum(
             fp32_boundary_name in line for line in custom_calls
         ),
@@ -2439,14 +2498,43 @@ def validate_layer0_residual_discriminator_hlo(
         )
         > 1
     )
-    expected_kernel_counts = {
-        attention_bf16_name: int(not attention_fp32),
-        attention_f32_name: int(attention_fp32),
-        dense_bf16_name: int(not dense_fp32),
-        dense_f32_name: int(dense_fp32),
-        fp32_boundary_name: int(attention_fp32) + int(dense_fp32),
-    }
-    expected_fp32_combines = int(attention_fp32) + int(dense_fp32)
+    if discriminator_kind == "combine_precision":
+        expected_kernel_counts = {
+            attention_bf16_name: int(not attention_fp32),
+            attention_f32_name: int(attention_fp32),
+            dense_bf16_name: int(not dense_fp32),
+            dense_f32_name: int(dense_fp32),
+            virtual_attention_name: 0,
+            virtual_dense_name: 0,
+            fp32_boundary_name: int(attention_fp32) + int(dense_fp32),
+        }
+        expected_fp32_combines = int(attention_fp32) + int(dense_fp32)
+        expected_hidden_collective_shapes = None
+        virtual_association_scope = None
+        virtual_association_scope_present = True
+    else:
+        expected_kernel_counts = {
+            attention_bf16_name: 0,
+            attention_f32_name: 0,
+            dense_bf16_name: 0,
+            dense_f32_name: 0,
+            virtual_attention_name: 8,
+            virtual_dense_name: 8,
+            fp32_boundary_name: 0,
+        }
+        expected_fp32_combines = 0
+        assert virtual_association is not None
+        dcp_first = virtual_association.startswith("dcp_then_model_")
+        expected_hidden_collective_shapes = {
+            "bf16[1,6144]": 3 if dcp_first else 1,
+            "bf16[8,1,6144]": 0 if dcp_first else 2,
+        }
+        virtual_association_scope = (
+            f"greenfield_virtual_tp32_{virtual_association}"
+        )
+        virtual_association_scope_present = (
+            virtual_association_scope in optimized_hlo
+        )
     violations = []
     if module.num_partitions not in (None, config.total_devices):
         violations.append(
@@ -2482,6 +2570,25 @@ def validate_layer0_residual_discriminator_hlo(
             f"expected={expected_fp32_combines} "
             f"observed={observed_fp32_combines}"
         )
+    if expected_hidden_collective_shapes is not None:
+        observed_hidden_collective_shapes = {
+            shape: result_shapes.get(shape, 0)
+            for shape in expected_hidden_collective_shapes
+        }
+        if (
+            observed_hidden_collective_shapes
+            != expected_hidden_collective_shapes
+        ):
+            violations.append(
+                "layer-0 discriminator virtual TP32 collective association "
+                "drifted: "
+                f"expected={expected_hidden_collective_shapes} "
+                f"observed={observed_hidden_collective_shapes}"
+            )
+        if not virtual_association_scope_present:
+            violations.append(
+                "layer-0 discriminator lost its virtual TP32 association scope"
+            )
     if (
         len(entry_roots) != 1
         or entry_roots[0].result_shapes != expected_root_shapes
@@ -2511,6 +2618,9 @@ def validate_layer0_residual_discriminator_hlo(
         "kernel_counts": kernel_counts,
         "expected_kernel_counts": expected_kernel_counts,
         "expected_fp32_local_combine_count": expected_fp32_combines,
+        "expected_hidden_collective_shapes": (
+            expected_hidden_collective_shapes
+        ),
         "entry_root_shapes": [
             shape.to_dict()
             for root in entry_roots
@@ -2522,9 +2632,14 @@ def validate_layer0_residual_discriminator_hlo(
         "normalization_scope_present": normalization_scope_present,
         "num_partitions": module.num_partitions,
         "observed_fp32_local_combine_count": observed_fp32_combines,
+        "discriminator_kind": discriminator_kind,
         "passed": not violations,
         "unexpected_collectives": unexpected_collectives,
         "variant_name": variant_name,
+        "virtual_tp32_association_scope": virtual_association_scope,
+        "virtual_tp32_association_scope_present": (
+            virtual_association_scope_present
+        ),
         "violations": violations,
     }
 
@@ -3105,6 +3220,9 @@ def build_decoder_step_program(
     observe_layer_residuals: bool = False,
     observe_prefill_index_inputs: bool = False,
     build_layer0_residual_discriminator: bool = False,
+    layer0_residual_discriminator_kind: (
+        Layer0ResidualDiscriminatorKind
+    ) = "combine_precision",
     split_residual_state: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
@@ -3206,6 +3324,20 @@ def build_decoder_step_program(
     if not isinstance(build_layer0_residual_discriminator, bool):
         raise PlanValidationError(
             "layer-0 residual discriminator flag must be boolean"
+        )
+    if layer0_residual_discriminator_kind not in (
+        "combine_precision",
+        "virtual_tp32",
+    ):
+        raise PlanValidationError(
+            "layer-0 residual discriminator kind is unknown"
+        )
+    if (
+        not build_layer0_residual_discriminator
+        and layer0_residual_discriminator_kind != "combine_precision"
+    ):
+        raise PlanValidationError(
+            "non-default layer-0 discriminator kind requires its build flag"
         )
     if not isinstance(split_residual_state, bool):
         raise PlanValidationError("split residual-state flag must be boolean")
@@ -4210,6 +4342,9 @@ def build_decoder_step_program(
         variant_name: str,
         reconstruct_attention_output_fp32: bool,
         reconstruct_dense_down_fp32: bool,
+        virtual_tp32_reduction_association: (
+            VirtualTp32ReductionAssociation | None
+        ),
     ) -> tuple[Any, Any, Any, Any, Any]:
         """Replay one isolated layer-0 arithmetic association."""
 
@@ -4294,6 +4429,9 @@ def build_decoder_step_program(
         def execute_layer0(
             reconstruct_attention_output_fp32: bool,
             reconstruct_dense_down_fp32: bool,
+            virtual_tp32_reduction_association: (
+                VirtualTp32ReductionAssociation | None
+            ),
         ) -> Any:
             stage = schedule.stages[0]
             layer = stage.layers[0]
@@ -4379,6 +4517,9 @@ def build_decoder_step_program(
                 reconstruct_dense_down_fp32=(
                     reconstruct_dense_down_fp32
                 ),
+                virtual_tp32_reduction_association=(
+                    virtual_tp32_reduction_association
+                ),
             )
 
         def stage0_branch(
@@ -4388,6 +4529,7 @@ def build_decoder_step_program(
             candidate = execute_layer0(
                 reconstruct_attention_output_fp32,
                 reconstruct_dense_down_fp32,
+                virtual_tp32_reduction_association,
             )
             stage = schedule.stages[0]
             if len(stage.layers) < 2:
@@ -4434,6 +4576,9 @@ def build_decoder_step_program(
         variant_name: str,
         reconstruct_attention_output_fp32: bool,
         reconstruct_dense_down_fp32: bool,
+        virtual_tp32_reduction_association: (
+            VirtualTp32ReductionAssociation | None
+        ),
     ) -> Any:
         if dsa_query_exact_association:
             def mapped_exact_query(
@@ -4465,6 +4610,9 @@ def build_decoder_step_program(
                     ),
                     reconstruct_dense_down_fp32=(
                         reconstruct_dense_down_fp32
+                    ),
+                    virtual_tp32_reduction_association=(
+                        virtual_tp32_reduction_association
                     ),
                 )
 
@@ -4500,6 +4648,9 @@ def build_decoder_step_program(
                     reconstruct_attention_output_fp32
                 ),
                 reconstruct_dense_down_fp32=reconstruct_dense_down_fp32,
+                virtual_tp32_reduction_association=(
+                    virtual_tp32_reduction_association
+                ),
             )
 
         mapped.__name__ = (
@@ -4733,6 +4884,7 @@ def build_decoder_step_program(
                         variant_name,
                         reconstruct_attention_output_fp32,
                         reconstruct_dense_down_fp32,
+                        virtual_tp32_reduction_association,
                     ),
                     mesh=mesh,
                     in_specs=input_specs,
@@ -4750,7 +4902,10 @@ def build_decoder_step_program(
                 variant_name,
                 reconstruct_attention_output_fp32,
                 reconstruct_dense_down_fp32,
-            ) in LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS
+                virtual_tp32_reduction_association,
+            ) in _layer0_residual_discriminator_specs(
+                layer0_residual_discriminator_kind
+            )
         )
     repair_prefill_index_cache = None
     materialize_dsa_query_weights_fp32 = None
@@ -4851,5 +5006,8 @@ def build_decoder_step_program(
         ),
         repair_prefill_index_cache=repair_prefill_index_cache,
         layer0_residual_discriminators=layer0_residual_discriminators,
+        layer0_residual_discriminator_kind=(
+            layer0_residual_discriminator_kind
+        ),
         split_residual_state=split_residual_state,
     )

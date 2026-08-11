@@ -1224,6 +1224,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--observe-layer0-subshard-variants",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--layer1-internal-reference-npz", type=Path)
     parser.add_argument("--layer1-internal-reference-sha256")
     parser.add_argument(
@@ -1267,6 +1273,25 @@ def main() -> int:
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
     args.observe_layer0_residual_variants = bool(
         args.observe_layer0_residual_variants
+    )
+    args.observe_layer0_subshard_variants = bool(
+        args.observe_layer0_subshard_variants
+    )
+    if (
+        args.observe_layer0_residual_variants
+        and args.observe_layer0_subshard_variants
+    ):
+        raise ValueError(
+            "layer-0 combine and subshard discriminators must remain isolated"
+        )
+    observe_layer0_discriminator = bool(
+        args.observe_layer0_residual_variants
+        or args.observe_layer0_subshard_variants
+    )
+    layer0_discriminator_kind = (
+        "virtual_tp32"
+        if args.observe_layer0_subshard_variants
+        else "combine_precision"
     )
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
@@ -1343,33 +1368,33 @@ def main() -> int:
         args.layer1_internal_reference_npz,
         args.layer1_internal_reference_sha256,
     )
-    if args.observe_layer0_residual_variants != all(
+    if observe_layer0_discriminator != all(
         value is not None for value in layer0_variant_reference_fields
     ) or (
-        not args.observe_layer0_residual_variants
+        not observe_layer0_discriminator
         and any(value is not None for value in layer0_variant_reference_fields)
     ):
         raise ValueError(
-            "layer-0 residual variants require both pinned layer-1 references"
+            "layer-0 discriminator requires both pinned layer-1 references"
         )
-    if args.observe_layer0_residual_variants and not dsa_oracle_mode:
+    if observe_layer0_discriminator and not dsa_oracle_mode:
         raise ValueError(
-            "layer-0 residual variants require the sealed DSA/token oracle"
+            "layer-0 discriminator requires the sealed DSA/token oracle"
         )
-    if args.observe_layer0_residual_variants and (
+    if observe_layer0_discriminator and (
         args.observe_dsa_internals or args.observe_layer_residuals
     ):
         raise ValueError(
-            "layer-0 residual variants must remain isolated from other observers"
+            "layer-0 discriminator must remain isolated from other observers"
         )
-    if args.observe_layer0_residual_variants and not (
+    if observe_layer0_discriminator and not (
         args.prefill_index_repair
         and args.dsa_query_exact_association
         and args.dsa_head_key_exact_association
         and args.dsa_score_default_precision
     ):
         raise ValueError(
-            "layer-0 residual variants require every proven 8K DSA correction"
+            "layer-0 discriminator requires every proven 8K DSA correction"
         )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
@@ -1488,7 +1513,7 @@ def main() -> int:
                 name.removeprefix("actual__"): np.asarray(payload[name])
                 for name in sorted(required)
             }
-    if args.observe_layer0_residual_variants:
+    if observe_layer0_discriminator:
         assert args.layer1_internal_reference_npz is not None
         assert args.layer1_internal_reference_sha256 is not None
         if _sha256_file(args.layer1_internal_reference_npz) != (
@@ -1798,12 +1823,13 @@ def main() -> int:
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             build_layer0_residual_discriminator=(
-                args.observe_layer0_residual_variants
+                observe_layer0_discriminator
             ),
+            layer0_residual_discriminator_kind=layer0_discriminator_kind,
             split_residual_state=args.split_residual_state,
         )
         dsa_observer = None
-        if dsa_oracle_mode and not args.observe_layer0_residual_variants:
+        if dsa_oracle_mode and not observe_layer0_discriminator:
             dsa_observer = build_decoder_step_program(
                 execution_plan,
                 schedule,
@@ -2517,7 +2543,7 @@ def main() -> int:
         fleet_dsa_observer_hlo_hashes = None
         dsa_observer_hlo_contract = None
         dsa_observer_isolation_contract = None
-        if dsa_oracle_mode and not args.observe_layer0_residual_variants:
+        if dsa_oracle_mode and not observe_layer0_discriminator:
             assert dsa_observer is not None
             multihost_utils.sync_global_devices(
                 "greenfield-short-dsa-observer-compile-start"
@@ -2630,12 +2656,21 @@ def main() -> int:
             str, dict[str, Any]
         ] = {}
         layer0_residual_discriminator_suite_contract = None
-        if args.observe_layer0_residual_variants:
+        if observe_layer0_discriminator:
             expected_variant_names = (
-                "baseline_bf16",
-                "attention_output_fp32",
-                "dense_down_fp32",
-                "attention_output_and_dense_down_fp32",
+                (
+                    "dcp_then_model_sequential_bf16",
+                    "dcp_then_model_pairwise_bf16",
+                    "model_then_dcp_sequential_bf16",
+                    "model_then_dcp_pairwise_bf16",
+                )
+                if args.observe_layer0_subshard_variants
+                else (
+                    "baseline_bf16",
+                    "attention_output_fp32",
+                    "dense_down_fp32",
+                    "attention_output_and_dense_down_fp32",
+                )
             )
             observed_variant_names = tuple(
                 name for name, _ in decoder.layer0_residual_discriminators
@@ -2715,6 +2750,7 @@ def main() -> int:
                 compiled_discriminators
             )
             layer0_residual_discriminator_suite_contract = {
+                "discriminator_kind": layer0_discriminator_kind,
                 "all_hlo_contracts_pass": all(
                     contract["passed"]
                     for contract in (
@@ -2861,7 +2897,7 @@ def main() -> int:
         else:
             output = compiled(*inputs)
             output[3].block_until_ready()
-        if args.observe_layer0_residual_variants:
+        if observe_layer0_discriminator:
             assert compiled_layer0_residual_discriminators
             assert layer0_residual_discriminator_suite_contract is not None
             assert layer1_normalized_hidden_reference is not None
@@ -2889,10 +2925,19 @@ def main() -> int:
                 .astype(np.float32)
             )
             variant_names = (
-                "baseline_bf16",
-                "attention_output_fp32",
-                "dense_down_fp32",
-                "attention_output_and_dense_down_fp32",
+                (
+                    "dcp_then_model_sequential_bf16",
+                    "dcp_then_model_pairwise_bf16",
+                    "model_then_dcp_sequential_bf16",
+                    "model_then_dcp_pairwise_bf16",
+                )
+                if args.observe_layer0_subshard_variants
+                else (
+                    "baseline_bf16",
+                    "attention_output_fp32",
+                    "dense_down_fp32",
+                    "attention_output_and_dense_down_fp32",
+                )
             )
             comparisons: dict[str, dict[str, Any]] = {}
             arm_contracts: dict[str, dict[str, Any]] = {}
@@ -3026,19 +3071,46 @@ def main() -> int:
                 "current_baseline_expected_sha256": (
                     LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
                 ),
+                "discriminator_kind": layer0_discriminator_kind,
                 "layer1_reference_sha256": (
                     args.layer1_internal_reference_sha256
                 ),
-                "reproduces_current_baseline": bool(
-                    comparisons["baseline_bf16"]["actual_sha256"]
-                    == LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                "reproduces_current_baseline": (
+                    bool(
+                        comparisons["baseline_bf16"]["actual_sha256"]
+                        == LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                    )
+                    if args.observe_layer0_residual_variants
+                    else None
+                ),
+                "sealed_independent_baseline": (
+                    None
+                    if args.observe_layer0_residual_variants
+                    else {
+                        "code_hash": (
+                            "12315aa1daccab67f7eaff709c291425a73b4006"
+                        ),
+                        "normalized_hidden_sha256": (
+                            LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                        ),
+                        "run_tag": (
+                            "greenfield_short_decoder_compile_pp8_8k_pallas_"
+                            "feature_linear_ot256_downf32_token_splitres_"
+                            "prefill_keyfix_queryexact_headkeyexact_"
+                            "scoredefault_oracle_dsa_layer0_residual_variants_"
+                            "trace2_20260810T221121969164909Z"
+                        ),
+                    }
                 ),
                 "variant_comparisons": comparisons,
                 "variant_names": list(variant_names),
             }
             discriminator_contract["passed"] = bool(
                 all(contract["passed"] for contract in arm_contracts.values())
-                and discriminator_contract["reproduces_current_baseline"]
+                and (
+                    discriminator_contract["reproduces_current_baseline"]
+                    is not False
+                )
                 and layer0_residual_discriminator_suite_contract["passed"]
             )
             if jax.process_index() == 0:
@@ -3055,15 +3127,15 @@ def main() -> int:
                         variants_bits, dtype=np.dtype("<u2")
                     ),
                     selected_positions=np.asarray(
-                        selection_by_name["baseline_bf16"][0],
+                        selection_by_name[variant_names[0]][0],
                         dtype=np.int32,
                     ),
                     selected_scores=np.asarray(
-                        selection_by_name["baseline_bf16"][1],
+                        selection_by_name[variant_names[0]][1],
                         dtype=np.float32,
                     ),
                     selected_valid_count=np.asarray(
-                        selection_by_name["baseline_bf16"][2],
+                        selection_by_name[variant_names[0]][2],
                         dtype=np.int32,
                     ),
                 )

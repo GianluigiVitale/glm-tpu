@@ -20,6 +20,7 @@ from .reference.rmsnorm import fused_add_rms_norm, rms_norm
 from .stage_local import (
     StageLocalDsaFp8Internals,
     StageLinearBackend,
+    VirtualTp32ReductionAssociation,
     _stage_fp8_linear,
     stage_local_dense_fp8_mapped,
     stage_local_dsa_fp8_mapped,
@@ -552,6 +553,9 @@ def stage_local_transformer_layer_fp8_split_mapped(
     linear_interpret: bool = False,
     reconstruct_attention_output_fp32: bool = False,
     reconstruct_dense_down_fp32: bool = False,
+    virtual_tp32_reduction_association: (
+        VirtualTp32ReductionAssociation | None
+    ) = None,
 ) -> StageLocalSplitLayerFp8Result:
     """Execute one layer while preserving legacy hidden/residual association."""
 
@@ -565,6 +569,14 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer dense FP32 reconstruction flag must be boolean")
     if reconstruct_dense_down_fp32 and mlp_kind != "dense":
         raise ValueError("dense FP32 reconstruction requires a dense layer")
+    if virtual_tp32_reduction_association is not None and (
+        reconstruct_attention_output_fp32 or reconstruct_dense_down_fp32
+    ):
+        raise ValueError(
+            "virtual TP32 reduction cannot be combined with FP32 reconstruction"
+        )
+    if virtual_tp32_reduction_association is not None and mlp_kind != "dense":
+        raise ValueError("virtual TP32 reduction requires a dense layer")
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise ValueError("layer sparse MoE backend is unknown")
     if not isinstance(pallas_moe_fuse_route_weighting, bool):
@@ -729,6 +741,9 @@ def stage_local_transformer_layer_fp8_split_mapped(
         linear_interpret=linear_interpret,
         add_residual=False,
         reconstruct_output_fp32=reconstruct_attention_output_fp32,
+        virtual_tp32_reduction_association=(
+            virtual_tp32_reduction_association
+        ),
     )
     normalized_mlp, post_attention_residual = fused_add_rms_norm(
         attention_result.output,
@@ -756,6 +771,9 @@ def stage_local_transformer_layer_fp8_split_mapped(
             precomputed_normalized=normalized_mlp,
             add_residual=False,
             reconstruct_down_fp32=reconstruct_dense_down_fp32,
+            virtual_tp32_reduction_association=(
+                virtual_tp32_reduction_association
+            ),
         )
         route_indices = jnp.full(
             (1, moe_contract.top_k), jnp.int32(-1), dtype=jnp.int32

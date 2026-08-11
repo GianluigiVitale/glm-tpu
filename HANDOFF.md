@@ -3367,3 +3367,38 @@ layer-1 norm. Independent inspection accepts both because neither can admit cont
 the exact per-arm kernels, combine counts, root shape and local groups remain mandatory. Do not
 request another review of this unchanged batch. Exact next: final mechanical verification,
 commit/push, authenticate idle fleet, and launch only the isolated discriminator.
+
+## Isolated combine-precision arms are admissible and all four are nonexact
+
+Protected tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T221121969164909Z`
+ran from 22:11--22:58 UTC at pushed `12315aa`. Four separately compiled single-arm executables
+all passed their independent HLO contracts, used the same non-donated post-prefill inputs and
+retained exact layer-0 DSA selection. The BF16 arm reproduces production SHA
+`787c9ba7...153b`; cross-arm fusion is absent, so all accepted-target comparisons are admissible.
+
+None is exact. Mismatch counts versus sealed accepted layer-1 normalized hidden are baseline
+`3960`, attention-output FP32 `4008`, dense-down FP32 `3998`, and both FP32 `4034`. Contract,
+suite, NPZ, pre-census and failure-census SHAs are `1d3d270f...b0e`, `31ed0093...75e`,
+`f7323ea2...45a`, `615dc21d...db9`, and `73d1e1dc...369d`. The contract exists byte-identically
+in the approved bucket and cleanup is authenticated 8/8. The diagnostic deliberately has no DB
+row, terminal `SUCCESS`, timing or XPlane; DB484 remains the only decoder performance result.
+
+The accepted source at `tpu-inference` pin `b3c25df47ac98783912dc658878181ec0a8ae16d`
+dequantizes raw FP8 to BF16, accumulates each physical dot in FP32, returns BF16, then performs a
+BF16 row-parallel reduction. Preserved accepted after-codegen HLO gzip SHA
+`51d014de...47f0` physically confirms a 32-way `RotatedPincerEmitter/StrategyND` reduction over
+the `4x2x4` topology for the row-parallel projection. PP8 currently performs one wider local dot
+per four-chip owner, so changing only the LP4 combine precision cannot reproduce the 32 separately
+rounded partials.
+
+The current default-off successor uses the already-packed weights and existing Pallas kernels. It
+splits each owner's attention-output K4096 contraction into eight K512 calls and each dense I3072
+path into eight I384 fused-SwiGLU calls. Every partial is BF16 before an explicit seven-add tree.
+Four isolated arms test local-eight before physical-four versus physical-four before local-eight,
+with sequential and pairwise BF16 trees. Repeated communication remains inside explicit LP4
+groups; production is unchanged. The optimized-HLO contract requires 8+8 exact subshard kernels,
+the requested hidden collective shapes, one live row and no escaped group. The full affected CPU
+batch passes 67/67 in 198.84 seconds; compileall, Bash, ShellCheck and diff checks pass. Exact next:
+one review of only this new diff from cleared `12315aa`, independent verification, commit/push,
+then one serialized protected subshard discriminator. Do not rerun the rejected precision arms.

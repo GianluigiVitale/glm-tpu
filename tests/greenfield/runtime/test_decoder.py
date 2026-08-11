@@ -552,6 +552,80 @@ ENTRY %main () -> (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) 
 '''
 
 
+def _layer0_virtual_tp32_discriminator_hlo(variant_name: str) -> str:
+    variants = {
+        "dcp_then_model_sequential_bf16",
+        "dcp_then_model_pairwise_bf16",
+        "model_then_dcp_sequential_bf16",
+        "model_then_dcp_pairwise_bf16",
+    }
+    if variant_name not in variants:
+        raise ValueError("unknown virtual TP32 test variant")
+    dcp_first = variant_name.startswith("dcp_then_model_")
+    replica_groups = (
+        "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
+        "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
+    )
+    gathers = "\n".join(
+        f"  %ag.{index} = s32[4,1] all-gather(%s), dimensions={{0}}, "
+        f"replica_groups={replica_groups}, channel_id={index + 1}, "
+        "use_global_device_ids=true"
+        for index in range(5)
+    )
+    hidden_shapes = (
+        ("bf16[1,6144]",) * 3
+        if dcp_first
+        else (
+            "bf16[1,6144]",
+            "bf16[8,1,6144]",
+            "bf16[8,1,6144]",
+        )
+    )
+    reductions = "\n".join(
+        f"  %ar.{index} = {shape} all-reduce(%b), "
+        f"replica_groups={replica_groups}, channel_id={index + 11}, "
+        "use_global_device_ids=true, to_apply=%add, "
+        f'metadata={{op_name="jit(probe)/greenfield_virtual_tp32_{variant_name}/psum"}}'
+        for index, shape in enumerate(hidden_shapes)
+    )
+    attention = "\n".join(
+        f"  %attention.{index} = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_block_matmul_m8_k512_n6144"'
+        for index in range(8)
+    )
+    dense = "\n".join(
+        f"  %dense.{index} = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_fused_block_swiglu_'
+        'm8_h6144_i384_o6144"'
+        for index in range(8)
+    )
+    return f'''HloModule layer0_{variant_name}, replica_count=1, num_partitions=32
+
+%add (x: bf16[], y: bf16[]) -> bf16[] {{
+  %x = bf16[] parameter(0)
+  %y = bf16[] parameter(1)
+  ROOT %sum = bf16[] add(%x, %y)
+}}
+
+ENTRY %main () -> (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) {{
+  %s = s32[1] constant({{0}})
+  %positions = s32[1,2048] constant({{0}})
+  %scores = f32[1,2048] constant({{0}})
+  %count = s32[1,1] constant({{0}})
+  %valid = pred[1,1] constant({{true}})
+  %b = bf16[1,6144] constant({{0}})
+{gathers}
+{reductions}
+{attention}
+{dense}
+  %normalized = bf16[1,6144] constant({{0}}), metadata={{op_name="jit(probe)/greenfield_layer1_input_norm_{variant_name}/mul"}}
+  ROOT %result = (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) tuple(%positions, %scores, %count, %normalized, %valid)
+}}
+'''
+
+
 def test_layer0_residual_discriminator_hlo_pins_isolated_arms() -> None:
     from glm_tpu.greenfield.runtime import (
         validate_layer0_residual_discriminator_hlo,
@@ -637,6 +711,65 @@ def test_layer0_residual_discriminator_hlo_pins_isolated_arms() -> None:
         )
 
 
+def test_layer0_virtual_tp32_discriminator_hlo_pins_subshards() -> None:
+    from glm_tpu.greenfield.runtime import (
+        validate_layer0_residual_discriminator_hlo,
+    )
+
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4))
+        for stage in range(8)
+    )
+    variants = (
+        "dcp_then_model_sequential_bf16",
+        "dcp_then_model_pairwise_bf16",
+        "model_then_dcp_sequential_bf16",
+        "model_then_dcp_pairwise_bf16",
+    )
+    for variant_name in variants:
+        accepted = validate_layer0_residual_discriminator_hlo(
+            _layer0_virtual_tp32_discriminator_hlo(variant_name),
+            config=_real_8k_decoder_config(dsa_score_default_precision=True),
+            groups=groups,
+            variant_name=variant_name,
+        )
+        assert accepted["passed"], accepted
+        assert accepted["discriminator_kind"] == "virtual_tp32"
+        assert accepted["kernel_counts"] == accepted["expected_kernel_counts"]
+        assert accepted["virtual_tp32_association_scope_present"]
+
+    model_first = _layer0_virtual_tp32_discriminator_hlo(
+        "model_then_dcp_pairwise_bf16"
+    )
+    wrong_shape = validate_layer0_residual_discriminator_hlo(
+        model_first.replace("bf16[8,1,6144]", "bf16[1,6144]"),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+        variant_name="model_then_dcp_pairwise_bf16",
+    )
+    assert not wrong_shape["passed"]
+    assert any(
+        "virtual TP32 collective association drifted" in item
+        for item in wrong_shape["violations"]
+    )
+
+    missing_subshard = validate_layer0_residual_discriminator_hlo(
+        model_first.replace(
+            "greenfield_fp8_block_matmul_m8_k512_n6144",
+            "greenfield_fp8_block_matmul_m8_k4096_n6144",
+            1,
+        ),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+        variant_name="model_then_dcp_pairwise_bf16",
+    )
+    assert not missing_subshard["passed"]
+    assert any(
+        "kernel association drifted" in item
+        for item in missing_subshard["violations"]
+    )
+
+
 def test_layer0_residual_discriminator_traces_real_stage0_shape() -> None:
     program = r'''
 import json
@@ -710,6 +843,19 @@ exact_decoder = build_decoder_step_program(
     build_layer0_residual_discriminator=True,
 )
 assert len(exact_decoder.layer0_residual_discriminators) == 4
+virtual_decoder = build_decoder_step_program(
+    plan,
+    schedule,
+    state,
+    weight_layout,
+    groups,
+    pairs,
+    complete_token_path=True,
+    split_residual_state=True,
+    build_layer0_residual_discriminator=True,
+    layer0_residual_discriminator_kind="virtual_tp32",
+)
+assert len(virtual_decoder.layer0_residual_discriminators) == 4
 
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -790,6 +936,12 @@ print(json.dumps({
         for name, stablehlo in exact_stablehlos.items()
     },
     "exact_variant_names": list(exact_stablehlos),
+    "virtual_discriminator_kind": (
+        virtual_decoder.layer0_residual_discriminator_kind
+    ),
+    "virtual_variant_names": [
+        name for name, _ in virtual_decoder.layer0_residual_discriminators
+    ],
     "multi_variant_outputs": {
         name: "tensor<32x4x8xbf16>" in stablehlo
         for name, stablehlo in stablehlos.items()
@@ -828,6 +980,13 @@ print(json.dumps({
     assert result["distinct_stablehlo"] == 4
     assert result["exact_distinct_stablehlo"] == 4
     assert result["exact_variant_names"] == result["variant_names"]
+    assert result["virtual_discriminator_kind"] == "virtual_tp32"
+    assert result["virtual_variant_names"] == [
+        "dcp_then_model_sequential_bf16",
+        "dcp_then_model_pairwise_bf16",
+        "model_then_dcp_sequential_bf16",
+        "model_then_dcp_pairwise_bf16",
+    ]
     assert all(result["exact_single_variant_outputs"].values())
     assert all(result["single_variant_outputs"].values())
     assert not any(result["multi_variant_outputs"].values())

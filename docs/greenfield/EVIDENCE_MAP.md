@@ -914,3 +914,22 @@ capture is still required.
 - The successor must compile and validate four single-arm executables independently, reuse the
   exact same post-prefill arrays for each non-donating execution, and stack only host-side after
   all arms complete. A full 8K decoder retry is not authorized first.
+
+## Independent layer-0 arms and virtual-TP32 discriminator readiness
+
+- Pushed pin `12315aa`, protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T221121969164909Z`,
+  makes the four precision arms admissible: independent HLOs, exact BF16 production control and
+  exact layer-0 DSA selection. All four remain accepted-target nonexact at
+  `3960/4008/3998/4034` mismatches.
+- Contract/suite/NPZ/pre-census/failure-census SHAs are `1d3d270f...b0e`, `31ed0093...75e`,
+  `f7323ea2...45a`, `615dc21d...db9`, and `73d1e1dc...369d`; direct approved-bucket contract bytes
+  agree and authenticated cleanup is 8/8. There is no DB/SUCCESS/timing evidence.
+- Accepted oracle source pin `b3c25df47ac98783912dc658878181ec0a8ae16d` and captured
+  after-codegen HLO gzip SHA `51d014de...47f0` show separately BF16-rounded local projection dots
+  feeding a physical 32-way BF16 `RotatedPincerEmitter/StrategyND` reduction. This is the premise
+  for reconstructing eight virtual contraction shards inside each PP8 owner.
+- The default-off successor uses 8 attention K512 plus 8 dense I384 existing Pallas calls, explicit
+  seven-add BF16 local trees and only LP4 physical reductions. Its affected forced-CPU suite passes
+  67/67 in 198.84 seconds with compileall/Bash/ShellCheck/diff checks green. Protected TPU HLO and
+  numerical output remain missing until the reviewed batch is committed and launched.

@@ -458,3 +458,16 @@ normalized outputs. Its nominal BF16 control therefore differs from current prod
 as negative compiler-association evidence. Reuse its exact post-prefill state, sealed layer-1
 target, oracle, loader and protection path through four separately compiled single-arm programs;
 do not stack the arms again or spend another full-decoder retry before the isolated result.
+
+Pushed `12315aa` closes that isolation requirement. Its four single-arm programs reproduce the
+current BF16 production SHA independently, retain exact layer-0 selection and reject all simple
+combine-precision variants against the sealed layer-1 target. Do not repeat them. Reuse contract
+SHA `1d3d270f...b0e`, suite SHA `31ed0093...75e`, NPZ SHA `f7323ea2...45a`, authenticated census
+and the unchanged post-prefill inputs as the prerequisite for the next discriminator. Accepted
+oracle source pin `b3c25df47ac98783912dc658878181ec0a8ae16d` plus captured after-codegen HLO gzip
+SHA `51d014de...47f0` show that each legacy row-parallel projection rounds a smaller local dot to
+BF16 before a physical 32-way BF16 reduction. Reuse the already-packed contiguous contraction
+bytes and existing Pallas block kernels to recover eight such partials per PP8 owner; do not repack,
+import the legacy executor or add another projection kernel. Test local-eight versus physical-four
+ordering and sequential versus pairwise BF16 trees in four isolated default-off programs. Only a
+protected exact arm may be integrated into production.

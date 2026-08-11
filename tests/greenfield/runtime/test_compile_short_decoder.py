@@ -128,6 +128,7 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         not in runner
     )
     assert '"--observe-layer0-residual-variants"' in compiler
+    assert '"--observe-layer0-subshard-variants"' in compiler
     assert "build_layer0_residual_discriminator" in compiler
     assert "validate_layer0_residual_discriminator_hlo" in compiler
     assert "decoder.layer0_residual_discriminators" in compiler
@@ -140,8 +141,17 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         "readonly LAYER0_RESIDUAL_VARIANTS="
         "${GLM_GREENFIELD_LAYER0_RESIDUAL_VARIANTS:-0}" in runner
     )
+    assert (
+        "readonly LAYER0_SUBSHARD_VARIANTS="
+        "${GLM_GREENFIELD_LAYER0_SUBSHARD_VARIANTS:-0}" in runner
+    )
     assert '--observe-layer0-residual-variants 1' in runner
-    assert "layer-0 residual variants require the complete exact recurrent" in runner
+    assert '--observe-layer0-subshard-variants 1' in runner
+    assert "layer-0 discriminator requires the complete exact recurrent" in runner
+    assert "ISOLATED_RESIDUAL_PREREQUISITE_TAG" in runner
+    assert "isolated residual direct remote contract hash drifted" in runner
+    assert '"dcp_then_model_sequential_bf16"' in compiler
+    assert '"model_then_dcp_pairwise_bf16"' in compiler
     assert '"schema_version": 14' in compiler
     assert 'record["schema_version"] for record in records} != {14}' in runner
     assert "results_db_run_id\": 518" in runner

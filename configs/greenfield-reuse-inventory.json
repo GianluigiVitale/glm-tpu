@@ -383,12 +383,12 @@
       "id": "greenfield-layer0-residual-discriminator",
       "category": "bounded diagnostic evidence",
       "source_repo": "glm-tpu",
-      "source_pin": "9b53ce2e784e616d6a1bbfdd3cd261dfaff04cbf",
-      "source_paths": ["/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T202128342266137Z", "/home/gianl/glm-run/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z"],
+      "source_pin": "12315aa1daccab67f7eaff709c291425a73b4006",
+      "source_paths": ["/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T221121969164909Z", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T202128342266137Z", "/home/gianl/glm-run/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z", "/home/gianl/glm-run/greenfield_accepted_prompt_projection_lowering_recovery_20260809T105858202006975Z/accepted_prompt_projection_lowering/jit_step_fun_impl.m64.owner0.after_codegen_hlo.txt.gz", "/home/gianl/tpu-inference/tpu_inference/layers/common/linear.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py"],
       "gate": "D",
-      "reason": "The corrected four-arm program proves FP32 combines and opaque boundaries survive, but optimized HLO tuple-fuses the arms' dense reductions and layer-1 RMSNorms, so its numerical outputs are inadmissible. Reuse the same post-prefill state/oracle/protection path through four separately compiled single-arm executables; reject stacked device-side arms and another blind full decoder retry."
+      "reason": "The isolated 12315aa programs reproduce production independently and reject all four simple LP4 combine-precision arms. Accepted source/HLO instead proves smaller local dots are rounded BF16 before a physical 32-way reduction. Reuse the same packed contraction bytes, post-prefill state, sealed target, oracle and protections through four default-off virtual-subshard associations; reject another precision-arm or blind full-decoder retry."
     },
     {
       "id": "legacy-residual-observer",
