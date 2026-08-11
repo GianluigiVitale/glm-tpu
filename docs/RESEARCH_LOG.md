@@ -7498,3 +7498,25 @@ unmotivated arithmetic variants.
   independently verify, commit/push and launch this one protected discriminator. Control must
   reproduce `6c54c09a...bca` / 3,984 mismatches. Candidate exactness authorizes the complete
   protected 8K run; nonexactness is diagnosed from the exact result before any new hypothesis.
+
+## 2026-08-11 22:33--23:02 — exact canary passes TPU arithmetic; folded operand guard refuses
+
+- The existing Sol reviewer confirmed both medium findings fully resolved, found no new
+  high/medium issue and returned `APPROVE COMMIT` for staged SHA `2cb1b478...b609`. Independent
+  verification passed and the exact tree was committed/pushed at `742eacd81310d5e98621be4671cbe132cdf56e65`.
+- The serialized protected discriminator at tag ending
+  `layer0_strategy_nd_row0_trace2_20260811T224134092630730Z` reached both full layer-0 compiles and
+  the same-reducer canary, then failed closed before model execution. The canary itself is exact:
+  `0` mismatches across 32 sealed trials x 32 lanes, 32 distinct hashes, 82 StableHLO barriers,
+  one LP4 gather, no host markers and fleet-identical HLO SHA `6a7cd2d9...7f6d`.
+- TPU optimized the canary's logical `bf16[8,1,6144]` operand as
+  `bf16[1,8,1,6144]`, retaining the shard-map singleton while producing the already-admitted
+  `bf16[4,8,1,6144]` result. Exact scope and replica groups are preserved. The guard therefore
+  reported only `shaped_gather_count=0`; this is an HLO-observation false rejection, not a reducer
+  mismatch. All eight ranks agree. Pre/failure censuses pass 8/8; no discriminator contract,
+  token/timing, DB row, `SUCCESS`, Gate-D or performance claim exists.
+- The bounded fix admits only logical rank-3 or TPU rank-4-singleton operands while retaining exact
+  dtype, dimensions, result, scope, one-collective and LP4-group checks. The focused test covers
+  both encodings, the preserved TPU HLO now passes, and malformed/extra collectives remain refused.
+  Exact next: finish the affected/static suite, obtain one new-diff-only Sol audit, commit/push and
+  retry the protected discriminator once.

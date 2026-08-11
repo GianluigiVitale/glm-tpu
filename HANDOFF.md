@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 22:33 UTC
+**Updated:** 2026-08-11 23:02 UTC
 
 ## Authority and isolation
 
@@ -208,10 +208,23 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   DB533 replay has zero mismatches across 196,608 outputs; Python, Bash, ShellCheck, JSON, all 15
   embedded-Python blocks and diff checks pass. A read-only exact-mode wrapper preflight validates
   all local/remote prerequisites through DB533 and stops at the expected dirty-worktree guard
-  before census or TPU work. Exact next is the existing Sol reviewer's bounded follow-up on those
-  two fixes, then independent verification, commit/push and one protected run. An exact result
-  authorizes complete protected 8K; a nonexact result must be diagnosed from this source-faithful
-  outcome rather than another guessed reduction tree.
+  before census or TPU work. The existing Sol reviewer approved staged SHA `2cb1b478...b609` with
+  no remaining high/medium issue; independent verification passed and the batch is committed and
+  pushed at `742eacd81310d5e98621be4671cbe132cdf56e65`.
+- The first protected run at that pin, tag ending
+  `layer0_strategy_nd_row0_trace2_20260811T224134092630730Z`, failed closed before model execution
+  and has no boundary/performance verdict. The same-reducer canary was numerically exact on TPU:
+  zero mismatches across 32 trials x 32 lanes, 32 distinct output hashes, 82 StableHLO barriers,
+  one exact LP4 gather and fleet-identical HLO SHA `6a7cd2d9...7f6d`. Its optimized operand retained
+  the shard-map singleton as `bf16[1,8,1,6144]`; the guard admitted only the logical
+  `bf16[8,1,6144]`, so it rejected solely on `shaped_gather_count=0`. Actual HLO scope, result
+  `bf16[4,8,1,6144]`, exact groups and execution all pass. Pre/failure censuses are 8/8 clean;
+  there is no contract, token/timing, DB row or `SUCCESS`.
+- The bounded correction admits only those two exact operand encodings and still requires the
+  exact result, scope, one collective and LP4 groups. The focused tests pass and the preserved TPU
+  HLO now passes the helper. Exact next is complete affected/static verification, one new-diff-only
+  Sol audit, commit/push and one protected retry. An exact result authorizes complete protected 8K;
+  a nonexact result is diagnosed before any new hypothesis.
 
 ## Historical main-RoPE integration batch
 

@@ -972,6 +972,11 @@ capture is still required.
   sealed trials/lanes, pins 82 BF16-round barriers and one exact LP4 gather, and globally refuses
   any third matching gather in the decoder. Local replay is exact at `0/196,608` mismatches and
   the affected suite passes `79/79`; protected TPU boundary evidence is still pending.
+- The first protected attempt at `742eacd` proves the canary itself exact on TPU (`0` mismatches,
+  32 trials x 32 lanes, 82 barriers, one exact LP4 gather). It stopped only because optimized HLO
+  retained a leading shard-map singleton on the gather operand. Eight-rank cleanup is clean; no
+  layer boundary, token, timing or Gate-D claim follows. The guard correction accepts only that
+  preserved real encoding or the logical rank-3 encoding.
 
 ### Pre-launch provenance disposition
 

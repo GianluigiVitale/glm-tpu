@@ -78,8 +78,10 @@ both layer-0 projections through two LP4 gathers. Its affected CPU/forced-device
 JSON, all 15 embedded-Python blocks and diff checks pass, and the read-only exact-mode wrapper
 preflight reaches the intended dirty-worktree refusal after validating DB533. The corrected HLO
 contract globally pins exactly two separately scoped gathers, while a same-reducer device canary
-pins all 32 sealed trials/lanes and 82 BF16-round barriers. No TPU boundary result exists until the
-existing Sol reviewer's bounded fix confirmation and the protected discriminator.
+pins all 32 sealed trials/lanes and 82 BF16-round barriers. The first protected attempt proves that
+canary exact on TPU but refuses its real `bf16[1,8,1,6144]` folded operand shape before model
+execution; cleanup is 8/8. The bounded guard fix passes focused tests and the preserved real HLO.
+No TPU boundary result exists until its new-diff-only Sol audit and protected retry.
 DB 417/418 prove decoded-overlay sparse-layer oracles; DB 420 proves complete checkpoint
 integrity/direct loading; DB 421 proves real PP8 dense/full-DSA/IndexShare layers; DB 439 proves the
 fused-routed deployable raw-FP8 PP8 MoE layer but misses its latency budget. None proves full-model correctness,

@@ -514,17 +514,18 @@ def test_strategy_nd_canary_hlo_requires_one_scoped_lp4_gather() -> None:
         "greenfield_strategy_nd_row0_association/"
         "greenfield_strategy_nd_row0_association_gather/all_gather\"}"
     )
-    hlo = (
-        "HloModule canary, replica_count=1, num_partitions=32\n\n"
-        "ENTRY main (input: bf16[8,1,6144]) -> bf16[4,8,1,6144] {\n"
-        "  %input = bf16[8,1,6144] parameter(0)\n"
-        f"{gather}\n"
-        "}\n"
-    )
-    passed = _validate_strategy_nd_canary_hlo(hlo, groups=groups)
-    assert passed["passed"], passed
-    assert passed["collective_count"] == 1
-    assert passed["scoped_shaped_gather_count"] == 1
+    for operand_shape in ("bf16[8,1,6144]", "bf16[1,8,1,6144]"):
+        hlo = (
+            "HloModule canary, replica_count=1, num_partitions=32\n\n"
+            f"ENTRY main (input: {operand_shape}) -> bf16[4,8,1,6144] {{\n"
+            f"  %input = {operand_shape} parameter(0)\n"
+            f"{gather}\n"
+            "}\n"
+        )
+        passed = _validate_strategy_nd_canary_hlo(hlo, groups=groups)
+        assert passed["passed"], passed
+        assert passed["collective_count"] == 1
+        assert passed["scoped_shaped_gather_count"] == 1
 
     extra = hlo.replace(
         gather,

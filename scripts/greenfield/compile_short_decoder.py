@@ -1260,7 +1260,11 @@ def _validate_strategy_nd_canary_hlo(
         for item in collectives
         if item.opcode == "all-gather"
         and any(
-            shape.dtype == "bf16" and shape.dimensions == (8, 1, 6144)
+            shape.dtype == "bf16"
+            and shape.dimensions in (
+                (8, 1, 6144),
+                (1, 8, 1, 6144),
+            )
             for shape in item.operand_shapes
         )
         and any(
