@@ -902,6 +902,78 @@ ENTRY %main (main_rope_table: bf16[8192,64]) -> (s32[1,2048], f32[1,2048], s32[1
 '''
 
 
+def _layer0_attention_output_association_discriminator_hlo(
+    variant_name: str,
+    *,
+    tpu_rewritten_owner_split: bool = False,
+) -> str:
+    control_name = "attention_output_association_control"
+    associations = {
+        "dcp_then_model_sequential_bf16",
+        "dcp_then_model_pairwise_bf16",
+        "model_then_dcp_sequential_bf16",
+        "model_then_dcp_pairwise_bf16",
+    }
+    association = variant_name.removeprefix("attention_output_")
+    if variant_name != control_name and association not in associations:
+        raise ValueError("unknown attention-output association test variant")
+
+    hlo = _layer0_attention_schedule_discriminator_hlo(
+        "attention_schedule_control",
+        tpu_rewritten_control=tpu_rewritten_owner_split,
+    ).replace("attention_schedule_control", variant_name)
+    if variant_name == control_name:
+        return hlo
+
+    replica_groups = (
+        "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
+        "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
+    )
+    old_reductions = "\n".join(
+        f"  %ar.{index} = bf16[1,6144] all-reduce(%b), "
+        f"replica_groups={replica_groups}, channel_id={index + 11}, "
+        "use_global_device_ids=true, to_apply=%add"
+        for index in range(3)
+    )
+    virtual_shape = (
+        "bf16[1,6144]"
+        if association.startswith("dcp_then_model_")
+        else "bf16[8,1,6144]"
+    )
+    new_reductions = "\n".join(
+        (
+            f"  %ar.{index} = "
+            f"{virtual_shape if index == 0 else 'bf16[1,6144]'} "
+            "all-reduce(%b), "
+            f"replica_groups={replica_groups}, channel_id={index + 11}, "
+            "use_global_device_ids=true, to_apply=%add"
+            + (
+                ", metadata={op_name=\"jit(probe)/"
+                f"greenfield_virtual_tp32_{association}/psum\""
+                "}"
+                if index == 0
+                else ""
+            )
+        )
+        for index in range(3)
+    )
+    production_attention = (
+        "  %attention = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_block_matmul_m8_k4096_n6144"'
+    )
+    virtual_attention = "\n".join(
+        f"  %attention.{index} = bf16[1,6144] custom-call(%b), "
+        'custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_block_matmul_m8_k512_n6144"'
+        for index in range(8)
+    )
+    return hlo.replace(old_reductions, new_reductions).replace(
+        production_attention,
+        virtual_attention,
+    )
+
+
 def _layer0_virtual_tp32_discriminator_hlo(variant_name: str) -> str:
     variants = {
         "dcp_then_model_sequential_bf16",
@@ -1293,6 +1365,136 @@ def test_layer0_attention_schedule_hlo_pins_control_and_challenger() -> None:
     assert contaminated_control["monolithic_attention_scope_present"]
 
 
+def test_layer0_attention_output_association_hlo_isolates_projection() -> None:
+    from glm_tpu.greenfield.runtime import (
+        validate_layer0_residual_discriminator_hlo,
+    )
+
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4))
+        for stage in range(8)
+    )
+    config = _real_8k_decoder_config(dsa_score_default_precision=True)
+    variants = (
+        "attention_output_association_control",
+        "attention_output_dcp_then_model_sequential_bf16",
+        "attention_output_dcp_then_model_pairwise_bf16",
+        "attention_output_model_then_dcp_sequential_bf16",
+        "attention_output_model_then_dcp_pairwise_bf16",
+    )
+    contracts = {}
+    for variant_name in variants:
+        hlo = _layer0_attention_output_association_discriminator_hlo(
+            variant_name
+        )
+        contract = validate_layer0_residual_discriminator_hlo(
+            hlo,
+            config=config,
+            groups=groups,
+            variant_name=variant_name,
+            main_rope_table_enabled=True,
+        )
+        assert contract["passed"], contract
+        assert contract["discriminator_kind"] == (
+            "attention_output_association"
+        )
+        assert len(contract["owner_split_output_gathers"]) == 1
+        assert not contract["cache_shaped_gathers"]
+        contracts[variant_name] = contract
+
+    control = contracts["attention_output_association_control"]
+    assert control["kernel_counts"][
+        "greenfield_fp8_block_matmul_m8_k4096_n6144"
+    ] == 1
+    assert control["kernel_counts"][
+        "greenfield_fp8_block_matmul_m8_k512_n6144"
+    ] == 0
+    for variant_name in variants[1:]:
+        candidate = contracts[variant_name]
+        assert candidate["kernel_counts"][
+            "greenfield_fp8_block_matmul_m8_k4096_n6144"
+        ] == 0
+        assert candidate["kernel_counts"][
+            "greenfield_fp8_block_matmul_m8_k512_n6144"
+        ] == 8
+        assert candidate["kernel_counts"][
+            "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144"
+        ] == 1
+        assert candidate["kernel_counts"][
+            "greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144"
+        ] == 0
+        assert candidate["virtual_tp32_association_scope_present"]
+
+    tpu_rewritten = validate_layer0_residual_discriminator_hlo(
+        _layer0_attention_output_association_discriminator_hlo(
+            "attention_output_model_then_dcp_pairwise_bf16",
+            tpu_rewritten_owner_split=True,
+        ),
+        config=config,
+        groups=groups,
+        variant_name="attention_output_model_then_dcp_pairwise_bf16",
+        main_rope_table_enabled=True,
+    )
+    assert tpu_rewritten["passed"], tpu_rewritten
+    assert tpu_rewritten["collective_counts"]["all-gather"] == 3
+
+    model_first_hlo = (
+        _layer0_attention_output_association_discriminator_hlo(
+            "attention_output_model_then_dcp_pairwise_bf16"
+        )
+    )
+    wrong_shape = validate_layer0_residual_discriminator_hlo(
+        model_first_hlo.replace("bf16[8,1,6144]", "bf16[1,6144]"),
+        config=config,
+        groups=groups,
+        variant_name="attention_output_model_then_dcp_pairwise_bf16",
+        main_rope_table_enabled=True,
+    )
+    assert not wrong_shape["passed"]
+    assert any(
+        "virtual TP32 collective association drifted" in item
+        for item in wrong_shape["violations"]
+    )
+
+    virtual_dense = validate_layer0_residual_discriminator_hlo(
+        model_first_hlo.replace(
+            "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144",
+            "greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144",
+        ),
+        config=config,
+        groups=groups,
+        variant_name="attention_output_model_then_dcp_pairwise_bf16",
+        main_rope_table_enabled=True,
+    )
+    assert not virtual_dense["passed"]
+    assert any(
+        "kernel association drifted" in item
+        for item in virtual_dense["violations"]
+    )
+
+
+def test_layer0_attention_output_specs_leave_dense_on_production_path() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _layer0_residual_discriminator_specs,
+    )
+
+    specs = _layer0_residual_discriminator_specs(
+        "attention_output_association"
+    )
+    assert tuple(spec[0] for spec in specs) == (
+        "attention_output_association_control",
+        "attention_output_dcp_then_model_sequential_bf16",
+        "attention_output_dcp_then_model_pairwise_bf16",
+        "attention_output_model_then_dcp_sequential_bf16",
+        "attention_output_model_then_dcp_pairwise_bf16",
+    )
+    assert specs[0][3:] == (None, False, False)
+    for spec in specs[1:]:
+        assert spec[1:3] == (False, False)
+        assert spec[3] is not None
+        assert spec[4:6] == (True, False)
+
+
 def test_layer0_ingredients_hlo_pins_primitive_capture() -> None:
     from glm_tpu.greenfield.runtime import (
         validate_layer0_ingredients_observer_hlo,
@@ -1494,6 +1696,20 @@ attention_decoder = build_decoder_step_program(
     layer0_residual_discriminator_kind="attention_schedule",
 )
 assert len(attention_decoder.layer0_residual_discriminators) == 2
+attention_output_decoder = build_decoder_step_program(
+    plan,
+    schedule,
+    state,
+    weight_layout,
+    groups,
+    pairs,
+    complete_token_path=True,
+    split_residual_state=True,
+    main_rope_table_enabled=True,
+    build_layer0_residual_discriminator=True,
+    layer0_residual_discriminator_kind="attention_output_association",
+)
+assert len(attention_output_decoder.layer0_residual_discriminators) == 5
 
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -1596,6 +1812,27 @@ print(json.dumps({
         name: stablehlo.count("stablehlo.all_gather")
         for name, stablehlo in attention_stablehlos.items()
     },
+    "attention_output_discriminator_kind": (
+        attention_output_decoder.layer0_residual_discriminator_kind
+    ),
+    "attention_output_main_rope_input": (
+        len(attention_output_decoder.input_specs) == 10
+    ),
+    "attention_output_program_count": len(
+        attention_output_decoder.layer0_residual_discriminators
+    ),
+    "attention_output_program_objects_distinct": len({
+        id(discriminator)
+        for _, discriminator in (
+            attention_output_decoder.layer0_residual_discriminators
+        )
+    }),
+    "attention_output_variant_names": [
+        name
+        for name, _ in (
+            attention_output_decoder.layer0_residual_discriminators
+        )
+    ],
     "virtual_discriminator_kind": (
         virtual_decoder.layer0_residual_discriminator_kind
     ),
@@ -1646,6 +1883,19 @@ print(json.dumps({
     assert result["attention_variant_names"] == [
         "attention_schedule_control",
         "replicated_monolithic_attention",
+    ]
+    assert result["attention_output_discriminator_kind"] == (
+        "attention_output_association"
+    )
+    assert result["attention_output_main_rope_input"]
+    assert result["attention_output_program_count"] == 5
+    assert result["attention_output_program_objects_distinct"] == 5
+    assert result["attention_output_variant_names"] == [
+        "attention_output_association_control",
+        "attention_output_dcp_then_model_sequential_bf16",
+        "attention_output_dcp_then_model_pairwise_bf16",
+        "attention_output_model_then_dcp_sequential_bf16",
+        "attention_output_model_then_dcp_pairwise_bf16",
     ]
     assert (
         result["attention_all_gather_counts"][
@@ -2827,6 +3077,21 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             split_residual_state=True,
             build_layer0_residual_discriminator=True,
             layer0_residual_discriminator_kind="attention_schedule",
+        )
+    with pytest.raises(PlanValidationError, match="requires the proven main-RoPE"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=True,
+            split_residual_state=True,
+            build_layer0_residual_discriminator=True,
+            layer0_residual_discriminator_kind=(
+                "attention_output_association"
+            ),
         )
     with pytest.raises(PlanValidationError, match="proven complete split-token"):
         build_decoder_step_program(

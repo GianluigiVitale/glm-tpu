@@ -23,6 +23,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--519, and existing association helpers | DB506--515 isolate the drift, DB516 seals physical M64, DB517 makes projection exact, DB518 makes the full cache exact, and DB519 rejects fused internal weight materialization. Production now separates the small stage-local weight materializer from repair; recurrent decode and legacy execution stay untouched. |
 | Layer-0 attention schedule | existing stage-local striped cache, sparse-MLA kernel, isolated discriminator, protected table-on DSA observer | Reuse the exact packed checkpoint, post-prefill state, selection, cache layout, kernel, HLO parser and protection wrapper. The default-off challenger changes only one boundary: one LP4 cache gather reconstructs page-major `[pages,512,640]` and runs one monolithic 2,048-position attention schedule per owner. No new loader, cache, oracle or legacy execution path is introduced. |
+| Layer-0 attention-output association | rejected uniform virtual-TP32 projection trees, accepted packed contraction shards, table-on owner-split control, protected attention-schedule result | Reuse only the eight K512 attention partials and four pinned BF16 associations from the old combined attention+dense diagnostic. Five isolated default-off programs keep dense-down on its production K3072 path and change only attention output projection. No checkpoint repack, legacy executor, cache gather or new Pallas kernel is introduced. |
 | DSA internal observer | oracle-only `83ff4a357` scorer, `9c1d6b3b9` prompt-key, and `89fc453b6` prompt-key-input modes, all descendants of accepted `b3c25df47`; protected DB513--515 | Default-off scorer/prompt-key modes remain unchanged. DB515 seals the actual 6,144-wide FP32 `h` entering projection at row 113 and proves it bitwise equal to the independent M2048 gather/RMS producer. Legacy execution is never imported; the observer is now preserved evidence, not a reason to recapture the input. |
 | DSA query association | protected capture, DB499 and physical DB521--526 | DB525's exact four-alias local tuple fusion and DB526's exact production composition are adapted default-off; rejected variants remain negative evidence. |
 | Production q-a association | accepted layer-0 capture, DB491 distributed q-a artifact, and the all-21 greenfield observer at `380659a` | Reuse the accepted shard-major fused `N=82` packing and norm association as a one-row, stage-local virtualized discriminator; never import the TP32 execution path or its full-pod collectives. |
@@ -472,6 +473,25 @@ bytes and existing Pallas block kernels to recover eight such partials per PP8 o
 import the legacy executor or add another projection kernel. Test local-eight versus physical-four
 ordering and sequential versus pairwise BF16 trees in four isolated default-off programs. Only a
 protected exact arm may be integrated into production.
+
+## Gate-D attention schedule and output-association reuse
+
+Protected table-on attention-schedule contract `bacc8a78...b7fbf` makes the owner-split control
+reproduce `6c54c09a...bca` and changes only 30 of its 3,984 mismatches under a monolithic 2,048-row
+schedule. The challenger therefore rejects attention segmentation as the trunk cause. Preserve its
+one-cache-gather HLO and `ad64fff2...f4f64` tensor artifact as negative evidence; do not integrate
+or rerun it.
+
+The next discriminator does not reinvent the already rejected combined virtual-TP32 matrix. It
+adapts its exact packed K512 attention partials and four association helpers, but deliberately
+keeps dense-down on the production full-width K3072 kernel. One unchanged table-on owner-split
+control plus four attention-only candidates compile as five separate programs. Their HLO contract
+requires eight K512 attention calls, zero K4096 attention calls, exactly one production dense call,
+zero I384 dense calls, the requested BF16 reduction shape/scope, one live row and exact LP4 groups.
+The protected wrapper pins the rejected schedule artifact as a prerequisite and accepts the
+intentional diagnostic exit only when the control reproduces `6c54c09a...bca`, all five arms retain
+exact selection and the five HLO modules are distinct. Production remains unchanged until one
+protected candidate materially removes the sealed layer-1 boundary mismatch.
 
 ## Gate-D layer-0 main-cache boundary reuse
 

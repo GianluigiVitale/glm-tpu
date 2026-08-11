@@ -1416,6 +1416,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
     )
     parser.add_argument(
+        "--observe-layer0-attention-output-association-variants",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
+    parser.add_argument(
         "--observe-layer0-ingredients",
         type=int,
         choices=(0, 1),
@@ -1472,6 +1478,9 @@ def main() -> int:
     args.observe_layer0_attention_schedule_variants = bool(
         args.observe_layer0_attention_schedule_variants
     )
+    args.observe_layer0_attention_output_association_variants = bool(
+        args.observe_layer0_attention_output_association_variants
+    )
     args.observe_layer0_ingredients = bool(args.observe_layer0_ingredients)
     if (
         sum(
@@ -1479,6 +1488,7 @@ def main() -> int:
                 args.observe_layer0_residual_variants,
                 args.observe_layer0_subshard_variants,
                 args.observe_layer0_attention_schedule_variants,
+                args.observe_layer0_attention_output_association_variants,
                 args.observe_layer0_ingredients,
             )
         )
@@ -1491,13 +1501,20 @@ def main() -> int:
         args.observe_layer0_residual_variants
         or args.observe_layer0_subshard_variants
         or args.observe_layer0_attention_schedule_variants
+        or args.observe_layer0_attention_output_association_variants
     )
     if args.observe_layer0_subshard_variants:
         layer0_discriminator_kind = "virtual_tp32"
     elif args.observe_layer0_attention_schedule_variants:
         layer0_discriminator_kind = "attention_schedule"
+    elif args.observe_layer0_attention_output_association_variants:
+        layer0_discriminator_kind = "attention_output_association"
     else:
         layer0_discriminator_kind = "combine_precision"
+    main_rope_layer0_discriminator = bool(
+        args.observe_layer0_attention_schedule_variants
+        or args.observe_layer0_attention_output_association_variants
+    )
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
         args.short_context_oracle_manifest_sha256 is not None
@@ -1620,6 +1637,16 @@ def main() -> int:
         raise ValueError(
             "layer-0 attention-schedule discriminator requires the protected "
             "table-on production path"
+        )
+    if args.observe_layer0_attention_output_association_variants and not (
+        args.main_rope_table
+        and args.runtime_kind == "pallas_feature_linear"
+        and args.complete_token_path
+        and args.split_residual_state
+    ):
+        raise ValueError(
+            "layer-0 attention-output association discriminator requires "
+            "the protected table-on production path"
         )
     if args.observe_layer0_ingredients and not (
         args.prefill_index_repair
@@ -2981,15 +3008,25 @@ def main() -> int:
                 if args.observe_layer0_subshard_variants
                 else (
                     (
-                        "attention_schedule_control",
-                        "replicated_monolithic_attention",
+                        "attention_output_association_control",
+                        "attention_output_dcp_then_model_sequential_bf16",
+                        "attention_output_dcp_then_model_pairwise_bf16",
+                        "attention_output_model_then_dcp_sequential_bf16",
+                        "attention_output_model_then_dcp_pairwise_bf16",
                     )
-                    if args.observe_layer0_attention_schedule_variants
+                    if args.observe_layer0_attention_output_association_variants
                     else (
-                        "baseline_bf16",
-                        "attention_output_fp32",
-                        "dense_down_fp32",
-                        "attention_output_and_dense_down_fp32",
+                        (
+                            "attention_schedule_control",
+                            "replicated_monolithic_attention",
+                        )
+                        if args.observe_layer0_attention_schedule_variants
+                        else (
+                            "baseline_bf16",
+                            "attention_output_fp32",
+                            "dense_down_fp32",
+                            "attention_output_and_dense_down_fp32",
+                        )
                     )
                 )
             )
@@ -3325,15 +3362,25 @@ def main() -> int:
                 if args.observe_layer0_subshard_variants
                 else (
                     (
-                        "attention_schedule_control",
-                        "replicated_monolithic_attention",
+                        "attention_output_association_control",
+                        "attention_output_dcp_then_model_sequential_bf16",
+                        "attention_output_dcp_then_model_pairwise_bf16",
+                        "attention_output_model_then_dcp_sequential_bf16",
+                        "attention_output_model_then_dcp_pairwise_bf16",
                     )
-                    if args.observe_layer0_attention_schedule_variants
+                    if args.observe_layer0_attention_output_association_variants
                     else (
-                        "baseline_bf16",
-                        "attention_output_fp32",
-                        "dense_down_fp32",
-                        "attention_output_and_dense_down_fp32",
+                        (
+                            "attention_schedule_control",
+                            "replicated_monolithic_attention",
+                        )
+                        if args.observe_layer0_attention_schedule_variants
+                        else (
+                            "baseline_bf16",
+                            "attention_output_fp32",
+                            "dense_down_fp32",
+                            "attention_output_and_dense_down_fp32",
+                        )
                     )
                 )
             )
@@ -3474,7 +3521,7 @@ def main() -> int:
                 ),
                 "current_baseline_expected_sha256": (
                     LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256
-                    if args.observe_layer0_attention_schedule_variants
+                    if main_rope_layer0_discriminator
                     else LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
                 ),
                 "discriminator_kind": layer0_discriminator_kind,
@@ -3484,19 +3531,23 @@ def main() -> int:
                 "reproduces_current_baseline": (
                     bool(
                         comparisons[
-                            "attention_schedule_control"
-                            if args.observe_layer0_attention_schedule_variants
+                            (
+                                "attention_output_association_control"
+                                if args.observe_layer0_attention_output_association_variants
+                                else "attention_schedule_control"
+                            )
+                            if main_rope_layer0_discriminator
                             else "baseline_bf16"
                         ]["actual_sha256"]
                         == (
                             LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256
-                            if args.observe_layer0_attention_schedule_variants
+                            if main_rope_layer0_discriminator
                             else LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
                         )
                     )
                     if (
                         args.observe_layer0_residual_variants
-                        or args.observe_layer0_attention_schedule_variants
+                        or main_rope_layer0_discriminator
                     )
                     else None
                 ),
@@ -3526,7 +3577,7 @@ def main() -> int:
                                 "20260811T113139003786245Z"
                             ),
                         }
-                        if args.observe_layer0_attention_schedule_variants
+                        if main_rope_layer0_discriminator
                         else {
                             "code_hash": (
                                 "12315aa1daccab67f7eaff709c291425a73b4006"

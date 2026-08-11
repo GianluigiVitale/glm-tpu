@@ -581,6 +581,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     virtual_tp32_reduction_association: (
         VirtualTp32ReductionAssociation | None
     ) = None,
+    virtual_tp32_attention_only: bool = False,
     replicated_monolithic_attention: bool = False,
     capture_ingredients: bool = False,
 ) -> StageLocalSplitLayerFp8Result | StageLocalSplitLayerFp8ObservedResult:
@@ -598,6 +599,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError(
             "layer replicated-monolithic attention flag must be boolean"
         )
+    if not isinstance(virtual_tp32_attention_only, bool):
+        raise ValueError("layer virtual-TP32 attention-only flag must be boolean")
     if not isinstance(capture_ingredients, bool):
         raise ValueError("layer ingredient-capture flag must be boolean")
     if reconstruct_dense_down_fp32 and mlp_kind != "dense":
@@ -607,6 +610,13 @@ def stage_local_transformer_layer_fp8_split_mapped(
     ):
         raise ValueError(
             "virtual TP32 reduction cannot be combined with FP32 reconstruction"
+        )
+    if (
+        virtual_tp32_attention_only
+        and virtual_tp32_reduction_association is None
+    ):
+        raise ValueError(
+            "attention-only virtual TP32 requires an explicit association"
         )
     if virtual_tp32_reduction_association is not None and mlp_kind != "dense":
         raise ValueError("virtual TP32 reduction requires a dense layer")
@@ -826,7 +836,9 @@ def stage_local_transformer_layer_fp8_split_mapped(
             add_residual=False,
             reconstruct_down_fp32=reconstruct_dense_down_fp32,
             virtual_tp32_reduction_association=(
-                virtual_tp32_reduction_association
+                None
+                if virtual_tp32_attention_only
+                else virtual_tp32_reduction_association
             ),
             capture_ingredients=capture_ingredients,
         )

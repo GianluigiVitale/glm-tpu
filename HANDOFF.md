@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 15:07 UTC
+**Updated:** 2026-08-11 15:47 UTC
 
 ## Authority and isolation
 
@@ -93,6 +93,20 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   trace, DB row or `SUCCESS`. Do not integrate monolithic attention or rerun this fork. Exact next
   is the isolated layer-0 output-projection/reduction-association discriminator, retaining the
   table-on owner-split control; do not rerun the complete decoder first.
+- That exact successor is now implemented locally as five separately compiled default-off arms:
+  one unchanged table-on control and four attention-output-only virtual-TP32 associations. It
+  reuses the existing packed K512 partials and BF16 association helpers, while dense-down remains
+  the production full-width K3072 path. Candidate HLO must contain 8 K512 attention calls, zero
+  K4096 attention calls, one K3072 dense call, zero I384 dense calls, the declared LP4 reduction
+  shapes/scope, one live row and no escaped group. The protected wrapper pins the rejected
+  attention-schedule contract/NPZ locally and remotely, and acknowledges an intentional exit only
+  if the control reproduces `6c54c09a...bca`, all five arm contracts/selection checks pass and all
+  five HLOs are distinct. The affected CPU suite passes `64/64` in `175.14 s`; compileall, JSON,
+  Bash, ShellCheck and diff checks pass. Existing Fable session `4c23bb63...f6` audited only this
+  new diff, found no high/medium issue and returned `APPROVE COMMIT`; its two low notes are
+  intentional fail-closed TPU-shape refusal and sealed-artifact coupling. No TPU run or numerical
+  result exists yet. Exact next is independent verification, commit/push and one protected
+  attention-output discriminator; do not request another review of this unchanged batch.
 - DB484 XPlane reanalysis proves only `0.727 ms/step` of non-permute local collective execution.
   Pallas custom calls are `26.357 ms`, other active work `3.351 ms`, and collective-permute
   start/done waiting is `205.195 ms` per core. Thus `8 x 30.435 = 243.5 ms` closes against the

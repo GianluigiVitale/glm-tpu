@@ -7260,3 +7260,36 @@ unmotivated arithmetic variants.
 - Exact next: seal this evidence, then reuse the isolated table-on layer-0 discriminator to test
   output-projection/reduction association. The owner-split control must again reproduce
   `6c54c09a...bca`; do not rerun attention scheduling or the complete 8K decoder first.
+
+## 2026-08-11 15:07--15:47 — attention-output-only association discriminator is locally complete
+
+- Reuse audit rejects another blank-slate or combined projection experiment. The existing
+  `e19833a` virtual-subshard code already produces eight separately rounded K512 attention-output
+  partials and implements the four local-eight/physical-four BF16 associations; its protected
+  result changed dense-down simultaneously and therefore cannot answer the narrower remaining
+  question. The new default-off path reuses only those attention pieces. Dense-down stays on the
+  production full-width K3072 Pallas kernel, and the owner-split sparse-attention schedule remains
+  unchanged.
+- Five independent programs now comprise the discriminator: the exact table-on production control
+  and four attention-output association candidates. Program construction threads an explicit
+  attention-only flag only when an association is selected. The HLO contract requires candidate
+  counts `8x K512 attention`, `0x K4096 attention`, `1x K3072 dense`, `0x I384 dense`, the exact
+  dcp-first/model-first BF16 collective result shapes, the named association scope, the surviving
+  owner-split output gather, exact LP4 groups and one live output row. It recognizes TPU's prior
+  owner-split rewrite with three surviving all-gathers but does not admit a cache-shaped gather.
+- The compiler and protected runner expose a separate flag, require the complete table-on repaired
+  8K path, use five distinct HLO modules and preserve diagnostic-only failure behavior. Before any
+  TPU work the runner validates the exact protected schedule-rejection contract
+  `bacc8a78...b7fbf`, NPZ `ad64fff2...f4f64`, both clean censuses and direct remote hashes. After
+  execution it requires control SHA `6c54c09a...bca`, 3,984 control mismatches, exact selection and
+  passing per-arm/suite contracts before printing
+  `ATTENTION_OUTPUT_ASSOCIATION_DIAGNOSTIC_CONTRACT_OK`.
+- The affected forced-CPU/runtime/compiler/kernel suite passes `64/64` in `175.14 s`. Python
+  compilation, Bash syntax, ShellCheck, JSON parsing and diff checks pass. These are mechanism
+  checks only; no TPU execution, tensor result, timing, trace, DB row, `SUCCESS`, Gate-D or
+  performance claim exists. Existing Fable session `4c23bb63-7401-4a45-b082-8743d7ea58b6`
+  audited only this new diff, independently passed three focused tests, found no high/medium issue
+  and returned `APPROVE COMMIT`. Its two low notes are deliberately fail-closed: unexpected TPU
+  collective shapes refuse the arm, and any replacement of the sealed prerequisite must update
+  exact mismatch pins. No repeat review is due. Exact next is independent verification,
+  commit/push and exactly one protected attention-output association discriminator.

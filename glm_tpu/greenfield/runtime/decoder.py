@@ -74,7 +74,10 @@ LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS = (
     ("attention_output_and_dense_down_fp32", True, True),
 )
 Layer0ResidualDiscriminatorKind = Literal[
-    "combine_precision", "virtual_tp32", "attention_schedule"
+    "combine_precision",
+    "virtual_tp32",
+    "attention_schedule",
+    "attention_output_association",
 ]
 LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS = (
     VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
@@ -82,6 +85,13 @@ LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS = (
 LAYER0_ATTENTION_SCHEDULE_DISCRIMINATOR_VARIANTS = (
     "attention_schedule_control",
     "replicated_monolithic_attention",
+)
+LAYER0_ATTENTION_OUTPUT_ASSOCIATION_VARIANTS = (
+    "attention_output_association_control",
+    *tuple(
+        f"attention_output_{association}"
+        for association in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+    ),
 )
 LAYER0_INGREDIENT_NAMES = (
     "selected_positions",
@@ -125,28 +135,51 @@ def _layer0_residual_discriminator_specs(
         bool,
         VirtualTp32ReductionAssociation | None,
         bool,
+        bool,
     ],
     ...,
 ]:
     if kind == "combine_precision":
         return tuple(
-            (name, attention_fp32, dense_fp32, None, False)
+            (name, attention_fp32, dense_fp32, None, False, False)
             for name, attention_fp32, dense_fp32 in (
                 LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS
             )
         )
     if kind == "virtual_tp32":
         return tuple(
-            (name, False, False, name, False)
+            (name, False, False, name, False, False)
             for name in LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS
         )
     if kind == "attention_schedule":
         return tuple(
-            (name, False, False, None, monolithic)
+            (name, False, False, None, False, monolithic)
             for name, monolithic in (
                 ("attention_schedule_control", False),
                 ("replicated_monolithic_attention", True),
             )
+        )
+    if kind == "attention_output_association":
+        return (
+            (
+                "attention_output_association_control",
+                False,
+                False,
+                None,
+                False,
+                False,
+            ),
+            *tuple(
+                (
+                    f"attention_output_{association}",
+                    False,
+                    False,
+                    association,
+                    True,
+                    False,
+                )
+                for association in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+            ),
         )
     raise PlanValidationError(
         f"unknown layer-0 residual discriminator kind: {kind}"
@@ -2652,6 +2685,21 @@ def validate_layer0_residual_discriminator_hlo(
         attention_fp32 = False
         dense_fp32 = False
         virtual_association = None
+    elif variant_name == "attention_output_association_control":
+        discriminator_kind = "attention_output_association"
+        attention_fp32 = False
+        dense_fp32 = False
+        virtual_association = None
+    elif variant_name.startswith("attention_output_") and (
+        variant_name.removeprefix("attention_output_")
+        in VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+    ):
+        discriminator_kind = "attention_output_association"
+        attention_fp32 = False
+        dense_fp32 = False
+        virtual_association = variant_name.removeprefix(
+            "attention_output_"
+        )
     else:
         raise PlanValidationError(
             f"unknown layer-0 discriminator variant: {variant_name}"
@@ -2863,7 +2911,10 @@ def validate_layer0_residual_discriminator_hlo(
         )
         > 1
     )
-    if discriminator_kind in {"combine_precision", "attention_schedule"}:
+    if discriminator_kind in {"combine_precision", "attention_schedule"} or (
+        discriminator_kind == "attention_output_association"
+        and virtual_association is None
+    ):
         expected_kernel_counts = {
             attention_bf16_name: int(not attention_fp32),
             attention_f32_name: int(attention_fp32),
@@ -2877,6 +2928,29 @@ def validate_layer0_residual_discriminator_hlo(
         expected_hidden_collective_shapes = None
         virtual_association_scope = None
         virtual_association_scope_present = True
+    elif discriminator_kind == "attention_output_association":
+        expected_kernel_counts = {
+            attention_bf16_name: 0,
+            attention_f32_name: 0,
+            dense_bf16_name: 1,
+            dense_f32_name: 0,
+            virtual_attention_name: 8,
+            virtual_dense_name: 0,
+            fp32_boundary_name: 0,
+        }
+        expected_fp32_combines = 0
+        assert virtual_association is not None
+        dcp_first = virtual_association.startswith("dcp_then_model_")
+        expected_hidden_collective_shapes = {
+            "bf16[1,6144]": 3 if dcp_first else 2,
+            "bf16[8,1,6144]": 0 if dcp_first else 1,
+        }
+        virtual_association_scope = (
+            f"greenfield_virtual_tp32_{virtual_association}"
+        )
+        virtual_association_scope_present = (
+            virtual_association_scope in optimized_hlo
+        )
     else:
         expected_kernel_counts = {
             attention_bf16_name: 0,
@@ -2912,7 +2986,12 @@ def validate_layer0_residual_discriminator_hlo(
         )
     if escaped_collectives:
         violations.append("layer-0 discriminator escaped PP8 local groups")
-    minimum_all_gathers = 3 if discriminator_kind == "attention_schedule" else 5
+    minimum_all_gathers = (
+        3
+        if discriminator_kind
+        in {"attention_schedule", "attention_output_association"}
+        else 5
+    )
     if not minimum_all_gathers <= by_opcode.get("all-gather", 0) <= 20:
         violations.append(
             "layer-0 discriminator DSA/attention gather count drifted: "
@@ -3002,7 +3081,10 @@ def validate_layer0_residual_discriminator_hlo(
         violations.append(
             "layer-0 control unexpectedly contains monolithic attention"
         )
-    elif discriminator_kind == "attention_schedule":
+    elif discriminator_kind in {
+        "attention_schedule",
+        "attention_output_association",
+    }:
         # TPU SPMD rewrites the LSE all-gather to an unnamed f32[256]
         # all-reduce and removes the validity gather.  The BF16 attention-output
         # gather survives with its scope, so pin it and independently reject the
@@ -3946,6 +4028,7 @@ def build_decoder_step_program(
         "combine_precision",
         "virtual_tp32",
         "attention_schedule",
+        "attention_output_association",
     ):
         raise PlanValidationError(
             "layer-0 residual discriminator kind is unknown"
@@ -3963,6 +4046,15 @@ def build_decoder_step_program(
     ):
         raise PlanValidationError(
             "attention-schedule discriminator requires the proven main-RoPE table"
+        )
+    if (
+        layer0_residual_discriminator_kind
+        == "attention_output_association"
+        and not main_rope_table_enabled
+    ):
+        raise PlanValidationError(
+            "attention-output association discriminator requires the proven "
+            "main-RoPE table"
         )
     if not isinstance(split_residual_state, bool):
         raise PlanValidationError("split residual-state flag must be boolean")
@@ -4021,11 +4113,12 @@ def build_decoder_step_program(
     if (
         main_rope_table_enabled
         and build_layer0_residual_discriminator
-        and layer0_residual_discriminator_kind != "attention_schedule"
+        and layer0_residual_discriminator_kind
+        not in {"attention_schedule", "attention_output_association"}
     ):
         raise PlanValidationError(
             "main-RoPE table execution admits only the isolated attention-"
-            "schedule discriminator"
+            "schedule/output-association discriminator"
         )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
@@ -5150,6 +5243,7 @@ def build_decoder_step_program(
         virtual_tp32_reduction_association: (
             VirtualTp32ReductionAssociation | None
         ),
+        virtual_tp32_attention_only: bool,
         replicated_monolithic_attention: bool,
     ) -> tuple[Any, Any, Any, Any, Any]:
         """Replay one isolated layer-0 arithmetic association."""
@@ -5262,6 +5356,7 @@ def build_decoder_step_program(
             virtual_tp32_reduction_association: (
                 VirtualTp32ReductionAssociation | None
             ),
+            virtual_tp32_attention_only: bool,
             replicated_monolithic_attention: bool,
         ) -> Any:
             stage = schedule.stages[0]
@@ -5352,6 +5447,7 @@ def build_decoder_step_program(
                 virtual_tp32_reduction_association=(
                     virtual_tp32_reduction_association
                 ),
+                virtual_tp32_attention_only=virtual_tp32_attention_only,
                 replicated_monolithic_attention=(
                     replicated_monolithic_attention
                 ),
@@ -5365,6 +5461,7 @@ def build_decoder_step_program(
                 reconstruct_attention_output_fp32,
                 reconstruct_dense_down_fp32,
                 virtual_tp32_reduction_association,
+                virtual_tp32_attention_only,
                 replicated_monolithic_attention,
             )
             stage = schedule.stages[0]
@@ -5415,6 +5512,7 @@ def build_decoder_step_program(
         virtual_tp32_reduction_association: (
             VirtualTp32ReductionAssociation | None
         ),
+        virtual_tp32_attention_only: bool,
         replicated_monolithic_attention: bool,
     ) -> Any:
         if dsa_query_exact_association:
@@ -5453,6 +5551,7 @@ def build_decoder_step_program(
                     virtual_tp32_reduction_association=(
                         virtual_tp32_reduction_association
                     ),
+                    virtual_tp32_attention_only=virtual_tp32_attention_only,
                     replicated_monolithic_attention=(
                         replicated_monolithic_attention
                     ),
@@ -5495,6 +5594,7 @@ def build_decoder_step_program(
                 virtual_tp32_reduction_association=(
                     virtual_tp32_reduction_association
                 ),
+                virtual_tp32_attention_only=virtual_tp32_attention_only,
                 replicated_monolithic_attention=(
                     replicated_monolithic_attention
                 ),
@@ -5995,6 +6095,7 @@ def build_decoder_step_program(
                         reconstruct_attention_output_fp32,
                         reconstruct_dense_down_fp32,
                         virtual_tp32_reduction_association,
+                        virtual_tp32_attention_only,
                         replicated_monolithic_attention,
                     ),
                     mesh=mesh,
@@ -6014,6 +6115,7 @@ def build_decoder_step_program(
                 reconstruct_attention_output_fp32,
                 reconstruct_dense_down_fp32,
                 virtual_tp32_reduction_association,
+                virtual_tp32_attention_only,
                 replicated_monolithic_attention,
             ) in _layer0_residual_discriminator_specs(
                 layer0_residual_discriminator_kind

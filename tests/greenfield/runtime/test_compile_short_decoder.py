@@ -430,6 +430,42 @@ def test_layer0_attention_schedule_discriminator_is_sealed_and_default_off() -> 
     assert "_layer0_attention_schedule_variants" in runner
 
 
+def test_layer0_attention_output_discriminator_is_sealed_and_default_off() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert (
+        '"--observe-layer0-attention-output-association-variants"'
+        in compiler
+    )
+    assert '"attention_output_association_control"' in compiler
+    assert '"attention_output_dcp_then_model_sequential_bf16"' in compiler
+    assert '"attention_output_model_then_dcp_pairwise_bf16"' in compiler
+    assert "LAYER0_ATTENTION_OUTPUT_VARIANTS:-0" in runner
+    assert (
+        "--observe-layer0-attention-output-association-variants 1" in runner
+    )
+    assert "layer-0 attention-output variants require the table-on" in runner
+    assert "ATTENTION_OUTPUT_PREREQUISITE_TAG" in runner
+    assert "20260811T142025290162247Z" in runner
+    assert "bacc8a785e3a9cfe26162b2452b8b47b" in runner
+    assert "ad64fff27fced824d76d82815800f9f9" in runner
+    assert "attention-output direct remote contract hash drifted" in runner
+    assert "attention-output direct remote NPZ hash drifted" in runner
+    assert (
+        "attention-output association diagnostic contract is missing" in runner
+    )
+    assert (
+        "attention-output association diagnostic contract failed" in runner
+    )
+    assert "ATTENTION_OUTPUT_ASSOCIATION_DIAGNOSTIC_CONTRACT_OK" in runner
+    assert (
+        "attention-output association diagnostic contract passed; preserving "
+        "intentional diagnostic exit" in runner
+    )
+    assert "_layer0_attention_output_variants" in runner
+
+
 @pytest.mark.parametrize(
     ("capacity", "label"),
     ((2048, "2k"), (8192, "8k")),
