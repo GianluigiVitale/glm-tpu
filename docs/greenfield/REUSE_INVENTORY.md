@@ -471,3 +471,23 @@ bytes and existing Pallas block kernels to recover eight such partials per PP8 o
 import the legacy executor or add another projection kernel. Test local-eight versus physical-four
 ordering and sequential versus pairwise BF16 trees in four isolated default-off programs. Only a
 protected exact arm may be integrated into production.
+
+## Gate-D layer-0 main-cache boundary reuse
+
+The accepted `dcp_cache_dump.py` hook already snapshots `self.kv_caches` after the compiled model
+step without returning tensors from the executable. Static registration order and the earlier
+protected prompt-index capture identify cache slot 0 as the DSA index key and slot 1 as layer 0's
+640-wide main MLA cache. Reuse this hook; do not add another callback or returned residual.
+
+Observer pin `3443515d9d3c42412558b778c608aaf07c6c89ff` adds only a default-off exact
+scheduler-step selector. Unset behavior remains the accepted prefill-only observer. The bounded
+Gate-D mode selects steps 4 and 5, so all eight processes emit the final 8,155-token prefill cache
+and the first recurrent cache update without copying the other scheduler states.
+
+`legacy_main_cache.py` reuses the prompt-cache shard/index reconstruction rules, validates all 32
+physical replicas and the exact `model=32,dcp=1` mesh, rejects historical-row mutation, and joins
+the protected PP8 owner subsets by exact DSA position. It compares selected prefill rows first,
+then position 8,155's newly produced row, and reports only one of `prefill_main_cache`,
+`recurrent_main_cache_producer`, or `cache_exact_attention_schedule_next`. Protected ingredient
+contract/NPZ hashes `9c3ec9fa...7693` / `fd76cd4c...249c` are mandatory. This is diagnostic
+correctness evidence, never a performance claim or a legacy execution dependency.

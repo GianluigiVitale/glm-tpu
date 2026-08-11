@@ -6919,3 +6919,32 @@ unmotivated arithmetic variants.
   by a bitwise dataflow-ordered comparison. Do not use the rejected returned-boundary observer, do
   not guess another combine tree, and do not rerun the full decoder before naming the first
   divergent primitive.
+
+## 2026-08-11 — matching legacy layer-0 main-cache capture implementation
+
+- Existing observability was sufficient: `dcp_cache_dump.py` runs after `model_fn` on the host and
+  does not alter or return model tensors. Cache registration order plus the protected prompt-index
+  capture pins slot 0 as the DSA index cache and slot 1 as layer 0's 640-wide main MLA cache.
+- Isolated legacy observer pin `3443515d9d3c42412558b778c608aaf07c6c89ff` is exactly one commit
+  after the accepted oracle. Its optional `GLM_DCP_CACHE_DUMP_STEPS` selector leaves historical
+  prefill-only behavior unchanged when unset and selects final prefill step 4 plus first decode
+  step 5 for this experiment. The focused legacy suite passes 22 tests and Fable approved commit.
+- The existing protected 8K DSA-oracle launcher gained one mutually exclusive, default-off mode;
+  it reuses the fleet lease, exact runtime pins, integrity checks, top-k capture, DB snapshot,
+  archive verification and authenticated cleanup. It requires two raw main-cache files per host,
+  exact environment propagation and 16 gathered files before comparison.
+- The offline comparator reconstructs the two fully replicated `bf16[24,16,32,640]` snapshots,
+  validates `model=32,dcp=1`, step/token/sequence/block-table/device identities and 32-way bitwise
+  replica agreement, and refuses if the first decode mutates any earlier live row. It pins the
+  protected PP8 ingredient hashes, reconstructs the 2,048 owner-selected rows in exact DSA order,
+  validates zero padding, and compares prefill rows before current position 8,155.
+- Classification is deliberately narrow: selected-row mismatch means `prefill_main_cache`; exact
+  selected rows but current-row mismatch means `recurrent_main_cache_producer`; both exact means
+  `cache_exact_attention_schedule_next`. The compact NPZ/JSON retain source hashes and set
+  `performance_claim=false`. The audit corrected owner validation from a position-modulo
+  assumption to the production page stripe `(position % 512) // 128`; a regression test and the
+  sealed `512/516/515/505` owner counts cover the rule. Seven focused tests and 72 affected tests
+  pass with compileall, Bash, ShellCheck, JSON and diff checks. The same-session fix review returned
+  `APPROVE COMMIT`; independent post-fix validation passes all 89 tests in the validation tree.
+- Exact next is commit/push followed by one serialized protected capture. No full decoder retry or
+  arithmetic change is authorized yet.

@@ -402,6 +402,17 @@
       "reason": "Returning selected boundaries perturbed production arithmetic. Preserve the evidence and do not reuse the full-model capture method."
     },
     {
+      "id": "legacy-layer0-main-cache-boundary",
+      "category": "oracle observability",
+      "source_repo": "tpu-inference oracle-only observer plus protected greenfield ingredients",
+      "source_pin": "accepted b3c25df47ac98783912dc658878181ec0a8ae16d / exact-step observer 3443515d9d3c42412558b778c608aaf07c6c89ff / ingredients 4d4e2c5da53554b3ab015d26cc6d1e058a7b48dd",
+      "source_paths": ["tpu_inference/runner/dcp_cache_dump.py", "tpu_inference/runner/tpu_runner.py", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_ingredients_trace2_20260811T033957390557074Z/layer0_ingredients"],
+      "disposition": "oracle_only",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/legacy_main_cache.py", "scripts/greenfield/compare_legacy_layer0_main_cache.py", "scripts/greenfield/run_capture_legacy_layer0_main_cache.sh"],
+      "gate": "D diagnostic",
+      "reason": "Reuse the accepted host-side cache dumper outside model JIT, narrowed by a default-off exact scheduler-step selector to final prefill step 4 and first decode step 5. Slot 1 is the first main MLA cache; the comparator validates 32 exact replicas, reconstructs only live rows, pins the protected PP8 ingredient hashes, and classifies prefill cache versus recurrent cache producer before attention scheduling. No legacy execution enters greenfield runtime."
+    },
+    {
       "id": "old-glm-tpu-worktrees",
       "category": "historical tooling",
       "source_repo": "glm-tpu",

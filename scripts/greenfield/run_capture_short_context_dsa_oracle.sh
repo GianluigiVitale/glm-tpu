@@ -14,6 +14,7 @@ readonly INTERNAL_MODE=${GLM_GREENFIELD_DSA_INTERNALS_MODE:-scorer}
 readonly INTERNAL_POSITION_OVERRIDE=${GLM_GREENFIELD_DSA_INTERNALS_POSITION:-}
 readonly PROMPT_CACHE_CAPTURE=${GLM_GREENFIELD_PROMPT_CACHE_CAPTURE:-0}
 readonly PREFILL_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE:-0}
+readonly MAIN_CACHE_CAPTURE=${GLM_GREENFIELD_MAIN_CACHE_CAPTURE:-0}
 readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
 [[ $INTERNAL_CAPTURE == 0 || $INTERNAL_CAPTURE == 1 ]] || {
   echo "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE must be 0 or 1" >&2
@@ -39,6 +40,10 @@ esac
   echo "GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE must be 0 or 1" >&2
   exit 2
 }
+[[ $MAIN_CACHE_CAPTURE == 0 || $MAIN_CACHE_CAPTURE == 1 ]] || {
+  echo "GLM_GREENFIELD_MAIN_CACHE_CAPTURE must be 0 or 1" >&2
+  exit 2
+}
 if [[ ! $INTERNAL_LAYER_ID =~ ^[0-9]+$ ]] ||
   ! ((INTERNAL_LAYER_ID <= 2 || (INTERNAL_LAYER_ID >= 6 && INTERNAL_LAYER_ID < 78 && (INTERNAL_LAYER_ID - 6) % 4 == 0))); then
   echo "DSA internal layer must be a full-indexer producer" >&2
@@ -49,7 +54,15 @@ if [[ $INTERNAL_LAYER_ID == 0 && $INTERNAL_MODE == scorer ]]; then
 else
   readonly INTERNAL_COMPARE_LAYER0=0
 fi
-if [[ $INTERNAL_CAPTURE == 1 ]]; then
+if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-main-cache-observer
+  readonly OBSERVER_BRANCH=greenfield/legacy-main-cache-observer
+  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-main-cache-3443515d9
+  readonly OBSERVER_COMMIT_DISTANCE=1
+  readonly LEGACY_PIN=3443515d9d3c42412558b778c608aaf07c6c89ff
+  readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
+  readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
+elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
   if [[ $INTERNAL_MODE == prompt_key_input ]]; then
@@ -86,6 +99,10 @@ readonly DISTRIBUTED_Q_A_MANIFEST_SHA=7518e7eff0487f0dc02cd4b0ff1c3d0fc3ef9ca7c4
 readonly DISTRIBUTED_Q_A_CODE_HASH=ea879a24d196f61e238a22ee5bb393d3b6fa938d
 readonly ACCEPTED_PROMPT_CACHE_SHA=3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1
 readonly DB512_PROMPT_CACHE_SHA=52bf55ed5e9ea74a59551351a21ae830fb39e289e82eaff636fb9ab84d7dcd8a
+readonly MAIN_CACHE_INGREDIENTS_DIR=/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_ingredients_trace2_20260811T033957390557074Z/layer0_ingredients
+readonly MAIN_CACHE_INGREDIENTS_CODE_HASH=4d4e2c5da53554b3ab015d26cc6d1e058a7b48dd
+readonly MAIN_CACHE_INGREDIENTS_CONTRACT_SHA=9c3ec9fae5be31f791d737804adf6bcbaaa7f481120ce706be7a43e5dcd37693
+readonly MAIN_CACHE_INGREDIENTS_TENSOR_SHA=fd76cd4c6e61be773fe49bfffaceb1467c0865420d68016471df1ebe5140249c
 readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
@@ -154,6 +171,13 @@ if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
     exit 2
   }
 fi
+if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && \
+     $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 ]] || {
+    echo "main-cache capture requires isolated accepted 8K oracle mode" >&2
+    exit 2
+  }
+fi
 readonly INTERNAL_TARGET_POSITION
 readonly TOKEN_ORACLE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/$PROFILE/$TOKEN_ORACLE_TAG/oracle
 
@@ -172,6 +196,8 @@ INTERNAL_DUMP_PREFIX=/tmp/$TAG/internals.npz
 PROMPT_CACHE_DUMP_PREFIX=/tmp/$TAG/index_cache.npz
 PROMPT_CACHE_RESULT_DIR=$RUN_DIR/prompt_index_cache
 PROMPT_CACHE_COMPARISON_DIR=$RUN_DIR/prompt_index_cache_comparison
+MAIN_CACHE_DUMP_PREFIX=/tmp/$TAG/main_cache.npz
+MAIN_CACHE_RESULT_DIR=$RUN_DIR/layer0_main_cache_comparison
 PREFILL_PROFILE_PREFIX=/tmp/$TAG/prefill_projection_profile
 PREFILL_HLO_PREFIX=/tmp/$TAG/prefill_projection_hlo
 PREFILL_PROJECTION_RESULT_DIR=$RUN_DIR/accepted_prompt_projection_lowering
@@ -206,7 +232,7 @@ readonly INTERNAL_RESULT_DIR
   echo "tracked legacy files are dirty" >&2
   exit 2
 }
-if [[ $INTERNAL_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
   [[ $(git -C "$ORACLE_REPO" rev-parse HEAD) == "$ORACLE_PIN" ]] || {
     echo "accepted legacy oracle pin changed" >&2
     exit 2
@@ -230,12 +256,27 @@ fi
   echo "source DB or sealed token oracle is unavailable" >&2
   exit 2
 }
-if [[ $INTERNAL_CAPTURE == 1 ]]; then
+if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  [[ -r $MAIN_CACHE_INGREDIENTS_DIR/contract.json &&
+     -r $MAIN_CACHE_INGREDIENTS_DIR/position_8155_ingredients.npz ]] || {
+    echo "protected PP8 layer-0 ingredients are unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$MAIN_CACHE_INGREDIENTS_DIR/contract.json" | awk '{print $1}') == \
+     "$MAIN_CACHE_INGREDIENTS_CONTRACT_SHA" &&
+     $(sha256sum "$MAIN_CACHE_INGREDIENTS_DIR/position_8155_ingredients.npz" | awk '{print $1}') == \
+     "$MAIN_CACHE_INGREDIENTS_TENSOR_SHA" ]] || {
+    echo "protected PP8 layer-0 ingredient identity drifted" >&2
+    exit 2
+  }
+fi
+if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
   [[ -r $REFERENCE_8K_DSA_ORACLE/manifest.json ]] || {
     echo "sealed DSA oracle comparison prerequisite is unavailable" >&2
     exit 2
   }
-  if [[ $INTERNAL_COMPARE_LAYER0 == 1 || $PROMPT_KEY_CAPTURE == 1 ]]; then
+  if [[ $INTERNAL_CAPTURE == 1 && \
+        ($INTERNAL_COMPARE_LAYER0 == 1 || $PROMPT_KEY_CAPTURE == 1) ]]; then
     [[ -r $LAYER0_INPUT_DIR/manifest.json &&
        -r $DISTRIBUTED_Q_A_DIR/manifest.json ]] || {
       echo "sealed layer-0 comparison prerequisites are unavailable" >&2
@@ -309,7 +350,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
-say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE PREFILL_PROJECTION_CAPTURE=$PREFILL_PROJECTION_CAPTURE"
+say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE PREFILL_PROJECTION_CAPTURE=$PREFILL_PROJECTION_CAPTURE MAIN_CACHE_CAPTURE=$MAIN_CACHE_CAPTURE"
 if [[ $PROMPT_CACHE_CAPTURE == 1 && $PROFILE != 8k ]]; then
   say "ABORT: prompt index-cache capture is defined only for the sealed 8K profile"
   exit 2
@@ -325,7 +366,7 @@ MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
     exit 1
   }
 
-if [[ $INTERNAL_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
   # Materialize the exact observer in a pin-specific detached worktree;
   # the accepted oracle checkout remains untouched on every host.
   # shellcheck disable=SC2016
@@ -333,7 +374,7 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$sync_observer" >"$RUN_DIR/sync_observer.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/sync_observer.txt" SYNC_OK || {
-    say "ABORT: exact DSA internal observer is unavailable on all hosts"
+    say "ABORT: exact legacy observer is unavailable on all hosts"
     exit 1
   }
 fi
@@ -348,7 +389,7 @@ has_eight_unique_markers "$RUN_DIR/prereq.txt" PREREQ_OK || {
   say "ABORT: exact legacy/golden/OOB/dump prerequisite failed"
   exit 1
 }
-if [[ $INTERNAL_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
   oracle_prereq='code=$(git -C '"$ORACLE_REPO"' rev-parse HEAD); dirty=$(git -C '"$ORACLE_REPO"' status --porcelain --untracked-files=no | wc -l); if [ "$code" = '"$ORACLE_PIN"' ] && [ "$dirty" -eq 0 ]; then echo "ORACLE_OK $(hostname)"; else echo "ORACLE_BAD $(hostname) code=$code dirty=$dirty"; fi'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
@@ -362,6 +403,9 @@ fi
 COMMON_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"' GLM_DSA_DUMP_TOPK_EVENTS=all GLM_DSA_DUMP_TOPK_SKIP_WARMUP=1 GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   COMMON_ENVS="$COMMON_ENVS GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=0"
+fi
+if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DCP_CACHE_DUMP=$MAIN_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=1 GLM_DCP_CACHE_DUMP_STEPS=4,5"
 fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$INTERNAL_TARGET_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
@@ -388,6 +432,9 @@ env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_oracle_env_$$; [ -n "$p" ]
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
   env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_internal_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS='"$INTERNAL_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_MODE='"$INTERNAL_MODE"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_LAYER='"$INTERNAL_LAYER"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_POSITION='"$INTERNAL_TARGET_POSITION"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_RUN_TAG='"$TAG"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_CODE_HASH='"$LEGACY_PIN"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
+elif [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  # shellcheck disable=SC2016
+  env_check='p=$(pgrep -x raylet | head -1); f=/tmp/main_cache_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP='"$MAIN_CACHE_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_LAYERS=1" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_STEPS=4,5" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
 fi
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$env_check" >"$RUN_DIR/raylet_env.txt" 2>&1
@@ -498,6 +545,19 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
     exit 1
   }
 fi
+if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  # The exact-step selector captures only the final prefill state and the
+  # first decode-updated state. Each host owns one JAX process and must write
+  # exactly those two fully replicated cache snapshots.
+  # shellcheck disable=SC2016
+  main_cache_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DCP_CACHE_DUMP] ARMED" "$logs" 2>/dev/null | tail -1); failures=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "GLM_DCP_CACHE_DUMP failed" "$logs" 2>/dev/null | wc -l); files=$(find /tmp/'"$TAG"' -type f -name "main_cache.postfwd.step*.proc*.npz" 2>/dev/null | wc -l); prefill=$(find /tmp/'"$TAG"' -type f -name "main_cache.postfwd.step0004.proc*.npz" 2>/dev/null | wc -l); decode=$(find /tmp/'"$TAG"' -type f -name "main_cache.postfwd.step0005.proc*.npz" 2>/dev/null | wc -l); printf "%s\nfiles=%s prefill=%s decode=%s failures=%s\n" "$armed" "$files" "$prefill" "$decode" "$failures"; if [ -n "$armed" ] && [ "$files" -eq 2 ] && [ "$prefill" -eq 1 ] && [ "$decode" -eq 1 ] && [ "$failures" -eq 0 ]; then echo "MAIN_CACHE_OK $(hostname)"; else echo "MAIN_CACHE_BAD $(hostname)"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$main_cache_integrity" >"$RUN_DIR/fleet_main_cache_integrity.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/fleet_main_cache_integrity.txt" MAIN_CACHE_OK || {
+    say "ABORT: layer-0 main-cache observer coverage is incomplete"
+    exit 1
+  }
+fi
 if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
   # One-step phase profiling writes one XPlane/JSON trace and two composition
   # records (start and stop) on every host. Binary sharing may leave the
@@ -564,6 +624,20 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
     -name 'index_cache.postfwd.step0004.proc*.npz' | wc -l)
   [[ $prompt_cache_source_count -eq 32 && $prompt_cache_final_count -eq 8 ]] || {
     say "ABORT: prompt-cache source coverage drifted total=$prompt_cache_source_count final=$prompt_cache_final_count"
+    exit 1
+  }
+fi
+main_cache_source_count=0
+if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  main_cache_source_count=$(find "$SOURCE_DIR" -type f \
+    -name 'main_cache.postfwd.step*.proc*.npz' | wc -l)
+  main_cache_prefill_count=$(find "$SOURCE_DIR" -type f \
+    -name 'main_cache.postfwd.step0004.proc*.npz' | wc -l)
+  main_cache_decode_count=$(find "$SOURCE_DIR" -type f \
+    -name 'main_cache.postfwd.step0005.proc*.npz' | wc -l)
+  [[ $main_cache_source_count -eq 16 && $main_cache_prefill_count -eq 8 && \
+     $main_cache_decode_count -eq 8 ]] || {
+    say "ABORT: main-cache source coverage drifted total=$main_cache_source_count prefill=$main_cache_prefill_count decode=$main_cache_decode_count"
     exit 1
   }
 fi
@@ -647,7 +721,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --first-decode-position "$FIRST_DECODE_POSITION" \
   --selected-width 2048 >"$RUN_DIR/capture.json"
 
-if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 || \
+      $MAIN_CACHE_CAPTURE == 1 ]]; then
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
     "$REFERENCE_8K_DSA_ORACLE" "$ORACLE_DIR" \
     >"$RUN_DIR/dsa_exact_comparison.json" <<'PY'
@@ -692,6 +767,24 @@ PY
 
 stop_owned_runtime
 runtime_started=0
+if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
+  say "comparing legacy and protected PP8 layer-0 main-cache boundaries"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/compare_legacy_layer0_main_cache.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --ingredients-dir "$MAIN_CACHE_INGREDIENTS_DIR" \
+    --output "$MAIN_CACHE_RESULT_DIR" \
+    --expected-code-hash "$PIN" \
+    --legacy-repository-pin "$LEGACY_PIN" \
+    --accepted-oracle-pin "$ORACLE_PIN" \
+    --ingredients-code-hash "$MAIN_CACHE_INGREDIENTS_CODE_HASH" \
+    --ingredients-contract-sha256 "$MAIN_CACHE_INGREDIENTS_CONTRACT_SHA" \
+    --ingredients-tensor-sha256 "$MAIN_CACHE_INGREDIENTS_TENSOR_SHA" \
+    --run-tag "$TAG" \
+    --source-run-id "$run_id" \
+    --source-item-row-id "$item_row_id" \
+    >"$RUN_DIR/layer0_main_cache_comparison_summary.json"
+fi
 if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
   say "sealing accepted M2048 projection XPlane and optimized-HLO association"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
@@ -890,7 +983,8 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
   "$INTERNAL_CAPTURE" "$internal_count" "$INTERNAL_COMPARE_LAYER0" \
   "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" "$INTERNAL_MODE" \
   "$PREFILL_PROJECTION_CAPTURE" "$prefill_profile_xplane_count" \
-  "$prefill_profile_trace_count" "$prefill_profile_hlo_count" <<'PY'
+  "$prefill_profile_trace_count" "$prefill_profile_hlo_count" \
+  "$MAIN_CACHE_CAPTURE" "$main_cache_source_count" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -1089,6 +1183,32 @@ if sys.argv[14] == "1":
         "accepted_prompt_projection_source": lowering["hlo"]["source"],
         "accepted_prompt_projection_xplane_file_count": sys.argv[15],
         "accepted_prompt_projection_trace_json_file_count": sys.argv[16],
+    })
+if sys.argv[18] == "1":
+    exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
+    comparison = json.loads(
+        (root / "layer0_main_cache_comparison" / "comparison.json").read_text()
+    )
+    if (
+        not exact_dsa["exact"]
+        or comparison["artifact_kind"]
+        != "glm52_legacy_pp8_layer0_main_cache_comparison"
+        or comparison["diagnostic_only"] is not True
+        or comparison["performance_claim"] is not False
+        or comparison["legacy"]["observer_pin"] != sys.argv[4]
+        or len(comparison["source_dump_files"]) != int(sys.argv[19])
+    ):
+        raise SystemExit("layer-0 main-cache comparison evidence drifted")
+    lines.update({
+        "layer0_main_cache_capture": "true",
+        "layer0_main_cache_classification": comparison["classification"],
+        "layer0_main_cache_diagnostic_only": "true",
+        "layer0_main_cache_dsa_event_tensors_exact": "true",
+        "layer0_main_cache_first_divergent_primitive": (
+            comparison["first_divergent_primitive"] or "none"
+        ),
+        "layer0_main_cache_manifest_sha256": comparison["manifest_sha256"],
+        "layer0_main_cache_source_file_count": sys.argv[19],
     })
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in lines.items())

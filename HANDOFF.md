@@ -3562,3 +3562,31 @@ sealed normalized-input/DSA fields, add the smallest isolated and non-returning 
 observer needed for the first open main-cache/attention boundary, run it once under the existing
 protected legacy harness, and compare primitives bitwise in dataflow order. Stop at the first
 divergence; only its causal fix may authorize another 8K Gate-D run.
+
+## Legacy main-cache discriminator is CPU-ready; protected values are pending
+
+The accepted host-side cache hook was extended on isolated branch
+`greenfield/legacy-main-cache-observer` by one default-off exact-step selector. It preserves the
+old prefill-only behavior when unset and permits only named scheduler steps when set. Focused tests
+pass 22/22; the one Fable review and same-session doc-only follow-up both returned
+`APPROVE COMMIT`. The observer was independently verified, committed/pushed at
+`3443515d9d3c42412558b778c608aaf07c6c89ff`, exactly one commit after accepted pin
+`b3c25df47ac98783912dc658878181ec0a8ae16d`. The owner's unrelated Claude PID remains untouched.
+
+The greenfield protected harness now has an isolated `GLM_GREENFIELD_MAIN_CACHE_CAPTURE=1` mode.
+It materializes that exact observer on all hosts, captures only cache slot 1 at steps 4/5, requires
+two files per host and 16 total, retains the existing token/DSA/load/state/DB/archive/census gates,
+and bit-pins the protected PP8 ingredient contract/NPZ. The comparator validates all 32 legacy
+replicas, exact mesh/page metadata, unchanged historical rows and PP8 owner selection, then checks
+the 2,048 selected prefill rows before the newly written row at position 8,155. Its only outcomes
+are `prefill_main_cache`, `recurrent_main_cache_producer`, or
+`cache_exact_attention_schedule_next`; it is explicitly diagnostic-only with no performance
+claim. The audit corrected owner validation from a position-modulo assumption to the production
+page stripe `(position % 512) // 128`; a regression test and sealed `512/516/515/505` owner counts
+cover the rule. Seven focused tests plus the affected 72-test batch pass; compileall, Bash, ShellCheck, JSON
+and diff checks pass. The same-session fix review returned `APPROVE COMMIT`; independent post-fix
+validation passes all 89 tests under `tests/greenfield/validation` plus the static checks.
+
+Exact next: commit/push this approved batch, authenticate the idle fleet, then launch
+`run_capture_legacy_layer0_main_cache.sh` once. Do not change PP8 arithmetic or rerun Gate D before
+the first divergent cache primitive is classified.

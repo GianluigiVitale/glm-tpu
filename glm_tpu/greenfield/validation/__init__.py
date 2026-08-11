@@ -14,6 +14,10 @@ from .legacy_residuals import (
     LegacyResidualComparisonConfig,
     compare_legacy_residuals,
 )
+from .legacy_main_cache import (
+    LegacyMainCacheComparisonConfig,
+    compare_legacy_layer0_main_cache,
+)
 from .legacy_dsa_internals import (
     AcceptedGreenfieldDsaInternalComparisonConfig,
     LegacyDsaInternalCaptureConfig,
@@ -68,6 +72,7 @@ __all__ = (
     "OneLayerOracleConfig",
     "AcceptedGreenfieldDsaInternalComparisonConfig",
     "LegacyResidualComparisonConfig",
+    "LegacyMainCacheComparisonConfig",
     "LegacyDsaInternalCaptureConfig",
     "LegacyDsaInternalComparisonConfig",
     "LegacyPromptKeyInternalConfig",
@@ -83,6 +88,7 @@ __all__ = (
     "compare_prompt_projection_input",
     "compare_accepted_greenfield_dsa_internal_observation",
     "compare_legacy_residuals",
+    "compare_legacy_layer0_main_cache",
     "compare_legacy_dsa_internals",
     "inspect_legacy_dsa_internal_capture",
     "inspect_legacy_prompt_key_internal_capture",
