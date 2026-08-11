@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 13:54 UTC
+**Updated:** 2026-08-11 14:12 UTC
 
 ## Authority and isolation
 
@@ -57,12 +57,26 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   that TPU XLA rewrites the owner-split LSE gather to an unnamed `f32[256]` all-reduce and removes
   the validity gather. Direct replay confirms 78/78 such rewrites in the preserved production HLO.
   The fixed control contract pins the surviving scoped output gather and independently forbids a
-  four-dimensional BF16 full-cache gather by shape; the challenger requires exactly one scoped and
+  BF16 full-cache gather by shape; the challenger requires exactly one scoped and
   shape-detected cache gather. The runner now gates the intentional diagnostic exit on the exact
   control SHA, both arm contracts and the HLO suite. The same session returned `APPROVE COMMIT`.
   The explicit-CPU affected suite passes `76/76` in `214.65 s`; Python, Bash, ShellCheck and diff
-  checks pass. Exact next is commit/push, authenticate the fleet, and run exactly one protected
-  discriminator before any complete-decoder retry.
+  checks pass. This batch is committed/pushed at `6b034456a93b6060bb9aadd181c4b31f86459f04`.
+- The first protected discriminator at tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_`
+  `layer0_attention_schedule_variants_trace2_20260811T140045239816310Z` stopped before execution:
+  TPU SPMD preserved the scoped LP4 cache gather but folded logical result
+  `bf16[4,16,128,640]` to `bf16[64,128,640]`. The control HLO passed; the challenger was rejected
+  only by the rank-4 shape guard. Pre/failure census SHAs are `a5b52d81...28a86` and
+  `c28d6e42...ca510`; all eight identical logs have SHA `a1504711...d888e`, diagnostics are in the
+  approved bucket, and cleanup is 8/8. There is no contract, execution, token, timing, DB,
+  `SUCCESS` or discriminator result. The bounded fix accepts only exact LP4 growth from a BF16
+  rank-3 cache operand to either the logical rank-4 result or TPU's flattened rank-3 result while
+  retaining the packed-width check. The focused test and both preserved TPU HLO arms pass offline.
+  Fable session `4c23bb63-7401-4a45-b082-8743d7ea58b6` independently replayed both real arms,
+  found no high/medium issue and returned `APPROVE COMMIT`. Exact next is independent affected
+  verification, commit/push, then one protected retry; no complete-decoder run is admissible first.
 - DB484 XPlane reanalysis proves only `0.727 ms/step` of non-permute local collective execution.
   Pallas custom calls are `26.357 ms`, other active work `3.351 ms`, and collective-permute
   start/done waiting is `205.195 ms` per core. Thus `8 x 30.435 = 243.5 ms` closes against the

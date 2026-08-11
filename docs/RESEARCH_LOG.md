@@ -7193,3 +7193,36 @@ unmotivated arithmetic variants.
 - Exact next: independently recheck the final diff, commit/push, authenticate an idle fleet, then
   run exactly one protected attention-schedule discriminator. Do not interpret that diagnostic as
   performance evidence or expect it to alter the eight-stage schedule.
+
+## 2026-08-11 13:54--14:12 — first discriminator stops on TPU cache-gather canonicalization
+
+- The reviewed batch was committed/pushed at
+  `6b034456a93b6060bb9aadd181c4b31f86459f04`. Static checks and the focused discriminator suite
+  pass, and the branch/origin pins were clean and identical before launch.
+- Protected tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_`
+  `layer0_attention_schedule_variants_trace2_20260811T140045239816310Z` passed strict pre-census,
+  exact eight-host sync and full decoder plus both isolated arm compilation. It stopped uniformly
+  before either arm executed because TPU SPMD canonicalized the scoped cache all-gather from the
+  logical `bf16[4,16,128,640]` representation to physical `bf16[64,128,640]`. The linter's
+  independent shape detector admitted only rank four. Control HLO passed; all groups remained the
+  exact eight local LP4 groups; the two HLO modules were distinct.
+- Suite/control/challenger contract SHAs are `02f4cb9e...60dfe`, `a88cb46d...33ee8`, and
+  `5d06e887...57801`; control/challenger compressed-HLO SHAs are `6db1e102...6cc0` and
+  `dd27407d...0ce83`. Pre/failure census SHAs are `a5b52d81...28a86` and
+  `c28d6e42...ca510`; eight identical host logs have SHA `a1504711...d888e`. Diagnostics are
+  archived under the approved result prefix and cleanup is authenticated 8/8. No discriminator
+  contract, execution, tensor comparison, timing, trace, DB row or terminal `SUCCESS` exists.
+- The bounded correction classifies a cache gather from both operand and result: BF16 rank-3 cache,
+  exact packed width, and either a logical rank-4 result with LP4 leading dimension or TPU's
+  rank-3 result with only page axis zero multiplied by four. This preserves the unscoped-gather
+  control guard without accepting an arbitrary BF16 collective. The focused regression passes,
+  and offline validation of both preserved real TPU HLO arms now returns `passed=True` with the
+  challenger containing exactly one cache-shaped gather.
+- Existing Fable session `4c23bb63-7401-4a45-b082-8743d7ea58b6` audited only this correction,
+  replayed both production-width real HLO arms, found no high/medium issue and returned
+  `APPROVE COMMIT`. Its sole low observation is that a future new operand rank would refuse closed;
+  do not pre-emptively relax the width/growth invariant.
+- Exact next: independently verify, commit/push, then retry the protected discriminator exactly
+  once. Do not run the complete decoder until the two-arm result is admissible and adjudicated.

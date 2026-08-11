@@ -769,6 +769,7 @@ def _layer0_attention_schedule_discriminator_hlo(
     variant_name: str,
     *,
     tpu_rewritten_control: bool = False,
+    tpu_flattened_cache_gather: bool = False,
 ) -> str:
     if variant_name not in {
         "attention_schedule_control",
@@ -778,6 +779,10 @@ def _layer0_attention_schedule_discriminator_hlo(
     monolithic = variant_name == "replicated_monolithic_attention"
     if monolithic and tpu_rewritten_control:
         raise ValueError("TPU owner-split rewrite applies only to the control")
+    if tpu_flattened_cache_gather and not monolithic:
+        raise ValueError(
+            "TPU cache-gather flattening applies only to the challenger"
+        )
     replica_groups = (
         "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
         "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
@@ -789,9 +794,14 @@ def _layer0_attention_schedule_discriminator_hlo(
         for index in range(2)
     )
     if monolithic:
+        gathered_cache_shape = (
+            "bf16[96,64,192]"
+            if tpu_flattened_cache_gather
+            else "bf16[4,24,64,192]"
+        )
         attention_gathers = (
             "  %cache = bf16[24,64,192] constant({0})\n"
-            "  %cache.ag = bf16[4,24,64,192] all-gather(%cache), "
+            f"  %cache.ag = {gathered_cache_shape} all-gather(%cache), "
             f"dimensions={{0}}, replica_groups={replica_groups}, "
             "channel_id=3, use_global_device_ids=true, "
             "metadata={op_name=\"jit(probe)/"
@@ -1186,6 +1196,21 @@ def test_layer0_attention_schedule_hlo_pins_control_and_challenger() -> None:
     assert len(challenger["monolithic_cache_gathers"]) == 1
     assert len(challenger["cache_shaped_gathers"]) == 1
     assert challenger["monolithic_attention_scope_present"]
+
+    tpu_challenger_hlo = _layer0_attention_schedule_discriminator_hlo(
+        "replicated_monolithic_attention",
+        tpu_flattened_cache_gather=True,
+    )
+    tpu_challenger = validate_layer0_residual_discriminator_hlo(
+        tpu_challenger_hlo,
+        config=config,
+        groups=groups,
+        variant_name="replicated_monolithic_attention",
+        main_rope_table_enabled=True,
+    )
+    assert tpu_challenger["passed"], tpu_challenger
+    assert len(tpu_challenger["monolithic_cache_gathers"]) == 1
+    assert len(tpu_challenger["cache_shaped_gathers"]) == 1
 
     tpu_control_hlo = _layer0_attention_schedule_discriminator_hlo(
         "attention_schedule_control",

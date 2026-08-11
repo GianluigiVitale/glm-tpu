@@ -2714,17 +2714,48 @@ def validate_layer0_residual_discriminator_hlo(
         for item in collectives
         if in_named_scope(item.op_name, owner_split_gather_scopes[0])
     )
+
+    def is_cache_shaped_gather(item: Any) -> bool:
+        if item.opcode != "all-gather":
+            return False
+        operands = tuple(
+            shape
+            for shape in item.operand_shapes
+            if shape.dtype == "bf16"
+            and len(shape.dimensions) == 3
+            and shape.dimensions[-1] == config.packed_cache_width
+        )
+        for result in item.result_shapes:
+            if result.dtype != "bf16":
+                continue
+            if (
+                len(result.dimensions) == 4
+                and result.dimensions[0] == config.local_parallel_size
+                and result.dimensions[-1] == config.packed_cache_width
+                and any(
+                    operand.dimensions == result.dimensions[1:]
+                    for operand in operands
+                )
+            ):
+                return True
+            # TPU SPMD canonicalizes ``all_gather(..., tiled=False)`` by
+            # folding the logical replica dimension into cache page axis 0.
+            if (
+                len(result.dimensions) == 3
+                and any(
+                    result.dimensions[0]
+                    == operand.dimensions[0] * config.local_parallel_size
+                    and result.dimensions[1:] == operand.dimensions[1:]
+                    for operand in operands
+                )
+            ):
+                return True
+        return False
+
     cache_shaped_gathers = tuple(
         item
         for item in collectives
-        if item.opcode == "all-gather"
-        and any(
-            shape.dtype == "bf16"
-            and len(shape.dimensions) == 4
-            and shape.dimensions[0] == config.local_parallel_size
-            and shape.dimensions[-1] == config.packed_cache_width
-            for shape in item.result_shapes
-        )
+        if is_cache_shaped_gather(item)
     )
     result_shapes = Counter(
         f"{shape.dtype}["
@@ -2954,13 +2985,7 @@ def validate_layer0_residual_discriminator_hlo(
                 "layer-0 discriminator must have exactly one scoped full-cache "
                 f"gather, found {len(monolithic_cache_gathers)}"
             )
-        elif not any(
-            shape.dtype == "bf16"
-            and len(shape.dimensions) == 4
-            and shape.dimensions[0] == config.local_parallel_size
-            and shape.dimensions[-1] == config.packed_cache_width
-            for shape in monolithic_cache_gathers[0].result_shapes
-        ):
+        elif not is_cache_shaped_gather(monolithic_cache_gathers[0]):
             violations.append(
                 "layer-0 discriminator monolithic cache-gather shape drifted"
             )
@@ -2981,7 +3006,9 @@ def validate_layer0_residual_discriminator_hlo(
         # TPU SPMD rewrites the LSE all-gather to an unnamed f32[256]
         # all-reduce and removes the validity gather.  The BF16 attention-output
         # gather survives with its scope, so pin it and independently reject the
-        # distinctive four-dimensional full-cache gather used by the challenger.
+        # distinctive logical full-cache gather used by the challenger. TPU SPMD
+        # may flatten its replica and page dimensions, so the shape guard checks
+        # the exact LP4 growth from operand to result as well as the packed width.
         if len(owner_split_output_gathers) != 1:
             violations.append(
                 "layer-0 attention control lost its owner-split output gather"
