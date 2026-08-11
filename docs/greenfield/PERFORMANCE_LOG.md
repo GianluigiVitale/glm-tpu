@@ -1238,3 +1238,11 @@ while the mismatch occurs in a separate 32-row decode executable and the prototy
 row. The prototype will not be launched as Gate-D or performance evidence. There is no measurement,
 DB row, trace, throughput, latency, or promotion claim. Work proceeds to a primitive-level layer-0
 ingredients capture before any decoder rerun.
+
+## DB530 main-cache localization — no performance result
+
+DB530 is an accepted-oracle correctness capture, not a greenfield timing experiment. It links
+run530/item1815, exact 8K token/DSA/cache protections, archive integrity and 8/8 cleanup, then
+localizes the first mismatch to layer-0 main-RoPE. The planned current-row TPU probe likewise has
+no warmup distribution, XPlane or decoder loop. DB484 remains the only accepted PP8 performance
+point at `244.091151 ms/token` and `4.096830 tok/s`; protected 8K Gate D and Gate E remain open.

@@ -23,6 +23,21 @@ readonly DB502_CODE_HASH=c230c11d2c852b52bbbf4b76791bb4dc80c598ba
 readonly DB502_RUNNER_SHA=2a77d75d27ae06128084f0d3956b0ea5b2886ae2b3a5ecbe896acc9bd43075c4
 readonly DB502_TENSOR_SHA=d9b14bdd47b5def0169b0b25157a8d472bc0017391030b0d7842b794fae8f76e
 readonly DB502_SUCCESS_SHA=de2e080d3eae672569acc4dada7eb41501c6f3508ac0e1747291041d95087dab
+readonly DB503_TAG=greenfield_layer0_qkv_a_production_20260808T140131250842069Z
+readonly DB503_DIR=/home/gianl/glm-run/$DB503_TAG
+readonly DB503_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/qkv_a_production_association/8k/$DB503_TAG
+readonly DB503_CODE_HASH=f715039399957bbc15f9366a6d947f33861d3c47
+readonly DB503_RUNNER_SHA=e7cd9fbb6d2fd42c77ce2258c8eff2c5b395cb217867cd1144ffded7dd0b1d5e
+readonly DB503_TENSOR_SHA=5dff6bb9405574b45d5d4b0c7e3a38e2fa0d92d0613ad6b3d8357ae14ae92fcb
+readonly DB503_SUCCESS_SHA=5d458cb8cda313f575352a4b90ba461b583692e0e4b1ed8a29f3e09fabeab03e
+readonly MAIN_CACHE_TAG=greenfield_legacy_layer0_main_cache_20260811T052303163478417Z
+readonly MAIN_CACHE_ROOT=/home/gianl/glm-run/$MAIN_CACHE_TAG
+readonly MAIN_CACHE_DIR=$MAIN_CACHE_ROOT/layer0_main_cache_comparison
+readonly MAIN_CACHE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/layer0_main_cache/8k/$MAIN_CACHE_TAG
+readonly MAIN_CACHE_CAPTURE_CODE_HASH=527233a3d817fbe50b0fe02835e7b148caf1b3c3
+readonly MAIN_CACHE_COMPARISON_SHA=c06f919df5b0b8bac3eb5466e5bd2aa5b2bbc33ec19995e8a052967117e8b8d9
+readonly MAIN_CACHE_TENSOR_SHA=a71213370a9f7a96998761af961ab379c91df1f286676f60b6bbab811efc0924
+readonly MAIN_CACHE_SUCCESS_SHA=7a46ae6574d1ae65018be9537ad198cdaca26b8e01bb94afbb61785f4ed7cd10
 readonly CURRENT_INTERNAL_NPZ=/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_oracle_dsa_dsa_internal_trace2_20260810T013247766447206Z/dsa_internal_observer/position_8155_internals.npz
 readonly CURRENT_INTERNAL_SHA=e1366c58a5eac8d995e6f56a4a3bb582fa6758b25bf19480b67e8f4c54914b50
 readonly EXACT_QUERY_INTERNAL_DIR=/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_oracle_dsa_dsa_internal_trace2_20260810T093638877848825Z/dsa_internal_observer
@@ -43,7 +58,7 @@ readonly TARGET=${GLM_GREENFIELD_DSA_ASSOCIATION_TARGET:-query}
   $TARGET == query_lp4_head_geometry || \
   $TARGET == query_lp4_production_exact || \
   $TARGET == query_lp4_head_key_boundary || \
-  $TARGET == qkv_a_production ]] || {
+  $TARGET == qkv_a_production || $TARGET == main_rope ]] || {
   echo "DSA association target is unknown: $TARGET" >&2
   exit 2
 }
@@ -55,6 +70,9 @@ if [[ $TARGET == q_a ]]; then
 elif [[ $TARGET == qkv_a_production ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_qkv_a_production_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=qkv_a_production_association
+elif [[ $TARGET == main_rope ]]; then
+  TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_main_rope_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REMOTE_KIND=main_rope_association
 elif [[ $TARGET == query_lp4 ]]; then
   TAG=${GLM_GREENFIELD_DSA_QUERY_ASSOCIATION_TAG:-greenfield_layer0_physical_lp4_dsa_query_association_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REMOTE_KIND=physical_lp4_dsa_query_association
@@ -177,6 +195,41 @@ if [[ $TARGET == qkv_a_production ]]; then
     exit 2
   }
 fi
+if [[ $TARGET == main_rope ]]; then
+  for path in "$DB503_DIR/runner.json" "$DB503_DIR/qkv_a_production.npz" \
+    "$DB503_DIR/SUCCESS" "$MAIN_CACHE_DIR/comparison.json" \
+    "$MAIN_CACHE_DIR/comparison.npz" "$MAIN_CACHE_ROOT/SUCCESS"; do
+    [[ -r $path ]] || {
+      echo "main-RoPE protected input is unavailable: $path" >&2
+      exit 2
+    }
+  done
+  [[ $(sha256sum "$DB503_DIR/runner.json" | awk '{print $1}') == \
+    "$DB503_RUNNER_SHA" && \
+    $(sha256sum "$DB503_DIR/qkv_a_production.npz" | awk '{print $1}') == \
+    "$DB503_TENSOR_SHA" && \
+    $(sha256sum "$DB503_DIR/SUCCESS" | awk '{print $1}') == \
+    "$DB503_SUCCESS_SHA" ]] || {
+    echo "sealed DB503 identity drifted" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$MAIN_CACHE_DIR/comparison.json" | awk '{print $1}') == \
+    "$MAIN_CACHE_COMPARISON_SHA" && \
+    $(sha256sum "$MAIN_CACHE_DIR/comparison.npz" | awk '{print $1}') == \
+    "$MAIN_CACHE_TENSOR_SHA" && \
+    $(sha256sum "$MAIN_CACHE_ROOT/SUCCESS" | awk '{print $1}') == \
+    "$MAIN_CACHE_SUCCESS_SHA" ]] || {
+    echo "sealed main-cache identity drifted" >&2
+    exit 2
+  }
+  [[ $(gcloud storage cat "$DB503_REMOTE/SUCCESS" | sha256sum | \
+    awk '{print $1}') == "$DB503_SUCCESS_SHA" && \
+    $(gcloud storage cat "$MAIN_CACHE_REMOTE/SUCCESS" | sha256sum | \
+    awk '{print $1}') == "$MAIN_CACHE_SUCCESS_SHA" ]] || {
+    echo "remote main-RoPE prerequisite identity drifted" >&2
+    exit 2
+  }
+fi
 
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || {
@@ -264,6 +317,14 @@ env JAX_PLATFORMS=tpu \
   --db502-code-hash "$DB502_CODE_HASH" \
   --db502-runner-sha256 "$DB502_RUNNER_SHA" \
   --db502-tensor-sha256 "$DB502_TENSOR_SHA" \
+  --db503-dir "$DB503_DIR" \
+  --db503-code-hash "$DB503_CODE_HASH" \
+  --db503-runner-sha256 "$DB503_RUNNER_SHA" \
+  --db503-tensor-sha256 "$DB503_TENSOR_SHA" \
+  --main-cache-dir "$MAIN_CACHE_DIR" \
+  --main-cache-capture-code-hash "$MAIN_CACHE_CAPTURE_CODE_HASH" \
+  --main-cache-comparison-sha256 "$MAIN_CACHE_COMPARISON_SHA" \
+  --main-cache-tensor-sha256 "$MAIN_CACHE_TENSOR_SHA" \
   "${current_args[@]}" \
   --output "$RUN_DIR/runner.json" \
   --hlo-dir "$RUN_DIR/hlo" >"$RUN_DIR/runner.log" 2>&1
@@ -295,6 +356,8 @@ elif target == "qkv_a_production":
     expected_candidates = {
         "production_fused_n82_convolution_shard_sum",
     }
+elif target == "main_rope":
+    expected_candidates = {"accepted_table_fp32_final_round"}
 elif target == "query_lp4":
     expected_candidates = {
         "physical_raw_owner_dot_m1_n1024",
@@ -390,6 +453,30 @@ if target == "qkv_a_production":
         or not all(hlo["required_shapes"].values())
     ):
         raise SystemExit("production qkv-a arithmetic/HLO contract failed")
+if target == "main_rope":
+    tensor = run_dir / runner["tensor_file"]["filename"]
+    candidate = runner["candidates"]["accepted_table_fp32_final_round"]
+    hlo = candidate["hlo"]
+    if (
+        runner["artifact_kind"] != "glm52_layer0_main_rope_association"
+        or not runner["one_live_row"]
+        or runner["position"] != 8155
+        or runner["rounding_contract"]
+        != "bf16_inputs_fp32_products_one_final_bf16_round"
+        or runner["upstream_baseline_comparison"]["mismatch_count"] != 18
+        or not candidate["comparison"]["elementwise_exact"]
+        or hlo["fp32_multiply_count"] < 4
+        or hlo["fp32_combine_count"] < 2
+        or hlo["final_round_count"] < 1
+        or hlo["bf16_arithmetic"]
+        or hlo["forbidden_instructions"]
+        or hlo["forbidden_markers"]
+        or not tensor.is_file()
+        or tensor.stat().st_size != runner["tensor_file"]["byte_count"]
+        or sha256(tensor.read_bytes()).hexdigest()
+        != runner["tensor_file"]["sha256"]
+    ):
+        raise SystemExit("main-RoPE arithmetic/HLO contract failed")
 if target == "query_lp4":
     tensor = run_dir / runner["tensor_file"]["filename"]
     if (
@@ -502,12 +589,16 @@ run_id = pv.start_run(
     connection,
     model=f"zai-org/GLM-5.2-FP8:greenfield-layer0-{target}-association",
     revision=(
-        f"bounded-real-layer0-v3-{target}-association"
-        if target == "qkv_a_production"
+        f"bounded-real-layer0-v4-{target}-association"
+        if target == "main_rope"
         else (
-            f"bounded-real-layer0-v2-{target}-association"
-            if target == "q_a"
-            else f"bounded-real-layer0-v1-{target}-association"
+            f"bounded-real-layer0-v3-{target}-association"
+            if target == "qkv_a_production"
+            else (
+                f"bounded-real-layer0-v2-{target}-association"
+                if target == "q_a"
+                else f"bounded-real-layer0-v1-{target}-association"
+            )
         )
     ),
     env={
@@ -521,9 +612,13 @@ run_id = pv.start_run(
         "device_kind": runner["device_kind"],
     },
     note=(
-        "Protected integrated layer-0 qkv-a production-helper diagnostic."
-        if target == "qkv_a_production"
-        else f"Protected layer-0 8K DSA {target} association diagnostic."
+        "Protected layer-0 main-RoPE current-row arithmetic diagnostic."
+        if target == "main_rope"
+        else (
+            "Protected integrated layer-0 qkv-a production-helper diagnostic."
+            if target == "qkv_a_production"
+            else f"Protected layer-0 8K DSA {target} association diagnostic."
+        )
     ),
     harness_repo=repo,
     fork_repo=None,
@@ -534,14 +629,22 @@ pv.record_item(
     benchmark=f"greenfield_layer0_{target}_association",
     item_id=f"layer0_position8155_{target}",
     prompt=(
-        "Sealed accepted layer-0 q-a, DB502 kv-a companion, and source weights."
-        if target == "qkv_a_production"
-        else f"Sealed accepted layer-0 {target} state and source weights."
+        "Sealed DB503 pre-RoPE companion and DB530 legacy current cache row."
+        if target == "main_rope"
+        else (
+            "Sealed accepted layer-0 q-a, DB502 kv-a companion, and source weights."
+            if target == "qkv_a_production"
+            else f"Sealed accepted layer-0 {target} state and source weights."
+        )
     ),
     gold=(
-        "Exact accepted q-a and exact sealed DB502 fused kv-a companion."
-        if target == "qkv_a_production"
-        else f"Elementwise-exact accepted {target} association."
+        "Exact accepted 64-wide layer-0 current main-RoPE cache suffix."
+        if target == "main_rope"
+        else (
+            "Exact accepted q-a and exact sealed DB502 fused kv-a companion."
+            if target == "qkv_a_production"
+            else f"Elementwise-exact accepted {target} association."
+        )
     ),
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=json.dumps(runner["exact_candidates"], sort_keys=True),
@@ -599,6 +702,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   fi
   if [[ -f qkv_a_production.npz ]]; then
     sha256sum qkv_a_production.npz
+  fi
+  if [[ -f main_rope_candidate.npz ]]; then
+    sha256sum main_rope_candidate.npz
   fi
   if [[ -f physical_lp4_query_candidates.npz ]]; then
     sha256sum physical_lp4_query_candidates.npz
@@ -672,6 +778,7 @@ summary = json.loads((root / "summary.json").read_text())
 artifact_kinds = {
     "q_a": "glm52_layer0_q_a_association",
     "qkv_a_production": "glm52_layer0_qkv_a_production_association",
+    "main_rope": "glm52_layer0_main_rope_association",
     "query_lp4": "glm52_layer0_physical_lp4_dsa_query_association",
     "query_lp4_q_a_boundary": (
         "glm52_layer0_physical_lp4_dsa_q_a_boundary_association"

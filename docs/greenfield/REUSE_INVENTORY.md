@@ -491,3 +491,11 @@ then position 8,155's newly produced row, and reports only one of `prefill_main_
 `recurrent_main_cache_producer`, or `cache_exact_attention_schedule_next`. Protected ingredient
 contract/NPZ hashes `9c3ec9fa...7693` / `fd76cd4c...249c` are mandatory. This is diagnostic
 correctness evidence, never a performance claim or a legacy execution dependency.
+
+Protected DB530 completes that discriminator and classifies `prefill_main_cache`. Its 30,544
+selected-row mismatches and 18 current-row mismatches localize the dominant error to cache
+dimensions 512--575, the main-RoPE suffix. Reuse DB503's already-sealed exact 576-wide qkv-a
+companion for the current pre-RoPE row; do not add another producer observer. The first bounded
+successor is only the accepted-table/FP32-products/one-final-BF16-round primitive inside the
+existing association probe. A full device table and decoder threading are reserved until that
+primitive is exact on TPU; DSA rotary and rejected combine/tree candidates remain untouched.

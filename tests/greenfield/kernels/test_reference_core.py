@@ -7,6 +7,7 @@ import pytest
 
 from glm_tpu.greenfield.kernels.reference import (
     apply_rotary,
+    apply_rotary_fp32_final_round,
     dense_swiglu,
     embedding_lookup,
     final_norm,
@@ -183,6 +184,59 @@ def test_rotary_pair_layouts_are_explicit_and_dot_preserving() -> None:
     )
 
 
+def test_rotary_fp32_final_round_matches_accepted_layer0_cache_row() -> None:
+    def bfloat16_from_hex(value: str, shape: tuple[int, ...]) -> jax.Array:
+        bits = np.frombuffer(bytes.fromhex(value), dtype="<u2").reshape(shape)
+        return jax.lax.bitcast_convert_type(jnp.asarray(bits), jnp.bfloat16)
+
+    pre_rope = bfloat16_from_hex(
+        "febe8fbe263ec7bf443fc9be2e3f6d3fb3be8c3f14bf1a3f"
+        "5abf78beb93de0bf2b4028bfc43e36be7f3f823f873f693f"
+        "d4bf1e3f103f133e343fb13fa83f3a3f8abf843e9c3ff23e"
+        "3abe633dd2be76bfe8be543f9ebf19bd253e9d3e333e1b3e"
+        "fdbf893f3c3f8fbfe23db73efb3f864052befebf4cbf7abe"
+        "7bc03fc08ebf303e",
+        (1, 64),
+    )
+    cos = bfloat16_from_hex(
+        "573fbc3e3cbf7bbf7d3fa4be533f4b3f53bf183f793f80bf"
+        "12bf793f8b3dd23c78bf3bbef73e4c3f6c3f793f7d3f7f3f"
+        "803f803f803f803f803f803f803f803f",
+        (1, 32),
+    )
+    sin = bfloat16_from_hex(
+        "0bbf6ebf2ebf483e23be723f11bf1c3f103f4ebf6c3e913b"
+        "523f683e7f3f80bf833e7c3f603f1b3fc53e743e153eb63d"
+        "5e3d073da43c483cf43b943b343bdc3a",
+        (1, 32),
+    )
+    expected = np.frombuffer(
+        bytes.fromhex(
+            "11bf0f3db1bf39bf54bf6ebe59bf46bf30be913fc4be3dbf"
+            "57bf913e923fabbfebbf0340ad3dd4be3c3f9c3f88bf68bf"
+            "e03edbbf043f893eaabf4b3f433fa6bf7a3f07bf30bf8f3f"
+            "0bbe07be833e82bf3dbf173f99bfa9beeb3da73e253e2a3e"
+            "02c0773f453f8cbfd33db83ef43f874043befebf4cbf7ebe"
+            "7ac040c08ebf2e3e"
+        ),
+        dtype="<u2",
+    ).reshape(1, 64)
+
+    got = apply_rotary_fp32_final_round(
+        pre_rope, cos, sin, interleaved=True
+    )
+    got_bits = np.asarray(
+        jax.lax.bitcast_convert_type(got, jnp.uint16)
+    )
+    np.testing.assert_array_equal(got_bits, expected)
+
+    rounded_products = apply_rotary(pre_rope, cos, sin, interleaved=True)
+    rounded_bits = np.asarray(
+        jax.lax.bitcast_convert_type(rounded_products, jnp.uint16)
+    )
+    assert int(np.count_nonzero(rounded_bits != expected)) == 16
+
+
 def test_rotary_refuses_odd_width_and_noninteger_positions() -> None:
     with pytest.raises(ValueError, match="even"):
         rotary_cos_sin(jnp.asarray([0]), rotary_dim=3, theta=10.0)
@@ -191,4 +245,11 @@ def test_rotary_refuses_odd_width_and_noninteger_positions() -> None:
     with pytest.raises(ValueError, match="pair dimension"):
         apply_rotary(
             jnp.ones((1, 4)), jnp.ones((1, 1)), jnp.ones((1, 1)), interleaved=True
+        )
+    with pytest.raises(ValueError, match="inexact"):
+        apply_rotary_fp32_final_round(
+            jnp.ones((1, 4), dtype=jnp.int32),
+            jnp.ones((1, 2), dtype=jnp.float32),
+            jnp.ones((1, 2), dtype=jnp.float32),
+            interleaved=True,
         )

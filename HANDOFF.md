@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 04:31 UTC
+**Updated:** 2026-08-11 06:57 UTC
 
 ## Authority and isolation
 
@@ -3590,3 +3590,31 @@ validation passes all 89 tests under `tests/greenfield/validation` plus the stat
 Exact next: commit/push this approved batch, authenticate the idle fleet, then launch
 `run_capture_legacy_layer0_main_cache.sh` once. Do not change PP8 arithmetic or rerun Gate D before
 the first divergent cache primitive is classified.
+
+## DB530 pins the first divergence to main-RoPE; bounded arithmetic proof is ready
+
+Protected DB530/item1815,
+`greenfield_legacy_layer0_main_cache_20260811T052303163478417Z`, completed the accepted 8K run,
+captured all 16 required cache files and passed exact raw token, DSA, state/load/cache, DB/archive
+and authenticated cleanup gates. The comparison classifies `prefill_main_cache`: 30,544 BF16
+mismatches occur in 2,047/2,048 selected rows, while the current row has 18 mismatches. Every
+current-row mismatch is in the 64-wide RoPE suffix; dimensions 576--639 padding are exact.
+Comparison manifest/tensor/SUCCESS SHAs are `fb47b2e3...69c9`, `a7121337...0924`, and
+`7a46ae65...cd10`. Independent rehashing passes 525 local-ledger records and 526 remote objects,
+DB integrity/run-item identity, direct local/remote SUCCESS equality and fresh 8/8 zero-work.
+
+DB503 already seals the exact current pre-RoPE 576-wide fused qkv-a companion. Applying the
+accepted position-8,155 BF16 table row to its final 64 values with FP32 products/adds and one final
+BF16 round reproduces DB530's legacy current suffix bitwise (`0/64` mismatches); the current
+greenfield row has 18. Position zero's identity rotation explains its exactness. Greenfield's
+dynamic negative-power/trig HLO and BF16 intermediate arithmetic are therefore upstream of the
+layer-0 residual; the four combine-precision and four virtual-TP32 trees were downstream guesses.
+
+The default-off successor adds only `apply_rotary_fp32_final_round` and a `main_rope` target to the
+existing DB503 association probe/protected wrapper. CPU reference and optimized-HLO tests prove
+four FP32 products, two FP32 combines, one final BF16 conversion, no BF16 rotary arithmetic,
+trig, callback or collective; the candidate is exact on the sealed row while the captured control
+retains 18 mismatches. This is readiness only. Exact next: complete affected tests/static checks,
+obtain one new-diff-only Fable approval, independently verify, commit/push, then run the seconds-
+scale protected TPU target. Only an exact protected result authorizes a separate plan-aware
+device-resident table/runtime-integration batch; no complete 8K retry is authorized first.

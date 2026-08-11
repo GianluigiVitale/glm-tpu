@@ -60,9 +60,15 @@ from glm_tpu.greenfield.kernels.reference.prefill_index import (  # noqa: E402
     promote_stage_local_prefill_index_wk,
 )
 from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm  # noqa: E402
+from glm_tpu.greenfield.kernels.reference.rotary import (  # noqa: E402
+    apply_rotary_fp32_final_round,
+)
 from glm_tpu.greenfield.runtime.decoder import (  # noqa: E402
     _validate_fused_qkv_a_decoder_association,
     validate_dsa_query_weight_materializer_hlo,
+)
+from glm_tpu.greenfield.sharding.hlo_contract import (  # noqa: E402
+    parse_hlo_module,
 )
 from glm_tpu.greenfield.validation.layer0_dsa_association import (  # noqa: E402
     inspect_distributed_q_a_norm_artifact,
@@ -75,6 +81,7 @@ Q_A_ARTIFACT_KIND = "glm52_layer0_q_a_association"
 PRODUCTION_QKV_A_ARTIFACT_KIND = (
     "glm52_layer0_qkv_a_production_association"
 )
+MAIN_ROPE_ARTIFACT_KIND = "glm52_layer0_main_rope_association"
 PHYSICAL_LP4_QUERY_ARTIFACT_KIND = (
     "glm52_layer0_physical_lp4_dsa_query_association"
 )
@@ -89,6 +96,11 @@ PHYSICAL_LP4_PRODUCTION_EXACT_ARTIFACT_KIND = (
 )
 PHYSICAL_LP4_HEAD_KEY_BOUNDARY_ARTIFACT_KIND = (
     "glm52_layer0_physical_lp4_dsa_head_key_boundary_association"
+)
+
+_ACCEPTED_MAIN_ROPE_ROW_POSITION = 8155
+_ACCEPTED_MAIN_ROPE_ROW_SHA256 = (
+    "67b01e3cab682d5ffd04ac9c8043e7e6825ee1275023428c41f9a1ae412dea1d"
 )
 
 
@@ -3290,6 +3302,315 @@ def _run_production_qkv_a(
     )
 
 
+def _accepted_main_rope_row_bits() -> tuple[np.ndarray, np.ndarray]:
+    """Build and identity-check the accepted position-8155 BF16 table row."""
+
+    dimensions = np.arange(0, 64, 2, dtype=np.float32)
+    frequencies = np.float32(1.0) / np.power(
+        np.float32(8_000_000.0),
+        dimensions / np.float32(64.0),
+        dtype=np.float32,
+    )
+    angles = np.float32(_ACCEPTED_MAIN_ROPE_ROW_POSITION) * frequencies
+    cos_bits = np.ascontiguousarray(
+        np.cos(angles, dtype=np.float32).astype(ml_dtypes.bfloat16)
+    ).view(np.uint16)
+    sin_bits = np.ascontiguousarray(
+        np.sin(angles, dtype=np.float32).astype(ml_dtypes.bfloat16)
+    ).view(np.uint16)
+    combined = np.concatenate((cos_bits, sin_bits))
+    if _array_sha256(combined) != _ACCEPTED_MAIN_ROPE_ROW_SHA256:
+        raise SystemExit("accepted main-RoPE position-8155 table row drifted")
+    return cos_bits, sin_bits
+
+
+def _validate_main_rope_hlo(optimized_hlo: str) -> dict[str, Any]:
+    """Require FP32 rotary arithmetic, one visible final round, and no trig."""
+
+    module = parse_hlo_module(optimized_hlo)
+
+    def has_shape(instruction: Any, dtype: str, widths: set[int]) -> bool:
+        return any(
+            shape.dtype == dtype
+            and shape.dimensions
+            and shape.dimensions[-1] in widths
+            for shape in instruction.result_shapes
+        )
+
+    forbidden_opcodes = {
+        "all-gather",
+        "all-reduce",
+        "all-to-all",
+        "collective-permute",
+        "cosine",
+        "power",
+        "reduce-scatter",
+        "sine",
+    }
+    forbidden = [
+        instruction.raw_line
+        for instruction in module.instructions
+        if instruction.opcode in forbidden_opcodes
+    ]
+    lowered = optimized_hlo.lower()
+    forbidden_markers = {
+        marker: lowered.count(marker)
+        for marker in ("host_callback", "xla_python_cpu_callback")
+        if marker in lowered
+    }
+    fp32_multiply_count = sum(
+        instruction.opcode == "multiply"
+        and has_shape(instruction, "f32", {32})
+        for instruction in module.instructions
+    )
+    fp32_combine_count = sum(
+        instruction.opcode in {"add", "subtract"}
+        and has_shape(instruction, "f32", {32})
+        for instruction in module.instructions
+    )
+    fp32_barrier_count = sum(
+        instruction.opcode == "optimization-barrier"
+        and has_shape(instruction, "f32", {64})
+        for instruction in module.instructions
+    )
+    final_round_count = sum(
+        instruction.opcode == "convert"
+        and has_shape(instruction, "bf16", {64})
+        and any(
+            shape.dtype == "f32"
+            and shape.dimensions
+            and shape.dimensions[-1] == 64
+            for shape in instruction.operand_shapes
+        )
+        for instruction in module.instructions
+    )
+    bf16_arithmetic = [
+        instruction.raw_line
+        for instruction in module.instructions
+        if instruction.opcode in {"add", "multiply", "subtract"}
+        and has_shape(instruction, "bf16", {32, 64})
+    ]
+    entry_bf16_widths = sorted(
+        shape.dimensions[-1]
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+        and instruction.opcode == "parameter"
+        for shape in instruction.result_shapes
+        if shape.dtype == "bf16" and shape.dimensions
+    )
+    passed = (
+        not forbidden
+        and not forbidden_markers
+        and not bf16_arithmetic
+        and fp32_multiply_count >= 4
+        and fp32_combine_count >= 2
+        and final_round_count >= 1
+        and entry_bf16_widths == [32, 32, 64]
+    )
+    return {
+        "bf16_arithmetic": bf16_arithmetic,
+        "entry_bf16_widths": entry_bf16_widths,
+        "final_round_count": final_round_count,
+        "forbidden_instructions": forbidden,
+        "forbidden_markers": forbidden_markers,
+        "fp32_barrier_count": fp32_barrier_count,
+        "fp32_combine_count": fp32_combine_count,
+        "fp32_multiply_count": fp32_multiply_count,
+        "hlo_sha256": sha256(optimized_hlo.encode()).hexdigest(),
+        "passed": passed,
+    }
+
+
+def _run_main_rope(
+    *,
+    args: argparse.Namespace,
+    code_hash: str,
+) -> None:
+    """Prove the accepted main-cache RoPE boundary on the real pre-RoPE row."""
+
+    required = (
+        args.db503_dir,
+        args.db503_code_hash,
+        args.db503_runner_sha256,
+        args.db503_tensor_sha256,
+        args.main_cache_dir,
+        args.main_cache_capture_code_hash,
+        args.main_cache_comparison_sha256,
+        args.main_cache_tensor_sha256,
+    )
+    if any(value is None for value in required):
+        raise SystemExit("main-RoPE protected identities are incomplete")
+
+    db503_runner_path = args.db503_dir / "runner.json"
+    db503_tensor_path = args.db503_dir / "qkv_a_production.npz"
+    main_comparison_path = args.main_cache_dir / "comparison.json"
+    main_tensor_path = args.main_cache_dir / "comparison.npz"
+    expected_files = (
+        (db503_runner_path, args.db503_runner_sha256),
+        (db503_tensor_path, args.db503_tensor_sha256),
+        (main_comparison_path, args.main_cache_comparison_sha256),
+        (main_tensor_path, args.main_cache_tensor_sha256),
+    )
+    if any(
+        not path.is_file() or _file_sha256(path) != expected
+        for path, expected in expected_files
+    ):
+        raise SystemExit("main-RoPE protected input identity drifted")
+
+    db503 = json.loads(db503_runner_path.read_text())
+    main_comparison = json.loads(main_comparison_path.read_text())
+    candidate_name = "accepted_table_fp32_final_round"
+    if (
+        db503.get("artifact_kind") != PRODUCTION_QKV_A_ARTIFACT_KIND
+        or db503.get("status") != "SUCCESS"
+        or db503.get("code_hash") != args.db503_code_hash
+        or not db503.get("association_restored")
+        or main_comparison.get("artifact_kind")
+        != "glm52_legacy_pp8_layer0_main_cache_comparison"
+        or main_comparison.get("capture_code_hash")
+        != args.main_cache_capture_code_hash
+        or main_comparison.get("classification") != "prefill_main_cache"
+        or main_comparison.get("performance_claim") is not False
+        or main_comparison["numerical_contract"]["current_position"]
+        != _ACCEPTED_MAIN_ROPE_ROW_POSITION
+    ):
+        raise SystemExit("main-RoPE source artifact contract drifted")
+
+    with np.load(db503_tensor_path, allow_pickle=False) as payload:
+        accepted_companion_bits = np.ascontiguousarray(
+            payload["accepted_db502_companion_bfloat16_bits"]
+        )
+        production_companion_bits = np.ascontiguousarray(
+            payload["production_companion_bfloat16_bits"]
+        )
+    with np.load(main_tensor_path, allow_pickle=False) as payload:
+        legacy_current_bits = np.ascontiguousarray(
+            payload["legacy_current_cache_bfloat16_bits"]
+        )
+        greenfield_current_bits = np.ascontiguousarray(
+            payload["greenfield_current_cache_bfloat16_bits"]
+        )
+    if (
+        accepted_companion_bits.shape != (576,)
+        or production_companion_bits.shape != (576,)
+        or accepted_companion_bits.dtype != np.uint16
+        or not np.array_equal(accepted_companion_bits, production_companion_bits)
+        or legacy_current_bits.shape != (1, 640)
+        or greenfield_current_bits.shape != (1, 640)
+        or legacy_current_bits.dtype != np.uint16
+        or greenfield_current_bits.dtype != np.uint16
+        or not np.array_equal(legacy_current_bits[:, :512], greenfield_current_bits[:, :512])
+        or not np.array_equal(legacy_current_bits[:, 576:], greenfield_current_bits[:, 576:])
+    ):
+        raise SystemExit("main-RoPE source tensor contract drifted")
+
+    pre_rope_bits = production_companion_bits[512:][None, :]
+    expected_bits = legacy_current_bits[:, 512:576]
+    observed_bits = greenfield_current_bits[:, 512:576]
+    observed_comparison = _compare_bfloat16_bits(expected_bits, observed_bits)
+    if observed_comparison["mismatch_count"] != 18:
+        raise SystemExit("captured greenfield main-RoPE baseline drifted")
+
+    cos_bits, sin_bits = _accepted_main_rope_row_bits()
+    pre_rope = jax.lax.bitcast_convert_type(
+        jnp.asarray(pre_rope_bits), jnp.bfloat16
+    )
+    cos = jax.lax.bitcast_convert_type(
+        jnp.asarray(cos_bits[None, :]), jnp.bfloat16
+    )
+    sin = jax.lax.bitcast_convert_type(
+        jnp.asarray(sin_bits[None, :]), jnp.bfloat16
+    )
+
+    def candidate(value: Any, table_cos: Any, table_sin: Any) -> Any:
+        return apply_rotary_fp32_final_round(
+            value, table_cos, table_sin, interleaved=True
+        )
+
+    args.hlo_dir.mkdir(parents=True)
+    compiled = jax.jit(candidate).lower(pre_rope, cos, sin).compile()
+    optimized_hlo = compiled.as_text()
+    (args.hlo_dir / f"{candidate_name}.optimized_hlo.txt").write_text(
+        optimized_hlo
+    )
+    hlo_contract = _validate_main_rope_hlo(optimized_hlo)
+    if not hlo_contract["passed"]:
+        raise SystemExit("main-RoPE FP32/final-round HLO contract failed")
+    output = compiled(pre_rope, cos, sin)
+    jax.block_until_ready(output)
+    candidate_bits = np.ascontiguousarray(np.asarray(output)).view(np.uint16)
+    comparison = _compare_bfloat16_bits(expected_bits, candidate_bits)
+    restored = comparison["elementwise_exact"]
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tensor_path = args.output.parent / "main_rope_candidate.npz"
+    np.savez(
+        tensor_path,
+        pre_rope_bfloat16_bits=pre_rope_bits,
+        accepted_cos_bfloat16_bits=cos_bits,
+        accepted_sin_bfloat16_bits=sin_bits,
+        legacy_current_rope_bfloat16_bits=expected_bits,
+        greenfield_current_rope_bfloat16_bits=observed_bits,
+        candidate_current_rope_bfloat16_bits=candidate_bits,
+    )
+    result = {
+        "artifact_kind": MAIN_ROPE_ARTIFACT_KIND,
+        "association_restored": restored,
+        "backend": jax.default_backend(),
+        "candidates": {
+            candidate_name: {
+                "comparison": comparison,
+                "hlo": hlo_contract,
+            }
+        },
+        "capture": db503["capture"],
+        "claim_scope": (
+            "Bounded layer-0 current-row main-RoPE arithmetic/HLO only; no "
+            "prefill-table, complete cache, decoder, Gate-D, latency, or "
+            "token-rate claim."
+        ),
+        "code_hash": code_hash,
+        "db503": {
+            "code_hash": args.db503_code_hash,
+            "runner_sha256": args.db503_runner_sha256,
+            "tensor_sha256": args.db503_tensor_sha256,
+        },
+        "device_count": jax.device_count(),
+        "device_kind": sorted({device.device_kind for device in jax.devices()}),
+        "diagnostic_only": True,
+        "exact_candidates": [candidate_name] if restored else [],
+        "format_version": 1,
+        "input_manifest_sha256": db503["input_manifest_sha256"],
+        "main_cache": {
+            "capture_code_hash": args.main_cache_capture_code_hash,
+            "comparison_manifest_sha256": main_comparison["manifest_sha256"],
+            "comparison_sha256": args.main_cache_comparison_sha256,
+            "tensor_sha256": args.main_cache_tensor_sha256,
+        },
+        "one_live_row": True,
+        "performance_claim": False,
+        "position": _ACCEPTED_MAIN_ROPE_ROW_POSITION,
+        "q_a_manifest_sha256": db503["q_a_manifest_sha256"],
+        "rounding_contract": "bf16_inputs_fp32_products_one_final_bf16_round",
+        "status": "SUCCESS",
+        "table": {
+            "frequency_formula": "1 / (theta ** (arange(0,64,2)/64))",
+            "position_row_sha256": _ACCEPTED_MAIN_ROPE_ROW_SHA256,
+            "storage_dtype": "bfloat16",
+            "theta": 8_000_000.0,
+        },
+        "tensor_file": {
+            "byte_count": tensor_path.stat().st_size,
+            "filename": tensor_path.name,
+            "sha256": _file_sha256(tensor_path),
+        },
+        "upstream_baseline_comparison": observed_comparison,
+    }
+    args.output.write_text(
+        json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -3303,6 +3624,7 @@ def main() -> None:
             "query_lp4_head_key_boundary",
             "q_a",
             "qkv_a_production",
+            "main_rope",
         ),
         default="query",
     )
@@ -3319,6 +3641,14 @@ def main() -> None:
     parser.add_argument("--db502-code-hash")
     parser.add_argument("--db502-runner-sha256")
     parser.add_argument("--db502-tensor-sha256")
+    parser.add_argument("--db503-dir", type=Path)
+    parser.add_argument("--db503-code-hash")
+    parser.add_argument("--db503-runner-sha256")
+    parser.add_argument("--db503-tensor-sha256")
+    parser.add_argument("--main-cache-dir", type=Path)
+    parser.add_argument("--main-cache-capture-code-hash")
+    parser.add_argument("--main-cache-comparison-sha256")
+    parser.add_argument("--main-cache-tensor-sha256")
     parser.add_argument("--current-internal-npz", type=Path)
     parser.add_argument("--current-internal-sha256")
     parser.add_argument("--output", type=Path, required=True)
@@ -3335,6 +3665,9 @@ def main() -> None:
         raise SystemExit("query association code hash drifted")
     if args.output.exists() or args.hlo_dir.exists():
         raise FileExistsError("append-only query association output exists")
+    if args.target == "main_rope":
+        _run_main_rope(args=args, code_hash=code_hash)
+        return
 
     comparison_path = args.capture_dir / "comparison.json"
     tensors_path = args.capture_dir / "internals.npz"

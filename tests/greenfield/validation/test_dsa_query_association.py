@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 
@@ -31,6 +32,38 @@ def test_query_comparison_records_exact_and_divergent_values() -> None:
     assert not divergent["elementwise_exact"]
     assert divergent["mismatch_count"] == 1
     assert divergent["max_abs"] == 0.25
+
+
+def test_main_rope_row_and_fp32_hlo_contract_are_exact() -> None:
+    cos_bits, sin_bits = subject._accepted_main_rope_row_bits()
+    assert cos_bits.shape == sin_bits.shape == (32,)
+    assert subject._array_sha256(np.concatenate((cos_bits, sin_bits))) == (
+        subject._ACCEPTED_MAIN_ROPE_ROW_SHA256
+    )
+
+    value = jnp.ones((1, 64), dtype=jnp.bfloat16)
+    cos = jnp.ones((1, 32), dtype=jnp.bfloat16)
+    sin = jnp.zeros((1, 32), dtype=jnp.bfloat16)
+    exact_hlo = subject.jax.jit(
+        lambda x, c, s: subject.apply_rotary_fp32_final_round(
+            x, c, s, interleaved=True
+        )
+    ).lower(value, cos, sin).compile().as_text()
+    exact_contract = subject._validate_main_rope_hlo(exact_hlo)
+    assert exact_contract["passed"]
+    assert exact_contract["fp32_multiply_count"] >= 4
+    assert exact_contract["final_round_count"] >= 1
+
+    rounded_hlo = subject.jax.jit(
+        lambda x, c, s: subject.apply_rotary(x, c, s, interleaved=True)
+    ).lower(value, cos, sin).compile().as_text()
+    rounded_contract = subject._validate_main_rope_hlo(rounded_hlo)
+    assert not rounded_contract["passed"]
+    assert (
+        rounded_contract["fp32_multiply_count"] < 4
+        or rounded_contract["final_round_count"] < 1
+        or rounded_contract["bf16_arithmetic"]
+    )
 
 
 def test_query_candidate_matrix_covers_legacy_and_production_shapes() -> None:
@@ -569,10 +602,19 @@ def test_protected_query_wrapper_is_bounded_and_fail_closed() -> None:
         "q_a_candidates.npz",
         "qkv_a_production.npz",
         "qkv_a_production_association",
+        "main_rope_candidate.npz",
+        "main_rope_association",
         "DB502_CODE_HASH=c230c11",
         "DB502_RUNNER_SHA=2a77d75d",
         "DB502_TENSOR_SHA=d9b14bdd",
         "DB502_SUCCESS_SHA=de2e080d",
+        "DB503_CODE_HASH=f7150393",
+        "DB503_RUNNER_SHA=e7cd9fbb",
+        "DB503_TENSOR_SHA=5dff6bb9",
+        "DB503_SUCCESS_SHA=5d458cb8",
+        "MAIN_CACHE_COMPARISON_SHA=c06f919d",
+        "MAIN_CACHE_TENSOR_SHA=a7121337",
+        "MAIN_CACHE_SUCCESS_SHA=7a46ae65",
         "CURRENT_INTERNAL_SHA=e1366c58",
         "EXACT_QUERY_INTERNAL_SHA=a889b664",
         "EXACT_QUERY_INTERNAL_CONTRACT_SHA=fb470de5",
@@ -608,6 +650,7 @@ def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
         '"query_lp4_head_geometry",',
         '"query_lp4_production_exact",',
         '"query_lp4_head_key_boundary",',
+        '"main_rope",',
         "_local_dsa_query_tuple4_exact",
         "decode_stage_local_prefill_index_wk_bf16",
         "promote_stage_local_prefill_index_wk",
@@ -616,5 +659,7 @@ def test_production_qkv_a_probe_reuses_integrated_helper_and_linter() -> None:
         "production_fused_n82_convolution_shard_sum",
         "companion_comparison",
         "fused_n82_convolution",
+        "apply_rotary_fp32_final_round",
+        "accepted_table_fp32_final_round",
     ):
         assert required in source

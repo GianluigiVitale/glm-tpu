@@ -979,3 +979,17 @@ capture is still required.
   main latent-cache rows, pre-projection attention output, accepted/greenfield 32 BF16 partials and
   post-reduction row, then MLP boundaries. This separates upstream cache/attention divergence from
   projection values and association.
+
+## DB530 layer-0 main-cache discriminator
+
+- DB530/item1815,
+  `greenfield_legacy_layer0_main_cache_20260811T052303163478417Z`, seals the accepted 8K cache
+  snapshots and classifies `prefill_main_cache`. Selected/current comparisons report
+  `30,544/18` BF16 mismatches; padding is exact and current mismatch dimensions are all within the
+  64-wide main-RoPE suffix.
+- Comparison manifest/tensor/SUCCESS SHAs are `fb47b2e3...69c9`, `a7121337...0924`, and
+  `7a46ae65...cd10`. Local ledger, remote object generations/CRC32C, DB run/item, archive and two
+  independent authenticated 8/8 clean censuses pass.
+- DB503's exact current pre-RoPE companion plus accepted table row SHA `67b01e3c...a1d` reproduces
+  legacy suffix SHA `e7c217ec...3281` when products/adds are FP32 and only the completed row is
+  rounded to BF16. This is offline causal readiness, not yet protected TPU or decoder evidence.

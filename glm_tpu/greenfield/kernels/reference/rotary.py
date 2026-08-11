@@ -84,3 +84,62 @@ def apply_rotary(
         ),
         axis=-1,
     )
+
+
+def apply_rotary_fp32_final_round(
+    value: jax.Array,
+    cos: jax.Array,
+    sin: jax.Array,
+    *,
+    interleaved: bool,
+) -> jax.Array:
+    """Rotate in FP32 and round only the completed result.
+
+    The accepted main-MLA path consumes a BF16 rotary-table row, evaluates the
+    multiply/add expression in FP32, and stores one final BF16 result.  This is
+    intentionally a separate, default-off primitive: the established DSA
+    rotary path keeps :func:`apply_rotary` and its existing numerical contract.
+
+    An FP32 optimization barrier prevents an early graph rewrite from moving a
+    downstream BF16 conversion into the products.  The barrier itself may be
+    eliminated after it has served that purpose, so protected TPU callers must
+    still lint the FP32 products and final conversion before treating the result
+    as exactness evidence.
+    """
+
+    if value.ndim < 1 or value.shape[-1] <= 0 or value.shape[-1] % 2:
+        raise ValueError("rotary input final dimension must be positive and even")
+    if not jnp.issubdtype(value.dtype, jnp.inexact):
+        raise ValueError("rotary input dtype must be inexact")
+    half = value.shape[-1] // 2
+    if cos.shape[-1:] != (half,) or sin.shape != cos.shape:
+        raise ValueError(
+            f"rotary cos/sin must share a final pair dimension of {half}"
+        )
+    if not isinstance(interleaved, bool):
+        raise ValueError("interleaved must be boolean")
+
+    value_f32 = value.astype(jnp.float32)
+    cos_f32 = cos.astype(jnp.float32)
+    sin_f32 = sin.astype(jnp.float32)
+    if interleaved:
+        first = value_f32[..., 0::2]
+        second = value_f32[..., 1::2]
+        completed = jnp.stack(
+            (
+                first * cos_f32 - second * sin_f32,
+                second * cos_f32 + first * sin_f32,
+            ),
+            axis=-1,
+        ).reshape(value.shape)
+    else:
+        first = value_f32[..., :half]
+        second = value_f32[..., half:]
+        completed = jnp.concatenate(
+            (
+                first * cos_f32 - second * sin_f32,
+                second * cos_f32 + first * sin_f32,
+            ),
+            axis=-1,
+        )
+    return jax.lax.optimization_barrier(completed).astype(value.dtype)

@@ -6948,3 +6948,30 @@ unmotivated arithmetic variants.
   `APPROVE COMMIT`; independent post-fix validation passes all 89 tests in the validation tree.
 - Exact next is commit/push followed by one serialized protected capture. No full decoder retry or
   arithmetic change is authorized yet.
+
+## 2026-08-11 05:23--06:57 — DB530 main-cache result and exact current-row RoPE mechanism
+
+- Protected DB530/item1815,
+  `greenfield_legacy_layer0_main_cache_20260811T052303163478417Z`, passes the accepted 8K token,
+  DSA, state/load/cache, 16-file observer, DB/archive and authenticated cleanup contracts. Its
+  comparison classifies `prefill_main_cache`: selected rows differ in 30,544 BF16 values across
+  2,047/2,048 positions; the newly written position-8,155 row differs in 18 values.
+- Main-cache layout is now data-proven: normalized latent dimensions 0--511, RoPE key 512--575,
+  zero padding 576--639. Current-row mismatches are wholly in the RoPE suffix. Comparison
+  manifest/tensor/SUCCESS SHAs are `fb47b2e3...69c9`, `a7121337...0924`, and
+  `7a46ae65...cd10`.
+- Independent sealing validation rehashes 525 local ledger records (zero missing/size/hash errors),
+  reconciles 526 remote objects with generations/CRC32C, verifies DB run530/item1815 and exact
+  local/remote SUCCESS bytes, and obtains a fresh read-only 8/8 `CENSUS_OK`.
+- Reusing DB503's exact `production_companion_bfloat16_bits` avoids another producer capture. Its
+  final 64 BF16 values are the current pre-RoPE key. The accepted positive-power/reciprocal BF16
+  table row at position 8,155 has SHA `67b01e3c...a1d`; FP32 multiply/add with one final BF16 round
+  produces legacy suffix SHA `e7c217ec...3281` bitwise. Ordinary BF16-intermediate rotation is
+  nonexact, and the protected greenfield suffix retains 18 mismatches.
+- The bounded successor reuses the DB503 probe and wrapper rather than adding a loader or fleet
+  path. Its new primitive is default-off and DSA remains unchanged. CPU HLO contains exactly four
+  FP32 rotary multiplies, two FP32 combines and one final BF16 conversion, with no BF16 rotary
+  arithmetic, dynamic power/cos/sin, callback or collective. The full table asset is deliberately
+  deferred until this arithmetic passes real TPU HLO and bitwise output.
+- Exact next: finish the affected batch, one Fable review of only the new diff, independent verify,
+  commit/push and one protected `main_rope` probe. Do not run the full 8K decoder or alter DSA.
