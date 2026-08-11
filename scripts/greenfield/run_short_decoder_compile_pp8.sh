@@ -982,7 +982,7 @@ fi
 if [[ $MAIN_ROPE_TABLE == 1 ]]; then
   readonly MAIN_ROPE_PREREQUISITE_TAG=greenfield_layer0_main_rope_20260811T072231959104598Z
   readonly MAIN_ROPE_PREREQUISITE_DIR=/home/gianl/glm-run/$MAIN_ROPE_PREREQUISITE_TAG
-  readonly MAIN_ROPE_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$MAIN_ROPE_PREREQUISITE_TAG
+  readonly MAIN_ROPE_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/main_rope_association/8k/$MAIN_ROPE_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$MAIN_ROPE_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
 import json
 from hashlib import sha256

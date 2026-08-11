@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 08:38 UTC
+**Updated:** 2026-08-11 08:40 UTC
 
 ## Authority and isolation
 
@@ -19,8 +19,9 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D integration batch
 
-- Branch HEAD is still pushed pin `6acc6e34a5646dae8425a282a7c77b339121a45b`; the default-off
-  main-RoPE table integration is an uncommitted coherent batch approved for commit.
+- The default-off main-RoPE table integration is committed/pushed at
+  `d66a4dfe7f88ddfa05f14fd8d6378528da125b03`. One two-line protected-path correction is
+  uncommitted pending focused Fable confirmation.
 - It reuses protected DB531 exactly: one host-built BF16 table uses the accepted positive-power /
   reciprocal / NumPy-FP32 trig formula, with the 8K asset pinned to SHA
   `6a22140f...070101` and position-8,155 row to `67b01e3c...a1d`. The replicated final input is
@@ -41,7 +42,13 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   now derives the exact direct name from both query-association and table flags; enabled/disabled
   synthetic TPU-HLO cases pass, and the affected `73`-test batch passes again in `52.85 s`. The
   same session independently passed the two focused tests and returned `APPROVE COMMIT`.
-- Exact next: commit/push, rerun strict fleet census, and launch exactly
+- The first protected invocation then stopped before census or TPU work because the wrapper used
+  `results/<tag>` for DB531's direct remote `SUCCESS`; the sealed artifact itself pins the actual
+  `oracles/greenfield/glm52/main_rope_association/8k/<tag>` prefix. The corrected URL returns the
+  exact expected SHA `8f9763e4...b6d7`, and its focused runner test, Bash and ShellCheck pass.
+  The same Fable session independently checked both remote paths/hashes and returned
+  `APPROVE COMMIT` for the correction.
+- Exact next: commit/push the path correction, rerun strict fleet census, and launch exactly
   one serialized protected complete 8K run with `GLM_GREENFIELD_MAIN_ROPE_TABLE=1`. Accept it only
   if raw tokens, exact DSA, state/load/cache, HLO, HBM, DB/archive and authenticated cleanup all
   pass. If layer-0 output still diverges, use that bounded result to localize the next upstream

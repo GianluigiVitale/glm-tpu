@@ -384,6 +384,10 @@ def test_main_rope_table_is_default_off_and_db531_protected() -> None:
     assert "main-RoPE table requires the exact repaired recurrent DSA chain" in runner
     assert "main-RoPE table must remain isolated from layer-0 diagnostics" in runner
     assert "greenfield_layer0_main_rope_20260811T072231959104598Z" in runner
+    assert (
+        "$APPROVED_BUCKET/oracles/greenfield/glm52/"
+        "main_rope_association/8k/$MAIN_ROPE_PREREQUISITE_TAG" in runner
+    )
     assert "DB531 direct remote SUCCESS hash drifted" in runner
     assert "expected_main_rope_sha256" in runner
     assert "validate_main_rope_hlo" in runner

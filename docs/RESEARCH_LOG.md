@@ -7032,3 +7032,18 @@ unmotivated arithmetic variants.
   enabled. No
   additional observer, legacy execution import, DSA change or repeat of the four rejected
   combine-precision theories is justified before that result.
+
+## 2026-08-11 08:38--08:40 — integration pushed; first invocation catches wrong DB531 archive prefix before TPU work
+
+- The reviewed integration is committed and pushed at
+  `d66a4dfe7f88ddfa05f14fd8d6378528da125b03`.
+- Its first protected invocation validated DB531's local hashes and live SQLite linkage, then
+  stopped before run-directory census, synchronization, load, compile or TPU work because the new
+  direct-remote check addressed `results/<tag>/SUCCESS`. DB531's sealed local `SUCCESS` and
+  orchestrator instead pin
+  `gs://driftbench-dsv4-uc/oracles/greenfield/glm52/main_rope_association/8k/<tag>`.
+- The wrapper now uses that exact prefix and its static test pins the path. A direct read returns
+  expected SHA `8f9763e4e8106db0fe30b9fa3820873f736ede2215edfc8b950fcd311d08b6d7`;
+  the focused test, Bash, ShellCheck and diff checks pass. The same Fable session independently
+  verified the sealed local prefix, corrected remote SHA and missing old URL, then returned
+  `APPROVE COMMIT`. Exact next is commit/push, then retry the one protected 8K run.
