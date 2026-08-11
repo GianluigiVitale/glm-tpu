@@ -6897,3 +6897,25 @@ unmotivated arithmetic variants.
   the smallest isolated legacy-oracle capture needed to expose the same boundaries and stop at the
   first bitwise divergence in dataflow order. Do not repeat the rejected combine-precision or
   uniform-tree experiments.
+
+## 2026-08-11 03:39--04:27 — protected PP8 primitive capture passes
+
+- Reviewed/pushed pin `4d4e2c5` ran one serialized protected 8K ingredient capture. The complete
+  teacher-forced prefill reached position 8,155, exact layer-0 selection passed, and the isolated
+  observer persisted its artifacts before the required diagnostic-only exception. There is no
+  timing, XPlane, DB row, `SUCCESS`, Gate-D or throughput claim.
+- The host contract passes all 29 fields, exact scores/order, owner partition/union and tail
+  invariants, replicated stage-0 values, inactive sentinels, health/finite checks and nonzero cache.
+  Owner-selected counts are `512/516/515/505`, totaling the exact 2,048 selected positions.
+- The optimized-HLO contract passes on all eight hosts with identical SHA `33c707ee...ffae`, 32
+  partitions, five all-gathers, five all-reduces, only explicit LP4 groups, exact production/virtual
+  kernel counts `1/8` for attention and dense, no FP32 boundary, no host marker, no escaped group
+  and no violation.
+- Contract/NPZ/HLO-contract/HLO-gzip SHAs are `9c3ec9fa...7693`, `fd76cd4c...249c`,
+  `45b1eb96...61d2`, and `c26e25b5...4d30`. Direct approved-bucket hashes match. Pre/failure census
+  SHAs `10f77f66...9c7` / `5d6b1127...878` prove authenticated eight-host cleanup.
+- Reuse DB493 rather than recapturing normalized input or DSA internals. The next experiment is the
+  smallest isolated legacy capture of the first still-open main-cache/attention primitive, followed
+  by a bitwise dataflow-ordered comparison. Do not use the rejected returned-boundary observer, do
+  not guess another combine tree, and do not rerun the full decoder before naming the first
+  divergent primitive.

@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-10 19:54 UTC
+**Updated:** 2026-08-11 04:31 UTC
 
 ## Authority and isolation
 
@@ -3530,3 +3530,35 @@ explicit-CPU check passes; the same audit session verified only the fix and retu
 independently verify, commit/push, authenticate an idle fleet, then run one serialized protected 8K
 ingredient capture. Build the corresponding isolated legacy-oracle capture and compare boundaries
 bitwise in dataflow order before changing production arithmetic or rerunning the decoder.
+
+## Protected PP8 layer-0 ingredients are sealed; legacy matching is next
+
+The reviewed observer was independently reverified, committed as
+`4d4e2c5da53554b3ab015d26cc6d1e058a7b48dd`, pushed, and run once under the protected 8K wrapper.
+Tag
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_ingredients_trace2_20260811T033957390557074Z`
+completed the full 8,155-token teacher-forced prefill and the isolated layer-0 replay at decode
+position 8,155. It then raised the required diagnostic-only exception before timing, trace, DB or
+`SUCCESS`; the outer exit code of one is intentional and is not a decoder failure.
+
+The contract passes exact selected positions/scores/order, exact owner partition and union, owner
+counts `512/516/515/505`, nonzero selected cache, finite values, lane replication, inactive-stage
+sentinels and all health bits. The 29 fields include the current/selected 640-wide cache, four
+owner-local and combined attention states, 32 attention projection partials, production local and
+reduced attention updates, MLP input, 32 dense partials, next hidden and layer-1 normalization.
+The HLO contract passes with 32 partitions, only five LP4 all-gathers and five LP4 all-reduces,
+one production plus eight diagnostic attention kernels, one production plus eight diagnostic dense
+kernels, no FP32 boundary, no host marker, no escaped collective and no violation. All eight hosts
+reported identical HLO SHA `33c707ee...ffae`.
+
+Local and approved-bucket artifact SHAs are contract `9c3ec9fa...7693`, NPZ
+`fd76cd4c...249c`, HLO contract `45b1eb96...61d2`, and optimized-HLO gzip
+`c26e25b5...4d30`. Pre/failure-exit census SHAs `10f77f66...9c7` / `5d6b1127...878`
+authenticate eight unique clean hosts. This is bounded correctness evidence only: DB484 remains the
+only decoder performance point and Gate D/E are unchanged.
+
+Exact next: do not change PP8 arithmetic or rerun the complete decoder. Reuse DB493 for the already
+sealed normalized-input/DSA fields, add the smallest isolated and non-returning legacy layer-0
+observer needed for the first open main-cache/attention boundary, run it once under the existing
+protected legacy harness, and compare primitives bitwise in dataflow order. Stop at the first
+divergence; only its causal fix may authorize another 8K Gate-D run.
