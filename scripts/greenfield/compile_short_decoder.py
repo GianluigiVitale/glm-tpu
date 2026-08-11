@@ -77,6 +77,9 @@ DSA_CROSS_BACKEND_SCORE_TOLERANCE = TensorTolerance(
 LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256 = (
     "787c9ba7b39d6fd43b59876f713052b64a3ac2d3ecbc6074795ba5364abe153b"
 )
+LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256 = (
+    "6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca"
+)
 
 
 def _git_head() -> str:
@@ -1407,6 +1410,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
     )
     parser.add_argument(
+        "--observe-layer0-attention-schedule-variants",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
+    parser.add_argument(
         "--observe-layer0-ingredients",
         type=int,
         choices=(0, 1),
@@ -1460,12 +1469,16 @@ def main() -> int:
     args.observe_layer0_subshard_variants = bool(
         args.observe_layer0_subshard_variants
     )
+    args.observe_layer0_attention_schedule_variants = bool(
+        args.observe_layer0_attention_schedule_variants
+    )
     args.observe_layer0_ingredients = bool(args.observe_layer0_ingredients)
     if (
         sum(
             (
                 args.observe_layer0_residual_variants,
                 args.observe_layer0_subshard_variants,
+                args.observe_layer0_attention_schedule_variants,
                 args.observe_layer0_ingredients,
             )
         )
@@ -1477,12 +1490,14 @@ def main() -> int:
     observe_layer0_discriminator = bool(
         args.observe_layer0_residual_variants
         or args.observe_layer0_subshard_variants
+        or args.observe_layer0_attention_schedule_variants
     )
-    layer0_discriminator_kind = (
-        "virtual_tp32"
-        if args.observe_layer0_subshard_variants
-        else "combine_precision"
-    )
+    if args.observe_layer0_subshard_variants:
+        layer0_discriminator_kind = "virtual_tp32"
+    elif args.observe_layer0_attention_schedule_variants:
+        layer0_discriminator_kind = "attention_schedule"
+    else:
+        layer0_discriminator_kind = "combine_precision"
     oracle_mode = args.short_context_oracle_dir is not None
     if oracle_mode != (
         args.short_context_oracle_manifest_sha256 is not None
@@ -1595,6 +1610,16 @@ def main() -> int:
     ):
         raise ValueError(
             "layer-0 discriminator requires every proven 8K DSA correction"
+        )
+    if args.observe_layer0_attention_schedule_variants and not (
+        args.main_rope_table
+        and args.runtime_kind == "pallas_feature_linear"
+        and args.complete_token_path
+        and args.split_residual_state
+    ):
+        raise ValueError(
+            "layer-0 attention-schedule discriminator requires the protected "
+            "table-on production path"
         )
     if args.observe_layer0_ingredients and not (
         args.prefill_index_repair
@@ -2955,10 +2980,17 @@ def main() -> int:
                 )
                 if args.observe_layer0_subshard_variants
                 else (
-                    "baseline_bf16",
-                    "attention_output_fp32",
-                    "dense_down_fp32",
-                    "attention_output_and_dense_down_fp32",
+                    (
+                        "attention_schedule_control",
+                        "replicated_monolithic_attention",
+                    )
+                    if args.observe_layer0_attention_schedule_variants
+                    else (
+                        "baseline_bf16",
+                        "attention_output_fp32",
+                        "dense_down_fp32",
+                        "attention_output_and_dense_down_fp32",
+                    )
                 )
             )
             observed_variant_names = tuple(
@@ -3007,6 +3039,7 @@ def main() -> int:
                     config=decoder.config,
                     groups=groups,
                     variant_name=variant_name,
+                    main_rope_table_enabled=args.main_rope_table,
                 )
                 layer0_residual_discriminator_hlo_contracts[
                     variant_name
@@ -3046,6 +3079,16 @@ def main() -> int:
                         layer0_residual_discriminator_hlo_contracts.values()
                     )
                 ),
+                "all_distinct_hlo_modules": (
+                    len(
+                        set(
+                            layer0_residual_discriminator_hlo_sha256.values()
+                        )
+                    )
+                    == len(expected_variant_names)
+                ),
+                # Retained for compatibility with the two completed four-arm
+                # diagnostic schemas. New consumers use the generic field.
                 "four_distinct_hlo_modules": (
                     len(
                         set(
@@ -3064,7 +3107,7 @@ def main() -> int:
                     "all_hlo_contracts_pass"
                 ]
                 and layer0_residual_discriminator_suite_contract[
-                    "four_distinct_hlo_modules"
+                    "all_distinct_hlo_modules"
                 ]
                 and layer0_residual_discriminator_suite_contract[
                     "program_count"
@@ -3281,10 +3324,17 @@ def main() -> int:
                 )
                 if args.observe_layer0_subshard_variants
                 else (
-                    "baseline_bf16",
-                    "attention_output_fp32",
-                    "dense_down_fp32",
-                    "attention_output_and_dense_down_fp32",
+                    (
+                        "attention_schedule_control",
+                        "replicated_monolithic_attention",
+                    )
+                    if args.observe_layer0_attention_schedule_variants
+                    else (
+                        "baseline_bf16",
+                        "attention_output_fp32",
+                        "dense_down_fp32",
+                        "attention_output_and_dense_down_fp32",
+                    )
                 )
             )
             comparisons: dict[str, dict[str, Any]] = {}
@@ -3300,8 +3350,14 @@ def main() -> int:
                     "greenfield-layer0-residual-discriminator-"
                     f"{variant_name}-execute-start"
                 )
+                discriminator_inputs = (*runtime_prefix, *tuple(output))
+                if args.main_rope_table:
+                    discriminator_inputs = (
+                        *discriminator_inputs,
+                        main_rope_table,
+                    )
                 discriminator_result = compiled_discriminator(
-                    *runtime_prefix, *tuple(output)
+                    *discriminator_inputs
                 )
                 discriminator_result[3].block_until_ready()
                 (
@@ -3417,7 +3473,9 @@ def main() -> int:
                     layer0_residual_discriminator_suite_contract
                 ),
                 "current_baseline_expected_sha256": (
-                    LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                    LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256
+                    if args.observe_layer0_attention_schedule_variants
+                    else LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
                 ),
                 "discriminator_kind": layer0_discriminator_kind,
                 "layer1_reference_sha256": (
@@ -3425,30 +3483,67 @@ def main() -> int:
                 ),
                 "reproduces_current_baseline": (
                     bool(
-                        comparisons["baseline_bf16"]["actual_sha256"]
-                        == LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                        comparisons[
+                            "attention_schedule_control"
+                            if args.observe_layer0_attention_schedule_variants
+                            else "baseline_bf16"
+                        ]["actual_sha256"]
+                        == (
+                            LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256
+                            if args.observe_layer0_attention_schedule_variants
+                            else LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                        )
                     )
-                    if args.observe_layer0_residual_variants
+                    if (
+                        args.observe_layer0_residual_variants
+                        or args.observe_layer0_attention_schedule_variants
+                    )
                     else None
                 ),
                 "sealed_independent_baseline": (
                     None
                     if args.observe_layer0_residual_variants
-                    else {
-                        "code_hash": (
-                            "12315aa1daccab67f7eaff709c291425a73b4006"
-                        ),
-                        "normalized_hidden_sha256": (
-                            LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
-                        ),
-                        "run_tag": (
-                            "greenfield_short_decoder_compile_pp8_8k_pallas_"
-                            "feature_linear_ot256_downf32_token_splitres_"
-                            "prefill_keyfix_queryexact_headkeyexact_"
-                            "scoredefault_oracle_dsa_layer0_residual_variants_"
-                            "trace2_20260810T221121969164909Z"
-                        ),
-                    }
+                    else (
+                        {
+                            "code_hash": (
+                                "b5ba20dd4768d62743494511df22f3cd5935bd46"
+                            ),
+                            "normalized_hidden_sha256": (
+                                LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256
+                            ),
+                            "observer_contract_sha256": (
+                                "7600e22f3682b8263a5a1771968331f04e1f6875f4cf01ad6b7ba74823063829"
+                            ),
+                            "observer_npz_sha256": (
+                                "96fe8d9bf0e8fa43a3f2ab92735854b8416f49a0082201515f6c720fd077af05"
+                            ),
+                            "run_tag": (
+                                "greenfield_short_decoder_compile_pp8_8k_"
+                                "pallas_feature_linear_ot256_downf32_token_"
+                                "splitres_prefill_keyfix_queryexact_"
+                                "headkeyexact_scoredefault_mainrope_oracle_"
+                                "dsa_dsa_internal_trace2_"
+                                "20260811T113139003786245Z"
+                            ),
+                        }
+                        if args.observe_layer0_attention_schedule_variants
+                        else {
+                            "code_hash": (
+                                "12315aa1daccab67f7eaff709c291425a73b4006"
+                            ),
+                            "normalized_hidden_sha256": (
+                                LAYER1_CURRENT_NORMALIZED_HIDDEN_SHA256
+                            ),
+                            "run_tag": (
+                                "greenfield_short_decoder_compile_pp8_8k_"
+                                "pallas_feature_linear_ot256_downf32_token_"
+                                "splitres_prefill_keyfix_queryexact_"
+                                "headkeyexact_scoredefault_oracle_dsa_"
+                                "layer0_residual_variants_trace2_"
+                                "20260810T221121969164909Z"
+                            ),
+                        }
+                    )
                 ),
                 "variant_comparisons": comparisons,
                 "variant_names": list(variant_names),

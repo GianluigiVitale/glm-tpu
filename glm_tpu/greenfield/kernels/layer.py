@@ -581,6 +581,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     virtual_tp32_reduction_association: (
         VirtualTp32ReductionAssociation | None
     ) = None,
+    replicated_monolithic_attention: bool = False,
     capture_ingredients: bool = False,
 ) -> StageLocalSplitLayerFp8Result | StageLocalSplitLayerFp8ObservedResult:
     """Execute one layer while preserving legacy hidden/residual association."""
@@ -593,6 +594,10 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer attention FP32 reconstruction flag must be boolean")
     if not isinstance(reconstruct_dense_down_fp32, bool):
         raise ValueError("layer dense FP32 reconstruction flag must be boolean")
+    if not isinstance(replicated_monolithic_attention, bool):
+        raise ValueError(
+            "layer replicated-monolithic attention flag must be boolean"
+        )
     if not isinstance(capture_ingredients, bool):
         raise ValueError("layer ingredient-capture flag must be boolean")
     if reconstruct_dense_down_fp32 and mlp_kind != "dense":
@@ -783,6 +788,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
         virtual_tp32_reduction_association=(
             virtual_tp32_reduction_association
         ),
+        replicated_monolithic_attention=replicated_monolithic_attention,
         capture_ingredients=capture_ingredients,
     )
     if capture_ingredients:

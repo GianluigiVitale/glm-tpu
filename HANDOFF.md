@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 10:01 UTC
+**Updated:** 2026-08-11 13:54 UTC
 
 ## Authority and isolation
 
@@ -17,7 +17,60 @@ Those tracked branch-local files are authoritative. Main checkout, old worktree,
 legacy `AGENTS.md`/`CLAUDE.md`/`HANDOFF.md` files have no authority here. The incremental TP32 plan
 and pipeline-parallelism ban are superseded. Never edit/delete the owner's untracked main files.
 
-## Current Gate-D integration batch
+## Current Gate-D exact status (supersedes older exact-next text below)
+
+- Gates A--C are complete. Gate D has one accepted 2K result, DB484, at `244.091151 ms/token` and
+  `4.096830 tok/s`; it does not pass Gate E. Complete 8K exactness remains open. DB484 is still the
+  only decoder performance result.
+- Main-RoPE integration, TPU-HLO strengthening and provenance fixes are committed/pushed at
+  `b5ba20dd4768d62743494511df22f3cd5935bd46`. The complete protected table-on 8K run at tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_trace2_`
+  `20260811T100352579850766Z` passed event 0 exactly but refused event 1 at layer 1: first set
+  divergence is offset 20, expected position 8,149 versus 8,083, with seven swaps each way. It has
+  no timing, DB row, `SUCCESS`, trace or Gate-D claim and ended with authenticated 8/8 cleanup.
+- Three fresh Fable-5-Max sessions (`5101637e...62da`, `b2250efa...9a3d`, `40be43db...e73330`) and
+  three fresh Opus-5-Max sessions (`538f340e...2dc6`, `cbf5bf84...c81a`, `9ae53601...2fe`) completed
+  independent read-only root-cause reviews. Direct verification accepts their consensus that the
+  table removes a common main-attention score offset but does not remove the layer-1 rank scatter.
+  It also proves the existing ingredients replay is not production-faithful downstream of the
+  cache rows: its `layer1_normalized` differs from the production table-off observer in
+  `1,035/6,144` values. Use only its cache fields as evidence.
+- The zero-code table-on production DSA-internal capture at pushed `b5ba20dd` is sealed under tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_dsa_internal_trace2_`
+  `20260811T113139003786245Z`. Its NPZ/contract/pre-census/failure-census SHAs are
+  `96fe8d9b...f05`, `7600e22f...b29`, `e3d6a952...244`, and `6b460d48...dfe`; all eight host logs
+  are identical (`1db883cf...65b`) and cleanup is 8/8. The true table-on layer-1 normalized hidden
+  SHA is `6c54c09a...bca`; versus accepted it differs in `3,984/6,144` values (max `0.00390625`,
+  mean `0.000147384`). Table-off differs in `3,960/6,144`; table-on versus table-off changes
+  `1,805/6,144`. Therefore main RoPE is a real corrected primitive but not the remaining causal
+  trunk error. Do not spend another run on RoPE or the four rejected combine-precision theories.
+- The evidence-selected next discriminator is two separately compiled table-on layer-0 programs:
+  an unchanged owner-split control and a replicated monolithic-attention challenger. The control
+  must reproduce `6c54c09a...bca` before the challenger is admissible. The challenger performs one
+  explicit LP4 full-cache gather and one 2,048-position sparse-attention schedule per owner; it
+  remains default-off and diagnostic-only. If it materially removes the 3,984-value boundary
+  mismatch, attention segmentation is causal. If it does not, reject that fork and test the
+  output-projection/reduction association next.
+- The two-arm batch is implemented. Fable session `4c23bb63-7401-4a45-b082-8743d7ea58b6` found
+  that TPU XLA rewrites the owner-split LSE gather to an unnamed `f32[256]` all-reduce and removes
+  the validity gather. Direct replay confirms 78/78 such rewrites in the preserved production HLO.
+  The fixed control contract pins the surviving scoped output gather and independently forbids a
+  four-dimensional BF16 full-cache gather by shape; the challenger requires exactly one scoped and
+  shape-detected cache gather. The runner now gates the intentional diagnostic exit on the exact
+  control SHA, both arm contracts and the HLO suite. The same session returned `APPROVE COMMIT`.
+  The explicit-CPU affected suite passes `76/76` in `214.65 s`; Python, Bash, ShellCheck and diff
+  checks pass. Exact next is commit/push, authenticate the fleet, and run exactly one protected
+  discriminator before any complete-decoder retry.
+- DB484 XPlane reanalysis proves only `0.727 ms/step` of non-permute local collective execution.
+  Pallas custom calls are `26.357 ms`, other active work `3.351 ms`, and collective-permute
+  start/done waiting is `205.195 ms` per core. Thus `8 x 30.435 = 243.5 ms` closes against the
+  `244.091 ms` wall: PP8 batch-one latency is a serial stage critical path, not an ICI-bandwidth
+  limit. The trace has no separate MXU-active or HBM-stall counters. After 8K exactness, optimize
+  active kernels and prioritize WS32 as the serious latency challenger; PP16 remains mandatory.
+
+## Historical main-RoPE integration batch
 
 - The default-off main-RoPE table integration is committed/pushed at
   `d66a4dfe7f88ddfa05f14fd8d6378528da125b03`; its archive-path correction is pushed at

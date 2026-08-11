@@ -7115,3 +7115,81 @@ unmotivated arithmetic variants.
   complete 8K run at the new pin. A pass must satisfy the full token/DSA/state/cache/HLO/HBM/wall/
   XPlane/DB/archive/cleanup contract; a sparse failure must be localized to the latent/cache or
   attention boundary, never another blind combine-tree retry.
+
+## 2026-08-11 10:03--12:21 — table-on 8K refusal and production-boundary capture
+
+- The reviewed HLO strengthening was committed/pushed at
+  `b5ba20dd4768d62743494511df22f3cd5935bd46`. One complete table-on protected 8K attempt reached
+  exact first-token execution and exact event 0, then refused event 1 at the layer-1 producer:
+  first divergent selection offset 20, expected position 8,149 versus 8,083, with seven set swaps
+  each way. The diagnostic has no timing, trace, DB row, terminal `SUCCESS`, Gate-D or performance
+  claim and ended with authenticated 8/8 cleanup.
+- At the owner's request, three fresh Fable-5-Max and three fresh Opus-5-Max read-only sessions
+  independently examined numerical propagation, HLO/wiring, legacy equivalence and discriminating
+  experiments. Their complete session IDs are `5101637e-0a22-4aab-b8de-6618ff9562da`,
+  `b2250efa-23e8-4676-a397-6ed909a3df31`, `40be43db-1bfa-4eb7-87ef-c44769e73330`,
+  `538f340e-6958-46e2-b60c-9872bae72dc6`, `cbf5bf84-8d01-41e6-8d32-4d237d1ac81a`, and
+  `9ae53601-fc55-42c6-837e-c54eb71bf2fe`. These were consultations, not duplicate code reviews.
+- Direct artifact comparison resolves their one important warning. The ingredient observer's
+  replayed `layer1_normalized` differs from the actual production table-off DSA-internal observer
+  in `1,035/6,144` BF16 values (max `0.001953125`, mean `0.0000332919`). Its downstream replay
+  tensors cannot adjudicate production arithmetic; only the cache rows it reads remain admissible.
+- A zero-code table-on production DSA-internal capture was therefore run under the existing
+  protected path. Tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
+  `prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_dsa_internal_trace2_`
+  `20260811T113139003786245Z` executed full load/compile/prefill and intentionally refused after the
+  observer. NPZ/contract/pre-census/failure-census SHAs are `96fe8d9bf0e8fa43a3f2ab92735854b8`
+  `416f49a0082201515f6c720fd077af05`, `7600e22f3682b8263a5a1771968331f04e1f6875f4cf01ad6b7ba74823063829`,
+  `e3d6a952e161bc95dce62bc33897bdd7bda11795533b791cee4277c9a104a244`, and
+  `6b460d489b2e736fd9f122a10f604400d675c4a835ef143f5382c30dacefcdfe`. All eight rank logs are
+  byte-identical with SHA `1db883cf9e90efa29ceb232a9edfd87e79464349b80727f3d4aa6905b85cc65b`.
+- The true table-on layer-1 normalized hidden SHA is
+  `6c54c09a773e622fef35e753dc99929a83b73d9d89157fd732a5ace903149bca`. It differs from accepted in
+  `3,984/6,144` values (max `0.00390625`, mean `0.00014738367`, RMS `0.000228802`), compared with
+  table-off's `3,960/6,144` (mean `0.00014559647`, RMS `0.000226730`). Table-on changes
+  `1,805/6,144` values versus table-off. Query mismatch also rises from 942 to 970 values, while
+  head weights and current key improve slightly. Main RoPE therefore removes a largely common
+  score offset but does not move the layer-0 trunk toward accepted. The remaining leading fork is
+  legacy monolithic sparse attention versus four owner-local BF16 partials plus FP32 LSE merge;
+  output-projection/reduction association follows only if that fork is rejected.
+- Exact next: implement two independently compiled table-on layer-0 arms using the existing
+  discriminator, cache layout and sparse-attention kernel. The owner-split control must reproduce
+  the sealed `6c54c09a...bca` production SHA. The challenger makes one explicit local full-cache
+  gather, reconstructs page-major `[pages,512,640]`, and runs one 2,048-position attention
+  schedule per active owner. Require exact selection, one live row, local-only groups, distinct
+  HLO, portable output bits and diagnostic-only failure behavior. Review the completed new diff
+  once, then commit/push and launch one protected discriminator; do not rerun the full decoder.
+
+## 2026-08-11 12:21--13:54 — attention-schedule discriminator approved; DB484 is a serial PP8 critical path
+
+- Two separately compiled, default-off layer-0 arms now reuse the production cache, sparse-attend,
+  value/output projection and discriminator machinery. The control preserves the owner-split
+  schedule; the challenger gathers one complete LP4 cache in page-major order and runs one
+  2,048-position attention schedule. Forced-four-CPU semantics reproduce the independent
+  monolithic reference exactly (`0.0` error), and the arms lower to distinct local-only HLO.
+- Fable session `4c23bb63-7401-4a45-b082-8743d7ea58b6` found one TPU-only blocker: the first
+  contract required all three named owner-split gathers, but preserved production HLO proves TPU
+  XLA rewrites all 78 LSE gathers into unnamed `f32[256]` all-reduces and eliminates the validity
+  gathers. Independent parser replay confirms 78 unnamed reductions and 78 sole reshape users to
+  `f32[4,1,64]`. The corrected contract requires the one surviving scoped BF16 output gather,
+  rejects any four-dimensional BF16 full-cache gather by shape in the control, and requires exactly
+  one scoped plus shape-detected cache gather in the challenger. A synthetic TPU-lowered control
+  passes, while a rogue unscoped cache gather fails.
+- The protected wrapper now validates top-level/arm/HLO-suite success, exact variant names, and the
+  exact sealed control SHA `6c54c09a...bca` before acknowledging the intentional diagnostic exit.
+  The same Fable session independently checked the fixes and returned `APPROVE COMMIT`. The
+  explicit-CPU affected suite passes `76/76` in `214.65 s`; Python compilation, Bash, ShellCheck
+  and diff checks pass.
+- DB484's accepted XPlane attributes `205.195 ms/core/step` to collective-permute start/done, but
+  only `0.727 ms` to all other collectives. Pallas custom calls take `26.357 ms` and all other
+  active categories `3.351 ms`; `8 x 30.435 = 243.5 ms` matches the protected `244.091 ms` wall.
+  Therefore the large permute category is predominantly stage synchronization while the other
+  seven PP8 stages perform required serial work, not 205 ms of ICI transfer. The trace contains no
+  separate MXU-active or HBM-stall counters. This validates local-collective removal but does not
+  prove PP8 has no headroom: after 8K exactness, active kernels are the fixed-plan target and WS32
+  is the main concurrency challenger; PP16 remains a mandatory measurement. Speculation remains
+  after the protected base decoder gates.
+- Exact next: independently recheck the final diff, commit/push, authenticate an idle fleet, then
+  run exactly one protected attention-schedule discriminator. Do not interpret that diagnostic as
+  performance evidence or expect it to alter the eight-stage schedule.

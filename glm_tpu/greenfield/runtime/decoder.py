@@ -74,10 +74,14 @@ LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS = (
     ("attention_output_and_dense_down_fp32", True, True),
 )
 Layer0ResidualDiscriminatorKind = Literal[
-    "combine_precision", "virtual_tp32"
+    "combine_precision", "virtual_tp32", "attention_schedule"
 ]
 LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS = (
     VIRTUAL_TP32_REDUCTION_ASSOCIATIONS
+)
+LAYER0_ATTENTION_SCHEDULE_DISCRIMINATOR_VARIANTS = (
+    "attention_schedule_control",
+    "replicated_monolithic_attention",
 )
 LAYER0_INGREDIENT_NAMES = (
     "selected_positions",
@@ -120,20 +124,29 @@ def _layer0_residual_discriminator_specs(
         bool,
         bool,
         VirtualTp32ReductionAssociation | None,
+        bool,
     ],
     ...,
 ]:
     if kind == "combine_precision":
         return tuple(
-            (name, attention_fp32, dense_fp32, None)
+            (name, attention_fp32, dense_fp32, None, False)
             for name, attention_fp32, dense_fp32 in (
                 LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS
             )
         )
     if kind == "virtual_tp32":
         return tuple(
-            (name, False, False, name)
+            (name, False, False, name, False)
             for name in LAYER0_VIRTUAL_TP32_DISCRIMINATOR_VARIANTS
+        )
+    if kind == "attention_schedule":
+        return tuple(
+            (name, False, False, None, monolithic)
+            for name, monolithic in (
+                ("attention_schedule_control", False),
+                ("replicated_monolithic_attention", True),
+            )
         )
     raise PlanValidationError(
         f"unknown layer-0 residual discriminator kind: {kind}"
@@ -2609,6 +2622,7 @@ def validate_layer0_residual_discriminator_hlo(
     config: DecoderStepConfig,
     groups: Sequence[Sequence[int]],
     variant_name: str,
+    main_rope_table_enabled: bool = False,
 ) -> dict[str, Any]:
     """Fail closed on one isolated layer-0 arithmetic probe arm.
 
@@ -2633,6 +2647,11 @@ def validate_layer0_residual_discriminator_hlo(
         attention_fp32 = False
         dense_fp32 = False
         virtual_association = variant_name
+    elif variant_name in LAYER0_ATTENTION_SCHEDULE_DISCRIMINATOR_VARIANTS:
+        discriminator_kind = "attention_schedule"
+        attention_fp32 = False
+        dense_fp32 = False
+        virtual_association = None
     else:
         raise PlanValidationError(
             f"unknown layer-0 discriminator variant: {variant_name}"
@@ -2660,6 +2679,53 @@ def validate_layer0_residual_discriminator_hlo(
         or item.maximum_group_size != config.local_parallel_size
     ]
     by_opcode = Counter(item.opcode for item in collectives)
+    monolithic_cache_gather_scope = (
+        "greenfield_replicated_monolithic_attention_cache_gather"
+    )
+
+    def in_named_scope(op_name: str | None, scope: str) -> bool:
+        return bool(op_name) and scope in op_name.split("/")
+
+    monolithic_cache_gathers = tuple(
+        item
+        for item in collectives
+        if in_named_scope(item.op_name, monolithic_cache_gather_scope)
+    )
+    monolithic_attention_scope = "greenfield_replicated_monolithic_attention"
+    monolithic_attention_scope_present = any(
+        in_named_scope(instruction.op_name, monolithic_attention_scope)
+        for instruction in module.instructions
+    )
+    owner_split_gather_scopes = (
+        "greenfield_owner_split_attention_output_gather",
+        "greenfield_owner_split_attention_lse_gather",
+        "greenfield_owner_split_attention_validity_gather",
+    )
+    owner_split_gathers = tuple(
+        item
+        for item in collectives
+        if any(
+            in_named_scope(item.op_name, scope)
+            for scope in owner_split_gather_scopes
+        )
+    )
+    owner_split_output_gathers = tuple(
+        item
+        for item in collectives
+        if in_named_scope(item.op_name, owner_split_gather_scopes[0])
+    )
+    cache_shaped_gathers = tuple(
+        item
+        for item in collectives
+        if item.opcode == "all-gather"
+        and any(
+            shape.dtype == "bf16"
+            and len(shape.dimensions) == 4
+            and shape.dimensions[0] == config.local_parallel_size
+            and shape.dimensions[-1] == config.packed_cache_width
+            for shape in item.result_shapes
+        )
+    )
     result_shapes = Counter(
         f"{shape.dtype}["
         + ",".join(str(value) for value in shape.dimensions)
@@ -2766,7 +2832,7 @@ def validate_layer0_residual_discriminator_hlo(
         )
         > 1
     )
-    if discriminator_kind == "combine_precision":
+    if discriminator_kind in {"combine_precision", "attention_schedule"}:
         expected_kernel_counts = {
             attention_bf16_name: int(not attention_fp32),
             attention_f32_name: int(attention_fp32),
@@ -2815,7 +2881,8 @@ def validate_layer0_residual_discriminator_hlo(
         )
     if escaped_collectives:
         violations.append("layer-0 discriminator escaped PP8 local groups")
-    if not 5 <= by_opcode.get("all-gather", 0) <= 20:
+    minimum_all_gathers = 3 if discriminator_kind == "attention_schedule" else 5
+    if not minimum_all_gathers <= by_opcode.get("all-gather", 0) <= 20:
         violations.append(
             "layer-0 discriminator DSA/attention gather count drifted: "
             f"{by_opcode.get('all-gather', 0)}"
@@ -2874,6 +2941,62 @@ def validate_layer0_residual_discriminator_hlo(
         violations.append(
             "layer-0 discriminator lost the scoped layer-1 normalization"
         )
+    expects_monolithic_attention = (
+        variant_name == "replicated_monolithic_attention"
+    )
+    if expects_monolithic_attention:
+        if not monolithic_attention_scope_present:
+            violations.append(
+                "layer-0 discriminator lost replicated monolithic attention"
+            )
+        if len(monolithic_cache_gathers) != 1:
+            violations.append(
+                "layer-0 discriminator must have exactly one scoped full-cache "
+                f"gather, found {len(monolithic_cache_gathers)}"
+            )
+        elif not any(
+            shape.dtype == "bf16"
+            and len(shape.dimensions) == 4
+            and shape.dimensions[0] == config.local_parallel_size
+            and shape.dimensions[-1] == config.packed_cache_width
+            for shape in monolithic_cache_gathers[0].result_shapes
+        ):
+            violations.append(
+                "layer-0 discriminator monolithic cache-gather shape drifted"
+            )
+        if len(cache_shaped_gathers) != 1:
+            violations.append(
+                "layer-0 monolithic challenger full-cache gather count drifted: "
+                f"{len(cache_shaped_gathers)}"
+            )
+        if owner_split_gathers:
+            violations.append(
+                "layer-0 monolithic challenger retained owner-split partial gathers"
+            )
+    elif monolithic_attention_scope_present or monolithic_cache_gathers:
+        violations.append(
+            "layer-0 control unexpectedly contains monolithic attention"
+        )
+    elif discriminator_kind == "attention_schedule":
+        # TPU SPMD rewrites the LSE all-gather to an unnamed f32[256]
+        # all-reduce and removes the validity gather.  The BF16 attention-output
+        # gather survives with its scope, so pin it and independently reject the
+        # distinctive four-dimensional full-cache gather used by the challenger.
+        if len(owner_split_output_gathers) != 1:
+            violations.append(
+                "layer-0 attention control lost its owner-split output gather"
+            )
+        if cache_shaped_gathers:
+            violations.append(
+                "layer-0 attention control contains a full-cache gather"
+            )
+    main_rope_table_contract = _validate_main_rope_table_hlo(
+        module,
+        config=config,
+        layers=1,
+        enabled=main_rope_table_enabled,
+    )
+    violations.extend(main_rope_table_contract["violations"])
     if host_markers:
         violations.append(
             f"layer-0 discriminator contains host execution: {host_markers}"
@@ -2884,6 +3007,26 @@ def validate_layer0_residual_discriminator_hlo(
         "escaped_collectives": escaped_collectives,
         "host_markers": host_markers,
         "kernel_counts": kernel_counts,
+        "main_rope_table_contract": main_rope_table_contract,
+        "main_rope_table_enabled": main_rope_table_enabled,
+        "monolithic_attention_scope_present": (
+            monolithic_attention_scope_present
+        ),
+        "monolithic_cache_gathers": [
+            _compact_collective_record(item)
+            for item in monolithic_cache_gathers
+        ],
+        "cache_shaped_gathers": [
+            _compact_collective_record(item)
+            for item in cache_shaped_gathers
+        ],
+        "owner_split_gathers": [
+            _compact_collective_record(item) for item in owner_split_gathers
+        ],
+        "owner_split_output_gathers": [
+            _compact_collective_record(item)
+            for item in owner_split_output_gathers
+        ],
         "expected_kernel_counts": expected_kernel_counts,
         "expected_fp32_local_combine_count": expected_fp32_combines,
         "expected_hidden_collective_shapes": (
@@ -3775,6 +3918,7 @@ def build_decoder_step_program(
     if layer0_residual_discriminator_kind not in (
         "combine_precision",
         "virtual_tp32",
+        "attention_schedule",
     ):
         raise PlanValidationError(
             "layer-0 residual discriminator kind is unknown"
@@ -3785,6 +3929,13 @@ def build_decoder_step_program(
     ):
         raise PlanValidationError(
             "non-default layer-0 discriminator kind requires its build flag"
+        )
+    if (
+        layer0_residual_discriminator_kind == "attention_schedule"
+        and not main_rope_table_enabled
+    ):
+        raise PlanValidationError(
+            "attention-schedule discriminator requires the proven main-RoPE table"
         )
     if not isinstance(split_residual_state, bool):
         raise PlanValidationError("split residual-state flag must be boolean")
@@ -3835,12 +3986,19 @@ def build_decoder_step_program(
             "layer-0 ingredient observer requires the proven complete split-token "
             "BF16 Pallas/DSA/fused-qkv path"
         )
-    if main_rope_table_enabled and (
-        build_layer0_residual_discriminator
-        or build_layer0_ingredients_observer
+    if main_rope_table_enabled and build_layer0_ingredients_observer:
+        raise PlanValidationError(
+            "main-RoPE table execution must remain isolated from layer-0 "
+            "ingredient diagnostics"
+        )
+    if (
+        main_rope_table_enabled
+        and build_layer0_residual_discriminator
+        and layer0_residual_discriminator_kind != "attention_schedule"
     ):
         raise PlanValidationError(
-            "main-RoPE table execution must remain isolated from layer-0 diagnostics"
+            "main-RoPE table execution admits only the isolated attention-"
+            "schedule discriminator"
         )
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
@@ -4957,6 +5115,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        local_main_rope_table: Any | None,
         *,
         variant_name: str,
         reconstruct_attention_output_fp32: bool,
@@ -4964,6 +5123,7 @@ def build_decoder_step_program(
         virtual_tp32_reduction_association: (
             VirtualTp32ReductionAssociation | None
         ),
+        replicated_monolithic_attention: bool,
     ) -> tuple[Any, Any, Any, Any, Any]:
         """Replay one isolated layer-0 arithmetic association."""
 
@@ -4974,6 +5134,30 @@ def build_decoder_step_program(
         kv_cache = local_kv_container[0]
         index_cache = local_index_container[0]
         metadata = local_metadata_container[0]
+        main_rope_table_row = None
+        if main_rope_table_enabled:
+            if (
+                local_main_rope_table is None
+                or local_main_rope_table.shape
+                != (config.context_capacity, geometry.qk_rope_head_dim)
+                or local_main_rope_table.dtype != jnp.bfloat16
+            ):
+                raise PlanValidationError(
+                    "layer-0 discriminator main-RoPE table is invalid"
+                )
+            safe_rope_position = jnp.clip(
+                position[0],
+                jnp.int32(0),
+                jnp.int32(config.context_capacity - 1),
+            )
+            with jax.named_scope("greenfield_main_rope_table_lookup"):
+                main_rope_table_row = local_main_rope_table[
+                    safe_rope_position
+                ]
+        elif local_main_rope_table is not None:
+            raise PlanValidationError(
+                "default layer-0 discriminator cannot consume a main-RoPE table"
+            )
 
         def weight(name: str) -> Any:
             return local_weights[name][0]
@@ -5051,6 +5235,7 @@ def build_decoder_step_program(
             virtual_tp32_reduction_association: (
                 VirtualTp32ReductionAssociation | None
             ),
+            replicated_monolithic_attention: bool,
         ) -> Any:
             stage = schedule.stages[0]
             layer = stage.layers[0]
@@ -5130,6 +5315,7 @@ def build_decoder_step_program(
                     else "highest"
                 ),
                 attention_projection_backend=attention_projection_backend,
+                main_rope_table_row=main_rope_table_row,
                 reconstruct_attention_output_fp32=(
                     reconstruct_attention_output_fp32
                 ),
@@ -5138,6 +5324,9 @@ def build_decoder_step_program(
                 ),
                 virtual_tp32_reduction_association=(
                     virtual_tp32_reduction_association
+                ),
+                replicated_monolithic_attention=(
+                    replicated_monolithic_attention
                 ),
             )
 
@@ -5149,6 +5338,7 @@ def build_decoder_step_program(
                 reconstruct_attention_output_fp32,
                 reconstruct_dense_down_fp32,
                 virtual_tp32_reduction_association,
+                replicated_monolithic_attention,
             )
             stage = schedule.stages[0]
             if len(stage.layers) < 2:
@@ -5198,6 +5388,7 @@ def build_decoder_step_program(
         virtual_tp32_reduction_association: (
             VirtualTp32ReductionAssociation | None
         ),
+        replicated_monolithic_attention: bool,
     ) -> Any:
         if dsa_query_exact_association:
             def mapped_exact_query(
@@ -5211,6 +5402,7 @@ def build_decoder_step_program(
                 position: Any,
                 block_tables: Any,
                 context_lengths: Any,
+                local_main_rope_table: Any | None = None,
             ) -> tuple[Any, Any, Any, Any, Any]:
                 return mapped_layer0_residual_discriminator_impl(
                     local_weights,
@@ -5223,6 +5415,7 @@ def build_decoder_step_program(
                     position,
                     block_tables,
                     context_lengths,
+                    local_main_rope_table,
                     variant_name=variant_name,
                     reconstruct_attention_output_fp32=(
                         reconstruct_attention_output_fp32
@@ -5232,6 +5425,9 @@ def build_decoder_step_program(
                     ),
                     virtual_tp32_reduction_association=(
                         virtual_tp32_reduction_association
+                    ),
+                    replicated_monolithic_attention=(
+                        replicated_monolithic_attention
                     ),
                 )
 
@@ -5250,6 +5446,7 @@ def build_decoder_step_program(
             position: Any,
             block_tables: Any,
             context_lengths: Any,
+            local_main_rope_table: Any | None = None,
         ) -> tuple[Any, Any, Any, Any, Any]:
             return mapped_layer0_residual_discriminator_impl(
                 local_weights,
@@ -5262,6 +5459,7 @@ def build_decoder_step_program(
                 position,
                 block_tables,
                 context_lengths,
+                local_main_rope_table,
                 variant_name=variant_name,
                 reconstruct_attention_output_fp32=(
                     reconstruct_attention_output_fp32
@@ -5269,6 +5467,9 @@ def build_decoder_step_program(
                 reconstruct_dense_down_fp32=reconstruct_dense_down_fp32,
                 virtual_tp32_reduction_association=(
                     virtual_tp32_reduction_association
+                ),
+                replicated_monolithic_attention=(
+                    replicated_monolithic_attention
                 ),
             )
 
@@ -5767,6 +5968,7 @@ def build_decoder_step_program(
                         reconstruct_attention_output_fp32,
                         reconstruct_dense_down_fp32,
                         virtual_tp32_reduction_association,
+                        replicated_monolithic_attention,
                     ),
                     mesh=mesh,
                     in_specs=input_specs,
@@ -5785,6 +5987,7 @@ def build_decoder_step_program(
                 reconstruct_attention_output_fp32,
                 reconstruct_dense_down_fp32,
                 virtual_tp32_reduction_association,
+                replicated_monolithic_attention,
             ) in _layer0_residual_discriminator_specs(
                 layer0_residual_discriminator_kind
             )

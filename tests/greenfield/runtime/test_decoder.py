@@ -765,6 +765,133 @@ ENTRY %main () -> (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) 
 '''
 
 
+def _layer0_attention_schedule_discriminator_hlo(
+    variant_name: str,
+    *,
+    tpu_rewritten_control: bool = False,
+) -> str:
+    if variant_name not in {
+        "attention_schedule_control",
+        "replicated_monolithic_attention",
+    }:
+        raise ValueError("unknown attention-schedule test variant")
+    monolithic = variant_name == "replicated_monolithic_attention"
+    if monolithic and tpu_rewritten_control:
+        raise ValueError("TPU owner-split rewrite applies only to the control")
+    replica_groups = (
+        "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
+        "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
+    )
+    generic_gathers = "\n".join(
+        f"  %ag.{index} = s32[4,1] all-gather(%s), dimensions={{0}}, "
+        f"replica_groups={replica_groups}, channel_id={index + 1}, "
+        "use_global_device_ids=true"
+        for index in range(2)
+    )
+    if monolithic:
+        attention_gathers = (
+            "  %cache = bf16[24,64,192] constant({0})\n"
+            "  %cache.ag = bf16[4,24,64,192] all-gather(%cache), "
+            f"dimensions={{0}}, replica_groups={replica_groups}, "
+            "channel_id=3, use_global_device_ids=true, "
+            "metadata={op_name=\"jit(probe)/"
+            "greenfield_replicated_monolithic_attention_cache_gather/"
+            "all_gather\"}\n"
+            "  %attention.schedule = bf16[1,128,512] constant({0}), "
+            "metadata={op_name=\"jit(probe)/"
+            "greenfield_replicated_monolithic_attention/output\"}"
+        )
+    elif tpu_rewritten_control:
+        attention_gathers = (
+            "  %partial.output = bf16[1,128,512] constant({0})\n"
+            "  %partial.output.ag = bf16[4,1,128,512] "
+            "all-gather(%partial.output), dimensions={0}, "
+            f"replica_groups={replica_groups}, channel_id=3, "
+            "use_global_device_ids=true, metadata={op_name=\"jit(probe)/"
+            "greenfield_owner_split_attention_output_gather/all_gather\"}\n"
+            "  %partial.lse = f32[256] constant({0})\n"
+            "  %partial.lse.ar = f32[256] all-reduce(%partial.lse), "
+            f"replica_groups={replica_groups}, channel_id=4, "
+            "use_global_device_ids=true, to_apply=%add_f32\n"
+            "  %partial.lse.reshape = f32[4,1,64] "
+            "reshape(%partial.lse.ar), metadata={op_name=\"jit(probe)/"
+            "shard_map/cond/branch_1_fun/all_gather\"}"
+        )
+    else:
+        scoped_shapes = (
+            ("bf16[4,1,128,512]", "greenfield_owner_split_attention_output_gather"),
+            ("f32[4,1,128]", "greenfield_owner_split_attention_lse_gather"),
+            ("pred[4,1]", "greenfield_owner_split_attention_validity_gather"),
+        )
+        local_shapes = ("bf16[1,128,512]", "f32[1,128]", "pred[1]")
+        attention_gathers = "\n".join(
+            f"  %partial.{index} = {local_shapes[index]} constant({{0}})\n"
+            f"  %partial.ag.{index} = {shape} all-gather(%partial.{index}), "
+            f"dimensions={{0}}, replica_groups={replica_groups}, "
+            f"channel_id={index + 3}, use_global_device_ids=true, "
+            f'metadata={{op_name="jit(probe)/{scope}/all_gather"}}'
+            for index, (shape, scope) in enumerate(scoped_shapes)
+        )
+    reductions = "\n".join(
+        f"  %ar.{index} = bf16[1,6144] all-reduce(%b), "
+        f"replica_groups={replica_groups}, channel_id={index + 11}, "
+        "use_global_device_ids=true, to_apply=%add"
+        for index in range(3)
+    )
+    main_rope_scope = "jit(probe)/shard_map/greenfield_main_rope_table"
+    multiplies = "\n".join(
+        f"  %rope.mul.{index} = f32[1,32] multiply(%f32, %f32), "
+        f'metadata={{op_name="{main_rope_scope}/mul.{index}"}}'
+        for index in range(8)
+    )
+    combines = "\n".join(
+        f"  %rope.add.{index} = f32[1,32] add(%rope.mul.{2 * index}, "
+        f"%rope.mul.{2 * index + 1}), "
+        f'metadata={{op_name="{main_rope_scope}/add.{index}"}}'
+        for index in range(4)
+    )
+    rounds = "\n".join(
+        f"  %rope.round.{index} = bf16[1,32] convert(%rope.add.{index}), "
+        f'metadata={{op_name="{main_rope_scope}/round.{index}"}}'
+        for index in range(2)
+    )
+    return f'''HloModule layer0_{variant_name}, replica_count=1, num_partitions=32
+
+%add (x: bf16[], y: bf16[]) -> bf16[] {{
+  %x = bf16[] parameter(0)
+  %y = bf16[] parameter(1)
+  ROOT %sum = bf16[] add(%x, %y)
+}}
+
+%add_f32 (x: f32[], y: f32[]) -> f32[] {{
+  %x = f32[] parameter(0)
+  %y = f32[] parameter(1)
+  ROOT %sum = f32[] add(%x, %y)
+}}
+
+ENTRY %main (main_rope_table: bf16[8192,64]) -> (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) {{
+  %main_rope_table = bf16[8192,64] parameter(0), metadata={{op_name="main_rope_table"}}
+  %s = s32[1] constant({{0}})
+  %positions = s32[1,2048] constant({{0}})
+  %scores = f32[1,2048] constant({{0}})
+  %count = s32[1,1] constant({{0}})
+  %valid = pred[1,1] constant({{true}})
+  %f32 = f32[1,32] constant({{0}})
+  %b = bf16[1,6144] constant({{0}})
+{multiplies}
+{combines}
+{rounds}
+{generic_gathers}
+{attention_gathers}
+{reductions}
+  %attention = bf16[1,6144] custom-call(%b), custom_call_target="tpu_custom_call", backend_config="greenfield_fp8_block_matmul_m8_k4096_n6144"
+  %dense = bf16[1,6144] custom-call(%b), custom_call_target="tpu_custom_call", backend_config="greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144"
+  %normalized = bf16[1,6144] constant({{0}}), metadata={{op_name="jit(probe)/greenfield_layer1_input_norm_{variant_name}/mul"}}
+  ROOT %result = (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) tuple(%positions, %scores, %count, %normalized, %valid)
+}}
+'''
+
+
 def _layer0_virtual_tp32_discriminator_hlo(variant_name: str) -> str:
     variants = {
         "dcp_then_model_sequential_bf16",
@@ -1018,6 +1145,129 @@ def test_layer0_residual_discriminator_hlo_pins_isolated_arms() -> None:
         )
 
 
+def test_layer0_attention_schedule_hlo_pins_control_and_challenger() -> None:
+    from glm_tpu.greenfield.runtime import (
+        validate_layer0_residual_discriminator_hlo,
+    )
+
+    groups = tuple(
+        tuple(stage * 4 + slot for slot in range(4))
+        for stage in range(8)
+    )
+    replica_groups = "{" + ",".join(
+        "{" + ",".join(str(rank) for rank in group) + "}"
+        for group in groups
+    ) + "}"
+    config = _real_8k_decoder_config(dsa_score_default_precision=True)
+    contracts = {}
+    for variant_name in (
+        "attention_schedule_control",
+        "replicated_monolithic_attention",
+    ):
+        hlo = _layer0_attention_schedule_discriminator_hlo(variant_name)
+        contracts[variant_name] = validate_layer0_residual_discriminator_hlo(
+            hlo,
+            config=config,
+            groups=groups,
+            variant_name=variant_name,
+            main_rope_table_enabled=True,
+        )
+        assert contracts[variant_name]["passed"], contracts[variant_name]
+        assert contracts[variant_name]["main_rope_table_contract"]["passed"]
+
+    control = contracts["attention_schedule_control"]
+    challenger = contracts["replicated_monolithic_attention"]
+    assert len(control["owner_split_gathers"]) == 3
+    assert len(control["owner_split_output_gathers"]) == 1
+    assert not control["monolithic_cache_gathers"]
+    assert not control["cache_shaped_gathers"]
+    assert not control["monolithic_attention_scope_present"]
+    assert not challenger["owner_split_gathers"]
+    assert len(challenger["monolithic_cache_gathers"]) == 1
+    assert len(challenger["cache_shaped_gathers"]) == 1
+    assert challenger["monolithic_attention_scope_present"]
+
+    tpu_control_hlo = _layer0_attention_schedule_discriminator_hlo(
+        "attention_schedule_control",
+        tpu_rewritten_control=True,
+    )
+    tpu_control = validate_layer0_residual_discriminator_hlo(
+        tpu_control_hlo,
+        config=config,
+        groups=groups,
+        variant_name="attention_schedule_control",
+        main_rope_table_enabled=True,
+    )
+    assert tpu_control["passed"], tpu_control
+    assert len(tpu_control["owner_split_gathers"]) == 1
+    assert len(tpu_control["owner_split_output_gathers"]) == 1
+    assert not tpu_control["cache_shaped_gathers"]
+
+    rogue_cache_hlo = tpu_control_hlo.replace(
+        "  %normalized =",
+        "  %rogue.cache = bf16[24,64,192] constant({0})\n"
+        "  %rogue.cache.ag = bf16[4,24,64,192] "
+        "all-gather(%rogue.cache), dimensions={0}, "
+        f"replica_groups={replica_groups}, channel_id=99, "
+        "use_global_device_ids=true\n"
+        "  %normalized =",
+        1,
+    )
+    rogue_cache = validate_layer0_residual_discriminator_hlo(
+        rogue_cache_hlo,
+        config=config,
+        groups=groups,
+        variant_name="attention_schedule_control",
+        main_rope_table_enabled=True,
+    )
+    assert not rogue_cache["passed"]
+    assert len(rogue_cache["cache_shaped_gathers"]) == 1
+    assert "layer-0 attention control contains a full-cache gather" in (
+        rogue_cache["violations"]
+    )
+
+    challenger_hlo = _layer0_attention_schedule_discriminator_hlo(
+        "replicated_monolithic_attention"
+    )
+    missing_cache = validate_layer0_residual_discriminator_hlo(
+        challenger_hlo.replace(
+            "greenfield_replicated_monolithic_attention_cache_gather",
+            "missing_monolithic_cache_scope",
+        ),
+        config=config,
+        groups=groups,
+        variant_name="replicated_monolithic_attention",
+        main_rope_table_enabled=True,
+    )
+    assert not missing_cache["passed"]
+    assert not missing_cache["monolithic_cache_gathers"]
+
+    escaped = validate_layer0_residual_discriminator_hlo(
+        challenger_hlo.replace("{0,1,2,3}", "{0,1,2,4}"),
+        config=config,
+        groups=groups,
+        variant_name="replicated_monolithic_attention",
+        main_rope_table_enabled=True,
+    )
+    assert not escaped["passed"]
+    assert escaped["escaped_collectives"]
+
+    contaminated_control = validate_layer0_residual_discriminator_hlo(
+        _layer0_attention_schedule_discriminator_hlo(
+            "attention_schedule_control"
+        ).replace(
+            "greenfield_owner_split_attention_output_gather",
+            "greenfield_replicated_monolithic_attention",
+        ),
+        config=config,
+        groups=groups,
+        variant_name="attention_schedule_control",
+        main_rope_table_enabled=True,
+    )
+    assert not contaminated_control["passed"]
+    assert contaminated_control["monolithic_attention_scope_present"]
+
+
 def test_layer0_ingredients_hlo_pins_primitive_capture() -> None:
     from glm_tpu.greenfield.runtime import (
         validate_layer0_ingredients_observer_hlo,
@@ -1205,6 +1455,20 @@ virtual_decoder = build_decoder_step_program(
     layer0_residual_discriminator_kind="virtual_tp32",
 )
 assert len(virtual_decoder.layer0_residual_discriminators) == 4
+attention_decoder = build_decoder_step_program(
+    plan,
+    schedule,
+    state,
+    weight_layout,
+    groups,
+    pairs,
+    complete_token_path=True,
+    split_residual_state=True,
+    main_rope_table_enabled=True,
+    build_layer0_residual_discriminator=True,
+    layer0_residual_discriminator_kind="attention_schedule",
+)
+assert len(attention_decoder.layer0_residual_discriminators) == 2
 
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -1265,6 +1529,14 @@ wk_owners = tuple(
     for slot in range(exact_decoder.config.maximum_full_indexer_slots)
 )
 exact_inputs = (weights, (query_aliases, wk_owners), *inputs[1:])
+attention_inputs = (
+    *inputs,
+    abstract(
+        (state.context_capacity, geometry.qk_rope_head_dim),
+        ml_dtypes.bfloat16,
+        attention_decoder.input_specs[-1],
+    ),
+)
 stablehlos = {
     name: jax.jit(discriminator).lower(*inputs).as_text()
     for name, discriminator in decoder.layer0_residual_discriminators
@@ -1272,6 +1544,10 @@ stablehlos = {
 exact_stablehlos = {
     name: jax.jit(discriminator).lower(*exact_inputs).as_text()
     for name, discriminator in exact_decoder.layer0_residual_discriminators
+}
+attention_stablehlos = {
+    name: jax.jit(discriminator).lower(*attention_inputs).as_text()
+    for name, discriminator in attention_decoder.layer0_residual_discriminators
 }
 print(json.dumps({
     "all_reduce_counts": {
@@ -1285,6 +1561,16 @@ print(json.dumps({
         for name, stablehlo in exact_stablehlos.items()
     },
     "exact_variant_names": list(exact_stablehlos),
+    "attention_discriminator_kind": (
+        attention_decoder.layer0_residual_discriminator_kind
+    ),
+    "attention_distinct_stablehlo": len(set(attention_stablehlos.values())),
+    "attention_main_rope_input": len(attention_decoder.input_specs) == 10,
+    "attention_variant_names": list(attention_stablehlos),
+    "attention_all_gather_counts": {
+        name: stablehlo.count("stablehlo.all_gather")
+        for name, stablehlo in attention_stablehlos.items()
+    },
     "virtual_discriminator_kind": (
         virtual_decoder.layer0_residual_discriminator_kind
     ),
@@ -1329,6 +1615,22 @@ print(json.dumps({
     assert result["distinct_stablehlo"] == 4
     assert result["exact_distinct_stablehlo"] == 4
     assert result["exact_variant_names"] == result["variant_names"]
+    assert result["attention_discriminator_kind"] == "attention_schedule"
+    assert result["attention_distinct_stablehlo"] == 2
+    assert result["attention_main_rope_input"]
+    assert result["attention_variant_names"] == [
+        "attention_schedule_control",
+        "replicated_monolithic_attention",
+    ]
+    assert (
+        result["attention_all_gather_counts"][
+            "replicated_monolithic_attention"
+        ]
+        == result["attention_all_gather_counts"][
+            "attention_schedule_control"
+        ]
+        - 2
+    )
     assert result["virtual_discriminator_kind"] == "virtual_tp32"
     assert result["virtual_variant_names"] == [
         "dcp_then_model_sequential_bf16",
@@ -2475,7 +2777,7 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             build_layer0_residual_discriminator=True,
         )
-    with pytest.raises(PlanValidationError, match="isolated from layer-0"):
+    with pytest.raises(PlanValidationError, match="admits only"):
         build_decoder_step_program(
             source_plan,
             source_schedule,
@@ -2487,6 +2789,19 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             split_residual_state=True,
             build_layer0_residual_discriminator=True,
             main_rope_table_enabled=True,
+        )
+    with pytest.raises(PlanValidationError, match="requires the proven main-RoPE"):
+        build_decoder_step_program(
+            source_plan,
+            source_schedule,
+            source_state,
+            source_layout,
+            groups,
+            pairs,
+            complete_token_path=True,
+            split_residual_state=True,
+            build_layer0_residual_discriminator=True,
+            layer0_residual_discriminator_kind="attention_schedule",
         )
     with pytest.raises(PlanValidationError, match="proven complete split-token"):
         build_decoder_step_program(

@@ -1009,6 +1009,7 @@ def stage_local_index_share_fp8_mapped(
     virtual_tp32_reduction_association: (
         VirtualTp32ReductionAssociation | None
     ) = None,
+    replicated_monolithic_attention: bool = False,
     capture_ingredients: bool = False,
 ) -> StageLocalIndexShareFp8Result | StageLocalIndexShareFp8ObservedResult:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
@@ -1028,6 +1029,10 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare residual-add flag must be boolean")
     if not isinstance(reconstruct_output_fp32, bool):
         raise ValueError("IndexShare FP32 output reconstruction flag must be boolean")
+    if not isinstance(replicated_monolithic_attention, bool):
+        raise ValueError(
+            "IndexShare replicated-monolithic attention flag must be boolean"
+        )
     if not isinstance(capture_ingredients, bool):
         raise ValueError("IndexShare ingredient-capture flag must be boolean")
     if main_rope_table_row is not None and (
@@ -1045,6 +1050,11 @@ def stage_local_index_share_fp8_mapped(
     ):
         raise ValueError(
             "IndexShare virtual TP32 association requires the BF16 Pallas path"
+        )
+    if replicated_monolithic_attention and capture_ingredients:
+        raise ValueError(
+            "replicated-monolithic attention must remain isolated from "
+            "ingredient capture"
         )
     if capture_ingredients and (
         reconstruct_output_fp32
@@ -1309,44 +1319,87 @@ def stage_local_index_share_fp8_mapped(
     )
     q_absorbed = full_query[..., : contract.kv_lora_rank]
     full_q_rope = full_query[..., contract.kv_lora_rank :]
-    partial = stage_local_sparse_mla_kernel(
-        q_absorbed,
-        full_q_rope,
-        cache,
-        block_tables,
-        selected,
-        context_lengths,
-        layout=cache_layout,
-        owner_index=local_slot,
-        contract=contract,
-        backend=sparse_attention_backend,
-        config=sparse_attention_config,
-        interpret=sparse_attention_interpret,
-    )
-    gathered_outputs = lax.all_gather(
-        partial.output,
-        axis_name=axis_name,
-        axis=0,
-        tiled=False,
-        axis_index_groups=groups,
-    )
-    gathered_lse = lax.all_gather(
-        partial.logsumexp,
-        axis_name=axis_name,
-        axis=0,
-        tiled=False,
-        axis_index_groups=groups,
-    )
-    gathered_validity = lax.all_gather(
-        partial.contract_valid,
-        axis_name=axis_name,
-        axis=0,
-        tiled=False,
-        axis_index_groups=groups,
-    )
-    combined: SparseAttentionResult = combine_stage_local_attention(
-        gathered_outputs, gathered_lse, gathered_validity
-    )
+    if replicated_monolithic_attention:
+        with jax.named_scope(
+            "greenfield_replicated_monolithic_attention_cache_gather"
+        ):
+            gathered_cache = lax.all_gather(
+                cache,
+                axis_name=axis_name,
+                axis=0,
+                tiled=False,
+                axis_index_groups=groups,
+            )
+        monolithic_cache = jnp.transpose(
+            gathered_cache, (1, 0, 2, 3)
+        ).reshape(
+            cache.shape[0],
+            cache_layout.logical_page_size,
+            cache_layout.packed_cache_width,
+        )
+        monolithic_layout = StageLocalKvLayout(
+            logical_page_size=cache_layout.logical_page_size,
+            local_parallel_size=1,
+            packed_cache_width=cache_layout.packed_cache_width,
+        )
+        with jax.named_scope("greenfield_replicated_monolithic_attention"):
+            combined = stage_local_sparse_mla_kernel(
+                q_absorbed,
+                full_q_rope,
+                monolithic_cache,
+                block_tables,
+                selected,
+                context_lengths,
+                layout=monolithic_layout,
+                owner_index=jnp.int32(0),
+                contract=contract,
+                backend=sparse_attention_backend,
+                config=sparse_attention_config,
+                interpret=sparse_attention_interpret,
+            )
+        partial = combined
+    else:
+        partial = stage_local_sparse_mla_kernel(
+            q_absorbed,
+            full_q_rope,
+            cache,
+            block_tables,
+            selected,
+            context_lengths,
+            layout=cache_layout,
+            owner_index=local_slot,
+            contract=contract,
+            backend=sparse_attention_backend,
+            config=sparse_attention_config,
+            interpret=sparse_attention_interpret,
+        )
+        with jax.named_scope("greenfield_owner_split_attention_output_gather"):
+            gathered_outputs = lax.all_gather(
+                partial.output,
+                axis_name=axis_name,
+                axis=0,
+                tiled=False,
+                axis_index_groups=groups,
+            )
+        with jax.named_scope("greenfield_owner_split_attention_lse_gather"):
+            gathered_lse = lax.all_gather(
+                partial.logsumexp,
+                axis_name=axis_name,
+                axis=0,
+                tiled=False,
+                axis_index_groups=groups,
+            )
+        with jax.named_scope("greenfield_owner_split_attention_validity_gather"):
+            gathered_validity = lax.all_gather(
+                partial.contract_valid,
+                axis_name=axis_name,
+                axis=0,
+                tiled=False,
+                axis_index_groups=groups,
+            )
+        combined = combine_stage_local_attention(
+            gathered_outputs, gathered_lse, gathered_validity
+        )
     attended_local = lax.dynamic_slice_in_dim(
         combined.output,
         local_slot.astype(jnp.int32) * jnp.int32(local_heads),

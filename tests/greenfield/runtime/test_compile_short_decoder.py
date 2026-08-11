@@ -257,10 +257,12 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     )
     assert '"--observe-layer0-residual-variants"' in compiler
     assert '"--observe-layer0-subshard-variants"' in compiler
+    assert '"--observe-layer0-attention-schedule-variants"' in compiler
     assert "build_layer0_residual_discriminator" in compiler
     assert "validate_layer0_residual_discriminator_hlo" in compiler
     assert "decoder.layer0_residual_discriminators" in compiler
     assert '"four_distinct_hlo_modules"' in compiler
+    assert '"all_distinct_hlo_modules"' in compiler
     assert '"hlo_suite_contract"' in compiler
     assert "for variant_name, compiled_discriminator in" in compiler
     assert "*runtime_prefix, *tuple(output)" in compiler
@@ -273,8 +275,13 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
         "readonly LAYER0_SUBSHARD_VARIANTS="
         "${GLM_GREENFIELD_LAYER0_SUBSHARD_VARIANTS:-0}" in runner
     )
+    assert (
+        "readonly LAYER0_ATTENTION_VARIANTS="
+        "${GLM_GREENFIELD_LAYER0_ATTENTION_VARIANTS:-0}" in runner
+    )
     assert '--observe-layer0-residual-variants 1' in runner
     assert '--observe-layer0-subshard-variants 1' in runner
+    assert '--observe-layer0-attention-schedule-variants 1' in runner
     assert "layer-0 discriminator requires the complete exact recurrent" in runner
     assert "ISOLATED_RESIDUAL_PREREQUISITE_TAG" in runner
     assert "isolated residual direct remote contract hash drifted" in runner
@@ -382,7 +389,7 @@ def test_main_rope_table_is_default_off_and_db531_protected() -> None:
     assert '--main-rope-table "$main_rope_table"' in runner
     assert "main-RoPE table requires the protected 8K" in runner
     assert "main-RoPE table requires the exact repaired recurrent DSA chain" in runner
-    assert "main-RoPE table must remain isolated from layer-0 diagnostics" in runner
+    assert "main-RoPE table admits only the isolated attention" in runner
     assert "greenfield_layer0_main_rope_20260811T072231959104598Z" in runner
     assert (
         "$APPROVED_BUCKET/oracles/greenfield/glm52/"
@@ -395,6 +402,32 @@ def test_main_rope_table_is_default_off_and_db531_protected() -> None:
     assert 'contract["fp32_combine_count"] < 78 * 4' in runner
     assert 'contract["final_round_count"] < 78 * 2' in runner
     assert "_mainrope" in runner
+
+
+def test_layer0_attention_schedule_discriminator_is_sealed_and_default_off() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert "LAYER1_MAIN_ROPE_NORMALIZED_HIDDEN_SHA256" in compiler
+    assert '"attention_schedule_control"' in compiler
+    assert '"replicated_monolithic_attention"' in compiler
+    assert '"discriminator_kind": layer0_discriminator_kind' in compiler
+    assert "96fe8d9bf0e8fa43a3f2ab92735854b8" in compiler
+    assert "7600e22f3682b8263a5a1771968331f0" in compiler
+    assert "LAYER0_ATTENTION_VARIANTS:-0" in runner
+    assert "layer-0 attention variants require the table-on" in runner
+    assert "ATTENTION_SCHEDULE_PREREQUISITE_TAG" in runner
+    assert "20260811T113139003786245Z" in runner
+    assert "table-on production-boundary direct remote contract hash drifted" in runner
+    assert "table-on production-boundary direct remote NPZ hash drifted" in runner
+    assert "attention-schedule diagnostic contract is missing" in runner
+    assert "attention-schedule diagnostic contract failed" in runner
+    assert "ATTENTION_SCHEDULE_DIAGNOSTIC_CONTRACT_OK" in runner
+    assert (
+        "attention-schedule diagnostic contract passed; preserving "
+        "intentional diagnostic exit" in runner
+    )
+    assert "_layer0_attention_schedule_variants" in runner
 
 
 @pytest.mark.parametrize(
