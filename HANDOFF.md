@@ -3618,3 +3618,25 @@ retains 18 mismatches. This is readiness only. Exact next: complete affected tes
 obtain one new-diff-only Fable approval, independently verify, commit/push, then run the seconds-
 scale protected TPU target. Only an exact protected result authorizes a separate plan-aware
 device-resident table/runtime-integration batch; no complete 8K retry is authorized first.
+
+## DB531 proves the main-RoPE mechanism on TPU
+
+Protected DB531/item1816,
+`greenfield_layer0_main_rope_20260811T072231959104598Z`, ran at pin
+`ed7c74f423e811f1acfbeb3c075fb8fad37d4f51`. The sealed DB503 pre-RoPE row plus the accepted
+position-8,155 BF16 table row and FP32-final-round primitive reproduces DB530's legacy 64-wide
+suffix bitwise: `0/64` mismatches and SHA `e7c217ec...3281`. The captured production control
+remains `18/64` nonexact. Runner/tensor/SUCCESS SHAs are `d32d0357...7370`,
+`52d2a36e...4145`, and `8f9763e4...b6d7`.
+
+Real TPU HLO SHA `c611c74d...f623` retains four FP32 multiplies and two FP32 combines. TPU lowers
+the one logical final round as two matching `f32[1,32] -> bf16[1,32]` conversions; there is no BF16
+rotary arithmetic, trig, callback or collective, and the exact entry widths are `64/32/32`.
+The archive, DB snapshot, object generations/CRC32C and authenticated pre/post censuses pass with
+8/8 clean hosts. This remains a bounded correctness diagnostic: no complete cache, decoder,
+latency, XPlane, Gate-D or throughput claim follows.
+
+Exact next: build a plan-aware device-resident BF16 main-RoPE table from the accepted formula and
+thread `apply_rotary_fp32_final_round` through main MLA only behind a default-off plan flag. Keep
+DSA rotary unchanged. After reference/exactness/table-integrity/HLO tests and one new-diff-only
+Fable audit, run the protected 8K Gate-D retry; do not add another primitive discriminator first.

@@ -1246,3 +1246,11 @@ run530/item1815, exact 8K token/DSA/cache protections, archive integrity and 8/8
 localizes the first mismatch to layer-0 main-RoPE. The planned current-row TPU probe likewise has
 no warmup distribution, XPlane or decoder loop. DB484 remains the only accepted PP8 performance
 point at `244.091151 ms/token` and `4.096830 tok/s`; protected 8K Gate D and Gate E remain open.
+
+## DB531 main-RoPE mechanism — no performance result
+
+DB531/item1816 is a five-second bounded arithmetic/HLO diagnostic on one four-chip host. It proves
+the accepted table row plus FP32-final-round mechanism is bitwise exact for the current 64-wide
+main-RoPE suffix and seals DB/archive/cleanup evidence. It has no warmed decode distribution,
+XPlane, complete cache or token loop, so five-second orchestration is not latency or throughput.
+DB484 remains the only accepted PP8 performance point; protected 8K Gate D and Gate E stay open.

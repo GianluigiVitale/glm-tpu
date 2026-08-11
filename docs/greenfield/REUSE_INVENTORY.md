@@ -499,3 +499,10 @@ companion for the current pre-RoPE row; do not add another producer observer. Th
 successor is only the accepted-table/FP32-products/one-final-BF16-round primitive inside the
 existing association probe. A full device table and decoder threading are reserved until that
 primitive is exact on TPU; DSA rotary and rejected combine/tree candidates remain untouched.
+
+DB531 now closes that reservation. Its protected real-TPU candidate is exact `0/64` against the
+legacy suffix while the production control remains `18/64`; HLO proves four FP32 products, two
+FP32 combines and two TPU-split final 32-lane rounds without trig, callback or collective. Reuse
+the accepted formula, DB531 row/table hash, reference primitive, DB503/DB530 source pins and the
+existing plan/runtime interfaces to build one device-resident main-RoPE table. Do not add another
+observer, recompute dynamic trig in the layer, alter DSA rotary or import legacy execution.

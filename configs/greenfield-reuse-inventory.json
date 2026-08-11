@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_utc": "2026-08-10T19:54:00Z",
+  "captured_utc": "2026-08-11T07:23:04Z",
   "policy": {
     "adapted": "Semantics or an interface are independently implemented inside greenfield and protected by greenfield tests/evidence.",
     "direct_reuse": "A non-model utility in glm-tpu is called directly and remains outside the greenfield model execution graph.",
@@ -9,7 +9,7 @@
     "research_candidate": "Pinned source for a future default-off isolated challenger; no performance or correctness claim yet."
   },
   "source_pins": {
-    "greenfield": "fab59c396d9135a649a38b58916adbf9a3ae1ca2",
+    "greenfield": "ed7c74f423e811f1acfbeb3c075fb8fad37d4f51",
     "glm_tpu_main": "a4a17ac4e90b15f1994bd8b26917ef62daa52660",
     "legacy_oracle": "b3c25df47ac98783912dc658878181ec0a8ae16d",
     "moe_tpu": "4d3f31b0fc2481886af21fe126999eaad7bd9992",
@@ -405,12 +405,12 @@
       "id": "legacy-layer0-main-cache-boundary",
       "category": "oracle observability",
       "source_repo": "tpu-inference oracle-only observer plus protected greenfield ingredients",
-      "source_pin": "accepted b3c25df47ac98783912dc658878181ec0a8ae16d / exact-step observer 3443515d9d3c42412558b778c608aaf07c6c89ff / ingredients 4d4e2c5da53554b3ab015d26cc6d1e058a7b48dd",
-      "source_paths": ["tpu_inference/runner/dcp_cache_dump.py", "tpu_inference/runner/tpu_runner.py", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_ingredients_trace2_20260811T033957390557074Z/layer0_ingredients", "/home/gianl/glm-run/greenfield_legacy_layer0_main_cache_20260811T052303163478417Z", "/home/gianl/glm-run/greenfield_layer0_qkv_a_production_20260808T140131250842069Z"],
+      "source_pin": "accepted b3c25df47ac98783912dc658878181ec0a8ae16d / exact-step observer 3443515d9d3c42412558b778c608aaf07c6c89ff / ingredients 4d4e2c5da53554b3ab015d26cc6d1e058a7b48dd / protected mechanism ed7c74f423e811f1acfbeb3c075fb8fad37d4f51",
+      "source_paths": ["tpu_inference/runner/dcp_cache_dump.py", "tpu_inference/runner/tpu_runner.py", "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_ingredients_trace2_20260811T033957390557074Z/layer0_ingredients", "/home/gianl/glm-run/greenfield_legacy_layer0_main_cache_20260811T052303163478417Z", "/home/gianl/glm-run/greenfield_layer0_qkv_a_production_20260808T140131250842069Z", "/home/gianl/glm-run/greenfield_layer0_main_rope_20260811T072231959104598Z"],
       "disposition": "oracle_only",
       "greenfield_consumers": ["glm_tpu/greenfield/validation/legacy_main_cache.py", "glm_tpu/greenfield/kernels/reference/rotary.py", "scripts/greenfield/compare_legacy_layer0_main_cache.py", "scripts/greenfield/run_capture_legacy_layer0_main_cache.sh", "scripts/greenfield/probe_layer0_dsa_query_association.py"],
       "gate": "D diagnostic",
-      "reason": "Reuse the accepted host-side cache dumper outside model JIT, narrowed by a default-off exact scheduler-step selector to final prefill step 4 and first decode step 5. Protected DB530 classifies prefill_main_cache: 30,544 selected-row mismatches and 18 current-row mismatches localize the dominant error to the 64-wide main-RoPE suffix. DB503 supplies the already-sealed exact current pre-RoPE companion; reuse it in the existing association probe to test accepted-table FP32 products with one final BF16 round before creating a device table or changing the decoder. No legacy execution enters greenfield runtime, and DSA rotary remains unchanged."
+      "reason": "Reuse the accepted host-side cache dumper outside model JIT, narrowed by a default-off exact scheduler-step selector to final prefill step 4 and first decode step 5. Protected DB530 classifies prefill_main_cache and localizes the dominant error to the 64-wide main-RoPE suffix. DB503 supplies the exact pre-RoPE companion; protected DB531 proves the accepted BF16 table row plus FP32-final-round primitive is exact 0/64 on TPU with compliant HLO. Reuse those pins to build the device-resident main-RoPE table and runtime path. No legacy execution enters greenfield runtime, and DSA rotary remains unchanged."
     },
     {
       "id": "old-glm-tpu-worktrees",

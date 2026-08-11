@@ -6975,3 +6975,24 @@ unmotivated arithmetic variants.
   deferred until this arithmetic passes real TPU HLO and bitwise output.
 - Exact next: finish the affected batch, one Fable review of only the new diff, independent verify,
   commit/push and one protected `main_rope` probe. Do not run the full 8K decoder or alter DSA.
+
+## 2026-08-11 07:13--07:23 — protected main-RoPE mechanism passes (DB531)
+
+- The first protected attempt stopped before arithmetic because TPU split the logical 64-lane
+  final conversion into two 32-lane conversions. Its preserved HLO proved the four FP32 products
+  and two combines were intact. A fail-closed matcher correction accepts exactly `[64]` or
+  `[32,32]` matching FP32-to-BF16 widths and rejects extra/mixed rounds; 15 affected tests pass and
+  one new-diff-only Fable review returned `APPROVE COMMIT`.
+- Protected DB531/item1816,
+  `greenfield_layer0_main_rope_20260811T072231959104598Z`, ran pin `ed7c74f...4f51` and restores
+  the legacy current main-RoPE suffix exactly: `0/64` mismatches, expected/candidate SHA
+  `e7c217ec...3281`. The captured greenfield baseline remains `18/64` nonexact.
+- TPU HLO SHA `c611c74d...f623` contains four FP32 multiplies, two FP32 add/sub combines, two final
+  32-lane BF16 conversions, exact `64/32/32` BF16 entries, and no BF16 rotary arithmetic, trig,
+  callback or collective. Runner/tensor/SUCCESS SHAs are `d32d0357...7370`,
+  `52d2a36e...4145`, and `8f9763e4...b6d7`.
+- Same-region archive and DB snapshot are sealed, and pre/post censuses report eight unique clean
+  hosts. This diagnostic has no decoder, latency, XPlane, cache-wide or Gate-D claim.
+- Exact next is a separate default-off integration batch: create the plan-aware device BF16 table,
+  use the proven FP32-final-round primitive only for main MLA q/k, preserve DSA, prove reference,
+  table-integrity and HLO contracts, audit once, then run the complete protected 8K Gate-D retry.

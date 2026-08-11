@@ -993,3 +993,16 @@ capture is still required.
 - DB503's exact current pre-RoPE companion plus accepted table row SHA `67b01e3c...a1d` reproduces
   legacy suffix SHA `e7c217ec...3281` when products/adds are FP32 and only the completed row is
   rounded to BF16. This is offline causal readiness, not yet protected TPU or decoder evidence.
+
+## DB531 protected main-RoPE mechanism
+
+- DB531/item1816, `greenfield_layer0_main_rope_20260811T072231959104598Z`, runs greenfield pin
+  `ed7c74f...4f51` on TPU and changes the sealed current suffix comparison from the captured
+  `18/64` mismatches to exact `0/64`; expected and candidate SHA are `e7c217ec...3281`.
+- HLO SHA `c611c74d...f623` proves four FP32 products, two FP32 combines and the TPU-equivalent split
+  final round `[32,32]`, with no BF16 rotary arithmetic, dynamic trig, callback or collective.
+- Runner/tensor/SUCCESS SHAs are `d32d0357...7370`, `52d2a36e...4145`, and
+  `8f9763e4...b6d7`. DB/archive/object-integrity and clean pre/post 8-host censuses pass.
+- Evidence scope is one real current main-RoPE row only. It authorizes the default-off device-table
+  and main-MLA integration batch, not Gate-D acceptance, performance, full-cache exactness or a DSA
+  change.
