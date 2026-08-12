@@ -2304,7 +2304,7 @@ if (
     != "1a6c2fb5c8c04b904daad45f751e0b5308919b85cb1f3cf63879c5febf3ea0e9"
     or canary.get("output_file_sha256")
     != "fda0228123392c29db87e1d6dd01cc6830041196409f49e0144628054cc64bd9"
-    or kernel_counts.get("greenfield_fp8_block_matmul_m8_k512_n6144") != 8
+    or kernel_counts.get("greenfield_fp8_strategy_nd_o_m8_k512_n6144") != 8
     or kernel_counts.get(
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144"
     ) != 8
@@ -2648,7 +2648,7 @@ def validate_strategy_nd_attention_hlo(executable, *, source):
             or contract["kernel_count"] != 624
             or contract["expected_kernel_count"] != 624
             or contract["kernel_name"]
-            != "greenfield_fp8_block_matmul_m8_k512_n6144"
+            != "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
             or not contract["partial_gather_bijection"]
             or not contract["exclusive_partial_dataflow"]
             or contract["exclusive_source_violations"]
@@ -3437,7 +3437,7 @@ if runtime_kind == "pallas_feature_linear":
         "greenfield_fp8_block_matmul_m8_k4096_n6144": (
             0 if strategy_nd_attention_projection else 78
         ),
-        "greenfield_fp8_block_matmul_m8_k512_n6144": (
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144": (
             624 if strategy_nd_attention_projection else 0
         ),
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": 78,

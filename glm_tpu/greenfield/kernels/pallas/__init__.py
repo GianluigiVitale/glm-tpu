@@ -16,6 +16,7 @@ from .fp8_matmul import (
     fp8_structured_kv_b_value,
     fp8_selected_swiglu_down,
     fp8_selected_up_gate,
+    fp8_strategy_nd_attention_matmul,
 )
 from .sparse_attention import (
     SparseMlaConfig,
@@ -59,6 +60,7 @@ __all__ = [
     "fp8_structured_kv_b_value",
     "fp8_selected_swiglu_down",
     "fp8_selected_up_gate",
+    "fp8_strategy_nd_attention_matmul",
     "local_topk_candidates_kernel",
     "local_topk_candidates_pallas",
     "merge_topk_candidates_kernel",

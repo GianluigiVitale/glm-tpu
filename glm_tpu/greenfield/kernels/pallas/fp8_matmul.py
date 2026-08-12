@@ -451,6 +451,32 @@ def fp8_block_matmul(
     )
 
 
+def fp8_strategy_nd_attention_matmul(
+    lhs: Any,
+    weight_bits: Any,
+    scale: Any,
+    *,
+    config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
+    interpret: bool = False,
+) -> Any:
+    """Return one distinctly named StrategyND attention K512 partial.
+
+    The arithmetic is identical to :func:`fp8_block_matmul`.  The dedicated
+    custom-call identity keeps the 624 attention partials disjoint from the
+    75 same-geometry routed-MoE down kernels in a complete decoder HLO.
+    """
+
+    return _fp8_block_matmul_impl(
+        lhs,
+        weight_bits,
+        scale,
+        config=config,
+        result_dtype=config.output_dtype,
+        kernel_prefix="greenfield_fp8_strategy_nd_o_",
+        interpret=interpret,
+    )
+
+
 def fp8_block_matmul_f32(
     lhs: Any,
     weight_bits: Any,

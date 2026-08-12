@@ -1262,7 +1262,7 @@ def _validate_pallas_stage_linear_decoder_calls(
         "greenfield_fp8_block_matmul_m8_k4096_n6144": (
             0 if strategy_nd_attention_projection else layers
         ),
-        "greenfield_fp8_block_matmul_m8_k512_n6144": (
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144": (
             8 * layers if strategy_nd_attention_projection else 0
         ),
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": layers,
@@ -2977,7 +2977,7 @@ def _validate_strategy_nd_attention_projection_hlo(
 
     scope = "greenfield_strategy_nd_row0_attention_output"
     gather_scope = "greenfield_strategy_nd_row0_association_gather"
-    kernel_name = "greenfield_fp8_block_matmul_m8_k512_n6144"
+    kernel_name = "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
 
     def in_scope(instruction: HloInstruction, name: str) -> bool:
         return bool(instruction.op_name) and name in (
@@ -3003,7 +3003,6 @@ def _validate_strategy_nd_attention_projection_hlo(
         if instruction.opcode == "custom-call"
         and 'custom_call_target="tpu_custom_call"' in instruction.raw_line
         and kernel_identifier.search(instruction.raw_line) is not None
-        and in_scope(instruction, scope)
     )
     violations: list[str] = []
     if not enabled:
@@ -4126,7 +4125,7 @@ def validate_layer0_residual_discriminator_hlo(
     )
     dense_f32_name = f"{dense_bf16_name}_downf32"
     virtual_attention_name = (
-        "greenfield_fp8_block_matmul_m8_k512_n6144"
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
     )
     virtual_dense_name = (
         "greenfield_fp8_fused_block_swiglu_"
@@ -4575,7 +4574,7 @@ def validate_layer0_ingredients_observer_hlo(
     )
     kernel_names = {
         "attention_production": "greenfield_fp8_block_matmul_m8_k4096_n6144",
-        "attention_virtual": "greenfield_fp8_block_matmul_m8_k512_n6144",
+        "attention_virtual": "greenfield_fp8_strategy_nd_o_m8_k512_n6144",
         "dense_production": (
             "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144"
         ),

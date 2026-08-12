@@ -7925,3 +7925,25 @@ unmotivated arithmetic variants.
   bypass/branch output and rogue pad callee. The same reviewer returned `APPROVE COMMIT`. The final
   combined affected suite passes 101/101 in 171.64 seconds; compileall, Bash, ShellCheck, runtime
   import smoke and diff checks pass. This is readiness only and changes no Gate-D/performance claim.
+
+## 2026-08-12 20:32--20:52 — first complete StrategyND compile fails closed on identity/scoping
+
+- The protected 8K launch at pin `67257db87e25ac379e46a3e11c1ecebf46fa6d96`, tag ending
+  `20260812T203236532727960Z`, passed remote-vacancy, exact sync and 8/8 pre-census, loaded the real
+  model and emitted the full decoder StableHLO/optimized HLO, then refused before execution.
+- The optimized module contains 699 calls carrying the old K512 name: precisely 624 attention
+  partials plus 75 unchanged routed-MoE down calls. That name collision made the feature validator
+  observe 699 rather than 75 and left the StrategyND validator with no scope-retaining way to select
+  its 624 calls after Pallas lowering. StableHLO independently contains all 78 trees, but the flat
+  parser saw only one lexical copy of SSA names reused across stage `stablehlo.case` branches.
+- StableHLO/optimized-HLO/contract/identical-log/pre-census/failure-census SHAs are
+  `2cdd9a6c...608`, `ef751d08...ea1`, `58be5a23...12e`, `e72bd293...a63`,
+  `5631d914...b85`, and `19504b0d...835`. There is no execution, token, timing, trace, DB row,
+  summary or `SUCCESS`; `NO_PROVISIONAL_DB_RUN` and the failure census authenticate 8/8 cleanup.
+- The correction reuses the exact same kernel implementation under a dedicated attention identity
+  and parses each case branch as a separate lexical graph while ignoring unrelated nested-region
+  closings by indentation. On the preserved complete artifacts with exactly the 624 proven
+  attention identities renamed, StableHLO passes `78/624/78` and optimized HLO passes `78/624`
+  with exact bijection, exclusive source flow and root liveness; feature and stage-linear counts
+  separately pass at 75 MoE and 624 attention calls. The affected combined suite passes 279/279.
+  Exact next is one correction-only Sol review, commit/push and one protected retry.

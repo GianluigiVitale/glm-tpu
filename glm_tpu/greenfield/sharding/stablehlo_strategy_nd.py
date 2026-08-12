@@ -39,7 +39,7 @@ _CALLEE_RE = re.compile(r"\bfunc\.call\s+@([^\s(]+)")
 _PAD_LOW_RE = re.compile(r"\blow\s*=\s*\[([^]]*)\]")
 _PAD_HIGH_RE = re.compile(r"\bhigh\s*=\s*\[([^]]*)\]")
 _PAD_INTERIOR_RE = re.compile(r"\binterior\s*=\s*\[([^]]*)\]")
-_KERNEL_NAME = "greenfield_fp8_block_matmul_m8_k512_n6144"
+_KERNEL_NAME = "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
 
 
 def _normalize_type(value: str) -> str:
@@ -146,16 +146,62 @@ def _parse_graphs(stablehlo: str) -> tuple[list[_StableGraph], list[str]]:
     graphs: list[_StableGraph] = []
     errors: list[str] = []
     current: _StableGraph | None = None
+    function_root: _StableGraph | None = None
+    region_stack: list[tuple[_StableGraph, str, int, int]] = []
+    case_index = 0
     return_index = 0
+
+    def new_graph(name: str, header: str) -> _StableGraph:
+        graph = _StableGraph(name, header, {}, defaultdict(list))
+        graphs.append(graph)
+        return graph
+
     for line_number, line in enumerate(StringIO(stablehlo), start=1):
         function = _FUNCTION_RE.match(line)
         if function is not None:
-            current = _StableGraph(
-                function.group(1), line.strip(), {}, defaultdict(list)
-            )
-            graphs.append(current)
+            if region_stack:
+                errors.append(
+                    "StableHLO case region is unterminated before "
+                    f"@{function.group(1)}"
+                )
+            current = new_graph(function.group(1), line.strip())
+            function_root = current
+            region_stack = []
+            case_index = 0
             return_index = 0
         if current is None:
+            continue
+        stripped = line.strip()
+        indentation = len(line) - len(line.lstrip())
+        if (
+            region_stack
+            and indentation == region_stack[-1][3]
+            and re.fullmatch(r"},\s*\{", stripped)
+        ):
+            parent, base_name, branch_index, case_indentation = (
+                region_stack[-1]
+            )
+            branch_index += 1
+            region_stack[-1] = (
+                parent,
+                base_name,
+                branch_index,
+                case_indentation,
+            )
+            current = new_graph(
+                f"{base_name}.branch{branch_index}", stripped
+            )
+            return_index = 0
+            continue
+        if (
+            region_stack
+            and indentation == region_stack[-1][3]
+            and stripped.startswith("})")
+        ):
+            current, _base_name, _branch_index, _case_indent = (
+                region_stack.pop()
+            )
+            return_index = 0
             continue
         assignment = _ASSIGNMENT_RE.match(line)
         if assignment is None:
@@ -240,6 +286,15 @@ def _parse_graphs(stablehlo: str) -> tuple[list[_StableGraph], list[str]]:
         current.nodes[name] = node
         for operand in node.operands:
             current.users[operand].append(node)
+        if opcode == "case" and re.search(r"\(\{\s*$", rhs):
+            assert function_root is not None
+            base_name = f"{function_root.name}#case{case_index}"
+            case_index += 1
+            region_stack.append((current, base_name, 0, indentation))
+            current = new_graph(f"{base_name}.branch0", line.strip())
+            return_index = 0
+    if region_stack:
+        errors.append("StableHLO case region is unterminated at end of module")
     if not graphs:
         errors.append("StableHLO contains no func.func computation")
     return graphs, errors

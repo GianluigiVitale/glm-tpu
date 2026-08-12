@@ -673,8 +673,8 @@ def _strategy_nd_attention_projection_hlo(*, folded: bool = False) -> str:
             f"  %call.{index} = {call_output} custom-call(%lhs, %rhs, %scale), "
             'custom_call_target="tpu_custom_call", metadata={op_name="jit(mapped)/'
             "shard_map/greenfield_strategy_nd_row0_attention_output/"
-            f"greenfield_fp8_block_matmul_m8_k512_n6144/call.{index}\"}}, "
-            'backend_config={"body":"greenfield_fp8_block_matmul_m8_k512_n6144"}'
+            f"greenfield_fp8_strategy_nd_o_m8_k512_n6144/call.{index}\"}}, "
+            'backend_config={"body":"greenfield_fp8_strategy_nd_o_m8_k512_n6144"}'
         )
         if folded:
             calls.append(
@@ -767,8 +767,8 @@ def test_strategy_nd_attention_projection_hlo_is_fail_closed() -> None:
     assert not rejected_dead["all_gathers_live"]
 
     suffixed = hlo.replace(
-        "greenfield_fp8_block_matmul_m8_k512_n6144",
-        "greenfield_fp8_block_matmul_m8_k512_n6144_wrong",
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144",
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144_wrong",
     )
     rejected_suffix = _validate_strategy_nd_attention_projection_hlo(
         parse_hlo_module(suffixed), layers=1, enabled=True
@@ -781,6 +781,68 @@ def test_strategy_nd_attention_projection_hlo_is_fail_closed() -> None:
     )
     assert not disabled["passed"]
     assert not disabled["applicable"]
+
+
+def test_strategy_nd_attention_kernel_identity_is_disjoint_from_moe_down() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_pallas_feature_decoder_calls,
+        _validate_pallas_stage_linear_decoder_calls,
+    )
+
+    stage_names = (
+        "greenfield_fp8_block_matmul_m8_k6144_n2048",
+        "greenfield_fp8_block_matmul_m8_k2048_n4096",
+        "greenfield_fp8_block_matmul_m8_k6144_n640",
+        "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512",
+        "greenfield_fp8_structured_kv_b_value_h16_l512_v256",
+        *(["greenfield_fp8_strategy_nd_o_m8_k512_n6144"] * 8),
+    )
+    stage_hlo = "\n".join(
+        f'%call.{index} = custom-call(), custom_call_target="tpu_custom_call", '
+        f'backend_config="{name}"'
+        for index, name in enumerate(stage_names)
+    )
+    # Same-geometry MoE down is present but cannot inflate StrategyND counts.
+    stage_hlo += (
+        '\n%moe = custom-call(), custom_call_target="tpu_custom_call", '
+        'backend_config="greenfield_fp8_block_matmul_m8_k512_n6144"'
+    )
+    stage = _validate_pallas_stage_linear_decoder_calls(
+        stage_hlo,
+        layers=1,
+        dense_layers=0,
+        full_indexer_layers=0,
+        attention_projection_backend="separate",
+        strategy_nd_attention_projection=True,
+    )
+    assert stage["passed"], stage
+    assert stage["kernel_counts"][
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
+    ] == 8
+
+    feature_names = (
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512",
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512",
+        "greenfield_fp8_block_up_gate_m8_k6144_n512",
+        "greenfield_fp8_block_up_gate_m8_k6144_n512",
+        "greenfield_fp8_block_matmul_m8_k512_n6144",
+    )
+    feature_hlo = "\n".join(
+        f'%feature.{index} = custom-call(u8[256,6144,512], '
+        'u8[256,6144,512], u8[256,512,6144]), '
+        'custom_call_target="tpu_custom_call", '
+        f'backend_config="{name}"'
+        for index, name in enumerate(feature_names)
+    )
+    feature_hlo += "\n" + stage_hlo
+    feature = _validate_pallas_feature_decoder_calls(
+        feature_hlo, sparse_layers=2, feature_output_tile=128
+    )
+    # Only the two explicit MoE identities count; eight StrategyND calls do not.
+    assert feature["kernel_counts"] == feature["expected_kernel_counts"]
+    assert feature["kernel_counts"][
+        "greenfield_fp8_block_matmul_m8_k512_n6144"
+    ] == 2
 
 
 def test_strategy_nd_attention_reduction_contract_replaces_projection_sum() -> None:
@@ -1364,7 +1426,7 @@ def _layer0_attention_output_association_discriminator_hlo(
     virtual_attention = "\n".join(
         f"  %attention.{index} = bf16[1,6144] custom-call(%b), "
         'custom_call_target="tpu_custom_call", '
-        'backend_config="greenfield_fp8_block_matmul_m8_k512_n6144"'
+        'backend_config="greenfield_fp8_strategy_nd_o_m8_k512_n6144"'
         for index in range(8)
     )
     return hlo.replace(old_reductions, new_reductions).replace(
@@ -1425,7 +1487,7 @@ def _layer0_strategy_nd_row0_discriminator_hlo(
     virtual_attention = "\n".join(
         f"  %attention.{index} = bf16[1,6144] custom-call(%b), "
         'custom_call_target="tpu_custom_call", '
-        'backend_config="greenfield_fp8_block_matmul_m8_k512_n6144"'
+        'backend_config="greenfield_fp8_strategy_nd_o_m8_k512_n6144"'
         for index in range(8)
     )
     production_dense = (
@@ -1491,7 +1553,7 @@ def _layer0_virtual_tp32_discriminator_hlo(variant_name: str) -> str:
     attention = "\n".join(
         f"  %attention.{index} = bf16[1,6144] custom-call(%b), "
         'custom_call_target="tpu_custom_call", '
-        'backend_config="greenfield_fp8_block_matmul_m8_k512_n6144"'
+        'backend_config="greenfield_fp8_strategy_nd_o_m8_k512_n6144"'
         for index in range(8)
     )
     dense = "\n".join(
@@ -1551,7 +1613,7 @@ def _layer0_ingredients_hlo(
     )
     kernels = [
         "greenfield_fp8_block_matmul_m8_k4096_n6144",
-        *(["greenfield_fp8_block_matmul_m8_k512_n6144"] * 8),
+        *(["greenfield_fp8_strategy_nd_o_m8_k512_n6144"] * 8),
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144",
         *(
             ["greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144"]
@@ -1966,7 +2028,7 @@ def test_layer0_attention_output_association_hlo_isolates_projection() -> None:
         "greenfield_fp8_block_matmul_m8_k4096_n6144"
     ] == 1
     assert control["kernel_counts"][
-        "greenfield_fp8_block_matmul_m8_k512_n6144"
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
     ] == 0
     for variant_name in variants[1:]:
         candidate = contracts[variant_name]
@@ -1974,7 +2036,7 @@ def test_layer0_attention_output_association_hlo_isolates_projection() -> None:
             "greenfield_fp8_block_matmul_m8_k4096_n6144"
         ] == 0
         assert candidate["kernel_counts"][
-            "greenfield_fp8_block_matmul_m8_k512_n6144"
+            "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
         ] == 8
         assert candidate["kernel_counts"][
             "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144"
@@ -2095,7 +2157,7 @@ def test_layer0_strategy_nd_row0_hlo_pins_two_local_partial_gathers() -> None:
         assert candidate["strategy_nd_attention_gather_count"] == 1
         assert candidate["strategy_nd_dense_gather_count"] == 1
         assert candidate["kernel_counts"][
-            "greenfield_fp8_block_matmul_m8_k512_n6144"
+            "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
         ] == 8
         assert candidate["kernel_counts"][
             "greenfield_fp8_fused_block_swiglu_m8_h6144_i384_o6144"
@@ -2281,7 +2343,7 @@ def test_layer0_ingredients_hlo_pins_primitive_capture() -> None:
 
     missing_partial = validate_layer0_ingredients_observer_hlo(
         hlo.replace(
-            "greenfield_fp8_block_matmul_m8_k512_n6144",
+            "greenfield_fp8_strategy_nd_o_m8_k512_n6144",
             "greenfield_fp8_block_matmul_m8_k4096_n6144",
             1,
         ),
@@ -2339,7 +2401,7 @@ def test_layer0_virtual_tp32_discriminator_hlo_pins_subshards() -> None:
 
     missing_subshard = validate_layer0_residual_discriminator_hlo(
         model_first.replace(
-            "greenfield_fp8_block_matmul_m8_k512_n6144",
+            "greenfield_fp8_strategy_nd_o_m8_k512_n6144",
             "greenfield_fp8_block_matmul_m8_k4096_n6144",
             1,
         ),

@@ -979,7 +979,7 @@ def _validate_hlo(optimized_hlo: str, arm: Arm) -> dict[str, Any]:
     required: dict[str, int] = {
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": 1,
         (
-            "greenfield_fp8_block_matmul_m8_k512_n6144"
+            "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
             if arm.attention_strategy_nd
             else "greenfield_fp8_block_matmul_m8_k4096_n6144"
         ): 8 if arm.attention_strategy_nd else 1,
@@ -1101,7 +1101,7 @@ def _validate_hlo(optimized_hlo: str, arm: Arm) -> dict[str, Any]:
             },
             "results": {("bf16[1,6144]",), ("bf16[8,6144]",)},
         },
-        "greenfield_fp8_block_matmul_m8_k512_n6144": {
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144": {
             "operands": {
                 ("bf16[1,512]", "u8[6144,512]", "f32[48,4]"),
                 ("bf16[8,512]", "u8[6144,512]", "f32[8,128]"),
@@ -1161,7 +1161,7 @@ def _validate_hlo(optimized_hlo: str, arm: Arm) -> dict[str, Any]:
 
     attention_scope, dense_scope = tuple(expected_collective_scopes)
     attention_kernel = (
-        "greenfield_fp8_block_matmul_m8_k512_n6144"
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
         if arm.attention_strategy_nd
         else "greenfield_fp8_block_matmul_m8_k4096_n6144"
     )

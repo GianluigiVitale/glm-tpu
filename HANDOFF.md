@@ -4245,3 +4245,26 @@ zero conversion, low/high/interior placement and return lineage; wrong real lhs/
 unknown callee refuse. Sol returned `APPROVE COMMIT`. The affected combined suite passes 101/101
 in 171.64 seconds; focused integration/static checks pass. Exact next is commit/push, then the
 single serialized protected 8K Gate-D run.
+
+## First full StrategyND decoder compile exposes a proof-identity collision
+
+The protected run at pin `67257db87e25ac379e46a3e11c1ecebf46fa6d96`, tag ending
+`strategynd_o_oracle_dsa_trace2_20260812T203236532727960Z`, failed closed before execution.
+The complete optimized HLO contains exactly 699 calls named
+`greenfield_fp8_block_matmul_m8_k512_n6144`: the intended 624 attention K512 partials plus the
+75 existing MoE-down calls with identical geometry. The feature contract therefore observed
+699 instead of 75, while the StrategyND contract could not distinguish its 624 producers.
+Pre-fusion StableHLO also showed that the complete pipeline nests stage bodies in sibling
+`stablehlo.case` regions whose SSA names are lexically reusable; the one-layer parser had treated
+the function as one flat graph. This is proof classification, not arithmetic or execution
+evidence. No model step, token, timing, trace, DB row or terminal artifact exists. Pre/failure
+censuses prove 8/8 zero work and provisional rollback reports `NO_PROVISIONAL_DB_RUN`.
+
+The bounded correction gives the mathematically unchanged attention call a unique
+`greenfield_fp8_strategy_nd_o_m8_k512_n6144` identity and makes the StableHLO parser track case
+branch lexical scopes by exact indentation-delimited regions. Replaying the preserved full decoder
+with only those 624 producer identities changed passes pre-fusion at `78 gathers / 624 kernels /
+78 exact trees`; optimized HLO passes `78 / 624`, producer/gather bijection, exclusive dataflow and
+root liveness, while the 75 MoE-down kernels remain independently counted. The combined affected
+suite passes 279/279. Exact next: one correction-only Sol audit, static checks, commit/push, then
+one serialized protected 8K retry. Do not reopen numerical search or run another discriminator.

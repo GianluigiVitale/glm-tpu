@@ -37,7 +37,7 @@ def _custom_call(
 
 def _synthetic_hlo(arm: object) -> str:
     attention_kernel = (
-        "greenfield_fp8_block_matmul_m8_k512_n6144"
+        "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
         if arm.attention_strategy_nd
         else "greenfield_fp8_block_matmul_m8_k4096_n6144"
     )
@@ -240,7 +240,7 @@ def test_projection_reduction_hlo_contract_pins_each_arm(arm: object) -> None:
 def test_projection_reduction_hlo_contract_fails_closed() -> None:
     arm = MODULE._ARMS[-1]
     hlo = _synthetic_hlo(arm)
-    kernel = "greenfield_fp8_block_matmul_m8_k512_n6144"
+    kernel = "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
 
     suffixed = hlo.replace(kernel, f"{kernel}_suffix", 2)
     assert not MODULE._validate_hlo(suffixed, arm)["passed"]
@@ -273,7 +273,7 @@ def test_projection_reduction_hlo_contract_fails_closed() -> None:
     )
     assert not MODULE._validate_hlo(wrong_collective_shape, arm)["passed"]
 
-    attention_kernel = "greenfield_fp8_block_matmul_m8_k512_n6144"
+    attention_kernel = "greenfield_fp8_strategy_nd_o_m8_k512_n6144"
     wrong_pallas_shape = hlo.replace(
         f"%{attention_kernel}.1 = bf16[1,6144]",
         f"%{attention_kernel}.1 = bf16[3]",

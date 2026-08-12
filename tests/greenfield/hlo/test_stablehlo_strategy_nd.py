@@ -92,7 +92,7 @@ def _strategy_nd_stablehlo(*, layers: int = 1) -> str:
                 f"%{prefix}_kernel_{shard} = stablehlo.custom_call "
                 f"@tpu_custom_call(%{prefix}_lhs_pad_{shard}, "
                 f"%{prefix}_weight_{shard}, %{prefix}_scale_pad_{shard}) "
-                '{kernel_name = "greenfield_fp8_block_matmul_m8_k512_n6144"} '
+                '{kernel_name = "greenfield_fp8_strategy_nd_o_m8_k512_n6144"} '
                 ": (tensor<8x512xbf16>, tensor<6144x512xui8>, "
                 "tensor<8x128xf32>) -> tensor<8x6144xbf16>"
             )
@@ -298,6 +298,33 @@ def _strategy_nd_stablehlo(*, layers: int = 1) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _case_scoped_strategy_nd_stablehlo() -> str:
+    """Put two identical-SSA layer programs in sibling case regions."""
+
+    source = _strategy_nd_stablehlo()
+    main_prefix = "  func.func public @main() {\n"
+    helper_marker = "\n  func.func private @_pad_lhs"
+    main_start = source.index(main_prefix) + len(main_prefix)
+    main_end = source.index("  }" + helper_marker, main_start)
+    body = source[main_start:main_end]
+    body_lines = body.splitlines()
+    assert body_lines[-1].strip() == "return %l0_output"
+    branch = "\n".join("      " + line.strip() for line in body_lines)
+    helpers = source[source.index(helper_marker) :]
+    return (
+        "module {\n"
+        "  func.func public @main(%selector: tensor<i32>) {\n"
+        "    %case = \"stablehlo.case\"(%selector) ({\n"
+        f"{branch}\n"
+        "    }, {\n"
+        f"{branch}\n"
+        "    }) : (tensor<i32>) -> tensor<1x6144xbf16>\n"
+        "    return %case\n"
+        "  }"
+        f"{helpers}"
+    )
+
+
 def test_exact_strategy_nd_stablehlo_contract_accepts_complete_tree() -> None:
     result = validate_strategy_nd_attention_stablehlo(
         _strategy_nd_stablehlo(), layers=1, enabled=True
@@ -315,6 +342,26 @@ def test_exact_strategy_nd_stablehlo_contract_accepts_complete_tree() -> None:
         _strategy_nd_stablehlo(), layers=1, enabled=False
     )
     assert not unexpected["passed"]
+
+
+def test_strategy_nd_stablehlo_tracks_sibling_case_ssa_scopes() -> None:
+    stablehlo = _case_scoped_strategy_nd_stablehlo()
+    result = validate_strategy_nd_attention_stablehlo(
+        stablehlo, layers=2, enabled=True
+    )
+    assert result["passed"], result
+    assert result["gather_count"] == 2
+    assert result["kernel_count"] == 16
+    assert result["matched_tree_count"] == 2
+
+    unterminated = stablehlo.replace(
+        "    }) : (tensor<i32>) -> tensor<1x6144xbf16>\n", "", 1
+    )
+    rejected = validate_strategy_nd_attention_stablehlo(
+        unterminated, layers=2, enabled=True
+    )
+    assert not rejected["passed"]
+    assert any("unterminated" in item for item in rejected["violations"])
 
 
 def test_strategy_nd_stablehlo_rejects_swapped_partial_rows() -> None:

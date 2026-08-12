@@ -26,6 +26,7 @@ from .pallas import (
     fp32_to_bf16_pallas_boundary,
     fp8_structured_kv_b_q_absorb,
     fp8_structured_kv_b_value,
+    fp8_strategy_nd_attention_matmul,
     pregathered_sparse_mla_pallas,
     stage_local_sparse_mla_kernel,
 )
@@ -225,7 +226,7 @@ def _virtual_attention_output_partials(
     virtual_scale_contraction = virtual_contraction // block_shape[1]
     return jnp.stack(
         tuple(
-            fp8_block_matmul(
+            fp8_strategy_nd_attention_matmul(
                 output_input[
                     :,
                     shard * virtual_contraction : (shard + 1)
