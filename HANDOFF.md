@@ -55,7 +55,16 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   attribute now refuse both demonstrated cases. Focused plus StrategyND tests pass 19/19. There is
   no runner/tensor/DB/SUCCESS result, DB max remains 537, and cleanup is authenticated 8/8. Exact
   next is confirmation of only this pad correction, commit/push and one serialized retry; do not
-  launch another full 8K decoder.
+  launch another full 8K decoder. That confirmation approved SHA `a44f050f...44e0`, committed and
+  pushed as `ffde307`. Its retry ending `20260812T160707708711839Z` compiled/validated/executed the
+  first arm and compiled the second, then spent 27 minutes in Python HLO dependency validation.
+  The interrupt traceback proves exponential re-traversal of a shared fusion DAG, not XLA/TPU
+  compilation. Per-source instruction results, fusion results and computation lookup are now
+  memoized; both preserved real HLOs validate in `0.043749` and `0.094537` seconds, and a 40-level
+  absent-source fusion diamond pins the former worst case. Tests pass 20/20. No classification,
+  tensor result, DB row, summary or SUCCESS exists; DB max is 537, diagnostics are archived, and
+  failure cleanup is authenticated 8/8. Exact next is one audit of this bounded linear-time fix,
+  commit/push and one protected retry.
 - The latest protected accepted capture is DB536/item1820,
   `greenfield_legacy_layer0_attention_projection_p8155_20260812T090000000000000Z`. It passed the
   exact raw passkey, all 14x21 DSA events, load/state checks, DB snapshot, approved-bucket archive,
@@ -4162,3 +4171,18 @@ sets and substring geometry matching admitted mismatched widths or a suffixed pa
 contract now requires either exact `[1,512]+scalar -> [8,512]` or `[1,4096]+scalar -> [8,4096]`
 and parses the complete padding attribute as exactly `0_7x0_0`; both mutations refuse. Exact next
 is confirmation of only this pad correction, commit/push and one protected retry.
+
+The pad correction received `APPROVE COMMIT` at staged SHA `a44f050f...44e0`, was pushed as
+`ffde307fd96a8e1e314b01a2ed610c306d9afda7`, and retried under tag
+`greenfield_layer0_projection_reduction_20260812T160707708711839Z`. It compiled, validated and
+executed local/local, then compiled the 488-KiB StrategyND-attention/local-dense HLO. The process
+subsequently consumed one CPU for 27 minutes without another artifact. The owned diagnostic was
+interrupted; its traceback proves `_value_depends_on` repeatedly recomputed shared fusion-DAG
+subgraphs and rescanned every computation in `_fusion_operand_indices`. This is a Python validator
+complexity bug, not TPU compilation or arithmetic evidence. Both preserved real HLOs now validate
+with zero violations in `0.043749` / `0.094537` seconds after memoizing instruction/fusion results
+and pre-indexing computations; a 40-level absent-source fusion diamond prevents regression. HLO
+SHAs are local/local `1187fe9f...a52f` and Strategy/local `f42b91fa...f483`; runner/pre/failure-
+census SHAs are `275c4a7d...2fe2`, `2a88321b...7a51`, and `457ff3c0...286a`. There is no final
+runner/tensor/DB/summary/SUCCESS; DB max is 537, diagnostics are archived, and cleanup is 8/8.
+Tests pass 20/20. Exact next is one bounded audit, commit/push and retry.

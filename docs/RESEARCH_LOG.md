@@ -7817,3 +7817,26 @@ unmotivated arithmetic variants.
   or a suffixed padding tuple. The correction now requires one of the two exact paired signatures
   and parses the complete padding attribute as exactly `0_7x0_0`; both demonstrated mutations
   refuse. Exact next is confirmation of only this correction, commit/push and one protected retry.
+
+## 2026-08-12 16:07--16:35 — retry exposes pathological Python HLO traversal
+
+- The exact pad correction was approved at staged SHA `a44f050f...44e0`, committed/pushed as
+  `ffde307fd96a8e1e314b01a2ed610c306d9afda7`, and retried under tag ending
+  `20260812T160707708711839Z`. Local/local compiled, validated and executed; the second arm emitted
+  its 488-KiB optimized StrategyND-attention/local-dense HLO, then the process remained CPU-active
+  without another artifact for 27 minutes.
+- The owned diagnostic was interrupted after proving it was Python rather than XLA. Its traceback
+  repeats `_value_depends_on -> _fusion_operand_indices` over the same shared fusion DAG. Each
+  dependency query recomputed prior nodes and each fusion scan rebuilt whole-module indexes,
+  yielding pathological rather than linear complexity on the large real HLO.
+- The bounded correction memoizes instruction dependency per source, memoizes fusion result-to-
+  caller-operand maps, memoizes subgraphs inside a fusion, and constructs computation/instruction
+  indexes once per analysis. A 40-level duplicated fusion DAG with an absent source pins the former
+  exponential case. The two preserved real HLOs now validate with zero violations in `0.043749`
+  and `0.094537` seconds; focused plus StrategyND tests pass 20/20.
+- Local/local and Strategy/local optimized-HLO SHAs are `1187fe9f...a52f` and
+  `f42b91fa...f483`; runner/pre/failure-census SHAs are `275c4a7d...2fe2`,
+  `2a88321b...7a51`, and `457ff3c0...286a`. No final runner JSON, tensor result, DB row, summary or
+  `SUCCESS` exists; DB max remains 537. The partial diagnostics were copied to the approved bucket
+  after authenticated 8/8 failure cleanup. Exact next is one Sol audit of only the linear-time
+  correction, commit/push and one protected retry.

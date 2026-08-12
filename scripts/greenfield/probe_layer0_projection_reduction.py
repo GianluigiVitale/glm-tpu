@@ -481,22 +481,37 @@ def _fusion_operand_indices(
     *,
     result_index: int | None = None,
     fusion_stack: frozenset[tuple[str, str]] = frozenset(),
+    by_key: Mapping[tuple[str, str], Any] | None = None,
+    instructions_by_computation: Mapping[str, tuple[Any, ...]] | None = None,
+    fusion_memo: dict[
+        tuple[tuple[str, str], int | None],
+        tuple[frozenset[int], tuple[str, ...]],
+    ]
+    | None = None,
 ) -> tuple[set[int], list[str]]:
     """Map a fusion result to only caller operands used by its called root."""
 
     fusion_key = _instruction_key(fusion)
+    memo_key = (fusion_key, result_index)
+    if fusion_memo is not None and memo_key in fusion_memo:
+        indices, errors = fusion_memo[memo_key]
+        return set(indices), list(errors)
     if fusion_key in fusion_stack:
         return set(), [f"recursive fusion lineage: {fusion.name}"]
     match = re.search(r"\bcalls=%?([^,\s}\]]+)", fusion.raw_line)
     if match is None:
         return set(), [f"fusion lacks called computation: {fusion.name}"]
     callee = match.group(1)
-    instructions = tuple(
-        item
-        for item in module.instructions
-        if _computation_id(item.computation) == callee
-    )
-    by_key = {_instruction_key(item): item for item in module.instructions}
+    if by_key is None:
+        by_key = {_instruction_key(item): item for item in module.instructions}
+    if instructions_by_computation is None:
+        grouped: dict[str, list[Any]] = {}
+        for item in module.instructions:
+            grouped.setdefault(_computation_id(item.computation), []).append(item)
+        instructions_by_computation = {
+            name: tuple(items) for name, items in grouped.items()
+        }
+    instructions = instructions_by_computation.get(callee, ())
     roots = tuple(
         item
         for item in instructions
@@ -505,15 +520,21 @@ def _fusion_operand_indices(
     if len(roots) != 1:
         return set(), [f"fusion callee root drifted: {fusion.name}"]
     errors: list[str] = []
-    visiting: set[tuple[str, str]] = set()
+    visiting: set[tuple[tuple[str, str], int | None]] = set()
+    dependency_memo: dict[
+        tuple[tuple[str, str], int | None], frozenset[int]
+    ] = {}
 
     def dependencies(instruction: Any, selected: int | None = None) -> set[int]:
-        key = _instruction_key(instruction)
+        key = (_instruction_key(instruction), selected)
+        if key in dependency_memo:
+            return set(dependency_memo[key])
         if key in visiting:
             errors.append(f"cyclic fusion value: {instruction.name}")
             return set()
         visiting.add(key)
         try:
+            result: set[int]
             if instruction.opcode == "parameter":
                 parameter_match = re.search(
                     r"\bparameter\(([0-9]+)\)", instruction.raw_line
@@ -523,10 +544,10 @@ def _fusion_operand_indices(
                         f"malformed fusion parameter: {instruction.name}"
                     )
                     return set()
-                return {int(parameter_match.group(1))}
-            if instruction.opcode == "constant":
-                return set()
-            if instruction.opcode == "get-tuple-element":
+                result = {int(parameter_match.group(1))}
+            elif instruction.opcode == "constant":
+                result = set()
+            elif instruction.opcode == "get-tuple-element":
                 index = _tuple_index(instruction)
                 if index is None or len(instruction.operand_names) != 1:
                     errors.append(
@@ -541,8 +562,8 @@ def _fusion_operand_indices(
                         f"undefined fusion tuple producer: {instruction.name}"
                     )
                     return set()
-                return dependencies(producer, index)
-            if instruction.opcode == "tuple":
+                result = dependencies(producer, index)
+            elif instruction.opcode == "tuple":
                 if selected is None:
                     indices = range(len(instruction.operand_names))
                 elif selected < len(instruction.operand_names):
@@ -550,7 +571,7 @@ def _fusion_operand_indices(
                 else:
                     errors.append(f"fusion tuple index drifted: {instruction.name}")
                     return set()
-                result: set[int] = set()
+                result = set()
                 for index in indices:
                     operand = by_key.get(
                         (instruction.computation, instruction.operand_names[index])
@@ -561,13 +582,15 @@ def _fusion_operand_indices(
                         )
                     else:
                         result.update(dependencies(operand))
-                return result
-            if instruction.opcode == "fusion":
+            elif instruction.opcode == "fusion":
                 nested_indices, nested_errors = _fusion_operand_indices(
                     module,
                     instruction,
                     result_index=selected,
                     fusion_stack=fusion_stack | {fusion_key},
+                    by_key=by_key,
+                    instructions_by_computation=instructions_by_computation,
+                    fusion_memo=fusion_memo,
                 )
                 errors.extend(nested_errors)
                 result = set()
@@ -586,23 +609,24 @@ def _fusion_operand_indices(
                         )
                     else:
                         result.update(dependencies(operand))
-                return result
-            if selected is not None:
+            elif selected is not None:
                 errors.append(
                     f"tuple index applied to non-tuple fusion value: "
                     f"{instruction.name}"
                 )
                 return set()
-            result = set()
-            for operand_name in instruction.operand_names:
-                operand = by_key.get((instruction.computation, operand_name))
-                if operand is None:
-                    errors.append(
-                        f"undefined fusion operand {operand_name}: "
-                        f"{instruction.name}"
-                    )
-                else:
-                    result.update(dependencies(operand))
+            else:
+                result = set()
+                for operand_name in instruction.operand_names:
+                    operand = by_key.get((instruction.computation, operand_name))
+                    if operand is None:
+                        errors.append(
+                            f"undefined fusion operand {operand_name}: "
+                            f"{instruction.name}"
+                        )
+                    else:
+                        result.update(dependencies(operand))
+            dependency_memo[key] = frozenset(result)
             return result
         finally:
             visiting.remove(key)
@@ -614,6 +638,8 @@ def _fusion_operand_indices(
     if invalid:
         errors.append(f"fusion caller operand indices drifted: {invalid}")
         indices.difference_update(invalid)
+    if fusion_memo is not None:
+        fusion_memo[memo_key] = (frozenset(indices), tuple(errors))
     return indices, errors
 
 
@@ -621,12 +647,25 @@ def _value_depends_on(module: Any, value: Any, source: Any) -> bool:
     """Test exact HLO value dependency while respecting tuple element selection."""
 
     by_key = {_instruction_key(item): item for item in module.instructions}
+    grouped: dict[str, list[Any]] = {}
+    for item in module.instructions:
+        grouped.setdefault(_computation_id(item.computation), []).append(item)
+    instructions_by_computation = {
+        name: tuple(items) for name, items in grouped.items()
+    }
+    fusion_memo: dict[
+        tuple[tuple[str, str], int | None],
+        tuple[frozenset[int], tuple[str, ...]],
+    ] = {}
     source_key = _instruction_key(source)
     visiting: set[tuple[str, str]] = set()
+    dependency_memo: dict[tuple[str, str], bool] = {}
 
     def depends(key: tuple[str, str]) -> bool:
         if key == source_key:
             return True
+        if key in dependency_memo:
+            return dependency_memo[key]
         if key in visiting:
             return False
         instruction = by_key.get(key)
@@ -638,21 +677,26 @@ def _value_depends_on(module: Any, value: Any, source: Any) -> bool:
             if instruction.opcode == "get-tuple-element":
                 index = _tuple_index(instruction)
                 if index is None or len(operands) != 1:
-                    return False
-                producer = by_key.get((instruction.computation, operands[0]))
+                    result = False
+                    producer = None
+                else:
+                    producer = by_key.get((instruction.computation, operands[0]))
                 if producer is None:
-                    return False
-                if producer.opcode == "tuple":
-                    if index >= len(producer.operand_names):
-                        return False
-                    return depends(
+                    result = False
+                elif producer.opcode == "tuple":
+                    result = index < len(producer.operand_names) and depends(
                         (instruction.computation, producer.operand_names[index])
                     )
-                if producer.opcode == "fusion":
+                elif producer.opcode == "fusion":
                     indices, errors = _fusion_operand_indices(
-                        module, producer, result_index=index
+                        module,
+                        producer,
+                        result_index=index,
+                        by_key=by_key,
+                        instructions_by_computation=instructions_by_computation,
+                        fusion_memo=fusion_memo,
                     )
-                    return not errors and any(
+                    result = not errors and any(
                         depends(
                             (
                                 instruction.computation,
@@ -661,19 +705,29 @@ def _value_depends_on(module: Any, value: Any, source: Any) -> bool:
                         )
                         for operand_index in indices
                     )
-                return False
-            if instruction.opcode == "fusion":
-                indices, errors = _fusion_operand_indices(module, instruction)
-                return not errors and any(
+                else:
+                    result = False
+            elif instruction.opcode == "fusion":
+                indices, errors = _fusion_operand_indices(
+                    module,
+                    instruction,
+                    by_key=by_key,
+                    instructions_by_computation=instructions_by_computation,
+                    fusion_memo=fusion_memo,
+                )
+                result = not errors and any(
                     depends((instruction.computation, operands[index]))
                     for index in indices
                 )
-            return any(
-                depends((instruction.computation, operand))
-                for operand in operands
-            )
+            else:
+                result = any(
+                    depends((instruction.computation, operand))
+                    for operand in operands
+                )
         finally:
             visiting.remove(key)
+        dependency_memo[key] = result
+        return result
 
     return depends(_instruction_key(value))
 
@@ -698,6 +752,16 @@ def _bounded_pallas_sources(
         "slice",
     }
     by_key = {_instruction_key(item): item for item in module.instructions}
+    grouped: dict[str, list[Any]] = {}
+    for item in module.instructions:
+        grouped.setdefault(_computation_id(item.computation), []).append(item)
+    instructions_by_computation = {
+        name: tuple(items) for name, items in grouped.items()
+    }
+    fusion_memo: dict[
+        tuple[tuple[str, str], int | None],
+        tuple[frozenset[int], tuple[str, ...]],
+    ] = {}
     sources: set[tuple[str, str]] = set()
     errors: list[str] = []
     visited: set[tuple[str, str]] = set()
@@ -750,7 +814,12 @@ def _bounded_pallas_sources(
                     errors.append(f"invalid fusion tuple selection: {instruction.name}")
                     return
                 indices, fusion_errors = _fusion_operand_indices(
-                    module, producer, result_index=index
+                    module,
+                    producer,
+                    result_index=index,
+                    by_key=by_key,
+                    instructions_by_computation=instructions_by_computation,
+                    fusion_memo=fusion_memo,
                 )
                 errors.extend(fusion_errors)
                 for operand_index in indices:
@@ -764,7 +833,13 @@ def _bounded_pallas_sources(
             errors.append(f"invalid tuple producer: {instruction.name}")
             return
         if instruction.opcode == "fusion":
-            indices, fusion_errors = _fusion_operand_indices(module, instruction)
+            indices, fusion_errors = _fusion_operand_indices(
+                module,
+                instruction,
+                by_key=by_key,
+                instructions_by_computation=instructions_by_computation,
+                fusion_memo=fusion_memo,
+            )
             errors.extend(fusion_errors)
             for index in indices:
                 visit((instruction.computation, instruction.operand_names[index]))

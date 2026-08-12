@@ -482,6 +482,40 @@ def test_projection_reduction_lineage_allows_only_exact_zero_row_pad() -> None:
     assert any("invalid activation pad" in error for error in suffix_errors)
 
 
+def test_projection_reduction_dependency_memoizes_shared_fusion_dag() -> None:
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    lines = [
+        "HloModule shared_dag, num_partitions=4",
+        "%add_two (left: bf16[1], right: bf16[1]) -> bf16[1] {",
+        "  %left = bf16[1] parameter(0)",
+        "  %right = bf16[1] parameter(1)",
+        "  ROOT %sum = bf16[1] add(%left, %right)",
+        "}",
+        "ENTRY main {",
+        "  %wanted = bf16[1] parameter(0)",
+        "  %rogue = bf16[1] parameter(1)",
+    ]
+    previous = "%rogue"
+    for index in range(40):
+        current = f"%diamond.{index}"
+        lines.append(
+            f"  {current} = bf16[1] fusion({previous}, {previous}), "
+            "kind=kLoop, calls=%add_two"
+        )
+        previous = current
+    lines.extend((f"  ROOT %root = bf16[1] copy({previous})", "}"))
+    module = parse_hlo_module("\n".join(lines))
+    source = next(item for item in module.instructions if item.name == "%wanted")
+    root = next(
+        item
+        for item in module.instructions
+        if item.raw_line.lstrip().startswith("ROOT ")
+        and item.computation.startswith("ENTRY ")
+    )
+    assert not MODULE._value_depends_on(module, root, source)
+
+
 def test_projection_reduction_runtime_imports_resolve() -> None:
     symbols = MODULE._load_runtime_symbols()
     assert len(symbols) == 15

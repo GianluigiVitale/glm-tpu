@@ -1318,3 +1318,9 @@ one bounded four-chip arm and failed its HLO lineage gate before device executio
 contract omitted TPU's exact-zero live-row padding. It produced no warmed loop, XPlane, wall
 distribution, decoder token, DB row or `SUCCESS`; DB484 remains the sole accepted performance
 point and Gate E remains open.
+
+The `ffde307` projection/reduction retry also produced no performance evidence. It executed only
+the first bounded arm and was interrupted while the Python HLO dependency checker pathologically
+re-traversed the second arm's shared fusion DAG. The 27-minute orchestration is validator CPU time,
+not TPU/model latency. There is no warmed decoder, XPlane, wall distribution, DB row or `SUCCESS`;
+DB484 remains the sole accepted performance point.
