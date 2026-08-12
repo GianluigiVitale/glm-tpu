@@ -7756,3 +7756,38 @@ unmotivated arithmetic variants.
   The corrected test is parameterized over false/true and asserts the exact forwarded value; the
   same reviewer returned `APPROVE COMMIT`. Decoder/compiler/prefill tests pass 85/85, and compileall,
   Bash, ShellCheck, JSON and diff checks pass.
+
+## 2026-08-12 13:43--14:32 — B512 executes; first open point moves after the exact latent
+
+- The clean `dab03de9` retry clears decoder, DSA-observer and prefill HLO contracts and executes the
+  full 8K model. Token `101252` is exact, but event 1 at layer 1 swaps seven selected positions each
+  way; its first order mismatch is expected `8152`, observed `1`, offset 2. Event 0 is exact. All
+  eight logs have SHA `454aad92...b3e5`; authenticated failure cleanup is 8/8. No timing, DB row,
+  summary or `SUCCESS` exists, so this is correctness localization only.
+- DB537's exact B512 attended latent therefore did not close the whole layer boundary. Cache,
+  B128, main RoPE and accepted two-head scheduling remain closed. The earliest remaining sequence
+  is post-latent `W_UV`, attention `o_proj` partial/reduction, residual/norm, dense partial/reduction
+  and layer-1 normalization.
+- A bounded four-arm probe now reuses, rather than recaptures, DB537's exact latent, DB536's accepted
+  post-`W_UV` row, the sealed replicated layer-0 residual, the accepted layer-1 normalized row,
+  stage-0 final-layout weights and DB533's physical StrategyND association. It crosses local versus
+  StrategyND attention and dense reductions independently. `W_UV` must be bitwise exact in every
+  arm before any final comparison is admitted.
+- Its initial readiness pass covered nine focused tests, Bash/ShellCheck/compileall, every real
+  source and all consumed checkpoint tensors. The one new-diff Sol audit then found three launch
+  blockers: a deferred runtime import named the wrong reference RMSNorm module; the HLO contract
+  did not yet prove exact module/operand/result geometry or Pallas-to-collective lineage; and DB
+  rollback authenticated only a completed result rather than the committed run/item prefixes.
+- The correction uses a runtime import smoke, exact logical and TPU-folded geometries, BF16-add
+  reducer/all-gather-dimension checks, and a bounded `W_UV -> attention -> dense -> root` lineage
+  and bijection proof. Temp-DB tests now exercise all three committed rollback prefixes. The focused
+  probe suite passes 13/13 and the StrategyND companion batch passes 18/18.
+- The first correction-only check approved the runtime import and DB-prefix rollback fixes, then
+  demonstrated one remaining tuple/GTE decoy: forward reachability followed the whole tuple even
+  when attention consumed the rogue element. Attention activation lineage now traces backward only
+  through bounded layout transforms and selects the exact tuple index; the demonstrated mutation
+  refuses. A second correction-only pass then demonstrated that treating every fusion operand as
+  live also fails open when the called computation returns only a rogue operand. Fusion dependency
+  now resolves the called root and maps only its contributing parameters to caller operands; direct
+  and tuple-result regressions prove live and decoy selection. Only confirmation of this fusion
+  correction by the same reviewer remains before commit and the protected four-chip launch.

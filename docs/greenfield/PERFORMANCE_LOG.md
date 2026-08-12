@@ -1306,3 +1306,9 @@ or `SUCCESS` exists, so DB484 remains the sole decoder performance point.
 The `9a90c3c` retry also has no performance result. It passes production decoder and DSA-observer
 HLO, then stops at an omitted prefill-validator flag before device execution. No prefill/decode wall,
 XPlane, DB row, summary or `SUCCESS` exists; DB484 remains the sole accepted decoder measurement.
+
+The `dab03de9` retry reaches real 8K execution after all decoder/observer/prefill HLO gates, but
+fails the mandatory DSA contract at layer 1 before warmup, timing, XPlane, DB recording or terminal
+sealing. Its exact raw token is not a performance result. DB484 therefore remains the only accepted
+PP8 decoder measurement at `244.091151 ms/token` / `4.096830 tok/s`; Gate E remains open. The next
+four-chip projection/reduction run is diagnostic-only and cannot change this standing.

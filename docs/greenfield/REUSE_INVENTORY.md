@@ -568,3 +568,12 @@ Each lane writes its owned rows into canonical selected slots, one BF16 LP4 sum 
 output/LSE/validity gathers are removed only in this default-off path. The protected launcher pins
 DB537 local hashes, exact-arm classification, DB row, direct remote objects and clean censuses before
 deployment. No legacy execution, new checkpoint, full-pod state or batch-32 row is reused.
+
+The first fully executing B512 8K retry makes event 0 exact but still diverges at the layer-1 DSA
+producer. The bounded successor does not recapture or reimplement any of those primitives. It
+reuses DB537's exact latent, DB536's accepted post-`W_UV` row, the existing layer-0 ingredient
+residual and dense weights, the accepted layer-1 normalized row, and DB533's already-audited
+StrategyND helper. Because the input latent is now exact, crossing that physical association
+independently at attention `o_proj` and dense-down is non-duplicative; the older combined
+StrategyND result consumed a nonexact attention input and remains negative evidence. The new probe
+is diagnostic-only and cannot authorize production unless one arm is bitwise exact.

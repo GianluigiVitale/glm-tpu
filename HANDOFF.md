@@ -22,6 +22,31 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 - Gates A--C are complete. Gate D has one accepted 2K result, DB484, at `244.091151 ms/token` and
   `4.096830 tok/s`; it does not pass Gate E. Complete 8K exactness remains open. DB484 is still the
   only decoder performance result.
+- The third selected-cache/B512 8K attempt at clean pushed pin `dab03de9` cleared the production
+  decoder, DSA-observer and teacher-forced-prefill HLO gates, completed the real 8K prefill/decode,
+  and produced the exact raw token `101252`. It still refused DSA correctness at event 1 entering
+  layer 1: expected position `8152` versus observed `1` at selected offset 2, with seven selected
+  positions swapped each way. Event 0 remains exact. All eight logs are identical at
+  `454aad92...b3e5`, there is no timing/DB/summary/`SUCCESS`, DB max remains 537, and failure cleanup
+  is authenticated 8/8. Thus DB537's exact B512 latent is necessary but does not by itself make the
+  complete layer-0 boundary exact.
+- The only live numerical fork is now downstream of DB537's exact latent: `W_UV` (required to
+  reproduce accepted SHA `79a6e290...2e9d`), attention `o_proj` reduction, dense-down reduction,
+  and the associated residual/norm boundary. One isolated four-arm probe reuses the protected
+  DB537 latent, accepted post-`W_UV` row, replicated layer-0 residual, accepted layer-1 normalized
+  hidden, stage-0 final-layout weights, and DB533's exact physical StrategyND map. It tests local /
+  StrategyND association independently for attention and dense, requires exact LP4 HLO and exact
+  `W_UV` before classification. The one-diff Sol audit found one launch-breaking import and two
+  fail-open protection gaps. The first correction-only pass approved the runtime import and all
+  three partial-DB-commit rollback states, but exposed a tuple-element decoy in the producer
+  lineage proof. The lineage check now traces each actual attention activation backward through
+  bounded layout transforms, selects the exact GTE tuple element, and has the reported decoy
+  regression. A second correction-only pass exposed an analogous opaque-fusion dependency; the
+  checker now resolves the fusion callee root, maps only contributing parameters back to caller
+  operands, and covers direct and tuple-result live/decoy cases. The focused suite passes 13/13 and
+  the StrategyND companion set passes 18/18. Exact next is confirmation of only this last correction
+  by the same reviewer, commit/push and one serialized four-chip probe; do not launch another full
+  8K decoder.
 - The latest protected accepted capture is DB536/item1820,
   `greenfield_legacy_layer0_attention_projection_p8155_20260812T090000000000000Z`. It passed the
   exact raw passkey, all 14x21 DSA events, load/state checks, DB snapshot, approved-bucket archive,
@@ -4074,3 +4099,40 @@ review/test this flag-threading correction, commit/push and retry once; arithmet
 The one-diff Sol audit found only a stale functional fixture; the fixture now verifies both false
 and true forwarding and correction-only review returned `APPROVE COMMIT`. The combined
 decoder/compiler/prefill suite passes 85/85 and static checks pass.
+
+## The real B512 8K run localizes the remaining boundary after attention
+
+Commit `dab03de9b3c8076ef19c5244a6a6a82306d7be38` contains the reviewed prefill forwarding fix.
+Its protected attempt under tag ending
+`pregatheredb512_oracle_dsa_trace2_20260812T134328170050840Z` passes all three complete optimized-
+HLO gates and executes the real model. The raw token is exactly `101252`, inactive rows remain
+sentinel and the top-1 margin is `6.5`, but the DSA contract refuses event 1 at layer 1: expected
+position `8152`, observed `1`, selected offset 2, with seven set swaps each way. All later event
+mismatches are downstream cascade. The identical eight-host log SHA is `454aad92...b3e5`; decoder,
+observer and prefill optimized-HLO gzip SHAs are `d2c63eea...f252`, `9afa03d1...2c6` and
+`c6068c5d...498e`. Pre/failure-census SHAs `7e7aa722...1b6a` / `394d37a2...fe2` prove 8/8 cleanup.
+There is no timing, trace, DB row, summary or `SUCCESS`, and live DB max remains 537.
+
+This result freezes cache/B128/RoPE work. DB537 already proves the attended latent exact, so the
+next admissible discriminator begins there and replays only `W_UV`, attention output projection,
+the first dense block and the layer-1 input norm. Four independent programs cross local versus
+protected DB533 StrategyND association for attention and dense. Every arm must first reproduce the
+accepted post-`W_UV` SHA `79a6e290...2e9d`; final classification compares the exact accepted
+layer-1 normalized SHA `9936ee1e...039`. The loader binds DB537, DB536, ingredients, layer-1,
+DB533 and checkpoint sources locally and remotely, checks every consumed tensor against the pinned
+manifest, and the HLO gate requires exactly two LP4 collectives under exact scopes plus exact Pallas
+identifiers. The initial focused suite passed 9/9 and all real-source/weight preflights passed. The
+bounded Sol audit then found a nonexistent deferred RMSNorm import, an HLO validator that did not
+pin geometry or producer lineage, and rollback that authenticated only the fully committed DB
+state. The import now resolves through a runtime smoke; HLO pins four partitions, logical/folded
+Pallas and collective geometry, BF16-add/all-gather semantics, W_UV->attention->dense->root
+dataflow and exact Pallas-to-collective lineage; rollback tests all three independently committed
+prefixes. The first correction-only check approved the import and rollback fixes but demonstrated a
+tuple/GTE decoy that still fooled forward reachability. Each attention activation now traces
+backward through bounded layout-only transforms to the sole `W_UV` call with exact tuple-index
+selection; the demonstrated decoy refuses. The next correction-only pass found that fusion inputs
+were still treated as all-live without reading the called computation. Fusion lineage now resolves
+the callee root and maps only actually contributing parameters to caller operands; direct and
+tuple-result live/rogue regressions prove both directions. Focused tests pass 13/13 and the
+StrategyND companion set passes 18/18. Exact next is confirmation of only this fusion correction,
+commit/push, idle-fleet proof and one protected probe.
