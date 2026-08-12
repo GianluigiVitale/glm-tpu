@@ -1077,3 +1077,24 @@ capture is still required.
   selected-path flag when calling the common validator. With that propagation restored, both the
   observer and prefill artifacts replay at `63/312/17`, 78 bijective links and zero violations.
   Execution still did not begin, so this remains HLO/readiness and clean-failure evidence.
+
+## DB539 exact attention-output projection association
+
+- DB539/item1823, tag
+  `greenfield_legacy_layer0_attention_update_p8155_20260812T172809039093068Z`, seals the accepted
+  layer-0 post-`o_proj` row at position 8,155. Its SHA is `68afed86...de7`. The DB538 StrategyND
+  candidate is bitwise exact at 0/6,144 mismatches; the local LP4 candidate has 3,652 mismatches.
+  Classification is `strategy_nd_attention_projection_exact` with only `strategy_nd` exact.
+- Capture JSON/tensor/comparison/SUCCESS/results-DB/remote-ledger SHAs are `f5b502cf...a91e`,
+  `02c78d13...cec6`, `780cf3c2...435c`, `f52d3e88...f508`, `c33f23bf...ea2`, and
+  `3f3910fc...e045`. Legacy observer `23ab8780...761`, oracle `b3c25df4...16d`, DB538 linkage,
+  live DB row, direct remote content and authenticated 8/8 pre/post censuses pass.
+- This authorizes only the default-off production integration of DB533's row-zero StrategyND tree
+  over eight K512 attention partials per LP4 owner. It does not close Gate D or establish latency.
+  The complete protected 8K run must still pass exact tokens/DSA, state/cache, HBM, local HLO,
+  fresh trace, profiler-free wall, DB/archive and cleanup.
+- Production admission is a two-level compiler proof. Optimized HLO pins exact physical calls,
+  local collectives, counts, groups, bijection and root liveness. Pre-fusion StableHLO separately
+  pins the ordered contiguous K512 input/weight/scale slices and every DB533 barrier-rounded
+  `y -> x -> z` add. Decode, DSA observer and prefill must archive both representations with
+  fleet-identical hashes; either contract failing blocks execution.

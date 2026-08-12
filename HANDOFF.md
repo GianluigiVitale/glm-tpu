@@ -22,6 +22,19 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 - Gates A--C are complete. Gate D has one accepted 2K result, DB484, at `244.091151 ms/token` and
   `4.096830 tok/s`; it does not pass Gate E. Complete 8K exactness remains open. DB484 is still the
   only decoder performance result.
+- DB539/item1823 resolves the Gate-D numerical cause. The accepted post-`o_proj` layer-0 row is
+  SHA `68afed86...de7`; DB538's StrategyND candidate is bitwise exact at `0/6,144` mismatches and
+  the ordinary local LP4 sum differs in `3,652/6,144`. The default-off production successor uses
+  eight separately rounded K512 partials per owner, one LP4 gather and DB533's exact local
+  `y -> x -> z` tree for attention projection only; dense/MoE remain unchanged. Its HLO gate pins
+  exact logical/folded geometry, exact names/groups, exclusive 8:1 partial lineage/bijection, root
+  liveness and the local-only meaning of folded `bf16[32,1,6144]`. The protected wrapper now puts
+  post-census before DB mutation, authenticates rollback of all committed DB prefixes, verifies
+  local/remote CRC32C plus the exact object set, and publishes rehashed `SUCCESS` last. Forced-CPU
+  decoder/prefill/wrapper tests pass 96/96 and the adjacent StrategyND/attention suites pass 34/34;
+  Bash, ShellCheck, compile and diff checks pass. Exact next: one Sol audit of this complete new
+  diff, correct only new findings, commit/push, then one protected 8K exact run. Do not rerun an
+  arithmetic discriminator first.
 - Protected DB538/item1822 completed the four independent post-latent arms at pushed pin
   `e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc`. Every arm first reproduces accepted post-`W_UV`
   SHA `79a6e290...2e9d`, so W_UV is closed. Neither local nor accepted StrategyND association at
@@ -4209,3 +4222,26 @@ SHAs are local/local `1187fe9f...a52f` and Strategy/local `f42b91fa...f483`; run
 census SHAs are `275c4a7d...2fe2`, `2a88321b...7a51`, and `457ff3c0...286a`. There is no final
 runner/tensor/DB/summary/SUCCESS; DB max is 537, diagnostics are archived, and cleanup is 8/8.
 Tests pass 20/20. Exact next is one bounded audit, commit/push and retry.
+
+## Current Gate-D successor
+
+DB538 then completed the four-arm projection/reduction discriminator, and DB539/item1823 resolved
+the open boundary: DB533's StrategyND attention-output association matches the accepted layer-0
+post-`o_proj` row bitwise (`0/6144` mismatches), while the ordinary LP4 sum differs in 3,652 values.
+The default-off production integration applies that tree to attention projection only in all 78
+layers; dense/MoE combines are unchanged.
+
+Sol's one integration audit found one remaining medium proof gap, not a numerical defect: optimized
+HLO proved an unordered set of eight K512 calls reached each local gather, but could not prove their
+ordered contiguous K512 slices or DB533's exact post-gather BF16 association. The correction adds
+a pre-fusion StableHLO graph contract for every enabled layer. It requires ordered input/weight/
+scale slices, exact per-layer source pairing, the physical DB533 row permutation, every barrier-
+rounded `y -> x -> z` add, exclusive gather use and a live final output. Decode, DSA observer and
+prefill now hash across all eight hosts and archive both StableHLO and optimized HLO. The preserved
+real DB538 StrategyND arm passes at `1 gather / 8 K512 / 1 tree`; swapped rows, cross-layer wiring,
+reassociation and output bypass all refuse. Sol's correction-only pass additionally found that pad
+callee bodies were opaque. The final gate binds each caller to an exact private helper with exact
+zero conversion, low/high/interior placement and return lineage; wrong real lhs/scale pads and an
+unknown callee refuse. Sol returned `APPROVE COMMIT`. The affected combined suite passes 101/101
+in 171.64 seconds; focused integration/static checks pass. Exact next is commit/push, then the
+single serialized protected 8K Gate-D run.

@@ -656,6 +656,7 @@ def validate_stage_local_prefill_index_repair_hlo(
 def validate_teacher_forced_prefill_hlo(
     optimized_hlo: str,
     *,
+    stablehlo: str | None = None,
     program: TeacherForcedPrefillProgram,
     schedule: PipelineSchedule,
     backend_contract: PrefillBackendContract,
@@ -672,6 +673,7 @@ def validate_teacher_forced_prefill_hlo(
         )
     decoder_contract = validate_decoder_step_hlo(
         optimized_hlo,
+        stablehlo=stablehlo,
         config=decoder.config,
         schedule=schedule,
         groups=decoder.groups,
@@ -700,6 +702,9 @@ def validate_teacher_forced_prefill_hlo(
         main_rope_table_enabled=decoder.main_rope_table_enabled,
         pregathered_b512_attention=(
             decoder.pregathered_b512_attention
+        ),
+        strategy_nd_attention_projection=(
+            decoder.strategy_nd_attention_projection
         ),
     )
     module = parse_hlo_module(optimized_hlo)

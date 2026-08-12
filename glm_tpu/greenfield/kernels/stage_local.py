@@ -159,7 +159,7 @@ _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER = 8
 # DB533 recovered the accepted M32 model-axis placement.  Indexing the 32
 # model-ordered projection partials by this inverse yields physical device-id
 # order, where device_id = x + 2*y + 8*z on the accepted 2x4x4 slice.
-_STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE = (
+STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE = (
     0,
     16,
     4,
@@ -192,6 +192,11 @@ _STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE = (
     27,
     15,
     31,
+)
+# Preserve the diagnostic probe's already-reviewed private import while the
+# StableHLO contract uses the explicit shared name above.
+_STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE = (
+    STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE
 )
 
 
@@ -392,7 +397,7 @@ def _strategy_nd_row0_bf16_reduce(model_partials: Any) -> Any:
         tuple(
             model_partials[model_position]
             for model_position in (
-                _STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE
+                STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE
             )
         ),
         axis=0,
@@ -1206,11 +1211,18 @@ def stage_local_index_share_fp8_mapped(
             "replicated-monolithic attention must remain isolated from "
             "ingredient capture"
         )
+    strategy_nd_attention_projection = (
+        virtual_tp32_reduction_association
+        == STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+    )
     if pregathered_b512_attention and (
         replicated_monolithic_attention
         or capture_ingredients
         or reconstruct_output_fp32
-        or virtual_tp32_reduction_association is not None
+        or (
+            virtual_tp32_reduction_association is not None
+            and not strategy_nd_attention_projection
+        )
     ):
         raise ValueError(
             "pregathered-B512 attention must remain isolated from diagnostic "

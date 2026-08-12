@@ -57,6 +57,9 @@ from ..sharding.hlo_contract import (
     HloShape,
     parse_hlo_module,
 )
+from ..sharding.stablehlo_strategy_nd import (
+    validate_strategy_nd_attention_stablehlo,
+)
 from ..types import ExecutionPlan, PlanName
 from .pipeline import (
     PipelineSkeletonConfig,
@@ -596,6 +599,7 @@ class DecoderStepProgram:
     attention_projection_backend: AttentionProjectionBackend
     main_rope_table_enabled: bool
     pregathered_b512_attention: bool
+    strategy_nd_attention_projection: bool
     main_rope_table_host: Any | None
     main_rope_table_sha256: str | None
     main_rope_table_bytes_per_device: int
@@ -1237,6 +1241,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     dsa_query_backend: StageLinearBackend = "pallas",
     dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
+    strategy_nd_attention_projection: bool = False,
     prefill_index_repair: bool = False,
     module: HloModule | None = None,
 ) -> dict[str, Any]:
@@ -1254,7 +1259,12 @@ def _validate_pallas_stage_linear_decoder_calls(
         "greenfield_fp8_block_matmul_m8_k6144_n2048": separate_qkv_a_calls,
         "greenfield_fp8_block_matmul_m8_k2048_n4096": layers,
         "greenfield_fp8_block_matmul_m8_k6144_n640": separate_qkv_a_calls,
-        "greenfield_fp8_block_matmul_m8_k4096_n6144": layers,
+        "greenfield_fp8_block_matmul_m8_k4096_n6144": (
+            0 if strategy_nd_attention_projection else layers
+        ),
+        "greenfield_fp8_block_matmul_m8_k512_n6144": (
+            8 * layers if strategy_nd_attention_projection else 0
+        ),
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": layers,
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": layers,
         "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": (
@@ -1280,6 +1290,10 @@ def _validate_pallas_stage_linear_decoder_calls(
         raise PlanValidationError("DSA query HLO backend is unknown")
     if not isinstance(dsa_head_key_exact_association, bool):
         raise PlanValidationError("exact DSA head/key HLO flag must be boolean")
+    if not isinstance(strategy_nd_attention_projection, bool):
+        raise PlanValidationError(
+            "StrategyND attention-projection HLO flag must be boolean"
+        )
     decoded_dimensions = (
         "2048,6144",
         "4096,2048",
@@ -1423,6 +1437,7 @@ def _classify_decoder_live_tensor_shapes(
     backend_contract: str,
     prefill_index_repair: bool = False,
     dsa_head_key_exact_association: bool = False,
+    strategy_nd_attention_projection: bool = False,
 ) -> dict[str, Any]:
     """Separate pinned DSA head scores from forbidden batch/full-pod tensors.
 
@@ -1658,6 +1673,7 @@ def _classify_decoder_live_tensor_shapes(
     allowed_prefill_index_repair_shapes = []
     allowed_exact_wk_feature_slices = []
     allowed_dsa_score_shapes = []
+    allowed_strategy_nd_virtual_partials = []
     forbidden_shapes = []
     hard_forbidden_dimensions = {
         (config.total_devices, config.hidden_size),
@@ -1677,6 +1693,30 @@ def _classify_decoder_live_tensor_shapes(
             config.index_key_width,
         ),
     }
+    strategy_nd_virtual_partial_shape = (
+        "bf16",
+        (config.total_devices, 1, config.hidden_size),
+    )
+    strategy_nd_virtual_partial_keys: set[tuple[str, str]] = set()
+    if strategy_nd_attention_projection:
+        gather_scope = "greenfield_strategy_nd_row0_association_gather"
+        strategy_gathers = tuple(
+            instruction
+            for instruction in module.collectives
+            if instruction.op_name is not None
+            and gather_scope in instruction.op_name.split("/")
+        )
+        gather_keys = tuple(
+            (instruction.computation, instruction.name)
+            for instruction in strategy_gathers
+        )
+        strategy_nd_virtual_partial_keys = {
+            key
+            for key, bits in _HloValueFlow(module).provenance(
+                gather_keys
+            ).items()
+            if bits
+        }
     for instruction in module.instructions:
         for shape in instruction.operand_shapes + instruction.result_shapes:
             if shape.dimensions not in hard_forbidden_dimensions:
@@ -1695,6 +1735,15 @@ def _classify_decoder_live_tensor_shapes(
             )
             if is_pinned_dsa_score:
                 allowed_dsa_score_shapes.append(record)
+            elif (
+                shape_key(shape) == strategy_nd_virtual_partial_shape
+                and (instruction.computation, instruction.name)
+                in strategy_nd_virtual_partial_keys
+            ):
+                # This is 32 virtual BF16 contraction partials resident on
+                # each LP4 owner after an exact four-way local gather, not a
+                # residual reconstructed over the physical 32-chip pod.
+                allowed_strategy_nd_virtual_partials.append(record)
             elif (
                 shape_key(shape) == repair_shape
                 and instruction.index in exact_wk_feature_slice_indices
@@ -1723,6 +1772,9 @@ def _classify_decoder_live_tensor_shapes(
         "allowed_prefill_index_repair_shapes": (
             allowed_prefill_index_repair_shapes
         ),
+        "allowed_strategy_nd_virtual_partials": (
+            allowed_strategy_nd_virtual_partials
+        ),
         "allowed_exact_wk_feature_slices": (
             allowed_exact_wk_feature_slices
         ),
@@ -1742,6 +1794,9 @@ def _classify_decoder_live_tensor_shapes(
         "score_dimensions": list(score_dimensions),
         "score_precision": (
             "default" if config.dsa_score_default_precision else "highest"
+        ),
+        "strategy_nd_attention_projection": (
+            strategy_nd_attention_projection
         ),
         "violations": body_violations,
     }
@@ -2651,6 +2706,494 @@ def _validate_pregathered_b512_attention_hlo(
     }
 
 
+class _HloValueFlow:
+    """Track HLO value provenance across tuples and called computations."""
+
+    def __init__(self, module: HloModule) -> None:
+        self._instructions = {
+            (instruction.computation, instruction.name): instruction
+            for instruction in module.instructions
+        }
+        parameters: dict[str, dict[int, tuple[str, str]]] = {}
+        roots: dict[str, tuple[str, str]] = {}
+
+        def computation_symbol(value: str) -> str:
+            parts = value.split()
+            if parts and parts[0] == "ENTRY":
+                parts = parts[1:]
+            return parts[0] if parts else value
+
+        for instruction in module.instructions:
+            symbol = computation_symbol(instruction.computation)
+            if instruction.opcode == "parameter":
+                match = re.search(
+                    r"\bparameter\(([0-9]+)\)", instruction.raw_line
+                )
+                if match is not None:
+                    parameters.setdefault(symbol, {})[int(match.group(1))] = (
+                        instruction.computation,
+                        instruction.name,
+                    )
+            if instruction.raw_line.lstrip().startswith("ROOT "):
+                roots[symbol] = (instruction.computation, instruction.name)
+
+        self._edges: dict[
+            tuple[str, str],
+            list[tuple[tuple[str, str], str, int | None]],
+        ] = {}
+        self._reverse_edges: dict[
+            tuple[str, str], set[tuple[str, str]]
+        ] = {}
+
+        def add_edge(
+            source: tuple[str, str],
+            target: tuple[str, str],
+            kind: str,
+            index: int | None = None,
+        ) -> None:
+            if source in self._instructions and target in self._instructions:
+                self._edges.setdefault(source, []).append(
+                    (target, kind, index)
+                )
+                self._reverse_edges.setdefault(target, set()).add(source)
+
+        call_opcodes = {"call", "conditional", "fusion", "while"}
+        for instruction in module.instructions:
+            target = (instruction.computation, instruction.name)
+            if instruction.opcode == "parameter":
+                continue
+            if instruction.opcode == "tuple":
+                for index, operand_name in enumerate(
+                    instruction.operand_names
+                ):
+                    add_edge(
+                        (instruction.computation, operand_name),
+                        target,
+                        "tuple",
+                        index,
+                    )
+            elif instruction.opcode == "get-tuple-element":
+                match = re.search(r"\bindex=([0-9]+)", instruction.raw_line)
+                if instruction.operand_names and match is not None:
+                    add_edge(
+                        (
+                            instruction.computation,
+                            instruction.operand_names[0],
+                        ),
+                        target,
+                        "get-tuple-element",
+                        int(match.group(1)),
+                    )
+            elif instruction.opcode not in call_opcodes:
+                for operand_name in instruction.operand_names:
+                    add_edge(
+                        (instruction.computation, operand_name),
+                        target,
+                        "ordinary",
+                    )
+
+            called = re.search(
+                r"\bcalls=(%[A-Za-z0-9_.:-]+)", instruction.raw_line
+            )
+            if called is not None:
+                symbol = called.group(1)
+                for index, operand_name in enumerate(
+                    instruction.operand_names
+                ):
+                    parameter = parameters.get(symbol, {}).get(index)
+                    if parameter is not None:
+                        add_edge(
+                            (instruction.computation, operand_name),
+                            parameter,
+                            "identity",
+                        )
+                root = roots.get(symbol)
+                if root is not None:
+                    add_edge(root, target, "identity")
+
+            branches = re.search(
+                r"\bbranch_computations=\{([^}]*)\}",
+                instruction.raw_line,
+            )
+            if branches is not None:
+                symbols = tuple(
+                    item.strip()
+                    for item in branches.group(1).split(",")
+                    if item.strip()
+                )
+                for branch_index, symbol in enumerate(symbols):
+                    operand_index = branch_index + 1
+                    if operand_index >= len(instruction.operand_names):
+                        continue
+                    parameter = parameters.get(symbol, {}).get(0)
+                    if parameter is not None:
+                        add_edge(
+                            (
+                                instruction.computation,
+                                instruction.operand_names[operand_index],
+                            ),
+                            parameter,
+                            "identity",
+                        )
+                    root = roots.get(symbol)
+                    if root is not None:
+                        add_edge(root, target, "identity")
+
+            body = re.search(
+                r"\bbody=(%[A-Za-z0-9_.:-]+)", instruction.raw_line
+            )
+            if body is not None and instruction.operand_names:
+                symbol = body.group(1)
+                parameter = parameters.get(symbol, {}).get(0)
+                if parameter is not None:
+                    add_edge(
+                        (
+                            instruction.computation,
+                            instruction.operand_names[0],
+                        ),
+                        parameter,
+                        "identity",
+                    )
+                    add_edge(target, parameter, "identity")
+                root = roots.get(symbol)
+                if root is not None:
+                    add_edge(root, target, "identity")
+
+    def provenance(
+        self,
+        seeds: Sequence[tuple[str, str]],
+        *,
+        allowed_target_opcodes: frozenset[str] | None = None,
+    ) -> dict[tuple[str, str], int]:
+        """Return one bit per seed at every reachable HLO value."""
+
+        ValuePath = tuple[int, ...] | None
+        reached: dict[
+            tuple[str, str], dict[ValuePath, int]
+        ] = {}
+        pending: list[tuple[tuple[str, str], ValuePath, int]] = []
+        for index, seed in enumerate(seeds):
+            if seed not in self._instructions:
+                continue
+            bit = 1 << index
+            reached.setdefault(seed, {})[()] = bit
+            pending.append((seed, (), bit))
+        while pending:
+            source, path, bits = pending.pop()
+            for target, kind, index in self._edges.get(source, ()):
+                target_instruction = self._instructions[target]
+                if (
+                    allowed_target_opcodes is not None
+                    and target_instruction.opcode
+                    not in allowed_target_opcodes
+                ):
+                    continue
+                if kind == "identity":
+                    target_path = path
+                elif kind == "tuple":
+                    assert index is not None
+                    target_path = (
+                        None if path is None else (index, *path)
+                    )
+                elif kind == "get-tuple-element":
+                    assert index is not None
+                    if path is None or path == ():
+                        target_path = (
+                            None
+                            if len(target_instruction.result_shapes) > 1
+                            else ()
+                        )
+                    elif path[0] != index:
+                        continue
+                    else:
+                        target_path = path[1:]
+                else:
+                    target_path = (
+                        None
+                        if len(target_instruction.result_shapes) > 1
+                        else ()
+                    )
+                target_paths = reached.setdefault(target, {})
+                old_bits = target_paths.get(target_path, 0)
+                new_bits = old_bits | bits
+                if new_bits != old_bits:
+                    target_paths[target_path] = new_bits
+                    pending.append((target, target_path, new_bits))
+        merged: dict[tuple[str, str], int] = {}
+        for key, path_bits in reached.items():
+            bits = 0
+            for value in path_bits.values():
+                bits |= value
+            merged[key] = bits
+        return merged
+
+    def exclusive_sources(
+        self,
+        targets: Sequence[tuple[str, str]],
+        *,
+        permitted_sources: frozenset[tuple[str, str]],
+        allowed_opcodes: frozenset[str],
+    ) -> tuple[frozenset[tuple[str, str]], tuple[str, ...]]:
+        """Trace targets backward and reject every non-permitted leaf/opcode."""
+
+        reached_sources: set[tuple[str, str]] = set()
+        violations: list[str] = []
+        pending = list(targets)
+        visited: set[tuple[str, str]] = set()
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            if current in permitted_sources:
+                reached_sources.add(current)
+                continue
+            instruction = self._instructions.get(current)
+            if instruction is None:
+                violations.append(f"missing HLO value {current}")
+                continue
+            if instruction.opcode not in allowed_opcodes:
+                violations.append(
+                    f"{current[1]} uses non-shape opcode {instruction.opcode}"
+                )
+                continue
+            sources = self._reverse_edges.get(current, set())
+            if not sources:
+                violations.append(
+                    f"{current[1]} reaches an unapproved {instruction.opcode} leaf"
+                )
+                continue
+            pending.extend(sources)
+        return frozenset(reached_sources), tuple(sorted(set(violations)))
+
+
+def _validate_strategy_nd_attention_projection_hlo(
+    module: HloModule,
+    *,
+    layers: int,
+    enabled: bool,
+) -> dict[str, Any]:
+    """Pin DB533's exact local replay for every attention projection."""
+
+    scope = "greenfield_strategy_nd_row0_attention_output"
+    gather_scope = "greenfield_strategy_nd_row0_association_gather"
+    kernel_name = "greenfield_fp8_block_matmul_m8_k512_n6144"
+
+    def in_scope(instruction: HloInstruction, name: str) -> bool:
+        return bool(instruction.op_name) and name in (
+            instruction.op_name or ""
+        ).split("/")
+
+    scoped = tuple(
+        instruction
+        for instruction in module.instructions
+        if in_scope(instruction, scope)
+    )
+    gathers = tuple(
+        instruction
+        for instruction in module.collectives
+        if in_scope(instruction, gather_scope)
+    )
+    kernel_identifier = re.compile(
+        rf"(?<![A-Za-z0-9_]){re.escape(kernel_name)}(?![A-Za-z0-9_])"
+    )
+    kernels = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.opcode == "custom-call"
+        and 'custom_call_target="tpu_custom_call"' in instruction.raw_line
+        and kernel_identifier.search(instruction.raw_line) is not None
+        and in_scope(instruction, scope)
+    )
+    violations: list[str] = []
+    if not enabled:
+        if scoped or gathers or kernels:
+            violations.append(
+                "default decoder unexpectedly contains StrategyND attention projection"
+            )
+        return {
+            "applicable": False,
+            "gather_count": len(gathers),
+            "kernel_count": len(kernels),
+            "passed": not violations,
+            "scoped_instruction_count": len(scoped),
+            "violations": violations,
+        }
+
+    expected_kernel_count = 8 * layers
+    if len(gathers) != layers:
+        violations.append(
+            "StrategyND attention gather count drifted: "
+            f"expected={layers} observed={len(gathers)}"
+        )
+    if len(kernels) != expected_kernel_count:
+        violations.append(
+            "StrategyND attention partial count drifted: "
+            f"expected={expected_kernel_count} observed={len(kernels)}"
+        )
+    logical_operand = HloShape("bf16", (8, 1, 6144))
+    logical_result = HloShape("bf16", (4, 8, 1, 6144))
+    folded_result = HloShape("bf16", (32, 1, 6144))
+    malformed_gathers = tuple(
+        instruction.name
+        for instruction in gathers
+        if instruction.opcode != "all-gather"
+        or instruction.operand_shapes != (logical_operand,)
+        or instruction.result_shapes
+        not in ((logical_result,), (folded_result,))
+        or "dimensions={0}" not in instruction.raw_line
+        or not instruction.use_global_device_ids
+    )
+    if malformed_gathers:
+        violations.append(
+            "StrategyND attention gathers lost exact LP4 geometry: "
+            f"{malformed_gathers}"
+        )
+    logical_call = (
+        (
+            HloShape("bf16", (1, 512)),
+            HloShape("u8", (6144, 512)),
+            HloShape("f32", (48, 4)),
+        ),
+        (HloShape("bf16", (1, 6144)),),
+    )
+    folded_call = (
+        (
+            HloShape("bf16", (8, 512)),
+            HloShape("u8", (6144, 512)),
+            HloShape("f32", (8, 128)),
+        ),
+        (HloShape("bf16", (8, 6144)),),
+    )
+    malformed_kernels = tuple(
+        instruction.name
+        for instruction in kernels
+        if (instruction.operand_shapes, instruction.result_shapes)
+        not in (logical_call, folded_call)
+    )
+    if malformed_kernels:
+        violations.append(
+            "StrategyND attention partials lost exact K512 geometry: "
+            f"{malformed_kernels[:8]}"
+        )
+
+    flow = _HloValueFlow(module)
+    kernel_keys = tuple(
+        (instruction.computation, instruction.name)
+        for instruction in kernels
+    )
+    gather_keys = tuple(
+        (instruction.computation, instruction.name)
+        for instruction in gathers
+    )
+    shape_only_opcodes = frozenset(
+        {
+            "all-gather",
+            "bitcast",
+            "concatenate",
+            "copy",
+            "fusion",
+            "get-tuple-element",
+            "optimization-barrier",
+            "parameter",
+            "reshape",
+            "slice",
+            "tuple",
+        }
+    )
+    kernel_flow = flow.provenance(
+        kernel_keys,
+        allowed_target_opcodes=shape_only_opcodes,
+    )
+    gather_source_bits = {
+        key: kernel_flow.get(key, 0) for key in gather_keys
+    }
+    malformed_lineage = tuple(
+        key[1]
+        for key, bits in gather_source_bits.items()
+        if bits.bit_count() != 8
+    )
+    if malformed_lineage:
+        violations.append(
+            "StrategyND attention gathers do not consume exactly eight K512 "
+            f"partials: {malformed_lineage}"
+        )
+    kernel_gather_counts = [
+        sum(bool(bits & (1 << index)) for bits in gather_source_bits.values())
+        for index in range(len(kernel_keys))
+    ]
+    partial_gather_bijection = (
+        len(gather_source_bits) == layers
+        and len(kernel_gather_counts) == expected_kernel_count
+        and all(count == 1 for count in kernel_gather_counts)
+        and not malformed_lineage
+    )
+    if not partial_gather_bijection:
+        violations.append(
+            "StrategyND K512 partials and attention gathers are not bijective"
+        )
+    gather_operands = tuple(
+        (instruction.computation, instruction.operand_names[0])
+        for instruction in gathers
+        if len(instruction.operand_names) == 1
+    )
+    exclusive_sources, exclusive_source_violations = flow.exclusive_sources(
+        gather_operands,
+        permitted_sources=frozenset(kernel_keys),
+        allowed_opcodes=shape_only_opcodes - {"all-gather"},
+    )
+    exclusive_partial_dataflow = (
+        len(gather_operands) == len(gathers)
+        and exclusive_sources == frozenset(kernel_keys)
+        and not exclusive_source_violations
+    )
+    if not exclusive_partial_dataflow:
+        violations.append(
+            "StrategyND gather operands are not exclusively assembled from "
+            "the declared K512 partials: "
+            f"{exclusive_source_violations}"
+        )
+
+    gather_flow = flow.provenance(gather_keys)
+    entry_roots = tuple(
+        (instruction.computation, instruction.name)
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+        and instruction.raw_line.lstrip().startswith("ROOT ")
+    )
+    live_gather_bits = 0
+    for root in entry_roots:
+        live_gather_bits |= gather_flow.get(root, 0)
+    expected_live_bits = (1 << len(gather_keys)) - 1
+    all_gathers_live = (
+        len(entry_roots) == 1 and live_gather_bits == expected_live_bits
+    )
+    if not all_gathers_live:
+        violations.append(
+            "StrategyND attention gather output is not live at the decoder root"
+        )
+    return {
+        "all_gathers_live": all_gathers_live,
+        "applicable": True,
+        "expected_gather_count": layers,
+        "expected_kernel_count": expected_kernel_count,
+        "exclusive_partial_dataflow": exclusive_partial_dataflow,
+        "exclusive_source_violations": exclusive_source_violations,
+        "gather_count": len(gathers),
+        "gather_names": [instruction.name for instruction in gathers],
+        "gather_source_counts": {
+            key[1]: bits.bit_count()
+            for key, bits in gather_source_bits.items()
+        },
+        "kernel_count": len(kernels),
+        "kernel_name": kernel_name,
+        "partial_gather_bijection": partial_gather_bijection,
+        "passed": not violations,
+        "scoped_instruction_count": len(scoped),
+        "violations": violations,
+    }
+
+
 def _expected_tpu_decoder_reductions(
     *,
     layers: int,
@@ -2661,11 +3204,14 @@ def _expected_tpu_decoder_reductions(
     complete_token_path: bool,
     split_residual_state: bool,
     token_observation_candidates: int,
+    strategy_nd_attention_projection: bool = False,
 ) -> tuple[dict[str, int], dict[str, int]]:
     """Return the protected GLM TPU all-reduce arities and logical shapes."""
 
     result_shapes = {
-        "bf16[1,6144]": layers + dense_layers,
+        "bf16[1,6144]": dense_layers + (
+            0 if strategy_nd_attention_projection else layers
+        ),
         "bf16[2,1,6144]": sparse_layers,
     }
     if pregathered_b512_attention:
@@ -2674,7 +3220,11 @@ def _expected_tpu_decoder_reductions(
         # 78 f32[256] and 78 u32[1,1,128] all-reduce components, including
         # their tuple launch fusion. The remaining attention-output and MLP
         # reductions are single-result, as is the new selected-cache sum.
-        arities = {"1": 2 * layers + layers}
+        arities = {
+            "1": 2 * layers + (
+                0 if strategy_nd_attention_projection else layers
+            )
+        }
         result_shapes["bf16[1,2048,640]"] = layers
     else:
         # The accepted full-decoder lowering launch-fuses the 312 logical
@@ -2700,6 +3250,7 @@ def _expected_tpu_decoder_reductions(
 def validate_decoder_step_hlo(
     optimized_hlo: str,
     *,
+    stablehlo: str | None = None,
     config: DecoderStepConfig,
     schedule: PipelineSchedule,
     groups: Sequence[Sequence[int]],
@@ -2718,6 +3269,7 @@ def validate_decoder_step_hlo(
     prefill_index_repair: bool = False,
     main_rope_table_enabled: bool = False,
     pregathered_b512_attention: bool = False,
+    strategy_nd_attention_projection: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -2753,6 +3305,14 @@ def validate_decoder_step_hlo(
     if not isinstance(pregathered_b512_attention, bool):
         raise PlanValidationError(
             "pregathered-B512 attention HLO flag must be boolean"
+        )
+    if not isinstance(strategy_nd_attention_projection, bool):
+        raise PlanValidationError(
+            "StrategyND attention-projection HLO flag must be boolean"
+        )
+    if strategy_nd_attention_projection and not pregathered_b512_attention:
+        raise PlanValidationError(
+            "StrategyND attention-projection HLO requires pregathered-B512"
         )
     if pregathered_b512_attention and backend_contract != (
         "tpu_v4_pp8_pallas_feature_linear"
@@ -2906,6 +3466,7 @@ def validate_decoder_step_hlo(
         # but adds embedding plus score/id singleton reductions.
         expected_gathers = (
             (0 if pregathered_b512_attention else 2 * layers)
+            + (layers if strategy_nd_attention_projection else 0)
             + 3 * full_layers
         )
         (
@@ -2916,6 +3477,9 @@ def validate_decoder_step_hlo(
             dense_layers=dense_layers,
             sparse_layers=sparse_layers,
             pregathered_b512_attention=pregathered_b512_attention,
+            strategy_nd_attention_projection=(
+                strategy_nd_attention_projection
+            ),
             feature_reconstruct_down_fp32=feature_reconstruct_down_fp32,
             complete_token_path=complete_token_path,
             split_residual_state=split_residual_state,
@@ -3095,6 +3659,9 @@ def validate_decoder_step_hlo(
         dsa_head_key_exact_association=(
             dsa_head_key_exact_association
         ),
+        strategy_nd_attention_projection=(
+            strategy_nd_attention_projection
+        ),
     )
     forbidden_shapes = live_tensor_contract["forbidden_shapes"]
     violations.extend(live_tensor_contract["violations"])
@@ -3156,6 +3723,9 @@ def validate_decoder_step_hlo(
                     dsa_head_key_exact_association
                 ),
                 attention_projection_backend=attention_projection_backend,
+                strategy_nd_attention_projection=(
+                    strategy_nd_attention_projection
+                ),
                 prefill_index_repair=prefill_index_repair,
                 module=module,
             )
@@ -3224,6 +3794,24 @@ def validate_decoder_step_hlo(
         )
     )
     violations.extend(pregathered_attention_contract["violations"])
+    strategy_nd_attention_contract = (
+        _validate_strategy_nd_attention_projection_hlo(
+            module,
+            layers=layers,
+            enabled=strategy_nd_attention_projection,
+        )
+    )
+    violations.extend(strategy_nd_attention_contract["violations"])
+    strategy_nd_attention_stablehlo_contract = (
+        validate_strategy_nd_attention_stablehlo(
+            stablehlo,
+            layers=layers,
+            enabled=strategy_nd_attention_projection,
+        )
+    )
+    violations.extend(
+        strategy_nd_attention_stablehlo_contract["violations"]
+    )
     return {
         "backend_contract": backend_contract,
         "collective_count": len(collectives),
@@ -3283,8 +3871,17 @@ def validate_decoder_step_hlo(
         "main_rope_table_enabled": main_rope_table_enabled,
         "main_rope_table_contract": main_rope_table_contract,
         "pregathered_b512_attention": pregathered_b512_attention,
+        "strategy_nd_attention_projection": (
+            strategy_nd_attention_projection
+        ),
         "pregathered_b512_attention_contract": (
             pregathered_attention_contract
+        ),
+        "strategy_nd_attention_projection_contract": (
+            strategy_nd_attention_contract
+        ),
+        "strategy_nd_attention_stablehlo_contract": (
+            strategy_nd_attention_stablehlo_contract
         ),
         "fused_qkv_a_contract": fused_qkv_a_contract,
         "passed": not violations,
@@ -4231,6 +4828,7 @@ def _execute_stage(
     dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
     pregathered_b512_attention: bool,
+    strategy_nd_attention_projection: bool,
     main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -4460,6 +5058,7 @@ def _execute_stage_split(
     dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
     pregathered_b512_attention: bool,
+    strategy_nd_attention_projection: bool,
     main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -4588,6 +5187,14 @@ def _execute_stage_split(
             ),
             attention_projection_backend=attention_projection_backend,
             pregathered_b512_attention=pregathered_b512_attention,
+            virtual_tp32_reduction_association=(
+                STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+                if strategy_nd_attention_projection
+                else None
+            ),
+            virtual_tp32_attention_only=(
+                strategy_nd_attention_projection
+            ),
             main_rope_table_row=main_rope_table_row,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -4702,6 +5309,7 @@ def build_decoder_step_program(
     attention_projection_backend: AttentionProjectionBackend = "separate",
     main_rope_table_enabled: bool = False,
     pregathered_b512_attention: bool = False,
+    strategy_nd_attention_projection: bool = False,
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
     observe_dsa_internals: bool = False,
@@ -4804,6 +5412,10 @@ def build_decoder_step_program(
         raise PlanValidationError(
             "decoder pregathered-B512 attention flag must be boolean"
         )
+    if not isinstance(strategy_nd_attention_projection, bool):
+        raise PlanValidationError(
+            "decoder StrategyND attention-projection flag must be boolean"
+        )
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(split_residual_state, bool):
@@ -4823,6 +5435,15 @@ def build_decoder_step_program(
         raise PlanValidationError(
             "pregathered-B512 attention requires the protected PP8 exact "
             "split-token Pallas/main-RoPE/DSA/fused-qkv path"
+        )
+    if strategy_nd_attention_projection and not pregathered_b512_attention:
+        raise PlanValidationError(
+            "StrategyND attention projection requires the protected "
+            "pregathered-B512 attention path"
+        )
+    if strategy_nd_attention_projection and not split_residual_state:
+        raise PlanValidationError(
+            "StrategyND attention projection requires split residual state"
         )
     if not isinstance(observe_dsa_events, bool):
         raise PlanValidationError("DSA event-observation flag must be boolean")
@@ -5373,6 +5994,9 @@ def build_decoder_step_program(
                             pregathered_b512_attention=(
                                 pregathered_b512_attention
                             ),
+                            strategy_nd_attention_projection=(
+                                strategy_nd_attention_projection
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
@@ -5436,6 +6060,9 @@ def build_decoder_step_program(
                             pregathered_b512_attention=(
                                 pregathered_b512_attention
                             ),
+                            strategy_nd_attention_projection=(
+                                strategy_nd_attention_projection
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
@@ -5497,6 +6124,9 @@ def build_decoder_step_program(
                             pregathered_b512_attention=(
                                 pregathered_b512_attention
                             ),
+                            strategy_nd_attention_projection=(
+                                strategy_nd_attention_projection
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                         ),
@@ -5553,6 +6183,9 @@ def build_decoder_step_program(
                         pregathered_b512_attention=(
                             pregathered_b512_attention
                         ),
+                        strategy_nd_attention_projection=(
+                            strategy_nd_attention_projection
+                        ),
                         main_rope_table_row=main_rope_table_row,
                         prefill_index_inputs=values[4],
                     ),
@@ -5601,6 +6234,9 @@ def build_decoder_step_program(
                         ),
                         pregathered_b512_attention=(
                             pregathered_b512_attention
+                        ),
+                        strategy_nd_attention_projection=(
+                            strategy_nd_attention_projection
                         ),
                         main_rope_table_row=main_rope_table_row,
                     ),
@@ -7101,6 +7737,9 @@ def build_decoder_step_program(
         attention_projection_backend=attention_projection_backend,
         main_rope_table_enabled=main_rope_table_enabled,
         pregathered_b512_attention=pregathered_b512_attention,
+        strategy_nd_attention_projection=(
+            strategy_nd_attention_projection
+        ),
         main_rope_table_host=main_rope_table_host,
         main_rope_table_sha256=main_rope_table_digest,
         main_rope_table_bytes_per_device=main_rope_table_bytes,

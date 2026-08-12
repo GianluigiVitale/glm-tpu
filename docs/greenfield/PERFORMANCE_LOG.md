@@ -1331,3 +1331,21 @@ normalized row (`4022/2318/4044/2388` mismatches). It has no complete decoder lo
 distribution, XPlane or HBM peak. DB484 therefore remains the sole accepted PP8 performance result
 at `244.091151 ms/token` / `4.096830 tok/s`; Gate E is still open. The next post-`o_proj` capture is
 also correctness-only and cannot change the performance standing.
+
+## DB539 attention-update classification — no performance result
+
+DB539/item1823 is an accepted-oracle capture and offline comparison, not a decoder benchmark. It
+proves the StrategyND attention projection matches the accepted layer-0 update bitwise and rejects
+the local LP4 sum, but has no warmed decoder loop, XPlane, HBM peak or profiler-free distribution.
+DB484 therefore remains the sole accepted PP8 performance result at `244.091151 ms/token` /
+`4.096830 tok/s`; Gates D and E remain open.
+
+The authorized production path replaces each K4096 attention-output projection plus LP4 sum with
+eight K512 calls plus one LP4 gather and the local StrategyND tree. Whether that extra arithmetic
+raises or lowers the approximately 30.435 ms active-stage time is unknown until the protected 8K
+run. Correctness, not an assumed speedup, is the reason for this integration.
+
+The subsequent StableHLO verifier correction is also not performance evidence. It performs no TPU
+execution and changes no arithmetic; it makes the protected compiler gate prove the ordered K512
+slices and exact DB533 reduction tree before timing is allowed. DB484 remains the only accepted
+decoder measurement until the complete protected 8K run passes.

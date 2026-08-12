@@ -7869,3 +7869,59 @@ unmotivated arithmetic variants.
   position/strategy/post-WUV/source-ledger semantics; and reject pre-existing or extra archive
   objects before terminal publication. Mutation/source-order tests cover every demonstrated bypass.
   The focused adjacent batch passes 20/20 and correction-only review returned `APPROVED`.
+
+## 2026-08-12 17:28--18:10 — DB539 resolves the post-`o_proj` boundary
+
+- DB539/item1823 completed under tag
+  `greenfield_legacy_layer0_attention_update_p8155_20260812T172809039093068Z`. The accepted layer-0
+  post-`o_proj` row has SHA `68afed86...de7`. DB538's StrategyND attention candidate matches all
+  6,144 BF16 elements bitwise; the ordinary local LP4 reduction differs in 3,652 elements. The
+  sealed classification is `strategy_nd_attention_projection_exact`, exact candidates are only
+  `strategy_nd`, and the first open boundary moves after attention projection.
+- Capture/comparison/tensor/SUCCESS/results-DB/remote-ledger SHAs are `f5b502cf...a91e`,
+  `780cf3c2...435c`, `02c78d13...cec6`, `f52d3e88...f508`, `c33f23bf...ea2`, and
+  `3f3910fc...e045`. The accepted observer pin is `23ab8780...761`, its oracle pin is
+  `b3c25df4...16d`, the DB538 prerequisite is pinned, direct approved-bucket bytes agree, and both
+  censuses authenticate 8/8 zero work.
+- This closes the numerical cause, not Gate D. The production successor is a separate default-off
+  flag on the already-proven B512/split-residual path. It reuses the existing eight-K512 partial
+  helper for attention only in all 78 layers; dense/MoE reductions are unchanged. Expected TPU
+  deltas are 78 new LP4 all-gathers, removal of 78 attention-output all-reduces, and replacement of
+  78 K4096 calls with 624 K512 calls.
+- The fail-closed HLO contract pins exact logical/folded shapes, exact kernel identifiers and
+  scopes, one-to-eight gather lineage, call/gather bijection, exclusive gather inputs, local global
+  ids/groups, and root liveness. It permits folded `bf16[32,1,6144]` only when derived from this
+  local virtual-partial gather. The preserved real DB538 one-layer optimized HLO passes this exact
+  contract; injected leaves, bypasses, duplicate partials, dead gathers and suffixed kernels fail.
+- The protected short-decoder wrapper now performs the strict post-census before any DB mutation,
+  authenticates and rolls back each possible committed DB prefix on later failure, refuses a
+  non-vacant remote tag, compares every archived object to local CRC32C, rejects an inexact remote
+  object set, and publishes directly rehashed `SUCCESS` last. This replaces the old nested
+  directory upload and prevents an archive failure from leaving a successful live DB row.
+- Local readiness currently passes the 96-test decoder/prefill/wrapper batch and the 34-test
+  StrategyND/attention/validation batch, plus compileall, Bash, ShellCheck and diff checks. Exact
+  next is one Sol audit of this complete new diff, corrections if any, commit/push, then one
+  serialized protected 8K Gate-D run. No further arithmetic discriminator is due first.
+
+## 2026-08-12 — StrategyND pre-fusion arithmetic proof closes the final audit gap
+
+- The single new-diff Sol audit found one medium fail-open condition: optimized HLO established
+  counts, exact names, local groups, gather lineage/bijection and root liveness, but it admitted a
+  permutation of the eight K512 partials and did not encode DB533's exact post-gather BF16 tree.
+- The correction validates pre-fusion StableHLO in addition to optimized HLO. For every layer it
+  requires ordered contiguous input/weight K512 and scale K4 slices from one source triple, exact
+  zero padding and K512 geometry, the DB533 physical-row permutation, the three `y`, one `x`, and
+  24 alternating `z` barrier-rounded reductions, exclusive gather consumption and a live final
+  concatenate. Calls, gathers and layer sources are bijective.
+- Decoder, DSA observer and teacher-forced prefill now capture the lowering before compilation,
+  compute fleet-identical StableHLO hashes, feed it to the common fail-closed validator and archive
+  it beside optimized HLO. Missing StableHLO refuses whenever StrategyND is enabled.
+- Direct replay of DB538's preserved real TPU StableHLO passes with one gather, eight ordered K512
+  calls and one exact tree. The first correction-only pass found that caller shapes/zero operands
+  did not authenticate the private pad bodies. The final matcher pins the exact helper signature,
+  i32-to-BF16/FP32 zero conversion, lhs/scale low/high/interior placement, sole pad operation and
+  return lineage. Wrong real lhs and scale pad placement and an unknown callee now refuse.
+- Regressions also cover swapped partial rows, cross-wired layer sources, changed association,
+  bypass/branch output and rogue pad callee. The same reviewer returned `APPROVE COMMIT`. The final
+  combined affected suite passes 101/101 in 171.64 seconds; compileall, Bash, ShellCheck, runtime
+  import smoke and diff checks pass. This is readiness only and changes no Gate-D/performance claim.

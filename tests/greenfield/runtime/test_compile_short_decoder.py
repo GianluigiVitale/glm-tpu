@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
+import re
+import sqlite3
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -295,8 +300,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "isolated residual direct remote contract hash drifted" in runner
     assert '"dcp_then_model_sequential_bf16"' in compiler
     assert '"model_then_dcp_pairwise_bf16"' in compiler
-    assert '"schema_version": 17' in compiler
-    assert 'record["schema_version"] for record in records} != {17}' in runner
+    assert '"schema_version": 18' in compiler
+    assert 'record["schema_version"] for record in records} != {18}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
@@ -448,6 +453,253 @@ def test_pregathered_b512_attention_is_default_off_and_db537_protected() -> None
     assert "greenfield_pregathered_b512_attention_prerequisite_db_run" in runner
     assert "if pregathered_b512_attention else None" in runner
     assert "_pregatheredb512" in runner
+
+
+def test_strategy_nd_attention_projection_is_default_off_and_db539_protected() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+    decoder = (REPO / "glm_tpu/greenfield/runtime/decoder.py").read_text()
+    prefill = (REPO / "glm_tpu/greenfield/runtime/prefill.py").read_text()
+
+    assert '"--strategy-nd-attention-projection"' in compiler
+    assert '"GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION", "0"' in compiler
+    assert "strategy_nd_attention_projection=False" not in compiler
+    assert '"strategy_nd_attention_projection": (' in compiler
+    assert "strategy_nd_attention_projection: bool = False" in decoder
+    assert "decoder.strategy_nd_attention_projection" in prefill
+    assert "decoder_stablehlo = lowered.as_text()" in compiler
+    assert "stablehlo=decoder_stablehlo" in compiler
+    assert "stablehlo=dsa_observer_stablehlo" in compiler
+    assert "stablehlo=prefill_stablehlo" in compiler
+    assert 'f"{hlo_stem}.stablehlo.mlir.gz"' in compiler
+    assert "validate_strategy_nd_attention_stablehlo" in decoder
+    assert (
+        "readonly STRATEGY_ND_ATTENTION_PROJECTION="
+        "${GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION:-0}" in runner
+    )
+    assert (
+        "export GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION="
+        "$STRATEGY_ND_ATTENTION_PROJECTION" in runner
+    )
+    assert "StrategyND attention projection requires the protected 8K" in runner
+    assert "STRATEGY_ND_ATTENTION_PREREQUISITE_TAG" in runner
+    assert "greenfield_legacy_layer0_attention_update_p8155_20260812T172809039093068Z" in runner
+    assert "DB539 StrategyND attention prerequisite drifted" in runner
+    assert "DB539 prerequisite DB linkage drifted" in runner
+    assert "DB539 direct remote $remote_file hash drifted" in runner
+    assert "validate_strategy_nd_attention_hlo" in runner
+    assert 'contract["gather_count"] != 78' in runner
+    assert 'contract["kernel_count"] != 624' in runner
+    assert "greenfield_strategy_nd_attention_projection_prerequisite_db_run" in runner
+    assert "539 if strategy_nd_attention_projection else None" in runner
+    assert "_strategynd_o" in runner
+    assert runner.index("strict_census post") < runner.index("pv.start_run(")
+
+
+def test_protected_runner_seals_archive_before_terminal_success() -> None:
+    runner = PROTECTED_RUNNER.read_text()
+
+    for token in (
+        "remote_prefix_preflight.txt",
+        "rollback_provisional_db",
+        "provisional_db_run_id.txt",
+        "google_crc32c",
+        "remote object ledger checksum mismatch",
+        "validate_exact_remote_object_set(root, prefix, listing)",
+        "terminal_success_done=1",
+        '"greenfield_run_tag": greenfield_run_tag',
+    ):
+        assert token in runner
+    post_census = runner.index("strict_census post")
+    db_mutation = runner.index("pv.start_run(")
+    bulk_upload = runner.index(
+        'gcloud storage cp --recursive --no-clobber "$RUN_DIR"/*'
+    )
+    exact_object_gate = runner.index(
+        "validate_exact_remote_object_set(root, prefix, listing)"
+    )
+    success_create = runner.index('(root / "SUCCESS").write_text')
+    success_upload_marker = (
+        'gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS"'
+    )
+    success_upload = runner.index(success_upload_marker)
+    terminal = runner.index("terminal_success_done=1")
+    assert (
+        post_census
+        < db_mutation
+        < bulk_upload
+        < exact_object_gate
+        < success_create
+        < success_upload
+        < terminal
+    )
+    assert "gcloud storage cp" not in runner[
+        success_upload + len(success_upload_marker) :
+    ]
+
+
+def _short_decoder_rollback_program() -> str:
+    match = re.search(
+        r"rollback_provisional_db\(\) \{.*?<<'PY'\n(?P<program>.*?)\nPY\n\}",
+        PROTECTED_RUNNER.read_text(),
+        flags=re.DOTALL,
+    )
+    assert match is not None
+    return match.group("program")
+
+
+@pytest.mark.parametrize("state", ("run", "item", "summary"))
+def test_short_decoder_rollback_removes_each_committed_prefix(
+    tmp_path: Path,
+    state: str,
+) -> None:
+    provenance_path = REPO / "bench/provenance.py"
+    specification = importlib.util.spec_from_file_location(
+        f"short_decoder_rollback_provenance_{state}", provenance_path
+    )
+    assert specification is not None and specification.loader is not None
+    provenance = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(provenance)
+
+    database = tmp_path / f"{state}.db"
+    tag = f"rollback_{state}"
+    pin = "a" * 40
+    runtime_manifest = "b" * 64
+    benchmark = "greenfield_78layer_8k_gate-d_pp8_strategynd_o"
+    connection = provenance.connect(str(database))
+    run_id = provenance.start_run(
+        connection,
+        model="zai-org/GLM-5.2-FP8:greenfield-78layer-8k-gate-d",
+        revision=runtime_manifest,
+        env={
+            "GLM_ENGINE": "greenfield_pp8_decoder_gate-d",
+            "greenfield_code_hash": pin,
+            "greenfield_complete_token_path": True,
+            "greenfield_run_tag": tag,
+            "greenfield_short_context_dsa_oracle": True,
+            "greenfield_short_context_oracle": True,
+            "greenfield_strategy_nd_attention_projection": True,
+            "runtime_manifest_sha256": runtime_manifest,
+        },
+        note=(
+            "Protected real 78-layer 8K transformer-body compile/run with "
+            "sealed test flags."
+        ),
+        harness_repo=str(REPO),
+        fork_repo=None,
+    )
+    if state in {"item", "summary"}:
+        provenance.record_item(
+            connection,
+            run_id,
+            benchmark=benchmark,
+            item_id="gate_d_exact_token_and_dsa",
+            prompt="sealed",
+            gold="exact",
+            raw_output="{}",
+            extracted="{}",
+            correct=True,
+            score=1.0,
+        )
+    if state == "summary":
+        provenance.finalize(
+            connection,
+            run_id,
+            benchmark=benchmark,
+            metric="contract_valid",
+            value=1.0,
+            note="Protected test.",
+        )
+    connection.close()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(database),
+            tag,
+            pin,
+            runtime_manifest,
+            "8k",
+            "1",
+            "1",
+            "1",
+            "1",
+        ],
+        input=_short_decoder_rollback_program(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ROLLED_BACK_PROVISIONAL_DB_RUN=" in result.stdout
+    verify = sqlite3.connect(database)
+    assert verify.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
+    assert verify.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
+    assert verify.execute("SELECT COUNT(*) FROM summary").fetchone()[0] == 0
+    verify.close()
+
+
+def test_short_decoder_rollback_refuses_nonidentical_run(tmp_path: Path) -> None:
+    provenance_path = REPO / "bench/provenance.py"
+    specification = importlib.util.spec_from_file_location(
+        "short_decoder_rollback_provenance_refusal", provenance_path
+    )
+    assert specification is not None and specification.loader is not None
+    provenance = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(provenance)
+
+    database = tmp_path / "refusal.db"
+    tag = "rollback_refusal"
+    runtime_manifest = "b" * 64
+    connection = provenance.connect(str(database))
+    provenance.start_run(
+        connection,
+        model="zai-org/GLM-5.2-FP8:greenfield-78layer-8k-gate-d",
+        revision=runtime_manifest,
+        env={
+            "GLM_ENGINE": "greenfield_pp8_decoder_gate-d",
+            "greenfield_code_hash": "c" * 40,
+            "greenfield_complete_token_path": True,
+            "greenfield_run_tag": tag,
+            "greenfield_short_context_dsa_oracle": True,
+            "greenfield_short_context_oracle": True,
+            "greenfield_strategy_nd_attention_projection": True,
+            "runtime_manifest_sha256": runtime_manifest,
+        },
+        note=(
+            "Protected real 78-layer 8K transformer-body compile/run with "
+            "sealed test flags."
+        ),
+        harness_repo=str(REPO),
+        fork_repo=None,
+    )
+    connection.close()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(database),
+            tag,
+            "a" * 40,
+            runtime_manifest,
+            "8k",
+            "1",
+            "1",
+            "1",
+            "1",
+        ],
+        input=_short_decoder_rollback_program(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "refusing non-identical provisional DB rollback" in result.stderr
+    verify = sqlite3.connect(database)
+    assert verify.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
+    verify.close()
 
 
 def test_layer0_attention_schedule_discriminator_is_sealed_and_default_off() -> None:

@@ -18,6 +18,7 @@ from .reference.qkv_a import (
 )
 from .reference.rmsnorm import fused_add_rms_norm, rms_norm
 from .stage_local import (
+    STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
     StageLocalDenseFp8Ingredients,
     StageLocalDsaFp8Internals,
     StageLocalIndexShareFp8Ingredients,
@@ -625,8 +626,14 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError(
             "attention-only virtual TP32 requires an explicit association"
         )
-    if virtual_tp32_reduction_association is not None and mlp_kind != "dense":
-        raise ValueError("virtual TP32 reduction requires a dense layer")
+    if (
+        virtual_tp32_reduction_association is not None
+        and mlp_kind != "dense"
+        and not virtual_tp32_attention_only
+    ):
+        raise ValueError(
+            "dense virtual TP32 reduction requires a dense layer"
+        )
     if capture_ingredients and (
         mlp_kind != "dense"
         or reconstruct_attention_output_fp32
@@ -637,11 +644,19 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError(
             "layer ingredient capture requires the production dense BF16 Pallas path"
         )
+    strategy_nd_attention_projection = (
+        virtual_tp32_attention_only
+        and virtual_tp32_reduction_association
+        == STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+    )
     if pregathered_b512_attention and (
         replicated_monolithic_attention
         or capture_ingredients
-        or virtual_tp32_reduction_association is not None
         or reconstruct_attention_output_fp32
+        or (
+            virtual_tp32_reduction_association is not None
+            and not strategy_nd_attention_projection
+        )
     ):
         raise ValueError(
             "layer pregathered-B512 attention must remain isolated from "

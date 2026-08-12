@@ -72,8 +72,11 @@ def test_protected_8k_prefill_repair_has_four_chunks_per_layer() -> None:
 
 
 @pytest.mark.parametrize("pregathered_b512_attention", [False, True])
+@pytest.mark.parametrize("strategy_nd_attention_projection", [False, True])
 def test_prefill_hlo_forwards_exact_head_key_contract(
-    monkeypatch, pregathered_b512_attention: bool
+    monkeypatch,
+    pregathered_b512_attention: bool,
+    strategy_nd_attention_projection: bool,
 ) -> None:
     captured: dict[str, object] = {}
 
@@ -99,6 +102,7 @@ def test_prefill_hlo_forwards_exact_head_key_contract(
         observe_prefill_index_inputs=False,
         pairs=((0, 1),),
         pregathered_b512_attention=pregathered_b512_attention,
+        strategy_nd_attention_projection=strategy_nd_attention_projection,
         split_residual_state=True,
     )
     program = SimpleNamespace(
@@ -114,16 +118,22 @@ def test_prefill_hlo_forwards_exact_head_key_contract(
 
     contract = validate_teacher_forced_prefill_hlo(
         hlo,
+        stablehlo="module @prefill {}",
         program=program,
         schedule=schedule,
         backend_contract="cpu_reference",
     )
 
     assert captured["dsa_head_key_exact_association"] is True
+    assert captured["stablehlo"] == "module @prefill {}"
     assert captured["main_rope_table_enabled"] is False
     assert (
         captured["pregathered_b512_attention"]
         is pregathered_b512_attention
+    )
+    assert (
+        captured["strategy_nd_attention_projection"]
+        is strategy_nd_attention_projection
     )
     assert contract["passed"] is True
 

@@ -173,6 +173,18 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
   exactly one scoped sum through only cache-preserving bitcast/copy/reshape transforms, and all
   exchange/call links must be bijective. Any bypass, escaped group, old attention-exchange scope,
   wrong B512 kernel count/shape or dead decode row is a hard HLO refusal.
+- DB539 fixes the subsequent attention-output projection association. Each LP4 owner computes
+  eight independently BF16-rounded K512 contraction partials from its local 4,096-wide output
+  projection input. One four-owner LP4 all-gather forms 32 virtual partials locally, then the
+  DB533 physical-row-zero `y -> x -> z` StrategyND tree reduces them. This applies to attention
+  projection only; dense and MoE combines retain their established local contracts.
+- The complete 78-layer StrategyND attention path must contain exactly 624 exact-name K512 Pallas
+  calls and 78 four-rank local all-gathers. Each gather must consume exactly eight calls, every
+  call must feed exactly one gather, no unapproved leaf or arithmetic may enter the gather operand,
+  and every gather must remain live at the decoder root. TPU's folded `bf16[32,1,6144]` value is
+  explicitly classified as 32 virtual contraction partials resident within LP4, never as a
+  physical 32-chip residual reconstruction. The feature is default-off and requires the protected
+  split-residual, selected-cache B512 path.
 
 ## GLM-5.2 sparse MoE
 
@@ -228,3 +240,14 @@ actual TPU score row, and the exact resulting state is consumed by IndexShare. T
 PyTorch CPU row has bounded score error but swaps two of 2,048 members at the cutoff (2,046 set
 overlap), so raw cross-backend position identity is explicitly false. No tolerance is applied to
 the runtime selection assertion, and the CPU positions are not used as runtime state.
+
+For DB539's StrategyND attention-output path, optimized HLO is necessary but insufficient because
+backend fusion erases slice order and most individual BF16 additions. The paired StableHLO contract
+requires shard `i` to use input/weight columns `[512i:512(i+1)]` and scale columns
+`[4i:4(i+1)]`, all eight partials to share one layer source triple, the exact DB533 physical row
+permutation, and the complete barrier-rounded `y -> x -> z` tree. The exact tree must be the
+gather's sole consumer and reach a function or manual-computation return. Swapping rows, cross-
+wiring layers, reassociating an add, or returning a bypass is a hard refusal. The lhs and scale pad
+calls must also resolve to exact private helpers: scalar i32 zero converts to BF16/FP32, then pads
+`[1,512] -> [8,512]` with high `[7,0]` or `[4,48] -> [8,128]` with high `[4,80]`, both with zero
+low/interior values and direct return lineage. An opaque, unknown or differently placed pad refuses.

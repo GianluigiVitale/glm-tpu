@@ -662,6 +662,181 @@ def test_pregathered_b512_reduction_contract_removes_old_merge_results() -> None
     assert default_shapes["u32[1,1,128]"] == 78
 
 
+def _strategy_nd_attention_projection_hlo(*, folded: bool = False) -> str:
+    call_input = "bf16[8,512]" if folded else "bf16[1,512]"
+    scale = "f32[8,128]" if folded else "f32[48,4]"
+    call_output = "bf16[8,6144]" if folded else "bf16[1,6144]"
+    calls: list[str] = []
+    partials: list[str] = []
+    for index in range(8):
+        calls.append(
+            f"  %call.{index} = {call_output} custom-call(%lhs, %rhs, %scale), "
+            'custom_call_target="tpu_custom_call", metadata={op_name="jit(mapped)/'
+            "shard_map/greenfield_strategy_nd_row0_attention_output/"
+            f"greenfield_fp8_block_matmul_m8_k512_n6144/call.{index}\"}}, "
+            'backend_config={"body":"greenfield_fp8_block_matmul_m8_k512_n6144"}'
+        )
+        if folded:
+            calls.append(
+                f"  %partial.{index} = bf16[1,6144] slice(%call.{index}), "
+                "slice={[0:1],[0:6144]}"
+            )
+            partials.append(f"%partial.{index}")
+        else:
+            partials.append(f"%call.{index}")
+    return f'''HloModule strategy_nd_attention, replica_count=1, num_partitions=4
+
+ENTRY %main (lhs: {call_input}, rhs: u8[6144,512], scale: {scale}) -> bf16[4,8,1,6144] {{
+  %lhs = {call_input} parameter(0)
+  %rhs = u8[6144,512] parameter(1)
+  %scale = {scale} parameter(2)
+{chr(10).join(calls)}
+  %partials = bf16[8,6144] concatenate({', '.join(partials)}), dimensions={{0}}
+  %logical = bf16[8,1,6144] reshape(%partials)
+  %gather = bf16[4,8,1,6144] all-gather(%logical), dimensions={{0}}, replica_groups={{{{0,1,2,3}}}}, use_global_device_ids=true, metadata={{op_name="jit(mapped)/shard_map/greenfield_strategy_nd_row0_attention_output/greenfield_strategy_nd_row0_association/greenfield_strategy_nd_row0_association_gather/all_gather"}}
+  ROOT %root = bf16[4,8,1,6144] copy(%gather)
+}}
+'''
+
+
+def test_strategy_nd_attention_projection_hlo_is_fail_closed() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_strategy_nd_attention_projection_hlo,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    for folded in (False, True):
+        hlo = _strategy_nd_attention_projection_hlo(folded=folded)
+        accepted = _validate_strategy_nd_attention_projection_hlo(
+            parse_hlo_module(hlo), layers=1, enabled=True
+        )
+        assert accepted["passed"], accepted
+        assert accepted["gather_count"] == 1
+        assert accepted["kernel_count"] == 8
+        assert accepted["gather_source_counts"] == {"%gather": 8}
+        assert accepted["partial_gather_bijection"]
+        assert accepted["exclusive_partial_dataflow"]
+        assert not accepted["exclusive_source_violations"]
+        assert accepted["all_gathers_live"]
+
+    hlo = _strategy_nd_attention_projection_hlo()
+    bypass = hlo.replace("all-gather(%logical)", "all-gather(%lhs)")
+    rejected_bypass = _validate_strategy_nd_attention_projection_hlo(
+        parse_hlo_module(bypass), layers=1, enabled=True
+    )
+    assert not rejected_bypass["passed"]
+    assert rejected_bypass["gather_source_counts"] == {"%gather": 0}
+
+    duplicate = hlo.replace("%call.7)", "%call.0)")
+    rejected_duplicate = _validate_strategy_nd_attention_projection_hlo(
+        parse_hlo_module(duplicate), layers=1, enabled=True
+    )
+    assert not rejected_duplicate["passed"]
+    assert not rejected_duplicate["partial_gather_bijection"]
+
+    injected = hlo.replace(
+        "scale: f32[48,4])",
+        "scale: f32[48,4], extra: bf16[1,6144])",
+    ).replace(
+        "  %scale = f32[48,4] parameter(2)",
+        "  %scale = f32[48,4] parameter(2)\n"
+        "  %extra = bf16[1,6144] parameter(3)",
+    ).replace(
+        "  %partials = bf16[8,6144] concatenate(",
+        "  %mixed = bf16[9,6144] concatenate(",
+    ).replace(
+        "), dimensions={0}\n  %logical =",
+        ", %extra), dimensions={0}\n"
+        "  %partials = bf16[8,6144] slice(%mixed), "
+        "slice={[0:8],[0:6144]}\n  %logical =",
+        1,
+    )
+    rejected_injected = _validate_strategy_nd_attention_projection_hlo(
+        parse_hlo_module(injected), layers=1, enabled=True
+    )
+    assert not rejected_injected["passed"]
+    assert rejected_injected["partial_gather_bijection"]
+    assert not rejected_injected["exclusive_partial_dataflow"]
+    assert rejected_injected["exclusive_source_violations"]
+
+    dead = hlo.replace("copy(%gather)", "copy(%logical)")
+    rejected_dead = _validate_strategy_nd_attention_projection_hlo(
+        parse_hlo_module(dead), layers=1, enabled=True
+    )
+    assert not rejected_dead["passed"]
+    assert not rejected_dead["all_gathers_live"]
+
+    suffixed = hlo.replace(
+        "greenfield_fp8_block_matmul_m8_k512_n6144",
+        "greenfield_fp8_block_matmul_m8_k512_n6144_wrong",
+    )
+    rejected_suffix = _validate_strategy_nd_attention_projection_hlo(
+        parse_hlo_module(suffixed), layers=1, enabled=True
+    )
+    assert not rejected_suffix["passed"]
+    assert rejected_suffix["kernel_count"] == 0
+
+    disabled = _validate_strategy_nd_attention_projection_hlo(
+        parse_hlo_module(hlo), layers=1, enabled=False
+    )
+    assert not disabled["passed"]
+    assert not disabled["applicable"]
+
+
+def test_strategy_nd_attention_reduction_contract_replaces_projection_sum() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _expected_tpu_decoder_reductions,
+    )
+
+    arities, shapes = _expected_tpu_decoder_reductions(
+        layers=78,
+        dense_layers=3,
+        sparse_layers=75,
+        pregathered_b512_attention=True,
+        strategy_nd_attention_projection=True,
+        feature_reconstruct_down_fp32=True,
+        complete_token_path=True,
+        split_residual_state=True,
+        token_observation_candidates=1,
+    )
+    assert arities == {"1": 234}
+    assert shapes["bf16[1,6144]"] == 3
+    assert shapes["bf16[1,2048,640]"] == 78
+
+
+def test_live_tensor_contract_admits_only_local_strategy_nd_virtual_partials() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _classify_decoder_live_tensor_shapes,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    hlo = _strategy_nd_attention_projection_hlo().replace(
+        "  ROOT %root = bf16[4,8,1,6144] copy(%gather)",
+        "  %folded = bf16[32,1,6144] bitcast(%gather)\n"
+        "  ROOT %root = bf16[32,1,6144] copy(%folded)",
+    )
+    module = parse_hlo_module(hlo)
+    rejected = _classify_decoder_live_tensor_shapes(
+        module,
+        config=_real_8k_decoder_config(),
+        full_indexer_layers=0,
+        backend_contract="cpu_reference",
+        strategy_nd_attention_projection=False,
+    )
+    assert not rejected["passed"]
+    assert rejected["forbidden_shapes"]
+    accepted = _classify_decoder_live_tensor_shapes(
+        module,
+        config=_real_8k_decoder_config(),
+        full_indexer_layers=0,
+        backend_contract="cpu_reference",
+        strategy_nd_attention_projection=True,
+    )
+    assert accepted["passed"], accepted
+    assert accepted["allowed_strategy_nd_virtual_partials"]
+    assert not accepted["forbidden_shapes"]
+
+
 def _main_rope_table_hlo(
     *,
     include_forbidden: bool = False,
@@ -3428,6 +3603,7 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             sparse_moe_backend="pallas_feature",
             attention_projection_backend="fused_n82_convolution",
+            devices=(object(),),
         )
 
     with pytest.raises(PlanValidationError, match="backend and runtime"):

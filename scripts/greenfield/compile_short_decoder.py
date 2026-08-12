@@ -1480,6 +1480,16 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--strategy-nd-attention-projection",
+        type=int,
+        choices=(0, 1),
+        default=int(
+            os.environ.get(
+                "GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION", "0"
+            )
+        ),
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1579,6 +1589,9 @@ def main() -> int:
     args.main_rope_table = bool(args.main_rope_table)
     args.pregathered_b512_attention = bool(
         args.pregathered_b512_attention
+    )
+    args.strategy_nd_attention_projection = bool(
+        args.strategy_nd_attention_projection
     )
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
@@ -1833,6 +1846,17 @@ def main() -> int:
         raise ValueError(
             "pregathered-B512 attention requires the protected 8K exact "
             "production path without a layer-0 diagnostic"
+        )
+    if args.strategy_nd_attention_projection and not (
+        args.pregathered_b512_attention
+        and args.context_capacity == 8192
+        and dsa_oracle_mode
+        and not observe_layer0_discriminator
+        and not args.observe_layer0_ingredients
+    ):
+        raise ValueError(
+            "StrategyND attention projection requires the protected 8K "
+            "pregathered-B512 production path"
         )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
@@ -2294,6 +2318,9 @@ def main() -> int:
             pregathered_b512_attention=(
                 args.pregathered_b512_attention
             ),
+            strategy_nd_attention_projection=(
+                args.strategy_nd_attention_projection
+            ),
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             build_layer0_residual_discriminator=(
@@ -2340,6 +2367,9 @@ def main() -> int:
                 pregathered_b512_attention=(
                     args.pregathered_b512_attention
                 ),
+                strategy_nd_attention_projection=(
+                    args.strategy_nd_attention_projection
+                ),
                 attention_projection_backend=(
                     attention_projection_backend
                 ),
@@ -2385,6 +2415,9 @@ def main() -> int:
                     main_rope_table_enabled=args.main_rope_table,
                     pregathered_b512_attention=(
                         args.pregathered_b512_attention
+                    ),
+                    strategy_nd_attention_projection=(
+                        args.strategy_nd_attention_projection
                     ),
                     attention_projection_backend=(
                         attention_projection_backend
@@ -3024,6 +3057,15 @@ def main() -> int:
             decoder.execute,
             donate_argnums=donate_argnums,
         ).lower(*inputs)
+        decoder_stablehlo = lowered.as_text()
+        stablehlo_sha256 = sha256(
+            decoder_stablehlo.encode("utf-8")
+        ).hexdigest()
+        fleet_stablehlo_hashes = _fleet_digest(
+            multihost_utils,
+            stablehlo_sha256,
+            num_processes=args.num_processes,
+        )
         compiled = lowered.compile()
         compile_seconds = time.monotonic() - compile_started
         multihost_utils.sync_global_devices("greenfield-short-decoder-compile-end")
@@ -3036,6 +3078,7 @@ def main() -> int:
         )
         hlo_contract = validate_decoder_step_hlo(
             optimized_hlo,
+            stablehlo=decoder_stablehlo,
             config=decoder.config,
             schedule=schedule,
             groups=groups,
@@ -3064,6 +3107,9 @@ def main() -> int:
             pregathered_b512_attention=(
                 decoder.pregathered_b512_attention
             ),
+            strategy_nd_attention_projection=(
+                decoder.strategy_nd_attention_projection
+            ),
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -3079,11 +3125,18 @@ def main() -> int:
                 encoding="utf-8",
             ) as stream:
                 stream.write(optimized_hlo)
+            with gzip.open(
+                hlo_dir / f"{hlo_stem}.stablehlo.mlir.gz",
+                "wt",
+                encoding="utf-8",
+            ) as stream:
+                stream.write(decoder_stablehlo)
             _atomic_json(
                 hlo_dir / f"{hlo_stem}.hlo_contract.json",
                 hlo_contract,
             )
         del optimized_hlo
+        del decoder_stablehlo
         if not hlo_contract["passed"]:
             raise RuntimeError(
                 "decoder HLO contract failed before execution: "
@@ -3092,7 +3145,9 @@ def main() -> int:
         compiled_dsa_observer = None
         dsa_observer_compile_seconds = None
         dsa_observer_hlo_sha256 = None
+        dsa_observer_stablehlo_sha256 = None
         fleet_dsa_observer_hlo_hashes = None
+        fleet_dsa_observer_stablehlo_hashes = None
         dsa_observer_hlo_contract = None
         dsa_observer_isolation_contract = None
         if dsa_oracle_mode and not (
@@ -3106,6 +3161,15 @@ def main() -> int:
             # Deliberately no donate_argnums: the observer must replay first
             # while preserving the prefill result for production timing.
             lowered_dsa_observer = jax.jit(dsa_observer.execute).lower(*inputs)
+            dsa_observer_stablehlo = lowered_dsa_observer.as_text()
+            dsa_observer_stablehlo_sha256 = sha256(
+                dsa_observer_stablehlo.encode("utf-8")
+            ).hexdigest()
+            fleet_dsa_observer_stablehlo_hashes = _fleet_digest(
+                multihost_utils,
+                dsa_observer_stablehlo_sha256,
+                num_processes=args.num_processes,
+            )
             compiled_dsa_observer = lowered_dsa_observer.compile()
             dsa_observer_compile_seconds = (
                 time.monotonic() - observer_compile_started
@@ -3124,6 +3188,7 @@ def main() -> int:
             )
             dsa_observer_hlo_contract = validate_decoder_step_hlo(
                 optimized_dsa_observer_hlo,
+                stablehlo=dsa_observer_stablehlo,
                 config=dsa_observer.config,
                 schedule=schedule,
                 groups=groups,
@@ -3157,6 +3222,9 @@ def main() -> int:
                 pregathered_b512_attention=(
                     dsa_observer.pregathered_b512_attention
                 ),
+                strategy_nd_attention_projection=(
+                    dsa_observer.strategy_nd_attention_projection
+                ),
             )
             dsa_observer_isolation_contract = (
                 _observer_hlo_isolation_contract(
@@ -3177,6 +3245,16 @@ def main() -> int:
                     encoding="utf-8",
                 ) as stream:
                     stream.write(optimized_dsa_observer_hlo)
+                with gzip.open(
+                    hlo_dir
+                    / (
+                        f"decoder_78layer_{context_label}_token_dsa_observer"
+                        ".stablehlo.mlir.gz"
+                    ),
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(dsa_observer_stablehlo)
                 _atomic_json(
                     hlo_dir
                     / (
@@ -3194,6 +3272,7 @@ def main() -> int:
                     dsa_observer_isolation_contract,
                 )
             del optimized_dsa_observer_hlo
+            del dsa_observer_stablehlo
             if not dsa_observer_hlo_contract["passed"]:
                 raise RuntimeError(
                     "DSA observer HLO contract failed before execution: "
@@ -3695,7 +3774,9 @@ def main() -> int:
         compiled_prefill = None
         prefill_compile_seconds = None
         prefill_hlo_sha256 = None
+        prefill_stablehlo_sha256 = None
         fleet_prefill_hlo_hashes = None
+        fleet_prefill_stablehlo_hashes = None
         prefill_hlo_contract = None
         if oracle_mode:
             assert prefill is not None and prefill_inputs is not None
@@ -3707,6 +3788,15 @@ def main() -> int:
                 prefill.execute,
                 donate_argnums=(1, 2, 3, 4),
             ).lower(*prefill_inputs)
+            prefill_stablehlo = lowered_prefill.as_text()
+            prefill_stablehlo_sha256 = sha256(
+                prefill_stablehlo.encode("utf-8")
+            ).hexdigest()
+            fleet_prefill_stablehlo_hashes = _fleet_digest(
+                multihost_utils,
+                prefill_stablehlo_sha256,
+                num_processes=args.num_processes,
+            )
             compiled_prefill = lowered_prefill.compile()
             prefill_compile_seconds = (
                 time.monotonic() - prefill_compile_started
@@ -3725,6 +3815,7 @@ def main() -> int:
             )
             prefill_hlo_contract = validate_teacher_forced_prefill_hlo(
                 optimized_prefill_hlo,
+                stablehlo=prefill_stablehlo,
                 program=prefill,
                 schedule=schedule,
                 backend_contract=hlo_backend_contract,
@@ -3738,12 +3829,20 @@ def main() -> int:
                     encoding="utf-8",
                 ) as stream:
                     stream.write(optimized_prefill_hlo)
+                with gzip.open(
+                    hlo_dir
+                    / f"prefill_78layer_{context_label}.stablehlo.mlir.gz",
+                    "wt",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(prefill_stablehlo)
                 _atomic_json(
                     hlo_dir
                     / f"prefill_78layer_{context_label}.hlo_contract.json",
                     prefill_hlo_contract,
                 )
             del optimized_prefill_hlo
+            del prefill_stablehlo
             if not prefill_hlo_contract["passed"]:
                 raise RuntimeError(
                     "prefill HLO contract failed before execution: "
@@ -4994,6 +5093,9 @@ def main() -> int:
             "dsa_observer_contract": dsa_observer_contract,
             "dsa_observer_hlo_contract": dsa_observer_hlo_contract,
             "dsa_observer_hlo_sha256": dsa_observer_hlo_sha256,
+            "dsa_observer_stablehlo_sha256": (
+                dsa_observer_stablehlo_sha256
+            ),
             "dsa_observer_isolation_contract": (
                 dsa_observer_isolation_contract
             ),
@@ -5022,13 +5124,20 @@ def main() -> int:
                 dsa_query_materialization_state
             ),
             "fleet_hlo_hashes": fleet_hlo_hashes,
+            "fleet_stablehlo_hashes": fleet_stablehlo_hashes,
             "fleet_dsa_observer_hlo_hashes": (
                 fleet_dsa_observer_hlo_hashes
+            ),
+            "fleet_dsa_observer_stablehlo_hashes": (
+                fleet_dsa_observer_stablehlo_hashes
             ),
             "fleet_dsa_query_materialization_hlo_hashes": (
                 fleet_dsa_query_materialization_hlo_hashes
             ),
             "fleet_prefill_hlo_hashes": fleet_prefill_hlo_hashes,
+            "fleet_prefill_stablehlo_hashes": (
+                fleet_prefill_stablehlo_hashes
+            ),
             "fleet_prefill_wk_materialization_hlo_hashes": (
                 fleet_prefill_wk_materialization_hlo_hashes
             ),
@@ -5045,6 +5154,9 @@ def main() -> int:
             "main_rope_table_enabled": decoder.main_rope_table_enabled,
             "pregathered_b512_attention": (
                 decoder.pregathered_b512_attention
+            ),
+            "strategy_nd_attention_projection": (
+                decoder.strategy_nd_attention_projection
             ),
             "main_rope_table_sha256": decoder.main_rope_table_sha256,
             "main_rope_table_shape": (
@@ -5081,6 +5193,7 @@ def main() -> int:
             "metadata_contract": metadata_contract,
             "metadata_passed": metadata_passed,
             "optimized_hlo_sha256": hlo_sha256,
+            "stablehlo_sha256": stablehlo_sha256,
             "plan_hash": execution_plan.plan_hash,
             "profiler_free_body_wall": _percentiles(samples),
             "profiler_free_complete_step_wall": (
@@ -5089,6 +5202,7 @@ def main() -> int:
             "prefill_compile_seconds": prefill_compile_seconds,
             "prefill_hlo_contract": prefill_hlo_contract,
             "prefill_hlo_sha256": prefill_hlo_sha256,
+            "prefill_stablehlo_sha256": prefill_stablehlo_sha256,
             "prefill_index_repair": args.prefill_index_repair,
             "prefill_index_repair_backend": (
                 prefill.index_repair_backend if prefill is not None else "none"
@@ -5120,7 +5234,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 17,
+            "schema_version": 18,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

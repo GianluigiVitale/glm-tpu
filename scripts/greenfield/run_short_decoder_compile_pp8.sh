@@ -26,6 +26,7 @@ readonly DSA_HEAD_KEY_EXACT_ASSOCIATION=${GLM_GREENFIELD_DSA_HEAD_KEY_EXACT_ASSO
 readonly DSA_SCORE_DEFAULT_PRECISION=${GLM_GREENFIELD_DSA_SCORE_DEFAULT_PRECISION:-0}
 readonly MAIN_ROPE_TABLE=${GLM_GREENFIELD_MAIN_ROPE_TABLE:-0}
 readonly PREGATHERED_B512_ATTENTION=${GLM_GREENFIELD_PREGATHERED_B512_ATTENTION:-0}
+readonly STRATEGY_ND_ATTENTION_PROJECTION=${GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION:-0}
 readonly SHORT_CONTEXT_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_ORACLE:-0}
 readonly SHORT_CONTEXT_DSA_ORACLE=${GLM_GREENFIELD_SHORT_CONTEXT_DSA_ORACLE:-0}
 readonly DSA_INTERNAL_OBSERVER=${GLM_GREENFIELD_DSA_INTERNAL_OBSERVER:-0}
@@ -143,6 +144,10 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=fdedaae31fb3c094266272ed48dfe62bb098257a782
 }
 [[ $PREGATHERED_B512_ATTENTION == 0 || $PREGATHERED_B512_ATTENTION == 1 ]] || {
   echo "pregathered-B512 attention flag must be 0 or 1" >&2
+  exit 2
+}
+[[ $STRATEGY_ND_ATTENTION_PROJECTION == 0 || $STRATEGY_ND_ATTENTION_PROJECTION == 1 ]] || {
+  echo "StrategyND attention-projection flag must be 0 or 1" >&2
   exit 2
 }
 [[ $SHORT_CONTEXT_ORACLE == 0 || $SHORT_CONTEXT_ORACLE == 1 ]] || {
@@ -280,6 +285,16 @@ if [[ $PREGATHERED_B512_ATTENTION == 1 ]]; then
   }
   [[ $LAYER0_DISCRIMINATOR == 0 && $LAYER0_INGREDIENTS == 0 ]] || {
     echo "pregathered-B512 attention must remain isolated from layer-0 diagnostics" >&2
+    exit 2
+  }
+fi
+if [[ $STRATEGY_ND_ATTENTION_PROJECTION == 1 ]]; then
+  [[ $PREGATHERED_B512_ATTENTION == 1 ]] || {
+    echo "StrategyND attention projection requires pregathered-B512 attention" >&2
+    exit 2
+  }
+  [[ $PROFILE == 8k && $SHORT_CONTEXT_ORACLE == 1 && $SHORT_CONTEXT_DSA_ORACLE == 1 && $LAYER0_DISCRIMINATOR == 0 && $LAYER0_INGREDIENTS == 0 ]] || {
+    echo "StrategyND attention projection requires the protected 8K Gate-D path" >&2
     exit 2
   }
 fi
@@ -473,6 +488,114 @@ PY
       sha256sum | awk '{print $1}')
     [[ $observed_remote_sha == "$expected_remote_sha" ]] || {
       echo "DB537 direct remote $remote_file hash drifted" >&2
+      exit 2
+    }
+  done
+fi
+if [[ $STRATEGY_ND_ATTENTION_PROJECTION == 1 ]]; then
+  readonly STRATEGY_ND_ATTENTION_PREREQUISITE_TAG=greenfield_legacy_layer0_attention_update_p8155_20260812T172809039093068Z
+  readonly STRATEGY_ND_ATTENTION_PREREQUISITE_DIR=/home/gianl/glm-run/$STRATEGY_ND_ATTENTION_PREREQUISITE_TAG
+  readonly STRATEGY_ND_ATTENTION_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/attention_update/8k/$STRATEGY_ND_ATTENTION_PREREQUISITE_TAG
+  /home/gianl/vllm-env/bin/python - \
+    "$STRATEGY_ND_ATTENTION_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
+import json
+from hashlib import sha256
+from pathlib import Path
+import re
+import sqlite3
+import sys
+
+run_dir = Path(sys.argv[1])
+db_path = Path(sys.argv[2])
+expected_hashes = {
+    "SUCCESS": "f52d3e88b060c19059392dad69ba959ce715ba489c44f3565b93c1215969f508",
+    "attention_update_capture/capture.json": "f5b502cfed1e393d03c7d7e5d20c0b930f2fc1eb0e3fd56524073cb77665a91e",
+    "attention_update_capture/attention_update.npz": "02c78d132f01c7564e416b001d378d1029b9ba6b1deaf044d1e6164e916acec6",
+    "attention_update_comparison/comparison.json": "780cf3c2f1470119c73b2399082bd1e9c61b6f9908e28b8f1bc2a7dda73d435c",
+    "results_ckpt.db": "c33f23bf69bbaa68f7d620fa74ee1e278805d26df5600921fdbab9587b2b4ea2",
+    "census_pre.txt": "2b638eb85a20f637c90c3b2afaf0b927e679d2eefd678763cf1209c779f2e59d",
+    "census_post.txt": "ac1aa438d6a189de51ca6e0d12389446b704427af8786c55df1411acc27f849a",
+    "remote_objects.json": "3f3910fc1c52e2122b0c199c62ca83f6a3efc64e7d4b3a7e41142914561ee045",
+}
+for relative, expected in expected_hashes.items():
+    path = run_dir / relative
+    if not path.is_file() or sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"DB539 prerequisite hash drifted: {relative}")
+
+capture = json.loads(
+    (run_dir / "attention_update_capture/capture.json").read_text()
+)
+comparison = json.loads(
+    (run_dir / "attention_update_comparison/comparison.json").read_text()
+)
+accepted_sha = (
+    "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7"
+)
+strategy = comparison.get("candidate_comparisons", {}).get("strategy_nd", {})
+local = comparison.get("candidate_comparisons", {}).get("local", {})
+if (
+    capture.get("legacy_code_hash")
+    != "23ab8780f3066ae1be12657d4f45daa7ea353761"
+    or capture.get("oracle_pin")
+    != "b3c25df47ac98783912dc658878181ec0a8ae16d"
+    or capture.get("position") != 8155
+    or capture.get("tensor", {}).get("tensor_sha256") != accepted_sha
+    or comparison.get("status") != "SUCCESS"
+    or comparison.get("classification")
+    != "strategy_nd_attention_projection_exact"
+    or comparison.get("exact_candidates") != ["strategy_nd"]
+    or comparison.get("first_open_boundary") != "after_attention_projection"
+    or comparison.get("probe", {}).get("results_db_run_id") != 538
+    or comparison.get("probe", {}).get("code_hash")
+    != "e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc"
+    or not strategy.get("elementwise_exact")
+    or strategy.get("mismatch_count") != 0
+    or strategy.get("expected_sha256") != accepted_sha
+    or strategy.get("observed_sha256") != accepted_sha
+    or local.get("elementwise_exact")
+    or local.get("mismatch_count") != 3652
+):
+    raise SystemExit("DB539 StrategyND attention prerequisite drifted")
+for name in ("census_pre.txt", "census_post.txt"):
+    workers = re.findall(
+        r"^CENSUS_OK .*?-w-([0-7])$", (run_dir / name).read_text(), re.M
+    )
+    if sorted(workers) != list("01234567"):
+        raise SystemExit(f"DB539 prerequisite {name} is not 8/8 clean")
+with sqlite3.connect(db_path) as conn:
+    if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        raise SystemExit("live results DB integrity failed")
+    row = conn.execute(
+        "SELECT r.model, r.harness_git, r.pod, i.id, i.benchmark, "
+        "i.item_id, i.correct, i.score FROM runs r JOIN items i "
+        "ON i.run_id = r.run_id WHERE r.run_id = 539"
+    ).fetchone()
+if row != (
+    "gs://driftbench-dsv4-uc/models/GLM-5.2-FP8",
+    "a4a17ac",
+    "db-v4-64-od",
+    1823,
+    "passkey_L8192_d0.5",
+    "t0",
+    1,
+    1.0,
+):
+    raise SystemExit("DB539 prerequisite DB linkage drifted")
+PY
+  for remote_file_sha in \
+    "SUCCESS:f52d3e88b060c19059392dad69ba959ce715ba489c44f3565b93c1215969f508" \
+    "attention_update_capture/capture.json:f5b502cfed1e393d03c7d7e5d20c0b930f2fc1eb0e3fd56524073cb77665a91e" \
+    "attention_update_capture/attention_update.npz:02c78d132f01c7564e416b001d378d1029b9ba6b1deaf044d1e6164e916acec6" \
+    "attention_update_comparison/comparison.json:780cf3c2f1470119c73b2399082bd1e9c61b6f9908e28b8f1bc2a7dda73d435c" \
+    "remote_objects.json:3f3910fc1c52e2122b0c199c62ca83f6a3efc64e7d4b3a7e41142914561ee045"
+  do
+    remote_file=${remote_file_sha%%:*}
+    expected_remote_sha=${remote_file_sha#*:}
+    observed_remote_sha=$(gcloud storage cat \
+      "$STRATEGY_ND_ATTENTION_PREREQUISITE_REMOTE/$remote_file" | \
+      sha256sum | awk '{print $1}')
+    [[ $observed_remote_sha == "$expected_remote_sha" ]] || {
+      echo "DB539 direct remote $remote_file hash drifted" >&2
       exit 2
     }
   done
@@ -1644,6 +1767,11 @@ if [[ $PREGATHERED_B512_ATTENTION == 1 ]]; then
   PREGATHERED_ATTENTION_SUFFIX=_pregatheredb512
 fi
 readonly PREGATHERED_ATTENTION_SUFFIX
+STRATEGY_ND_ATTENTION_SUFFIX=
+if [[ $STRATEGY_ND_ATTENTION_PROJECTION == 1 ]]; then
+  STRATEGY_ND_ATTENTION_SUFFIX=_strategynd_o
+fi
+readonly STRATEGY_ND_ATTENTION_SUFFIX
 ORACLE_SUFFIX=
 if [[ $SHORT_CONTEXT_ORACLE == 1 ]]; then
   ORACLE_SUFFIX=_oracle
@@ -1682,7 +1810,7 @@ if [[ $VERIFY_DEVICE_ROUNDTRIP == 1 ]]; then
   ROUNDTRIP_SUFFIX=_roundtrip
 fi
 readonly ROUNDTRIP_SUFFIX
-TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${PREFILL_REPAIR_SUFFIX}${DSA_QUERY_SUFFIX}${DSA_HEAD_KEY_SUFFIX}${DSA_SCORE_PRECISION_SUFFIX}${MAIN_ROPE_SUFFIX}${PREGATHERED_ATTENTION_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}${DSA_INTERNAL_SUFFIX}${LAYER0_VARIANT_SUFFIX}${ROUNDTRIP_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_SHORT_DECODER_TAG:-greenfield_short_decoder_compile_pp8${CONTEXT_TAG_SUFFIX}_${RUNTIME_KIND}${TILE_SUFFIX}${RECONSTRUCTION_SUFFIX}${FUSION_SUFFIX}${TOKEN_SUFFIX}${SPLIT_RESIDUAL_SUFFIX}${PREFILL_REPAIR_SUFFIX}${DSA_QUERY_SUFFIX}${DSA_HEAD_KEY_SUFFIX}${DSA_SCORE_PRECISION_SUFFIX}${MAIN_ROPE_SUFFIX}${PREGATHERED_ATTENTION_SUFFIX}${STRATEGY_ND_ATTENTION_SUFFIX}${ORACLE_SUFFIX}${RESIDUAL_SUFFIX}${DSA_INTERNAL_SUFFIX}${LAYER0_VARIANT_SUFFIX}${ROUNDTRIP_SUFFIX}_trace${TRACE_STEPS}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -1731,6 +1859,20 @@ say() {
   echo "[short-decoder-pp8 $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
 }
 
+set +e
+remote_prefix_listing=$(gcloud storage ls "$REMOTE_PREFIX/**" 2>&1)
+remote_prefix_rc=$?
+set -e
+printf '%s\n' "$remote_prefix_listing" >"$RUN_DIR/remote_prefix_preflight.txt"
+if [[ $remote_prefix_rc -eq 0 ]]; then
+  say "ABORT: append-only remote prefix already contains objects"
+  exit 1
+elif [[ $remote_prefix_rc -ne 1 ]] || ! grep -q "matched no objects" \
+  "$RUN_DIR/remote_prefix_preflight.txt"; then
+  say "ABORT: remote-prefix vacancy check failed"
+  exit 1
+fi
+
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || {
   say "ABORT: another protected pod workflow holds the global lease"
@@ -1759,8 +1901,144 @@ strict_census() {
 }
 
 post_census_done=0
+terminal_success_done=0
+
+rollback_provisional_db() {
+  /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$TAG" "$PIN" \
+    "$RUNTIME_MANIFEST_SHA" "$CONTEXT_LABEL" "$SHORT_CONTEXT_ORACLE" \
+    "$SHORT_CONTEXT_DSA_ORACLE" "$COMPLETE_TOKEN_PATH" \
+    "$STRATEGY_ND_ATTENTION_PROJECTION" \
+    >"$RUN_DIR/provisional_db_rollback.txt" <<'PY'
+from __future__ import annotations
+
+import json
+import sqlite3
+import sys
+
+(
+    db_path,
+    run_tag,
+    pin,
+    runtime_manifest_sha256,
+    context_label,
+    short_context_oracle,
+    short_context_dsa_oracle,
+    complete_token_path,
+    strategy_nd_attention_projection,
+) = sys.argv[1:]
+short_context_oracle = bool(int(short_context_oracle))
+short_context_dsa_oracle = bool(int(short_context_dsa_oracle))
+complete_token_path = bool(int(complete_token_path))
+strategy_nd_attention_projection = bool(int(strategy_nd_attention_projection))
+scope = (
+    "gate-d"
+    if short_context_dsa_oracle
+    else (
+        "token-oracle"
+        if short_context_oracle
+        else ("token-mechanism" if complete_token_path else "body")
+    )
+)
+
+connection = sqlite3.connect(db_path)
+connection.execute("BEGIN IMMEDIATE")
+matches = []
+for row in connection.execute(
+    "SELECT run_id, model, model_revision, env_json, note FROM runs "
+    "WHERE model_revision = ?",
+    (runtime_manifest_sha256,),
+):
+    environment = json.loads(row[3])
+    if environment.get("greenfield_run_tag") == run_tag:
+        matches.append((row, environment))
+if not matches:
+    connection.rollback()
+    print("NO_PROVISIONAL_DB_RUN")
+    raise SystemExit(0)
+if len(matches) != 1:
+    connection.rollback()
+    raise SystemExit("refusing ambiguous provisional DB rollback")
+(run, environment), = matches
+run_id = run[0]
+expected_model = (
+    f"zai-org/GLM-5.2-FP8:greenfield-78layer-{context_label}-{scope}"
+)
+expected_benchmark_prefix = (
+    f"greenfield_78layer_{context_label}_{scope}_pp8"
+)
+expected_item_id = (
+    "gate_d_exact_token_and_dsa"
+    if short_context_dsa_oracle
+    else (
+        "raw_token_prefix"
+        if short_context_oracle
+        else ("token_step_mechanism" if complete_token_path else "body_step")
+    )
+)
+items = connection.execute(
+    "SELECT benchmark, item_id, correct, score FROM items WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+summaries = connection.execute(
+    "SELECT benchmark, metric, value FROM summary WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+item_state_valid = not items or (
+    len(items) == 1
+    and items[0][0].startswith(expected_benchmark_prefix)
+    and items[0][1:] == (expected_item_id, 1, 1.0)
+    and (
+        ("_strategynd_o" in items[0][0])
+        == strategy_nd_attention_projection
+    )
+)
+summary_state_valid = not summaries or (
+    len(summaries) == 1
+    and items
+    and summaries[0]
+    == (items[0][0], "contract_valid", 1.0)
+)
+if (
+    run[1] != expected_model
+    or run[2] != runtime_manifest_sha256
+    or environment.get("GLM_ENGINE") != f"greenfield_pp8_decoder_{scope}"
+    or environment.get("greenfield_code_hash") != pin
+    or environment.get("runtime_manifest_sha256")
+    != runtime_manifest_sha256
+    or environment.get("greenfield_complete_token_path") != complete_token_path
+    or environment.get("greenfield_short_context_oracle")
+    != short_context_oracle
+    or environment.get("greenfield_short_context_dsa_oracle")
+    != short_context_dsa_oracle
+    or environment.get("greenfield_strategy_nd_attention_projection")
+    != strategy_nd_attention_projection
+    or not run[4].startswith(
+        f"Protected real 78-layer {context_label.upper()} transformer-body "
+        "compile/run with "
+    )
+    or not item_state_valid
+    or not summary_state_valid
+):
+    connection.rollback()
+    raise SystemExit("refusing non-identical provisional DB rollback")
+connection.execute("DELETE FROM summary WHERE run_id = ?", (run_id,))
+connection.execute("DELETE FROM items WHERE run_id = ?", (run_id,))
+connection.execute("DELETE FROM runs WHERE run_id = ?", (run_id,))
+if connection.execute(
+    "SELECT COUNT(*) FROM runs WHERE run_id = ?", (run_id,)
+).fetchone()[0]:
+    connection.rollback()
+    raise SystemExit("provisional DB rollback did not remove run")
+connection.commit()
+print(f"ROLLED_BACK_PROVISIONAL_DB_RUN={run_id}")
+PY
+}
+
 on_exit() {
   local status=$?
+  if [[ $status -ne 0 && $terminal_success_done -eq 0 ]]; then
+    rollback_provisional_db || true
+  fi
   if [[ $post_census_done -eq 0 ]]; then
     strict_census failure_exit || true
   fi
@@ -1772,7 +2050,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION MAIN_ROPE_TABLE=$MAIN_ROPE_TABLE PREGATHERED_B512_ATTENTION=$PREGATHERED_B512_ATTENTION SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS LAYER0_ATTENTION_VARIANTS=$LAYER0_ATTENTION_VARIANTS LAYER0_ATTENTION_OUTPUT_VARIANTS=$LAYER0_ATTENTION_OUTPUT_VARIANTS LAYER0_STRATEGY_ND_ROW0=$LAYER0_STRATEGY_ND_ROW0 LAYER0_INGREDIENTS=$LAYER0_INGREDIENTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN PROFILE=$PROFILE CONTEXT_CAPACITY=$CONTEXT_CAPACITY PROMPT_TOKEN_COUNT=$PROMPT_TOKEN_COUNT RUNTIME_KIND=$RUNTIME_KIND VERIFY_DEVICE_ROUNDTRIP=$VERIFY_DEVICE_ROUNDTRIP FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32 COMPLETE_TOKEN_PATH=$COMPLETE_TOKEN_PATH SPLIT_RESIDUAL_STATE=$SPLIT_RESIDUAL_STATE PREFILL_INDEX_REPAIR=$PREFILL_INDEX_REPAIR DSA_QUERY_EXACT_ASSOCIATION=$DSA_QUERY_EXACT_ASSOCIATION DSA_HEAD_KEY_EXACT_ASSOCIATION=$DSA_HEAD_KEY_EXACT_ASSOCIATION DSA_SCORE_DEFAULT_PRECISION=$DSA_SCORE_DEFAULT_PRECISION MAIN_ROPE_TABLE=$MAIN_ROPE_TABLE PREGATHERED_B512_ATTENTION=$PREGATHERED_B512_ATTENTION STRATEGY_ND_ATTENTION_PROJECTION=$STRATEGY_ND_ATTENTION_PROJECTION SHORT_CONTEXT_ORACLE=$SHORT_CONTEXT_ORACLE SHORT_CONTEXT_DSA_ORACLE=$SHORT_CONTEXT_DSA_ORACLE LAYER_RESIDUAL_OBSERVER=$LAYER_RESIDUAL_OBSERVER LAYER_RESIDUAL_POSITION=$LAYER_RESIDUAL_POSITION DSA_INTERNAL_OBSERVER=$DSA_INTERNAL_OBSERVER LAYER0_RESIDUAL_VARIANTS=$LAYER0_RESIDUAL_VARIANTS LAYER0_SUBSHARD_VARIANTS=$LAYER0_SUBSHARD_VARIANTS LAYER0_ATTENTION_VARIANTS=$LAYER0_ATTENTION_VARIANTS LAYER0_ATTENTION_OUTPUT_VARIANTS=$LAYER0_ATTENTION_OUTPUT_VARIANTS LAYER0_STRATEGY_ND_ROW0=$LAYER0_STRATEGY_ND_ROW0 LAYER0_INGREDIENTS=$LAYER0_INGREDIENTS WARMUP=$WARMUP ITERATIONS=$ITERATIONS TRACE_STEPS=$TRACE_STEPS"
 say "RUNTIME=$RUNTIME_MANIFEST_SHA SOURCE_RUNTIME=$SOURCE_RUNTIME_MANIFEST_SHA SOURCE=$SOURCE_MANIFEST_SHA"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -1810,6 +2088,7 @@ coordinator="$coordinator:8476"
 say "launching real 78-layer $CONTEXT_NAME load/compile coordinator=$coordinator"
 # shellcheck disable=SC2016
 execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; verify_device_roundtrip='"$VERIFY_DEVICE_ROUNDTRIP"'; feature_output_tile='"$FEATURE_OUTPUT_TILE"'; feature_fuse_route_weighting='"$FEATURE_FUSE_ROUTE_WEIGHTING"'; feature_reconstruct_down_fp32='"$FEATURE_RECONSTRUCT_DOWN_FP32"'; complete_token_path='"$COMPLETE_TOKEN_PATH"'; split_residual_state='"$SPLIT_RESIDUAL_STATE"'; prefill_index_repair='"$PREFILL_INDEX_REPAIR"'; dsa_query_exact_association='"$DSA_QUERY_EXACT_ASSOCIATION"'; dsa_head_key_exact_association='"$DSA_HEAD_KEY_EXACT_ASSOCIATION"'; dsa_score_default_precision='"$DSA_SCORE_DEFAULT_PRECISION"'; main_rope_table='"$MAIN_ROPE_TABLE"'; pregathered_b512_attention='"$PREGATHERED_B512_ATTENTION"'; short_context_oracle='"$SHORT_CONTEXT_ORACLE"'; oracle_dir='"$SHORT_CONTEXT_ORACLE_DIR"'; oracle_sha='"$SHORT_CONTEXT_ORACLE_MANIFEST_SHA"'; short_context_dsa_oracle='"$SHORT_CONTEXT_DSA_ORACLE"'; dsa_oracle_dir='"$SHORT_CONTEXT_DSA_ORACLE_DIR"'; dsa_oracle_sha='"$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA"'; layer_residual_observer='"$LAYER_RESIDUAL_OBSERVER"'; layer_residual_position='"$LAYER_RESIDUAL_POSITION"'; dsa_internal_observer='"$DSA_INTERNAL_OBSERVER"'; internal_baseline='"$DSA_INTERNAL_BASELINE_NPZ"'; internal_baseline_sha='"$DSA_INTERNAL_BASELINE_SHA"'; internal_ref='"$DSA_INTERNAL_LAYER0_REFERENCE_NPZ"'; internal_ref_sha='"$DSA_INTERNAL_LAYER0_REFERENCE_SHA"'; layer0_variants='"$LAYER0_RESIDUAL_VARIANTS"'; layer0_subshard_variants='"$LAYER0_SUBSHARD_VARIANTS"'; layer0_attention_variants='"$LAYER0_ATTENTION_VARIANTS"'; layer0_attention_output_variants='"$LAYER0_ATTENTION_OUTPUT_VARIANTS"'; layer0_strategy_nd_row0='"$LAYER0_STRATEGY_ND_ROW0"'; strategy_nd_canary_input='"$STRATEGY_ND_CANARY_INPUT_BITS"'; strategy_nd_canary_input_sha='"$STRATEGY_ND_CANARY_INPUT_SHA"'; strategy_nd_canary_output='"$STRATEGY_ND_CANARY_OUTPUT_BITS"'; strategy_nd_canary_output_sha='"$STRATEGY_ND_CANARY_OUTPUT_SHA"'; layer0_ingredients='"$LAYER0_INGREDIENTS"'; layer1_ref='"$LAYER1_INTERNAL_REFERENCE_NPZ"'; layer1_ref_sha='"$LAYER1_INTERNAL_REFERENCE_SHA"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo" "$run/layer_residual_observer" "$run/dsa_internal_observer" "$run/layer0_residual_discriminator" "$run/layer0_ingredients"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { gcloud storage cp --no-clobber "$log" "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_observer/* "$remote/dsa_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer_residual_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer_residual_observer/* "$remote/layer_residual_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/dsa_internal_observer/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/dsa_internal_observer/* "$remote/dsa_internal_observer/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_residual_discriminator/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_residual_discriminator/* "$remote/layer0_residual_discriminator/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/layer0_ingredients/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/layer0_ingredients/* "$remote/layer0_ingredients/" >/dev/null 2>&1 || true; fi; xplane=$(find "$run/trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); if [[ -n $xplane ]]; then gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; trace_args=(); if [[ '"$TRACE_STEPS"' -gt 0 ]]; then trace_args=(--trace-root "$run/trace" --trace-steps '"$TRACE_STEPS"'); fi; oracle_args=(); if [[ $short_context_oracle == 1 ]]; then oracle_args=(--short-context-oracle-dir "$oracle_dir" --short-context-oracle-manifest-sha256 "$oracle_sha"); fi; dsa_oracle_args=(); if [[ $short_context_dsa_oracle == 1 ]]; then dsa_oracle_args=(--short-context-dsa-oracle-dir "$dsa_oracle_dir" --short-context-dsa-oracle-manifest-sha256 "$dsa_oracle_sha"); fi; residual_args=(); if [[ $layer_residual_observer == 1 ]]; then residual_args=(--observe-layer-residuals 1 --layer-residual-position "$layer_residual_position"); fi; internal_args=(); if [[ $dsa_internal_observer == 1 ]]; then internal_args=(--observe-dsa-internals 1 --dsa-internal-baseline-observation-npz "$internal_baseline" --dsa-internal-baseline-observation-sha256 "$internal_baseline_sha" --dsa-internal-layer0-reference-npz "$internal_ref" --dsa-internal-layer0-reference-sha256 "$internal_ref_sha"); fi; variant_args=(); if [[ $layer0_variants == 1 ]]; then variant_args=(--observe-layer0-residual-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_subshard_variants == 1 ]]; then variant_args=(--observe-layer0-subshard-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_attention_variants == 1 ]]; then variant_args=(--observe-layer0-attention-schedule-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_attention_output_variants == 1 ]]; then variant_args=(--observe-layer0-attention-output-association-variants 1 --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_strategy_nd_row0 == 1 ]]; then variant_args=(--observe-layer0-strategy-nd-row0-association 1 --strategy-nd-canary-input-bits "$strategy_nd_canary_input" --strategy-nd-canary-input-sha256 "$strategy_nd_canary_input_sha" --strategy-nd-canary-output-bits "$strategy_nd_canary_output" --strategy-nd-canary-output-sha256 "$strategy_nd_canary_output_sha" --layer1-internal-reference-npz "$layer1_ref" --layer1-internal-reference-sha256 "$layer1_ref_sha"); elif [[ $layer0_ingredients == 1 ]]; then variant_args=(--observe-layer0-ingredients 1); fi; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip "$verify_device_roundtrip" --feature-output-tile "$feature_output_tile" --feature-fuse-route-weighting "$feature_fuse_route_weighting" --feature-reconstruct-down-fp32 "$feature_reconstruct_down_fp32" --complete-token-path "$complete_token_path" --split-residual-state "$split_residual_state" --prefill-index-repair "$prefill_index_repair" --dsa-query-exact-association "$dsa_query_exact_association" --dsa-head-key-exact-association "$dsa_head_key_exact_association" --dsa-score-default-precision "$dsa_score_default_precision" --main-rope-table "$main_rope_table" --pregathered-b512-attention "$pregathered_b512_attention" --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${trace_args[@]}" "${oracle_args[@]}" "${dsa_oracle_args[@]}" "${residual_args[@]}" "${internal_args[@]}" "${variant_args[@]}" --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command="export GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION=$STRATEGY_ND_ATTENTION_PROJECTION; $execute_command"
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
@@ -2042,7 +2321,7 @@ fi
 gcloud storage cp "$REMOTE_PREFIX/host_records/decoder.rank*.json" \
   "$RUN_DIR/host_records/" >/dev/null
 gcloud storage cp "$REMOTE_PREFIX/host_records/decoder.rank*.log" \
-  "$RUN_DIR/host_logs/" >/dev/null
+  "$RUN_DIR/host_records/" >/dev/null
 gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/hlo/" >/dev/null
 if [[ $TRACE_STEPS -gt 0 ]]; then
   gcloud storage cp "$REMOTE_PREFIX/traces/trace.rank*.xplane.pb" \
@@ -2065,14 +2344,20 @@ if [[ $LAYER0_INGREDIENTS == 1 ]]; then
     "$RUN_DIR/layer0_ingredients/" >/dev/null
 fi
 
+strict_census post || {
+  say "ABORT: post-run census is not eight-host zero work"
+  exit 1
+}
+post_census_done=1
+
 say "validating fleet agreement and recording diagnostic DB linkage"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
   "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$RUNTIME_KIND" \
-  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SPLIT_RESIDUAL_STATE" "$PREFILL_INDEX_REPAIR" "$DSA_QUERY_EXACT_ASSOCIATION" "$DSA_HEAD_KEY_EXACT_ASSOCIATION" "$DSA_SCORE_DEFAULT_PRECISION" "$MAIN_ROPE_TABLE" "$PREGATHERED_B512_ATTENTION" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
+  "$FEATURE_OUTPUT_TILE" "$FEATURE_FUSE_ROUTE_WEIGHTING" "$FEATURE_RECONSTRUCT_DOWN_FP32" "$COMPLETE_TOKEN_PATH" "$SPLIT_RESIDUAL_STATE" "$PREFILL_INDEX_REPAIR" "$DSA_QUERY_EXACT_ASSOCIATION" "$DSA_HEAD_KEY_EXACT_ASSOCIATION" "$DSA_SCORE_DEFAULT_PRECISION" "$MAIN_ROPE_TABLE" "$PREGATHERED_B512_ATTENTION" "$STRATEGY_ND_ATTENTION_PROJECTION" "$SHORT_CONTEXT_ORACLE" "$SHORT_CONTEXT_ORACLE_MANIFEST_SHA" "$SHORT_CONTEXT_DSA_ORACLE" "$SHORT_CONTEXT_DSA_ORACLE_MANIFEST_SHA" "$SPARSE_MOE_BACKEND" "$HLO_BACKEND_CONTRACT" "$RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_LAYOUT_HASH" "$WARMUP" "$ITERATIONS" "$TRACE_STEPS" \
   "$CONTEXT_LABEL" "$CONTEXT_CAPACITY" "$PROMPT_TOKEN_COUNT" \
   "$ATTENTION_PROJECTION_BACKEND" "$EXPECTED_LOADED_PAYLOAD_BYTES" \
-  "$VERIFY_DEVICE_ROUNDTRIP" <<'PY'
+  "$VERIFY_DEVICE_ROUNDTRIP" "$TAG" <<'PY'
 from __future__ import annotations
 
 import json
@@ -2102,6 +2387,7 @@ import numpy as np
     dsa_score_default_precision,
     main_rope_table,
     pregathered_b512_attention,
+    strategy_nd_attention_projection,
     short_context_oracle,
     short_context_oracle_manifest_sha256,
     short_context_dsa_oracle,
@@ -2119,6 +2405,7 @@ import numpy as np
     attention_projection_backend,
     expected_loaded_payload_bytes,
     verify_device_roundtrip,
+    greenfield_run_tag,
 ) = sys.argv[1:]
 feature_output_tile = int(feature_output_tile)
 feature_fuse_route_weighting = bool(int(feature_fuse_route_weighting))
@@ -2131,6 +2418,7 @@ dsa_head_key_exact_association = bool(int(dsa_head_key_exact_association))
 dsa_score_default_precision = bool(int(dsa_score_default_precision))
 main_rope_table = bool(int(main_rope_table))
 pregathered_b512_attention = bool(int(pregathered_b512_attention))
+strategy_nd_attention_projection = bool(int(strategy_nd_attention_projection))
 short_context_oracle = bool(int(short_context_oracle))
 short_context_dsa_oracle = bool(int(short_context_dsa_oracle))
 warmup = int(warmup)
@@ -2230,6 +2518,10 @@ if {record["pregathered_b512_attention"] for record in records} != {
     pregathered_b512_attention
 }:
     raise SystemExit("fleet pregathered-B512 attention flag drifted")
+if {record["strategy_nd_attention_projection"] for record in records} != {
+    strategy_nd_attention_projection
+}:
+    raise SystemExit("fleet StrategyND attention-projection flag drifted")
 expected_repair_backend = (
     "physical_m64_chunk" if prefill_index_repair else "none"
 )
@@ -2241,7 +2533,7 @@ if {record["prefill_used"] for record in records} != {
     short_context_oracle
 }:
     raise SystemExit("fleet short-context prefill flag drifted")
-if {record["schema_version"] for record in records} != {17}:
+if {record["schema_version"] for record in records} != {18}:
     raise SystemExit("fleet decoder record schema drifted")
 
 expected_main_rope_shape = [context_capacity, 64]
@@ -2327,9 +2619,51 @@ def validate_pregathered_attention_hlo(executable, *, source):
     ):
         raise SystemExit(f"{source} default pregathered-B512 state is not absent")
 
+def validate_strategy_nd_attention_hlo(executable, *, source):
+    if (
+        executable["strategy_nd_attention_projection"]
+        != strategy_nd_attention_projection
+    ):
+        raise SystemExit(f"{source} StrategyND attention flag drifted")
+    contract = executable["strategy_nd_attention_projection_contract"]
+    if (
+        not contract["passed"]
+        or contract["applicable"] != strategy_nd_attention_projection
+        or contract["violations"]
+    ):
+        raise SystemExit(f"{source} StrategyND attention HLO contract failed")
+    if strategy_nd_attention_projection:
+        if (
+            contract["gather_count"] != 78
+            or contract["expected_gather_count"] != 78
+            or contract["kernel_count"] != 624
+            or contract["expected_kernel_count"] != 624
+            or contract["kernel_name"]
+            != "greenfield_fp8_block_matmul_m8_k512_n6144"
+            or not contract["partial_gather_bijection"]
+            or not contract["exclusive_partial_dataflow"]
+            or contract["exclusive_source_violations"]
+            or not contract["all_gathers_live"]
+            or set(contract["gather_source_counts"].values()) != {8}
+        ):
+            raise SystemExit(
+                f"{source} StrategyND attention physical contract drifted"
+            )
+    elif (
+        contract["gather_count"] != 0
+        or contract["kernel_count"] != 0
+        or contract["scoped_instruction_count"] != 0
+    ):
+        raise SystemExit(
+            f"{source} default StrategyND attention state is not absent"
+        )
+
 for record in records:
     validate_main_rope_hlo(record["hlo_contract"], source="decoder")
     validate_pregathered_attention_hlo(
+        record["hlo_contract"], source="decoder"
+    )
+    validate_strategy_nd_attention_hlo(
         record["hlo_contract"], source="decoder"
     )
     if main_rope_table:
@@ -2387,6 +2721,10 @@ for record in records:
             source="DSA observer",
         )
         validate_pregathered_attention_hlo(
+            record["dsa_observer_hlo_contract"],
+            source="DSA observer",
+        )
+        validate_strategy_nd_attention_hlo(
             record["dsa_observer_hlo_contract"],
             source="DSA observer",
         )
@@ -2613,6 +2951,14 @@ if short_context_oracle:
     for record in records:
         prefill = record["prefill_hlo_contract"]
         validate_main_rope_hlo(
+            prefill["decoder_contract"],
+            source="teacher-forced prefill",
+        )
+        validate_pregathered_attention_hlo(
+            prefill["decoder_contract"],
+            source="teacher-forced prefill",
+        )
+        validate_strategy_nd_attention_hlo(
             prefill["decoder_contract"],
             source="teacher-forced prefill",
         )
@@ -3041,7 +3387,12 @@ if runtime_kind == "pallas_feature_linear":
         "greenfield_fp8_block_matmul_m8_k6144_n2048": separate_qkv_a_calls,
         "greenfield_fp8_block_matmul_m8_k2048_n4096": 78,
         "greenfield_fp8_block_matmul_m8_k6144_n640": separate_qkv_a_calls,
-        "greenfield_fp8_block_matmul_m8_k4096_n6144": 78,
+        "greenfield_fp8_block_matmul_m8_k4096_n6144": (
+            0 if strategy_nd_attention_projection else 78
+        ),
+        "greenfield_fp8_block_matmul_m8_k512_n6144": (
+            624 if strategy_nd_attention_projection else 0
+        ),
         "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": 78,
         "greenfield_fp8_structured_kv_b_value_h16_l512_v256": 78,
         "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": 0,
@@ -3205,6 +3556,7 @@ summary = {
     "dsa_score_default_precision": dsa_score_default_precision,
     "main_rope_table_enabled": main_rope_table,
     "pregathered_b512_attention": pregathered_b512_attention,
+    "strategy_nd_attention_projection": strategy_nd_attention_projection,
     "main_rope_table_sha256": records[0]["main_rope_table_sha256"],
     "main_rope_table_shape": records[0]["main_rope_table_shape"],
     "main_rope_table_bytes_per_device": records[0][
@@ -3230,6 +3582,23 @@ summary = {
             ),
         }
         if pregathered_b512_attention
+        else None
+    ),
+    "strategy_nd_attention_projection_prerequisite": (
+        {
+            "accepted_output_sha256": (
+                "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7"
+            ),
+            "classification": "strategy_nd_attention_projection_exact",
+            "code_hash": "a4a17ac",
+            "exact_candidate": "strategy_nd",
+            "results_db_item_row_id": 1823,
+            "results_db_run_id": 539,
+            "success_sha256": (
+                "f52d3e88b060c19059392dad69ba959ce715ba489c44f3565b93c1215969f508"
+            ),
+        }
+        if strategy_nd_attention_projection
         else None
     ),
     "dsa_score_default_precision_prerequisite": (
@@ -3502,6 +3871,12 @@ run_id = pv.start_run(
         "greenfield_pregathered_b512_attention_prerequisite_db_run": (
             537 if pregathered_b512_attention else None
         ),
+        "greenfield_strategy_nd_attention_projection": (
+            strategy_nd_attention_projection
+        ),
+        "greenfield_strategy_nd_attention_projection_prerequisite_db_run": (
+            539 if strategy_nd_attention_projection else None
+        ),
         "greenfield_prefill_index_repair_backend": expected_repair_backend,
         "greenfield_prefill_index_repair_prerequisite_db_run": (
             518 if prefill_index_repair else None
@@ -3534,6 +3909,7 @@ run_id = pv.start_run(
         ),
         "greenfield_sparse_moe_backend": sparse_moe_backend,
         "greenfield_code_hash": pin,
+        "greenfield_run_tag": greenfield_run_tag,
         "legacy_oracle_code_hash": oracle_pin,
         "hlo_sha256": records[0]["optimized_hlo_sha256"],
         "dsa_observer_hlo_sha256": records[0][
@@ -3559,6 +3935,8 @@ run_id = pv.start_run(
         f"device-resident main-RoPE table {main_rope_table}; "
         f"selected-cache LP4 exchange plus block-512 attention "
         f"{pregathered_b512_attention}; "
+        f"exact StrategyND attention projection "
+        f"{strategy_nd_attention_projection}; "
         f"runtime device round-trip verification {verify_device_roundtrip}; "
         + (
             f"real {prompt_token_count:,}-token prompt with exact raw tokens and "
@@ -3582,6 +3960,7 @@ run_id = pv.start_run(
     harness_repo=repo,
     fork_repo=oracle_repo,
 )
+(run_dir / "provisional_db_run_id.txt").write_text(f"{run_id}\n")
 pv.record_item(
     conn,
     run_id,
@@ -3597,6 +3976,7 @@ pv.record_item(
         + ("_scoredefault" if dsa_score_default_precision else "")
         + ("_mainrope" if main_rope_table else "")
         + ("_pregatheredb512" if pregathered_b512_attention else "")
+        + ("_strategynd_o" if strategy_nd_attention_projection else "")
         + ("_roundtrip" if verify_device_roundtrip else "")
     ),
     item_id=(
@@ -3652,6 +4032,7 @@ pv.finalize(
         + ("_scoredefault" if dsa_score_default_precision else "")
         + ("_mainrope" if main_rope_table else "")
         + ("_pregatheredb512" if pregathered_b512_attention else "")
+        + ("_strategynd_o" if strategy_nd_attention_projection else "")
         + ("_roundtrip" if verify_device_roundtrip else "")
     ),
     metric="contract_valid",
@@ -3687,27 +4068,153 @@ if sqlite3.connect(run_dir / "results_ckpt.db").execute("PRAGMA integrity_check"
 print(f"SHORT_DECODER_STEP_VALID db_run={run_id} p50_ms={fleet_p50:.6f}")
 PY
 
-strict_census post || {
-  say "ABORT: post-run census is not eight-host zero work"
-  exit 1
-}
-post_census_done=1
-
 say "sealing and archiving protected diagnostic evidence"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
   find host_records host_logs hlo traces dsa_observer \
-    layer_residual_observer dsa_internal_observer -type f -print0 | \
+    layer_residual_observer dsa_internal_observer \
+    layer0_residual_discriminator layer0_ingredients -type f -print0 | \
     sort -z | xargs -0 sha256sum
   sha256sum summary.json xplane_summary.json results_ckpt.db census_pre.txt census_post.txt \
-    sync.txt execute.txt orchestrator.sealed.log
+    sync.txt execute.txt orchestrator.sealed.log remote_prefix_preflight.txt \
+    provisional_db_run_id.txt
 ) >"$RUN_DIR/evidence.sha256"
 DB_RUN=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["results_db_run_id"])' \
   "$RUN_DIR/summary.json")
-printf 'db_run=%s\n' "$DB_RUN" >"$RUN_DIR/SUCCESS"
-gcloud storage cp --recursive --no-clobber "$RUN_DIR" "$REMOTE_PREFIX/" >/dev/null
-gcloud storage cp "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX/SUCCESS" --no-clobber >/dev/null
+gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
+  "$REMOTE_PREFIX/" >/dev/null
+
+/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \
+  >"$RUN_DIR/remote_objects.json" <<'PY'
+import base64
+from concurrent.futures import ThreadPoolExecutor
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+import google_crc32c
+
+root = Path(sys.argv[1])
+prefix = sys.argv[2]
+paths = [
+    (path, path.relative_to(root).as_posix())
+    for path in sorted(root.rglob("*"))
+    if path.is_file() and path.name not in {"SUCCESS", "remote_objects.json"}
+]
+
+
+def local_crc32c(path):
+    checksum = google_crc32c.Checksum()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            checksum.update(chunk)
+    return base64.b64encode(checksum.digest()).decode()
+
+
+def describe(item):
+    path, relative = item
+    value = json.loads(
+        subprocess.run(
+            [
+                "gcloud",
+                "storage",
+                "objects",
+                "describe",
+                f"{prefix}/{relative}",
+                "--format=json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
+    crc32c = value.get("crc32c_hash") or value.get("crc32c")
+    if int(value["size"]) != path.stat().st_size or crc32c != local_crc32c(path):
+        raise SystemExit(f"remote object verification failed: {relative}")
+    return {
+        "crc32c": crc32c,
+        "generation": value["generation"],
+        "path": relative,
+        "size": int(value["size"]),
+    }
+
+
+with ThreadPoolExecutor(max_workers=16) as executor:
+    records = list(executor.map(describe, paths))
+print(json.dumps({"objects": records}, indent=2, sort_keys=True))
+PY
+gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
+  "$REMOTE_PREFIX/remote_objects.json" >/dev/null
+local_remote_objects_sha=$(sha256sum "$RUN_DIR/remote_objects.json" | awk '{print $1}')
+remote_remote_objects_sha=$(gcloud storage cat "$REMOTE_PREFIX/remote_objects.json" |
+  sha256sum | awk '{print $1}')
+[[ $local_remote_objects_sha == "$remote_remote_objects_sha" ]] || {
+  say "ABORT: remote object ledger checksum mismatch"
+  exit 1
+}
+
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$RUN_DIR" "$REMOTE_PREFIX" <<'PY'
+from pathlib import Path
+import subprocess
+import sys
+
+from glm_tpu.greenfield.validation.attention_update import (
+    validate_exact_remote_object_set,
+)
+
+root = Path(sys.argv[1])
+prefix = sys.argv[2]
+listing = subprocess.run(
+    ["gcloud", "storage", "ls", f"{prefix}/**"],
+    check=True,
+    capture_output=True,
+    text=True,
+).stdout.splitlines()
+validate_exact_remote_object_set(root, prefix, listing)
+PY
+
+/home/gianl/vllm-env/bin/python - \
+  "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" <<'PY'
+from hashlib import sha256
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+summary = json.loads((root / "summary.json").read_text())
+values = {
+    "artifact_kind": summary["artifact_kind"],
+    "code_hash": sys.argv[3],
+    "results_db_run_id": summary["results_db_run_id"],
+    "gate_d_passed": str(summary["gate_d_passed"]).lower(),
+    "plan_hash": summary["plan_hash"],
+    "strategy_nd_attention_projection": str(
+        summary["strategy_nd_attention_projection"]
+    ).lower(),
+    "evidence_sha256": sha256((root / "evidence.sha256").read_bytes()).hexdigest(),
+    "remote_objects_sha256": sha256(
+        (root / "remote_objects.json").read_bytes()
+    ).hexdigest(),
+    "remote_prefix": sys.argv[2],
+}
+(root / "SUCCESS").write_text(
+    "".join(f"{key}={value}\n" for key, value in values.items())
+)
+PY
+gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" \
+  "$REMOTE_PREFIX/SUCCESS" >/dev/null
+local_success_sha=$(sha256sum "$RUN_DIR/SUCCESS" | awk '{print $1}')
+remote_success_sha=$(gcloud storage cat "$REMOTE_PREFIX/SUCCESS" |
+  sha256sum | awk '{print $1}')
+[[ $local_success_sha == "$remote_success_sha" ]] || {
+  say "ABORT: remote SUCCESS checksum mismatch"
+  exit 1
+}
+terminal_success_done=1
+
 trap - EXIT
 echo "SHORT_DECODER_STEP_OK $TAG DB=$DB_RUN"
