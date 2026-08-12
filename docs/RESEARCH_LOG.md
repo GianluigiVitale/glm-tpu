@@ -7659,3 +7659,16 @@ unmotivated arithmetic variants.
   rollback exercise and diff checks pass. These are readiness facts only. Exact next is the same
   Sol reviewer's correction-only confirmation, followed by commit/push, strict idle-fleet proof and
   one protected probe. No complete 8K retry is authorized before its classification.
+
+## 2026-08-12 11:43--11:44 — first arithmetic launch refuses a source-key typo
+
+- The reviewed batch was committed/pushed at `bb933edee095bf3aeab2481a66c836af1d63afb3` and launched
+  once under tag `greenfield_layer0_attention_arithmetic_20260812T114328336808595Z`. It failed
+  closed four seconds after the authenticated pre-census, before JAX import/compile, tensor output,
+  DB mutation or terminal evidence. The exit trap found no provisional DB row and the independent
+  failure-exit census again proves all eight hosts idle; partial diagnostics were archived.
+- Root cause is a local source-contract key error, not model arithmetic: the pinned real ingredient
+  contract records `decode_position=8155`, while the probe checked `position`. The exact correction
+  checks `decode_position`, exposes the guard for a regression that rejects the wrong alias, and
+  requires an all-real-source CPU preflight before another protected attempt. No Gate-D or
+  performance conclusion follows from this failed launch.

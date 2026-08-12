@@ -182,6 +182,23 @@ def test_attention_arithmetic_q_a_reference_is_hash_pinned(tmp_path: Path) -> No
     np.testing.assert_array_equal(actual, expected)
 
 
+def test_attention_arithmetic_source_contract_uses_sealed_decode_position() -> None:
+    ingredient = {
+        "decode_position": 8155,
+        "main_rope_table_sha256": MODULE._TABLE_SHA256,
+    }
+    accepted = {
+        "capture_mode": "attention_projection",
+        "position": 8155,
+        "tensors": {"attended_latent_bfloat16_bits": {"shape": [64, 512]}},
+    }
+    MODULE._validate_source_contract(ingredient, accepted)
+    wrong_key = dict(ingredient)
+    wrong_key["position"] = wrong_key.pop("decode_position")
+    with pytest.raises(RuntimeError, match="source contract drifted"):
+        MODULE._validate_source_contract(wrong_key, accepted)
+
+
 def test_attention_arithmetic_checkpoint_evidence_must_equal_manifest(
     tmp_path: Path,
 ) -> None:

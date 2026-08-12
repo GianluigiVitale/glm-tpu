@@ -49,6 +49,14 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   then commit/push, authenticated idle-fleet census and one serialized protected probe. An exact
   arm authorizes only its default-off integration plus the one upstream cache repair before 8K; no
   exact arm means capture the smallest accepted main-query operand rather than guess again.
+- Commit `bb933edee095bf3aeab2481a66c836af1d63afb3` was pushed and one protected attempt at tag
+  `greenfield_layer0_attention_arithmetic_20260812T114328336808595Z` failed closed in four seconds,
+  before JAX compilation or DB mutation. The sealed ingredients contract names the live row
+  `decode_position=8155`; the probe incorrectly checked a nonexistent `position` key. Pre-census
+  and failure-exit census both authenticate 8/8 zero work, the provisional rollback reports no DB
+  run, and diagnostic artifacts are preserved. The bounded fix checks `decode_position`, adds a
+  regression for the exact sealed schema and must replay every real pinned source locally before
+  a reviewed retry. This failure is not arithmetic, Gate-D or performance evidence.
 - Main-RoPE integration, TPU-HLO strengthening and provenance fixes are committed/pushed at
   `b5ba20dd4768d62743494511df22f3cd5935bd46`. The complete protected table-on 8K run at tag
   `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`

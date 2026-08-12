@@ -599,6 +599,22 @@ def _validate_hlo(optimized_hlo: str, arm: Arm) -> dict[str, Any]:
     }
 
 
+def _validate_source_contract(
+    ingredient_contract: dict[str, Any], accepted_capture: dict[str, Any]
+) -> None:
+    if (
+        ingredient_contract.get("main_rope_table_sha256") != _TABLE_SHA256
+        or ingredient_contract.get("decode_position") != _POSITION
+        or accepted_capture.get("position") != _POSITION
+        or accepted_capture.get("capture_mode") != "attention_projection"
+        or accepted_capture.get("tensors", {})
+        .get("attended_latent_bfloat16_bits", {})
+        .get("shape")
+        != [64, 512]
+    ):
+        raise RuntimeError("attention arithmetic source contract drifted")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-code-hash", required=True)
@@ -650,17 +666,7 @@ def main() -> int:
             raise RuntimeError(f"{label} SHA-256 drifted")
     ingredient_contract = json.loads(args.ingredients_contract.read_text())
     accepted_capture = json.loads(args.accepted_capture.read_text())
-    if (
-        ingredient_contract.get("main_rope_table_sha256") != _TABLE_SHA256
-        or ingredient_contract.get("position") != _POSITION
-        or accepted_capture.get("position") != _POSITION
-        or accepted_capture.get("capture_mode") != "attention_projection"
-        or accepted_capture.get("tensors", {})
-        .get("attended_latent_bfloat16_bits", {})
-        .get("shape")
-        != [64, 512]
-    ):
-        raise RuntimeError("attention arithmetic source contract drifted")
+    _validate_source_contract(ingredient_contract, accepted_capture)
 
     (
         normalized,
