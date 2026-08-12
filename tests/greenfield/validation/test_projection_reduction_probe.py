@@ -424,6 +424,64 @@ def test_projection_reduction_hlo_contract_fails_closed() -> None:
     )
 
 
+def test_projection_reduction_lineage_allows_only_exact_zero_row_pad() -> None:
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    kernel = "greenfield_fp8_block_matmul_m8_k4096_n6144"
+    hlo = "\n".join(
+        (
+            "HloModule pad_lineage, num_partitions=4",
+            "ENTRY main {",
+            "  %input = bf16[1,4096] parameter(0)",
+            "  %bits = u8[6144,4096] parameter(1)",
+            "  %scale = f32[48,32] parameter(2)",
+            "  " + _custom_call(
+                kernel, 0, "bf16[1,4096]", ("%input", "%bits", "%scale")
+            ),
+            "  %zero = bf16[] constant(0)",
+            "  ROOT %padded = bf16[8,4096] pad("
+            f"%{kernel}.0, %zero), padding=0_7x0_0",
+            "}",
+        )
+    )
+
+    def trace(text: str) -> tuple[set[tuple[str, str]], list[str]]:
+        module = parse_hlo_module(text)
+        calls = MODULE._pallas_calls(module)
+        kernel_by_key = {
+            MODULE._instruction_key(instruction): name
+            for instruction, name in calls
+        }
+        root = next(
+            instruction
+            for instruction in module.instructions
+            if instruction.raw_line.lstrip().startswith("ROOT ")
+        )
+        return MODULE._bounded_pallas_sources(
+            module,
+            (MODULE._instruction_key(root),),
+            kernel_by_key=kernel_by_key,
+        )
+
+    sources, errors = trace(hlo)
+    assert not errors
+    assert {name for _, name in sources} == {f"%{kernel}.0"}
+
+    _, nonzero_errors = trace(hlo.replace("constant(0)", "constant(1)", 1))
+    assert any("nonzero activation pad" in error for error in nonzero_errors)
+
+    _, geometry_errors = trace(hlo.replace("padding=0_7x0_0", "padding=0_6x0_0"))
+    assert any("invalid activation pad" in error for error in geometry_errors)
+
+    _, width_errors = trace(hlo.replace("bf16[8,4096] pad", "bf16[8,512] pad"))
+    assert any("invalid activation pad" in error for error in width_errors)
+
+    _, suffix_errors = trace(
+        hlo.replace("padding=0_7x0_0", "padding=0_7x0_0x1_1")
+    )
+    assert any("invalid activation pad" in error for error in suffix_errors)
+
+
 def test_projection_reduction_runtime_imports_resolve() -> None:
     symbols = MODULE._load_runtime_symbols()
     assert len(symbols) == 15

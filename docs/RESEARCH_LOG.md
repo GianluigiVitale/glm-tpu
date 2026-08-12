@@ -7791,3 +7791,29 @@ unmotivated arithmetic variants.
   now resolves the called root and maps only its contributing parameters to caller operands; direct
   and tuple-result regressions prove live and decoy selection. Only confirmation of this fusion
   correction by the same reviewer remains before commit and the protected four-chip launch.
+
+## 2026-08-12 15:58--15:59 — first projection/reduction launch preserves real folded HLO
+
+- The same reviewer approved staged SHA `3973ece2...033e`; it was committed and pushed as
+  `f399b77ac1c24a5d564d3eb45b0b96e21ca6e349`. The protected run ending
+  `20260812T155820993121185Z` passed pinned-source validation and 8/8 pre-census, compiled the first
+  local-attention/local-dense arm, and failed closed before execution or classification.
+- The sole activation-lineage violation is a legitimate TPU fold: the one live `[1,4096]` row is
+  padded with exact BF16 zero to the Pallas m8 operand `[8,4096]`. Root liveness separately refused
+  because the fusion walker interpreted literal arguments of `constant(...)` as unresolved HLO
+  values. The physical contract itself is exact: two LP4 BF16 all-reduces, three expected Pallas
+  calls, exact folded geometries, and exact Pallas-to-collective lineage.
+- The correction admits only BF16 scalar-zero row pads `[1,512] -> [8,512]` or `[1,4096] ->
+  [8,4096]` with exact `0_7x0_0` geometry and traces only the live input; nonzero or wrong geometry
+  refuses. Constants contribute no fusion caller dependency. The preserved real HLO now validates
+  with zero violations and focused plus StrategyND tests pass 19/19.
+- Optimized-HLO/StableHLO/runner/pre/failure-census SHAs are `7bef1cd4...38e0`,
+  `74473235...f262`, `7c884cc2...ca94`, `3ee5498f...d284`, and `478ba020...0a00`.
+  Diagnostics are in the approved bucket. There is no runner JSON, tensor result, DB row, summary
+  or `SUCCESS`; DB max remains 537 and failure cleanup is authenticated 8/8. Exact next is one Sol
+  audit of only this new correction, commit/push and one protected retry.
+- That bounded audit approved the evidence account and found one fail-open detail in the new pad
+  rule: independent input/output sets and substring geometry matching admitted mismatched widths
+  or a suffixed padding tuple. The correction now requires one of the two exact paired signatures
+  and parses the complete padding attribute as exactly `0_7x0_0`; both demonstrated mutations
+  refuse. Exact next is confirmation of only this correction, commit/push and one protected retry.

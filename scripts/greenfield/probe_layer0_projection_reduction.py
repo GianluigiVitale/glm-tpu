@@ -524,6 +524,8 @@ def _fusion_operand_indices(
                     )
                     return set()
                 return {int(parameter_match.group(1))}
+            if instruction.opcode == "constant":
+                return set()
             if instruction.opcode == "get-tuple-element":
                 index = _tuple_index(instruction)
                 if index is None or len(instruction.operand_names) != 1:
@@ -691,6 +693,7 @@ def _bounded_pallas_sources(
         "dynamic-slice",
         "get-tuple-element",
         "fusion",
+        "pad",
         "reshape",
         "slice",
     }
@@ -765,6 +768,39 @@ def _bounded_pallas_sources(
             errors.extend(fusion_errors)
             for index in indices:
                 visit((instruction.computation, instruction.operand_names[index]))
+            return
+        if instruction.opcode == "pad":
+            padding_match = re.search(
+                r"\bpadding=([^,\s}]+)", instruction.raw_line
+            )
+            if (
+                len(instruction.operand_names) != 2
+                or (
+                    _shape_signatures(instruction.operand_shapes),
+                    _shape_signatures(instruction.result_shapes),
+                )
+                not in {
+                    (("bf16[1,512]", "bf16[]"), ("bf16[8,512]",)),
+                    (("bf16[1,4096]", "bf16[]"), ("bf16[8,4096]",)),
+                }
+                or padding_match is None
+                or padding_match.group(1) != "0_7x0_0"
+            ):
+                errors.append(f"invalid activation pad: {instruction.name}")
+                return
+            padding_value = by_key.get(
+                (instruction.computation, instruction.operand_names[1])
+            )
+            if (
+                padding_value is None
+                or padding_value.opcode != "constant"
+                or _shape_signatures(padding_value.result_shapes) != ("bf16[]",)
+                or re.search(r"\bconstant\(0(?:\.0*)?\)", padding_value.raw_line)
+                is None
+            ):
+                errors.append(f"nonzero activation pad: {instruction.name}")
+                return
+            visit((instruction.computation, instruction.operand_names[0]))
             return
         shapes = instruction.operand_shapes + instruction.result_shapes
         if not shapes or any(shape.dtype != "bf16" for shape in shapes):

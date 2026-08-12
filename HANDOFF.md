@@ -43,10 +43,19 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   bounded layout transforms, selects the exact GTE tuple element, and has the reported decoy
   regression. A second correction-only pass exposed an analogous opaque-fusion dependency; the
   checker now resolves the fusion callee root, maps only contributing parameters back to caller
-  operands, and covers direct and tuple-result live/decoy cases. The focused suite passes 13/13 and
-  the StrategyND companion set passes 18/18. Exact next is confirmation of only this last correction
-  by the same reviewer, commit/push and one serialized four-chip probe; do not launch another full
-  8K decoder.
+  operands, and covers direct and tuple-result live/decoy cases. The same reviewer approved staged
+  SHA `3973ece2...033e`; commit `f399b77` is pushed. Its protected attempt ending
+  `20260812T155820993121185Z` compiled the first real arm and refused before execution because TPU
+  folded the live attention input with an exact zero row-pad `[1,4096] -> [8,4096]`, which the
+  linter had not admitted; fusion-root liveness also misread literal constants as operands. The
+  preserved real HLO now validates after admitting only exact BF16-zero `[1,512|4096] ->
+  [8,512|4096]` row padding and treating fusion constants as dependency-free. The bounded audit
+  approved the evidence but found independent shape-set and substring checks could admit
+  mismatched widths or suffixed geometry; exact paired signatures and a complete parsed padding
+  attribute now refuse both demonstrated cases. Focused plus StrategyND tests pass 19/19. There is
+  no runner/tensor/DB/SUCCESS result, DB max remains 537, and cleanup is authenticated 8/8. Exact
+  next is confirmation of only this pad correction, commit/push and one serialized retry; do not
+  launch another full 8K decoder.
 - The latest protected accepted capture is DB536/item1820,
   `greenfield_legacy_layer0_attention_projection_p8155_20260812T090000000000000Z`. It passed the
   exact raw passkey, all 14x21 DSA events, load/state checks, DB snapshot, approved-bucket archive,
@@ -4136,3 +4145,20 @@ the callee root and maps only actually contributing parameters to caller operand
 tuple-result live/rogue regressions prove both directions. Focused tests pass 13/13 and the
 StrategyND companion set passes 18/18. Exact next is confirmation of only this fusion correction,
 commit/push, idle-fleet proof and one protected probe.
+
+The same reviewer approved staged SHA `3973ece2...033e`, committed/pushed as `f399b77`. The first
+protected launch, tag `greenfield_layer0_projection_reduction_20260812T155820993121185Z`, compiled
+and preserved the real local/local arm HLO, then refused before execution. TPU lowering correctly
+pads the one live attention row with BF16 zero to the Pallas m8 operand `[8,4096]`; the bounded
+lineage allowlist omitted `pad`. Its fusion-root walker also followed literal values inside
+`constant(...)` as if they were HLO operands, causing the separate root-liveness refusal. Optimized
+HLO/runner/pre/failure-census SHAs are `7bef1cd4...38e0`, `7c884cc2...ca94`,
+`3ee5498f...d284`, and `478ba020...0a00`; diagnostics are archived, no DB row or terminal artifact
+exists, and cleanup is 8/8. The correction admits only exact BF16-zero row padding from
+`[1,512|4096]` to `[8,512|4096]`, rejects nonzero/wrong geometry, and treats fusion constants as
+dependency-free. The preserved real HLO replays with zero violations and focused plus StrategyND
+tests pass 19/19. The bounded audit approved the evidence and found only that independent shape
+sets and substring geometry matching admitted mismatched widths or a suffixed padding tuple. The
+contract now requires either exact `[1,512]+scalar -> [8,512]` or `[1,4096]+scalar -> [8,4096]`
+and parses the complete padding attribute as exactly `0_7x0_0`; both mutations refuse. Exact next
+is confirmation of only this pad correction, commit/push and one protected retry.

@@ -1312,3 +1312,9 @@ fails the mandatory DSA contract at layer 1 before warmup, timing, XPlane, DB re
 sealing. Its exact raw token is not a performance result. DB484 therefore remains the only accepted
 PP8 decoder measurement at `244.091151 ms/token` / `4.096830 tok/s`; Gate E remains open. The next
 four-chip projection/reduction run is diagnostic-only and cannot change this standing.
+
+The first projection/reduction attempt at `f399b77` also has no performance result. It compiled
+one bounded four-chip arm and failed its HLO lineage gate before device execution because the
+contract omitted TPU's exact-zero live-row padding. It produced no warmed loop, XPlane, wall
+distribution, decoder token, DB row or `SUCCESS`; DB484 remains the sole accepted performance
+point and Gate E remains open.
