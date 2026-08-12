@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-11 23:02 UTC
+**Updated:** 2026-08-12 UTC
 
 ## Authority and isolation
 
@@ -225,6 +225,58 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   HLO now passes the helper. Exact next is complete affected/static verification, one new-diff-only
   Sol audit, commit/push and one protected retry. An exact result authorizes complete protected 8K;
   a nonexact result is diagnosed before any new hypothesis.
+- The correction was independently verified, approved by the existing Sol reviewer, and
+  committed/pushed at `98b09b14a5eb60ed9d52e37c2a987d3c2bd192d1`. Its single protected retry,
+  tag ending `layer0_strategy_nd_row0_trace2_20260811T230818465472943Z`, completed the arithmetic
+  and emitted `STRATEGY_ND_ROW0_DIAGNOSTIC_CONTRACT_OK`. The canary is exact on all 32 sealed
+  trials x 32 lanes with 82 barriers, one exact LP4 gather and fleet HLO SHA `8253c122...d5b`.
+  The control again reproduces `6c54c09a...bca` / `3,984` mismatches. The measured StrategyND
+  tree on both attention-output and dense-down changes the boundary to `41628831...a66d` and
+  improves it to `3,492` mismatches, max `0.00390625`, mean `0.000109618`, but is not exact.
+  It fixes 1,363 formerly wrong elements, regresses 871 formerly exact elements and improves all
+  three 2,048-wide bands (`1334/1312/1338` to `1138/1173/1181`), so the tree is relevant and no
+  missing color band explains the remainder. Contract/NPZ/suite/canary SHAs are
+  `20d10b80...663`, `36661b90...517`, `f1ff2343...53c`, and `c7bf3b0d...a74`; direct remote hashes
+  match. Pre/failure census SHAs `cdea3d12...a82` / `9f9d1baf...7df` prove 8/8 cleanup, and all
+  rank logs are identical at `f5d6e949...3c90`. This intentional diagnostic has no timing,
+  XPlane, DB row or `SUCCESS`; Gate D/E remain open.
+- Do not integrate the partial correction or guess another reduction tree. The first still-open
+  primitive is the accepted layer-0 main-attention output entering `o_proj`: all reduction trials
+  consumed unverified projection operands, and the earlier monolithic-schedule arm did not capture
+  the accepted operand. Reuse the existing exact-step, non-returning legacy callback/protected 8K
+  oracle stack to capture only row-zero post-`W_UV`/pre-`o_proj` BF16 state, then compare it against
+  a table-on greenfield ingredients capture in logical head order. That comparison chooses between
+  attention arithmetic and per-projection-partial arithmetic without another full-decoder guess.
+- The oracle-only observer extension is reviewed, committed and pushed at
+  `bf8a03e264971c8efba99a346d1e8189ef0ff518`, exactly seven commits after accepted
+  `b3c25df47`. It adds only default-off `attention_output` mode at the actual post-`W_UV`,
+  pre-`o_proj` BF16 boundary; prior modes are unchanged. Its staged SHA was
+  `9b01eaf0...e65`, the focused tests pass, and the existing Sol reviewer returned
+  `APPROVE COMMIT` with no high/medium findings.
+- The greenfield successor is locally complete. The protected accepted wrapper pins that exact
+  observer and seals one process-0, position-8,155 logical-head row while retaining exact tokens,
+  all DSA events, load/state, DB/archive and 8/8 cleanup. The existing layer-0 ingredients replay
+  now accepts only the proven main-RoPE table path and records the run/table/HLO identities. The
+  independent comparator joins owners `[0,1,2,3]` into 16,384 logical heads and classifies exact
+  as `projection_partial_arithmetic`, otherwise
+  `attention_arithmetic_before_output_projection`. It is diagnostic-only.
+- The one new-diff-only Sol audit found one medium fail-closed gap: the first table-on ingredient
+  contract counted a correctly shaped main-RoPE parameter and named arithmetic independently, so
+  an unused table could pass. The correction follows tuple indices and dataflow across TPU
+  conditionals, fusions and prefill while bodies, and requires the exact chain from the table
+  parameter through a scoped dynamic-slice lookup, every scoped FP32 product/combine/final BF16
+  round, and captured `attention_output_input` root. A planted unused-table fixture now refuses.
+  The preserved real TPU table-on discriminator HLO passes at `2/8/4/4` dependent
+  lookup/product/combine/final-round instructions. The complete affected suite passes `89/89`;
+  Python compilation, Bash, ShellCheck, JSON and diff checks pass. The correction-only follow-up
+  found that metadata-stripped direct rounds were represented by their combine keys rather than
+  their actual convert keys, allowing a dead final round plus an altered bypass conversion to
+  reach the captured root. The fixed graph now seeds the real BF16 convert instructions while
+  retaining unique per-combine counting; a planted bypass has valid upstream table arithmetic but
+  is rejected because the admitted rounds do not reach root 17. The affected suite again passes
+  `89/89` and preserved real TPU HLO remains valid. Exact next is another correction-only check by
+  the same reviewer; after an unchanged commit/push, run only the accepted and table-on captures
+  serially, compare and archive. Do not launch another guessed tree or complete 8K first.
 
 ## Historical main-RoPE integration batch
 

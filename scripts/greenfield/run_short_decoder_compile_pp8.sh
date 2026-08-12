@@ -259,8 +259,8 @@ if [[ $MAIN_ROPE_TABLE == 1 ]]; then
     echo "main-RoPE table requires the exact repaired recurrent DSA chain" >&2
     exit 2
   }
-  [[ $LAYER0_RESIDUAL_VARIANTS == 0 && $LAYER0_SUBSHARD_VARIANTS == 0 && $LAYER0_INGREDIENTS == 0 ]] || {
-    echo "main-RoPE table admits only the isolated attention-schedule/output-association discriminator" >&2
+  [[ $LAYER0_RESIDUAL_VARIANTS == 0 && $LAYER0_SUBSHARD_VARIANTS == 0 ]] || {
+    echo "main-RoPE table admits only the isolated attention/StrategyND/ingredient diagnostics" >&2
     exit 2
   }
 fi
@@ -347,6 +347,10 @@ if [[ $LAYER0_INGREDIENTS == 1 ]]; then
   }
   [[ $RUNTIME_KIND == pallas_feature_linear && $COMPLETE_TOKEN_PATH == 1 && $SPLIT_RESIDUAL_STATE == 1 ]] || {
     echo "layer-0 ingredients require the complete split Pallas-linear path" >&2
+    exit 2
+  }
+  [[ $MAIN_ROPE_TABLE == 1 ]] || {
+    echo "layer-0 ingredients require the proven main-RoPE table" >&2
     exit 2
   }
   [[ $PREFILL_INDEX_REPAIR == 1 && $DSA_QUERY_EXACT_ASSOCIATION == 1 && $DSA_HEAD_KEY_EXACT_ASSOCIATION == 1 && $DSA_SCORE_DEFAULT_PRECISION == 1 ]] || {
@@ -1677,6 +1681,33 @@ if [[ $execute_status -ne 0 ]] || \
     gcloud storage cp "$REMOTE_PREFIX/layer0_ingredients/*" \
       "$RUN_DIR/layer0_ingredients/" \
       >>"$RUN_DIR/diagnostic_downloads.txt" 2>&1 || true
+    /home/gianl/vllm-env/bin/python - \
+      "$RUN_DIR/layer0_ingredients/contract.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    raise SystemExit("layer-0 ingredient diagnostic contract is missing")
+contract = json.loads(path.read_text())
+main_rope = contract.get("hlo_contract", {}).get(
+    "main_rope_table_contract", {}
+)
+if (
+    not contract.get("passed")
+    or contract.get("decode_position") != 8155
+    or contract.get("main_rope_table_enabled") is not True
+    or contract.get("main_rope_table_sha256")
+    != "6a22140f31c94bbb99092301902a4ed18abfb6be0944194005564f0db3c80701"
+    or not main_rope.get("passed")
+    or main_rope.get("table_parameter_count") != 1
+    or main_rope.get("named_table_parameter_count") != 1
+):
+    raise SystemExit("layer-0 ingredient diagnostic contract failed")
+print("LAYER0_INGREDIENTS_DIAGNOSTIC_CONTRACT_OK")
+PY
+    say "layer-0 ingredient diagnostic contract passed; preserving intentional diagnostic exit"
   fi
   if [[ $LAYER0_ATTENTION_VARIANTS == 1 ]]; then
     /home/gianl/vllm-env/bin/python - \

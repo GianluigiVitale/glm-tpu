@@ -1899,6 +1899,7 @@ def _validate_main_rope_table_hlo(
     config: DecoderStepConfig,
     layers: int,
     enabled: bool,
+    required_entry_root_indices: Sequence[int] = (),
 ) -> dict[str, Any]:
     """Pin the explicit table input and main-MLA-only FP32 rotary scope."""
 
@@ -1966,6 +1967,225 @@ def _validate_main_rope_table_hlo(
     )
     fp32_combine_count = len(scoped_fp32_combines)
 
+    def computation_symbol(value: str) -> str:
+        parts = value.split()
+        if parts and parts[0] == "ENTRY":
+            parts = parts[1:]
+        return parts[0] if parts else value
+
+    instruction_by_key = {
+        (instruction.computation, instruction.name): instruction
+        for instruction in module.instructions
+    }
+    parameters: dict[str, dict[int, tuple[str, str]]] = {}
+    roots: dict[str, tuple[str, str]] = {}
+    for instruction in module.instructions:
+        symbol = computation_symbol(instruction.computation)
+        if instruction.opcode == "parameter":
+            parameter_match = re.search(
+                r"\bparameter\(([0-9]+)\)", instruction.raw_line
+            )
+            if parameter_match is not None:
+                parameters.setdefault(symbol, {})[
+                    int(parameter_match.group(1))
+                ] = (instruction.computation, instruction.name)
+        if instruction.raw_line.lstrip().startswith("ROOT "):
+            roots[symbol] = (instruction.computation, instruction.name)
+
+    # Edges preserve tuple element paths through branch arguments and call
+    # results.  This is deliberately a small HLO value-flow proof rather than
+    # an op-name heuristic: optimized TPU HLO moves the table lookup and rotary
+    # arithmetic into separate fusion/conditional computations.
+    edge_map: dict[
+        tuple[str, str],
+        list[tuple[tuple[str, str], str, int | None]],
+    ] = {}
+
+    def add_edge(
+        source: tuple[str, str],
+        target: tuple[str, str],
+        kind: str,
+        index: int | None = None,
+    ) -> None:
+        if source in instruction_by_key and target in instruction_by_key:
+            edge_map.setdefault(source, []).append((target, kind, index))
+
+    call_opcodes = {"call", "conditional", "fusion", "while"}
+    for instruction in module.instructions:
+        target = (instruction.computation, instruction.name)
+        if instruction.opcode == "parameter":
+            continue
+        if instruction.opcode == "tuple":
+            for index, operand_name in enumerate(instruction.operand_names):
+                add_edge(
+                    (instruction.computation, operand_name),
+                    target,
+                    "tuple",
+                    index,
+                )
+        elif instruction.opcode == "get-tuple-element":
+            tuple_index_match = re.search(
+                r"\bindex=([0-9]+)", instruction.raw_line
+            )
+            if instruction.operand_names and tuple_index_match is not None:
+                add_edge(
+                    (
+                        instruction.computation,
+                        instruction.operand_names[0],
+                    ),
+                    target,
+                    "get-tuple-element",
+                    int(tuple_index_match.group(1)),
+                )
+        elif instruction.opcode not in call_opcodes:
+            for operand_name in instruction.operand_names:
+                add_edge(
+                    (instruction.computation, operand_name),
+                    target,
+                    "ordinary",
+                )
+
+        called_match = re.search(
+            r"\bcalls=(%[A-Za-z0-9_.:-]+)", instruction.raw_line
+        )
+        if called_match is not None:
+            called_symbol = called_match.group(1)
+            for index, operand_name in enumerate(instruction.operand_names):
+                parameter_key = parameters.get(called_symbol, {}).get(index)
+                if parameter_key is not None:
+                    add_edge(
+                        (instruction.computation, operand_name),
+                        parameter_key,
+                        "identity",
+                    )
+            root_key = roots.get(called_symbol)
+            if root_key is not None:
+                add_edge(root_key, target, "identity")
+
+        branches_match = re.search(
+            r"\bbranch_computations=\{([^}]*)\}",
+            instruction.raw_line,
+        )
+        if branches_match is not None:
+            branch_symbols = tuple(
+                item.strip()
+                for item in branches_match.group(1).split(",")
+                if item.strip()
+            )
+            for branch_index, branch_symbol in enumerate(branch_symbols):
+                operand_index = branch_index + 1
+                if operand_index >= len(instruction.operand_names):
+                    continue
+                parameter_key = parameters.get(branch_symbol, {}).get(0)
+                if parameter_key is not None:
+                    add_edge(
+                        (
+                            instruction.computation,
+                            instruction.operand_names[operand_index],
+                        ),
+                        parameter_key,
+                        "identity",
+                    )
+                root_key = roots.get(branch_symbol)
+                if root_key is not None:
+                    add_edge(root_key, target, "identity")
+
+        body_match = re.search(
+            r"\bbody=(%[A-Za-z0-9_.:-]+)", instruction.raw_line
+        )
+        if body_match is not None and instruction.operand_names:
+            body_symbol = body_match.group(1)
+            body_parameter = parameters.get(body_symbol, {}).get(0)
+            if body_parameter is not None:
+                add_edge(
+                    (
+                        instruction.computation,
+                        instruction.operand_names[0],
+                    ),
+                    body_parameter,
+                    "identity",
+                )
+                add_edge(target, body_parameter, "identity")
+            body_root = roots.get(body_symbol)
+            if body_root is not None:
+                add_edge(body_root, target, "identity")
+
+    ValuePath = tuple[int, ...] | None
+
+    def forward_dataflow(
+        seeds: Sequence[tuple[str, str]],
+    ) -> dict[tuple[str, str], set[ValuePath]]:
+        reached: dict[tuple[str, str], set[ValuePath]] = {}
+        pending: list[tuple[tuple[str, str], ValuePath]] = []
+        for seed in seeds:
+            if seed in instruction_by_key:
+                reached.setdefault(seed, set()).add(())
+                pending.append((seed, ()))
+        while pending:
+            source, path = pending.pop()
+            for target, kind, index in edge_map.get(source, ()):
+                target_instruction = instruction_by_key[target]
+                if kind == "identity":
+                    target_path = path
+                elif kind == "tuple":
+                    assert index is not None
+                    target_path = (
+                        None
+                        if path is None
+                        else (index, *path)
+                    )
+                elif kind == "get-tuple-element":
+                    assert index is not None
+                    if path is None or path == ():
+                        target_path = (
+                            None
+                            if len(target_instruction.result_shapes) > 1
+                            else ()
+                        )
+                    elif path[0] != index:
+                        continue
+                    else:
+                        target_path = path[1:]
+                else:
+                    target_path = (
+                        None
+                        if len(target_instruction.result_shapes) > 1
+                        else ()
+                    )
+                target_paths = reached.setdefault(target, set())
+                if target_path not in target_paths:
+                    target_paths.add(target_path)
+                    pending.append((target, target_path))
+        return reached
+
+    def instruction_key(instruction: HloInstruction) -> tuple[str, str]:
+        return instruction.computation, instruction.name
+
+    table_flow = forward_dataflow(
+        tuple(instruction_key(item) for item in table_parameters)
+    )
+    table_dependent_lookups = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction_key(instruction) in table_flow
+        and instruction.opcode == "dynamic-slice"
+        and instruction.op_name is not None
+        and "greenfield_main_rope_table_lookup" in instruction.op_name
+    )
+    lookup_flow = forward_dataflow(
+        tuple(instruction_key(item) for item in table_dependent_lookups)
+    )
+
+    def lookup_dependent(instruction: HloInstruction) -> bool:
+        return instruction_key(instruction) in lookup_flow
+
+    table_dependent_fp32_multiplies = tuple(
+        item for item in scoped_fp32_multiplies if lookup_dependent(item)
+    )
+    table_dependent_fp32_combines = tuple(
+        item for item in scoped_fp32_combines if lookup_dependent(item)
+    )
+
     def is_final_round(instruction: HloInstruction) -> bool:
         return (
             instruction.opcode == "convert"
@@ -2014,6 +2234,7 @@ def _validate_main_rope_table_hlo(
         key: [] for key in scoped_combine_keys
     }
     direct_dataflow_round_combine_keys: set[tuple[str, str]] = set()
+    direct_dataflow_final_rounds: list[HloInstruction] = []
     for instruction in module.instructions:
         consumed_combine_keys = scoped_combine_keys.intersection(
             (instruction.computation, operand_name)
@@ -2031,12 +2252,58 @@ def _validate_main_rope_table_hlo(
             direct_dataflow_round_combine_keys.update(
                 consumed_combine_keys
             )
+            direct_dataflow_final_rounds.append(instruction)
     scoped_final_round_count = len(scoped_final_rounds)
     direct_dataflow_final_round_count = len(
         direct_dataflow_round_combine_keys
     )
     final_round_count = (
         scoped_final_round_count + direct_dataflow_final_round_count
+    )
+    final_rounds = tuple(
+        (*scoped_final_rounds, *direct_dataflow_final_rounds)
+    )
+    table_dependent_final_rounds = tuple(
+        item for item in final_rounds if lookup_dependent(item)
+    )
+    table_dependent_direct_round_combine_keys: set[tuple[str, str]] = set()
+    for instruction in table_dependent_final_rounds:
+        if instruction_key(instruction) in scoped_final_round_keys:
+            continue
+        table_dependent_direct_round_combine_keys.update(
+            scoped_combine_keys.intersection(
+                (instruction.computation, operand_name)
+                for operand_name in instruction.operand_names
+            )
+        )
+    table_dependent_final_round_count = sum(
+        lookup_dependent(item) for item in scoped_final_rounds
+    ) + len(table_dependent_direct_round_combine_keys)
+    final_round_flow = forward_dataflow(
+        tuple(instruction_key(item) for item in table_dependent_final_rounds)
+    )
+    entry_roots = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+        and instruction.raw_line.lstrip().startswith("ROOT ")
+    )
+
+    def dependent_root_indices(
+        flow: Mapping[tuple[str, str], set[ValuePath]],
+    ) -> tuple[int, ...]:
+        indices: set[int] = set()
+        for root in entry_roots:
+            for path in flow.get(instruction_key(root), ()):
+                if path is None:
+                    indices.update(required_entry_root_indices)
+                elif path:
+                    indices.add(path[0])
+        return tuple(sorted(indices))
+
+    table_dependent_root_indices = dependent_root_indices(table_flow)
+    final_round_dependent_root_indices = dependent_root_indices(
+        final_round_flow
     )
     combines_with_sole_convert_user = sum(
         len(users) == 1 and is_final_round(users[0])
@@ -2048,6 +2315,10 @@ def _validate_main_rope_table_hlo(
             violations.append("main-RoPE table parameter contract drifted")
         if not scoped:
             violations.append("main-RoPE table scope is absent")
+        if not table_dependent_lookups:
+            violations.append(
+                "main-RoPE table does not feed its position lookup"
+            )
         if forbidden:
             violations.append("main-RoPE table scope contains forbidden operations")
         if bf16_arithmetic:
@@ -2056,8 +2327,19 @@ def _validate_main_rope_table_hlo(
             violations.append("main-RoPE FP32 products are rounded before combine")
         if fp32_multiply_count < layers * 8:
             violations.append("main-RoPE FP32 multiply count is too small")
+        if (
+            len(table_dependent_fp32_multiplies)
+            != fp32_multiply_count
+        ):
+            violations.append(
+                "main-RoPE FP32 products do not depend on the table lookup"
+            )
         if fp32_combine_count < layers * 4:
             violations.append("main-RoPE FP32 combine count is too small")
+        if len(table_dependent_fp32_combines) != fp32_combine_count:
+            violations.append(
+                "main-RoPE FP32 combines do not depend on the table lookup"
+            )
         if (
             combines_with_direct_fp32_product_operands
             != fp32_combine_count
@@ -2067,6 +2349,30 @@ def _validate_main_rope_table_hlo(
             )
         if final_round_count < layers * 2:
             violations.append("main-RoPE final-round count is too small")
+        if table_dependent_final_round_count != final_round_count:
+            violations.append(
+                "main-RoPE final rounds do not depend on the table lookup"
+            )
+        missing_table_roots = sorted(
+            set(required_entry_root_indices).difference(
+                table_dependent_root_indices
+            )
+        )
+        if missing_table_roots:
+            violations.append(
+                "main-RoPE captured roots do not depend on the table: "
+                f"{missing_table_roots}"
+            )
+        missing_round_roots = sorted(
+            set(required_entry_root_indices).difference(
+                final_round_dependent_root_indices
+            )
+        )
+        if missing_round_roots:
+            violations.append(
+                "main-RoPE captured roots do not depend on final BF16 rounds: "
+                f"{missing_round_roots}"
+            )
     elif table_parameters or named_table_parameters or scoped:
         violations.append("default decoder unexpectedly contains main-RoPE table state")
     return {
@@ -2091,7 +2397,24 @@ def _validate_main_rope_table_hlo(
         "premature_product_rounds": list(premature_product_rounds),
         "scoped_instruction_count": len(scoped),
         "scoped_final_round_count": scoped_final_round_count,
+        "table_dependent_final_round_count": (
+            table_dependent_final_round_count
+        ),
+        "table_dependent_fp32_combine_count": len(
+            table_dependent_fp32_combines
+        ),
+        "table_dependent_fp32_multiply_count": len(
+            table_dependent_fp32_multiplies
+        ),
+        "table_dependent_lookup_count": len(table_dependent_lookups),
+        "table_dependent_root_indices": list(
+            table_dependent_root_indices
+        ),
         "table_parameter_count": len(table_parameters),
+        "final_round_dependent_root_indices": list(
+            final_round_dependent_root_indices
+        ),
+        "required_entry_root_indices": list(required_entry_root_indices),
         "violations": violations,
     }
 
@@ -3327,6 +3650,7 @@ def validate_layer0_ingredients_observer_hlo(
     *,
     config: DecoderStepConfig,
     groups: Sequence[Sequence[int]],
+    main_rope_table_enabled: bool = False,
 ) -> dict[str, Any]:
     """Fail closed on the single diagnostic layer-0 ingredient replay."""
 
@@ -3463,6 +3787,18 @@ def validate_layer0_ingredients_observer_hlo(
         violations.append(
             "layer-0 ingredient observer lost the scoped layer-1 normalization"
         )
+    main_rope_table_contract = _validate_main_rope_table_hlo(
+        module,
+        config=config,
+        layers=1,
+        enabled=main_rope_table_enabled,
+        required_entry_root_indices=(
+            (LAYER0_INGREDIENT_NAMES.index("attention_output_input"),)
+            if main_rope_table_enabled
+            else ()
+        ),
+    )
+    violations.extend(main_rope_table_contract["violations"])
     if host_markers:
         violations.append(
             f"layer-0 ingredient observer contains host execution: {host_markers}"
@@ -3482,6 +3818,8 @@ def validate_layer0_ingredients_observer_hlo(
         "host_markers": host_markers,
         "ingredient_names": list(LAYER0_INGREDIENT_NAMES),
         "kernel_counts": kernel_counts,
+        "main_rope_table_contract": main_rope_table_contract,
+        "main_rope_table_enabled": main_rope_table_enabled,
         "num_partitions": module.num_partitions,
         "passed": not violations,
         "unexpected_collectives": unexpected_collectives,
@@ -4264,11 +4602,6 @@ def build_decoder_step_program(
         raise PlanValidationError(
             "layer-0 ingredient observer requires the proven complete split-token "
             "BF16 Pallas/DSA/fused-qkv path"
-        )
-    if main_rope_table_enabled and build_layer0_ingredients_observer:
-        raise PlanValidationError(
-            "main-RoPE table execution must remain isolated from layer-0 "
-            "ingredient diagnostics"
         )
     if (
         main_rope_table_enabled
@@ -5780,6 +6113,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        local_main_rope_table: Any | None = None,
     ) -> tuple[Any, ...]:
         """Replay layer 0 once and return primitive, unsaturated boundaries."""
 
@@ -5790,6 +6124,31 @@ def build_decoder_step_program(
         kv_cache = local_kv_container[0]
         index_cache = local_index_container[0]
         metadata = local_metadata_container[0]
+        main_rope_table_row = None
+        if main_rope_table_enabled:
+            if (
+                local_main_rope_table is None
+                or local_main_rope_table.shape
+                != (config.context_capacity, geometry.qk_rope_head_dim)
+                or local_main_rope_table.dtype != jnp.bfloat16
+            ):
+                raise PlanValidationError(
+                    "layer-0 ingredient main-RoPE table is invalid"
+                )
+            safe_rope_position = jnp.clip(
+                position[0],
+                jnp.int32(0),
+                jnp.int32(config.context_capacity - 1),
+            )
+            with jax.named_scope("greenfield_main_rope_table_lookup"):
+                main_rope_table_row = local_main_rope_table[
+                    safe_rope_position
+                ]
+        elif local_main_rope_table is not None:
+            raise PlanValidationError(
+                "default layer-0 ingredient observer cannot consume a "
+                "main-RoPE table"
+            )
 
         def weight(name: str) -> Any:
             return local_weights[name][0]
@@ -5954,6 +6313,7 @@ def build_decoder_step_program(
                 dsa_head_key_exact_association=True,
                 dsa_score_precision="default",
                 attention_projection_backend=attention_projection_backend,
+                main_rope_table_row=main_rope_table_row,
                 capture_ingredients=True,
             )
             candidate = observed.result

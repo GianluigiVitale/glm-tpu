@@ -174,6 +174,7 @@ def _split_operands(value: str) -> tuple[str, ...]:
     result.append(value[start:].strip())
     names = []
     for operand in result:
+        operand = re.sub(r"/\*.*?\*/", "", operand).strip()
         token = operand.split()[0] if operand else ""
         if _NAME_RE.match(token):
             names.append(token)

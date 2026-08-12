@@ -7520,3 +7520,84 @@ unmotivated arithmetic variants.
   both encodings, the preserved TPU HLO now passes, and malformed/extra collectives remain refused.
   Exact next: finish the affected/static suite, obtain one new-diff-only Sol audit, commit/push and
   retry the protected discriminator once.
+
+## 2026-08-11 23:02--23:55 — DB533 tree is causal but projection operands remain nonexact
+
+- The bounded HLO correction passed the full affected suite (`79/79`), static checks and one
+  new-diff-only Sol audit, then was committed/pushed at
+  `98b09b14a5eb60ed9d52e37c2a987d3c2bd192d1`. One serialized protected retry used tag ending
+  `layer0_strategy_nd_row0_trace2_20260811T230818465472943Z`; no other TPU workflow overlapped it.
+- The run emitted `STRATEGY_ND_ROW0_DIAGNOSTIC_CONTRACT_OK`. Its same-reducer canary has zero
+  mismatches across 32 sealed DB533 trials x 32 lanes, 32 distinct output hashes, 82 StableHLO
+  barriers, one exact LP4 gather and fleet-identical optimized-HLO SHA `8253c122...d5b`. Both
+  layer arms retain one live row, exact selection, sentinel inactive rows, lane replication, exact
+  LP4 groups, distinct HLO and passing contracts.
+- The control is stable at SHA `6c54c09a...bca`, `3,984/6,144` mismatches, max `0.00390625` and
+  mean `0.00014738367`. Applying DB533's row-zero StrategyND tree to both 32-way virtual
+  projections produces SHA `41628831...a66d`, `3,492/6,144` mismatches, unchanged max and mean
+  `0.00010961798`. It fixes 1,363 control mismatches and regresses 871 control matches. The three
+  2,048-wide mismatch bands improve uniformly from `1334/1312/1338` to `1138/1173/1181`; the
+  residue is not one omitted StrategyND color band.
+- Local and direct approved-bucket SHAs match for contract `20d10b80...663`, NPZ
+  `36661b90...517`, suite `f1ff2343...53c` and canary `c7bf3b0d...a74`. Pre/failure census SHAs
+  `cdea3d12...a82` / `9f9d1baf...7df` authenticate eight clean hosts; all eight rank logs are
+  identical at `f5d6e949...3c90`. The wrapper's exit one is the required diagnostic exit. There is
+  no timing, XPlane, DB row, terminal `SUCCESS`, Gate-D or performance claim.
+- The measured tree is relevant but not sufficient, so do not integrate it or launch complete 8K.
+  The earliest unresolved input is the accepted layer-0 post-`W_UV`, pre-`o_proj` attention row.
+  Reuse the existing non-returning exact-position callback and protected accepted-8K harness to
+  seal only that BF16 operand, then enable the existing greenfield ingredients observer with the
+  already-proven main-RoPE table and compare logical head order bitwise. A mismatch localizes the
+  defect before projection; an exact operand localizes it to the K512 partial computation. This is
+  source-order localization, not another reduction-tree hypothesis.
+
+## 2026-08-12 — accepted attention-operand discriminator is locally complete
+
+- The oracle observer extension was reviewed once, committed and pushed at
+  `bf8a03e264971c8efba99a346d1e8189ef0ff518`, seven commits after accepted `b3c25df47`.
+  Its only new mode is default-off `attention_output`: immediately after the real `W_UV` FP32
+  einsum/scale/final BF16 cast and reshape, and before `o_proj`, it invokes the existing exact-row,
+  non-returning callback. The artifact is one 16,384-wide BF16 row at layer 0 / position 8,155;
+  scorer and prompt-key modes remain unchanged. Focused tests pass and the one Sol audit found no
+  high/medium issue for staged SHA `9b01eaf0...e65`.
+- The protected accepted 8K wrapper now admits only that exact observer pin/mode/position, requires
+  one process-0 owner and seven nonowners, keeps the exact raw-token/DSA/load/state/DB/archive and
+  cleanup contract, and seals the operand with source-file, content and provenance hashes. It does
+  not return the tensor into execution and makes no performance claim.
+- The existing greenfield ingredient observer is reused, not replaced. It now runs only with the
+  DB531 main-RoPE table path, records the exact run tag/table SHA/HLO contract, and captures the
+  post-prefill first-decode operand as four ordered `[4096]` owner slices. The independent
+  comparator validates both append-only artifacts and joins owners `[0,1,2,3]` into the accepted
+  16,384-wide logical-head order. Exact bytes classify the remaining defect as K512 projection
+  partial arithmetic; any mismatch classifies it before `o_proj` in attention arithmetic.
+- Local validation passes affected capture/oracle/compiler tests `66/66`, the complete decoder/HLO
+  file `27/27`, compileall, Bash, ShellCheck, JSON and diff checks. Both launch wrappers reach the
+  intended dirty-worktree guard before fleet work. One new-diff-only Sol audit of the exact staged
+  greenfield batch remains before commit/push and the two serialized protected captures.
+
+## 2026-08-12 — ingredient HLO dataflow audit correction
+
+- The one greenfield-batch Sol audit found one medium issue before deployment: the initial
+  main-RoPE HLO gate did not prove that its exact table parameter fed the rotary arithmetic or the
+  captured operand. The positive synthetic ingredient fixture exposed the gap by leaving the table
+  unused while named FP32 arithmetic still passed.
+- The corrected gate constructs a tuple-index-aware HLO value-flow graph across fusion arguments,
+  conditional branches and while-carried state. It now requires the exact table parameter to feed
+  a scoped dynamic-slice lookup, all scoped FP32 products and combines, all admitted final BF16
+  rounds, and the `attention_output_input` entry-root element through those rounds. The HLO parser
+  also preserves operands preceded by TPU's `/*index=N*/` tuple comments; a regression pins that
+  behavior. The unused-table ingredient fixture now fails closed.
+- The preserved real TPU table-on layer-0 HLO passes the strengthened dependency proof with two
+  dependent dynamic-slice instructions, eight FP32 products, four FP32 combines and four final
+  BF16 rounds. The complete affected CPU suite passes `89/89` in `169.06 s`; compileall, Bash,
+  ShellCheck, JSON and diff checks pass. Exact next is a correction-only follow-up by the same Sol
+  reviewer, then an unchanged commit/push and the two serialized protected operand captures.
+- That follow-up found a second medium fail-closed issue specific to metadata-stripped final
+  rounds: the dependency seed used each consumed FP32 combine key rather than the actual BF16
+  convert instruction key. A dead admitted convert plus a different conversion on the captured
+  path could therefore pass. The correction records the actual direct-convert instructions for
+  reachability while continuing to count unique consumed combines, so harmless duplicate converts
+  do not inflate the arithmetic contract. A planted fixture keeps table lookup, products and
+  combines correct but routes root 17 through an altered bypass; it now fails solely because the
+  admitted final rounds cannot reach the root. Focused `3/3`, complete affected `89/89` in
+  `169.35 s`, and preserved real-TPU replay all pass. The same reviewer receives only this delta.

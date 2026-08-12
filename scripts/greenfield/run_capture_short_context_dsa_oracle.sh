@@ -24,9 +24,15 @@ readonly INTERNAL_LAYER_ID=${GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID:-0}
 case "$INTERNAL_MODE" in
   scorer)
     readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=0
     ;;
   prompt_key | prompt_key_input)
     readonly PROMPT_KEY_CAPTURE=1
+    readonly ATTENTION_OUTPUT_CAPTURE=0
+    ;;
+  attention_output)
+    readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=1
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
@@ -70,7 +76,11 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $INTERNAL_MODE == prompt_key_input ]]; then
+  if [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-bf8a03e26
+    readonly OBSERVER_COMMIT_DISTANCE=7
+    readonly LEGACY_PIN=bf8a03e264971c8efba99a346d1e8189ef0ff518
+  elif [[ $INTERNAL_MODE == prompt_key_input ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-89fc453b6
     readonly OBSERVER_COMMIT_DISTANCE=6
     readonly LEGACY_PIN=89fc453b6116ac3df71e666db6f4659775b313c3
@@ -170,6 +180,15 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     exit 2
   }
 fi
+if [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
+  [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
+     $PROFILE == 8k && $INTERNAL_TARGET_POSITION == 8155 && \
+     $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
+     $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
+    echo "attention-output capture requires isolated layer-0 8K position 8155 mode" >&2
+    exit 2
+  }
+fi
 if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
   [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && $PROMPT_CACHE_CAPTURE == 0 && \
      $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
@@ -223,6 +242,8 @@ if [[ $INTERNAL_MODE == prompt_key_input ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_projection_input_comparison
 elif [[ $INTERNAL_MODE == prompt_key ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_key_comparison
+elif [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/attention_output_capture
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -909,7 +930,22 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $PROMPT_KEY_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
+  say "sealing accepted layer-0 post-W_UV/pre-o_proj operand"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_accepted_attention_output_operand.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    --capture-process-indices 0 \
+    >"$RUN_DIR/attention_output_capture_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $PROMPT_KEY_CAPTURE == 1 ]]; then
   say "comparing accepted prompt-key producer at position $INTERNAL_TARGET_POSITION"
   env JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
@@ -1099,7 +1135,52 @@ lines = {
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode in ("prompt_key", "prompt_key_input"):
+    if mode == "attention_output":
+        capture = json.loads(
+            (root / "attention_output_capture" / "capture.json").read_text()
+        )
+        if (
+            not exact_dsa["exact"]
+            or capture["artifact_kind"]
+            != "glm52_accepted_attention_output_operand_capture"
+            or capture["capture_layout"] != "logical_head_order_live_row"
+            or capture["capture_mode"] != mode
+            or capture["capture_process_indices"] != [0]
+            or capture["diagnostic_only"] is not True
+            or capture["performance_claim"] is not False
+            or capture["legacy_code_hash"] != sys.argv[4]
+            or capture["oracle_pin"]
+            != "b3c25df47ac98783912dc658878181ec0a8ae16d"
+            or capture["position"] != 8155
+        ):
+            raise SystemExit("attention-output capture evidence drifted")
+        capture_path = root / "attention_output_capture" / "capture.json"
+        lines.update({
+            "accepted_attention_output_capture": "true",
+            "accepted_attention_output_capture_layout": capture[
+                "capture_layout"
+            ],
+            "accepted_attention_output_capture_mode": mode,
+            "accepted_attention_output_diagnostic_only": "true",
+            "accepted_attention_output_dsa_event_tensors_exact": "true",
+            "accepted_attention_output_manifest_file_sha256": sha256(
+                capture_path.read_bytes()
+            ).hexdigest(),
+            "accepted_attention_output_manifest_sha256": capture[
+                "manifest_sha256"
+            ],
+            "accepted_attention_output_source_file_count": sys.argv[9],
+            "accepted_attention_output_tensor_sha256": capture["tensor"][
+                "tensor_sha256"
+            ],
+            "accepted_oracle_pin": capture["oracle_pin"],
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_process_indices": "0",
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": capture["layer_name"],
+            "dsa_event_tensors_exact": "true",
+        })
+    elif mode in ("prompt_key", "prompt_key_input"):
         result_name = (
             "prompt_projection_input_comparison"
             if mode == "prompt_key_input"

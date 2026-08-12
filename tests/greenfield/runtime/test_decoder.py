@@ -470,6 +470,7 @@ def _main_rope_table_hlo(
     round_scope: bool = True,
     duplicate_round: bool = False,
     round_products_to_bf16: bool = False,
+    table_dataflow: bool = True,
 ) -> str:
     scoped_name = "jit(mapped_token)/shard_map/greenfield_main_rope_table"
     multiplies = "\n".join(
@@ -517,7 +518,11 @@ def _main_rope_table_hlo(
 
 ENTRY %main (main_rope_table: bf16[8192,64]) -> bf16[1,32] {{
   %main_rope_table = bf16[8192,64] parameter(0), metadata={{op_name="main_rope_table"}}
-  %f32 = f32[1,32] constant({{...}})
+  %zero = s32[] constant(0)
+  %table.row = bf16[1,64] dynamic-slice(%main_rope_table, %zero, %zero), dynamic_slice_sizes={{1,64}}, metadata={{op_name="greenfield_main_rope_table_lookup/dynamic_slice"}}
+  %table.half = bf16[1,32] slice(%table.row), slice={{[0:1], [0:32]}}
+  %table.f32 = f32[1,32] convert(%table.half)
+  %f32 = f32[1,32] {"copy(%table.f32)" if table_dataflow else "constant({...})"}
 {multiplies}
 {product_rounds}
 {combines}
@@ -546,6 +551,10 @@ def test_main_rope_table_hlo_contract_is_fail_closed() -> None:
     assert accepted["expected_table_shape"] == [8192, 64]
     assert accepted["table_parameter_count"] == 1
     assert accepted["named_table_parameter_count"] == 1
+    assert accepted["table_dependent_lookup_count"] == 1
+    assert accepted["table_dependent_fp32_multiply_count"] == 8
+    assert accepted["table_dependent_fp32_combine_count"] == 4
+    assert accepted["table_dependent_final_round_count"] == 2
     assert accepted["fp32_multiply_count"] == 8
     assert accepted["fp32_combine_count"] == 4
     assert accepted["combines_with_direct_fp32_product_operands"] == 4
@@ -554,6 +563,20 @@ def test_main_rope_table_hlo_contract_is_fail_closed() -> None:
     assert accepted["scoped_final_round_count"] == 2
     assert accepted["direct_dataflow_final_round_count"] == 0
     assert accepted["combines_with_sole_convert_user"] == 2
+
+    unused_table = _validate_main_rope_table_hlo(
+        parse_hlo_module(_main_rope_table_hlo(table_dataflow=False)),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not unused_table["passed"]
+    assert unused_table["table_dependent_lookup_count"] == 1
+    assert unused_table["table_dependent_fp32_multiply_count"] == 0
+    assert any(
+        "products do not depend on the table lookup" in violation
+        for violation in unused_table["violations"]
+    )
 
     metadata_stripped = _validate_main_rope_table_hlo(
         parse_hlo_module(_main_rope_table_hlo(round_scope=False)),
@@ -886,7 +909,10 @@ ENTRY %main (main_rope_table: bf16[8192,64]) -> (s32[1,2048], f32[1,2048], s32[1
   %scores = f32[1,2048] constant({{0}})
   %count = s32[1,1] constant({{0}})
   %valid = pred[1,1] constant({{true}})
-  %f32 = f32[1,32] constant({{0}})
+  %rope.zero = s32[] constant(0)
+  %rope.table.row = bf16[1,64] dynamic-slice(%main_rope_table, %rope.zero, %rope.zero), dynamic_slice_sizes={{1,64}}, metadata={{op_name="greenfield_main_rope_table_lookup/dynamic_slice"}}
+  %rope.table.half = bf16[1,32] slice(%rope.table.row), slice={{[0:1], [0:32]}}
+  %f32 = f32[1,32] convert(%rope.table.half)
   %b = bf16[1,6144] constant({{0}})
 {multiplies}
 {combines}
@@ -1127,7 +1153,13 @@ ENTRY %main () -> (s32[1,2048], f32[1,2048], s32[1,1], bf16[1,6144], pred[1,1]) 
 '''
 
 
-def _layer0_ingredients_hlo() -> str:
+def _layer0_ingredients_hlo(
+    *,
+    main_rope_table: bool = False,
+    table_dataflow: bool = True,
+    round_scope: bool = True,
+    root_from_final_rounds: bool = True,
+) -> str:
     replica_groups = (
         "{{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},"
         "{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}"
@@ -1191,6 +1223,8 @@ def _layer0_ingredients_hlo() -> str:
     root_shapes = ", ".join(shape(*item) for item in roots)
     constants = []
     for index, item in enumerate(roots):
+        if main_rope_table and table_dataflow and index == 17:
+            continue
         metadata = (
             ', metadata={op_name="jit(probe)/'
             'greenfield_layer0_ingredients_layer1_norm/mul"}'
@@ -1200,7 +1234,80 @@ def _layer0_ingredients_hlo() -> str:
         constants.append(
             f"  %root.{index} = {shape(*item)} constant({{0}}){metadata}"
         )
-    operands = ", ".join(f"%root.{index}" for index in range(len(roots)))
+    operands = ", ".join(
+        "%rope.output.input"
+        if main_rope_table and table_dataflow and index == 17
+        else f"%root.{index}"
+        for index in range(len(roots))
+    )
+    table_signature = (
+        "main_rope_table: bf16[8192,64]" if main_rope_table else ""
+    )
+    table_scope = "jit(probe)/shard_map/greenfield_main_rope_table"
+    table_lines = ""
+    if main_rope_table:
+        products = "\n".join(
+            f"  %rope.mul.{index} = f32[1,32] multiply(%rope.f32, "
+            f"%rope.f32), metadata={{op_name=\"{table_scope}/mul.{index}\"}}"
+            for index in range(8)
+        )
+        combines = "\n".join(
+            f"  %rope.add.{index} = f32[1,32] add(%rope.mul.{2 * index}, "
+            f"%rope.mul.{2 * index + 1}), "
+            f"metadata={{op_name=\"{table_scope}/add.{index}\"}}"
+            for index in range(4)
+        )
+        rounds = "\n".join(
+            f"  %rope.round.{index} = bf16[1,32] convert(%rope.add.{index})"
+            + (
+                f", metadata={{op_name=\"{table_scope}/round.{index}\"}}"
+                if round_scope
+                else ""
+            )
+            for index in range(2)
+        )
+        rope_source = (
+            "%rope.table.f32" if table_dataflow else "%rope.constant.f32"
+        )
+        output_lines = ""
+        if table_dataflow:
+            root_rounds = "%rope.rounds"
+            bypass_lines = ""
+            if not root_from_final_rounds:
+                bypass_lines = (
+                    "  %rope.bypass.add.0 = f32[1,32] add("
+                    "%rope.add.0, %rope.add.0)\n"
+                    "  %rope.bypass.add.1 = f32[1,32] add("
+                    "%rope.add.1, %rope.add.1)\n"
+                    "  %rope.bypass.round.0 = bf16[1,32] convert("
+                    "%rope.bypass.add.0)\n"
+                    "  %rope.bypass.round.1 = bf16[1,32] convert("
+                    "%rope.bypass.add.1)\n"
+                    "  %rope.bypass.rounds = bf16[1,64] concatenate("
+                    "%rope.bypass.round.0, %rope.bypass.round.1), "
+                    "dimensions={1}\n"
+                )
+                root_rounds = "%rope.bypass.rounds"
+            output_lines = (
+                "  %rope.rounds = bf16[1,64] concatenate(%rope.round.0, "
+                "%rope.round.1), dimensions={1}\n"
+                + bypass_lines
+                + "  %rope.pad.value = bf16[] constant(0)\n"
+                "  %rope.output.input = bf16[1,4096] pad("
+                f"{root_rounds}, %rope.pad.value), padding=0_0x0_4032\n"
+            )
+        table_lines = f'''  %main_rope_table = bf16[8192,64] parameter(0), metadata={{op_name="main_rope_table"}}
+  %rope.zero = s32[] constant(0)
+  %rope.table.row = bf16[1,64] dynamic-slice(%main_rope_table, %rope.zero, %rope.zero), dynamic_slice_sizes={{1,64}}, metadata={{op_name="{table_scope}_lookup/dynamic_slice"}}
+  %rope.table.half = bf16[1,32] slice(%rope.table.row), slice={{[0:1], [0:32]}}
+  %rope.table.f32 = f32[1,32] convert(%rope.table.half)
+  %rope.constant.f32 = f32[1,32] constant({{0}})
+  %rope.f32 = f32[1,32] copy({rope_source})
+{products}
+{combines}
+{rounds}
+{output_lines}
+'''
     return f'''HloModule layer0_ingredients, replica_count=1, num_partitions=32
 
 %add (x: bf16[], y: bf16[]) -> bf16[] {{
@@ -1209,8 +1316,8 @@ def _layer0_ingredients_hlo() -> str:
   ROOT %sum = bf16[] add(%x, %y)
 }}
 
-ENTRY %main () -> ({root_shapes}) {{
-  %s = s32[1] constant({{0}})
+ENTRY %main ({table_signature}) -> ({root_shapes}) {{
+{table_lines}  %s = s32[1] constant({{0}})
   %b = bf16[1,6144] constant({{0}})
 {gathers}
 {reductions}
@@ -1722,6 +1829,74 @@ def test_layer0_ingredients_hlo_pins_primitive_capture() -> None:
     assert accepted["passed"], accepted
     assert accepted["kernel_counts"] == accepted["expected_kernel_counts"]
     assert len(accepted["ingredient_names"]) == 29
+
+    table_on = validate_layer0_ingredients_observer_hlo(
+        _layer0_ingredients_hlo(main_rope_table=True),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+        main_rope_table_enabled=True,
+    )
+    assert table_on["passed"], table_on
+    assert table_on["main_rope_table_contract"]["passed"]
+    assert table_on["main_rope_table_contract"][
+        "required_entry_root_indices"
+    ] == [17]
+    assert table_on["main_rope_table_contract"][
+        "table_dependent_root_indices"
+    ] == [17]
+    assert table_on["main_rope_table_contract"][
+        "final_round_dependent_root_indices"
+    ] == [17]
+
+    unused_table = validate_layer0_ingredients_observer_hlo(
+        _layer0_ingredients_hlo(
+            main_rope_table=True,
+            table_dataflow=False,
+        ),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+        main_rope_table_enabled=True,
+    )
+    assert not unused_table["passed"]
+    assert any(
+        "products do not depend on the table lookup" in violation
+        for violation in unused_table["violations"]
+    )
+    assert any(
+        "captured roots do not depend on the table" in violation
+        for violation in unused_table["violations"]
+    )
+
+    bypassed_final_rounds = validate_layer0_ingredients_observer_hlo(
+        _layer0_ingredients_hlo(
+            main_rope_table=True,
+            round_scope=False,
+            root_from_final_rounds=False,
+        ),
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+        main_rope_table_enabled=True,
+    )
+    assert not bypassed_final_rounds["passed"]
+    assert bypassed_final_rounds["main_rope_table_contract"][
+        "table_dependent_root_indices"
+    ] == [17]
+    assert bypassed_final_rounds["main_rope_table_contract"][
+        "final_round_dependent_root_indices"
+    ] == []
+    assert any(
+        "captured roots do not depend on final BF16 rounds" in violation
+        for violation in bypassed_final_rounds["violations"]
+    )
+
+    missing_table = validate_layer0_ingredients_observer_hlo(
+        hlo,
+        config=_real_8k_decoder_config(dsa_score_default_precision=True),
+        groups=groups,
+        main_rope_table_enabled=True,
+    )
+    assert not missing_table["passed"]
+    assert not missing_table["main_rope_table_contract"]["passed"]
 
     escaped = validate_layer0_ingredients_observer_hlo(
         hlo.replace("{0,1,2,3}", "{0,1,2,4}"),

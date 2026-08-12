@@ -1,5 +1,12 @@
 """Independent greenfield correctness artifacts and comparisons."""
 
+from .attention_output_operand import (
+    AcceptedAttentionOutputCaptureConfig,
+    AttentionOutputComparisonConfig,
+    capture_accepted_attention_output_operand,
+    compare_attention_output_operands,
+)
+
 from .gate_c_oracle import (
     GateCOracleConfig,
     capture_gate_c_oracle,
@@ -68,6 +75,8 @@ from .short_context_logprob_oracle import (
 )
 
 __all__ = (
+    "AcceptedAttentionOutputCaptureConfig",
+    "AttentionOutputComparisonConfig",
     "GateCOracleConfig",
     "OneLayerOracleConfig",
     "AcceptedGreenfieldDsaInternalComparisonConfig",
@@ -81,11 +90,13 @@ __all__ = (
     "ShortContextDsaOracleConfig",
     "ShortContextLogprobOracleConfig",
     "capture_gate_c_oracle",
+    "capture_accepted_attention_output_operand",
     "capture_one_layer_oracle",
     "capture_legacy_prompt_index_cache",
     "compare_prompt_key_internal_states",
     "compare_prompt_index_key_bits",
     "compare_prompt_projection_input",
+    "compare_attention_output_operands",
     "compare_accepted_greenfield_dsa_internal_observation",
     "compare_legacy_residuals",
     "compare_legacy_layer0_main_cache",

@@ -77,6 +77,20 @@ def test_parser_extracts_physical_collective_contract() -> None:
     assert permute.source_target_pairs[0] == (0, 4)
 
 
+def test_parser_preserves_tuple_operands_after_index_comments() -> None:
+    text = r'''HloModule tuple_comments
+
+ENTRY main {
+  a = bf16[1] parameter(0)
+  b = bf16[1] parameter(1)
+  c = bf16[1] parameter(2)
+  ROOT result = (bf16[1], bf16[1], bf16[1]) tuple(a, /*index=1*/b, c)
+}
+'''
+    root = parse_hlo_module(text).instructions[-1]
+    assert root.operand_names == ("a", "b", "c")
+
+
 def test_parser_expands_current_jax_mesh_replica_groups() -> None:
     mesh_hlo = GOOD_HLO.replace(
         "replica_groups={{0,1,2,3},{4,5,6,7}}",

@@ -1545,6 +1545,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    greenfield_run_tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "").strip()
     context_label = _protected_short_context_label(args.context_capacity)
     if args.feature_output_tile is None:
         args.feature_output_tile = (
@@ -1737,6 +1738,10 @@ def main() -> int:
         raise ValueError(
             "layer-0 ingredient capture requires the sealed DSA/token oracle"
         )
+    if args.observe_layer0_ingredients and not greenfield_run_tag:
+        raise ValueError(
+            "layer-0 ingredient capture requires GLM_GREENFIELD_RUN_TAG"
+        )
     if observe_layer0_discriminator and (
         args.observe_dsa_internals or args.observe_layer_residuals
     ):
@@ -1793,12 +1798,14 @@ def main() -> int:
         and args.dsa_query_exact_association
         and args.dsa_head_key_exact_association
         and args.dsa_score_default_precision
+        and args.main_rope_table
         and args.runtime_kind == "pallas_feature_linear"
         and args.complete_token_path
         and args.split_residual_state
     ):
         raise ValueError(
-            "layer-0 ingredient capture requires the proven 8K production path"
+            "layer-0 ingredient capture requires the proven table-on 8K "
+            "production path"
         )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
@@ -3622,6 +3629,7 @@ def main() -> int:
                     optimized_ingredients_hlo,
                     config=decoder.config,
                     groups=groups,
+                    main_rope_table_enabled=args.main_rope_table,
                 )
             )
             if jax.process_index() == 0:
@@ -4057,8 +4065,11 @@ def main() -> int:
             multihost_utils.sync_global_devices(
                 "greenfield-layer0-ingredients-execute-start"
             )
+            ingredients_inputs = (*runtime_prefix, *tuple(output))
+            if args.main_rope_table:
+                ingredients_inputs = (*ingredients_inputs, main_rope_table)
             ingredients_result = compiled_layer0_ingredients_observer(
-                *runtime_prefix, *tuple(output)
+                *ingredients_inputs
             )
             ingredients_result[-1].block_until_ready()
             observed_ingredients = {
@@ -4103,6 +4114,9 @@ def main() -> int:
                     "hlo_contract": layer0_ingredients_hlo_contract,
                     "hlo_sha256": layer0_ingredients_hlo_sha256,
                     "ingredient_names": list(LAYER0_INGREDIENT_NAMES),
+                    "main_rope_table_enabled": args.main_rope_table,
+                    "main_rope_table_sha256": decoder.main_rope_table_sha256,
+                    "run_tag": greenfield_run_tag,
                     "source_state": "post_teacher_forced_prefill",
                 }
             )

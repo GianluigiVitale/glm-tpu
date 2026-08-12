@@ -67,6 +67,13 @@ def test_layer0_ingredient_capture_is_default_off_and_protected() -> None:
     assert "--observe-layer0-ingredients 1" in runner
     assert "layer0_ingredients.optimized_hlo.txt.gz" in compiler
     assert "source_state\": \"post_teacher_forced_prefill" in compiler
+    assert "requires the proven table-on 8K" in compiler
+    assert "main_rope_table_enabled=args.main_rope_table" in compiler
+    assert '"run_tag": greenfield_run_tag' in compiler
+    assert "requires GLM_GREENFIELD_RUN_TAG" in compiler
+    assert "ingredients_inputs = (*runtime_prefix, *tuple(output))" in compiler
+    assert "LAYER0_INGREDIENTS_DIAGNOSTIC_CONTRACT_OK" in runner
+    assert "layer-0 ingredients require the proven main-RoPE table" in runner
     assert '"$remote/layer0_ingredients/"' in runner
     paired_dsa_observer_gate = (
         "observe_layer0_discriminator or args.observe_layer0_ingredients"
