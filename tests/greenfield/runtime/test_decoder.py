@@ -619,6 +619,49 @@ def test_pregathered_b512_attention_hlo_contract_is_fail_closed() -> None:
     assert not default["passed"]
 
 
+def test_pregathered_b512_reduction_contract_removes_old_merge_results() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _expected_tpu_decoder_reductions,
+    )
+
+    arities, shapes = _expected_tpu_decoder_reductions(
+        layers=78,
+        dense_layers=3,
+        sparse_layers=75,
+        pregathered_b512_attention=True,
+        feature_reconstruct_down_fp32=True,
+        complete_token_path=True,
+        split_residual_state=True,
+        token_observation_candidates=1,
+    )
+    assert arities == {"1": 312}
+    assert shapes == {
+        "bf16[1,6144]": 81,
+        "bf16[2,1,6144]": 75,
+        "bf16[1,2048,640]": 78,
+        "f32[8,6144]": 75,
+        "bf16[1,1,6144]": 1,
+        "bf16[4]": 1,
+        "s32[4]": 1,
+    }
+    assert "f32[256]" not in shapes
+    assert "u32[1,1,128]" not in shapes
+
+    default_arities, default_shapes = _expected_tpu_decoder_reductions(
+        layers=78,
+        dense_layers=3,
+        sparse_layers=75,
+        pregathered_b512_attention=False,
+        feature_reconstruct_down_fp32=True,
+        complete_token_path=True,
+        split_residual_state=True,
+        token_observation_candidates=1,
+    )
+    assert default_arities == {"1": 355, "2": 16, "3": 1}
+    assert default_shapes["f32[256]"] == 78
+    assert default_shapes["u32[1,1,128]"] == 78
+
+
 def _main_rope_table_hlo(
     *,
     include_forbidden: bool = False,

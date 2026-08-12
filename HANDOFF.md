@@ -4044,3 +4044,17 @@ Logical/folded bypass, suffix and out-of-scope regressions now refuse. The same 
 only that correction and returned `APPROVE COMMIT`; the complete runtime suite passes 69/69 after
 the correction, the cleared kernel suite remains 24/24, and compileall/Bash/ShellCheck/JSON/diff
 checks pass. Exact next from the clean pushed integration pin is the one protected 8K run above.
+
+That integration was committed/pushed at `a2d3905360a2c6b543e8c860025c9ebacc266584`. Its first
+protected 8K attempt, tag ending `pregatheredb512_oracle_dsa_trace2_20260812T124936782974104Z`,
+failed closed before execution because the aggregate HLO formula still expected the removed
+owner-split LSE/validity reductions. The real optimized HLO has exact local counts `ag=63`,
+`ar=312`, `cp=17`; all 78 named selected-cache sums bijectively feed all 78 exact B512 calls, and
+the old result/LSE/validity scopes are absent. The only violations were the stale expectation of
+`ar=450`, including 78 `f32[256]` and 78 `u32[1,1,128]` merge components. HLO/log/pre/failure-census
+SHAs are `a1041bd5...daa0`, `eb357219...fe0`, `f02d226d...726`, and `e73f3fa7...ae7`; all eight
+logs are identical, diagnostics are archived, no DB row/SUCCESS/summary exists, and cleanup is 8/8.
+The bounded correction removes those two families only when the selected-cache path is enabled;
+the default arity/shape contract is unchanged. The preserved real HLO replays with zero violations
+and exact expected/observed counts. Exact next: focused/full runtime verification, one Sol audit of
+only this correction, commit/push, then one clean protected retry; no model arithmetic change is due.

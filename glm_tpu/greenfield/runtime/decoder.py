@@ -2651,6 +2651,52 @@ def _validate_pregathered_b512_attention_hlo(
     }
 
 
+def _expected_tpu_decoder_reductions(
+    *,
+    layers: int,
+    dense_layers: int,
+    sparse_layers: int,
+    pregathered_b512_attention: bool,
+    feature_reconstruct_down_fp32: bool,
+    complete_token_path: bool,
+    split_residual_state: bool,
+    token_observation_candidates: int,
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Return the protected GLM TPU all-reduce arities and logical shapes."""
+
+    result_shapes = {
+        "bf16[1,6144]": layers + dense_layers,
+        "bf16[2,1,6144]": sparse_layers,
+    }
+    if pregathered_b512_attention:
+        # The selected-cache path removes all three owner-split result/LSE/
+        # validity gathers. TPU XLA had rewritten the latter two families to
+        # 78 f32[256] and 78 u32[1,1,128] all-reduce components, including
+        # their tuple launch fusion. The remaining attention-output and MLP
+        # reductions are single-result, as is the new selected-cache sum.
+        arities = {"1": 2 * layers + layers}
+        result_shapes["bf16[1,2048,640]"] = layers
+    else:
+        # The accepted full-decoder lowering launch-fuses the 312 logical
+        # attention/MLP components into this exact physical arity histogram.
+        arities = {"1": 277, "2": 16, "3": 1}
+        result_shapes.update(
+            {"f32[256]": layers, "u32[1,1,128]": layers}
+        )
+    if feature_reconstruct_down_fp32:
+        arities["1"] += sparse_layers
+        result_shapes["f32[8,6144]"] = sparse_layers
+    if complete_token_path:
+        arities["1"] += 3
+        embedding_shape = (
+            "bf16[1,1,6144]" if split_residual_state else "bf16[1,6144]"
+        )
+        result_shapes[embedding_shape] = result_shapes.get(embedding_shape, 0) + 1
+        if token_observation_candidates == 1:
+            result_shapes.update({"bf16[4]": 1, "s32[4]": 1})
+    return arities, result_shapes
+
+
 def validate_decoder_step_hlo(
     optimized_hlo: str,
     *,
@@ -2852,15 +2898,9 @@ def validate_decoder_step_hlo(
                 "the complete 78-layer GLM-5.2 decoder"
             )
 
-        # Gate C established the semantic TPU rewrite: every attention body
-        # contributes three reduction results and every MLP contributes one.
-        # The first complete 78-layer optimized HLO then established the exact
-        # physical lowering.  All 312 logical results are present, but XLA
-        # launch-fuses 78 padded-u32 results into 43 single-result, 16
-        # two-result, and one three-result all-reduces.  Pin both views: merely
-        # expecting 4 * layers physical instructions falsely reports 18
-        # missing collectives, while checking only logical arity would allow a
-        # physical launch-count regression to pass unnoticed.
+        # Gate C and complete-decoder HLO establish both semantic result shapes
+        # and exact physical launch arities. Pin both views: checking only one
+        # would admit a missing logical result or a launch-fusion regression.
         # TPU XLA lowers each four-element top-1 all-gather to a one-hot local
         # all-reduce.  The complete path therefore adds no physical gather,
         # but adds embedding plus score/id singleton reductions.
@@ -2868,51 +2908,24 @@ def validate_decoder_step_hlo(
             (0 if pregathered_b512_attention else 2 * layers)
             + 3 * full_layers
         )
-        expected_reduction_arity_counts = {"1": 277, "2": 16, "3": 1}
-        if pregathered_b512_attention:
-            expected_reduction_arity_counts["1"] += layers
-        if feature_reconstruct_down_fp32:
-            expected_reduction_arity_counts["1"] += sparse_layers
-        if complete_token_path:
-            expected_reduction_arity_counts["1"] += 3
+        (
+            expected_reduction_arity_counts,
+            expected_reduction_result_shape_counts,
+        ) = _expected_tpu_decoder_reductions(
+            layers=layers,
+            dense_layers=dense_layers,
+            sparse_layers=sparse_layers,
+            pregathered_b512_attention=pregathered_b512_attention,
+            feature_reconstruct_down_fp32=feature_reconstruct_down_fp32,
+            complete_token_path=complete_token_path,
+            split_residual_state=split_residual_state,
+            token_observation_candidates=token_observation_candidates,
+        )
         expected_reductions = sum(expected_reduction_arity_counts.values())
         expected_reduction_component_count = sum(
             int(arity) * count
             for arity, count in expected_reduction_arity_counts.items()
         )
-        expected_reduction_result_shape_counts = {
-            "bf16[1,6144]": (
-                layers + dense_layers
-            ),
-            "bf16[2,1,6144]": sparse_layers,
-            "f32[256]": layers,
-            "u32[1,1,128]": layers,
-        }
-        if pregathered_b512_attention:
-            expected_reduction_result_shape_counts[
-                "bf16[1,2048,640]"
-            ] = layers
-        if feature_reconstruct_down_fp32:
-            expected_reduction_result_shape_counts[
-                "f32[8,6144]"
-            ] = sparse_layers
-        if complete_token_path:
-            embedding_shape = (
-                "bf16[1,1,6144]"
-                if split_residual_state
-                else "bf16[1,6144]"
-            )
-            expected_reduction_result_shape_counts[embedding_shape] = (
-                expected_reduction_result_shape_counts.get(
-                    embedding_shape, 0
-                )
-                + 1
-            )
-            if token_observation_candidates == 1:
-                expected_reduction_result_shape_counts.update(
-                    {"bf16[4]": 1, "s32[4]": 1}
-                )
-
         reductions = by_opcode.get("all-reduce", ())
         reduction_arity_counts = {
             str(arity): count

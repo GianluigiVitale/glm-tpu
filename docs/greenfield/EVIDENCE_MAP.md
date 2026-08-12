@@ -1066,3 +1066,9 @@ capture is still required.
   through only cache-preserving shape transforms to one scoped LP4 exchange. The 78 exchange/call
   links must be bijective; logical/folded bypass, suffix and out-of-scope mutations are regression
   tested. This is readiness evidence only until the protected complete-decoder HLO passes.
+- The first real integrated compile at `a2d3905` preserves a complete optimized HLO before its stale
+  aggregate count guard refuses. It directly proves the selected path has local `ag/ar/cp =
+  63/312/17`, all 78 cache-exchange/kernel links pass, and the old LSE/validity TPU rewrites
+  (`f32[256]` and `u32[1,1,128]`, 78 each) are absent with their source gathers. Replaying that exact
+  HLO against the corrected conditional count/shape contract passes with zero violations. This is
+  HLO readiness and authenticated failure-cleanup evidence, not decoder correctness/performance.

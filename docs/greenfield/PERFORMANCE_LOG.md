@@ -1296,3 +1296,9 @@ selected-cache sum of logical shape `[1,2048,640]`, and changes sparse attention
 on 16 local heads. Whether that improves or regresses the approximately 30.435 ms active stage is
 unknown until the protected complete 8K trace and profiler-free wall run. DB484 remains the only
 accepted PP8 performance point at `244.091151 ms/token` / `4.096830 tok/s`.
+
+The first integrated 8K attempt at `a2d3905` produced no timing result: it stopped after real HLO
+compilation and before execution because a stale aggregate formula expected 450 rather than the
+observed 312 local all-reduces. The preserved HLO confirms the intended 78 selected-cache sums and
+removal of both old 78-element LSE/validity reduction families. No XPlane, wall distribution, DB row
+or `SUCCESS` exists, so DB484 remains the sole decoder performance point.

@@ -7709,3 +7709,26 @@ unmotivated arithmetic variants.
   runtime batch passes 69/69 after correction; the already-cleared kernel batch remains 24/24.
   Compileall, Bash, ShellCheck, JSON and diff checks pass. Exact next is a clean push followed by
   one serialized protected 8K run with DB537's default-off flag; no further arithmetic probe is due.
+
+## 2026-08-12 12:49--13:06 — first integrated 8K compile exposes stale aggregate counts
+
+- Commit `a2d3905360a2c6b543e8c860025c9ebacc266584` was pushed and launched once under tag ending
+  `pregatheredb512_oracle_dsa_trace2_20260812T124936782974104Z`. Pre-census and eight-host sync
+  passed. Compilation completed far enough to preserve the full real 78-layer optimized HLO, then
+  all ranks identically refused before execution because expected all-reduces were 450 versus 312.
+- This is an expectation bug, not a missing operation. The default owner-split path gathers output,
+  LSE and validity; TPU rewrites the last two families into 78 `f32[256]` and 78 `u32[1,1,128]`
+  all-reduce components with tuple launch fusion. The selected-cache path intentionally skips all
+  three merges because it runs the globally reconstructed selected segment locally and validates
+  identical global metadata. Those exact two all-reduce shape families therefore disappear.
+- The real HLO contains exact local counts `all-gather=63`, `all-reduce=312`,
+  `collective-permute=17`, one result per all-reduce, no old merge scope, and 78 named selected-cache
+  sums bijectively feeding 78 exact-name/in-scope B512 kernels. With the conditional expectation
+  corrected, that preserved HLO validates with zero violations and exact expected/observed arities
+  and shapes. The default no-flag expectation remains `{"1":355,"2":16,"3":1}` for this full
+  exact configuration; only the selected-cache branch becomes `{"1":312}`.
+- Optimized-HLO/failed-contract/identical-log/pre/failure-census SHAs are `a1041bd5...daa0`,
+  `4b832c4e...b929`, `eb357219...fe0`, `f02d226d...726`, and `e73f3fa7...ae7`. Diagnostics are in
+  the approved bucket. No token, timing, XPlane, DB row, `summary.json` or `SUCCESS` exists; live DB
+  max remains 537 and post-failure cleanup is authenticated 8/8. Exact next is one reviewed bounded
+  correction and one protected retry, not another numerical discriminator.
