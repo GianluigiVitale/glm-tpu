@@ -1019,3 +1019,23 @@ capture is still required.
 - Evidence scope is one real current main-RoPE row only. It authorizes the default-off device-table
   and main-MLA integration batch, not Gate-D acceptance, performance, full-cache exactness or a DSA
   change.
+
+## DB534 and DB536 accepted layer-0 attention operands
+
+- DB534/item1819 seals the exact accepted post-`W_UV`/pre-`o_proj` row at position 8,155. Its SHA
+  `79a6e290...2e9d` differs from the table-on PP8 operand `0103e22c...82ab` in 5,117/16,384 BF16
+  values. Exact tokens, all-event DSA, state/load, DB/archive and 8/8 cleanup pass; it is diagnostic,
+  not decoder performance evidence.
+- DB536/item1820 seals both the accepted attended latent and the same post-WUV row. The latent SHA
+  `923e9bfe...d2a` differs from table-on PP8 SHA `f98193a5...558` in 4,344/32,768 values, with
+  `6.103515625e-05` maximum and `1.399234975e-06` mean absolute error. Every head differs. The
+  protected classification is `attention_arithmetic_before_w_uv`.
+- DB536 local/remote hashes match for capture JSON `f517b408...96a`, tensor NPZ
+  `3a619a09...a30`, comparison JSON `6d43a176...a4c`, DB snapshot `52eee52f...b69` and terminal
+  `SUCCESS` `88691576...47c`; exact DSA and authenticated 8/8 pre/post cleanup pass. This closes
+  W_UV/o_proj as root causes and authorizes only the bounded full-segment/block/head-geometry probe.
+- DB530 comparison NPZ `a7121337...0924` is also the accepted-cache input authority for that probe.
+  Its accepted score-order rows have SHA `73298b7d...71be2`; stable position ordering produces SHA
+  `8b59adca...87c6` and the same position SHA `ef78b044...fea08` as the table-on owner union. The
+  current table-on segment differs at exactly position 8,145 / latent column 367, so both inputs run
+  through each compiled arm and only the accepted-cache result can identify exact arithmetic.

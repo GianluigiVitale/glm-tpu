@@ -7601,3 +7601,61 @@ unmotivated arithmetic variants.
   combines correct but routes root 17 through an altered bypass; it now fails solely because the
   admitted final rounds cannot reach the root. Focused `3/3`, complete affected `89/89` in
   `169.35 s`, and preserved real-TPU replay all pass. The same reviewer receives only this delta.
+
+## 2026-08-12 01:14--10:27 — DB534/DB536 localize Gate D before W_UV
+
+- DB534/item1819,
+  `greenfield_legacy_layer0_attention_output_p8155_20260812T011425114458014Z`, sealed the accepted
+  layer-0 post-`W_UV`/pre-`o_proj` BF16 row with exact raw passkey, all-event DSA, integrity,
+  DB/archive and clean-fleet evidence. The accepted SHA is `79a6e290...2e9d`. The separately sealed
+  table-on PP8 ingredient operand is `0103e22c...82ab`; it differs in `5,117/16,384` values, max
+  `6.103515625e-05` and mean `6.509990271e-07`. This rejected `o_proj` as the first divergence but
+  could not distinguish W_UV from its attended-latent input.
+- The observer was therefore narrowed once more without returning data into execution. Protected
+  DB536/item1820,
+  `greenfield_legacy_layer0_attention_projection_p8155_20260812T090000000000000Z`, captures both
+  sides of W_UV at layer 0 / position 8,155. It passed the exact raw passkey, all 14x21 DSA arrays,
+  load/state integrity, SQLite integrity and run/item linkage, approved-bucket archive and 8/8
+  authenticated pre/post zero-work censuses. Local and directly streamed remote SHAs match for
+  `SUCCESS` (`88691576...47c`), capture JSON (`f517b408...96a`), tensor NPZ
+  (`3a619a09...a30`), comparison (`6d43a176...a4c`) and DB snapshot (`52eee52f...b69`).
+- The accepted attended latent SHA is `923e9bfe...d2a`. Compared with table-on PP8 SHA
+  `f98193a5...558`, it differs in `4,344/32,768` BF16 elements, max `6.103515625e-05`, mean
+  `1.399234975e-06`, signed mean `-2.990454107e-08`, p99 `3.0517578125e-05`; all 64 heads differ,
+  with 47--90 mismatches per head. The post-WUV comparison remains `5,117/16,384`. Classification
+  is therefore `attention_arithmetic_before_w_uv`; W_UV and o_proj are not the root.
+- The remaining bounded hypotheses are the accepted full-2,048 selected-row schedule, its default
+  512-row flash block versus greenfield 128, and accepted two-head/device arithmetic versus
+  greenfield redundant 64-head owner partials/local 16-head projection. Next reuse the sealed
+  selected cache rows, stage-0 packed qkv-a/q-b/kv-b state, main-RoPE table primitive and existing
+  single-host protection/HLO machinery in one multi-arm four-chip probe. No complete model retry is
+  authorized until one arm is exact or a smaller accepted main-query capture becomes necessary.
+- The probe must not use the table-on cache as its sole input: the DB530 recount leaves one
+  non-RoPE latent mismatch at position 8,145 / column 367. DB530's sealed comparison NPZ already
+  carries the accepted 2,048 rows in exact DSA score order. Stable-sorting those rows by position
+  yields SHA `8b59adca...87c6`, the identical position SHA `ef78b044...fea08`, and exactly one
+  difference from the table-on segment SHA `0191e626...2c5b`. Use the accepted segment as the
+  arithmetic authority and execute the greenfield segment through the same compiled arms only as
+  a contamination control; this needs no additional accepted-model capture.
+
+## 2026-08-12 — pre-WUV arithmetic discriminator is CPU/HLO-ready
+
+- One isolated default-off probe now compiles five accepted-cache and same-executable greenfield-
+  cache arms: block 128/512 with 16 heads, block 128/512 with accepted two-head scheduling, and a
+  full two-head projection/attention arm. The new pre-gathered Pallas kernel mirrors the accepted
+  finite-mask online FP32 recurrence, BF16 probability boundary and final BF16 latent while carrying
+  exactly one live row and no communication.
+- The loader consumes only stage-0 qkv-a/q-b/kv-b tensors. The pinned runtime manifest must match
+  its adjacent evidence byte-for-byte; destination/stage/slot/file size and safetensors header hash
+  bind names, shapes and dtypes, while every consumed tensor byte count and SHA is rechecked. The
+  real packed checkpoint passes this trust-chain replay without hashing unrelated 26-GB payloads.
+- The one new-diff Sol audit found no high issue and five medium fail-closed gaps. Corrections bind
+  the checkpoint manifest, parse/reject synchronous and async collective opcodes, score unresolved
+  classifications as nonexact, run terminal census before DB mutation and delete only this exact
+  provisional row if later protection fails, reject occupied archive prefixes, compare every local
+  and remote CRC32C and directly rehash the remote ledger and `SUCCESS`.
+- Focused explicit-CPU tests pass 14/14; the complete affected kernels+validation suite passes
+  264/264 in 218.09 seconds. Compileall, Bash, ShellCheck, real-checkpoint replay, provisional-DB
+  rollback exercise and diff checks pass. These are readiness facts only. Exact next is the same
+  Sol reviewer's correction-only confirmation, followed by commit/push, strict idle-fleet proof and
+  one protected probe. No complete 8K retry is authorized before its classification.

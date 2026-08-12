@@ -34,6 +34,7 @@ from .topk import bitonic_sort_pairs
 
 
 _NEGATIVE_INFINITY = float("-inf")
+_FINITE_MASK_VALUE = -0.7 * float(jnp.finfo(jnp.float32).max)
 _NO_POSITION = -1
 _MAX_EXACT_FP32_INTEGER = 1 << 24
 _TPU_V4_DMA_ROWS = 8
@@ -594,6 +595,189 @@ def _fused_selected_kv_attention_pallas(
         lane_weights,
     )
     return output, lse_lanes[:, :, 0]
+
+
+def pregathered_sparse_mla_pallas(
+    query_nope_absorbed: Any,
+    query_rope: Any,
+    selected_cache: Any,
+    valid_counts: Any,
+    *,
+    contract: MlaNumericalContract = MlaNumericalContract(),
+    config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
+    interpret: bool = False,
+) -> Any:
+    """Attend one live row over an already ordered, topology-local segment.
+
+    This default-off path is the arithmetic half of a prospective LP4 selected-row
+    exchange.  It accepts no global cache or position table: callers must provide the
+    exact ascending 2,048-row BF16 segment already resident on the local stage.  The
+    finite mask, online update, BF16 probability boundary and final BF16 round mirror
+    the accepted flash association while remaining independent of legacy execution.
+    """
+
+    heads = contract.num_heads
+    latent = contract.kv_lora_rank
+    rope_width = contract.qk_rope_head_dim
+    segment_width = contract.top_k
+    cache_width = contract.packed_cache_width
+    if query_nope_absorbed.shape != (1, heads, latent):
+        raise ValueError("pregathered sparse-MLA absorbed query shape drifted")
+    if query_rope.shape != (1, heads, rope_width):
+        raise ValueError("pregathered sparse-MLA RoPE query shape drifted")
+    if selected_cache.shape != (1, segment_width, cache_width):
+        raise ValueError("pregathered sparse-MLA selected cache shape drifted")
+    if valid_counts.shape != (1,) or valid_counts.dtype != jnp.int32:
+        raise ValueError("pregathered sparse-MLA valid counts must be int32[1]")
+    if (
+        query_nope_absorbed.dtype != jnp.bfloat16
+        or query_rope.dtype != jnp.bfloat16
+        or selected_cache.dtype != jnp.bfloat16
+    ):
+        raise ValueError("pregathered sparse-MLA operands must be BF16")
+    segment_block = min(config.segment_block, segment_width)
+    if segment_width % segment_block:
+        raise ValueError("pregathered sparse-MLA segment blocks must divide top_k")
+    if not interpret and segment_block % 128:
+        raise ValueError("compiled pregathered segment blocks must divide into 128")
+    block_count = segment_width // segment_block
+    padding = cache_width - latent - rope_width
+    if padding < 0:
+        raise ValueError("pregathered sparse-MLA cache truncates the packed query")
+    packed_query = jnp.concatenate(
+        (
+            query_nope_absorbed,
+            query_rope,
+            jnp.zeros((1, heads, padding), dtype=jnp.bfloat16),
+        ),
+        axis=-1,
+    )
+    blocked_cache = selected_cache.reshape(
+        1, block_count, segment_block, cache_width
+    )
+
+    def kernel(
+        valid_count_ref: Any,
+        query_ref: Any,
+        cache_ref: Any,
+        output_ref: Any,
+        maximum_ref: Any,
+        denominator_ref: Any,
+        accumulator_ref: Any,
+    ) -> None:
+        block = pl.program_id(1)
+
+        @pl.when(block == 0)
+        def initialize() -> None:
+            maximum_ref[...] = jnp.full(
+                maximum_ref.shape, _FINITE_MASK_VALUE, jnp.float32
+            )
+            denominator_ref[...] = jnp.zeros(
+                denominator_ref.shape, jnp.float32
+            )
+            accumulator_ref[...] = jnp.zeros(
+                accumulator_ref.shape, jnp.float32
+            )
+
+        query = query_ref[0]
+        cache = cache_ref[0, 0]
+        slots = (
+            lax.broadcasted_iota(jnp.int32, (1, segment_block), 1)
+            + block * segment_block
+        )
+        scores = lax.dot_general(
+            query,
+            cache,
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            precision=lax.Precision.DEFAULT,
+            preferred_element_type=jnp.float32,
+        ) * jnp.float32(contract.softmax_scale)
+        scores = jnp.where(
+            slots < valid_count_ref[0], scores, _FINITE_MASK_VALUE
+        ).astype(jnp.float32)
+        block_maximum = jnp.max(scores, axis=1, keepdims=True)
+        maximum = jnp.maximum(maximum_ref[...], block_maximum)
+        correction = jnp.exp(maximum_ref[...] - maximum)
+        probabilities = jnp.exp(scores - maximum)
+        denominator = (
+            denominator_ref[...] * correction
+            + jnp.sum(probabilities, axis=1, keepdims=True)
+        )
+        partial = lax.dot_general(
+            probabilities.astype(cache.dtype),
+            cache[:, :latent],
+            dimension_numbers=(((1,), (0,)), ((), ())),
+            precision=lax.Precision.DEFAULT,
+            preferred_element_type=jnp.float32,
+        )
+        accumulator = accumulator_ref[...] * correction + partial
+        maximum_ref[...] = maximum
+        denominator_ref[...] = denominator
+        accumulator_ref[...] = accumulator
+
+        @pl.when(block == block_count - 1)
+        def finalize() -> None:
+            maximum_final = jnp.maximum(maximum, _FINITE_MASK_VALUE)
+            final_correction = jnp.exp(maximum - maximum_final)
+            denominator_final = (
+                denominator * final_correction
+                + jnp.exp(_FINITE_MASK_VALUE - maximum_final)
+            )
+            normalized = (
+                accumulator * final_correction / denominator_final
+            )
+            output_ref[0] = jnp.where(
+                maximum > _FINITE_MASK_VALUE, normalized, 0.0
+            ).astype(jnp.bfloat16)
+
+    def query_map(row: Any, block: Any, valid_count: Any) -> tuple[Any, int, int]:
+        del block, valid_count
+        return row, 0, 0
+
+    def cache_map(
+        row: Any, block: Any, valid_count: Any
+    ) -> tuple[Any, Any, int, int]:
+        del valid_count
+        return row, block, 0, 0
+
+    def output_map(
+        row: Any, block: Any, valid_count: Any
+    ) -> tuple[Any, int, int]:
+        del block, valid_count
+        return row, 0, 0
+
+    call = pl.pallas_call(
+        kernel,
+        grid_spec=pltpu.PrefetchScalarGridSpec(
+            num_scalar_prefetch=1,
+            grid=(1, block_count),
+            in_specs=(
+                pl.BlockSpec((1, heads, cache_width), query_map),
+                pl.BlockSpec(
+                    (1, 1, segment_block, cache_width), cache_map
+                ),
+            ),
+            out_specs=pl.BlockSpec((1, heads, latent), output_map),
+            scratch_shapes=(
+                pltpu.VMEM((heads, 1), jnp.float32),
+                pltpu.VMEM((heads, 1), jnp.float32),
+                pltpu.VMEM((heads, latent), jnp.float32),
+            ),
+        ),
+        out_shape=jax.ShapeDtypeStruct(
+            (1, heads, latent), query_nope_absorbed.dtype
+        ),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("arbitrary", "arbitrary"),
+            vmem_limit_bytes=config.vmem_limit_bytes,
+        ),
+        interpret=interpret,
+        name=(
+            "greenfield_pregathered_sparse_mla_"
+            f"h{heads}_k{segment_width}_b{segment_block}_w{cache_width}"
+        ),
+    )
+    return call(valid_counts, packed_query, blocked_cache)
 
 
 def stage_local_sparse_mla_pallas(

@@ -19,6 +19,7 @@ from .fp8_matmul import (
 )
 from .sparse_attention import (
     SparseMlaConfig,
+    pregathered_sparse_mla_pallas,
     stage_local_sparse_mla_kernel,
     stage_local_sparse_mla_pallas,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "local_topk_candidates_pallas",
     "merge_topk_candidates_kernel",
     "merge_topk_candidates_pallas",
+    "pregathered_sparse_mla_pallas",
     "stage_local_sparse_mla_kernel",
     "stage_local_sparse_mla_pallas",
     "stage_remote_copy_kernel",

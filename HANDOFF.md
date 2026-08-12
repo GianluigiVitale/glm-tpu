@@ -22,6 +22,33 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 - Gates A--C are complete. Gate D has one accepted 2K result, DB484, at `244.091151 ms/token` and
   `4.096830 tok/s`; it does not pass Gate E. Complete 8K exactness remains open. DB484 is still the
   only decoder performance result.
+- The latest protected accepted capture is DB536/item1820,
+  `greenfield_legacy_layer0_attention_projection_p8155_20260812T090000000000000Z`. It passed the
+  exact raw passkey, all 14x21 DSA events, load/state checks, DB snapshot, approved-bucket archive,
+  direct remote rehashes and authenticated 8/8 pre/post cleanup. The accepted attended latent is
+  BF16 `[64,512]`, SHA `923e9bfe...d2a`; the post-`W_UV`/pre-`o_proj` row remains SHA
+  `79a6e290...2e9d`.
+- DB536 conclusively classifies the first open layer-0 defect as
+  `attention_arithmetic_before_w_uv`: accepted versus table-on PP8 attended latent differs in
+  `4,344/32,768` BF16 values, max `6.103515625e-05`, mean `1.399234975e-06`. Every one of the 64
+  heads differs (47--90 values/head). The post-`W_UV` row differs in `5,117/16,384`, max
+  `6.103515625e-05`, mean `6.509990271e-07`. Therefore `W_UV`, `o_proj`, all tested projection
+  trees and combine precision are downstream of the first mismatch and must not be retried.
+- The bounded four-chip arithmetic probe is now CPU/HLO-ready, not yet TPU evidence. It uses
+  DB530's exact accepted 2,048 selected cache rows as primary input and the one-value-different
+  table-on rows as a same-executable control, loads only manifest-bound stage-0 qkv-a/q-b/kv-b
+  state, and independently compiles five block-128/512, 16-head/2-head and full-projection arms.
+  Its HLO gate requires one live row, exact kernel counts and no collective/host callback/global
+  state. The full explicit-CPU kernels+validation suite passes 264/264 in 218.09 seconds; the real
+  104-GiB packed checkpoint replays through the strengthened manifest/header/tensor trust chain.
+- The one new-diff Sol audit found no high and five medium protection/diagnostic gaps. All five are
+  corrected: checkpoint evidence equals the pinned runtime manifest, async collectives fail closed,
+  unresolved arms record `correct=false`, post-census precedes DB recording with exact provisional
+  rollback on any later failure, and every archived object has local/remote CRC32C equality plus
+  direct ledger/SUCCESS rehash. Exact next is correction-only confirmation by that same reviewer,
+  then commit/push, authenticated idle-fleet census and one serialized protected probe. An exact
+  arm authorizes only its default-off integration plus the one upstream cache repair before 8K; no
+  exact arm means capture the smallest accepted main-query operand rather than guess again.
 - Main-RoPE integration, TPU-HLO strengthening and provenance fixes are committed/pushed at
   `b5ba20dd4768d62743494511df22f3cd5935bd46`. The complete protected table-on 8K run at tag
   `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_`
