@@ -1324,3 +1324,10 @@ the first bounded arm and was interrupted while the Python HLO dependency checke
 re-traversed the second arm's shared fusion DAG. The 27-minute orchestration is validator CPU time,
 not TPU/model latency. There is no warmed decoder, XPlane, wall distribution, DB row or `SUCCESS`;
 DB484 remains the sole accepted performance point.
+
+DB538/item1822 completes that same projection/reduction experiment but remains diagnostic-only.
+All four arms reproduce the accepted post-`W_UV` row and none reproduces the accepted layer-1
+normalized row (`4022/2318/4044/2388` mismatches). It has no complete decoder loop, warmed wall
+distribution, XPlane or HBM peak. DB484 therefore remains the sole accepted PP8 performance result
+at `244.091151 ms/token` / `4.096830 tok/s`; Gate E is still open. The next post-`o_proj` capture is
+also correctness-only and cannot change the performance standing.

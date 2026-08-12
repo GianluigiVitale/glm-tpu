@@ -7840,3 +7840,32 @@ unmotivated arithmetic variants.
   `SUCCESS` exists; DB max remains 537. The partial diagnostics were copied to the approved bucket
   after authenticated 8/8 failure cleanup. Exact next is one Sol audit of only the linear-time
   correction, commit/push and one protected retry.
+
+## 2026-08-12 16:40--17:15 — DB538 rejects all four reduction associations
+
+- The reviewed linear-time validator fix was committed/pushed at `e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc`.
+  Its serialized protected retry completed as DB538/item1822 under tag
+  `greenfield_layer0_projection_reduction_20260812T164052560787241Z` with terminal `SUCCESS`,
+  approved archive and authenticated 8/8 cleanup.
+- All four arms reproduce accepted post-`W_UV` BF16 SHA `79a6e290...2e9d` exactly. Their accepted
+  layer-1 normalized-hidden mismatch counts are `4022` (local/local), `2318` (Strategy/local),
+  `4044` (local/Strategy), and `2388` (Strategy/Strategy); exact-arm set is empty and the sealed
+  classification is `projection_reduction_unresolved`. Local and Strategy attention candidates
+  are invariant to the dense-only arm, so the next boundary can inspect attention independently.
+- Runner/tensor/summary/SUCCESS SHAs are `303dd91e...f8`, `e801d547...e0e`, `90090...`, and
+  `774435...`. This is correctness-only evidence and does not alter DB484's performance standing.
+- Accepted evidence currently ends immediately before `o_proj`; no accepted post-projection row,
+  post-attention residual or normalized-MLP boundary exists. Reusing the rejected table-on cache
+  rows would invalidate the oracle. The smallest new capture is therefore the actual legacy
+  post-`o_proj` row at layer 0, position 8,155.
+- Oracle-only observer commit `23ab8780f3066ae1be12657d4f45daa7ea353761` adds a default-off,
+  non-returning `jax.debug.callback` after the real `self.o_proj`. A deterministic non-identity
+  integration fixture proves the artifact equals the returned projected row rather than the
+  pre-projection operand; six focused tests pass and the one new-diff Sol audit approved it. The
+  greenfield capture/comparison reuses DB538 directly and will distinguish exact local association,
+  exact StrategyND association, or contraction arithmetic inside `o_proj` without another guess.
+- The one new-diff Sol audit found three medium protection gaps. Corrections bind DB538 runner,
+  tensor, summary, SUCCESS, run 538, live item/summary rows and direct remote hashes; require exact
+  position/strategy/post-WUV/source-ledger semantics; and reject pre-existing or extra archive
+  objects before terminal publication. Mutation/source-order tests cover every demonstrated bypass.
+  The focused adjacent batch passes 20/20 and correction-only review returned `APPROVED`.

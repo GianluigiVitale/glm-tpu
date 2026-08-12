@@ -26,21 +26,31 @@ case "$INTERNAL_MODE" in
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=0
     readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=0
     ;;
   prompt_key | prompt_key_input)
     readonly PROMPT_KEY_CAPTURE=1
     readonly ATTENTION_OUTPUT_CAPTURE=0
     readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=0
     ;;
   attention_output)
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=1
     readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=0
     ;;
   attention_projection)
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=0
     readonly ATTENTION_PROJECTION_CAPTURE=1
+    readonly ATTENTION_UPDATE_CAPTURE=0
+    ;;
+  attention_update)
+    readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=1
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
@@ -84,7 +94,11 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
+  if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-23ab8780f
+    readonly OBSERVER_COMMIT_DISTANCE=9
+    readonly LEGACY_PIN=23ab8780f3066ae1be12657d4f45daa7ea353761
+  elif [[ $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-11c250648
     readonly OBSERVER_COMMIT_DISTANCE=8
     readonly LEGACY_PIN=11c2506480e98902d66a88309533f624c994d202
@@ -136,6 +150,15 @@ readonly ATTENTION_PROJECTION_INGREDIENTS_CODE_HASH=d4862e5601bb81761a6c3b695df6
 readonly ATTENTION_PROJECTION_INGREDIENTS_CONTRACT_SHA=02f0f1c3e22b08c6646167ac5a7ffaf5056932003ee722752f7d40e26e714864
 readonly ATTENTION_PROJECTION_INGREDIENTS_TENSOR_SHA=c06fe575f0518e981c3099a8033c1978b01fd0cff843ecbbd7a25cebed8d0e95
 readonly MAIN_ROPE_TABLE_SHA=6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701
+readonly PROJECTION_REDUCTION_TAG=greenfield_layer0_projection_reduction_20260812T164052560787241Z
+readonly PROJECTION_REDUCTION_DIR=/home/gianl/glm-run/$PROJECTION_REDUCTION_TAG
+readonly PROJECTION_REDUCTION_CODE_HASH=e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc
+readonly PROJECTION_REDUCTION_RUNNER_SHA=303dd91eed1d75e0cd443645c5f1ef745f259c51596d0651646bb141db8f16f8
+readonly PROJECTION_REDUCTION_TENSOR_SHA=e801d5471697fefd1477c46603698289de93818d08d214bdf56e576f52819e0e
+readonly PROJECTION_REDUCTION_SUMMARY_SHA=90090ba9999812082727ed56b734163f07e3c27b4eb88fa049b9c2504516e782
+readonly PROJECTION_REDUCTION_SUCCESS_SHA=7744356f63b67cc813901499d0828c029ea5a9c985a5dac65525700457f79985
+readonly PROJECTION_REDUCTION_RUN_ID=538
+readonly PROJECTION_REDUCTION_REMOTE=$APPROVED_BUCKET/results/$PROJECTION_REDUCTION_TAG
 readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
@@ -198,7 +221,8 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     exit 2
   }
 fi
-if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
+if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 || \
+      $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
   [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
      $PROFILE == 8k && $INTERNAL_TARGET_POSITION == 8155 && \
      $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
@@ -206,6 +230,75 @@ if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 ]]; t
     echo "attention projection capture requires isolated layer-0 8K position 8155 mode" >&2
     exit 2
   }
+fi
+if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+  [[ -r $PROJECTION_REDUCTION_DIR/runner.json &&
+     -r $PROJECTION_REDUCTION_DIR/projection_reduction.npz &&
+     -r $PROJECTION_REDUCTION_DIR/summary.json &&
+     -r $PROJECTION_REDUCTION_DIR/SUCCESS ]] || {
+    echo "protected projection/reduction evidence is unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$PROJECTION_REDUCTION_DIR/runner.json" | awk '{print $1}') == \
+     "$PROJECTION_REDUCTION_RUNNER_SHA" &&
+     $(sha256sum "$PROJECTION_REDUCTION_DIR/projection_reduction.npz" | awk '{print $1}') == \
+     "$PROJECTION_REDUCTION_TENSOR_SHA" &&
+     $(sha256sum "$PROJECTION_REDUCTION_DIR/summary.json" | awk '{print $1}') == \
+     "$PROJECTION_REDUCTION_SUMMARY_SHA" &&
+     $(sha256sum "$PROJECTION_REDUCTION_DIR/SUCCESS" | awk '{print $1}') == \
+     "$PROJECTION_REDUCTION_SUCCESS_SHA" ]] || {
+    echo "protected projection/reduction evidence identity drifted" >&2
+    exit 2
+  }
+  /home/gianl/vllm-env/bin/python - "$RESULTS_DB" \
+    "$PROJECTION_REDUCTION_RUN_ID" "$PROJECTION_REDUCTION_TAG" \
+    "$PROJECTION_REDUCTION_CODE_HASH" <<'PY'
+import json
+import sqlite3
+import sys
+
+db_path, run_id_text, run_tag, code_hash = sys.argv[1:]
+run_id = int(run_id_text)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+run = connection.execute(
+    "SELECT model, model_revision, env_json, note FROM runs WHERE run_id = ?",
+    (run_id,),
+).fetchone()
+items = connection.execute(
+    "SELECT benchmark, item_id, gold, correct, score FROM items WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+summaries = connection.execute(
+    "SELECT benchmark, metric, value FROM summary WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+connection.close()
+if run is None:
+    raise SystemExit("protected DB538 run is absent")
+environment = json.loads(run[2])
+if (
+    run[0] != "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
+    or run[1] != "native-jax-db537-strategy-nd-v1"
+    or run[3]
+    != "Protected layer-0 projection/reduction discriminator; no performance claim."
+    or environment.get("greenfield_run_tag") != run_tag
+    or environment.get("greenfield_code_hash") != code_hash
+    or environment.get("classification") != "projection_reduction_unresolved"
+    or items != [(
+        "greenfield_layer0_projection_reduction",
+        "position8155",
+        "Exact accepted BF16 layer-1 normalized hidden [6144].",
+        0,
+        0.0,
+    )]
+    or summaries != [(
+        "greenfield_layer0_projection_reduction",
+        "probe_contract_valid",
+        1.0,
+    )]
+):
+    raise SystemExit("protected DB538 live DB identity drifted")
+PY
 fi
 if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
   [[ $PROFILE == 8k && $INTERNAL_CAPTURE == 0 && $PROMPT_CACHE_CAPTURE == 0 && \
@@ -278,6 +371,8 @@ elif [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/attention_output_capture
 elif [[ $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/attention_projection_capture
+elif [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/attention_update_capture
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -372,6 +467,35 @@ flock -n 9 || {
 say() {
   echo "[short-dsa-oracle $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
 }
+
+set +e
+remote_prefix_listing=$(gcloud storage ls "$REMOTE_PREFIX/**" 2>&1)
+remote_prefix_rc=$?
+set -e
+printf '%s\n' "$remote_prefix_listing" >"$RUN_DIR/remote_prefix_preflight.txt"
+if [[ $remote_prefix_rc -eq 0 ]]; then
+  say "ABORT: append-only remote prefix already contains objects"
+  exit 1
+elif [[ $remote_prefix_rc -ne 1 ]] || ! grep -q "matched no objects" \
+  "$RUN_DIR/remote_prefix_preflight.txt"; then
+  say "ABORT: remote-prefix vacancy check failed"
+  exit 1
+fi
+
+if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+  for spec in \
+    "$PROJECTION_REDUCTION_RUNNER_SHA $PROJECTION_REDUCTION_REMOTE/runner.json" \
+    "$PROJECTION_REDUCTION_TENSOR_SHA $PROJECTION_REDUCTION_REMOTE/projection_reduction.npz" \
+    "$PROJECTION_REDUCTION_SUMMARY_SHA $PROJECTION_REDUCTION_REMOTE/summary.json" \
+    "$PROJECTION_REDUCTION_SUCCESS_SHA $PROJECTION_REDUCTION_REMOTE/SUCCESS"; do
+    read -r expected uri <<<"$spec"
+    observed=$(gcloud storage cat "$uri" | sha256sum | awk '{print $1}')
+    [[ $observed == "$expected" ]] || {
+      say "ABORT: protected DB538 remote source hash drifted: $uri"
+      exit 1
+    }
+  done
+fi
 
 has_eight_unique_markers() {
   local file=$1 marker=$2
@@ -964,7 +1088,43 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+  say "sealing accepted layer-0 post-o_proj attention update"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_accepted_attention_update.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    --capture-process-indices 0 \
+    >"$RUN_DIR/attention_update_capture_summary.json"
+  accepted_update_capture_sha=$(sha256sum \
+    "$INTERNAL_RESULT_DIR/capture.json" | awk '{print $1}')
+  say "comparing accepted attention update with protected DB538 candidates"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/compare_accepted_attention_update.py" \
+    --accepted-capture-dir "$INTERNAL_RESULT_DIR" \
+    --probe-dir "$PROJECTION_REDUCTION_DIR" \
+    --output "$RUN_DIR/attention_update_comparison" \
+    --accepted-capture-file-sha256 "$accepted_update_capture_sha" \
+    --probe-runner-sha256 "$PROJECTION_REDUCTION_RUNNER_SHA" \
+    --probe-tensor-sha256 "$PROJECTION_REDUCTION_TENSOR_SHA" \
+    --probe-summary-sha256 "$PROJECTION_REDUCTION_SUMMARY_SHA" \
+    --probe-success-sha256 "$PROJECTION_REDUCTION_SUCCESS_SHA" \
+    --probe-run-id "$PROJECTION_REDUCTION_RUN_ID" \
+    --accepted-run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --probe-code-hash "$PROJECTION_REDUCTION_CODE_HASH" \
+    --probe-tag "$PROJECTION_REDUCTION_TAG" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    >"$RUN_DIR/attention_update_comparison_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
   say "sealing accepted operands on both sides of layer-0 W_UV"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/capture_accepted_attention_projection_operands.py" \
@@ -1128,11 +1288,14 @@ gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" <<'PY' \
   >"$RUN_DIR/remote_objects.json"
+import base64
 from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import subprocess
 import sys
+
+import google_crc32c
 
 root = Path(sys.argv[1])
 prefix = sys.argv[2]
@@ -1147,17 +1310,25 @@ for path in sorted(root.rglob("*")):
         continue
     paths.append((path, relative))
 
+def local_crc32c(path):
+    checksum = google_crc32c.Checksum()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            checksum.update(chunk)
+    return base64.b64encode(checksum.digest()).decode()
+
 def describe(item):
     path, relative = item
     remote = json.loads(subprocess.run(
         ["gcloud", "storage", "objects", "describe", f"{prefix}/{relative}", "--format=json"],
         check=True, capture_output=True, text=True,
     ).stdout)
-    if int(remote["size"]) != path.stat().st_size:
-        raise SystemExit(f"remote size mismatch: {relative}")
     crc32c = remote.get("crc32c_hash") or remote.get("crc32c")
-    if not crc32c:
-        raise SystemExit(f"remote CRC32C missing: {relative}")
+    if (
+        int(remote["size"]) != path.stat().st_size
+        or crc32c != local_crc32c(path)
+    ):
+        raise SystemExit(f"remote object verification failed: {relative}")
     return {
         "crc32c": crc32c,
         "generation": remote["generation"],
@@ -1171,6 +1342,33 @@ print(json.dumps({"objects": records}, indent=2, sort_keys=True))
 PY
 gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
   "$REMOTE_PREFIX/remote_objects.json" >/dev/null
+local_remote_objects_sha=$(sha256sum "$RUN_DIR/remote_objects.json" | awk '{print $1}')
+remote_remote_objects_sha=$(gcloud storage cat "$REMOTE_PREFIX/remote_objects.json" |
+  sha256sum | awk '{print $1}')
+[[ $local_remote_objects_sha == "$remote_remote_objects_sha" ]] || {
+  say "ABORT: remote object ledger checksum mismatch"
+  exit 1
+}
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$RUN_DIR" "$REMOTE_PREFIX" <<'PY'
+from pathlib import Path
+import subprocess
+import sys
+
+from glm_tpu.greenfield.validation.attention_update import (
+    validate_exact_remote_object_set,
+)
+
+root = Path(sys.argv[1])
+prefix = sys.argv[2]
+listing = subprocess.run(
+    ["gcloud", "storage", "ls", f"{prefix}/**"],
+    check=True,
+    capture_output=True,
+    text=True,
+).stdout.splitlines()
+validate_exact_remote_object_set(root, prefix, listing)
+PY
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
   "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" \
@@ -1203,7 +1401,82 @@ lines = {
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode == "attention_projection":
+    if mode == "attention_update":
+        capture_path = root / "attention_update_capture" / "capture.json"
+        comparison_path = (
+            root / "attention_update_comparison" / "comparison.json"
+        )
+        capture = json.loads(capture_path.read_text())
+        comparison = json.loads(comparison_path.read_text())
+        candidates = comparison["candidate_comparisons"]
+        if (
+            not exact_dsa["exact"]
+            or capture["artifact_kind"]
+            != "glm52_accepted_attention_update_capture"
+            or capture["capture_layout"] != "replicated_logical_live_row"
+            or capture["capture_mode"] != mode
+            or capture["capture_process_indices"] != [0]
+            or capture["diagnostic_only"] is not True
+            or capture["performance_claim"] is not False
+            or capture["legacy_code_hash"] != sys.argv[4]
+            or capture["oracle_pin"]
+            != "b3c25df47ac98783912dc658878181ec0a8ae16d"
+            or capture["position"] != 8155
+            or capture["tensor"]["shape"] != [6144]
+            or comparison["artifact_kind"]
+            != "glm52_accepted_greenfield_attention_update_comparison"
+            or comparison["status"] != "SUCCESS"
+            or comparison["diagnostic_only"] is not True
+            or comparison["performance_claim"] is not False
+            or comparison["classification"] not in {
+                "local_attention_projection_exact",
+                "strategy_nd_attention_projection_exact",
+                "both_attention_projections_exact",
+                "attention_projection_arithmetic_unresolved",
+            }
+            or set(candidates) != {"local", "strategy_nd"}
+            or any(value["shape"] != [6144] for value in candidates.values())
+        ):
+            raise SystemExit("attention-update comparison evidence drifted")
+        lines.update({
+            "accepted_attention_update_capture": "true",
+            "accepted_attention_update_capture_layout": capture[
+                "capture_layout"
+            ],
+            "accepted_attention_update_capture_mode": mode,
+            "accepted_attention_update_diagnostic_only": "true",
+            "accepted_attention_update_dsa_event_tensors_exact": "true",
+            "accepted_attention_update_manifest_file_sha256": sha256(
+                capture_path.read_bytes()
+            ).hexdigest(),
+            "accepted_attention_update_manifest_sha256": capture[
+                "manifest_sha256"
+            ],
+            "accepted_attention_update_source_file_count": sys.argv[9],
+            "accepted_attention_update_tensor_sha256": capture["tensor"][
+                "tensor_sha256"
+            ],
+            "accepted_oracle_pin": capture["oracle_pin"],
+            "attention_update_classification": comparison["classification"],
+            "attention_update_comparison_file_sha256": sha256(
+                comparison_path.read_bytes()
+            ).hexdigest(),
+            "attention_update_comparison_manifest_sha256": comparison[
+                "manifest_sha256"
+            ],
+            "attention_update_exact_candidates": ",".join(
+                comparison["exact_candidates"]
+            ) or "none",
+            "attention_update_first_open_boundary": comparison[
+                "first_open_boundary"
+            ],
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_process_indices": "0",
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": capture["layer_name"],
+            "dsa_event_tensors_exact": "true",
+        })
+    elif mode == "attention_projection":
         capture_path = root / "attention_projection_capture" / "capture.json"
         comparison_path = (
             root / "attention_projection_comparison" / "comparison.json"

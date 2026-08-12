@@ -22,6 +22,29 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 - Gates A--C are complete. Gate D has one accepted 2K result, DB484, at `244.091151 ms/token` and
   `4.096830 tok/s`; it does not pass Gate E. Complete 8K exactness remains open. DB484 is still the
   only decoder performance result.
+- Protected DB538/item1822 completed the four independent post-latent arms at pushed pin
+  `e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc`. Every arm first reproduces accepted post-`W_UV`
+  SHA `79a6e290...2e9d`, so W_UV is closed. Neither local nor accepted StrategyND association at
+  attention `o_proj`, crossed independently with local/StrategyND dense-down, reproduces accepted
+  layer-1 normalization: the four mismatch counts are `4022/2318/4044/2388`. Thus four combine-
+  precision/association theories are conclusively rejected and must not be rerun. Runner/tensor
+  SHAs are `303dd91e...f8` / `e801d547...e0e`; DB/archive and 8/8 cleanup pass.
+- The smallest missing accepted boundary is now the actual post-`o_proj` layer-0 attention update.
+  Existing accepted artifacts stop immediately before `o_proj`; the table-on downstream rows are
+  non-authoritative because their cache path was already proved non-production-faithful. Observer
+  pin `23ab8780f3066ae1be12657d4f45daa7ea353761` adds one default-off, non-returning callback for
+  that exact row. Its six focused tests pass and its one new-diff Sol audit is approved. The
+  greenfield bulk adds a manifest-bound capture, comparison against DB538's two attention
+  candidates, CRC32C-equal archive verification and a dedicated protected 8K wrapper. Its one Sol
+  audit found three medium provenance/archive gaps: incomplete DB538 terminal binding, insufficient
+  semantic arm checks, and no exact remote object-set gate. The corrections pin DB538 summary,
+  SUCCESS, live DB row and remote hashes; require exact strategy/value/source-ledger semantics; and
+  verify a vacant prefix plus an exact nonterminal object set before publishing `SUCCESS`. Mutation
+  regressions pass and correction-only review returned `APPROVED`. Exact next: commit/push,
+  clean-fleet proof, then exactly one protected attention-update capture. If either candidate is
+  exact, implement it and rerun complete 8K; if neither is exact, the mismatch is inside local
+  `o_proj` contraction arithmetic and the captured row becomes the direct oracle. Do not rerun
+  DB538 or another full decoder first.
 - The third selected-cache/B512 8K attempt at clean pushed pin `dab03de9` cleared the production
   decoder, DSA-observer and teacher-forced-prefill HLO gates, completed the real 8K prefill/decode,
   and produced the exact raw token `101252`. It still refused DSA correctness at event 1 entering
