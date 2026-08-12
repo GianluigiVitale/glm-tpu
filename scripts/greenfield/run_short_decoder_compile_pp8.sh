@@ -2457,6 +2457,7 @@ if len({record["hostname"] for record in records}) != 8:
 for field in (
     "code_hash",
     "dsa_observer_hlo_sha256",
+    "dsa_observer_stablehlo_sha256",
     "dsa_query_materialization_hlo_sha256",
     "main_rope_table_sha256",
     "optimized_hlo_sha256",
@@ -2464,6 +2465,7 @@ for field in (
     "runtime_layout_hash",
     "runtime_manifest_sha256",
     "schedule_hash",
+    "stablehlo_sha256",
     "state_layout_hash",
     "topology_hash",
 ):
@@ -2626,10 +2628,17 @@ def validate_strategy_nd_attention_hlo(executable, *, source):
     ):
         raise SystemExit(f"{source} StrategyND attention flag drifted")
     contract = executable["strategy_nd_attention_projection_contract"]
+    stable_contract = executable[
+        "strategy_nd_attention_stablehlo_contract"
+    ]
     if (
         not contract["passed"]
         or contract["applicable"] != strategy_nd_attention_projection
         or contract["violations"]
+        or not stable_contract["passed"]
+        or stable_contract["applicable"]
+        != strategy_nd_attention_projection
+        or stable_contract["violations"]
     ):
         raise SystemExit(f"{source} StrategyND attention HLO contract failed")
     if strategy_nd_attention_projection:
@@ -2645,6 +2654,16 @@ def validate_strategy_nd_attention_hlo(executable, *, source):
             or contract["exclusive_source_violations"]
             or not contract["all_gathers_live"]
             or set(contract["gather_source_counts"].values()) != {8}
+            or stable_contract["expected_gather_count"] != 78
+            or stable_contract["expected_kernel_count"] != 624
+            or stable_contract["gather_count"] != 78
+            or stable_contract["kernel_count"] != 624
+            or stable_contract["matched_tree_count"] != 78
+            or len(stable_contract["matched_trees"]) != 78
+            or any(
+                tree["kernel_count"] != 8
+                for tree in stable_contract["matched_trees"]
+            )
         ):
             raise SystemExit(
                 f"{source} StrategyND attention physical contract drifted"
@@ -2653,6 +2672,12 @@ def validate_strategy_nd_attention_hlo(executable, *, source):
         contract["gather_count"] != 0
         or contract["kernel_count"] != 0
         or contract["scoped_instruction_count"] != 0
+        or stable_contract["expected_gather_count"] != 0
+        or stable_contract["expected_kernel_count"] != 0
+        or stable_contract["gather_count"] != 0
+        or stable_contract["kernel_count"] != 0
+        or stable_contract["matched_tree_count"] != 0
+        or stable_contract["matched_trees"]
     ):
         raise SystemExit(
             f"{source} default StrategyND attention state is not absent"
@@ -2666,6 +2691,13 @@ for record in records:
     validate_strategy_nd_attention_hlo(
         record["hlo_contract"], source="decoder"
     )
+    if (
+        record["stablehlo_sha256"] is None
+        or len(set(record["fleet_stablehlo_hashes"])) != 1
+        or record["fleet_stablehlo_hashes"][0]
+        != record["stablehlo_sha256"]
+    ):
+        raise SystemExit("fleet decoder StableHLO hash drifted")
     if main_rope_table:
         if (
             record["main_rope_table_sha256"]
@@ -2689,7 +2721,7 @@ for record in records:
     ):
         raise SystemExit("default decoder materialized main-RoPE table state")
 if short_context_oracle:
-    for field in ("prefill_hlo_sha256",):
+    for field in ("prefill_hlo_sha256", "prefill_stablehlo_sha256"):
         values = {record[field] for record in records}
         if len(values) != 1 or None in values:
             raise SystemExit(f"fleet field {field} disagrees: {values}")
@@ -2903,6 +2935,8 @@ for record in records:
             or token["short_context_oracle"] is not None
             or record["prefill_hlo_contract"] is not None
             or record["prefill_hlo_sha256"] is not None
+            or record["prefill_stablehlo_sha256"] is not None
+            or record["fleet_prefill_stablehlo_hashes"] is not None
         ):
             raise SystemExit("synthetic token path contains oracle evidence")
     elif record["token_contract"] is not None:
@@ -2998,6 +3032,10 @@ if short_context_oracle:
             or len(set(record["fleet_prefill_hlo_hashes"])) != 1
             or record["fleet_prefill_hlo_hashes"][0]
             != record["prefill_hlo_sha256"]
+            or record["prefill_stablehlo_sha256"] is None
+            or len(set(record["fleet_prefill_stablehlo_hashes"])) != 1
+            or record["fleet_prefill_stablehlo_hashes"][0]
+            != record["prefill_stablehlo_sha256"]
         ):
             raise SystemExit("prefill HLO/fleet contract drifted")
         if prefill_index_repair:
@@ -3273,6 +3311,13 @@ if short_context_dsa_oracle:
             or len(set(record["fleet_dsa_observer_hlo_hashes"])) != 1
             or record["fleet_dsa_observer_hlo_hashes"][0]
             != record["dsa_observer_hlo_sha256"]
+            or record["dsa_observer_stablehlo_sha256"] is None
+            or len(
+                set(record["fleet_dsa_observer_stablehlo_hashes"])
+            )
+            != 1
+            or record["fleet_dsa_observer_stablehlo_hashes"][0]
+            != record["dsa_observer_stablehlo_sha256"]
             or not record[
                 "trace_and_timing_use_observer_free_production_executable"
             ]
@@ -3323,8 +3368,10 @@ else:
                 "dsa_observer_contract",
                 "dsa_observer_hlo_contract",
                 "dsa_observer_hlo_sha256",
+                "dsa_observer_stablehlo_sha256",
                 "dsa_observer_isolation_contract",
                 "fleet_dsa_observer_hlo_hashes",
+                "fleet_dsa_observer_stablehlo_hashes",
             )
         ):
             raise SystemExit("unrequested DSA observer evidence is present")

@@ -490,6 +490,11 @@ def test_strategy_nd_attention_projection_is_default_off_and_db539_protected() -
     assert "validate_strategy_nd_attention_hlo" in runner
     assert 'contract["gather_count"] != 78' in runner
     assert 'contract["kernel_count"] != 624' in runner
+    assert 'stable_contract["matched_tree_count"] != 78' in runner
+    assert 'stable_contract["expected_kernel_count"] != 624' in runner
+    assert 'record["fleet_stablehlo_hashes"][0]' in runner
+    assert 'record["fleet_prefill_stablehlo_hashes"][0]' in runner
+    assert 'record["fleet_dsa_observer_stablehlo_hashes"][0]' in runner
     assert "greenfield_strategy_nd_attention_projection_prerequisite_db_run" in runner
     assert "539 if strategy_nd_attention_projection else None" in runner
     assert "_strategynd_o" in runner
