@@ -1302,3 +1302,7 @@ compilation and before execution because a stale aggregate formula expected 450 
 observed 312 local all-reduces. The preserved HLO confirms the intended 78 selected-cache sums and
 removal of both old 78-element LSE/validity reduction families. No XPlane, wall distribution, DB row
 or `SUCCESS` exists, so DB484 remains the sole decoder performance point.
+
+The `9a90c3c` retry also has no performance result. It passes production decoder and DSA-observer
+HLO, then stops at an omitted prefill-validator flag before device execution. No prefill/decode wall,
+XPlane, DB row, summary or `SUCCESS` exists; DB484 remains the sole accepted decoder measurement.

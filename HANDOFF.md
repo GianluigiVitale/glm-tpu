@@ -4058,3 +4058,19 @@ The bounded correction removes those two families only when the selected-cache p
 the default arity/shape contract is unchanged. The preserved real HLO replays with zero violations
 and exact expected/observed counts. Exact next: focused/full runtime verification, one Sol audit of
 only this correction, commit/push, then one clean protected retry; no model arithmetic change is due.
+
+That correction was reviewed, passed 70/70 runtime tests and the preserved real HLO, then was
+committed/pushed at `9a90c3c8a75980e22ffe93c5b21be0e9f7e70106`. Its protected retry, tag ending
+`pregatheredb512_oracle_dsa_trace2_20260812T131644863022004Z`, proves the production decoder and
+DSA-observer HLO gates pass and reaches the later teacher-forced prefill gate. Prefill refused only
+because `validate_teacher_forced_prefill_hlo` omitted the already-recorded decoder
+`pregathered_b512_attention` flag when delegating to the common decoder validator. Consequently it
+interpreted the same valid prefill HLO as default mode. The two-line propagation fix is bounded;
+preserved real DSA-observer and prefill HLOs both replay with `63/312/17`, 78 bijective B512 links
+and zero violations. Prefill/observer HLO SHAs are `de2a78b5...5966` / `f1c09e2e...b2b9`; identical
+log and pre/failure census SHAs are `db53a0e7...41d3`, `3fa4daf7...cea0`, and
+`d5d2a590...239e`. No execution/timing/DB/SUCCESS/summary exists and cleanup is 8/8. Exact next is
+review/test this flag-threading correction, commit/push and retry once; arithmetic remains frozen.
+The one-diff Sol audit found only a stale functional fixture; the fixture now verifies both false
+and true forwarding and correction-only review returned `APPROVE COMMIT`. The combined
+decoder/compiler/prefill suite passes 85/85 and static checks pass.

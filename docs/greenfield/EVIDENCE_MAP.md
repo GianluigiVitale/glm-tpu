@@ -1072,3 +1072,8 @@ capture is still required.
   (`f32[256]` and `u32[1,1,128]`, 78 each) are absent with their source gathers. Replaying that exact
   HLO against the corrected conditional count/shape contract passes with zero violations. This is
   HLO readiness and authenticated failure-cleanup evidence, not decoder correctness/performance.
+- The `9a90c3c` retry additionally preserves passing production-decoder and DSA-observer HLOs plus
+  the real prefill HLO. Prefill initially refused only because its wrapper omitted the immutable
+  selected-path flag when calling the common validator. With that propagation restored, both the
+  observer and prefill artifacts replay at `63/312/17`, 78 bijective links and zero violations.
+  Execution still did not begin, so this remains HLO/readiness and clean-failure evidence.

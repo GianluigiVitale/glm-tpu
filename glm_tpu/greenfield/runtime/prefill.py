@@ -698,6 +698,9 @@ def validate_teacher_forced_prefill_hlo(
         split_residual_state=decoder.split_residual_state,
         prefill_index_repair=index_repair_enabled,
         main_rope_table_enabled=decoder.main_rope_table_enabled,
+        pregathered_b512_attention=(
+            decoder.pregathered_b512_attention
+        ),
     )
     module = parse_hlo_module(optimized_hlo)
     expected_fused_qkv_internal_loops = (

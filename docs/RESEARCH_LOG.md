@@ -7732,3 +7732,27 @@ unmotivated arithmetic variants.
   the approved bucket. No token, timing, XPlane, DB row, `summary.json` or `SUCCESS` exists; live DB
   max remains 537 and post-failure cleanup is authenticated 8/8. Exact next is one reviewed bounded
   correction and one protected retry, not another numerical discriminator.
+
+## 2026-08-12 13:16--13:32 — retry clears decoder/observer and finds omitted prefill flag
+
+- The reviewed count correction was committed/pushed at `9a90c3c8a75980e22ffe93c5b21be0e9f7e70106`.
+  Its protected retry under tag ending `pregatheredb512_oracle_dsa_trace2_20260812T131644863022004Z`
+  passes the production decoder and DSA-observer HLO gates, then refuses before execution in the
+  teacher-forced prefill HLO gate.
+- The prefill executable itself contains exactly the selected-cache path: local counts are
+  `63/312/17`, all-reduce arity is `{"1":312}`, 78 cache sums bijectively feed 78 B512 calls, and
+  old merge scopes are absent. The prefill validator delegates to the common decoder validator but
+  failed to pass `decoder.pregathered_b512_attention`; it therefore requested the default-mode
+  219 gathers/372 reductions and reported selected-cache scope as unexpected.
+- The bounded correction threads the immutable program flag into that one validation call. Direct
+  replay of both preserved real DSA-observer and prefill HLOs with the selected flag passes with
+  zero violations. No arithmetic, executable construction, runtime input, checkpoint or default
+  path changes. A source regression pins the propagation.
+- Prefill HLO/failed-contract, observer HLO/contract, identical-log and pre/failure-census SHAs are
+  `de2a78b5...5966` / `169913f1...a739`, `f1c09e2e...b2b9` / `05219b3a...f56c`,
+  `db53a0e7...41d3`, `3fa4daf7...cea0`, and `d5d2a590...239e`. Diagnostics are archived; no
+  execution, token, timing, XPlane, DB row, summary or `SUCCESS` exists, and cleanup is 8/8.
+- One Sol audit of only this propagation delta found a stale functional `SimpleNamespace` fixture.
+  The corrected test is parameterized over false/true and asserts the exact forwarded value; the
+  same reviewer returned `APPROVE COMMIT`. Decoder/compiler/prefill tests pass 85/85, and compileall,
+  Bash, ShellCheck, JSON and diff checks pass.

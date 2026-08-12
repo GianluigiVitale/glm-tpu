@@ -71,7 +71,10 @@ def test_protected_8k_prefill_repair_has_four_chunks_per_layer() -> None:
     assert 21 * _prefill_index_repair_chunk_count(8155) == 84
 
 
-def test_prefill_hlo_forwards_exact_head_key_contract(monkeypatch) -> None:
+@pytest.mark.parametrize("pregathered_b512_attention", [False, True])
+def test_prefill_hlo_forwards_exact_head_key_contract(
+    monkeypatch, pregathered_b512_attention: bool
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_decoder_contract(*_args, **kwargs):
@@ -95,6 +98,7 @@ def test_prefill_hlo_forwards_exact_head_key_contract(monkeypatch) -> None:
         main_rope_table_enabled=False,
         observe_prefill_index_inputs=False,
         pairs=((0, 1),),
+        pregathered_b512_attention=pregathered_b512_attention,
         split_residual_state=True,
     )
     program = SimpleNamespace(
@@ -117,6 +121,10 @@ def test_prefill_hlo_forwards_exact_head_key_contract(monkeypatch) -> None:
 
     assert captured["dsa_head_key_exact_association"] is True
     assert captured["main_rope_table_enabled"] is False
+    assert (
+        captured["pregathered_b512_attention"]
+        is pregathered_b512_attention
+    )
     assert contract["passed"] is True
 
 

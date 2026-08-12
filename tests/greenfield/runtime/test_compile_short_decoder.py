@@ -423,6 +423,11 @@ def test_pregathered_b512_attention_is_default_off_and_db537_protected() -> None
         "            )" in compiler
     )
     assert '"pregathered_b512_attention": (' in compiler
+    prefill = (
+        REPO / "glm_tpu/greenfield/runtime/prefill.py"
+    ).read_text()
+    assert "pregathered_b512_attention=(" in prefill
+    assert "decoder.pregathered_b512_attention" in prefill
     assert (
         "readonly PREGATHERED_B512_ATTENTION="
         "${GLM_GREENFIELD_PREGATHERED_B512_ATTENTION:-0}" in runner
