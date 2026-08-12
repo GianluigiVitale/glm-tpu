@@ -1281,3 +1281,18 @@ zero and supplies the model-position/physical-device mapping needed by the layer
 The run has no model, checkpoint, warmed decode distribution, XPlane or token loop. It therefore
 changes no latency or throughput standing: DB484 remains the only accepted PP8 decoder result at
 `244.091151 ms/token` and `4.096830 tok/s`; Gate E remains open.
+
+## DB537 block-512 arithmetic — no performance result
+
+DB537/item1821 is a bounded five-arm single-host TPU arithmetic discriminator. It proves that the
+complete 2,048 selected rows with B512 recurrence are bitwise exact for the accepted 64-head latent,
+including the local H16 schedule chosen for production; B128 retains 216 mismatches. It has no full
+decoder loop, warmed wall distribution, XPlane or HBM peak, so its elapsed orchestration time is not
+token latency and does not advance Gate E.
+
+The authorized default-off integration changes the physical work materially: it removes two
+per-layer attention all-gathers (query and tuple-fused output/LSE/validity), adds one LP4 BF16
+selected-cache sum of logical shape `[1,2048,640]`, and changes sparse attention from B128 to B512
+on 16 local heads. Whether that improves or regresses the approximately 30.435 ms active stage is
+unknown until the protected complete 8K trace and profiler-free wall run. DB484 remains the only
+accepted PP8 performance point at `244.091151 ms/token` / `4.096830 tok/s`.

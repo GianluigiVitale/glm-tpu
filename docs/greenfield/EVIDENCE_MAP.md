@@ -1039,3 +1039,30 @@ capture is still required.
   `8b59adca...87c6` and the same position SHA `ef78b044...fea08` as the table-on owner union. The
   current table-on segment differs at exactly position 8,145 / latent column 367, so both inputs run
   through each compiled arm and only the accepted-cache result can identify exact arithmetic.
+
+## DB537 exact block-512 attention arithmetic
+
+- DB537/item1821, `greenfield_layer0_attention_arithmetic_20260812T114701365714147Z`, runs the
+  isolated five-arm four-chip probe at pin `83577222b4d48cb4b2fec544c06e3a71fbc821f5` and
+  classifies `exact_arithmetic_arm_identified`. The exact accepted-cache arms are
+  `pregathered_h16_b512`, `pregathered_attention_h2_b512`, and `pregathered_full_h2_b512`; the same
+  three arms are exact with the table-on greenfield cache control.
+- Every exact arm reproduces accepted attended-latent SHA
+  `923e9bfeb65864868cef359cf98ebad67f2756794ad142ac87e66b71877a2d2a` with zero of 32,768 BF16
+  mismatches. Both B128 controls retain 216 mismatches and maximum error `3.0517578125e-05`.
+  Therefore the causal requirement is the complete 2,048-row selected segment with B512 recurrence;
+  accepted two-head projection scheduling is unnecessary because the local 16-head arm is exact.
+- Runner/tensor/summary/SUCCESS SHAs are `7961622c...a4ec`, `7d5ebe15...1f61`,
+  `9793f89a...8540`, and `ecc2b873...3153`. All five real-TPU HLO contracts pass without
+  communication, the checkpoint manifest/evidence/tensor chain is pinned, DB linkage is exact,
+  remote CRC32C/content checks pass, and pre/post censuses authenticate eight idle hosts.
+- This is bounded arithmetic evidence, not decoder correctness or performance. It authorizes one
+  default-off PP8 production integration: each lane places only its owned selected rows in the
+  canonical 2,048-row segment, one LP4 BF16 sum reconstructs that segment, and the existing
+  pre-gathered H16 B512 kernel computes only that lane's 16 heads. The protected 8K run must still
+  prove exact tokens/DSA, cache/state, local HLO, trace, wall, HBM, DB/archive and cleanup.
+- The reviewed production HLO contract does not accept counts/shapes as consumption proof. Every
+  exact-name B512 call must be inside the named attention scope, and cache operand 2 must trace
+  through only cache-preserving shape transforms to one scoped LP4 exchange. The 78 exchange/call
+  links must be bijective; logical/folded bypass, suffix and out-of-scope mutations are regression
+  tested. This is readiness evidence only until the protected complete-decoder HLO passes.

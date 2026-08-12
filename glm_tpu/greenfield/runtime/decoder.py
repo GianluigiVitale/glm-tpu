@@ -57,7 +57,7 @@ from ..sharding.hlo_contract import (
     HloShape,
     parse_hlo_module,
 )
-from ..types import ExecutionPlan
+from ..types import ExecutionPlan, PlanName
 from .pipeline import (
     PipelineSkeletonConfig,
     _canonical_groups,
@@ -595,6 +595,7 @@ class DecoderStepProgram:
     dsa_score_default_precision: bool
     attention_projection_backend: AttentionProjectionBackend
     main_rope_table_enabled: bool
+    pregathered_b512_attention: bool
     main_rope_table_host: Any | None
     main_rope_table_sha256: str | None
     main_rope_table_bytes_per_device: int
@@ -2419,6 +2420,237 @@ def _validate_main_rope_table_hlo(
     }
 
 
+def _validate_pregathered_b512_attention_hlo(
+    optimized_hlo: str,
+    *,
+    module: HloModule,
+    config: DecoderStepConfig,
+    layers: int,
+    enabled: bool,
+) -> dict[str, Any]:
+    """Pin the DB537-selected LP4 exchange and block-512 attention body."""
+
+    exchange_scope = "greenfield_selected_cache_lp4_exchange"
+    attention_scope = "greenfield_pregathered_b512_attention"
+    kernel_name = "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
+    old_scopes = (
+        "greenfield_owner_split_attention_output_gather",
+        "greenfield_owner_split_attention_lse_gather",
+        "greenfield_owner_split_attention_validity_gather",
+        "greenfield_replicated_monolithic_attention_cache_gather",
+        "greenfield_replicated_monolithic_attention",
+    )
+    kernel_identifier = re.compile(
+        rf"(?<![A-Za-z0-9_]){re.escape(kernel_name)}(?![A-Za-z0-9_])"
+    )
+
+    def in_scope(op_name: str | None, scope: str) -> bool:
+        return bool(op_name) and scope in op_name.split("/")
+
+    exchanges = tuple(
+        collective
+        for collective in module.collectives
+        if in_scope(collective.op_name, exchange_scope)
+    )
+    scoped_attention_instructions = tuple(
+        instruction
+        for instruction in module.instructions
+        if in_scope(instruction.op_name, attention_scope)
+    )
+    old_scope_instructions = tuple(
+        instruction.name
+        for instruction in module.instructions
+        if any(in_scope(instruction.op_name, scope) for scope in old_scopes)
+    )
+    custom_calls = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.opcode == "custom-call"
+        and 'custom_call_target="tpu_custom_call"' in instruction.raw_line
+        and kernel_identifier.search(instruction.raw_line) is not None
+        and in_scope(instruction.op_name, attention_scope)
+    )
+    violations: list[str] = []
+    if not enabled:
+        if exchanges or scoped_attention_instructions or custom_calls:
+            violations.append(
+                "default decoder unexpectedly contains pregathered-B512 attention"
+            )
+        return {
+            "applicable": False,
+            "attention_instruction_count": len(scoped_attention_instructions),
+            "exchange_count": len(exchanges),
+            "kernel_count": len(custom_calls),
+            "passed": not violations,
+            "violations": violations,
+        }
+
+    expected_cache_shape = HloShape(
+        "bf16", (1, config.selected_width, config.packed_cache_width)
+    )
+    folded_cache_shape = HloShape(
+        "bf16", (1, 4, config.selected_width // 4, config.packed_cache_width)
+    )
+    if (
+        config.local_parallel_size != 4
+        or config.selected_width != 2048
+        or config.packed_cache_width != 640
+    ):
+        violations.append("pregathered-B512 HLO geometry is not PP8 LP4 GLM-5.2")
+    if len(exchanges) != layers:
+        violations.append(
+            "pregathered-B512 selected-cache exchange count drifted: "
+            f"expected={layers} observed={len(exchanges)}"
+        )
+    malformed_exchanges = tuple(
+        collective.name
+        for collective in exchanges
+        if collective.opcode != "all-reduce"
+        or not (
+            expected_cache_shape in collective.operand_shapes
+            and expected_cache_shape in collective.result_shapes
+        )
+        and not (
+            folded_cache_shape in collective.operand_shapes
+            and folded_cache_shape in collective.result_shapes
+        )
+    )
+    if malformed_exchanges:
+        violations.append(
+            "pregathered-B512 exchange lost exact BF16 selected-cache shape: "
+            f"{malformed_exchanges}"
+        )
+    if len(custom_calls) != layers:
+        violations.append(
+            "pregathered-B512 Pallas kernel count drifted: "
+            f"expected={layers} observed={len(custom_calls)}"
+        )
+    malformed_calls = tuple(
+        instruction.name
+        for instruction in custom_calls
+        if instruction.operand_shapes
+        not in (
+            (
+                HloShape("s32", (1,)),
+                HloShape("bf16", (1, 16, 640)),
+                expected_cache_shape,
+            ),
+            (
+                HloShape("s32", (1,)),
+                HloShape("bf16", (1, 16, 640)),
+                folded_cache_shape,
+            ),
+        )
+        or instruction.result_shapes != (HloShape("bf16", (1, 16, 512)),)
+    )
+    if malformed_calls:
+        violations.append(
+            "pregathered-B512 Pallas calls lost exact selected-cache/output shapes"
+        )
+
+    instruction_by_key = {
+        (instruction.computation, instruction.name): instruction
+        for instruction in module.instructions
+    }
+    exchange_keys = {
+        (instruction.computation, instruction.name) for instruction in exchanges
+    }
+    cache_shapes = {expected_cache_shape, folded_cache_shape}
+    allowed_cache_transforms = {"bitcast", "copy", "reshape"}
+    kernel_exchange_links: list[dict[str, str]] = []
+    cache_dataflow_failures: list[str] = []
+    for custom_call in custom_calls:
+        if len(custom_call.operand_names) < 3:
+            cache_dataflow_failures.append(
+                f"{custom_call.name}: missing cache operand"
+            )
+            continue
+        current = (custom_call.computation, custom_call.operand_names[2])
+        visited: set[tuple[str, str]] = set()
+        while current not in exchange_keys:
+            if current in visited:
+                cache_dataflow_failures.append(
+                    f"{custom_call.name}: cache dataflow contains a cycle"
+                )
+                break
+            visited.add(current)
+            source = instruction_by_key.get(current)
+            if source is None:
+                cache_dataflow_failures.append(
+                    f"{custom_call.name}: cache operand source is absent"
+                )
+                break
+            if (
+                source.opcode not in allowed_cache_transforms
+                or len(source.operand_names) != 1
+                or len(source.operand_shapes) != 1
+                or len(source.result_shapes) != 1
+                or source.operand_shapes[0] not in cache_shapes
+                or source.result_shapes[0] not in cache_shapes
+                or source.operand_shapes[0].element_count
+                != source.result_shapes[0].element_count
+            ):
+                cache_dataflow_failures.append(
+                    f"{custom_call.name}: cache operand bypasses the scoped exchange"
+                )
+                break
+            current = (source.computation, source.operand_names[0])
+        else:
+            kernel_exchange_links.append(
+                {
+                    "computation": custom_call.computation,
+                    "exchange": current[1],
+                    "kernel": custom_call.name,
+                }
+            )
+    if cache_dataflow_failures:
+        violations.append(
+            "pregathered-B512 kernel cache operands do not depend on their "
+            "scoped exchanges: "
+            f"{tuple(cache_dataflow_failures)}"
+        )
+    linked_exchange_counts = Counter(
+        (item["computation"], item["exchange"])
+        for item in kernel_exchange_links
+    )
+    exchange_bijection = (
+        len(kernel_exchange_links) == len(custom_calls)
+        and set(linked_exchange_counts) == exchange_keys
+        and all(count == 1 for count in linked_exchange_counts.values())
+    )
+    if not exchange_bijection:
+        violations.append(
+            "pregathered-B512 exchanges and kernel cache operands are not bijective"
+        )
+    if not scoped_attention_instructions:
+        violations.append("pregathered-B512 attention scope is absent")
+    if old_scope_instructions:
+        violations.append(
+            "pregathered-B512 decoder retained an old attention exchange path: "
+            f"{old_scope_instructions[:8]}"
+        )
+    return {
+        "applicable": True,
+        "attention_instruction_count": len(scoped_attention_instructions),
+        "cache_dataflow_failures": cache_dataflow_failures,
+        "exchange_count": len(exchanges),
+        "exchange_bijection": exchange_bijection,
+        "exchange_names": [item.name for item in exchanges],
+        "exchange_shapes": [
+            [shape.to_dict() for shape in item.result_shapes]
+            for item in exchanges
+        ],
+        "expected_exchange_count": layers,
+        "expected_exchange_shape": "bf16[1,2048,640]",
+        "kernel_count": len(custom_calls),
+        "kernel_exchange_links": kernel_exchange_links,
+        "kernel_name": kernel_name,
+        "old_scope_instruction_count": len(old_scope_instructions),
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
 def validate_decoder_step_hlo(
     optimized_hlo: str,
     *,
@@ -2439,6 +2671,7 @@ def validate_decoder_step_hlo(
     split_residual_state: bool = False,
     prefill_index_repair: bool = False,
     main_rope_table_enabled: bool = False,
+    pregathered_b512_attention: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -2471,6 +2704,16 @@ def validate_decoder_step_hlo(
         raise PlanValidationError("prefill index-repair flag must be boolean")
     if not isinstance(main_rope_table_enabled, bool):
         raise PlanValidationError("main-RoPE table HLO flag must be boolean")
+    if not isinstance(pregathered_b512_attention, bool):
+        raise PlanValidationError(
+            "pregathered-B512 attention HLO flag must be boolean"
+        )
+    if pregathered_b512_attention and backend_contract != (
+        "tpu_v4_pp8_pallas_feature_linear"
+    ):
+        raise PlanValidationError(
+            "pregathered-B512 attention requires the PP8 Pallas-linear HLO contract"
+        )
     if feature_reconstruct_down_fp32 and feature_fuse_route_weighting:
         raise PlanValidationError(
             "feature FP32 reconstruction is incompatible with fused route "
@@ -2621,8 +2864,13 @@ def validate_decoder_step_hlo(
         # TPU XLA lowers each four-element top-1 all-gather to a one-hot local
         # all-reduce.  The complete path therefore adds no physical gather,
         # but adds embedding plus score/id singleton reductions.
-        expected_gathers = 2 * layers + 3 * full_layers
+        expected_gathers = (
+            (0 if pregathered_b512_attention else 2 * layers)
+            + 3 * full_layers
+        )
         expected_reduction_arity_counts = {"1": 277, "2": 16, "3": 1}
+        if pregathered_b512_attention:
+            expected_reduction_arity_counts["1"] += layers
         if feature_reconstruct_down_fp32:
             expected_reduction_arity_counts["1"] += sparse_layers
         if complete_token_path:
@@ -2640,6 +2888,10 @@ def validate_decoder_step_hlo(
             "f32[256]": layers,
             "u32[1,1,128]": layers,
         }
+        if pregathered_b512_attention:
+            expected_reduction_result_shape_counts[
+                "bf16[1,2048,640]"
+            ] = layers
         if feature_reconstruct_down_fp32:
             expected_reduction_result_shape_counts[
                 "f32[8,6144]"
@@ -2668,12 +2920,28 @@ def validate_decoder_step_hlo(
                 Counter(len(item.result_shapes) for item in reductions).items()
             )
         }
-        result_shapes = Counter(
-            (
+        def reduction_shape_signature(
+            item: HloInstruction, shape: HloShape
+        ) -> str:
+            if (
+                pregathered_b512_attention
+                and item.op_name
+                and "greenfield_selected_cache_lp4_exchange"
+                in item.op_name.split("/")
+                and shape == HloShape("bf16", (1, 4, 512, 640))
+            ):
+                # TPU may preserve the Pallas B512 block fold around the
+                # all-reduce.  It is the same 2,048x640 logical segment and
+                # is accepted only in the exact named exchange scope.
+                return "bf16[1,2048,640]"
+            return (
                 f"{shape.dtype}["
                 + ",".join(str(dimension) for dimension in shape.dimensions)
                 + "]"
             )
+
+        result_shapes = Counter(
+            reduction_shape_signature(item, shape)
             for item in reductions
             for shape in item.result_shapes
         )
@@ -2933,6 +3201,16 @@ def validate_decoder_step_hlo(
         enabled=main_rope_table_enabled,
     )
     violations.extend(main_rope_table_contract["violations"])
+    pregathered_attention_contract = (
+        _validate_pregathered_b512_attention_hlo(
+            optimized_hlo,
+            module=module,
+            config=config,
+            layers=layers,
+            enabled=pregathered_b512_attention,
+        )
+    )
+    violations.extend(pregathered_attention_contract["violations"])
     return {
         "backend_contract": backend_contract,
         "collective_count": len(collectives),
@@ -2991,6 +3269,10 @@ def validate_decoder_step_hlo(
         "attention_projection_backend": attention_projection_backend,
         "main_rope_table_enabled": main_rope_table_enabled,
         "main_rope_table_contract": main_rope_table_contract,
+        "pregathered_b512_attention": pregathered_b512_attention,
+        "pregathered_b512_attention_contract": (
+            pregathered_attention_contract
+        ),
         "fused_qkv_a_contract": fused_qkv_a_contract,
         "passed": not violations,
         "violations": violations,
@@ -3935,6 +4217,7 @@ def _execute_stage(
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
     dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
+    pregathered_b512_attention: bool,
     main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -4050,6 +4333,7 @@ def _execute_stage(
                 else "highest"
             ),
             attention_projection_backend=attention_projection_backend,
+            pregathered_b512_attention=pregathered_b512_attention,
             main_rope_table_row=main_rope_table_row,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -4162,6 +4446,7 @@ def _execute_stage_split(
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None,
     dsa_recurrent_wk_weights: tuple[Any, ...] | None,
     attention_projection_backend: AttentionProjectionBackend,
+    pregathered_b512_attention: bool,
     main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -4289,6 +4574,7 @@ def _execute_stage_split(
                 else "highest"
             ),
             attention_projection_backend=attention_projection_backend,
+            pregathered_b512_attention=pregathered_b512_attention,
             main_rope_table_row=main_rope_table_row,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -4402,6 +4688,7 @@ def build_decoder_step_program(
     dsa_score_default_precision: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     main_rope_table_enabled: bool = False,
+    pregathered_b512_attention: bool = False,
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
     observe_dsa_internals: bool = False,
@@ -4500,8 +4787,30 @@ def build_decoder_step_program(
         )
     if not isinstance(main_rope_table_enabled, bool):
         raise PlanValidationError("decoder main-RoPE table flag must be boolean")
+    if not isinstance(pregathered_b512_attention, bool):
+        raise PlanValidationError(
+            "decoder pregathered-B512 attention flag must be boolean"
+        )
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
+    if not isinstance(split_residual_state, bool):
+        raise PlanValidationError("split residual-state flag must be boolean")
+    if pregathered_b512_attention and not (
+        plan.name is PlanName.PP8_LP4
+        and plan.local_parallel_size == 4
+        and main_rope_table_enabled
+        and complete_token_path
+        and split_residual_state
+        and linear_backend == "pallas"
+        and dsa_query_exact_association
+        and dsa_head_key_exact_association
+        and dsa_score_default_precision
+        and attention_projection_backend == "fused_n82_convolution"
+    ):
+        raise PlanValidationError(
+            "pregathered-B512 attention requires the protected PP8 exact "
+            "split-token Pallas/main-RoPE/DSA/fused-qkv path"
+        )
     if not isinstance(observe_dsa_events, bool):
         raise PlanValidationError("DSA event-observation flag must be boolean")
     if not isinstance(observe_dsa_internals, bool):
@@ -4554,8 +4863,6 @@ def build_decoder_step_program(
             "attention-output association discriminator requires the proven "
             "main-RoPE table"
         )
-    if not isinstance(split_residual_state, bool):
-        raise PlanValidationError("split residual-state flag must be boolean")
     if observe_dsa_events and not complete_token_path:
         raise PlanValidationError(
             "DSA event observation requires the complete-token path"
@@ -5050,6 +5357,9 @@ def build_decoder_step_program(
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
+                            pregathered_b512_attention=(
+                                pregathered_b512_attention
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
@@ -5110,6 +5420,9 @@ def build_decoder_step_program(
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
+                            pregathered_b512_attention=(
+                                pregathered_b512_attention
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
@@ -5168,6 +5481,9 @@ def build_decoder_step_program(
                             attention_projection_backend=(
                                 attention_projection_backend
                             ),
+                            pregathered_b512_attention=(
+                                pregathered_b512_attention
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                         ),
@@ -5221,6 +5537,9 @@ def build_decoder_step_program(
                         attention_projection_backend=(
                             attention_projection_backend
                         ),
+                        pregathered_b512_attention=(
+                            pregathered_b512_attention
+                        ),
                         main_rope_table_row=main_rope_table_row,
                         prefill_index_inputs=values[4],
                     ),
@@ -5266,6 +5585,9 @@ def build_decoder_step_program(
                         dsa_recurrent_wk_weights=dsa_recurrent_wk_weights,
                         attention_projection_backend=(
                             attention_projection_backend
+                        ),
+                        pregathered_b512_attention=(
+                            pregathered_b512_attention
                         ),
                         main_rope_table_row=main_rope_table_row,
                     ),
@@ -6765,6 +7087,7 @@ def build_decoder_step_program(
         dsa_score_default_precision=dsa_score_default_precision,
         attention_projection_backend=attention_projection_backend,
         main_rope_table_enabled=main_rope_table_enabled,
+        pregathered_b512_attention=pregathered_b512_attention,
         main_rope_table_host=main_rope_table_host,
         main_rope_table_sha256=main_rope_table_digest,
         main_rope_table_bytes_per_device=main_rope_table_bytes,

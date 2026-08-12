@@ -345,6 +345,90 @@ def gather_stage_local_selected_kv(
     return SelectedKvSegment(gathered, positions, counts, row_valid)
 
 
+def gather_stage_local_selected_kv_aligned(
+    cache_local: jax.Array,
+    block_tables: jax.Array,
+    selected: SelectedPositions,
+    context_lengths: jax.Array,
+    *,
+    layout: StageLocalKvLayout,
+    owner_index: int | jax.Array,
+) -> SelectedKvSegment:
+    """Place one owner's rows in their canonical global selected slots.
+
+    Unlike :func:`gather_stage_local_selected_kv`, this helper does not compact
+    an owner's subset.  Every lane returns the same ascending positions/counts;
+    values owned by another lane are zero.  A topology-local sum can therefore
+    reconstruct the selected segment without changing its row order or
+    exchanging the complete paged cache.
+    """
+
+    if cache_local.ndim != 3 or not jnp.issubdtype(cache_local.dtype, jnp.inexact):
+        raise ValueError("local cache must be inexact [pages,local_rows,width]")
+    if any(dimension <= 0 for dimension in cache_local.shape):
+        raise ValueError("local cache dimensions must all be positive")
+    num_pages, local_rows, cache_width = cache_local.shape
+    if local_rows != layout.local_rows_per_page:
+        raise ValueError("local cache rows disagree with the declared KV layout")
+    if cache_width != layout.packed_cache_width:
+        raise ValueError("local cache width disagrees with the declared KV layout")
+    if block_tables.ndim != 2:
+        raise ValueError("block_tables must have shape [rows,max_blocks]")
+    _require_int32("block_tables", block_tables)
+    if block_tables.shape[1] == 0:
+        raise ValueError("block_tables must expose at least one logical block")
+    if isinstance(owner_index, int) and not isinstance(owner_index, bool):
+        if not 0 <= owner_index < layout.local_parallel_size:
+            raise ValueError("owner_index is outside the local stage group")
+    elif (
+        not hasattr(owner_index, "shape")
+        or owner_index.shape != ()
+        or not jnp.issubdtype(owner_index.dtype, jnp.integer)
+    ):
+        raise ValueError("owner_index must be an integer scalar")
+
+    canonical = canonicalize_selected_positions(selected)
+    positions = canonical.selection.positions
+    counts = canonical.selection.valid_counts
+    rows, width = positions.shape
+    _require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
+    _require_shape("context_lengths", context_lengths, (rows,))
+    _require_int32("context_lengths", context_lengths)
+
+    slots = lax.broadcasted_iota(jnp.int32, (rows, width), 1)
+    live = slots < counts[:, None]
+    position_ok = (positions >= 0) & (positions < context_lengths[:, None])
+    safe_positions = jnp.where(live & position_ok, positions, jnp.int32(0))
+    logical_blocks = safe_positions // jnp.int32(layout.logical_page_size)
+    block_ok = logical_blocks < block_tables.shape[1]
+    safe_blocks = jnp.clip(logical_blocks, 0, block_tables.shape[1] - 1)
+    page_ids = jnp.take_along_axis(block_tables, safe_blocks, axis=1)
+    page_ok = (page_ids >= 0) & (page_ids < num_pages)
+    safe_pages = jnp.clip(page_ids, 0, max(num_pages - 1, 0))
+    within_page = safe_positions % jnp.int32(layout.logical_page_size)
+    actual_owner = within_page // jnp.int32(layout.local_rows_per_page)
+    local_row = within_page % jnp.int32(layout.local_rows_per_page)
+    flat_rows = safe_pages * local_rows + local_row
+    flat_cache = cache_local.reshape(num_pages * local_rows, cache_width)
+    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(
+        rows, width, cache_width
+    )
+    slot_ok = live & position_ok & block_ok & page_ok
+    owned = slot_ok & (actual_owner == owner_index)
+    gathered = jnp.where(
+        owned[..., None], gathered, jnp.zeros((), cache_local.dtype)
+    )
+    length_ok = (context_lengths >= 0) & (
+        context_lengths <= block_tables.shape[1] * layout.logical_page_size
+    )
+    row_valid = (
+        canonical.contract_valid
+        & length_ok
+        & jnp.all(jnp.where(live, slot_ok, True), axis=1)
+    )
+    return SelectedKvSegment(gathered, positions, counts, row_valid)
+
+
 def sparse_mla_attention(
     query_nope_absorbed: jax.Array,
     query_rope: jax.Array,

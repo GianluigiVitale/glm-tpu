@@ -267,6 +267,7 @@ def stage_local_transformer_layer_fp8_mapped(
     dsa_score_precision: Literal["default", "highest"] = "highest",
     attention_projection_backend: AttentionProjectionBackend = "separate",
     linear_interpret: bool = False,
+    pregathered_b512_attention: bool = False,
 ) -> StageLocalLayerFp8Result:
     """Execute exact DSA/IndexShare, sparse MLA, and dense or MoE MLP."""
 
@@ -274,6 +275,8 @@ def stage_local_transformer_layer_fp8_mapped(
         raise ValueError("layer indexer kind must be full or shared")
     if mlp_kind not in ("dense", "sparse"):
         raise ValueError("layer MLP kind must be dense or sparse")
+    if not isinstance(pregathered_b512_attention, bool):
+        raise ValueError("layer pregathered-B512 attention flag must be boolean")
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise ValueError("layer sparse MoE backend is unknown")
     if not isinstance(pallas_moe_fuse_route_weighting, bool):
@@ -437,6 +440,7 @@ def stage_local_transformer_layer_fp8_mapped(
         precomputed_kv_a=current_kv,
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
+        pregathered_b512_attention=pregathered_b512_attention,
     )
     residual = attention_result.output
     if mlp_kind == "dense":
@@ -583,6 +587,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     ) = None,
     virtual_tp32_attention_only: bool = False,
     replicated_monolithic_attention: bool = False,
+    pregathered_b512_attention: bool = False,
     capture_ingredients: bool = False,
 ) -> StageLocalSplitLayerFp8Result | StageLocalSplitLayerFp8ObservedResult:
     """Execute one layer while preserving legacy hidden/residual association."""
@@ -599,6 +604,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError(
             "layer replicated-monolithic attention flag must be boolean"
         )
+    if not isinstance(pregathered_b512_attention, bool):
+        raise ValueError("layer pregathered-B512 attention flag must be boolean")
     if not isinstance(virtual_tp32_attention_only, bool):
         raise ValueError("layer virtual-TP32 attention-only flag must be boolean")
     if not isinstance(capture_ingredients, bool):
@@ -629,6 +636,16 @@ def stage_local_transformer_layer_fp8_split_mapped(
     ):
         raise ValueError(
             "layer ingredient capture requires the production dense BF16 Pallas path"
+        )
+    if pregathered_b512_attention and (
+        replicated_monolithic_attention
+        or capture_ingredients
+        or virtual_tp32_reduction_association is not None
+        or reconstruct_attention_output_fp32
+    ):
+        raise ValueError(
+            "layer pregathered-B512 attention must remain isolated from "
+            "diagnostic attention/output variants"
         )
     if sparse_moe_backend not in ("reference", "pallas_feature"):
         raise ValueError("layer sparse MoE backend is unknown")
@@ -799,6 +816,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             virtual_tp32_reduction_association
         ),
         replicated_monolithic_attention=replicated_monolithic_attention,
+        pregathered_b512_attention=pregathered_b512_attention,
         capture_ingredients=capture_ingredients,
     )
     if capture_ingredients:

@@ -413,6 +413,17 @@
       "reason": "Reuse the accepted host-side cache dumper outside model JIT, narrowed by a default-off exact scheduler-step selector to final prefill step 4 and first decode step 5. Protected DB530 classifies prefill_main_cache and localizes the dominant error to the 64-wide main-RoPE suffix. DB503 supplies the exact pre-RoPE companion; protected DB531 proves the accepted BF16 table row plus FP32-final-round primitive is exact 0/64 on TPU with compliant HLO. The default-off integration now builds one plan-sized BF16 table, verifies its replicated per-device identity, threads it through decoder/observer/prefill, and applies the protected primitive only to main-MLA query and cache key under a fail-closed HLO contract. DB530's accepted 2,048 selected rows are also stable-sorted into the table-on position order for the bounded pre-WUV arithmetic probe; the greenfield segment differs by exactly one latent BF16 value and runs only as a same-executable control. The legacy observer remains oracle-only; no legacy execution enters greenfield runtime, and DSA rotary plus default behavior remain unchanged."
     },
     {
+      "id": "greenfield-selected-cache-b512-attention",
+      "category": "numerical mechanism and production adaptation",
+      "source_repo": "glm-tpu greenfield protected arithmetic probe",
+      "source_pin": "83577222b4d48cb4b2fec544c06e3a71fbc821f5 / DB537 item1821",
+      "source_paths": ["glm_tpu/greenfield/kernels/pallas/sparse_attention.py", "scripts/greenfield/probe_layer0_attention_arithmetic.py", "scripts/greenfield/run_layer0_attention_arithmetic_probe.sh", "/home/gianl/glm-run/greenfield_layer0_attention_arithmetic_20260812T114701365714147Z", "glm_tpu/greenfield/kernels/reference/attention.py", "glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh"],
+      "gate": "D",
+      "reason": "Protected DB537 identifies three bitwise-exact B512 arms on both accepted and table-on cache inputs, including the simplest local H16 arm; both B128 controls retain 216/32768 mismatches. The default-off adaptation places only each lane's owned rows into canonical selected slots, reconstructs [1,2048,640] with one LP4 BF16 sum, runs local 16-head B512 attention and removes the old query/output/LSE/validity gathers. It reuses the packed checkpoint, striped cache, exact DSA selection, pre-gathered Pallas kernel and protected wrapper; no full cache, legacy execution, full-pod state or dead batch row is introduced. A protected complete 8K result is still required."
+    },
+    {
       "id": "greenfield-layer0-attention-schedule-discriminator",
       "category": "bounded diagnostic evidence",
       "source_repo": "glm-tpu greenfield runtime and protected artifacts",

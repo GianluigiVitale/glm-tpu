@@ -324,6 +324,42 @@ def attention_mapped_monolithic(
     )
     return result.output, result.cache[None], result.contract_valid
 
+def attention_mapped_pregathered_b512(
+    row, cache_container, selection, counts, pos, table, valid_lengths,
+    norm, qa, qa_scale, qa_norm, qb, qb_scale, kva, kva_scale, kva_norm,
+    kvb, kvb_scale, output_weight, output_scale, local_slot,
+):
+    result = stage_local_index_share_fp8_mapped(
+        row,
+        cache_container[0],
+        selection,
+        counts,
+        pos,
+        table,
+        valid_lengths,
+        norm,
+        qa,
+        qa_scale,
+        qa_norm,
+        qb,
+        qb_scale,
+        kva,
+        kva_scale,
+        kva_norm,
+        kvb,
+        kvb_scale,
+        output_weight,
+        output_scale,
+        local_slot[0],
+        axis_name='stage',
+        contract=mla,
+        cache_layout=layout,
+        block_shape=(2, 2),
+        sparse_attention_interpret=True,
+        pregathered_b512_attention=True,
+    )
+    return result.output, result.cache[None], result.contract_valid
+
 attention_map = jax.shard_map(
     attention_mapped,
     mesh=mesh,
@@ -350,6 +386,18 @@ attention_table_map = jax.shard_map(
 )
 attention_monolithic_map = jax.shard_map(
     attention_mapped_monolithic,
+    mesh=mesh,
+    in_specs=(
+        P(), P('stage', None, None, None), P(), P(), P(), P(), P(), P(),
+        P(), P(), P(), P('stage', None), P('stage', None), P(), P(), P(),
+        P('stage', None), P('stage', None), P(None, 'stage'), P(None, 'stage'),
+        P('stage'),
+    ),
+    out_specs=(P(), P('stage', None, None, None), P()),
+    check_vma=False,
+)
+attention_pregathered_map = jax.shard_map(
+    attention_mapped_pregathered_b512,
     mesh=mesh,
     in_specs=(
         P(), P('stage', None, None, None), P(), P(), P(), P(), P(), P(),
@@ -393,6 +441,14 @@ attention_monolithic_compiled = jax.jit(attention_monolithic_map).lower(
     monolithic_kv_cache,
     monolithic_attention_valid,
 ) = attention_monolithic_compiled(*attention_args)
+attention_pregathered_compiled = jax.jit(attention_pregathered_map).lower(
+    *attention_args
+).compile()
+(
+    pregathered_output,
+    pregathered_kv_cache,
+    pregathered_attention_valid,
+) = attention_pregathered_compiled(*attention_args)
 rope_row = jnp.asarray([0.0, 1.0], jnp.bfloat16)
 attention_table_args = (
     *attention_args,
@@ -469,6 +525,17 @@ print(json.dumps({
         ))),
         'valid': bool(jnp.all(monolithic_attention_valid)),
     },
+    'pregathered_b512_attention': {
+        'cache_exact': bool(jnp.array_equal(
+            pregathered_kv_cache, got_kv_cache
+        )),
+        'hlo': collectives(attention_pregathered_compiled.as_text()),
+        'output_error_vs_reference': float(jnp.max(jnp.abs(
+            pregathered_output.astype(jnp.float32)
+            - expected_attention.output.astype(jnp.float32)
+        ))),
+        'valid': bool(jnp.all(pregathered_attention_valid)),
+    },
     'main_rope_table': {
         'cache_exact': bool(jnp.array_equal(
             table_kv_cache, jnp.asarray(expected_table_cache)
@@ -541,6 +608,17 @@ print(json.dumps({
     }
     assert result["monolithic_attention"]["output_error_vs_reference"] == 0.0
     assert result["monolithic_attention"]["valid"]
+    assert result["pregathered_b512_attention"]["cache_exact"]
+    assert result["pregathered_b512_attention"]["hlo"] == {
+        "ag": 0,
+        "ar": 2,
+        "cp": 0,
+    }
+    assert (
+        result["pregathered_b512_attention"]["output_error_vs_reference"]
+        == 0.0
+    )
+    assert result["pregathered_b512_attention"]["valid"]
     assert not result["bad_dsa_valid"]
     assert result["bad_dsa_cache_unchanged"]
     assert not result["bad_attention_valid"]

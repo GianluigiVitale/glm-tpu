@@ -1474,6 +1474,12 @@ def parse_args() -> argparse.Namespace:
         choices=(0, 1),
         default=0,
     )
+    parser.add_argument(
+        "--pregathered-b512-attention",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1571,6 +1577,9 @@ def main() -> int:
         args.dsa_score_default_precision
     )
     args.main_rope_table = bool(args.main_rope_table)
+    args.pregathered_b512_attention = bool(
+        args.pregathered_b512_attention
+    )
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
     args.observe_layer0_residual_variants = bool(
@@ -1806,6 +1815,24 @@ def main() -> int:
         raise ValueError(
             "layer-0 ingredient capture requires the proven table-on 8K "
             "production path"
+        )
+    if args.pregathered_b512_attention and not (
+        args.context_capacity == 8192
+        and dsa_oracle_mode
+        and args.prefill_index_repair
+        and args.dsa_query_exact_association
+        and args.dsa_head_key_exact_association
+        and args.dsa_score_default_precision
+        and args.main_rope_table
+        and args.runtime_kind == "pallas_feature_linear"
+        and args.complete_token_path
+        and args.split_residual_state
+        and not observe_layer0_discriminator
+        and not args.observe_layer0_ingredients
+    ):
+        raise ValueError(
+            "pregathered-B512 attention requires the protected 8K exact "
+            "production path without a layer-0 diagnostic"
         )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
@@ -2264,6 +2291,9 @@ def main() -> int:
                 args.dsa_score_default_precision
             ),
             main_rope_table_enabled=args.main_rope_table,
+            pregathered_b512_attention=(
+                args.pregathered_b512_attention
+            ),
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             build_layer0_residual_discriminator=(
@@ -2307,6 +2337,9 @@ def main() -> int:
                     args.dsa_score_default_precision
                 ),
                 main_rope_table_enabled=args.main_rope_table,
+                pregathered_b512_attention=(
+                    args.pregathered_b512_attention
+                ),
                 attention_projection_backend=(
                     attention_projection_backend
                 ),
@@ -2350,6 +2383,9 @@ def main() -> int:
                         args.dsa_score_default_precision
                     ),
                     main_rope_table_enabled=args.main_rope_table,
+                    pregathered_b512_attention=(
+                        args.pregathered_b512_attention
+                    ),
                     attention_projection_backend=(
                         attention_projection_backend
                     ),
@@ -3025,6 +3061,9 @@ def main() -> int:
             complete_token_path=decoder.complete_token_path,
             split_residual_state=decoder.split_residual_state,
             main_rope_table_enabled=decoder.main_rope_table_enabled,
+            pregathered_b512_attention=(
+                decoder.pregathered_b512_attention
+            ),
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -3114,6 +3153,9 @@ def main() -> int:
                 split_residual_state=dsa_observer.split_residual_state,
                 main_rope_table_enabled=(
                     dsa_observer.main_rope_table_enabled
+                ),
+                pregathered_b512_attention=(
+                    dsa_observer.pregathered_b512_attention
                 ),
             )
             dsa_observer_isolation_contract = (
@@ -5001,6 +5043,9 @@ def main() -> int:
             "local_index_nonzero_counts": local_index_nonzero,
             "local_kv_nonzero_counts": local_kv_nonzero,
             "main_rope_table_enabled": decoder.main_rope_table_enabled,
+            "pregathered_b512_attention": (
+                decoder.pregathered_b512_attention
+            ),
             "main_rope_table_sha256": decoder.main_rope_table_sha256,
             "main_rope_table_shape": (
                 list(decoder.main_rope_table_host.shape)
@@ -5075,7 +5120,7 @@ def main() -> int:
             "runtime_manifest_sha256": expectation.runtime_manifest_sha256,
             "runtime_kind": args.runtime_kind,
             "schedule_hash": schedule.schedule_hash,
-            "schema_version": 16,
+            "schema_version": 17,
             "state_layout": state_layout.to_dict(),
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,

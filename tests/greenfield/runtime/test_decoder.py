@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import replace
 
 import pytest
 
@@ -462,6 +463,160 @@ def _real_8k_decoder_config(*, dsa_score_default_precision: bool = False):
         vocab_size=154880,
         dsa_score_default_precision=dsa_score_default_precision,
     )
+
+
+def _pregathered_b512_hlo(
+    *, folded_cache: bool = True, old_scope: bool = False
+) -> str:
+    cache_shape = "bf16[1,4,512,640]" if folded_cache else "bf16[1,2048,640]"
+    exchange = (
+        f"  %sum = {cache_shape} all-reduce(%cache), "
+        "replica_groups={{0,1,2,3}}, to_apply=%add, "
+        'metadata={op_name="jit(mapped)/shard_map/'
+        'greenfield_selected_cache_lp4_exchange/psum"}'
+    )
+    kernel = (
+        "  %call = bf16[1,16,512] custom-call(%count, %query, %sum), "
+        'custom_call_target="tpu_custom_call", metadata={op_name="jit(mapped)/'
+        "shard_map/greenfield_pregathered_b512_attention/"
+        'greenfield_pregathered_sparse_mla_h16_k2048_b512_w640/pallas_call"}, '
+        'backend_config={"body":"'
+        'greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"}'
+    )
+    old = (
+        '  %old = bf16[1,16,512] copy(%call), '
+        'metadata={op_name="jit(mapped)/shard_map/'
+        'greenfield_owner_split_attention_output_gather/copy"}\n'
+        if old_scope
+        else ""
+    )
+    root = "%old" if old_scope else "%call"
+    return f'''HloModule pregathered, replica_count=1, num_partitions=4
+
+%add (x: bf16[], y: bf16[]) -> bf16[] {{
+  %x = bf16[] parameter(0)
+  %y = bf16[] parameter(1)
+  ROOT %out = bf16[] add(%x, %y)
+}}
+
+ENTRY %main (cache: {cache_shape}) -> bf16[1,16,512] {{
+  %cache = {cache_shape} parameter(0)
+{exchange}
+  %count = s32[1] constant({{2048}})
+  %query = bf16[1,16,640] constant({{...}})
+{kernel}
+{old}  ROOT %root = bf16[1,16,512] copy({root})
+}}
+'''
+
+
+def test_pregathered_b512_attention_hlo_contract_is_fail_closed() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_pregathered_b512_attention_hlo,
+    )
+    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+
+    config = replace(_real_8k_decoder_config(), packed_cache_width=640)
+    for folded_cache in (False, True):
+        hlo = _pregathered_b512_hlo(folded_cache=folded_cache)
+        contract = _validate_pregathered_b512_attention_hlo(
+            hlo,
+            module=parse_hlo_module(hlo),
+            config=config,
+            layers=1,
+            enabled=True,
+        )
+        assert contract["passed"], contract
+        assert contract["exchange_count"] == 1
+        assert contract["exchange_bijection"]
+        assert contract["kernel_count"] == 1
+        assert len(contract["kernel_exchange_links"]) == 1
+
+        bypassed = hlo.replace(
+            "custom-call(%count, %query, %sum)",
+            "custom-call(%count, %query, %cache)",
+        )
+        rejected_bypass = _validate_pregathered_b512_attention_hlo(
+            bypassed,
+            module=parse_hlo_module(bypassed),
+            config=config,
+            layers=1,
+            enabled=True,
+        )
+        assert not rejected_bypass["passed"]
+        assert not rejected_bypass["exchange_bijection"]
+        assert any(
+            "cache operands do not depend" in violation
+            for violation in rejected_bypass["violations"]
+        )
+
+    wrong_block = _pregathered_b512_hlo().replace("b512", "b128")
+    rejected_block = _validate_pregathered_b512_attention_hlo(
+        wrong_block,
+        module=parse_hlo_module(wrong_block),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not rejected_block["passed"]
+    assert rejected_block["kernel_count"] == 0
+
+    suffixed_kernel = _pregathered_b512_hlo().replace(
+        "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640",
+        "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640_wrong",
+    )
+    rejected_suffix = _validate_pregathered_b512_attention_hlo(
+        suffixed_kernel,
+        module=parse_hlo_module(suffixed_kernel),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not rejected_suffix["passed"]
+    assert rejected_suffix["kernel_count"] == 0
+
+    out_of_scope = _pregathered_b512_hlo().replace(
+        "greenfield_pregathered_b512_attention/",
+        "greenfield_unscoped_b512_attention/",
+    )
+    out_of_scope = out_of_scope.replace(
+        "  %count =",
+        "  %scoped_marker = bf16[1,4,512,640] copy(%sum), "
+        'metadata={op_name="jit(mapped)/shard_map/'
+        'greenfield_pregathered_b512_attention/unrelated_marker"}\n'
+        "  %count =",
+        1,
+    )
+    rejected_scope = _validate_pregathered_b512_attention_hlo(
+        out_of_scope,
+        module=parse_hlo_module(out_of_scope),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not rejected_scope["passed"]
+    assert rejected_scope["attention_instruction_count"] == 1
+    assert rejected_scope["kernel_count"] == 0
+
+    old_scope = _pregathered_b512_hlo(old_scope=True)
+    rejected_old_scope = _validate_pregathered_b512_attention_hlo(
+        old_scope,
+        module=parse_hlo_module(old_scope),
+        config=config,
+        layers=1,
+        enabled=True,
+    )
+    assert not rejected_old_scope["passed"]
+    assert rejected_old_scope["old_scope_instruction_count"] == 1
+
+    default = _validate_pregathered_b512_attention_hlo(
+        _pregathered_b512_hlo(),
+        module=parse_hlo_module(_pregathered_b512_hlo()),
+        config=config,
+        layers=1,
+        enabled=False,
+    )
+    assert not default["passed"]
 
 
 def _main_rope_table_hlo(

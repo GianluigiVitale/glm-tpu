@@ -23,6 +23,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | DSA validation | legacy `dsa_topk_dump.py`/`dsa_topk_diff.py` | Portable sealed event artifacts and exact set/tie/order/IndexShare comparisons. |
 | Prompt index-cache oracle | legacy `dcp_cache_dump.py`, accepted `glm_dsa_indexer.py`, DB505--519, and existing association helpers | DB506--515 isolate the drift, DB516 seals physical M64, DB517 makes projection exact, DB518 makes the full cache exact, and DB519 rejects fused internal weight materialization. Production now separates the small stage-local weight materializer from repair; recurrent decode and legacy execution stay untouched. |
 | Layer-0 attention schedule | existing stage-local striped cache, sparse-MLA kernel, isolated discriminator, protected table-on DSA observer | Reuse the exact packed checkpoint, post-prefill state, selection, cache layout, kernel, HLO parser and protection wrapper. The default-off challenger changes only one boundary: one LP4 cache gather reconstructs page-major `[pages,512,640]` and runs one monolithic 2,048-position attention schedule per owner. No new loader, cache, oracle or legacy execution path is introduced. |
+| Exact selected-cache attention | DB530/DB536 sealed cache/latent operands, existing stage-local cache layout, pre-gathered Pallas kernel and protected DB537 | DB537 proves H16/B512 over the complete selected segment is bitwise exact while B128 is not. Adapt the existing pieces into one default-off LP4 selected-row exchange plus local 16-head B512 attention; do not revive full-cache gathering or accepted two-head scheduling. |
 | Layer-0 attention-output association | rejected uniform virtual-TP32 projection trees, accepted packed contraction shards, table-on owner-split control, protected attention-schedule result | The protected five-arm run makes every attention-only association worse than the exact control. Preserve the code/HLO/tensor artifacts as negative evidence; do not integrate, rerun or extend uniform association trees. |
 | Accepted decode lowering | accepted 8K oracle/protection stack, XLA dump controls, DB516 parser patterns, DB532 and DB533 | DB532 seals the exact final 32-row decode lowering; DB533 uniquely recovers every row/column association and the accepted model-to-device permutation. The protected row-zero replay improves the boundary from 3,984 to 3,492 mismatches but is nonexact, proving the tree relevant while leaving its projection operands unverified. Preserve the two-gather diagnostic as evidence; next reuse the exact-step legacy callback to capture post-`W_UV`/pre-`o_proj`, not another tree. |
 | DSA internal observer | oracle-only `83ff4a357` scorer, `9c1d6b3b9` prompt-key, `89fc453b6` prompt-key-input, reviewed `bf8a03e26` attention-output mode and `11c250648` attention-projection mode, all descendants of accepted `b3c25df47`; protected DB513--515, DB534 and DB536 | Default-off prior modes remain unchanged. DB534 seals post-`W_UV`/pre-`o_proj`; DB536 seals the attended latent immediately before W_UV and proves 4,344/32,768 BF16 mismatches already exist across all 64 heads. Reuse the sealed operands, DB530's accepted selected cache and the table-on cache control for the bounded full-segment/block/head-geometry probe. Legacy execution is never imported. |
@@ -552,3 +553,18 @@ Decoder, DSA-observer and teacher-forced-prefill HLO contracts fail closed on th
 scoped FP32 arithmetic, forbidden trig/collectives and BF16 intermediate arithmetic. The protected
 8K wrapper additionally pins DB531's local hashes, live DB row and direct remote `SUCCESS` before
 the integration can execute.
+
+## DB537 selected-cache/B512 attention reuse
+
+The isolated arithmetic probe reuses DB530's stable-sorted accepted 2,048 cache rows, DB536's
+accepted pre-WUV latent, the existing packed stage-0 qkv-a/q-b/kv-b owners and the independent
+pre-gathered Pallas kernel. DB537 makes three B512 arms bitwise exact on both accepted and table-on
+cache inputs; both B128 arms miss exactly 216/32,768 values. This closes block size as the causal
+arithmetic variable and rejects a need to emulate accepted two-head projection scheduling.
+
+The production adaptation reuses the existing striped local cache rather than gathering full pages.
+Each lane writes its owned rows into canonical selected slots, one BF16 LP4 sum reconstructs only
+`[1,2048,640]`, and that lane's existing 16-head query runs the exact B512 kernel. The old query and
+output/LSE/validity gathers are removed only in this default-off path. The protected launcher pins
+DB537 local hashes, exact-arm classification, DB row, direct remote objects and clean censuses before
+deployment. No legacy execution, new checkpoint, full-pod state or batch-32 row is reused.

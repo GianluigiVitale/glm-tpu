@@ -7672,3 +7672,40 @@ unmotivated arithmetic variants.
   checks `decode_position`, exposes the guard for a regression that rejects the wrong alias, and
   requires an all-real-source CPU preflight before another protected attempt. No Gate-D or
   performance conclusion follows from this failed launch.
+
+## 2026-08-12 11:47--11:49 — DB537 identifies exact B512 attention arithmetic
+
+- The source-key correction was independently verified, committed/pushed at `8357722`, and the
+  serialized protected retry completed as DB537/item1821 under tag
+  `greenfield_layer0_attention_arithmetic_20260812T114701365714147Z`. The run classifies
+  `exact_arithmetic_arm_identified`; the accepted-cache and table-on-cache exact-arm sets are both
+  `pregathered_h16_b512`, `pregathered_attention_h2_b512`, and `pregathered_full_h2_b512`.
+- All three B512 arms reproduce accepted BF16 latent SHA `923e9bfe...d2a` with zero of 32,768
+  mismatches. Both B128 arms retain 216 mismatches and max `3.0517578125e-05`. Thus full selected
+  segment plus B512 is causal, while accepted two-head projection scheduling is unnecessary; the
+  existing local H16 projection/attention arrangement is exact.
+- Runner/tensor/summary/SUCCESS SHAs are `7961622c...a4ec`, `7d5ebe15...1f61`,
+  `9793f89a...8540`, and `ecc2b873...3153`. Local/remote content, object CRC32C/generations,
+  checkpoint trust chain, SQLite run/item, all HLOs and authenticated pre/post 8/8 censuses pass.
+  This remains bounded arithmetic evidence with no decoder timing, trace or Gate-D claim.
+- The authorized default-off integration reuses the striped cache and existing pre-gathered Pallas
+  kernel. Each lane writes only owned rows into canonical selected slots; one LP4 BF16 sum produces
+  `[1,2048,640]`; the lane runs only its 16 heads with B512. The old query and tuple-fused
+  output/LSE/validity gathers disappear. Exact next is one reviewed integration commit and one
+  protected complete 8K Gate-D run, not another primitive discriminator.
+
+## 2026-08-12 — selected-cache/B512 integration review closes fail-open HLO gaps
+
+- One Sol audit of only staged integration SHA `f469dc24...d8bd` found no high and two medium HLO
+  gaps. The first allowed a correctly shaped but unused selected-cache sum beside a B512 call that
+  consumed owner-local cache. The second used unrestricted kernel-name substring matching and did
+  not require the call itself to be inside the exact attention scope.
+- The corrected contract traces custom-call cache operand 2 through only BF16 element-preserving
+  bitcast/copy/reshape instructions to exactly one scoped LP4 exchange and requires a one-to-one
+  mapping for all layer exchanges and calls. It also matches the exact kernel identifier and exact
+  attention scope. Logical and TPU-folded bypasses, suffixed identifiers and an out-of-scope call
+  with an unrelated scoped marker all refuse.
+- The same reviewer inspected only the correction delta and returned `APPROVE COMMIT`. The full
+  runtime batch passes 69/69 after correction; the already-cleared kernel batch remains 24/24.
+  Compileall, Bash, ShellCheck, JSON and diff checks pass. Exact next is a clean push followed by
+  one serialized protected 8K run with DB537's default-off flag; no further arithmetic probe is due.

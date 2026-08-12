@@ -4004,3 +4004,43 @@ Exact next: build a plan-aware device-resident BF16 main-RoPE table from the acc
 thread `apply_rotary_fp32_final_round` through main MLA only behind a default-off plan flag. Keep
 DSA rotary unchanged. After reference/exactness/table-integrity/HLO tests and one new-diff-only
 Fable audit, run the protected 8K Gate-D retry; do not add another primitive discriminator first.
+
+## DB537 identifies the exact attention arithmetic and ends the numerical search
+
+Protected DB537/item1821,
+`greenfield_layer0_attention_arithmetic_20260812T114701365714147Z`, completed once at pin
+`83577222b4d48cb4b2fec544c06e3a71fbc821f5`. Classification is
+`exact_arithmetic_arm_identified`. The exact accepted-cache and greenfield-cache arms are the same:
+`pregathered_h16_b512`, `pregathered_attention_h2_b512`, and `pregathered_full_h2_b512`. Every one
+reproduces accepted attended-latent SHA `923e9bfe...d2a` with zero of 32,768 BF16 mismatches. Both
+B128 controls retain 216 mismatches with maximum error `3.0517578125e-05`.
+
+Runner/tensor/summary/SUCCESS SHAs are `7961622c...a4ec`, `7d5ebe15...1f61`,
+`9793f89a...8540`, and `ecc2b873...3153`; evidence/DB snapshot/pre/post-census SHAs are
+`2c877e8c...f690`, `cd6cd598...498`, `77e426bd...7ca`, and `43f60339...ebd`. All five HLOs are
+communication-free, checkpoint manifest/evidence/tensor provenance passes, remote CRC32C/content
+verification passes, the live DB row is exact, and cleanup is authenticated 8/8. This proves the
+mechanism only; DB484 remains the sole decoder timing and Gate D/E remain open.
+
+The selected production adaptation is the simplest exact arm. Each LP4 lane preserves its local 16
+query heads, places only its owned cache rows in canonical 2,048 selected slots, reconstructs that
+2.5-MiB BF16 segment with one local sum, and runs the existing pre-gathered B512 Pallas kernel. It
+removes the old query and output/LSE/validity gathers, never gathers full cache pages and never
+crosses the four-chip stage. The feature is distinct and default-off; decoder, DSA observer,
+prefill, HLO, launcher, DB and archive contracts are being threaded together.
+
+Exact next: complete the one integration batch, run its one new-diff-only Sol audit, independently
+verify, commit/push, prove the fleet idle and launch exactly one protected complete 8K run with the
+DB537 flag. A correct run closes Gate D. Its fresh wall/trace/HBM evidence decides Gate E; do not
+return to B128, uniform reduction trees, full-cache gathering, Claude Code or another arithmetic
+discriminator first.
+
+The integration audit of staged SHA `f469dc24...d8bd` found no high and two medium HLO fail-open
+gaps: counts/shapes did not prove the B512 cache operand consumed the scoped LP4 sum, and substring
+kernel matching admitted a suffixed or out-of-scope call. The correction requires an exact
+identifier and attention scope, traces cache operand 2 backward through only BF16 cache-preserving
+bitcast/copy/reshape operations, and requires a bijection between all 78 exchanges and kernels.
+Logical/folded bypass, suffix and out-of-scope regressions now refuse. The same Sol reviewer checked
+only that correction and returned `APPROVE COMMIT`; the complete runtime suite passes 69/69 after
+the correction, the cleared kernel suite remains 24/24, and compileall/Bash/ShellCheck/JSON/diff
+checks pass. Exact next from the clean pushed integration pin is the one protected 8K run above.

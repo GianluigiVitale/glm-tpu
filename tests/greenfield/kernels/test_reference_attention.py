@@ -13,6 +13,7 @@ from glm_tpu.greenfield.kernels.reference import (
     canonicalize_selected_positions,
     gather_paged_selected_kv,
     gather_stage_local_selected_kv,
+    gather_stage_local_selected_kv_aligned,
     selected_positions_for_owner,
     sparse_mla_attention,
     stage_local_sparse_mla_reference,
@@ -212,6 +213,70 @@ def test_owner_subset_accepts_jitted_scalar_stage_index() -> None:
         jnp.asarray([[7, 2, 0, 5]], dtype=jnp.int32),
         jnp.asarray([4], dtype=jnp.int32),
     )
+
+
+def test_aligned_owner_segments_sum_to_exact_global_selected_segment() -> None:
+    local_caches, block_tables, _ = local_cache_fixture()
+    layout = small_layout()
+    selected = SelectedPositions(
+        jnp.asarray([[7, 2, 0, 5]], dtype=jnp.int32),
+        jnp.asarray([4], dtype=jnp.int32),
+    )
+    expected = gather_paged_selected_kv(
+        jnp.concatenate(tuple(local_caches), axis=1),
+        block_tables,
+        selected,
+        jnp.asarray([8], dtype=jnp.int32),
+    )
+    aligned = [
+        gather_stage_local_selected_kv_aligned(
+            local_caches[owner],
+            block_tables,
+            selected,
+            jnp.asarray([8], dtype=jnp.int32),
+            layout=layout,
+            owner_index=owner,
+        )
+        for owner in range(layout.local_parallel_size)
+    ]
+    np.testing.assert_array_equal(
+        np.asarray(sum((item.values for item in aligned), jnp.zeros_like(aligned[0].values))),
+        np.asarray(expected.values),
+    )
+    for item in aligned:
+        np.testing.assert_array_equal(item.positions, expected.positions)
+        np.testing.assert_array_equal(item.valid_counts, expected.valid_counts)
+        np.testing.assert_array_equal(item.contract_valid, expected.contract_valid)
+
+
+def test_aligned_owner_segment_zeros_unowned_rows_and_propagates_health() -> None:
+    local_caches, block_tables, _ = local_cache_fixture()
+    layout = small_layout()
+    selected = SelectedPositions(
+        jnp.asarray([[7, 2, 0, 5]], dtype=jnp.int32),
+        jnp.asarray([4], dtype=jnp.int32),
+    )
+    segment = gather_stage_local_selected_kv_aligned(
+        local_caches[0],
+        block_tables,
+        selected,
+        jnp.asarray([8], dtype=jnp.int32),
+        layout=layout,
+        owner_index=jnp.asarray(0, dtype=jnp.int32),
+    )
+    np.testing.assert_array_equal(segment.positions, [[0, 2, 5, 7]])
+    np.testing.assert_array_equal(np.asarray(segment.values[0, [1, 3]]), 0)
+    assert np.all(np.any(np.asarray(segment.values[0, [0, 2]]) != 0, axis=1))
+    np.testing.assert_array_equal(segment.contract_valid, [True])
+    invalid = gather_stage_local_selected_kv_aligned(
+        local_caches[0],
+        block_tables,
+        selected,
+        jnp.asarray([5], dtype=jnp.int32),
+        layout=layout,
+        owner_index=0,
+    )
+    np.testing.assert_array_equal(invalid.contract_valid, [False])
     mapped = jax.jit(
         lambda owner: selected_positions_for_owner(
             selected,

@@ -8,6 +8,7 @@ provided stage-local axis groups.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Literal, NamedTuple, Sequence
 
 import jax
@@ -25,6 +26,7 @@ from .pallas import (
     fp32_to_bf16_pallas_boundary,
     fp8_structured_kv_b_q_absorb,
     fp8_structured_kv_b_value,
+    pregathered_sparse_mla_pallas,
     stage_local_sparse_mla_kernel,
 )
 from .reference.attention import (
@@ -34,6 +36,7 @@ from .reference.attention import (
     canonicalize_selected_positions,
     combine_stage_local_attention,
     gather_stage_local_selected_kv,
+    gather_stage_local_selected_kv_aligned,
 )
 from .reference.dsa import (
     DsaNumericalContract,
@@ -1154,6 +1157,7 @@ def stage_local_index_share_fp8_mapped(
         VirtualTp32ReductionAssociation | None
     ) = None,
     replicated_monolithic_attention: bool = False,
+    pregathered_b512_attention: bool = False,
     capture_ingredients: bool = False,
 ) -> StageLocalIndexShareFp8Result | StageLocalIndexShareFp8ObservedResult:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
@@ -1177,6 +1181,8 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError(
             "IndexShare replicated-monolithic attention flag must be boolean"
         )
+    if not isinstance(pregathered_b512_attention, bool):
+        raise ValueError("IndexShare pregathered-B512 flag must be boolean")
     if not isinstance(capture_ingredients, bool):
         raise ValueError("IndexShare ingredient-capture flag must be boolean")
     if main_rope_table_row is not None and (
@@ -1200,6 +1206,18 @@ def stage_local_index_share_fp8_mapped(
             "replicated-monolithic attention must remain isolated from "
             "ingredient capture"
         )
+    if pregathered_b512_attention and (
+        replicated_monolithic_attention
+        or capture_ingredients
+        or reconstruct_output_fp32
+        or virtual_tp32_reduction_association is not None
+    ):
+        raise ValueError(
+            "pregathered-B512 attention must remain isolated from diagnostic "
+            "attention/output variants"
+        )
+    if pregathered_b512_attention and cache_layout.local_parallel_size != 4:
+        raise ValueError("pregathered-B512 attention is protected only for PP8 LP4")
     if capture_ingredients and (
         reconstruct_output_fp32
         or virtual_tp32_reduction_association is not None
@@ -1448,22 +1466,51 @@ def stage_local_index_share_fp8_mapped(
         )
     else:
         raise ValueError("stage-local FP8 linear backend is unknown")
-    packed_query = jnp.concatenate((q_absorbed_local, q_rope), axis=-1)
-    gathered_query = lax.all_gather(
-        packed_query,
-        axis_name=axis_name,
-        axis=0,
-        tiled=False,
-        axis_index_groups=groups,
-    )
-    full_query = _reshape_gathered_heads(
-        gathered_query,
-        num_heads=contract.num_heads,
-        head_width=contract.kv_lora_rank + contract.qk_rope_head_dim,
-    )
-    q_absorbed = full_query[..., : contract.kv_lora_rank]
-    full_q_rope = full_query[..., contract.kv_lora_rank :]
-    if replicated_monolithic_attention:
+    if pregathered_b512_attention:
+        aligned = gather_stage_local_selected_kv_aligned(
+            cache,
+            block_tables,
+            selected,
+            context_lengths,
+            layout=cache_layout,
+            owner_index=local_slot,
+        )
+        with jax.named_scope("greenfield_selected_cache_lp4_exchange"):
+            selected_cache = lax.psum(
+                aligned.values,
+                axis_name=axis_name,
+                axis_index_groups=groups,
+            )
+        with jax.named_scope("greenfield_pregathered_b512_attention"):
+            attended_local = pregathered_sparse_mla_pallas(
+                q_absorbed_local,
+                q_rope,
+                selected_cache,
+                aligned.valid_counts,
+                contract=replace(contract, num_heads=local_heads),
+                config=SparseMlaConfig(segment_block=512),
+                interpret=sparse_attention_interpret,
+            )
+        attention_contract_valid = aligned.contract_valid
+        partial = None
+        combined = None
+    else:
+        packed_query = jnp.concatenate((q_absorbed_local, q_rope), axis=-1)
+        gathered_query = lax.all_gather(
+            packed_query,
+            axis_name=axis_name,
+            axis=0,
+            tiled=False,
+            axis_index_groups=groups,
+        )
+        full_query = _reshape_gathered_heads(
+            gathered_query,
+            num_heads=contract.num_heads,
+            head_width=contract.kv_lora_rank + contract.qk_rope_head_dim,
+        )
+        q_absorbed = full_query[..., : contract.kv_lora_rank]
+        full_q_rope = full_query[..., contract.kv_lora_rank :]
+    if not pregathered_b512_attention and replicated_monolithic_attention:
         with jax.named_scope(
             "greenfield_replicated_monolithic_attention_cache_gather"
         ):
@@ -1502,7 +1549,7 @@ def stage_local_index_share_fp8_mapped(
                 interpret=sparse_attention_interpret,
             )
         partial = combined
-    else:
+    elif not pregathered_b512_attention:
         partial = stage_local_sparse_mla_kernel(
             q_absorbed,
             full_q_rope,
@@ -1544,12 +1591,15 @@ def stage_local_index_share_fp8_mapped(
         combined = combine_stage_local_attention(
             gathered_outputs, gathered_lse, gathered_validity
         )
-    attended_local = lax.dynamic_slice_in_dim(
-        combined.output,
-        local_slot.astype(jnp.int32) * jnp.int32(local_heads),
-        local_heads,
-        axis=1,
-    )
+    if not pregathered_b512_attention:
+        assert combined is not None
+        attended_local = lax.dynamic_slice_in_dim(
+            combined.output,
+            local_slot.astype(jnp.int32) * jnp.int32(local_heads),
+            local_heads,
+            axis=1,
+        )
+        attention_contract_valid = combined.contract_valid
     if linear_backend == "reference":
         assert local_weight_uv is not None
         value_states = jnp.einsum(
@@ -1670,12 +1720,14 @@ def stage_local_index_share_fp8_mapped(
     result = StageLocalIndexShareFp8Result(
         output,
         cache,
-        metadata_valid & combined.contract_valid,
+        metadata_valid & attention_contract_valid,
     )
     if not capture_ingredients:
         return result
     assert owner_selected_cache is not None
     assert diagnostic_virtual_partials is not None
+    assert partial is not None
+    assert combined is not None
     return StageLocalIndexShareFp8ObservedResult(
         result,
         StageLocalIndexShareFp8Ingredients(

@@ -295,8 +295,8 @@ def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     assert "isolated residual direct remote contract hash drifted" in runner
     assert '"dcp_then_model_sequential_bf16"' in compiler
     assert '"model_then_dcp_pairwise_bf16"' in compiler
-    assert '"schema_version": 16' in compiler
-    assert 'record["schema_version"] for record in records} != {16}' in runner
+    assert '"schema_version": 17' in compiler
+    assert 'record["schema_version"] for record in records} != {17}' in runner
     assert "results_db_run_id\": 518" in runner
     assert (
         "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
@@ -410,6 +410,39 @@ def test_main_rope_table_is_default_off_and_db531_protected() -> None:
     assert 'contract["fp32_combine_count"] < 78 * 4' in runner
     assert 'contract["final_round_count"] < 78 * 2' in runner
     assert "_mainrope" in runner
+
+
+def test_pregathered_b512_attention_is_default_off_and_db537_protected() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert '"--pregathered-b512-attention"' in compiler
+    assert (
+        "pregathered_b512_attention=(\n"
+        "                args.pregathered_b512_attention\n"
+        "            )" in compiler
+    )
+    assert '"pregathered_b512_attention": (' in compiler
+    assert (
+        "readonly PREGATHERED_B512_ATTENTION="
+        "${GLM_GREENFIELD_PREGATHERED_B512_ATTENTION:-0}" in runner
+    )
+    assert (
+        '--pregathered-b512-attention "$pregathered_b512_attention"'
+        in runner
+    )
+    assert "pregathered-B512 attention requires the protected 8K" in runner
+    assert "PREGATHERED_ATTENTION_PREREQUISITE_TAG" in runner
+    assert "greenfield_layer0_attention_arithmetic_20260812T114701365714147Z" in runner
+    assert "DB537 attention-arithmetic prerequisite drifted" in runner
+    assert "DB537 prerequisite DB linkage drifted" in runner
+    assert "DB537 direct remote $remote_file hash drifted" in runner
+    assert "validate_pregathered_attention_hlo" in runner
+    assert 'contract["exchange_count"] != 78' in runner
+    assert 'contract["kernel_count"] != 78' in runner
+    assert "greenfield_pregathered_b512_attention_prerequisite_db_run" in runner
+    assert "if pregathered_b512_attention else None" in runner
+    assert "_pregatheredb512" in runner
 
 
 def test_layer0_attention_schedule_discriminator_is_sealed_and_default_off() -> None:

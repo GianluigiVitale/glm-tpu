@@ -156,6 +156,23 @@ artifact-producing oracle only; it is not imported by the greenfield engine.
 - Owner partials emit normalized latent plus FP32 log-sum-exp. The exact
   stage-local merge weights each partial by its LSE; an empty owner contributes
   zero and an all-empty row returns zero. No stage/pod axis participates.
+- The DB537-selected PP8 alternative is separate and default-off. Every lane canonicalizes the
+  same ascending 2,048-position selection, writes only its owned BF16 cache rows into those exact
+  slots and writes BF16 zero elsewhere. One four-lane stage-local BF16 sum reconstructs the
+  selected `[1,2048,640]` segment exactly because every element has one nonzero owner. It never
+  gathers the paged cache or crosses the LP4 group.
+- Each lane retains only its local 16 query heads and runs the pre-gathered sparse-MLA recurrence
+  with a 512-row segment block. Scores, online max/sum and normalization remain FP32; unnormalized
+  probabilities round to BF16 before the latent PV, and the final `[1,16,512]` latent rounds to
+  BF16 once. DB537 proves this H16/B512 arithmetic bitwise exact against the accepted 64-head
+  attended latent. B128 is explicitly nonexact and may not substitute.
+- In the DB537 path the old query all-gather and output/LSE/validity all-gathers are absent. The
+  selected-cache exchange is exactly one BF16 LP4 sum per layer; no validity collective is needed
+  because all lanes validate identical global selection/page metadata before ownership masking.
+  Every exact-name B512 call must be inside the attention scope, its cache operand must depend on
+  exactly one scoped sum through only cache-preserving bitcast/copy/reshape transforms, and all
+  exchange/call links must be bijective. Any bypass, escaped group, old attention-exchange scope,
+  wrong B512 kernel count/shape or dead decode row is a hard HLO refusal.
 
 ## GLM-5.2 sparse MoE
 
