@@ -25,14 +25,22 @@ case "$INTERNAL_MODE" in
   scorer)
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=0
     ;;
   prompt_key | prompt_key_input)
     readonly PROMPT_KEY_CAPTURE=1
     readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=0
     ;;
   attention_output)
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=1
+    readonly ATTENTION_PROJECTION_CAPTURE=0
+    ;;
+  attention_projection)
+    readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=1
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
@@ -76,7 +84,11 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
+  if [[ $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-11c250648
+    readonly OBSERVER_COMMIT_DISTANCE=8
+    readonly LEGACY_PIN=11c2506480e98902d66a88309533f624c994d202
+  elif [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-bf8a03e26
     readonly OBSERVER_COMMIT_DISTANCE=7
     readonly LEGACY_PIN=bf8a03e264971c8efba99a346d1e8189ef0ff518
@@ -118,6 +130,12 @@ readonly MAIN_CACHE_INGREDIENTS_DIR=/home/gianl/glm-run/greenfield_short_decoder
 readonly MAIN_CACHE_INGREDIENTS_CODE_HASH=4d4e2c5da53554b3ab015d26cc6d1e058a7b48dd
 readonly MAIN_CACHE_INGREDIENTS_CONTRACT_SHA=9c3ec9fae5be31f791d737804adf6bcbaaa7f481120ce706be7a43e5dcd37693
 readonly MAIN_CACHE_INGREDIENTS_TENSOR_SHA=fd76cd4c6e61be773fe49bfffaceb1467c0865420d68016471df1ebe5140249c
+readonly ATTENTION_PROJECTION_INGREDIENTS_TAG=greenfield_table_on_layer0_ingredients_p8155_20260812T021718885910564Z
+readonly ATTENTION_PROJECTION_INGREDIENTS_DIR=/home/gianl/gcs-models/results/$ATTENTION_PROJECTION_INGREDIENTS_TAG/layer0_ingredients
+readonly ATTENTION_PROJECTION_INGREDIENTS_CODE_HASH=d4862e5601bb81761a6c3b695df6a439fb87c909
+readonly ATTENTION_PROJECTION_INGREDIENTS_CONTRACT_SHA=02f0f1c3e22b08c6646167ac5a7ffaf5056932003ee722752f7d40e26e714864
+readonly ATTENTION_PROJECTION_INGREDIENTS_TENSOR_SHA=c06fe575f0518e981c3099a8033c1978b01fd0cff843ecbbd7a25cebed8d0e95
+readonly MAIN_ROPE_TABLE_SHA=6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701
 readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
@@ -180,12 +198,12 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     exit 2
   }
 fi
-if [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
+if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
   [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
      $PROFILE == 8k && $INTERNAL_TARGET_POSITION == 8155 && \
      $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
      $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
-    echo "attention-output capture requires isolated layer-0 8K position 8155 mode" >&2
+    echo "attention projection capture requires isolated layer-0 8K position 8155 mode" >&2
     exit 2
   }
 fi
@@ -209,6 +227,20 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
      $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
      $DECODE_PROJECTION_CAPTURE == 0 ]] || {
     echo "main-cache capture requires isolated accepted 8K oracle mode" >&2
+    exit 2
+  }
+fi
+if [[ $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
+  [[ -r $ATTENTION_PROJECTION_INGREDIENTS_DIR/contract.json &&
+     -r $ATTENTION_PROJECTION_INGREDIENTS_DIR/position_8155_ingredients.npz ]] || {
+    echo "protected table-on attention ingredients are unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$ATTENTION_PROJECTION_INGREDIENTS_DIR/contract.json" | awk '{print $1}') == \
+     "$ATTENTION_PROJECTION_INGREDIENTS_CONTRACT_SHA" &&
+     $(sha256sum "$ATTENTION_PROJECTION_INGREDIENTS_DIR/position_8155_ingredients.npz" | awk '{print $1}') == \
+     "$ATTENTION_PROJECTION_INGREDIENTS_TENSOR_SHA" ]] || {
+    echo "protected table-on attention ingredient identity drifted" >&2
     exit 2
   }
 fi
@@ -244,6 +276,8 @@ elif [[ $INTERNAL_MODE == prompt_key ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_key_comparison
 elif [[ $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/attention_output_capture
+elif [[ $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/attention_projection_capture
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -930,7 +964,41 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
+  say "sealing accepted operands on both sides of layer-0 W_UV"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_accepted_attention_projection_operands.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    --capture-process-indices 0 \
+    >"$RUN_DIR/attention_projection_capture_summary.json"
+  accepted_projection_capture_sha=$(sha256sum \
+    "$INTERNAL_RESULT_DIR/capture.json" | awk '{print $1}')
+  say "comparing accepted and preserved table-on PP8 attention projection operands"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/compare_attention_projection_operands.py" \
+    --accepted-capture-dir "$INTERNAL_RESULT_DIR" \
+    --greenfield-ingredients-dir "$ATTENTION_PROJECTION_INGREDIENTS_DIR" \
+    --output "$RUN_DIR/attention_projection_comparison" \
+    --accepted-capture-file-sha256 "$accepted_projection_capture_sha" \
+    --accepted-run-tag "$TAG" \
+    --ingredients-contract-sha256 "$ATTENTION_PROJECTION_INGREDIENTS_CONTRACT_SHA" \
+    --ingredients-tensor-sha256 "$ATTENTION_PROJECTION_INGREDIENTS_TENSOR_SHA" \
+    --greenfield-code-hash "$ATTENTION_PROJECTION_INGREDIENTS_CODE_HASH" \
+    --greenfield-run-tag "$ATTENTION_PROJECTION_INGREDIENTS_TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --main-rope-table-sha256 "$MAIN_ROPE_TABLE_SHA" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    >"$RUN_DIR/attention_projection_comparison_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_OUTPUT_CAPTURE == 1 ]]; then
   say "sealing accepted layer-0 post-W_UV/pre-o_proj operand"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/capture_accepted_attention_output_operand.py" \
@@ -1135,7 +1203,94 @@ lines = {
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode == "attention_output":
+    if mode == "attention_projection":
+        capture_path = root / "attention_projection_capture" / "capture.json"
+        comparison_path = (
+            root / "attention_projection_comparison" / "comparison.json"
+        )
+        capture = json.loads(capture_path.read_text())
+        comparison = json.loads(comparison_path.read_text())
+        output = comparison["attention_output"]
+        latent = comparison["attended_latent"]
+        if (
+            not exact_dsa["exact"]
+            or capture["artifact_kind"]
+            != "glm52_accepted_attention_projection_capture"
+            or capture["capture_layout"] != "logical_head_order_live_row"
+            or capture["capture_mode"] != mode
+            or capture["capture_process_indices"] != [0]
+            or capture["diagnostic_only"] is not True
+            or capture["performance_claim"] is not False
+            or capture["legacy_code_hash"] != sys.argv[4]
+            or capture["oracle_pin"]
+            != "b3c25df47ac98783912dc658878181ec0a8ae16d"
+            or capture["position"] != 8155
+            or capture["tensors"]["attended_latent_bfloat16_bits"]["shape"]
+            != [64, 512]
+            or capture["tensors"]["attention_output_bfloat16_bits"]["shape"]
+            != [16384]
+            or capture["tensors"]["attention_output_bfloat16_bits"]["sha256"]
+            != "79a6e290274ef470b518a6de894b44d2929ad6861d1751f0915aa4eb20cf2e9d"
+            or comparison["status"] != "SUCCESS"
+            or comparison["artifact_kind"]
+            != "glm52_accepted_greenfield_attention_projection_comparison"
+            or comparison["classification"] not in {
+                "attention_arithmetic_before_w_uv",
+                "w_uv_projection_arithmetic",
+            }
+            or output["elementwise_exact"] is not False
+            or output["mismatch_count"] != 5117
+            or output["first_mismatch_index"] != 3
+            or output["max_abs_error"] != 6.103515625e-05
+            or output["expected_sha256"]
+            != "79a6e290274ef470b518a6de894b44d2929ad6861d1751f0915aa4eb20cf2e9d"
+            or output["observed_sha256"]
+            != "0103e22c558d1390820bc9d39cc05b90f4555fa7c0be5de7cd33c34748a582ab"
+            or latent["shape"] != [64, 512]
+        ):
+            raise SystemExit("attention-projection comparison evidence drifted")
+        lines.update({
+            "accepted_attention_projection_capture": "true",
+            "accepted_attention_projection_capture_layout": capture[
+                "capture_layout"
+            ],
+            "accepted_attention_projection_capture_mode": mode,
+            "accepted_attention_projection_diagnostic_only": "true",
+            "accepted_attention_projection_dsa_event_tensors_exact": "true",
+            "accepted_attention_projection_manifest_file_sha256": sha256(
+                capture_path.read_bytes()
+            ).hexdigest(),
+            "accepted_attention_projection_manifest_sha256": capture[
+                "manifest_sha256"
+            ],
+            "accepted_attention_projection_source_file_count": sys.argv[9],
+            "accepted_attention_projection_latent_sha256": capture["tensors"][
+                "attended_latent_bfloat16_bits"
+            ]["sha256"],
+            "accepted_attention_projection_output_sha256": capture["tensors"][
+                "attention_output_bfloat16_bits"
+            ]["sha256"],
+            "attention_projection_classification": comparison["classification"],
+            "attention_projection_comparison_file_sha256": sha256(
+                comparison_path.read_bytes()
+            ).hexdigest(),
+            "attention_projection_comparison_manifest_sha256": comparison[
+                "manifest_sha256"
+            ],
+            "attention_projection_latent_mismatch_count": str(
+                latent["mismatch_count"]
+            ),
+            "attention_projection_output_mismatch_count": str(
+                output["mismatch_count"]
+            ),
+            "accepted_oracle_pin": capture["oracle_pin"],
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_process_indices": "0",
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": capture["layer_name"],
+            "dsa_event_tensors_exact": "true",
+        })
+    elif mode == "attention_output":
         capture = json.loads(
             (root / "attention_output_capture" / "capture.json").read_text()
         )

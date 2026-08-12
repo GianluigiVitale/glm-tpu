@@ -1699,7 +1699,7 @@ if (
     or contract.get("decode_position") != 8155
     or contract.get("main_rope_table_enabled") is not True
     or contract.get("main_rope_table_sha256")
-    != "6a22140f31c94bbb99092301902a4ed18abfb6be0944194005564f0db3c80701"
+    != "6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701"
     or not main_rope.get("passed")
     or main_rope.get("table_parameter_count") != 1
     or main_rope.get("named_table_parameter_count") != 1
