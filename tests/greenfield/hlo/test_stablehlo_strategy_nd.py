@@ -333,6 +333,24 @@ def test_exact_strategy_nd_stablehlo_contract_accepts_complete_tree() -> None:
     assert result["kernel_count"] == 8
     assert result["matched_tree_count"] == 1
 
+    dense_gather = (
+        "    %dense_seed = stablehlo.constant dense<0> : "
+        "tensor<1x8x1x6144xbf16>\n"
+        '    %dense_gather = "stablehlo.all_gather"(%dense_seed) '
+        "<{all_gather_dim = 0 : i64, use_global_device_ids}> : "
+        "(tensor<1x8x1x6144xbf16>) -> tensor<4x8x1x6144xbf16>\n"
+    )
+    coexisting = validate_strategy_nd_attention_stablehlo(
+        _strategy_nd_stablehlo().replace(
+            "    return %l0_output\n", dense_gather + "    return %l0_output\n", 1
+        ),
+        layers=1,
+        enabled=True,
+    )
+    assert coexisting["passed"], coexisting
+    assert coexisting["candidate_gather_count"] == 2
+    assert coexisting["gather_count"] == 1
+
     missing = validate_strategy_nd_attention_stablehlo(
         None, layers=1, enabled=True
     )

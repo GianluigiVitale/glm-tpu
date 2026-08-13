@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 import re
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from .stablehlo_strategy_nd import (
     _MatchError,
@@ -1644,6 +1644,7 @@ def validate_dense_final_layout_decoder_stablehlo(
     stablehlo: str,
     *,
     dense_layers: int,
+    replica_groups: Sequence[Sequence[int]],
 ) -> dict[str, object]:
     """Prove every live one-row dense chain in the complete decoder.
 
@@ -1663,11 +1664,32 @@ def validate_dense_final_layout_decoder_stablehlo(
     parsed, dependency_errors = _expand_dependency_barriers(stablehlo)
     graphs, parse_errors = _parse_graphs(parsed)
     violations = [*dependency_errors, *parse_errors]
+    canonical_groups = tuple(
+        tuple(int(rank) for rank in group) for group in replica_groups
+    )
+    if not canonical_groups or any(
+        len(group) != 4 for group in canonical_groups
+    ):
+        raise ValueError("dense decoder replica groups must be non-empty LP4 groups")
+    flattened_groups = tuple(
+        rank for group in canonical_groups for rank in group
+    )
+    if len(set(flattened_groups)) != len(flattened_groups):
+        raise ValueError("dense decoder replica groups must be disjoint")
+    normalized_replica_groups = (
+        "replica_groups=dense<["
+        + ",".join(
+            "[" + ",".join(str(rank) for rank in group) + "]"
+            for group in canonical_groups
+        )
+        + f"]>:tensor<{len(canonical_groups)}x4xi64>"
+    )
     matched_groups = 0
     matched_shards = 0
     live_results = 0
     runtime_u8_bitcasts = 0
     layout_constraints = 0
+    dead_row_nodes = 0
     try:
         candidates = [
             (graph, node)
@@ -1676,6 +1698,22 @@ def validate_dense_final_layout_decoder_stablehlo(
             if node.opcode == "convolution"
             and node.result_type == "tensor<1x768xf32>"
         ]
+        dense_graph_names = {graph.name for graph, _node in candidates}
+        dead_row_nodes = sum(
+            node.result_type
+            in {
+                "tensor<32x6144xbf16>",
+                "tensor<32x768xf32>",
+                "tensor<32x384xbf16>",
+            }
+            for graph in graphs
+            if graph.name in dense_graph_names
+            for node in graph.nodes.values()
+        )
+        if dead_row_nodes:
+            raise _MatchError(
+                "dense decoder arithmetic graph contains M32 token rows"
+            )
         if len(candidates) != 8 * dense_layers:
             raise _MatchError(
                 "dense decoder gate/up convolution count drifted: "
@@ -1832,8 +1870,7 @@ def validate_dense_final_layout_decoder_stablehlo(
             if (
                 gather.all_gather_dimension != 0
                 or not gather.use_global_device_ids
-                or "replica_groups=dense<[[0,1,2,3]]>:tensor<1x4xi64>"
-                not in normalized_gather
+                or normalized_replica_groups not in normalized_gather
             ):
                 raise _MatchError(
                     f"{gather.name}: dense decoder gather group drifted"
@@ -1885,6 +1922,7 @@ def validate_dense_final_layout_decoder_stablehlo(
         violations.append(str(error))
 
     return {
+        "dead_row_node_count": dead_row_nodes,
         "dense_layer_group_count": matched_groups,
         "exact_live_result_count": live_results,
         "exact_runtime_u8_bitcast_count": runtime_u8_bitcasts,

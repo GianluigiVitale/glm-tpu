@@ -2981,6 +2981,8 @@ def validate_strategy_nd_attention_hlo(executable, *, source):
             or set(contract["gather_source_counts"].values()) != {8}
             or stable_contract["expected_gather_count"] != 78
             or stable_contract["expected_kernel_count"] != 624
+            or stable_contract["candidate_gather_count"]
+            != 78 + (3 if dense_final_layout_convolution else 0)
             or stable_contract["gather_count"] != 78
             or stable_contract["kernel_count"] != 624
             or stable_contract["matched_tree_count"] != 78
@@ -2999,6 +3001,8 @@ def validate_strategy_nd_attention_hlo(executable, *, source):
         or contract["scoped_instruction_count"] != 0
         or stable_contract["expected_gather_count"] != 0
         or stable_contract["expected_kernel_count"] != 0
+        or stable_contract["candidate_gather_count"]
+        != (3 if dense_final_layout_convolution else 0)
         or stable_contract["gather_count"] != 0
         or stable_contract["kernel_count"] != 0
         or stable_contract["matched_tree_count"] != 0
@@ -3044,6 +3048,7 @@ def validate_dense_final_layout_hlo(executable, *, source):
         != {"gate_up": expected_ranks, "down": expected_ranks}
         or not exact_stable["passed"]
         or exact_stable["violations"]
+        or exact_stable["dead_row_node_count"] != 0
         or exact_stable["dense_layer_group_count"]
         != (3 if dense_final_layout_convolution else 0)
         or exact_stable["exact_live_result_count"]

@@ -984,9 +984,11 @@ def validate_strategy_nd_attention_stablehlo(
         )
         return {
             "applicable": enabled,
+            "candidate_gather_count": 0,
             "expected_gather_count": layers if enabled else 0,
             "gather_count": 0,
             "kernel_count": 0,
+            "matched_tree_count": 0,
             "matched_trees": [],
             "passed": not violations,
             "violations": violations,
@@ -999,7 +1001,7 @@ def validate_strategy_nd_attention_stablehlo(
             violations.append(f"duplicate StableHLO function @{graph.name}")
         else:
             helpers[graph.name] = graph
-    gathered: list[tuple[_StableGraph, _StableNode]] = []
+    gather_candidates: list[tuple[_StableGraph, _StableNode]] = []
     all_kernels: list[tuple[str, str]] = []
     for graph in graphs:
         for node in graph.nodes.values():
@@ -1014,7 +1016,43 @@ def validate_strategy_nd_attention_stablehlo(
                     "tensor<4x8x1x6144xbf16>",
                 )
             ):
-                gathered.append((graph, node))
+                gather_candidates.append((graph, node))
+
+    def depends_on_strategy_kernel(
+        graph: _StableGraph, gather: _StableNode
+    ) -> bool:
+        shape_only = {
+            "broadcast_in_dim",
+            "concatenate",
+            "optimization_barrier",
+            "reshape",
+            "slice",
+        }
+        pending = list(gather.operands)
+        visited: set[str] = set()
+        while pending:
+            name = pending.pop()
+            if name in visited:
+                continue
+            visited.add(name)
+            node = graph.nodes.get(name)
+            if node is None:
+                continue
+            if node.opcode == "custom_call" and node.kernel_name == _KERNEL_NAME:
+                return True
+            if node.opcode in shape_only:
+                pending.extend(node.operands)
+        return False
+
+    # Dense final-layout layers deliberately use the same exact LP4 gather
+    # geometry as StrategyND attention.  Classify by K512 value lineage, not
+    # shape alone; any disconnected/malformed attention path still leaves its
+    # exact K512 kernels unmatched by the bijection below and fails closed.
+    gathered = [
+        (graph, node)
+        for graph, node in gather_candidates
+        if depends_on_strategy_kernel(graph, node)
+    ]
 
     expected_gathers = layers if enabled else 0
     expected_kernels = 8 * expected_gathers
@@ -1086,6 +1124,7 @@ def validate_strategy_nd_attention_stablehlo(
         "applicable": enabled,
         "expected_gather_count": expected_gathers,
         "expected_kernel_count": expected_kernels,
+        "candidate_gather_count": len(gather_candidates),
         "gather_count": len(gathered),
         "kernel_count": len(all_kernels),
         "matched_tree_count": len(matched_trees),

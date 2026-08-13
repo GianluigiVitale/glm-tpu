@@ -894,6 +894,7 @@ def _validate_dense_final_layout_convolution_hlo(
     *,
     dense_layers: int,
     enabled: bool,
+    groups: Sequence[Sequence[int]] = ((0, 1, 2, 3),),
     module: HloModule | None = None,
 ) -> dict[str, Any]:
     """Pin the true-row-one production form of the DB548 dense arithmetic.
@@ -1017,14 +1018,6 @@ def _validate_dense_final_layout_convolution_hlo(
         and "tensor<6144x768xbf16>" in line
         for line in stablehlo_text.splitlines()
     )
-    stable_dead_rows = sum(
-        signature in stablehlo_text
-        for signature in (
-            "tensor<32x6144xbf16>",
-            "tensor<32x768xf32>",
-            "tensor<32x384xbf16>",
-        )
-    )
     expected_ranks = {
         rank: expected_rank_count for rank in range(8)
     }
@@ -1071,7 +1064,7 @@ def _validate_dense_final_layout_convolution_hlo(
         if source in by_key and target in by_key:
             forward_edges.setdefault(source, []).append((target, kind, index))
 
-    call_opcodes = {"call", "fusion"}
+    call_opcodes = {"call", "conditional", "fusion"}
     for instruction in module.instructions:
         target = (instruction.computation, instruction.name)
         if instruction.opcode == "parameter":
@@ -1109,19 +1102,48 @@ def _validate_dense_final_layout_convolution_hlo(
             r"\bcalls=(%[A-Za-z0-9_.:-]+)", instruction.raw_line
         )
         if called is None:
-            continue
-        symbol = called.group(1)
-        for index, operand_name in enumerate(instruction.operand_names):
-            parameter = parameters.get(symbol, {}).get(index)
-            if parameter is not None:
-                add_edge(
-                    (instruction.computation, operand_name),
-                    parameter,
-                    "identity",
-                )
-        root = roots.get(symbol)
-        if root is not None:
-            add_edge(root, target, "identity")
+            branch_match = re.search(
+                r"\bbranch_computations=\{([^}]*)\}",
+                instruction.raw_line,
+            )
+            if branch_match is None:
+                continue
+            branch_symbols = tuple(
+                item.strip()
+                for item in branch_match.group(1).split(",")
+            )
+            if (
+                instruction.opcode != "conditional"
+                or len(instruction.operand_names) != len(branch_symbols) + 1
+            ):
+                continue
+            for branch_index, symbol in enumerate(branch_symbols):
+                parameter = parameters.get(symbol, {}).get(0)
+                if parameter is not None:
+                    add_edge(
+                        (
+                            instruction.computation,
+                            instruction.operand_names[branch_index + 1],
+                        ),
+                        parameter,
+                        "identity",
+                    )
+                root = roots.get(symbol)
+                if root is not None:
+                    add_edge(root, target, "identity")
+        else:
+            symbol = called.group(1)
+            for index, operand_name in enumerate(instruction.operand_names):
+                parameter = parameters.get(symbol, {}).get(index)
+                if parameter is not None:
+                    add_edge(
+                        (instruction.computation, operand_name),
+                        parameter,
+                        "identity",
+                    )
+            root = roots.get(symbol)
+            if root is not None:
+                add_edge(root, target, "identity")
 
     gate_keys = {(item.computation, item.name) for item in gate}
     down_keys = {(item.computation, item.name) for item in down}
@@ -1209,6 +1231,7 @@ def _validate_dense_final_layout_convolution_hlo(
         validate_dense_final_layout_decoder_stablehlo(
             stablehlo_text,
             dense_layers=dense_layers,
+            replica_groups=groups,
         )
         if enabled and stablehlo_available
         else {
@@ -1217,10 +1240,12 @@ def _validate_dense_final_layout_convolution_hlo(
             "exact_runtime_u8_bitcast_count": 0,
             "gate_up_layout_constraint_count": 0,
             "matched_virtual_shard_count": 0,
+            "dead_row_node_count": 0,
             "passed": not enabled,
             "violations": [],
         }
     )
+    stable_dead_rows = int(exact_stablehlo["dead_row_node_count"])
     violations = []
     if enabled and not stablehlo_available:
         violations.append(
@@ -3399,7 +3424,8 @@ def _validate_strategy_nd_attention_projection_hlo(
     gathers = tuple(
         instruction
         for instruction in module.collectives
-        if in_scope(instruction, gather_scope)
+        if in_scope(instruction, scope)
+        and in_scope(instruction, gather_scope)
     )
     kernel_identifier = re.compile(
         rf"(?<![A-Za-z0-9_]){re.escape(kernel_name)}(?![A-Za-z0-9_])"
@@ -3611,15 +3637,17 @@ def _expected_tpu_decoder_reductions(
     split_residual_state: bool,
     token_observation_candidates: int,
     strategy_nd_attention_projection: bool = False,
+    dense_final_layout_convolution: bool = False,
 ) -> tuple[dict[str, int], dict[str, int]]:
     """Return the protected GLM TPU all-reduce arities and logical shapes."""
 
-    result_shapes = {
-        "bf16[1,6144]": dense_layers + (
-            0 if strategy_nd_attention_projection else layers
-        ),
-        "bf16[2,1,6144]": sparse_layers,
-    }
+    dense_reductions = 0 if dense_final_layout_convolution else dense_layers
+    residual_reductions = dense_reductions + (
+        0 if strategy_nd_attention_projection else layers
+    )
+    result_shapes = {"bf16[2,1,6144]": sparse_layers}
+    if residual_reductions:
+        result_shapes["bf16[1,6144]"] = residual_reductions
     if pregathered_b512_attention:
         # The selected-cache path removes all three owner-split result/LSE/
         # validity gathers. TPU XLA had rewritten the latter two families to
@@ -3627,7 +3655,9 @@ def _expected_tpu_decoder_reductions(
         # their tuple launch fusion. The remaining attention-output and MLP
         # reductions are single-result, as is the new selected-cache sum.
         arities = {
-            "1": 2 * layers + (
+            "1": 2 * layers - (
+                dense_layers if dense_final_layout_convolution else 0
+            ) + (
                 0 if strategy_nd_attention_projection else layers
             )
         }
@@ -3890,6 +3920,9 @@ def validate_decoder_step_hlo(
             pregathered_b512_attention=pregathered_b512_attention,
             strategy_nd_attention_projection=(
                 strategy_nd_attention_projection
+            ),
+            dense_final_layout_convolution=(
+                dense_final_layout_convolution
             ),
             feature_reconstruct_down_fp32=feature_reconstruct_down_fp32,
             complete_token_path=complete_token_path,
@@ -4232,6 +4265,7 @@ def validate_decoder_step_hlo(
             stablehlo,
             dense_layers=dense_layers,
             enabled=dense_final_layout_convolution,
+            groups=canonical_groups,
             module=module,
         )
     )

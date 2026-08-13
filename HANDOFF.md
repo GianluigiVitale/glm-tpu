@@ -19,31 +19,35 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
-- Protected DB549/item1833 completed from pushed pin `57f6a052214e3394c86c2b2ebe0073f9989aca3b`
-  under tag `greenfield_layer0_dense_envelope_split_rms_20260813T134012434338842Z`.
-  It proves the accepted scalar-only layer-1 RMS schedule exactly in TPU HLO, but its numerical
-  result returns to `1,073/6,144` mismatches (observed SHA `229dc8ac...812f`). This conclusively
-  rejects the RMS schedule as the source of DB548's one-ULP improvement. DB548 remains the best
-  measured dense formulation: one BF16 ULP at index 2795, not exact and not performance evidence.
-- The active default-off production integration carries DB548's final-layout dense formulation into
-  the real true-row-one decoder without importing legacy execution. It adds deterministic offline
-  gate/up/down FP8+scale transforms for all three dense layers, direct manifest-bound loading, the
-  eight-virtual-rank convolution path at `M=1`, decoder/DSA-observer/prefill HLO gates, and protected
-  wrapper publication. The wrapper directly pins local/remote DB548 selection evidence and the
-  DB549 rejected challenger, including sealed DB rows and packed tensor hashes.
-- Focused checkpoint/HLO/wrapper tests pass `58/58`; the extracted DB548/549 prerequisite validator
-  passes the live sealed artifacts and DB. No complete 8K decoder, timing, XPlane, DB row or
-  promotion claim has yet been produced by this integration. Exact next: finish affected validation,
-  one new-diff-only Sol audit, commit/push, create the plan-aware dense runtime derivative, then run
-  exactly one protected complete 8K Gate-D retry. Gate D remains open and DB484 remains the only
-  decoder performance result.
-- The one bounded Sol bulk audit found and the correction closes two pre-launch blockers: the direct
-  runtime loader retains FP8 as exact U8 storage bits, so the dense arithmetic boundary now performs
-  a shape-preserving `bitcast_convert_type` to E4M3FN; and the complete-decoder HLO gate now reuses
-  the exact dense StableHLO matcher and independently proves gate/down/result liveness. Regression
-  mutations for an arithmetic RHS, unrelated layout constraint and dead convolutions all refuse.
-  A loader-shaped U8 trace passes. This is validation only; the correction still needs its delta
-  audit and protected 8K execution before Gate D can close.
+- Clean pushed pin `5dc58b0607173d5aa842b22405cb45c2b334073c` contains the reviewed,
+  default-off production integration of DB548's selected final-layout dense formulation. The direct
+  runtime loader's U8 FP8 storage is bitcast to E4M3FN only at the arithmetic boundary; exact
+  StableHLO/optimized-HLO gates prove packed lineage, 24 gate/up plus 24 down convolutions and live
+  results for all three dense layers. The affected suites passed before the protected launch.
+- The plan-aware feature runtime derivative is complete and sealed under tag
+  `greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z`: 32 payloads,
+  834,537,814,016 payload bytes, 10,688 tensors, manifest SHA
+  `5b48a1f66be359cc70e8bb59e0ce77ed813f835305fd38ac9befc2eeaf8e2268` and layout hash
+  `5047020f7d36338ae63cd4d443a79493a1e4ca1190a9bfdb650eef76aba310f3`. Verification,
+  archive and 8/8 cleanup pass.
+- One protected 8K attempt from that pin ran under tag ending
+  `densefinalconv_oracle_dsa_trace2_20260813T161207480221381Z`. It loaded and compiled the real
+  78-layer checkpoint, then failed closed in the HLO contract before execution. There are no tokens,
+  DSA verdict, timing, XPlane, DB row, summary or `SUCCESS`; rollback is `NO_PROVISIONAL_DB_RUN` and
+  failure cleanup is authenticated 8/8. Optimized/StableHLO/contract SHAs are
+  `9f2e8d48...8394`, `dc84ad2f...e54` and `f798e1ff...84c8`.
+- The preserved HLO proves four stale proof assumptions, not a model graph defect: the selected
+  dense path intentionally replaces three dense BF16 all-reduces with three exact LP4 all-gathers;
+  the attention validator mistook those same-geometry dense gathers for K512 attention gathers;
+  the liveness walker stopped at a live `branch_computations` conditional; and the raw dead-row scan
+  mistook the public SPMD device axis for a batch axis. The bounded correction pins 231 reductions,
+  classifies exactly 78 of 81 gather candidates by direct K512 lineage, follows tuple paths through
+  the conditional, requires all eight exact LP4 groups, and checks dead rows only in dense arithmetic
+  graphs. The preserved real HLO now passes StrategyND 78/78 and dense 3/3 with zero violations.
+  Affected tests pass `89/89`, dense-probe tests pass `55/55`, and static checks are clean.
+- Gate D remains open; DB484 remains the only decoder performance result. Exact next: one Sol audit
+  of this correction only, commit/push, then exactly one serialized protected 8K retry. Only a run
+  with exact tokens/DSA, valid wall/trace/HBM, DB/archive and clean fleet closes Gate D.
 
 - Reviewed correction `ca7c78e9eef55040a5fbcf9c0572c3fcf274a022` moved the identity barriers
   to the reduction inputs and ran once under tag

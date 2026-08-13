@@ -5,6 +5,32 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 16:45 UTC — complete dense decoder reaches protected HLO; validator drift isolated
+
+- Reviewed pin `5dc58b0607173d5aa842b22405cb45c2b334073c` was pushed. Its plan-aware
+  QKV+dense runtime pack completed under tag
+  `greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z`: 32 payloads,
+  834,537,814,016 payload bytes and 10,688 tensors. Runtime manifest/layout SHAs are
+  `5b48a1f6...e2268` / `5047020f...10f3`; direct verification, archive and 8/8 cleanup pass.
+- The first protected complete 8K launch from that pin passed every immutable prerequisite and
+  loaded/compiled the real 78-layer model. It failed closed before execution because the composite
+  HLO validator expected the pre-dense collective mix. No token, numerical, timing, XPlane, DB,
+  archive or performance result exists. Rollback is `NO_PROVISIONAL_DB_RUN`; failure cleanup is
+  authenticated 8/8. Optimized/StableHLO SHAs are `9f2e8d48...8394` / `dc84ad2f...e54`.
+- The real HLO contains 231 all-reduces, exactly three fewer than the old path, because the three
+  selected dense layers each use one exact local LP4 all-gather instead. The total all-gather count
+  remains the already expected 144. Exactly 81 StableHLO gathers share the StrategyND geometry:
+  78 are direct K512 attention trees and three are exact dense-down trees. All dense gathers name
+  the eight explicit host-local groups; no full-pod reduction or model execution occurred.
+- The bounded proof correction removes four false failures without weakening arithmetic checks:
+  reduction expectations account for the selected dense backend; attention gathers are classified
+  by exact scope/direct K512 lineage; optimized liveness follows exact tuple indices through
+  `branch_computations`; and dead-row detection examines the dense arithmetic graph rather than the
+  public SPMD device axis. Preserved real replay passes 78 attention trees and all three dense trees,
+  with 24+24 convolutions, live results and zero dense dead-row nodes. Affected tests pass `89/89`,
+  dense-probe tests `55/55`, and shell/Python/diff checks are clean. One correction-only Sol audit,
+  commit/push and one protected retry are next. Gate D remains open.
+
 ## 2026-08-13 14:29 UTC — split RMS rejected; best dense path enters production integration
 
 - Protected DB549/item1833 completed from `57f6a052214e3394c86c2b2ebe0073f9989aca3b`.

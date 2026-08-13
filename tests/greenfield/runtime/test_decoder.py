@@ -310,6 +310,7 @@ def test_dense_final_layout_hlo_pins_one_row_geometry_and_ranks() -> None:
     assert accepted["optimized_exact_gate_down_bijection"]
     assert accepted["optimized_exact_down_result_liveness"]
     assert accepted["stablehlo_exact_arithmetic_contract"] == {
+        "dead_row_node_count": 0,
         "dense_layer_group_count": 1,
         "exact_live_result_count": 1,
         "exact_runtime_u8_bitcast_count": 2,
@@ -1028,6 +1029,23 @@ def test_strategy_nd_attention_projection_hlo_is_fail_closed() -> None:
         assert not accepted["exclusive_source_violations"]
         assert accepted["all_gathers_live"]
 
+    coexisting_dense_gather = _strategy_nd_attention_projection_hlo().replace(
+        "  ROOT %root = bf16[4,8,1,6144] copy(%gather)",
+        "  %dense_gather = bf16[4,8,1,6144] all-gather(%logical), "
+        "dimensions={0}, replica_groups={{0,1,2,3}}, "
+        "use_global_device_ids=true, metadata={op_name=\"jit(mapped)/"
+        "shard_map/greenfield_strategy_nd_row0_dense_down/"
+        "greenfield_strategy_nd_row0_association/"
+        "greenfield_strategy_nd_row0_association_gather/all_gather\"}\n"
+        "  ROOT %root = bf16[4,8,1,6144] copy(%gather)",
+        1,
+    )
+    coexisting = _validate_strategy_nd_attention_projection_hlo(
+        parse_hlo_module(coexisting_dense_gather), layers=1, enabled=True
+    )
+    assert coexisting["passed"], coexisting
+    assert coexisting["gather_count"] == 1
+
     hlo = _strategy_nd_attention_projection_hlo()
     bypass = hlo.replace("all-gather(%logical)", "all-gather(%lhs)")
     rejected_bypass = _validate_strategy_nd_attention_projection_hlo(
@@ -1165,13 +1183,14 @@ def test_strategy_nd_attention_reduction_contract_replaces_projection_sum() -> N
         sparse_layers=75,
         pregathered_b512_attention=True,
         strategy_nd_attention_projection=True,
+        dense_final_layout_convolution=True,
         feature_reconstruct_down_fp32=True,
         complete_token_path=True,
         split_residual_state=True,
         token_observation_candidates=1,
     )
-    assert arities == {"1": 234}
-    assert shapes["bf16[1,6144]"] == 3
+    assert arities == {"1": 231}
+    assert "bf16[1,6144]" not in shapes
     assert shapes["bf16[1,2048,640]"] == 78
 
 
