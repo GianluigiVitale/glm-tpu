@@ -1266,6 +1266,22 @@ def _validate_optimized_hlo(
                 external_parameter_value(materialized_input)
             )
         if (
+            scheduled_module
+            and label == "gate_up"
+            and rank == 0
+            and materialized_input is not None
+            and materialized_input.raw_opcode == "fusion"
+        ):
+            direct_materialized_root = called_root(materialized_input)
+            if (
+                direct_materialized_root is not None
+                and direct_materialized_root.raw_opcode == "convert"
+                and _shape_signatures(direct_materialized_root.result_shapes)
+                == (weight_shape,)
+                and virtual_rank(direct_materialized_root) == rank
+            ):
+                root = direct_materialized_root
+        if (
             (
                 materialized_root := exact_materialized_gate_root(
                     materialized_input
@@ -1886,28 +1902,50 @@ def _validate_optimized_hlo(
 
         roots_by_rank: dict[int, tuple[Any, Any]] = {}
         errors: list[str] = []
-        for rank in range(8):
-            if rank not in down_by_rank:
-                continue
-            computation = _computation_id(down_by_rank[rank].computation)
-            roots = [
-                item
-                for item in instructions_by_computation.get(computation, ())
-                if item.raw_line.lstrip().startswith("ROOT ")
-            ]
-            callers = callers_by_computation.get(computation, ())
-            if (
-                len(roots) == 1
-                and roots[0].raw_opcode == "dynamic-update-slice"
-            ):
-                if len(callers) != 1:
-                    errors.append(f"rank {rank} fused stack caller drifted")
-                else:
-                    roots_by_rank[rank] = (roots[0], callers[0])
-        if not roots_by_rank:
+        stack_roots = [
+            item
+            for items in instructions_by_computation.values()
+            for item in items
+            if item.raw_line.lstrip().startswith("ROOT ")
+            and item.raw_opcode == "dynamic-update-slice"
+            and _shape_signatures(item.operand_shapes)
+            == (
+                "bf16[8,32,6144]",
+                "bf16[1,32,6144]",
+                "s32[]",
+                "s32[]",
+                "s32[]",
+            )
+            and _shape_signatures(item.result_shapes)
+            == ("bf16[8,32,6144]",)
+        ]
+        if not stack_roots:
             return [], None, []
+        if len(stack_roots) != 8:
+            return [], None, ["M32 fused stack does not contain exactly eight updates"]
+        for root in stack_roots:
+            root_operands = [
+                operand(root, index) for index in range(len(root.operand_names))
+            ]
+            ranks = [
+                rank
+                for rank in range(8)
+                if len(root_operands) == 5
+                and exact_s32_constant(root_operands[2], rank)
+            ]
+            computation = _computation_id(root.computation)
+            callers = callers_by_computation.get(computation, ())
+            if len(ranks) != 1 or len(callers) != 1:
+                errors.append("M32 fused stack rank/caller classification drifted")
+                continue
+            rank = ranks[0]
+            if rank in roots_by_rank:
+                errors.append(f"rank {rank} fused stack update is duplicated")
+                continue
+            roots_by_rank[rank] = (root, callers[0])
         if set(roots_by_rank) != set(range(8)):
-            return [], None, ["M32 fused stack does not contain all eight ranks"]
+            errors.append("M32 fused stack does not contain all eight ranks")
+            return [], None, errors
 
         callers: list[Any] = []
         for rank in range(8):
@@ -1918,7 +1956,7 @@ def _validate_optimized_hlo(
             if (
                 caller.raw_opcode != "fusion"
                 or not caller.computation.startswith("ENTRY ")
-                or virtual_rank(caller) != rank
+                or virtual_rank(caller) not in (None, rank)
                 or _shape_signatures(caller.result_shapes)
                 != ("bf16[8,32,6144]",)
                 or len(root_operands) != 5
@@ -1944,15 +1982,33 @@ def _validate_optimized_hlo(
                 != ("bf16[32,6144]",)
                 or _shape_signatures(inserted.result_shapes)
                 != ("bf16[1,32,6144]",)
-                or rounded is None
-                or rounded.raw_opcode != "convert"
-                or _shape_signatures(rounded.operand_shapes)
-                != ("f32[32,6144]",)
-                or _shape_signatures(rounded.result_shapes)
-                != ("bf16[32,6144]",)
-                or operand(rounded, 0) is not down_by_rank[rank]
             ):
                 errors.append(f"rank {rank} fused stack BF16 insertion drifted")
+                continue
+            integrated_down = (
+                rounded is not None
+                and rounded.raw_opcode == "convert"
+                and _shape_signatures(rounded.operand_shapes)
+                == ("f32[32,6144]",)
+                and _shape_signatures(rounded.result_shapes)
+                == ("bf16[32,6144]",)
+                and operand(rounded, 0) is down_by_rank[rank]
+                and down_value_by_rank.get(rank) is caller
+                and virtual_rank(caller) == rank
+            )
+            split_down = (
+                rounded is not None
+                and rounded.raw_opcode == "parameter"
+                and not rounded.computation.startswith("ENTRY ")
+                and _shape_signatures(rounded.result_shapes)
+                == ("bf16[32,6144]",)
+                and external_parameter_value(rounded)
+                is down_value_by_rank.get(rank)
+                and virtual_rank(caller) is None
+                and len(caller.operand_names) == (1 if rank == 0 else 2)
+            )
+            if not integrated_down and not split_down:
+                errors.append(f"rank {rank} fused stack BF16 source drifted")
                 continue
             if not (
                 exact_s32_constant(root_operands[2], rank)

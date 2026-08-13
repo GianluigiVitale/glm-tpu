@@ -103,6 +103,16 @@ REAL_SERIALIZED_SCALE_ENVELOPE_OPTIMIZED_HLO = Path(
 REAL_SERIALIZED_SCALE_ENVELOPE_OPTIMIZED_HLO_SHA256 = (
     "0cff45d9ab9fb1428ea2c6483b33be8dc5416769db42800f8c3099ed1c16453b"
 )
+REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_ACCEPTED_GEOMETRY_HLO",
+        "/home/gianl/glm-run/greenfield_layer0_dense_envelope_cross_layer_"
+        "20260813T115238978656998Z/hlo/dense_convolution.optimized_hlo.txt",
+    )
+)
+REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO_SHA256 = (
+    "ac57c042ae591d99cebc982f37f06b3c335f3f3d1453fd9e2f7269a1c3b9094c"
+)
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
     "decode_projection_lowering/8k/"
@@ -2365,6 +2375,68 @@ def test_dense_envelope_binds_materialized_gate_tuple_fail_closed() -> None:
         dense_envelope=True,
     )
     assert rejected_tuple["exact_packed_weight_lineage"] is False
+
+
+@pytest.mark.skipif(
+    not REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO.exists(),
+    reason="protected all-accepted dense geometry HLO is unavailable",
+)
+def test_dense_envelope_binds_split_m32_stack_fail_closed() -> None:
+    optimized_hlo = REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO_SHA256
+    )
+    contract = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert contract["passed"] is True, contract["violations"]
+    assert contract["exact_packed_weight_lineage"] is True
+    assert contract["exact_accepted_kernel_geometry"] is True
+    assert contract["lineage"]["ordered_stack_sources"] == [
+        [rank] for rank in range(8)
+    ]
+    assert len(contract["lineage"]["m32_fused_stack_callers"]) == 8
+
+    mutations = (
+        optimized_hlo.replace(
+            "%constant.195 = s32[] constant(1)",
+            "%constant.195 = s32[] constant(2)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "fusion(%bitcast_dynamic-update-slice_fusion.7, %fusion.58), "
+            "kind=kLoop, calls=%fused_computation.69",
+            "fusion(%bitcast_dynamic-update-slice_fusion.7, %fusion.55), "
+            "kind=kLoop, calls=%fused_computation.69",
+            1,
+        ),
+        optimized_hlo.replace(
+            "fusion(%bitcast_dynamic-update-slice_fusion.6, %fusion.55), "
+            "kind=kLoop, calls=%fused_computation.68",
+            "fusion(%bitcast_dynamic-update-slice_fusion.7, %fusion.55), "
+            "kind=kLoop, calls=%fused_computation.68",
+            1,
+        ),
+        optimized_hlo.replace(
+            "%mul.190 = f32[6144,768]{1,0:T(8,128)} multiply(",
+            "%mul.190 = f32[6144,768]{1,0:T(8,128)} add(",
+            1,
+        ),
+    )
+    assert all(mutated != optimized_hlo for mutated in mutations)
+    for mutated in mutations:
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+        )
+        assert rejected["passed"] is False
 
 
 @pytest.mark.skipif(

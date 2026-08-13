@@ -5,6 +5,34 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 12:02 UTC — all 16 dense contractions reach accepted TPU geometry
+
+- Three reviewed scheduling commits followed DB547's one-ULP result. `077dffb` replaced compressed
+  scales with direct E4M3FN weights and output-expanded scales, producing 15/16 accepted scheduled
+  contractions in the protected 11:10 run. `6eff524` serialized each later gate against the exact
+  previous down result and moved the sole old schedule to gate rank zero in the 11:38 run.
+  `bd94967` added a unary rank-zero materialization barrier while preserving the seven two-result
+  predecessor barriers.
+- The protected 11:52 retry at `bd94967`, tag
+  `greenfield_layer0_dense_envelope_cross_layer_20260813T115238978656998Z`, achieves the accepted
+  backend configuration for all eight gate/up and all eight down convolutions. This is the first
+  full-model compile in the campaign with all 16 exact kernel windows, iteration bounds, splits,
+  input windows and padding fields. The scheduling problem that survived the preceding retries is
+  therefore closed.
+- The run refused before arithmetic only in the optimized-HLO proof layer. XLA emitted rank zero's
+  gate weight as one direct dequant fusion and split the M32 output stack into seven standalone
+  down-result fusions plus eight ordered dynamic-update-slice fusions; the prior checker understood
+  only tuple-materialized gate weights and down-plus-stack fused computations. No tensor verdict,
+  DB row, summary, archive or `SUCCESS` exists. Optimized-HLO/StableHLO/runner/pre/failure-census
+  SHAs are `ac57c042...094c`, `16019c24...072`, `1c3c393b...f98f`, `811baa15...27dc`, and
+  `0bd76a05...4659`; authenticated failure cleanup is 8/8.
+- The bounded proof correction now accepts the SHA-pinned real HLO only after binding rank zero to
+  its exact packed bits/scales and proving exactly eight BF16 stack insertions in rank order, each
+  with the exact down result, index, predecessor and final live-row slice. A duplicated index,
+  wrong down source, skipped predecessor or altered rank-zero dequant arithmetic refuses. The full
+  affected validation file passes 50/50. Exact next is one new-diff-only Sol audit, commit/push and
+  one serialized protected arithmetic retry; no new numerical hypothesis or full 8K run precedes it.
+
 ## 2026-08-13 08:49 UTC — Gate-D dense boundary narrowed to compiler fusion envelope
 
 - Eleven reviewed commits landed in the preceding eight hours. Protected DB540--DB546 exercised
