@@ -964,6 +964,15 @@ if dense:
         and optimized_lineage.get("rmsnorm_contract", {}).get(
             "exact_weighted_operand_graph"
         ) is True
+        and optimized_lineage.get("rmsnorm_contract", {}).get(
+            "exact_reduction_operand_graph"
+        ) is True
+        and optimized_lineage.get("rmsnorm_contract", {}).get(
+            "exact_cross_fusion_reduction_lineage"
+        ) is True
+        and optimized_lineage.get("rmsnorm_contract", {}).get(
+            "exact_m32_reduction_geometry"
+        ) is True
         and {
             "add",
             "div",

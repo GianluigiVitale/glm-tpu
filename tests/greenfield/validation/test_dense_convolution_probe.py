@@ -52,6 +52,11 @@ SPEC.loader.exec_module(MODULE)
 def _synthetic_hlo() -> str:
     lines = [
         "HloModule dense_convolution, num_partitions=4",
+        "%sum_reducer (lhs: f32[], rhs: f32[]) -> f32[] {",
+        "  %lhs = f32[] parameter(0)",
+        "  %rhs = f32[] parameter(1)",
+        "  ROOT %sum_value = f32[] add(%lhs, %rhs)",
+        "}",
         "ENTRY main {",
         "  %normalized = bf16[1,6144] parameter(0)",
         "  %residual = bf16[1,6144] parameter(100)",
@@ -299,7 +304,45 @@ def _synthetic_m32_hlo() -> str:
 
 
 def _synthetic_m32_layer1_only_hlo() -> str:
-    return _synthetic_m32_hlo().replace(
+    hlo = _synthetic_m32_hlo()
+    rms_start = hlo.index("  %update_f32 =")
+    root_start = hlo.index("  ROOT %root =", rms_start)
+    rms = hlo[rms_start:root_start]
+    rms = rms.replace(
+        "  %update_f32 = f32[1,6144] convert(%update)",
+        "  %rms_zero = bf16[] constant(0)\n"
+        "  %update_m32 = bf16[32,6144] pad(%update, %rms_zero), "
+        "padding=0_31x0_0\n"
+        "  %residual_m32 = bf16[32,6144] pad(%residual, %rms_zero), "
+        "padding=0_31x0_0\n"
+        "  %update_f32 = f32[32,6144] convert(%update_m32)",
+        1,
+    ).replace(
+        "  %residual_f32 = f32[1,6144] convert(%residual)",
+        "  %residual_f32 = f32[32,6144] convert(%residual_m32)",
+        1,
+    )
+    rms = rms.replace("f32[1,6144]", "f32[32,6144]")
+    rms = rms.replace("f32[1,1]", "f32[32,1]")
+    rms = rms.replace("f32[1] reduce", "f32[32] reduce")
+    rms = rms.replace("bf16[1,6144] convert", "bf16[32,6144] convert")
+    rms = rms.replace(
+        "  %norm_wide = bf16[1,6144] broadcast(%norm), dimensions={1}",
+        "  %norm_seed = bf16[1,6144] broadcast(%norm), dimensions={1}\n"
+        "  %norm_wide = bf16[32,6144] broadcast(%norm_seed), "
+        "dimensions={0,1}",
+        1,
+    ).replace(
+        "  %layer1 = bf16[1,6144] multiply(%rounded, %norm_wide), ",
+        "  %layer1_m32 = bf16[32,6144] multiply(%rounded, %norm_wide), ",
+        1,
+    )
+    rms += (
+        "  %layer1 = bf16[1,6144] slice(%layer1_m32), "
+        "slice={[0:1], [0:6144]}\n"
+    )
+    hlo = hlo[:rms_start] + rms + hlo[root_start:]
+    return hlo.replace(
         "  ROOT %root = (bf16[1,6144], bf16[1,6144]) "
         "tuple(%update, %layer1)",
         "  ROOT %layer1_result = bf16[1,6144] copy(%layer1)",
@@ -528,6 +571,14 @@ print(jax.jit(mapped).lower(*arguments).as_text())
         )
     if layer1_only:
         program = program.replace(
+            "    layer1 = fused_add_rms_norm(update, residual, norm, epsilon=1e-5)[0]",
+            "    update = jnp.pad(update, ((0, 31), (0, 0)), "
+            "constant_values=jnp.bfloat16(0))\n"
+            "    residual = jnp.pad(residual, ((0, 31), (0, 0)), "
+            "constant_values=jnp.bfloat16(0))\n"
+            "    layer1 = fused_add_rms_norm(update, residual, norm, epsilon=1e-5)[0]\n"
+            "    layer1 = layer1[:1, :]",
+        ).replace(
             "    return update, layer1",
             "    return layer1",
         ).replace(
@@ -667,6 +718,36 @@ def test_dense_cross_layer_hlo_contract_requires_layer1_only_result() -> None:
     assert stable["passed"], stable["violations"]
     assert optimized["passed"], optimized["violations"]
     assert stable["result_mode"] == optimized["result_mode"] == "layer1_only"
+    wrong_pad = stablehlo.replace(
+        "low = [0, 0], high = [31, 0], interior = [0, 0]",
+        "low = [0, 0], high = [30, 0], interior = [0, 0]",
+        1,
+    )
+    assert wrong_pad != stablehlo
+    assert not MODULE._validate_stablehlo(
+        wrong_pad, compile_rows=32, layer1_only=True
+    )["passed"]
+    residual_call = re.search(
+        r"(%[0-9]+ = func\.call @_pad\()(%arg10)(, %[A-Za-z0-9_]+\))",
+        stablehlo,
+    )
+    assert residual_call is not None
+    dense_pad_sources = [
+        source
+        for source in re.findall(
+            r"func\.call @_pad\((%[A-Za-z0-9_]+),", stablehlo
+        )
+        if source not in {"%arg9", "%arg10"}
+    ]
+    assert len(dense_pad_sources) == 1
+    cross_wired_residual = (
+        stablehlo[: residual_call.start(2)]
+        + dense_pad_sources[0]
+        + stablehlo[residual_call.end(2) :]
+    )
+    assert not MODULE._validate_stablehlo(
+        cross_wired_residual, compile_rows=32, layer1_only=True
+    )["passed"]
     assert not MODULE._validate_stablehlo(
         _exact_stablehlo(32), compile_rows=32, layer1_only=True
     )["passed"]
@@ -691,19 +772,20 @@ def test_dense_cross_layer_hlo_contract_requires_layer1_only_result() -> None:
         'greenfield_dense_convolution_layer1_rmsnorm/mul"}'
     )
     valid_layer1 = (
-        "  %layer1 = bf16[1,6144] multiply(%rounded, %norm_wide), "
+        "  %layer1_m32 = bf16[32,6144] multiply(%rounded, %norm_wide), "
         + scoped_mul
     )
     reapplied_layer1 = (
-        "  %layer1 = bf16[1,6144] multiply(%rounded, %norm_wide)\n"
-        "  %rogue_layer1 = bf16[1,6144] multiply(%layer1, %norm_wide), "
+        "  %layer1_m32 = bf16[32,6144] multiply(%rounded, %norm_wide)\n"
+        "  %rogue_layer1_m32 = bf16[32,6144] multiply("
+        "%layer1_m32, %norm_wide), "
         + scoped_mul
     )
     reapplied_weight = optimized_hlo.replace(
         valid_layer1, reapplied_layer1, 1
     ).replace(
-        "ROOT %layer1_result = bf16[1,6144] copy(%layer1)",
-        "ROOT %layer1_result = bf16[1,6144] copy(%rogue_layer1)",
+        "%layer1 = bf16[1,6144] slice(%layer1_m32)",
+        "%layer1 = bf16[1,6144] slice(%rogue_layer1_m32)",
         1,
     )
     assert reapplied_weight != optimized_hlo
@@ -713,6 +795,87 @@ def test_dense_cross_layer_hlo_contract_requires_layer1_only_result() -> None:
     assert not reapplied_contract["passed"]
     assert not reapplied_contract["lineage"]["rmsnorm_contract"][
         "exact_weighted_operand_graph"
+    ]
+    rogue_variance = optimized_hlo.replace(
+        "  %inverse = f32[32,1] rsqrt(%variance), ",
+        "  %rogue_variance = f32[32,1] add(%variance, %variance)\n"
+        "  %inverse = f32[32,1] rsqrt(%rogue_variance), ",
+        1,
+    )
+    assert rogue_variance != optimized_hlo
+    rogue_variance_contract = MODULE._validate_optimized_hlo(
+        rogue_variance, compile_rows=32, layer1_only=True
+    )
+    assert not rogue_variance_contract["passed"]
+    assert not rogue_variance_contract["lineage"]["rmsnorm_contract"][
+        "exact_reduction_operand_graph"
+    ]
+    rogue_sum = optimized_hlo.replace(
+        "  %sum_row = f32[32,1] reshape(%sum)",
+        "  %rogue_sum = f32[32] add(%sum, %sum)\n"
+        "  %sum_row = f32[32,1] reshape(%rogue_sum)",
+        1,
+    )
+    assert rogue_sum != optimized_hlo
+    rogue_sum_contract = MODULE._validate_optimized_hlo(
+        rogue_sum, compile_rows=32, layer1_only=True
+    )
+    assert not rogue_sum_contract["passed"]
+    assert not rogue_sum_contract["lineage"]["rmsnorm_contract"][
+        "exact_reduction_operand_graph"
+    ]
+    rogue_mean = optimized_hlo.replace(
+        "  %variance = f32[32,1] add(%mean, %epsilon), ",
+        "  %rogue_mean = f32[32,1] add(%mean, %mean)\n"
+        "  %variance = f32[32,1] add(%rogue_mean, %epsilon), ",
+        1,
+    )
+    assert rogue_mean != optimized_hlo
+    rogue_mean_contract = MODULE._validate_optimized_hlo(
+        rogue_mean, compile_rows=32, layer1_only=True
+    )
+    assert not rogue_mean_contract["passed"]
+    assert not rogue_mean_contract["lineage"]["rmsnorm_contract"][
+        "exact_reduction_operand_graph"
+    ]
+    wrong_reducer = optimized_hlo.replace(
+        "ROOT %sum_value = f32[] add(%lhs, %rhs)",
+        "ROOT %sum_value = f32[] subtract(%lhs, %rhs)",
+        1,
+    )
+    assert wrong_reducer != optimized_hlo
+    wrong_reducer_contract = MODULE._validate_optimized_hlo(
+        wrong_reducer, compile_rows=32, layer1_only=True
+    )
+    assert not wrong_reducer_contract["passed"]
+    assert not wrong_reducer_contract["lineage"]["rmsnorm_contract"][
+        "exact_reduction_operand_graph"
+    ]
+    wrong_live_row = optimized_hlo.replace(
+        "slice={[0:1], [0:6144]}",
+        "slice={[1:2], [0:6144]}",
+        1,
+    )
+    assert wrong_live_row != optimized_hlo
+    wrong_live_row_contract = MODULE._validate_optimized_hlo(
+        wrong_live_row, compile_rows=32, layer1_only=True
+    )
+    assert not wrong_live_row_contract["passed"]
+    assert not wrong_live_row_contract["lineage"]["rmsnorm_contract"][
+        "exact_m32_reduction_geometry"
+    ]
+    wrong_reduction_axis = optimized_hlo.replace(
+        "f32[32] reduce(%square, %zero), dimensions={1}",
+        "f32[32] reduce(%square, %zero), dimensions={0}",
+        1,
+    )
+    assert wrong_reduction_axis != optimized_hlo
+    wrong_reduction_contract = MODULE._validate_optimized_hlo(
+        wrong_reduction_axis, compile_rows=32, layer1_only=True
+    )
+    assert not wrong_reduction_contract["passed"]
+    assert not wrong_reduction_contract["lineage"]["rmsnorm_contract"][
+        "exact_m32_reduction_geometry"
     ]
 
 
@@ -1119,6 +1282,7 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "activation_graph",
         "association_graph",
         "rms_graph",
+        "rms_reduction_geometry",
         "nonexact",
         "nonexact_negative_count",
         "nonexact_bad_index",
@@ -1222,6 +1386,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                     "rmsnorm_contract": {
                         "add_count": 2,
                         "direct_exact_operand_graph": True,
+                        "exact_cross_fusion_reduction_lineage": True,
+                        "exact_m32_reduction_geometry": True,
+                        "exact_reduction_operand_graph": True,
                         "exact_result_binding": True,
                         "exact_weighted_operand_graph": True,
                         "divide_count": 1,
@@ -1404,6 +1571,10 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         runner["hlo"]["optimized_contract"]["lineage"][
             "rmsnorm_contract"
         ]["direct_exact_operand_graph"] = False
+    elif mutation == "rms_reduction_geometry":
+        runner["hlo"]["optimized_contract"]["lineage"][
+            "rmsnorm_contract"
+        ]["exact_m32_reduction_geometry"] = False
     elif mutation.startswith("nonexact"):
         runner["classification"] = "accepted_dense_convolution_nonexact"
         runner["exact"] = False

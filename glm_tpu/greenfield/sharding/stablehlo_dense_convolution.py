@@ -584,16 +584,47 @@ def _validate_m32_input_pad(
 
 
 def _match_rmsnorm(
-    graph: _StableGraph, dense_output: str, *, layer1_only: bool = False
+    graph: _StableGraph,
+    helpers: dict[str, _StableGraph],
+    dense_output: str,
+    *,
+    layer1_only: bool = False,
 ) -> tuple[str, str, str]:
+    rows = 32 if layer1_only else 1
+    row_type = f"tensor<{rows}x6144x"
+    scalar_row_type = f"tensor<{rows}x1xf32>"
+
+    def exact_m32_pad(source: str) -> str:
+        call = _only(
+            (
+                node
+                for node in graph.matching_users(
+                    source,
+                    opcode="call",
+                    result_type="tensor<32x6144xbf16>",
+                )
+                if node.operands and node.operands[0] == source
+            ),
+            f"M32 RMSNorm pad for {source}",
+        )
+        if _validate_m32_input_pad(graph, helpers, call.name) != source:
+            raise _MatchError(f"{call.name}: M32 RMSNorm pad source drifted")
+        return call.name
+
+    dense_value = exact_m32_pad(dense_output) if layer1_only else dense_output
     dense_f32 = _expect_unary(
-        graph, dense_output, opcode="convert", result_type="tensor<1x6144xf32>"
+        graph,
+        dense_value,
+        opcode="convert",
+        result_type=f"{row_type}f32>",
     )
     combined = _only(
         (
             node
             for node in graph.matching_users(
-                dense_f32.name, opcode="add", result_type="tensor<1x6144xf32>"
+                dense_f32.name,
+                opcode="add",
+                result_type=f"{row_type}f32>",
             )
             if len(node.operands) == 2 and node.operands[0] == dense_f32.name
         ),
@@ -603,16 +634,34 @@ def _match_rmsnorm(
         graph,
         combined.operands[1],
         opcode="convert",
-        result_type="tensor<1x6144xf32>",
+        result_type=f"{row_type}f32>",
     )
+    residual = residual.operands[0]
+    if layer1_only:
+        residual_pad = _expect_node(
+            graph,
+            residual,
+            opcode="call",
+            result_type="tensor<32x6144xbf16>",
+        )
+        if len(residual_pad.operands) != 2:
+            raise _MatchError(f"{residual_pad.name}: residual pad arity drifted")
+        residual = _validate_m32_input_pad(
+            graph, helpers, residual_pad.name
+        )
     square = _expect_unary(
-        graph, combined.name, opcode="square", result_type="tensor<1x6144xf32>"
+        graph,
+        combined.name,
+        opcode="square",
+        result_type=f"{row_type}f32>",
     )
     reduce = _only(
         (
             node
             for node in graph.matching_users(
-                square.name, opcode="reduce", result_type="tensor<1xf32>"
+                square.name,
+                opcode="reduce",
+                result_type=f"tensor<{rows}xf32>",
             )
             if len(node.operands) == 2 and node.operands[0] == square.name
         ),
@@ -626,13 +675,16 @@ def _match_rmsnorm(
     if zero.constant_literal != "0.000000e+00":
         raise _MatchError(f"{zero.name}: RMSNorm zero drifted")
     summed = _expect_broadcast(
-        graph, reduce.name, dimensions=(0,), result_type="tensor<1x1xf32>"
+        graph,
+        reduce.name,
+        dimensions=(0,),
+        result_type=scalar_row_type,
     )
     width = _expect_constant_broadcast(
         graph,
         literal="6.144000e+03",
         scalar_type="tensor<f32>",
-        result_type="tensor<1x1xf32>",
+        result_type=scalar_row_type,
         dimensions=(),
     )
     mean = _expect_binary(
@@ -640,13 +692,13 @@ def _match_rmsnorm(
         summed.name,
         width.name,
         opcode="divide",
-        result_type="tensor<1x1xf32>",
+        result_type=scalar_row_type,
     )
     epsilon = _expect_constant_broadcast(
         graph,
         literal="9.99999974E-6",
         scalar_type="tensor<f32>",
-        result_type="tensor<1x1xf32>",
+        result_type=scalar_row_type,
         dimensions=(),
     )
     variance = _expect_binary(
@@ -654,28 +706,34 @@ def _match_rmsnorm(
         mean.name,
         epsilon.name,
         opcode="add",
-        result_type="tensor<1x1xf32>",
+        result_type=scalar_row_type,
     )
     reciprocal = _expect_unary(
-        graph, variance.name, opcode="rsqrt", result_type="tensor<1x1xf32>"
+        graph,
+        variance.name,
+        opcode="rsqrt",
+        result_type=scalar_row_type,
     )
     scale = _expect_broadcast(
         graph,
         reciprocal.name,
         dimensions=(0, 1),
-        result_type="tensor<1x6144xf32>",
+        result_type=f"{row_type}f32>",
     )
     normalized = _expect_binary(
         graph,
         combined.name,
         scale.name,
         opcode="multiply",
-        result_type="tensor<1x6144xf32>",
+        result_type=f"{row_type}f32>",
     )
     rounded = _expect_unary(
-        graph, normalized.name, opcode="convert", result_type="tensor<1x6144xbf16>"
+        graph,
+        normalized.name,
+        opcode="convert",
+        result_type=f"{row_type}bf16>",
     )
-    norm_weight = _only(
+    norm_weight_seed = _only(
         (
             node
             for node in graph.nodes.values()
@@ -686,14 +744,34 @@ def _match_rmsnorm(
         ),
         "layer-1 RMSNorm weight broadcast",
     )
+    norm_weight = norm_weight_seed
+    if layer1_only:
+        norm_weight = _expect_broadcast(
+            graph,
+            norm_weight_seed.name,
+            dimensions=(0, 1),
+            result_type="tensor<32x6144xbf16>",
+        )
     output = _expect_binary(
         graph,
         rounded.name,
         norm_weight.name,
         opcode="multiply",
-        result_type="tensor<1x6144xbf16>",
+        result_type=f"{row_type}bf16>",
     )
-    expected_return = (output.name,) if layer1_only else (dense_output, output.name)
+    returned_output = output.name
+    if layer1_only:
+        returned_output = _expect_slice(
+            graph,
+            output.name,
+            ((0, 1), (0, 6144)),
+            "tensor<1x6144xbf16>",
+        ).name
+    expected_return = (
+        (returned_output,)
+        if layer1_only
+        else (dense_output, returned_output)
+    )
     _only(
         (
             node
@@ -705,9 +783,11 @@ def _match_rmsnorm(
         if layer1_only
         else "probe dense/layer-1 return",
     )
-    if layer1_only and graph.users.get(dense_output, ()) != [dense_f32]:
+    if layer1_only and graph.users.get(dense_output, ()) != [
+        graph.node(dense_value)
+    ]:
         raise _MatchError("layer-1-only probe externalizes the dense update")
-    return residual.operands[0], norm_weight.operands[0], output.name
+    return residual, norm_weight_seed.operands[0], returned_output
 
 
 def validate_dense_convolution_stablehlo(
@@ -814,8 +894,12 @@ def validate_dense_convolution_stablehlo(
         ):
             raise _MatchError(f"{gather.name}: dense gather group drifted")
         dense_output = _match_reduction_tree(graph, gather)
+        helpers = {item.name: item for item in graphs if item is not graph}
         residual, norm_weight, _layer1 = _match_rmsnorm(
-            graph, dense_output, layer1_only=layer1_only
+            graph,
+            helpers,
+            dense_output,
+            layer1_only=layer1_only,
         )
         layer_roots = next(iter(rows.values()))[0]
         root_contracts = (
@@ -828,7 +912,6 @@ def validate_dense_convolution_stablehlo(
         )
         normalized_root = layer_roots[0]
         if compile_rows == 32:
-            helpers = {item.name: item for item in graphs if item is not graph}
             normalized_root = _validate_m32_input_pad(
                 graph, helpers, normalized_root
             )

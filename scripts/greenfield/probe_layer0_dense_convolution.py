@@ -1933,6 +1933,37 @@ def _validate_optimized_hlo(
                 "semantic_counts": dict(sorted(rms_semantics.items())),
             }
             lineage["rmsnorm_contract"] = rms_contract
+            rms_rows = 32 if layer1_only else 1
+            rms_f32_shape = f"f32[{rms_rows},6144]"
+            rms_bf16_shape = f"bf16[{rms_rows},6144]"
+            rms_reduction_shape = f"f32[{rms_rows}]"
+            rms_reduction_operand_shapes = (
+                _shape_signatures(rms_reductions[0].operand_shapes)
+                if len(rms_reductions) == 1
+                else ()
+            )
+            exact_m32_reduction_geometry = (
+                not layer1_only
+                or (
+                    len(rms_reductions) == 1
+                    and rms_reduction_operand_shapes[:1] == (rms_f32_shape,)
+                    and _shape_signatures(rms_reductions[0].result_shapes)
+                    == (rms_reduction_shape,)
+                    and "dimensions={1}" in re.sub(
+                        r"\s+", "", rms_reductions[0].raw_line
+                    )
+                    and any(
+                        is_m32_row0_slice(item)
+                        and _shape_signatures(item.operand_shapes)
+                        == (rms_bf16_shape,)
+                        and _value_depends_on(module, layer1_result, item)
+                        for item in module.instructions
+                    )
+                )
+            )
+            rms_contract["exact_m32_reduction_geometry"] = (
+                exact_m32_reduction_geometry
+            )
             entry_norm_parameters = [
                 item
                 for item in module.instructions
@@ -1960,6 +1991,12 @@ def _validate_optimized_hlo(
                     ):
                         value = operand(value, 0)
                         continue
+                    if (
+                        value.raw_opcode == "parameter"
+                        and not value.computation.startswith("ENTRY ")
+                    ):
+                        value = external_parameter_value(value)
+                        continue
                     if value.raw_opcode == "parameter" and not value.computation.startswith(
                         "ENTRY "
                     ):
@@ -1967,6 +2004,249 @@ def _validate_optimized_hlo(
                         continue
                     return False
                 return value is source
+
+            def exact_chain_source(value: Any | None, source: Any) -> bool:
+                """Bind an operand to one semantic value across exact fusion exits."""
+
+                candidates = [source]
+                external = fully_externalized_value(source)
+                if external is not None and external is not source:
+                    candidates.append(external)
+                return any(
+                    exact_semantic_source(value, candidate)
+                    for candidate in candidates
+                )
+
+            def exact_constant(
+                value: Any | None, expected: np.float32
+            ) -> bool:
+                seen: set[tuple[str, str]] = set()
+                while value is not None and _instruction_key(value) not in seen:
+                    seen.add(_instruction_key(value))
+                    if (
+                        value.raw_opcode in semantic_layout_only
+                        and len(value.operand_names) == 1
+                    ):
+                        value = operand(value, 0)
+                        continue
+                    if value.raw_opcode != "constant":
+                        return False
+                    match = re.search(
+                        r"\bconstant\(([-+]?(?:[0-9]+(?:\.[0-9]*)?|"
+                        r"\.[0-9]+)(?:[eE][-+]?[0-9]+)?)\)",
+                        value.raw_line,
+                    )
+                    return (
+                        match is not None
+                        and np.float32(float(match.group(1))) == expected
+                    )
+                return False
+
+            def exact_add_reducer(item: Any) -> bool:
+                match = re.search(r"\bto_apply=%?([^,\s}\]]+)", item.raw_line)
+                if match is None:
+                    return False
+                values = instructions_by_computation.get(match.group(1), ())
+                parameters = [
+                    value for value in values if value.raw_opcode == "parameter"
+                ]
+                roots = [
+                    value
+                    for value in values
+                    if value.raw_line.lstrip().startswith("ROOT ")
+                ]
+                if (
+                    len(parameters) != 2
+                    or len(roots) != 1
+                    or roots[0].raw_opcode != "add"
+                    or len(roots[0].operand_names) != 2
+                ):
+                    return False
+                root_operands = {
+                    _instruction_key(unwrap_layout(operand(roots[0], index)))
+                    for index in range(2)
+                    if unwrap_layout(operand(roots[0], index)) is not None
+                }
+                return root_operands == {
+                    _instruction_key(value) for value in parameters
+                }
+
+            def semantic_origins(item: Any) -> frozenset[tuple[str, str]]:
+                origins = []
+                for index in range(len(item.operand_names)):
+                    value = operand(item, index)
+                    seen: set[tuple[str, str]] = set()
+                    while value is not None and _instruction_key(value) not in seen:
+                        seen.add(_instruction_key(value))
+                        if (
+                            value.raw_opcode in semantic_layout_only
+                            and len(value.operand_names) == 1
+                        ):
+                            value = operand(value, 0)
+                            continue
+                        if (
+                            value.raw_opcode == "parameter"
+                            and not value.computation.startswith("ENTRY ")
+                        ):
+                            value = external_parameter_value(value)
+                            continue
+                        break
+                    if value is not None:
+                        origins.append(_instruction_key(value))
+                return frozenset(origins)
+
+            residual_adds = [
+                item
+                for item in rms_adds
+                if _shape_signatures(item.result_shapes)
+                in {(rms_f32_shape,), (rms_bf16_shape,)}
+            ]
+            square_candidates = [
+                item
+                for item in rms_items
+                if (item.op_name or "").split("/")[-1] == "square"
+                and item.raw_opcode in {"multiply", "square"}
+                and (
+                    (
+                        item.raw_opcode == "square"
+                        and len(item.operand_names) == 1
+                    )
+                    or (
+                        item.raw_opcode == "multiply"
+                        and len(item.operand_names) == 2
+                        and unwrap_layout(operand(item, 0))
+                        is unwrap_layout(operand(item, 1))
+                    )
+                )
+            ]
+            mean_candidates = [
+                item
+                for item in rms_items
+                if (item.op_name or "").split("/")[-1] == "div"
+                and item.raw_opcode in {"divide", "multiply"}
+                and len(item.operand_names) == 2
+            ]
+            mean_shapes = {
+                f"f32[{rms_rows}]",
+                f"f32[{rms_rows},1]",
+            }
+            if rms_rows == 1:
+                mean_shapes.add("f32[]")
+            variance_candidates = [
+                item
+                for item in rms_adds
+                if _shape_signatures(item.result_shapes)[0:1]
+                and _shape_signatures(item.result_shapes)[0] in mean_shapes
+                and len(item.operand_names) == 2
+            ]
+
+            exact_reduction_pairs: list[tuple[Any, Any, Any]] = []
+            if len(square_candidates) == 1 and len(rms_reductions) == 1:
+                square = square_candidates[0]
+                reduction = rms_reductions[0]
+                square_source = operand(square, 0)
+                matching_residual_adds = [
+                    item
+                    for item in residual_adds
+                    if exact_chain_source(square_source, item)
+                ]
+                if (
+                    len(matching_residual_adds) == 1
+                    and len(reduction.operand_names) == 2
+                    and exact_chain_source(operand(reduction, 0), square)
+                    and exact_constant(operand(reduction, 1), np.float32(0.0))
+                    and exact_add_reducer(reduction)
+                ):
+                    exact_reduction_pairs.append(
+                        (reduction, square, matching_residual_adds[0])
+                    )
+
+            exact_mean_pairs: list[tuple[Any, Any, Any]] = []
+            for mean in mean_candidates:
+                for reduction, square, residual_add in exact_reduction_pairs:
+                    if mean.raw_opcode == "divide":
+                        exact = exact_chain_source(
+                            operand(mean, 0), reduction
+                        ) and exact_constant(
+                            operand(mean, 1), np.float32(6144.0)
+                        )
+                    else:
+                        exact = any(
+                            exact_chain_source(
+                                operand(mean, reduction_index), reduction
+                            )
+                            and exact_constant(
+                                operand(mean, 1 - reduction_index),
+                                np.float32(1.0 / 6144.0),
+                            )
+                            for reduction_index in range(2)
+                        )
+                    if exact:
+                        exact_mean_pairs.append((mean, square, residual_add))
+
+            exact_variance_pairs: list[tuple[Any, Any, Any]] = []
+            for variance in variance_candidates:
+                for mean, square, residual_add in exact_mean_pairs:
+                    if any(
+                        exact_chain_source(
+                            operand(variance, mean_index), mean
+                        )
+                        and exact_constant(
+                            operand(variance, 1 - mean_index),
+                            np.float32(1.0e-5),
+                        )
+                        for mean_index in range(2)
+                    ):
+                        exact_variance_pairs.append(
+                            (variance, square, residual_add)
+                        )
+
+            exact_rsqrt_pairs: list[tuple[Any, Any, Any]] = []
+            for rsqrt in rms_rsqrt:
+                if len(rsqrt.operand_names) != 1:
+                    continue
+                for variance, square, residual_add in exact_variance_pairs:
+                    if exact_chain_source(operand(rsqrt, 0), variance):
+                        exact_rsqrt_pairs.append(
+                            (rsqrt, square, residual_add)
+                        )
+
+            exact_normalized_values: dict[tuple[str, str], Any] = {}
+            for item in rms_multiply_or_square:
+                if (
+                    (item.op_name or "").split("/")[-1] != "mul"
+                    or item.raw_opcode != "multiply"
+                    or len(item.operand_names) != 2
+                    or _shape_signatures(item.result_shapes)
+                    != (rms_f32_shape,)
+                ):
+                    continue
+                for rsqrt, _square, reduction_residual_add in exact_rsqrt_pairs:
+                    for normalized_index in range(2):
+                        normalized_residual_adds = [
+                            candidate
+                            for candidate in residual_adds
+                            if exact_chain_source(
+                                operand(item, normalized_index), candidate
+                            )
+                        ]
+                        if (
+                            len(normalized_residual_adds) == 1
+                            and semantic_origins(normalized_residual_adds[0])
+                            == semantic_origins(reduction_residual_add)
+                            and exact_chain_source(
+                                operand(item, 1 - normalized_index), rsqrt
+                            )
+                        ):
+                            exact_normalized_values[_instruction_key(item)] = item
+
+            exact_reduction_operand_graph = (
+                len(exact_reduction_pairs) == 1
+                and len(exact_mean_pairs) == 1
+                and len(exact_variance_pairs) == 1
+                and len(exact_rsqrt_pairs) == 1
+                and len(exact_normalized_values) == 1
+            )
 
             def exact_rounded_normalized_source(value: Any | None) -> bool:
                 seen: set[tuple[str, str]] = set()
@@ -1977,7 +2257,7 @@ def _validate_optimized_hlo(
                         value.raw_opcode == "convert"
                         and len(value.operand_names) == 1
                         and _shape_signatures(value.result_shapes)
-                        == ("bf16[1,6144]",)
+                        == (rms_bf16_shape,)
                     ):
                         normalized = operand(value, 0)
                         break
@@ -1991,25 +2271,9 @@ def _validate_optimized_hlo(
                         value = operand(value, 0)
                         continue
                     return False
-                if (
-                    normalized is None
-                    or normalized.raw_opcode != "multiply"
-                    or (normalized.op_name or "").split("/")[-1] != "mul"
-                    or len(normalized.operand_names) != 2
-                ):
-                    return False
-                normalized_operands = [
-                    operand(normalized, index) for index in range(2)
-                ]
-                return any(
-                    exact_semantic_source(normalized_operands[0], residual_add)
-                    and exact_semantic_source(normalized_operands[1], rms_value)
-                    or exact_semantic_source(normalized_operands[1], residual_add)
-                    and exact_semantic_source(normalized_operands[0], rms_value)
-                    for residual_add in rms_adds
-                    if _shape_signatures(residual_add.result_shapes)
-                    in {("f32[1,6144]",), ("bf16[1,6144]",)}
-                    for rms_value in rms_rsqrt
+                return (
+                    normalized is not None
+                    and _instruction_key(normalized) in exact_normalized_values
                 )
 
             weighted_external_values: dict[tuple[str, str], Any] = {}
@@ -2035,7 +2299,7 @@ def _validate_optimized_hlo(
                 if (
                     external is not None
                     and _shape_signatures(external.result_shapes)
-                    == ("bf16[1,6144]",)
+                    == (rms_bf16_shape,)
                 ):
                     weighted_external_values[_instruction_key(external)] = external
             exact_result_binding = (
@@ -2044,8 +2308,30 @@ def _validate_optimized_hlo(
                     layer1_result, next(iter(weighted_external_values.values()))
                 )
             )
+            external_reductions = {
+                _instruction_key(value): value
+                for item in rms_reductions
+                if (value := fully_externalized_value(item)) is not None
+            }
+            external_rsqrt = {
+                _instruction_key(value): value
+                for item in rms_rsqrt
+                if (value := fully_externalized_value(item)) is not None
+            }
+            exact_cross_fusion_reduction_lineage = (
+                exact_reduction_operand_graph
+                and len(external_reductions) == 1
+                and len(external_rsqrt) == 1
+                and len(weighted_external_values) == 1
+            )
+            rms_contract["exact_reduction_operand_graph"] = (
+                exact_reduction_operand_graph
+            )
             rms_contract["exact_weighted_operand_graph"] = (
                 len(weighted_external_values) == 1
+            )
+            rms_contract["exact_cross_fusion_reduction_lineage"] = (
+                exact_cross_fusion_reduction_lineage
             )
             rms_contract["exact_result_binding"] = exact_result_binding
             rms_contract["weighted_external_values"] = sorted(
@@ -2056,55 +2342,7 @@ def _validate_optimized_hlo(
                 item.computation == layer1_result.computation
                 for item in rms_items
             ):
-                residual_adds = [
-                    item
-                    for item in rms_adds
-                    if _shape_signatures(item.result_shapes)
-                    in {("f32[1,6144]",), ("bf16[1,6144]",)}
-                ]
-                scalar_adds = [
-                    item for item in rms_adds if item not in residual_adds
-                ]
-                square_candidates = [
-                    item
-                    for item in rms_multiply_or_square
-                    if item.raw_opcode == "square"
-                    or (
-                        len(item.operand_names) == 2
-                        and unwrap(operand(item, 0))
-                        is unwrap(operand(item, 1))
-                    )
-                ]
-                normalized_candidates = [
-                    item
-                    for item in rms_multiply_or_square
-                    if _shape_signatures(item.result_shapes)
-                    == ("f32[1,6144]",)
-                    if any(
-                        local_depends(item, add) for add in residual_adds
-                    )
-                    and any(local_depends(item, value) for value in rms_rsqrt)
-                ]
-                direct_rms_exact = (
-                    len(residual_adds) == 1
-                    and len(scalar_adds) == 1
-                    and len(square_candidates) == 1
-                    and len(rms_reductions) == 1
-                    and local_depends(rms_reductions[0], square_candidates[0])
-                    and len(rms_divides) == 1
-                    and local_depends(rms_divides[0], rms_reductions[0])
-                    and local_depends(scalar_adds[0], rms_divides[0])
-                    and len(rms_rsqrt) == 1
-                    and local_depends(rms_rsqrt[0], scalar_adds[0])
-                    and len(normalized_candidates) == 1
-                    and local_depends(
-                        layer1_result, normalized_candidates[0]
-                    )
-                    and all(
-                        local_depends(layer1_result, item)
-                        for item in rms_items
-                    )
-                )
+                direct_rms_exact = exact_reduction_operand_graph
             rms_contract["direct_exact_operand_graph"] = direct_rms_exact
             if (
                 not {
@@ -2117,6 +2355,8 @@ def _validate_optimized_hlo(
                 }.issubset(rms_semantics)
                 or not direct_rms_exact
                 or not exact_result_binding
+                or not exact_m32_reduction_geometry
+                or not exact_cross_fusion_reduction_lineage
                 or not all(
                     _value_depends_on(module, layer1_result, parameter)
                     for parameter in entry_parameters
@@ -2312,13 +2552,36 @@ def main() -> int:
                 groups=groups,
                 association=STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
             )
+        rms_dense_update = dense_update
+        rms_residual = post_attention_residual
+        if args.layer1_only:
+            with jax.named_scope(
+                "greenfield_dense_convolution_layer1_m32_reduction_geometry"
+            ):
+                rms_dense_update = jnp.pad(
+                    dense_update,
+                    ((0, 31), (0, 0)),
+                    mode="constant",
+                    constant_values=jnp.bfloat16(0),
+                )
+                rms_residual = jnp.pad(
+                    post_attention_residual,
+                    ((0, 31), (0, 0)),
+                    mode="constant",
+                    constant_values=jnp.bfloat16(0),
+                )
         with jax.named_scope("greenfield_dense_convolution_layer1_rmsnorm"):
             layer1 = fused_add_rms_norm(
-                dense_update,
-                post_attention_residual,
+                rms_dense_update,
+                rms_residual,
                 layer1_norm,
                 epsilon=1e-5,
             )[0]
+        if args.layer1_only:
+            with jax.named_scope(
+                "greenfield_dense_convolution_layer1_m32_live_row"
+            ):
+                layer1 = layer1[:1, :]
         return layer1 if args.layer1_only else (dense_update, layer1)
 
     out_specs = P() if args.layer1_only else (P(), P())
