@@ -98,6 +98,7 @@ DENSE_COMPILE_ROWS=${GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS:-1}
 DENSE_LAYER1_ONLY=${GLM_GREENFIELD_DENSE_LAYER1_ONLY:-0}
 DENSE_FINAL_LAYOUT=${GLM_GREENFIELD_DENSE_FINAL_LAYOUT:-0}
 DENSE_ENVELOPE=${GLM_GREENFIELD_DENSE_ENVELOPE:-0}
+DENSE_SPLIT_LAYER1_RMS=${GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS:-0}
 [[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
   exit 2
@@ -116,6 +117,10 @@ DENSE_ENVELOPE=${GLM_GREENFIELD_DENSE_ENVELOPE:-0}
 }
 [[ $DENSE_ENVELOPE == 0 || $DENSE_ENVELOPE == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_ENVELOPE must be 0 or 1" >&2
+  exit 2
+}
+[[ $DENSE_SPLIT_LAYER1_RMS == 0 || $DENSE_SPLIT_LAYER1_RMS == 1 ]] || {
+  echo "GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS must be 0 or 1" >&2
   exit 2
 }
 if [[ $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS != 1 ]]; then
@@ -137,8 +142,15 @@ if [[ $DENSE_ENVELOPE == 1 && $DENSE_FINAL_LAYOUT != 1 ]]; then
   echo "dense envelope requires the final-layout discriminator" >&2
   exit 2
 fi
+if [[ $DENSE_SPLIT_LAYER1_RMS == 1 && $DENSE_ENVELOPE != 1 ]]; then
+  echo "split layer-1 RMS requires the dense-envelope discriminator" >&2
+  exit 2
+fi
 if [[ $DENSE_CONVOLUTION == 1 ]]; then
-  if [[ $DENSE_ENVELOPE == 1 ]]; then
+  if [[ $DENSE_SPLIT_LAYER1_RMS == 1 ]]; then
+    TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_envelope_split_rms_$(date -u +%Y%m%dT%H%M%S%NZ)}
+    TENSOR_BASENAME=dense_envelope_split_rms.npz
+  elif [[ $DENSE_ENVELOPE == 1 ]]; then
     TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_envelope_cross_layer_$(date -u +%Y%m%dT%H%M%S%NZ)}
     TENSOR_BASENAME=dense_envelope_cross_layer.npz
   elif [[ $DENSE_FINAL_LAYOUT == 1 ]]; then
@@ -182,6 +194,10 @@ fi
 dense_envelope_probe_args=()
 if [[ $DENSE_ENVELOPE == 1 ]]; then
   dense_envelope_probe_args=(--dense-envelope)
+fi
+split_layer1_rms_probe_args=()
+if [[ $DENSE_SPLIT_LAYER1_RMS == 1 ]]; then
+  split_layer1_rms_probe_args=(--split-layer1-rms)
 fi
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
@@ -268,7 +284,7 @@ rollback_provisional_db() {
     "$DENSE_CONVOLUTION" "$RUN_DIR" "$DB538_TENSOR_SHA" \
     "$CHECKPOINT_MANIFEST_SHA" "$HARNESS_GIT" "$FORK_GIT" \
     "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$DENSE_FINAL_LAYOUT" \
-    "$DENSE_ENVELOPE" \
+    "$DENSE_ENVELOPE" "$DENSE_SPLIT_LAYER1_RMS" \
     "$ACCEPTED_M32_HLO_SHA" \
     "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
     "$ACCEPTED_M32_RAW_HLO_SHA" \
@@ -293,6 +309,7 @@ import sys
     dense_layer1_only_text,
     dense_final_layout_text,
     dense_envelope_text,
+    split_layer1_rms_text,
     accepted_m32_hlo_sha,
     accepted_m32_summary_sha,
     accepted_m32_success_sha,
@@ -303,6 +320,7 @@ compile_rows = int(dense_compile_rows_text)
 layer1_only = dense_layer1_only_text == "1"
 final_layout = dense_final_layout_text == "1"
 dense_envelope = dense_envelope_text == "1"
+split_layer1_rms = split_layer1_rms_text == "1"
 expected_final_layout_records = {
     "dense.slot_00.merged_gate_up.weight_bits_in_out": {
         "shape": [4, 8, 6144, 768],
@@ -333,7 +351,9 @@ if not runner_path.is_file():
     raise SystemExit("refusing rollback without the producing runner")
 runner = json.loads(runner_path.read_text())
 dense_arm = (
-    "accepted_m32_dense_envelope_cross_layer"
+    "accepted_m32_dense_envelope_split_rms"
+    if split_layer1_rms
+    else "accepted_m32_dense_envelope_cross_layer"
     if dense_envelope
     else "accepted_m32_dense_final_layout_cross_layer"
     if final_layout
@@ -347,7 +367,9 @@ dense_arm = (
 )
 model = (
     (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-cross-layer"
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-split-rms"
+        if split_layer1_rms
+        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-cross-layer"
         if dense_envelope
         else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
         if final_layout
@@ -364,7 +386,9 @@ model = (
 )
 revision = (
     (
-        "native-jax-accepted-dense-envelope-v1"
+        "native-jax-accepted-dense-envelope-split-rms-v1"
+        if split_layer1_rms
+        else "native-jax-accepted-dense-envelope-v1"
         if dense_envelope
         else "native-jax-accepted-dense-final-layout-v1"
         if final_layout
@@ -381,7 +405,9 @@ revision = (
 )
 benchmark = (
     (
-        "greenfield_layer0_dense_envelope_cross_layer"
+        "greenfield_layer0_dense_envelope_split_rms"
+        if split_layer1_rms
+        else "greenfield_layer0_dense_envelope_cross_layer"
         if dense_envelope
         else "greenfield_layer0_dense_final_layout_cross_layer"
         if final_layout
@@ -398,7 +424,9 @@ benchmark = (
 )
 note = (
     (
-        "Protected layer-0 accepted dense fusion-envelope discriminator; no performance claim."
+        "Protected layer-1 accepted split-RMS schedule discriminator; no performance claim."
+        if split_layer1_rms
+        else "Protected layer-0 accepted dense fusion-envelope discriminator; no performance claim."
         if dense_envelope
         else "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
         if final_layout
@@ -415,7 +443,9 @@ note = (
 )
 engine = (
     (
-        "greenfield_dense_envelope_cross_layer_probe"
+        "greenfield_dense_envelope_split_rms_probe"
+        if split_layer1_rms
+        else "greenfield_dense_envelope_cross_layer_probe"
         if dense_envelope
         else "greenfield_dense_final_layout_cross_layer_probe"
         if final_layout
@@ -442,6 +472,7 @@ expected_environment = {
             "compile_rows": compile_rows,
             "dense_envelope": dense_envelope,
             "final_dense_layout": final_layout,
+            "split_layer1_rms": split_layer1_rms,
             "result_mode": (
                 "layer1_only" if layer1_only else "dense_and_layer1"
             ),
@@ -463,6 +494,15 @@ expected_environment = {
                     "scheduled_kernel_geometry_required": True,
                 }
                 if final_layout
+                else {}
+            ),
+            **(
+                {
+                    "exact_accepted_scheduled_reduction": True,
+                    "split_recompute_exact": True,
+                    "split_output_fusion_exact": True,
+                }
+                if split_layer1_rms
                 else {}
             ),
             **(
@@ -500,6 +540,15 @@ if (
             or runner.get("compile_rows") != compile_rows
             or runner.get("dense_envelope") is not dense_envelope
             or runner.get("final_dense_layout") is not final_layout
+            or runner.get("split_layer1_rms") is not split_layer1_rms
+            or runner.get("hlo", {})
+            .get("stablehlo_contract", {})
+            .get("split_layer1_rms")
+            is not split_layer1_rms
+            or runner.get("hlo", {})
+            .get("optimized_contract", {})
+            .get("split_layer1_rms")
+            is not split_layer1_rms
             or runner.get("final_layout_records")
             != (expected_final_layout_records if final_layout else {})
             or (
@@ -513,6 +562,29 @@ if (
                     .get("optimized_contract", {})
                     .get("exact_accepted_kernel_geometry")
                     is not True
+                    or (
+                        split_layer1_rms
+                        and (
+                            runner.get("hlo", {})
+                            .get("optimized_contract", {})
+                            .get("lineage", {})
+                            .get("rmsnorm_contract", {})
+                            .get("split_recompute_exact")
+                            is not True
+                            or runner.get("hlo", {})
+                            .get("optimized_contract", {})
+                            .get("lineage", {})
+                            .get("rmsnorm_contract", {})
+                            .get("exact_accepted_scheduled_reduction")
+                            is not True
+                            or runner.get("hlo", {})
+                            .get("optimized_contract", {})
+                            .get("lineage", {})
+                            .get("rmsnorm_contract", {})
+                            .get("split_output_fusion_exact")
+                            is not True
+                        )
+                    )
                     or set(
                         runner.get("hlo", {})
                         .get("optimized_contract", {})
@@ -621,7 +693,9 @@ summaries = connection.execute(
 ).fetchall()
 expected_prompt = (
     (
-        "Sealed exact pre-dense RMSNorm boundary with accepted dense fusion envelope."
+        "Sealed accepted scalar-only layer-1 RMS schedule with exact recompute."
+        if split_layer1_rms
+        else "Sealed exact pre-dense RMSNorm boundary with accepted dense fusion envelope."
         if dense_envelope
         else "Sealed exact StrategyND attention boundary with accepted final-layout dense fusion."
         if final_layout
@@ -847,6 +921,7 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
         "${layer1_probe_args[@]}" \
         "${final_layout_probe_args[@]}" \
         "${dense_envelope_probe_args[@]}" \
+        "${split_layer1_rms_probe_args[@]}" \
         --db538-runner "$DB538_RUNNER" \
         --db538-runner-sha256 "$DB538_RUNNER_SHA" \
         --db538-tensor "$DB538_TENSOR" \
@@ -912,7 +987,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$DB538_SUMMARY_SHA" "$DB538_SUCCESS_SHA" \
   "$POST_ATTENTION_RESIDUAL_SHA" "$CHECKPOINT_MANIFEST_SHA" \
   "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$DENSE_FINAL_LAYOUT" \
-  "$DENSE_ENVELOPE" "$ATTENTION_UPDATE_SHA" "$COMBINED_RESIDUAL_SHA" \
+  "$DENSE_ENVELOPE" "$DENSE_SPLIT_LAYER1_RMS" \
+  "$ATTENTION_UPDATE_SHA" "$COMBINED_RESIDUAL_SHA" \
   "$NORMALIZED_MLP_SHA" \
   "$ACCEPTED_M32_HLO_SHA" \
   "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
@@ -944,6 +1020,7 @@ import sys
     dense_layer1_only_text,
     dense_final_layout_text,
     dense_envelope_text,
+    split_layer1_rms_text,
     attention_update_sha,
     combined_residual_sha,
     normalized_mlp_sha,
@@ -957,12 +1034,15 @@ compile_rows = int(dense_compile_rows_text)
 layer1_only = dense_layer1_only_text == "1"
 final_layout = dense_final_layout_text == "1"
 dense_envelope = dense_envelope_text == "1"
+split_layer1_rms = split_layer1_rms_text == "1"
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if dense:
     exact = runner.get("exact")
     arm = (
-        "accepted_m32_dense_envelope_cross_layer"
+        "accepted_m32_dense_envelope_split_rms"
+        if split_layer1_rms
+        else "accepted_m32_dense_envelope_cross_layer"
         if dense_envelope
         else "accepted_m32_dense_final_layout_cross_layer"
         if final_layout
@@ -1052,6 +1132,7 @@ if dense:
         and stable.get("compile_rows") == compile_rows
         and stable.get("dense_envelope") is dense_envelope
         and stable.get("final_dense_layout") is final_layout
+        and stable.get("split_layer1_rms") is split_layer1_rms
         and stable.get("live_rows") == 1
         and stable.get("result_mode")
         == ("layer1_only" if layer1_only else "dense_and_layer1")
@@ -1110,6 +1191,7 @@ if dense:
         and optimized.get("compile_rows") == compile_rows
         and optimized.get("dense_envelope") is dense_envelope
         and optimized.get("final_dense_layout") is final_layout
+        and optimized.get("split_layer1_rms") is split_layer1_rms
         and optimized.get("live_rows") == 1
         and optimized.get("result_mode")
         == ("layer1_only" if layer1_only else "dense_and_layer1")
@@ -1170,6 +1252,28 @@ if dense:
         and optimized_lineage.get("rmsnorm_contract", {}).get(
             "exact_m32_reduction_geometry"
         ) is True
+        and optimized_lineage.get("rmsnorm_contract", {}).get(
+            "split_layer1_rms"
+        ) is split_layer1_rms
+        and (
+            not split_layer1_rms
+            or (
+                optimized_lineage.get("rmsnorm_contract", {}).get(
+                    "split_recompute_exact"
+                ) is True
+                and optimized_lineage.get("rmsnorm_contract", {}).get(
+                    "exact_accepted_scheduled_reduction"
+                ) is True
+                and optimized_lineage.get("rmsnorm_contract", {}).get(
+                    "split_output_fusion_exact"
+                ) is True
+                and len(
+                    optimized_lineage.get("rmsnorm_contract", {}).get(
+                        "accepted_scheduled_reduction_values", []
+                    )
+                ) == 1
+            )
+        )
         and {
             "add",
             "div",
@@ -1337,6 +1441,7 @@ if dense:
         and runner.get("compile_rows") == compile_rows
         and runner.get("dense_envelope") is dense_envelope
         and runner.get("final_dense_layout") is final_layout
+        and runner.get("split_layer1_rms") is split_layer1_rms
         and runner.get("live_rows") == 1
         and runner.get("diagnostic_dead_rows") == compile_rows - 1
         and runner.get("result_mode")
@@ -1376,7 +1481,9 @@ if not runner_valid:
 
 model = (
     (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-cross-layer"
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-split-rms"
+        if split_layer1_rms
+        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-cross-layer"
         if dense_envelope
         else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
         if final_layout
@@ -1393,7 +1500,9 @@ model = (
 )
 revision = (
     (
-        "native-jax-accepted-dense-envelope-v1"
+        "native-jax-accepted-dense-envelope-split-rms-v1"
+        if split_layer1_rms
+        else "native-jax-accepted-dense-envelope-v1"
         if dense_envelope
         else "native-jax-accepted-dense-final-layout-v1"
         if final_layout
@@ -1410,7 +1519,9 @@ revision = (
 )
 benchmark = (
     (
-        "greenfield_layer0_dense_envelope_cross_layer"
+        "greenfield_layer0_dense_envelope_split_rms"
+        if split_layer1_rms
+        else "greenfield_layer0_dense_envelope_cross_layer"
         if dense_envelope
         else "greenfield_layer0_dense_final_layout_cross_layer"
         if final_layout
@@ -1427,7 +1538,9 @@ benchmark = (
 )
 engine = (
     (
-        "greenfield_dense_envelope_cross_layer_probe"
+        "greenfield_dense_envelope_split_rms_probe"
+        if split_layer1_rms
+        else "greenfield_dense_envelope_cross_layer_probe"
         if dense_envelope
         else "greenfield_dense_final_layout_cross_layer_probe"
         if final_layout
@@ -1444,7 +1557,9 @@ engine = (
 )
 note = (
     (
-        "Protected layer-0 accepted dense fusion-envelope discriminator; no performance claim."
+        "Protected layer-1 accepted split-RMS schedule discriminator; no performance claim."
+        if split_layer1_rms
+        else "Protected layer-0 accepted dense fusion-envelope discriminator; no performance claim."
         if dense_envelope
         else "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
         if final_layout
@@ -1482,6 +1597,7 @@ run_id = pv.start_run(
                 "compile_rows": compile_rows,
                 "dense_envelope": dense_envelope,
                 "final_dense_layout": final_layout,
+                "split_layer1_rms": split_layer1_rms,
                 "result_mode": runner["result_mode"],
                 **(
                     {
@@ -1507,6 +1623,15 @@ run_id = pv.start_run(
                         "scheduled_kernel_geometry_required": True,
                     }
                     if final_layout
+                    else {}
+                ),
+                **(
+                    {
+                        "exact_accepted_scheduled_reduction": True,
+                        "split_recompute_exact": True,
+                        "split_output_fusion_exact": True,
+                    }
+                    if split_layer1_rms
                     else {}
                 ),
                 **(
@@ -1551,7 +1676,9 @@ pv.record_item(
     item_id="position8155",
     prompt=(
         (
-            "Sealed exact StrategyND attention boundary with accepted final-layout dense fusion."
+            "Sealed accepted scalar-only layer-1 RMS schedule with exact recompute."
+            if split_layer1_rms
+            else "Sealed exact StrategyND attention boundary with accepted final-layout dense fusion."
             if final_layout and not dense_envelope
             else "Sealed exact pre-dense RMSNorm boundary with accepted dense fusion envelope."
             if dense_envelope
@@ -1605,6 +1732,7 @@ summary = {
     "exact_arms": runner["exact_arms"],
     "dense_envelope": dense_envelope if dense else False,
     "final_dense_layout": final_layout if dense else False,
+    "split_layer1_rms": split_layer1_rms if dense else False,
     "final_layout_records": (
         runner.get("final_layout_records", {}) if dense else {}
     ),
@@ -1627,6 +1755,33 @@ summary = {
         .get("optimized_contract", {})
         .get("scheduled_kernel_geometry_required", False)
         if dense and final_layout
+        else False
+    ),
+    "exact_accepted_scheduled_reduction": (
+        runner.get("hlo", {})
+        .get("optimized_contract", {})
+        .get("lineage", {})
+        .get("rmsnorm_contract", {})
+        .get("exact_accepted_scheduled_reduction", False)
+        if dense and split_layer1_rms
+        else False
+    ),
+    "split_recompute_exact": (
+        runner.get("hlo", {})
+        .get("optimized_contract", {})
+        .get("lineage", {})
+        .get("rmsnorm_contract", {})
+        .get("split_recompute_exact", False)
+        if dense and split_layer1_rms
+        else False
+    ),
+    "split_output_fusion_exact": (
+        runner.get("hlo", {})
+        .get("optimized_contract", {})
+        .get("lineage", {})
+        .get("rmsnorm_contract", {})
+        .get("split_output_fusion_exact", False)
+        if dense and split_layer1_rms
         else False
     ),
     "live_rows": 1,
@@ -1747,6 +1902,12 @@ if summary["final_dense_layout"] and (
     or summary.get("exact_accepted_kernel_geometry") is not True
 ):
     raise SystemExit("accepted scheduled kernel geometry drifted before SUCCESS")
+if summary["split_layer1_rms"] and (
+    summary.get("split_recompute_exact") is not True
+    or summary.get("split_output_fusion_exact") is not True
+    or summary.get("exact_accepted_scheduled_reduction") is not True
+):
+    raise SystemExit("accepted split RMS schedule drifted before SUCCESS")
 values = {
     "artifact_kind": summary["artifact_kind"],
     "code_hash": sys.argv[3],
@@ -1759,12 +1920,20 @@ values = {
     "exact_arms": ",".join(summary["exact_arms"]) or "none",
     "dense_envelope": str(summary["dense_envelope"]).lower(),
     "final_dense_layout": str(summary["final_dense_layout"]).lower(),
+    "split_layer1_rms": str(summary["split_layer1_rms"]).lower(),
     "final_layout_records_sha256": records_sha,
     "exact_accepted_kernel_geometry": str(
         summary["exact_accepted_kernel_geometry"]
     ).lower(),
     "scheduled_kernel_geometry_required": str(
         summary["scheduled_kernel_geometry_required"]
+    ).lower(),
+    "exact_accepted_scheduled_reduction": str(
+        summary["exact_accepted_scheduled_reduction"]
+    ).lower(),
+    "split_recompute_exact": str(summary["split_recompute_exact"]).lower(),
+    "split_output_fusion_exact": str(
+        summary["split_output_fusion_exact"]
     ).lower(),
     "performance_claim": "false",
     "evidence_sha256": sha256((root / "evidence.sha256").read_bytes()).hexdigest(),

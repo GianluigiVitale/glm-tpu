@@ -419,6 +419,7 @@ def _validate_stablehlo(
     layer1_only: bool = False,
     final_dense_layout: bool = False,
     dense_envelope: bool = False,
+    split_layer1_rms: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.stablehlo_dense_convolution import (
         validate_dense_convolution_stablehlo,
@@ -430,6 +431,7 @@ def _validate_stablehlo(
         layer1_only=layer1_only,
         final_dense_layout=final_dense_layout,
         dense_envelope=dense_envelope,
+        split_layer1_rms=split_layer1_rms,
     )
 
 
@@ -440,6 +442,7 @@ def _validate_optimized_hlo(
     layer1_only: bool = False,
     final_dense_layout: bool = False,
     dense_envelope: bool = False,
+    split_layer1_rms: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -455,6 +458,12 @@ def _validate_optimized_hlo(
     if dense_envelope and not final_dense_layout:
         raise ValueError(
             "dense-envelope optimized-HLO proof requires final-layout mode"
+        )
+    if split_layer1_rms and not (
+        dense_envelope and layer1_only and compile_rows == 32
+    ):
+        raise ValueError(
+            "split layer-1 RMS proof requires the M32 dense envelope"
         )
     module = parse_hlo_module(optimized_hlo)
     by_key = {_instruction_key(item): item for item in module.instructions}
@@ -3629,6 +3638,9 @@ def _validate_optimized_hlo(
                 normalized_bf16_shapes.add("bf16[1,6144]")
                 weighted_result_shapes.add("bf16[1,6144]")
             exact_normalized_values: dict[tuple[str, str], Any] = {}
+            normalized_residual_adds_by_value: dict[
+                tuple[str, str], Any
+            ] = {}
             for item in rms_multiply_or_square:
                 if (
                     (item.op_name or "").split("/")[-1] != "mul"
@@ -3664,7 +3676,11 @@ def _validate_optimized_hlo(
                                 operand(item, 1 - normalized_index), rsqrt
                             )
                         ):
-                            exact_normalized_values[_instruction_key(item)] = item
+                            key = _instruction_key(item)
+                            exact_normalized_values[key] = item
+                            normalized_residual_adds_by_value[key] = (
+                                normalized_residual_adds[0]
+                            )
 
             exact_reduction_operand_graph = (
                 len(exact_reduction_pairs) == 1
@@ -3704,6 +3720,7 @@ def _validate_optimized_hlo(
                 )
 
             weighted_external_values: dict[tuple[str, str], Any] = {}
+            weighted_internal_values: dict[tuple[str, str], Any] = {}
             for item in rms_items:
                 if (
                     (item.op_name or "").split("/")[-1] != "mul"
@@ -3729,7 +3746,9 @@ def _validate_optimized_hlo(
                     and _shape_signatures(external.result_shapes)[0]
                     in weighted_result_shapes
                 ):
-                    weighted_external_values[_instruction_key(external)] = external
+                    external_key = _instruction_key(external)
+                    weighted_external_values[external_key] = external
+                    weighted_internal_values[external_key] = item
             exact_result_binding = (
                 len(weighted_external_values) == 1
                 and exact_layout_source(
@@ -3760,6 +3779,89 @@ def _validate_optimized_hlo(
                 for item in rms_rsqrt
                 if (value := fully_externalized_value(item)) is not None
             }
+            split_recompute_exact = not split_layer1_rms
+            split_output_fusion_exact = not split_layer1_rms
+            if split_layer1_rms:
+                reduction_residual_add = (
+                    exact_reduction_pairs[0][2]
+                    if len(exact_reduction_pairs) == 1
+                    else None
+                )
+                normalized_residual_add = (
+                    next(iter(normalized_residual_adds_by_value.values()))
+                    if len(normalized_residual_adds_by_value) == 1
+                    else None
+                )
+                split_recompute_exact = bool(
+                    reduction_residual_add is not None
+                    and normalized_residual_add is not None
+                    and normalized_residual_add is not reduction_residual_add
+                    and semantic_origins(normalized_residual_add)
+                    == semantic_origins(reduction_residual_add)
+                )
+                normalized_value = (
+                    next(iter(exact_normalized_values.values()))
+                    if len(exact_normalized_values) == 1
+                    else None
+                )
+                weighted_value = (
+                    next(iter(weighted_internal_values.values()))
+                    if len(weighted_internal_values) == 1
+                    else None
+                )
+                split_output_fusion_exact = bool(
+                    normalized_residual_add is not None
+                    and normalized_value is not None
+                    and weighted_value is not None
+                    and not normalized_value.computation.startswith("ENTRY ")
+                    and normalized_residual_add.computation
+                    == normalized_value.computation
+                    == weighted_value.computation
+                )
+
+            def exact_accepted_rms_reduction_schedule(value: Any) -> bool:
+                if (
+                    not scheduled_module
+                    or value.raw_opcode != "fusion"
+                    or _shape_signatures(value.result_shapes)
+                    != ("f32[32]",)
+                ):
+                    return False
+                marker = "backend_config="
+                if marker not in value.raw_line:
+                    return False
+                try:
+                    config = json.loads(value.raw_line.split(marker, 1)[1])
+                except json.JSONDecodeError:
+                    return False
+                window = config.get("window_config", {})
+                megacore = config.get("megacore_config", {})
+                return bool(
+                    window.get("kernel_window_bounds") == []
+                    and window.get("output_window_bounds") == ["2", "48"]
+                    and window.get("input_window_bounds") == []
+                    and window.get("iteration_bounds") == ["2", "1"]
+                    and window.get("cost_model_type")
+                    == "COST_MODEL_TYPE_INVALID"
+                    and window.get("is_mask") is False
+                    and window.get("pad_input_on_minor_dim") == "0"
+                    and window.get("pad_output_on_minor_dim") == "0"
+                    and megacore.get("megacore_split_dim") == "0"
+                    and megacore.get("megacore_allreduce_bytes") == "4096"
+                )
+
+            accepted_scheduled_reduction_values = sorted(
+                value.name
+                for value in external_reductions.values()
+                if exact_accepted_rms_reduction_schedule(value)
+            )
+            exact_accepted_scheduled_reduction = (
+                not split_layer1_rms
+                or (
+                    len(external_reductions) == 1
+                    and len(accepted_scheduled_reduction_values) == 1
+                )
+            )
             exact_cross_fusion_reduction_lineage = (
                 exact_reduction_operand_graph
                 and len(external_reductions) == 1
@@ -3776,6 +3878,17 @@ def _validate_optimized_hlo(
                 exact_cross_fusion_reduction_lineage
             )
             rms_contract["exact_result_binding"] = exact_result_binding
+            rms_contract["split_layer1_rms"] = split_layer1_rms
+            rms_contract["split_recompute_exact"] = split_recompute_exact
+            rms_contract["split_output_fusion_exact"] = (
+                split_output_fusion_exact
+            )
+            rms_contract["exact_accepted_scheduled_reduction"] = (
+                exact_accepted_scheduled_reduction
+            )
+            rms_contract["accepted_scheduled_reduction_values"] = (
+                accepted_scheduled_reduction_values
+            )
             rms_contract["weighted_external_values"] = sorted(
                 item.name for item in weighted_external_values.values()
             )
@@ -4189,6 +4302,14 @@ def _validate_optimized_hlo(
                 )
             ):
                 violations.append("optimized residual/RMSNorm graph drifted")
+            if split_layer1_rms and not (
+                split_recompute_exact
+                and split_output_fusion_exact
+                and exact_accepted_scheduled_reduction
+            ):
+                violations.append(
+                    "accepted split layer-1 RMS schedule drifted"
+                )
             if dense_envelope and not all(
                 predense_contract[name]
                 for name in (
@@ -4233,6 +4354,7 @@ def _validate_optimized_hlo(
         "lineage": lineage,
         "live_rows": 1,
         "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
+        "split_layer1_rms": split_layer1_rms,
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
         "passed": not violations,
@@ -4248,6 +4370,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--layer1-only", action="store_true")
     parser.add_argument("--final-dense-layout", action="store_true")
     parser.add_argument("--dense-envelope", action="store_true")
+    parser.add_argument("--split-layer1-rms", action="store_true")
     parser.add_argument("--db538-runner", type=Path, required=True)
     parser.add_argument("--db538-runner-sha256", required=True)
     parser.add_argument("--db538-tensor", type=Path, required=True)
@@ -4290,6 +4413,14 @@ def main() -> int:
     if args.dense_envelope and not args.final_dense_layout:
         raise RuntimeError(
             "dense-envelope discriminator requires final-layout mode"
+        )
+    if args.split_layer1_rms and not (
+        args.dense_envelope
+        and args.layer1_only
+        and args.compile_rows == 32
+    ):
+        raise RuntimeError(
+            "split layer-1 RMS discriminator requires the M32 dense envelope"
         )
     (
         normalized,
@@ -4471,12 +4602,41 @@ def main() -> int:
                         constant_values=jnp.bfloat16(0),
                     )
         with jax.named_scope("greenfield_dense_convolution_layer1_rmsnorm"):
-            layer1 = fused_add_rms_norm(
-                rms_dense_update,
-                rms_residual,
-                layer1_norm,
-                epsilon=1e-5,
-            )[0]
+            if args.split_layer1_rms:
+                with jax.named_scope(
+                    "greenfield_dense_convolution_layer1_split_reduction"
+                ):
+                    reduction_sum = (
+                        rms_dense_update.astype(jnp.float32)
+                        + rms_residual.astype(jnp.float32)
+                    )
+                    variance = jnp.mean(
+                        lax.square(reduction_sum), axis=-1, keepdims=True
+                    )
+                    inverse = lax.rsqrt(variance + jnp.float32(1e-5))
+                with jax.named_scope(
+                    "greenfield_dense_convolution_layer1_split_recompute"
+                ):
+                    output_dense = lax.optimization_barrier(
+                        rms_dense_update
+                    )
+                    output_residual = lax.optimization_barrier(rms_residual)
+                    output_sum = (
+                        output_dense.astype(jnp.float32)
+                        + output_residual.astype(jnp.float32)
+                    )
+                    normalized_output = output_sum * inverse
+                    layer1 = (
+                        normalized_output.astype(layer1_norm.dtype)
+                        * layer1_norm
+                    ).astype(rms_dense_update.dtype)
+            else:
+                layer1 = fused_add_rms_norm(
+                    rms_dense_update,
+                    rms_residual,
+                    layer1_norm,
+                    epsilon=1e-5,
+                )[0]
         if args.layer1_only:
             with jax.named_scope(
                 "greenfield_dense_convolution_layer1_m32_live_row"
@@ -4600,6 +4760,7 @@ def main() -> int:
         layer1_only=args.layer1_only,
         final_dense_layout=args.final_dense_layout,
         dense_envelope=args.dense_envelope,
+        split_layer1_rms=args.split_layer1_rms,
     )
     stablehlo_path = args.hlo_dir / "dense_convolution.stablehlo.mlir"
     stablehlo_path.write_text(stablehlo)
@@ -4615,6 +4776,7 @@ def main() -> int:
         layer1_only=args.layer1_only,
         final_dense_layout=args.final_dense_layout,
         dense_envelope=args.dense_envelope,
+        split_layer1_rms=args.split_layer1_rms,
     )
     optimized_path = args.hlo_dir / "dense_convolution.optimized_hlo.txt"
     optimized_path.write_text(optimized_hlo)
@@ -4639,7 +4801,9 @@ def main() -> int:
     comparison = _compare_bits(accepted_layer1_bits, layer1_bits)
     exact = comparison["elementwise_exact"]
     arm = (
-        "accepted_m32_dense_envelope_cross_layer"
+        "accepted_m32_dense_envelope_split_rms"
+        if args.split_layer1_rms
+        else "accepted_m32_dense_envelope_cross_layer"
         if args.dense_envelope
         else "accepted_m32_dense_final_layout_cross_layer"
         if args.final_dense_layout
@@ -4661,6 +4825,7 @@ def main() -> int:
         "exact": exact,
         "exact_arms": [arm] if exact else [],
         "dense_envelope": args.dense_envelope,
+        "split_layer1_rms": args.split_layer1_rms,
         "final_dense_layout": args.final_dense_layout,
         "final_layout_records": final_layout_records,
         "hlo": {

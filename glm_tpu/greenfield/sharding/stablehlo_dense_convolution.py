@@ -842,6 +842,7 @@ def _match_rmsnorm(
     *,
     layer1_only: bool = False,
     residual_is_m32: bool = False,
+    split_layer1_rms: bool = False,
 ) -> tuple[str, str, str]:
     rows = 32 if layer1_only else 1
     row_type = f"tensor<{rows}x6144x"
@@ -883,13 +884,14 @@ def _match_rmsnorm(
         ),
         "dense residual addition",
     )
-    residual = _expect_node(
+    residual_conversion = _expect_node(
         graph,
         combined.operands[1],
         opcode="convert",
         result_type=f"{row_type}f32>",
     )
-    residual = residual.operands[0]
+    residual_value = residual_conversion.operands[0]
+    residual = residual_value
     if layer1_only and not residual_is_m32:
         residual_pad = _expect_node(
             graph,
@@ -998,9 +1000,44 @@ def _match_rmsnorm(
         dimensions=(0, 1),
         result_type=f"{row_type}f32>",
     )
+    normalized_sum = combined.name
+    if split_layer1_rms:
+        dense_output_barrier = _expect_unary(
+            graph,
+            dense_value,
+            opcode="optimization_barrier",
+            result_type=f"{row_type}bf16>",
+        )
+        residual_output_barrier = _expect_unary(
+            graph,
+            residual_value,
+            opcode="optimization_barrier",
+            result_type=f"{row_type}bf16>",
+        )
+        dense_output_f32 = _expect_unary(
+            graph,
+            dense_output_barrier.name,
+            opcode="convert",
+            result_type=f"{row_type}f32>",
+        )
+        residual_output_f32 = _expect_unary(
+            graph,
+            residual_output_barrier.name,
+            opcode="convert",
+            result_type=f"{row_type}f32>",
+        )
+        normalized_sum = _expect_binary(
+            graph,
+            dense_output_f32.name,
+            residual_output_f32.name,
+            opcode="add",
+            result_type=f"{row_type}f32>",
+        ).name
+        if normalized_sum == combined.name:
+            raise _MatchError("split RMSNorm reused the reduction residual sum")
     normalized = _expect_binary(
         graph,
-        combined.name,
+        normalized_sum,
         scale.name,
         opcode="multiply",
         result_type=f"{row_type}f32>",
@@ -1246,6 +1283,7 @@ def validate_dense_convolution_stablehlo(
     layer1_only: bool = False,
     final_dense_layout: bool = False,
     dense_envelope: bool = False,
+    split_layer1_rms: bool = False,
 ) -> dict[str, object]:
     """Validate all eight exact dense chains and the exact StrategyND tree."""
 
@@ -1259,6 +1297,12 @@ def validate_dense_convolution_stablehlo(
     if dense_envelope and not final_dense_layout:
         raise ValueError(
             "dense-envelope StableHLO proof requires final-layout mode"
+        )
+    if split_layer1_rms and not (
+        dense_envelope and layer1_only and compile_rows == 32
+    ):
+        raise ValueError(
+            "split layer-1 RMS proof requires the M32 dense envelope"
         )
     parsed_stablehlo, dependency_errors = _expand_dependency_barriers(
         stablehlo
@@ -1424,6 +1468,7 @@ def validate_dense_convolution_stablehlo(
             dense_output,
             layer1_only=layer1_only,
             residual_is_m32=dense_envelope,
+            split_layer1_rms=split_layer1_rms,
         )
         layer_roots = next(iter(rows.values()))[0]
         root_contracts = (
@@ -1575,6 +1620,7 @@ def validate_dense_convolution_stablehlo(
         "matched_virtual_shards": matched_shards,
         "live_rows": 1,
         "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
+        "split_layer1_rms": split_layer1_rms,
         "passed": not violations,
         "violations": violations,
     }

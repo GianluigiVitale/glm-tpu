@@ -697,6 +697,170 @@ def _with_exact_scheduled_dense_tiling(hlo: str) -> str:
     return "\n".join(lines)
 
 
+def _with_exact_split_layer1_rms_schedule(hlo: str) -> str:
+    reduction_config = {
+        "megacore_config": {
+            "megacore_allreduce_bytes": "4096",
+            "megacore_split_dim": "0",
+        },
+        "window_config": {
+            "cost_model_type": "COST_MODEL_TYPE_INVALID",
+            "input_window_bounds": [],
+            "is_mask": False,
+            "iteration_bounds": ["2", "1"],
+            "kernel_window_bounds": [],
+            "output_window_bounds": ["2", "48"],
+            "pad_input_on_minor_dim": "0",
+            "pad_output_on_minor_dim": "0",
+        },
+    }
+    scope = (
+        'metadata={op_name="jit(probe)/'
+        'greenfield_dense_convolution_layer1_rmsnorm/'
+    )
+    reduction_computation = "\n".join(
+        (
+            "%split_rms_reduction {",
+            "  %split_update = bf16[32,6144] parameter(0)",
+            "  %split_residual = bf16[32,6144] parameter(1)",
+            "  %split_update_f32 = f32[32,6144] convert(%split_update)",
+            "  %split_residual_f32 = f32[32,6144] convert(%split_residual)",
+            "  %split_combined = f32[32,6144] add("
+            "%split_update_f32, %split_residual_f32), " + scope + 'add"}',
+            "  %split_square = f32[32,6144] multiply("
+            "%split_combined, %split_combined), " + scope + 'square"}',
+            "  %split_zero = f32[] constant(0)",
+            "  ROOT %split_sum = f32[32] reduce(%split_square, %split_zero), "
+            "dimensions={1}, to_apply=%sum_reducer, " + scope + 'reduce_sum"}',
+            "}",
+        )
+    )
+    output_computation = "\n".join(
+        (
+            "%split_rms_output {",
+            "  %output_update = bf16[32,6144] parameter(0)",
+            "  %output_residual = bf16[32,6144] parameter(1)",
+            "  %output_inverse = f32[32,1] parameter(2)",
+            "  %output_norm = bf16[6144] parameter(3)",
+            "  %output_update_barrier = bf16[32,6144] "
+            "optimization-barrier(%output_update)",
+            "  %output_residual_barrier = bf16[32,6144] "
+            "optimization-barrier(%output_residual)",
+            "  %output_update_f32 = f32[32,6144] "
+            "convert(%output_update_barrier)",
+            "  %output_residual_f32 = f32[32,6144] "
+            "convert(%output_residual_barrier)",
+            "  %output_combined = f32[32,6144] add("
+            "%output_update_f32, %output_residual_f32), " + scope + 'add"}',
+            "  %output_inverse_wide = f32[32,6144] broadcast("
+            "%output_inverse), dimensions={0,1}",
+            "  %output_normalized = f32[32,6144] multiply("
+            "%output_combined, %output_inverse_wide), " + scope + 'mul"}',
+            "  %output_rounded = bf16[32,6144] convert(%output_normalized)",
+            "  %output_norm_seed = bf16[1,6144] broadcast("
+            "%output_norm), dimensions={1}",
+            "  %output_norm_wide = bf16[32,6144] broadcast("
+            "%output_norm_seed), dimensions={0,1}",
+            "  ROOT %output_weighted = bf16[32,6144] multiply("
+            "%output_rounded, %output_norm_wide), " + scope + 'mul"}',
+            "}",
+        )
+    )
+    hlo = hlo.replace(
+        "ENTRY main {",
+        reduction_computation + "\n\n" + output_computation + "\n\nENTRY main {",
+        1,
+    )
+    old = "\n".join(
+        (
+            "  %update_f32 = f32[32,6144] convert(%update_m32)",
+            "  %residual_f32 = f32[32,6144] convert(%predense_carried)",
+            "  %combined = f32[32,6144] add(%update_f32, %residual_f32), "
+            + scope
+            + 'add"}',
+            "  %square = f32[32,6144] multiply(%combined, %combined), "
+            + scope
+            + 'square"}',
+            "  %zero = f32[] constant(0)",
+            "  %sum = f32[32] reduce(%square, %zero), dimensions={1}, "
+            "to_apply=%sum_reducer, "
+            + scope
+            + 'reduce_sum"}',
+        )
+    )
+    new = "\n".join(
+        (
+            "  %split_sum = f32[32] fusion(%update_m32, %predense_carried), "
+            "kind=kLoop, calls=%split_rms_reduction, "
+            + scope
+            + 'reduce_sum"}, backend_config='
+            + json.dumps(reduction_config, separators=(",", ":")),
+        )
+    )
+    assert old in hlo
+    hlo = hlo.replace(old, new, 1).replace(
+        "  %sum_row = f32[32,1] reshape(%sum)",
+        "  %sum_row = f32[32,1] reshape(%split_sum)",
+        1,
+    )
+    old_output = "\n".join(
+        (
+            "  %inverse_wide = f32[32,6144] broadcast(%inverse), "
+            "dimensions={0,1}",
+            "  %rms_normalized = f32[32,6144] multiply("
+            "%combined, %inverse_wide), " + scope + 'mul"}',
+            "  %rounded = bf16[32,6144] convert(%rms_normalized)",
+            "  %norm_seed = bf16[1,6144] broadcast(%norm), dimensions={1}",
+            "  %norm_wide = bf16[32,6144] broadcast(%norm_seed), "
+            "dimensions={0,1}",
+            "  %layer1_m32 = bf16[32,6144] multiply(%rounded, %norm_wide), "
+            + scope
+            + 'mul"}',
+        )
+    )
+    new_output = (
+        "  %layer1_m32 = bf16[32,6144] fusion("
+        "%update_m32, %predense_carried, %inverse, %norm), "
+        "kind=kLoop, calls=%split_rms_output"
+    )
+    assert old_output in hlo
+    return hlo.replace(old_output, new_output, 1)
+
+
+@lru_cache(maxsize=1)
+def _exact_dense_envelope_split_rms_stablehlo() -> str:
+    stablehlo = _exact_dense_envelope_stablehlo()
+    source = "\n".join(
+        (
+            "      %828 = stablehlo.convert %827 : "
+            "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
+            "      %829 = stablehlo.convert %6 : "
+            "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
+            "      %830 = stablehlo.add %828, %829 : tensor<32x6144xf32>",
+        )
+    )
+    replacement = source + "\n" + "\n".join(
+        (
+            "      %split_dense = stablehlo.optimization_barrier %827 : "
+            "tensor<32x6144xbf16>",
+            "      %split_residual = stablehlo.optimization_barrier %6 : "
+            "tensor<32x6144xbf16>",
+            "      %split_dense_f32 = stablehlo.convert %split_dense : "
+            "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
+            "      %split_residual_f32 = stablehlo.convert %split_residual : "
+            "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
+            "      %split_combined = stablehlo.add %split_dense_f32, "
+            "%split_residual_f32 : tensor<32x6144xf32>",
+        )
+    )
+    assert source in stablehlo
+    return stablehlo.replace(source, replacement, 1).replace(
+        "%840 = stablehlo.multiply %830, %839",
+        "%840 = stablehlo.multiply %split_combined, %839",
+        1,
+    )
+
+
 def _synthetic_dense_envelope_externalized_gate_hlo() -> str:
     """Move each exact RMS output across a fusion boundary before its gate."""
 
@@ -2078,6 +2242,7 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
         )
         assert rejected["passed"] is False
 
+
     optimized_mutations = (
         optimized_hlo.replace(
             "convolution(%gate_weighted, %gate_rhs)",
@@ -2190,6 +2355,137 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
         assert "optimized pre-dense fused RMSNorm envelope drifted" in (
             rejected["violations"]
         )
+
+
+def test_dense_split_layer1_rms_requires_recompute_and_accepted_schedule() -> None:
+    stablehlo = _exact_dense_envelope_split_rms_stablehlo()
+    stable = MODULE._validate_stablehlo(
+        stablehlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+        split_layer1_rms=True,
+    )
+    assert stable["passed"], stable
+    assert stable["split_layer1_rms"] is True
+
+    optimized_hlo = _with_exact_split_layer1_rms_schedule(
+        _with_exact_scheduled_dense_tiling(
+            _synthetic_dense_envelope_optimized_hlo()
+        )
+    )
+    optimized = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+        split_layer1_rms=True,
+    )
+    assert optimized["passed"], optimized
+    assert optimized["split_layer1_rms"] is True
+    rms = optimized["lineage"]["rmsnorm_contract"]
+    assert rms["split_recompute_exact"] is True
+    assert rms["exact_accepted_scheduled_reduction"] is True
+    assert rms["accepted_scheduled_reduction_values"] == ["%split_sum"]
+
+    stable_bypass = stablehlo.replace(
+        "%840 = stablehlo.multiply %split_combined, %839",
+        "%840 = stablehlo.multiply %830, %839",
+        1,
+    )
+    assert stable_bypass != stablehlo
+    assert not MODULE._validate_stablehlo(
+        stable_bypass,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+        split_layer1_rms=True,
+    )["passed"]
+
+    mutations = (
+        optimized_hlo.replace(
+            '"output_window_bounds":["2","48"]',
+            '"output_window_bounds":["4","24"]',
+            1,
+        ),
+        optimized_hlo.replace(
+            '"megacore_allreduce_bytes":"4096","megacore_split_dim":"0"',
+            '"megacore_allreduce_bytes":"4096","megacore_split_dim":"1"',
+            1,
+        ),
+        optimized_hlo.replace(
+            "%output_update_f32, %output_residual_f32",
+            "%output_update_f32, %output_update_f32",
+            1,
+        ),
+        optimized_hlo.replace(
+            "  %layer1_m32 = bf16[32,6144] fusion("
+            "%update_m32, %predense_carried, %inverse, %norm), "
+            "kind=kLoop, calls=%split_rms_output",
+            "\n".join(
+                (
+                    "  %main_update_barrier = bf16[32,6144] "
+                    "optimization-barrier(%update_m32)",
+                    "  %main_residual_barrier = bf16[32,6144] "
+                    "optimization-barrier(%predense_carried)",
+                    "  %main_update_f32 = f32[32,6144] "
+                    "convert(%main_update_barrier)",
+                    "  %main_residual_f32 = f32[32,6144] "
+                    "convert(%main_residual_barrier)",
+                    "  %main_combined = f32[32,6144] add("
+                    "%main_update_f32, %main_residual_f32), "
+                    'metadata={op_name="jit(probe)/'
+                    'greenfield_dense_convolution_layer1_rmsnorm/add"}',
+                    "  %main_inverse_wide = f32[32,6144] broadcast("
+                    "%inverse), dimensions={0,1}",
+                    "  %main_normalized = f32[32,6144] multiply("
+                    "%main_combined, %main_inverse_wide), "
+                    'metadata={op_name="jit(probe)/'
+                    'greenfield_dense_convolution_layer1_rmsnorm/mul"}',
+                    "  %main_rounded = bf16[32,6144] convert(%main_normalized)",
+                    "  %main_norm_seed = bf16[1,6144] broadcast("
+                    "%norm), dimensions={1}",
+                    "  %main_norm_wide = bf16[32,6144] broadcast("
+                    "%main_norm_seed), dimensions={0,1}",
+                    "  %layer1_m32 = bf16[32,6144] multiply("
+                    "%main_rounded, %main_norm_wide), "
+                    'metadata={op_name="jit(probe)/'
+                    'greenfield_dense_convolution_layer1_rmsnorm/mul"}',
+                )
+            ),
+            1,
+        ),
+    )
+    assert all(mutated != optimized_hlo for mutated in mutations)
+    for mutated in mutations:
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+            split_layer1_rms=True,
+        )
+        assert rejected["passed"] is False
+        assert "accepted split layer-1 RMS schedule drifted" in (
+            rejected["violations"]
+        )
+
+    old_schedule = _with_exact_scheduled_dense_tiling(
+        _synthetic_dense_envelope_optimized_hlo()
+    )
+    rejected_old = MODULE._validate_optimized_hlo(
+        old_schedule,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+        split_layer1_rms=True,
+    )
+    assert rejected_old["passed"] is False
 
 
 @pytest.mark.skipif(
@@ -2892,6 +3188,7 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "GLM_GREENFIELD_DENSE_LAYER1_ONLY",
         "GLM_GREENFIELD_DENSE_FINAL_LAYOUT",
         "GLM_GREENFIELD_DENSE_ENVELOPE",
+        "GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS",
         "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4",
         'strict_census pre',
         'strict_census post',
@@ -2924,6 +3221,8 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "envelope_fusion",
         "envelope_graph",
         "envelope_source",
+        "split_rms",
+        "split_rms_schedule",
         "classification",
         "comparison",
         "source",
@@ -2962,6 +3261,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "exact": True,
         "exact_arms": ["accepted_dense_convolution"],
         "final_dense_layout": False,
+        "split_layer1_rms": False,
         "final_layout_records": {},
         "result_mode": "dense_and_layer1",
         "hlo": {
@@ -2973,6 +3273,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "dense_envelope": False,
                 "down_convolution_count": 8,
                 "final_dense_layout": False,
+                "split_layer1_rms": False,
                 "gate_up_convolution_count": 8,
                 "live_rows": 1,
                 "lineage": {
@@ -3045,6 +3346,11 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                         "exact_reduction_operand_graph": True,
                         "exact_result_binding": True,
                         "exact_weighted_operand_graph": True,
+                        "split_layer1_rms": False,
+                        "split_recompute_exact": True,
+                        "split_output_fusion_exact": True,
+                        "exact_accepted_scheduled_reduction": True,
+                        "accepted_scheduled_reduction_values": [],
                         "divide_count": 1,
                         "multiply_or_square_count": 3,
                         "reduce_count": 1,
@@ -3081,6 +3387,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "dense_envelope": False,
                 "down_convolution_count": 8,
                 "final_dense_layout": False,
+                "split_layer1_rms": False,
                 "gate_up_convolution_count": 8,
                 "gate_up_layout_constraint_count": 0,
                 "live_rows": 1,
@@ -3163,6 +3470,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     layer1_only = False
     final_layout = False
     dense_envelope = False
+    split_layer1_rms = False
     if mutation in (
         "m32",
         "cross_layer",
@@ -3178,15 +3486,22 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "envelope_fusion",
             "envelope_graph",
             "envelope_source",
+            "split_rms",
+            "split_rms_schedule",
         ):
         compile_rows = 32
-        dense_envelope = mutation.startswith("envelope")
+        split_layer1_rms = mutation.startswith("split_rms")
+        dense_envelope = mutation.startswith("envelope") or split_layer1_rms
         layer1_only = mutation.startswith(
-            ("cross_layer", "final_layout", "envelope")
+            ("cross_layer", "final_layout", "envelope", "split_rms")
         )
-        final_layout = mutation.startswith(("final_layout", "envelope"))
+        final_layout = mutation.startswith(
+            ("final_layout", "envelope", "split_rms")
+        )
         arm = (
-            "accepted_m32_dense_envelope_cross_layer"
+            "accepted_m32_dense_envelope_split_rms"
+            if split_layer1_rms
+            else "accepted_m32_dense_envelope_cross_layer"
             if dense_envelope
             else "accepted_m32_dense_final_layout_cross_layer"
             if final_layout
@@ -3204,6 +3519,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "exact_arms": [arm],
                 "final_dense_layout": final_layout,
                 "result_mode": result_mode,
+                "split_layer1_rms": split_layer1_rms,
             }
         )
         runner["hlo"]["optimized_contract"]["compile_rows"] = 32
@@ -3213,6 +3529,24 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         runner["hlo"]["optimized_contract"][
             "final_dense_layout"
         ] = final_layout
+        runner["hlo"]["optimized_contract"][
+            "split_layer1_rms"
+        ] = split_layer1_rms
+        runner["hlo"]["optimized_contract"]["lineage"][
+            "rmsnorm_contract"
+        ].update(
+            {
+                "split_layer1_rms": split_layer1_rms,
+                "split_recompute_exact": True,
+                "split_output_fusion_exact": True,
+                "exact_accepted_scheduled_reduction": True,
+                "accepted_scheduled_reduction_values": (
+                    ["%multiply_reduce_fusion"]
+                    if split_layer1_rms
+                    else []
+                ),
+            }
+        )
         runner["hlo"]["optimized_contract"]["result_mode"] = result_mode
         runner["hlo"]["optimized_contract"]["lineage"][
             "m32_live_row_slices"
@@ -3235,6 +3569,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         runner["hlo"]["stablehlo_contract"][
             "final_dense_layout"
         ] = final_layout
+        runner["hlo"]["stablehlo_contract"][
+            "split_layer1_rms"
+        ] = split_layer1_rms
         runner["hlo"]["stablehlo_contract"][
             "gate_up_layout_constraint_count"
         ] = 8 if final_layout else 0
@@ -3344,6 +3681,10 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                     ]["fused_gate_binding_count"] = 7
                 elif mutation == "envelope_source":
                     runner["source"]["attention_update_sha256"] = "0" * 64
+                elif mutation == "split_rms_schedule":
+                    runner["hlo"]["optimized_contract"]["lineage"][
+                        "rmsnorm_contract"
+                    ]["exact_accepted_scheduled_reduction"] = False
         if mutation == "cross_layer_mode":
             runner["result_mode"] = "dense_and_layer1"
     elif mutation == "classification":
@@ -3415,6 +3756,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 str(int(layer1_only)),
                 str(int(final_layout)),
                 str(int(dense_envelope)),
+                str(int(split_layer1_rms)),
                 "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7",
                 "02d045b9a0ec5ab22a711bd6a964564f707be0848683381104e83331020e31a3",
                 "082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f",
@@ -3434,6 +3776,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "cross_layer",
         "final_layout",
         "envelope",
+        "split_rms",
         "nonexact",
     ):
         assert completed.returncode != 0
@@ -3446,9 +3789,12 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "cross_layer",
         "final_layout",
         "envelope",
+        "split_rms",
     )
     expected_arm = (
-        "accepted_m32_dense_envelope_cross_layer"
+        "accepted_m32_dense_envelope_split_rms"
+        if mutation == "split_rms"
+        else "accepted_m32_dense_envelope_cross_layer"
         if mutation == "envelope"
         else "accepted_m32_dense_final_layout_cross_layer"
         if mutation == "final_layout"
@@ -3477,7 +3823,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     assert run is not None
     assert run[0:2] == (
         (
-            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-cross-layer"
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-split-rms"
+            if mutation == "split_rms"
+            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-cross-layer"
             if mutation == "envelope"
             else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
             if mutation == "final_layout"
@@ -3490,7 +3838,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             )
         ),
         (
-            "native-jax-accepted-dense-envelope-v1"
+            "native-jax-accepted-dense-envelope-split-rms-v1"
+            if mutation == "split_rms"
+            else "native-jax-accepted-dense-envelope-v1"
             if mutation == "envelope"
             else "native-jax-accepted-dense-final-layout-v1"
             if mutation == "final_layout"
@@ -3508,6 +3858,15 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     assert environment["compile_rows"] == compile_rows
     assert environment["dense_envelope"] is dense_envelope
     assert environment["final_dense_layout"] is final_layout
+    assert environment["split_layer1_rms"] is split_layer1_rms
+    assert summary["split_layer1_rms"] is split_layer1_rms
+    if split_layer1_rms:
+        assert environment["exact_accepted_scheduled_reduction"] is True
+        assert environment["split_recompute_exact"] is True
+        assert environment["split_output_fusion_exact"] is True
+        assert summary["exact_accepted_scheduled_reduction"] is True
+        assert summary["split_recompute_exact"] is True
+        assert summary["split_output_fusion_exact"] is True
     if final_layout:
         assert environment["final_layout_records_sha256"] == (
             "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4"
@@ -3522,11 +3881,13 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         assert summary["scheduled_kernel_geometry_required"] is True
     assert environment["result_mode"] == (
         "layer1_only"
-        if mutation in ("cross_layer", "final_layout", "envelope")
+        if mutation in ("cross_layer", "final_layout", "envelope", "split_rms")
         else "dense_and_layer1"
     )
     assert run[3] == (
-        "Protected layer-0 accepted dense fusion-envelope discriminator; no performance claim."
+        "Protected layer-1 accepted split-RMS schedule discriminator; no performance claim."
+        if mutation == "split_rms"
+        else "Protected layer-0 accepted dense fusion-envelope discriminator; no performance claim."
         if mutation == "envelope"
         else "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
         if mutation == "final_layout"
@@ -3540,7 +3901,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     )
     assert item == (
         (
-            "greenfield_layer0_dense_envelope_cross_layer"
+            "greenfield_layer0_dense_envelope_split_rms"
+            if mutation == "split_rms"
+            else "greenfield_layer0_dense_envelope_cross_layer"
             if mutation == "envelope"
             else "greenfield_layer0_dense_final_layout_cross_layer"
             if mutation == "final_layout"
@@ -3557,7 +3920,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     )
     assert metric == (
         (
-            "greenfield_layer0_dense_envelope_cross_layer"
+            "greenfield_layer0_dense_envelope_split_rms"
+            if mutation == "split_rms"
+            else "greenfield_layer0_dense_envelope_cross_layer"
             if mutation == "envelope"
             else "greenfield_layer0_dense_final_layout_cross_layer"
             if mutation == "final_layout"

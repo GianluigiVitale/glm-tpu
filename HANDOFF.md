@@ -19,6 +19,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Current clean pushed baseline is `3d5b2ee840c41bcd86a1e1936a95db2d4a8e73f9`. Protected DB548/item1832,
+  tag `greenfield_layer0_dense_envelope_cross_layer_20260813T120703034434907Z`, completed from
+  that pin with DB/archive/`SUCCESS` and authenticated 8/8 pre/post cleanup. All eight gate/up and
+  all eight down contractions prove exact packed-weight lineage and the accepted scheduled TPU
+  backend geometry. The numerical result is nevertheless byte-identical to DB547: one BF16 ULP at
+  layer-1 index 2795, expected bits 48423 versus observed 48422, with observed SHA
+  `9b52a04e...4005`. Therefore convolution weight layout and scheduled contraction geometry are
+  conclusively rejected as the remaining cause; do not extend or rerun that scheduling theory.
+- The next bounded discriminator is the downstream layer-1 fused add/RMSNorm. The accepted
+  after-codegen HLO reduces the squared M32 row in a scalar-only fusion with output window
+  `[2,48]`, iteration `[2,1]`, megacore split 0 and 4,096 reduction bytes, then recomputes the
+  residual sum in the final weighted fusion. DB548 instead carries that F32 sum out of a tuple
+  reduction scheduled as output `[4,24]`, iteration `[1,2]`, split 1. Add one default-off
+  recompute/split-RMS arm whose optimized-HLO gate requires the accepted exact graph and scheduled
+  geometry. Exact output authorizes a true-row-one production formulation and complete 8K retry;
+  nonexact output closes RMSNorm scheduling and leaves the dense partial result as the sole open
+  boundary. Gate D remains open; DB484 remains the only decoder performance result.
+
 - Current clean pushed baseline is `bd94967eb4f2a610d0a798d8b1e7656cbf3b45c9`. Its protected retry,
   tag `greenfield_layer0_dense_envelope_cross_layer_20260813T115238978656998Z`, compiled the real
   checkpoint and achieved the accepted scheduled backend geometry for all 16 layer-0 dense

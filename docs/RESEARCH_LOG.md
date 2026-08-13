@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 12:08 UTC — DB548 rejects dense contraction scheduling; one RMS boundary remains
+
+- Proof commit `3d5b2ee840c41bcd86a1e1936a95db2d4a8e73f9` received its one-diff Sol approval
+  and was pushed. Protected DB548/item1832 completed under tag
+  `greenfield_layer0_dense_envelope_cross_layer_20260813T120703034434907Z`; exact StableHLO,
+  optimized-HLO, checkpoint/packed-weight provenance, DB/archive/remote-content gates and the
+  authenticated 8/8 pre/post census all pass.
+- Every gate/up rank 0--7 and down rank 0--7 has exact packed FP8/scale lineage and the accepted
+  scheduled TPU kernel/input/output windows, iterations, padding and megacore configuration. The
+  arithmetic result remains the identical DB547 one-ULP miss: layer-1 index 2795 expected BF16
+  bits 48423, observed 48422, max error `0.000244140625`, mismatch count `1/6144`, observed SHA
+  `9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005`. This closes the multi-run
+  dense contraction scheduling hypothesis rather than authorizing production integration.
+- The remaining exact after-codegen difference is downstream. Accepted layer-1 fused RMSNorm
+  computes only the F32 row reduction in a `[2,48]` / `[2,1]` / megacore-split-0 fusion, then
+  recomputes the residual sum in the final weighted fusion. DB548 returns both row reduction and
+  summed F32 tensor from a `[4,24]` / `[1,2]` / split-1 tuple fusion. The exact next batch is one
+  default-off recompute/split-RMS discriminator with an accepted-geometry HLO gate. A miss closes
+  RMS scheduling and localizes the sole remaining defect to the dense partial result; no complete
+  8K retry or further convolution-scheduling change precedes it.
+- Runner/tensor/summary/`SUCCESS` SHAs are `0c903540...9112`, `6cb76623...480f`,
+  `916f6ea2...0080`, and `a81433c3...39f1`; optimized/StableHLO SHAs are
+  `5f4dd837...a877` / `16019c24...072`. DB snapshot/pre/post-census/remote-ledger SHAs are
+  `b8324394...f0f6`, `47be12f7...509a`, `407e3f8f...cb83`, and `026b0d0b...f7e1`.
+
 ## 2026-08-13 12:02 UTC — all 16 dense contractions reach accepted TPU geometry
 
 - Three reviewed scheduling commits followed DB547's one-ULP result. `077dffb` replaced compressed
