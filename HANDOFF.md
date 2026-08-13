@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Pushed correction `09135efc3d679359c79839ed64303c5c09261500` received Sol approval at
+  staged SHA `a64b6623...7210` and completed another 46-second protected replay attempt under tag
+  `greenfield_layer0_captured_rms_replay_20260813T212551468198545Z`. Both arms passed StableHLO
+  and optimized-HLO proof and executed real arithmetic. The run then failed closed because the
+  control did not reproduce DB548. There is no terminal runner/NPZ/summary/DB row/`SUCCESS` or
+  accepted numerical verdict; the prior script also did not retain the computed rows on this
+  failure. Rollback is `NO_PROVISIONAL_DB_RUN`, cleanup is authenticated 8/8, and failure evidence
+  is archived under the nonterminal diagnostic subtree. Control/split optimized-HLO SHAs are
+  `54edbe45...83a7` / `7a6cc269...b7b`; StableHLO SHAs are `b4fdb677...720d` /
+  `b079e88d...e95b`.
+- The preserved HLO identifies the invalid control abstraction. DB548's layer-1 fusion consumes the
+  two original BF16 carried-residual source rows, performs their exact F32 add -> BF16 round inside
+  the fused graph, then adds the dense update. The first replay instead supplied that already-
+  rounded M32 residual as one external input. Equal bytes did not preserve the integrated compiler
+  context, so the control was not admissible. The correction now supplies the two source rows
+  already sealed in the capture NPZ, proves their exact M1->M32 pads/add/BF16 round, and keeps the
+  layer-1 norm as a separate fourth input. Old single-residual protected HLOs now refuse. A failure
+  after arithmetic now preserves exact comparison JSON and all four rows below `hlo/` before the
+  guard. Focused tests pass 7/7. Exact next: affected suite, one bulk Sol audit, commit/push and one
+  under-one-minute replay; still no full checkpoint or 8K run.
+
 - Pushed correction `9cbb5a68ca426fcac5ff6a404bb8b47a793b3957` received Sol approval at
   staged SHA `18647918...96d1` and launched once under tag
   `greenfield_layer0_captured_rms_replay_20260813T211240092773251Z`. The control proof now passes.

@@ -1146,7 +1146,7 @@ def validate_captured_dense_rms_stablehlo(
     contains no dense contractions: the input is the sealed set of 32 real
     BF16 down partials.  The contract reuses the exact DB533 tree and exact
     layer-1 RMS matcher used by the full dense probe, then additionally binds
-    the three replay inputs and the outer ``sdy.manual_computation`` result.
+    the four replay inputs and the outer ``sdy.manual_computation`` result.
     """
 
     if not isinstance(split_layer1_rms, bool):
@@ -1247,7 +1247,7 @@ def validate_captured_dense_rms_stablehlo(
                     f"{node.name}: captured partial slice drifted"
                 )
             pending.extend(node.operands)
-        if terminals != {"%arg3"}:
+        if terminals != {"%arg4"}:
             raise _MatchError(
                 f"captured partial gather source drifted: {sorted(terminals)}"
             )
@@ -1261,10 +1261,47 @@ def validate_captured_dense_rms_stablehlo(
             residual_is_m32=True,
             split_layer1_rms=split_layer1_rms,
         )
-        if residual != "%arg4" or norm_weight != "%arg5":
+        residual_round = _expect_node(
+            graph,
+            residual,
+            opcode="convert",
+            result_type="tensor<32x6144xbf16>",
+        )
+        if len(residual_round.operands) != 1:
+            raise _MatchError("captured carried-residual round arity drifted")
+        residual_add = _expect_node(
+            graph,
+            residual_round.operands[0],
+            opcode="add",
+            result_type="tensor<32x6144xf32>",
+        )
+        if len(residual_add.operands) != 2:
+            raise _MatchError("captured carried-residual add arity drifted")
+        residual_sources: list[str] = []
+        for operand in residual_add.operands:
+            conversion = _expect_node(
+                graph,
+                operand,
+                opcode="convert",
+                result_type="tensor<32x6144xf32>",
+            )
+            if len(conversion.operands) != 1:
+                raise _MatchError(
+                    "captured carried-residual conversion arity drifted"
+                )
+            pad = _expect_node(
+                graph,
+                conversion.operands[0],
+                opcode="call",
+                result_type="tensor<32x6144xbf16>",
+            )
+            residual_sources.append(
+                _validate_m32_input_pad(graph, helpers, pad.name)
+            )
+        if tuple(residual_sources) != ("%arg5", "%arg6") or norm_weight != "%arg7":
             raise _MatchError(
-                "captured RMS residual/norm input identity drifted: "
-                f"residual={residual} norm={norm_weight}"
+                "captured RMS residual-source/norm identity drifted: "
+                f"sources={residual_sources} norm={norm_weight}"
             )
 
         manual_matches = list(
@@ -1280,7 +1317,7 @@ def validate_captured_dense_rms_stablehlo(
         manual_operands = tuple(
             re.findall(r"%[A-Za-z0-9_.$#-]+", manual_matches[0].group(2))
         )
-        if manual_operands != ("%arg0", "%arg1", "%arg2"):
+        if manual_operands != ("%arg0", "%arg1", "%arg2", "%arg3"):
             raise _MatchError(
                 f"captured RMS manual operands drifted: {manual_operands}"
             )
@@ -1292,9 +1329,10 @@ def validate_captured_dense_rms_stablehlo(
         if re.findall(
             r"(%arg[0-9]+):\s*(tensor<[^>]+>)", manual_line
         ) != [
-            ("%arg3", "tensor<1x8x1x6144xbf16>"),
-            ("%arg4", "tensor<32x6144xbf16>"),
-            ("%arg5", "tensor<6144xbf16>"),
+            ("%arg4", "tensor<1x8x1x6144xbf16>"),
+            ("%arg5", "tensor<1x6144xbf16>"),
+            ("%arg6", "tensor<1x6144xbf16>"),
+            ("%arg7", "tensor<6144xbf16>"),
         ]:
             raise _MatchError("captured RMS manual block arguments drifted")
         _only(

@@ -5,6 +5,29 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 21:34 UTC — fast replay reaches arithmetic and rejects its single-residual control
+
+- Reviewed/pushed commit `09135efc3d679359c79839ed64303c5c09261500` ran the four-chip bounded
+  discriminator under tag `greenfield_layer0_captured_rms_replay_20260813T212551468198545Z`.
+  Wall time to safe failure was 46 seconds. Both arms passed exact StableHLO/optimized-HLO gates
+  and executed; the terminal guard then rejected the control because it did not reproduce DB548.
+- This invalidates the experiment's control abstraction, not DB548 or Gate D. The replay accepted
+  the already-carried BF16 M32 residual as one external tensor. Preserved DB548 HLO instead takes
+  the two original BF16 source rows, computes their F32 sum and explicit BF16 round inside its
+  layer-1 fusion, then adds the dense update. Supplying equal carried bytes did not preserve that
+  fused compiler context. Control/split optimized-HLO SHAs are `54edbe45...83a7` and
+  `7a6cc269...b7b`.
+- The failed run has no terminal runner JSON, NPZ, summary, DB row, sealed archive, `SUCCESS`,
+  accepted numerical verdict, Gate-D advancement or performance result. The old failure path did
+  not retain the computed rows. Rollback is `NO_PROVISIONAL_DB_RUN`; cleanup is authenticated 8/8
+  and proof/log evidence is preserved remotely below the nonterminal `diagnostic/` subtree.
+- The bounded correction feeds the two source rows already present in the SHA-pinned capture NPZ,
+  recreates their exact M1->M32 pads/F32 add/BF16 round, and proves that graph plus the separate
+  layer-1 norm input. The retired one-input residual HLOs refuse. Future post-arithmetic failures
+  first preserve a comparison JSON and NPZ under `hlo/`, preventing another information-free
+  retry. Focused tests pass 7/7. Run affected tests, obtain one bulk Sol audit, commit/push and retry
+  the sub-minute discriminator once; do not run the full checkpoint or 8K decoder.
+
 ## 2026-08-13 21:15 UTC — control proof passes; split arm exposes exact partitioned rsqrt bridge
 
 - Sol approved staged correction SHA `18647918...96d1`; pushed commit

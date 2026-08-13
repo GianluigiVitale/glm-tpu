@@ -39,6 +39,12 @@ _CAPTURE_PARTIALS_SHA = (
 _CAPTURE_RESIDUAL_SHA = (
     "f583581fe6cdd8f1cb437b7864070de9fdd39b83be01d2d4afe072a997042dc0"
 )
+_ATTENTION_UPDATE_SHA = (
+    "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7"
+)
+_COMBINED_RESIDUAL_SHA = (
+    "02d045b9a0ec5ab22a711bd6a964564f707be0848683381104e83331020e31a3"
+)
 _LAYER1_NORM_SHA = (
     "10e34f4f99c638b29557526283205071c1ac8f81f168f4a6817e7e1def4b6c87"
 )
@@ -334,6 +340,12 @@ def _load_sources(args: argparse.Namespace) -> tuple[np.ndarray, ...]:
         residual_bits = np.ascontiguousarray(
             payload["post_attention_m32_bfloat16_bits"]
         )
+        attention_bits = np.ascontiguousarray(
+            payload["attention_update_bfloat16_bits"]
+        )
+        combined_bits = np.ascontiguousarray(
+            payload["combined_residual_bfloat16_bits"]
+        )
         norm_bits = np.ascontiguousarray(
             payload["layer1_input_norm_bfloat16_bits"]
         )
@@ -343,6 +355,8 @@ def _load_sources(args: argparse.Namespace) -> tuple[np.ndarray, ...]:
     expected_arrays = (
         (partial_bits, (4, 8, 1, 6144), _CAPTURE_PARTIALS_SHA),
         (residual_bits, (32, 6144), _CAPTURE_RESIDUAL_SHA),
+        (attention_bits, (1, 6144), _ATTENTION_UPDATE_SHA),
+        (combined_bits, (1, 6144), _COMBINED_RESIDUAL_SHA),
         (norm_bits, (6144,), _LAYER1_NORM_SHA),
         (accepted_bits, (6144,), _ACCEPTED_LAYER1_SHA),
     )
@@ -398,7 +412,14 @@ def _load_sources(args: argparse.Namespace) -> tuple[np.ndarray, ...]:
         or _array_sha256(dense_update_bits) != _DENSE_UPDATE_SHA
     ):
         raise RuntimeError("captured partials do not reproduce DB533 StrategyND")
-    return partial_bits, residual_bits, norm_bits, accepted_bits, db548_observed
+    return (
+        partial_bits,
+        attention_bits,
+        combined_bits,
+        norm_bits,
+        accepted_bits,
+        db548_observed,
+    )
 
 
 def _exact_accepted_rms_schedule(value: Any) -> bool:
@@ -506,18 +527,19 @@ def _validate_captured_rms_optimized_hlo(
         for item in module.instructions
         if item.computation.startswith("ENTRY ") and item.raw_opcode == "parameter"
     ]
-    expected_parameter_shapes = {
+    expected_parameter_shapes = (
+        "bf16[1,6144]",
+        "bf16[1,6144]",
         "bf16[1,8,1,6144]",
-        "bf16[32,6144]",
         "bf16[6144]",
-    }
+    )
     if (
-        len(entry_parameters) != 3
-        or {
+        len(entry_parameters) != 4
+        or tuple(sorted(
             shape
             for item in entry_parameters
             for shape in _shape_signatures(item.result_shapes)
-        }
+        ))
         != expected_parameter_shapes
     ):
         violations.append("captured RMS ENTRY inputs drifted")
@@ -739,7 +761,12 @@ def _build_arm(mesh: Any, *, split_layer1_rms: bool) -> Any:
 
     groups = ((0, 1, 2, 3),)
 
-    def local(partial_slot: Any, residual_m32: Any, layer1_norm: Any) -> Any:
+    def local(
+        partial_slot: Any,
+        attention_value: Any,
+        residual_value: Any,
+        layer1_norm: Any,
+    ) -> Any:
         with jax.named_scope("greenfield_captured_rms_strategy_gather"):
             gathered = lax.all_gather(
                 partial_slot[0],
@@ -759,6 +786,24 @@ def _build_arm(mesh: Any, *, split_layer1_rms: bool) -> Any:
                 mode="constant",
                 constant_values=jnp.bfloat16(0),
             )
+        with jax.named_scope("greenfield_captured_rms_predense_m32"):
+            attention_m32 = jnp.pad(
+                attention_value,
+                ((0, 31), (0, 0)),
+                mode="constant",
+                constant_values=jnp.bfloat16(0),
+            )
+            residual_source_m32 = jnp.pad(
+                residual_value,
+                ((0, 31), (0, 0)),
+                mode="constant",
+                constant_values=jnp.bfloat16(0),
+            )
+        with jax.named_scope("greenfield_captured_rms_carried_residual"):
+            residual_m32 = (
+                attention_m32.astype(jnp.float32)
+                + residual_source_m32.astype(jnp.float32)
+            ).astype(jnp.bfloat16)
         with jax.named_scope("greenfield_captured_rms_layer1"):
             if split_layer1_rms:
                 with jax.named_scope("split_reduction"):
@@ -796,7 +841,7 @@ def _build_arm(mesh: Any, *, split_layer1_rms: bool) -> Any:
     return jax.shard_map(
         local,
         mesh=mesh,
-        in_specs=(P("lp4", None, None, None), P(), P()),
+        in_specs=(P("lp4", None, None, None), P(), P(), P()),
         out_specs=P(),
         check_vma=False,
     )
@@ -843,7 +888,8 @@ def main() -> int:
         )
     (
         partial_bits,
-        residual_bits,
+        attention_bits,
+        combined_bits,
         norm_bits,
         accepted_bits,
         db548_observed_bits,
@@ -867,8 +913,9 @@ def main() -> int:
             partial_bits.view(ml_dtypes.bfloat16), partial_sharding
         ),
         jax.device_put(
-            residual_bits.view(ml_dtypes.bfloat16), replicated
+            attention_bits.view(ml_dtypes.bfloat16), replicated
         ),
+        jax.device_put(combined_bits.view(ml_dtypes.bfloat16), replicated),
         jax.device_put(norm_bits.view(ml_dtypes.bfloat16), replicated),
     )
     args.hlo_dir.mkdir(parents=True, exist_ok=True)
@@ -926,10 +973,33 @@ def main() -> int:
         arms["accepted_split"]["comparison"]["elementwise_exact"]
         and arms["accepted_split"]["output_sha256"] == _ACCEPTED_LAYER1_SHA
     )
+    diagnostic_json = args.hlo_dir / "arithmetic_diagnostic.json"
+    diagnostic_npz = args.hlo_dir / "arithmetic_diagnostic.npz"
+    diagnostic_json.write_text(
+        json.dumps(
+            {
+                "arms": arms,
+                "control_admissible": control_admissible,
+                "split_exact": split_exact,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    np.savez(
+        diagnostic_npz,
+        accepted_layer1_normalized_bfloat16_bits=accepted_bits,
+        control_layer1_normalized_bfloat16_bits=outputs["control"],
+        db548_layer1_normalized_bfloat16_bits=db548_observed_bits,
+        split_layer1_normalized_bfloat16_bits=outputs["accepted_split"],
+    )
     if not control_admissible:
         raise RuntimeError(
             "captured RMS control did not reproduce the protected DB548 output"
         )
+    diagnostic_json.unlink()
+    diagnostic_npz.unlink()
     classification = (
         "captured_partials_split_rms_exact"
         if split_exact
