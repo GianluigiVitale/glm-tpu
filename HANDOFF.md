@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed correction `ca7c78e9eef55040a5fbcf9c0572c3fcf274a022` moved the identity barriers
+  to the reduction inputs and ran once under tag
+  `greenfield_layer0_dense_envelope_split_rms_20260813T130459893823080Z`. The protected HLO now
+  achieves the accepted scalar-only layer-1 RMS reduction exactly: result `f32[32]`, output window
+  `[2,48]`, iterations `[2,1]`, megacore split 0 and 4,096 reduction bytes. All 16 dense
+  contractions retain their accepted scheduled geometry. This closes the compiler-schedule
+  objective but is not yet numerical evidence.
+- The run failed closed before arithmetic only because the optimized-HLO proof still assumed an M32
+  normalized-output graph. XLA pushed the already-required final row-zero slice into the output
+  fusion: it recomputes the exact residual add and normalization at `f32[1,6144]`, while its scalar
+  reduction remains M32. There is no tensor verdict, runner JSON, DB row, summary, sealed archive or
+  `SUCCESS`; 8/8 failure cleanup passes and exactly eight remote diagnostic objects exist.
+  Optimized/StableHLO SHAs are `ad97e7f6...7327` / `2de54df4...7f67`.
+- The active proof-only correction canonicalizes the exact M32 reduction inputs and exact live-row
+  recompute inputs to the same two physical BF16 sources. It admits only exact zero M1->M32 padding,
+  exact row-zero M32->M1 slicing, shape/dtype-preserving layout steps and exact BF16->F32 converts.
+  The preserved real HLO now passes every RMS graph/schedule/output contract; duplicated reduction
+  or output sources, a row-one slice and nonzero identity padding all refuse. Focused split-RMS
+  tests pass 3/3. Exact next: full affected validation, one new-diff-only Sol audit, commit/push and
+  one protected arithmetic retry. Do not change the now-proven scheduling construct.
+
 - Clean pushed pin `cd1bb736c70446ec2933f5a0d7a87cd8fdf16f22` contains the reviewed,
   default-off first split-RMS discriminator. Its protected launch, tag
   `greenfield_layer0_dense_envelope_split_rms_20260813T124723663516442Z`, passed remote vacancy,

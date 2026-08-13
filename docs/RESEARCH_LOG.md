@@ -5,6 +5,28 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 13:05 UTC — reduction-side barriers achieve the accepted scalar RMS schedule
+
+- Reviewed commit `ca7c78e9eef55040a5fbcf9c0572c3fcf274a022` ran once under protected tag
+  `greenfield_layer0_dense_envelope_split_rms_20260813T130459893823080Z`. The exact compiler
+  objective succeeds: layer-1 RMS reduction is scalar-only `f32[32]` with accepted output window
+  `[2,48]`, iterations `[2,1]`, megacore split 0 and 4,096 reduction bytes. All eight gate/up and
+  eight down contractions retain their accepted schedules.
+- The run refused before arithmetic because the existing proof expected the normalized output to
+  remain M32. XLA correctly pushed the terminal row-zero slice into the final fusion, where the
+  exact dense/residual sum, normalization, BF16 round and norm-weight multiply operate at M1. The
+  M32 scalar reduction is separate and no wide tensor is tuple-carried. Thus this is successful
+  scheduling evidence, not a numerical result.
+- No comparison, runner JSON, DB row, summary, sealed archive or `SUCCESS` exists. Pre/failure
+  censuses authenticate 8/8 zero work; exactly eight diagnostic objects were preserved remotely.
+  Optimized/StableHLO SHAs are `ad97e7f6...7327` / `2de54df4...7f67`.
+- The bounded proof correction canonicalizes the full-row reduction add and live-row recompute add
+  to the same two exact BF16 sources. Only zero M1->M32 padding, exact row-zero M32->M1 slicing,
+  dtype/value-preserving layout operations and exact BF16->F32 converts are admitted. The SHA-pinned
+  real HLO now passes; duplicate reduction/output inputs, row-one selection and nonzero identity pad
+  refuse. Focused tests pass 3/3. One new-diff audit and one protected arithmetic retry are next;
+  the proven scheduling source remains frozen.
+
 ## 2026-08-13 12:47 UTC — first split-RMS attempt rejects output-side barriers
 
 - Reviewed commit `cd1bb736c70446ec2933f5a0d7a87cd8fdf16f22` was launched once under tag

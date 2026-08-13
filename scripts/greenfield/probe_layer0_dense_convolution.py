@@ -485,6 +485,12 @@ def _validate_optimized_hlo(
             return None
         return by_key.get((item.computation, item.operand_names[index]))
 
+    def unquoted_hlo(raw_line: str) -> str:
+        """Remove quoted metadata and comments before parsing attributes."""
+
+        unquoted = re.sub(r'"(?:\\.|[^"\\])*"', '""', raw_line)
+        return re.sub(r"/\*.*?\*/", "", unquoted, flags=re.DOTALL)
+
     def is_m32_row0_slice(item: Any) -> bool:
         if compile_rows != 32 or item.raw_opcode != "slice":
             return False
@@ -492,15 +498,18 @@ def _validate_optimized_hlo(
         result_shapes = _shape_signatures(item.result_shapes)
         if len(operand_shapes) != 1 or len(result_shapes) != 1:
             return False
-        compact = re.sub(r"\s+", "", item.raw_line)
+        compact = re.sub(r"\s+", "", unquoted_hlo(item.raw_line))
         two_dimensional = re.fullmatch(
             r"(bf16|f32)\[32,([0-9]+)\]", operand_shapes[0]
         )
         if two_dimensional is not None:
             dtype, width = two_dimensional.groups()
+            slice_matches = re.findall(
+                r"\bslice=(\{\[[^]]+\](?:,\[[^]]+\])*\})", compact
+            )
             return (
                 result_shapes[0] == f"{dtype}[1,{width}]"
-                and f"slice={{[0:1],[0:{width}]}}" in compact
+                and slice_matches == [f"{{[0:1],[0:{width}]}}"]
             )
         three_dimensional = re.fullmatch(
             r"(bf16|f32)\[8,32,([0-9]+)\]", operand_shapes[0]
@@ -508,9 +517,12 @@ def _validate_optimized_hlo(
         if three_dimensional is None:
             return False
         dtype, width = three_dimensional.groups()
+        slice_matches = re.findall(
+            r"\bslice=(\{\[[^]]+\](?:,\[[^]]+\])*\})", compact
+        )
         return (
             result_shapes[0] == f"{dtype}[8,1,{width}]"
-            and f"slice={{[0:8],[0:1],[0:{width}]}}" in compact
+            and slice_matches == [f"{{[0:8],[0:1],[0:{width}]}}"]
         )
 
     def unwrap_layout(item: Any | None) -> Any | None:
@@ -2324,6 +2336,7 @@ def _validate_optimized_hlo(
                 not association_add_is_live(item) for item in association_adds
             ):
                 violations.append("optimized StrategyND add lineage drifted")
+            z_concat = None
             if expected_association_shapes == {"y": 9, "x": 1, "z": 72}:
                 def normalized_dimensions(item: Any) -> tuple[int, ...]:
                     dimensions = item.result_shapes[0].dimensions
@@ -3514,11 +3527,123 @@ def _validate_optimized_hlo(
                         origins.append(_instruction_key(value))
                 return frozenset(origins)
 
+            def exact_rms_add_origins(
+                item: Any, *, rows: int
+            ) -> frozenset[tuple[str, str]]:
+                """Canonicalize exact M32 or live-row residual-add inputs."""
+
+                expected_bf16 = f"bf16[{rows},6144]"
+                expected_f32 = f"f32[{rows},6144]"
+                if (
+                    item.raw_opcode != "add"
+                    or _shape_signatures(item.result_shapes)
+                    != (expected_f32,)
+                    or len(item.operand_names) != 2
+                ):
+                    return frozenset()
+                origins: list[tuple[str, str]] = []
+                for index in range(2):
+                    value = operand(item, index)
+                    if (
+                        value is None
+                        or value.raw_opcode != "convert"
+                        or _shape_signatures(value.operand_shapes)
+                        != (expected_bf16,)
+                        or _shape_signatures(value.result_shapes)
+                        != (expected_f32,)
+                        or len(value.operand_names) != 1
+                    ):
+                        return frozenset()
+                    value = operand(value, 0)
+                    seen: set[tuple[str, str]] = set()
+                    while (
+                        value is not None
+                        and _instruction_key(value) not in seen
+                    ):
+                        seen.add(_instruction_key(value))
+                        if (
+                            value.raw_opcode == "parameter"
+                            and not value.computation.startswith("ENTRY ")
+                        ):
+                            value = external_parameter_value(value)
+                            continue
+                        if (
+                            value.raw_opcode in {"copy", "reshape"}
+                            and len(value.operand_names) == 1
+                            and len(value.operand_shapes) == 1
+                            and len(value.result_shapes) == 1
+                            and value.operand_shapes[0].dtype
+                            == value.result_shapes[0].dtype
+                            and value.operand_shapes[0].element_count
+                            == value.result_shapes[0].element_count
+                        ):
+                            value = operand(value, 0)
+                            continue
+                        if rows == 1 and is_m32_row0_slice(value):
+                            if (
+                                _shape_signatures(value.operand_shapes)
+                                != ("bf16[32,6144]",)
+                                or _shape_signatures(value.result_shapes)
+                                != ("bf16[1,6144]",)
+                                or len(value.operand_names) != 1
+                            ):
+                                return frozenset()
+                            value = operand(value, 0)
+                            continue
+                        if value.raw_opcode == "pad":
+                            compact = re.sub(
+                                r"\s+", "", unquoted_hlo(value.raw_line)
+                            )
+                            padding_matches = re.findall(
+                                r"\bpadding=([^,\s}]+)", compact
+                            )
+                            if (
+                                len(value.operand_names) != 2
+                                or not exact_constant(
+                                    operand(value, 1), np.float32(0.0)
+                                )
+                            ):
+                                return frozenset()
+                            if rows == 32:
+                                exact_pad = (
+                                    _shape_signatures(value.operand_shapes)
+                                    == ("bf16[1,6144]", "bf16[]")
+                                    and _shape_signatures(value.result_shapes)
+                                    == ("bf16[32,6144]",)
+                                    and padding_matches == ["0_31x0_0"]
+                                )
+                            else:
+                                exact_pad = (
+                                    _shape_signatures(value.operand_shapes)
+                                    == ("bf16[1,6144]", "bf16[]")
+                                    and _shape_signatures(value.result_shapes)
+                                    == ("bf16[1,6144]",)
+                                    and padding_matches == ["0_0x0_0"]
+                                )
+                            if not exact_pad:
+                                return frozenset()
+                            value = operand(value, 0)
+                            continue
+                        if value is not z_concat and not (
+                            value.raw_opcode == "get-tuple-element"
+                            and _tuple_index(value) == 1
+                        ):
+                            return frozenset()
+                        break
+                    if value is None:
+                        return frozenset()
+                    origins.append(_instruction_key(value))
+                result = frozenset(origins)
+                return result if len(result) == 2 else frozenset()
+
+            residual_add_shapes = {rms_f32_shape, rms_bf16_shape}
+            if split_layer1_rms:
+                residual_add_shapes.add("f32[1,6144]")
             residual_adds = [
                 item
                 for item in rms_adds
                 if _shape_signatures(item.result_shapes)
-                in {(rms_f32_shape,), (rms_bf16_shape,)}
+                in {(shape,) for shape in residual_add_shapes}
             ]
             square_candidates = [
                 item
@@ -3663,15 +3788,46 @@ def _validate_optimized_hlo(
                                 )
                                 if _shape_signatures(item.result_shapes)
                                 == (rms_f32_shape,)
-                                else exact_m32_row0_chain_source(
-                                    operand(item, normalized_index), candidate
+                                else (
+                                    exact_chain_source(
+                                        operand(item, normalized_index),
+                                        candidate,
+                                    )
+                                    if _shape_signatures(
+                                        candidate.result_shapes
+                                    )
+                                    == ("f32[1,6144]",)
+                                    else exact_m32_row0_chain_source(
+                                        operand(item, normalized_index),
+                                        candidate,
+                                    )
                                 )
                             )
                         ]
+                        exact_recompute_origins = False
+                        if len(normalized_residual_adds) == 1:
+                            normalized_add = normalized_residual_adds[0]
+                            exact_recompute_origins = (
+                                semantic_origins(normalized_add)
+                                == semantic_origins(reduction_residual_add)
+                                or (
+                                    split_layer1_rms
+                                    and _shape_signatures(
+                                        normalized_add.result_shapes
+                                    )
+                                    == ("f32[1,6144]",)
+                                    and exact_rms_add_origins(
+                                        normalized_add, rows=1
+                                    )
+                                    == exact_rms_add_origins(
+                                        reduction_residual_add, rows=32
+                                    )
+                                    != frozenset()
+                                )
+                            )
                         if (
                             len(normalized_residual_adds) == 1
-                            and semantic_origins(normalized_residual_adds[0])
-                            == semantic_origins(reduction_residual_add)
+                            and exact_recompute_origins
                             and exact_chain_source(
                                 operand(item, 1 - normalized_index), rsqrt
                             )
@@ -3781,6 +3937,7 @@ def _validate_optimized_hlo(
             }
             split_recompute_exact = not split_layer1_rms
             split_output_fusion_exact = not split_layer1_rms
+            split_normalized_residual_add = None
             if split_layer1_rms:
                 reduction_residual_add = (
                     exact_reduction_pairs[0][2]
@@ -3796,8 +3953,23 @@ def _validate_optimized_hlo(
                     reduction_residual_add is not None
                     and normalized_residual_add is not None
                     and normalized_residual_add is not reduction_residual_add
-                    and semantic_origins(normalized_residual_add)
-                    == semantic_origins(reduction_residual_add)
+                    and (
+                        semantic_origins(normalized_residual_add)
+                        == semantic_origins(reduction_residual_add)
+                        or (
+                            _shape_signatures(
+                                normalized_residual_add.result_shapes
+                            )
+                            == ("f32[1,6144]",)
+                            and exact_rms_add_origins(
+                                normalized_residual_add, rows=1
+                            )
+                            == exact_rms_add_origins(
+                                reduction_residual_add, rows=32
+                            )
+                            != frozenset()
+                        )
+                    )
                 )
                 normalized_value = (
                     next(iter(exact_normalized_values.values()))
@@ -3818,6 +3990,7 @@ def _validate_optimized_hlo(
                     == normalized_value.computation
                     == weighted_value.computation
                 )
+                split_normalized_residual_add = normalized_residual_add
 
             def exact_accepted_rms_reduction_schedule(value: Any) -> bool:
                 if (
@@ -3905,6 +4078,7 @@ def _validate_optimized_hlo(
                 "exact_gate_input_binding": not dense_envelope,
                 "exact_operand_graph": not dense_envelope,
                 "exact_carried_residual_binding": not dense_envelope,
+                "exact_layer1_source_identity": not split_layer1_rms,
                 "fused_gate_binding_count": 0,
                 "weighted_value_count": 0,
             }
@@ -4244,8 +4418,8 @@ def _validate_optimized_hlo(
                         and exact_predense_source(operand(value, 0), carried)
                     )
 
-                carried_bindings = [
-                    item.name
+                carried_binding_values = [
+                    item
                     for item, _residual_add in carried_values
                     if post_residual_add is not None
                     and any(
@@ -4255,7 +4429,64 @@ def _validate_optimized_hlo(
                         for index in range(len(post_residual_add.operand_names))
                     )
                 ]
-                exact_carried_residual_binding = len(set(carried_bindings)) == 1
+                carried_binding_values = list(
+                    {
+                        _instruction_key(item): item
+                        for item in carried_binding_values
+                    }.values()
+                )
+                carried_bindings = [item.name for item in carried_binding_values]
+                exact_carried_residual_binding = len(carried_binding_values) == 1
+                exact_layer1_source_identity = not split_layer1_rms
+                if split_layer1_rms:
+                    carried_external_values = [
+                        external_values[-1]
+                        for item in carried_binding_values
+                        if (external_values := predense_external_values(item))
+                    ]
+                    allowed_origins = (
+                        frozenset(
+                            _instruction_key(value)
+                            for value in (z_concat, *carried_external_values)
+                            if value is not None
+                        )
+                        if len(carried_external_values) == 1
+                        else frozenset()
+                    )
+                    reduction_origins = (
+                        exact_rms_add_origins(
+                            reduction_residual_add, rows=32
+                        )
+                        if reduction_residual_add is not None
+                        else frozenset()
+                    )
+                    output_origins = (
+                        exact_rms_add_origins(
+                            split_normalized_residual_add,
+                            rows=(
+                                1
+                                if _shape_signatures(
+                                    split_normalized_residual_add.result_shapes
+                                )
+                                == ("f32[1,6144]",)
+                                else 32
+                            ),
+                        )
+                        if split_normalized_residual_add is not None
+                        else frozenset()
+                    )
+                    exact_layer1_source_identity = bool(
+                        len(allowed_origins) == 2
+                        and reduction_origins == allowed_origins
+                        and output_origins == allowed_origins
+                    )
+                    split_recompute_exact = bool(
+                        split_recompute_exact
+                        and exact_layer1_source_identity
+                    )
+                    rms_contract["split_recompute_exact"] = (
+                        split_recompute_exact
+                    )
                 exact_predense_operand_graph = bool(
                     exact_predense_graphs
                     and len(weighted_values) in {1, 8}
@@ -4267,6 +4498,9 @@ def _validate_optimized_hlo(
                         "carried_values": sorted(set(carried_bindings)),
                         "exact_carried_residual_binding": (
                             exact_carried_residual_binding
+                        ),
+                        "exact_layer1_source_identity": (
+                            exact_layer1_source_identity
                         ),
                         "exact_gate_input_binding": exact_gate_input_binding,
                         "exact_fused_gate_ownership": (
@@ -4317,6 +4551,7 @@ def _validate_optimized_hlo(
                     "exact_fused_gate_ownership",
                     "exact_operand_graph",
                     "exact_carried_residual_binding",
+                    "exact_layer1_source_identity",
                 )
             ):
                 violations.append(

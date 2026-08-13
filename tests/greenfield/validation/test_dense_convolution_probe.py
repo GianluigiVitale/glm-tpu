@@ -123,6 +123,27 @@ REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO = Path(
 REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO_SHA256 = (
     "dbe6f797008722ae8b2b4a53ddc83d1ebcecf858c44682b9654cd7b207397103"
 )
+REAL_REDUCTION_BARRIER_SPLIT_RMS_ROOT = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_REDUCTION_BARRIER_SPLIT_RMS_ROOT",
+        "/home/gianl/glm-run/greenfield_layer0_dense_envelope_split_rms_"
+        "20260813T130459893823080Z/hlo",
+    )
+)
+REAL_REDUCTION_BARRIER_SPLIT_RMS_HLO = (
+    REAL_REDUCTION_BARRIER_SPLIT_RMS_ROOT
+    / "dense_convolution.optimized_hlo.txt"
+)
+REAL_REDUCTION_BARRIER_SPLIT_RMS_HLO_SHA256 = (
+    "ad97e7f644fdd79fe726046b36d0cec0b6ca700402ff0b85f1ed814af27f7327"
+)
+REAL_REDUCTION_BARRIER_SPLIT_RMS_STABLEHLO = (
+    REAL_REDUCTION_BARRIER_SPLIT_RMS_ROOT
+    / "dense_convolution.stablehlo.mlir"
+)
+REAL_REDUCTION_BARRIER_SPLIT_RMS_STABLEHLO_SHA256 = (
+    "2de54df491300f94bb2d600243439fe1c43c5614a9434588b3a896f19aab7f67"
+)
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
     "decode_projection_lowering/8k/"
@@ -2523,6 +2544,199 @@ def test_dense_split_layer1_rms_rejects_output_barrier_tuple_schedule() -> None:
     rms = rejected["lineage"]["rmsnorm_contract"]
     assert rms["exact_accepted_scheduled_reduction"] is False
     assert rms["accepted_scheduled_reduction_values"] == []
+
+
+@pytest.mark.skipif(
+    not (
+        REAL_REDUCTION_BARRIER_SPLIT_RMS_HLO.exists()
+        and REAL_REDUCTION_BARRIER_SPLIT_RMS_STABLEHLO.exists()
+    ),
+    reason="protected reduction-barrier split-RMS HLO is unavailable",
+)
+def test_dense_split_layer1_rms_replays_scalar_schedule_and_exact_output() -> None:
+    optimized_hlo = REAL_REDUCTION_BARRIER_SPLIT_RMS_HLO.read_text()
+    stablehlo = REAL_REDUCTION_BARRIER_SPLIT_RMS_STABLEHLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_REDUCTION_BARRIER_SPLIT_RMS_HLO_SHA256
+    )
+    assert sha256(stablehlo.encode()).hexdigest() == (
+        REAL_REDUCTION_BARRIER_SPLIT_RMS_STABLEHLO_SHA256
+    )
+    stable = MODULE._validate_stablehlo(
+        stablehlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+        split_layer1_rms=True,
+    )
+    assert stable["passed"], stable
+    optimized = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+        split_layer1_rms=True,
+    )
+    assert optimized["passed"], optimized
+    rms = optimized["lineage"]["rmsnorm_contract"]
+    assert rms["exact_reduction_operand_graph"] is True
+    assert rms["split_recompute_exact"] is True
+    assert rms["split_output_fusion_exact"] is True
+    assert rms["exact_accepted_scheduled_reduction"] is True
+    assert rms["accepted_scheduled_reduction_values"] == [
+        "%multiply_reduce_fusion"
+    ]
+    predense = optimized["lineage"]["predense_rmsnorm_contract"]
+    assert predense["exact_layer1_source_identity"] is True
+
+    rogue_arithmetic_lines = []
+    pad_attribute_spoof_lines = []
+    slice_attribute_spoof_lines = []
+    pad_comment_spoof_lines = []
+    slice_comment_spoof_lines = []
+    association_scope_drift_lines = []
+    for line in optimized_hlo.splitlines():
+        if line.lstrip().startswith("%pad.12 ="):
+            rogue_arithmetic_lines.append(
+                "  %rogue_dense = bf16[1,6144]{1,0:T(2,128)(2,1)S(3)} "
+                "add(%constant_dynamic-update-slice_fusion, "
+                "%constant_dynamic-update-slice_fusion)"
+            )
+            rogue_arithmetic_lines.append(
+                line.replace(
+                    "pad(%constant_dynamic-update-slice_fusion,",
+                    "pad(%rogue_dense,",
+                    1,
+                )
+            )
+            pad_attribute_spoof_lines.append(
+                line.replace(
+                    "padding=0_31x0_0, metadata={op_name=\"",
+                    "padding=31_0x0_0, metadata={op_name=\""
+                    "padding=0_31x0_0/",
+                    1,
+                )
+            )
+            pad_comment_spoof_lines.append(
+                line.replace(
+                    "padding=0_31x0_0,",
+                    "/* padding=0_31x0_0 */ padding=31_0x0_0,",
+                    1,
+                )
+            )
+        else:
+            rogue_arithmetic_lines.append(
+                line.replace(
+                    "fusion(%get-tuple-element.135, "
+                    "%constant_dynamic-update-slice_fusion,",
+                    "fusion(%get-tuple-element.135, %rogue_dense,",
+                    1,
+                )
+            )
+            pad_attribute_spoof_lines.append(line)
+            pad_comment_spoof_lines.append(line)
+        if line.lstrip().startswith("%slice.1263 ="):
+            slice_attribute_spoof_lines.append(
+                line.replace(
+                    "slice={[0:1], [0:6144]}, metadata={op_name=\"",
+                    "slice={[1:2], [0:6144]}, metadata={op_name=\""
+                    "slice={[0:1],[0:6144]}/",
+                    1,
+                )
+            )
+            slice_comment_spoof_lines.append(
+                line.replace(
+                    "slice={[0:1], [0:6144]},",
+                    "/* slice={[0:1],[0:6144]} */ "
+                    "slice={[1:2], [0:6144]},",
+                    1,
+                )
+            )
+        else:
+            slice_attribute_spoof_lines.append(line)
+            slice_comment_spoof_lines.append(line)
+        if line.lstrip().startswith("%add.633 ="):
+            association_scope_drift_lines.append(
+                line.replace(
+                    "greenfield_strategy_nd_row0_dense_convolution_down/"
+                    "greenfield_strategy_nd_row0_association/add",
+                    "greenfield_strategy_nd_row0_dense_convolution_down/"
+                    "rogue_association/add",
+                    1,
+                )
+            )
+        else:
+            association_scope_drift_lines.append(line)
+    rogue_arithmetic = "\n".join(rogue_arithmetic_lines)
+    pad_attribute_spoof = "\n".join(pad_attribute_spoof_lines)
+    slice_attribute_spoof = "\n".join(slice_attribute_spoof_lines)
+    pad_comment_spoof = "\n".join(pad_comment_spoof_lines)
+    slice_comment_spoof = "\n".join(slice_comment_spoof_lines)
+    association_scope_drift = "\n".join(association_scope_drift_lines)
+
+    mutations = (
+        optimized_hlo.replace(
+            "%add.608 = f32[32,6144]{1,0:T(8,128)} add("
+            "%convert_element_type.357, %convert_element_type.356)",
+            "%add.608 = f32[32,6144]{1,0:T(8,128)} add("
+            "%convert_element_type.357, %convert_element_type.357)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "%add.673 = f32[1,6144]{1,0:T(1,128)} add("
+            "%convert_element_type.446, %convert_element_type.445)",
+            "%add.673 = f32[1,6144]{1,0:T(1,128)} add("
+            "%convert_element_type.446, %convert_element_type.446)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "%slice.1263 = bf16[1,6144]{1,0:T(2,128)(2,1)} slice("
+            "%param_0.467), slice={[0:1], [0:6144]}",
+            "%slice.1263 = bf16[1,6144]{1,0:T(2,128)(2,1)} slice("
+            "%param_0.467), slice={[1:2], [0:6144]}",
+            1,
+        ),
+        optimized_hlo.replace(
+            "%constant.2.clone.3 = bf16[]{:T(256)} constant(0)",
+            "%constant.2.clone.3 = bf16[]{:T(256)} constant(1)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "  %slice.1263 = bf16[1,6144]{1,0:T(2,128)(2,1)} slice("
+            "%param_0.467), slice={[0:1], [0:6144]}",
+            "\n".join(
+                (
+                    "  %rogue_layout = bf16[32,6144]{0,1} bitcast("
+                    "%param_0.467)",
+                    "  %slice.1263 = bf16[1,6144]{1,0:T(2,128)(2,1)} "
+                    "slice(%rogue_layout), slice={[0:1], [0:6144]}",
+                )
+            ),
+            1,
+        ),
+        rogue_arithmetic,
+        pad_attribute_spoof,
+        slice_attribute_spoof,
+        pad_comment_spoof,
+        slice_comment_spoof,
+        association_scope_drift,
+    )
+    assert all(mutated != optimized_hlo for mutated in mutations)
+    for mutated in mutations:
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+            split_layer1_rms=True,
+        )
+        assert rejected["passed"] is False
+        assert "accepted split layer-1 RMS schedule drifted" in (
+            rejected["violations"]
+        )
 
 
 @pytest.mark.skipif(
