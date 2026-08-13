@@ -10,8 +10,11 @@ import jax.numpy as jnp
 import numpy as np
 
 from glm_tpu.greenfield.kernels.stage_local import (
+    _decode_dense_fp8_in_out,
+    _dense_bf16_convolution,
     _strategy_nd_row0_bf16_reduce,
     _sum_virtual_dcp_bf16_partials,
+    _virtual_dense_convolution_down_partials,
 )
 
 
@@ -199,6 +202,79 @@ def test_strategy_nd_row0_rejects_wrong_geometry_or_dtype() -> None:
     with np.testing.assert_raises_regex(ValueError, "rounded BF16"):
         _strategy_nd_row0_bf16_reduce(
             jnp.zeros((32, 1, 6144), dtype=jnp.float32)
+        )
+
+
+def test_dense_convolution_primitives_preserve_fp8_decode_and_f32_accumulation() -> None:
+    bits = jnp.asarray(
+        np.arange(16, dtype=np.uint8).reshape(4, 4), dtype=jnp.uint8
+    )
+    scale = jnp.asarray([[0.5]], dtype=jnp.float32)
+    decoded = _decode_dense_fp8_in_out(
+        bits, scale, block_shape=(4, 4)
+    )
+    expected = jax.lax.bitcast_convert_type(
+        bits, jnp.float8_e4m3fn
+    ).astype(jnp.float32) * jnp.float32(0.5)
+    np.testing.assert_array_equal(
+        np.asarray(decoded).view(np.uint16),
+        np.asarray(expected.astype(jnp.bfloat16)).view(np.uint16),
+    )
+
+    lhs = jnp.asarray([[1.0, -2.0, 0.5, 3.0]], dtype=jnp.bfloat16)
+    actual = _dense_bf16_convolution(lhs, decoded)
+    reference = jax.lax.dot_general(
+        lhs,
+        decoded,
+        dimension_numbers=(((1,), (0,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+    np.testing.assert_array_equal(
+        np.asarray(actual).view(np.uint16),
+        np.asarray(reference).view(np.uint16),
+    )
+
+
+def test_virtual_dense_convolution_has_one_row_and_sixteen_convolutions() -> None:
+    shapes = (
+        jax.ShapeDtypeStruct((1, 6144), jnp.bfloat16),
+        jax.ShapeDtypeStruct((3072, 6144), jnp.uint8),
+        jax.ShapeDtypeStruct((24, 48), jnp.float32),
+        jax.ShapeDtypeStruct((3072, 6144), jnp.uint8),
+        jax.ShapeDtypeStruct((24, 48), jnp.float32),
+        jax.ShapeDtypeStruct((6144, 3072), jnp.uint8),
+        jax.ShapeDtypeStruct((48, 24), jnp.float32),
+    )
+    lowered = jax.jit(
+        lambda *args: _virtual_dense_convolution_down_partials(
+            *args, block_shape=(128, 128)
+        )
+    ).lower(*shapes)
+    assert lowered.out_info.shape == (8, 1, 6144)
+    assert lowered.out_info.dtype == jnp.bfloat16
+    stablehlo = lowered.as_text()
+    assert stablehlo.count("stablehlo.convolution") == 16
+    assert "tensor<1x6144xbf16>" in stablehlo
+    assert "tensor<32x6144xbf16>" not in stablehlo
+
+
+def test_virtual_dense_convolution_rejects_nonexact_contract() -> None:
+    good = (
+        jnp.zeros((1, 6144), dtype=jnp.bfloat16),
+        jnp.zeros((3072, 6144), dtype=jnp.uint8),
+        jnp.ones((24, 48), dtype=jnp.float32),
+        jnp.zeros((3072, 6144), dtype=jnp.uint8),
+        jnp.ones((24, 48), dtype=jnp.float32),
+        jnp.zeros((6144, 3072), dtype=jnp.uint8),
+        jnp.ones((48, 24), dtype=jnp.float32),
+    )
+    with np.testing.assert_raises_regex(ValueError, "requires 128x128"):
+        _virtual_dense_convolution_down_partials(
+            *good, block_shape=(64, 128)
+        )
+    with np.testing.assert_raises_regex(ValueError, "input must be BF16"):
+        _virtual_dense_convolution_down_partials(
+            good[0].astype(jnp.float32), *good[1:], block_shape=(128, 128)
         )
 
 

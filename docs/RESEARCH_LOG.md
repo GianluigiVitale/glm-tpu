@@ -7947,3 +7947,80 @@ unmotivated arithmetic variants.
   with exact bijection, exclusive source flow and root liveness; feature and stage-linear counts
   separately pass at 75 MoE and 624 attention calls. The affected combined suite passes 279/279.
   Exact next is one correction-only Sol review, commit/push and one protected retry.
+
+## 2026-08-12 21:25--22:25 — corrected 8K execution moves the boundary into layer-0 dense arithmetic
+
+- The identity/scoping correction was reviewed, committed and pushed as
+  `df60b9ae247c851ce465db87d61a7766752b0503`. Its serialized protected retry used tag
+  `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_pregatheredb512_strategynd_o_oracle_dsa_trace2_20260812T212508338416109Z`.
+- All three decoder/DSA-observer/prefill StableHLO and optimized-HLO contracts pass with the exact
+  StrategyND attention identities. The real checkpoint executes through prefill and token 0.
+  Token `101252` is exact, expected at candidate rank one, candidate order/ties are valid and all
+  inactive rows remain sentinel. Event 0/layer 0 DSA is exact.
+- The DSA observer fails closed at event 1/layer 1. Its first legacy-order mismatch is expected
+  position `8083` versus observed `8135` at selected offset 21; the selected set has eight
+  expected-only and eight observed-only positions. Scores are exactly equal on all 2,048 aligned
+  positions, but coverage cannot pass because the selected sets differ. Subsequent events are
+  downstream cascade. This is correctness localization, not timing evidence.
+- Decoder/observer/prefill StableHLO gzip SHAs are `69c2f70e...69bb`, `b177e70e...9608` and
+  `2ddf679b...d932`; optimized-HLO gzip SHAs are `2b372909...db40`, `2fda6234...7359` and
+  `237ee2c2...9f14`. Their contract JSON SHAs are `1ba0d538...fe8b`, `7ebdb62f...db3` and
+  `a1d7178d...96e5`. The DSA NPZ and token-observation SHAs are `3ef53ba1...6622` and
+  `e5e35f3b...e03c`. All eight logs have SHA `2619bbb...e9d`; failure cleanup is authenticated
+  8/8. No warmup, measured iteration, XPlane, DB row, summary or terminal `SUCCESS` exists, and
+  provisional rollback reports `NO_PROVISIONAL_DB_RUN`.
+- This corrects the earlier over-broad statement that DB539 resolved the full numerical cause.
+  DB539 proved only the attention output projection. DB538 already showed no local/StrategyND
+  dense-reduction association arm is exact, and the latest complete run retains the event-1
+  boundary after exact attention. The remaining open sequence is layer-0 dense/MLP local partial
+  arithmetic, down combine, residual add and layer-1 normalization.
+- The accepted M32 after-codegen HLO uses dequantized BF16 weights and plain convolution for dense
+  local arithmetic: gate/up `f32[32,768] convolution(bf16[32,6144], bf16[6144,768])` followed by
+  BF16 conversion, and down `f32[32,6144] convolution(bf16[32,384], bf16[384,6144])` followed by
+  BF16 conversion and the same global BF16 StrategyND tree. Greenfield currently uses one fused
+  Pallas SwiGLU/down program per virtual shard. The next experiment is therefore a bounded layer-0
+  dense arithmetic discriminator against DB538's accepted layer-1-normalized target, not another
+  full 8K retry. Only an exact arm authorizes production integration; otherwise capture the
+  smallest accepted post-MLP boundary.
+
+## 2026-08-12 22:25--23:55 — bounded dense-convolution discriminator reaches reviewed correction
+
+- A default-off four-chip probe now replays the accepted M32 dense arithmetic without loading the
+  complete model: eight one-row gate/up BF16 convolutions, explicit BF16 SwiGLU, eight one-row down
+  convolutions, and the already-proved DB533 StrategyND reduction. It consumes DB538's exact
+  post-attention residual and accepted layer-1-normalized row plus only manifest-bound stage-0
+  checkpoint tensors.
+- Its protected wrapper reuses the serialized lease and strict 8/8 censuses, pins DB538 and the
+  checkpoint manifest locally/remotely, authenticates every partial DB state for rollback, verifies
+  local/remote CRC32C equality, rejects a non-vacant/inexact archive, and publishes `SUCCESS` last.
+- The one new-diff Sol audit found four medium publication/HLO gaps: coarse StableHLO and optimized-
+  HLO gates, insufficient runner schema, and incomplete rollback authentication. Those are fixed.
+  The final correction-only finding showed optimized HLO still admitted SwiGLU reassociation, a
+  self-add substitute for DB533, and a dead RMSNorm graph. The optimized checker now pins exact
+  gate/sigmoid/up edges across fusion boundaries, BF16-round-separated three-node `y`/`z` forests,
+  the sole `x` edge and live residual/RMSNorm semantics; StableHLO independently pins exact physical
+  leaves and source order. All three demonstrated mutations and an outer gate/up source swap refuse.
+- The combined affected suite passes 56/56; compileall, Bash, ShellCheck, five embedded Python
+  blocks and diff checks pass. This is local readiness only. Exact next is the same reviewer's
+  correction confirmation, one commit/push, and one serialized protected discriminator run.
+
+## 2026-08-12 23:40--23:55 — optimized tree proof binds physical leaves and pairing
+
+- The same correction-only audit reproduced one remaining optimized-HLO fail-open. Generic
+  three-add component topology did not identify the four physical leaves or DB533 pairing: a
+  duplicated y row and an adjacent replacement for the required cross middle band both passed.
+- The optimized matcher now parses exact slice ranges within direct and fused components, requires
+  distinct rows zero through three, applies adjacent pairing to even y bands/z segments and cross
+  pairing to odd ones, proves x consumes distinct rows zero and one, and binds ordered y-band and
+  z-segment concatenations across fusion callers. The preserved CPU lowering reports exact y ids
+  `0..2`, z ids `0..23`, exact leaf pairings and exact ordered roots.
+- Regressions cover both reported mutations, wrong odd-z pairing, and reordered y/z outputs. The
+  correction-only review then reproduced fused-result decoys: an exact internal scoped tree could
+  be dead, or extra arithmetic could be mixed into it before the fusion return. The matcher now
+  requires exactly one callee result and resolves its actual `ROOT` through only unary
+  layout/rounding transforms to the exact scoped component root before mapping it to a caller.
+  Live fused y passes and both reported rogue-return forms refuse.
+- The focused dense file passes 15/15; the affected combined suite passes 57/57. Compileall, Bash,
+  ShellCheck, all five wrapper Python heredocs and diff checks pass. This remains local readiness;
+  the same reviewer returned `APPROVE COMMIT` for staged SHA `61d7a917...8cda`. Only commit/push
+  and the protected four-chip discriminator remain.

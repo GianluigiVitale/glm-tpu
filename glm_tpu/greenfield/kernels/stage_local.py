@@ -332,6 +332,167 @@ def _virtual_dense_down_partials(
     )
 
 
+def _decode_dense_fp8_in_out(
+    weight_bits: Any,
+    scale: Any,
+    *,
+    block_shape: tuple[int, int],
+) -> Any:
+    """Decode one legacy-oriented ``[in, out]`` dense weight to BF16."""
+
+    if weight_bits.ndim != 2 or scale.ndim != 2:
+        raise ValueError("dense convolution weight and scale must be rank two")
+    if weight_bits.dtype != jnp.uint8 or scale.dtype != jnp.float32:
+        raise ValueError("dense convolution requires U8 FP8 bits and FP32 scales")
+    expected_scale = tuple(
+        (dimension + block - 1) // block
+        for dimension, block in zip(
+            weight_bits.shape, block_shape, strict=True
+        )
+    )
+    if scale.shape != expected_scale:
+        raise ValueError(
+            "dense convolution scale geometry drifted: "
+            f"expected={expected_scale} found={scale.shape}"
+        )
+    expanded = jnp.repeat(scale, block_shape[0], axis=0)
+    expanded = jnp.repeat(expanded, block_shape[1], axis=1)
+    expanded = expanded[: weight_bits.shape[0], : weight_bits.shape[1]]
+    weight = lax.bitcast_convert_type(weight_bits, jnp.float8_e4m3fn)
+    return (
+        weight.astype(jnp.float32) * expanded.astype(jnp.float32)
+    ).astype(jnp.bfloat16)
+
+
+def _dense_bf16_convolution(lhs: Any, weight_in_out: Any) -> Any:
+    """Apply the accepted zero-spatial dense convolution and round once."""
+
+    if lhs.ndim != 2 or weight_in_out.ndim != 2:
+        raise ValueError("dense convolution operands must be rank two")
+    if lhs.shape[0] != 1 or lhs.shape[1] != weight_in_out.shape[0]:
+        raise ValueError("dense convolution operand geometry drifted")
+    if lhs.dtype != jnp.bfloat16 or weight_in_out.dtype != jnp.bfloat16:
+        raise ValueError("dense convolution operands must be BF16")
+    return lax.conv_general_dilated(
+        lhs,
+        weight_in_out,
+        window_strides=(),
+        padding=(),
+        dimension_numbers=("NC", "IO", "NC"),
+        preferred_element_type=jnp.float32,
+    ).astype(jnp.bfloat16)
+
+
+def _virtual_dense_convolution_down_partials(
+    normalized: Any,
+    gate_bits: Any,
+    gate_scale: Any,
+    up_bits: Any,
+    up_scale: Any,
+    down_bits: Any,
+    down_scale: Any,
+    *,
+    block_shape: tuple[int, int],
+) -> Any:
+    """Replay the accepted one-row dense arithmetic for eight virtual ranks.
+
+    The accepted M32 executable gives each physical tensor rank one merged
+    gate/up ``[6144, 768]`` convolution, a BF16 SwiGLU boundary and one
+    ``[384, 6144]`` down convolution.  PP8 stores eight consecutive legacy
+    ranks on each owner.  This helper virtualizes those ranks without creating
+    token rows: every convolution still has exactly one live row.
+    """
+
+    expected = {
+        "normalized": (1, 6144),
+        "gate_bits": (3072, 6144),
+        "gate_scale": (24, 48),
+        "up_bits": (3072, 6144),
+        "up_scale": (24, 48),
+        "down_bits": (6144, 3072),
+        "down_scale": (48, 24),
+    }
+    values = {
+        "normalized": normalized,
+        "gate_bits": gate_bits,
+        "gate_scale": gate_scale,
+        "up_bits": up_bits,
+        "up_scale": up_scale,
+        "down_bits": down_bits,
+        "down_scale": down_scale,
+    }
+    for name, shape in expected.items():
+        if values[name].shape != shape:
+            raise ValueError(
+                f"virtual dense convolution {name} shape drifted: "
+                f"expected={shape} found={values[name].shape}"
+            )
+    if block_shape != (128, 128):
+        raise ValueError("virtual dense convolution requires 128x128 blocks")
+    if normalized.dtype != jnp.bfloat16:
+        raise ValueError("virtual dense convolution input must be BF16")
+    if any(
+        value.dtype != jnp.uint8
+        for value in (gate_bits, up_bits, down_bits)
+    ) or any(
+        value.dtype != jnp.float32
+        for value in (gate_scale, up_scale, down_scale)
+    ):
+        raise ValueError("virtual dense convolution weight dtypes drifted")
+
+    virtual_intermediate = 384
+    virtual_scale_intermediate = 3
+    partials = []
+    for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
+        start = shard * virtual_intermediate
+        stop = start + virtual_intermediate
+        scale_start = shard * virtual_scale_intermediate
+        scale_stop = scale_start + virtual_scale_intermediate
+        merged_bits = jnp.concatenate(
+            (
+                gate_bits[start:stop, :].T,
+                up_bits[start:stop, :].T,
+            ),
+            axis=1,
+        )
+        merged_scale = jnp.concatenate(
+            (
+                gate_scale[scale_start:scale_stop, :].T,
+                up_scale[scale_start:scale_stop, :].T,
+            ),
+            axis=1,
+        )
+        down_bits_in_out = down_bits[:, start:stop].T
+        down_scale_in_out = down_scale[:, scale_start:scale_stop].T
+        with jax.named_scope(
+            f"greenfield_dense_convolution_virtual_rank_{shard:02d}"
+        ):
+            gate_up = _dense_bf16_convolution(
+                normalized,
+                _decode_dense_fp8_in_out(
+                    merged_bits,
+                    merged_scale,
+                    block_shape=block_shape,
+                ),
+            )
+            gate = gate_up[:, :virtual_intermediate]
+            up = gate_up[:, virtual_intermediate:]
+            activated = (
+                gate * jax.nn.sigmoid(gate) * up
+            ).astype(jnp.bfloat16)
+            partials.append(
+                _dense_bf16_convolution(
+                    activated,
+                    _decode_dense_fp8_in_out(
+                        down_bits_in_out,
+                        down_scale_in_out,
+                        block_shape=block_shape,
+                    ),
+                )
+            )
+    return jnp.stack(tuple(partials), axis=0)
+
+
 def _sum_virtual_dcp_bf16_partials(
     partials: Any,
     *,

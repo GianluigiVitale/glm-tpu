@@ -22,19 +22,38 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 - Gates A--C are complete. Gate D has one accepted 2K result, DB484, at `244.091151 ms/token` and
   `4.096830 tok/s`; it does not pass Gate E. Complete 8K exactness remains open. DB484 is still the
   only decoder performance result.
-- DB539/item1823 resolves the Gate-D numerical cause. The accepted post-`o_proj` layer-0 row is
-  SHA `68afed86...de7`; DB538's StrategyND candidate is bitwise exact at `0/6,144` mismatches and
-  the ordinary local LP4 sum differs in `3,652/6,144`. The default-off production successor uses
-  eight separately rounded K512 partials per owner, one LP4 gather and DB533's exact local
-  `y -> x -> z` tree for attention projection only; dense/MoE remain unchanged. Its HLO gate pins
-  exact logical/folded geometry, exact names/groups, exclusive 8:1 partial lineage/bijection, root
-  liveness and the local-only meaning of folded `bf16[32,1,6144]`. The protected wrapper now puts
-  post-census before DB mutation, authenticates rollback of all committed DB prefixes, verifies
-  local/remote CRC32C plus the exact object set, and publishes rehashed `SUCCESS` last. Forced-CPU
-  decoder/prefill/wrapper tests pass 96/96 and the adjacent StrategyND/attention suites pass 34/34;
-  Bash, ShellCheck, compile and diff checks pass. Exact next: one Sol audit of this complete new
-  diff, correct only new findings, commit/push, then one protected 8K exact run. Do not rerun an
-  arithmetic discriminator first.
+- The latest protected 8K attempt ran from clean pushed pin
+  `df60b9ae247c851ce465db87d61a7766752b0503` under tag ending
+  `strategynd_o_oracle_dsa_trace2_20260812T212508338416109Z`. Decoder, DSA-observer and prefill
+  StableHLO plus optimized-HLO contracts all pass. The real checkpoint executed through prefill
+  and one decode token; token `101252` is exactly correct, candidate order/ties pass and inactive
+  rows remain sentinel. Event 0/layer 0 DSA is exact. The run then fails closed at event 1/layer 1:
+  first legacy-order mismatch expected `8083`, observed `8135`, selected offset 21, with eight
+  expected-only and eight observed-only positions. Scores on the 2,048 aligned positions are
+  bitwise equal, but selected-set coverage is incomplete. Later events are downstream cascade.
+  There is no warmup/timing/XPlane/DB/summary/`SUCCESS`; rollback says `NO_PROVISIONAL_DB_RUN`,
+  all eight logs share SHA `2619bbb...e9d`, and failure cleanup is authenticated 8/8.
+- DB539 resolves attention projection only, not the complete Gate-D numerical cause. Its accepted
+  post-`o_proj` layer-0 row SHA `68afed86...de7` proves StrategyND attention exact at `0/6,144`
+  mismatches while ordinary LP4 differs in `3,652/6,144`. The latest run proves this correction is
+  insufficient: the first remaining boundary is after exact attention, inside layer-0 dense/MLP
+  local arithmetic, its down combine, residual addition or layer-1 normalization. DB538 already
+  rejected all local/StrategyND dense-reduction pairings, so reduction association alone must not
+  be retried.
+- The accepted legacy M32 after-codegen HLO gives the next bounded candidate directly. Gate/up use
+  `f32[32,768] convolution(bf16[32,6144], bf16[6144,768])`, then BF16 conversion; down uses
+  `f32[32,6144] convolution(bf16[32,384], bf16[384,6144])`, then BF16 conversion and the already-
+  proved global StrategyND BF16 association. The greenfield virtual dense path instead uses the
+  fused Pallas SwiGLU/down kernel for each virtual shard. The bounded replacement is implemented:
+  eight one-row virtual convolution chains reuse DB538's exact StrategyND-attention state and
+  accepted layer-1 normalized target, with manifest-bound stage-0 weights and a default-off,
+  serialized protected wrapper. Its one new-diff Sol audit found four publication/HLO gaps and one
+  final exact-arithmetic gap. Corrections authenticate every DB prefix and archive byte, pin exact
+  StableHLO weight/source order, SwiGLU operands, the barrier-rounded DB533 `y -> x -> z` forests,
+  and residual/RMSNorm semantics. The three reported arithmetic mutations now refuse; the affected
+  suite passes 56/56 and static checks pass. Exact next is correction-only confirmation by the same
+  reviewer, commit/push, then one protected discriminator. Only an exact result may be integrated
+  before the next 8K retry; a nonexact result triggers the smallest post-MLP oracle capture.
 - Protected DB538/item1822 completed the four independent post-latent arms at pushed pin
   `e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc`. Every arm first reproduces accepted post-`W_UV`
   SHA `79a6e290...2e9d`, so W_UV is closed. Neither local nor accepted StrategyND association at
@@ -4268,3 +4287,25 @@ with only those 624 producer identities changed passes pre-fusion at `78 gathers
 root liveness, while the 75 MoE-down kernels remain independently counted. The combined affected
 suite passes 279/279. Exact next: one correction-only Sol audit, static checks, commit/push, then
 one serialized protected 8K retry. Do not reopen numerical search or run another discriminator.
+
+## Current exact next: bounded dense-convolution discriminator
+
+The corrected 8K run at pushed pin `df60b9ae...503` executes the real checkpoint, produces exact
+token 0 and exact layer-0 DSA, then fails at layer-1 DSA. DB539 already proves attention through
+layer-0 `o_proj` exact, so the only open boundary is the layer-0 dense/MLP arithmetic, residual and
+layer-1 norm. A default-off four-chip probe now replays the accepted M32 dense lowering with eight
+BF16-dequantized convolution arms, explicit BF16 SwiGLU, down convolution, and DB533 StrategyND.
+
+The wrapper pins DB538 and every checkpoint tensor and preserves census/DB/archive/SUCCESS-last
+protections. StableHLO proves the exact pre-fusion arithmetic. Optimized HLO proves exact
+gate/sigmoid/up wiring, each barrier-rounded tree, residual and live RMSNorm. The latest
+correction additionally binds every y/z leaf to a distinct physical row, requires DB533's
+alternating adjacent/cross pairings, proves x consumes rows zero and one, and pins ordered y/z
+concatenations across fusion boundaries. The two audit mutations plus wrong z pairing and y/z
+order refuse. A final correction resolves each single-result fusion `ROOT` through only unary
+layout/rounding transforms to the exact scoped tree, so both a dead valid tree and extra arithmetic
+mixed into the returned tree refuse. The valid direct/fused
+synthetic graphs and preserved real CPU lowering pass. The affected suite passes 57/57 with static
+checks. The same reviewer returned `APPROVE COMMIT` for staged SHA `61d7a917...8cda`. Exact next:
+commit/push, then one serialized protected discriminator. Exact output authorizes production
+integration and another 8K; nonexact output authorizes only the smallest post-MLP oracle capture.

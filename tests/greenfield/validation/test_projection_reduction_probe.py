@@ -660,9 +660,11 @@ def _rollback_program() -> str:
 
 
 @pytest.mark.parametrize("state", ("run", "item", "summary"))
+@pytest.mark.parametrize("dense", (False, True), ids=("projection", "dense"))
 def test_projection_reduction_rollback_removes_each_committed_prefix(
     tmp_path: Path,
     state: str,
+    dense: bool,
 ) -> None:
     provenance_path = REPO / "bench/provenance.py"
     specification = importlib.util.spec_from_file_location(
@@ -673,22 +675,110 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
     specification.loader.exec_module(provenance)
 
     database = tmp_path / f"{state}.db"
-    tag = f"rollback_{state}"
-    pin = "a" * 40
+    tag = f"rollback_{dense}_{state}"
+    pin = subprocess.check_output(
+        ["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True
+    ).strip()
+    db538_tensor_sha = "e801d5471697fefd1477c46603698289de93818d08d214bdf56e576f52819e0e"
+    checkpoint_manifest_sha = (
+        "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134"
+    )
+    harness_git = subprocess.check_output(
+        ["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], text=True
+    ).strip()
+    fork_git = subprocess.check_output(
+        ["git", "-C", str(Path.home() / "tpu-inference"), "rev-parse", "--short", "HEAD"],
+        text=True,
+    ).strip()
+    model = (
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        if dense
+        else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
+    )
+    revision = (
+        "native-jax-db538-dense-convolution-v1"
+        if dense
+        else "native-jax-db537-strategy-nd-v1"
+    )
+    benchmark = (
+        "greenfield_layer0_dense_convolution"
+        if dense
+        else "greenfield_layer0_projection_reduction"
+    )
+    engine = (
+        "greenfield_dense_convolution_probe"
+        if dense
+        else "greenfield_projection_reduction_probe"
+    )
+    note = (
+        "Protected layer-0 dense convolution discriminator; no performance claim."
+        if dense
+        else "Protected layer-0 projection/reduction discriminator; no performance claim."
+    )
+    if dense:
+        runner = {
+            "artifact_kind": "glm52_layer0_dense_convolution_probe",
+            "classification": "accepted_dense_convolution_nonexact",
+            "code_hash": pin,
+            "exact": False,
+            "exact_arms": [],
+            "layer1_comparison": {"mismatch_count": 7},
+            "source": {"db538_tensor_sha256": db538_tensor_sha},
+            "status": "SUCCESS",
+        }
+        source_environment = {
+            "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+            "db538_tensor_sha256": db538_tensor_sha,
+        }
+        mismatch_counts = {"accepted_dense_convolution": 7}
+        prompt = "Sealed exact StrategyND attention boundary at first 8K decode row."
+    else:
+        arm_names = (
+            "local_attention_local_dense",
+            "strategy_attention_local_dense",
+            "local_attention_strategy_dense",
+            "strategy_attention_strategy_dense",
+        )
+        runner = {
+            "artifact_kind": "glm52_layer0_projection_reduction_probe",
+            "arms": {
+                name: {"layer1_comparison": {"mismatch_count": index + 1}}
+                for index, name in enumerate(arm_names)
+            },
+            "classification": "projection_reduction_unresolved",
+            "code_hash": pin,
+            "exact_arms": [],
+            "source": {
+                "attention_arithmetic_sha256": "b" * 64,
+                "association_analysis_sha256": "c" * 64,
+            },
+            "status": "SUCCESS",
+        }
+        source_environment = {
+            "attention_tensor_sha256": "b" * 64,
+            "association_analysis_sha256": "c" * 64,
+        }
+        mismatch_counts = {
+            name: runner["arms"][name]["layer1_comparison"]["mismatch_count"]
+            for name in arm_names
+        }
+        prompt = "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
+    run_dir = tmp_path / f"runner_{dense}_{state}"
+    run_dir.mkdir()
+    (run_dir / "runner.json").write_text(json.dumps(runner))
     connection = provenance.connect(str(database))
     run_id = provenance.start_run(
         connection,
-        model="zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction",
-        revision="native-jax-db537-strategy-nd-v1",
+        model=model,
+        revision=revision,
         env={
-            "GLM_ENGINE": "greenfield_projection_reduction_probe",
+            "GLM_ENGINE": engine,
             "greenfield_code_hash": pin,
             "greenfield_run_tag": tag,
+            "classification": runner["classification"],
+            **source_environment,
         },
-        note=(
-            "Protected layer-0 projection/reduction discriminator; "
-            "no performance claim."
-        ),
+        note=note,
         harness_repo=str(REPO),
         fork_repo=None,
     )
@@ -696,11 +786,18 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
         provenance.record_item(
             connection,
             run_id,
-            benchmark="greenfield_layer0_projection_reduction",
+            benchmark=benchmark,
             item_id="position8155",
-            prompt="sealed",
+            prompt=prompt,
             gold="Exact accepted BF16 layer-1 normalized hidden [6144].",
-            raw_output="{}",
+            raw_output=json.dumps(
+                {
+                    "classification": runner["classification"],
+                    "exact_arms": [],
+                    "mismatch_counts": mismatch_counts,
+                },
+                sort_keys=True,
+            ),
             extracted="none",
             correct=False,
             score=0.0,
@@ -709,15 +806,30 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
         provenance.finalize(
             connection,
             run_id,
-            benchmark="greenfield_layer0_projection_reduction",
+            benchmark=benchmark,
             metric="probe_contract_valid",
             value=1.0,
-            note="Diagnostic only.",
+            note=(
+                "Diagnostic layer-0 arithmetic classification only; "
+                "no decoder claim."
+            ),
         )
     connection.close()
 
     result = subprocess.run(
-        [sys.executable, "-", str(database), tag, pin],
+        [
+            sys.executable,
+            "-",
+            str(database),
+            tag,
+            pin,
+            str(int(dense)),
+            str(run_dir),
+            db538_tensor_sha,
+            checkpoint_manifest_sha,
+            harness_git,
+            fork_git,
+        ],
         input=_rollback_program(),
         text=True,
         capture_output=True,
@@ -729,4 +841,156 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
     assert verify.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
     assert verify.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
     assert verify.execute("SELECT COUNT(*) FROM summary").fetchone()[0] == 0
+    verify.close()
+
+
+@pytest.mark.parametrize(
+    ("table", "assignment", "value"),
+    (
+        ("runs", "env_json", json.dumps({"rogue": True})),
+        ("runs", "note", "rogue"),
+        ("runs", "pod", "rogue-pod"),
+        ("items", "prompt", "rogue"),
+        ("items", "raw_output", "{}"),
+        ("items", "extracted", "rogue"),
+        ("items", "correct", 1),
+        ("items", "score", 1.0),
+        ("summary", "note", "rogue"),
+        ("summary", "value", 0.0),
+    ),
+)
+def test_dense_rollback_refuses_unauthenticated_rows(
+    tmp_path: Path,
+    table: str,
+    assignment: str,
+    value: object,
+) -> None:
+    provenance_path = REPO / "bench/provenance.py"
+    specification = importlib.util.spec_from_file_location(
+        f"dense_rollback_refusal_{table}_{assignment}", provenance_path
+    )
+    assert specification is not None and specification.loader is not None
+    provenance = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(provenance)
+    pin = subprocess.check_output(
+        ["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True
+    ).strip()
+    tag = f"rollback_refusal_{table}_{assignment}"
+    tensor_sha = "e801d5471697fefd1477c46603698289de93818d08d214bdf56e576f52819e0e"
+    checkpoint_manifest_sha = (
+        "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134"
+    )
+    harness_git = subprocess.check_output(
+        ["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], text=True
+    ).strip()
+    fork_git = subprocess.check_output(
+        ["git", "-C", str(Path.home() / "tpu-inference"), "rev-parse", "--short", "HEAD"],
+        text=True,
+    ).strip()
+    runner = {
+        "artifact_kind": "glm52_layer0_dense_convolution_probe",
+        "classification": "accepted_dense_convolution_nonexact",
+        "code_hash": pin,
+        "exact": False,
+        "exact_arms": [],
+        "layer1_comparison": {"mismatch_count": 7},
+        "source": {"db538_tensor_sha256": tensor_sha},
+        "status": "SUCCESS",
+    }
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "runner.json").write_text(json.dumps(runner))
+    database = tmp_path / "results.db"
+    connection = provenance.connect(str(database))
+    run_id = provenance.start_run(
+        connection,
+        model="zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution",
+        revision="native-jax-db538-dense-convolution-v1",
+        env={
+            "GLM_ENGINE": "greenfield_dense_convolution_probe",
+            "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+            "classification": runner["classification"],
+            "db538_tensor_sha256": tensor_sha,
+            "greenfield_code_hash": pin,
+            "greenfield_run_tag": tag,
+        },
+        note=(
+            "Protected layer-0 dense convolution discriminator; "
+            "no performance claim."
+        ),
+        harness_repo=str(REPO),
+        fork_repo=None,
+    )
+    provenance.record_item(
+        connection,
+        run_id,
+        benchmark="greenfield_layer0_dense_convolution",
+        item_id="position8155",
+        prompt="Sealed exact StrategyND attention boundary at first 8K decode row.",
+        gold="Exact accepted BF16 layer-1 normalized hidden [6144].",
+        raw_output=json.dumps(
+            {
+                "classification": runner["classification"],
+                "exact_arms": [],
+                "mismatch_counts": {"accepted_dense_convolution": 7},
+            },
+            sort_keys=True,
+        ),
+        extracted="none",
+        correct=False,
+        score=0.0,
+    )
+    provenance.finalize(
+        connection,
+        run_id,
+        benchmark="greenfield_layer0_dense_convolution",
+        metric="probe_contract_valid",
+        value=1.0,
+        note=(
+            "Diagnostic layer-0 arithmetic classification only; "
+            "no decoder claim."
+        ),
+    )
+    assert table in {"runs", "items", "summary"}
+    assert assignment in {
+        "env_json",
+        "note",
+        "pod",
+        "prompt",
+        "raw_output",
+        "extracted",
+        "correct",
+        "score",
+        "value",
+    }
+    connection.execute(
+        f"UPDATE {table} SET {assignment} = ? WHERE run_id = ?",
+        (value, run_id),
+    )
+    connection.commit()
+    connection.close()
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(database),
+            tag,
+            pin,
+            "1",
+            str(run_dir),
+            tensor_sha,
+            checkpoint_manifest_sha,
+            harness_git,
+            fork_git,
+        ],
+        input=_rollback_program(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode != 0 or completed.stdout == "NO_PROVISIONAL_DB_RUN\n"
+    verify = sqlite3.connect(database)
+    assert verify.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
+    assert verify.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 1
+    assert verify.execute("SELECT COUNT(*) FROM summary").fetchone()[0] == 1
     verify.close()

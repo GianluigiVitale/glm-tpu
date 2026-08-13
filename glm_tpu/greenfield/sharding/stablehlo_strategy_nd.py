@@ -30,7 +30,7 @@ _TENSOR_RE = re.compile(r"tensor<[^>\n]+>")
 _SLICE_RE = re.compile(
     rf"stablehlo\.slice\s+({_SSA})\s+\[([0-9:,\s-]+)\]"
 )
-_DIMS_RE = re.compile(r"\bdims\s*=\s*\[([^]]*)\]")
+_DIMS_RE = re.compile(r"\b(?:dims|dimensions)\s*=\s*\[([^]]*)\]")
 _ALL_GATHER_DIM_RE = re.compile(r"\ball_gather_dim\s*=\s*([0-9]+)")
 _CONCAT_DIM_RE = re.compile(r"\bdim\s*=\s*([0-9]+)")
 _KERNEL_RE = re.compile(r'\bkernel_name\s*=\s*"([^"]+)"')
@@ -65,6 +65,7 @@ class _StableNode:
     all_gather_dimension: int | None
     use_global_device_ids: bool
     line_number: int
+    raw_line: str
 
 
 @dataclass(slots=True)
@@ -106,6 +107,9 @@ def _opcode(rhs: str) -> str | None:
     stable = re.match(r"stablehlo\.([a-z0-9_]+)", rhs)
     if stable is not None:
         return stable.group(1)
+    chlo = re.match(r"chlo\.([a-z0-9_]+)", rhs)
+    if chlo is not None:
+        return chlo.group(1)
     if rhs.startswith("func.call"):
         return "call"
     return None
@@ -230,6 +234,7 @@ def _parse_graphs(stablehlo: str) -> tuple[list[_StableGraph], list[str]]:
                     all_gather_dimension=None,
                     use_global_device_ids=False,
                     line_number=line_number,
+                    raw_line=line.strip(),
                 )
                 current.nodes[name] = node
                 for operand in operands:
@@ -282,6 +287,7 @@ def _parse_graphs(stablehlo: str) -> tuple[list[_StableGraph], list[str]]:
             ),
             use_global_device_ids="use_global_device_ids" in rhs,
             line_number=line_number,
+            raw_line=line.strip(),
         )
         current.nodes[name] = node
         for operand in node.operands:

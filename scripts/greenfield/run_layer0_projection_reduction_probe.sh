@@ -61,13 +61,41 @@ readonly CHECKPOINT_SUCCESS_SHA=368ef308c7937258c181cdc42fecddf8a7f7ca7bab04470d
 readonly CHECKPOINT_MANIFEST_SHA=de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134
 readonly CHECKPOINT_REMOTE=$APPROVED_BUCKET/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/$CHECKPOINT_TAG
 
+readonly DB538_TAG=greenfield_layer0_projection_reduction_20260812T164052560787241Z
+readonly DB538_DIR=/home/gianl/glm-run/$DB538_TAG
+readonly DB538_RUNNER=$DB538_DIR/runner.json
+readonly DB538_TENSOR=$DB538_DIR/projection_reduction.npz
+readonly DB538_SUMMARY=$DB538_DIR/summary.json
+readonly DB538_SUCCESS=$DB538_DIR/SUCCESS
+readonly DB538_RUNNER_SHA=303dd91eed1d75e0cd443645c5f1ef745f259c51596d0651646bb141db8f16f8
+readonly DB538_TENSOR_SHA=e801d5471697fefd1477c46603698289de93818d08d214bdf56e576f52819e0e
+readonly DB538_SUMMARY_SHA=90090ba9999812082727ed56b734163f07e3c27b4eb88fa049b9c2504516e782
+readonly DB538_SUCCESS_SHA=7744356f63b67cc813901499d0828c029ea5a9c985a5dac65525700457f79985
+readonly DB538_CODE_HASH=e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc
+readonly DB538_RUN_ID=538
+readonly DB538_REMOTE=$APPROVED_BUCKET/results/$DB538_TAG
+readonly POST_ATTENTION_RESIDUAL_SHA=a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e
+
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_PROJECTION_REDUCTION_TAG:-greenfield_layer0_projection_reduction_$(date -u +%Y%m%dT%H%M%S%NZ)}
+HARNESS_GIT=$(git -C "$WORKTREE" rev-parse --short HEAD)
+FORK_GIT=$(git -C /home/gianl/tpu-inference rev-parse --short HEAD)
+DENSE_CONVOLUTION=${GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE:-0}
+[[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
+  echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
+  exit 2
+}
+if [[ $DENSE_CONVOLUTION == 1 ]]; then
+  TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_convolution_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  TENSOR_BASENAME=dense_convolution.npz
+else
+  TAG=${GLM_GREENFIELD_PROJECTION_REDUCTION_TAG:-greenfield_layer0_projection_reduction_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  TENSOR_BASENAME=projection_reduction.npz
+fi
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
-  echo "refusing projection/reduction probe outside $BRANCH" >&2
+  echo "refusing layer-0 arithmetic probe outside $BRANCH" >&2
   exit 2
 }
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]] || {
@@ -136,7 +164,7 @@ strict_census() {
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   local command
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_projection_reduction[.]py|[p]robe_layer0_attention_arithmetic[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_projection_reduction[.]py|[p]robe_layer0_dense_convolution[.]py|[p]robe_layer0_attention_arithmetic[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
     --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
@@ -147,6 +175,8 @@ terminal_success_done=0
 
 rollback_provisional_db() {
   /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$TAG" "$PIN" \
+    "$DENSE_CONVOLUTION" "$RUN_DIR" "$DB538_TENSOR_SHA" \
+    "$CHECKPOINT_MANIFEST_SHA" "$HARNESS_GIT" "$FORK_GIT" \
     >"$RUN_DIR/provisional_db_rollback.txt" <<'PY'
 from __future__ import annotations
 
@@ -154,19 +184,113 @@ import json
 import sqlite3
 import sys
 
-db_path, run_tag, pin = sys.argv[1:]
+(
+    db_path,
+    run_tag,
+    pin,
+    dense_text,
+    run_dir,
+    db538_tensor_sha,
+    checkpoint_manifest_sha,
+    harness_git,
+    fork_git,
+) = sys.argv[1:]
+dense = dense_text == "1"
+runner_path = __import__("pathlib").Path(run_dir) / "runner.json"
+if not runner_path.is_file():
+    raise SystemExit("refusing rollback without the producing runner")
+runner = json.loads(runner_path.read_text())
+model = (
+    "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+    if dense
+    else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
+)
+revision = (
+    "native-jax-db538-dense-convolution-v1"
+    if dense
+    else "native-jax-db537-strategy-nd-v1"
+)
+benchmark = (
+    "greenfield_layer0_dense_convolution"
+    if dense
+    else "greenfield_layer0_projection_reduction"
+)
+note = (
+    "Protected layer-0 dense convolution discriminator; no performance claim."
+    if dense
+    else "Protected layer-0 projection/reduction discriminator; no performance claim."
+)
+engine = (
+    "greenfield_dense_convolution_probe"
+    if dense
+    else "greenfield_projection_reduction_probe"
+)
+expected_environment = {
+    "GLM_ENGINE": engine,
+    "greenfield_code_hash": pin,
+    "greenfield_run_tag": run_tag,
+    "classification": runner.get("classification"),
+    **(
+        {
+            "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+            "db538_tensor_sha256": db538_tensor_sha,
+        }
+        if dense
+        else {
+            "attention_tensor_sha256": runner.get("source", {}).get(
+                "attention_arithmetic_sha256"
+            ),
+            "association_analysis_sha256": runner.get("source", {}).get(
+                "association_analysis_sha256"
+            ),
+        }
+    ),
+}
+if (
+    runner.get("status") != "SUCCESS"
+    or runner.get("code_hash") != pin
+    or (
+        dense
+        and (
+            runner.get("artifact_kind")
+            != "glm52_layer0_dense_convolution_probe"
+            or runner.get("source", {}).get("db538_tensor_sha256")
+            != db538_tensor_sha
+            or runner.get("classification")
+            not in {
+                "accepted_dense_convolution_exact",
+                "accepted_dense_convolution_nonexact",
+            }
+        )
+    )
+    or (
+        not dense
+        and (
+            runner.get("artifact_kind")
+            != "glm52_layer0_projection_reduction_probe"
+            or runner.get("classification")
+            != (
+                "exact_projection_reduction_arm_identified"
+                if runner.get("exact_arms")
+                else "projection_reduction_unresolved"
+            )
+        )
+    )
+):
+    raise SystemExit("refusing rollback from an unauthenticated runner")
 connection = sqlite3.connect(db_path)
 connection.execute("BEGIN IMMEDIATE")
 matches = []
 for row in connection.execute(
-    "SELECT run_id, model, model_revision, env_json, note FROM runs "
+    "SELECT run_id, model, model_revision, harness_git, fork_git, env_json, "
+    "pod, note FROM runs "
     "WHERE model = ? AND model_revision = ?",
     (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction",
-        "native-jax-db537-strategy-nd-v1",
+        model,
+        revision,
     ),
 ):
-    environment = json.loads(row[3])
+    environment = json.loads(row[5])
     if environment.get("greenfield_run_tag") == run_tag:
         matches.append((row, environment))
 if not matches:
@@ -179,31 +303,74 @@ if len(matches) != 1:
 (run, environment), = matches
 run_id = run[0]
 items = connection.execute(
-    "SELECT benchmark, item_id, gold, correct, score FROM items WHERE run_id = ?",
+    "SELECT benchmark, item_id, prompt, gold, raw_output, extracted, correct, "
+    "score, n_prompt_tokens, n_gen_tokens, latency_ms, seed, finish_reason, "
+    "truncated FROM items WHERE run_id = ?",
     (run_id,),
 ).fetchall()
 summaries = connection.execute(
-    "SELECT benchmark, metric, value FROM summary WHERE run_id = ?",
+    "SELECT benchmark, n, metric, value, card_value, delta, note FROM summary "
+    "WHERE run_id = ?",
     (run_id,),
 ).fetchall()
-expected_item_prefix = (
-        "greenfield_layer0_projection_reduction",
-        "position8155",
-        "Exact accepted BF16 layer-1 normalized hidden [6144].",
+expected_prompt = (
+    "Sealed exact StrategyND attention boundary at first 8K decode row."
+    if dense
+    else "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
 )
-item_state_valid = not items or (
-    len(items) == 1
-    and items[0][0:3] == expected_item_prefix
-    and items[0][3] in (0, 1)
-    and items[0][4] in (0.0, 1.0)
+expected_raw = json.dumps(
+    {
+        "classification": runner["classification"],
+        "exact_arms": runner["exact_arms"],
+        "mismatch_counts": (
+            {
+                "accepted_dense_convolution": runner[
+                    "layer1_comparison"
+                ]["mismatch_count"]
+            }
+            if dense
+            else {
+                name: arm["layer1_comparison"]["mismatch_count"]
+                for name, arm in runner["arms"].items()
+            }
+        ),
+    },
+    sort_keys=True,
 )
-summary_state_valid = not summaries or summaries == [
-    ("greenfield_layer0_projection_reduction", "probe_contract_valid", 1.0)
-]
+expected_item = (
+    benchmark,
+    "position8155",
+    expected_prompt,
+    "Exact accepted BF16 layer-1 normalized hidden [6144].",
+    expected_raw,
+    ",".join(runner["exact_arms"]) or "none",
+    int(bool(runner["exact_arms"])),
+    float(bool(runner["exact_arms"])),
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+)
+item_state_valid = not items or items == [expected_item]
+summary_state_valid = not summaries or summaries == [(
+    benchmark,
+    1,
+    "probe_contract_valid",
+    1.0,
+    None,
+    None,
+    "Diagnostic layer-0 arithmetic classification only; no decoder claim.",
+)]
 if (
-    environment.get("greenfield_code_hash") != pin
-    or run[4]
-    != "Protected layer-0 projection/reduction discriminator; no performance claim."
+    run[1] != model
+    or run[2] != revision
+    or run[3] != harness_git
+    or run[4] != fork_git
+    or environment != expected_environment
+    or run[6] != "db-v4-64-od"
+    or run[7] != note
     or not item_state_valid
     or not summary_state_valid
     or (summaries and not items)
@@ -255,6 +422,60 @@ require_sha "$ASSOCIATION_ANALYSIS" "$ASSOCIATION_ANALYSIS_SHA" "association ana
 require_sha "$ASSOCIATION_SUCCESS" "$ASSOCIATION_SUCCESS_SHA" "association SUCCESS"
 require_sha "$CHECKPOINT_ROOT/SUCCESS" "$CHECKPOINT_SUCCESS_SHA" "checkpoint SUCCESS"
 require_sha "$CHECKPOINT_ROOT/runtime_manifest.json" "$CHECKPOINT_MANIFEST_SHA" "checkpoint manifest"
+if [[ $DENSE_CONVOLUTION == 1 ]]; then
+  require_sha "$DB538_RUNNER" "$DB538_RUNNER_SHA" "DB538 runner"
+  require_sha "$DB538_TENSOR" "$DB538_TENSOR_SHA" "DB538 tensor"
+  require_sha "$DB538_SUMMARY" "$DB538_SUMMARY_SHA" "DB538 summary"
+  require_sha "$DB538_SUCCESS" "$DB538_SUCCESS_SHA" "DB538 SUCCESS"
+  /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$DB538_RUN_ID" \
+    "$DB538_TAG" "$DB538_CODE_HASH" <<'PY'
+import json
+import sqlite3
+import sys
+
+db_path, run_id_text, run_tag, code_hash = sys.argv[1:]
+run_id = int(run_id_text)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+run = connection.execute(
+    "SELECT model, model_revision, env_json, note FROM runs WHERE run_id = ?",
+    (run_id,),
+).fetchone()
+items = connection.execute(
+    "SELECT benchmark, item_id, gold, correct, score FROM items WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+summaries = connection.execute(
+    "SELECT benchmark, metric, value FROM summary WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+connection.close()
+if run is None:
+    raise SystemExit("protected DB538 run is absent")
+environment = json.loads(run[2])
+if (
+    run[0] != "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
+    or run[1] != "native-jax-db537-strategy-nd-v1"
+    or run[3]
+    != "Protected layer-0 projection/reduction discriminator; no performance claim."
+    or environment.get("greenfield_run_tag") != run_tag
+    or environment.get("greenfield_code_hash") != code_hash
+    or environment.get("classification") != "projection_reduction_unresolved"
+    or items != [(
+        "greenfield_layer0_projection_reduction",
+        "position8155",
+        "Exact accepted BF16 layer-1 normalized hidden [6144].",
+        0,
+        0.0,
+    )]
+    or summaries != [(
+        "greenfield_layer0_projection_reduction",
+        "probe_contract_valid",
+        1.0,
+    )]
+):
+    raise SystemExit("protected DB538 live DB identity drifted")
+PY
+fi
 
 require_remote_sha "$ATTENTION_REMOTE/attention_arithmetic.npz" "$ATTENTION_TENSOR_SHA" "DB537 tensor"
 require_remote_sha "$ATTENTION_REMOTE/runner.json" "$ATTENTION_RUNNER_SHA" "DB537 runner"
@@ -271,46 +492,80 @@ require_remote_sha "$ASSOCIATION_REMOTE/association/analysis.json" "$ASSOCIATION
 require_remote_sha "$ASSOCIATION_REMOTE/SUCCESS" "$ASSOCIATION_SUCCESS_SHA" "association SUCCESS"
 require_remote_sha "$CHECKPOINT_REMOTE/SUCCESS" "$CHECKPOINT_SUCCESS_SHA" "checkpoint SUCCESS"
 require_remote_sha "$CHECKPOINT_REMOTE/runtime_manifest.json" "$CHECKPOINT_MANIFEST_SHA" "checkpoint manifest"
+if [[ $DENSE_CONVOLUTION == 1 ]]; then
+  require_remote_sha "$DB538_REMOTE/runner.json" "$DB538_RUNNER_SHA" "DB538 runner"
+  require_remote_sha "$DB538_REMOTE/projection_reduction.npz" "$DB538_TENSOR_SHA" "DB538 tensor"
+  require_remote_sha "$DB538_REMOTE/summary.json" "$DB538_SUMMARY_SHA" "DB538 summary"
+  require_remote_sha "$DB538_REMOTE/SUCCESS" "$DB538_SUCCESS_SHA" "DB538 SUCCESS"
+fi
 
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
 }
 
-say "running four isolated projection/reduction association arms"
 started=$(date +%s)
-(
-  cd "$WORKTREE"
-  JAX_PLATFORMS=tpu \
-    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
-    TPU_PROCESS_BOUNDS=1,1,1 \
-    TPU_VISIBLE_DEVICES=0,1,2,3 \
-    PYTHONPATH="$WORKTREE" \
-    /home/gianl/vllm-env/bin/python \
-      scripts/greenfield/probe_layer0_projection_reduction.py \
-      --expected-code-hash "$PIN" \
-      --attention-arithmetic "$ATTENTION_TENSOR" \
-      --attention-arithmetic-sha256 "$ATTENTION_TENSOR_SHA" \
-      --attention-runner "$ATTENTION_RUNNER" \
-      --attention-runner-sha256 "$ATTENTION_RUNNER_SHA" \
-      --accepted-projection "$ACCEPTED_NPZ" \
-      --accepted-projection-sha256 "$ACCEPTED_NPZ_SHA" \
-      --accepted-projection-capture "$ACCEPTED_JSON" \
-      --accepted-projection-capture-sha256 "$ACCEPTED_JSON_SHA" \
-      --ingredients "$INGREDIENT_NPZ" \
-      --ingredients-sha256 "$INGREDIENT_NPZ_SHA" \
-      --ingredients-contract "$INGREDIENT_JSON" \
-      --ingredients-contract-sha256 "$INGREDIENT_JSON_SHA" \
-      --layer1-reference "$LAYER1_REFERENCE" \
-      --layer1-reference-sha256 "$LAYER1_REFERENCE_SHA" \
-      --association-analysis "$ASSOCIATION_ANALYSIS" \
-      --association-analysis-sha256 "$ASSOCIATION_ANALYSIS_SHA" \
-      --checkpoint-root "$CHECKPOINT_ROOT" \
-      --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
-      --output "$RUN_DIR/runner.json" \
-      --tensor-output "$RUN_DIR/projection_reduction.npz" \
-      --hlo-dir "$RUN_DIR/hlo"
-) >"$RUN_DIR/runner.log" 2>&1
+if [[ $DENSE_CONVOLUTION == 1 ]]; then
+  say "running accepted dense-convolution arithmetic arm"
+  (
+    cd "$WORKTREE"
+    JAX_PLATFORMS=tpu \
+      TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+      TPU_PROCESS_BOUNDS=1,1,1 \
+      TPU_VISIBLE_DEVICES=0,1,2,3 \
+      PYTHONPATH="$WORKTREE" \
+      /home/gianl/vllm-env/bin/python \
+        scripts/greenfield/probe_layer0_dense_convolution.py \
+        --expected-code-hash "$PIN" \
+        --db538-runner "$DB538_RUNNER" \
+        --db538-runner-sha256 "$DB538_RUNNER_SHA" \
+        --db538-tensor "$DB538_TENSOR" \
+        --db538-tensor-sha256 "$DB538_TENSOR_SHA" \
+        --db538-summary "$DB538_SUMMARY" \
+        --db538-summary-sha256 "$DB538_SUMMARY_SHA" \
+        --db538-success "$DB538_SUCCESS" \
+        --db538-success-sha256 "$DB538_SUCCESS_SHA" \
+        --checkpoint-root "$CHECKPOINT_ROOT" \
+        --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
+        --output "$RUN_DIR/runner.json" \
+        --tensor-output "$RUN_DIR/$TENSOR_BASENAME" \
+        --hlo-dir "$RUN_DIR/hlo"
+  ) >"$RUN_DIR/runner.log" 2>&1
+else
+  say "running four isolated projection/reduction association arms"
+  (
+    cd "$WORKTREE"
+    JAX_PLATFORMS=tpu \
+      TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+      TPU_PROCESS_BOUNDS=1,1,1 \
+      TPU_VISIBLE_DEVICES=0,1,2,3 \
+      PYTHONPATH="$WORKTREE" \
+      /home/gianl/vllm-env/bin/python \
+        scripts/greenfield/probe_layer0_projection_reduction.py \
+        --expected-code-hash "$PIN" \
+        --attention-arithmetic "$ATTENTION_TENSOR" \
+        --attention-arithmetic-sha256 "$ATTENTION_TENSOR_SHA" \
+        --attention-runner "$ATTENTION_RUNNER" \
+        --attention-runner-sha256 "$ATTENTION_RUNNER_SHA" \
+        --accepted-projection "$ACCEPTED_NPZ" \
+        --accepted-projection-sha256 "$ACCEPTED_NPZ_SHA" \
+        --accepted-projection-capture "$ACCEPTED_JSON" \
+        --accepted-projection-capture-sha256 "$ACCEPTED_JSON_SHA" \
+        --ingredients "$INGREDIENT_NPZ" \
+        --ingredients-sha256 "$INGREDIENT_NPZ_SHA" \
+        --ingredients-contract "$INGREDIENT_JSON" \
+        --ingredients-contract-sha256 "$INGREDIENT_JSON_SHA" \
+        --layer1-reference "$LAYER1_REFERENCE" \
+        --layer1-reference-sha256 "$LAYER1_REFERENCE_SHA" \
+        --association-analysis "$ASSOCIATION_ANALYSIS" \
+        --association-analysis-sha256 "$ASSOCIATION_ANALYSIS_SHA" \
+        --checkpoint-root "$CHECKPOINT_ROOT" \
+        --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
+        --output "$RUN_DIR/runner.json" \
+        --tensor-output "$RUN_DIR/$TENSOR_BASENAME" \
+        --hlo-dir "$RUN_DIR/hlo"
+  ) >"$RUN_DIR/runner.log" 2>&1
+fi
 elapsed=$(( $(date +%s) - started ))
 say "probe completed in ${elapsed}s"
 
@@ -321,7 +576,10 @@ strict_census post || {
 post_census_done=1
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
-  "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$TAG" <<'PY'
+  "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$TAG" \
+  "$DENSE_CONVOLUTION" "$DB538_RUNNER_SHA" "$DB538_TENSOR_SHA" \
+  "$DB538_SUMMARY_SHA" "$DB538_SUCCESS_SHA" \
+  "$POST_ATTENTION_RESIDUAL_SHA" "$CHECKPOINT_MANIFEST_SHA" <<'PY'
 from __future__ import annotations
 
 import json
@@ -329,18 +587,253 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, db_path, repo, elapsed, run_tag = sys.argv[1:]
+(
+    run_dir,
+    pin,
+    db_path,
+    repo,
+    elapsed,
+    run_tag,
+    dense_text,
+    db538_runner_sha,
+    db538_tensor_sha,
+    db538_summary_sha,
+    db538_success_sha,
+    post_attention_sha,
+    checkpoint_manifest_sha,
+) = sys.argv[1:]
+dense = dense_text == "1"
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
-if (
-    runner["status"] != "SUCCESS"
-    or runner["code_hash"] != pin
-    or runner["artifact_kind"] != "glm52_layer0_projection_reduction_probe"
-    or len(runner["arms"]) != 4
-    or not all(arm["hlo"]["contract"]["passed"] for arm in runner["arms"].values())
-    or not all(arm["value_comparison"]["elementwise_exact"] for arm in runner["arms"].values())
-):
-    raise SystemExit("projection/reduction runner contract failed")
+if dense:
+    exact = runner.get("exact")
+    classification = (
+        "accepted_dense_convolution_exact"
+        if exact is True
+        else "accepted_dense_convolution_nonexact"
+    )
+    comparison = runner.get("layer1_comparison", {})
+    stable = runner.get("hlo", {}).get("stablehlo_contract", {})
+    optimized = runner.get("hlo", {}).get("optimized_contract", {})
+    source = runner.get("source", {})
+    weight_records = runner.get("weight_records")
+    sha_pattern = __import__("re").compile(r"[0-9a-f]{64}")
+    source_valid = source == {
+        "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+        "db538_runner_sha256": db538_runner_sha,
+        "db538_tensor_sha256": db538_tensor_sha,
+        "db538_summary_sha256": db538_summary_sha,
+        "db538_success_sha256": db538_success_sha,
+        "post_attention_residual_sha256": post_attention_sha,
+    }
+    comparison_valid = (
+        comparison.get("shape") == [6144]
+        and comparison.get("expected_sha256")
+        == "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039"
+        and comparison.get("elementwise_exact") is exact
+        and isinstance(comparison.get("mismatch_count"), int)
+        and (comparison["mismatch_count"] == 0) is exact
+        and bool(comparison.get("first_mismatch_index") is None) is exact
+        and bool(comparison.get("max_abs_error") == 0.0) is exact
+        and bool(comparison.get("mean_abs_error") == 0.0) is exact
+        and isinstance(comparison.get("observed_sha256"), str)
+        and sha_pattern.fullmatch(comparison["observed_sha256"]) is not None
+        and (
+            comparison["observed_sha256"] == comparison["expected_sha256"]
+        ) is exact
+    )
+    stable_valid = (
+        stable.get("passed") is True
+        and stable.get("violations") == []
+        and stable.get("collective_counts") == {
+            "all_gather": 1,
+            "all_reduce": 0,
+            "all_to_all": 0,
+            "collective_broadcast": 0,
+            "collective_permute": 0,
+            "reduce_scatter": 0,
+        }
+        and stable.get("convolution_count") == 16
+        and stable.get("gate_up_convolution_count") == 8
+        and stable.get("down_convolution_count") == 8
+        and stable.get("matched_virtual_shards") == list(range(8))
+    )
+    optimized_lineage = optimized.get("lineage", {})
+    optimized_valid = (
+        optimized.get("passed") is True
+        and optimized.get("violations") == []
+        and optimized.get("async_collectives") == []
+        and optimized.get("collective_count") == 1
+        and optimized.get("convolution_count") == 16
+        and optimized.get("gate_up_convolution_count") == 8
+        and optimized.get("down_convolution_count") == 8
+        and optimized.get("unexpected_convolutions") == []
+        and optimized.get("num_partitions") == 4
+        and optimized.get("num_replicas") in (None, 1)
+        and optimized_lineage.get("gate_up_virtual_ranks") == list(range(8))
+        and optimized_lineage.get("down_virtual_ranks") == list(range(8))
+        and optimized_lineage.get("ordered_stack_sources")
+        == [[rank] for rank in range(8)]
+        and optimized_lineage.get("association_add_shapes")
+        == {"y": 9, "x": 1, "z": 72}
+        and optimized_lineage.get("association_edge_graph")
+        == {
+            "x": {"component_count": 1, "exact": True},
+            "y": {"component_count": 3, "exact": True},
+            "z": {"component_count": 24, "exact": True},
+        }
+        and set(optimized_lineage.get("activation_contract", {}))
+        == {str(rank) for rank in range(8)}
+        and all(
+            {
+                opcode: len(items)
+                for opcode, items in optimized_lineage[
+                    "activation_contract"
+                ][str(rank)].items()
+                if opcode != "exact_operand_graph"
+            }
+            == {
+                "negate": 1,
+                "exponential": 1,
+                "add": 1,
+                "divide": 1,
+                "multiply": 2,
+            }
+            and optimized_lineage["activation_contract"][str(rank)].get(
+                "exact_operand_graph"
+            ) is True
+            for rank in range(8)
+        )
+        and optimized_lineage.get("rmsnorm_contract", {}).get(
+            "direct_exact_operand_graph"
+        ) is True
+        and {
+            "add",
+            "div",
+            "mul",
+            "reduce_sum",
+            "rsqrt",
+            "square",
+        }.issubset(
+            optimized_lineage.get("rmsnorm_contract", {}).get(
+                "semantic_counts", {}
+            )
+        )
+        and {
+            "bf16[1,6144]",
+            "bf16[6144]",
+        }.issubset(
+            set(optimized_lineage.get("layer1_only_parameter_shapes", []))
+        )
+        and len(optimized_lineage.get("collective_convolution_sources", []))
+        == 8
+    )
+    weights_valid = (
+        isinstance(weight_records, list)
+        and len(weight_records) == 4
+        and [item.get("device_slot") for item in weight_records]
+        == list(range(4))
+        and all(
+            item.get("destination_filename")
+            == (
+                "base_decoder_runtime_feature/stage_00/"
+                f"device_slot_{slot:02d}.safetensors"
+            )
+            and sha_pattern.fullmatch(item.get("evidence_file_sha256", ""))
+            is not None
+            and sha_pattern.fullmatch(item.get("header_sha256", ""))
+            is not None
+            and isinstance(item.get("tensors"), list)
+            and {
+                tensor.get("name") for tensor in item["tensors"]
+            }
+            == {
+                "attention.slot_00.kv_b.weight_bits",
+                "attention.slot_00.kv_b.scale_inv",
+                "attention.slot_00.o.weight_bits",
+                "attention.slot_00.o.scale_inv",
+                "attention.slot_00.post_norm",
+                "dense.slot_00.gate.weight_bits",
+                "dense.slot_00.gate.scale_inv",
+                "dense.slot_00.up.weight_bits",
+                "dense.slot_00.up.scale_inv",
+                "dense.slot_00.down.weight_bits",
+                "dense.slot_00.down.scale_inv",
+                "attention.slot_01.input_norm",
+            }
+            and all(
+                isinstance(tensor.get("name"), str)
+                and sha_pattern.fullmatch(tensor.get("sha256", "")) is not None
+                for tensor in item["tensors"]
+            )
+            for slot, item in enumerate(weight_records)
+        )
+    )
+    runner_valid = (
+        isinstance(exact, bool)
+        and
+        runner["status"] == "SUCCESS"
+        and runner["code_hash"] == pin
+        and runner["artifact_kind"] == "glm52_layer0_dense_convolution_probe"
+        and runner.get("position") == 8155
+        and runner.get("performance_claim") is False
+        and runner.get("classification") == classification
+        and runner["exact_arms"]
+        == (["accepted_dense_convolution"] if exact else [])
+        and comparison_valid
+        and source_valid
+        and stable_valid
+        and optimized_valid
+        and weights_valid
+        and sha_pattern.fullmatch(runner.get("hlo", {}).get("stablehlo_sha256", ""))
+        is not None
+        and sha_pattern.fullmatch(runner.get("hlo", {}).get("optimized_sha256", ""))
+        is not None
+    )
+else:
+    runner_valid = (
+        runner["status"] == "SUCCESS"
+        and runner["code_hash"] == pin
+        and runner["artifact_kind"]
+        == "glm52_layer0_projection_reduction_probe"
+        and len(runner["arms"]) == 4
+        and all(
+            arm["hlo"]["contract"]["passed"]
+            for arm in runner["arms"].values()
+        )
+        and all(
+            arm["value_comparison"]["elementwise_exact"]
+            for arm in runner["arms"].values()
+        )
+    )
+if not runner_valid:
+    raise SystemExit("layer-0 arithmetic runner contract failed")
+
+model = (
+    "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+    if dense
+    else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
+)
+revision = (
+    "native-jax-db538-dense-convolution-v1"
+    if dense
+    else "native-jax-db537-strategy-nd-v1"
+)
+benchmark = (
+    "greenfield_layer0_dense_convolution"
+    if dense
+    else "greenfield_layer0_projection_reduction"
+)
+engine = (
+    "greenfield_dense_convolution_probe"
+    if dense
+    else "greenfield_projection_reduction_probe"
+)
+note = (
+    "Protected layer-0 dense convolution discriminator; no performance claim."
+    if dense
+    else "Protected layer-0 projection/reduction discriminator; no performance claim."
+)
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -348,17 +841,32 @@ import provenance as pv
 connection = pv.connect(db_path)
 run_id = pv.start_run(
     connection,
-    model="zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction",
-    revision="native-jax-db537-strategy-nd-v1",
+    model=model,
+    revision=revision,
     env={
-        "GLM_ENGINE": "greenfield_projection_reduction_probe",
+        "GLM_ENGINE": engine,
         "greenfield_code_hash": pin,
         "greenfield_run_tag": run_tag,
-        "attention_tensor_sha256": runner["source"]["attention_arithmetic_sha256"],
-        "association_analysis_sha256": runner["source"]["association_analysis_sha256"],
         "classification": runner["classification"],
+        **(
+            {
+                "checkpoint_manifest_sha256": runner["source"][
+                    "checkpoint_manifest_sha256"
+                ],
+                "db538_tensor_sha256": runner["source"]["db538_tensor_sha256"],
+            }
+            if dense
+            else {
+                "attention_tensor_sha256": runner["source"][
+                    "attention_arithmetic_sha256"
+                ],
+                "association_analysis_sha256": runner["source"][
+                    "association_analysis_sha256"
+                ],
+            }
+        ),
     },
-    note="Protected layer-0 projection/reduction discriminator; no performance claim.",
+    note=note,
     harness_repo=repo,
     fork_repo=None,
 )
@@ -366,18 +874,26 @@ run_id = pv.start_run(
 pv.record_item(
     connection,
     run_id,
-    benchmark="greenfield_layer0_projection_reduction",
+    benchmark=benchmark,
     item_id="position8155",
-    prompt="Sealed exact B512 latent and layer-0 residual at first 8K decode row.",
+    prompt=(
+        "Sealed exact StrategyND attention boundary at first 8K decode row."
+        if dense
+        else "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
+    ),
     gold="Exact accepted BF16 layer-1 normalized hidden [6144].",
     raw_output=json.dumps(
         {
             "classification": runner["classification"],
             "exact_arms": runner["exact_arms"],
-            "mismatch_counts": {
-                name: arm["layer1_comparison"]["mismatch_count"]
-                for name, arm in runner["arms"].items()
-            },
+            "mismatch_counts": (
+                {"accepted_dense_convolution": runner["layer1_comparison"]["mismatch_count"]}
+                if dense
+                else {
+                    name: arm["layer1_comparison"]["mismatch_count"]
+                    for name, arm in runner["arms"].items()
+                }
+            ),
         },
         sort_keys=True,
     ),
@@ -388,10 +904,10 @@ pv.record_item(
 pv.finalize(
     connection,
     run_id,
-    benchmark="greenfield_layer0_projection_reduction",
+    benchmark=benchmark,
     metric="probe_contract_valid",
     value=1.0,
-    note="Diagnostic projection/reduction classification only; no decoder claim.",
+    note="Diagnostic layer-0 arithmetic classification only; no decoder claim.",
 )
 connection.close()
 summary = {
@@ -424,7 +940,7 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
   find hlo -type f -print0 | sort -z | xargs -0 sha256sum
-  sha256sum projection_reduction.npz runner.json runner.log summary.json \
+  sha256sum "$TENSOR_BASENAME" runner.json runner.log summary.json \
     results_ckpt.db census_pre.txt census_post.txt orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
