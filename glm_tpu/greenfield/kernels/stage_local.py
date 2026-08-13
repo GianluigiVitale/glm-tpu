@@ -14,6 +14,7 @@ from typing import Any, Literal, NamedTuple, Sequence
 import jax
 import jax.numpy as jnp
 from jax import lax
+from jax.experimental.layout import Layout, with_layout_constraint
 
 from .pallas import (
     Fp8BlockMatmulConfig,
@@ -556,13 +557,26 @@ def _virtual_dense_final_layout_convolution_down_partials(
         with jax.named_scope(
             f"greenfield_dense_convolution_virtual_rank_{shard:02d}"
         ):
+            gate_up_weight = _decode_dense_fp8_in_out(
+                merged_bits_in_out[shard],
+                merged_scale_in_out[shard],
+                block_shape=block_shape,
+            )
+            # The accepted M32 HLO keeps this decoded [in, out] operand in XLA
+            # minor-to-major {1,0}.  JAX's Layout API takes the reverse,
+            # major-to-minor order, hence (0,1) here.  Host-side final packing
+            # alone is insufficient: TPU layout assignment otherwise selects
+            # XLA {0,1} for gate/up while independently selecting the accepted
+            # layout for down.  This diagnostic-only, default-off
+            # discriminator pins the accepted gate/up operand without changing
+            # its values or dot dimension numbers.
+            gate_up_weight = with_layout_constraint(
+                gate_up_weight,
+                Layout(major_to_minor=(0, 1)),
+            )
             gate_up = _dense_bf16_convolution(
                 normalized,
-                _decode_dense_fp8_in_out(
-                    merged_bits_in_out[shard],
-                    merged_scale_in_out[shard],
-                    block_shape=block_shape,
-                ),
+                gate_up_weight,
             )
             gate = gate_up[:, :384]
             up = gate_up[:, 384:]

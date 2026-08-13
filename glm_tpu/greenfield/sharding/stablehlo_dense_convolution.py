@@ -182,6 +182,34 @@ def _expect_convolution(
         raise _MatchError(f"{node.name}: dense convolution contract drifted")
 
 
+def _expect_accepted_gate_up_layout(
+    graph: _StableGraph,
+    output: str,
+) -> str:
+    """Bind one gate/up RHS to the exact accepted layout constraint."""
+
+    node = _expect_node(
+        graph,
+        output,
+        opcode="custom_call",
+        result_type="tensor<6144x768xbf16>",
+    )
+    normalized = re.sub(r"\s+", "", node.raw_line)
+    if (
+        len(node.operands) != 1
+        or node.tensor_types[-2:]
+        != (
+            "tensor<6144x768xbf16>",
+            "tensor<6144x768xbf16>",
+        )
+        or "stablehlo.custom_call@LayoutConstraint(" not in normalized
+        or "operand_layouts=[dense<[0,1]>:tensor<2xindex>]" not in normalized
+        or "result_layouts=[dense<[1,0]>:tensor<2xindex>]" not in normalized
+    ):
+        raise _MatchError(f"{node.name}: accepted gate/up layout drifted")
+    return node.operands[0]
+
+
 def _match_fp8_decode(
     graph: _StableGraph,
     output: str,
@@ -251,9 +279,14 @@ def _match_one_shard(
     if len(gate_up.operands) != 2:
         raise _MatchError(f"{gate_up.name}: gate/up operand arity drifted")
     normalized = gate_up.operands[0]
+    decoded_gate_up = gate_up.operands[1]
+    if final_dense_layout:
+        decoded_gate_up = _expect_accepted_gate_up_layout(
+            graph, decoded_gate_up
+        )
     gate_bits, gate_scales = _match_fp8_decode(
         graph,
-        gate_up.operands[1],
+        decoded_gate_up,
         bit_type="tensor<6144x768xui8>",
         fp8_type="tensor<6144x768xf8E4M3FN>",
         scale_seed_type="tensor<6144x6xf32>",
@@ -903,6 +936,13 @@ def validate_dense_convolution_stablehlo(
     graphs, parse_errors = _parse_graphs(stablehlo)
     violations.extend(parse_errors)
     matched_shards: list[int] = []
+    layout_constraint_count = sum(
+        1
+        for item in graphs
+        for node in item.nodes.values()
+        if node.opcode == "custom_call"
+        and "@LayoutConstraint(" in node.raw_line
+    )
     try:
         graph = _only(
             (item for item in graphs if item.name == "main"),
@@ -924,6 +964,19 @@ def validate_dense_convolution_stablehlo(
             raise _MatchError(
                 f"dense convolution count drifted: gate_up={len(gate_up)} "
                 f"down={len(down)}"
+            )
+        layout_constraints = [
+            node
+            for node in graph.nodes.values()
+            if node.opcode == "custom_call"
+            and "@LayoutConstraint(" in node.raw_line
+        ]
+        expected_layout_constraints = 8 if final_dense_layout else 0
+        if len(layout_constraints) != expected_layout_constraints:
+            raise _MatchError(
+                "dense gate/up layout-constraint count drifted: "
+                f"expected={expected_layout_constraints} "
+                f"found={len(layout_constraints)}"
             )
         rows: dict[int, tuple[tuple[str, ...], str]] = {}
         for convolution in gate_up:
@@ -1116,6 +1169,7 @@ def validate_dense_convolution_stablehlo(
         "down_convolution_count": 8 if matched_shards == list(range(8)) else 0,
         "final_dense_layout": final_dense_layout,
         "gate_up_convolution_count": 8 if matched_shards == list(range(8)) else 0,
+        "gate_up_layout_constraint_count": layout_constraint_count,
         "matched_virtual_shards": matched_shards,
         "live_rows": 1,
         "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",

@@ -1231,6 +1231,46 @@ def test_dense_final_layout_stablehlo_binds_packed_shards_and_sources() -> None:
     )
     assert contract["passed"], contract
     assert contract["matched_virtual_shards"] == list(range(8))
+    assert contract["gate_up_layout_constraint_count"] == 8
+    layout_lines = [
+        line
+        for line in stablehlo.splitlines()
+        if "stablehlo.custom_call @LayoutConstraint" in line
+    ]
+    assert len(layout_lines) == 8
+    result_match = re.search(
+        r"^\s*(%[A-Za-z0-9_.$#-]+)\s*=", layout_lines[0]
+    )
+    source_match = re.search(
+        r"@LayoutConstraint\((%[A-Za-z0-9_.$#-]+)\)", layout_lines[0]
+    )
+    assert result_match is not None and source_match is not None
+    missing_layout = stablehlo.replace(layout_lines[0] + "\n", "", 1)
+    missing_layout = re.sub(
+        rf"{re.escape(result_match.group(1))}"
+        r"(?![A-Za-z0-9_.$#-])",
+        source_match.group(1),
+        missing_layout,
+    )
+    missing_contract = MODULE._validate_stablehlo(
+        missing_layout,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert missing_contract["passed"] is False
+    wrong_layout = stablehlo.replace(
+        "result_layouts = [dense<[1, 0]> : tensor<2xindex>]",
+        "result_layouts = [dense<[0, 1]> : tensor<2xindex>]",
+        1,
+    )
+    wrong_contract = MODULE._validate_stablehlo(
+        wrong_layout,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert wrong_contract["passed"] is False
     dense_prefix = stablehlo.split('"stablehlo.all_gather"', 1)[0]
     assert "stablehlo.transpose" not in dense_prefix
     wrong_first_shard = stablehlo.replace(
@@ -1736,6 +1776,7 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "final_layout_record",
         "final_layout_hlo",
         "final_layout_lineage",
+        "final_layout_constraint",
         "classification",
         "comparison",
         "source",
@@ -1891,6 +1932,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "down_convolution_count": 8,
                 "final_dense_layout": False,
                 "gate_up_convolution_count": 8,
+                "gate_up_layout_constraint_count": 0,
                 "live_rows": 1,
                 "matched_virtual_shards": list(range(8)),
                 "passed": True,
@@ -1978,6 +2020,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "final_layout_record",
             "final_layout_hlo",
             "final_layout_lineage",
+            "final_layout_constraint",
         ):
         compile_rows = 32
         layer1_only = mutation.startswith(("cross_layer", "final_layout"))
@@ -2021,6 +2064,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         runner["hlo"]["stablehlo_contract"][
             "final_dense_layout"
         ] = final_layout
+        runner["hlo"]["stablehlo_contract"][
+            "gate_up_layout_constraint_count"
+        ] = 8 if final_layout else 0
         runner["hlo"]["stablehlo_contract"]["result_mode"] = result_mode
         runner["source"].update(
             {
@@ -2077,6 +2123,10 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 runner["hlo"]["optimized_contract"][
                     "exact_packed_weight_lineage"
                 ] = False
+            elif mutation == "final_layout_constraint":
+                runner["hlo"]["stablehlo_contract"][
+                    "gate_up_layout_constraint_count"
+                ] = 7
         if mutation == "cross_layer_mode":
             runner["result_mode"] = "dense_and_layer1"
     elif mutation == "classification":

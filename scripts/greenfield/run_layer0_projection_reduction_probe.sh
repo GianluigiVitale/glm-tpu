@@ -955,6 +955,8 @@ if dense:
         and stable.get("convolution_count") == 16
         and stable.get("gate_up_convolution_count") == 8
         and stable.get("down_convolution_count") == 8
+        and stable.get("gate_up_layout_constraint_count")
+        == (8 if final_layout else 0)
         and stable.get("matched_virtual_shards") == list(range(8))
     )
     optimized_lineage = optimized.get("lineage", {})
