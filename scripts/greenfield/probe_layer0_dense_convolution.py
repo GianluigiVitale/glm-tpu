@@ -68,9 +68,128 @@ _DENSE_WEIGHT_NAMES = (
     "attention.slot_01.input_norm",
 )
 
+_FINAL_DENSE_LAYOUT_RECORDS: dict[str, dict[str, Any]] = {
+    "dense.slot_00.merged_gate_up.weight_bits_in_out": {
+        "dtype": "uint8",
+        "sha256": (
+            "82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf"
+        ),
+        "shape": [4, 8, 6144, 768],
+    },
+    "dense.slot_00.merged_gate_up.scale_inv_in_out": {
+        "dtype": "float32",
+        "sha256": (
+            "7dc31abfa4677a517c643f0efe63dfc8cf5405ee3b2f6b7abc863772562c0151"
+        ),
+        "shape": [4, 8, 48, 6],
+    },
+    "dense.slot_00.down.weight_bits_in_out": {
+        "dtype": "uint8",
+        "sha256": (
+            "8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e"
+        ),
+        "shape": [4, 8, 384, 6144],
+    },
+    "dense.slot_00.down.scale_inv_in_out": {
+        "dtype": "float32",
+        "sha256": (
+            "c00fd888dcd3f7c7063dfeb91027274bd78c483ad9832ac77c37f00d16ea6c8e"
+        ),
+        "shape": [4, 8, 3, 48],
+    },
+}
+
 
 def _array_sha256(value: np.ndarray) -> str:
     return sha256(np.ascontiguousarray(value).tobytes(order="C")).hexdigest()
+
+
+def _pack_dense_final_layout(
+    weights: dict[str, np.ndarray],
+) -> tuple[tuple[np.ndarray, ...], dict[str, dict[str, Any]]]:
+    """Pack the layer-0 dense weights into accepted ``[in, out]`` shards."""
+
+    gate = weights[_DENSE_WEIGHT_NAMES[0]]
+    gate_scale = weights[_DENSE_WEIGHT_NAMES[1]]
+    up = weights[_DENSE_WEIGHT_NAMES[2]]
+    up_scale = weights[_DENSE_WEIGHT_NAMES[3]]
+    down = weights[_DENSE_WEIGHT_NAMES[4]]
+    down_scale = weights[_DENSE_WEIGHT_NAMES[5]]
+    expected = {
+        "gate": ((4, 3072, 6144), np.uint8),
+        "gate_scale": ((4, 24, 48), np.float32),
+        "up": ((4, 3072, 6144), np.uint8),
+        "up_scale": ((4, 24, 48), np.float32),
+        "down": ((4, 6144, 3072), np.uint8),
+        "down_scale": ((4, 48, 24), np.float32),
+    }
+    values = {
+        "gate": gate,
+        "gate_scale": gate_scale,
+        "up": up,
+        "up_scale": up_scale,
+        "down": down,
+        "down_scale": down_scale,
+    }
+    for name, (shape, dtype) in expected.items():
+        value = values[name]
+        if value.shape != shape or value.dtype != dtype:
+            raise RuntimeError(
+                f"final-layout source {name} drifted: "
+                f"shape={value.shape} dtype={value.dtype}"
+            )
+
+    merged_bits = np.empty((4, 8, 6144, 768), dtype=np.uint8)
+    merged_scale = np.empty((4, 8, 48, 6), dtype=np.float32)
+    down_bits = np.empty((4, 8, 384, 6144), dtype=np.uint8)
+    down_scales = np.empty((4, 8, 3, 48), dtype=np.float32)
+    for owner in range(4):
+        for shard in range(8):
+            start = shard * 384
+            stop = start + 384
+            scale_start = shard * 3
+            scale_stop = scale_start + 3
+            merged_bits[owner, shard] = np.concatenate(
+                (gate[owner, start:stop].T, up[owner, start:stop].T),
+                axis=1,
+            )
+            merged_scale[owner, shard] = np.concatenate(
+                (
+                    gate_scale[owner, scale_start:scale_stop].T,
+                    up_scale[owner, scale_start:scale_stop].T,
+                ),
+                axis=1,
+            )
+            down_bits[owner, shard] = down[owner, :, start:stop].T
+            down_scales[owner, shard] = down_scale[
+                owner, :, scale_start:scale_stop
+            ].T
+    packed = tuple(
+        np.ascontiguousarray(value)
+        for value in (merged_bits, merged_scale, down_bits, down_scales)
+    )
+    records = {
+        name: {
+            "dtype": str(value.dtype),
+            "sha256": _array_sha256(value),
+            "shape": list(value.shape),
+        }
+        for name, value in zip(
+            (
+                "dense.slot_00.merged_gate_up.weight_bits_in_out",
+                "dense.slot_00.merged_gate_up.scale_inv_in_out",
+                "dense.slot_00.down.weight_bits_in_out",
+                "dense.slot_00.down.scale_inv_in_out",
+            ),
+            packed,
+            strict=True,
+        )
+    }
+    if records != _FINAL_DENSE_LAYOUT_RECORDS:
+        raise RuntimeError(
+            "packed final-layout checkpoint bytes drifted from the pinned manifest"
+        )
+    return packed, records
 
 
 def _git_head() -> str:
@@ -280,19 +399,30 @@ def _load_accepted_m32_source(args: argparse.Namespace) -> dict[str, str]:
 
 
 def _validate_stablehlo(
-    stablehlo: str, *, compile_rows: int = 1, layer1_only: bool = False
+    stablehlo: str,
+    *,
+    compile_rows: int = 1,
+    layer1_only: bool = False,
+    final_dense_layout: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.stablehlo_dense_convolution import (
         validate_dense_convolution_stablehlo,
     )
 
     return validate_dense_convolution_stablehlo(
-        stablehlo, compile_rows=compile_rows, layer1_only=layer1_only
+        stablehlo,
+        compile_rows=compile_rows,
+        layer1_only=layer1_only,
+        final_dense_layout=final_dense_layout,
     )
 
 
 def _validate_optimized_hlo(
-    optimized_hlo: str, *, compile_rows: int = 1, layer1_only: bool = False
+    optimized_hlo: str,
+    *,
+    compile_rows: int = 1,
+    layer1_only: bool = False,
+    final_dense_layout: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -301,6 +431,10 @@ def _validate_optimized_hlo(
 
     if compile_rows not in (1, 32):
         raise ValueError("dense optimized-HLO compile rows must be 1 or 32")
+    if final_dense_layout and (compile_rows != 32 or not layer1_only):
+        raise ValueError(
+            "final-layout dense optimized-HLO proof requires M32 layer1-only"
+        )
     module = parse_hlo_module(optimized_hlo)
     by_key = {_instruction_key(item): item for item in module.instructions}
     users: dict[tuple[str, str], list[Any]] = {}
@@ -542,6 +676,366 @@ def _validate_optimized_hlo(
         value = int(matches[0])
         return value if 0 <= value < 8 else None
 
+    def parameter_index(item: Any) -> int | None:
+        if item.raw_opcode != "parameter":
+            return None
+        match = re.search(r"\bparameter\(([0-9]+)\)", item.raw_line)
+        return int(match.group(1)) if match is not None else None
+
+    entry_parameters = {
+        parameter_index(item): item
+        for item in module.instructions
+        if item.computation.startswith("ENTRY ")
+        and item.raw_opcode == "parameter"
+        and parameter_index(item) is not None
+    }
+    expected_packed_parameters = {
+        "gate_up": (
+            (2, "u8[1,8,6144,768]"),
+            (3, "f32[1,8,48,6]"),
+        ),
+        "down": (
+            (4, "u8[1,8,384,6144]"),
+            (5, "f32[1,8,3,48]"),
+        ),
+    }
+
+    def nonarithmetic_layout(item: Any | None) -> Any | None:
+        seen: set[tuple[str, str]] = set()
+        while (
+            item is not None
+            and item.raw_opcode
+            in {"bitcast", "copy", "optimization-barrier", "reshape"}
+            and len(item.operand_names) == 1
+            and _instruction_key(item) not in seen
+        ):
+            seen.add(_instruction_key(item))
+            item = operand(item, 0)
+        return item
+
+    def called_root(item: Any) -> Any | None:
+        if item.raw_opcode != "fusion":
+            return item
+        match = re.search(r"\bcalls=%?([^,\s}\]]+)", item.raw_line)
+        if match is None:
+            return None
+        roots = [
+            value
+            for value in instructions_by_computation.get(match.group(1), ())
+            if value.raw_line.lstrip().startswith("ROOT ")
+        ]
+        return roots[0] if len(roots) == 1 else None
+
+    def fusion_result(item: Any, index: int | None = None) -> Any | None:
+        root = called_root(item)
+        if root is None:
+            return None
+        if index is None:
+            return root if root.raw_opcode != "tuple" else None
+        if root.raw_opcode != "tuple" or index >= len(root.operand_names):
+            return None
+        return by_key.get((root.computation, root.operand_names[index]))
+
+    def slice_ranges(item: Any) -> tuple[tuple[int, int], ...] | None:
+        match = re.search(r"\bslice=\{([^}]*)\}", item.raw_line)
+        if match is None:
+            return None
+        ranges = tuple(
+            (int(start), int(stop))
+            for start, stop in re.findall(
+                r"\[(-?[0-9]+):(-?[0-9]+)(?::[0-9]+)?\]",
+                match.group(1),
+            )
+        )
+        return ranges or None
+
+    def broadcast_dimensions(item: Any) -> tuple[int, ...] | None:
+        match = re.search(r"\bdimensions=\{([^}]*)\}", item.raw_line)
+        if match is None:
+            return None
+        payload = match.group(1).strip()
+        if not payload:
+            return ()
+        if re.fullmatch(r"[0-9]+(?:,[0-9]+)*", payload) is None:
+            return None
+        return tuple(int(value) for value in payload.split(","))
+
+    def exact_packed_source(
+        value: Any | None,
+        expected: Any,
+        *,
+        label: str,
+        rank: int,
+        scale: bool,
+    ) -> bool:
+        """Trace one bits/scale value through exact non-arithmetic lowering."""
+
+        expected_shape = expected.result_shapes[0].dimensions
+        if label == "gate_up":
+            payload_shape = (6144, 768) if not scale else (48, 6)
+            scale_shapes = {
+                "seed": (48, 6),
+                "inner": (48, 128, 6),
+                "middle": (6144, 6),
+                "outer": (6144, 6, 128),
+                "wide": (6144, 768),
+            }
+        elif label == "down":
+            payload_shape = (384, 6144) if not scale else (3, 48)
+            scale_shapes = {
+                "seed": (3, 48),
+                "inner": (3, 128, 48),
+                "middle": (384, 48),
+                "outer": (384, 48, 128),
+                "wide": (384, 6144),
+            }
+        else:
+            return False
+
+        def shape(item: Any | None) -> tuple[int, ...] | None:
+            if item is None or len(item.result_shapes) != 1:
+                return None
+            return item.result_shapes[0].dimensions
+
+        def exact_rank_slice(item: Any) -> bool:
+            if item.raw_opcode != "slice" or len(item.operand_names) != 1:
+                return False
+            source = operand(item, 0)
+            source_shape = shape(source)
+            ranges = slice_ranges(item)
+            if source_shape == expected_shape:
+                expected_ranges = tuple(
+                    (rank, rank + 1) if index == 1 else (0, dimension)
+                    for index, dimension in enumerate(source_shape)
+                )
+            elif source_shape == expected_shape[1:]:
+                expected_ranges = tuple(
+                    (rank, rank + 1) if index == 0 else (0, dimension)
+                    for index, dimension in enumerate(source_shape)
+                )
+            else:
+                return False
+            return ranges == expected_ranges
+
+        def exact_layout_edge(
+            item: Any,
+            source: Any,
+            selected_rank: bool,
+        ) -> bool:
+            source_shape = shape(source)
+            result_shape = shape(item)
+            if source_shape is None or result_shape is None:
+                return False
+            if item.raw_opcode in {
+                "copy",
+                "optimization-barrier",
+            }:
+                return source_shape == result_shape
+            if item.raw_opcode not in {"bitcast", "reshape"}:
+                return False
+            if selected_rank:
+                return (source_shape, result_shape) in {
+                    (expected_shape, expected_shape[1:]),
+                    (expected_shape[1:], expected_shape),
+                }
+            if not scale:
+                return (
+                    tuple(value for value in source_shape if value != 1)
+                    == payload_shape
+                    == tuple(value for value in result_shape if value != 1)
+                )
+            return (source_shape, result_shape) in {
+                (
+                    tuple((1, 1) + scale_shapes["seed"]),
+                    scale_shapes["seed"],
+                ),
+                (
+                    tuple((1,) + scale_shapes["seed"]),
+                    scale_shapes["seed"],
+                ),
+                (scale_shapes["inner"], scale_shapes["middle"]),
+                (scale_shapes["outer"], scale_shapes["wide"]),
+            }
+
+        visiting: set[tuple[tuple[str, str], bool]] = set()
+
+        def walk(item: Any | None, selected_rank: bool) -> bool:
+            if item is None:
+                return False
+            state = (_instruction_key(item), selected_rank)
+            if state in visiting:
+                return False
+            visiting.add(state)
+            try:
+                if item.raw_opcode == "parameter":
+                    if item.computation.startswith("ENTRY "):
+                        return item is expected and selected_rank
+                    return walk(external_parameter_value(item), selected_rank)
+                if item.raw_opcode == "fusion":
+                    return walk(fusion_result(item), selected_rank)
+                if item.raw_opcode == "get-tuple-element":
+                    if len(item.operand_names) != 1:
+                        return False
+                    producer = operand(item, 0)
+                    index = _tuple_index(item)
+                    if producer is None or index is None:
+                        return False
+                    if producer.raw_opcode == "fusion":
+                        return walk(
+                            fusion_result(producer, index), selected_rank
+                        )
+                    if (
+                        producer.raw_opcode == "tuple"
+                        and index < len(producer.operand_names)
+                    ):
+                        return walk(operand(producer, index), selected_rank)
+                    return False
+                if item.raw_opcode in {
+                    "bitcast",
+                    "copy",
+                    "optimization-barrier",
+                    "reshape",
+                }:
+                    source = operand(item, 0)
+                    return (
+                        len(item.operand_names) == 1
+                        and source is not None
+                        and exact_layout_edge(item, source, selected_rank)
+                        and walk(source, selected_rank)
+                    )
+                if item.raw_opcode == "copy-done":
+                    return len(item.operand_names) == 1 and walk(
+                        operand(item, 0), selected_rank
+                    )
+                if item.raw_opcode == "copy-start":
+                    return len(item.operand_names) == 1 and walk(
+                        operand(item, 0), selected_rank
+                    )
+                if item.raw_opcode == "slice":
+                    if selected_rank or not exact_rank_slice(item):
+                        return False
+                    source = operand(item, 0)
+                    return source is not None and walk(source, True)
+                if item.raw_opcode in {"broadcast", "broadcast-in-dim"}:
+                    if not scale or len(item.operand_names) != 1:
+                        return False
+                    source = operand(item, 0)
+                    source_shape = shape(source)
+                    result_shape = shape(item)
+                    dimensions = broadcast_dimensions(item)
+                    if source is None:
+                        return False
+                    if (source_shape, result_shape, dimensions) not in {
+                        (
+                            scale_shapes["seed"],
+                            scale_shapes["inner"],
+                            (0, 2),
+                        ),
+                        (
+                            scale_shapes["middle"],
+                            scale_shapes["outer"],
+                            (0, 1),
+                        ),
+                    }:
+                        return False
+                    return walk(source, selected_rank)
+                return False
+            finally:
+                visiting.remove(state)
+
+        return walk(value, False)
+
+    def exact_packed_dequant(
+        weight: Any | None,
+        *,
+        label: str,
+        rank: int,
+        weight_shape: str,
+    ) -> tuple[bool, list[str]]:
+        """Bind one live convolution RHS to its exact packed bits/scale pair."""
+
+        immediate = nonarithmetic_layout(weight)
+        if immediate is None:
+            return False, []
+        root = nonarithmetic_layout(called_root(immediate))
+        f32_shape = weight_shape.replace("bf16", "f32", 1)
+        fp8_shape = weight_shape.replace("bf16", "f8e4m3fn", 1)
+        if (
+            root is None
+            or root.raw_opcode != "convert"
+            or _shape_signatures(root.result_shapes) != (weight_shape,)
+            or virtual_rank(root) != rank
+            or len(root.operand_names) != 1
+        ):
+            return False, []
+        scaled = nonarithmetic_layout(operand(root, 0))
+        if (
+            scaled is None
+            or scaled.raw_opcode != "multiply"
+            or _shape_signatures(scaled.result_shapes) != (f32_shape,)
+            or virtual_rank(scaled) != rank
+            or len(scaled.operand_names) != 2
+        ):
+            return False, []
+        decoded = None
+        scale = None
+        bits = None
+        for index in range(2):
+            candidate = nonarithmetic_layout(operand(scaled, index))
+            if (
+                candidate is None
+                or candidate.raw_opcode != "convert"
+                or _shape_signatures(candidate.result_shapes) != (f32_shape,)
+                or virtual_rank(candidate) != rank
+                or len(candidate.operand_names) != 1
+            ):
+                continue
+            bitcast = nonarithmetic_layout(operand(candidate, 0))
+            if (
+                bitcast is None
+                or bitcast.raw_opcode != "bitcast-convert"
+                or _shape_signatures(bitcast.result_shapes) != (fp8_shape,)
+                or virtual_rank(bitcast) != rank
+                or len(bitcast.operand_names) != 1
+            ):
+                continue
+            decoded = candidate
+            bits = operand(bitcast, 0)
+            scale = operand(scaled, 1 - index)
+            break
+        if decoded is None or bits is None or scale is None:
+            return False, []
+        expected = expected_packed_parameters[label]
+        expected_items = []
+        for index, shape in expected:
+            parameter = entry_parameters.get(index)
+            if (
+                parameter is None
+                or _shape_signatures(parameter.result_shapes) != (shape,)
+            ):
+                return False, []
+            expected_items.append(parameter)
+        exact_bits = exact_packed_source(
+            bits,
+            expected_items[0],
+            label=label,
+            rank=rank,
+            scale=False,
+        )
+        exact_scale = exact_packed_source(
+            scale,
+            expected_items[1],
+            label=label,
+            rank=rank,
+            scale=True,
+        )
+        return (
+            exact_bits and exact_scale,
+            [item.name for item in expected_items]
+            if exact_bits and exact_scale
+            else [],
+        )
+
     for item in convolutions:
         operands = _shape_signatures(item.operand_shapes)
         results = _shape_signatures(item.result_shapes)
@@ -573,6 +1067,44 @@ def _validate_optimized_hlo(
             down.append(item)
         else:
             unexpected.append(item.name)
+    accepted_weight_layouts = {
+        "gate_up": [],
+        "down": [],
+    }
+    for label, items, shape in (
+        ("gate_up", gate_up, "bf16[6144,768]"),
+        ("down", down, "bf16[384,6144]"),
+    ):
+        for item in items:
+            weight = operand(item, 1)
+            rank = virtual_rank(item)
+            accepted_layout = bool(
+                weight is not None
+                and re.search(
+                    rf"=\s*{re.escape(shape)}\{{1,0(?::|\}})",
+                    weight.raw_line,
+                )
+            )
+            exact_dequant, parameter_sources = (
+                exact_packed_dequant(
+                    weight,
+                    label=label,
+                    rank=rank,
+                    weight_shape=shape,
+                )
+                if final_dense_layout and rank is not None
+                else (True, [])
+            )
+            accepted_weight_layouts[label].append(
+                {
+                    "accepted": accepted_layout and exact_dequant,
+                    "accepted_layout": accepted_layout,
+                    "convolution": item.name,
+                    "exact_packed_dequant": exact_dequant,
+                    "parameter_sources": parameter_sources,
+                    "virtual_rank": rank,
+                }
+            )
     async_collectives = [
         item.name
         for item in module.instructions
@@ -597,6 +1129,39 @@ def _validate_optimized_hlo(
             "optimized convolution geometry/count drifted: "
             f"gate_up={len(gate_up)} down={len(down)} unexpected={unexpected}"
         )
+    exact_accepted_weight_layout = (
+        len(accepted_weight_layouts["gate_up"]) == 8
+        and len(accepted_weight_layouts["down"]) == 8
+        and all(
+            record["accepted"]
+            for records in accepted_weight_layouts.values()
+            for record in records
+        )
+    )
+    exact_packed_weight_lineage = (
+        not final_dense_layout
+        or (
+            set(entry_parameters) == set(range(7))
+            and all(
+                record["exact_packed_dequant"]
+                for records in accepted_weight_layouts.values()
+                for record in records
+            )
+            and all(
+                {
+                    record["virtual_rank"]
+                    for record in records
+                    if record["virtual_rank"] is not None
+                }
+                == set(range(8))
+                for records in accepted_weight_layouts.values()
+            )
+        )
+    )
+    if final_dense_layout and not exact_accepted_weight_layout:
+        violations.append("accepted dense convolution weight layout drifted")
+    if final_dense_layout and not exact_packed_weight_lineage:
+        violations.append("packed dense weight lineage drifted")
     if async_collectives:
         violations.append(f"async collectives are forbidden: {async_collectives}")
     if len(collectives) != 1 or len(scoped) != 1:
@@ -2450,11 +3015,15 @@ def _validate_optimized_hlo(
     if forbidden:
         violations.append(f"forbidden HLO markers: {forbidden}")
     return {
+        "accepted_weight_layouts": accepted_weight_layouts,
         "async_collectives": async_collectives,
         "collective_count": len(collectives),
         "compile_rows": compile_rows,
         "convolution_count": len(convolutions),
         "down_convolution_count": len(down),
+        "exact_accepted_weight_layout": exact_accepted_weight_layout,
+        "exact_packed_weight_lineage": exact_packed_weight_lineage,
+        "final_dense_layout": final_dense_layout,
         "gate_up_convolution_count": len(gate_up),
         "lineage": lineage,
         "live_rows": 1,
@@ -2472,6 +3041,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--compile-rows", type=int, choices=(1, 32), default=1)
     parser.add_argument("--layer1-only", action="store_true")
+    parser.add_argument("--final-dense-layout", action="store_true")
     parser.add_argument("--db538-runner", type=Path, required=True)
     parser.add_argument("--db538-runner-sha256", required=True)
     parser.add_argument("--db538-tensor", type=Path, required=True)
@@ -2505,6 +3075,12 @@ def main() -> int:
         )
     if args.layer1_only and args.compile_rows != 32:
         raise RuntimeError("layer-1-only discriminator requires accepted M32 geometry")
+    if args.final_dense_layout and not (
+        args.layer1_only and args.compile_rows == 32
+    ):
+        raise RuntimeError(
+            "final-layout discriminator requires accepted M32 layer-1-only mode"
+        )
     normalized, post_attention, accepted_layer1_bits = _load_db538(args)
     m32_arguments = (
         args.accepted_m32_hlo,
@@ -2525,6 +3101,12 @@ def main() -> int:
         args.checkpoint_root,
         manifest_sha256=args.checkpoint_manifest_sha256,
     )
+    final_layout_records: dict[str, dict[str, Any]] = {}
+    packed_final_layout: tuple[np.ndarray, ...] | None = None
+    if args.final_dense_layout:
+        packed_final_layout, final_layout_records = _pack_dense_final_layout(
+            weights
+        )
 
     import jax
     from jax import lax
@@ -2537,6 +3119,7 @@ def main() -> int:
         STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
         _reduce_virtual_tp32_bf16_partials,
         _virtual_dense_convolution_down_partials,
+        _virtual_dense_final_layout_convolution_down_partials,
     )
 
     if jax.default_backend() != "tpu" or jax.local_device_count() != 4:
@@ -2544,63 +3127,67 @@ def main() -> int:
     mesh = Mesh(np.asarray(jax.local_devices()), ("lp4",))
     replicated = NamedSharding(mesh, P())
     slot_three = NamedSharding(mesh, P("lp4", None, None))
-    arguments = (
-        jax.device_put(normalized, replicated),
-        jax.device_put(post_attention, replicated),
-        jax.device_put(weights[_DENSE_WEIGHT_NAMES[0]], slot_three),
-        jax.device_put(weights[_DENSE_WEIGHT_NAMES[1]], slot_three),
-        jax.device_put(weights[_DENSE_WEIGHT_NAMES[2]], slot_three),
-        jax.device_put(weights[_DENSE_WEIGHT_NAMES[3]], slot_three),
-        jax.device_put(weights[_DENSE_WEIGHT_NAMES[4]], slot_three),
-        jax.device_put(weights[_DENSE_WEIGHT_NAMES[5]], slot_three),
-        jax.device_put(weights[_DENSE_WEIGHT_NAMES[6]], replicated),
-    )
-    in_specs = (
-        P(),
-        P(),
-        P("lp4", None, None),
-        P("lp4", None, None),
-        P("lp4", None, None),
-        P("lp4", None, None),
-        P("lp4", None, None),
-        P("lp4", None, None),
-        P(),
-    )
+    if args.final_dense_layout:
+        assert packed_final_layout is not None
+        slot_four = NamedSharding(mesh, P("lp4", None, None, None))
+        arguments = (
+            jax.device_put(normalized, replicated),
+            jax.device_put(post_attention, replicated),
+            *(jax.device_put(value, slot_four) for value in packed_final_layout),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[6]], replicated),
+        )
+        in_specs = (
+            P(),
+            P(),
+            P("lp4", None, None, None),
+            P("lp4", None, None, None),
+            P("lp4", None, None, None),
+            P("lp4", None, None, None),
+            P(),
+        )
+    else:
+        arguments = (
+            jax.device_put(normalized, replicated),
+            jax.device_put(post_attention, replicated),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[0]], slot_three),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[1]], slot_three),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[2]], slot_three),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[3]], slot_three),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[4]], slot_three),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[5]], slot_three),
+            jax.device_put(weights[_DENSE_WEIGHT_NAMES[6]], replicated),
+        )
+        in_specs = (
+            P(),
+            P(),
+            P("lp4", None, None),
+            P("lp4", None, None),
+            P("lp4", None, None),
+            P("lp4", None, None),
+            P("lp4", None, None),
+            P("lp4", None, None),
+            P(),
+        )
     groups = ((0, 1, 2, 3),)
 
-    def local(
-        normalized_input: Any,
+    def prepare_dense_input(normalized_input: Any) -> Any:
+        if args.compile_rows != 32:
+            return normalized_input
+        with jax.named_scope(
+            "greenfield_dense_convolution_m32_compile_geometry"
+        ):
+            return jnp.pad(
+                normalized_input,
+                ((0, 31), (0, 0)),
+                mode="constant",
+                constant_values=jnp.bfloat16(0),
+            )
+
+    def finish_dense(
+        partials: Any,
         post_attention_residual: Any,
-        gate_bits_slot: Any,
-        gate_scale_slot: Any,
-        up_bits_slot: Any,
-        up_scale_slot: Any,
-        down_bits_slot: Any,
-        down_scale_slot: Any,
         layer1_norm: Any,
     ) -> Any:
-        dense_input = normalized_input
-        if args.compile_rows == 32:
-            with jax.named_scope(
-                "greenfield_dense_convolution_m32_compile_geometry"
-            ):
-                dense_input = jnp.pad(
-                    normalized_input,
-                    ((0, 31), (0, 0)),
-                    mode="constant",
-                    constant_values=jnp.bfloat16(0),
-                )
-        partials = _virtual_dense_convolution_down_partials(
-            dense_input,
-            gate_bits_slot[0],
-            gate_scale_slot[0],
-            up_bits_slot[0],
-            up_scale_slot[0],
-            down_bits_slot[0],
-            down_scale_slot[0],
-            block_shape=(128, 128),
-            compile_rows=args.compile_rows,
-        )
         if args.compile_rows == 32:
             with jax.named_scope(
                 "greenfield_dense_convolution_m32_geometry_anchor"
@@ -2651,9 +3238,54 @@ def main() -> int:
                 layer1 = layer1[:1, :]
         return layer1 if args.layer1_only else (dense_update, layer1)
 
+    def local(
+        normalized_input: Any,
+        post_attention_residual: Any,
+        gate_bits_slot: Any,
+        gate_scale_slot: Any,
+        up_bits_slot: Any,
+        up_scale_slot: Any,
+        down_bits_slot: Any,
+        down_scale_slot: Any,
+        layer1_norm: Any,
+    ) -> Any:
+        dense_input = prepare_dense_input(normalized_input)
+        partials = _virtual_dense_convolution_down_partials(
+            dense_input,
+            gate_bits_slot[0],
+            gate_scale_slot[0],
+            up_bits_slot[0],
+            up_scale_slot[0],
+            down_bits_slot[0],
+            down_scale_slot[0],
+            block_shape=(128, 128),
+            compile_rows=args.compile_rows,
+        )
+        return finish_dense(partials, post_attention_residual, layer1_norm)
+
+    def local_final_layout(
+        normalized_input: Any,
+        post_attention_residual: Any,
+        merged_bits_slot: Any,
+        merged_scale_slot: Any,
+        down_bits_slot: Any,
+        down_scale_slot: Any,
+        layer1_norm: Any,
+    ) -> Any:
+        partials = _virtual_dense_final_layout_convolution_down_partials(
+            prepare_dense_input(normalized_input),
+            merged_bits_slot[0],
+            merged_scale_slot[0],
+            down_bits_slot[0],
+            down_scale_slot[0],
+            block_shape=(128, 128),
+            compile_rows=args.compile_rows,
+        )
+        return finish_dense(partials, post_attention_residual, layer1_norm)
+
     out_specs = P() if args.layer1_only else (P(), P())
     mapped = jax.shard_map(
-        local,
+        local_final_layout if args.final_dense_layout else local,
         mesh=mesh,
         in_specs=in_specs,
         out_specs=out_specs,
@@ -2666,6 +3298,7 @@ def main() -> int:
         stablehlo,
         compile_rows=args.compile_rows,
         layer1_only=args.layer1_only,
+        final_dense_layout=args.final_dense_layout,
     )
     stablehlo_path = args.hlo_dir / "dense_convolution.stablehlo.mlir"
     stablehlo_path.write_text(stablehlo)
@@ -2679,6 +3312,7 @@ def main() -> int:
         optimized_hlo,
         compile_rows=args.compile_rows,
         layer1_only=args.layer1_only,
+        final_dense_layout=args.final_dense_layout,
     )
     optimized_path = args.hlo_dir / "dense_convolution.optimized_hlo.txt"
     optimized_path.write_text(optimized_hlo)
@@ -2703,7 +3337,9 @@ def main() -> int:
     comparison = _compare_bits(accepted_layer1_bits, layer1_bits)
     exact = comparison["elementwise_exact"]
     arm = (
-        "accepted_m32_dense_cross_layer"
+        "accepted_m32_dense_final_layout_cross_layer"
+        if args.final_dense_layout
+        else "accepted_m32_dense_cross_layer"
         if args.layer1_only
         else (
             "accepted_m32_dense_convolution"
@@ -2720,6 +3356,8 @@ def main() -> int:
         "diagnostic_dead_rows": args.compile_rows - 1,
         "exact": exact,
         "exact_arms": [arm] if exact else [],
+        "final_dense_layout": args.final_dense_layout,
+        "final_layout_records": final_layout_records,
         "hlo": {
             "optimized_contract": optimized_contract,
             "optimized_sha256": sha256(optimized_hlo.encode()).hexdigest(),

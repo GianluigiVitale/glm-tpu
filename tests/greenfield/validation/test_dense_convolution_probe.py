@@ -366,6 +366,98 @@ def _synthetic_m32_layer1_only_hlo() -> str:
     )
 
 
+def _synthetic_final_layout_optimized_hlo() -> str:
+    hlo = _synthetic_m32_layer1_only_hlo().replace(
+        "  %residual = bf16[1,6144] parameter(100)",
+        "  %residual = bf16[1,6144] parameter(1)",
+        1,
+    ).replace(
+        "  %norm = bf16[6144] parameter(101)",
+        "  %norm = bf16[6144] parameter(6)\n"
+        "  %packed_gate_bits = u8[1,8,6144,768] parameter(2)\n"
+        "  %packed_gate_scale = f32[1,8,48,6] parameter(3)\n"
+        "  %packed_down_bits = u8[1,8,384,6144] parameter(4)\n"
+        "  %packed_down_scale = f32[1,8,3,48] parameter(5)",
+        1,
+    )
+    for rank in range(8):
+        scope = (
+            'metadata={op_name="jit(probe)/'
+            f"greenfield_dense_convolution_virtual_rank_{rank:02d}/"
+        )
+        gate_parameter = re.compile(
+            rf"  %gate_up_weight\.{rank} = bf16\[6144,768\] parameter\([0-9]+\)"
+        )
+        gate_dequant = "\n".join(
+            (
+                f"  %gate_bits_slice.{rank} = u8[1,1,6144,768] "
+                f"slice(%packed_gate_bits), slice={{[0:1], [{rank}:{rank + 1}], "
+                "[0:6144], [0:768]}}",
+                f"  %gate_bits.{rank} = u8[6144,768] "
+                f"bitcast(%gate_bits_slice.{rank})",
+                f"  %gate_fp8.{rank} = f8e4m3fn[6144,768] "
+                f"bitcast-convert(%gate_bits.{rank}), {scope}bitcast_convert_type\"}}",
+                f"  %gate_f32.{rank} = f32[6144,768] convert(%gate_fp8.{rank}), "
+                f"{scope}convert_element_type\"}}",
+                f"  %gate_scale_slice.{rank} = f32[1,1,48,6] "
+                f"slice(%packed_gate_scale), slice={{[0:1], [{rank}:{rank + 1}], "
+                "[0:48], [0:6]}}",
+                f"  %gate_scale_seed.{rank} = f32[48,6] "
+                f"reshape(%gate_scale_slice.{rank})",
+                f"  %gate_scale_inner.{rank} = f32[48,128,6] "
+                f"broadcast(%gate_scale_seed.{rank}), dimensions={{0,2}}",
+                f"  %gate_scale_middle.{rank} = f32[6144,6] "
+                f"reshape(%gate_scale_inner.{rank})",
+                f"  %gate_scale_outer.{rank} = f32[6144,6,128] "
+                f"broadcast(%gate_scale_middle.{rank}), dimensions={{0,1}}",
+                f"  %gate_scale_wide.{rank} = f32[6144,768] "
+                f"reshape(%gate_scale_outer.{rank})",
+                f"  %gate_scaled.{rank} = f32[6144,768] multiply("
+                f"%gate_f32.{rank}, %gate_scale_wide.{rank}), {scope}mul\"}}",
+                f"  %gate_up_weight.{rank} = bf16[6144,768]{{1,0}} "
+                f"convert(%gate_scaled.{rank}), {scope}convert_element_type\"}}",
+            )
+        )
+        hlo, count = gate_parameter.subn(gate_dequant, hlo, count=1)
+        assert count == 1
+        down_parameter = re.compile(
+            rf"  %down_weight\.{rank} = bf16\[384,6144\] parameter\([0-9]+\)"
+        )
+        down_dequant = "\n".join(
+            (
+                f"  %down_bits_slice.{rank} = u8[1,1,384,6144] "
+                f"slice(%packed_down_bits), slice={{[0:1], [{rank}:{rank + 1}], "
+                "[0:384], [0:6144]}}",
+                f"  %down_bits.{rank} = u8[384,6144] "
+                f"bitcast(%down_bits_slice.{rank})",
+                f"  %down_fp8.{rank} = f8e4m3fn[384,6144] "
+                f"bitcast-convert(%down_bits.{rank}), {scope}bitcast_convert_type\"}}",
+                f"  %down_f32.{rank} = f32[384,6144] convert(%down_fp8.{rank}), "
+                f"{scope}convert_element_type\"}}",
+                f"  %down_scale_slice.{rank} = f32[1,1,3,48] "
+                f"slice(%packed_down_scale), slice={{[0:1], [{rank}:{rank + 1}], "
+                "[0:3], [0:48]}}",
+                f"  %down_scale_seed.{rank} = f32[3,48] "
+                f"reshape(%down_scale_slice.{rank})",
+                f"  %down_scale_inner.{rank} = f32[3,128,48] "
+                f"broadcast(%down_scale_seed.{rank}), dimensions={{0,2}}",
+                f"  %down_scale_middle.{rank} = f32[384,48] "
+                f"reshape(%down_scale_inner.{rank})",
+                f"  %down_scale_outer.{rank} = f32[384,48,128] "
+                f"broadcast(%down_scale_middle.{rank}), dimensions={{0,1}}",
+                f"  %down_scale_wide.{rank} = f32[384,6144] "
+                f"reshape(%down_scale_outer.{rank})",
+                f"  %down_scaled.{rank} = f32[384,6144] multiply("
+                f"%down_f32.{rank}, %down_scale_wide.{rank}), {scope}mul\"}}",
+                f"  %down_weight.{rank} = bf16[384,6144]{{1,0}} "
+                f"convert(%down_scaled.{rank}), {scope}convert_element_type\"}}",
+            )
+        )
+        hlo, count = down_parameter.subn(down_dequant, hlo, count=1)
+        assert count == 1
+    return hlo
+
+
 def _synthetic_m32_hlo_with_fused_live_row(*, rogue_return: bool) -> str:
     hlo = _synthetic_m32_hlo()
     start = hlo.index("  %stack =")
@@ -617,6 +709,97 @@ print(jax.jit(mapped).lower(*arguments).as_text())
     return completed.stdout
 
 
+@lru_cache(maxsize=1)
+def _exact_final_layout_stablehlo() -> str:
+    program = r'''
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
+from glm_tpu.greenfield.kernels.stage_local import (
+    STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+    _reduce_virtual_tp32_bf16_partials,
+    _virtual_dense_final_layout_convolution_down_partials,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("lp4",))
+replicated = NamedSharding(mesh, P())
+slot = NamedSharding(mesh, P("lp4", None, None, None))
+contracts = (
+    ((1, 6144), jnp.bfloat16, replicated),
+    ((1, 6144), jnp.bfloat16, replicated),
+    ((4, 8, 6144, 768), jnp.uint8, slot),
+    ((4, 8, 48, 6), jnp.float32, slot),
+    ((4, 8, 384, 6144), jnp.uint8, slot),
+    ((4, 8, 3, 48), jnp.float32, slot),
+    ((6144,), jnp.bfloat16, replicated),
+)
+arguments = tuple(
+    jax.ShapeDtypeStruct(shape, dtype, sharding=sharding)
+    for shape, dtype, sharding in contracts
+)
+
+def local(normalized, residual, merged_bits, merged_scale,
+          down_bits, down_scale, norm):
+    normalized = jnp.pad(
+        normalized, ((0, 31), (0, 0)),
+        constant_values=jnp.bfloat16(0),
+    )
+    partials = _virtual_dense_final_layout_convolution_down_partials(
+        normalized, merged_bits[0], merged_scale[0],
+        down_bits[0], down_scale[0], block_shape=(128, 128),
+        compile_rows=32,
+    )
+    partials = jax.lax.optimization_barrier(partials)[:, :1, :]
+    with jax.named_scope("greenfield_strategy_nd_row0_dense_convolution_down"):
+        update = _reduce_virtual_tp32_bf16_partials(
+            partials,
+            axis_name="lp4",
+            groups=((0, 1, 2, 3),),
+            association=STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+        )
+    update = jnp.pad(
+        update, ((0, 31), (0, 0)),
+        constant_values=jnp.bfloat16(0),
+    )
+    residual = jnp.pad(
+        residual, ((0, 31), (0, 0)),
+        constant_values=jnp.bfloat16(0),
+    )
+    layer1 = fused_add_rms_norm(
+        update, residual, norm, epsilon=1e-5,
+    )[0]
+    return layer1[:1, :]
+
+mapped = jax.shard_map(
+    local,
+    mesh=mesh,
+    in_specs=(P(), P(), P("lp4", None, None, None),
+              P("lp4", None, None, None),
+              P("lp4", None, None, None),
+              P("lp4", None, None, None), P()),
+    out_specs=P(),
+    check_vma=False,
+)
+print(jax.jit(mapped).lower(*arguments).as_text())
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=REPO,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    return completed.stdout
+
+
 def test_dense_convolution_hlo_contract_accepts_exact_graph() -> None:
     stable = MODULE._validate_stablehlo(_exact_stablehlo())
     optimized = MODULE._validate_optimized_hlo(_synthetic_hlo())
@@ -734,6 +917,8 @@ def test_dense_cross_layer_hlo_contract_requires_layer1_only_result() -> None:
     assert stable["passed"], stable["violations"]
     assert optimized["passed"], optimized["violations"]
     assert stable["result_mode"] == optimized["result_mode"] == "layer1_only"
+
+
     wrong_pad = stablehlo.replace(
         "low = [0, 0], high = [31, 0], interior = [0, 0]",
         "low = [0, 0], high = [30, 0], interior = [0, 0]",
@@ -893,6 +1078,185 @@ def test_dense_cross_layer_hlo_contract_requires_layer1_only_result() -> None:
     assert not wrong_reduction_contract["lineage"]["rmsnorm_contract"][
         "exact_m32_reduction_geometry"
     ]
+
+
+def test_dense_final_layout_hlo_contract_requires_accepted_weight_layout() -> None:
+    accepted = _synthetic_final_layout_optimized_hlo()
+    contract = MODULE._validate_optimized_hlo(
+        accepted,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert contract["passed"], contract
+    assert contract["exact_accepted_weight_layout"] is True
+    assert contract["exact_packed_weight_lineage"] is True
+    no_owner_scale = accepted.replace(
+        "  %gate_scale_slice.0 = f32[1,1,48,6] "
+        "slice(%packed_gate_scale), "
+        "slice={[0:1], [0:1], [0:48], [0:6]}",
+        "  %gate_scale_no_owner.0 = f32[8,48,6] "
+        "reshape(%packed_gate_scale)\n"
+        "  %gate_scale_slice.0 = f32[1,48,6] "
+        "slice(%gate_scale_no_owner.0), "
+        "slice={[0:1], [0:48], [0:6]}",
+        1,
+    )
+    assert no_owner_scale != accepted
+    no_owner_contract = MODULE._validate_optimized_hlo(
+        no_owner_scale,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert no_owner_contract["passed"], no_owner_contract
+    assert no_owner_contract["exact_packed_weight_lineage"] is True
+    for source, replacement in (
+        (
+            "bf16[6144,768]{1,0} convert",
+            "bf16[6144,768]{0,1} convert",
+        ),
+        (
+            "bf16[384,6144]{1,0} convert",
+            "bf16[384,6144]{0,1} convert",
+        ),
+    ):
+        rejected = MODULE._validate_optimized_hlo(
+            accepted.replace(source, replacement, 1),
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+        )
+        assert rejected["passed"] is False
+        assert "accepted dense convolution weight layout drifted" in (
+            rejected["violations"]
+        )
+    for weight, convolution, shape, live_edge in (
+        (
+            "%gate_up_weight.0",
+            "%gate_up.0",
+            "bf16[6144,768]{1,0}",
+            "%m32_padded, %gate_up_weight.0",
+        ),
+        (
+            "%down_weight.0",
+            "%down.0",
+            "bf16[384,6144]{1,0}",
+            "%activated.0, %down_weight.0",
+        ),
+    ):
+        marker = f"  {convolution} ="
+        rogue = f"%rogue_{weight[1:]}"
+        mutated = accepted.replace(
+            marker,
+            f"  {rogue} = {shape} add({weight}, {weight})\n{marker}",
+            1,
+        ).replace(live_edge, live_edge.replace(weight, rogue), 1)
+        assert mutated != accepted
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+        )
+        assert rejected["passed"] is False
+        assert rejected["exact_packed_weight_lineage"] is False
+        assert "packed dense weight lineage drifted" in rejected["violations"]
+    source_mutations = (
+        accepted.replace(
+            "slice(%packed_gate_bits), slice={[0:1], [0:1], [0:6144], [0:768]}",
+            "slice(%packed_gate_bits), slice={[0:1], [1:2], [0:6144], [0:768]}",
+            1,
+        ),
+        accepted.replace(
+            "  %gate_scaled.0 = f32[6144,768] multiply("
+            "%gate_f32.0, %gate_scale_wide.0)",
+            "  %rogue_gate_scale.0 = f32[6144,768] add("
+            "%gate_scale_wide.0, %gate_scale_wide.0)\n"
+            "  %gate_scaled.0 = f32[6144,768] multiply("
+            "%gate_f32.0, %rogue_gate_scale.0)",
+            1,
+        ),
+        accepted.replace(
+            "  %down_fp8.0 = f8e4m3fn[384,6144] "
+            "bitcast-convert(%down_bits.0)",
+            "  %rogue_down_bits.0 = u8[384,6144] add("
+            "%down_bits.0, %down_bits.0)\n"
+            "  %down_fp8.0 = f8e4m3fn[384,6144] "
+            "bitcast-convert(%rogue_down_bits.0)",
+            1,
+        ),
+        accepted.replace(
+            "  %gate_bits_slice.0 = u8[1,1,6144,768] "
+            "slice(%packed_gate_bits), slice={[0:1], [0:1], [0:6144], [0:768]}",
+            "  %reassociated_gate_bits.0 = u8[1,6144,8,768] "
+            "reshape(%packed_gate_bits)\n"
+            "  %gate_bits_slice.0 = u8[1,6144,1,768] "
+            "slice(%reassociated_gate_bits.0), "
+            "slice={[0:1], [0:6144], [0:1], [0:768]}",
+            1,
+        ),
+        accepted.replace(
+            "  %gate_scale_seed.0 = f32[48,6] "
+            "reshape(%gate_scale_slice.0)\n"
+            "  %gate_scale_inner.0 = f32[48,128,6] "
+            "broadcast(%gate_scale_seed.0), dimensions={0,2}",
+            "  %gate_scale_seed.0 = f32[6,48] "
+            "reshape(%gate_scale_slice.0)\n"
+            "  %gate_scale_inner.0 = f32[6,128,48] "
+            "broadcast(%gate_scale_seed.0), dimensions={0,2}",
+            1,
+        ),
+    )
+    assert all(mutated != accepted for mutated in source_mutations)
+    for mutated in source_mutations:
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+        )
+        assert rejected["passed"] is False
+        assert rejected["exact_packed_weight_lineage"] is False
+        assert "packed dense weight lineage drifted" in rejected["violations"]
+
+
+def test_dense_final_layout_stablehlo_binds_packed_shards_and_sources() -> None:
+    stablehlo = _exact_final_layout_stablehlo()
+    contract = MODULE._validate_stablehlo(
+        stablehlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert contract["passed"], contract
+    assert contract["matched_virtual_shards"] == list(range(8))
+    dense_prefix = stablehlo.split('"stablehlo.all_gather"', 1)[0]
+    assert "stablehlo.transpose" not in dense_prefix
+    wrong_first_shard = stablehlo.replace(
+        "stablehlo.slice %2 [0:1, 0:6144, 0:768]",
+        "stablehlo.slice %2 [1:2, 0:6144, 0:768]",
+        1,
+    )
+    assert wrong_first_shard != stablehlo
+    assert not MODULE._validate_stablehlo(
+        wrong_first_shard,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )["passed"]
+    cross_wired_outer = stablehlo.replace(
+        "manual_computation(%arg0, %arg1, %arg2, %arg3, %arg4, %arg5, %arg6)",
+        "manual_computation(%arg0, %arg1, %arg3, %arg2, %arg4, %arg5, %arg6)",
+        1,
+    )
+    assert cross_wired_outer != stablehlo
+    assert not MODULE._validate_stablehlo(
+        cross_wired_outer,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )["passed"]
 
 
 @pytest.mark.skipif(
@@ -1346,6 +1710,8 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "ACCEPTED_M32_HLO_SHA=25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
         "GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS",
         "GLM_GREENFIELD_DENSE_LAYER1_ONLY",
+        "GLM_GREENFIELD_DENSE_FINAL_LAYOUT",
+        "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba",
         'strict_census pre',
         'strict_census post',
         'rollback_provisional_db',
@@ -1366,6 +1732,10 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "m32",
         "cross_layer",
         "cross_layer_mode",
+        "final_layout",
+        "final_layout_record",
+        "final_layout_hlo",
+        "final_layout_lineage",
         "classification",
         "comparison",
         "source",
@@ -1402,6 +1772,8 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "diagnostic_dead_rows": 0,
         "exact": True,
         "exact_arms": ["accepted_dense_convolution"],
+        "final_dense_layout": False,
+        "final_layout_records": {},
         "result_mode": "dense_and_layer1",
         "hlo": {
             "optimized_contract": {
@@ -1410,6 +1782,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "compile_rows": 1,
                 "convolution_count": 16,
                 "down_convolution_count": 8,
+                "final_dense_layout": False,
                 "gate_up_convolution_count": 8,
                 "live_rows": 1,
                 "lineage": {
@@ -1516,6 +1889,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "convolution_count": 16,
                 "compile_rows": 1,
                 "down_convolution_count": 8,
+                "final_dense_layout": False,
                 "gate_up_convolution_count": 8,
                 "live_rows": 1,
                 "matched_virtual_shards": list(range(8)),
@@ -1595,11 +1969,23 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     }
     compile_rows = 1
     layer1_only = False
-    if mutation in ("m32", "cross_layer", "cross_layer_mode"):
+    final_layout = False
+    if mutation in (
+        "m32",
+        "cross_layer",
+        "cross_layer_mode",
+        "final_layout",
+            "final_layout_record",
+            "final_layout_hlo",
+            "final_layout_lineage",
+        ):
         compile_rows = 32
-        layer1_only = mutation.startswith("cross_layer")
+        layer1_only = mutation.startswith(("cross_layer", "final_layout"))
+        final_layout = mutation.startswith("final_layout")
         arm = (
-            "accepted_m32_dense_cross_layer"
+            "accepted_m32_dense_final_layout_cross_layer"
+            if final_layout
+            else "accepted_m32_dense_cross_layer"
             if layer1_only
             else "accepted_m32_dense_convolution"
         )
@@ -1610,10 +1996,14 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "compile_rows": 32,
                 "diagnostic_dead_rows": 31,
                 "exact_arms": [arm],
+                "final_dense_layout": final_layout,
                 "result_mode": result_mode,
             }
         )
         runner["hlo"]["optimized_contract"]["compile_rows"] = 32
+        runner["hlo"]["optimized_contract"][
+            "final_dense_layout"
+        ] = final_layout
         runner["hlo"]["optimized_contract"]["result_mode"] = result_mode
         runner["hlo"]["optimized_contract"]["lineage"][
             "m32_live_row_slices"
@@ -1621,8 +2011,16 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         if layer1_only:
             runner["hlo"]["optimized_contract"]["lineage"][
                 "result_parameter_sources"
-            ] = [[f"%parameter.{index}" for index in range(9)]]
+            ] = [
+                [
+                    f"%parameter.{index}"
+                    for index in range(7 if final_layout else 9)
+                ]
+            ]
         runner["hlo"]["stablehlo_contract"]["compile_rows"] = 32
+        runner["hlo"]["stablehlo_contract"][
+            "final_dense_layout"
+        ] = final_layout
         runner["hlo"]["stablehlo_contract"]["result_mode"] = result_mode
         runner["source"].update(
             {
@@ -1640,6 +2038,45 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 ),
             }
         )
+        if final_layout:
+            runner["final_layout_records"] = json.loads(
+                json.dumps(MODULE._FINAL_DENSE_LAYOUT_RECORDS)
+            )
+            runner["hlo"]["optimized_contract"].update(
+                {
+                    "exact_accepted_weight_layout": True,
+                    "exact_packed_weight_lineage": True,
+                    "accepted_weight_layouts": {
+                        label: [
+                            {
+                                "accepted": True,
+                                "accepted_layout": True,
+                                "convolution": f"%{label}.{index}",
+                                "exact_packed_dequant": True,
+                                "parameter_sources": [
+                                    f"%{label}_bits",
+                                    f"%{label}_scale",
+                                ],
+                                "virtual_rank": index,
+                            }
+                            for index in range(8)
+                        ]
+                        for label in ("gate_up", "down")
+                    },
+                }
+            )
+            if mutation == "final_layout_record":
+                next(iter(runner["final_layout_records"].values()))[
+                    "sha256"
+                ] = "0" * 64
+            elif mutation == "final_layout_hlo":
+                runner["hlo"]["optimized_contract"][
+                    "exact_accepted_weight_layout"
+                ] = False
+            elif mutation == "final_layout_lineage":
+                runner["hlo"]["optimized_contract"][
+                    "exact_packed_weight_lineage"
+                ] = False
         if mutation == "cross_layer_mode":
             runner["result_mode"] = "dense_and_layer1"
     elif mutation == "classification":
@@ -1709,6 +2146,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134",
             str(compile_rows),
             str(int(layer1_only)),
+            str(int(final_layout)),
             "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
             "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
             "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
@@ -1719,14 +2157,22 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         capture_output=True,
         check=False,
     )
-    if mutation not in ("none", "m32", "cross_layer", "nonexact"):
+    if mutation not in (
+        "none",
+        "m32",
+        "cross_layer",
+        "final_layout",
+        "nonexact",
+    ):
         assert completed.returncode != 0
         return
     assert completed.returncode == 0, completed.stdout + completed.stderr
     summary = json.loads((run_dir / "summary.json").read_text())
-    expected_exact = mutation in ("none", "m32", "cross_layer")
+    expected_exact = mutation in ("none", "m32", "cross_layer", "final_layout")
     expected_arm = (
-        "accepted_m32_dense_cross_layer"
+        "accepted_m32_dense_final_layout_cross_layer"
+        if mutation == "final_layout"
+        else "accepted_m32_dense_cross_layer"
         if mutation == "cross_layer"
         else (
             "accepted_m32_dense_convolution"
@@ -1751,7 +2197,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     assert run is not None
     assert run[0:2] == (
         (
-            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
+            if mutation == "final_layout"
+            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
             if mutation == "cross_layer"
             else (
                 "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
@@ -1760,7 +2208,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             )
         ),
         (
-            "native-jax-db542-dense-cross-layer-v1"
+            "native-jax-accepted-dense-final-layout-v1"
+            if mutation == "final_layout"
+            else "native-jax-db542-dense-cross-layer-v1"
             if mutation == "cross_layer"
             else (
                 "native-jax-db532-dense-m32-discriminator-v1"
@@ -1772,11 +2222,24 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     environment = json.loads(run[2])
     assert environment["greenfield_run_tag"] == tag
     assert environment["compile_rows"] == compile_rows
+    assert environment["final_dense_layout"] is final_layout
+    if final_layout:
+        assert environment["final_layout_records_sha256"] == (
+            "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+        )
+        assert summary["final_layout_records"] == MODULE._FINAL_DENSE_LAYOUT_RECORDS
+        assert summary["final_layout_records_sha256"] == (
+            "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+        )
     assert environment["result_mode"] == (
-        "layer1_only" if mutation == "cross_layer" else "dense_and_layer1"
+        "layer1_only"
+        if mutation in ("cross_layer", "final_layout")
+        else "dense_and_layer1"
     )
     assert run[3] == (
-        "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
+        "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
+        if mutation == "final_layout"
+        else "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
         if mutation == "cross_layer"
         else (
             "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
@@ -1786,7 +2249,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     )
     assert item == (
         (
-            "greenfield_layer0_dense_m32_cross_layer"
+            "greenfield_layer0_dense_final_layout_cross_layer"
+            if mutation == "final_layout"
+            else "greenfield_layer0_dense_m32_cross_layer"
             if mutation == "cross_layer"
             else (
                 "greenfield_layer0_dense_m32_convolution"
@@ -1799,7 +2264,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     )
     assert metric == (
         (
-            "greenfield_layer0_dense_m32_cross_layer"
+            "greenfield_layer0_dense_final_layout_cross_layer"
+            if mutation == "final_layout"
+            else "greenfield_layer0_dense_m32_cross_layer"
             if mutation == "cross_layer"
             else (
                 "greenfield_layer0_dense_m32_convolution"

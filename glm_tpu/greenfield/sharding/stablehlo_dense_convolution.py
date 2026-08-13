@@ -245,6 +245,7 @@ def _match_one_shard(
     gate_up: _StableNode,
     *,
     compile_rows: int,
+    final_dense_layout: bool = False,
 ) -> tuple[int, tuple[str, ...], str]:
     row_type = f"tensor<{compile_rows}x"
     if len(gate_up.operands) != 2:
@@ -270,77 +271,124 @@ def _match_one_shard(
             f"{row_type}768xf32>",
         ),
     )
-    merged_bits = _expect_node(
-        graph,
-        gate_bits,
-        opcode="concatenate",
-        result_type="tensor<6144x768xui8>",
-    )
-    if merged_bits.concatenate_dimension != 1 or len(merged_bits.operands) != 2:
-        raise _MatchError(f"{merged_bits.name}: gate/up bit ordering drifted")
-    bit_slices = []
-    for operand in merged_bits.operands:
-        transpose = _expect_node(
+    if final_dense_layout:
+        gate_bits_reshape = _expect_node(
             graph,
-            operand,
-            opcode="transpose",
-            result_type="tensor<6144x384xui8>",
+            gate_bits,
+            opcode="reshape",
+            result_type="tensor<6144x768xui8>",
         )
-        if transpose.dimensions != (1, 0) or len(transpose.operands) != 1:
-            raise _MatchError(f"{transpose.name}: gate/up bit transpose drifted")
-        bit_slices.append(
-            _expect_node(
-                graph,
-                transpose.operands[0],
-                opcode="slice",
-                result_type="tensor<384x6144xui8>",
+        gate_bits_slice = _expect_node(
+            graph,
+            gate_bits_reshape.operands[0],
+            opcode="slice",
+            result_type="tensor<1x6144x768xui8>",
+        )
+        if gate_bits_slice.slice_ranges is None:
+            raise _MatchError(f"{gate_bits_slice.name}: packed gate slice absent")
+        shard = gate_bits_slice.slice_ranges[0][0]
+        if gate_bits_slice.slice_ranges != (
+            (shard, shard + 1),
+            (0, 6144),
+            (0, 768),
+        ):
+            raise _MatchError(f"{gate_bits_slice.name}: packed gate slice drifted")
+        gate_scale_reshape = _expect_node(
+            graph,
+            gate_scales,
+            opcode="reshape",
+            result_type="tensor<48x6xf32>",
+        )
+        gate_scale_slice = _expect_node(
+            graph,
+            gate_scale_reshape.operands[0],
+            opcode="slice",
+            result_type="tensor<1x48x6xf32>",
+        )
+        if gate_scale_slice.slice_ranges != (
+            (shard, shard + 1),
+            (0, 48),
+            (0, 6),
+        ):
+            raise _MatchError(
+                f"{gate_scale_slice.name}: packed gate scale slice drifted"
             )
+        gate_bit_root = gate_bits_slice.operands[0]
+        gate_scale_root = gate_scale_slice.operands[0]
+    else:
+        merged_bits = _expect_node(
+            graph,
+            gate_bits,
+            opcode="concatenate",
+            result_type="tensor<6144x768xui8>",
         )
-    first_ranges = bit_slices[0].slice_ranges
-    if (
-        first_ranges is None
-        or first_ranges[1] != (0, 6144)
-        or first_ranges[0][1] != first_ranges[0][0] + 384
-        or first_ranges[0][0] % 384
-    ):
-        raise _MatchError(f"{bit_slices[0].name}: gate shard slice drifted")
-    shard = first_ranges[0][0] // 384
-    expected_bit_ranges = ((shard * 384, (shard + 1) * 384), (0, 6144))
-    if any(
-        node.slice_ranges != expected_bit_ranges or len(node.operands) != 1
-        for node in bit_slices
-    ):
-        raise _MatchError(f"{gate_up.name}: gate/up shard slices cross-wired")
+        if merged_bits.concatenate_dimension != 1 or len(merged_bits.operands) != 2:
+            raise _MatchError(f"{merged_bits.name}: gate/up bit ordering drifted")
+        bit_slices = []
+        for operand in merged_bits.operands:
+            transpose = _expect_node(
+                graph,
+                operand,
+                opcode="transpose",
+                result_type="tensor<6144x384xui8>",
+            )
+            if transpose.dimensions != (1, 0) or len(transpose.operands) != 1:
+                raise _MatchError(f"{transpose.name}: gate/up bit transpose drifted")
+            bit_slices.append(
+                _expect_node(
+                    graph,
+                    transpose.operands[0],
+                    opcode="slice",
+                    result_type="tensor<384x6144xui8>",
+                )
+            )
+        first_ranges = bit_slices[0].slice_ranges
+        if (
+            first_ranges is None
+            or first_ranges[1] != (0, 6144)
+            or first_ranges[0][1] != first_ranges[0][0] + 384
+            or first_ranges[0][0] % 384
+        ):
+            raise _MatchError(f"{bit_slices[0].name}: gate shard slice drifted")
+        shard = first_ranges[0][0] // 384
+        expected_bit_ranges = ((shard * 384, (shard + 1) * 384), (0, 6144))
+        if any(
+            node.slice_ranges != expected_bit_ranges or len(node.operands) != 1
+            for node in bit_slices
+        ):
+            raise _MatchError(f"{gate_up.name}: gate/up shard slices cross-wired")
 
-    merged_scales = _expect_node(
-        graph,
-        gate_scales,
-        opcode="concatenate",
-        result_type="tensor<48x6xf32>",
-    )
-    if merged_scales.concatenate_dimension != 1 or len(merged_scales.operands) != 2:
-        raise _MatchError(f"{merged_scales.name}: gate/up scale ordering drifted")
-    scale_slices = []
-    for operand in merged_scales.operands:
-        transpose = _expect_node(
-            graph, operand, opcode="transpose", result_type="tensor<48x3xf32>"
+        merged_scales = _expect_node(
+            graph,
+            gate_scales,
+            opcode="concatenate",
+            result_type="tensor<48x6xf32>",
         )
-        if transpose.dimensions != (1, 0) or len(transpose.operands) != 1:
-            raise _MatchError(f"{transpose.name}: gate/up scale transpose drifted")
-        scale_slices.append(
-            _expect_node(
-                graph,
-                transpose.operands[0],
-                opcode="slice",
-                result_type="tensor<3x48xf32>",
+        if merged_scales.concatenate_dimension != 1 or len(merged_scales.operands) != 2:
+            raise _MatchError(f"{merged_scales.name}: gate/up scale ordering drifted")
+        scale_slices = []
+        for operand in merged_scales.operands:
+            transpose = _expect_node(
+                graph, operand, opcode="transpose", result_type="tensor<48x3xf32>"
             )
-        )
-    expected_scale_ranges = ((shard * 3, (shard + 1) * 3), (0, 48))
-    if any(
-        node.slice_ranges != expected_scale_ranges or len(node.operands) != 1
-        for node in scale_slices
-    ):
-        raise _MatchError(f"{gate_up.name}: gate/up scale slices cross-wired")
+            if transpose.dimensions != (1, 0) or len(transpose.operands) != 1:
+                raise _MatchError(f"{transpose.name}: gate/up scale transpose drifted")
+            scale_slices.append(
+                _expect_node(
+                    graph,
+                    transpose.operands[0],
+                    opcode="slice",
+                    result_type="tensor<3x48xf32>",
+                )
+            )
+        expected_scale_ranges = ((shard * 3, (shard + 1) * 3), (0, 48))
+        if any(
+            node.slice_ranges != expected_scale_ranges or len(node.operands) != 1
+            for node in scale_slices
+        ):
+            raise _MatchError(f"{gate_up.name}: gate/up scale slices cross-wired")
+        gate_bit_root = bit_slices[0].operands[0]
+        gate_scale_root = scale_slices[0].operands[0]
 
     gate_up_bf16 = _expect_unary(
         graph,
@@ -464,44 +512,88 @@ def _match_one_shard(
             f"{row_type}6144xf32>",
         ),
     )
-    down_bits_transpose = _expect_node(
-        graph,
-        down_bits,
-        opcode="transpose",
-        result_type="tensor<384x6144xui8>",
-    )
-    if down_bits_transpose.dimensions != (1, 0):
-        raise _MatchError(f"{down_bits}: down bit transpose drifted")
-    down_bit_slice = _expect_node(
-        graph,
-        down_bits_transpose.operands[0],
-        opcode="slice",
-        result_type="tensor<6144x384xui8>",
-    )
-    if down_bit_slice.slice_ranges != (
-        (0, 6144),
-        (shard * 384, (shard + 1) * 384),
-    ):
-        raise _MatchError(f"{down_bit_slice.name}: down bit slice drifted")
-    down_scale_transpose = _expect_node(
-        graph,
-        down_scales,
-        opcode="transpose",
-        result_type="tensor<3x48xf32>",
-    )
-    if down_scale_transpose.dimensions != (1, 0):
-        raise _MatchError(f"{down_scales}: down scale transpose drifted")
-    down_scale_slice = _expect_node(
-        graph,
-        down_scale_transpose.operands[0],
-        opcode="slice",
-        result_type="tensor<48x3xf32>",
-    )
-    if down_scale_slice.slice_ranges != (
-        (0, 48),
-        (shard * 3, (shard + 1) * 3),
-    ):
-        raise _MatchError(f"{down_scale_slice.name}: down scale slice drifted")
+    if final_dense_layout:
+        down_bits_reshape = _expect_node(
+            graph,
+            down_bits,
+            opcode="reshape",
+            result_type="tensor<384x6144xui8>",
+        )
+        down_bit_slice = _expect_node(
+            graph,
+            down_bits_reshape.operands[0],
+            opcode="slice",
+            result_type="tensor<1x384x6144xui8>",
+        )
+        if down_bit_slice.slice_ranges != (
+            (shard, shard + 1),
+            (0, 384),
+            (0, 6144),
+        ):
+            raise _MatchError(f"{down_bit_slice.name}: packed down slice drifted")
+        down_scale_reshape = _expect_node(
+            graph,
+            down_scales,
+            opcode="reshape",
+            result_type="tensor<3x48xf32>",
+        )
+        down_scale_slice = _expect_node(
+            graph,
+            down_scale_reshape.operands[0],
+            opcode="slice",
+            result_type="tensor<1x3x48xf32>",
+        )
+        if down_scale_slice.slice_ranges != (
+            (shard, shard + 1),
+            (0, 3),
+            (0, 48),
+        ):
+            raise _MatchError(
+                f"{down_scale_slice.name}: packed down scale slice drifted"
+            )
+        down_bit_root = down_bit_slice.operands[0]
+        down_scale_root = down_scale_slice.operands[0]
+    else:
+        down_bits_transpose = _expect_node(
+            graph,
+            down_bits,
+            opcode="transpose",
+            result_type="tensor<384x6144xui8>",
+        )
+        if down_bits_transpose.dimensions != (1, 0):
+            raise _MatchError(f"{down_bits}: down bit transpose drifted")
+        down_bit_slice = _expect_node(
+            graph,
+            down_bits_transpose.operands[0],
+            opcode="slice",
+            result_type="tensor<6144x384xui8>",
+        )
+        if down_bit_slice.slice_ranges != (
+            (0, 6144),
+            (shard * 384, (shard + 1) * 384),
+        ):
+            raise _MatchError(f"{down_bit_slice.name}: down bit slice drifted")
+        down_scale_transpose = _expect_node(
+            graph,
+            down_scales,
+            opcode="transpose",
+            result_type="tensor<3x48xf32>",
+        )
+        if down_scale_transpose.dimensions != (1, 0):
+            raise _MatchError(f"{down_scales}: down scale transpose drifted")
+        down_scale_slice = _expect_node(
+            graph,
+            down_scale_transpose.operands[0],
+            opcode="slice",
+            result_type="tensor<48x3xf32>",
+        )
+        if down_scale_slice.slice_ranges != (
+            (0, 48),
+            (shard * 3, (shard + 1) * 3),
+        ):
+            raise _MatchError(f"{down_scale_slice.name}: down scale slice drifted")
+        down_bit_root = down_bit_slice.operands[0]
+        down_scale_root = down_scale_slice.operands[0]
     down_bf16 = _expect_unary(
         graph,
         down.name,
@@ -510,12 +602,14 @@ def _match_one_shard(
     )
     roots = (
         normalized,
-        bit_slices[0].operands[0],
-        scale_slices[0].operands[0],
-        bit_slices[1].operands[0],
-        scale_slices[1].operands[0],
-        down_bit_slice.operands[0],
-        down_scale_slice.operands[0],
+        gate_bit_root,
+        gate_scale_root,
+        *((down_bit_root, down_scale_root) if final_dense_layout else (
+            bit_slices[1].operands[0],
+            scale_slices[1].operands[0],
+            down_bit_root,
+            down_scale_root,
+        )),
     )
     return shard, roots, down_bf16.name
 
@@ -791,13 +885,21 @@ def _match_rmsnorm(
 
 
 def validate_dense_convolution_stablehlo(
-    stablehlo: str, *, compile_rows: int = 1, layer1_only: bool = False
+    stablehlo: str,
+    *,
+    compile_rows: int = 1,
+    layer1_only: bool = False,
+    final_dense_layout: bool = False,
 ) -> dict[str, object]:
     """Validate all eight exact dense chains and the exact StrategyND tree."""
 
     violations: list[str] = []
     if compile_rows not in (1, 32):
         raise ValueError("dense StableHLO compile rows must be 1 or 32")
+    if final_dense_layout and (compile_rows != 32 or not layer1_only):
+        raise ValueError(
+            "final-layout dense StableHLO proof requires M32 layer1-only"
+        )
     graphs, parse_errors = _parse_graphs(stablehlo)
     violations.extend(parse_errors)
     matched_shards: list[int] = []
@@ -826,7 +928,10 @@ def validate_dense_convolution_stablehlo(
         rows: dict[int, tuple[tuple[str, ...], str]] = {}
         for convolution in gate_up:
             shard, roots, result = _match_one_shard(
-                graph, convolution, compile_rows=compile_rows
+                graph,
+                convolution,
+                compile_rows=compile_rows,
+                final_dense_layout=final_dense_layout,
             )
             if shard in rows:
                 raise _MatchError(f"duplicate dense virtual shard {shard}")
@@ -903,12 +1008,27 @@ def validate_dense_convolution_stablehlo(
         )
         layer_roots = next(iter(rows.values()))[0]
         root_contracts = (
-            ("tensor<1x3072x6144xui8>", "tensor<3072x6144xui8>"),
-            ("tensor<1x24x48xf32>", "tensor<24x48xf32>"),
-            ("tensor<1x3072x6144xui8>", "tensor<3072x6144xui8>"),
-            ("tensor<1x24x48xf32>", "tensor<24x48xf32>"),
-            ("tensor<1x6144x3072xui8>", "tensor<6144x3072xui8>"),
-            ("tensor<1x48x24xf32>", "tensor<48x24xf32>"),
+            (
+                (
+                    "tensor<1x8x6144x768xui8>",
+                    "tensor<8x6144x768xui8>",
+                ),
+                ("tensor<1x8x48x6xf32>", "tensor<8x48x6xf32>"),
+                (
+                    "tensor<1x8x384x6144xui8>",
+                    "tensor<8x384x6144xui8>",
+                ),
+                ("tensor<1x8x3x48xf32>", "tensor<8x3x48xf32>"),
+            )
+            if final_dense_layout
+            else (
+                ("tensor<1x3072x6144xui8>", "tensor<3072x6144xui8>"),
+                ("tensor<1x24x48xf32>", "tensor<24x48xf32>"),
+                ("tensor<1x3072x6144xui8>", "tensor<3072x6144xui8>"),
+                ("tensor<1x24x48xf32>", "tensor<24x48xf32>"),
+                ("tensor<1x6144x3072xui8>", "tensor<6144x3072xui8>"),
+                ("tensor<1x48x24xf32>", "tensor<48x24xf32>"),
+            )
         )
         normalized_root = layer_roots[0]
         if compile_rows == 32:
@@ -935,11 +1055,10 @@ def validate_dense_convolution_stablehlo(
             if manual_call is None
             else [value.strip() for value in manual_call.group(1).split(",")]
         )
-        if (
-            len(set(manual_arguments)) != 9
-            or any(name in graph.nodes for name in manual_arguments)
-            or manual_arguments
-            != [
+        expected_manual_arguments = (
+            ["%arg7", "%arg9", "%arg10", "%arg11", "%arg12", "%arg8", "%arg13"]
+            if final_dense_layout
+            else [
                 "%arg9",
                 "%arg11",
                 "%arg12",
@@ -950,7 +1069,15 @@ def validate_dense_convolution_stablehlo(
                 "%arg10",
                 "%arg17",
             ]
-            or outer_arguments != [f"%arg{index}" for index in range(9)]
+        )
+        expected_outer_arguments = [
+            f"%arg{index}" for index in range(7 if final_dense_layout else 9)
+        ]
+        if (
+            len(set(manual_arguments)) != len(expected_manual_arguments)
+            or any(name in graph.nodes for name in manual_arguments)
+            or manual_arguments != expected_manual_arguments
+            or outer_arguments != expected_outer_arguments
         ):
             raise _MatchError("dense probe manual argument ownership drifted")
         expected_graph_count = 2 if compile_rows == 32 else 1
@@ -987,6 +1114,7 @@ def validate_dense_convolution_stablehlo(
         "compile_rows": compile_rows,
         "convolution_count": stablehlo.count("stablehlo.convolution"),
         "down_convolution_count": 8 if matched_shards == list(range(8)) else 0,
+        "final_dense_layout": final_dense_layout,
         "gate_up_convolution_count": 8 if matched_shards == list(range(8)) else 0,
         "matched_virtual_shards": matched_shards,
         "live_rows": 1,

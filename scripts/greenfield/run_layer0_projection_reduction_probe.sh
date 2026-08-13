@@ -93,6 +93,7 @@ FORK_GIT=$(git -C /home/gianl/tpu-inference rev-parse --short HEAD)
 DENSE_CONVOLUTION=${GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE:-0}
 DENSE_COMPILE_ROWS=${GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS:-1}
 DENSE_LAYER1_ONLY=${GLM_GREENFIELD_DENSE_LAYER1_ONLY:-0}
+DENSE_FINAL_LAYOUT=${GLM_GREENFIELD_DENSE_FINAL_LAYOUT:-0}
 [[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
   exit 2
@@ -105,6 +106,10 @@ DENSE_LAYER1_ONLY=${GLM_GREENFIELD_DENSE_LAYER1_ONLY:-0}
   echo "GLM_GREENFIELD_DENSE_LAYER1_ONLY must be 0 or 1" >&2
   exit 2
 }
+[[ $DENSE_FINAL_LAYOUT == 0 || $DENSE_FINAL_LAYOUT == 1 ]] || {
+  echo "GLM_GREENFIELD_DENSE_FINAL_LAYOUT must be 0 or 1" >&2
+  exit 2
+}
 if [[ $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS != 1 ]]; then
   echo "projection/reduction mode requires compile rows 1" >&2
   exit 2
@@ -114,8 +119,17 @@ if [[ $DENSE_LAYER1_ONLY == 1 && \
   echo "layer-1-only mode requires the dense M32 discriminator" >&2
   exit 2
 fi
+if [[ $DENSE_FINAL_LAYOUT == 1 && \
+      ! ( $DENSE_CONVOLUTION == 1 && $DENSE_COMPILE_ROWS == 32 && \
+          $DENSE_LAYER1_ONLY == 1 ) ]]; then
+  echo "final dense layout requires the M32 layer-1-only discriminator" >&2
+  exit 2
+fi
 if [[ $DENSE_CONVOLUTION == 1 ]]; then
-  if [[ $DENSE_LAYER1_ONLY == 1 ]]; then
+  if [[ $DENSE_FINAL_LAYOUT == 1 ]]; then
+    TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_final_layout_cross_layer_$(date -u +%Y%m%dT%H%M%S%NZ)}
+    TENSOR_BASENAME=dense_final_layout_cross_layer.npz
+  elif [[ $DENSE_LAYER1_ONLY == 1 ]]; then
     TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_m32_cross_layer_$(date -u +%Y%m%dT%H%M%S%NZ)}
     TENSOR_BASENAME=dense_m32_cross_layer.npz
   elif [[ $DENSE_COMPILE_ROWS == 32 ]]; then
@@ -145,6 +159,10 @@ fi
 layer1_probe_args=()
 if [[ $DENSE_LAYER1_ONLY == 1 ]]; then
   layer1_probe_args=(--layer1-only)
+fi
+final_layout_probe_args=()
+if [[ $DENSE_FINAL_LAYOUT == 1 ]]; then
+  final_layout_probe_args=(--final-dense-layout)
 fi
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
@@ -230,7 +248,8 @@ rollback_provisional_db() {
   /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$TAG" "$PIN" \
     "$DENSE_CONVOLUTION" "$RUN_DIR" "$DB538_TENSOR_SHA" \
     "$CHECKPOINT_MANIFEST_SHA" "$HARNESS_GIT" "$FORK_GIT" \
-    "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$ACCEPTED_M32_HLO_SHA" \
+    "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$DENSE_FINAL_LAYOUT" \
+    "$ACCEPTED_M32_HLO_SHA" \
     "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
     "$ACCEPTED_M32_RAW_HLO_SHA" \
     >"$RUN_DIR/provisional_db_rollback.txt" <<'PY'
@@ -252,6 +271,7 @@ import sys
     fork_git,
     dense_compile_rows_text,
     dense_layer1_only_text,
+    dense_final_layout_text,
     accepted_m32_hlo_sha,
     accepted_m32_summary_sha,
     accepted_m32_success_sha,
@@ -260,12 +280,40 @@ import sys
 dense = dense_text == "1"
 compile_rows = int(dense_compile_rows_text)
 layer1_only = dense_layer1_only_text == "1"
+final_layout = dense_final_layout_text == "1"
+expected_final_layout_records = {
+    "dense.slot_00.merged_gate_up.weight_bits_in_out": {
+        "shape": [4, 8, 6144, 768],
+        "dtype": "uint8",
+        "sha256": "82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf",
+    },
+    "dense.slot_00.merged_gate_up.scale_inv_in_out": {
+        "shape": [4, 8, 48, 6],
+        "dtype": "float32",
+        "sha256": "7dc31abfa4677a517c643f0efe63dfc8cf5405ee3b2f6b7abc863772562c0151",
+    },
+    "dense.slot_00.down.weight_bits_in_out": {
+        "shape": [4, 8, 384, 6144],
+        "dtype": "uint8",
+        "sha256": "8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e",
+    },
+    "dense.slot_00.down.scale_inv_in_out": {
+        "shape": [4, 8, 3, 48],
+        "dtype": "float32",
+        "sha256": "c00fd888dcd3f7c7063dfeb91027274bd78c483ad9832ac77c37f00d16ea6c8e",
+    },
+}
+final_layout_records_sha256 = (
+    "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+)
 runner_path = __import__("pathlib").Path(run_dir) / "runner.json"
 if not runner_path.is_file():
     raise SystemExit("refusing rollback without the producing runner")
 runner = json.loads(runner_path.read_text())
 dense_arm = (
-    "accepted_m32_dense_cross_layer"
+    "accepted_m32_dense_final_layout_cross_layer"
+    if final_layout
+    else "accepted_m32_dense_cross_layer"
     if layer1_only
     else (
         "accepted_m32_dense_convolution"
@@ -275,7 +323,9 @@ dense_arm = (
 )
 model = (
     (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
+        if final_layout
+        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
         if layer1_only
         else (
             "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
@@ -288,7 +338,9 @@ model = (
 )
 revision = (
     (
-        "native-jax-db542-dense-cross-layer-v1"
+        "native-jax-accepted-dense-final-layout-v1"
+        if final_layout
+        else "native-jax-db542-dense-cross-layer-v1"
         if layer1_only
         else (
             "native-jax-db532-dense-m32-discriminator-v1"
@@ -301,7 +353,9 @@ revision = (
 )
 benchmark = (
     (
-        "greenfield_layer0_dense_m32_cross_layer"
+        "greenfield_layer0_dense_final_layout_cross_layer"
+        if final_layout
+        else "greenfield_layer0_dense_m32_cross_layer"
         if layer1_only
         else (
             "greenfield_layer0_dense_m32_convolution"
@@ -314,7 +368,9 @@ benchmark = (
 )
 note = (
     (
-        "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
+        "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
+        if final_layout
+        else "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
         if layer1_only
         else (
             "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
@@ -327,7 +383,9 @@ note = (
 )
 engine = (
     (
-        "greenfield_dense_m32_cross_layer_probe"
+        "greenfield_dense_final_layout_cross_layer_probe"
+        if final_layout
+        else "greenfield_dense_m32_cross_layer_probe"
         if layer1_only
         else (
             "greenfield_dense_m32_convolution_probe"
@@ -348,8 +406,18 @@ expected_environment = {
             "checkpoint_manifest_sha256": checkpoint_manifest_sha,
             "db538_tensor_sha256": db538_tensor_sha,
             "compile_rows": compile_rows,
+            "final_dense_layout": final_layout,
             "result_mode": (
                 "layer1_only" if layer1_only else "dense_and_layer1"
+            ),
+            **(
+                {
+                    "final_layout_records_sha256": (
+                        final_layout_records_sha256
+                    )
+                }
+                if final_layout
+                else {}
             ),
             **(
                 {
@@ -384,6 +452,9 @@ if (
             or runner.get("source", {}).get("db538_tensor_sha256")
             != db538_tensor_sha
             or runner.get("compile_rows") != compile_rows
+            or runner.get("final_dense_layout") is not final_layout
+            or runner.get("final_layout_records")
+            != (expected_final_layout_records if final_layout else {})
             or runner.get("live_rows") != 1
             or runner.get("diagnostic_dead_rows") != compile_rows - 1
             or runner.get("result_mode")
@@ -458,7 +529,9 @@ summaries = connection.execute(
 ).fetchall()
 expected_prompt = (
     (
-        "Sealed exact StrategyND attention boundary with layer-1-only accepted-M32 dense fusion."
+        "Sealed exact StrategyND attention boundary with accepted final-layout dense fusion."
+        if final_layout
+        else "Sealed exact StrategyND attention boundary with layer-1-only accepted-M32 dense fusion."
         if layer1_only
         else (
             "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
@@ -678,6 +751,7 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
         --expected-code-hash "$PIN" \
         --compile-rows "$DENSE_COMPILE_ROWS" \
         "${layer1_probe_args[@]}" \
+        "${final_layout_probe_args[@]}" \
         --db538-runner "$DB538_RUNNER" \
         --db538-runner-sha256 "$DB538_RUNNER_SHA" \
         --db538-tensor "$DB538_TENSOR" \
@@ -742,11 +816,13 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$DENSE_CONVOLUTION" "$DB538_RUNNER_SHA" "$DB538_TENSOR_SHA" \
   "$DB538_SUMMARY_SHA" "$DB538_SUCCESS_SHA" \
   "$POST_ATTENTION_RESIDUAL_SHA" "$CHECKPOINT_MANIFEST_SHA" \
-  "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$ACCEPTED_M32_HLO_SHA" \
+  "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$DENSE_FINAL_LAYOUT" \
+  "$ACCEPTED_M32_HLO_SHA" \
   "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
   "$ACCEPTED_M32_RAW_HLO_SHA" <<'PY'
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import math
 from pathlib import Path
@@ -769,6 +845,7 @@ import sys
     checkpoint_manifest_sha,
     dense_compile_rows_text,
     dense_layer1_only_text,
+    dense_final_layout_text,
     accepted_m32_hlo_sha,
     accepted_m32_summary_sha,
     accepted_m32_success_sha,
@@ -777,12 +854,15 @@ import sys
 dense = dense_text == "1"
 compile_rows = int(dense_compile_rows_text)
 layer1_only = dense_layer1_only_text == "1"
+final_layout = dense_final_layout_text == "1"
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if dense:
     exact = runner.get("exact")
     arm = (
-        "accepted_m32_dense_cross_layer"
+        "accepted_m32_dense_final_layout_cross_layer"
+        if final_layout
+        else "accepted_m32_dense_cross_layer"
         if layer1_only
         else (
             "accepted_m32_dense_convolution"
@@ -796,6 +876,7 @@ if dense:
     optimized = runner.get("hlo", {}).get("optimized_contract", {})
     source = runner.get("source", {})
     weight_records = runner.get("weight_records")
+    final_layout_records = runner.get("final_layout_records")
     sha_pattern = __import__("re").compile(r"[0-9a-f]{64}")
     mismatch_count = comparison.get("mismatch_count")
     first_mismatch_index = comparison.get("first_mismatch_index")
@@ -859,6 +940,7 @@ if dense:
         stable.get("passed") is True
         and stable.get("violations") == []
         and stable.get("compile_rows") == compile_rows
+        and stable.get("final_dense_layout") is final_layout
         and stable.get("live_rows") == 1
         and stable.get("result_mode")
         == ("layer1_only" if layer1_only else "dense_and_layer1")
@@ -913,6 +995,7 @@ if dense:
         optimized.get("passed") is True
         and optimized.get("violations") == []
         and optimized.get("compile_rows") == compile_rows
+        and optimized.get("final_dense_layout") is final_layout
         and optimized.get("live_rows") == 1
         and optimized.get("result_mode")
         == ("layer1_only" if layer1_only else "dense_and_layer1")
@@ -988,7 +1071,8 @@ if dense:
         and (
             (
                 len(optimized_lineage.get("result_parameter_sources", [])) == 1
-                and len(optimized_lineage["result_parameter_sources"][0]) == 9
+                and len(optimized_lineage["result_parameter_sources"][0])
+                == (7 if final_layout else 9)
             )
             if layer1_only
             else {
@@ -1003,6 +1087,59 @@ if dense:
         and (
             compile_rows == 1
             or len(optimized_lineage.get("m32_live_row_slices", [])) == 1
+        )
+        and (
+            not final_layout
+            or (
+                optimized.get("exact_accepted_weight_layout") is True
+                and optimized.get("exact_packed_weight_lineage") is True
+                and set(optimized.get("accepted_weight_layouts", {}))
+                == {"gate_up", "down"}
+                and all(
+                    len(records) == 8
+                    and {
+                        record.get("virtual_rank") for record in records
+                    } == set(range(8))
+                    and all(
+                        record.get("accepted") is True
+                        and record.get("accepted_layout") is True
+                        and record.get("exact_packed_dequant") is True
+                        and len(record.get("parameter_sources", [])) == 2
+                        for record in records
+                    )
+                    for records in optimized["accepted_weight_layouts"].values()
+                )
+            )
+        )
+    )
+    expected_final_layout = {
+        "dense.slot_00.merged_gate_up.weight_bits_in_out": {
+            "shape": [4, 8, 6144, 768],
+            "dtype": "uint8",
+            "sha256": "82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf",
+        },
+        "dense.slot_00.merged_gate_up.scale_inv_in_out": {
+            "shape": [4, 8, 48, 6],
+            "dtype": "float32",
+            "sha256": "7dc31abfa4677a517c643f0efe63dfc8cf5405ee3b2f6b7abc863772562c0151",
+        },
+        "dense.slot_00.down.weight_bits_in_out": {
+            "shape": [4, 8, 384, 6144],
+            "dtype": "uint8",
+            "sha256": "8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e",
+        },
+        "dense.slot_00.down.scale_inv_in_out": {
+            "shape": [4, 8, 3, 48],
+            "dtype": "float32",
+            "sha256": "c00fd888dcd3f7c7063dfeb91027274bd78c483ad9832ac77c37f00d16ea6c8e",
+        },
+    }
+    final_layout_records_valid = (
+        isinstance(final_layout_records, dict)
+        and (
+            final_layout_records == expected_final_layout
+            if final_layout
+            else final_layout_records == {}
         )
     )
     weights_valid = (
@@ -1055,6 +1192,7 @@ if dense:
         and runner.get("position") == 8155
         and runner.get("performance_claim") is False
         and runner.get("compile_rows") == compile_rows
+        and runner.get("final_dense_layout") is final_layout
         and runner.get("live_rows") == 1
         and runner.get("diagnostic_dead_rows") == compile_rows - 1
         and runner.get("result_mode")
@@ -1066,6 +1204,7 @@ if dense:
         and source_valid
         and stable_valid
         and optimized_valid
+        and final_layout_records_valid
         and weights_valid
         and sha_pattern.fullmatch(runner.get("hlo", {}).get("stablehlo_sha256", ""))
         is not None
@@ -1093,7 +1232,9 @@ if not runner_valid:
 
 model = (
     (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
+        if final_layout
+        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
         if layer1_only
         else (
             "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
@@ -1106,7 +1247,9 @@ model = (
 )
 revision = (
     (
-        "native-jax-db542-dense-cross-layer-v1"
+        "native-jax-accepted-dense-final-layout-v1"
+        if final_layout
+        else "native-jax-db542-dense-cross-layer-v1"
         if layer1_only
         else (
             "native-jax-db532-dense-m32-discriminator-v1"
@@ -1119,7 +1262,9 @@ revision = (
 )
 benchmark = (
     (
-        "greenfield_layer0_dense_m32_cross_layer"
+        "greenfield_layer0_dense_final_layout_cross_layer"
+        if final_layout
+        else "greenfield_layer0_dense_m32_cross_layer"
         if layer1_only
         else (
             "greenfield_layer0_dense_m32_convolution"
@@ -1132,7 +1277,9 @@ benchmark = (
 )
 engine = (
     (
-        "greenfield_dense_m32_cross_layer_probe"
+        "greenfield_dense_final_layout_cross_layer_probe"
+        if final_layout
+        else "greenfield_dense_m32_cross_layer_probe"
         if layer1_only
         else (
             "greenfield_dense_m32_convolution_probe"
@@ -1145,7 +1292,9 @@ engine = (
 )
 note = (
     (
-        "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
+        "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
+        if final_layout
+        else "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
         if layer1_only
         else (
             "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
@@ -1177,7 +1326,17 @@ run_id = pv.start_run(
                 ],
                 "db538_tensor_sha256": runner["source"]["db538_tensor_sha256"],
                 "compile_rows": compile_rows,
+                "final_dense_layout": final_layout,
                 "result_mode": runner["result_mode"],
+                **(
+                    {
+                        "final_layout_records_sha256": (
+                            "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+                        )
+                    }
+                    if final_layout
+                    else {}
+                ),
                 **(
                     {
                         "accepted_m32_hlo_raw_sha256": runner["source"][
@@ -1220,7 +1379,9 @@ pv.record_item(
     item_id="position8155",
     prompt=(
         (
-            "Sealed exact StrategyND attention boundary with layer-1-only accepted-M32 dense fusion."
+            "Sealed exact StrategyND attention boundary with accepted final-layout dense fusion."
+            if final_layout
+            else "Sealed exact StrategyND attention boundary with layer-1-only accepted-M32 dense fusion."
             if layer1_only
             else (
                 "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
@@ -1268,6 +1429,17 @@ summary = {
     "diagnostic_dead_rows": compile_rows - 1 if dense else 0,
     "elapsed_seconds": int(elapsed),
     "exact_arms": runner["exact_arms"],
+    "final_dense_layout": final_layout if dense else False,
+    "final_layout_records": (
+        runner.get("final_layout_records", {}) if dense else {}
+    ),
+    "final_layout_records_sha256": sha256(
+        json.dumps(
+            runner.get("final_layout_records", {}) if dense else {},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest(),
     "live_rows": 1,
     "result_mode": (
         runner.get("result_mode") if dense else "dense_and_layer1"
@@ -1368,6 +1540,19 @@ import sys
 
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
+records_sha = sha256(
+    json.dumps(
+        summary["final_layout_records"],
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+).hexdigest()
+if records_sha != summary["final_layout_records_sha256"]:
+    raise SystemExit("final-layout record manifest hash drifted before SUCCESS")
+if summary["final_dense_layout"] and records_sha != (
+    "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+):
+    raise SystemExit("pinned final-layout record manifest drifted before SUCCESS")
 values = {
     "artifact_kind": summary["artifact_kind"],
     "code_hash": sys.argv[3],
@@ -1378,6 +1563,8 @@ values = {
     "results_db_run_id": summary["results_db_run_id"],
     "classification": summary["classification"],
     "exact_arms": ",".join(summary["exact_arms"]) or "none",
+    "final_dense_layout": str(summary["final_dense_layout"]).lower(),
+    "final_layout_records_sha256": records_sha,
     "performance_claim": "false",
     "evidence_sha256": sha256((root / "evidence.sha256").read_bytes()).hexdigest(),
     "remote_objects_sha256": sha256(

@@ -497,6 +497,91 @@ def _virtual_dense_convolution_down_partials(
     return jnp.stack(tuple(partials), axis=0)
 
 
+def _virtual_dense_final_layout_convolution_down_partials(
+    normalized: Any,
+    merged_bits_in_out: Any,
+    merged_scale_in_out: Any,
+    down_bits_in_out: Any,
+    down_scale_in_out: Any,
+    *,
+    block_shape: tuple[int, int],
+    compile_rows: int = 32,
+) -> Any:
+    """Replay dense arithmetic from accepted ``[in, out]`` weight layout.
+
+    This diagnostic-only primitive consumes eight already-packed virtual TP32
+    shards.  Unlike :func:`_virtual_dense_convolution_down_partials`, it does
+    not transpose or concatenate checkpoint tensors in the compiled program.
+    That distinction lets the TPU layout assignment reproduce the accepted
+    row-major ``[in, out]`` convolution operands without changing any values.
+    """
+
+    if compile_rows != 32:
+        raise ValueError("final-layout dense discriminator requires M32")
+    expected = {
+        "normalized": (32, 6144),
+        "merged_bits_in_out": (8, 6144, 768),
+        "merged_scale_in_out": (8, 48, 6),
+        "down_bits_in_out": (8, 384, 6144),
+        "down_scale_in_out": (8, 3, 48),
+    }
+    values = {
+        "normalized": normalized,
+        "merged_bits_in_out": merged_bits_in_out,
+        "merged_scale_in_out": merged_scale_in_out,
+        "down_bits_in_out": down_bits_in_out,
+        "down_scale_in_out": down_scale_in_out,
+    }
+    for name, shape in expected.items():
+        if values[name].shape != shape:
+            raise ValueError(
+                f"final-layout dense {name} shape drifted: "
+                f"expected={shape} found={values[name].shape}"
+            )
+    if block_shape != (128, 128):
+        raise ValueError("final-layout dense requires 128x128 blocks")
+    if normalized.dtype != jnp.bfloat16:
+        raise ValueError("final-layout dense input must be BF16")
+    if any(
+        value.dtype != jnp.uint8
+        for value in (merged_bits_in_out, down_bits_in_out)
+    ) or any(
+        value.dtype != jnp.float32
+        for value in (merged_scale_in_out, down_scale_in_out)
+    ):
+        raise ValueError("final-layout dense weight dtypes drifted")
+
+    partials = []
+    for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
+        with jax.named_scope(
+            f"greenfield_dense_convolution_virtual_rank_{shard:02d}"
+        ):
+            gate_up = _dense_bf16_convolution(
+                normalized,
+                _decode_dense_fp8_in_out(
+                    merged_bits_in_out[shard],
+                    merged_scale_in_out[shard],
+                    block_shape=block_shape,
+                ),
+            )
+            gate = gate_up[:, :384]
+            up = gate_up[:, 384:]
+            activated = (gate * jax.nn.sigmoid(gate) * up).astype(
+                jnp.bfloat16
+            )
+            partials.append(
+                _dense_bf16_convolution(
+                    activated,
+                    _decode_dense_fp8_in_out(
+                        down_bits_in_out[shard],
+                        down_scale_in_out[shard],
+                        block_shape=block_shape,
+                    ),
+                )
+            )
+    return jnp.stack(tuple(partials), axis=0)
+
+
 def _sum_virtual_dcp_bf16_partials(
     partials: Any,
     *,
