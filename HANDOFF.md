@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Clean pushed pin `2c3b84eebc287682625ab54ac3cc3dfd143e8230` closes the outer-prefill-loop
+  liveness proof and was used for one protected 8K retry, tag ending
+  `densefinalconv_oracle_dsa_trace2_20260813T175401077722428Z`. All decoder, DSA-observer and
+  teacher-forced-prefill StableHLO/optimized-HLO contracts pass; the complete real checkpoint
+  executed all 8,155 prefill tokens. Token `101252`, candidate order/ties, inactive-row sentinels
+  and event 0/layer 0 DSA are exact. The run then fails closed at event 1/layer 1: first order
+  mismatch expected `8136`, observed `8150`, with six expected-only positions
+  `[680,1052,1143,1841,2436,7575]` and six observed-only positions
+  `[1026,6642,6690,6738,6810,7463]`. Common-position scores are bitwise equal, but selected-set
+  coverage is incomplete. Observation/token SHAs are `ee032a54...ff74` / `39145080...b78a`.
+  There is no timing, XPlane, HBM, DB row, summary, terminal archive or `SUCCESS`; rollback is
+  `NO_PROVISIONAL_DB_RUN` and failure cleanup is authenticated 8/8.
+- This is not another infrastructure/proof failure. DB539 already seals exact layer-0 attention;
+  DB548's integrated final-layout dense formulation is still one BF16 ULP wrong at layer-1 index
+  2795, and the full prefill proves that error changes the layer-1 historical DSA set. Stop full
+  8K retries and stop extending HLO validators until a bounded layer-0 probe is `0/6,144`.
+  Exact next: capture all 32 live BF16 down partials from the current accepted-geometry convolution,
+  reproduce the current result from those bytes, derive the legacy dense association/fusion against
+  the immutable layer-1 oracle, and integrate only a bit-exact result. One bulk correction audit and
+  one protected 8K retry follow; DB484 remains the only decoder performance result.
+
 - Reviewed/pushed commit `5352cf30401daacabed2c1df7cba12e54198977d` closes the four
   complete-decoder proof mismatches from the 16:12 run. Sol approved staged SHA `f93060ff...a7a7`;
   the complete affected suite passed 144/144. Its protected retry, tag ending

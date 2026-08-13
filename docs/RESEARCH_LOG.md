@@ -5,6 +5,30 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 19:05 UTC — full prefill exposes layer-0 dense arithmetic as the Gate-D blocker
+
+- Reviewed/pushed pin `2c3b84eebc287682625ab54ac3cc3dfd143e8230` was used for one protected
+  8K retry under tag ending
+  `densefinalconv_oracle_dsa_trace2_20260813T175401077722428Z`. Decoder, DSA-observer and
+  teacher-forced-prefill HLO contracts all pass; the real 78-layer checkpoint completed all 8,155
+  teacher-forced tokens. This is the first final-layout production attempt to reach numerical DSA
+  observation rather than refusing in a proof layer.
+- Token `101252` is exact. Candidate ordering/ties, inactive sentinels and event 0/layer 0 DSA pass.
+  Event 1/layer 1 first differs at selected offset 11, expected position `8136` versus observed
+  `8150`; six expected-only positions are `[680,1052,1143,1841,2436,7575]` and six observed-only
+  positions are `[1026,6642,6690,6738,6810,7463]`. Common-position scores have zero numerical
+  error, but membership coverage is incomplete and later events cascade. Observation/token SHAs
+  are `ee032a54...ff74` / `39145080...b78a`.
+- The run stopped before warmup/timing, trace, HBM and publication. There is no DB row, summary,
+  terminal archive or `SUCCESS`; rollback is `NO_PROVISIONAL_DB_RUN`, and pre/failure censuses are
+  authenticated 8/8. No performance conclusion exists.
+- DB539 already proves the layer-0 attention update bitwise exact. DB548's selected dense result is
+  still one BF16 ULP wrong at layer-1 index 2795, and this run proves that bounded one-row error is
+  not acceptable for the complete 8K DSA contract. Repeated full retries and proof-only polishing
+  are now frozen. The next bounded discriminator captures the current convolution's 32 BF16 down
+  partials, reproduces its reduction offline, and searches only the exact legacy dense reduction/
+  fusion boundary. Another complete 8K run is forbidden until the short probe is `0/6,144`.
+
 ## 2026-08-13 17:45 UTC — decoder proof passes; outer prefill-loop liveness isolated
 
 - Commit `5352cf30401daacabed2c1df7cba12e54198977d` was approved on staged SHA

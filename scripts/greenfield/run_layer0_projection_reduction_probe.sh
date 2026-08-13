@@ -99,6 +99,7 @@ DENSE_LAYER1_ONLY=${GLM_GREENFIELD_DENSE_LAYER1_ONLY:-0}
 DENSE_FINAL_LAYOUT=${GLM_GREENFIELD_DENSE_FINAL_LAYOUT:-0}
 DENSE_ENVELOPE=${GLM_GREENFIELD_DENSE_ENVELOPE:-0}
 DENSE_SPLIT_LAYER1_RMS=${GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS:-0}
+DENSE_CAPTURE_PARTIALS=${GLM_GREENFIELD_DENSE_CAPTURE_PARTIALS:-0}
 [[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
   exit 2
@@ -121,6 +122,10 @@ DENSE_SPLIT_LAYER1_RMS=${GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS:-0}
 }
 [[ $DENSE_SPLIT_LAYER1_RMS == 0 || $DENSE_SPLIT_LAYER1_RMS == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS must be 0 or 1" >&2
+  exit 2
+}
+[[ $DENSE_CAPTURE_PARTIALS == 0 || $DENSE_CAPTURE_PARTIALS == 1 ]] || {
+  echo "GLM_GREENFIELD_DENSE_CAPTURE_PARTIALS must be 0 or 1" >&2
   exit 2
 }
 if [[ $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS != 1 ]]; then
@@ -146,8 +151,18 @@ if [[ $DENSE_SPLIT_LAYER1_RMS == 1 && $DENSE_ENVELOPE != 1 ]]; then
   echo "split layer-1 RMS requires the dense-envelope discriminator" >&2
   exit 2
 fi
+if [[ $DENSE_CAPTURE_PARTIALS == 1 && \
+      ! ( $DENSE_CONVOLUTION == 1 && $DENSE_COMPILE_ROWS == 32 && \
+          $DENSE_LAYER1_ONLY == 1 && $DENSE_FINAL_LAYOUT == 1 && \
+          $DENSE_ENVELOPE == 1 && $DENSE_SPLIT_LAYER1_RMS == 0 ) ]]; then
+  echo "dense partial capture requires the unsplit M32 final-layout envelope" >&2
+  exit 2
+fi
 if [[ $DENSE_CONVOLUTION == 1 ]]; then
-  if [[ $DENSE_SPLIT_LAYER1_RMS == 1 ]]; then
+  if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
+    TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_partial_capture_$(date -u +%Y%m%dT%H%M%S%NZ)}
+    TENSOR_BASENAME=dense_partial_capture.npz
+  elif [[ $DENSE_SPLIT_LAYER1_RMS == 1 ]]; then
     TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_envelope_split_rms_$(date -u +%Y%m%dT%H%M%S%NZ)}
     TENSOR_BASENAME=dense_envelope_split_rms.npz
   elif [[ $DENSE_ENVELOPE == 1 ]]; then
@@ -198,6 +213,10 @@ fi
 split_layer1_rms_probe_args=()
 if [[ $DENSE_SPLIT_LAYER1_RMS == 1 ]]; then
   split_layer1_rms_probe_args=(--split-layer1-rms)
+fi
+capture_partials_probe_args=()
+if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
+  capture_partials_probe_args=(--capture-partials)
 fi
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
@@ -284,7 +303,7 @@ rollback_provisional_db() {
     "$DENSE_CONVOLUTION" "$RUN_DIR" "$DB538_TENSOR_SHA" \
     "$CHECKPOINT_MANIFEST_SHA" "$HARNESS_GIT" "$FORK_GIT" \
     "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$DENSE_FINAL_LAYOUT" \
-    "$DENSE_ENVELOPE" "$DENSE_SPLIT_LAYER1_RMS" \
+    "$DENSE_ENVELOPE" "$DENSE_SPLIT_LAYER1_RMS" "$DENSE_CAPTURE_PARTIALS" \
     "$ACCEPTED_M32_HLO_SHA" \
     "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
     "$ACCEPTED_M32_RAW_HLO_SHA" \
@@ -310,6 +329,7 @@ import sys
     dense_final_layout_text,
     dense_envelope_text,
     split_layer1_rms_text,
+    capture_partials_text,
     accepted_m32_hlo_sha,
     accepted_m32_summary_sha,
     accepted_m32_success_sha,
@@ -321,6 +341,10 @@ layer1_only = dense_layer1_only_text == "1"
 final_layout = dense_final_layout_text == "1"
 dense_envelope = dense_envelope_text == "1"
 split_layer1_rms = split_layer1_rms_text == "1"
+capture_partials = capture_partials_text == "1"
+if capture_partials:
+    print("NO_PROVISIONAL_DB_RUN")
+    raise SystemExit(0)
 expected_final_layout_records = {
     "dense.slot_00.merged_gate_up.weight_bits_in_out": {
         "shape": [4, 8, 6144, 768],
@@ -922,6 +946,7 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
         "${final_layout_probe_args[@]}" \
         "${dense_envelope_probe_args[@]}" \
         "${split_layer1_rms_probe_args[@]}" \
+        "${capture_partials_probe_args[@]}" \
         --db538-runner "$DB538_RUNNER" \
         --db538-runner-sha256 "$DB538_RUNNER_SHA" \
         --db538-tensor "$DB538_TENSOR" \
@@ -981,6 +1006,227 @@ strict_census post || {
 }
 post_census_done=1
 
+if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
+  /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$elapsed" "$TAG" \
+    "$DB538_RUNNER_SHA" "$DB538_TENSOR_SHA" "$DB538_SUMMARY_SHA" \
+    "$DB538_SUCCESS_SHA" "$CHECKPOINT_MANIFEST_SHA" \
+    "$ACCEPTED_M32_HLO_SHA" "$ACCEPTED_M32_SUMMARY_SHA" \
+    "$ACCEPTED_M32_SUCCESS_SHA" "$ACCEPTED_M32_RAW_HLO_SHA" <<'PY'
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+from pathlib import Path
+import sys
+
+import numpy as np
+
+(
+    run_dir_text,
+    pin,
+    elapsed_text,
+    run_tag,
+    db538_runner_sha,
+    db538_tensor_sha,
+    db538_summary_sha,
+    db538_success_sha,
+    checkpoint_manifest_sha,
+    accepted_m32_hlo_sha,
+    accepted_m32_summary_sha,
+    accepted_m32_success_sha,
+    accepted_m32_raw_hlo_sha,
+) = sys.argv[1:]
+run_dir = Path(run_dir_text)
+runner_path = run_dir / "runner.json"
+tensor_path = run_dir / "dense_partial_capture.npz"
+runner = json.loads(runner_path.read_text())
+
+def file_sha(path: Path) -> str:
+    return sha256(path.read_bytes()).hexdigest()
+
+def array_sha(value: np.ndarray) -> str:
+    return sha256(np.ascontiguousarray(value).tobytes(order="C")).hexdigest()
+
+expected_sources = {
+    "accepted_m32_hlo_raw_sha256": accepted_m32_raw_hlo_sha,
+    "accepted_m32_hlo_sha256": accepted_m32_hlo_sha,
+    "accepted_m32_summary_sha256": accepted_m32_summary_sha,
+    "accepted_m32_success_sha256": accepted_m32_success_sha,
+    "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+    "db538_runner_sha256": db538_runner_sha,
+    "db538_tensor_sha256": db538_tensor_sha,
+    "db538_summary_sha256": db538_summary_sha,
+    "db538_success_sha256": db538_success_sha,
+    "attention_update_sha256": "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7",
+    "combined_residual_sha256": "02d045b9a0ec5ab22a711bd6a964564f707be0848683381104e83331020e31a3",
+    "normalized_mlp_sha256": "082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f",
+    "post_attention_residual_sha256": "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e",
+}
+stable = runner.get("hlo", {}).get("stablehlo_contract", {})
+optimized = runner.get("hlo", {}).get("optimized_contract", {})
+records = runner.get("capture_records")
+if not (
+    runner.get("artifact_kind") == "glm52_layer0_dense_partial_capture"
+    and runner.get("classification") == "accepted_m32_dense_partials_captured"
+    and runner.get("code_hash") == pin
+    and runner.get("compile_rows") == 32
+    and runner.get("diagnostic_dead_rows") == 31
+    and runner.get("capture_partials") is True
+    and runner.get("dense_envelope") is True
+    and runner.get("final_dense_layout") is True
+    and runner.get("split_layer1_rms") is False
+    and runner.get("exact") is False
+    and runner.get("exact_arms") == []
+    and runner.get("layer1_comparison") is None
+    and runner.get("live_rows") == 1
+    and runner.get("result_mode") == "partials_only"
+    and runner.get("performance_claim") is False
+    and runner.get("position") == 8155
+    and runner.get("status") == "SUCCESS"
+    and runner.get("source") == expected_sources
+    and stable.get("passed") is True
+    and stable.get("partials_only") is True
+    and stable.get("result_mode") == "partials_only"
+    and stable.get("matched_virtual_shards") == list(range(8))
+    and stable.get("convolution_count") == 16
+    and stable.get("collective_counts") == {
+        "all_gather": 1,
+        "all_reduce": 0,
+        "all_to_all": 0,
+        "collective_broadcast": 0,
+        "collective_permute": 0,
+        "reduce_scatter": 0,
+    }
+    and optimized.get("passed") is True
+    and optimized.get("accepted_gate_up_ranks") == list(range(8))
+    and optimized.get("accepted_down_ranks") == list(range(8))
+    and optimized.get("async_collectives") == []
+    and optimized.get("exact_capture_lineage") is True
+    and optimized.get("exact_live_schedule_bijection") is True
+    and optimized.get("exact_result_binding") is True
+    and optimized.get("capture_gather_count") == 1
+    and optimized.get("collective_count") == 1
+    and optimized.get("performance_claim") is False
+):
+    raise SystemExit("dense partial-capture runner contract drifted")
+
+expected_record_shapes = {
+    "dense_virtual_partials_bfloat16_bits": (
+        [4, 8, 1, 6144],
+        ["pp8_owner", "virtual_rank", "row", "hidden"],
+    ),
+    "post_attention_m32_bfloat16_bits": (
+        [32, 6144],
+        ["row", "hidden"],
+    ),
+}
+if not isinstance(records, dict) or set(records) != set(expected_record_shapes):
+    raise SystemExit("dense partial-capture record set drifted")
+for name, (shape, order) in expected_record_shapes.items():
+    record = records[name]
+    if (
+        record.get("shape") != shape
+        or record.get("axis_order") != order
+        or record.get("dtype") != "uint16"
+        or not isinstance(record.get("sha256"), str)
+        or len(record["sha256"]) != 64
+    ):
+        raise SystemExit(f"dense partial-capture record drifted: {name}")
+
+expected_keys = {
+    "accepted_layer1_normalized_bfloat16_bits",
+    "attention_update_bfloat16_bits",
+    "combined_residual_bfloat16_bits",
+    "compile_rows",
+    "dense_virtual_partials_bfloat16_bits",
+    "layer1_input_norm_bfloat16_bits",
+    "normalized_mlp_bfloat16_bits",
+    "post_attention_m32_bfloat16_bits",
+    "post_attention_residual_bfloat16_bits",
+}
+with np.load(tensor_path, allow_pickle=False) as payload:
+    if set(payload.files) != expected_keys:
+        raise SystemExit("dense partial-capture NPZ key set drifted")
+    if payload["compile_rows"].shape != () or int(payload["compile_rows"]) != 32:
+        raise SystemExit("dense partial-capture compile rows drifted")
+    for name, (shape, _order) in expected_record_shapes.items():
+        value = np.ascontiguousarray(payload[name])
+        if (
+            list(value.shape) != shape
+            or value.dtype != np.uint16
+            or array_sha(value) != records[name]["sha256"]
+        ):
+            raise SystemExit(f"dense partial-capture tensor drifted: {name}")
+    for name, (shape, expected_sha) in {
+        "accepted_layer1_normalized_bfloat16_bits": (
+            (6144,),
+            "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039",
+        ),
+        "attention_update_bfloat16_bits": (
+            (1, 6144),
+            "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7",
+        ),
+        "combined_residual_bfloat16_bits": (
+            (1, 6144),
+            "02d045b9a0ec5ab22a711bd6a964564f707be0848683381104e83331020e31a3",
+        ),
+        "layer1_input_norm_bfloat16_bits": (
+            (6144,),
+            "10e34f4f99c638b29557526283205071c1ac8f81f168f4a6817e7e1def4b6c87",
+        ),
+        "normalized_mlp_bfloat16_bits": (
+            (1, 6144),
+            "082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f",
+        ),
+        "post_attention_residual_bfloat16_bits": (
+            (1, 6144),
+            "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e",
+        ),
+    }.items():
+        value = payload[name]
+        if (
+            value.shape != shape
+            or value.dtype != np.uint16
+            or array_sha(value) != expected_sha
+        ):
+            raise SystemExit(f"dense partial-capture source tensor drifted: {name}")
+
+optimized_path = run_dir / "hlo/dense_convolution.optimized_hlo.txt"
+stable_path = run_dir / "hlo/dense_convolution.stablehlo.mlir"
+if (
+    file_sha(optimized_path) != runner["hlo"]["optimized_sha256"]
+    or file_sha(stable_path) != runner["hlo"]["stablehlo_sha256"]
+):
+    raise SystemExit("dense partial-capture HLO file identity drifted")
+summary = {
+    "artifact_kind": runner["artifact_kind"],
+    "capture_records": records,
+    "classification": runner["classification"],
+    "code_hash": pin,
+    "compile_rows": 32,
+    "diagnostic_dead_rows": 31,
+    "elapsed_seconds": int(elapsed_text),
+    "exact_arms": [],
+    "hlo": {
+        "optimized_sha256": runner["hlo"]["optimized_sha256"],
+        "stablehlo_sha256": runner["hlo"]["stablehlo_sha256"],
+    },
+    "live_rows": 1,
+    "performance_claim": False,
+    "result_mode": "partials_only",
+    "results_db_run_id": None,
+    "run_tag": run_tag,
+    "runner_sha256": file_sha(runner_path),
+    "source": expected_sources,
+    "status": "SUCCESS",
+    "tensor_sha256": file_sha(tensor_path),
+}
+(run_dir / "summary.json").write_text(
+    json.dumps(summary, indent=2, sort_keys=True) + "\n"
+)
+print("DENSE_PARTIAL_CAPTURE_VALID")
+PY
+else
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$TAG" \
   "$DENSE_CONVOLUTION" "$DB538_RUNNER_SHA" "$DB538_TENSOR_SHA" \
@@ -1807,6 +2053,7 @@ if sqlite3.connect(run_dir / "results_ckpt.db").execute(
     raise SystemExit("projection/reduction DB snapshot failed integrity check")
 print(f"PROJECTION_REDUCTION_VALID db_run={run_id}")
 PY
+fi
 
 say "freezing and archiving projection/reduction evidence"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
@@ -1814,7 +2061,10 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   cd "$RUN_DIR"
   find hlo -type f -print0 | sort -z | xargs -0 sha256sum
   sha256sum "$TENSOR_BASENAME" runner.json runner.log summary.json \
-    results_ckpt.db census_pre.txt census_post.txt orchestrator.sealed.log
+    census_pre.txt census_post.txt orchestrator.sealed.log
+  if [[ -f results_ckpt.db ]]; then
+    sha256sum results_ckpt.db
+  fi
 ) >"$RUN_DIR/evidence.sha256"
 gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
   "$REMOTE_PREFIX/" >/dev/null
@@ -1884,6 +2134,65 @@ import sys
 
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
+if summary.get("artifact_kind") == "glm52_layer0_dense_partial_capture":
+    records = summary.get("capture_records")
+    records_sha = sha256(
+        json.dumps(records, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if not (
+        summary.get("classification")
+        == "accepted_m32_dense_partials_captured"
+        and summary.get("code_hash") == sys.argv[3]
+        and summary.get("compile_rows") == 32
+        and summary.get("diagnostic_dead_rows") == 31
+        and summary.get("exact_arms") == []
+        and summary.get("live_rows") == 1
+        and summary.get("performance_claim") is False
+        and summary.get("result_mode") == "partials_only"
+        and summary.get("results_db_run_id") is None
+        and summary.get("status") == "SUCCESS"
+        and isinstance(summary.get("runner_sha256"), str)
+        and summary["runner_sha256"]
+        == sha256((root / "runner.json").read_bytes()).hexdigest()
+        and isinstance(summary.get("tensor_sha256"), str)
+        and summary["tensor_sha256"]
+        == sha256((root / "dense_partial_capture.npz").read_bytes()).hexdigest()
+        and isinstance(records, dict)
+        and set(records)
+        == {
+            "dense_virtual_partials_bfloat16_bits",
+            "post_attention_m32_bfloat16_bits",
+        }
+    ):
+        raise SystemExit("dense partial-capture summary drifted before SUCCESS")
+    values = {
+        "artifact_kind": summary["artifact_kind"],
+        "capture_records_sha256": records_sha,
+        "classification": summary["classification"],
+        "code_hash": sys.argv[3],
+        "compile_rows": summary["compile_rows"],
+        "diagnostic_dead_rows": summary["diagnostic_dead_rows"],
+        "evidence_sha256": sha256(
+            (root / "evidence.sha256").read_bytes()
+        ).hexdigest(),
+        "exact_arms": "none",
+        "live_rows": summary["live_rows"],
+        "performance_claim": "false",
+        "remote_objects_sha256": sha256(
+            (root / "remote_objects.json").read_bytes()
+        ).hexdigest(),
+        "remote_prefix": sys.argv[2],
+        "result_mode": summary["result_mode"],
+        "results_db_run_id": "none",
+        "runner_sha256": summary["runner_sha256"],
+        "tensor_sha256": summary["tensor_sha256"],
+    }
+    for key, value in sorted(summary.get("source", {}).items()):
+        values[f"source_{key}"] = value
+    (root / "SUCCESS").write_text(
+        "".join(f"{key}={value}\n" for key, value in sorted(values.items()))
+    )
+    raise SystemExit(0)
 records_sha = sha256(
     json.dumps(
         summary["final_layout_records"],

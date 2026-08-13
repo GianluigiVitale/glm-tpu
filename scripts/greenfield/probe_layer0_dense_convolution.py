@@ -420,6 +420,7 @@ def _validate_stablehlo(
     final_dense_layout: bool = False,
     dense_envelope: bool = False,
     split_layer1_rms: bool = False,
+    partials_only: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.stablehlo_dense_convolution import (
         validate_dense_convolution_stablehlo,
@@ -432,7 +433,312 @@ def _validate_stablehlo(
         final_dense_layout=final_dense_layout,
         dense_envelope=dense_envelope,
         split_layer1_rms=split_layer1_rms,
+        partials_only=partials_only,
     )
+
+
+def _validate_partial_capture_optimized_hlo(
+    optimized_hlo: str,
+) -> dict[str, Any]:
+    """Validate scheduled contractions and the sole live LP4 capture gather.
+
+    Exact pre-fusion arithmetic and packed-weight lineage are proved by the
+    StableHLO contract.  This post-scheduling companion deliberately checks
+    only the facts that compilation can change: all sixteen accepted TPU
+    convolution schedules and one live four-owner gather of their BF16 rows.
+    """
+
+    from glm_tpu.greenfield.sharding.hlo_contract import (
+        COLLECTIVE_OPCODES,
+        parse_hlo_module,
+    )
+
+    module = parse_hlo_module(optimized_hlo)
+    violations: list[str] = []
+    scheduled: dict[str, dict[int, Any]] = {"gate_up": {}, "down": {}}
+
+    def accepted_schedule(item: Any, *, label: str) -> bool:
+        marker = "backend_config="
+        if marker not in item.raw_line:
+            return False
+        try:
+            config = json.loads(item.raw_line.split(marker, 1)[1])
+        except json.JSONDecodeError:
+            return False
+        window = config.get("window_config", {})
+        megacore = config.get("megacore_config", {})
+        algorithm = config.get("convolution_algorithm_config", {})
+        expected = (
+            {
+                "kernel_window_bounds": ["384", "6"],
+                "input_window_bounds": ["4", "24"],
+                "output_window_bounds": ["4", "6"],
+                "iteration_bounds": ["1", "1", "2"],
+                "megacore_split_dim": "2",
+                "megacore_allreduce_bytes": "98304",
+            }
+            if label == "gate_up"
+            else {
+                "kernel_window_bounds": ["48", "6"],
+                "input_window_bounds": ["4", "3"],
+                "output_window_bounds": ["4", "6"],
+                "iteration_bounds": ["8", "1", "1"],
+                "megacore_split_dim": "0",
+                "megacore_allreduce_bytes": None,
+            }
+        )
+        return bool(
+            algorithm.get("emitter") == "EmitAllBatchInSublanes"
+            and window.get("kernel_window_bounds")
+            == expected["kernel_window_bounds"]
+            and window.get("input_window_bounds")
+            == expected["input_window_bounds"]
+            and window.get("output_window_bounds")
+            == expected["output_window_bounds"]
+            and window.get("iteration_bounds") == expected["iteration_bounds"]
+            and window.get("cost_model_type") == "COST_MODEL_TYPE_CLASSIC"
+            and window.get("is_mask") is False
+            and window.get("pad_input_on_minor_dim") == "0"
+            and window.get("pad_output_on_minor_dim") == "0"
+            and megacore.get("megacore_split_dim")
+            == expected["megacore_split_dim"]
+            and megacore.get("megacore_allreduce_bytes")
+            == expected["megacore_allreduce_bytes"]
+        )
+
+    for item in module.instructions:
+        name = item.op_name or ""
+        rank_match = re.search(
+            r"greenfield_dense_convolution_virtual_rank_(\d{2})/"
+            r"conv_general_dilated(?:$|/)",
+            name,
+        )
+        if rank_match is None or "convolution_algorithm_config" not in item.raw_line:
+            continue
+        rank = int(rank_match.group(1))
+        labels = [
+            label
+            for label in ("gate_up", "down")
+            if accepted_schedule(item, label=label)
+        ]
+        if len(labels) != 1:
+            violations.append(
+                f"virtual rank {rank} scheduled convolution is not uniquely accepted"
+            )
+            continue
+        label = labels[0]
+        if rank in scheduled[label]:
+            violations.append(f"duplicate scheduled {label} rank {rank}")
+        else:
+            scheduled[label][rank] = item
+
+    for label in ("gate_up", "down"):
+        if sorted(scheduled[label]) != list(range(8)):
+            violations.append(
+                f"accepted {label} rank set drifted: {sorted(scheduled[label])}"
+            )
+
+    async_collectives = [
+        item.name
+        for item in module.instructions
+        if any(
+            item.raw_opcode == f"{opcode}-{suffix}"
+            for opcode in COLLECTIVE_OPCODES
+            for suffix in ("start", "done")
+        )
+    ]
+    collectives = [
+        item
+        for item in module.instructions
+        if item.raw_opcode in COLLECTIVE_OPCODES
+    ]
+    gathers = [
+        item
+        for item in collectives
+        if item.raw_opcode == "all-gather"
+        and "greenfield_dense_partial_capture_gather" in (item.op_name or "")
+    ]
+    if len(gathers) != 1:
+        violations.append(
+            f"dense partial capture gather count drifted: {len(gathers)}"
+        )
+    capture_lineage = False
+    result_binding = False
+    exact_live_schedule_bijection = False
+    if len(gathers) == 1:
+        gather = gathers[0]
+        unquoted = re.sub(r'"(?:\\.|[^"\\])*"', '""', gather.raw_line)
+        unquoted = re.sub(r"/\*.*?\*/", "", unquoted)
+        dimension_matches = re.findall(
+            r"\bdimensions=\{([^}]*)\}", re.sub(r"\s+", "", unquoted)
+        )
+        if not (
+            _shape_signatures(gather.operand_shapes) == ("bf16[8,1,6144]",)
+            and _shape_signatures(gather.result_shapes)
+            in {("bf16[32,1,6144]",), ("bf16[4,8,1,6144]",)}
+            and gather.replica_groups == ((0, 1, 2, 3),)
+            and dimension_matches == ["0"]
+            and gather.use_global_device_ids
+        ):
+            violations.append("dense partial capture gather geometry drifted")
+        by_key = {
+            _instruction_key(item): item for item in module.instructions
+        }
+        gather_input = (
+            by_key.get((gather.computation, gather.operand_names[0]))
+            if len(gather.operand_names) == 1
+            else None
+        )
+        # Reuse the exact M32 ordered-stack/live-row proof rather than a
+        # transitive dependency walk.  Only the terminal result geometry is
+        # intentionally different in capture mode.
+        strategy_hlo = optimized_hlo.replace(
+            "greenfield_dense_partial_capture_gather",
+            "greenfield_strategy_nd_row0_dense_convolution_down/"
+            "greenfield_strategy_nd_row0_association/"
+            "greenfield_strategy_nd_row0_association_gather",
+        )
+        stack_contract = _validate_optimized_hlo(
+            strategy_hlo,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+            split_layer1_rms=False,
+        )
+        stack_lineage = stack_contract.get("lineage", {})
+        accepted_weight_layouts = stack_contract.get(
+            "accepted_weight_layouts", {}
+        )
+        exact_live_schedule_bijection = bool(
+            stack_contract.get("scheduled_kernel_geometry_required") is True
+            and stack_contract.get("exact_accepted_kernel_geometry") is True
+            and stack_contract.get("exact_accepted_weight_layout") is True
+            and stack_contract.get("exact_packed_weight_lineage") is True
+            and set(accepted_weight_layouts) == {"gate_up", "down"}
+            and all(
+                len(records := accepted_weight_layouts[label]) == 8
+                and {record.get("virtual_rank") for record in records}
+                == set(range(8))
+                and len(
+                    {
+                        record.get("convolution")
+                        for record in records
+                    }
+                )
+                == 8
+                and all(
+                    record.get("exact_convolution_tiling") is True
+                    and record.get("exact_packed_dequant") is True
+                    and record.get("accepted") is True
+                    for record in records
+                )
+                for label in ("gate_up", "down")
+            )
+            and {
+                record.get("convolution")
+                for record in accepted_weight_layouts["down"]
+            }
+            == set(
+                stack_lineage.get("collective_convolution_sources", ())
+            )
+        )
+        if not exact_live_schedule_bijection:
+            violations.append(
+                "accepted schedules do not bijectively bind the live contractions"
+            )
+        capture_lineage = bool(
+            gather_input is not None
+            and exact_live_schedule_bijection
+            and set(scheduled["down"]) == set(range(8))
+            and stack_lineage.get("ordered_stack_sources")
+            == [[rank] for rank in range(8)]
+            and len(stack_lineage.get("m32_live_row_slices", ())) == 1
+            and len(
+                set(
+                    stack_lineage.get(
+                        "collective_convolution_sources", ()
+                    )
+                )
+            )
+            == 8
+            and stack_lineage.get("down_virtual_ranks") == list(range(8))
+        )
+        if not capture_lineage:
+            violations.append(
+                "dense partial gather bypasses the eight scheduled down results"
+            )
+
+        def exact_layout_result(value: Any | None, source: Any) -> bool:
+            seen: set[tuple[str, str]] = set()
+            while value is not None and _instruction_key(value) not in seen:
+                if value is source:
+                    return True
+                seen.add(_instruction_key(value))
+                if (
+                    value.raw_opcode not in {"bitcast", "copy", "reshape"}
+                    or len(value.operand_names) != 1
+                    or len(value.operand_shapes) != 1
+                    or len(value.result_shapes) != 1
+                    or value.operand_shapes[0].dtype
+                    != value.result_shapes[0].dtype
+                    or value.operand_shapes[0].element_count
+                    != value.result_shapes[0].element_count
+                ):
+                    return False
+                value = by_key.get(
+                    (value.computation, value.operand_names[0])
+                )
+            return value is source
+
+        roots = [
+            item
+            for item in module.instructions
+            if item.computation.startswith("ENTRY ")
+            and item.raw_line.lstrip().startswith("ROOT ")
+        ]
+        if len(roots) == 1 and len(roots[0].operand_names) == 2:
+            captured_result = by_key.get(
+                (roots[0].computation, roots[0].operand_names[0])
+            )
+            result_binding = bool(
+                captured_result is not None
+                and _shape_signatures(captured_result.result_shapes)
+                == ("bf16[4,8,1,6144]",)
+                and exact_layout_result(captured_result, gather)
+            )
+        if not result_binding:
+            violations.append(
+                "dense partial capture ENTRY result bypasses the exact gather"
+            )
+    unexpected_collectives = [
+        item.name
+        for item in collectives
+        if item not in gathers
+    ]
+    if unexpected_collectives:
+        violations.append(
+            f"dense partial capture contains unexpected collectives: {unexpected_collectives}"
+        )
+    if async_collectives:
+        violations.append(
+            f"dense partial capture contains async collectives: {async_collectives}"
+        )
+    if "xla_python_cpu_callback" in optimized_hlo or "host_callback" in optimized_hlo:
+        violations.append("dense partial capture contains a host callback")
+    return {
+        "accepted_down_ranks": sorted(scheduled["down"]),
+        "accepted_gate_up_ranks": sorted(scheduled["gate_up"]),
+        "async_collectives": async_collectives,
+        "exact_capture_lineage": capture_lineage,
+        "exact_live_schedule_bijection": exact_live_schedule_bijection,
+        "exact_result_binding": result_binding,
+        "capture_gather_count": len(gathers),
+        "collective_count": len(collectives),
+        "passed": not violations,
+        "performance_claim": False,
+        "violations": violations,
+    }
 
 
 def _validate_optimized_hlo(
@@ -4606,6 +4912,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--final-dense-layout", action="store_true")
     parser.add_argument("--dense-envelope", action="store_true")
     parser.add_argument("--split-layer1-rms", action="store_true")
+    parser.add_argument("--capture-partials", action="store_true")
     parser.add_argument("--db538-runner", type=Path, required=True)
     parser.add_argument("--db538-runner-sha256", required=True)
     parser.add_argument("--db538-tensor", type=Path, required=True)
@@ -4656,6 +4963,16 @@ def main() -> int:
     ):
         raise RuntimeError(
             "split layer-1 RMS discriminator requires the M32 dense envelope"
+        )
+    if args.capture_partials and not (
+        args.dense_envelope
+        and args.final_dense_layout
+        and args.layer1_only
+        and args.compile_rows == 32
+        and not args.split_layer1_rms
+    ):
+        raise RuntimeError(
+            "partial capture requires the unsplit M32 final-layout dense envelope"
         )
     (
         normalized,
@@ -4723,7 +5040,15 @@ def main() -> int:
                     jax.device_put(value, slot_four)
                     for value in packed_final_layout
                 ),
-                jax.device_put(weights[_DENSE_WEIGHT_NAMES[6]], replicated),
+                *(
+                    ()
+                    if args.capture_partials
+                    else (
+                        jax.device_put(
+                            weights[_DENSE_WEIGHT_NAMES[6]], replicated
+                        ),
+                    )
+                ),
             )
             in_specs = (
                 P(),
@@ -4733,7 +5058,7 @@ def main() -> int:
                 P("lp4", None, None, None),
                 P("lp4", None, None, None),
                 P("lp4", None, None, None),
-                P(),
+                *((P(),) if not args.capture_partials else ()),
             )
         else:
             arguments = (
@@ -4976,9 +5301,74 @@ def main() -> int:
             residual_is_m32=True,
         )
 
-    out_specs = P() if args.layer1_only else (P(), P())
+    def local_dense_partial_capture(
+        attention_value: Any,
+        residual_value: Any,
+        post_norm: Any,
+        merged_bits_slot: Any,
+        merged_scale_slot: Any,
+        down_bits_slot: Any,
+        down_scale_slot: Any,
+    ) -> Any:
+        """Return all 32 real BF16 down rows before any association tree."""
+
+        with jax.named_scope(
+            "greenfield_dense_convolution_predense_m32_geometry"
+        ):
+            attention_m32 = jnp.pad(
+                attention_value,
+                ((0, 31), (0, 0)),
+                mode="constant",
+                constant_values=jnp.bfloat16(0),
+            )
+            residual_m32 = jnp.pad(
+                residual_value,
+                ((0, 31), (0, 0)),
+                mode="constant",
+                constant_values=jnp.bfloat16(0),
+            )
+        with jax.named_scope(
+            "greenfield_dense_convolution_predense_rmsnorm"
+        ):
+            dense_input, post_attention_m32 = fused_add_rms_norm(
+                attention_m32,
+                residual_m32,
+                post_norm,
+                epsilon=1e-5,
+            )
+        partials = _virtual_dense_final_layout_convolution_down_partials(
+            dense_input,
+            merged_bits_slot[0],
+            merged_scale_slot[0],
+            down_bits_slot[0],
+            down_scale_slot[0],
+            block_shape=(128, 128),
+            compile_rows=32,
+        )
+        with jax.named_scope(
+            "greenfield_dense_convolution_m32_geometry_anchor"
+        ):
+            partials = lax.optimization_barrier(partials)
+        with jax.named_scope("greenfield_dense_convolution_m32_live_row"):
+            live_partials = partials[:, :1, :]
+        with jax.named_scope("greenfield_dense_partial_capture_gather"):
+            gathered = lax.all_gather(
+                live_partials,
+                axis_name="lp4",
+                axis=0,
+                tiled=False,
+                axis_index_groups=groups,
+            )
+        # The exact carried post-attention residual keeps both pre-dense
+        # fused-add/RMSNorm outputs live and lets the StableHLO contract prove
+        # that observation did not replace the production arithmetic source.
+        return gathered, post_attention_m32
+
+    out_specs = (P(), P()) if args.capture_partials else P() if args.layer1_only else (P(), P())
     mapped = jax.shard_map(
-        local_dense_envelope
+        local_dense_partial_capture
+        if args.capture_partials
+        else local_dense_envelope
         if args.dense_envelope
         else local_final_layout
         if args.final_dense_layout
@@ -4998,6 +5388,7 @@ def main() -> int:
         final_dense_layout=args.final_dense_layout,
         dense_envelope=args.dense_envelope,
         split_layer1_rms=args.split_layer1_rms,
+        partials_only=args.capture_partials,
     )
     stablehlo_path = args.hlo_dir / "dense_convolution.stablehlo.mlir"
     stablehlo_path.write_text(stablehlo)
@@ -5007,13 +5398,17 @@ def main() -> int:
         )
     compiled = lowered.compile()
     optimized_hlo = compiled.as_text()
-    optimized_contract = _validate_optimized_hlo(
-        optimized_hlo,
-        compile_rows=args.compile_rows,
-        layer1_only=args.layer1_only,
-        final_dense_layout=args.final_dense_layout,
-        dense_envelope=args.dense_envelope,
-        split_layer1_rms=args.split_layer1_rms,
+    optimized_contract = (
+        _validate_partial_capture_optimized_hlo(optimized_hlo)
+        if args.capture_partials
+        else _validate_optimized_hlo(
+            optimized_hlo,
+            compile_rows=args.compile_rows,
+            layer1_only=args.layer1_only,
+            final_dense_layout=args.final_dense_layout,
+            dense_envelope=args.dense_envelope,
+            split_layer1_rms=args.split_layer1_rms,
+        )
     )
     optimized_path = args.hlo_dir / "dense_convolution.optimized_hlo.txt"
     optimized_path.write_text(optimized_hlo)
@@ -5022,7 +5417,44 @@ def main() -> int:
             f"dense convolution optimized HLO failed: {optimized_contract}"
         )
     compiled_result = compiled(*arguments)
-    if args.layer1_only:
+    captured_partials_bits = None
+    captured_residual_bits = None
+    capture_records: dict[str, Any] = {}
+    if args.capture_partials:
+        captured_partials, captured_residual = compiled_result
+        jax.block_until_ready((captured_partials, captured_residual))
+        captured_partials_bits = np.ascontiguousarray(
+            np.asarray(captured_partials)
+        ).view(np.uint16)
+        captured_residual_bits = np.ascontiguousarray(
+            np.asarray(captured_residual)
+        ).view(np.uint16)
+        if (
+            captured_partials_bits.shape != (4, 8, 1, 6144)
+            or captured_partials_bits.dtype != np.uint16
+            or captured_residual_bits.shape != (32, 6144)
+            or captured_residual_bits.dtype != np.uint16
+        ):
+            raise RuntimeError(
+                "dense partial capture output geometry/dtype drifted"
+            )
+        capture_records = {
+            "dense_virtual_partials_bfloat16_bits": {
+                "axis_order": ["pp8_owner", "virtual_rank", "row", "hidden"],
+                "dtype": "uint16",
+                "sha256": _array_sha256(captured_partials_bits),
+                "shape": [4, 8, 1, 6144],
+            },
+            "post_attention_m32_bfloat16_bits": {
+                "axis_order": ["row", "hidden"],
+                "dtype": "uint16",
+                "sha256": _array_sha256(captured_residual_bits),
+                "shape": [32, 6144],
+            },
+        }
+        layer1_bits = None
+        dense_update_bits = None
+    elif args.layer1_only:
         layer1 = compiled_result
         jax.block_until_ready(layer1)
         dense_update_bits = None
@@ -5032,13 +5464,19 @@ def main() -> int:
         dense_update_bits = np.ascontiguousarray(np.asarray(dense_update)).view(
             np.uint16
         )
-    layer1_bits = np.ascontiguousarray(np.asarray(layer1).reshape(6144)).view(
-        np.uint16
-    )
-    comparison = _compare_bits(accepted_layer1_bits, layer1_bits)
-    exact = comparison["elementwise_exact"]
+    if not args.capture_partials:
+        layer1_bits = np.ascontiguousarray(
+            np.asarray(layer1).reshape(6144)
+        ).view(np.uint16)
+        comparison = _compare_bits(accepted_layer1_bits, layer1_bits)
+        exact = comparison["elementwise_exact"]
+    else:
+        comparison = None
+        exact = False
     arm = (
-        "accepted_m32_dense_envelope_split_rms"
+        "accepted_m32_dense_partial_capture"
+        if args.capture_partials
+        else "accepted_m32_dense_envelope_split_rms"
         if args.split_layer1_rms
         else "accepted_m32_dense_envelope_cross_layer"
         if args.dense_envelope
@@ -5052,15 +5490,25 @@ def main() -> int:
             else "accepted_dense_convolution"
         )
     )
-    classification = f"{arm}_{'exact' if exact else 'nonexact'}"
+    classification = (
+        "accepted_m32_dense_partials_captured"
+        if args.capture_partials
+        else f"{arm}_{'exact' if exact else 'nonexact'}"
+    )
     result = {
-        "artifact_kind": "glm52_layer0_dense_convolution_probe",
+        "artifact_kind": (
+            "glm52_layer0_dense_partial_capture"
+            if args.capture_partials
+            else "glm52_layer0_dense_convolution_probe"
+        ),
         "classification": classification,
         "code_hash": code_hash,
         "compile_rows": args.compile_rows,
         "diagnostic_dead_rows": args.compile_rows - 1,
         "exact": exact,
         "exact_arms": [arm] if exact else [],
+        "capture_partials": args.capture_partials,
+        "capture_records": capture_records,
         "dense_envelope": args.dense_envelope,
         "split_layer1_rms": args.split_layer1_rms,
         "final_dense_layout": args.final_dense_layout,
@@ -5074,7 +5522,13 @@ def main() -> int:
         "layer1_comparison": comparison,
         "performance_claim": False,
         "live_rows": 1,
-        "result_mode": "layer1_only" if args.layer1_only else "dense_and_layer1",
+        "result_mode": (
+            "partials_only"
+            if args.capture_partials
+            else "layer1_only"
+            if args.layer1_only
+            else "dense_and_layer1"
+        ),
         "position": _POSITION,
         "source": {
             "checkpoint_manifest_sha256": args.checkpoint_manifest_sha256,
@@ -5103,7 +5557,9 @@ def main() -> int:
     tensors = {
         "accepted_layer1_normalized_bfloat16_bits": accepted_layer1_bits,
         "compile_rows": np.array(args.compile_rows, dtype=np.int32),
-        "layer1_normalized_bfloat16_bits": layer1_bits,
+        "layer1_input_norm_bfloat16_bits": np.ascontiguousarray(
+            weights[_DENSE_WEIGHT_NAMES[6]]
+        ).view(np.uint16),
         "normalized_mlp_bfloat16_bits": np.ascontiguousarray(normalized).view(
             np.uint16
         ),
@@ -5111,6 +5567,14 @@ def main() -> int:
             post_attention
         ).view(np.uint16),
     }
+    if layer1_bits is not None:
+        tensors["layer1_normalized_bfloat16_bits"] = layer1_bits
+    if captured_partials_bits is not None:
+        tensors["dense_virtual_partials_bfloat16_bits"] = (
+            captured_partials_bits
+        )
+    if captured_residual_bits is not None:
+        tensors["post_attention_m32_bfloat16_bits"] = captured_residual_bits
     if args.dense_envelope:
         tensors.update(
             {

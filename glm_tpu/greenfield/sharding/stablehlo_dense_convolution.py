@@ -1298,15 +1298,18 @@ def validate_dense_convolution_stablehlo(
     final_dense_layout: bool = False,
     dense_envelope: bool = False,
     split_layer1_rms: bool = False,
+    partials_only: bool = False,
 ) -> dict[str, object]:
     """Validate all eight exact dense chains and the exact StrategyND tree."""
 
     violations: list[str] = []
     if compile_rows not in (1, 32):
         raise ValueError("dense StableHLO compile rows must be 1 or 32")
-    if final_dense_layout and (compile_rows != 32 or not layer1_only):
+    if final_dense_layout and (
+        compile_rows != 32 or not (layer1_only or partials_only)
+    ):
         raise ValueError(
-            "final-layout dense StableHLO proof requires M32 layer1-only"
+            "final-layout dense StableHLO proof requires M32 layer1 or partial capture"
         )
     if dense_envelope and not final_dense_layout:
         raise ValueError(
@@ -1317,6 +1320,15 @@ def validate_dense_convolution_stablehlo(
     ):
         raise ValueError(
             "split layer-1 RMS proof requires the M32 dense envelope"
+        )
+    if partials_only and not (
+        dense_envelope
+        and final_dense_layout
+        and compile_rows == 32
+        and not split_layer1_rms
+    ):
+        raise ValueError(
+            "dense partial capture requires the unsplit M32 final-layout envelope"
         )
     parsed_stablehlo, dependency_errors = _expand_dependency_barriers(
         stablehlo
@@ -1466,24 +1478,79 @@ def validate_dense_convolution_stablehlo(
             ),
             "dense StrategyND all-gather",
         )
-        normalized_gather = re.sub(r"\s+", "", gather.raw_line)
+        sanitized_gather = re.sub(
+            r'"(?:\\.|[^"\\])*"', '""', gather.raw_line
+        )
+        sanitized_gather = re.sub(r"/\*.*?\*/", "", sanitized_gather)
+        normalized_gather = re.sub(r"\s+", "", sanitized_gather)
+        replica_group_attributes = re.findall(
+            r"\breplica_groups=dense<\[\[[0-9,]+\]\]>:tensor<1x4xi64>",
+            normalized_gather,
+        )
         if (
             gather.all_gather_dimension != 0
             or not gather.use_global_device_ids
-            or "replica_groups=dense<[[0,1,2,3]]>:tensor<1x4xi64>"
-            not in normalized_gather
+            or replica_group_attributes
+            != [
+                "replica_groups=dense<[[0,1,2,3]]>:tensor<1x4xi64>"
+            ]
         ):
             raise _MatchError(f"{gather.name}: dense gather group drifted")
-        dense_output = _match_reduction_tree(graph, gather)
         helpers = {item.name: item for item in graphs if item is not graph}
-        residual, norm_weight, _layer1 = _match_rmsnorm(
-            graph,
-            helpers,
-            dense_output,
-            layer1_only=layer1_only,
-            residual_is_m32=dense_envelope,
-            split_layer1_rms=split_layer1_rms,
+        manual_matches = list(
+            re.finditer(
+                r"(?m)^\s*(%[A-Za-z0-9_.-]+)(?::([0-9]+))?\s*=\s*"
+                r"sdy\.manual_computation\(([^)]*)\)",
+                stablehlo,
+            )
         )
+        if len(manual_matches) != 1:
+            raise _MatchError("dense probe manual computation is not unique")
+        manual_match = manual_matches[0]
+        manual_result = manual_match.group(1)
+        if partials_only:
+            returned = _only(
+                (
+                    node
+                    for node in graph.nodes.values()
+                    if node.opcode == "return"
+                    and node.raw_line.startswith("sdy.return ")
+                ),
+                "dense partial-capture return",
+            )
+            if len(returned.operands) != 2 or returned.operands[0] != gather.name:
+                raise _MatchError(
+                    "dense partial capture does not return the exact gathered partials"
+                )
+            outer_return = _only(
+                (
+                    node
+                    for node in graph.nodes.values()
+                    if node.opcode == "return"
+                    and node.raw_line.startswith("return ")
+                ),
+                "dense partial-capture outer return",
+            )
+            if (
+                manual_match.group(2) != "2"
+                or outer_return.operands
+                != (f"{manual_result}#0", f"{manual_result}#1")
+            ):
+                raise _MatchError(
+                    "dense partial capture outer manual results drifted"
+                )
+            residual = returned.operands[1]
+            norm_weight = None
+        else:
+            dense_output = _match_reduction_tree(graph, gather)
+            residual, norm_weight, _layer1 = _match_rmsnorm(
+                graph,
+                helpers,
+                dense_output,
+                layer1_only=layer1_only,
+                residual_is_m32=dense_envelope,
+                split_layer1_rms=split_layer1_rms,
+            )
         layer_roots = next(iter(rows.values()))[0]
         root_contracts = (
             (
@@ -1542,28 +1609,21 @@ def validate_dense_convolution_stablehlo(
             if node.tensor_types[-2:] != tensor_types or len(node.operands) != 1:
                 raise _MatchError(f"{root}: dense checkpoint source reshape drifted")
             manual_arguments.append(node.operands[0])
-        if dense_envelope:
+        if dense_envelope and not partials_only:
+            assert norm_weight is not None
             manual_arguments.append(norm_weight)
-        else:
+        elif not dense_envelope:
+            assert norm_weight is not None
             manual_arguments.extend((residual, norm_weight))
-        manual_call = re.search(
-            r"sdy\.manual_computation\(([^)]*)\)", stablehlo
-        )
         outer_arguments = (
-            []
-            if manual_call is None
-            else [value.strip() for value in manual_call.group(1).split(",")]
+            [value.strip() for value in manual_match.group(3).split(",")]
         )
         expected_manual_arguments = (
-            [
-                "%arg8",
-                "%arg9",
-                "%arg10",
-                "%arg11",
-                "%arg12",
-                "%arg13",
-                "%arg14",
-                "%arg15",
+            [f"%arg{index}" for index in range(7, 14)]
+            if partials_only
+            else [
+                "%arg8", "%arg9", "%arg10", "%arg11", "%arg12",
+                "%arg13", "%arg14", "%arg15",
             ]
             if dense_envelope
             else ["%arg7", "%arg9", "%arg10", "%arg11", "%arg12", "%arg8", "%arg13"]
@@ -1583,7 +1643,13 @@ def validate_dense_convolution_stablehlo(
         expected_outer_arguments = [
             f"%arg{index}"
             for index in range(
-                8 if dense_envelope else 7 if final_dense_layout else 9
+                7
+                if partials_only
+                else 8
+                if dense_envelope
+                else 7
+                if final_dense_layout
+                else 9
             )
         ]
         if (
@@ -1633,7 +1699,14 @@ def validate_dense_convolution_stablehlo(
         "gate_up_layout_constraint_count": layout_constraint_count,
         "matched_virtual_shards": matched_shards,
         "live_rows": 1,
-        "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
+        "partials_only": partials_only,
+        "result_mode": (
+            "partials_only"
+            if partials_only
+            else "layer1_only"
+            if layer1_only
+            else "dense_and_layer1"
+        ),
         "split_layer1_rms": split_layer1_rms,
         "passed": not violations,
         "violations": violations,

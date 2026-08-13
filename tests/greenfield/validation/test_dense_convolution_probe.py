@@ -12,6 +12,7 @@ import sys
 from functools import lru_cache
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 
@@ -112,6 +113,21 @@ REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO = Path(
 )
 REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO_SHA256 = (
     "ac57c042ae591d99cebc982f37f06b3c335f3f3d1453fd9e2f7269a1c3b9094c"
+)
+REAL_DB548_OPTIMIZED_HLO = Path(
+    "/home/gianl/glm-run/greenfield_layer0_dense_envelope_cross_layer_"
+    "20260813T120703034434907Z/hlo/dense_convolution.optimized_hlo.txt"
+)
+REAL_DB548_OPTIMIZED_HLO_SHA256 = (
+    "5f4dd83793da67be6a8c580949920e93f8c64fe8205816738e7d04890640a877"
+)
+REAL_DB548_TENSOR = REAL_DB548_OPTIMIZED_HLO.parents[1] / (
+    "dense_envelope_cross_layer.npz"
+)
+REAL_LAYER1_NORM_SLOT = Path(
+    "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/"
+    "greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/"
+    "base_decoder_runtime_feature/stage_00/device_slot_00.safetensors"
 )
 REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO = Path(
     os.environ.get(
@@ -1512,6 +1528,85 @@ mapped = jax.shard_map(
               P("lp4", None, None, None),
               P("lp4", None, None, None), P()),
     out_specs=P(),
+    check_vma=False,
+)
+print(jax.jit(mapped).lower(*arguments).as_text())
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=REPO,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    return completed.stdout
+
+
+@lru_cache(maxsize=1)
+def _exact_dense_partial_capture_stablehlo() -> str:
+    program = r'''
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax import lax
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
+from glm_tpu.greenfield.kernels.stage_local import (
+    _virtual_dense_final_layout_convolution_down_partials,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("lp4",))
+replicated = NamedSharding(mesh, P())
+slot = NamedSharding(mesh, P("lp4", None, None, None))
+contracts = (
+    ((1, 6144), jnp.bfloat16, replicated),
+    ((1, 6144), jnp.bfloat16, replicated),
+    ((6144,), jnp.bfloat16, replicated),
+    ((4, 8, 6144, 768), jnp.float8_e4m3fn, slot),
+    ((4, 8, 48, 768), jnp.float32, slot),
+    ((4, 8, 384, 6144), jnp.float8_e4m3fn, slot),
+    ((4, 8, 3, 6144), jnp.float32, slot),
+)
+arguments = tuple(
+    jax.ShapeDtypeStruct(shape, dtype, sharding=sharding)
+    for shape, dtype, sharding in contracts
+)
+
+def local(attention, residual, post_norm, merged_bits, merged_scale,
+          down_bits, down_scale):
+    attention = jnp.pad(
+        attention, ((0, 31), (0, 0)), constant_values=jnp.bfloat16(0),
+    )
+    residual = jnp.pad(
+        residual, ((0, 31), (0, 0)), constant_values=jnp.bfloat16(0),
+    )
+    normalized, carried = fused_add_rms_norm(
+        attention, residual, post_norm, epsilon=1e-5,
+    )
+    partials = _virtual_dense_final_layout_convolution_down_partials(
+        normalized, merged_bits[0], merged_scale[0], down_bits[0],
+        down_scale[0], block_shape=(128, 128), compile_rows=32,
+    )
+    partials = lax.optimization_barrier(partials)[:, :1, :]
+    gathered = lax.all_gather(
+        partials, "lp4", axis=0, tiled=False,
+        axis_index_groups=((0, 1, 2, 3),),
+    )
+    return gathered, carried
+
+mapped = jax.shard_map(
+    local,
+    mesh=mesh,
+    in_specs=(P(), P(), P(), P("lp4", None, None, None),
+              P("lp4", None, None, None), P("lp4", None, None, None),
+              P("lp4", None, None, None)),
+    out_specs=(P(), P()),
     check_vma=False,
 )
 print(jax.jit(mapped).lower(*arguments).as_text())
@@ -3440,6 +3535,11 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "GLM_GREENFIELD_DENSE_FINAL_LAYOUT",
         "GLM_GREENFIELD_DENSE_ENVELOPE",
         "GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS",
+        "GLM_GREENFIELD_DENSE_CAPTURE_PARTIALS",
+        "--capture-partials",
+        "glm52_layer0_dense_partial_capture",
+        "dense_partial_capture.npz",
+        "capture_records_sha256",
         "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4",
         'strict_census pre',
         'strict_census post',
@@ -3452,6 +3552,213 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
     assert text.index("strict_census post") < text.index(
         'PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python -'
     )
+
+
+@pytest.mark.skipif(
+    not REAL_DB548_TENSOR.exists() or not REAL_LAYER1_NORM_SLOT.exists(),
+    reason="protected dense source tensors are not available",
+)
+def test_dense_partial_capture_wrapper_seals_without_a_db_row(
+    tmp_path: Path,
+) -> None:
+    wrapper = WRAPPER.read_text()
+    programs = re.findall(r"<<'PY'\n(.*?)\nPY\n", wrapper, re.DOTALL)
+    record_program = next(
+        value for value in programs if "DENSE_PARTIAL_CAPTURE_VALID" in value
+    )
+    success_program = next(
+        value
+        for value in programs
+        if "dense partial-capture summary drifted before SUCCESS" in value
+    )
+    run_dir = tmp_path / "capture"
+    hlo_dir = run_dir / "hlo"
+    hlo_dir.mkdir(parents=True)
+    optimized_path = hlo_dir / "dense_convolution.optimized_hlo.txt"
+    stable_path = hlo_dir / "dense_convolution.stablehlo.mlir"
+    optimized_path.write_text("optimized capture hlo\n")
+    stable_path.write_text("stable capture hlo\n")
+    pin = "a" * 40
+    source_arguments = [f"{index:064x}" for index in range(1, 9)]
+    (
+        db538_runner_sha,
+        db538_tensor_sha,
+        db538_summary_sha,
+        db538_success_sha,
+        checkpoint_manifest_sha,
+        accepted_m32_hlo_sha,
+        accepted_m32_summary_sha,
+        accepted_m32_success_sha,
+    ) = source_arguments
+    accepted_m32_raw_hlo_sha = "9" * 64
+    sources = {
+        "accepted_m32_hlo_raw_sha256": accepted_m32_raw_hlo_sha,
+        "accepted_m32_hlo_sha256": accepted_m32_hlo_sha,
+        "accepted_m32_summary_sha256": accepted_m32_summary_sha,
+        "accepted_m32_success_sha256": accepted_m32_success_sha,
+        "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+        "db538_runner_sha256": db538_runner_sha,
+        "db538_tensor_sha256": db538_tensor_sha,
+        "db538_summary_sha256": db538_summary_sha,
+        "db538_success_sha256": db538_success_sha,
+        "attention_update_sha256": (
+            "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7"
+        ),
+        "combined_residual_sha256": (
+            "02d045b9a0ec5ab22a711bd6a964564f707be0848683381104e83331020e31a3"
+        ),
+        "normalized_mlp_sha256": (
+            "082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f"
+        ),
+        "post_attention_residual_sha256": (
+            "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
+        ),
+    }
+    partials = np.zeros((4, 8, 1, 6144), dtype=np.uint16)
+    carried = np.zeros((32, 6144), dtype=np.uint16)
+    records = {
+        "dense_virtual_partials_bfloat16_bits": {
+            "axis_order": ["pp8_owner", "virtual_rank", "row", "hidden"],
+            "dtype": "uint16",
+            "sha256": sha256(partials.tobytes()).hexdigest(),
+            "shape": [4, 8, 1, 6144],
+        },
+        "post_attention_m32_bfloat16_bits": {
+            "axis_order": ["row", "hidden"],
+            "dtype": "uint16",
+            "sha256": sha256(carried.tobytes()).hexdigest(),
+            "shape": [32, 6144],
+        },
+    }
+    runner = {
+        "artifact_kind": "glm52_layer0_dense_partial_capture",
+        "capture_partials": True,
+        "capture_records": records,
+        "classification": "accepted_m32_dense_partials_captured",
+        "code_hash": pin,
+        "compile_rows": 32,
+        "dense_envelope": True,
+        "diagnostic_dead_rows": 31,
+        "exact": False,
+        "exact_arms": [],
+        "final_dense_layout": True,
+        "hlo": {
+            "optimized_contract": {
+                "accepted_down_ranks": list(range(8)),
+                "accepted_gate_up_ranks": list(range(8)),
+                "async_collectives": [],
+                "capture_gather_count": 1,
+                "collective_count": 1,
+                "exact_capture_lineage": True,
+                "exact_live_schedule_bijection": True,
+                "exact_result_binding": True,
+                "passed": True,
+                "performance_claim": False,
+            },
+            "optimized_sha256": sha256(optimized_path.read_bytes()).hexdigest(),
+            "stablehlo_contract": {
+                "collective_counts": {
+                    "all_gather": 1,
+                    "all_reduce": 0,
+                    "all_to_all": 0,
+                    "collective_broadcast": 0,
+                    "collective_permute": 0,
+                    "reduce_scatter": 0,
+                },
+                "convolution_count": 16,
+                "matched_virtual_shards": list(range(8)),
+                "partials_only": True,
+                "passed": True,
+                "result_mode": "partials_only",
+            },
+            "stablehlo_sha256": sha256(stable_path.read_bytes()).hexdigest(),
+        },
+        "layer1_comparison": None,
+        "live_rows": 1,
+        "performance_claim": False,
+        "position": 8155,
+        "result_mode": "partials_only",
+        "source": sources,
+        "split_layer1_rms": False,
+        "status": "SUCCESS",
+    }
+    (run_dir / "runner.json").write_text(json.dumps(runner))
+    with np.load(REAL_DB548_TENSOR, allow_pickle=False) as source:
+        accepted_layer1 = np.ascontiguousarray(
+            source["accepted_layer1_normalized_bfloat16_bits"]
+        )
+        attention_update = np.ascontiguousarray(
+            source["attention_update_bfloat16_bits"]
+        )
+        combined_residual = np.ascontiguousarray(
+            source["combined_residual_bfloat16_bits"]
+        )
+        normalized_mlp = np.ascontiguousarray(
+            source["normalized_mlp_bfloat16_bits"]
+        )
+        post_attention = np.ascontiguousarray(
+            source["post_attention_residual_bfloat16_bits"]
+        )
+    from safetensors import safe_open
+
+    with safe_open(REAL_LAYER1_NORM_SLOT, framework="np") as handle:
+        layer1_norm = np.ascontiguousarray(
+            handle.get_tensor("attention.slot_01.input_norm")
+        ).view(np.uint16)
+    np.savez(
+        run_dir / "dense_partial_capture.npz",
+        accepted_layer1_normalized_bfloat16_bits=accepted_layer1,
+        attention_update_bfloat16_bits=attention_update,
+        combined_residual_bfloat16_bits=combined_residual,
+        compile_rows=np.array(32, dtype=np.int32),
+        dense_virtual_partials_bfloat16_bits=partials,
+        layer1_input_norm_bfloat16_bits=layer1_norm,
+        normalized_mlp_bfloat16_bits=normalized_mlp,
+        post_attention_m32_bfloat16_bits=carried,
+        post_attention_residual_bfloat16_bits=post_attention,
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(run_dir),
+            pin,
+            "7",
+            "capture_test",
+            *source_arguments[:5],
+            *source_arguments[5:],
+            accepted_m32_raw_hlo_sha,
+        ],
+        input=record_program,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "DENSE_PARTIAL_CAPTURE_VALID" in result.stdout
+    summary = json.loads((run_dir / "summary.json").read_text())
+    assert summary["results_db_run_id"] is None
+    assert summary["capture_records"] == records
+
+    (run_dir / "evidence.sha256").write_text("evidence\n")
+    (run_dir / "remote_objects.json").write_text('{"objects": []}\n')
+    result = subprocess.run(
+        [sys.executable, "-", str(run_dir), "gs://test/capture", pin],
+        input=success_program,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    success = dict(
+        line.split("=", 1)
+        for line in (run_dir / "SUCCESS").read_text().splitlines()
+    )
+    assert success["results_db_run_id"] == "none"
+    assert success["result_mode"] == "partials_only"
+    assert success["capture_records_sha256"] == sha256(
+        json.dumps(records, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 @pytest.mark.parametrize(
@@ -4188,3 +4495,203 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "probe_contract_valid",
         1.0,
     )
+
+
+@pytest.mark.skipif(
+    not REAL_DB548_OPTIMIZED_HLO.exists(),
+    reason="preserved DB548 TPU HLO is not available",
+)
+def test_dense_partial_capture_optimized_contract_pins_schedules_and_gather() -> None:
+    optimized_hlo = REAL_DB548_OPTIMIZED_HLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_DB548_OPTIMIZED_HLO_SHA256
+    )
+    captured = optimized_hlo.replace(
+        "greenfield_strategy_nd_row0_dense_convolution_down/"
+        "greenfield_strategy_nd_row0_association/"
+        "greenfield_strategy_nd_row0_association_gather",
+        "greenfield_dense_partial_capture_gather",
+    )
+    captured = re.sub(
+        r"^  ROOT %fusion\.91 = .*?$",
+        "  %capture_view = bf16[4,8,1,6144]{3,2,1,0} "
+        "bitcast(%all-gather)\n"
+        "  ROOT %capture_tuple = (bf16[4,8,1,6144]{3,2,1,0}, "
+        "bf16[32,6144]{1,0}) tuple(%capture_view, %copy-done.1)",
+        captured,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    accepted = MODULE._validate_partial_capture_optimized_hlo(captured)
+    assert accepted["passed"] is True
+    assert accepted["accepted_gate_up_ranks"] == list(range(8))
+    assert accepted["accepted_down_ranks"] == list(range(8))
+    assert accepted["capture_gather_count"] == 1
+    assert accepted["exact_capture_lineage"] is True
+    assert accepted["exact_live_schedule_bijection"] is True
+    assert accepted["exact_result_binding"] is True
+
+    wrong_window = captured.replace(
+        '"input_window_bounds":["4","24"]',
+        '"input_window_bounds":["4","3"]',
+        1,
+    )
+    assert MODULE._validate_partial_capture_optimized_hlo(wrong_window)[
+        "passed"
+    ] is False
+    wrong_group = captured.replace(
+        "replica_groups={{0,1,2,3}}",
+        "replica_groups={{0,1,3,2}}",
+        1,
+    )
+    assert MODULE._validate_partial_capture_optimized_hlo(wrong_group)[
+        "passed"
+    ] is False
+    rogue_capture = captured.replace(
+        "  %all-gather = ",
+        "  %rogue_capture = bf16[8,1,6144]{2,1,0} constant(0)\n"
+        "  %all-gather = ",
+        1,
+    ).replace(
+        "all-gather(%copy.29)",
+        "all-gather(%rogue_capture)",
+        1,
+    )
+    assert MODULE._validate_partial_capture_optimized_hlo(rogue_capture)[
+        "passed"
+    ] is False
+    wrong_live_row = captured.replace(
+        "slice={[0:8], [0:1], [0:6144]}",
+        "slice={[0:8], [1:2], [0:6144]}",
+        1,
+    )
+    assert wrong_live_row != captured
+    assert MODULE._validate_partial_capture_optimized_hlo(wrong_live_row)[
+        "passed"
+    ] is False
+    rogue_arithmetic = captured.replace(
+        "  %all-gather = ",
+        "  %rogue_add = bf16[8,1,6144]{2,0,1:T(8,128)(2,1)S(3)} "
+        "add(%copy.29, %copy.29)\n"
+        "  %all-gather = ",
+        1,
+    ).replace(
+        "all-gather(%copy.29)",
+        "all-gather(%rogue_add)",
+        1,
+    )
+    assert MODULE._validate_partial_capture_optimized_hlo(rogue_arithmetic)[
+        "passed"
+    ] is False
+    rogue_result = captured.replace(
+        "  %capture_view = ",
+        "  %rogue_result = bf16[32,1,6144]{2,0,1:T(8,128)(2,1)S(3)} "
+        "add(%all-gather, %all-gather)\n"
+        "  %capture_view = ",
+        1,
+    ).replace(
+        "bitcast(%all-gather)\n  ROOT %capture_tuple",
+        "bitcast(%rogue_result)\n  ROOT %capture_tuple",
+        1,
+    )
+    assert MODULE._validate_partial_capture_optimized_hlo(rogue_result)[
+        "passed"
+    ] is False
+
+    live_down = next(
+        line for line in captured.splitlines() if line.startswith("  %fusion.61 =")
+    )
+    wrong_live_down = live_down.replace(
+        '/conv_general_dilated"', '/actual_live_down"', 1
+    ).replace(
+        '"iteration_bounds":["8","1","1"]',
+        '"iteration_bounds":["7","1","1"]',
+        1,
+    )
+    live_shape = re.match(r"  %fusion\.61 = (\S+) fusion\(", live_down)
+    assert live_shape is not None
+    dead_schedule = (
+        f"  %dead_schedule = {live_shape.group(1)} copy(%fusion.61), metadata="
+        + live_down.split("metadata=", 1)[1]
+    )
+    decoy_schedule = captured.replace(
+        live_down, f"{wrong_live_down}\n{dead_schedule}", 1
+    )
+    decoy_result = MODULE._validate_partial_capture_optimized_hlo(
+        decoy_schedule
+    )
+    assert decoy_result["accepted_down_ranks"] == list(range(8))
+    assert decoy_result["exact_live_schedule_bijection"] is False
+    assert decoy_result["passed"] is False
+
+    async_collective = captured.replace(
+        "  %capture_view = ",
+        "  %rogue_async_start = ((f32[32]{0:T(128)S(3)}, "
+        "f32[32]{0:T(128)S(3)}), u32[]) "
+        "all-reduce-start(%add_rsqrt_fusion.1), channel_id=99, "
+        "replica_groups={{0,1,2,3}}, use_global_device_ids=true, "
+        "to_apply=%region_0.1\n"
+        "  %rogue_async_done = f32[32]{0:T(128)S(3)} "
+        "all-reduce-done(%rogue_async_start), channel_id=99\n"
+        "  %capture_view = ",
+        1,
+    )
+    async_result = MODULE._validate_partial_capture_optimized_hlo(
+        async_collective
+    )
+    assert async_result["async_collectives"] == [
+        "%rogue_async_start",
+        "%rogue_async_done",
+    ]
+    assert async_result["passed"] is False
+
+
+def test_dense_partial_capture_stablehlo_pins_group_and_outer_return() -> None:
+    stablehlo = _exact_dense_partial_capture_stablehlo()
+
+    def validate(candidate: str) -> dict[str, object]:
+        return MODULE._validate_stablehlo(
+            candidate,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+            partials_only=True,
+        )
+
+    accepted = validate(stablehlo)
+    assert accepted["passed"], accepted["violations"]
+
+    exact_group = (
+        "replica_groups = dense<[[0, 1, 2, 3]]> : tensor<1x4xi64>"
+    )
+    wrong_group = stablehlo.replace(
+        exact_group,
+        "replica_groups = dense<[[0, 1, 3, 2]]> : tensor<1x4xi64> "
+        f"/* {exact_group} */",
+        1,
+    )
+    assert wrong_group != stablehlo
+    assert not validate(wrong_group)["passed"]
+
+    wrong_outer = stablehlo.replace(
+        "%0:2 = sdy.manual_computation(",
+        "%manual:2 = sdy.manual_computation(",
+        1,
+    )
+    outer_return = (
+        "    return %0#0, %0#1 : tensor<4x8x1x6144xbf16>, "
+        "tensor<32x6144xbf16>"
+    )
+    decoy_return = (
+        "    %capture_decoy = stablehlo.constant dense<0.000000e+00> : "
+        "tensor<4x8x1x6144xbf16>\n"
+        "    %carried_decoy = stablehlo.constant dense<0.000000e+00> : "
+        "tensor<32x6144xbf16>\n"
+        "    %0:2 = stablehlo.optimization_barrier %capture_decoy, "
+        "%carried_decoy : tensor<4x8x1x6144xbf16>, tensor<32x6144xbf16>\n"
+        f"{outer_return}"
+    )
+    wrong_outer = wrong_outer.replace(outer_return, decoy_return, 1)
+    assert wrong_outer != stablehlo
+    assert not validate(wrong_outer)["passed"]

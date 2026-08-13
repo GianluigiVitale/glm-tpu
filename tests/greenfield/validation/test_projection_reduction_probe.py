@@ -782,9 +782,14 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             "exact_arms": [],
             "final_dense_layout": False,
             "final_layout_records": {},
+            "hlo": {
+                "optimized_contract": {"split_layer1_rms": False},
+                "stablehlo_contract": {"split_layer1_rms": False},
+            },
             "live_rows": 1,
             "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
             "layer1_comparison": {"mismatch_count": 7},
+            "split_layer1_rms": False,
             "source": {
                 "db538_tensor_sha256": db538_tensor_sha,
                 **(
@@ -815,6 +820,7 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             "dense_envelope": False,
             "final_dense_layout": False,
             "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
+            "split_layer1_rms": False,
             **(
                 {
                     "accepted_m32_hlo_raw_sha256": (
@@ -943,10 +949,12 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             harness_git,
             fork_git,
             str(compile_rows),
-            str(int(layer1_only)),
-            "0",
-            "0",
-            "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
+                str(int(layer1_only)),
+                "0",
+                "0",
+                "0",
+                "0",
+                "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
             "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
             "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
             "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
