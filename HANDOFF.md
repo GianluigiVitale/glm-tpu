@@ -19,6 +19,44 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The current default-off batch replaces the one-hour iteration loop with a direct contraction
+  discriminator. `probe_layer0_isolated_dense.py` loads only the pinned layer-0 dense weights and
+  sealed position-8155 inputs, compiles one M32 virtual contraction per LP4 chip, executes that
+  program for the eight virtual ranks, then reuses the already-proved DB533/RMS replay to compare
+  all 32 BF16 partials and the layer-1 row. The production eight-rank path is unchanged by default.
+  Exact StableHLO pins the pre-dense RMS, FP8 dequantization, gate/SwiGLU/down chain and live row.
+  The initial bulk Sol review found that the first optimized check proved only shapes, schedules and
+  transitive liveness. The correction now reuses the mature final-layout matcher and independently
+  pins exact packed bits/scale dequant lineage, `{1,0}` RHS layouts, the gate/SwiGLU/down operand
+  graph, the BF16 down result, the sole row-zero return and exact two-result ENTRY arity; rogue RHS,
+  activation, down-result, result and tuple mutations refuse. The correction review additionally
+  found that result one was shape-only; it is now bound to the exact two padded source rows, F32 add
+  and BF16 carried-residual round. Returning one input or extra carried arithmetic refuses. It still
+  requires zero collectives. Structural zero/one/index literals are parsed after removing quoted
+  metadata and comments; metadata-decoy literals refuse.
+  The existing protected wrapper provides exclusive default-off selection, source/checkpoint
+  hashes, no-DB rollback, census, CRC archive and `SUCCESS`-last sealing. Forced-device/unit,
+  mutation and wrapper publication tests pass; there is no TPU numerical result or performance
+  claim yet. The isolated suite passes 6/6, shared dense validation passes 59/59 and focused kernel
+  tests pass 2/2. Exact next is one correction-only Sol confirmation, then one serialized protected
+  isolated replay—not a complete decoder or 8K retry.
+
+- Reviewed/pushed pin `3d58107036734310275519fea0e4d03762f1cbab` completed the protected
+  bounded replay under tag `greenfield_layer0_captured_rms_replay_20260813T214428668951467Z`.
+  The arithmetic executed in six seconds and the complete protected workflow finished in about one
+  minute. The corrected control is bitwise exact to DB548 at `0/6,144`, output SHA
+  `9b52a04e...4005`, proving the sealed 32 partials, DB533 tree, original two residual sources and
+  integrated layer-1 RMS boundary form an admissible replay. The accepted scalar-split challenger
+  is nonexact at `1,073/6,144`, first index 1, maximum error `0.0078125`, output SHA
+  `229dc8ac...812f`; this exactly reproduces DB549 and closes RMS scheduling as the cause.
+- Runner/tensor/summary/`SUCCESS` SHAs are `97332982...c7d`, `20917284...becd`,
+  `8a708300...cfbe` and `bb9f3c91...3e86`. Both HLO contracts pass, the result is deliberately
+  no-DB/non-performance evidence, local/remote archive verification passes and cleanup is
+  authenticated 8/8. Gate D remains open. Full 8K retries remain frozen: the sole open boundary is
+  now the accepted dense partial/contraction value, not StrategyND or downstream RMSNorm. Exact
+  next is an offline plus sub-minute TPU sensitivity over the sealed partials at hidden index 2795
+  to identify the causal virtual contraction/value delta, then change only that source arithmetic.
+
 - Pushed correction `09135efc3d679359c79839ed64303c5c09261500` received Sol approval at
   staged SHA `a64b6623...7210` and completed another 46-second protected replay attempt under tag
   `greenfield_layer0_captured_rms_replay_20260813T212551468198545Z`. Both arms passed StableHLO

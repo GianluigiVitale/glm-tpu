@@ -371,6 +371,7 @@ def _match_one_shard(
     *,
     compile_rows: int,
     final_dense_layout: bool = False,
+    single_virtual_shard: bool = False,
 ) -> tuple[int, tuple[str, ...], str, str | None, str | None]:
     row_type = f"tensor<{compile_rows}x"
     if len(gate_up.operands) != 2:
@@ -421,49 +422,99 @@ def _match_one_shard(
         ),
     )
     if final_dense_layout:
+        def exact_single_rank_root(
+            source: str,
+            *,
+            singleton_type: str,
+            owner_type: str,
+            ui8_type: str | None = None,
+        ) -> str:
+            node = graph.node(source)
+            if ui8_type is not None and node.opcode == "bitcast_convert":
+                if (
+                    len(node.operands) != 1
+                    or node.tensor_types[-2:] != (ui8_type, singleton_type)
+                ):
+                    raise _MatchError(
+                        f"{node.name}: isolated runtime FP8 bitcast drifted"
+                    )
+                node = graph.node(node.operands[0])
+                singleton_type = ui8_type
+                owner_type = owner_type.replace("xf8E4M3FN>", "xui8>")
+            if (
+                node.opcode != "reshape"
+                or len(node.operands) != 1
+                or node.tensor_types[-2:] != (owner_type, singleton_type)
+                or node.operands[0] in graph.nodes
+            ):
+                raise _MatchError(
+                    f"{node.name}: isolated virtual-rank source drifted"
+                )
+            return node.operands[0]
+
         gate_bits_reshape = _expect_node(
             graph,
             gate_bits,
             opcode="reshape",
             result_type="tensor<6144x768xf8E4M3FN>",
         )
-        gate_bits_slice = _expect_node(
-            graph,
-            gate_bits_reshape.operands[0],
-            opcode="slice",
-            result_type="tensor<1x6144x768xf8E4M3FN>",
-        )
-        if gate_bits_slice.slice_ranges is None:
-            raise _MatchError(f"{gate_bits_slice.name}: packed gate slice absent")
-        shard = gate_bits_slice.slice_ranges[0][0]
-        if gate_bits_slice.slice_ranges != (
-            (shard, shard + 1),
-            (0, 6144),
-            (0, 768),
-        ):
-            raise _MatchError(f"{gate_bits_slice.name}: packed gate slice drifted")
+        if single_virtual_shard:
+            shard = 0
+            gate_bit_root = exact_single_rank_root(
+                gate_bits_reshape.operands[0],
+                singleton_type="tensor<1x6144x768xf8E4M3FN>",
+                owner_type="tensor<1x1x6144x768xf8E4M3FN>",
+                ui8_type="tensor<1x6144x768xui8>",
+            )
+        else:
+            gate_bits_slice = _expect_node(
+                graph,
+                gate_bits_reshape.operands[0],
+                opcode="slice",
+                result_type="tensor<1x6144x768xf8E4M3FN>",
+            )
+            if gate_bits_slice.slice_ranges is None:
+                raise _MatchError(
+                    f"{gate_bits_slice.name}: packed gate slice absent"
+                )
+            shard = gate_bits_slice.slice_ranges[0][0]
+            if gate_bits_slice.slice_ranges != (
+                (shard, shard + 1),
+                (0, 6144),
+                (0, 768),
+            ):
+                raise _MatchError(
+                    f"{gate_bits_slice.name}: packed gate slice drifted"
+                )
+            gate_bit_root = gate_bits_slice.operands[0]
         gate_scale_reshape = _expect_node(
             graph,
             gate_scales,
             opcode="reshape",
             result_type="tensor<48x768xf32>",
         )
-        gate_scale_slice = _expect_node(
-            graph,
-            gate_scale_reshape.operands[0],
-            opcode="slice",
-            result_type="tensor<1x48x768xf32>",
-        )
-        if gate_scale_slice.slice_ranges != (
-            (shard, shard + 1),
-            (0, 48),
-            (0, 768),
-        ):
-            raise _MatchError(
-                f"{gate_scale_slice.name}: packed gate scale slice drifted"
+        if single_virtual_shard:
+            gate_scale_root = exact_single_rank_root(
+                gate_scale_reshape.operands[0],
+                singleton_type="tensor<1x48x768xf32>",
+                owner_type="tensor<1x1x48x768xf32>",
             )
-        gate_bit_root = gate_bits_slice.operands[0]
-        gate_scale_root = gate_scale_slice.operands[0]
+        else:
+            gate_scale_slice = _expect_node(
+                graph,
+                gate_scale_reshape.operands[0],
+                opcode="slice",
+                result_type="tensor<1x48x768xf32>",
+            )
+            if gate_scale_slice.slice_ranges != (
+                (shard, shard + 1),
+                (0, 48),
+                (0, 768),
+            ):
+                raise _MatchError(
+                    f"{gate_scale_slice.name}: packed gate scale slice drifted"
+                )
+            gate_scale_root = gate_scale_slice.operands[0]
     else:
         merged_bits = _expect_node(
             graph,
@@ -681,40 +732,57 @@ def _match_one_shard(
             opcode="reshape",
             result_type="tensor<384x6144xf8E4M3FN>",
         )
-        down_bit_slice = _expect_node(
-            graph,
-            down_bits_reshape.operands[0],
-            opcode="slice",
-            result_type="tensor<1x384x6144xf8E4M3FN>",
-        )
-        if down_bit_slice.slice_ranges != (
-            (shard, shard + 1),
-            (0, 384),
-            (0, 6144),
-        ):
-            raise _MatchError(f"{down_bit_slice.name}: packed down slice drifted")
+        if single_virtual_shard:
+            down_bit_root = exact_single_rank_root(
+                down_bits_reshape.operands[0],
+                singleton_type="tensor<1x384x6144xf8E4M3FN>",
+                owner_type="tensor<1x1x384x6144xf8E4M3FN>",
+                ui8_type="tensor<1x384x6144xui8>",
+            )
+        else:
+            down_bit_slice = _expect_node(
+                graph,
+                down_bits_reshape.operands[0],
+                opcode="slice",
+                result_type="tensor<1x384x6144xf8E4M3FN>",
+            )
+            if down_bit_slice.slice_ranges != (
+                (shard, shard + 1),
+                (0, 384),
+                (0, 6144),
+            ):
+                raise _MatchError(
+                    f"{down_bit_slice.name}: packed down slice drifted"
+                )
+            down_bit_root = down_bit_slice.operands[0]
         down_scale_reshape = _expect_node(
             graph,
             down_scales,
             opcode="reshape",
             result_type="tensor<3x6144xf32>",
         )
-        down_scale_slice = _expect_node(
-            graph,
-            down_scale_reshape.operands[0],
-            opcode="slice",
-            result_type="tensor<1x3x6144xf32>",
-        )
-        if down_scale_slice.slice_ranges != (
-            (shard, shard + 1),
-            (0, 3),
-            (0, 6144),
-        ):
-            raise _MatchError(
-                f"{down_scale_slice.name}: packed down scale slice drifted"
+        if single_virtual_shard:
+            down_scale_root = exact_single_rank_root(
+                down_scale_reshape.operands[0],
+                singleton_type="tensor<1x3x6144xf32>",
+                owner_type="tensor<1x1x3x6144xf32>",
             )
-        down_bit_root = down_bit_slice.operands[0]
-        down_scale_root = down_scale_slice.operands[0]
+        else:
+            down_scale_slice = _expect_node(
+                graph,
+                down_scale_reshape.operands[0],
+                opcode="slice",
+                result_type="tensor<1x3x6144xf32>",
+            )
+            if down_scale_slice.slice_ranges != (
+                (shard, shard + 1),
+                (0, 3),
+                (0, 6144),
+            ):
+                raise _MatchError(
+                    f"{down_scale_slice.name}: packed down scale slice drifted"
+                )
+            down_scale_root = down_scale_slice.operands[0]
     else:
         down_bits_transpose = _expect_node(
             graph,
@@ -1551,6 +1619,213 @@ def _match_predense_rmsnorm(
     if weight_seed.dimensions != (1,) or len(weight_seed.operands) != 1:
         raise _MatchError("pre-dense RMSNorm weight seed drifted")
     return (sources[0], sources[1]), weight_seed.operands[0]
+
+
+def validate_isolated_dense_partial_stablehlo(
+    stablehlo: str,
+) -> dict[str, object]:
+    """Prove one exact M32 contraction per LP4 chip with no collective.
+
+    The same compiled program is executed eight times with separately sealed
+    virtual-rank weight slices.  This contract therefore proves exactly one
+    pre-dense RMSNorm -> gate/SwiGLU/down chain and its exact live row; the
+    artifact manifest binds each of the eight runtime input batches.
+    """
+
+    parsed, dependency_errors = _expand_dependency_barriers(stablehlo)
+    graphs, parse_errors = _parse_graphs(parsed)
+    violations = [*dependency_errors, *parse_errors]
+    matched = False
+    runtime_u8_bitcasts = 0
+    try:
+        graph = _only(
+            (item for item in graphs if item.name == "main"),
+            "isolated dense main graph",
+        )
+        helpers = {item.name: item for item in graphs if item is not graph}
+        gate_up = [
+            node
+            for node in graph.nodes.values()
+            if node.opcode == "convolution"
+            and node.result_type == "tensor<32x768xf32>"
+        ]
+        down = [
+            node
+            for node in graph.nodes.values()
+            if node.opcode == "convolution"
+            and node.result_type == "tensor<32x6144xf32>"
+        ]
+        if len(gate_up) != 1 or len(down) != 1:
+            raise _MatchError(
+                "isolated dense convolution count drifted: "
+                f"gate_up={len(gate_up)} down={len(down)}"
+            )
+        shard, roots, down_result, dependency, dependency_output = (
+            _match_one_shard(
+                graph,
+                gate_up[0],
+                compile_rows=32,
+                final_dense_layout=True,
+                single_virtual_shard=True,
+            )
+        )
+        if shard != 0 or dependency is not None or dependency_output is not None:
+            raise _MatchError("isolated dense virtual-rank identity drifted")
+        stacked = _expect_broadcast(
+            graph,
+            down_result,
+            dimensions=(1, 2),
+            result_type="tensor<1x32x6144xbf16>",
+        )
+        anchored = _expect_unary(
+            graph,
+            stacked.name,
+            opcode="optimization_barrier",
+            result_type="tensor<1x32x6144xbf16>",
+        )
+        live = _expect_slice(
+            graph,
+            anchored.name,
+            ((0, 1), (0, 1), (0, 6144)),
+            "tensor<1x1x6144xbf16>",
+        )
+        inner_return = _only(
+            (
+                node
+                for node in graph.nodes.values()
+                if node.opcode == "return"
+                and node.raw_line.startswith("sdy.return ")
+            ),
+            "isolated dense manual return",
+        )
+        if inner_return.operands[0] != live.name or len(inner_return.operands) != 2:
+            raise _MatchError("isolated dense live partial return drifted")
+        predense_sources, predense_norm = _match_predense_rmsnorm(
+            graph,
+            helpers,
+            roots[0],
+            inner_return.operands[1],
+        )
+        if (
+            predense_sources != ("%arg7", "%arg8")
+            or predense_norm != "%arg9"
+            or roots[1:] != ("%arg10", "%arg11", "%arg12", "%arg13")
+        ):
+            raise _MatchError("isolated dense manual source ownership drifted")
+        gate_users = {
+            node.name
+            for node in graph.users.get(roots[0], ())
+            if node.opcode == "convolution"
+        }
+        if gate_users != {gate_up[0].name}:
+            raise _MatchError(
+                "isolated pre-dense RMSNorm does not feed exactly one gate"
+            )
+        layout_constraints = [
+            node
+            for node in graph.nodes.values()
+            if node.opcode == "custom_call"
+            and "@LayoutConstraint(" in node.raw_line
+        ]
+        if len(layout_constraints) != 1:
+            raise _MatchError("isolated dense layout-constraint count drifted")
+        manual_matches = list(
+            re.finditer(
+                r"(?m)^\s*(%[A-Za-z0-9_.-]+):2\s*=\s*"
+                r"sdy\.manual_computation\(([^)]*)\)",
+                stablehlo,
+            )
+        )
+        if len(manual_matches) != 1:
+            raise _MatchError("isolated dense manual computation is not unique")
+        manual_result = manual_matches[0].group(1)
+        if [value.strip() for value in manual_matches[0].group(2).split(",")] != [
+            f"%arg{index}" for index in range(7)
+        ]:
+            raise _MatchError("isolated dense outer manual operands drifted")
+        manual_line = next(
+            line
+            for line in stablehlo.splitlines()
+            if f"{manual_result}:2 = sdy.manual_computation" in line
+        )
+        block_arguments = re.findall(
+            r"(%arg(?:7|8|9|10|11|12|13)):\s*(tensor<[^>]+>)",
+            manual_line,
+        )
+        allowed_block_arguments = (
+            [
+                ("%arg7", "tensor<1x6144xbf16>"),
+                ("%arg8", "tensor<1x6144xbf16>"),
+                ("%arg9", "tensor<6144xbf16>"),
+                ("%arg10", "tensor<1x1x6144x768xf8E4M3FN>"),
+                ("%arg11", "tensor<1x1x48x768xf32>"),
+                ("%arg12", "tensor<1x1x384x6144xf8E4M3FN>"),
+                ("%arg13", "tensor<1x1x3x6144xf32>"),
+            ],
+            [
+                ("%arg7", "tensor<1x6144xbf16>"),
+                ("%arg8", "tensor<1x6144xbf16>"),
+                ("%arg9", "tensor<6144xbf16>"),
+                ("%arg10", "tensor<1x1x6144x768xui8>"),
+                ("%arg11", "tensor<1x1x48x768xf32>"),
+                ("%arg12", "tensor<1x1x384x6144xui8>"),
+                ("%arg13", "tensor<1x1x3x6144xf32>"),
+            ],
+        )
+        if block_arguments not in allowed_block_arguments:
+            raise _MatchError("isolated dense manual block arguments drifted")
+        runtime_u8_bitcasts = stablehlo.count("stablehlo.bitcast_convert")
+        expected_bitcasts = 2 if block_arguments == allowed_block_arguments[1] else 0
+        if runtime_u8_bitcasts != expected_bitcasts:
+            raise _MatchError("isolated dense runtime U8 bitcast count drifted")
+        outer_return = _only(
+            (
+                node
+                for node in graph.nodes.values()
+                if node.opcode == "return"
+                and node.raw_line.startswith("return ")
+            ),
+            "isolated dense outer return",
+        )
+        if outer_return.operands != (
+            f"{manual_result}#0",
+            f"{manual_result}#1",
+        ):
+            raise _MatchError("isolated dense outer results drifted")
+        if len(graphs) != 2 or set(helpers) != {"_pad"}:
+            raise _MatchError("isolated dense helper set drifted")
+        matched = True
+    except (AttributeError, _MatchError, ValueError) as error:
+        violations.append(str(error))
+
+    collective_counts = {
+        opcode: stablehlo.count(f"stablehlo.{opcode}")
+        for opcode in (
+            "all_gather",
+            "all_reduce",
+            "all_to_all",
+            "collective_broadcast",
+            "collective_permute",
+            "reduce_scatter",
+        )
+    }
+    if any(collective_counts.values()):
+        violations.append(
+            f"isolated dense collective contract drifted: {collective_counts}"
+        )
+    if "xla_python_cpu_callback" in stablehlo or "host_callback" in stablehlo:
+        violations.append("isolated dense module contains a host callback")
+    return {
+        "collective_counts": collective_counts,
+        "convolution_count": stablehlo.count("stablehlo.convolution"),
+        "exact_result_binding": matched,
+        "gate_up_layout_constraint_count": stablehlo.count("@LayoutConstraint("),
+        "matched_virtual_shards": [0] if matched else [],
+        "runtime_u8_bitcast_count": runtime_u8_bitcasts,
+        "virtual_contractions_per_chip": 1,
+        "passed": not violations,
+        "violations": violations,
+    }
 
 
 def validate_dense_convolution_stablehlo(

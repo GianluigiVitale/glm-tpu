@@ -547,24 +547,29 @@ def _virtual_dense_final_layout_convolution_down_partials(
     *,
     block_shape: tuple[int, int],
     compile_rows: int = 32,
+    virtual_shards: int = _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER,
 ) -> Any:
     """Replay dense arithmetic from accepted ``[in, out]`` weight layout.
 
-    This diagnostic-only primitive consumes eight already-packed virtual TP32
-    shards.  Unlike :func:`_virtual_dense_convolution_down_partials`, it does
-    not transpose or concatenate checkpoint tensors in the compiled program.
-    That distinction lets the TPU layout assignment reproduce the accepted
-    row-major ``[in, out]`` convolution operands without changing any values.
+    This diagnostic-only primitive consumes one or eight already-packed
+    virtual TP32 shards.  The one-shard form is used only by the isolated
+    contraction discriminator; the production candidate retains eight shards.
+    Unlike :func:`_virtual_dense_convolution_down_partials`, it does not
+    transpose or concatenate checkpoint tensors in the compiled program. That
+    distinction lets TPU layout assignment reproduce the accepted row-major
+    ``[in, out]`` convolution operands without changing any values.
     """
 
     if compile_rows not in (1, 32):
         raise ValueError("final-layout dense requires one or 32 compile rows")
+    if virtual_shards not in (1, _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
+        raise ValueError("final-layout dense requires one or eight virtual shards")
     expected = {
         "normalized": (compile_rows, 6144),
-        "merged_bits_in_out": (8, 6144, 768),
-        "merged_scale_in_out": (8, 48, 768),
-        "down_bits_in_out": (8, 384, 6144),
-        "down_scale_in_out": (8, 3, 6144),
+        "merged_bits_in_out": (virtual_shards, 6144, 768),
+        "merged_scale_in_out": (virtual_shards, 48, 768),
+        "down_bits_in_out": (virtual_shards, 384, 6144),
+        "down_scale_in_out": (virtual_shards, 3, 6144),
     }
     values = {
         "normalized": normalized,
@@ -605,7 +610,7 @@ def _virtual_dense_final_layout_convolution_down_partials(
 
     partials = []
     previous_partial = None
-    for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
+    for shard in range(virtual_shards):
         with jax.named_scope(
             f"greenfield_dense_convolution_virtual_rank_{shard:02d}"
         ):

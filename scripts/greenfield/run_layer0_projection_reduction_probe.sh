@@ -141,6 +141,7 @@ DENSE_ENVELOPE=${GLM_GREENFIELD_DENSE_ENVELOPE:-0}
 DENSE_SPLIT_LAYER1_RMS=${GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS:-0}
 DENSE_CAPTURE_PARTIALS=${GLM_GREENFIELD_DENSE_CAPTURE_PARTIALS:-0}
 CAPTURED_RMS_REPLAY=${GLM_GREENFIELD_CAPTURED_RMS_REPLAY:-0}
+ISOLATED_DENSE_REPLAY=${GLM_GREENFIELD_ISOLATED_DENSE_REPLAY:-0}
 [[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
   exit 2
@@ -173,12 +174,20 @@ CAPTURED_RMS_REPLAY=${GLM_GREENFIELD_CAPTURED_RMS_REPLAY:-0}
   echo "GLM_GREENFIELD_CAPTURED_RMS_REPLAY must be 0 or 1" >&2
   exit 2
 }
-if [[ $CAPTURED_RMS_REPLAY == 1 && \
+[[ $ISOLATED_DENSE_REPLAY == 0 || $ISOLATED_DENSE_REPLAY == 1 ]] || {
+  echo "GLM_GREENFIELD_ISOLATED_DENSE_REPLAY must be 0 or 1" >&2
+  exit 2
+}
+if [[ $CAPTURED_RMS_REPLAY == 1 && $ISOLATED_DENSE_REPLAY == 1 ]]; then
+  echo "captured RMS and isolated dense replays are mutually exclusive" >&2
+  exit 2
+fi
+if [[ ( $CAPTURED_RMS_REPLAY == 1 || $ISOLATED_DENSE_REPLAY == 1 ) && \
       ! ( $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS == 1 && \
           $DENSE_LAYER1_ONLY == 0 && $DENSE_FINAL_LAYOUT == 0 && \
           $DENSE_ENVELOPE == 0 && $DENSE_SPLIT_LAYER1_RMS == 0 && \
           $DENSE_CAPTURE_PARTIALS == 0 ) ]]; then
-  echo "captured RMS replay is exclusive of dense/checkpoint modes" >&2
+  echo "bounded replays are exclusive of dense/checkpoint modes" >&2
   exit 2
 fi
 if [[ $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS != 1 ]]; then
@@ -211,7 +220,10 @@ if [[ $DENSE_CAPTURE_PARTIALS == 1 && \
   echo "dense partial capture requires the unsplit M32 final-layout envelope" >&2
   exit 2
 fi
-if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
+  TAG=${GLM_GREENFIELD_ISOLATED_DENSE_TAG:-greenfield_layer0_isolated_dense_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  TENSOR_BASENAME=isolated_dense_replay.npz
+elif [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_CAPTURED_RMS_TAG:-greenfield_layer0_captured_rms_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
   TENSOR_BASENAME=captured_rms_replay.npz
 elif [[ $DENSE_CONVOLUTION == 1 ]]; then
@@ -525,6 +537,306 @@ summary = {
 print("CAPTURED_RMS_REPLAY_VALID")
 PY
 }
+validate_isolated_dense_replay() {
+  /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$elapsed" "$TAG" \
+    "$CAPTURED_RMS_SOURCE_TENSOR_SHA" "$CAPTURED_RMS_SOURCE_RUNNER_SHA" \
+    "$CAPTURED_RMS_SOURCE_SUMMARY_SHA" "$CAPTURED_RMS_SOURCE_SUCCESS_SHA" \
+    "$CAPTURED_RMS_DB548_TENSOR_SHA" "$CAPTURED_RMS_DB548_RUNNER_SHA" \
+    "$CAPTURED_RMS_DB548_SUMMARY_SHA" "$CAPTURED_RMS_DB548_SUCCESS_SHA" \
+    "$CAPTURED_RMS_DB548_HLO_SHA" "$CAPTURED_RMS_DB549_TENSOR_SHA" \
+    "$CAPTURED_RMS_DB549_RUNNER_SHA" "$CAPTURED_RMS_DB549_SUMMARY_SHA" \
+    "$CAPTURED_RMS_DB549_SUCCESS_SHA" "$CAPTURED_RMS_DB549_HLO_SHA" \
+    "$CHECKPOINT_MANIFEST_SHA" <<'PY'
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+import math
+from pathlib import Path
+import sys
+
+import ml_dtypes
+import numpy as np
+
+(
+    run_dir_text,
+    pin,
+    elapsed_text,
+    run_tag,
+    capture_tensor_sha,
+    capture_runner_sha,
+    capture_summary_sha,
+    capture_success_sha,
+    db548_tensor_sha,
+    db548_runner_sha,
+    db548_summary_sha,
+    db548_success_sha,
+    db548_hlo_sha,
+    db549_tensor_sha,
+    db549_runner_sha,
+    db549_summary_sha,
+    db549_success_sha,
+    db549_hlo_sha,
+    checkpoint_manifest_sha,
+) = sys.argv[1:]
+root = Path(run_dir_text)
+runner_path = root / "runner.json"
+tensor_path = root / "isolated_dense_replay.npz"
+runner = json.loads(runner_path.read_text())
+
+def file_sha(path: Path) -> str:
+    return sha256(path.read_bytes()).hexdigest()
+
+def array_sha(value: np.ndarray) -> str:
+    return sha256(np.ascontiguousarray(value).tobytes(order="C")).hexdigest()
+
+def compare(reference: np.ndarray, observed: np.ndarray) -> dict[str, object]:
+    mismatch = reference != observed
+    indices = np.flatnonzero(mismatch)
+    expected_float = reference.view(ml_dtypes.bfloat16).astype(np.float32)
+    observed_float = observed.view(ml_dtypes.bfloat16).astype(np.float32)
+    errors = np.abs(expected_float - observed_float)
+    return {
+        "elementwise_exact": not bool(indices.size),
+        "expected_sha256": array_sha(reference),
+        "first_mismatch_index": None if not indices.size else int(indices[0]),
+        "max_abs_error": float(errors.max(initial=0.0)),
+        "mean_abs_error": float(errors.mean()),
+        "mismatch_count": int(indices.size),
+        "observed_sha256": array_sha(observed),
+        "shape": list(observed.shape),
+    }
+
+expected_source = {
+    "capture_runner_sha256": capture_runner_sha,
+    "capture_summary_sha256": capture_summary_sha,
+    "capture_success_sha256": capture_success_sha,
+    "capture_tensor_sha256": capture_tensor_sha,
+    "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+    "db548_hlo_sha256": db548_hlo_sha,
+    "db548_runner_sha256": db548_runner_sha,
+    "db548_summary_sha256": db548_summary_sha,
+    "db548_success_sha256": db548_success_sha,
+    "db548_tensor_sha256": db548_tensor_sha,
+    "db549_hlo_sha256": db549_hlo_sha,
+    "db549_runner_sha256": db549_runner_sha,
+    "db549_summary_sha256": db549_summary_sha,
+    "db549_success_sha256": db549_success_sha,
+    "db549_tensor_sha256": db549_tensor_sha,
+}
+expected_records = {
+    "dense.slot_00.merged_gate_up.weight_bits_in_out": {
+        "dtype": "float8_e4m3fn",
+        "sha256": "82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf",
+        "shape": [4, 8, 6144, 768],
+    },
+    "dense.slot_00.merged_gate_up.scale_inv_in_out": {
+        "dtype": "float32",
+        "sha256": "9b4bfee8b15d04545a277ba4e1ea0d3b73427a0f2cebf0a5f5fa4d7ab32bf8b3",
+        "shape": [4, 8, 48, 768],
+    },
+    "dense.slot_00.down.weight_bits_in_out": {
+        "dtype": "float8_e4m3fn",
+        "sha256": "8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e",
+        "shape": [4, 8, 384, 6144],
+    },
+    "dense.slot_00.down.scale_inv_in_out": {
+        "dtype": "float32",
+        "sha256": "f37e87987745d263d152ff17415d21d572fa3c73ad5888207f1aa44916f74bdd",
+        "shape": [4, 8, 3, 6144],
+    },
+}
+if not (
+    runner.get("artifact_kind") == "glm52_layer0_isolated_dense_replay"
+    and runner.get("code_hash") == pin
+    and runner.get("control_admissible") is True
+    and type(runner.get("exact")) is bool
+    and runner.get("exact_arms")
+    == (["isolated_virtual_contractions"] if runner["exact"] else [])
+    and runner.get("final_layout_records") == expected_records
+    and runner.get("performance_claim") is False
+    and runner.get("position") == 8155
+    and runner.get("source") == expected_source
+    and runner.get("status") == "SUCCESS"
+    and runner.get("virtual_contractions_per_chip") == 1
+    and runner.get("virtual_rank_batches") == 8
+):
+    raise SystemExit("isolated dense runner identity drifted")
+
+with np.load(tensor_path, allow_pickle=False) as payload:
+    expected_keys = {
+        "accepted_layer1_normalized_bfloat16_bits",
+        "captured_dense_virtual_partials_bfloat16_bits",
+        "control_layer1_normalized_bfloat16_bits",
+        "isolated_dense_virtual_partials_bfloat16_bits",
+        "isolated_layer1_normalized_bfloat16_bits",
+    }
+    if set(payload.files) != expected_keys:
+        raise SystemExit("isolated dense tensor key set drifted")
+    accepted = np.ascontiguousarray(
+        payload["accepted_layer1_normalized_bfloat16_bits"]
+    )
+    captured = np.ascontiguousarray(
+        payload["captured_dense_virtual_partials_bfloat16_bits"]
+    )
+    control = np.ascontiguousarray(
+        payload["control_layer1_normalized_bfloat16_bits"]
+    )
+    isolated_partials = np.ascontiguousarray(
+        payload["isolated_dense_virtual_partials_bfloat16_bits"]
+    )
+    isolated = np.ascontiguousarray(
+        payload["isolated_layer1_normalized_bfloat16_bits"]
+    )
+if not (
+    all(value.dtype == np.uint16 for value in (accepted, captured, control, isolated_partials, isolated))
+    and accepted.shape == control.shape == isolated.shape == (6144,)
+    and captured.shape == isolated_partials.shape == (4, 8, 1, 6144)
+    and array_sha(accepted)
+    == "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039"
+    and array_sha(captured)
+    == "9d9f65dddc7b622875872a33a6522c330c8fb5490c8cba14526553c211516e35"
+    and array_sha(control)
+    == "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005"
+):
+    raise SystemExit("isolated dense tensor identity drifted")
+comparison = compare(accepted, isolated)
+if runner.get("isolated_layer1_comparison") != comparison:
+    raise SystemExit("isolated dense layer1 comparison drifted")
+if runner.get("isolated_layer1_sha256") != array_sha(isolated):
+    raise SystemExit("isolated dense layer1 SHA drifted")
+partial_mismatch = captured != isolated_partials
+first_partial = np.argwhere(partial_mismatch)
+expected_partial = {
+    "elementwise_exact": not bool(first_partial.size),
+    "first_mismatch_index": (
+        None
+        if not first_partial.size
+        else [int(value) for value in first_partial[0]]
+    ),
+    "mismatch_count": int(np.count_nonzero(partial_mismatch)),
+    "per_virtual_rank": [
+        {
+            "mismatch_count": int(np.count_nonzero(partial_mismatch[:, rank])),
+            "virtual_rank": rank,
+        }
+        for rank in range(8)
+    ],
+}
+if runner.get("partial_comparison") != expected_partial:
+    raise SystemExit("isolated dense partial comparison drifted")
+exact = runner["exact"]
+if not (
+    runner.get("classification")
+    == (
+        "isolated_virtual_contractions_exact"
+        if exact
+        else "isolated_virtual_contractions_nonexact"
+    )
+    and comparison["elementwise_exact"] is exact
+):
+    raise SystemExit("isolated dense classification drifted")
+
+isolated_hlo = runner.get("hlo", {}).get("isolated_dense", {})
+rms_hlo = runner.get("hlo", {}).get("layer1_replay", {})
+isolated_stable = isolated_hlo.get("stablehlo_contract", {})
+isolated_optimized = isolated_hlo.get("optimized_contract", {})
+rms_stable = rms_hlo.get("stablehlo_contract", {})
+rms_optimized = rms_hlo.get("optimized_contract", {})
+expected_hlo_files = {
+    "isolated_dense": (
+        root / "hlo/isolated_dense.stablehlo.mlir",
+        root / "hlo/isolated_dense.optimized_hlo.txt",
+    ),
+    "layer1_replay": (
+        root / "hlo/layer1_replay.stablehlo.mlir",
+        root / "hlo/layer1_replay.optimized_hlo.txt",
+    ),
+}
+if not (
+    isolated_stable.get("passed") is True
+    and isolated_stable.get("violations") == []
+    and isolated_stable.get("convolution_count") == 2
+    and isolated_stable.get("exact_result_binding") is True
+    and isolated_stable.get("matched_virtual_shards") == [0]
+    and isolated_stable.get("virtual_contractions_per_chip") == 1
+    and not any(isolated_stable.get("collective_counts", {}).values())
+    and isolated_optimized.get("passed") is True
+    and isolated_optimized.get("violations") == []
+    and isolated_optimized.get("accepted_gate_up_schedule") is True
+    and isolated_optimized.get("accepted_down_schedule") is True
+    and isolated_optimized.get("async_collectives") == []
+    and isolated_optimized.get("collective_count") == 0
+    and isolated_optimized.get("convolution_count") == 2
+    and isolated_optimized.get("gate_up_convolution_count") == 1
+    and isolated_optimized.get("down_convolution_count") == 1
+    and isolated_optimized.get("exact_accepted_kernel_geometry") is True
+    and isolated_optimized.get("exact_accepted_weight_layout") is True
+    and isolated_optimized.get("exact_activation_graph") is True
+    and isolated_optimized.get("exact_carried_residual_binding") is True
+    and isolated_optimized.get("exact_packed_weight_lineage") is True
+    and isolated_optimized.get("exact_result_binding") is True
+    and isolated_optimized.get("final_dense_layout") is True
+    and isolated_optimized.get("dense_envelope") is True
+    and isolated_optimized.get("isolated_dense") is True
+    and isolated_optimized.get("live_rows") == 1
+    and isolated_optimized.get("num_partitions") == 4
+    and isolated_optimized.get("num_replicas") in (None, 1)
+    and isolated_optimized.get("performance_claim") is False
+    and rms_stable.get("passed") is True
+    and rms_stable.get("violations") == []
+    and rms_stable.get("exact_result_binding") is True
+    and rms_stable.get("split_layer1_rms") is False
+    and rms_optimized.get("passed") is True
+    and rms_optimized.get("violations") == []
+    and rms_optimized.get("collective_count") == 1
+    and rms_optimized.get("exact_result_binding") is True
+    and rms_optimized.get("split_layer1_rms") is False
+):
+    raise SystemExit("isolated dense HLO contract drifted")
+for name, (stable_path, optimized_path) in expected_hlo_files.items():
+    if not (
+        runner["hlo"][name]["stablehlo_sha256"] == file_sha(stable_path)
+        and runner["hlo"][name]["optimized_sha256"] == file_sha(optimized_path)
+    ):
+        raise SystemExit("isolated dense HLO file hash drifted")
+
+summary = {
+    "artifact_kind": runner["artifact_kind"],
+    "classification": runner["classification"],
+    "code_hash": pin,
+    "control_admissible": True,
+    "elapsed_seconds": int(elapsed_text),
+    "exact": exact,
+    "exact_arms": runner["exact_arms"],
+    "final_layout_records": expected_records,
+    "hlo": {
+        name: {
+            "optimized_sha256": runner["hlo"][name]["optimized_sha256"],
+            "stablehlo_sha256": runner["hlo"][name]["stablehlo_sha256"],
+        }
+        for name in ("isolated_dense", "layer1_replay")
+    },
+    "isolated_layer1_comparison": comparison,
+    "isolated_layer1_sha256": array_sha(isolated),
+    "partial_comparison": expected_partial,
+    "performance_claim": False,
+    "position": 8155,
+    "results_db_run_id": None,
+    "run_tag": run_tag,
+    "runner_sha256": file_sha(runner_path),
+    "source": expected_source,
+    "status": "SUCCESS",
+    "tensor_sha256": file_sha(tensor_path),
+    "virtual_contractions_per_chip": 1,
+    "virtual_rank_batches": 8,
+}
+(root / "summary.json").write_text(
+    json.dumps(summary, indent=2, sort_keys=True) + "\n"
+)
+print("ISOLATED_DENSE_REPLAY_VALID")
+PY
+}
 if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
   capture_partials_probe_args=(--capture-partials)
 fi
@@ -599,7 +911,7 @@ strict_census() {
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   local command
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_projection_reduction[.]py|[p]robe_layer0_dense_convolution[.]py|[p]robe_layer0_captured_rms[.]py|[p]robe_layer0_attention_arithmetic[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_projection_reduction[.]py|[p]robe_layer0_dense_convolution[.]py|[p]robe_layer0_captured_rms[.]py|[p]robe_layer0_isolated_dense[.]py|[p]robe_layer0_attention_arithmetic[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
     --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
@@ -609,7 +921,7 @@ post_census_done=0
 terminal_success_done=0
 
 rollback_provisional_db() {
-  if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  if [[ $CAPTURED_RMS_REPLAY == 1 || $ISOLATED_DENSE_REPLAY == 1 ]]; then
     echo "NO_PROVISIONAL_DB_RUN" >"$RUN_DIR/provisional_db_rollback.txt"
     return 0
   fi
@@ -1135,7 +1447,7 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR PIN=$PIN"
-if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+if [[ $CAPTURED_RMS_REPLAY == 1 || $ISOLATED_DENSE_REPLAY == 1 ]]; then
   require_sha "$CAPTURED_RMS_SOURCE_TENSOR" "$CAPTURED_RMS_SOURCE_TENSOR_SHA" "captured RMS source tensor"
   require_sha "$CAPTURED_RMS_SOURCE_RUNNER" "$CAPTURED_RMS_SOURCE_RUNNER_SHA" "captured RMS source runner"
   require_sha "$CAPTURED_RMS_SOURCE_SUMMARY" "$CAPTURED_RMS_SOURCE_SUMMARY_SHA" "captured RMS source summary"
@@ -1165,6 +1477,12 @@ if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
   require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/summary.json" "$CAPTURED_RMS_DB549_SUMMARY_SHA" "captured RMS DB549 summary"
   require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/SUCCESS" "$CAPTURED_RMS_DB549_SUCCESS_SHA" "captured RMS DB549 SUCCESS"
   require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/hlo/dense_convolution.optimized_hlo.txt" "$CAPTURED_RMS_DB549_HLO_SHA" "captured RMS DB549 HLO"
+  if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
+    require_sha "$CHECKPOINT_ROOT/SUCCESS" "$CHECKPOINT_SUCCESS_SHA" "checkpoint SUCCESS"
+    require_sha "$CHECKPOINT_ROOT/runtime_manifest.json" "$CHECKPOINT_MANIFEST_SHA" "checkpoint manifest"
+    require_remote_sha "$CHECKPOINT_REMOTE/SUCCESS" "$CHECKPOINT_SUCCESS_SHA" "checkpoint SUCCESS"
+    require_remote_sha "$CHECKPOINT_REMOTE/runtime_manifest.json" "$CHECKPOINT_MANIFEST_SHA" "checkpoint manifest"
+  fi
 else
 require_sha "$ATTENTION_TENSOR" "$ATTENTION_TENSOR_SHA" "DB537 tensor"
 require_sha "$ATTENTION_RUNNER" "$ATTENTION_RUNNER_SHA" "DB537 runner"
@@ -1275,7 +1593,53 @@ strict_census pre || {
 }
 
 started=$(date +%s)
-if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
+  say "replaying one layer-0 virtual contraction per physical chip"
+  (
+    cd "$WORKTREE"
+    JAX_PLATFORMS=tpu \
+      TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+      TPU_PROCESS_BOUNDS=1,1,1 \
+      TPU_VISIBLE_DEVICES=0,1,2,3 \
+      PYTHONPATH="$WORKTREE" \
+      /home/gianl/vllm-env/bin/python \
+        scripts/greenfield/probe_layer0_isolated_dense.py \
+        --expected-code-hash "$PIN" \
+        --capture-tensor "$CAPTURED_RMS_SOURCE_TENSOR" \
+        --capture-tensor-sha256 "$CAPTURED_RMS_SOURCE_TENSOR_SHA" \
+        --capture-runner "$CAPTURED_RMS_SOURCE_RUNNER" \
+        --capture-runner-sha256 "$CAPTURED_RMS_SOURCE_RUNNER_SHA" \
+        --capture-summary "$CAPTURED_RMS_SOURCE_SUMMARY" \
+        --capture-summary-sha256 "$CAPTURED_RMS_SOURCE_SUMMARY_SHA" \
+        --capture-success "$CAPTURED_RMS_SOURCE_SUCCESS" \
+        --capture-success-sha256 "$CAPTURED_RMS_SOURCE_SUCCESS_SHA" \
+        --db548-tensor "$CAPTURED_RMS_DB548_TENSOR" \
+        --db548-tensor-sha256 "$CAPTURED_RMS_DB548_TENSOR_SHA" \
+        --db548-runner "$CAPTURED_RMS_DB548_RUNNER" \
+        --db548-runner-sha256 "$CAPTURED_RMS_DB548_RUNNER_SHA" \
+        --db548-summary "$CAPTURED_RMS_DB548_SUMMARY" \
+        --db548-summary-sha256 "$CAPTURED_RMS_DB548_SUMMARY_SHA" \
+        --db548-success "$CAPTURED_RMS_DB548_SUCCESS" \
+        --db548-success-sha256 "$CAPTURED_RMS_DB548_SUCCESS_SHA" \
+        --db548-hlo "$CAPTURED_RMS_DB548_HLO" \
+        --db548-hlo-sha256 "$CAPTURED_RMS_DB548_HLO_SHA" \
+        --db549-tensor "$CAPTURED_RMS_DB549_TENSOR" \
+        --db549-tensor-sha256 "$CAPTURED_RMS_DB549_TENSOR_SHA" \
+        --db549-runner "$CAPTURED_RMS_DB549_RUNNER" \
+        --db549-runner-sha256 "$CAPTURED_RMS_DB549_RUNNER_SHA" \
+        --db549-summary "$CAPTURED_RMS_DB549_SUMMARY" \
+        --db549-summary-sha256 "$CAPTURED_RMS_DB549_SUMMARY_SHA" \
+        --db549-success "$CAPTURED_RMS_DB549_SUCCESS" \
+        --db549-success-sha256 "$CAPTURED_RMS_DB549_SUCCESS_SHA" \
+        --db549-hlo "$CAPTURED_RMS_DB549_HLO" \
+        --db549-hlo-sha256 "$CAPTURED_RMS_DB549_HLO_SHA" \
+        --checkpoint-root "$CHECKPOINT_ROOT" \
+        --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
+        --output "$RUN_DIR/runner.json" \
+        --tensor-output "$RUN_DIR/$TENSOR_BASENAME" \
+        --hlo-dir "$RUN_DIR/hlo"
+  ) >"$RUN_DIR/runner.log" 2>&1
+elif [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
   say "replaying sealed dense partials through isolated layer-1 RMS arms"
   (
     cd "$WORKTREE"
@@ -1396,7 +1760,9 @@ strict_census post || {
 }
 post_census_done=1
 
-if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
+  validate_isolated_dense_replay
+elif [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
   validate_captured_rms_replay
 elif [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
   /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$elapsed" "$TAG" \
@@ -2529,6 +2895,152 @@ import google_crc32c
 
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
+if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
+    runner = json.loads((root / "runner.json").read_text())
+    exact = summary.get("exact")
+    exact_schema = bool(
+        exact is True
+        and summary.get("classification")
+        == "isolated_virtual_contractions_exact"
+        and summary.get("exact_arms") == ["isolated_virtual_contractions"]
+    )
+    nonexact_schema = bool(
+        exact is False
+        and summary.get("classification")
+        == "isolated_virtual_contractions_nonexact"
+        and summary.get("exact_arms") == []
+    )
+    actual_hlo = {
+        name: {
+            "optimized_sha256": sha256(
+                (root / "hlo" / f"{name}.optimized_hlo.txt").read_bytes()
+            ).hexdigest(),
+            "stablehlo_sha256": sha256(
+                (root / "hlo" / f"{name}.stablehlo.mlir").read_bytes()
+            ).hexdigest(),
+        }
+        for name in ("isolated_dense", "layer1_replay")
+    }
+    evidence_records = {}
+    for line in (root / "evidence.sha256").read_text().splitlines():
+        digest, relative = line.split(None, 1)
+        evidence_records[relative.strip()] = digest
+
+    def local_crc32c(path: Path) -> str:
+        checksum = google_crc32c.Checksum()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+                checksum.update(chunk)
+        return base64.b64encode(checksum.digest()).decode()
+
+    ledger = json.loads((root / "remote_objects.json").read_text())
+    ledger_by_path = {
+        record["path"]: record for record in ledger.get("objects", ())
+    }
+    expected_ledger_paths = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.name not in {"SUCCESS", "remote_objects.json"}
+    }
+    exact_ledger = bool(
+        set(ledger_by_path) == expected_ledger_paths
+        and all(
+            record.get("size") == (root / relative).stat().st_size
+            and record.get("crc32c") == local_crc32c(root / relative)
+            and isinstance(record.get("generation"), str)
+            and record["generation"]
+            for relative, record in ledger_by_path.items()
+        )
+    )
+    evidence_bound = bool(
+        evidence_records.get("summary.json")
+        == sha256((root / "summary.json").read_bytes()).hexdigest()
+        and evidence_records.get("runner.json")
+        == sha256((root / "runner.json").read_bytes()).hexdigest()
+        and evidence_records.get("isolated_dense_replay.npz")
+        == sha256((root / "isolated_dense_replay.npz").read_bytes()).hexdigest()
+        and all(
+            evidence_records.get(f"hlo/{name}.{suffix}") == digest
+            for name in ("isolated_dense", "layer1_replay")
+            for suffix, digest in (
+                ("optimized_hlo.txt", actual_hlo[name]["optimized_sha256"]),
+                ("stablehlo.mlir", actual_hlo[name]["stablehlo_sha256"]),
+            )
+        )
+    )
+    if not (
+        summary.get("code_hash") == sys.argv[3]
+        and runner.get("artifact_kind") == summary["artifact_kind"]
+        and runner.get("code_hash") == summary["code_hash"]
+        and runner.get("classification") == summary["classification"]
+        and runner.get("control_admissible") is True
+        and runner.get("exact") is exact
+        and runner.get("exact_arms") == summary.get("exact_arms")
+        and runner.get("source") == summary.get("source")
+        and runner.get("final_layout_records")
+        == summary.get("final_layout_records")
+        and runner.get("isolated_layer1_comparison")
+        == summary.get("isolated_layer1_comparison")
+        and runner.get("isolated_layer1_sha256")
+        == summary.get("isolated_layer1_sha256")
+        and runner.get("partial_comparison")
+        == summary.get("partial_comparison")
+        and all(
+            actual_hlo[name] == summary["hlo"][name]
+            and actual_hlo[name]["optimized_sha256"]
+            == runner["hlo"][name]["optimized_sha256"]
+            and actual_hlo[name]["stablehlo_sha256"]
+            == runner["hlo"][name]["stablehlo_sha256"]
+            for name in ("isolated_dense", "layer1_replay")
+        )
+        and evidence_bound
+        and exact_ledger
+        and summary.get("performance_claim") is False
+        and summary.get("position") == 8155
+        and summary.get("results_db_run_id") is None
+        and summary.get("runner_sha256")
+        == sha256((root / "runner.json").read_bytes()).hexdigest()
+        and summary.get("tensor_sha256")
+        == sha256((root / "isolated_dense_replay.npz").read_bytes()).hexdigest()
+        and summary.get("status") == "SUCCESS"
+        and summary.get("virtual_contractions_per_chip") == 1
+        and summary.get("virtual_rank_batches") == 8
+        and (exact_schema or nonexact_schema)
+    ):
+        raise SystemExit("isolated dense replay summary drifted before SUCCESS")
+    values = {
+        "artifact_kind": summary["artifact_kind"],
+        "classification": summary["classification"],
+        "code_hash": sys.argv[3],
+        "control_admissible": "true",
+        "evidence_sha256": sha256(
+            (root / "evidence.sha256").read_bytes()
+        ).hexdigest(),
+        "exact": str(exact).lower(),
+        "exact_arms": ",".join(summary["exact_arms"]) or "none",
+        "isolated_layer1_sha256": summary["isolated_layer1_sha256"],
+        "performance_claim": "false",
+        "remote_objects_sha256": sha256(
+            (root / "remote_objects.json").read_bytes()
+        ).hexdigest(),
+        "remote_prefix": sys.argv[2],
+        "results_db_run_id": "none",
+        "runner_sha256": summary["runner_sha256"],
+        "tensor_sha256": summary["tensor_sha256"],
+        "virtual_contractions_per_chip": "1",
+        "virtual_rank_batches": "8",
+    }
+    for name, hashes in sorted(actual_hlo.items()):
+        values[f"{name}_optimized_hlo_sha256"] = hashes[
+            "optimized_sha256"
+        ]
+        values[f"{name}_stablehlo_sha256"] = hashes["stablehlo_sha256"]
+    for key, value in sorted(summary.get("source", {}).items()):
+        values[f"source_{key}"] = value
+    (root / "SUCCESS").write_text(
+        "".join(f"{key}={value}\n" for key, value in sorted(values.items()))
+    )
+    raise SystemExit(0)
 if summary.get("artifact_kind") == "glm52_layer0_captured_rms_replay":
     runner = json.loads((root / "runner.json").read_text())
     arms = summary.get("arms")

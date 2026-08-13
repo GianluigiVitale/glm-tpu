@@ -748,6 +748,7 @@ def _validate_optimized_hlo(
     final_dense_layout: bool = False,
     dense_envelope: bool = False,
     split_layer1_rms: bool = False,
+    isolated_dense: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -756,7 +757,9 @@ def _validate_optimized_hlo(
 
     if compile_rows not in (1, 32):
         raise ValueError("dense optimized-HLO compile rows must be 1 or 32")
-    if final_dense_layout and (compile_rows != 32 or not layer1_only):
+    if final_dense_layout and (
+        compile_rows != 32 or (not layer1_only and not isolated_dense)
+    ):
         raise ValueError(
             "final-layout dense optimized-HLO proof requires M32 layer1-only"
         )
@@ -769,6 +772,16 @@ def _validate_optimized_hlo(
     ):
         raise ValueError(
             "split layer-1 RMS proof requires the M32 dense envelope"
+        )
+    if isolated_dense and not (
+        compile_rows == 32
+        and final_dense_layout
+        and dense_envelope
+        and not layer1_only
+        and not split_layer1_rms
+    ):
+        raise ValueError(
+            "isolated dense proof requires the M32 final-layout envelope"
         )
     module = parse_hlo_module(optimized_hlo)
     by_key = {_instruction_key(item): item for item in module.instructions}
@@ -1038,12 +1051,40 @@ def _validate_optimized_hlo(
     }
     expected_packed_parameters = {
         "gate_up": (
-            (3 if dense_envelope else 2, "f8e4m3fn[1,8,6144,768]"),
-            (4 if dense_envelope else 3, "f32[1,8,48,768]"),
+            (
+                3 if dense_envelope else 2,
+                (
+                    "f8e4m3fn[1,1,6144,768]"
+                    if isolated_dense
+                    else "f8e4m3fn[1,8,6144,768]"
+                ),
+            ),
+            (
+                4 if dense_envelope else 3,
+                (
+                    "f32[1,1,48,768]"
+                    if isolated_dense
+                    else "f32[1,8,48,768]"
+                ),
+            ),
         ),
         "down": (
-            (5 if dense_envelope else 4, "f8e4m3fn[1,8,384,6144]"),
-            (6 if dense_envelope else 5, "f32[1,8,3,6144]"),
+            (
+                5 if dense_envelope else 4,
+                (
+                    "f8e4m3fn[1,1,384,6144]"
+                    if isolated_dense
+                    else "f8e4m3fn[1,8,384,6144]"
+                ),
+            ),
+            (
+                6 if dense_envelope else 5,
+                (
+                    "f32[1,1,3,6144]"
+                    if isolated_dense
+                    else "f32[1,8,3,6144]"
+                ),
+            ),
         ),
     }
 
@@ -1084,14 +1125,16 @@ def _validate_optimized_hlo(
         return by_key.get((root.computation, root.operand_names[index]))
 
     def slice_ranges(item: Any) -> tuple[tuple[int, int], ...] | None:
-        match = re.search(r"\bslice=\{([^}]*)\}", item.raw_line)
-        if match is None:
+        matches = re.findall(
+            r"\bslice=\{([^}]*)\}", unquoted_hlo(item.raw_line)
+        )
+        if len(matches) != 1:
             return None
         ranges = tuple(
             (int(start), int(stop))
             for start, stop in re.findall(
                 r"\[(-?[0-9]+):(-?[0-9]+)(?::[0-9]+)?\]",
-                match.group(1),
+                matches[0],
             )
         )
         return ranges or None
@@ -1313,7 +1356,9 @@ def _validate_optimized_hlo(
             try:
                 if item.raw_opcode == "parameter":
                     if item.computation.startswith("ENTRY "):
-                        return item is expected and selected_rank
+                        return item is expected and (
+                            selected_rank or isolated_dense
+                        )
                     return walk(external_parameter_value(item), selected_rank)
                 if item.raw_opcode == "fusion":
                     return walk(fusion_result(item), selected_rank)
@@ -1870,16 +1915,24 @@ def _validate_optimized_hlo(
         in (item.op_name or "").split("/")
     ]
     violations = []
+    expected_virtual_ranks = {0} if isolated_dense else set(range(8))
+    expected_convolution_count = len(expected_virtual_ranks)
     if module.num_partitions != 4 or module.num_replicas not in (None, 1):
         violations.append("optimized module cardinality drifted")
-    if len(gate_up) != 8 or len(down) != 8 or unexpected:
+    if (
+        len(gate_up) != expected_convolution_count
+        or len(down) != expected_convolution_count
+        or unexpected
+    ):
         violations.append(
             "optimized convolution geometry/count drifted: "
             f"gate_up={len(gate_up)} down={len(down)} unexpected={unexpected}"
         )
     exact_accepted_weight_layout = (
-        len(accepted_weight_layouts["gate_up"]) == 8
-        and len(accepted_weight_layouts["down"]) == 8
+        len(accepted_weight_layouts["gate_up"])
+        == expected_convolution_count
+        and len(accepted_weight_layouts["down"])
+        == expected_convolution_count
         and all(
             record["accepted"]
             for records in accepted_weight_layouts.values()
@@ -1890,7 +1943,11 @@ def _validate_optimized_hlo(
         not final_dense_layout
         or (
             set(entry_parameters)
-            == set(range(8 if dense_envelope else 7))
+            == set(
+                range(
+                    7 if isolated_dense else 8 if dense_envelope else 7
+                )
+            )
             and all(
                 record["exact_packed_dequant"]
                 for records in accepted_weight_layouts.values()
@@ -1902,7 +1959,7 @@ def _validate_optimized_hlo(
                     for record in records
                     if record["virtual_rank"] is not None
                 }
-                == set(range(8))
+                == expected_virtual_ranks
                 for records in accepted_weight_layouts.values()
             )
         )
@@ -1926,6 +1983,700 @@ def _validate_optimized_hlo(
         violations.append("accepted dense convolution tiling drifted")
     if async_collectives:
         violations.append(f"async collectives are forbidden: {async_collectives}")
+
+    if isolated_dense:
+        if collectives:
+            violations.append("isolated dense program contains a collective")
+
+        def value_shape(item: Any | None) -> tuple[str, tuple[int, ...]] | None:
+            if item is None or len(item.result_shapes) != 1:
+                return None
+            result = item.result_shapes[0]
+            return result.dtype, result.dimensions
+
+        def exact_one(item: Any | None) -> bool:
+            seen: set[tuple[str, str]] = set()
+            while item is not None and _instruction_key(item) not in seen:
+                seen.add(_instruction_key(item))
+                if item.raw_opcode == "constant":
+                    literals = re.findall(
+                        r"\bconstant\(([^)]*)\)",
+                        unquoted_hlo(item.raw_line),
+                    )
+                    return bool(
+                        len(literals) == 1
+                        and re.fullmatch(
+                            r"1(?:\.0*)?(?:[eE][+-]?0+)?",
+                            literals[0],
+                        )
+                    )
+                if item.raw_opcode in {
+                    "broadcast",
+                    "broadcast-in-dim",
+                    "convert",
+                } and len(item.operand_names) == 1:
+                    item = operand(item, 0)
+                    continue
+                return False
+            return False
+
+        def exact_unit_layout_edge(item: Any, source: Any) -> bool:
+            source_shape = value_shape(source)
+            result_shape = value_shape(item)
+            if source_shape is None or result_shape is None:
+                return False
+            source_dtype, source_dimensions = source_shape
+            result_dtype, result_dimensions = result_shape
+            if source_dtype != result_dtype:
+                return False
+            source_nonunit = tuple(
+                value for value in source_dimensions if value != 1
+            )
+            result_nonunit = tuple(
+                value for value in result_dimensions if value != 1
+            )
+            if source_nonunit != result_nonunit:
+                return False
+            source_layout = result_minor_to_major(source)
+            result_layout = result_minor_to_major(item)
+            if source_layout is None or result_layout is None:
+                return False
+            source_physical = tuple(
+                source_dimensions[axis]
+                for axis in source_layout
+                if source_dimensions[axis] != 1
+            )
+            result_physical = tuple(
+                result_dimensions[axis]
+                for axis in result_layout
+                if result_dimensions[axis] != 1
+            )
+            return source_physical == result_physical
+
+        def exact_zero_s32(item: Any | None) -> bool:
+            literals = (
+                []
+                if item is None
+                else re.findall(
+                    r"\bconstant\(([^)]*)\)",
+                    unquoted_hlo(item.raw_line),
+                )
+            )
+            return bool(
+                item is not None
+                and item.raw_opcode == "constant"
+                and _shape_signatures(item.result_shapes) == ("s32[]",)
+                and literals == ["0"]
+            )
+
+        def exact_dense_value_path(
+            value: Any | None,
+            source: Any,
+            *,
+            allow_live_row_slice: bool,
+            allow_bf16_round: bool,
+        ) -> bool:
+            """Trace only the exact value-preserving/rounding dense result path."""
+
+            visiting: set[tuple[str, str]] = set()
+
+            def walk(item: Any | None, round_available: bool) -> bool:
+                if item is None:
+                    return False
+                if _instruction_key(item) == _instruction_key(source):
+                    return True
+                key = _instruction_key(item)
+                if key in visiting:
+                    return False
+                visiting.add(key)
+                try:
+                    if item.raw_opcode == "parameter" and not item.computation.startswith(
+                        "ENTRY "
+                    ):
+                        return walk(external_parameter_value(item), round_available)
+                    if item.raw_opcode == "fusion":
+                        return walk(called_root(item), round_available)
+                    if item.raw_opcode == "get-tuple-element":
+                        if len(item.operand_names) != 1:
+                            return False
+                        producer = operand(item, 0)
+                        index = _tuple_index(item)
+                        if producer is None or index is None:
+                            return False
+                        if producer.raw_opcode == "fusion":
+                            return walk(fusion_result(producer, index), round_available)
+                        if (
+                            producer.raw_opcode == "tuple"
+                            and index < len(producer.operand_names)
+                        ):
+                            return walk(operand(producer, index), round_available)
+                        return False
+                    if item.raw_opcode in {"copy", "optimization-barrier"}:
+                        parent = operand(item, 0)
+                        return bool(
+                            len(item.operand_names) == 1
+                            and parent is not None
+                            and value_shape(item) == value_shape(parent)
+                            and (
+                                item.raw_opcode == "copy"
+                                or result_minor_to_major(item) is not None
+                                and result_minor_to_major(item)
+                                == result_minor_to_major(parent)
+                            )
+                            and walk(parent, round_available)
+                        )
+                    if item.raw_opcode in {"bitcast", "reshape"}:
+                        parent = operand(item, 0)
+                        return bool(
+                            len(item.operand_names) == 1
+                            and parent is not None
+                            and exact_unit_layout_edge(item, parent)
+                            and walk(parent, round_available)
+                        )
+                    if item.raw_opcode == "convert":
+                        parent = operand(item, 0)
+                        parent_shape = value_shape(parent)
+                        item_shape = value_shape(item)
+                        exact_widen = bool(
+                            parent_shape is not None
+                            and item_shape is not None
+                            and parent_shape[0] == "bf16"
+                            and item_shape[0] == "f32"
+                            and parent_shape[1] == item_shape[1]
+                        )
+                        exact_round = bool(
+                            round_available
+                            and parent_shape is not None
+                            and item_shape is not None
+                            and parent_shape[0] == "f32"
+                            and item_shape[0] == "bf16"
+                            and parent_shape[1] == item_shape[1]
+                            and exact_bf16_round(item)
+                        )
+                        return bool(
+                            len(item.operand_names) == 1
+                            and parent is not None
+                            and (exact_widen or exact_round)
+                            and walk(
+                                parent,
+                                False if exact_round else round_available,
+                            )
+                        )
+                    if item.raw_opcode == "slice" and allow_live_row_slice:
+                        parent = operand(item, 0)
+                        parent_shape = value_shape(parent)
+                        result_shape = value_shape(item)
+                        ranges = slice_ranges(item)
+                        accepted = {
+                            (
+                                ("bf16", (32, 6144)),
+                                ("bf16", (1, 6144)),
+                                ((0, 1), (0, 6144)),
+                            ),
+                            (
+                                ("bf16", (1, 32, 6144)),
+                                ("bf16", (1, 1, 6144)),
+                                ((0, 1), (0, 1), (0, 6144)),
+                            ),
+                        }
+                        return bool(
+                            parent is not None
+                            and (parent_shape, result_shape, ranges) in accepted
+                            and walk(parent, round_available)
+                        )
+                    if item.raw_opcode == "dynamic-update-slice":
+                        if (
+                            len(item.operand_names) != 5
+                            or value_shape(item) != ("bf16", (1, 32, 6144))
+                        ):
+                            return False
+                        base = operand(item, 0)
+                        update = operand(item, 1)
+                        return bool(
+                            base is not None
+                            and base.raw_opcode == "custom-call"
+                            and not base.operand_names
+                            and re.findall(
+                                r'\bcustom_call_target="([^"]+)"',
+                                base.raw_line,
+                            )
+                            == ["AllocateBuffer"]
+                            and value_shape(base) == value_shape(item)
+                            and all(
+                                exact_zero_s32(operand(item, index))
+                                for index in (2, 3, 4)
+                            )
+                            and walk(update, round_available)
+                        )
+                    return False
+                finally:
+                    visiting.remove(key)
+
+            return walk(value, allow_bf16_round)
+
+        exact_activation_graph = False
+        gate_external = None
+        down_external = None
+        if len(gate_up) == 1 and len(down) == 1:
+            gate_values = exact_external_values(gate_up[0])
+            down_values = exact_external_values(down[0])
+            gate_external = gate_values[0] if len(gate_values) == 1 else None
+            down_external = down_values[0] if len(down_values) == 1 else None
+            activation_shapes = {"bf16[32,384]", "f32[32,384]"}
+            scoped_activation = [
+                item
+                for item in module.instructions
+                if virtual_rank(item) == 0
+                and set(_shape_signatures(item.result_shapes))
+                & activation_shapes
+            ]
+            selected = {
+                opcode: [
+                    item
+                    for item in scoped_activation
+                    if item.raw_opcode == opcode
+                ]
+                for opcode in (
+                    "negate",
+                    "exponential",
+                    "add",
+                    "divide",
+                    "multiply",
+                )
+            }
+            if (
+                gate_external is not None
+                and down_external is not None
+                and len(selected["negate"]) == 1
+                and len(selected["exponential"]) == 1
+                and len(selected["add"]) == 1
+                and len(selected["divide"]) == 1
+                and len(selected["multiply"]) == 2
+            ):
+                negate = selected["negate"][0]
+                exponential = selected["exponential"][0]
+                denominator = selected["add"][0]
+                sigmoid = selected["divide"][0]
+                slices = [
+                    item
+                    for item in scoped_activation
+                    if item.raw_opcode == "slice"
+                    and value_shape(item) == ("bf16", (32, 384))
+                ]
+                gate_slice = next(
+                    (
+                        item
+                        for item in slices
+                        if slice_ranges(item)
+                        == ((0, 32), (0, 384))
+                    ),
+                    None,
+                )
+                up_slice = next(
+                    (
+                        item
+                        for item in slices
+                        if slice_ranges(item)
+                        == ((0, 32), (384, 768))
+                    ),
+                    None,
+                )
+                multiplications = selected["multiply"]
+                silu = next(
+                    (
+                        item
+                        for item in multiplications
+                        if gate_slice is not None
+                        and exact_dense_value_path(
+                            operand(item, 0),
+                            gate_slice,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=True,
+                        )
+                        and exact_dense_value_path(
+                            operand(item, 1),
+                            sigmoid,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=False,
+                        )
+                        or gate_slice is not None
+                        and exact_dense_value_path(
+                            operand(item, 1),
+                            gate_slice,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=True,
+                        )
+                        and exact_dense_value_path(
+                            operand(item, 0),
+                            sigmoid,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=False,
+                        )
+                    ),
+                    None,
+                )
+                activated = next(
+                    (
+                        item
+                        for item in multiplications
+                        if item is not silu
+                    ),
+                    None,
+                )
+                denominator_operands = [
+                    operand(denominator, index)
+                    for index in range(len(denominator.operand_names))
+                ]
+                sigmoid_operands = [
+                    operand(sigmoid, index)
+                    for index in range(len(sigmoid.operand_names))
+                ]
+                common_source = (
+                    operand(gate_slice, 0)
+                    if gate_slice is not None
+                    and up_slice is not None
+                    and operand(gate_slice, 0) is operand(up_slice, 0)
+                    else None
+                )
+                activated_external = ()
+                if activated is not None:
+                    activated_external = exact_external_values(activated)
+                activated_source = (
+                    activated_external[0]
+                    if len(activated_external) == 1
+                    else activated
+                )
+                exact_activation_graph = bool(
+                    gate_slice is not None
+                    and up_slice is not None
+                    and common_source is not None
+                    and exact_dense_value_path(
+                        common_source,
+                        gate_external,
+                        allow_live_row_slice=False,
+                        allow_bf16_round=True,
+                    )
+                    and exact_dense_value_path(
+                        operand(negate, 0),
+                        gate_slice,
+                        allow_live_row_slice=False,
+                        allow_bf16_round=True,
+                    )
+                    and exact_dense_value_path(
+                        operand(exponential, 0),
+                        negate,
+                        allow_live_row_slice=False,
+                        allow_bf16_round=False,
+                    )
+                    and len(denominator_operands) == 2
+                    and any(
+                        exact_dense_value_path(
+                            value,
+                            exponential,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=False,
+                        )
+                        for value in denominator_operands
+                    )
+                    and any(exact_one(value) for value in denominator_operands)
+                    and len(sigmoid_operands) == 2
+                    and exact_one(sigmoid_operands[0])
+                    and exact_dense_value_path(
+                        sigmoid_operands[1],
+                        denominator,
+                        allow_live_row_slice=False,
+                        allow_bf16_round=False,
+                    )
+                    and silu is not None
+                    and activated is not None
+                    and exact_bf16_round(silu)
+                    and exact_bf16_round(activated)
+                    and (
+                        exact_dense_value_path(
+                            operand(activated, 0),
+                            silu,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=False,
+                        )
+                        and exact_dense_value_path(
+                            operand(activated, 1),
+                            up_slice,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=True,
+                        )
+                        or exact_dense_value_path(
+                            operand(activated, 1),
+                            silu,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=False,
+                        )
+                        and exact_dense_value_path(
+                            operand(activated, 0),
+                            up_slice,
+                            allow_live_row_slice=False,
+                            allow_bf16_round=True,
+                        )
+                    )
+                    and activated_source is not None
+                    and exact_dense_value_path(
+                        operand(down[0], 0),
+                        activated_source,
+                        allow_live_row_slice=False,
+                        allow_bf16_round=True,
+                    )
+                )
+        if not exact_activation_graph:
+            violations.append("isolated dense exact SwiGLU graph drifted")
+
+        roots = [
+            item
+            for item in module.instructions
+            if item.computation.startswith("ENTRY ")
+            and item.raw_line.lstrip().startswith("ROOT ")
+        ]
+        exact_carried_residual_binding = False
+
+        def exact_carried_input(
+            value: Any | None, expected: Any | None
+        ) -> bool:
+            seen: set[tuple[str, str]] = set()
+            while value is not None and _instruction_key(value) not in seen:
+                if value is expected:
+                    return True
+                seen.add(_instruction_key(value))
+                if (
+                    value.raw_opcode == "parameter"
+                    and not value.computation.startswith("ENTRY ")
+                ):
+                    value = external_parameter_value(value)
+                    continue
+                if value.raw_opcode == "copy-done" and len(
+                    value.operand_names
+                ) == 1:
+                    start = operand(value, 0)
+                    if not (
+                        start is not None
+                        and start.raw_opcode == "copy-start"
+                        and len(start.operand_names) == 1
+                        and len(start.operand_shapes) == 1
+                        and len(start.result_shapes) == 3
+                        and len(value.result_shapes) == 1
+                        and value.result_shapes[0] == start.result_shapes[1]
+                        and start.operand_shapes[0].dtype
+                        == value.result_shapes[0].dtype
+                        and start.operand_shapes[0].dimensions
+                        == value.result_shapes[0].dimensions
+                    ):
+                        return False
+                    value = operand(start, 0)
+                    continue
+                if value.raw_opcode in {"copy", "reshape"} and len(
+                    value.operand_names
+                ) == 1:
+                    parent = operand(value, 0)
+                    if not (
+                        parent is not None
+                        and len(value.operand_shapes) == 1
+                        and len(value.result_shapes) == 1
+                        and value.operand_shapes[0].dtype
+                        == value.result_shapes[0].dtype
+                        and value.operand_shapes[0].dimensions
+                        == value.result_shapes[0].dimensions
+                    ):
+                        return False
+                    value = parent
+                    continue
+                return False
+            return False
+
+        def exact_carried_pad(
+            value: Any | None, expected: Any | None
+        ) -> bool:
+            if (
+                value is None
+                or value.raw_opcode != "convert"
+                or _shape_signatures(value.operand_shapes)
+                != ("bf16[32,6144]",)
+                or _shape_signatures(value.result_shapes)
+                != ("f32[32,6144]",)
+                or len(value.operand_names) != 1
+            ):
+                return False
+            padded = operand(value, 0)
+            if (
+                padded is None
+                or padded.raw_opcode != "pad"
+                or _shape_signatures(padded.operand_shapes)
+                != ("bf16[1,6144]", "bf16[]")
+                or _shape_signatures(padded.result_shapes)
+                != ("bf16[32,6144]",)
+                or len(padded.operand_names) != 2
+            ):
+                return False
+            padding = re.findall(
+                r"\bpadding=([^,}\s]+)", unquoted_hlo(padded.raw_line)
+            )
+            zero = operand(padded, 1)
+            zero_literals = (
+                []
+                if zero is None
+                else re.findall(
+                    r"\bconstant\(([^)]*)\)",
+                    unquoted_hlo(zero.raw_line),
+                )
+            )
+            return bool(
+                padding == ["0_31x0_0"]
+                and zero is not None
+                and zero.raw_opcode == "constant"
+                and _shape_signatures(zero.result_shapes) == ("bf16[]",)
+                and len(zero_literals) == 1
+                and re.fullmatch(
+                    r"0(?:\.0*)?(?:[eE][+-]?0+)?",
+                    zero_literals[0],
+                )
+                and exact_carried_input(operand(padded, 0), expected)
+            )
+
+        exact_carried_values: list[Any] = []
+        carried_inputs = (entry_parameters.get(0), entry_parameters.get(1))
+        if all(
+            item is not None
+            and _shape_signatures(item.result_shapes) == ("bf16[1,6144]",)
+            for item in carried_inputs
+        ):
+            for residual_add in module.instructions:
+                if (
+                    residual_add.raw_opcode != "add"
+                    or _shape_signatures(residual_add.result_shapes)
+                    != ("f32[32,6144]",)
+                    or len(residual_add.operand_names) != 2
+                    or not any(
+                        exact_carried_pad(
+                            operand(residual_add, 0), carried_inputs[index]
+                        )
+                        and exact_carried_pad(
+                            operand(residual_add, 1),
+                            carried_inputs[1 - index],
+                        )
+                        for index in range(2)
+                    )
+                ):
+                    continue
+                exact_carried_values.extend(
+                    item
+                    for item in module.instructions
+                    if item.raw_opcode == "convert"
+                    and _shape_signatures(item.operand_shapes)
+                    == ("f32[32,6144]",)
+                    and _shape_signatures(item.result_shapes)
+                    == ("bf16[32,6144]",)
+                    and len(item.operand_names) == 1
+                    and operand(item, 0) is residual_add
+                )
+        exact_carried_values = list(
+            {
+                _instruction_key(item): item
+                for item in exact_carried_values
+            }.values()
+        )
+        exact_result_binding = False
+        if (
+            len(roots) == 1
+            and roots[0].raw_opcode == "tuple"
+            and len(roots[0].operand_names) == 2
+            and _shape_signatures(roots[0].result_shapes)
+            in {
+                ("bf16[1,1,6144]", "bf16[32,6144]"),
+                ("bf16[4,1,6144]", "bf16[32,6144]"),
+            }
+            and down_external is not None
+        ):
+            partial_result = operand(roots[0], 0)
+            carried_result = operand(roots[0], 1)
+            exact_carried_residual_binding = bool(
+                carried_result is not None
+                and sum(
+                    exact_dense_value_path(
+                        carried_result,
+                        candidate,
+                        allow_live_row_slice=False,
+                        allow_bf16_round=False,
+                    )
+                    for candidate in exact_carried_values
+                )
+                == 1
+            )
+            exact_result_binding = bool(
+                exact_carried_residual_binding
+                and exact_dense_value_path(
+                    partial_result,
+                    down_external,
+                    allow_live_row_slice=True,
+                    allow_bf16_round=True,
+                )
+            )
+        if not exact_result_binding:
+            violations.append("isolated dense exact result graph drifted")
+
+        custom_calls = [
+            item.name
+            for item in module.instructions
+            if item.raw_opcode == "custom-call"
+            and 'custom_call_target="tpu_custom_call"' in item.raw_line
+        ]
+        forbidden = [
+            marker
+            for marker in (
+                "host_callback",
+                "xla_python_cpu_callback",
+                " outfeed(",
+            )
+            if marker in optimized_hlo
+        ]
+        if custom_calls or forbidden:
+            violations.append("isolated dense program contains host/Pallas effects")
+        return {
+            "accepted_down_schedule": bool(
+                len(accepted_weight_layouts["down"]) == 1
+                and accepted_weight_layouts["down"][0][
+                    "exact_convolution_tiling"
+                ]
+                is True
+            ),
+            "accepted_gate_up_schedule": bool(
+                len(accepted_weight_layouts["gate_up"]) == 1
+                and accepted_weight_layouts["gate_up"][0][
+                    "exact_convolution_tiling"
+                ]
+                is True
+            ),
+            "accepted_weight_layouts": accepted_weight_layouts,
+            "async_collectives": async_collectives,
+            "collective_count": len(collectives),
+            "compile_rows": compile_rows,
+            "convolution_count": len(convolutions),
+            "dense_envelope": dense_envelope,
+            "down_convolution_count": len(down),
+            "exact_accepted_kernel_geometry": exact_accepted_kernel_geometry,
+            "exact_accepted_weight_layout": exact_accepted_weight_layout,
+            "exact_activation_graph": exact_activation_graph,
+            "exact_carried_residual_binding": exact_carried_residual_binding,
+            "exact_packed_weight_lineage": exact_packed_weight_lineage,
+            "exact_result_binding": exact_result_binding,
+            "final_dense_layout": final_dense_layout,
+            "gate_up_convolution_count": len(gate_up),
+            "isolated_dense": True,
+            "live_rows": 1,
+            "num_partitions": module.num_partitions,
+            "num_replicas": module.num_replicas,
+            "passed": not violations,
+            "performance_claim": False,
+            "scheduled_kernel_geometry_required": scheduled_module,
+            "unexpected_convolutions": unexpected,
+            "violations": violations,
+        }
+
     if len(collectives) != 1 or len(scoped) != 1:
         violations.append(
             "expected one exact dense StrategyND collective: "

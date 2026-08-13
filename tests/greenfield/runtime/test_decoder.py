@@ -535,6 +535,41 @@ def test_dense_final_layout_kernel_traces_loader_u8_storage() -> None:
     assert result.dtype == jnp.bfloat16
 
 
+def test_dense_final_layout_kernel_traces_one_isolated_virtual_shard() -> None:
+    import jax
+    import jax.numpy as jnp
+
+    from glm_tpu.greenfield.kernels.stage_local import (
+        _virtual_dense_final_layout_convolution_down_partials,
+    )
+
+    arguments = (
+        jax.ShapeDtypeStruct((32, 6144), jnp.bfloat16),
+        jax.ShapeDtypeStruct((1, 6144, 768), jnp.uint8),
+        jax.ShapeDtypeStruct((1, 48, 768), jnp.float32),
+        jax.ShapeDtypeStruct((1, 384, 6144), jnp.uint8),
+        jax.ShapeDtypeStruct((1, 3, 6144), jnp.float32),
+    )
+    result = jax.eval_shape(
+        lambda *values: _virtual_dense_final_layout_convolution_down_partials(
+            *values,
+            block_shape=(128, 128),
+            compile_rows=32,
+            virtual_shards=1,
+        ),
+        *arguments,
+    )
+    assert result.shape == (1, 32, 6144)
+    assert result.dtype == jnp.bfloat16
+    with pytest.raises(ValueError, match="one or eight virtual shards"):
+        _virtual_dense_final_layout_convolution_down_partials(
+            *arguments,
+            block_shape=(128, 128),
+            compile_rows=32,
+            virtual_shards=2,
+        )
+
+
 def _repair_scoped_shape_hlo(*, include_unscoped: bool = False) -> str:
     unrelated = ""
     if include_unscoped:

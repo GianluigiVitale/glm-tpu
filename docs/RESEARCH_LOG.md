@@ -5,6 +5,57 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 22:12 UTC — direct one-contraction-per-chip discriminator is locally complete
+
+- Added one default-off diagnostic that compiles exactly one layer-0 virtual dense contraction per
+  LP4 chip and executes the same program for eight separately packed virtual-rank batches. It
+  reuses the sealed position-8155 attention/residual rows, deterministic final-layout weights,
+  DB533 StrategyND and the now-admissible RMS replay. This directly compares all 32 BF16 partials
+  and the downstream layer-1 row without a complete checkpoint/decoder run.
+- The production eight-rank helper remains the default; only the diagnostic passes
+  `virtual_shards=1`. Exact StableHLO proves the M1-to-M32 pads, pre-dense RMS, FP8 dequantization,
+  layout constraint, gate/SwiGLU/down arithmetic and exact live row. The initial bulk Sol review
+  found two proof gaps in the optimized companion: transitive dependency could admit inserted
+  arithmetic, and convolution RHS shapes were not bound to packed bits/scales or physical layout.
+  The correction reuses the existing final-layout matcher for one virtual rank, pins exact packed
+  dequant/RHS lineage, exact gate/SwiGLU/down/result edges and exact two-result ENTRY arity, while
+  retaining the two accepted schedules and zero collective/host/Pallas effects. Parser-valid rogue
+  activation/down/result/tuple/RHS/layout mutations now refuse. The correction review found one
+  remaining shape-only edge on result one; that result is now bound to the exact M1-to-M32 pads,
+  two-source F32 residual add and BF16 carried round. Returning one input or inserted carried
+  arithmetic also refuses. A follow-up metadata-decoy mutation exposed unsanitized literal text;
+  zero/one/index literals now require one exact structural value after stripping strings/comments,
+  and both zero-as-one and one-as-zero metadata spoofs refuse.
+- The existing protected wrapper now selects this mode exclusively/default-off, authenticates the
+  same captured-RMS/checkpoint sources, publishes no DB row, and retains strict fleet census,
+  rollback, CRC archive and `SUCCESS`-last rules. Forced CPU U8/direct-FP8 lowering, arithmetic and
+  schedule mutations, exact/nonexact tensor schema, summary and terminal publication are tested.
+  The isolated suite passes 6/6, the shared dense suite passes 59/59 and focused kernel tests pass
+  2/2. There is no TPU arithmetic result, Gate-D advancement or performance claim yet. Next obtain
+  one correction-only Sol confirmation, then run one protected bounded replay.
+
+## 2026-08-13 21:46 UTC — sub-minute replay validates control and rejects RMS scheduling
+
+- Sol approved staged SHA `c9c6388b...c92df`; the correction was committed/pushed as
+  `3d58107036734310275519fea0e4d03762f1cbab` and ran once under protected tag
+  `greenfield_layer0_captured_rms_replay_20260813T214428668951467Z`. Arithmetic completed in six
+  seconds and the lease/census/archive/SUCCESS-last workflow completed in about one minute.
+- The control is now admissible: it reproduces protected DB548 bitwise at `0/6,144`, SHA
+  `9b52a04e...4005`. This proves the replay's sealed 32 BF16 partials, exact DB533 association, two
+  original residual source rows and layer-1 RMS context are coherent. The scalar-split arm is
+  nonexact at `1,073/6,144`, first mismatch 1, maximum/mean error `0.0078125` /
+  `3.4686963772401214e-05`, SHA `229dc8ac...812f`. Those are exactly DB549's prior values, so RMS
+  scheduling is conclusively rejected rather than merely failing to reproduce a control.
+- Runner/tensor/summary/`SUCCESS` SHAs are `97332982...c7d`, `20917284...becd`,
+  `8a708300...cfbe` and `bb9f3c91...3e86`; control/split optimized-HLO SHAs are
+  `0025ee34...bfe` / `bbb626ea...bbb`. Both HLO contracts, exact local/remote archive verification
+  and authenticated 8/8 cleanup pass. There is intentionally no DB row or performance claim.
+- Gate D remains open, but the repeated one-hour diagnostic loop is no longer required. Full 8K
+  retries stay frozen. The remaining boundary is the dense partial/contraction value feeding the
+  already-proved StrategyND/RMS chain. Next use the sealed partials to localize hidden index 2795
+  offline and in one sub-minute TPU sensitivity replay, then inspect only the causal virtual
+  contraction; do not reopen reduction or RMS theories.
+
 ## 2026-08-13 21:34 UTC — fast replay reaches arithmetic and rejects its single-residual control
 
 - Reviewed/pushed commit `09135efc3d679359c79839ed64303c5c09261500` ran the four-chip bounded
