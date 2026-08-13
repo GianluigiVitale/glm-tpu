@@ -64,6 +64,25 @@ REAL_FINAL_LAYOUT_OPTIMIZED_HLO = Path(
 REAL_FINAL_LAYOUT_OPTIMIZED_HLO_SHA256 = (
     "caa2569ad56c953ae7cdbe8bf1583bcafd13bb8188435bca34ec818650a2e39e"
 )
+REAL_DENSE_ENVELOPE_ROOT = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_ENVELOPE_ROOT",
+        "/home/gianl/glm-run/greenfield_layer0_dense_envelope_cross_layer_"
+        "20260813T094239645854705Z/hlo",
+    )
+)
+REAL_DENSE_ENVELOPE_OPTIMIZED_HLO = (
+    REAL_DENSE_ENVELOPE_ROOT / "dense_convolution.optimized_hlo.txt"
+)
+REAL_DENSE_ENVELOPE_OPTIMIZED_HLO_SHA256 = (
+    "dbe7f3dbd82ebe832bcbd0c0d06cb85663fb1f63be202c893f07a1d98c288213"
+)
+REAL_DENSE_ENVELOPE_STABLEHLO = (
+    REAL_DENSE_ENVELOPE_ROOT / "dense_convolution.stablehlo.mlir"
+)
+REAL_DENSE_ENVELOPE_STABLEHLO_SHA256 = (
+    "74e1fe97c58cbf003dd0d4937bfa37ffc71e2ec7ef5a7317f2f6c509fcfa9fd3"
+)
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
     "decode_projection_lowering/8k/"
@@ -721,6 +740,97 @@ def _synthetic_dense_envelope_nested_rms_hlo() -> str:
         1,
     )
     return hlo
+
+
+def _synthetic_dense_envelope_tpu_corrections_hlo() -> str:
+    """Model folded row scalars, async copies, and BF16 correction lowering."""
+
+    hlo = _synthetic_dense_envelope_optimized_hlo()
+    folded_replacements = (
+        (
+            "  %gate_sum_row = f32[32,1] reshape(%gate_sum_squares)\n"
+            "  %gate_width = f32[32,1] constant(6144)\n"
+            "  %gate_mean = f32[32,1] divide("
+            "%gate_sum_row, %gate_width), ",
+            "  %gate_width = f32[32] constant(6144)\n"
+            "  %gate_mean = f32[32] divide("
+            "%gate_sum_squares, %gate_width), ",
+        ),
+        ("  %gate_epsilon = f32[32,1]", "  %gate_epsilon = f32[32]"),
+        ("  %gate_variance = f32[32,1]", "  %gate_variance = f32[32]"),
+        ("  %gate_inverse = f32[32,1]", "  %gate_inverse = f32[32]"),
+        (
+            "broadcast(%gate_inverse), dimensions={0,1}",
+            "broadcast(%gate_inverse), dimensions={0}",
+        ),
+    )
+    for old, new in folded_replacements:
+        assert old in hlo
+        hlo = hlo.replace(old, new)
+
+    weighted_scope = (
+        'metadata={op_name="jit(probe)/'
+        'greenfield_dense_convolution_predense_rmsnorm/mul"}'
+    )
+    old_weighted = (
+        "  %gate_weighted = bf16[32,6144] multiply("
+        "%gate_rounded, %gate_norm_wide), " + weighted_scope
+    )
+    corrected_weighted = (
+        "  %gate_rounded_f32 = f32[32,6144] convert(%gate_rounded)\n"
+        "  %gate_norm_f32 = f32[32,6144] convert(%gate_norm_wide)\n"
+        "  %gate_weighted_f32 = f32[32,6144] multiply("
+        "%gate_rounded_f32, %gate_norm_f32), "
+        + weighted_scope
+        + ', backend_config={"float_type_correction_info":'
+        '{"original_type":"BF16"}}\n'
+        "  %gate_weighted = bf16[32,6144] convert(%gate_weighted_f32)"
+    )
+    assert hlo.count(old_weighted) == 8
+    hlo = hlo.replace(old_weighted, corrected_weighted)
+
+    copy_anchor = "  %packed_down_scale = f32[1,8,3,48] parameter(6)"
+    copy_values = "\n".join(
+        (
+            copy_anchor,
+            "  %attention_copy_start = (bf16[1,6144], bf16[1,6144], "
+            "u32[]) copy-start(%attention)",
+            "  %attention_copy_done = bf16[1,6144] "
+            "copy-done(%attention_copy_start)",
+            "  %residual_copy_start = (bf16[1,6144], bf16[1,6144], "
+            "u32[]) copy-start(%combined_residual)",
+            "  %residual_copy_done = bf16[1,6144] "
+            "copy-done(%residual_copy_start)",
+        )
+    )
+    assert copy_anchor in hlo
+    hlo = hlo.replace(copy_anchor, copy_values, 1)
+    gate_arguments = "%attention, %combined_residual, %post_norm,"
+    copied_arguments = (
+        "%attention_copy_done, %residual_copy_done, %post_norm,"
+    )
+    assert hlo.count(gate_arguments) == 8
+    return hlo.replace(gate_arguments, copied_arguments)
+
+
+def _synthetic_final_layout_async_down_scale_hlo() -> str:
+    hlo = _synthetic_final_layout_optimized_hlo()
+    direct = (
+        "  %down_scale_slice.0 = f32[1,1,3,48] "
+        "slice(%packed_down_scale), "
+        "slice={[0:1], [0:1], [0:3], [0:48]}}"
+    )
+    asynchronous = "\n".join(
+        (
+            "  %down_scale_slice_start.0 = ((f32[1,8,3,48]), "
+            "f32[1,1,3,48], s32[]) slice-start(%packed_down_scale), "
+            "slice={[0:1], [0:1], [0:3], [0:48]}}",
+            "  %down_scale_slice.0 = f32[1,1,3,48] "
+            "slice-done(%down_scale_slice_start.0)",
+        )
+    )
+    assert direct in hlo
+    return hlo.replace(direct, asynchronous, 1)
 
 
 def _synthetic_m32_hlo_with_fused_live_row(*, rogue_return: bool) -> str:
@@ -1631,6 +1741,32 @@ def test_dense_final_layout_real_hlo_binds_folded_scale_lowerings() -> None:
         assert "packed dense weight lineage drifted" in rejected["violations"]
 
 
+def test_dense_final_layout_accepts_only_exact_async_rank_slice() -> None:
+    optimized_hlo = _synthetic_final_layout_async_down_scale_hlo()
+    contract = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert contract["passed"], contract
+    assert contract["exact_packed_weight_lineage"] is True
+    wrong_rank = optimized_hlo.replace(
+        "slice={[0:1], [0:1], [0:3], [0:48]}}",
+        "slice={[0:1], [1:2], [0:3], [0:48]}}",
+        1,
+    )
+    assert wrong_rank != optimized_hlo
+    rejected = MODULE._validate_optimized_hlo(
+        wrong_rank,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert rejected["passed"] is False
+    assert rejected["exact_packed_weight_lineage"] is False
+
+
 def test_dense_final_layout_stablehlo_binds_packed_shards_and_sources() -> None:
     stablehlo = _exact_final_layout_stablehlo()
     contract = MODULE._validate_stablehlo(
@@ -1747,6 +1883,18 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
     assert nested["lineage"]["predense_rmsnorm_contract"][
         "exact_fused_gate_ownership"
     ] is True
+    corrected_hlo = _synthetic_dense_envelope_tpu_corrections_hlo()
+    corrected = MODULE._validate_optimized_hlo(
+        corrected_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert corrected["passed"], corrected
+    assert corrected["lineage"]["predense_rmsnorm_contract"][
+        "weighted_value_count"
+    ] == 8
 
     stable_mutations = (
         stablehlo.replace(
@@ -1844,6 +1992,193 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
         assert "optimized pre-dense fused RMSNorm envelope drifted" in (
             rejected["violations"]
         )
+
+    correction_mutations = (
+        corrected_hlo.replace(
+            '"original_type":"BF16"', '"original_type":"F32"', 1
+        ),
+        corrected_hlo.replace(
+            "  %gate_rounded_f32 = f32[32,6144] convert(%gate_rounded)",
+            "  %gate_rounded_s16 = s16[32,6144] convert(%gate_rounded)\n"
+            "  %gate_rounded_f32 = f32[32,6144] "
+            "convert(%gate_rounded_s16)",
+            1,
+        ),
+        corrected_hlo.replace(
+            "  %gate_weighted = bf16[32,6144] "
+            "convert(%gate_weighted_f32)",
+            "  %gate_weighted_rogue = f32[32,6144] add("
+            "%gate_weighted_f32, %gate_weighted_f32)\n"
+            "  %gate_weighted = bf16[32,6144] "
+            "convert(%gate_weighted_rogue)",
+            1,
+        ),
+        corrected_hlo.replace(
+            "copy-done(%attention_copy_start)",
+            "copy-done(%residual_copy_start)",
+            1,
+        ),
+        corrected_hlo.replace(
+            "  %gate_inverse_wide = f32[32,6144] broadcast("
+            "%gate_inverse), dimensions={0}",
+            "  %gate_inverse_transposed = f32[6144,32] broadcast("
+            "%gate_inverse), dimensions={1}\n"
+            "  %gate_inverse_wide = f32[32,6144] "
+            "reshape(%gate_inverse_transposed)",
+            1,
+        ),
+    )
+    assert all(value != corrected_hlo for value in correction_mutations)
+    for mutated in correction_mutations:
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+        )
+        assert rejected["passed"] is False
+        assert "optimized pre-dense fused RMSNorm envelope drifted" in (
+            rejected["violations"]
+        )
+
+
+@pytest.mark.skipif(
+    not (
+        REAL_DENSE_ENVELOPE_OPTIMIZED_HLO.exists()
+        and REAL_DENSE_ENVELOPE_STABLEHLO.exists()
+    ),
+    reason="protected dense-envelope HLO is unavailable",
+)
+def test_dense_envelope_replays_failed_protected_compile_exactly() -> None:
+    optimized_hlo = REAL_DENSE_ENVELOPE_OPTIMIZED_HLO.read_text()
+    stablehlo = REAL_DENSE_ENVELOPE_STABLEHLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_DENSE_ENVELOPE_OPTIMIZED_HLO_SHA256
+    )
+    assert sha256(stablehlo.encode()).hexdigest() == (
+        REAL_DENSE_ENVELOPE_STABLEHLO_SHA256
+    )
+    optimized = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    stable = MODULE._validate_stablehlo(
+        stablehlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert optimized["passed"], optimized
+    assert stable["passed"], stable
+    predense = optimized["lineage"]["predense_rmsnorm_contract"]
+    assert predense["fused_gate_binding_count"] == 8
+    assert predense["weighted_value_count"] == 8
+    assert predense["exact_carried_residual_binding"] is True
+
+    correction_line = next(
+        line
+        for line in optimized_hlo.splitlines()
+        if line.lstrip().startswith("%mul.372 =")
+    )
+    wrong_correction = optimized_hlo.replace(
+        correction_line,
+        correction_line.replace(
+            '"original_type":"BF16"', '"original_type":"F32"'
+        ),
+        1,
+    )
+    slice_line = next(
+        line
+        for line in optimized_hlo.splitlines()
+        if line.lstrip().startswith("%slice-start =")
+    )
+    wrong_slice = optimized_hlo.replace(
+        slice_line,
+        slice_line.replace(
+            "slice={[0:1], [0:1], [0:3], [0:48]}",
+            "slice={[0:1], [1:2], [0:3], [0:48]}",
+        ),
+        1,
+    )
+    wrong_weighted_result = optimized_hlo.replace(
+        "  ROOT %convert.243 = bf16[32,6144]",
+        "  %rogue_weighted = f32[32,6144] add(%mul.372, %mul.372)\n"
+        "  ROOT %convert.243 = bf16[32,6144]",
+        1,
+    ).replace(
+        "convert(%mul.372)", "convert(%rogue_weighted)", 1
+    )
+    rsqrt_broadcast_line = next(
+        line
+        for line in optimized_hlo.splitlines()
+        if line.lstrip().startswith("%mul.374 =")
+    )
+    normalized_line = next(
+        line
+        for line in optimized_hlo.splitlines()
+        if line.lstrip().startswith("%mul.373 =")
+    )
+    wrong_rsqrt_layout = optimized_hlo.replace(
+        rsqrt_broadcast_line,
+        rsqrt_broadcast_line
+        + "\n  %rogue_rsqrt_layout = f32[32,6144]{0,1} "
+        "bitcast(%mul.374)",
+        1,
+    ).replace(
+        normalized_line,
+        normalized_line.replace(
+            "multiply(%add.824, %mul.374)",
+            "multiply(%add.824, %rogue_rsqrt_layout)",
+        ),
+        1,
+    )
+    assert all(
+        mutated != optimized_hlo
+        for mutated in (
+            wrong_correction,
+            wrong_slice,
+            wrong_weighted_result,
+            wrong_rsqrt_layout,
+        )
+    )
+    correction_contract = MODULE._validate_optimized_hlo(
+        wrong_correction,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    slice_contract = MODULE._validate_optimized_hlo(
+        wrong_slice,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    result_contract = MODULE._validate_optimized_hlo(
+        wrong_weighted_result,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    layout_contract = MODULE._validate_optimized_hlo(
+        wrong_rsqrt_layout,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert correction_contract["passed"] is False
+    assert result_contract["passed"] is False
+    assert layout_contract["passed"] is False
+    assert slice_contract["passed"] is False
+    assert slice_contract["exact_packed_weight_lineage"] is False
 
 
 @pytest.mark.skipif(

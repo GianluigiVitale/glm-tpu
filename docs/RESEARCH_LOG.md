@@ -8139,3 +8139,27 @@ unmotivated arithmetic variants.
   `082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f`. Exact means dense MLP or
   cross-layer fusion remains open; nonexact means post-attention add/RMSNorm is already divergent.
   No numerical result or performance claim exists yet.
+
+## 2026-08-13 09:42--10:35 — dense-envelope run fails safely and yields exact lowering corrections
+
+- The reviewed default-off envelope discriminator was committed/pushed at `67488b5eb1378b3d0489e0d4029fa1685195920a`
+  and launched once as `greenfield_layer0_dense_envelope_cross_layer_20260813T094239645854705Z`.
+  It compiled the protected real checkpoint, then refused in optimized-HLO validation before model
+  arithmetic. No runner, tensor comparison, DB row, summary, archive or terminal `SUCCESS` exists.
+  The failure census proves all eight hosts clean, so the attempt is diagnostic-only.
+- The captured TPU HLO confirms the intended fusion hypothesis was physically realized: one exact
+  pre-dense add/square/reduce and row-wise rsqrt feed eight gate-local clones of the normalized and
+  weighted BF16 result; each clone is in the same outer fusion as its gate convolution. The exact
+  BF16 pre-dense residual is independently carried into the downstream layer-1 residual/RMSNorm.
+- Refusal came from two legitimate lowering forms outside the pre-run synthetic envelope. Rank-zero
+  down scales use asynchronous `slice-start`/`slice-done`; the weighted BF16 multiply uses BF16
+  operands lifted to F32, an F32 multiply explicitly marked `original_type=BF16`, and one live BF16
+  conversion. Row scalar shapes fold from `[32,1]` to `[32]`, and entry values traverse exact
+  device `copy-start`/`copy-done` pairs.
+- The bounded validator correction accepts only source/range/dtype/result-exact asynchronous slices,
+  shape-preserving device copies, exact BF16-to-F32 operand lifts, explicit BF16 correction metadata
+  and the sole live BF16 result. It separately proves the shared reduction and every recomputed
+  gate-local residual add originate from the same two exact entry rows. Preserved real StableHLO
+  and optimized HLO now pass with 16 packed RHS paths, eight fused gate bindings and one carried
+  residual. Wrong ranges/sources, F32 correction metadata, S16 detours and extra arithmetic refuse.
+  This remains local HLO readiness; one reviewed commit and one protected numerical retry are next.

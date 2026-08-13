@@ -811,7 +811,9 @@ def _validate_optimized_hlo(
             return item.result_shapes[0].dimensions
 
         def exact_rank_slice(item: Any) -> bool:
-            if item.raw_opcode != "slice" or len(item.operand_names) != 1:
+            if item.raw_opcode not in {"slice", "slice-start"} or len(
+                item.operand_names
+            ) != 1:
                 return False
             source = operand(item, 0)
             source_shape = shape(source)
@@ -955,6 +957,31 @@ def _validate_optimized_hlo(
                     if selected_rank or not exact_rank_slice(item):
                         return False
                     source = operand(item, 0)
+                    return source is not None and walk(source, True)
+                if item.raw_opcode == "slice-done":
+                    if selected_rank or len(item.operand_names) != 1:
+                        return False
+                    start = operand(item, 0)
+                    if (
+                        start is None
+                        or start.raw_opcode != "slice-start"
+                        or not exact_rank_slice(start)
+                    ):
+                        return False
+                    ranges = slice_ranges(start)
+                    result_shape = shape(item)
+                    if (
+                        ranges is None
+                        or result_shape
+                        != tuple(stop - begin for begin, stop in ranges)
+                        or len(item.result_shapes) != 1
+                        or item.result_shapes[0].dtype
+                        != expected.result_shapes[0].dtype
+                        or len(start.result_shapes) != 3
+                        or item.result_shapes[0] != start.result_shapes[1]
+                    ):
+                        return False
+                    source = operand(start, 0)
                     return source is not None and walk(source, True)
                 if item.raw_opcode in {"broadcast", "broadcast-in-dim"}:
                     if not scale or len(item.operand_names) != 1:
@@ -2758,6 +2785,28 @@ def _validate_optimized_hlo(
                         value = operand(value, 0)
                         continue
                     if (
+                        value.raw_opcode == "copy-done"
+                        and len(value.operand_names) == 1
+                    ):
+                        start = operand(value, 0)
+                        if not (
+                            start is not None
+                            and start.raw_opcode == "copy-start"
+                            and len(start.operand_names) == 1
+                            and len(start.operand_shapes) == 1
+                            and len(start.result_shapes) == 3
+                            and len(value.result_shapes) == 1
+                            and value.result_shapes[0]
+                            == start.result_shapes[1]
+                            and start.operand_shapes[0].dtype
+                            == value.result_shapes[0].dtype
+                            and start.operand_shapes[0].dimensions
+                            == value.result_shapes[0].dimensions
+                        ):
+                            return False
+                        value = operand(start, 0)
+                        continue
+                    if (
                         allow_broadcast
                         and value.raw_opcode in {"broadcast", "broadcast-in-dim"}
                         and len(value.operand_names) == 1
@@ -2793,6 +2842,141 @@ def _validate_optimized_hlo(
                         return False
                     value = operand(value, 0)
                 return False
+
+            def exact_predense_bf16_operand(
+                value: Any | None,
+                source: Any,
+                *,
+                allow_broadcast: bool = False,
+            ) -> bool:
+                """Accept one semantic BF16 operand, including its exact F32 lift."""
+
+                if exact_predense_source(
+                    value, source, allow_broadcast=allow_broadcast
+                ):
+                    return True
+                value = predense_unwrap(value)
+                return bool(
+                    value is not None
+                    and value.raw_opcode == "convert"
+                    and _shape_signatures(value.operand_shapes)
+                    == ("bf16[32,6144]",)
+                    and _shape_signatures(value.result_shapes)
+                    == ("f32[32,6144]",)
+                    and len(value.operand_names) == 1
+                    and exact_predense_source(
+                        operand(value, 0),
+                        source,
+                        allow_broadcast=allow_broadcast,
+                    )
+                )
+
+            def exact_predense_rsqrt_operand(
+                value: Any | None, source: Any
+            ) -> bool:
+                """Bind one row scalar to every feature without reassociation."""
+
+                candidates = predense_external_values(source)
+                if not candidates:
+                    return False
+                candidate_keys = {
+                    _instruction_key(candidate) for candidate in candidates
+                }
+                scalar_shapes = {"f32[32]", "f32[32,1]"}
+                wide_shape = ("f32[32,6144]",)
+                seen: set[tuple[tuple[str, str], bool]] = set()
+
+                def walk(item: Any | None, broadcast_seen: bool) -> bool:
+                    if item is None:
+                        return False
+                    state = (_instruction_key(item), broadcast_seen)
+                    if state in seen:
+                        return False
+                    seen.add(state)
+                    key = _instruction_key(item)
+                    if key in candidate_keys:
+                        return broadcast_seen
+                    if exact_predense_layout_edge(item):
+                        source_item = operand(item, 0)
+                        source_signatures = _shape_signatures(
+                            item.operand_shapes
+                        )
+                        result_signatures = _shape_signatures(
+                            item.result_shapes
+                        )
+                        if broadcast_seen:
+                            exact_layout = (
+                                len(source_signatures) == 1
+                                and len(result_signatures) == 1
+                                and source_signatures[0] in scalar_shapes
+                                and result_signatures[0] in scalar_shapes
+                            )
+                        else:
+                            exact_layout = (
+                                item.raw_opcode != "bitcast"
+                                and source_signatures == wide_shape
+                                and result_signatures == wide_shape
+                            )
+                        return exact_layout and walk(
+                            source_item, broadcast_seen
+                        )
+                    if (
+                        not broadcast_seen
+                        and item.raw_opcode
+                        in {"broadcast", "broadcast-in-dim"}
+                        and len(item.operand_names) == 1
+                        and _shape_signatures(item.result_shapes) == wide_shape
+                    ):
+                        source_item = operand(item, 0)
+                        source_shape = _shape_signatures(item.operand_shapes)
+                        dimensions = broadcast_dimensions(item)
+                        exact_broadcast = (
+                            source_shape == ("f32[32]",)
+                            and dimensions == (0,)
+                        ) or (
+                            source_shape == ("f32[32,1]",)
+                            and dimensions == (0, 1)
+                        )
+                        return exact_broadcast and walk(source_item, True)
+                    if (
+                        item.raw_opcode == "parameter"
+                        and not item.computation.startswith("ENTRY ")
+                    ):
+                        return walk(
+                            external_parameter_value(item), broadcast_seen
+                        )
+                    return False
+
+                return walk(value, False)
+
+            def predense_weighted_output(value: Any) -> Any | None:
+                """Return the exact semantic BF16 result of one weighted multiply."""
+
+                if (
+                    _shape_signatures(value.result_shapes)
+                    == ("bf16[32,6144]",)
+                    and exact_bf16_round(value)
+                ):
+                    return value
+                if not (
+                    _shape_signatures(value.result_shapes)
+                    == ("f32[32,6144]",)
+                    and has_bf16_correction(value)
+                ):
+                    return None
+                rounded_users = [
+                    item
+                    for item in users.get(_instruction_key(value), ())
+                    if item.computation == value.computation
+                    and item.raw_opcode == "convert"
+                    and _shape_signatures(item.operand_shapes)
+                    == ("f32[32,6144]",)
+                    and _shape_signatures(item.result_shapes)
+                    == ("bf16[32,6144]",)
+                    and len(item.operand_names) == 1
+                    and operand(item, 0) is value
+                ]
+                return rounded_users[0] if len(rounded_users) == 1 else None
 
             def predense_unwrap(value: Any | None) -> Any | None:
                 seen: set[tuple[str, str]] = set()
@@ -3335,7 +3519,7 @@ def _validate_optimized_hlo(
                     if (item.op_name or "").split("/")[-1] == "div"
                     and item.raw_opcode in {"divide", "multiply"}
                     and _shape_signatures(item.result_shapes)
-                    == ("f32[32,1]",)
+                    in {("f32[32]",), ("f32[32,1]",)}
                     and len(item.operand_names) == 2
                 ]
                 predense_variances = [
@@ -3343,7 +3527,7 @@ def _validate_optimized_hlo(
                     for item in predense_items
                     if item.raw_opcode == "add"
                     and _shape_signatures(item.result_shapes)
-                    == ("f32[32,1]",)
+                    in {("f32[32]",), ("f32[32,1]",)}
                     and len(item.operand_names) == 2
                 ]
                 predense_rsqrt = [
@@ -3351,7 +3535,7 @@ def _validate_optimized_hlo(
                     for item in predense_items
                     if item.raw_opcode == "rsqrt"
                     and _shape_signatures(item.result_shapes)
-                    == ("f32[32,1]",)
+                    in {("f32[32]",), ("f32[32,1]",)}
                     and len(item.operand_names) == 1
                 ]
                 predense_normalized = [
@@ -3364,14 +3548,12 @@ def _validate_optimized_hlo(
                     and len(item.operand_names) == 2
                 ]
                 predense_weighted = [
-                    item
+                    (item, predense_weighted_output(item))
                     for item in predense_items
                     if (item.op_name or "").split("/")[-1] == "mul"
                     and item.raw_opcode == "multiply"
-                    and _shape_signatures(item.result_shapes)
-                    == ("bf16[32,6144]",)
                     and len(item.operand_names) == 2
-                    and exact_bf16_round(item)
+                    and predense_weighted_output(item) is not None
                 ]
 
                 exact_predense_graphs: list[tuple[Any, Any]] = []
@@ -3440,64 +3622,79 @@ def _validate_optimized_hlo(
                                             operand(rsqrt, 0), variance
                                         ):
                                             continue
-                                        for normalized_value in predense_normalized:
-                                            if not any(
-                                                exact_predense_source(
-                                                    operand(
-                                                        normalized_value, index
-                                                    ),
-                                                    residual_add,
-                                                )
-                                                and exact_predense_source(
-                                                    operand(
-                                                        normalized_value,
-                                                        1 - index,
-                                                    ),
-                                                    rsqrt,
-                                                    allow_broadcast=True,
-                                                )
-                                                for index in range(2)
+                                        for normalized_residual_add in (
+                                            predense_residual_adds
+                                        ):
+                                            for normalized_value in (
+                                                predense_normalized
                                             ):
-                                                continue
-                                            rounded_values = [
-                                                item
-                                                for item in module.instructions
-                                                if item.raw_opcode == "convert"
-                                                and _shape_signatures(
-                                                    item.result_shapes
-                                                )
-                                                == ("bf16[32,6144]",)
-                                                and len(item.operand_names) == 1
-                                                and exact_predense_source(
-                                                    operand(item, 0),
-                                                    normalized_value,
-                                                )
-                                            ]
-                                            for weighted in predense_weighted:
-                                                if predense_post_norm is None:
-                                                    continue
-                                                if any(
+                                                if not any(
                                                     exact_predense_source(
                                                         operand(
-                                                            weighted,
-                                                            round_index,
+                                                            normalized_value,
+                                                            index,
                                                         ),
-                                                        rounded,
+                                                        normalized_residual_add,
                                                     )
-                                                    and exact_predense_source(
+                                                    and exact_predense_rsqrt_operand(
                                                         operand(
-                                                            weighted,
-                                                            1 - round_index,
+                                                            normalized_value,
+                                                            1 - index,
                                                         ),
-                                                        predense_post_norm,
-                                                        allow_broadcast=True,
+                                                        rsqrt,
                                                     )
-                                                    for rounded in rounded_values
-                                                    for round_index in range(2)
+                                                    for index in range(2)
                                                 ):
-                                                    exact_predense_graphs.append(
-                                                        (weighted, residual_add)
+                                                    continue
+                                                rounded_values = [
+                                                    item
+                                                    for item in module.instructions
+                                                    if item.raw_opcode == "convert"
+                                                    and _shape_signatures(
+                                                        item.result_shapes
                                                     )
+                                                    == ("bf16[32,6144]",)
+                                                    and len(item.operand_names)
+                                                    == 1
+                                                    and exact_predense_source(
+                                                        operand(item, 0),
+                                                        normalized_value,
+                                                    )
+                                                ]
+                                                for (
+                                                    weighted,
+                                                    weighted_output,
+                                                ) in predense_weighted:
+                                                    if (
+                                                        predense_post_norm
+                                                        is None
+                                                    ):
+                                                        continue
+                                                    if any(
+                                                        exact_predense_bf16_operand(
+                                                            operand(
+                                                                weighted,
+                                                                round_index,
+                                                            ),
+                                                            rounded,
+                                                        )
+                                                        and exact_predense_bf16_operand(
+                                                            operand(
+                                                                weighted,
+                                                                1 - round_index,
+                                                            ),
+                                                            predense_post_norm,
+                                                            allow_broadcast=True,
+                                                        )
+                                                        for rounded in rounded_values
+                                                        for round_index in range(2)
+                                                    ):
+                                                        exact_predense_graphs.append(
+                                                            (
+                                                                weighted_output,
+                                                                normalized_residual_add,
+                                                            )
+                                                        )
 
                 exact_predense_graphs = list(
                     {
@@ -3542,7 +3739,7 @@ def _validate_optimized_hlo(
                 )
                 exact_fused_gate_ownership = fused_gate_binding_count == 8
                 carried_values: list[tuple[Any, Any]] = []
-                for _weighted, residual_add in exact_predense_graphs:
+                for residual_add in predense_residual_adds:
                     for item in module.instructions:
                         if (
                             item.raw_opcode == "convert"
