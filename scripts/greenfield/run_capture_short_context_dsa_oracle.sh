@@ -27,30 +27,42 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_OUTPUT_CAPTURE=0
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=0
     ;;
   prompt_key | prompt_key_input)
     readonly PROMPT_KEY_CAPTURE=1
     readonly ATTENTION_OUTPUT_CAPTURE=0
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=0
     ;;
   attention_output)
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=1
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=0
     ;;
   attention_projection)
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=0
     readonly ATTENTION_PROJECTION_CAPTURE=1
     readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=0
     ;;
   attention_update)
     readonly PROMPT_KEY_CAPTURE=0
     readonly ATTENTION_OUTPUT_CAPTURE=0
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=1
+    readonly DENSE_BOUNDARY_CAPTURE=0
+    ;;
+  dense_boundary)
+    readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=1
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
@@ -94,7 +106,11 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+  if [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-8443ea64f
+    readonly OBSERVER_COMMIT_DISTANCE=10
+    readonly LEGACY_PIN=8443ea64f4574335091130f0e4f1dfef258c91f7
+  elif [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-23ab8780f
     readonly OBSERVER_COMMIT_DISTANCE=9
     readonly LEGACY_PIN=23ab8780f3066ae1be12657d4f45daa7ea353761
@@ -159,6 +175,15 @@ readonly PROJECTION_REDUCTION_SUMMARY_SHA=90090ba9999812082727ed56b734163f07e3c2
 readonly PROJECTION_REDUCTION_SUCCESS_SHA=7744356f63b67cc813901499d0828c029ea5a9c985a5dac65525700457f79985
 readonly PROJECTION_REDUCTION_RUN_ID=538
 readonly PROJECTION_REDUCTION_REMOTE=$APPROVED_BUCKET/results/$PROJECTION_REDUCTION_TAG
+readonly DENSE_CONVOLUTION_TAG=greenfield_layer0_dense_convolution_20260813T005213127235575Z
+readonly DENSE_CONVOLUTION_DIR=/home/gianl/glm-run/$DENSE_CONVOLUTION_TAG
+readonly DENSE_CONVOLUTION_CODE_HASH=2f63779309b25c71c1cc7d35ff97715ae4bf631e
+readonly DENSE_CONVOLUTION_RUNNER_SHA=876353e2504d728343223f03be9092a08d2662924ceb4b88d6f09563101bad91
+readonly DENSE_CONVOLUTION_TENSOR_SHA=2cdf128976eb7e04d5c84e012f066d1766361af57896cd22f83c01c7d704e1b9
+readonly DENSE_CONVOLUTION_SUMMARY_SHA=9b277ca495d3b9e9ce497d2bf78a520a2672f133e68228d14a10937d4a4b1449
+readonly DENSE_CONVOLUTION_SUCCESS_SHA=d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799
+readonly DENSE_CONVOLUTION_RUN_ID=540
+readonly DENSE_CONVOLUTION_REMOTE=$APPROVED_BUCKET/results/$DENSE_CONVOLUTION_TAG
 readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
@@ -222,14 +247,84 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
   }
 fi
 if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 || \
-      $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+      $ATTENTION_UPDATE_CAPTURE == 1 || $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
   [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
      $PROFILE == 8k && $INTERNAL_TARGET_POSITION == 8155 && \
      $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
      $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
-    echo "attention projection capture requires isolated layer-0 8K position 8155 mode" >&2
+    echo "layer-0 boundary capture requires isolated 8K position 8155 mode" >&2
     exit 2
   }
+fi
+if [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+  [[ -r $DENSE_CONVOLUTION_DIR/runner.json &&
+     -r $DENSE_CONVOLUTION_DIR/dense_convolution.npz &&
+     -r $DENSE_CONVOLUTION_DIR/summary.json &&
+     -r $DENSE_CONVOLUTION_DIR/SUCCESS ]] || {
+    echo "protected dense-convolution evidence is unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DENSE_CONVOLUTION_DIR/runner.json" | awk '{print $1}') == \
+     "$DENSE_CONVOLUTION_RUNNER_SHA" &&
+     $(sha256sum "$DENSE_CONVOLUTION_DIR/dense_convolution.npz" | awk '{print $1}') == \
+     "$DENSE_CONVOLUTION_TENSOR_SHA" &&
+     $(sha256sum "$DENSE_CONVOLUTION_DIR/summary.json" | awk '{print $1}') == \
+     "$DENSE_CONVOLUTION_SUMMARY_SHA" &&
+     $(sha256sum "$DENSE_CONVOLUTION_DIR/SUCCESS" | awk '{print $1}') == \
+     "$DENSE_CONVOLUTION_SUCCESS_SHA" ]] || {
+    echo "protected dense-convolution evidence identity drifted" >&2
+    exit 2
+  }
+  /home/gianl/vllm-env/bin/python - "$RESULTS_DB" \
+    "$DENSE_CONVOLUTION_RUN_ID" "$DENSE_CONVOLUTION_TAG" \
+    "$DENSE_CONVOLUTION_CODE_HASH" <<'PY'
+import json
+import sqlite3
+import sys
+
+db_path, run_id_text, run_tag, code_hash = sys.argv[1:]
+run_id = int(run_id_text)
+connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+run = connection.execute(
+    "SELECT model, model_revision, env_json, note FROM runs WHERE run_id = ?",
+    (run_id,),
+).fetchone()
+items = connection.execute(
+    "SELECT benchmark, item_id, gold, correct, score FROM items WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+summaries = connection.execute(
+    "SELECT benchmark, metric, value FROM summary WHERE run_id = ?",
+    (run_id,),
+).fetchall()
+connection.close()
+if run is None:
+    raise SystemExit("protected DB540 run is absent")
+environment = json.loads(run[2])
+if (
+    run[0] != "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+    or run[1] != "native-jax-db538-dense-convolution-v1"
+    or run[3]
+    != "Protected layer-0 dense convolution discriminator; no performance claim."
+    or environment.get("GLM_ENGINE") != "greenfield_dense_convolution_probe"
+    or environment.get("greenfield_run_tag") != run_tag
+    or environment.get("greenfield_code_hash") != code_hash
+    or environment.get("classification") != "accepted_dense_convolution_nonexact"
+    or items != [(
+        "greenfield_layer0_dense_convolution",
+        "position8155",
+        "Exact accepted BF16 layer-1 normalized hidden [6144].",
+        0,
+        0.0,
+    )]
+    or summaries != [(
+        "greenfield_layer0_dense_convolution",
+        "probe_contract_valid",
+        1.0,
+    )]
+):
+    raise SystemExit("protected DB540 live DB identity drifted")
+PY
 fi
 if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
   [[ -r $PROJECTION_REDUCTION_DIR/runner.json &&
@@ -373,6 +468,8 @@ elif [[ $ATTENTION_PROJECTION_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/attention_projection_capture
 elif [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/attention_update_capture
+elif [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/dense_boundary_capture
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -492,6 +589,20 @@ if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
     observed=$(gcloud storage cat "$uri" | sha256sum | awk '{print $1}')
     [[ $observed == "$expected" ]] || {
       say "ABORT: protected DB538 remote source hash drifted: $uri"
+      exit 1
+    }
+  done
+fi
+if [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+  for spec in \
+    "$DENSE_CONVOLUTION_RUNNER_SHA $DENSE_CONVOLUTION_REMOTE/runner.json" \
+    "$DENSE_CONVOLUTION_TENSOR_SHA $DENSE_CONVOLUTION_REMOTE/dense_convolution.npz" \
+    "$DENSE_CONVOLUTION_SUMMARY_SHA $DENSE_CONVOLUTION_REMOTE/summary.json" \
+    "$DENSE_CONVOLUTION_SUCCESS_SHA $DENSE_CONVOLUTION_REMOTE/SUCCESS"; do
+    read -r expected uri <<<"$spec"
+    observed=$(gcloud storage cat "$uri" | sha256sum | awk '{print $1}')
+    [[ $observed == "$expected" ]] || {
+      say "ABORT: protected DB540 remote source hash drifted: $uri"
       exit 1
     }
   done
@@ -1088,7 +1199,43 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+  say "sealing accepted layer-0 dense output boundary"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_accepted_dense_boundary.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    --capture-process-indices 0 \
+    >"$RUN_DIR/dense_boundary_capture_summary.json"
+  accepted_dense_boundary_capture_sha=$(sha256sum \
+    "$INTERNAL_RESULT_DIR/capture.json" | awk '{print $1}')
+  say "comparing accepted dense boundary with protected DB540"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/compare_accepted_dense_boundary.py" \
+    --accepted-capture-dir "$INTERNAL_RESULT_DIR" \
+    --probe-dir "$DENSE_CONVOLUTION_DIR" \
+    --output "$RUN_DIR/dense_boundary_comparison" \
+    --accepted-capture-file-sha256 "$accepted_dense_boundary_capture_sha" \
+    --probe-runner-sha256 "$DENSE_CONVOLUTION_RUNNER_SHA" \
+    --probe-tensor-sha256 "$DENSE_CONVOLUTION_TENSOR_SHA" \
+    --probe-summary-sha256 "$DENSE_CONVOLUTION_SUMMARY_SHA" \
+    --probe-success-sha256 "$DENSE_CONVOLUTION_SUCCESS_SHA" \
+    --probe-run-id "$DENSE_CONVOLUTION_RUN_ID" \
+    --accepted-run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --probe-code-hash "$DENSE_CONVOLUTION_CODE_HASH" \
+    --probe-tag "$DENSE_CONVOLUTION_TAG" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    >"$RUN_DIR/dense_boundary_comparison_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
   say "sealing accepted layer-0 post-o_proj attention update"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/capture_accepted_attention_update.py" \
@@ -1401,7 +1548,125 @@ lines = {
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode == "attention_update":
+    if mode == "dense_boundary":
+        capture_path = root / "dense_boundary_capture" / "capture.json"
+        comparison_path = (
+            root / "dense_boundary_comparison" / "comparison.json"
+        )
+        capture = json.loads(capture_path.read_text())
+        comparison = json.loads(comparison_path.read_text())
+        dense = comparison["dense_update"]
+        residual = comparison["post_attention_residual"]
+        if (
+            not exact_dsa["exact"]
+            or capture["artifact_kind"]
+            != "glm52_accepted_dense_boundary_capture"
+            or capture["capture_layout"]
+            != "replicated_logical_live_rows"
+            or capture["capture_mode"] != mode
+            or capture["capture_process_indices"] != [0]
+            or capture["diagnostic_only"] is not True
+            or capture["performance_claim"] is not False
+            or capture["legacy_code_hash"] != sys.argv[4]
+            or capture["oracle_pin"]
+            != "b3c25df47ac98783912dc658878181ec0a8ae16d"
+            or capture["position"] != 8155
+            or set(capture["tensors"])
+            != {"dense_update", "post_attention_residual"}
+            or any(
+                value["shape"] != [6144]
+                for value in capture["tensors"].values()
+            )
+            or comparison["artifact_kind"]
+            != "glm52_accepted_greenfield_dense_boundary_comparison"
+            or comparison["status"] != "SUCCESS"
+            or comparison["diagnostic_only"] is not True
+            or comparison["performance_claim"] is not False
+            or comparison["classification"] not in {
+                "dense_update_exact_layer1_fused_norm_open",
+                "dense_mlp_output_nonexact",
+            }
+            or comparison["first_open_boundary"] not in {
+                "layer1_fused_add_rmsnorm",
+                "dense_mlp_input_or_arithmetic",
+            }
+            or dense["shape"] != [6144]
+            or residual["shape"] != [6144]
+            or residual["elementwise_exact"] is not True
+            or residual["mismatch_count"] != 0
+            or comparison["probe"] != {
+                "code_hash": "2f63779309b25c71c1cc7d35ff97715ae4bf631e",
+                "run_id": 540,
+                "runner_sha256": "876353e2504d728343223f03be9092a08d2662924ceb4b88d6f09563101bad91",
+                "success_sha256": "d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799",
+                "summary_sha256": "9b277ca495d3b9e9ce497d2bf78a520a2672f133e68228d14a10937d4a4b1449",
+                "tag": "greenfield_layer0_dense_convolution_20260813T005213127235575Z",
+                "tensor_sha256": "2cdf128976eb7e04d5c84e012f066d1766361af57896cd22f83c01c7d704e1b9",
+            }
+        ):
+            raise SystemExit("dense-boundary comparison evidence drifted")
+        expected_boundary = (
+            "layer1_fused_add_rmsnorm"
+            if dense["elementwise_exact"]
+            else "dense_mlp_input_or_arithmetic"
+        )
+        if comparison["first_open_boundary"] != expected_boundary:
+            raise SystemExit("dense-boundary classification contradiction")
+        lines.update({
+            "accepted_dense_boundary_capture": "true",
+            "accepted_dense_boundary_capture_layout": capture[
+                "capture_layout"
+            ],
+            "accepted_dense_boundary_capture_mode": mode,
+            "accepted_dense_boundary_diagnostic_only": "true",
+            "accepted_dense_boundary_dsa_event_tensors_exact": "true",
+            "accepted_dense_boundary_manifest_file_sha256": sha256(
+                capture_path.read_bytes()
+            ).hexdigest(),
+            "accepted_dense_boundary_manifest_sha256": capture[
+                "manifest_sha256"
+            ],
+            "accepted_dense_boundary_source_file_count": sys.argv[9],
+            "accepted_dense_update_sha256": capture["tensors"][
+                "dense_update"
+            ]["sha256"],
+            "accepted_post_attention_residual_sha256": capture["tensors"][
+                "post_attention_residual"
+            ]["sha256"],
+            "accepted_oracle_pin": capture["oracle_pin"],
+            "dense_boundary_classification": comparison["classification"],
+            "dense_boundary_comparison_file_sha256": sha256(
+                comparison_path.read_bytes()
+            ).hexdigest(),
+            "dense_boundary_comparison_manifest_sha256": comparison[
+                "manifest_sha256"
+            ],
+            "dense_boundary_dense_update_exact": str(
+                dense["elementwise_exact"]
+            ).lower(),
+            "dense_boundary_first_open_boundary": comparison[
+                "first_open_boundary"
+            ],
+            "dense_boundary_residual_exact": "true",
+            "dense_boundary_probe_runner_sha256": comparison["probe"][
+                "runner_sha256"
+            ],
+            "dense_boundary_probe_success_sha256": comparison["probe"][
+                "success_sha256"
+            ],
+            "dense_boundary_probe_summary_sha256": comparison["probe"][
+                "summary_sha256"
+            ],
+            "dense_boundary_probe_tensor_sha256": comparison["probe"][
+                "tensor_sha256"
+            ],
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_process_indices": "0",
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": capture["layer_name"],
+            "dsa_event_tensors_exact": "true",
+        })
+    elif mode == "attention_update":
         capture_path = root / "attention_update_capture" / "capture.json"
         comparison_path = (
             root / "attention_update_comparison" / "comparison.json"
