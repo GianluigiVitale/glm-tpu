@@ -1942,7 +1942,7 @@ def _validate_optimized_hlo(
                 if len(rms_reductions) == 1
                 else ()
             )
-            exact_m32_reduction_geometry = (
+            exact_m32_reduction_geometry_core = (
                 not layer1_only
                 or (
                     len(rms_reductions) == 1
@@ -1952,17 +1952,7 @@ def _validate_optimized_hlo(
                     and "dimensions={1}" in re.sub(
                         r"\s+", "", rms_reductions[0].raw_line
                     )
-                    and any(
-                        is_m32_row0_slice(item)
-                        and _shape_signatures(item.operand_shapes)
-                        == (rms_bf16_shape,)
-                        and _value_depends_on(module, layer1_result, item)
-                        for item in module.instructions
-                    )
                 )
-            )
-            rms_contract["exact_m32_reduction_geometry"] = (
-                exact_m32_reduction_geometry
             )
             entry_norm_parameters = [
                 item
@@ -2015,6 +2005,51 @@ def _validate_optimized_hlo(
                 return any(
                     exact_semantic_source(value, candidate)
                     for candidate in candidates
+                )
+
+            def exact_m32_row0_chain_source(
+                value: Any | None, source: Any
+            ) -> bool:
+                """Bind the optimized live-row slice to one exact M32 value."""
+
+                candidates = [source]
+                external = fully_externalized_value(source)
+                if external is not None and external is not source:
+                    candidates.append(external)
+                seen: set[tuple[str, str]] = set()
+                sliced = False
+                while value is not None and _instruction_key(value) not in seen:
+                    if any(value is candidate for candidate in candidates):
+                        return sliced
+                    seen.add(_instruction_key(value))
+                    if (
+                        value.raw_opcode in semantic_layout_only
+                        and len(value.operand_names) == 1
+                    ):
+                        value = operand(value, 0)
+                        continue
+                    if (
+                        value.raw_opcode == "parameter"
+                        and not value.computation.startswith("ENTRY ")
+                    ):
+                        value = external_parameter_value(value)
+                        continue
+                    if (
+                        not sliced
+                        and is_m32_row0_slice(value)
+                        and _shape_signatures(value.operand_shapes)
+                        == (rms_f32_shape,)
+                        and _shape_signatures(value.result_shapes)
+                        == ("f32[1,6144]",)
+                        and len(value.operand_names) == 1
+                    ):
+                        sliced = True
+                        value = operand(value, 0)
+                        continue
+                    return False
+                return (
+                    any(value is candidate for candidate in candidates)
+                    and sliced
                 )
 
             def exact_constant(
@@ -2211,14 +2246,23 @@ def _validate_optimized_hlo(
                             (rsqrt, square, residual_add)
                         )
 
+            normalized_f32_shapes = {rms_f32_shape}
+            normalized_bf16_shapes = {rms_bf16_shape}
+            weighted_result_shapes = {rms_bf16_shape}
+            if layer1_only:
+                normalized_f32_shapes.add("f32[1,6144]")
+                normalized_bf16_shapes.add("bf16[1,6144]")
+                weighted_result_shapes.add("bf16[1,6144]")
             exact_normalized_values: dict[tuple[str, str], Any] = {}
             for item in rms_multiply_or_square:
                 if (
                     (item.op_name or "").split("/")[-1] != "mul"
                     or item.raw_opcode != "multiply"
                     or len(item.operand_names) != 2
-                    or _shape_signatures(item.result_shapes)
-                    != (rms_f32_shape,)
+                    or not set(_shape_signatures(item.result_shapes)).issubset(
+                        normalized_f32_shapes
+                    )
+                    or len(item.result_shapes) != 1
                 ):
                     continue
                 for rsqrt, _square, reduction_residual_add in exact_rsqrt_pairs:
@@ -2226,8 +2270,15 @@ def _validate_optimized_hlo(
                         normalized_residual_adds = [
                             candidate
                             for candidate in residual_adds
-                            if exact_chain_source(
-                                operand(item, normalized_index), candidate
+                            if (
+                                exact_chain_source(
+                                    operand(item, normalized_index), candidate
+                                )
+                                if _shape_signatures(item.result_shapes)
+                                == (rms_f32_shape,)
+                                else exact_m32_row0_chain_source(
+                                    operand(item, normalized_index), candidate
+                                )
                             )
                         ]
                         if (
@@ -2256,8 +2307,9 @@ def _validate_optimized_hlo(
                     if (
                         value.raw_opcode == "convert"
                         and len(value.operand_names) == 1
-                        and _shape_signatures(value.result_shapes)
-                        == (rms_bf16_shape,)
+                        and len(value.result_shapes) == 1
+                        and _shape_signatures(value.result_shapes)[0]
+                        in normalized_bf16_shapes
                     ):
                         normalized = operand(value, 0)
                         break
@@ -2298,8 +2350,9 @@ def _validate_optimized_hlo(
                 external = fully_externalized_value(item)
                 if (
                     external is not None
-                    and _shape_signatures(external.result_shapes)
-                    == (rms_bf16_shape,)
+                    and len(external.result_shapes) == 1
+                    and _shape_signatures(external.result_shapes)[0]
+                    in weighted_result_shapes
                 ):
                     weighted_external_values[_instruction_key(external)] = external
             exact_result_binding = (
@@ -2307,6 +2360,20 @@ def _validate_optimized_hlo(
                 and exact_layout_source(
                     layer1_result, next(iter(weighted_external_values.values()))
                 )
+            )
+            exact_m32_reduction_geometry = (
+                exact_m32_reduction_geometry_core
+                and (
+                    not layer1_only
+                    or (
+                        exact_reduction_operand_graph
+                        and len(weighted_external_values) == 1
+                        and exact_result_binding
+                    )
+                )
+            )
+            rms_contract["exact_m32_reduction_geometry"] = (
+                exact_m32_reduction_geometry
             )
             external_reductions = {
                 _instruction_key(value): value

@@ -37,6 +37,22 @@ REAL_M32_OPTIMIZED_HLO = Path(
 REAL_M32_OPTIMIZED_HLO_SHA256 = (
     "c9c9bf90c9528016846ccea48e04877e0ee0e44bc2d83f3ea0cbd9997162266a"
 )
+REAL_M32_LAYER1_ROOT = Path(
+    "/home/gianl/glm-run/greenfield_layer0_dense_m32_cross_layer_"
+    "20260813T065606056966514Z/hlo"
+)
+REAL_M32_LAYER1_OPTIMIZED_HLO = (
+    REAL_M32_LAYER1_ROOT / "dense_convolution.optimized_hlo.txt"
+)
+REAL_M32_LAYER1_OPTIMIZED_HLO_SHA256 = (
+    "41f9e6fb12b374b8d95fab39ad2e3d4a9a505f65c61ccb3ac4ee0f946132ae70"
+)
+REAL_M32_LAYER1_STABLEHLO = (
+    REAL_M32_LAYER1_ROOT / "dense_convolution.stablehlo.mlir"
+)
+REAL_M32_LAYER1_STABLEHLO_SHA256 = (
+    "c77c126ed2ceeead3f00e71c5467463612ab2f88b1ab58f7993ee09164bd6474"
+)
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
     "decode_projection_lowering/8k/"
@@ -973,6 +989,81 @@ def test_dense_convolution_m32_contract_replays_fused_tpu_stack() -> None:
     assert all(value != hlo for value in mutations)
     assert all(
         not MODULE._validate_optimized_hlo(value, compile_rows=32)["passed"]
+        for value in mutations
+    )
+
+
+@pytest.mark.skipif(
+    not REAL_M32_LAYER1_OPTIMIZED_HLO.exists()
+    or not REAL_M32_LAYER1_STABLEHLO.exists(),
+    reason="failed-closed M32 layer-1 TPU HLO is not mounted",
+)
+def test_dense_cross_layer_contract_replays_real_tpu_fusions() -> None:
+    assert MODULE._file_sha256(REAL_M32_LAYER1_OPTIMIZED_HLO) == (
+        REAL_M32_LAYER1_OPTIMIZED_HLO_SHA256
+    )
+    assert MODULE._file_sha256(REAL_M32_LAYER1_STABLEHLO) == (
+        REAL_M32_LAYER1_STABLEHLO_SHA256
+    )
+    stable = MODULE._validate_stablehlo(
+        REAL_M32_LAYER1_STABLEHLO.read_text(),
+        compile_rows=32,
+        layer1_only=True,
+    )
+    hlo = REAL_M32_LAYER1_OPTIMIZED_HLO.read_text()
+    exact = MODULE._validate_optimized_hlo(
+        hlo, compile_rows=32, layer1_only=True
+    )
+    assert stable["passed"], stable["violations"]
+    assert exact["passed"], exact["violations"]
+    contract = exact["lineage"]["rmsnorm_contract"]
+    assert contract["exact_m32_reduction_geometry"] is True
+    assert contract["exact_reduction_operand_graph"] is True
+    assert contract["weighted_external_values"] == ["%fusion.143"]
+
+    wrong_live_row = hlo.replace(
+        "slice={[0:1], [0:6144]}, metadata={op_name=\"jit(local)/shard_map/"
+        "greenfield_dense_convolution_layer1_m32_live_row/slice\"",
+        "slice={[1:2], [0:6144]}, metadata={op_name=\"jit(local)/shard_map/"
+        "greenfield_dense_convolution_layer1_m32_live_row/slice\"",
+        1,
+    )
+    rogue_combined = hlo.replace(
+        "  %slice.1302 = f32[1,6144]",
+        "  %rogue_combined = f32[32,6144] add(%param_0.647, "
+        "%param_0.647)\n  %slice.1302 = f32[1,6144]",
+        1,
+    ).replace(
+        "slice(%param_0.647), slice={[0:1], [0:6144]}",
+        "slice(%rogue_combined), slice={[0:1], [0:6144]}",
+        1,
+    )
+    rogue_rsqrt = hlo.replace(
+        "  %bitcast.445 = f32[1]",
+        "  %rogue_rsqrt = f32[32] add(%add_rsqrt_fusion, "
+        "%add_rsqrt_fusion)\n  %bitcast.445 = f32[1]",
+        1,
+    ).replace(
+        "bitcast(%add_rsqrt_fusion)", "bitcast(%rogue_rsqrt)", 1
+    )
+    rogue_result = hlo.replace(
+        "  ROOT %fusion.143 = bf16[1,6144]",
+        "  %fusion.143 = bf16[1,6144]",
+        1,
+    )
+    result_head, result_tail = rogue_result.rsplit("\n}", 1)
+    rogue_result = (
+        result_head
+        + "\n  ROOT %rogue_result = bf16[1,6144] add(%fusion.143, "
+        "%fusion.143)\n}"
+        + result_tail
+    )
+    mutations = (wrong_live_row, rogue_combined, rogue_rsqrt, rogue_result)
+    assert all(value != hlo for value in mutations)
+    assert all(
+        not MODULE._validate_optimized_hlo(
+            value, compile_rows=32, layer1_only=True
+        )["passed"]
         for value in mutations
     )
 
