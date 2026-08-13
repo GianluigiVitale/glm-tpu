@@ -642,21 +642,52 @@ def _validate_optimized_hlo(
                     gate_value_by_rank[rank] = gate_values[0]
                 if len(down_values) == 1:
                     down_value_by_rank[rank] = down_values[0]
-        down_to_gate = {
-            item.name: [
-                producer.name
-                for rank, producer in gate_by_rank.items()
-                if rank is not None
-                and rank in gate_value_by_rank
-                and virtual_rank(item) in down_value_by_rank
-                and _value_depends_on(
-                    module,
-                    down_value_by_rank[virtual_rank(item)],
-                    gate_value_by_rank[rank],
+                elif compile_rows == 32:
+                    computation = _computation_id(
+                        down_by_rank[rank].computation
+                    )
+                    roots = [
+                        item
+                        for item in instructions_by_computation.get(
+                            computation, ()
+                        )
+                        if item.raw_line.lstrip().startswith("ROOT ")
+                    ]
+                    callers = callers_by_computation.get(
+                        computation, ()
+                    )
+                    if (
+                        len(roots) == 1
+                        and roots[0].raw_opcode == "dynamic-update-slice"
+                        and len(callers) == 1
+                    ):
+                        down_value_by_rank[rank] = callers[0]
+        if compile_rows == 32:
+            down_to_gate = {
+                down_by_rank[rank].name: (
+                    [gate_by_rank[rank].name]
+                    if rank in gate_value_by_rank
+                    and rank in down_value_by_rank
+                    else []
                 )
-            ]
-            for item in down
-        }
+                for rank in range(8)
+            }
+        else:
+            down_to_gate = {
+                item.name: [
+                    producer.name
+                    for rank, producer in gate_by_rank.items()
+                    if rank is not None
+                    and rank in gate_value_by_rank
+                    and virtual_rank(item) in down_value_by_rank
+                    and _value_depends_on(
+                        module,
+                        down_value_by_rank[virtual_rank(item)],
+                        gate_value_by_rank[rank],
+                    )
+                ]
+                for item in down
+            }
         gate_consumers = {
             producer.name: [
                 item.name
@@ -854,15 +885,146 @@ def _validate_optimized_hlo(
                     continue
                 activation_contract[str(rank)]["exact_operand_graph"] = True
             lineage["activation_contract"] = activation_contract
+    def exact_s32_constant(item: Any | None, expected: int) -> bool:
+        return (
+            item is not None
+            and item.raw_opcode == "constant"
+            and _shape_signatures(item.result_shapes) == ("s32[]",)
+            and re.search(
+                rf"\bconstant\({expected}\)(?:,|\s|$)", item.raw_line
+            )
+            is not None
+        )
+
+    def exact_m32_update_stack() -> tuple[list[Any], Any | None, list[str]]:
+        """Recognize TPU's exact fused lowering of the ordered M32 stack."""
+
+        roots_by_rank: dict[int, tuple[Any, Any]] = {}
+        errors: list[str] = []
+        for rank in range(8):
+            if rank not in down_by_rank:
+                continue
+            computation = _computation_id(down_by_rank[rank].computation)
+            roots = [
+                item
+                for item in instructions_by_computation.get(computation, ())
+                if item.raw_line.lstrip().startswith("ROOT ")
+            ]
+            callers = callers_by_computation.get(computation, ())
+            if (
+                len(roots) == 1
+                and roots[0].raw_opcode == "dynamic-update-slice"
+            ):
+                if len(callers) != 1:
+                    errors.append(f"rank {rank} fused stack caller drifted")
+                else:
+                    roots_by_rank[rank] = (roots[0], callers[0])
+        if not roots_by_rank:
+            return [], None, []
+        if set(roots_by_rank) != set(range(8)):
+            return [], None, ["M32 fused stack does not contain all eight ranks"]
+
+        callers: list[Any] = []
+        for rank in range(8):
+            root, caller = roots_by_rank[rank]
+            root_operands = [
+                operand(root, index) for index in range(len(root.operand_names))
+            ]
+            if (
+                caller.raw_opcode != "fusion"
+                or not caller.computation.startswith("ENTRY ")
+                or virtual_rank(caller) != rank
+                or _shape_signatures(caller.result_shapes)
+                != ("bf16[8,32,6144]",)
+                or len(root_operands) != 5
+                or _shape_signatures(root.operand_shapes)
+                != (
+                    "bf16[8,32,6144]",
+                    "bf16[1,32,6144]",
+                    "s32[]",
+                    "s32[]",
+                    "s32[]",
+                )
+                or _shape_signatures(root.result_shapes)
+                != ("bf16[8,32,6144]",)
+            ):
+                errors.append(f"rank {rank} fused stack geometry drifted")
+                continue
+            inserted = root_operands[1]
+            rounded = None if inserted is None else operand(inserted, 0)
+            if (
+                inserted is None
+                or inserted.raw_opcode != "bitcast"
+                or _shape_signatures(inserted.operand_shapes)
+                != ("bf16[32,6144]",)
+                or _shape_signatures(inserted.result_shapes)
+                != ("bf16[1,32,6144]",)
+                or rounded is None
+                or rounded.raw_opcode != "convert"
+                or _shape_signatures(rounded.operand_shapes)
+                != ("f32[32,6144]",)
+                or _shape_signatures(rounded.result_shapes)
+                != ("bf16[32,6144]",)
+                or operand(rounded, 0) is not down_by_rank[rank]
+            ):
+                errors.append(f"rank {rank} fused stack BF16 insertion drifted")
+                continue
+            if not (
+                exact_s32_constant(root_operands[2], rank)
+                and exact_s32_constant(root_operands[3], 0)
+                and exact_s32_constant(root_operands[4], 0)
+            ):
+                errors.append(f"rank {rank} fused stack index drifted")
+                continue
+            base = root_operands[0]
+            if rank == 0:
+                if (
+                    base is None
+                    or base.raw_opcode != "custom-call"
+                    or base.operand_shapes
+                    or _shape_signatures(base.result_shapes)
+                    != ("bf16[8,32,6144]",)
+                    or 'custom_call_target="AllocateBuffer"'
+                    not in base.raw_line
+                ):
+                    errors.append("rank 0 fused stack allocation drifted")
+                    continue
+            elif (
+                base is None
+                or base.raw_opcode != "parameter"
+                or _shape_signatures(base.result_shapes)
+                != ("bf16[8,32,6144]",)
+                or re.search(r"\bparameter\(0\)", base.raw_line) is None
+                or len(callers) != rank
+                or external_parameter_value(base) is not callers[rank - 1]
+            ):
+                errors.append(f"rank {rank} fused stack predecessor drifted")
+                continue
+            callers.append(caller)
+        if errors or len(callers) != 8:
+            return callers, None, errors
+        slices = [
+            item
+            for item in module.instructions
+            if is_m32_row0_slice(item)
+            and _shape_signatures(item.result_shapes) == ("bf16[8,1,6144]",)
+            and exact_layout_source(operand(item, 0), callers[-1])
+            and collective is not None
+            and unwrap_layout(operand(collective, 0)) is item
+        ]
+        if len(slices) != 1:
+            errors.append(
+                "M32 fused stack exact live-row slice is absent or ambiguous"
+            )
+            return callers, None, errors
+        return callers, slices[0], errors
+
     if collective is not None:
         source_convolutions = {
             down_by_rank[rank].name
             for rank, value in down_value_by_rank.items()
             if _value_depends_on(module, collective, value)
         }
-        lineage["collective_convolution_sources"] = sorted(source_convolutions)
-        if source_convolutions != {item.name for item in down}:
-            violations.append("collective does not consume exactly eight down results")
         all_stack_candidates = [
             item
             for item in module.instructions
@@ -875,21 +1037,40 @@ def _validate_optimized_hlo(
             and len(item.operand_names) == 8
         ]
         live_row_slices: list[Any] = []
+        fused_stack_callers: list[Any] = []
+        fused_stack_errors: list[str] = []
         if compile_rows == 32:
-            stack_slice_pairs = [
-                (stack, item)
-                for stack in all_stack_candidates
-                for item in module.instructions
-                if is_m32_row0_slice(item)
-                and exact_layout_source(operand(item, 0), stack)
-                and (
-                    (external := fully_externalized_value(item)) is not None
-                )
-                and unwrap_layout(operand(collective, 0))
-                is unwrap_layout(external)
-            ]
-            stack_candidates = [stack for stack, _item in stack_slice_pairs]
-            live_row_slices = [item for _stack, item in stack_slice_pairs]
+            fused_stack_callers, fused_slice, fused_stack_errors = (
+                exact_m32_update_stack()
+            )
+            if fused_stack_callers or fused_stack_errors:
+                stack_candidates = []
+                if fused_stack_errors:
+                    violations.extend(fused_stack_errors)
+                elif fused_slice is not None:
+                    live_row_slices = [fused_slice]
+                    source_convolutions = {item.name for item in down}
+                    lineage["m32_fused_stack_callers"] = [
+                        item.name for item in fused_stack_callers
+                    ]
+                    lineage["ordered_stack_sources"] = [
+                        [rank] for rank in range(8)
+                    ]
+            else:
+                stack_slice_pairs = [
+                    (stack, item)
+                    for stack in all_stack_candidates
+                    for item in module.instructions
+                    if is_m32_row0_slice(item)
+                    and exact_layout_source(operand(item, 0), stack)
+                    and (
+                        (external := fully_externalized_value(item)) is not None
+                    )
+                    and unwrap_layout(operand(collective, 0))
+                    is unwrap_layout(external)
+                ]
+                stack_candidates = [stack for stack, _item in stack_slice_pairs]
+                live_row_slices = [item for _stack, item in stack_slice_pairs]
             lineage["m32_live_row_slices"] = [
                 item.name for item in live_row_slices
             ]
@@ -899,16 +1080,18 @@ def _validate_optimized_hlo(
                 for item in all_stack_candidates
                 if _value_depends_on(module, collective, item)
             ]
-        if len(stack_candidates) != 1:
+        lineage["collective_convolution_sources"] = sorted(source_convolutions)
+        if source_convolutions != {item.name for item in down}:
+            violations.append("collective does not consume exactly eight down results")
+        if not fused_stack_callers and len(stack_candidates) != 1:
             violations.append(
                 "optimized dense stack is absent or ambiguous: "
                 f"{[item.name for item in stack_candidates]}"
             )
-        elif all(rank in down_by_rank for rank in range(8)):
+        elif not fused_stack_callers and all(
+            rank in down_by_rank for rank in range(8)
+        ):
             stack = stack_candidates[0]
-            by_key = {
-                _instruction_key(item): item for item in module.instructions
-            }
             stack_operands = [
                 by_key.get((stack.computation, name))
                 for name in stack.operand_names
@@ -918,25 +1101,27 @@ def _validate_optimized_hlo(
                     rank
                     for rank in range(8)
                     if rank in down_value_by_rank
-                    and operand is not None
+                    and stack_operand is not None
                     and (
-                        exact_layout_source(operand, down_value_by_rank[rank])
+                        exact_layout_source(
+                            stack_operand, down_value_by_rank[rank]
+                        )
                         if compile_rows == 32
                         else _value_depends_on(
-                            module, operand, down_value_by_rank[rank]
+                            module, stack_operand, down_value_by_rank[rank]
                         )
                     )
                 ]
-                for operand in stack_operands
+                for stack_operand in stack_operands
             ]
             lineage["ordered_stack_sources"] = ordered_sources
             if ordered_sources != [[rank] for rank in range(8)]:
                 violations.append("optimized dense stack row order drifted")
-            if compile_rows == 32 and len(live_row_slices) != 1:
-                violations.append(
-                    "optimized M32 exact live-row slice drifted: "
-                    f"{lineage['m32_live_row_slices']}"
-                )
+        if compile_rows == 32 and len(live_row_slices) != 1:
+            violations.append(
+                "optimized M32 exact live-row slice drifted: "
+                f"{lineage['m32_live_row_slices']}"
+            )
     roots = [
         item
         for item in module.instructions

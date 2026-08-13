@@ -27,6 +27,16 @@ REAL_OPTIMIZED_HLO = Path(
 REAL_OPTIMIZED_HLO_SHA256 = (
     "e3a2538f8d158f2113e93563ba3ba3a24e51a57b45981db33a7b3b7fdc857ca0"
 )
+REAL_M32_OPTIMIZED_HLO = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_M32_HLO",
+        "/home/gianl/glm-run/greenfield_layer0_dense_m32_convolution_"
+        "20260813T032542730910073Z/hlo/dense_convolution.optimized_hlo.txt",
+    )
+)
+REAL_M32_OPTIMIZED_HLO_SHA256 = (
+    "c9c9bf90c9528016846ccea48e04877e0ee0e44bc2d83f3ea0cbd9997162266a"
+)
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
     "decode_projection_lowering/8k/"
@@ -325,6 +335,47 @@ def _synthetic_m32_hlo_with_fused_live_row(*, rogue_return: bool) -> str:
     return hlo[:header] + computation + hlo[header:start] + caller + hlo[end:]
 
 
+def _synthetic_m32_hlo_with_fused_rogue_down() -> str:
+    hlo = _synthetic_m32_hlo()
+    down_weight = (
+        "  %down_weight.0 = bf16[384,6144] parameter(2)\n"
+    )
+    down = (
+        "  %down.0 = f32[32,6144] convolution(%activated.0, "
+        "%down_weight.0), dim_labels=bf_io->bf, "
+        'metadata={op_name="jit(probe)/'
+        'greenfield_dense_convolution_virtual_rank_00/down"}\n'
+    )
+    rounded = "  %down_bf16.0 = bf16[32,6144] convert(%down.0)\n"
+    row = (
+        "  %down_row.0 = bf16[1,32,6144] reshape(%down_bf16.0)\n"
+    )
+    for line in (down_weight, down, rounded, row):
+        assert line in hlo
+    hlo = hlo.replace(down, "", 1).replace(rounded, "", 1).replace(row, "", 1)
+    caller = (
+        "  %down_row.0 = bf16[1,32,6144] fusion("
+        "%activated.0, %down_weight.0), kind=kLoop, "
+        "calls=%fused_rogue_down\n"
+    )
+    hlo = hlo.replace(down_weight, down_weight + caller, 1)
+    computation = (
+        "%fused_rogue_down (%p0: bf16[32,384], "
+        "%p1: bf16[384,6144]) -> bf16[1,32,6144] {\n"
+        "  %p0 = bf16[32,384] parameter(0)\n"
+        "  %p1 = bf16[384,6144] parameter(1)\n"
+        "  %down.0 = f32[32,6144] convolution(%p0, %p1), "
+        "dim_labels=bf_io->bf, metadata={op_name=\"jit(probe)/"
+        "greenfield_dense_convolution_virtual_rank_00/down\"}\n"
+        "  %rounded.0 = bf16[32,6144] convert(%down.0)\n"
+        "  %rogue.0 = bf16[32,6144] add(%rounded.0, %rounded.0)\n"
+        "  ROOT %row.0 = bf16[1,32,6144] reshape(%rogue.0)\n"
+        "}\n\n"
+    )
+    header = hlo.index("\n") + 1
+    return hlo[:header] + computation + hlo[header:]
+
+
 def _synthetic_hlo_with_fused_y0(*, rogue_return: str | None) -> str:
     hlo = _synthetic_hlo()
     start_marker = "  %association_y_leaf.0.0 ="
@@ -578,6 +629,11 @@ def test_dense_convolution_m32_hlo_contract_accepts_only_live_row() -> None:
         compile_rows=32,
     )
     assert not fused_rogue["passed"]
+    rogue_down = MODULE._validate_optimized_hlo(
+        _synthetic_m32_hlo_with_fused_rogue_down(),
+        compile_rows=32,
+    )
+    assert not rogue_down["passed"]
 
 
 @pytest.mark.skipif(
@@ -612,6 +668,70 @@ def test_dense_convolution_m32_source_is_bound_to_db532() -> None:
     arguments.accepted_m32_summary_sha256 = "0" * 64
     with pytest.raises(RuntimeError, match="accepted M32 summary SHA-256 drifted"):
         MODULE._load_accepted_m32_source(arguments)
+
+
+@pytest.mark.skipif(
+    not REAL_M32_OPTIMIZED_HLO.exists(),
+    reason="protected real M32 dense-convolution HLO is not mounted",
+)
+def test_dense_convolution_m32_contract_replays_fused_tpu_stack() -> None:
+    assert MODULE._file_sha256(REAL_M32_OPTIMIZED_HLO) == (
+        REAL_M32_OPTIMIZED_HLO_SHA256
+    )
+    hlo = REAL_M32_OPTIMIZED_HLO.read_text()
+    exact = MODULE._validate_optimized_hlo(hlo, compile_rows=32)
+    assert exact["passed"], exact["violations"]
+    assert exact["lineage"]["ordered_stack_sources"] == [
+        [rank] for rank in range(8)
+    ]
+    assert len(exact["lineage"]["m32_fused_stack_callers"]) == 8
+
+    wrong_index = hlo.replace(
+        "%constant.231 = s32[] constant(3)",
+        "%constant.231 = s32[] constant(2)",
+        1,
+    )
+    wrong_predecessor = hlo.replace(
+        "fusion(%bitcast_dynamic-update-slice_fusion.5, %bitcast.416,",
+        "fusion(%bitcast_dynamic-update-slice_fusion.6, %bitcast.416,",
+        1,
+    )
+    missing_round = hlo.replace(
+        "%bitcast.280 = bf16[1,32,6144]{2,1,0:T(8,128)(2,1)} "
+        "bitcast(%convert_element_type.351)",
+        "%bitcast.280 = bf16[1,32,6144]{2,1,0:T(8,128)(2,1)} "
+        "bitcast(%conv_general_dilated.97)",
+        1,
+    )
+    rogue_stack = hlo.replace(
+        "  %slice.1043 = bf16[8,1,6144]",
+        "  %rogue_m32_stack = bf16[8,32,6144] add("
+        "%bitcast_dynamic-update-slice_fusion, "
+        "%bitcast_dynamic-update-slice_fusion)\n"
+        "  %slice.1043 = bf16[8,1,6144]",
+        1,
+    ).replace(
+        "slice(%bitcast_dynamic-update-slice_fusion), ",
+        "slice(%rogue_m32_stack), ",
+        1,
+    )
+    wrong_live_row = hlo.replace(
+        "slice={[0:8], [0:1], [0:6144]}",
+        "slice={[0:8], [1:2], [0:6144]}",
+        1,
+    )
+    mutations = (
+        wrong_index,
+        wrong_predecessor,
+        missing_round,
+        rogue_stack,
+        wrong_live_row,
+    )
+    assert all(value != hlo for value in mutations)
+    assert all(
+        not MODULE._validate_optimized_hlo(value, compile_rows=32)["passed"]
+        for value in mutations
+    )
 
 
 def test_dense_convolution_hlo_contract_binds_fused_component_root() -> None:
