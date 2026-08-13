@@ -8437,3 +8437,24 @@ unmotivated arithmetic variants.
   refuses. The source adds a unary identity barrier for rank zero while preserving both live outputs
   of the rank 1--7 predecessor barriers. This remains an unproven scheduling hypothesis until the
   next protected HLO shows all eight accepted gate geometries.
+
+## 2026-08-13 20:03--20:04 — first 32-partial capture compiles and refuses only an inapplicable cardinality check
+
+- Reviewed/pushed commit `1987770bb89f436253686f789c0b5ccbfebc2335` launched once as
+  `greenfield_layer0_dense_partial_capture_20260813T200306361654899Z`. It compiled the protected
+  final-layout checkpoint and preserved the real StableHLO plus scheduled TPU HLO, then refused
+  before arithmetic. No tensor, numerical verdict, DB row, summary, archive or terminal `SUCCESS`
+  exists. Failure cleanup authenticates 8/8 zero work.
+- The scheduled HLO has all eight gate and all eight down convolutions at their exact accepted
+  backend geometries. Every live convolution independently proves exact packed FP8/scale lineage;
+  the down contractions form the exact ordered eight-rank DUS stack, row-zero slice, sole local
+  four-way gather and exact ENTRY tuple result. The only false predicate was the reused envelope's
+  global `exact_packed_weight_lineage`: it requires eight ENTRY parameters because the ordinary
+  envelope also computes layer-1 RMSNorm, while partial capture intentionally has seven and returns
+  only gathered partials plus carried residual.
+- Optimized/Stable HLO SHAs are `8426fbf24b...77b290` and `bbb991d46b...b6e4c`; runner log,
+  pre-census and failure-census SHAs are `0c6d204a54...41469`, `9250916ff0...f2548` and
+  `e260176cf8...0a95`. The correction drops only that global cardinality dependency from capture
+  publication; it continues to require all 16 exact per-contraction source/schedule records and
+  their live down-stack bijection. The SHA-pinned protected replay passes and the dead-schedule
+  decoy remains rejected. One correction review/commit and one bounded capture retry are next.

@@ -121,6 +121,13 @@ REAL_DB548_OPTIMIZED_HLO = Path(
 REAL_DB548_OPTIMIZED_HLO_SHA256 = (
     "5f4dd83793da67be6a8c580949920e93f8c64fe8205816738e7d04890640a877"
 )
+REAL_PARTIAL_CAPTURE_OPTIMIZED_HLO = Path(
+    "/home/gianl/glm-run/greenfield_layer0_dense_partial_capture_"
+    "20260813T200306361654899Z/hlo/dense_convolution.optimized_hlo.txt"
+)
+REAL_PARTIAL_CAPTURE_OPTIMIZED_HLO_SHA256 = (
+    "8426fbf24bece38cead562752ef87be07e7a2ab31bf94560e3065fb18277b290"
+)
 REAL_DB548_TENSOR = REAL_DB548_OPTIMIZED_HLO.parents[1] / (
     "dense_envelope_cross_layer.npz"
 )
@@ -4644,6 +4651,21 @@ def test_dense_partial_capture_optimized_contract_pins_schedules_and_gather() ->
         "%rogue_async_done",
     ]
     assert async_result["passed"] is False
+
+
+@pytest.mark.skipif(
+    not REAL_PARTIAL_CAPTURE_OPTIMIZED_HLO.exists(),
+    reason="preserved protected partial-capture HLO is not available",
+)
+def test_dense_partial_capture_replays_exact_protected_hlo() -> None:
+    optimized_hlo = REAL_PARTIAL_CAPTURE_OPTIMIZED_HLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_PARTIAL_CAPTURE_OPTIMIZED_HLO_SHA256
+    )
+    result = MODULE._validate_partial_capture_optimized_hlo(optimized_hlo)
+    assert result["passed"], result["violations"]
+    assert result["exact_live_schedule_bijection"] is True
+    assert result["exact_capture_lineage"] is True
 
 
 def test_dense_partial_capture_stablehlo_pins_group_and_outer_return() -> None:

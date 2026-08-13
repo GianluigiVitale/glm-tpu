@@ -614,7 +614,6 @@ def _validate_partial_capture_optimized_hlo(
             stack_contract.get("scheduled_kernel_geometry_required") is True
             and stack_contract.get("exact_accepted_kernel_geometry") is True
             and stack_contract.get("exact_accepted_weight_layout") is True
-            and stack_contract.get("exact_packed_weight_lineage") is True
             and set(accepted_weight_layouts) == {"gate_up", "down"}
             and all(
                 len(records := accepted_weight_layouts[label]) == 8

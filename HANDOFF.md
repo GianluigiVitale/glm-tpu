@@ -4572,3 +4572,30 @@ SHA `082125fe...758f`. Exactness localizes the cause to dense MLP/cross-layer fu
 localizes it to post-attention add/RMSNorm. Sol approved only the new legacy diff and focused tests
 pass 6/6. Exact next is one audit of the greenfield wrapper/sealer diff, commit/push, then one
 serialized protected 8K dense-input capture. Gate D remains open.
+
+## Current exact next: solve the remaining dense reduction offline
+
+Protected DB547 reduced the complete layer-0 dense boundary from 1,073 BF16 mismatches to exactly
+one ULP at hidden index 2795; DB548 preserved the same result after all 16 convolutions matched the
+accepted schedules. The latest complete 8K run reaches exact token 101252 and exact event 0/layer 0,
+then differs by six selected positions at event 1/layer 1. Full 8K retries are frozen until the
+layer-1 normalized row is exact in a bounded probe.
+
+Commit `1987770bb89f436253686f789c0b5ccbfebc2335` adds a default-off, protected four-chip capture
+of all 32 real BF16 down partials plus the exact residual/norm operands. The first launch, tag
+`greenfield_layer0_dense_partial_capture_20260813T200306361654899Z`, compiled the real StableHLO
+and scheduled TPU HLO but refused before arithmetic. Its generic dense validator required eight
+ENTRY parameters because the ordinary envelope also returns layer-1 RMSNorm; capture mode correctly
+has only seven and returns the partials/carried residual. All 16 live convolutions independently
+pass exact packed lineage and accepted schedules, and the exact ordered down stack/gather/result
+bindings pass. Optimized/Stable HLO SHAs are `8426fbf2...b290` and `bbb991d4...6e4c`; runner log,
+pre-census and failure-census SHAs are `0c6d204a...1469`, `9250916f...2548` and
+`e260176c...a95`. No arithmetic, tensor, DB row, summary, archive or terminal `SUCCESS` exists;
+cleanup is authenticated 8/8.
+
+The bounded correction removes only that inapplicable global ENTRY-cardinality predicate while
+retaining per-live-contraction packed-source, accepted-schedule, virtual-rank and gather bijections.
+The SHA-pinned real capture HLO now replays; a wrong live schedule masked by dead exact metadata
+still refuses. Exact next: correction-only review, commit/push and one protected partial capture.
+Then enumerate reduction association offline against the captured accepted layer-1 target; only a
+0/6144 result authorizes production integration and one complete protected 8K retry.
