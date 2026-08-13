@@ -238,20 +238,15 @@ def _expect_accepted_gate_up_layout(
 
     dependency: str | None = None
     dependency_output: str | None = None
-    node = _expect_node(
-        graph,
-        output,
-        opcode=(
-            "optimization_barrier"
-            if "#" in output
-            else "custom_call"
-        ),
-        result_type="tensor<6144x768xbf16>",
-    )
-    if node.opcode == "optimization_barrier":
+    node = graph.node(output)
+    if (
+        node.opcode != "optimization_barrier"
+        or node.result_type != "tensor<6144x768xbf16>"
+    ):
+        raise _MatchError(f"{node.name}: accepted gate/up barrier drifted")
+    if node.name.endswith("#0"):
         if (
-            not node.name.endswith("#0")
-            or len(node.operands) != 2
+            len(node.operands) != 2
             or graph.node(node.operands[1]).result_type
             != "tensor<32x6144xbf16>"
         ):
@@ -270,12 +265,16 @@ def _expect_accepted_gate_up_layout(
             raise _MatchError(
                 f"{sibling.name}: predecessor barrier result drifted"
             )
-        node = _expect_node(
-            graph,
-            node.operands[0],
-            opcode="custom_call",
-            result_type="tensor<6144x768xbf16>",
+    elif "#" in node.name or len(node.operands) != 1:
+        raise _MatchError(
+            f"{node.name}: rank-zero materialization barrier drifted"
         )
+    node = _expect_node(
+        graph,
+        node.operands[0],
+        opcode="custom_call",
+        result_type="tensor<6144x768xbf16>",
+    )
     normalized = re.sub(r"\s+", "", node.raw_line)
     if (
         len(node.operands) != 1

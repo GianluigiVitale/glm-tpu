@@ -8222,3 +8222,23 @@ unmotivated arithmetic variants.
   suite passes 82/82 and compilation/diff checks pass. Exact next is one new-diff Sol audit,
   commit/push, and one protected retry; only an exact accepted layer-1 row permits production
   integration and another complete 8K decoder.
+
+## 2026-08-13 11:38--12:00 — predecessor ordering moves the sole old gate to rank zero
+
+- Reviewed commit `6eff524e9cdd6339e632807acca61c02514745dc` ran once under protected tag
+  `greenfield_layer0_dense_envelope_cross_layer_20260813T113846748941458Z`. It compiled the real
+  checkpoint and refused in optimized-HLO validation before arithmetic. No runner, tensor verdict,
+  DB row, summary, archive or terminal `SUCCESS` exists. Preflight and failure censuses are
+  byte-identical at SHA `de4f2955...841d` and authenticate all eight hosts clean. Optimized-HLO,
+  StableHLO and runner-log SHAs are `0cff45d9...53b`, `6be35702...5b8` and `c12ec577...202`.
+- The scheduled HLO proves the predecessor chain changed the intended compiler boundary. All eight
+  down convolutions retain the accepted schedule. Gate ranks 1--7 now use `[384,6]`, input
+  `[4,24]`, iterations `[1,1,2]` and split 2; rank zero alone uses the old `[48,6]`, input `[4,3]`,
+  iterations `[1,1,16]`. Rank zero is also the only gate without a materialization barrier.
+- TPU externalizes the seven decoded gate weights as exact tuple results, copies each selected
+  BF16 `[6144,768]` value in four distinct 1,536-row pieces, and rejoins it with `ConcatBitcast`.
+  The bounded optimized-HLO matcher now proves that scheduled path back through the exact tuple
+  result/dequant graph to the packed FP8 bits and scales; a duplicated piece or wrong tuple result
+  refuses. The source adds a unary identity barrier for rank zero while preserving both live outputs
+  of the rank 1--7 predecessor barriers. This remains an unproven scheduling hypothesis until the
+  next protected HLO shows all eight accepted gate geometries.

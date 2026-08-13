@@ -19,6 +19,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Current pushed baseline is `6eff524e9cdd6339e632807acca61c02514745dc`. Its protected retry,
+  tag `greenfield_layer0_dense_envelope_cross_layer_20260813T113846748941458Z`, compiled the real
+  checkpoint and failed closed in optimized-HLO validation before arithmetic. There is no runner,
+  tensor verdict, DB row, archive, summary or `SUCCESS`; pre/failure censuses are identical and
+  authenticate 8/8 clean hosts. Optimized-HLO, StableHLO and runner-log SHAs are
+  `0cff45d9...53b`, `6be35702...5b8` and `c12ec577...202`.
+- The ordered dependency was effective but left rank zero as the sole exception. Every down
+  contraction remains accepted. Gate ranks 1--7 now have the accepted `[384,6]` / `[1,1,2]`
+  schedule; rank zero, which has no predecessor barrier, alone has `[48,6]` / `[1,1,16]`. TPU
+  materializes ranks 1--7 as exact BF16 tuple results copied in four complete 1,536-row pieces.
+- Active uncommitted correction gives rank zero its own unary value-preserving materialization
+  barrier and retains the two-result predecessor barriers for ranks 1--7. The optimized-HLO proof
+  binds TPU's materialized `ConcatBitcast` path through all four distinct pieces and the exact tuple
+  element back to its packed FP8 bits/scales; duplicated pieces or a wrong tuple result refuse.
+  Exact next: finish the complete affected suite, one new-diff-only Sol audit, commit/push, then one
+  serialized protected retry. Only scheduled 16/16 accepted geometry and an exact layer-1 row
+  authorize production integration.
+
 - Current clean pushed baseline is `077dffbb218697f5f6943395a94b0f2ead980e99`. Its one
   protected retry, tag `greenfield_layer0_dense_envelope_cross_layer_20260813T111019310055824Z`,
   compiled the real checkpoint but failed closed in optimized-HLO validation before arithmetic.

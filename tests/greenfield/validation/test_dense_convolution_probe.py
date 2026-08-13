@@ -93,6 +93,16 @@ REAL_ACCEPTED_SCALE_ENVELOPE_OPTIMIZED_HLO = Path(
 REAL_ACCEPTED_SCALE_ENVELOPE_OPTIMIZED_HLO_SHA256 = (
     "68b7ca3dba1d53d7172c4bc82cde9beb7abd464e3b748995ef261abe9d8e55ab"
 )
+REAL_SERIALIZED_SCALE_ENVELOPE_OPTIMIZED_HLO = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_SERIALIZED_SCALE_HLO",
+        "/home/gianl/glm-run/greenfield_layer0_dense_envelope_cross_layer_"
+        "20260813T113846748941458Z/hlo/dense_convolution.optimized_hlo.txt",
+    )
+)
+REAL_SERIALIZED_SCALE_ENVELOPE_OPTIMIZED_HLO_SHA256 = (
+    "0cff45d9ab9fb1428ea2c6483b33be8dc5416769db42800f8c3099ed1c16453b"
+)
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
     "decode_projection_lowering/8k/"
@@ -1844,6 +1854,38 @@ def test_dense_final_layout_stablehlo_binds_packed_shards_and_sources() -> None:
         if ":2 = stablehlo.optimization_barrier" in line
     ]
     assert len(dependency_lines) == 7
+    rank_zero_barriers = [
+        line
+        for line in stablehlo.splitlines()
+        if " = stablehlo.optimization_barrier " in line
+        and ":2 =" not in line
+        and "tensor<6144x768xbf16>" in line
+    ]
+    assert len(rank_zero_barriers) == 1
+    rank_zero_match = re.search(
+        r"(%[^ ]+) = stablehlo\.optimization_barrier (%[^ ]+) :",
+        rank_zero_barriers[0],
+    )
+    assert rank_zero_match is not None
+    missing_rank_zero_barrier = stablehlo.replace(
+        rank_zero_barriers[0] + "\n", "", 1
+    )
+    missing_rank_zero_barrier = re.sub(
+        re.escape(rank_zero_match.group(1)) + r"(?![A-Za-z0-9_.$#-])",
+        rank_zero_match.group(2),
+        missing_rank_zero_barrier,
+    )
+    assert missing_rank_zero_barrier != stablehlo
+    rejected_rank_zero = MODULE._validate_stablehlo(
+        missing_rank_zero_barrier,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert rejected_rank_zero["passed"] is False
+    assert "accepted gate/up barrier drifted" in " ".join(
+        rejected_rank_zero["violations"]
+    )
     first_dependency = re.search(
         r"optimization_barrier\s+%[^,]+,\s*(%[^ ]+)",
         dependency_lines[0],
@@ -2237,6 +2279,92 @@ def test_dense_envelope_replays_accepted_scale_lowering_fail_closed() -> None:
     assert rejected["accepted_weight_layouts"]["down"][0][
         "exact_packed_dequant"
     ] is False
+
+
+@pytest.mark.skipif(
+    not REAL_SERIALIZED_SCALE_ENVELOPE_OPTIMIZED_HLO.exists(),
+    reason="protected serialized-scale envelope HLO is unavailable",
+)
+def test_dense_envelope_binds_materialized_gate_tuple_fail_closed() -> None:
+    optimized_hlo = REAL_SERIALIZED_SCALE_ENVELOPE_OPTIMIZED_HLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_SERIALIZED_SCALE_ENVELOPE_OPTIMIZED_HLO_SHA256
+    )
+    contract = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert contract["passed"] is False
+    assert contract["exact_packed_weight_lineage"] is True
+    assert contract["exact_accepted_kernel_geometry"] is False
+    gate_rows = contract["accepted_weight_layouts"]["gate_up"]
+    assert all(row["exact_packed_dequant"] for row in gate_rows)
+    assert [
+        row["virtual_rank"]
+        for row in gate_rows
+        if not row["exact_convolution_tiling"]
+    ] == [0]
+    assert all(
+        row["exact_packed_dequant"]
+        and row["exact_convolution_tiling"]
+        for row in contract["accepted_weight_layouts"]["down"]
+    )
+
+    duplicated_piece = optimized_hlo.replace(
+        "slice={[0:1536], [0:768]}",
+        "slice={[1536:3072], [0:768]}",
+        1,
+    )
+    assert duplicated_piece != optimized_hlo
+    rejected_piece = MODULE._validate_optimized_hlo(
+        duplicated_piece,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert rejected_piece["exact_packed_weight_lineage"] is False
+
+    swapped_pieces = optimized_hlo.replace(
+        "custom-call(%slice-done.24, %slice-done.25, "
+        "%slice-done.26, %slice-done.27), "
+        'custom_call_target="ConcatBitcast"',
+        "custom-call(%slice-done.25, %slice-done.24, "
+        "%slice-done.26, %slice-done.27), "
+        'custom_call_target="ConcatBitcast"',
+        1,
+    )
+    assert swapped_pieces != optimized_hlo
+    rejected_order = MODULE._validate_optimized_hlo(
+        swapped_pieces,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert rejected_order["exact_packed_weight_lineage"] is False
+
+    wrong_tuple_result = optimized_hlo.replace(
+        "get-tuple-element(%fusion), index=6, metadata={op_name=\"jit("
+        "local_dense_envelope)/shard_map/greenfield_dense_convolution_"
+        "virtual_rank_07/convert_element_type\"",
+        "get-tuple-element(%fusion), index=5, metadata={op_name=\"jit("
+        "local_dense_envelope)/shard_map/greenfield_dense_convolution_"
+        "virtual_rank_07/convert_element_type\"",
+        1,
+    )
+    assert wrong_tuple_result != optimized_hlo
+    rejected_tuple = MODULE._validate_optimized_hlo(
+        wrong_tuple_result,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert rejected_tuple["exact_packed_weight_lineage"] is False
 
 
 @pytest.mark.skipif(

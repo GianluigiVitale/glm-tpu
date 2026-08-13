@@ -615,7 +615,17 @@ def _virtual_dense_final_layout_convolution_down_partials(
                 gate_up_weight,
                 Layout(major_to_minor=(0, 1)),
             )
-            if previous_partial is not None:
+            if previous_partial is None:
+                # Rank zero has no predecessor, but it still needs the same
+                # decoded-weight materialization boundary as ranks one through
+                # seven.  Without it TPU leaves only rank zero's dequantization
+                # inside the contraction fusion and selects the narrow legacy
+                # schedule for that one rank.
+                with jax.named_scope(
+                    "greenfield_dense_convolution_virtual_rank_dependency"
+                ):
+                    gate_up_weight = lax.optimization_barrier(gate_up_weight)
+            else:
                 # A PP8 owner executes eight virtual legacy-DCP shards on one
                 # physical chip.  Keep their gate/down pairs ordered without
                 # changing any tensor value.  Otherwise TPU scheduling may run

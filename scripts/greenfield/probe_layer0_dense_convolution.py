@@ -1160,6 +1160,120 @@ def _validate_optimized_hlo(
                 item = source
             return item
 
+        def exact_materialized_gate_root(item: Any | None) -> Any | None:
+            """Resolve TPU's exact four-slice materialized gate weight.
+
+            A live optimization barrier may externalize several decoded gate
+            weights as tuple results.  TPU copies one selected BF16 result in
+            four contiguous 1,536-row pieces and rejoins them with
+            ``ConcatBitcast`` before the convolution.  Bind that scheduled
+            copy form back to the exact tuple element; the ordinary dequant
+            proof below then binds its bits and scales to the packed ENTRY
+            parameters.
+            """
+
+            if (
+                not scheduled_module
+                or label != "gate_up"
+                or item is None
+                or item.raw_opcode != "custom-call"
+                or 'custom_call_target="ConcatBitcast"' not in item.raw_line
+                or _shape_signatures(item.result_shapes) != (weight_shape,)
+                or result_minor_to_major(item) != (1, 0)
+                or len(item.operand_names) != 4
+            ):
+                return None
+            source_value = None
+            # ConcatBitcast consumes buffers in physical allocation order.
+            # The preserved scheduled HLO uses logical row order for ranks
+            # one through six and the exact [1,2,3,0] allocation rotation for
+            # tuple result zero (virtual rank seven).  Pin that order rather
+            # than merely proving that all four pieces exist.
+            piece_order = (1, 2, 3, 0) if rank == 7 else (0, 1, 2, 3)
+            for piece, value in zip(piece_order, item.operand_names):
+                done = by_key.get((item.computation, value))
+                if (
+                    done is None
+                    or done.raw_opcode != "slice-done"
+                    or _shape_signatures(done.result_shapes)
+                    != ("bf16[1536,768]",)
+                    or result_minor_to_major(done) != (1, 0)
+                    or len(done.operand_names) != 1
+                ):
+                    return None
+                start = operand(done, 0)
+                ranges = slice_ranges(start) if start is not None else None
+                if (
+                    start is None
+                    or start.raw_opcode != "slice-start"
+                    or len(start.operand_names) != 1
+                    or ranges
+                    != (
+                        (piece * 1536, (piece + 1) * 1536),
+                        (0, 768),
+                    )
+                    or len(start.result_shapes) != 3
+                    or done.result_shapes[0] != start.result_shapes[1]
+                ):
+                    return None
+                candidate = operand(start, 0)
+                if (
+                    candidate is None
+                    or candidate.raw_opcode != "get-tuple-element"
+                    or _shape_signatures(candidate.result_shapes)
+                    != (weight_shape,)
+                    or result_minor_to_major(candidate) != (1, 0)
+                    or len(candidate.operand_names) != 1
+                ):
+                    return None
+                if source_value is None:
+                    source_value = candidate
+                elif _instruction_key(candidate) != _instruction_key(
+                    source_value
+                ):
+                    return None
+            if source_value is None:
+                return None
+            producer = operand(source_value, 0)
+            tuple_index = _tuple_index(source_value)
+            if (
+                producer is None
+                or producer.raw_opcode != "fusion"
+                or tuple_index is None
+                or not producer.computation.startswith("ENTRY ")
+            ):
+                return None
+            result = fusion_result(producer, tuple_index)
+            return (
+                result
+                if result is not None
+                and _shape_signatures(result.result_shapes) == (weight_shape,)
+                and virtual_rank(result) == rank
+                else None
+            )
+
+        materialized_input = immediate
+        if materialized_input.raw_opcode == "fusion":
+            materialized_input = unwrap_singleton_payload(
+                called_root(materialized_input), "bf16"
+            )
+        if (
+            materialized_input is not None
+            and materialized_input.raw_opcode == "parameter"
+            and not materialized_input.computation.startswith("ENTRY ")
+        ):
+            materialized_input = nonarithmetic_layout(
+                external_parameter_value(materialized_input)
+            )
+        if (
+            (
+                materialized_root := exact_materialized_gate_root(
+                    materialized_input
+                )
+            )
+            is not None
+        ):
+            root = materialized_root
         if (
             root is None
             or root.raw_opcode != "convert"
