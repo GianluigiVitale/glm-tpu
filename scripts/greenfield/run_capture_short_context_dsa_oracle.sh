@@ -28,6 +28,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=0
     ;;
   prompt_key | prompt_key_input)
     readonly PROMPT_KEY_CAPTURE=1
@@ -35,6 +36,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=0
     ;;
   attention_output)
     readonly PROMPT_KEY_CAPTURE=0
@@ -42,6 +44,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=0
     ;;
   attention_projection)
     readonly PROMPT_KEY_CAPTURE=0
@@ -49,6 +52,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_PROJECTION_CAPTURE=1
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=0
     ;;
   attention_update)
     readonly PROMPT_KEY_CAPTURE=0
@@ -56,6 +60,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=1
     readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=0
     ;;
   dense_boundary)
     readonly PROMPT_KEY_CAPTURE=0
@@ -63,6 +68,15 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_PROJECTION_CAPTURE=0
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=1
+    readonly DENSE_INPUT_CAPTURE=0
+    ;;
+  dense_input)
+    readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=1
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
@@ -106,7 +120,11 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+  if [[ $DENSE_INPUT_CAPTURE == 1 ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-0c2f7f28a
+    readonly OBSERVER_COMMIT_DISTANCE=11
+    readonly LEGACY_PIN=0c2f7f28a075a51f5eb51dc98bbb74e363d3290f
+  elif [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-8443ea64f
     readonly OBSERVER_COMMIT_DISTANCE=10
     readonly LEGACY_PIN=8443ea64f4574335091130f0e4f1dfef258c91f7
@@ -247,7 +265,8 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
   }
 fi
 if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 || \
-      $ATTENTION_UPDATE_CAPTURE == 1 || $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+      $ATTENTION_UPDATE_CAPTURE == 1 || $DENSE_BOUNDARY_CAPTURE == 1 || \
+      $DENSE_INPUT_CAPTURE == 1 ]]; then
   [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
      $PROFILE == 8k && $INTERNAL_TARGET_POSITION == 8155 && \
      $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
@@ -256,7 +275,7 @@ if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 || \
     exit 2
   }
 fi
-if [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+if [[ $DENSE_BOUNDARY_CAPTURE == 1 || $DENSE_INPUT_CAPTURE == 1 ]]; then
   [[ -r $DENSE_CONVOLUTION_DIR/runner.json &&
      -r $DENSE_CONVOLUTION_DIR/dense_convolution.npz &&
      -r $DENSE_CONVOLUTION_DIR/summary.json &&
@@ -286,41 +305,82 @@ db_path, run_id_text, run_tag, code_hash = sys.argv[1:]
 run_id = int(run_id_text)
 connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 run = connection.execute(
-    "SELECT model, model_revision, env_json, note FROM runs WHERE run_id = ?",
+    "SELECT run_id, created_utc, model, model_revision, harness_git, fork_git, "
+    "env_json, pod, note FROM runs WHERE run_id = ?",
     (run_id,),
 ).fetchone()
 items = connection.execute(
-    "SELECT benchmark, item_id, gold, correct, score FROM items WHERE run_id = ?",
+    "SELECT id, run_id, benchmark, item_id, asked_utc, prompt, gold, "
+    "raw_output, extracted, correct, score, n_prompt_tokens, n_gen_tokens, "
+    "latency_ms, seed, finish_reason, truncated FROM items WHERE run_id = ?",
     (run_id,),
 ).fetchall()
 summaries = connection.execute(
-    "SELECT benchmark, metric, value FROM summary WHERE run_id = ?",
+    "SELECT id, run_id, benchmark, created_utc, n, metric, value, card_value, "
+    "delta, note FROM summary WHERE run_id = ?",
     (run_id,),
 ).fetchall()
 connection.close()
 if run is None:
     raise SystemExit("protected DB540 run is absent")
-environment = json.loads(run[2])
+environment = json.loads(run[6])
+expected_environment = {
+    "GLM_ENGINE": "greenfield_dense_convolution_probe",
+    "checkpoint_manifest_sha256": (
+        "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134"
+    ),
+    "classification": "accepted_dense_convolution_nonexact",
+    "db538_tensor_sha256": (
+        "e801d5471697fefd1477c46603698289de93818d08d214bdf56e576f52819e0e"
+    ),
+    "greenfield_code_hash": code_hash,
+    "greenfield_run_tag": run_tag,
+}
 if (
-    run[0] != "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
-    or run[1] != "native-jax-db538-dense-convolution-v1"
-    or run[3]
-    != "Protected layer-0 dense convolution discriminator; no performance claim."
-    or environment.get("GLM_ENGINE") != "greenfield_dense_convolution_probe"
-    or environment.get("greenfield_run_tag") != run_tag
-    or environment.get("greenfield_code_hash") != code_hash
-    or environment.get("classification") != "accepted_dense_convolution_nonexact"
+    run != (
+        540,
+        "2026-08-13T00:53:15+00:00",
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution",
+        "native-jax-db538-dense-convolution-v1",
+        "2f63779",
+        "b3c25df47",
+        run[6],
+        "db-v4-64-od",
+        "Protected layer-0 dense convolution discriminator; no performance claim.",
+    )
+    or environment != expected_environment
     or items != [(
+        1824,
+        540,
         "greenfield_layer0_dense_convolution",
         "position8155",
+        "2026-08-13T00:53:15+00:00",
+        "Sealed exact StrategyND attention boundary at first 8K decode row.",
         "Exact accepted BF16 layer-1 normalized hidden [6144].",
+        '{"classification": "accepted_dense_convolution_nonexact", '
+        '"exact_arms": [], "mismatch_counts": '
+        '{"accepted_dense_convolution": 1073}}',
+        "none",
         0,
         0.0,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )]
     or summaries != [(
+        771,
+        540,
         "greenfield_layer0_dense_convolution",
+        "2026-08-13T00:53:15+00:00",
+        1,
         "probe_contract_valid",
         1.0,
+        None,
+        None,
+        "Diagnostic layer-0 arithmetic classification only; no decoder claim.",
     )]
 ):
     raise SystemExit("protected DB540 live DB identity drifted")
@@ -470,6 +530,8 @@ elif [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/attention_update_capture
 elif [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/dense_boundary_capture
+elif [[ $DENSE_INPUT_CAPTURE == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/dense_input_capture
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -593,7 +655,7 @@ if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
     }
   done
 fi
-if [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+if [[ $DENSE_BOUNDARY_CAPTURE == 1 || $DENSE_INPUT_CAPTURE == 1 ]]; then
   for spec in \
     "$DENSE_CONVOLUTION_RUNNER_SHA $DENSE_CONVOLUTION_REMOTE/runner.json" \
     "$DENSE_CONVOLUTION_TENSOR_SHA $DENSE_CONVOLUTION_REMOTE/dense_convolution.npz" \
@@ -1199,7 +1261,43 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $DENSE_INPUT_CAPTURE == 1 ]]; then
+  say "sealing accepted layer-0 normalized dense-MLP input"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_accepted_dense_input.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    --capture-process-indices 0 \
+    >"$RUN_DIR/dense_input_capture_summary.json"
+  accepted_dense_input_capture_sha=$(sha256sum \
+    "$INTERNAL_RESULT_DIR/capture.json" | awk '{print $1}')
+  say "comparing accepted dense input with protected DB540"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/compare_accepted_dense_input.py" \
+    --accepted-capture-dir "$INTERNAL_RESULT_DIR" \
+    --probe-dir "$DENSE_CONVOLUTION_DIR" \
+    --output "$RUN_DIR/dense_input_comparison" \
+    --accepted-capture-file-sha256 "$accepted_dense_input_capture_sha" \
+    --probe-runner-sha256 "$DENSE_CONVOLUTION_RUNNER_SHA" \
+    --probe-tensor-sha256 "$DENSE_CONVOLUTION_TENSOR_SHA" \
+    --probe-summary-sha256 "$DENSE_CONVOLUTION_SUMMARY_SHA" \
+    --probe-success-sha256 "$DENSE_CONVOLUTION_SUCCESS_SHA" \
+    --probe-run-id "$DENSE_CONVOLUTION_RUN_ID" \
+    --accepted-run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --probe-code-hash "$DENSE_CONVOLUTION_CODE_HASH" \
+    --probe-tag "$DENSE_CONVOLUTION_TAG" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    >"$RUN_DIR/dense_input_comparison_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
   say "sealing accepted layer-0 dense output boundary"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/capture_accepted_dense_boundary.py" \
@@ -1527,6 +1625,7 @@ PY
   "$DECODE_PROJECTION_CAPTURE" "$decode_projection_hlo_count" <<'PY'
 from hashlib import sha256
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -1545,10 +1644,183 @@ lines = {
     "remote_objects_sha256": sha256((root / "remote_objects.json").read_bytes()).hexdigest(),
     "remote_prefix": remote,
 }
+
+def manifest_sha256(value):
+    payload = dict(value)
+    payload.pop("manifest_sha256", None)
+    encoded = json.dumps(
+        payload,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()
+
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode == "dense_boundary":
+    if mode == "dense_input":
+        capture_path = root / "dense_input_capture" / "capture.json"
+        comparison_path = (
+            root / "dense_input_comparison" / "comparison.json"
+        )
+        capture = json.loads(capture_path.read_text())
+        comparison = json.loads(comparison_path.read_text())
+        normalized = comparison["normalized_mlp"]
+        capture_manifest_sha = manifest_sha256(capture)
+        comparison_manifest_sha = manifest_sha256(comparison)
+        observed_sha = (
+            "082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f"
+        )
+        if (
+            not exact_dsa["exact"]
+            or capture.get("manifest_sha256") != capture_manifest_sha
+            or capture["artifact_kind"]
+            != "glm52_accepted_dense_input_capture"
+            or capture["capture_layout"] != "replicated_logical_live_row"
+            or capture["capture_mode"] != mode
+            or capture["capture_process_indices"] != [0]
+            or capture["diagnostic_only"] is not True
+            or capture["performance_claim"] is not False
+            or capture["legacy_code_hash"] != sys.argv[4]
+            or capture["oracle_pin"]
+            != "b3c25df47ac98783912dc658878181ec0a8ae16d"
+            or capture["position"] != 8155
+            or capture["tensor"]["shape"] != [6144]
+            or comparison["artifact_kind"]
+            != "glm52_accepted_greenfield_dense_input_comparison"
+            or comparison.get("manifest_sha256") != comparison_manifest_sha
+            or comparison.get("accepted_capture_manifest_sha256")
+            != capture_manifest_sha
+            or comparison["status"] != "SUCCESS"
+            or comparison["diagnostic_only"] is not True
+            or comparison["performance_claim"] is not False
+            or comparison["classification"] not in {
+                "normalized_mlp_exact_dense_arithmetic_open",
+                "normalized_mlp_nonexact",
+            }
+            or comparison["first_open_boundary"] not in {
+                "dense_mlp_or_cross_layer_fusion",
+                "post_attention_add_rmsnorm",
+            }
+            or normalized["shape"] != [6144]
+            or normalized.get("observed_sha256") != observed_sha
+            or normalized.get("expected_sha256")
+            != capture["tensor"].get("tensor_sha256")
+            or comparison["probe"] != {
+                "code_hash": "2f63779309b25c71c1cc7d35ff97715ae4bf631e",
+                "run_id": 540,
+                "runner_sha256": "876353e2504d728343223f03be9092a08d2662924ceb4b88d6f09563101bad91",
+                "success_sha256": "d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799",
+                "summary_sha256": "9b277ca495d3b9e9ce497d2bf78a520a2672f133e68228d14a10937d4a4b1449",
+                "tag": "greenfield_layer0_dense_convolution_20260813T005213127235575Z",
+                "tensor_sha256": "2cdf128976eb7e04d5c84e012f066d1766361af57896cd22f83c01c7d704e1b9",
+            }
+        ):
+            raise SystemExit("dense-input comparison evidence drifted")
+        expected_classification = (
+            "normalized_mlp_exact_dense_arithmetic_open"
+            if normalized["elementwise_exact"]
+            else "normalized_mlp_nonexact"
+        )
+        expected_boundary = (
+            "dense_mlp_or_cross_layer_fusion"
+            if normalized["elementwise_exact"]
+            else "post_attention_add_rmsnorm"
+        )
+        mismatch_count = normalized.get("mismatch_count")
+        first_mismatch = normalized.get("first_mismatch_index")
+        mean_error = normalized.get("mean_abs_error")
+        max_error = normalized.get("max_abs_error")
+        numeric_types = (int, float)
+        finite_errors = (
+            isinstance(mean_error, numeric_types)
+            and not isinstance(mean_error, bool)
+            and isinstance(max_error, numeric_types)
+            and not isinstance(max_error, bool)
+            and math.isfinite(mean_error)
+            and math.isfinite(max_error)
+        )
+        if normalized["elementwise_exact"] is True:
+            numerical_contract = (
+                type(mismatch_count) is int
+                and mismatch_count == 0
+                and first_mismatch is None
+                and finite_errors
+                and mean_error == 0.0
+                and max_error == 0.0
+                and normalized["expected_sha256"] == observed_sha
+            )
+        elif normalized["elementwise_exact"] is False:
+            numerical_contract = (
+                type(mismatch_count) is int
+                and 1 <= mismatch_count <= 6144
+                and type(first_mismatch) is int
+                and 0 <= first_mismatch < 6144
+                and finite_errors
+                and 0.0 < mean_error <= max_error
+                and normalized["expected_sha256"] != observed_sha
+            )
+        else:
+            numerical_contract = False
+        if (
+            comparison["classification"] != expected_classification
+            or comparison["first_open_boundary"] != expected_boundary
+            or not numerical_contract
+        ):
+            raise SystemExit("dense-input numerical/classification contradiction")
+        lines.update({
+            "accepted_dense_input_capture": "true",
+            "accepted_dense_input_capture_layout": capture[
+                "capture_layout"
+            ],
+            "accepted_dense_input_capture_mode": mode,
+            "accepted_dense_input_diagnostic_only": "true",
+            "accepted_dense_input_dsa_event_tensors_exact": "true",
+            "accepted_dense_input_manifest_file_sha256": sha256(
+                capture_path.read_bytes()
+            ).hexdigest(),
+            "accepted_dense_input_manifest_sha256": capture[
+                "manifest_sha256"
+            ],
+            "accepted_dense_input_source_file_count": sys.argv[9],
+            "accepted_normalized_mlp_sha256": capture["tensor"][
+                "tensor_sha256"
+            ],
+            "accepted_oracle_pin": capture["oracle_pin"],
+            "dense_input_classification": comparison["classification"],
+            "dense_input_comparison_file_sha256": sha256(
+                comparison_path.read_bytes()
+            ).hexdigest(),
+            "dense_input_comparison_manifest_sha256": comparison[
+                "manifest_sha256"
+            ],
+            "dense_input_first_open_boundary": comparison[
+                "first_open_boundary"
+            ],
+            "dense_input_normalized_mlp_exact": str(
+                normalized["elementwise_exact"]
+            ).lower(),
+            "dense_input_probe_runner_sha256": comparison["probe"][
+                "runner_sha256"
+            ],
+            "dense_input_probe_success_sha256": comparison["probe"][
+                "success_sha256"
+            ],
+            "dense_input_probe_summary_sha256": comparison["probe"][
+                "summary_sha256"
+            ],
+            "dense_input_probe_tensor_sha256": comparison["probe"][
+                "tensor_sha256"
+            ],
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_process_indices": "0",
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": capture["layer_name"],
+            "dsa_event_tensors_exact": "true",
+        })
+    elif mode == "dense_boundary":
         capture_path = root / "dense_boundary_capture" / "capture.json"
         comparison_path = (
             root / "dense_boundary_comparison" / "comparison.json"

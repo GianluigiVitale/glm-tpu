@@ -578,3 +578,12 @@ StrategyND helper. Because the input latent is now exact, crossing that physical
 independently at attention `o_proj` and dense-down is non-duplicative; the older combined
 StrategyND result consumed a nonexact attention input and remains negative evidence. The new probe
 is diagnostic-only and cannot authorize production unless one arm is bitwise exact.
+
+DB540 executes the accepted-shape dense convolution but remains nonexact at `1073/6144` layer-1
+BF16 values. DB542's M32/31-dead-row challenger is bitwise identical to DB540, so compile-row
+geometry is rejected. A subsequent legacy layer-output callback materialized the dense boundary
+and reproduced DB540's raw rows while breaking the exact DSA trace; that observer is rejected
+alongside the older returned-residual design. Reuse the internal callback machinery only at layer
+0's already-consumed normalized MLP input, under exact full-model token/DSA adjudication.
+Oracle-only pin `0c2f7f28a075a51f5eb51dc98bbb74e363d3290f` and the greenfield `dense_input`
+sealer localize the remaining boundary without importing legacy execution or reopening M1/M32.

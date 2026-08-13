@@ -4334,3 +4334,27 @@ synthetic graphs and preserved real CPU lowering pass. The affected suite passes
 checks. The same reviewer returned `APPROVE COMMIT` for staged SHA `61d7a917...8cda`. Exact next:
 commit/push, then one serialized protected discriminator. Exact output authorizes production
 integration and another 8K; nonexact output authorizes only the smallest post-MLP oracle capture.
+
+## Current exact next: accepted dense-input discriminator
+
+DB540 completed the layer-0 dense-convolution probe. Its accepted-shape M1 candidate is nonexact at
+the layer-1 normalized boundary: `1073/6144` BF16 mismatches and observed SHA
+`229dc8ac...812f` versus accepted `9936ee1e...039f`. DB542 then ran the compile-rows-32 challenger
+and produced the identical mismatch count, error distribution and output SHA. This conclusively
+rejects inactive/dead M32 rows and M1-versus-M32 compile geometry as the cause. Do not integrate
+M32 or repeat that hypothesis.
+
+The first attempted accepted dense-output capture executed the complete legacy 8K model as DB541,
+but failed exact DSA at layer 1 and has no sealed comparison, archive or `SUCCESS`. Its raw
+dense/residual rows are bitwise identical to DB540. The new layer-output callback therefore
+materialized the boundary and changed the accepted fused arithmetic, just as the earlier returned
+residual observer did. DB541 is invalid as an accepted boundary oracle and cannot be recovered.
+
+The smallest successor reuses the proven internal callback machinery but observes only the BF16
+tensor already consumed by layer 0's dense MLP. Oracle-only pin `0c2f7f28a...3290f` adds the
+default-off `dense_input` mode; exact class/layer/signature gates and the full legacy token/DSA
+comparison remain mandatory. The greenfield sealer compares that row with DB540 normalized-MLP
+SHA `082125fe...758f`. Exactness localizes the cause to dense MLP/cross-layer fusion; nonexactness
+localizes it to post-attention add/RMSNorm. Sol approved only the new legacy diff and focused tests
+pass 6/6. Exact next is one audit of the greenfield wrapper/sealer diff, commit/push, then one
+serialized protected 8K dense-input capture. Gate D remains open.

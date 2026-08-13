@@ -457,6 +457,17 @@
       "reason": "The prefill-only ledger made the old one-row StrategyND probe inadmissible. DB532 seals the exact M32 decode lowering; DB533 runs the corrected repeated-M32 fingerprint and uniquely resolves all 6,144 columns for every physical row. The protected row-zero replay is exact as a canary and improved the old nonexact-input layer boundary from 3,984 to 3,492 mismatches, but was not exact when applied jointly to nonexact attention-output and dense-down partials. DB537 now supplies an exact attended latent, so one bounded four-arm probe crosses the measured StrategyND association independently at attention o_proj and dense down; this is nonduplicative and diagnostic-only."
     },
     {
+      "id": "layer0-dense-input-boundary",
+      "category": "oracle lowering observability",
+      "source_repo": "oracle-only tpu-inference observer plus protected greenfield dense probes",
+      "source_pin": "accepted b3c25df47ac98783912dc658878181ec0a8ae16d / dense-input observer 0c2f7f28a075a51f5eb51dc98bbb74e363d3290f / DB540 / DB542 557834a700164aec570b0304205567feb1f8a980",
+      "source_paths": ["tpu_inference/runner/dsa_topk_dump.py", "tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py", "tpu_inference/models/vllm/vllm_model_wrapper.py", "glm_tpu/greenfield/validation/dense_input.py", "scripts/greenfield/run_capture_legacy_layer0_dense_input.sh", "/home/gianl/glm-run/greenfield_layer0_dense_convolution_20260813T005213127235575Z"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/dense_input.py", "scripts/greenfield/capture_accepted_dense_input.py", "scripts/greenfield/compare_accepted_dense_input.py", "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"],
+      "gate": "D diagnostic",
+      "reason": "DB540 is nonexact at 1073/6144 layer-1 values and DB542's M32/31-dead-row challenger is bitwise identical, rejecting compile-row geometry. The legacy dense-output callback reproduced DB540 while breaking exact DSA, so it remains rejected. Reuse only the already-consumed normalized-MLP input callback under exact full-model token/DSA adjudication; compare its sealed BF16 row to DB540 to choose post-attention norm versus dense/cross-layer fusion without importing legacy execution."
+    },
+    {
       "id": "old-glm-tpu-worktrees",
       "category": "historical tooling",
       "source_repo": "glm-tpu",

@@ -12,6 +12,12 @@ from .dense_boundary import (
     capture_accepted_dense_boundary,
     compare_dense_boundary_candidate,
 )
+from .dense_input import (
+    AcceptedDenseInputCaptureConfig,
+    DenseInputComparisonConfig,
+    capture_accepted_dense_input,
+    compare_dense_input_candidate,
+)
 from .attention_output_operand import (
     AcceptedAttentionProjectionCaptureConfig,
     AcceptedAttentionOutputCaptureConfig,
@@ -98,7 +104,9 @@ __all__ = (
     "AttentionProjectionComparisonConfig",
     "AttentionUpdateComparisonConfig",
     "AcceptedDenseBoundaryCaptureConfig",
+    "AcceptedDenseInputCaptureConfig",
     "DenseBoundaryComparisonConfig",
+    "DenseInputComparisonConfig",
     "GateCOracleConfig",
     "OneLayerOracleConfig",
     "AcceptedGreenfieldDsaInternalComparisonConfig",
@@ -116,6 +124,7 @@ __all__ = (
     "capture_accepted_attention_projection_operands",
     "capture_accepted_attention_update",
     "capture_accepted_dense_boundary",
+    "capture_accepted_dense_input",
     "capture_one_layer_oracle",
     "capture_legacy_prompt_index_cache",
     "compare_prompt_key_internal_states",
@@ -125,6 +134,7 @@ __all__ = (
     "compare_attention_projection_operands",
     "compare_attention_update_candidates",
     "compare_dense_boundary_candidate",
+    "compare_dense_input_candidate",
     "compare_accepted_greenfield_dsa_internal_observation",
     "compare_legacy_residuals",
     "compare_legacy_layer0_main_cache",

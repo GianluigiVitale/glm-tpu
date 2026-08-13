@@ -8089,3 +8089,26 @@ unmotivated arithmetic variants.
   transforms, while BF16 validity belongs to each live producer rather than any convert user. All
   three preserved-real-HLO mutations now refuse. The focused and affected CPU suites pass 16/16 and
   58/58; exact next is same-reviewer confirmation, commit/push, then one protected retry.
+
+## 2026-08-13 00:52--04:20 — DB540 completes; M32 and output observer are rejected
+
+- Protected DB540/tag `greenfield_layer0_dense_convolution_20260813T005213127235575Z` completed
+  the accepted-shape dense convolution probe. Layer 1 is nonexact at `1073/6144`, first index 1,
+  max absolute error `0.0078125`, mean error `3.4686963772401214e-05`, and observed SHA
+  `229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f`.
+- Protected DB542/commit `557834a700164aec570b0304205567feb1f8a980` repeats the arithmetic with
+  `compile_rows=32`, one live row and 31 diagnostic dead rows. Every numerical result, including
+  the SHA and all 1,073 mismatches, is identical to DB540. M32/dead-row compile geometry is closed.
+- The legacy dense-boundary attempt executed the real model and provisionally wrote DB541, but the
+  mandatory exact DSA comparison refused at event 1/layer 1. Its raw dense update SHA
+  `efde8532...b4fc` and residual SHA `a105fdbd...8f8e` are identical to DB540. The layer-output
+  callback perturbed the fused lowering into the standalone candidate arithmetic. The run has no
+  sealed comparison/archive/`SUCCESS` and cannot be accepted.
+- Oracle-only commit `0c2f7f28a075a51f5eb51dc98bbb74e363d3290f` instead observes the already-
+  consumed layer-0 normalized MLP input. The full 8K wrapper must still prove exact raw tokens and
+  all DSA events before sealing it. Sol approved staged SHA `018c36e1...b7b7`; focused old/new
+  observer tests pass 6/6 on CPU.
+- The comparison pins all four DB540 files and its DB row, then compares the captured row to SHA
+  `082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f`. Exact means dense MLP or
+  cross-layer fusion remains open; nonexact means post-attention add/RMSNorm is already divergent.
+  No numerical result or performance claim exists yet.
