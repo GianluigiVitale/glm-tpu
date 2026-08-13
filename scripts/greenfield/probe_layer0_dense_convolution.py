@@ -749,6 +749,7 @@ def _validate_optimized_hlo(
     dense_envelope: bool = False,
     split_layer1_rms: bool = False,
     isolated_dense: bool = False,
+    accepted_gate_singleton: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -782,6 +783,10 @@ def _validate_optimized_hlo(
     ):
         raise ValueError(
             "isolated dense proof requires the M32 final-layout envelope"
+        )
+    if accepted_gate_singleton and not isolated_dense:
+        raise ValueError(
+            "accepted gate singleton proof requires isolated dense mode"
         )
     module = parse_hlo_module(optimized_hlo)
     by_key = {_instruction_key(item): item for item in module.instructions}
@@ -2215,6 +2220,7 @@ def _validate_optimized_hlo(
             return walk(value, allow_bf16_round)
 
         exact_activation_graph = False
+        exact_gate_singleton_external_boundary = not accepted_gate_singleton
         gate_external = None
         down_external = None
         if len(gate_up) == 1 and len(down) == 1:
@@ -2222,7 +2228,26 @@ def _validate_optimized_hlo(
             down_values = exact_external_values(down[0])
             gate_external = gate_values[0] if len(gate_values) == 1 else None
             down_external = down_values[0] if len(down_values) == 1 else None
+            if accepted_gate_singleton:
+                gate_callers = callers_by_computation.get(
+                    _computation_id(gate_up[0].computation), ()
+                )
+                exact_gate_singleton_external_boundary = bool(
+                    gate_external is not None
+                    and gate_external.raw_opcode == "fusion"
+                    and gate_external.computation.startswith("ENTRY ")
+                    and len(gate_external.result_shapes) == 1
+                    and value_shape(gate_external)
+                    == ("bf16", (32, 1, 768))
+                    and len(gate_callers) == 1
+                    and gate_callers[0] is gate_external
+                    and exact_accepted_convolution_tiling(
+                        gate_up[0], "gate_up"
+                    )
+                )
             activation_shapes = {"bf16[32,384]", "f32[32,384]"}
+            if accepted_gate_singleton:
+                activation_shapes.add("bf16[32,1,384]")
             scoped_activation = [
                 item
                 for item in module.instructions
@@ -2257,18 +2282,32 @@ def _validate_optimized_hlo(
                 exponential = selected["exponential"][0]
                 denominator = selected["add"][0]
                 sigmoid = selected["divide"][0]
+                expected_gate_slice_shape = (
+                    ("bf16", (32, 1, 384))
+                    if accepted_gate_singleton
+                    else ("bf16", (32, 384))
+                )
+                expected_gate_ranges = (
+                    ((0, 32), (0, 1), (0, 384))
+                    if accepted_gate_singleton
+                    else ((0, 32), (0, 384))
+                )
+                expected_up_ranges = (
+                    ((0, 32), (0, 1), (384, 768))
+                    if accepted_gate_singleton
+                    else ((0, 32), (384, 768))
+                )
                 slices = [
                     item
                     for item in scoped_activation
                     if item.raw_opcode == "slice"
-                    and value_shape(item) == ("bf16", (32, 384))
+                    and value_shape(item) == expected_gate_slice_shape
                 ]
                 gate_slice = next(
                     (
                         item
                         for item in slices
-                        if slice_ranges(item)
-                        == ((0, 32), (0, 384))
+                        if slice_ranges(item) == expected_gate_ranges
                     ),
                     None,
                 )
@@ -2276,8 +2315,7 @@ def _validate_optimized_hlo(
                     (
                         item
                         for item in slices
-                        if slice_ranges(item)
-                        == ((0, 32), (384, 768))
+                        if slice_ranges(item) == expected_up_ranges
                     ),
                     None,
                 )
@@ -2350,6 +2388,12 @@ def _validate_optimized_hlo(
                     gate_slice is not None
                     and up_slice is not None
                     and common_source is not None
+                    and value_shape(common_source)
+                    == (
+                        ("bf16", (32, 1, 768))
+                        if accepted_gate_singleton
+                        else ("bf16", (32, 768))
+                    )
                     and exact_dense_value_path(
                         common_source,
                         gate_external,
@@ -2427,6 +2471,11 @@ def _validate_optimized_hlo(
                 )
         if not exact_activation_graph:
             violations.append("isolated dense exact SwiGLU graph drifted")
+        if not exact_gate_singleton_external_boundary:
+            violations.append(
+                "isolated dense accepted gate singleton external boundary "
+                "drifted"
+            )
 
         roots = [
             item
@@ -2637,6 +2686,7 @@ def _validate_optimized_hlo(
         if custom_calls or forbidden:
             violations.append("isolated dense program contains host/Pallas effects")
         return {
+            "accepted_gate_singleton": accepted_gate_singleton,
             "accepted_down_schedule": bool(
                 len(accepted_weight_layouts["down"]) == 1
                 and accepted_weight_layouts["down"][0][
@@ -2662,6 +2712,9 @@ def _validate_optimized_hlo(
             "exact_accepted_weight_layout": exact_accepted_weight_layout,
             "exact_activation_graph": exact_activation_graph,
             "exact_carried_residual_binding": exact_carried_residual_binding,
+            "exact_gate_singleton_external_boundary": (
+                exact_gate_singleton_external_boundary
+            ),
             "exact_packed_weight_lineage": exact_packed_weight_lineage,
             "exact_result_binding": exact_result_binding,
             "final_dense_layout": final_dense_layout,

@@ -372,6 +372,7 @@ def _match_one_shard(
     compile_rows: int,
     final_dense_layout: bool = False,
     single_virtual_shard: bool = False,
+    accepted_gate_singleton: bool = False,
 ) -> tuple[int, tuple[str, ...], str, str | None, str | None]:
     row_type = f"tensor<{compile_rows}x"
     if len(gate_up.operands) != 2:
@@ -596,18 +597,50 @@ def _match_one_shard(
         opcode="convert",
         result_type=f"{row_type}768xbf16>",
     )
-    gate = _expect_slice(
-        graph,
-        gate_up_bf16.name,
-        ((0, compile_rows), (0, 384)),
-        f"{row_type}384xbf16>",
-    )
-    up = _expect_slice(
-        graph,
-        gate_up_bf16.name,
-        ((0, compile_rows), (384, 768)),
-        f"{row_type}384xbf16>",
-    )
+    if accepted_gate_singleton:
+        gate_up_value = _expect_unary(
+            graph,
+            gate_up_bf16.name,
+            opcode="reshape",
+            result_type=f"tensor<{compile_rows}x1x768xbf16>",
+        )
+        gate_rank3 = _expect_slice(
+            graph,
+            gate_up_value.name,
+            ((0, compile_rows), (0, 1), (0, 384)),
+            f"tensor<{compile_rows}x1x384xbf16>",
+        )
+        up_rank3 = _expect_slice(
+            graph,
+            gate_up_value.name,
+            ((0, compile_rows), (0, 1), (384, 768)),
+            f"tensor<{compile_rows}x1x384xbf16>",
+        )
+        gate = _expect_unary(
+            graph,
+            gate_rank3.name,
+            opcode="reshape",
+            result_type=f"{row_type}384xbf16>",
+        )
+        up = _expect_unary(
+            graph,
+            up_rank3.name,
+            opcode="reshape",
+            result_type=f"{row_type}384xbf16>",
+        )
+    else:
+        gate = _expect_slice(
+            graph,
+            gate_up_bf16.name,
+            ((0, compile_rows), (0, 384)),
+            f"{row_type}384xbf16>",
+        )
+        up = _expect_slice(
+            graph,
+            gate_up_bf16.name,
+            ((0, compile_rows), (384, 768)),
+            f"{row_type}384xbf16>",
+        )
     negated = _expect_unary(
         graph,
         gate.name,
@@ -1623,6 +1656,8 @@ def _match_predense_rmsnorm(
 
 def validate_isolated_dense_partial_stablehlo(
     stablehlo: str,
+    *,
+    accepted_gate_singleton: bool = False,
 ) -> dict[str, object]:
     """Prove one exact M32 contraction per LP4 chip with no collective.
 
@@ -1667,6 +1702,7 @@ def validate_isolated_dense_partial_stablehlo(
                 compile_rows=32,
                 final_dense_layout=True,
                 single_virtual_shard=True,
+                accepted_gate_singleton=accepted_gate_singleton,
             )
         )
         if shard != 0 or dependency is not None or dependency_output is not None:
@@ -1816,6 +1852,7 @@ def validate_isolated_dense_partial_stablehlo(
     if "xla_python_cpu_callback" in stablehlo or "host_callback" in stablehlo:
         violations.append("isolated dense module contains a host callback")
     return {
+        "accepted_gate_singleton": accepted_gate_singleton,
         "collective_counts": collective_counts,
         "convolution_count": stablehlo.count("stablehlo.convolution"),
         "exact_result_binding": matched,

@@ -31,11 +31,13 @@ from scripts.greenfield.probe_layer0_captured_rms import (  # noqa: E402
 )
 from scripts.greenfield.probe_layer0_dense_convolution import (  # noqa: E402
     _FINAL_DENSE_LAYOUT_RECORDS,
+    _load_accepted_m32_source,
     _pack_dense_final_layout,
     _validate_optimized_hlo,
 )
 from scripts.greenfield.probe_layer0_projection_reduction import (  # noqa: E402
     _compare_bits,
+    _file_sha256,
     _load_weights,
 )
 
@@ -43,6 +45,68 @@ from scripts.greenfield.probe_layer0_projection_reduction import (  # noqa: E402
 _POSITION = 8155
 _SENSITIVITY_HIDDEN_INDEX = 2795
 _SENSITIVITY_PARTIAL_BIT_DELTA_LIMIT = 32
+
+
+def _validate_gate_singleton_discriminator(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Bind the challenger to the exact accepted-vs-DB548 HLO difference."""
+
+    import gzip
+    import re
+
+    accepted_source = _load_accepted_m32_source(args)
+    if _file_sha256(args.db548_hlo) != args.db548_hlo_sha256:
+        raise RuntimeError("DB548 HLO SHA-256 drifted")
+    with gzip.open(args.accepted_m32_hlo, "rt", errors="replace") as stream:
+        accepted_hlo = stream.read()
+    db548_hlo = args.db548_hlo.read_text()
+    accepted_rank3 = len(
+        re.findall(
+            r"= bf16\[32,1,768\].*"
+            r"MergedColumnParallelLinear/shard_map/dot_general",
+            accepted_hlo,
+        )
+    )
+    accepted_rank2 = len(
+        re.findall(
+            r"= bf16\[32,768\].*"
+            r"MergedColumnParallelLinear/shard_map/dot_general",
+            accepted_hlo,
+        )
+    )
+    db548_rank3 = len(
+        re.findall(
+            r"= bf16\[32,1,768\].*"
+            r"greenfield_dense_convolution_virtual_rank_[0-7][0-7]/"
+            r"conv_general_dilated",
+            db548_hlo,
+        )
+    )
+    db548_rank2 = len(
+        re.findall(
+            r"= bf16\[32,768\].*"
+            r"greenfield_dense_convolution_virtual_rank_[0-7][0-7]/"
+            r"conv_general_dilated",
+            db548_hlo,
+        )
+    )
+    result = {
+        "accepted_rank2_gate_count": accepted_rank2,
+        "accepted_rank3_gate_count": accepted_rank3,
+        "challenger_selected": True,
+        "db548_rank2_gate_count": db548_rank2,
+        "db548_rank3_gate_count": db548_rank3,
+    }
+    if result != {
+        "accepted_rank2_gate_count": 0,
+        "accepted_rank3_gate_count": 3,
+        "challenger_selected": True,
+        "db548_rank2_gate_count": 8,
+        "db548_rank3_gate_count": 0,
+    }:
+        raise RuntimeError(f"gate singleton HLO discriminator drifted: {result}")
+    return result, accepted_source
 
 
 def _git_head() -> str:
@@ -60,6 +124,7 @@ def _validate_isolated_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
         final_dense_layout=True,
         dense_envelope=True,
         isolated_dense=True,
+        accepted_gate_singleton=True,
     )
 
 
@@ -111,6 +176,7 @@ def _build_isolated_partial(mesh: Any) -> Any:
                 block_shape=(128, 128),
                 compile_rows=32,
                 virtual_shards=1,
+                accepted_gate_singleton=True,
             )
         with jax.named_scope("greenfield_isolated_dense_live_row"):
             partials = lax.optimization_barrier(partials)
@@ -301,6 +367,12 @@ def parse_args() -> argparse.Namespace:
     for suffix in ("tensor", "runner", "summary", "success", "hlo"):
         parser.add_argument(f"--db549-{suffix}", type=Path, required=True)
         parser.add_argument(f"--db549-{suffix}-sha256", required=True)
+    parser.add_argument("--accepted-m32-hlo", type=Path, required=True)
+    parser.add_argument("--accepted-m32-hlo-sha256", required=True)
+    parser.add_argument("--accepted-m32-summary", type=Path, required=True)
+    parser.add_argument("--accepted-m32-summary-sha256", required=True)
+    parser.add_argument("--accepted-m32-success", type=Path, required=True)
+    parser.add_argument("--accepted-m32-success-sha256", required=True)
     parser.add_argument("--checkpoint-root", type=Path, required=True)
     parser.add_argument("--checkpoint-manifest-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -326,6 +398,9 @@ def main() -> int:
         accepted_bits,
         db548_bits,
     ) = _load_sources(args)
+    gate_singleton_discriminator, accepted_m32_source = (
+        _validate_gate_singleton_discriminator(args)
+    )
     weights, _weight_records = _load_weights(
         args.checkpoint_root,
         manifest_sha256=args.checkpoint_manifest_sha256,
@@ -366,7 +441,9 @@ def main() -> int:
     mapped = _build_isolated_partial(mesh)
     lowered = jax.jit(mapped).lower(*rank_arguments[0])
     stablehlo = lowered.as_text()
-    stable_contract = validate_isolated_dense_partial_stablehlo(stablehlo)
+    stable_contract = validate_isolated_dense_partial_stablehlo(
+        stablehlo, accepted_gate_singleton=True
+    )
     stable_path = args.hlo_dir / "isolated_dense.stablehlo.mlir"
     stable_path.write_text(stablehlo)
     if not stable_contract["passed"]:
@@ -522,6 +599,7 @@ def main() -> int:
         else "isolated_virtual_contractions_nonexact"
     )
     result = {
+        "accepted_gate_singleton": True,
         "artifact_kind": "glm52_layer0_isolated_dense_replay",
         "classification": classification,
         "code_hash": code_hash,
@@ -529,6 +607,7 @@ def main() -> int:
         "exact": exact,
         "exact_arms": ["isolated_virtual_contractions"] if exact else [],
         "final_layout_records": packed_records,
+        "gate_singleton_discriminator": gate_singleton_discriminator,
         "hlo": {
             "isolated_dense": {
                 "optimized_contract": optimized_contract,
@@ -550,6 +629,7 @@ def main() -> int:
         "position": _POSITION,
         "sensitivity": sensitivity,
         "source": {
+            **accepted_m32_source,
             "capture_runner_sha256": args.capture_runner_sha256,
             "capture_summary_sha256": args.capture_summary_sha256,
             "capture_success_sha256": args.capture_success_sha256,

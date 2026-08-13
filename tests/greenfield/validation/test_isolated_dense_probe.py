@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -26,6 +27,11 @@ REAL_DB548 = Path(
     "/home/gianl/glm-run/"
     "greenfield_layer0_dense_envelope_cross_layer_"
     "20260813T120703034434907Z/dense_envelope_cross_layer.npz"
+)
+REAL_ACCEPTED_M32 = Path(
+    "/home/gianl/gcs-models/oracles/greenfield/glm52/"
+    "decode_projection_lowering/8k/"
+    "greenfield_accepted_decode_projection_lowering_20260811T184908676873350Z"
 )
 SPEC = importlib.util.spec_from_file_location("isolated_dense_probe", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -120,8 +126,39 @@ def _config(label: str) -> str:
     )
 
 
-def _optimized_hlo() -> str:
+def _optimized_hlo(*, external_gate_singleton: bool = True) -> str:
+    gate_computation = ""
+    if external_gate_singleton:
+        gate_computation = '''gate_fusion {
+  %gate_lhs = bf16[32,6144]{1,0} parameter(0)
+  %gate_weight = bf16[6144,768]{1,0} parameter(1)
+  %gate_dot = f32[32,768]{1,0} convolution(%gate_lhs, %gate_weight), dim_labels=bf_io->bf, metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/conv_general_dilated"}
+  %gate_round = bf16[32,768]{1,0} convert(%gate_dot)
+  ROOT %gate_singleton_root = bf16[32,1,768]{2,0,1} reshape(%gate_round)
+}
+'''
+        gate_execution = (
+            '  %gate_singleton = bf16[32,1,768]{2,0,1} '
+            'fusion(%carried, %gate_rhs), kind=kOutput, calls=%gate_fusion, '
+            'metadata={op_name="jit/local/'
+            'greenfield_dense_convolution_virtual_rank_00/'
+            'conv_general_dilated"}, backend_config='
+            + _config("gate")
+        )
+    else:
+        gate_execution = (
+            '  %gate = f32[32,768]{1,0} convolution(%carried, %gate_rhs), '
+            'dim_labels=bf_io->bf, metadata={op_name="jit/local/'
+            'greenfield_dense_convolution_virtual_rank_00/'
+            'conv_general_dilated"}, backend_config='
+            + _config("gate")
+            + '\n  %gate_round = bf16[32,768]{1,0} convert(%gate)'
+            + '\n  %gate_singleton = bf16[32,1,768]{2,0,1} '
+            'reshape(%gate_round)'
+        )
     return f'''HloModule isolated_dense, is_scheduled=true, replica_count=1, num_partitions=4
+
+{gate_computation}
 
 ENTRY main {{
   %attention = bf16[1,6144]{{1,0}} parameter(0)
@@ -147,10 +184,11 @@ ENTRY main {{
   %gate_scale_wide = f32[6144,768]{{1,0}} reshape(%gate_scale_expanded), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/reshape"}}
   %gate_scaled = f32[6144,768]{{1,0}} multiply(%gate_decoded, %gate_scale_wide), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/mul"}}
   %gate_rhs = bf16[6144,768]{{1,0}} convert(%gate_scaled), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/convert_element_type"}}
-  %gate = f32[32,768]{{1,0}} convolution(%carried, %gate_rhs), dim_labels=bf_io->bf, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/conv_general_dilated"}}, backend_config={_config("gate")}
-  %gate_round = bf16[32,768]{{1,0}} convert(%gate)
-  %gate_slice = bf16[32,384]{{1,0}} slice(%gate_round), slice={{[0:32],[0:384]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
-  %up_slice = bf16[32,384]{{1,0}} slice(%gate_round), slice={{[0:32],[384:768]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
+{gate_execution}
+  %gate_slice_rank3 = bf16[32,1,384]{{2,0,1}} slice(%gate_singleton), slice={{[0:32],[0:1],[0:384]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
+  %up_slice_rank3 = bf16[32,1,384]{{2,0,1}} slice(%gate_singleton), slice={{[0:32],[0:1],[384:768]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
+  %gate_slice = bf16[32,384]{{1,0}} reshape(%gate_slice_rank3)
+  %up_slice = bf16[32,384]{{1,0}} reshape(%up_slice_rank3)
   %gate_wide = f32[32,384]{{1,0}} convert(%gate_slice)
   %up_wide = f32[32,384]{{1,0}} convert(%up_slice)
   %one = bf16[] constant(1)
@@ -192,8 +230,11 @@ def test_isolated_dense_stablehlo_contract_accepts_u8_and_fp8() -> None:
         ("jnp.float8_e4m3fn", 0),
     ):
         stablehlo = _stablehlo(bit_dtype=bit_dtype)
-        result = validate_isolated_dense_partial_stablehlo(stablehlo)
+        result = validate_isolated_dense_partial_stablehlo(
+            stablehlo, accepted_gate_singleton=True
+        )
         assert result["passed"], result
+        assert result["accepted_gate_singleton"] is True
         assert result["convolution_count"] == 2
         assert result["matched_virtual_shards"] == [0]
         assert result["runtime_u8_bitcast_count"] == expected_bitcasts
@@ -216,11 +257,14 @@ def test_isolated_dense_stablehlo_contract_refuses_wrong_arithmetic() -> None:
     mutations = (
         stablehlo.replace("applies stablehlo.add", "applies stablehlo.maximum", 1),
         stablehlo.replace("[0:1, 0:1, 0:6144]", "[0:1, 1:2, 0:6144]", 1),
-        stablehlo.replace("stablehlo.multiply %46, %39", "stablehlo.add %46, %39", 1),
-        stablehlo.replace("sdy.return %59, %6", "sdy.return %59, %20", 1),
+        stablehlo.replace("stablehlo.multiply %49, %42", "stablehlo.add %49, %42", 1),
+        stablehlo.replace("sdy.return %62, %6", "sdy.return %62, %20", 1),
     )
+    assert all(value != stablehlo for value in mutations)
     assert all(
-        not validate_isolated_dense_partial_stablehlo(value)["passed"]
+        not validate_isolated_dense_partial_stablehlo(
+            value, accepted_gate_singleton=True
+        )["passed"]
         for value in mutations
     )
 
@@ -229,10 +273,19 @@ def test_isolated_dense_optimized_contract_pins_schedule_and_liveness() -> None:
     accepted = _optimized_hlo()
     result = MODULE._validate_isolated_optimized_hlo(accepted)
     assert result["passed"], result
+    assert result["accepted_gate_singleton"] is True
     assert result["exact_activation_graph"]
     assert result["exact_carried_residual_binding"]
+    assert result["exact_gate_singleton_external_boundary"]
     assert result["exact_packed_weight_lineage"]
     assert result["exact_result_binding"]
+    direct_singleton = MODULE._validate_isolated_optimized_hlo(
+        _optimized_hlo(external_gate_singleton=False)
+    )
+    assert not direct_singleton["passed"]
+    assert not direct_singleton[
+        "exact_gate_singleton_external_boundary"
+    ]
     mutations = (
         accepted.replace('"iteration_bounds":["1","1","2"]', '"iteration_bounds":["1","1","3"]', 1),
         accepted.replace(
@@ -259,16 +312,21 @@ def test_isolated_dense_optimized_contract_pins_schedule_and_liveness() -> None:
             1,
         ),
         accepted.replace(
-            "%gate_rhs = bf16[6144,768]{1,0} convert",
-            "%gate_rhs = bf16[6144,768]{0,1} convert",
+            "%gate_weight = bf16[6144,768]{1,0} parameter",
+            "%gate_weight = bf16[6144,768]{0,1} parameter",
             1,
         ),
         accepted.replace(
-            "  %gate = f32[32,768]",
-            "  %rogue_gate_rhs = bf16[6144,768]{1,0} add(%gate_rhs, %gate_rhs)\n"
-            "  %gate = f32[32,768]",
+            "  %gate_dot = f32[32,768]{1,0} convolution",
+            "  %rogue_gate_weight = bf16[6144,768]{1,0} "
+            "add(%gate_weight, %gate_weight)\n"
+            "  %gate_dot = f32[32,768]{1,0} convolution",
             1,
-        ).replace("convolution(%carried, %gate_rhs)", "convolution(%carried, %rogue_gate_rhs)", 1),
+        ).replace(
+            "convolution(%gate_lhs, %gate_weight)",
+            "convolution(%gate_lhs, %rogue_gate_weight)",
+            1,
+        ),
         accepted.replace(
             "%down_rhs = bf16[384,6144]{1,0} convert",
             "%down_rhs = bf16[384,6144]{0,1} convert",
@@ -317,10 +375,13 @@ def test_isolated_dense_optimized_contract_pins_schedule_and_liveness() -> None:
             1,
         ),
     )
-    assert all(
-        not MODULE._validate_isolated_optimized_hlo(value)["passed"]
-        for value in mutations
-    )
+    assert all(value != accepted for value in mutations)
+    accepted_mutations = [
+        index
+        for index, value in enumerate(mutations)
+        if MODULE._validate_isolated_optimized_hlo(value)["passed"]
+    ]
+    assert not accepted_mutations, accepted_mutations
 
 
 def test_isolated_partial_comparison_reports_each_virtual_rank() -> None:
@@ -370,6 +431,9 @@ def test_isolated_dense_wrapper_is_default_off_and_no_db() -> None:
     wrapper = WRAPPER.read_text()
     assert "GLM_GREENFIELD_ISOLATED_DENSE_REPLAY:-0" in wrapper
     assert "probe_layer0_isolated_dense.py" in wrapper
+    assert '--accepted-m32-hlo "$ACCEPTED_M32_HLO"' in wrapper
+    assert '--accepted-m32-summary "$ACCEPTED_M32_SUMMARY"' in wrapper
+    assert '--accepted-m32-success "$ACCEPTED_M32_SUCCESS"' in wrapper
     assert "bounded replays are exclusive" in wrapper
     assert wrapper.index("validate_isolated_dense_replay()") < wrapper.index(
         'if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then\n'
@@ -381,6 +445,55 @@ def test_isolated_dense_wrapper_is_default_off_and_no_db() -> None:
         '$ISOLATED_DENSE_REPLAY == 1 ]]; then' in rollback
     )
     assert "NO_PROVISIONAL_DB_RUN" in rollback
+
+
+@pytest.mark.skipif(
+    not REAL_ACCEPTED_M32.exists()
+    or not (
+        REAL_DB548.parent / "hlo/dense_convolution.optimized_hlo.txt"
+    ).exists(),
+    reason="pinned accepted/DB548 HLO sources are unavailable",
+)
+def test_gate_singleton_discriminator_is_bound_to_pinned_hlo() -> None:
+    result, source = MODULE._validate_gate_singleton_discriminator(
+        SimpleNamespace(
+            accepted_m32_hlo=(
+                REAL_ACCEPTED_M32
+                / "accepted_decode_projection_lowering/"
+                "jit_step_fun_impl.m32.after_codegen_hlo.txt.gz"
+            ),
+            accepted_m32_hlo_sha256=(
+                "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c"
+            ),
+            accepted_m32_summary=(
+                REAL_ACCEPTED_M32
+                / "accepted_decode_projection_lowering/summary.json"
+            ),
+            accepted_m32_summary_sha256=(
+                "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3"
+            ),
+            accepted_m32_success=REAL_ACCEPTED_M32 / "SUCCESS",
+            accepted_m32_success_sha256=(
+                "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278"
+            ),
+            db548_hlo=(
+                REAL_DB548.parent / "hlo/dense_convolution.optimized_hlo.txt"
+            ),
+            db548_hlo_sha256=(
+                "5f4dd83793da67be6a8c580949920e93f8c64fe8205816738e7d04890640a877"
+            ),
+        )
+    )
+    assert result == {
+        "accepted_rank2_gate_count": 0,
+        "accepted_rank3_gate_count": 3,
+        "challenger_selected": True,
+        "db548_rank2_gate_count": 8,
+        "db548_rank3_gate_count": 0,
+    }
+    assert source["accepted_m32_hlo_raw_sha256"] == (
+        "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775"
+    )
 
 
 @pytest.mark.skipif(
@@ -427,6 +540,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "reduce_scatter": 0,
     }
     isolated_stable = {
+        "accepted_gate_singleton": True,
         "collective_counts": zero_collectives,
         "convolution_count": 2,
         "exact_result_binding": True,
@@ -438,6 +552,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "violations": [],
     }
     isolated_optimized = {
+        "accepted_gate_singleton": True,
         "accepted_down_schedule": True,
         "accepted_gate_up_schedule": True,
         "async_collectives": [],
@@ -450,6 +565,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "exact_accepted_weight_layout": True,
         "exact_activation_graph": True,
         "exact_carried_residual_binding": True,
+        "exact_gate_singleton_external_boundary": True,
         "exact_packed_weight_lineage": True,
         "exact_result_binding": True,
         "final_dense_layout": True,
@@ -500,11 +616,24 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "db549_summary_sha256",
         "db549_success_sha256",
         "db549_hlo_sha256",
+        "accepted_m32_hlo_sha256",
+        "accepted_m32_summary_sha256",
+        "accepted_m32_success_sha256",
         "checkpoint_manifest_sha256",
     )
-    source_hashes = [f"{index:064x}" for index in range(1, 16)]
+    source_hashes = [f"{index:064x}" for index in range(1, 19)]
     ordered_values = dict(zip(source_names, source_hashes, strict=True))
     source = {
+        "accepted_m32_hlo_raw_sha256": "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
+        "accepted_m32_hlo_sha256": ordered_values[
+            "accepted_m32_hlo_sha256"
+        ],
+        "accepted_m32_success_sha256": ordered_values[
+            "accepted_m32_success_sha256"
+        ],
+        "accepted_m32_summary_sha256": ordered_values[
+            "accepted_m32_summary_sha256"
+        ],
         "capture_runner_sha256": ordered_values["capture_runner_sha256"],
         "capture_summary_sha256": ordered_values["capture_summary_sha256"],
         "capture_success_sha256": ordered_values["capture_success_sha256"],
@@ -539,6 +668,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
     }
     pin = "a" * 40
     runner = {
+        "accepted_gate_singleton": True,
         "artifact_kind": "glm52_layer0_isolated_dense_replay",
         "classification": "isolated_virtual_contractions_exact",
         "code_hash": pin,
@@ -546,6 +676,13 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "exact": True,
         "exact_arms": ["isolated_virtual_contractions"],
         "final_layout_records": records,
+        "gate_singleton_discriminator": {
+            "accepted_rank2_gate_count": 0,
+            "accepted_rank3_gate_count": 3,
+            "challenger_selected": True,
+            "db548_rank2_gate_count": 8,
+            "db548_rank3_gate_count": 0,
+        },
         "hlo": {},
         "isolated_layer1_comparison": comparison,
         "isolated_layer1_sha256": MODULE._array_sha256(accepted),
@@ -699,6 +836,9 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
     success = (run_dir / "SUCCESS").read_text()
     assert "artifact_kind=glm52_layer0_isolated_dense_replay\n" in success
     assert "results_db_run_id=none\n" in success
+    assert "accepted_gate_singleton=true\n" in success
+    assert "gate_singleton_accepted_rank3_count=3\n" in success
+    assert "gate_singleton_db548_rank2_count=8\n" in success
     assert "sensitivity_baseline_dense_update_bits=47808\n" in success
     assert "sensitivity_candidate_count=15\n" in success
     assert (

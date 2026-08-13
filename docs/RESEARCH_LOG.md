@@ -5,6 +5,53 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 23:43 UTC — exact HLO differential selects a gate-singleton challenger
+
+- Offline inspection of the immutable accepted M32 HLO and DB548 HLO identifies one untested live
+  contraction/fusion edge. The accepted program contains exactly three merged gate/up results at
+  `bf16[32,1,768]` and no rank-two equivalents; DB548 contains eight rank-two
+  `bf16[32,768]` gate results and no rank-three equivalents. Both source files, the accepted
+  summary and terminal seal are SHA-bound by the existing protected wrapper.
+- The default-off isolated one-contraction program now preserves the accepted singleton through
+  exact rank-three gate/up slices before reshaping to the unchanged SwiGLU/down arithmetic. The
+  production helper's default remains false, so ordinary decoder behavior is unchanged. StableHLO
+  and optimized-HLO contracts require the exact rank-three boundary and continue pinning final
+  packed-weight lineage, accepted gate/down schedules, BF16 activation arithmetic, the down result
+  and sole live row. A direct rank-two bypass and all earlier arithmetic/schedule mutations refuse.
+- Focused challenger tests pass 8/8. The broader forced-four-CPU dense, StrategyND, decoder and
+  compile set passes 152/152 in 255.63 seconds. Python compilation, shell syntax, shellcheck, JSON
+  and diff checks pass; optional Ruff/Black are unavailable in the environment. The one staged bulk
+  audit found one medium proof gap: the test did not distinguish a rank-three reshape retained in
+  ENTRY from the accepted scheduled gate fusion exporting `bf16[32,1,768]`. The correction requires
+  the exact single-result fusion caller and accepted schedule, publishes that predicate, accepts an
+  exact two-computation graph and rejects the former no-boundary graph. The affected dense tests now
+  pass 67/67. No TPU arithmetic, DB row, performance claim or Gate-D advancement exists yet. After
+  one correction-only confirmation, run only the ~70-second protected isolated replay and judge
+  whether the 32 partials move the dense update from `47808` into the already-proved exact
+  `47809/47810` window.
+
+## 2026-08-13 23:15 UTC — eight-second sensitivity pins the exact dense-update window
+
+- Reviewed/pushed pin `aa6f477a6cbde98d5f332aaf60b02d63f8cd4adc` ran once as protected tag
+  `greenfield_layer0_isolated_dense_replay_20260813T231304996686440Z`. TPU arithmetic completed in
+  eight seconds and the full lease/census/archive/`SUCCESS`-last workflow completed in about 70
+  seconds. Exact StableHLO, optimized-HLO, independent sweep reconstruction, CRC verification and
+  authenticated 8/8 cleanup all pass.
+- The control again reproduces all 32 captured BF16 down partials and DB548's layer-1 SHA
+  `9b52a04e...4005`, with the sole mismatch at hidden 2795. The current dense-update bits there are
+  `47808`. Exhausting all 2,048 one-leaf BF16 code perturbations in `[-32,32]` deduplicates to 15
+  actual values `47802..47816`. Exactly candidates 7 and 8—dense-update bits `47809` and `47810`—
+  produce the accepted complete row at `0/6,144` mismatches, SHA `9936ee1e...d3039`.
+- Runner/tensor/summary/`SUCCESS` SHAs are `9a0361b4...8137`, `455035b3...3e5f`,
+  `a7cf8cf0...390f` and `41b6ea10...856a`; remote ledger SHA is `65006196...c5a2`. This remains
+  no-DB/non-performance diagnostic evidence and does not promote Gate D.
+- Offline exact-tree dynamic programming shows that reaching `47809` requires at least five
+  one-ULP leaf changes and `47810` at least eight. Testing all adjacent/cross y/z DB533 pairings
+  yields only `47807` or the current `47808`. Therefore neither a single-coordinate output patch
+  nor another blind reduction-tree variant is admissible. Inspect the accepted-versus-current
+  contraction/fusion arithmetic, validate one general correction with the sub-minute replay, and
+  authorize one complete 8K retry only after the bounded row is exact.
+
 ## 2026-08-13 22:58 UTC — seven-second contraction replay closes sibling scheduling
 
 - Reviewed/pushed pin `20bcf778869a5a9d871df21796d1bbf92876a1fe` ran once as protected tag

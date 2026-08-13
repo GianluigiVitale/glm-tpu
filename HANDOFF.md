@@ -19,6 +19,45 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The next bounded challenger is implemented locally and remains default-off. An exact offline
+  differential over SHA-pinned HLO proves the accepted M32 program has three merged gate/up
+  results shaped `bf16[32,1,768]` and zero `bf16[32,768]` equivalents, while DB548 has eight
+  `bf16[32,768]` gate results and zero rank-three equivalents. The isolated one-contraction
+  program now optionally preserves this accepted singleton through rank-three gate/up slices
+  before SwiGLU. Production retains the old default because `accepted_gate_singleton=False`.
+  StableHLO and optimized-HLO validators bind the exact singleton/slice/reshape path, packed
+  weights, schedules, activation/down graph and live result; a direct rank-two bypass refuses.
+  The one bulk Sol audit found one medium proof gap: the synthetic optimized-HLO positive preserved
+  the rank-three tensor but did not require it to be the scheduled gate fusion's external result.
+  The correction now requires the exact single-result gate fusion boundary, accepted scheduled
+  geometry and subsequent rank-three activation path. A two-computation graph passes while the
+  former direct-ENTRY singleton graph refuses; the wrapper pins the new published predicate.
+  The protected wrapper authenticates both accepted and DB548 HLO sources and publishes the
+  discriminator fields. Focused tests pass 8/8, the affected dense validation set passes 67/67,
+  and the broader forced-CPU dense/runtime set passed 152/152 before the bounded correction;
+  Python compilation, shell syntax, shellcheck, JSON and diff checks pass. There is no TPU result
+  or Gate-D promotion yet. Exact next is one correction-only Sol confirmation, then one
+  ~70-second protected isolated replay—not a complete decoder.
+
+- Reviewed/pushed pin `aa6f477a6cbde98d5f332aaf60b02d63f8cd4adc` completed the protected
+  sensitivity sweep under tag
+  `greenfield_layer0_isolated_dense_replay_20260813T231304996686440Z`. The TPU probe took eight
+  seconds; the complete census/archive/`SUCCESS`-last workflow took about 70 seconds. Its control
+  again reproduces all 32 captured partials and DB548's one-ULP layer-1 miss. The 2,048 logical
+  one-leaf BF16 perturbations collapse to 15 distinct dense-update codes `47802..47816`; only
+  `47809` and `47810` produce the fully accepted 6,144-value layer-1 row, SHA
+  `9936ee1e...d3039`. The current dense update at hidden 2795 is `47808`. This is a sensitivity
+  bound, not permission to patch one coordinate: exact next is to identify the general real
+  contraction/fusion edge that moves the value into the accepted window, validate it with this
+  sub-minute probe, and only then run one complete protected 8K decoder.
+- Runner/tensor/summary/`SUCCESS` SHAs are `9a0361b4...8137`, `455035b3...3e5f`,
+  `a7cf8cf0...390f` and `41b6ea10...856a`; the remote-object ledger is `65006196...c5a2`.
+  Exact HLO, independent sweep reconstruction, CRC archive verification and authenticated 8/8
+  cleanup pass. There is intentionally no DB row, performance claim or Gate-D promotion. Offline
+  exact-tree search shows the nearest `47809` witness needs five one-ULP leaf changes and `47810`
+  needs eight; changing the DB533 y/z pairing reaches only `47807` or `47808`. Do not reopen blind
+  reduction-tree variants or the hour-long decoder loop.
+
 - Pushed pin `20bcf778869a5a9d871df21796d1bbf92876a1fe` completed the protected
   one-contraction discriminator under tag
   `greenfield_layer0_isolated_dense_replay_20260813T225647267633552Z`. Arithmetic and both exact

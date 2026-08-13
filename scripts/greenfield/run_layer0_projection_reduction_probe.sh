@@ -546,6 +546,8 @@ validate_isolated_dense_replay() {
     "$CAPTURED_RMS_DB548_HLO_SHA" "$CAPTURED_RMS_DB549_TENSOR_SHA" \
     "$CAPTURED_RMS_DB549_RUNNER_SHA" "$CAPTURED_RMS_DB549_SUMMARY_SHA" \
     "$CAPTURED_RMS_DB549_SUCCESS_SHA" "$CAPTURED_RMS_DB549_HLO_SHA" \
+    "$ACCEPTED_M32_HLO_SHA" "$ACCEPTED_M32_SUMMARY_SHA" \
+    "$ACCEPTED_M32_SUCCESS_SHA" \
     "$CHECKPOINT_MANIFEST_SHA" <<'PY'
 from __future__ import annotations
 
@@ -577,6 +579,9 @@ import numpy as np
     db549_summary_sha,
     db549_success_sha,
     db549_hlo_sha,
+    accepted_m32_hlo_sha,
+    accepted_m32_summary_sha,
+    accepted_m32_success_sha,
     checkpoint_manifest_sha,
 ) = sys.argv[1:]
 root = Path(run_dir_text)
@@ -608,6 +613,10 @@ def compare(reference: np.ndarray, observed: np.ndarray) -> dict[str, object]:
     }
 
 expected_source = {
+    "accepted_m32_hlo_raw_sha256": "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
+    "accepted_m32_hlo_sha256": accepted_m32_hlo_sha,
+    "accepted_m32_success_sha256": accepted_m32_success_sha,
+    "accepted_m32_summary_sha256": accepted_m32_summary_sha,
     "capture_runner_sha256": capture_runner_sha,
     "capture_summary_sha256": capture_summary_sha,
     "capture_success_sha256": capture_success_sha,
@@ -646,14 +655,24 @@ expected_records = {
         "shape": [4, 8, 3, 6144],
     },
 }
+expected_gate_singleton_discriminator = {
+    "accepted_rank2_gate_count": 0,
+    "accepted_rank3_gate_count": 3,
+    "challenger_selected": True,
+    "db548_rank2_gate_count": 8,
+    "db548_rank3_gate_count": 0,
+}
 if not (
-    runner.get("artifact_kind") == "glm52_layer0_isolated_dense_replay"
+    runner.get("accepted_gate_singleton") is True
+    and runner.get("artifact_kind") == "glm52_layer0_isolated_dense_replay"
     and runner.get("code_hash") == pin
     and runner.get("control_admissible") is True
     and type(runner.get("exact")) is bool
     and runner.get("exact_arms")
     == (["isolated_virtual_contractions"] if runner["exact"] else [])
     and runner.get("final_layout_records") == expected_records
+    and runner.get("gate_singleton_discriminator")
+    == expected_gate_singleton_discriminator
     and runner.get("performance_claim") is False
     and runner.get("position") == 8155
     and runner.get("source") == expected_source
@@ -928,13 +947,15 @@ expected_hlo_files = {
     ),
 }
 if not (
-    isolated_stable.get("passed") is True
+    isolated_stable.get("accepted_gate_singleton") is True
+    and isolated_stable.get("passed") is True
     and isolated_stable.get("violations") == []
     and isolated_stable.get("convolution_count") == 2
     and isolated_stable.get("exact_result_binding") is True
     and isolated_stable.get("matched_virtual_shards") == [0]
     and isolated_stable.get("virtual_contractions_per_chip") == 1
     and not any(isolated_stable.get("collective_counts", {}).values())
+    and isolated_optimized.get("accepted_gate_singleton") is True
     and isolated_optimized.get("passed") is True
     and isolated_optimized.get("violations") == []
     and isolated_optimized.get("accepted_gate_up_schedule") is True
@@ -948,6 +969,9 @@ if not (
     and isolated_optimized.get("exact_accepted_weight_layout") is True
     and isolated_optimized.get("exact_activation_graph") is True
     and isolated_optimized.get("exact_carried_residual_binding") is True
+    and isolated_optimized.get(
+        "exact_gate_singleton_external_boundary"
+    ) is True
     and isolated_optimized.get("exact_packed_weight_lineage") is True
     and isolated_optimized.get("exact_result_binding") is True
     and isolated_optimized.get("final_dense_layout") is True
@@ -976,6 +1000,7 @@ for name, (stable_path, optimized_path) in expected_hlo_files.items():
         raise SystemExit("isolated dense HLO file hash drifted")
 
 summary = {
+    "accepted_gate_singleton": True,
     "artifact_kind": runner["artifact_kind"],
     "classification": runner["classification"],
     "code_hash": pin,
@@ -984,6 +1009,7 @@ summary = {
     "exact": exact,
     "exact_arms": runner["exact_arms"],
     "final_layout_records": expected_records,
+    "gate_singleton_discriminator": expected_gate_singleton_discriminator,
     "hlo": {
         name: {
             "optimized_sha256": runner["hlo"][name]["optimized_sha256"],
@@ -1653,8 +1679,14 @@ if [[ $CAPTURED_RMS_REPLAY == 1 || $ISOLATED_DENSE_REPLAY == 1 ]]; then
   require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/SUCCESS" "$CAPTURED_RMS_DB549_SUCCESS_SHA" "captured RMS DB549 SUCCESS"
   require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/hlo/dense_convolution.optimized_hlo.txt" "$CAPTURED_RMS_DB549_HLO_SHA" "captured RMS DB549 HLO"
   if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
+    require_sha "$ACCEPTED_M32_HLO" "$ACCEPTED_M32_HLO_SHA" "accepted M32 HLO"
+    require_sha "$ACCEPTED_M32_SUMMARY" "$ACCEPTED_M32_SUMMARY_SHA" "accepted M32 summary"
+    require_sha "$ACCEPTED_M32_SUCCESS" "$ACCEPTED_M32_SUCCESS_SHA" "accepted M32 SUCCESS"
     require_sha "$CHECKPOINT_ROOT/SUCCESS" "$CHECKPOINT_SUCCESS_SHA" "checkpoint SUCCESS"
     require_sha "$CHECKPOINT_ROOT/runtime_manifest.json" "$CHECKPOINT_MANIFEST_SHA" "checkpoint manifest"
+    require_remote_sha "$ACCEPTED_M32_REMOTE/accepted_decode_projection_lowering/jit_step_fun_impl.m32.after_codegen_hlo.txt.gz" "$ACCEPTED_M32_HLO_SHA" "accepted M32 HLO"
+    require_remote_sha "$ACCEPTED_M32_REMOTE/accepted_decode_projection_lowering/summary.json" "$ACCEPTED_M32_SUMMARY_SHA" "accepted M32 summary"
+    require_remote_sha "$ACCEPTED_M32_REMOTE/SUCCESS" "$ACCEPTED_M32_SUCCESS_SHA" "accepted M32 SUCCESS"
     require_remote_sha "$CHECKPOINT_REMOTE/SUCCESS" "$CHECKPOINT_SUCCESS_SHA" "checkpoint SUCCESS"
     require_remote_sha "$CHECKPOINT_REMOTE/runtime_manifest.json" "$CHECKPOINT_MANIFEST_SHA" "checkpoint manifest"
   fi
@@ -1808,6 +1840,12 @@ if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
         --db549-success-sha256 "$CAPTURED_RMS_DB549_SUCCESS_SHA" \
         --db549-hlo "$CAPTURED_RMS_DB549_HLO" \
         --db549-hlo-sha256 "$CAPTURED_RMS_DB549_HLO_SHA" \
+        --accepted-m32-hlo "$ACCEPTED_M32_HLO" \
+        --accepted-m32-hlo-sha256 "$ACCEPTED_M32_HLO_SHA" \
+        --accepted-m32-summary "$ACCEPTED_M32_SUMMARY" \
+        --accepted-m32-summary-sha256 "$ACCEPTED_M32_SUMMARY_SHA" \
+        --accepted-m32-success "$ACCEPTED_M32_SUCCESS" \
+        --accepted-m32-success-sha256 "$ACCEPTED_M32_SUCCESS_SHA" \
         --checkpoint-root "$CHECKPOINT_ROOT" \
         --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
         --output "$RUN_DIR/runner.json" \
@@ -3144,7 +3182,9 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
         )
     )
     if not (
-        summary.get("code_hash") == sys.argv[3]
+        summary.get("accepted_gate_singleton") is True
+        and runner.get("accepted_gate_singleton") is True
+        and summary.get("code_hash") == sys.argv[3]
         and runner.get("artifact_kind") == summary["artifact_kind"]
         and runner.get("code_hash") == summary["code_hash"]
         and runner.get("classification") == summary["classification"]
@@ -3154,6 +3194,8 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
         and runner.get("source") == summary.get("source")
         and runner.get("final_layout_records")
         == summary.get("final_layout_records")
+        and runner.get("gate_singleton_discriminator")
+        == summary.get("gate_singleton_discriminator")
         and runner.get("isolated_layer1_comparison")
         == summary.get("isolated_layer1_comparison")
         and runner.get("isolated_layer1_sha256")
@@ -3185,6 +3227,7 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
     ):
         raise SystemExit("isolated dense replay summary drifted before SUCCESS")
     values = {
+        "accepted_gate_singleton": "true",
         "artifact_kind": summary["artifact_kind"],
         "classification": summary["classification"],
         "code_hash": sys.argv[3],
@@ -3195,6 +3238,16 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
         "exact": str(exact).lower(),
         "exact_arms": ",".join(summary["exact_arms"]) or "none",
         "isolated_layer1_sha256": summary["isolated_layer1_sha256"],
+        "gate_singleton_accepted_rank3_count": str(
+            summary["gate_singleton_discriminator"][
+                "accepted_rank3_gate_count"
+            ]
+        ),
+        "gate_singleton_db548_rank2_count": str(
+            summary["gate_singleton_discriminator"][
+                "db548_rank2_gate_count"
+            ]
+        ),
         "performance_claim": "false",
         "remote_objects_sha256": sha256(
             (root / "remote_objects.json").read_bytes()

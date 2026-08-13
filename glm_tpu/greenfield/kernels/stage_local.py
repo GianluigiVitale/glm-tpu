@@ -548,6 +548,7 @@ def _virtual_dense_final_layout_convolution_down_partials(
     block_shape: tuple[int, int],
     compile_rows: int = 32,
     virtual_shards: int = _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER,
+    accepted_gate_singleton: bool = False,
 ) -> Any:
     """Replay dense arithmetic from accepted ``[in, out]`` weight layout.
 
@@ -564,6 +565,8 @@ def _virtual_dense_final_layout_convolution_down_partials(
         raise ValueError("final-layout dense requires one or 32 compile rows")
     if virtual_shards not in (1, _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
         raise ValueError("final-layout dense requires one or eight virtual shards")
+    if not isinstance(accepted_gate_singleton, bool):
+        raise ValueError("accepted gate singleton flag must be boolean")
     expected = {
         "normalized": (compile_rows, 6144),
         "merged_bits_in_out": (virtual_shards, 6144, 768),
@@ -662,8 +665,24 @@ def _virtual_dense_final_layout_convolution_down_partials(
                 normalized,
                 gate_up_weight,
             )
-            gate = gate_up[:, :384]
-            up = gate_up[:, 384:]
+            if accepted_gate_singleton:
+                # The accepted M32 lowering returns the merged gate/up
+                # contraction as [rows, 1, 768].  Its SwiGLU consumes two
+                # rank-three slices and only then bitcasts them to
+                # [rows, 384].  Preserve that otherwise-size-one boundary in
+                # the bounded discriminator so TPU receives the same fusion
+                # input geometry; the production path remains unchanged
+                # unless this explicit default-off flag is selected.
+                gate_up = jnp.reshape(gate_up, (compile_rows, 1, 768))
+                gate = jnp.reshape(
+                    gate_up[:, :, :384], (compile_rows, 384)
+                )
+                up = jnp.reshape(
+                    gate_up[:, :, 384:], (compile_rows, 384)
+                )
+            else:
+                gate = gate_up[:, :384]
+                up = gate_up[:, 384:]
             activated = (gate * jax.nn.sigmoid(gate) * up).astype(
                 jnp.bfloat16
             )
