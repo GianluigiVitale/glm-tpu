@@ -4606,9 +4606,15 @@ def main() -> int:
                 with jax.named_scope(
                     "greenfield_dense_convolution_layer1_split_reduction"
                 ):
+                    reduction_dense = lax.optimization_barrier(
+                        rms_dense_update
+                    )
+                    reduction_residual = lax.optimization_barrier(
+                        rms_residual
+                    )
                     reduction_sum = (
-                        rms_dense_update.astype(jnp.float32)
-                        + rms_residual.astype(jnp.float32)
+                        reduction_dense.astype(jnp.float32)
+                        + reduction_residual.astype(jnp.float32)
                     )
                     variance = jnp.mean(
                         lax.square(reduction_sum), axis=-1, keepdims=True
@@ -4617,13 +4623,9 @@ def main() -> int:
                 with jax.named_scope(
                     "greenfield_dense_convolution_layer1_split_recompute"
                 ):
-                    output_dense = lax.optimization_barrier(
-                        rms_dense_update
-                    )
-                    output_residual = lax.optimization_barrier(rms_residual)
                     output_sum = (
-                        output_dense.astype(jnp.float32)
-                        + output_residual.astype(jnp.float32)
+                        rms_dense_update.astype(jnp.float32)
+                        + rms_residual.astype(jnp.float32)
                     )
                     normalized_output = output_sum * inverse
                     layer1 = (

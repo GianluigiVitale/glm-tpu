@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 12:47 UTC — first split-RMS attempt rejects output-side barriers
+
+- Reviewed commit `cd1bb736c70446ec2933f5a0d7a87cd8fdf16f22` was launched once under tag
+  `greenfield_layer0_dense_envelope_split_rms_20260813T124723663516442Z`. It passed protected
+  preflight and 8/8 pre-census, compiled the real checkpoint, and refused before arithmetic because
+  the scheduled RMS reduction did not match the accepted scalar-only contract. No comparison,
+  runner JSON, DB row, summary, sealed terminal archive or `SUCCESS` exists; failure cleanup is
+  authenticated 8/8. The failure trap preserved exactly eight diagnostic objects remotely under
+  `diagnostic/<tag>/` (logs, HLOs, censuses, preflight and rollback report), but did not publish a
+  terminal result. Optimized/StableHLO SHAs are `dbe6f797...7103` / `3614a077...a0f`.
+- XLA folded the output-side identity barrier into the reduction envelope. The live fusion returns
+  `(f32[32], bf16[32,6144])`, where the BF16 result is the pre-dense normalized row used by the
+  final weighted fusion. Its output window `[4,24]`, iterations `[1,2]` and megacore split 1 are
+  the rejected old schedule, rather than the accepted scalar-only `[2,48]`, `[2,1]`, split 0.
+- The smallest successor reverses the barrier direction: the scalar reduction consumes barred
+  dense/residual inputs while the final normalized output recomputes from their raw values. The
+  source StableHLO contract pins that graph, and the optimized contract still requires the exact
+  accepted scheduled reduction plus same-fusion output recomputation. The failed protected HLO is
+  SHA-pinned as a refusal regression; focused tests pass 2/2. This is local readiness only. One
+  new-diff audit and one protected retry precede any numerical or Gate-D conclusion.
+
 ## 2026-08-13 12:08 UTC — DB548 rejects dense contraction scheduling; one RMS boundary remains
 
 - Proof commit `3d5b2ee840c41bcd86a1e1936a95db2d4a8e73f9` received its one-diff Sol approval

@@ -866,9 +866,17 @@ def _match_rmsnorm(
         return call.name
 
     dense_value = exact_m32_pad(dense_output) if layer1_only else dense_output
+    reduction_dense_value = dense_value
+    if split_layer1_rms:
+        reduction_dense_value = _expect_unary(
+            graph,
+            dense_value,
+            opcode="optimization_barrier",
+            result_type=f"{row_type}bf16>",
+        ).name
     dense_f32 = _expect_unary(
         graph,
-        dense_value,
+        reduction_dense_value,
         opcode="convert",
         result_type=f"{row_type}f32>",
     )
@@ -890,7 +898,21 @@ def _match_rmsnorm(
         opcode="convert",
         result_type=f"{row_type}f32>",
     )
-    residual_value = residual_conversion.operands[0]
+    reduction_residual_value = residual_conversion.operands[0]
+    residual_value = reduction_residual_value
+    if split_layer1_rms:
+        reduction_residual_barrier = _expect_node(
+            graph,
+            reduction_residual_value,
+            opcode="optimization_barrier",
+            result_type=f"{row_type}bf16>",
+        )
+        if len(reduction_residual_barrier.operands) != 1:
+            raise _MatchError(
+                f"{reduction_residual_barrier.name}: split residual barrier "
+                "arity drifted"
+            )
+        residual_value = reduction_residual_barrier.operands[0]
     residual = residual_value
     if layer1_only and not residual_is_m32:
         residual_pad = _expect_node(
@@ -1002,27 +1024,15 @@ def _match_rmsnorm(
     )
     normalized_sum = combined.name
     if split_layer1_rms:
-        dense_output_barrier = _expect_unary(
-            graph,
-            dense_value,
-            opcode="optimization_barrier",
-            result_type=f"{row_type}bf16>",
-        )
-        residual_output_barrier = _expect_unary(
-            graph,
-            residual_value,
-            opcode="optimization_barrier",
-            result_type=f"{row_type}bf16>",
-        )
         dense_output_f32 = _expect_unary(
             graph,
-            dense_output_barrier.name,
+            dense_value,
             opcode="convert",
             result_type=f"{row_type}f32>",
         )
         residual_output_f32 = _expect_unary(
             graph,
-            residual_output_barrier.name,
+            residual_value,
             opcode="convert",
             result_type=f"{row_type}f32>",
         )

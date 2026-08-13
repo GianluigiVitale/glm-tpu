@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Clean pushed pin `cd1bb736c70446ec2933f5a0d7a87cd8fdf16f22` contains the reviewed,
+  default-off first split-RMS discriminator. Its protected launch, tag
+  `greenfield_layer0_dense_envelope_split_rms_20260813T124723663516442Z`, passed remote vacancy,
+  exact sync and 8/8 pre-census, compiled the real checkpoint, and failed closed in optimized-HLO
+  validation before arithmetic. There is no tensor verdict, DB row, summary, sealed terminal
+  archive or `SUCCESS`; failure cleanup is authenticated 8/8. The failure trap preserved exactly
+  eight objects below the remote `diagnostic/<tag>/` subtree (logs, HLOs, censuses, preflight and
+  rollback report), while no terminal publication exists. Optimized and StableHLO SHAs are
+  `dbe6f797...7103` and `3614a077...a0f`.
+- The preserved HLO is decisive. Output-side optimization barriers did not produce the accepted
+  scalar-only RMS reduction. XLA returned `(f32[32], bf16[32,6144])` from a `[4,24]` / `[1,2]` /
+  megacore-split-1 reduction fusion: its BF16 tuple member is the pre-dense normalized value, which
+  the final weighted fusion consumes. This is the old schedule and no numerical evidence.
+- The bounded correction moves both value-preserving barriers to the reduction inputs and leaves
+  the final output sum on the raw dense/residual inputs. StableHLO now requires that exact direction;
+  optimized HLO still requires a scalar-only `[2,48]` / `[2,1]` / split-0 reduction and an exact
+  same-fusion output recomputation. The failed real HLO is SHA-pinned and refuses. Focused tests pass
+  2/2. Exact next: complete the affected suite/static checks, one new-diff-only Sol audit,
+  commit/push, authenticated idle-fleet proof and one serialized protected retry. Gate D remains
+  open; do not run the complete 8K decoder before this discriminator produces an exact result.
+
 - Current clean pushed baseline is `3d5b2ee840c41bcd86a1e1936a95db2d4a8e73f9`. Protected DB548/item1832,
   tag `greenfield_layer0_dense_envelope_cross_layer_20260813T120703034434907Z`, completed from
   that pin with DB/archive/`SUCCESS` and authenticated 8/8 pre/post cleanup. All eight gate/up and

@@ -113,6 +113,16 @@ REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO = Path(
 REAL_ACCEPTED_GEOMETRY_ENVELOPE_OPTIMIZED_HLO_SHA256 = (
     "ac57c042ae591d99cebc982f37f06b3c335f3f3d1453fd9e2f7269a1c3b9094c"
 )
+REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO",
+        "/home/gianl/glm-run/greenfield_layer0_dense_envelope_split_rms_"
+        "20260813T124723663516442Z/hlo/dense_convolution.optimized_hlo.txt",
+    )
+)
+REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO_SHA256 = (
+    "dbe6f797008722ae8b2b4a53ddc83d1ebcecf858c44682b9654cd7b207397103"
+)
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
     "decode_projection_lowering/8k/"
@@ -742,14 +752,9 @@ def _with_exact_split_layer1_rms_schedule(hlo: str) -> str:
             "  %output_residual = bf16[32,6144] parameter(1)",
             "  %output_inverse = f32[32,1] parameter(2)",
             "  %output_norm = bf16[6144] parameter(3)",
-            "  %output_update_barrier = bf16[32,6144] "
-            "optimization-barrier(%output_update)",
-            "  %output_residual_barrier = bf16[32,6144] "
-            "optimization-barrier(%output_residual)",
-            "  %output_update_f32 = f32[32,6144] "
-            "convert(%output_update_barrier)",
+            "  %output_update_f32 = f32[32,6144] convert(%output_update)",
             "  %output_residual_f32 = f32[32,6144] "
-            "convert(%output_residual_barrier)",
+            "convert(%output_residual)",
             "  %output_combined = f32[32,6144] add("
             "%output_update_f32, %output_residual_f32), " + scope + 'add"}',
             "  %output_inverse_wide = f32[32,6144] broadcast("
@@ -839,7 +844,7 @@ def _exact_dense_envelope_split_rms_stablehlo() -> str:
             "      %830 = stablehlo.add %828, %829 : tensor<32x6144xf32>",
         )
     )
-    replacement = source + "\n" + "\n".join(
+    replacement = "\n".join(
         (
             "      %split_dense = stablehlo.optimization_barrier %827 : "
             "tensor<32x6144xbf16>",
@@ -849,8 +854,14 @@ def _exact_dense_envelope_split_rms_stablehlo() -> str:
             "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
             "      %split_residual_f32 = stablehlo.convert %split_residual : "
             "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
-            "      %split_combined = stablehlo.add %split_dense_f32, "
+            "      %830 = stablehlo.add %split_dense_f32, "
             "%split_residual_f32 : tensor<32x6144xf32>",
+            "      %828 = stablehlo.convert %827 : "
+            "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
+            "      %829 = stablehlo.convert %6 : "
+            "(tensor<32x6144xbf16>) -> tensor<32x6144xf32>",
+            "      %split_combined = stablehlo.add %828, %829 : "
+            "tensor<32x6144xf32>",
         )
     )
     assert source in stablehlo
@@ -2486,6 +2497,32 @@ def test_dense_split_layer1_rms_requires_recompute_and_accepted_schedule() -> No
         split_layer1_rms=True,
     )
     assert rejected_old["passed"] is False
+
+
+@pytest.mark.skipif(
+    not REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO.exists(),
+    reason="protected output-barrier split-RMS HLO is unavailable",
+)
+def test_dense_split_layer1_rms_rejects_output_barrier_tuple_schedule() -> None:
+    optimized_hlo = REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_OUTPUT_BARRIER_SPLIT_RMS_HLO_SHA256
+    )
+    rejected = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+        split_layer1_rms=True,
+    )
+    assert rejected["passed"] is False
+    assert "accepted split layer-1 RMS schedule drifted" in (
+        rejected["violations"]
+    )
+    rms = rejected["lineage"]["rmsnorm_contract"]
+    assert rms["exact_accepted_scheduled_reduction"] is False
+    assert rms["accepted_scheduled_reduction_values"] == []
 
 
 @pytest.mark.skipif(
