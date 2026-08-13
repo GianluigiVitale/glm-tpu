@@ -40,6 +40,23 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   local arithmetic, its down combine, residual addition or layer-1 normalization. DB538 already
   rejected all local/StrategyND dense-reduction pairings, so reduction association alone must not
   be retried.
+- The protected dense-convolution discriminator then ran from clean pushed pin
+  `a6f7a37e29d7307da5223c1fe407735ad617ee5d` under tag ending
+  `20260813T003828617161352Z`. Both exact StableHLO and optimized-HLO contracts pass, and the real
+  TPU arm executed in nine seconds. Its verdict is conclusively nonexact: the accepted
+  dense-convolution/SwiGLU/down/DB533 arithmetic differs from the accepted layer-1 normalized row
+  in `1,073/6,144` BF16 elements (first mismatch 1, max absolute error `0.0078125`, mean absolute
+  error `3.4686963772401214e-05`). Therefore this complete legacy-local dense arithmetic candidate
+  is rejected and must not be integrated or retried as a theory. The wrapper then failed closed
+  before DB/archive publication because its embedded schema expected the older summary-only
+  association graph while the reviewed HLO validator emitted exact leaf identities/pairings/order.
+  No DB row, summary, `SUCCESS`, or remote archive exists; DB max remains 539, rollback reports
+  `NO_PROVISIONAL_DB_RUN`, and pre/post cleanup is authenticated 8/8. The bounded publication-schema
+  correction accepts the actual nonexact runner with `correct=0`, preserves all detailed graph
+  invariants, and passes the complete affected CPU suite 58/58. Exact next: one Sol audit of only
+  this publication delta, commit/push, and one short serialized rerun solely to publish the negative
+  evidence. Then capture the smallest accepted post-MLP boundary; do not run another full decoder or
+  another dense-arithmetic theory first.
 - The accepted legacy M32 after-codegen HLO gives the next bounded candidate directly. Gate/up use
   `f32[32,768] convolution(bf16[32,6144], bf16[6144,768])`, then BF16 conversion; down uses
   `f32[32,6144] convolution(bf16[32,384], bf16[384,6144])`, then BF16 conversion and the already-
@@ -51,7 +68,7 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   association values across TPU-created nested and tuple-output fusions. There is no tensor result,
   classification, DB row, summary or `SUCCESS`; failure cleanup is authenticated 8/8. Preserved
   optimized/StableHLO SHAs are `e3a2538f...7ca0` / `a32a3cf8...70f6`.
-- The bounded correction now maps only exact callee roots/tuple indices to caller values, recursively
+- The bounded correction maps only exact callee roots/tuple indices to caller values, recursively
   resolves SwiGLU parameters to the same-rank gate convolution, recognizes TPU BF16 correction
   metadata, rebuilds all 27 physical DB533 components across fusions, and pins TPU's ordered three-
   band pad/max plus 24-segment dynamic-update chain. The preserved real HLO passes; wrong BF16
@@ -60,9 +77,8 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   remaining broad-dependency/decoy edges in nested SwiGLU: extra arithmetic before the nested
   source, a dead BF16 convert, and extra arithmetic before down convolution. All now require exact
   identity through bounded unary layout transforms and live producer BF16 semantics; all three
-  preserved-HLO mutations refuse. Exact next is confirmation by that same reviewer, commit/push and
-  one serialized discriminator retry. Only an exact result may be integrated before the next 8K
-  retry; a nonexact result triggers the smallest post-MLP oracle capture.
+  preserved-HLO mutations refuse. The same reviewer approved staged SHA `1c912792...d59e`; the
+  correction is committed and pushed at `a6f7a37e29d7307da5223c1fe407735ad617ee5d`.
 - Protected DB538/item1822 completed the four independent post-latent arms at pushed pin
   `e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc`. Every arm first reproduces accepted post-`W_UV`
   SHA `79a6e290...2e9d`, so W_UV is closed. Neither local nor accepted StrategyND association at

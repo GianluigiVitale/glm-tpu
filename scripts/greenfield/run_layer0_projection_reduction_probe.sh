@@ -583,6 +583,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 import sqlite3
 import sys
@@ -618,6 +619,36 @@ if dense:
     source = runner.get("source", {})
     weight_records = runner.get("weight_records")
     sha_pattern = __import__("re").compile(r"[0-9a-f]{64}")
+    mismatch_count = comparison.get("mismatch_count")
+    first_mismatch_index = comparison.get("first_mismatch_index")
+    max_abs_error = comparison.get("max_abs_error")
+    mean_abs_error = comparison.get("mean_abs_error")
+    if exact is True:
+        numerical_comparison_valid = (
+            type(mismatch_count) is int
+            and mismatch_count == 0
+            and first_mismatch_index is None
+            and type(max_abs_error) in (int, float)
+            and math.isfinite(max_abs_error)
+            and max_abs_error == 0.0
+            and type(mean_abs_error) in (int, float)
+            and math.isfinite(mean_abs_error)
+            and mean_abs_error == 0.0
+        )
+    elif exact is False:
+        numerical_comparison_valid = (
+            type(mismatch_count) is int
+            and 1 <= mismatch_count <= 6144
+            and type(first_mismatch_index) is int
+            and 0 <= first_mismatch_index < 6144
+            and type(max_abs_error) in (int, float)
+            and math.isfinite(max_abs_error)
+            and type(mean_abs_error) in (int, float)
+            and math.isfinite(mean_abs_error)
+            and 0.0 < mean_abs_error <= max_abs_error
+        )
+    else:
+        numerical_comparison_valid = False
     source_valid = source == {
         "checkpoint_manifest_sha256": checkpoint_manifest_sha,
         "db538_runner_sha256": db538_runner_sha,
@@ -631,11 +662,7 @@ if dense:
         and comparison.get("expected_sha256")
         == "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039"
         and comparison.get("elementwise_exact") is exact
-        and isinstance(comparison.get("mismatch_count"), int)
-        and (comparison["mismatch_count"] == 0) is exact
-        and bool(comparison.get("first_mismatch_index") is None) is exact
-        and bool(comparison.get("max_abs_error") == 0.0) is exact
-        and bool(comparison.get("mean_abs_error") == 0.0) is exact
+        and numerical_comparison_valid
         and isinstance(comparison.get("observed_sha256"), str)
         and sha_pattern.fullmatch(comparison["observed_sha256"]) is not None
         and (
@@ -659,6 +686,39 @@ if dense:
         and stable.get("matched_virtual_shards") == list(range(8))
     )
     optimized_lineage = optimized.get("lineage", {})
+    association_graph = optimized_lineage.get("association_edge_graph", {})
+    expected_pairings = {
+        str(component): (
+            [[0, 1], [2, 3]]
+            if component % 2 == 0
+            else [[0, 3], [1, 2]]
+        )
+        for component in range(24)
+    }
+    x_association_valid = association_graph.get("x") == {
+        "component_count": 1,
+        "exact": True,
+        "leaf_rows": [0, 1],
+    }
+    y_association = association_graph.get("y", {})
+    y_association_valid = y_association == {
+        "component_count": 3,
+        "component_ids": list(range(3)),
+        "exact": True,
+        "leaf_pairings": {
+            key: value
+            for key, value in expected_pairings.items()
+            if int(key) < 3
+        },
+        "ordered_components": [[component] for component in range(3)],
+    }
+    z_association_valid = association_graph.get("z") == {
+        "component_count": 24,
+        "component_ids": list(range(24)),
+        "exact": True,
+        "leaf_pairings": expected_pairings,
+        "ordered_components": [[component] for component in range(24)],
+    }
     optimized_valid = (
         optimized.get("passed") is True
         and optimized.get("violations") == []
@@ -676,12 +736,9 @@ if dense:
         == [[rank] for rank in range(8)]
         and optimized_lineage.get("association_add_shapes")
         == {"y": 9, "x": 1, "z": 72}
-        and optimized_lineage.get("association_edge_graph")
-        == {
-            "x": {"component_count": 1, "exact": True},
-            "y": {"component_count": 3, "exact": True},
-            "z": {"component_count": 24, "exact": True},
-        }
+        and x_association_valid
+        and y_association_valid
+        and z_association_valid
         and set(optimized_lineage.get("activation_contract", {}))
         == {str(rank) for rank in range(8)}
         and all(

@@ -5,6 +5,34 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 — Gate-D dense-convolution candidate rejected; publication-only correction pending
+
+- Complete 8K exactness remains the active Gate D. The latest full protected run generated the
+  exact token `101252` and matched layer-0 DSA, then first diverged at layer-1 DSA. DB539 proves the
+  complete layer-0 attention update exact, localizing the first open boundary to layer-0 dense/MLP,
+  its residual update, or layer-1 RMSNorm.
+- The bounded dense discriminator at clean pushed pin
+  `a6f7a37e29d7307da5223c1fe407735ad617ee5d` reproduced the accepted M32 lowering: BF16-rounded
+  convolution gate/up, explicit BF16 SwiGLU, BF16-rounded convolution down, and DB533's exact
+  StrategyND association. Both exact StableHLO and optimized-HLO contracts passed on real TPU HLO.
+  The protected arm executed in 9 seconds and classified
+  `accepted_dense_convolution_nonexact`: `1,073/6,144` layer-1 BF16 elements differ, first mismatch
+  index 1, max absolute error `0.0078125`, mean absolute error
+  `3.4686963772401214e-05`; expected/observed SHAs are `9936ee1e...3039` / `229dc8ac...812f`.
+  This candidate is conclusively rejected and will not be integrated or retried as a theory.
+- Run `/home/gianl/glm-run/greenfield_layer0_dense_convolution_20260813T003828617161352Z` then
+  failed closed only at publication: its reviewed rich association graph records exact physical
+  leaf rows, pairings, and component order, but the embedded wrapper still expected the earlier
+  summary-only schema. No DB row/summary/`SUCCESS`/archive was created, DB max remains 539,
+  rollback says `NO_PROVISIONAL_DB_RUN`, and strict pre/post censuses pass 8/8. Runner/tensor/log
+  SHAs are `3388b58c...5548` / `2cdf1289...e1b9` / `1cbd655b...8903`.
+- The publication-only correction validates the full rich graph and records a successful diagnostic
+  with `correct=0`, `score=0.0`, while keeping `probe_contract_valid=1.0`. It accepts the exact real
+  nonexact runner in a temporary DB replay; the affected CPU-only suite passes 58/58. Exact next is
+  one Sol audit of this new delta, commit/push, one short protected rerun solely for durable negative
+  DB/archive evidence, then the smallest accepted post-MLP oracle capture. No further full 8K run is
+  justified until that boundary identifies the actual arithmetic mismatch.
+
 ## 2026-07-06 — Repo initialized (starting point; nothing ported yet)
 - Created `glm-tpu` as the GLM-5.2 porting harness (the moe-tpu sibling): `CLAUDE.md`, `HANDOFF.md`, `PLAN.md`,
   `docs/00-feasibility-memo.md` (the config-verified GO study), dir scaffold, `.env` gitignored.

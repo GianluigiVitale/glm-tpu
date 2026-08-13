@@ -676,6 +676,11 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "activation_graph",
         "association_graph",
         "rms_graph",
+        "nonexact",
+        "nonexact_negative_count",
+        "nonexact_bad_index",
+        "nonexact_negative_error",
+        "nonexact_nan_mean",
     ),
 )
 def test_dense_convolution_wrapper_records_authenticated_diagnostic(
@@ -718,9 +723,43 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                     },
                     "association_add_shapes": {"x": 1, "y": 9, "z": 72},
                     "association_edge_graph": {
-                        "x": {"component_count": 1, "exact": True},
-                        "y": {"component_count": 3, "exact": True},
-                        "z": {"component_count": 24, "exact": True},
+                        "x": {
+                            "component_count": 1,
+                            "exact": True,
+                            "leaf_rows": [0, 1],
+                        },
+                        "y": {
+                            "component_count": 3,
+                            "component_ids": list(range(3)),
+                            "exact": True,
+                            "leaf_pairings": {
+                                str(component): (
+                                    [[0, 1], [2, 3]]
+                                    if component % 2 == 0
+                                    else [[0, 3], [1, 2]]
+                                )
+                                for component in range(3)
+                            },
+                            "ordered_components": [
+                                [component] for component in range(3)
+                            ],
+                        },
+                        "z": {
+                            "component_count": 24,
+                            "component_ids": list(range(24)),
+                            "exact": True,
+                            "leaf_pairings": {
+                                str(component): (
+                                    [[0, 1], [2, 3]]
+                                    if component % 2 == 0
+                                    else [[0, 3], [1, 2]]
+                                )
+                                for component in range(24)
+                            },
+                            "ordered_components": [
+                                [component] for component in range(24)
+                            ],
+                        },
                     },
                     "collective_convolution_sources": [
                         f"%down.{index}" for index in range(8)
@@ -861,6 +900,28 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         runner["hlo"]["optimized_contract"]["lineage"][
             "rmsnorm_contract"
         ]["direct_exact_operand_graph"] = False
+    elif mutation.startswith("nonexact"):
+        runner["classification"] = "accepted_dense_convolution_nonexact"
+        runner["exact"] = False
+        runner["exact_arms"] = []
+        runner["layer1_comparison"].update(
+            {
+                "elementwise_exact": False,
+                "first_mismatch_index": 1,
+                "max_abs_error": 0.0078125,
+                "mean_abs_error": 3.4686963772401214e-05,
+                "mismatch_count": 1073,
+                "observed_sha256": "2" * 64,
+            }
+        )
+        if mutation == "nonexact_negative_count":
+            runner["layer1_comparison"]["mismatch_count"] = -1
+        elif mutation == "nonexact_bad_index":
+            runner["layer1_comparison"]["first_mismatch_index"] = "rogue"
+        elif mutation == "nonexact_negative_error":
+            runner["layer1_comparison"]["max_abs_error"] = -1.0
+        elif mutation == "nonexact_nan_mean":
+            runner["layer1_comparison"]["mean_abs_error"] = float("nan")
     (run_dir / "runner.json").write_text(json.dumps(runner))
     database = tmp_path / "results.db"
     completed = subprocess.run(
@@ -886,12 +947,15 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         capture_output=True,
         check=False,
     )
-    if mutation != "none":
+    if mutation not in ("none", "nonexact"):
         assert completed.returncode != 0
         return
     assert completed.returncode == 0, completed.stdout + completed.stderr
     summary = json.loads((run_dir / "summary.json").read_text())
-    assert summary["exact_arms"] == ["accepted_dense_convolution"]
+    expected_exact = mutation == "none"
+    assert summary["exact_arms"] == (
+        ["accepted_dense_convolution"] if expected_exact else []
+    )
     connection = sqlite3.connect(database)
     run = connection.execute(
         "SELECT model, model_revision, env_json, note FROM runs"
@@ -912,7 +976,11 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     assert run[3] == (
         "Protected layer-0 dense convolution discriminator; no performance claim."
     )
-    assert item == ("greenfield_layer0_dense_convolution", 1, 1.0)
+    assert item == (
+        "greenfield_layer0_dense_convolution",
+        int(expected_exact),
+        float(expected_exact),
+    )
     assert metric == (
         "greenfield_layer0_dense_convolution",
         "probe_contract_valid",
