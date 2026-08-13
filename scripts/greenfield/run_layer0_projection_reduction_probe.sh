@@ -92,6 +92,7 @@ HARNESS_GIT=$(git -C "$WORKTREE" rev-parse --short HEAD)
 FORK_GIT=$(git -C /home/gianl/tpu-inference rev-parse --short HEAD)
 DENSE_CONVOLUTION=${GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE:-0}
 DENSE_COMPILE_ROWS=${GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS:-1}
+DENSE_LAYER1_ONLY=${GLM_GREENFIELD_DENSE_LAYER1_ONLY:-0}
 [[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
   exit 2
@@ -100,12 +101,24 @@ DENSE_COMPILE_ROWS=${GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS:-1}
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS must be 1 or 32" >&2
   exit 2
 }
+[[ $DENSE_LAYER1_ONLY == 0 || $DENSE_LAYER1_ONLY == 1 ]] || {
+  echo "GLM_GREENFIELD_DENSE_LAYER1_ONLY must be 0 or 1" >&2
+  exit 2
+}
 if [[ $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS != 1 ]]; then
   echo "projection/reduction mode requires compile rows 1" >&2
   exit 2
 fi
+if [[ $DENSE_LAYER1_ONLY == 1 && \
+      ! ( $DENSE_CONVOLUTION == 1 && $DENSE_COMPILE_ROWS == 32 ) ]]; then
+  echo "layer-1-only mode requires the dense M32 discriminator" >&2
+  exit 2
+fi
 if [[ $DENSE_CONVOLUTION == 1 ]]; then
-  if [[ $DENSE_COMPILE_ROWS == 32 ]]; then
+  if [[ $DENSE_LAYER1_ONLY == 1 ]]; then
+    TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_m32_cross_layer_$(date -u +%Y%m%dT%H%M%S%NZ)}
+    TENSOR_BASENAME=dense_m32_cross_layer.npz
+  elif [[ $DENSE_COMPILE_ROWS == 32 ]]; then
     TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_m32_convolution_$(date -u +%Y%m%dT%H%M%S%NZ)}
     TENSOR_BASENAME=dense_m32_convolution.npz
   else
@@ -128,6 +141,10 @@ if [[ $DENSE_COMPILE_ROWS == 32 ]]; then
     --accepted-m32-success "$ACCEPTED_M32_SUCCESS"
     --accepted-m32-success-sha256 "$ACCEPTED_M32_SUCCESS_SHA"
   )
+fi
+layer1_probe_args=()
+if [[ $DENSE_LAYER1_ONLY == 1 ]]; then
+  layer1_probe_args=(--layer1-only)
 fi
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
@@ -213,7 +230,7 @@ rollback_provisional_db() {
   /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$TAG" "$PIN" \
     "$DENSE_CONVOLUTION" "$RUN_DIR" "$DB538_TENSOR_SHA" \
     "$CHECKPOINT_MANIFEST_SHA" "$HARNESS_GIT" "$FORK_GIT" \
-    "$DENSE_COMPILE_ROWS" "$ACCEPTED_M32_HLO_SHA" \
+    "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$ACCEPTED_M32_HLO_SHA" \
     "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
     "$ACCEPTED_M32_RAW_HLO_SHA" \
     >"$RUN_DIR/provisional_db_rollback.txt" <<'PY'
@@ -234,6 +251,7 @@ import sys
     harness_git,
     fork_git,
     dense_compile_rows_text,
+    dense_layer1_only_text,
     accepted_m32_hlo_sha,
     accepted_m32_summary_sha,
     accepted_m32_success_sha,
@@ -241,51 +259,81 @@ import sys
 ) = sys.argv[1:]
 dense = dense_text == "1"
 compile_rows = int(dense_compile_rows_text)
+layer1_only = dense_layer1_only_text == "1"
 runner_path = __import__("pathlib").Path(run_dir) / "runner.json"
 if not runner_path.is_file():
     raise SystemExit("refusing rollback without the producing runner")
 runner = json.loads(runner_path.read_text())
+dense_arm = (
+    "accepted_m32_dense_cross_layer"
+    if layer1_only
+    else (
+        "accepted_m32_dense_convolution"
+        if compile_rows == 32
+        else "accepted_dense_convolution"
+    )
+)
 model = (
     (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
-        if compile_rows == 32
-        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
+        if layer1_only
+        else (
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+            if compile_rows == 32
+            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        )
     )
     if dense
     else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
 )
 revision = (
     (
-        "native-jax-db532-dense-m32-discriminator-v1"
-        if compile_rows == 32
-        else "native-jax-db538-dense-convolution-v1"
+        "native-jax-db542-dense-cross-layer-v1"
+        if layer1_only
+        else (
+            "native-jax-db532-dense-m32-discriminator-v1"
+            if compile_rows == 32
+            else "native-jax-db538-dense-convolution-v1"
+        )
     )
     if dense
     else "native-jax-db537-strategy-nd-v1"
 )
 benchmark = (
     (
-        "greenfield_layer0_dense_m32_convolution"
-        if compile_rows == 32
-        else "greenfield_layer0_dense_convolution"
+        "greenfield_layer0_dense_m32_cross_layer"
+        if layer1_only
+        else (
+            "greenfield_layer0_dense_m32_convolution"
+            if compile_rows == 32
+            else "greenfield_layer0_dense_convolution"
+        )
     )
     if dense
     else "greenfield_layer0_projection_reduction"
 )
 note = (
     (
-        "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
-        if compile_rows == 32
-        else "Protected layer-0 dense convolution discriminator; no performance claim."
+        "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
+        if layer1_only
+        else (
+            "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+            if compile_rows == 32
+            else "Protected layer-0 dense convolution discriminator; no performance claim."
+        )
     )
     if dense
     else "Protected layer-0 projection/reduction discriminator; no performance claim."
 )
 engine = (
     (
-        "greenfield_dense_m32_convolution_probe"
-        if compile_rows == 32
-        else "greenfield_dense_convolution_probe"
+        "greenfield_dense_m32_cross_layer_probe"
+        if layer1_only
+        else (
+            "greenfield_dense_m32_convolution_probe"
+            if compile_rows == 32
+            else "greenfield_dense_convolution_probe"
+        )
     )
     if dense
     else "greenfield_projection_reduction_probe"
@@ -300,6 +348,9 @@ expected_environment = {
             "checkpoint_manifest_sha256": checkpoint_manifest_sha,
             "db538_tensor_sha256": db538_tensor_sha,
             "compile_rows": compile_rows,
+            "result_mode": (
+                "layer1_only" if layer1_only else "dense_and_layer1"
+            ),
             **(
                 {
                     "accepted_m32_hlo_raw_sha256": accepted_m32_raw_hlo_sha,
@@ -335,10 +386,12 @@ if (
             or runner.get("compile_rows") != compile_rows
             or runner.get("live_rows") != 1
             or runner.get("diagnostic_dead_rows") != compile_rows - 1
+            or runner.get("result_mode")
+            != ("layer1_only" if layer1_only else "dense_and_layer1")
             or runner.get("classification")
             not in {
-                f"{'accepted_m32_dense_convolution' if compile_rows == 32 else 'accepted_dense_convolution'}_exact",
-                f"{'accepted_m32_dense_convolution' if compile_rows == 32 else 'accepted_dense_convolution'}_nonexact",
+                f"{dense_arm}_exact",
+                f"{dense_arm}_nonexact",
             }
             or (
                 compile_rows == 32
@@ -405,9 +458,13 @@ summaries = connection.execute(
 ).fetchall()
 expected_prompt = (
     (
-        "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
-        if compile_rows == 32
-        else "Sealed exact StrategyND attention boundary at first 8K decode row."
+        "Sealed exact StrategyND attention boundary with layer-1-only accepted-M32 dense fusion."
+        if layer1_only
+        else (
+            "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
+            if compile_rows == 32
+            else "Sealed exact StrategyND attention boundary at first 8K decode row."
+        )
     )
     if dense
     else "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
@@ -418,11 +475,7 @@ expected_raw = json.dumps(
         "exact_arms": runner["exact_arms"],
         "mismatch_counts": (
             {
-                (
-                    "accepted_m32_dense_convolution"
-                    if compile_rows == 32
-                    else "accepted_dense_convolution"
-                ): runner["layer1_comparison"]["mismatch_count"]
+                dense_arm: runner["layer1_comparison"]["mismatch_count"]
             }
             if dense
             else {
@@ -624,6 +677,7 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
         scripts/greenfield/probe_layer0_dense_convolution.py \
         --expected-code-hash "$PIN" \
         --compile-rows "$DENSE_COMPILE_ROWS" \
+        "${layer1_probe_args[@]}" \
         --db538-runner "$DB538_RUNNER" \
         --db538-runner-sha256 "$DB538_RUNNER_SHA" \
         --db538-tensor "$DB538_TENSOR" \
@@ -688,7 +742,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$DENSE_CONVOLUTION" "$DB538_RUNNER_SHA" "$DB538_TENSOR_SHA" \
   "$DB538_SUMMARY_SHA" "$DB538_SUCCESS_SHA" \
   "$POST_ATTENTION_RESIDUAL_SHA" "$CHECKPOINT_MANIFEST_SHA" \
-  "$DENSE_COMPILE_ROWS" "$ACCEPTED_M32_HLO_SHA" \
+  "$DENSE_COMPILE_ROWS" "$DENSE_LAYER1_ONLY" "$ACCEPTED_M32_HLO_SHA" \
   "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
   "$ACCEPTED_M32_RAW_HLO_SHA" <<'PY'
 from __future__ import annotations
@@ -714,6 +768,7 @@ import sys
     post_attention_sha,
     checkpoint_manifest_sha,
     dense_compile_rows_text,
+    dense_layer1_only_text,
     accepted_m32_hlo_sha,
     accepted_m32_summary_sha,
     accepted_m32_success_sha,
@@ -721,14 +776,19 @@ import sys
 ) = sys.argv[1:]
 dense = dense_text == "1"
 compile_rows = int(dense_compile_rows_text)
+layer1_only = dense_layer1_only_text == "1"
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if dense:
     exact = runner.get("exact")
     arm = (
-        "accepted_m32_dense_convolution"
-        if compile_rows == 32
-        else "accepted_dense_convolution"
+        "accepted_m32_dense_cross_layer"
+        if layer1_only
+        else (
+            "accepted_m32_dense_convolution"
+            if compile_rows == 32
+            else "accepted_dense_convolution"
+        )
     )
     classification = f"{arm}_{'exact' if exact is True else 'nonexact'}"
     comparison = runner.get("layer1_comparison", {})
@@ -800,6 +860,8 @@ if dense:
         and stable.get("violations") == []
         and stable.get("compile_rows") == compile_rows
         and stable.get("live_rows") == 1
+        and stable.get("result_mode")
+        == ("layer1_only" if layer1_only else "dense_and_layer1")
         and stable.get("collective_counts") == {
             "all_gather": 1,
             "all_reduce": 0,
@@ -852,6 +914,8 @@ if dense:
         and optimized.get("violations") == []
         and optimized.get("compile_rows") == compile_rows
         and optimized.get("live_rows") == 1
+        and optimized.get("result_mode")
+        == ("layer1_only" if layer1_only else "dense_and_layer1")
         and optimized.get("async_collectives") == []
         and optimized.get("collective_count") == 1
         and optimized.get("convolution_count") == 16
@@ -894,6 +958,12 @@ if dense:
         and optimized_lineage.get("rmsnorm_contract", {}).get(
             "direct_exact_operand_graph"
         ) is True
+        and optimized_lineage.get("rmsnorm_contract", {}).get(
+            "exact_result_binding"
+        ) is True
+        and optimized_lineage.get("rmsnorm_contract", {}).get(
+            "exact_weighted_operand_graph"
+        ) is True
         and {
             "add",
             "div",
@@ -906,11 +976,18 @@ if dense:
                 "semantic_counts", {}
             )
         )
-        and {
-            "bf16[1,6144]",
-            "bf16[6144]",
-        }.issubset(
-            set(optimized_lineage.get("layer1_only_parameter_shapes", []))
+        and (
+            (
+                len(optimized_lineage.get("result_parameter_sources", [])) == 1
+                and len(optimized_lineage["result_parameter_sources"][0]) == 9
+            )
+            if layer1_only
+            else {
+                "bf16[1,6144]",
+                "bf16[6144]",
+            }.issubset(
+                set(optimized_lineage.get("layer1_only_parameter_shapes", []))
+            )
         )
         and len(optimized_lineage.get("collective_convolution_sources", []))
         == 8
@@ -971,6 +1048,8 @@ if dense:
         and runner.get("compile_rows") == compile_rows
         and runner.get("live_rows") == 1
         and runner.get("diagnostic_dead_rows") == compile_rows - 1
+        and runner.get("result_mode")
+        == ("layer1_only" if layer1_only else "dense_and_layer1")
         and runner.get("classification") == classification
         and runner["exact_arms"]
         == ([arm] if exact else [])
@@ -1005,45 +1084,65 @@ if not runner_valid:
 
 model = (
     (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
-        if compile_rows == 32
-        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
+        if layer1_only
+        else (
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+            if compile_rows == 32
+            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        )
     )
     if dense
     else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
 )
 revision = (
     (
-        "native-jax-db532-dense-m32-discriminator-v1"
-        if compile_rows == 32
-        else "native-jax-db538-dense-convolution-v1"
+        "native-jax-db542-dense-cross-layer-v1"
+        if layer1_only
+        else (
+            "native-jax-db532-dense-m32-discriminator-v1"
+            if compile_rows == 32
+            else "native-jax-db538-dense-convolution-v1"
+        )
     )
     if dense
     else "native-jax-db537-strategy-nd-v1"
 )
 benchmark = (
     (
-        "greenfield_layer0_dense_m32_convolution"
-        if compile_rows == 32
-        else "greenfield_layer0_dense_convolution"
+        "greenfield_layer0_dense_m32_cross_layer"
+        if layer1_only
+        else (
+            "greenfield_layer0_dense_m32_convolution"
+            if compile_rows == 32
+            else "greenfield_layer0_dense_convolution"
+        )
     )
     if dense
     else "greenfield_layer0_projection_reduction"
 )
 engine = (
     (
-        "greenfield_dense_m32_convolution_probe"
-        if compile_rows == 32
-        else "greenfield_dense_convolution_probe"
+        "greenfield_dense_m32_cross_layer_probe"
+        if layer1_only
+        else (
+            "greenfield_dense_m32_convolution_probe"
+            if compile_rows == 32
+            else "greenfield_dense_convolution_probe"
+        )
     )
     if dense
     else "greenfield_projection_reduction_probe"
 )
 note = (
     (
-        "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
-        if compile_rows == 32
-        else "Protected layer-0 dense convolution discriminator; no performance claim."
+        "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
+        if layer1_only
+        else (
+            "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+            if compile_rows == 32
+            else "Protected layer-0 dense convolution discriminator; no performance claim."
+        )
     )
     if dense
     else "Protected layer-0 projection/reduction discriminator; no performance claim."
@@ -1069,6 +1168,7 @@ run_id = pv.start_run(
                 ],
                 "db538_tensor_sha256": runner["source"]["db538_tensor_sha256"],
                 "compile_rows": compile_rows,
+                "result_mode": runner["result_mode"],
                 **(
                     {
                         "accepted_m32_hlo_raw_sha256": runner["source"][
@@ -1111,9 +1211,13 @@ pv.record_item(
     item_id="position8155",
     prompt=(
         (
-            "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
-            if compile_rows == 32
-            else "Sealed exact StrategyND attention boundary at first 8K decode row."
+            "Sealed exact StrategyND attention boundary with layer-1-only accepted-M32 dense fusion."
+            if layer1_only
+            else (
+                "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
+                if compile_rows == 32
+                else "Sealed exact StrategyND attention boundary at first 8K decode row."
+            )
         )
         if dense
         else "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
@@ -1156,6 +1260,9 @@ summary = {
     "elapsed_seconds": int(elapsed),
     "exact_arms": runner["exact_arms"],
     "live_rows": 1,
+    "result_mode": (
+        runner.get("result_mode") if dense else "dense_and_layer1"
+    ),
     "performance_claim": False,
     "results_db_run_id": run_id,
     "source": runner.get("source", {}),
@@ -1258,6 +1365,7 @@ values = {
     "compile_rows": summary["compile_rows"],
     "live_rows": summary["live_rows"],
     "diagnostic_dead_rows": summary["diagnostic_dead_rows"],
+    "result_mode": summary["result_mode"],
     "results_db_run_id": summary["results_db_run_id"],
     "classification": summary["classification"],
     "exact_arms": ",".join(summary["exact_arms"]) or "none",

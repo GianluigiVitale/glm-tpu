@@ -298,6 +298,15 @@ def _synthetic_m32_hlo() -> str:
     return head + "  %stack =" + tail
 
 
+def _synthetic_m32_layer1_only_hlo() -> str:
+    return _synthetic_m32_hlo().replace(
+        "  ROOT %root = (bf16[1,6144], bf16[1,6144]) "
+        "tuple(%update, %layer1)",
+        "  ROOT %layer1_result = bf16[1,6144] copy(%layer1)",
+        1,
+    )
+
+
 def _synthetic_m32_hlo_with_fused_live_row(*, rogue_return: bool) -> str:
     hlo = _synthetic_m32_hlo()
     start = hlo.index("  %stack =")
@@ -433,8 +442,10 @@ def _synthetic_hlo_with_fused_y0(*, rogue_return: str | None) -> str:
     )
 
 
-@lru_cache(maxsize=2)
-def _exact_stablehlo(compile_rows: int = 1) -> str:
+@lru_cache(maxsize=4)
+def _exact_stablehlo(
+    compile_rows: int = 1, *, layer1_only: bool = False
+) -> str:
     assert compile_rows in (1, 32)
     program = r'''
 import jax
@@ -514,6 +525,14 @@ print(jax.jit(mapped).lower(*arguments).as_text())
             "    partials = jax.lax.optimization_barrier(partials)\n"
             "    partials = partials[:, :1, :]\n"
             "    with jax.named_scope",
+        )
+    if layer1_only:
+        program = program.replace(
+            "    return update, layer1",
+            "    return layer1",
+        ).replace(
+            "    out_specs=(P(), P()),",
+            "    out_specs=P(),",
         )
     environment = dict(os.environ)
     environment["JAX_PLATFORMS"] = "cpu"
@@ -634,6 +653,67 @@ def test_dense_convolution_m32_hlo_contract_accepts_only_live_row() -> None:
         compile_rows=32,
     )
     assert not rogue_down["passed"]
+
+
+def test_dense_cross_layer_hlo_contract_requires_layer1_only_result() -> None:
+    stablehlo = _exact_stablehlo(32, layer1_only=True)
+    stable = MODULE._validate_stablehlo(
+        stablehlo, compile_rows=32, layer1_only=True
+    )
+    optimized_hlo = _synthetic_m32_layer1_only_hlo()
+    optimized = MODULE._validate_optimized_hlo(
+        optimized_hlo, compile_rows=32, layer1_only=True
+    )
+    assert stable["passed"], stable["violations"]
+    assert optimized["passed"], optimized["violations"]
+    assert stable["result_mode"] == optimized["result_mode"] == "layer1_only"
+    assert not MODULE._validate_stablehlo(
+        _exact_stablehlo(32), compile_rows=32, layer1_only=True
+    )["passed"]
+    assert not MODULE._validate_optimized_hlo(
+        _synthetic_m32_hlo(), compile_rows=32, layer1_only=True
+    )["passed"]
+    doubled_result = optimized_hlo.replace(
+        "ROOT %layer1_result = bf16[1,6144] copy(%layer1)",
+        "ROOT %layer1_result = bf16[1,6144] add(%layer1, %layer1)",
+        1,
+    )
+    assert doubled_result != optimized_hlo
+    doubled_contract = MODULE._validate_optimized_hlo(
+        doubled_result, compile_rows=32, layer1_only=True
+    )
+    assert not doubled_contract["passed"]
+    assert not doubled_contract["lineage"]["rmsnorm_contract"][
+        "exact_result_binding"
+    ]
+    scoped_mul = (
+        'metadata={op_name="jit(probe)/'
+        'greenfield_dense_convolution_layer1_rmsnorm/mul"}'
+    )
+    valid_layer1 = (
+        "  %layer1 = bf16[1,6144] multiply(%rounded, %norm_wide), "
+        + scoped_mul
+    )
+    reapplied_layer1 = (
+        "  %layer1 = bf16[1,6144] multiply(%rounded, %norm_wide)\n"
+        "  %rogue_layer1 = bf16[1,6144] multiply(%layer1, %norm_wide), "
+        + scoped_mul
+    )
+    reapplied_weight = optimized_hlo.replace(
+        valid_layer1, reapplied_layer1, 1
+    ).replace(
+        "ROOT %layer1_result = bf16[1,6144] copy(%layer1)",
+        "ROOT %layer1_result = bf16[1,6144] copy(%rogue_layer1)",
+        1,
+    )
+    assert reapplied_weight != optimized_hlo
+    reapplied_contract = MODULE._validate_optimized_hlo(
+        reapplied_weight, compile_rows=32, layer1_only=True
+    )
+    assert not reapplied_contract["passed"]
+    assert not reapplied_contract["lineage"]["rmsnorm_contract"][
+        "exact_weighted_operand_graph"
+    ]
 
 
 @pytest.mark.skipif(
@@ -1011,6 +1091,7 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "DB538_CODE_HASH=e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc",
         "ACCEPTED_M32_HLO_SHA=25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
         "GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS",
+        "GLM_GREENFIELD_DENSE_LAYER1_ONLY",
         'strict_census pre',
         'strict_census post',
         'rollback_provisional_db',
@@ -1029,6 +1110,8 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
     (
         "none",
         "m32",
+        "cross_layer",
+        "cross_layer_mode",
         "classification",
         "comparison",
         "source",
@@ -1064,6 +1147,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "diagnostic_dead_rows": 0,
         "exact": True,
         "exact_arms": ["accepted_dense_convolution"],
+        "result_mode": "dense_and_layer1",
         "hlo": {
             "optimized_contract": {
                 "async_collectives": [],
@@ -1138,6 +1222,8 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                     "rmsnorm_contract": {
                         "add_count": 2,
                         "direct_exact_operand_graph": True,
+                        "exact_result_binding": True,
+                        "exact_weighted_operand_graph": True,
                         "divide_count": 1,
                         "multiply_or_square_count": 3,
                         "reduce_count": 1,
@@ -1155,6 +1241,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "num_partitions": 4,
                 "num_replicas": 1,
                 "passed": True,
+                "result_mode": "dense_and_layer1",
                 "unexpected_convolutions": [],
                 "violations": [],
             },
@@ -1175,6 +1262,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "live_rows": 1,
                 "matched_virtual_shards": list(range(8)),
                 "passed": True,
+                "result_mode": "dense_and_layer1",
                 "violations": [],
             },
             "stablehlo_sha256": "e" * 64,
@@ -1248,21 +1336,36 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         ],
     }
     compile_rows = 1
-    if mutation == "m32":
+    layer1_only = False
+    if mutation in ("m32", "cross_layer", "cross_layer_mode"):
         compile_rows = 32
+        layer1_only = mutation.startswith("cross_layer")
+        arm = (
+            "accepted_m32_dense_cross_layer"
+            if layer1_only
+            else "accepted_m32_dense_convolution"
+        )
+        result_mode = "layer1_only" if layer1_only else "dense_and_layer1"
         runner.update(
             {
-                "classification": "accepted_m32_dense_convolution_exact",
+                "classification": f"{arm}_exact",
                 "compile_rows": 32,
                 "diagnostic_dead_rows": 31,
-                "exact_arms": ["accepted_m32_dense_convolution"],
+                "exact_arms": [arm],
+                "result_mode": result_mode,
             }
         )
         runner["hlo"]["optimized_contract"]["compile_rows"] = 32
+        runner["hlo"]["optimized_contract"]["result_mode"] = result_mode
         runner["hlo"]["optimized_contract"]["lineage"][
             "m32_live_row_slices"
         ] = ["%m32_live"]
+        if layer1_only:
+            runner["hlo"]["optimized_contract"]["lineage"][
+                "result_parameter_sources"
+            ] = [[f"%parameter.{index}" for index in range(9)]]
         runner["hlo"]["stablehlo_contract"]["compile_rows"] = 32
+        runner["hlo"]["stablehlo_contract"]["result_mode"] = result_mode
         runner["source"].update(
             {
                 "accepted_m32_hlo_raw_sha256": (
@@ -1279,6 +1382,8 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 ),
             }
         )
+        if mutation == "cross_layer_mode":
+            runner["result_mode"] = "dense_and_layer1"
     elif mutation == "classification":
         runner["classification"] = "accepted_dense_convolution_nonexact"
     elif mutation == "comparison":
@@ -1341,6 +1446,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e",
             "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134",
             str(compile_rows),
+            str(int(layer1_only)),
             "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
             "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
             "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
@@ -1351,16 +1457,20 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         capture_output=True,
         check=False,
     )
-    if mutation not in ("none", "m32", "nonexact"):
+    if mutation not in ("none", "m32", "cross_layer", "nonexact"):
         assert completed.returncode != 0
         return
     assert completed.returncode == 0, completed.stdout + completed.stderr
     summary = json.loads((run_dir / "summary.json").read_text())
-    expected_exact = mutation in ("none", "m32")
+    expected_exact = mutation in ("none", "m32", "cross_layer")
     expected_arm = (
-        "accepted_m32_dense_convolution"
-        if mutation == "m32"
-        else "accepted_dense_convolution"
+        "accepted_m32_dense_cross_layer"
+        if mutation == "cross_layer"
+        else (
+            "accepted_m32_dense_convolution"
+            if mutation == "m32"
+            else "accepted_dense_convolution"
+        )
     )
     assert summary["exact_arms"] == (
         [expected_arm] if expected_exact else []
@@ -1379,38 +1489,61 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     assert run is not None
     assert run[0:2] == (
         (
-            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
-            if mutation == "m32"
-            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
+            if mutation == "cross_layer"
+            else (
+                "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+                if mutation == "m32"
+                else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+            )
         ),
         (
-            "native-jax-db532-dense-m32-discriminator-v1"
-            if mutation == "m32"
-            else "native-jax-db538-dense-convolution-v1"
+            "native-jax-db542-dense-cross-layer-v1"
+            if mutation == "cross_layer"
+            else (
+                "native-jax-db532-dense-m32-discriminator-v1"
+                if mutation == "m32"
+                else "native-jax-db538-dense-convolution-v1"
+            )
         ),
     )
     environment = json.loads(run[2])
     assert environment["greenfield_run_tag"] == tag
     assert environment["compile_rows"] == compile_rows
+    assert environment["result_mode"] == (
+        "layer1_only" if mutation == "cross_layer" else "dense_and_layer1"
+    )
     assert run[3] == (
-        "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
-        if mutation == "m32"
-        else "Protected layer-0 dense convolution discriminator; no performance claim."
+        "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
+        if mutation == "cross_layer"
+        else (
+            "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+            if mutation == "m32"
+            else "Protected layer-0 dense convolution discriminator; no performance claim."
+        )
     )
     assert item == (
         (
-            "greenfield_layer0_dense_m32_convolution"
-            if mutation == "m32"
-            else "greenfield_layer0_dense_convolution"
+            "greenfield_layer0_dense_m32_cross_layer"
+            if mutation == "cross_layer"
+            else (
+                "greenfield_layer0_dense_m32_convolution"
+                if mutation == "m32"
+                else "greenfield_layer0_dense_convolution"
+            )
         ),
         int(expected_exact),
         float(expected_exact),
     )
     assert metric == (
         (
-            "greenfield_layer0_dense_m32_convolution"
-            if mutation == "m32"
-            else "greenfield_layer0_dense_convolution"
+            "greenfield_layer0_dense_m32_cross_layer"
+            if mutation == "cross_layer"
+            else (
+                "greenfield_layer0_dense_m32_convolution"
+                if mutation == "m32"
+                else "greenfield_layer0_dense_convolution"
+            )
         ),
         "probe_contract_valid",
         1.0,

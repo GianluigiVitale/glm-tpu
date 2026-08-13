@@ -584,7 +584,7 @@ def _validate_m32_input_pad(
 
 
 def _match_rmsnorm(
-    graph: _StableGraph, dense_output: str
+    graph: _StableGraph, dense_output: str, *, layer1_only: bool = False
 ) -> tuple[str, str, str]:
     dense_f32 = _expect_unary(
         graph, dense_output, opcode="convert", result_type="tensor<1x6144xf32>"
@@ -693,20 +693,25 @@ def _match_rmsnorm(
         opcode="multiply",
         result_type="tensor<1x6144xbf16>",
     )
+    expected_return = (output.name,) if layer1_only else (dense_output, output.name)
     _only(
         (
             node
             for node in graph.nodes.values()
             if node.opcode == "return"
-            and node.operands == (dense_output, output.name)
+            and node.operands == expected_return
         ),
-        "probe dense/layer-1 return",
+        "probe layer-1-only return"
+        if layer1_only
+        else "probe dense/layer-1 return",
     )
+    if layer1_only and graph.users.get(dense_output, ()) != [dense_f32]:
+        raise _MatchError("layer-1-only probe externalizes the dense update")
     return residual.operands[0], norm_weight.operands[0], output.name
 
 
 def validate_dense_convolution_stablehlo(
-    stablehlo: str, *, compile_rows: int = 1
+    stablehlo: str, *, compile_rows: int = 1, layer1_only: bool = False
 ) -> dict[str, object]:
     """Validate all eight exact dense chains and the exact StrategyND tree."""
 
@@ -809,7 +814,9 @@ def validate_dense_convolution_stablehlo(
         ):
             raise _MatchError(f"{gather.name}: dense gather group drifted")
         dense_output = _match_reduction_tree(graph, gather)
-        residual, norm_weight, _layer1 = _match_rmsnorm(graph, dense_output)
+        residual, norm_weight, _layer1 = _match_rmsnorm(
+            graph, dense_output, layer1_only=layer1_only
+        )
         layer_roots = next(iter(rows.values()))[0]
         root_contracts = (
             ("tensor<1x3072x6144xui8>", "tensor<3072x6144xui8>"),
@@ -900,6 +907,7 @@ def validate_dense_convolution_stablehlo(
         "gate_up_convolution_count": 8 if matched_shards == list(range(8)) else 0,
         "matched_virtual_shards": matched_shards,
         "live_rows": 1,
+        "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
         "passed": not violations,
         "violations": violations,
     }

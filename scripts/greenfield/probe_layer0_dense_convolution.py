@@ -280,19 +280,19 @@ def _load_accepted_m32_source(args: argparse.Namespace) -> dict[str, str]:
 
 
 def _validate_stablehlo(
-    stablehlo: str, *, compile_rows: int = 1
+    stablehlo: str, *, compile_rows: int = 1, layer1_only: bool = False
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.stablehlo_dense_convolution import (
         validate_dense_convolution_stablehlo,
     )
 
     return validate_dense_convolution_stablehlo(
-        stablehlo, compile_rows=compile_rows
+        stablehlo, compile_rows=compile_rows, layer1_only=layer1_only
     )
 
 
 def _validate_optimized_hlo(
-    optimized_hlo: str, *, compile_rows: int = 1
+    optimized_hlo: str, *, compile_rows: int = 1, layer1_only: bool = False
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -1129,55 +1129,77 @@ def _validate_optimized_hlo(
         and item.raw_line.lstrip().startswith("ROOT ")
     ]
     by_key = {_instruction_key(item): item for item in module.instructions}
+    expected_result_shapes = (
+        ("bf16[1,6144]",)
+        if layer1_only
+        else ("bf16[1,6144]", "bf16[1,6144]")
+    )
     if (
         len(roots) != 1
-        or _shape_signatures(roots[0].result_shapes)
-        != ("bf16[1,6144]", "bf16[1,6144]")
+        or _shape_signatures(roots[0].result_shapes) != expected_result_shapes
         or collective is None
     ):
         violations.append("probe entry result geometry drifted")
     else:
-        root_operands = [
-            by_key.get((roots[0].computation, name))
-            for name in roots[0].operand_names
-        ]
+        if layer1_only:
+            dense_result = None
+            layer1_result = roots[0]
+        else:
+            returned = [
+                by_key.get((roots[0].computation, name))
+                for name in roots[0].operand_names
+            ]
+            dense_result = returned[0] if len(returned) == 2 else None
+            layer1_result = returned[1] if len(returned) == 2 else None
         if (
-            len(root_operands) != 2
-            or any(item is None for item in root_operands)
-            or any(
-                not _value_depends_on(module, item, collective)
-                for item in root_operands
-                if item is not None
+            layer1_result is None
+            or (not layer1_only and dense_result is None)
+            or not _value_depends_on(module, layer1_result, collective)
+            or (
+                dense_result is not None
+                and not _value_depends_on(module, dense_result, collective)
             )
         ):
             violations.append("probe results bypass the dense StrategyND collective")
         else:
+            dense_consumer = dense_result or layer1_result
             entry_parameters = [
                 item
                 for item in module.instructions
                 if item.computation.startswith("ENTRY ")
                 and item.raw_opcode == "parameter"
             ]
+            results = (
+                [layer1_result]
+                if layer1_only
+                else [dense_result, layer1_result]
+            )
             parameter_sources = [
                 {
                     parameter.name
                     for parameter in entry_parameters
-                    if _value_depends_on(module, operand, parameter)
+                    if _value_depends_on(module, result, parameter)
                 }
-                for operand in root_operands
-                if operand is not None
+                for result in results
+                if result is not None
             ]
             lineage["result_parameter_sources"] = [
                 sorted(values) for values in parameter_sources
             ]
-            if len(parameter_sources) != 2:
+            if layer1_only:
+                expected_parameters = {item.name for item in entry_parameters}
+                if parameter_sources != [expected_parameters]:
+                    violations.append(
+                        "layer-1-only result does not consume every exact input"
+                    )
+            elif len(parameter_sources) != 2:
                 violations.append("probe result parameter lineage is incomplete")
             else:
-                layer1_only = parameter_sources[1] - parameter_sources[0]
+                layer1_only_sources = parameter_sources[1] - parameter_sources[0]
                 layer1_only_shapes = {
                     shape
                     for parameter in entry_parameters
-                    if parameter.name in layer1_only
+                    if parameter.name in layer1_only_sources
                     for shape in _shape_signatures(parameter.result_shapes)
                 }
                 lineage["layer1_only_parameter_shapes"] = sorted(
@@ -1244,7 +1266,7 @@ def _validate_optimized_hlo(
                     external = callers[0]
                 return _value_depends_on(
                     module, external, collective
-                ) and _value_depends_on(module, root_operands[0], external)
+                ) and _value_depends_on(module, dense_consumer, external)
 
             if expected_association_shapes == {"y": 9, "x": 1, "z": 72} and any(
                 not association_add_is_live(item) for item in association_adds
@@ -1851,14 +1873,14 @@ def _validate_optimized_hlo(
                     z_exact = False
                 z_concat, z_order = (
                     ordered_concatenate(
-                        z_components, (6144,), 1, root_operands[0]
+                        z_components, (6144,), 1, dense_consumer
                     )
                     if z_exact
                     else (None, [])
                 )
                 if z_concat is None and z_exact:
                     z_concat, z_order = ordered_dynamic_update_chain(
-                        z_components, root_operands[0]
+                        z_components, dense_consumer
                     )
                 if z_concat is None:
                     z_exact = False
@@ -1911,9 +1933,127 @@ def _validate_optimized_hlo(
                 "semantic_counts": dict(sorted(rms_semantics.items())),
             }
             lineage["rmsnorm_contract"] = rms_contract
+            entry_norm_parameters = [
+                item
+                for item in module.instructions
+                if item.computation.startswith("ENTRY ")
+                and item.raw_opcode == "parameter"
+                and _shape_signatures(item.result_shapes) == ("bf16[6144]",)
+            ]
+
+            semantic_layout_only = layout_only | {
+                "broadcast",
+                "broadcast-in-dim",
+                "copy-done",
+                "copy-start",
+            }
+
+            def exact_semantic_source(value: Any | None, source: Any) -> bool:
+                seen: set[tuple[str, str]] = set()
+                while value is not None and _instruction_key(value) not in seen:
+                    if value is source:
+                        return True
+                    seen.add(_instruction_key(value))
+                    if (
+                        value.raw_opcode in semantic_layout_only
+                        and len(value.operand_names) == 1
+                    ):
+                        value = operand(value, 0)
+                        continue
+                    if value.raw_opcode == "parameter" and not value.computation.startswith(
+                        "ENTRY "
+                    ):
+                        value = external_parameter_value(value)
+                        continue
+                    return False
+                return value is source
+
+            def exact_rounded_normalized_source(value: Any | None) -> bool:
+                seen: set[tuple[str, str]] = set()
+                normalized = None
+                while value is not None and _instruction_key(value) not in seen:
+                    seen.add(_instruction_key(value))
+                    if (
+                        value.raw_opcode == "convert"
+                        and len(value.operand_names) == 1
+                        and _shape_signatures(value.result_shapes)
+                        == ("bf16[1,6144]",)
+                    ):
+                        normalized = operand(value, 0)
+                        break
+                    if has_bf16_correction(value):
+                        normalized = value
+                        break
+                    if (
+                        value.raw_opcode in layout_only
+                        and len(value.operand_names) == 1
+                    ):
+                        value = operand(value, 0)
+                        continue
+                    return False
+                if (
+                    normalized is None
+                    or normalized.raw_opcode != "multiply"
+                    or (normalized.op_name or "").split("/")[-1] != "mul"
+                    or len(normalized.operand_names) != 2
+                ):
+                    return False
+                normalized_operands = [
+                    operand(normalized, index) for index in range(2)
+                ]
+                return any(
+                    exact_semantic_source(normalized_operands[0], residual_add)
+                    and exact_semantic_source(normalized_operands[1], rms_value)
+                    or exact_semantic_source(normalized_operands[1], residual_add)
+                    and exact_semantic_source(normalized_operands[0], rms_value)
+                    for residual_add in rms_adds
+                    if _shape_signatures(residual_add.result_shapes)
+                    in {("f32[1,6144]",), ("bf16[1,6144]",)}
+                    for rms_value in rms_rsqrt
+                )
+
+            weighted_external_values: dict[tuple[str, str], Any] = {}
+            for item in rms_items:
+                if (
+                    (item.op_name or "").split("/")[-1] != "mul"
+                    or not exact_bf16_round(item)
+                    or item.raw_opcode != "multiply"
+                    or len(item.operand_names) != 2
+                    or len(entry_norm_parameters) != 1
+                ):
+                    continue
+                item_operands = [operand(item, index) for index in range(2)]
+                if not any(
+                    exact_semantic_source(item_operands[norm_index], entry_norm_parameters[0])
+                    and exact_rounded_normalized_source(
+                        item_operands[1 - norm_index]
+                    )
+                    for norm_index in range(2)
+                ):
+                    continue
+                external = fully_externalized_value(item)
+                if (
+                    external is not None
+                    and _shape_signatures(external.result_shapes)
+                    == ("bf16[1,6144]",)
+                ):
+                    weighted_external_values[_instruction_key(external)] = external
+            exact_result_binding = (
+                len(weighted_external_values) == 1
+                and exact_layout_source(
+                    layer1_result, next(iter(weighted_external_values.values()))
+                )
+            )
+            rms_contract["exact_weighted_operand_graph"] = (
+                len(weighted_external_values) == 1
+            )
+            rms_contract["exact_result_binding"] = exact_result_binding
+            rms_contract["weighted_external_values"] = sorted(
+                item.name for item in weighted_external_values.values()
+            )
             direct_rms_exact = True
             if rms_items and all(
-                item.computation == root_operands[1].computation
+                item.computation == layer1_result.computation
                 for item in rms_items
             ):
                 residual_adds = [
@@ -1958,10 +2098,10 @@ def _validate_optimized_hlo(
                     and local_depends(rms_rsqrt[0], scalar_adds[0])
                     and len(normalized_candidates) == 1
                     and local_depends(
-                        root_operands[1], normalized_candidates[0]
+                        layer1_result, normalized_candidates[0]
                     )
                     and all(
-                        local_depends(root_operands[1], item)
+                        local_depends(layer1_result, item)
                         for item in rms_items
                     )
                 )
@@ -1976,8 +2116,9 @@ def _validate_optimized_hlo(
                     "square",
                 }.issubset(rms_semantics)
                 or not direct_rms_exact
+                or not exact_result_binding
                 or not all(
-                    _value_depends_on(module, root_operands[1], parameter)
+                    _value_depends_on(module, layer1_result, parameter)
                     for parameter in entry_parameters
                     if any(
                         shape in {"bf16[1,6144]", "bf16[6144]"}
@@ -2010,6 +2151,7 @@ def _validate_optimized_hlo(
         "gate_up_convolution_count": len(gate_up),
         "lineage": lineage,
         "live_rows": 1,
+        "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
         "passed": not violations,
@@ -2022,6 +2164,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--compile-rows", type=int, choices=(1, 32), default=1)
+    parser.add_argument("--layer1-only", action="store_true")
     parser.add_argument("--db538-runner", type=Path, required=True)
     parser.add_argument("--db538-runner-sha256", required=True)
     parser.add_argument("--db538-tensor", type=Path, required=True)
@@ -2053,6 +2196,8 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
+    if args.layer1_only and args.compile_rows != 32:
+        raise RuntimeError("layer-1-only discriminator requires accepted M32 geometry")
     normalized, post_attention, accepted_layer1_bits = _load_db538(args)
     m32_arguments = (
         args.accepted_m32_hlo,
@@ -2126,7 +2271,7 @@ def main() -> int:
         down_bits_slot: Any,
         down_scale_slot: Any,
         layer1_norm: Any,
-    ) -> tuple[Any, Any]:
+    ) -> Any:
         dense_input = normalized_input
         if args.compile_rows == 32:
             with jax.named_scope(
@@ -2174,20 +2319,23 @@ def main() -> int:
                 layer1_norm,
                 epsilon=1e-5,
             )[0]
-        return dense_update, layer1
+        return layer1 if args.layer1_only else (dense_update, layer1)
 
+    out_specs = P() if args.layer1_only else (P(), P())
     mapped = jax.shard_map(
         local,
         mesh=mesh,
         in_specs=in_specs,
-        out_specs=(P(), P()),
+        out_specs=out_specs,
         check_vma=False,
     )
     args.hlo_dir.mkdir(parents=True, exist_ok=True)
     lowered = jax.jit(mapped).lower(*arguments)
     stablehlo = lowered.as_text()
     stablehlo_contract = _validate_stablehlo(
-        stablehlo, compile_rows=args.compile_rows
+        stablehlo,
+        compile_rows=args.compile_rows,
+        layer1_only=args.layer1_only,
     )
     stablehlo_path = args.hlo_dir / "dense_convolution.stablehlo.mlir"
     stablehlo_path.write_text(stablehlo)
@@ -2198,7 +2346,9 @@ def main() -> int:
     compiled = lowered.compile()
     optimized_hlo = compiled.as_text()
     optimized_contract = _validate_optimized_hlo(
-        optimized_hlo, compile_rows=args.compile_rows
+        optimized_hlo,
+        compile_rows=args.compile_rows,
+        layer1_only=args.layer1_only,
     )
     optimized_path = args.hlo_dir / "dense_convolution.optimized_hlo.txt"
     optimized_path.write_text(optimized_hlo)
@@ -2206,20 +2356,30 @@ def main() -> int:
         raise RuntimeError(
             f"dense convolution optimized HLO failed: {optimized_contract}"
         )
-    dense_update, layer1 = compiled(*arguments)
-    jax.block_until_ready((dense_update, layer1))
-    dense_update_bits = np.ascontiguousarray(np.asarray(dense_update)).view(
-        np.uint16
-    )
+    compiled_result = compiled(*arguments)
+    if args.layer1_only:
+        layer1 = compiled_result
+        jax.block_until_ready(layer1)
+        dense_update_bits = None
+    else:
+        dense_update, layer1 = compiled_result
+        jax.block_until_ready((dense_update, layer1))
+        dense_update_bits = np.ascontiguousarray(np.asarray(dense_update)).view(
+            np.uint16
+        )
     layer1_bits = np.ascontiguousarray(np.asarray(layer1).reshape(6144)).view(
         np.uint16
     )
     comparison = _compare_bits(accepted_layer1_bits, layer1_bits)
     exact = comparison["elementwise_exact"]
     arm = (
-        "accepted_m32_dense_convolution"
-        if args.compile_rows == 32
-        else "accepted_dense_convolution"
+        "accepted_m32_dense_cross_layer"
+        if args.layer1_only
+        else (
+            "accepted_m32_dense_convolution"
+            if args.compile_rows == 32
+            else "accepted_dense_convolution"
+        )
     )
     classification = f"{arm}_{'exact' if exact else 'nonexact'}"
     result = {
@@ -2239,6 +2399,7 @@ def main() -> int:
         "layer1_comparison": comparison,
         "performance_claim": False,
         "live_rows": 1,
+        "result_mode": "layer1_only" if args.layer1_only else "dense_and_layer1",
         "position": _POSITION,
         "source": {
             "checkpoint_manifest_sha256": args.checkpoint_manifest_sha256,
@@ -2255,19 +2416,20 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     args.tensor_output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(
-        args.tensor_output,
-        accepted_layer1_normalized_bfloat16_bits=accepted_layer1_bits,
-        compile_rows=np.array(args.compile_rows, dtype=np.int32),
-        dense_update_bfloat16_bits=dense_update_bits,
-        layer1_normalized_bfloat16_bits=layer1_bits,
-        normalized_mlp_bfloat16_bits=np.ascontiguousarray(normalized).view(
+    tensors = {
+        "accepted_layer1_normalized_bfloat16_bits": accepted_layer1_bits,
+        "compile_rows": np.array(args.compile_rows, dtype=np.int32),
+        "layer1_normalized_bfloat16_bits": layer1_bits,
+        "normalized_mlp_bfloat16_bits": np.ascontiguousarray(normalized).view(
             np.uint16
         ),
-        post_attention_residual_bfloat16_bits=np.ascontiguousarray(
+        "post_attention_residual_bfloat16_bits": np.ascontiguousarray(
             post_attention
         ).view(np.uint16),
-    )
+    }
+    if dense_update_bits is not None:
+        tensors["dense_update_bfloat16_bits"] = dense_update_bits
+    np.savez(args.tensor_output, **tensors)
     print(json.dumps(result, sort_keys=True))
     return 0
 

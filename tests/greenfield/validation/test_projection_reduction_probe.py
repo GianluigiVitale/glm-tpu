@@ -661,15 +661,16 @@ def _rollback_program() -> str:
 
 @pytest.mark.parametrize("state", ("run", "item", "summary"))
 @pytest.mark.parametrize(
-    ("dense", "compile_rows"),
-    ((False, 1), (True, 1), (True, 32)),
-    ids=("projection", "dense", "dense_m32"),
+    ("dense", "compile_rows", "layer1_only"),
+    ((False, 1, False), (True, 1, False), (True, 32, False), (True, 32, True)),
+    ids=("projection", "dense", "dense_m32", "dense_m32_cross_layer"),
 )
 def test_projection_reduction_rollback_removes_each_committed_prefix(
     tmp_path: Path,
     state: str,
     dense: bool,
     compile_rows: int,
+    layer1_only: bool,
 ) -> None:
     provenance_path = REPO / "bench/provenance.py"
     specification = importlib.util.spec_from_file_location(
@@ -680,7 +681,7 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
     specification.loader.exec_module(provenance)
 
     database = tmp_path / f"{state}.db"
-    tag = f"rollback_{dense}_{compile_rows}_{state}"
+    tag = f"rollback_{dense}_{compile_rows}_{layer1_only}_{state}"
     pin = subprocess.check_output(
         ["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True
     ).strip()
@@ -697,54 +698,78 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
     ).strip()
     model = (
         (
-            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
-            if compile_rows == 32
-            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
+            if layer1_only
+            else (
+                "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+                if compile_rows == 32
+                else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+            )
         )
         if dense
         else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
     )
     revision = (
         (
-            "native-jax-db532-dense-m32-discriminator-v1"
-            if compile_rows == 32
-            else "native-jax-db538-dense-convolution-v1"
+            "native-jax-db542-dense-cross-layer-v1"
+            if layer1_only
+            else (
+                "native-jax-db532-dense-m32-discriminator-v1"
+                if compile_rows == 32
+                else "native-jax-db538-dense-convolution-v1"
+            )
         )
         if dense
         else "native-jax-db537-strategy-nd-v1"
     )
     benchmark = (
         (
-            "greenfield_layer0_dense_m32_convolution"
-            if compile_rows == 32
-            else "greenfield_layer0_dense_convolution"
+            "greenfield_layer0_dense_m32_cross_layer"
+            if layer1_only
+            else (
+                "greenfield_layer0_dense_m32_convolution"
+                if compile_rows == 32
+                else "greenfield_layer0_dense_convolution"
+            )
         )
         if dense
         else "greenfield_layer0_projection_reduction"
     )
     engine = (
         (
-            "greenfield_dense_m32_convolution_probe"
-            if compile_rows == 32
-            else "greenfield_dense_convolution_probe"
+            "greenfield_dense_m32_cross_layer_probe"
+            if layer1_only
+            else (
+                "greenfield_dense_m32_convolution_probe"
+                if compile_rows == 32
+                else "greenfield_dense_convolution_probe"
+            )
         )
         if dense
         else "greenfield_projection_reduction_probe"
     )
     note = (
         (
-            "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
-            if compile_rows == 32
-            else "Protected layer-0 dense convolution discriminator; no performance claim."
+            "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
+            if layer1_only
+            else (
+                "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+                if compile_rows == 32
+                else "Protected layer-0 dense convolution discriminator; no performance claim."
+            )
         )
         if dense
         else "Protected layer-0 projection/reduction discriminator; no performance claim."
     )
     if dense:
         arm = (
-            "accepted_m32_dense_convolution"
-            if compile_rows == 32
-            else "accepted_dense_convolution"
+            "accepted_m32_dense_cross_layer"
+            if layer1_only
+            else (
+                "accepted_m32_dense_convolution"
+                if compile_rows == 32
+                else "accepted_dense_convolution"
+            )
         )
         runner = {
             "artifact_kind": "glm52_layer0_dense_convolution_probe",
@@ -755,6 +780,7 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             "exact": False,
             "exact_arms": [],
             "live_rows": 1,
+            "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
             "layer1_comparison": {"mismatch_count": 7},
             "source": {
                 "db538_tensor_sha256": db538_tensor_sha,
@@ -783,6 +809,7 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             "checkpoint_manifest_sha256": checkpoint_manifest_sha,
             "compile_rows": compile_rows,
             "db538_tensor_sha256": db538_tensor_sha,
+            "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
             **(
                 {
                     "accepted_m32_hlo_raw_sha256": (
@@ -804,10 +831,14 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
         }
         mismatch_counts = {arm: 7}
         prompt = (
-            "Sealed exact StrategyND attention boundary with diagnostic "
-            "accepted-M32 dense geometry."
-            if compile_rows == 32
-            else "Sealed exact StrategyND attention boundary at first 8K decode row."
+            "Sealed exact StrategyND attention boundary with layer-1-only accepted-M32 dense fusion."
+            if layer1_only
+            else (
+                "Sealed exact StrategyND attention boundary with diagnostic "
+                "accepted-M32 dense geometry."
+                if compile_rows == 32
+                else "Sealed exact StrategyND attention boundary at first 8K decode row."
+            )
         )
     else:
         arm_names = (
@@ -840,7 +871,7 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             for name in arm_names
         }
         prompt = "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
-    run_dir = tmp_path / f"runner_{dense}_{state}"
+    run_dir = tmp_path / f"runner_{dense}_{compile_rows}_{layer1_only}_{state}"
     run_dir.mkdir()
     (run_dir / "runner.json").write_text(json.dumps(runner))
     connection = provenance.connect(str(database))
@@ -907,6 +938,7 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             harness_git,
             fork_git,
             str(compile_rows),
+            str(int(layer1_only)),
             "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
             "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
             "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
@@ -978,6 +1010,7 @@ def test_dense_rollback_refuses_unauthenticated_rows(
         "exact": False,
         "exact_arms": [],
         "live_rows": 1,
+        "result_mode": "dense_and_layer1",
         "layer1_comparison": {"mismatch_count": 7},
         "source": {"db538_tensor_sha256": tensor_sha},
         "status": "SUCCESS",
@@ -999,6 +1032,7 @@ def test_dense_rollback_refuses_unauthenticated_rows(
             "db538_tensor_sha256": tensor_sha,
             "greenfield_code_hash": pin,
             "greenfield_run_tag": tag,
+            "result_mode": "dense_and_layer1",
         },
         note=(
             "Protected layer-0 dense convolution discriminator; "
@@ -1069,6 +1103,7 @@ def test_dense_rollback_refuses_unauthenticated_rows(
             harness_git,
             fork_git,
             "1",
+            "0",
             "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
             "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
             "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
