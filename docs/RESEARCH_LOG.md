@@ -8163,3 +8163,33 @@ unmotivated arithmetic variants.
   and optimized HLO now pass with 16 packed RHS paths, eight fused gate bindings and one carried
   residual. Wrong ranges/sources, F32 correction metadata, S16 detours and extra arithmetic refuse.
   This remains local HLO readiness; one reviewed commit and one protected numerical retry are next.
+
+## 2026-08-13 10:12--18:00 — DB547 reduces the dense boundary to one ULP; accepted tiling is isolated
+
+- The reviewed envelope correction was committed/pushed at
+  `09c0ea0aaf191a9cd7a71c9c8dad5b215855f5a4` and completed once as protected DB547/tag
+  `greenfield_layer0_dense_envelope_cross_layer_20260813T101232103323778Z`. StableHLO and
+  optimized-HLO contracts passed, the real layer-0 arithmetic executed, all evidence published to
+  the approved bucket/results DB, and the terminal census authenticated 8/8 zero work.
+- The layer-1 comparison improved from the repeated DB540/542/546 result of `1,073/6,144`
+  mismatches to `1/6,144`. The only mismatch is index 2795, expected BF16 bits 48423 versus
+  observed 48422, max/mean absolute error `0.000244140625`; expected and observed row SHAs are
+  `9936ee1e...39` and `9b52a04e...05`. The same index was already wrong before the envelope, so
+  output materialization and the downstream RMSNorm are not a sufficient explanation.
+- Exact metadata reconstruction of the accepted complete-model after-codegen HLO found a concrete
+  compiler discriminator. Accepted layer-0 gate/up uses kernel window `[384,6]`, output `[4,6]`,
+  iteration `[1,1,2]`, megacore split 2 and 98,304 all-reduce bytes; accepted down uses kernel
+  `[48,6]`, output `[4,6]`, iteration `[8,1,1]`, split 0. DB547 instead compiled gate/up as
+  `[48,6]` / `[1,1,16]` and down as `[48,8]` / `[6,1,1]`. The compressed packed scales forced
+  extra runtime output-block expansion and changed contraction association despite the accepted
+  logical RHS layout.
+- The bounded replacement keeps the FP8 bytes unchanged, views them directly as E4M3FN, and packs
+  scales expanded only across the output axis. New gate/up scale shape/SHA is
+  `[4,8,48,768]` / `9b4bfee8...bf8b3`; new down scale is `[4,8,3,6144]` /
+  `f37e8798...4bdd`; canonical four-record manifest SHA is `45bfd64e...1ba4`. StableHLO and
+  optimized-HLO validators pin exact direct-FP8 rank slices, scale broadcasts, dequant lineage and
+  accepted layouts. Scheduled TPU HLO must additionally match the exact accepted backend configs
+  for all eight gate/up and eight down convolutions; unscheduled CPU HLO cannot satisfy protected
+  publication. Wrong ranks, scale reassociation, arithmetic detours and wrong gate/down tilings
+  refuse. This is local readiness only; one Sol audit, commit/push and one serialized protected
+  discriminator are next.

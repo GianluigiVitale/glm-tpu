@@ -306,27 +306,27 @@ dense_envelope = dense_envelope_text == "1"
 expected_final_layout_records = {
     "dense.slot_00.merged_gate_up.weight_bits_in_out": {
         "shape": [4, 8, 6144, 768],
-        "dtype": "uint8",
+        "dtype": "float8_e4m3fn",
         "sha256": "82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf",
     },
     "dense.slot_00.merged_gate_up.scale_inv_in_out": {
-        "shape": [4, 8, 48, 6],
+        "shape": [4, 8, 48, 768],
         "dtype": "float32",
-        "sha256": "7dc31abfa4677a517c643f0efe63dfc8cf5405ee3b2f6b7abc863772562c0151",
+        "sha256": "9b4bfee8b15d04545a277ba4e1ea0d3b73427a0f2cebf0a5f5fa4d7ab32bf8b3",
     },
     "dense.slot_00.down.weight_bits_in_out": {
         "shape": [4, 8, 384, 6144],
-        "dtype": "uint8",
+        "dtype": "float8_e4m3fn",
         "sha256": "8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e",
     },
     "dense.slot_00.down.scale_inv_in_out": {
-        "shape": [4, 8, 3, 48],
+        "shape": [4, 8, 3, 6144],
         "dtype": "float32",
-        "sha256": "c00fd888dcd3f7c7063dfeb91027274bd78c483ad9832ac77c37f00d16ea6c8e",
+        "sha256": "f37e87987745d263d152ff17415d21d572fa3c73ad5888207f1aa44916f74bdd",
     },
 }
 final_layout_records_sha256 = (
-    "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+    "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4"
 )
 runner_path = __import__("pathlib").Path(run_dir) / "runner.json"
 if not runner_path.is_file():
@@ -458,7 +458,9 @@ expected_environment = {
                 {
                     "final_layout_records_sha256": (
                         final_layout_records_sha256
-                    )
+                    ),
+                    "exact_accepted_kernel_geometry": True,
+                    "scheduled_kernel_geometry_required": True,
                 }
                 if final_layout
                 else {}
@@ -500,6 +502,40 @@ if (
             or runner.get("final_dense_layout") is not final_layout
             or runner.get("final_layout_records")
             != (expected_final_layout_records if final_layout else {})
+            or (
+                final_layout
+                and (
+                    runner.get("hlo", {})
+                    .get("optimized_contract", {})
+                    .get("scheduled_kernel_geometry_required")
+                    is not True
+                    or runner.get("hlo", {})
+                    .get("optimized_contract", {})
+                    .get("exact_accepted_kernel_geometry")
+                    is not True
+                    or set(
+                        runner.get("hlo", {})
+                        .get("optimized_contract", {})
+                        .get("accepted_weight_layouts", {})
+                    )
+                    != {"gate_up", "down"}
+                    or any(
+                        len(records) != 8
+                        for records in runner.get("hlo", {})
+                        .get("optimized_contract", {})
+                        .get("accepted_weight_layouts", {})
+                        .values()
+                    )
+                    or any(
+                        record.get("exact_convolution_tiling") is not True
+                        for records in runner.get("hlo", {})
+                        .get("optimized_contract", {})
+                        .get("accepted_weight_layouts", {})
+                        .values()
+                        for record in records
+                    )
+                )
+            )
             or runner.get("live_rows") != 1
             or runner.get("diagnostic_dead_rows") != compile_rows - 1
             or runner.get("result_mode")
@@ -1171,6 +1207,8 @@ if dense:
             or (
                 optimized.get("exact_accepted_weight_layout") is True
                 and optimized.get("exact_packed_weight_lineage") is True
+                and optimized.get("scheduled_kernel_geometry_required") is True
+                and optimized.get("exact_accepted_kernel_geometry") is True
                 and set(optimized.get("accepted_weight_layouts", {}))
                 == {"gate_up", "down"}
                 and all(
@@ -1182,6 +1220,7 @@ if dense:
                         record.get("accepted") is True
                         and record.get("accepted_layout") is True
                         and record.get("exact_packed_dequant") is True
+                        and record.get("exact_convolution_tiling") is True
                         and len(record.get("parameter_sources", [])) == 2
                         for record in records
                     )
@@ -1219,23 +1258,23 @@ if dense:
     expected_final_layout = {
         "dense.slot_00.merged_gate_up.weight_bits_in_out": {
             "shape": [4, 8, 6144, 768],
-            "dtype": "uint8",
+            "dtype": "float8_e4m3fn",
             "sha256": "82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf",
         },
         "dense.slot_00.merged_gate_up.scale_inv_in_out": {
-            "shape": [4, 8, 48, 6],
+            "shape": [4, 8, 48, 768],
             "dtype": "float32",
-            "sha256": "7dc31abfa4677a517c643f0efe63dfc8cf5405ee3b2f6b7abc863772562c0151",
+            "sha256": "9b4bfee8b15d04545a277ba4e1ea0d3b73427a0f2cebf0a5f5fa4d7ab32bf8b3",
         },
         "dense.slot_00.down.weight_bits_in_out": {
             "shape": [4, 8, 384, 6144],
-            "dtype": "uint8",
+            "dtype": "float8_e4m3fn",
             "sha256": "8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e",
         },
         "dense.slot_00.down.scale_inv_in_out": {
-            "shape": [4, 8, 3, 48],
+            "shape": [4, 8, 3, 6144],
             "dtype": "float32",
-            "sha256": "c00fd888dcd3f7c7063dfeb91027274bd78c483ad9832ac77c37f00d16ea6c8e",
+            "sha256": "f37e87987745d263d152ff17415d21d572fa3c73ad5888207f1aa44916f74bdd",
         },
     }
     final_layout_records_valid = (
@@ -1462,8 +1501,10 @@ run_id = pv.start_run(
                 **(
                     {
                         "final_layout_records_sha256": (
-                            "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
-                        )
+                            "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4"
+                        ),
+                        "exact_accepted_kernel_geometry": True,
+                        "scheduled_kernel_geometry_required": True,
                     }
                     if final_layout
                     else {}
@@ -1574,6 +1615,20 @@ summary = {
             separators=(",", ":"),
         ).encode()
     ).hexdigest(),
+    "exact_accepted_kernel_geometry": (
+        runner.get("hlo", {})
+        .get("optimized_contract", {})
+        .get("exact_accepted_kernel_geometry", False)
+        if dense and final_layout
+        else False
+    ),
+    "scheduled_kernel_geometry_required": (
+        runner.get("hlo", {})
+        .get("optimized_contract", {})
+        .get("scheduled_kernel_geometry_required", False)
+        if dense and final_layout
+        else False
+    ),
     "live_rows": 1,
     "result_mode": (
         runner.get("result_mode") if dense else "dense_and_layer1"
@@ -1684,9 +1739,14 @@ records_sha = sha256(
 if records_sha != summary["final_layout_records_sha256"]:
     raise SystemExit("final-layout record manifest hash drifted before SUCCESS")
 if summary["final_dense_layout"] and records_sha != (
-    "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+    "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4"
 ):
     raise SystemExit("pinned final-layout record manifest drifted before SUCCESS")
+if summary["final_dense_layout"] and (
+    summary.get("scheduled_kernel_geometry_required") is not True
+    or summary.get("exact_accepted_kernel_geometry") is not True
+):
+    raise SystemExit("accepted scheduled kernel geometry drifted before SUCCESS")
 values = {
     "artifact_kind": summary["artifact_kind"],
     "code_hash": sys.argv[3],
@@ -1700,6 +1760,12 @@ values = {
     "dense_envelope": str(summary["dense_envelope"]).lower(),
     "final_dense_layout": str(summary["final_dense_layout"]).lower(),
     "final_layout_records_sha256": records_sha,
+    "exact_accepted_kernel_geometry": str(
+        summary["exact_accepted_kernel_geometry"]
+    ).lower(),
+    "scheduled_kernel_geometry_required": str(
+        summary["scheduled_kernel_geometry_required"]
+    ).lower(),
     "performance_claim": "false",
     "evidence_sha256": sha256((root / "evidence.sha256").read_bytes()).hexdigest(),
     "remote_objects_sha256": sha256(

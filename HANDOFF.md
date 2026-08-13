@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Current clean pushed baseline is `09c0ea0aaf191a9cd7a71c9c8dad5b215855f5a4`. Protected
+  DB547/tag `greenfield_layer0_dense_envelope_cross_layer_20260813T101232103323778Z` completed
+  from that reviewed pin with strict DB/archive/SUCCESS publication and authenticated 8/8 cleanup.
+  The envelope changed the prior `1,073/6,144` layer-1 BF16 mismatches to exactly one: index 2795,
+  expected bits 48423 versus observed 48422, absolute error `0.000244140625`. This proves the
+  fused pre-dense RMSNorm/carried-residual candidate fixed 1,072 values but is not yet exact.
+- Direct comparison with the accepted complete-model TPU HLO resolves the remaining bounded
+  compiler cause. DB547's runtime-expanded scale grids produced gate/down convolution tilings
+  `kernel=[48,6], iterations=[1,1,16]` and `kernel=[48,8], iterations=[6,1,1]`; the accepted
+  full-model layer-0 path uses `kernel=[384,6], iterations=[1,1,2]` and
+  `kernel=[48,6], iterations=[8,1,1]`. Communication and the downstream layer-1 RMSNorm are not
+  the discriminator; the packed scale layout changed convolution accumulation geometry.
+- Active uncommitted replacement preserves the same FP8 weight bytes but stores direct
+  `float8_e4m3fn` views plus output-expanded FP32 scales (`[4,8,48,768]` gate/up and
+  `[4,8,3,6144]` down). Its manifest SHA is `45bfd64e...1ba4`. The StableHLO/optimized-HLO
+  contracts prove exact rank/source/dequant lineage and now require the scheduled TPU gate/down
+  backend configs to equal the accepted kernel windows, iterations and megacore split before any
+  arithmetic result can publish. Portable validation is green. Exact next: one new-diff-only Sol
+  audit, commit/push, strict idle-fleet census, then exactly one protected dense-envelope
+  discriminator. Do not run the complete 8K decoder first.
+
 - Current clean pushed baseline is `67488b5eb1378b3d0489e0d4029fa1685195920a`. Protected DB546
   (`greenfield_layer0_dense_final_layout_cross_layer_20260813T084105898153921Z`) had already proved
   exact packed-checkpoint lineage and accepted `{1,0}` layouts for all 16 dense convolution RHS

@@ -365,6 +365,46 @@ def _decode_dense_fp8_in_out(
     ).astype(jnp.bfloat16)
 
 
+def _decode_dense_fp8_expanded_output_scale_in_out(
+    weight: Any,
+    scale: Any,
+    *,
+    block_rows: int,
+) -> Any:
+    """Decode an accepted ``[in, out]`` FP8 shard and expanded output scale.
+
+    The accepted TPU lowering receives FP8 weights directly and stores one
+    FP32 scale for every output column and input block.  Keeping that small
+    expanded-output representation in the packed checkpoint is intentional:
+    it lowers to the accepted single row-block broadcast instead of a second
+    output-block expansion that changes the convolution accumulation tiling.
+    """
+
+    if weight.ndim != 2 or scale.ndim != 2:
+        raise ValueError("accepted dense weight and scale must be rank two")
+    if weight.dtype != jnp.float8_e4m3fn or scale.dtype != jnp.float32:
+        raise ValueError(
+            "accepted dense decode requires FP8 weights and FP32 scales"
+        )
+    if not isinstance(block_rows, int) or isinstance(block_rows, bool):
+        raise ValueError("accepted dense input block must be an integer")
+    if block_rows <= 0:
+        raise ValueError("accepted dense input block must be positive")
+    expected_scale = (
+        (weight.shape[0] + block_rows - 1) // block_rows,
+        weight.shape[1],
+    )
+    if scale.shape != expected_scale:
+        raise ValueError(
+            "accepted dense scale geometry drifted: "
+            f"expected={expected_scale} found={scale.shape}"
+        )
+    expanded = jnp.repeat(scale, block_rows, axis=0)[: weight.shape[0], :]
+    return (
+        weight.astype(jnp.float32) * expanded.astype(jnp.float32)
+    ).astype(jnp.bfloat16)
+
+
 def _dense_bf16_convolution(lhs: Any, weight_in_out: Any) -> Any:
     """Apply the accepted zero-spatial dense convolution and round once."""
 
@@ -522,9 +562,9 @@ def _virtual_dense_final_layout_convolution_down_partials(
     expected = {
         "normalized": (32, 6144),
         "merged_bits_in_out": (8, 6144, 768),
-        "merged_scale_in_out": (8, 48, 6),
+        "merged_scale_in_out": (8, 48, 768),
         "down_bits_in_out": (8, 384, 6144),
-        "down_scale_in_out": (8, 3, 48),
+        "down_scale_in_out": (8, 3, 6144),
     }
     values = {
         "normalized": normalized,
@@ -544,7 +584,7 @@ def _virtual_dense_final_layout_convolution_down_partials(
     if normalized.dtype != jnp.bfloat16:
         raise ValueError("final-layout dense input must be BF16")
     if any(
-        value.dtype != jnp.uint8
+        value.dtype != jnp.float8_e4m3fn
         for value in (merged_bits_in_out, down_bits_in_out)
     ) or any(
         value.dtype != jnp.float32
@@ -557,10 +597,10 @@ def _virtual_dense_final_layout_convolution_down_partials(
         with jax.named_scope(
             f"greenfield_dense_convolution_virtual_rank_{shard:02d}"
         ):
-            gate_up_weight = _decode_dense_fp8_in_out(
+            gate_up_weight = _decode_dense_fp8_expanded_output_scale_in_out(
                 merged_bits_in_out[shard],
                 merged_scale_in_out[shard],
-                block_shape=block_shape,
+                block_rows=block_shape[0],
             )
             # The accepted M32 HLO keeps this decoded [in, out] operand in XLA
             # minor-to-major {1,0}.  JAX's Layout API takes the reverse,
@@ -586,10 +626,10 @@ def _virtual_dense_final_layout_convolution_down_partials(
             partials.append(
                 _dense_bf16_convolution(
                     activated,
-                    _decode_dense_fp8_in_out(
+                    _decode_dense_fp8_expanded_output_scale_in_out(
                         down_bits_in_out[shard],
                         down_scale_in_out[shard],
-                        block_shape=block_shape,
+                        block_rows=block_shape[0],
                     ),
                 )
             )

@@ -70,7 +70,7 @@ _DENSE_WEIGHT_NAMES = (
 
 _FINAL_DENSE_LAYOUT_RECORDS: dict[str, dict[str, Any]] = {
     "dense.slot_00.merged_gate_up.weight_bits_in_out": {
-        "dtype": "uint8",
+        "dtype": "float8_e4m3fn",
         "sha256": (
             "82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf"
         ),
@@ -79,12 +79,12 @@ _FINAL_DENSE_LAYOUT_RECORDS: dict[str, dict[str, Any]] = {
     "dense.slot_00.merged_gate_up.scale_inv_in_out": {
         "dtype": "float32",
         "sha256": (
-            "7dc31abfa4677a517c643f0efe63dfc8cf5405ee3b2f6b7abc863772562c0151"
+            "9b4bfee8b15d04545a277ba4e1ea0d3b73427a0f2cebf0a5f5fa4d7ab32bf8b3"
         ),
-        "shape": [4, 8, 48, 6],
+        "shape": [4, 8, 48, 768],
     },
     "dense.slot_00.down.weight_bits_in_out": {
-        "dtype": "uint8",
+        "dtype": "float8_e4m3fn",
         "sha256": (
             "8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e"
         ),
@@ -93,9 +93,9 @@ _FINAL_DENSE_LAYOUT_RECORDS: dict[str, dict[str, Any]] = {
     "dense.slot_00.down.scale_inv_in_out": {
         "dtype": "float32",
         "sha256": (
-            "c00fd888dcd3f7c7063dfeb91027274bd78c483ad9832ac77c37f00d16ea6c8e"
+            "f37e87987745d263d152ff17415d21d572fa3c73ad5888207f1aa44916f74bdd"
         ),
-        "shape": [4, 8, 3, 48],
+        "shape": [4, 8, 3, 6144],
     },
 }
 
@@ -140,9 +140,9 @@ def _pack_dense_final_layout(
             )
 
     merged_bits = np.empty((4, 8, 6144, 768), dtype=np.uint8)
-    merged_scale = np.empty((4, 8, 48, 6), dtype=np.float32)
+    merged_scale = np.empty((4, 8, 48, 768), dtype=np.float32)
     down_bits = np.empty((4, 8, 384, 6144), dtype=np.uint8)
-    down_scales = np.empty((4, 8, 3, 48), dtype=np.float32)
+    down_scales = np.empty((4, 8, 3, 6144), dtype=np.float32)
     for owner in range(4):
         for shard in range(8):
             start = shard * 384
@@ -155,15 +155,27 @@ def _pack_dense_final_layout(
             )
             merged_scale[owner, shard] = np.concatenate(
                 (
-                    gate_scale[owner, scale_start:scale_stop].T,
-                    up_scale[owner, scale_start:scale_stop].T,
+                    np.repeat(
+                        gate_scale[owner, scale_start:scale_stop].T,
+                        128,
+                        axis=1,
+                    ),
+                    np.repeat(
+                        up_scale[owner, scale_start:scale_stop].T,
+                        128,
+                        axis=1,
+                    ),
                 ),
                 axis=1,
             )
             down_bits[owner, shard] = down[owner, :, start:stop].T
-            down_scales[owner, shard] = down_scale[
-                owner, :, scale_start:scale_stop
-            ].T
+            down_scales[owner, shard] = np.repeat(
+                down_scale[owner, :, scale_start:scale_stop].T,
+                128,
+                axis=1,
+            )
+    merged_bits = merged_bits.view(ml_dtypes.float8_e4m3fn)
+    down_bits = down_bits.view(ml_dtypes.float8_e4m3fn)
     packed = tuple(
         np.ascontiguousarray(value)
         for value in (merged_bits, merged_scale, down_bits, down_scales)
@@ -700,12 +712,12 @@ def _validate_optimized_hlo(
     }
     expected_packed_parameters = {
         "gate_up": (
-            (3 if dense_envelope else 2, "u8[1,8,6144,768]"),
-            (4 if dense_envelope else 3, "f32[1,8,48,6]"),
+            (3 if dense_envelope else 2, "f8e4m3fn[1,8,6144,768]"),
+            (4 if dense_envelope else 3, "f32[1,8,48,768]"),
         ),
         "down": (
-            (5 if dense_envelope else 4, "u8[1,8,384,6144]"),
-            (6 if dense_envelope else 5, "f32[1,8,3,48]"),
+            (5 if dense_envelope else 4, "f8e4m3fn[1,8,384,6144]"),
+            (6 if dense_envelope else 5, "f32[1,8,3,6144]"),
         ),
     }
 
@@ -769,6 +781,26 @@ def _validate_optimized_hlo(
             return None
         return tuple(int(value) for value in payload.split(","))
 
+    def result_minor_to_major(item: Any | None) -> tuple[int, ...] | None:
+        """Return the physical result order without constraining TPU tiles."""
+
+        if item is None:
+            return None
+        match = re.search(
+            r"=\s*[A-Za-z][A-Za-z0-9_]*\[[0-9,]*\]"
+            r"\{([0-9]+(?:,[0-9]+)*)",
+            item.raw_line,
+        )
+        if match is None:
+            return None
+        return tuple(int(value) for value in match.group(1).split(","))
+
+    def exact_row_major_layout(item: Any | None) -> bool:
+        if item is None or len(item.result_shapes) != 1:
+            return False
+        rank = len(item.result_shapes[0].dimensions)
+        return result_minor_to_major(item) == tuple(reversed(range(rank)))
+
     def exact_packed_source(
         value: Any | None,
         expected: Any,
@@ -781,25 +813,17 @@ def _validate_optimized_hlo(
 
         expected_shape = expected.result_shapes[0].dimensions
         if label == "gate_up":
-            payload_shape = (6144, 768) if not scale else (48, 6)
+            payload_shape = (6144, 768) if not scale else (48, 768)
             scale_shapes = {
-                "seed": (48, 6),
-                "inner": (48, 128, 6),
-                "folded_inner": (1, 6, 48, 128),
-                "middle": (6144, 6),
-                "outer": (6144, 6, 128),
-                "folded_outer": None,
+                "seed": (48, 768),
+                "inner": (48, 128, 768),
                 "wide": (6144, 768),
             }
         elif label == "down":
-            payload_shape = (384, 6144) if not scale else (3, 48)
+            payload_shape = (384, 6144) if not scale else (3, 6144)
             scale_shapes = {
-                "seed": (3, 48),
-                "inner": (3, 128, 48),
-                "folded_inner": None,
-                "middle": (384, 48),
-                "outer": (384, 48, 128),
-                "folded_outer": (48, 8, 48, 128),
+                "seed": (3, 6144),
+                "inner": (3, 128, 6144),
                 "wide": (384, 6144),
             }
         else:
@@ -845,8 +869,19 @@ def _validate_optimized_hlo(
                 "copy",
                 "optimization-barrier",
             }:
-                return source_shape == result_shape
+                return source_shape == result_shape and (
+                    not scheduled_module
+                    or (
+                        result_minor_to_major(item) is not None
+                        and result_minor_to_major(item)
+                        == result_minor_to_major(source)
+                    )
+                )
             if item.raw_opcode not in {"bitcast", "reshape"}:
+                return False
+            if scheduled_module and not (
+                exact_row_major_layout(source) and exact_row_major_layout(item)
+            ):
                 return False
             if selected_rank:
                 return (source_shape, result_shape) in {
@@ -868,35 +903,8 @@ def _validate_optimized_hlo(
                     tuple((1,) + scale_shapes["seed"]),
                     scale_shapes["seed"],
                 ),
-                (scale_shapes["inner"], scale_shapes["middle"]),
-                (scale_shapes["outer"], scale_shapes["wide"]),
+                (scale_shapes["inner"], scale_shapes["wide"]),
             }
-            if scale_shapes["folded_inner"] is not None:
-                exact_scale_edges.update(
-                    {
-                        (
-                            scale_shapes["inner"],
-                            scale_shapes["folded_inner"],
-                        ),
-                        (
-                            scale_shapes["folded_inner"],
-                            scale_shapes["middle"],
-                        ),
-                    }
-                )
-            if scale_shapes["folded_outer"] is not None:
-                exact_scale_edges.update(
-                    {
-                        (
-                            scale_shapes["outer"],
-                            scale_shapes["folded_outer"],
-                        ),
-                        (
-                            scale_shapes["folded_outer"],
-                            scale_shapes["wide"],
-                        ),
-                    }
-                )
             return (source_shape, result_shape) in exact_scale_edges
 
         visiting: set[tuple[tuple[str, str], bool]] = set()
@@ -998,11 +1006,6 @@ def _validate_optimized_hlo(
                             scale_shapes["inner"],
                             (0, 2),
                         ),
-                        (
-                            scale_shapes["middle"],
-                            scale_shapes["outer"],
-                            (0, 1),
-                        ),
                     }:
                         return False
                     return walk(source, selected_rank)
@@ -1069,6 +1072,23 @@ def _validate_optimized_hlo(
                     and exact_singleton_payload(source, dtype)
                 ):
                     return None
+                if scheduled_module and item.raw_opcode in {
+                    "bitcast",
+                    "reshape",
+                } and not (
+                    exact_row_major_layout(source)
+                    and exact_row_major_layout(item)
+                ):
+                    return None
+                if scheduled_module and item.raw_opcode in {
+                    "copy",
+                    "optimization-barrier",
+                } and not (
+                    result_minor_to_major(item) is not None
+                    and result_minor_to_major(item)
+                    == result_minor_to_major(source)
+                ):
+                    return None
                 item = source
             return item
 
@@ -1109,14 +1129,16 @@ def _validate_optimized_hlo(
             )
             if (
                 bitcast is None
-                or bitcast.raw_opcode != "bitcast-convert"
                 or not exact_singleton_payload(bitcast, "f8e4m3fn")
-                or virtual_rank(bitcast) != rank
-                or len(bitcast.operand_names) != 1
             ):
                 continue
+            if bitcast.raw_opcode == "bitcast-convert":
+                if len(bitcast.operand_names) != 1:
+                    continue
+                bits = operand(bitcast, 0)
+            else:
+                bits = bitcast
             decoded = candidate
-            bits = operand(bitcast, 0)
             scale = operand(scaled, 1 - index)
             break
         if decoded is None or bits is None or scale is None:
@@ -1187,6 +1209,80 @@ def _validate_optimized_hlo(
         "gate_up": [],
         "down": [],
     }
+
+    def exact_accepted_convolution_tiling(item: Any, label: str) -> bool:
+        expected = {
+            "gate_up": {
+                "kernel_window_bounds": ["384", "6"],
+                "output_window_bounds": ["4", "6"],
+                "input_window_bounds": ["4", "24"],
+                "iteration_bounds": ["1", "1", "2"],
+                "cost_model_type": "COST_MODEL_TYPE_CLASSIC",
+                "is_mask": False,
+                "pad_input_on_minor_dim": "0",
+                "pad_output_on_minor_dim": "0",
+                "megacore_split_dim": "2",
+                "megacore_allreduce_bytes": "98304",
+            },
+            "down": {
+                "kernel_window_bounds": ["48", "6"],
+                "output_window_bounds": ["4", "6"],
+                "input_window_bounds": ["4", "3"],
+                "iteration_bounds": ["8", "1", "1"],
+                "cost_model_type": "COST_MODEL_TYPE_CLASSIC",
+                "is_mask": False,
+                "pad_input_on_minor_dim": "0",
+                "pad_output_on_minor_dim": "0",
+                "megacore_split_dim": "0",
+                "megacore_allreduce_bytes": None,
+            },
+        }[label]
+        candidates = [
+            item,
+            *callers_by_computation.get(
+                _computation_id(item.computation), ()
+            ),
+        ]
+        configs = []
+        for candidate in candidates:
+            marker = "backend_config="
+            if marker not in candidate.raw_line:
+                continue
+            try:
+                config = json.loads(candidate.raw_line.split(marker, 1)[1])
+            except json.JSONDecodeError:
+                return False
+            if "convolution_algorithm_config" in config:
+                configs.append(config)
+        if len(configs) != 1:
+            return False
+        window = configs[0].get("window_config", {})
+        megacore = configs[0].get("megacore_config", {})
+        return (
+            configs[0].get("convolution_algorithm_config", {}).get("emitter")
+            == "EmitAllBatchInSublanes"
+            and window.get("kernel_window_bounds")
+            == expected["kernel_window_bounds"]
+            and window.get("output_window_bounds")
+            == expected["output_window_bounds"]
+            and window.get("input_window_bounds")
+            == expected["input_window_bounds"]
+            and window.get("iteration_bounds")
+            == expected["iteration_bounds"]
+            and window.get("cost_model_type")
+            == expected["cost_model_type"]
+            and window.get("is_mask") is expected["is_mask"]
+            and window.get("pad_input_on_minor_dim")
+            == expected["pad_input_on_minor_dim"]
+            and window.get("pad_output_on_minor_dim")
+            == expected["pad_output_on_minor_dim"]
+            and megacore.get("megacore_split_dim")
+            == expected["megacore_split_dim"]
+            and megacore.get("megacore_allreduce_bytes")
+            == expected["megacore_allreduce_bytes"]
+        )
+
+    scheduled_module = "is_scheduled=true" in optimized_hlo.splitlines()[0]
     for label, items, shape in (
         ("gate_up", gate_up, "bf16[6144,768]"),
         ("down", down, "bf16[384,6144]"),
@@ -1213,9 +1309,21 @@ def _validate_optimized_hlo(
             )
             accepted_weight_layouts[label].append(
                 {
-                    "accepted": accepted_layout and exact_dequant,
+                    "accepted": (
+                        accepted_layout
+                        and exact_dequant
+                        and (
+                            not scheduled_module
+                            or exact_accepted_convolution_tiling(item, label)
+                        )
+                    ),
                     "accepted_layout": accepted_layout,
                     "convolution": item.name,
+                    "exact_convolution_tiling": (
+                        exact_accepted_convolution_tiling(item, label)
+                        if scheduled_module
+                        else None
+                    ),
                     "exact_packed_dequant": exact_dequant,
                     "parameter_sources": parameter_sources,
                     "virtual_rank": rank,
@@ -1275,10 +1383,23 @@ def _validate_optimized_hlo(
             )
         )
     )
+    exact_accepted_kernel_geometry = (
+        not final_dense_layout
+        or (
+            not scheduled_module
+            or all(
+                record["exact_convolution_tiling"] is True
+                for records in accepted_weight_layouts.values()
+                for record in records
+            )
+        )
+    )
     if final_dense_layout and not exact_accepted_weight_layout:
         violations.append("accepted dense convolution weight layout drifted")
     if final_dense_layout and not exact_packed_weight_lineage:
         violations.append("packed dense weight lineage drifted")
+    if final_dense_layout and not exact_accepted_kernel_geometry:
+        violations.append("accepted dense convolution tiling drifted")
     if async_collectives:
         violations.append(f"async collectives are forbidden: {async_collectives}")
     if len(collectives) != 1 or len(scoped) != 1:
@@ -3866,6 +3987,8 @@ def _validate_optimized_hlo(
         "dense_envelope": dense_envelope,
         "down_convolution_count": len(down),
         "exact_accepted_weight_layout": exact_accepted_weight_layout,
+        "exact_accepted_kernel_geometry": exact_accepted_kernel_geometry,
+        "scheduled_kernel_geometry_required": scheduled_module,
         "exact_packed_weight_lineage": exact_packed_weight_lineage,
         "final_dense_layout": final_dense_layout,
         "gate_up_convolution_count": len(gate_up),

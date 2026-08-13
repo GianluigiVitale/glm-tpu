@@ -221,6 +221,7 @@ def _match_fp8_decode(
     scale_wide_type: str,
     weight_type: str,
     first_broadcast_dimensions: tuple[int, ...],
+    direct_fp8_expanded_output_scale: bool = False,
 ) -> tuple[str, str]:
     rounded = _expect_node(
         graph, output, opcode="convert", result_type=weight_type
@@ -235,11 +236,18 @@ def _match_fp8_decode(
     fp32 = _expect_node(
         graph, scaled.operands[0], opcode="convert", result_type=scale_wide_type
     )
-    fp8 = _expect_node(
-        graph, fp32.operands[0], opcode="bitcast_convert", result_type=fp8_type
-    )
-    if fp8.tensor_types[-2:] != (bit_type, fp8_type):
-        raise _MatchError(f"{fp8.name}: FP8 bitcast geometry drifted")
+    if direct_fp8_expanded_output_scale:
+        fp8 = _expect_node(
+            graph, fp32.operands[0], opcode="reshape", result_type=fp8_type
+        )
+        if fp8.result_type != bit_type:
+            raise _MatchError(f"{fp8.name}: direct FP8 geometry drifted")
+    else:
+        fp8 = _expect_node(
+            graph, fp32.operands[0], opcode="bitcast_convert", result_type=fp8_type
+        )
+        if fp8.tensor_types[-2:] != (bit_type, fp8_type):
+            raise _MatchError(f"{fp8.name}: FP8 bitcast geometry drifted")
     wide_scale = _expect_node(
         graph, scaled.operands[1], opcode="reshape", result_type=scale_wide_type
     )
@@ -249,6 +257,12 @@ def _match_fp8_decode(
         opcode="broadcast_in_dim",
         result_type=scale_middle_type,
     )
+    if direct_fp8_expanded_output_scale:
+        if second_broadcast.dimensions != first_broadcast_dimensions:
+            raise _MatchError(
+                f"{second_broadcast.name}: expanded-output scale drifted"
+            )
+        return fp8.name, second_broadcast.operands[0]
     if second_broadcast.dimensions != (0, 1):
         raise _MatchError(f"{second_broadcast.name}: inner scale expansion drifted")
     middle_scale = _expect_node(
@@ -287,13 +301,26 @@ def _match_one_shard(
     gate_bits, gate_scales = _match_fp8_decode(
         graph,
         decoded_gate_up,
-        bit_type="tensor<6144x768xui8>",
+        bit_type=(
+            "tensor<6144x768xf8E4M3FN>"
+            if final_dense_layout
+            else "tensor<6144x768xui8>"
+        ),
         fp8_type="tensor<6144x768xf8E4M3FN>",
-        scale_seed_type="tensor<6144x6xf32>",
-        scale_middle_type="tensor<6144x6x128xf32>",
+        scale_seed_type=(
+            "tensor<48x768xf32>"
+            if final_dense_layout
+            else "tensor<6144x6xf32>"
+        ),
+        scale_middle_type=(
+            "tensor<48x128x768xf32>"
+            if final_dense_layout
+            else "tensor<6144x6x128xf32>"
+        ),
         scale_wide_type="tensor<6144x768xf32>",
         weight_type="tensor<6144x768xbf16>",
         first_broadcast_dimensions=(0, 2),
+        direct_fp8_expanded_output_scale=final_dense_layout,
     )
     _expect_convolution(
         gate_up,
@@ -309,13 +336,13 @@ def _match_one_shard(
             graph,
             gate_bits,
             opcode="reshape",
-            result_type="tensor<6144x768xui8>",
+            result_type="tensor<6144x768xf8E4M3FN>",
         )
         gate_bits_slice = _expect_node(
             graph,
             gate_bits_reshape.operands[0],
             opcode="slice",
-            result_type="tensor<1x6144x768xui8>",
+            result_type="tensor<1x6144x768xf8E4M3FN>",
         )
         if gate_bits_slice.slice_ranges is None:
             raise _MatchError(f"{gate_bits_slice.name}: packed gate slice absent")
@@ -330,18 +357,18 @@ def _match_one_shard(
             graph,
             gate_scales,
             opcode="reshape",
-            result_type="tensor<48x6xf32>",
+            result_type="tensor<48x768xf32>",
         )
         gate_scale_slice = _expect_node(
             graph,
             gate_scale_reshape.operands[0],
             opcode="slice",
-            result_type="tensor<1x48x6xf32>",
+            result_type="tensor<1x48x768xf32>",
         )
         if gate_scale_slice.slice_ranges != (
             (shard, shard + 1),
             (0, 48),
-            (0, 6),
+            (0, 768),
         ):
             raise _MatchError(
                 f"{gate_scale_slice.name}: packed gate scale slice drifted"
@@ -528,13 +555,26 @@ def _match_one_shard(
     down_bits, down_scales = _match_fp8_decode(
         graph,
         down.operands[1],
-        bit_type="tensor<384x6144xui8>",
+        bit_type=(
+            "tensor<384x6144xf8E4M3FN>"
+            if final_dense_layout
+            else "tensor<384x6144xui8>"
+        ),
         fp8_type="tensor<384x6144xf8E4M3FN>",
-        scale_seed_type="tensor<384x48xf32>",
-        scale_middle_type="tensor<384x48x128xf32>",
+        scale_seed_type=(
+            "tensor<3x6144xf32>"
+            if final_dense_layout
+            else "tensor<384x48xf32>"
+        ),
+        scale_middle_type=(
+            "tensor<3x128x6144xf32>"
+            if final_dense_layout
+            else "tensor<384x48x128xf32>"
+        ),
         scale_wide_type="tensor<384x6144xf32>",
         weight_type="tensor<384x6144xbf16>",
         first_broadcast_dimensions=(0, 2),
+        direct_fp8_expanded_output_scale=final_dense_layout,
     )
     _expect_convolution(
         down,
@@ -550,13 +590,13 @@ def _match_one_shard(
             graph,
             down_bits,
             opcode="reshape",
-            result_type="tensor<384x6144xui8>",
+            result_type="tensor<384x6144xf8E4M3FN>",
         )
         down_bit_slice = _expect_node(
             graph,
             down_bits_reshape.operands[0],
             opcode="slice",
-            result_type="tensor<1x384x6144xui8>",
+            result_type="tensor<1x384x6144xf8E4M3FN>",
         )
         if down_bit_slice.slice_ranges != (
             (shard, shard + 1),
@@ -568,18 +608,18 @@ def _match_one_shard(
             graph,
             down_scales,
             opcode="reshape",
-            result_type="tensor<3x48xf32>",
+            result_type="tensor<3x6144xf32>",
         )
         down_scale_slice = _expect_node(
             graph,
             down_scale_reshape.operands[0],
             opcode="slice",
-            result_type="tensor<1x3x48xf32>",
+            result_type="tensor<1x3x6144xf32>",
         )
         if down_scale_slice.slice_ranges != (
             (shard, shard + 1),
             (0, 3),
-            (0, 48),
+            (0, 6144),
         ):
             raise _MatchError(
                 f"{down_scale_slice.name}: packed down scale slice drifted"
@@ -1266,15 +1306,15 @@ def validate_dense_convolution_stablehlo(
         root_contracts = (
             (
                 (
-                    "tensor<1x8x6144x768xui8>",
-                    "tensor<8x6144x768xui8>",
+                    "tensor<1x8x6144x768xf8E4M3FN>",
+                    "tensor<8x6144x768xf8E4M3FN>",
                 ),
-                ("tensor<1x8x48x6xf32>", "tensor<8x48x6xf32>"),
+                ("tensor<1x8x48x768xf32>", "tensor<8x48x768xf32>"),
                 (
-                    "tensor<1x8x384x6144xui8>",
-                    "tensor<8x384x6144xui8>",
+                    "tensor<1x8x384x6144xf8E4M3FN>",
+                    "tensor<8x384x6144xf8E4M3FN>",
                 ),
-                ("tensor<1x8x3x48xf32>", "tensor<8x3x48xf32>"),
+                ("tensor<1x8x3x6144xf32>", "tensor<8x3x6144xf32>"),
             )
             if final_dense_layout
             else (

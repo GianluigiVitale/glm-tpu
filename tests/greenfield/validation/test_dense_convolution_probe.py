@@ -404,10 +404,10 @@ def _synthetic_final_layout_optimized_hlo() -> str:
     ).replace(
         "  %norm = bf16[6144] parameter(101)",
         "  %norm = bf16[6144] parameter(6)\n"
-        "  %packed_gate_bits = u8[1,8,6144,768] parameter(2)\n"
-        "  %packed_gate_scale = f32[1,8,48,6] parameter(3)\n"
-        "  %packed_down_bits = u8[1,8,384,6144] parameter(4)\n"
-        "  %packed_down_scale = f32[1,8,3,48] parameter(5)",
+        "  %packed_gate_bits = f8e4m3fn[1,8,6144,768]{3,2,1,0} parameter(2)\n"
+        "  %packed_gate_scale = f32[1,8,48,768]{3,2,1,0} parameter(3)\n"
+        "  %packed_down_bits = f8e4m3fn[1,8,384,6144]{3,2,1,0} parameter(4)\n"
+        "  %packed_down_scale = f32[1,8,3,6144]{3,2,1,0} parameter(5)",
         1,
     )
     for rank in range(8):
@@ -420,28 +420,22 @@ def _synthetic_final_layout_optimized_hlo() -> str:
         )
         gate_dequant = "\n".join(
             (
-                f"  %gate_bits_slice.{rank} = u8[1,1,6144,768] "
+                f"  %gate_bits_slice.{rank} = f8e4m3fn[1,1,6144,768]{{3,2,1,0}} "
                 f"slice(%packed_gate_bits), slice={{[0:1], [{rank}:{rank + 1}], "
                 "[0:6144], [0:768]}}",
-                f"  %gate_bits.{rank} = u8[6144,768] "
+                f"  %gate_bits.{rank} = f8e4m3fn[6144,768]{{1,0}} "
                 f"bitcast(%gate_bits_slice.{rank})",
-                f"  %gate_fp8.{rank} = f8e4m3fn[6144,768] "
-                f"bitcast-convert(%gate_bits.{rank}), {scope}bitcast_convert_type\"}}",
-                f"  %gate_f32.{rank} = f32[6144,768] convert(%gate_fp8.{rank}), "
+                f"  %gate_f32.{rank} = f32[6144,768] convert(%gate_bits.{rank}), "
                 f"{scope}convert_element_type\"}}",
-                f"  %gate_scale_slice.{rank} = f32[1,1,48,6] "
+                f"  %gate_scale_slice.{rank} = f32[1,1,48,768]{{3,2,1,0}} "
                 f"slice(%packed_gate_scale), slice={{[0:1], [{rank}:{rank + 1}], "
-                "[0:48], [0:6]}}",
-                f"  %gate_scale_seed.{rank} = f32[48,6] "
+                "[0:48], [0:768]}}",
+                f"  %gate_scale_seed.{rank} = f32[48,768]{{1,0}} "
                 f"reshape(%gate_scale_slice.{rank})",
-                f"  %gate_scale_inner.{rank} = f32[48,128,6] "
+                f"  %gate_scale_inner.{rank} = f32[48,128,768]{{2,1,0}} "
                 f"broadcast(%gate_scale_seed.{rank}), dimensions={{0,2}}",
-                f"  %gate_scale_middle.{rank} = f32[6144,6] "
+                f"  %gate_scale_wide.{rank} = f32[6144,768]{{1,0}} "
                 f"reshape(%gate_scale_inner.{rank})",
-                f"  %gate_scale_outer.{rank} = f32[6144,6,128] "
-                f"broadcast(%gate_scale_middle.{rank}), dimensions={{0,1}}",
-                f"  %gate_scale_wide.{rank} = f32[6144,768] "
-                f"reshape(%gate_scale_outer.{rank})",
                 f"  %gate_scaled.{rank} = f32[6144,768] multiply("
                 f"%gate_f32.{rank}, %gate_scale_wide.{rank}), {scope}mul\"}}",
                 f"  %gate_up_weight.{rank} = bf16[6144,768]{{1,0}} "
@@ -455,28 +449,22 @@ def _synthetic_final_layout_optimized_hlo() -> str:
         )
         down_dequant = "\n".join(
             (
-                f"  %down_bits_slice.{rank} = u8[1,1,384,6144] "
+                f"  %down_bits_slice.{rank} = f8e4m3fn[1,1,384,6144]{{3,2,1,0}} "
                 f"slice(%packed_down_bits), slice={{[0:1], [{rank}:{rank + 1}], "
                 "[0:384], [0:6144]}}",
-                f"  %down_bits.{rank} = u8[384,6144] "
+                f"  %down_bits.{rank} = f8e4m3fn[384,6144]{{1,0}} "
                 f"bitcast(%down_bits_slice.{rank})",
-                f"  %down_fp8.{rank} = f8e4m3fn[384,6144] "
-                f"bitcast-convert(%down_bits.{rank}), {scope}bitcast_convert_type\"}}",
-                f"  %down_f32.{rank} = f32[384,6144] convert(%down_fp8.{rank}), "
+                f"  %down_f32.{rank} = f32[384,6144] convert(%down_bits.{rank}), "
                 f"{scope}convert_element_type\"}}",
-                f"  %down_scale_slice.{rank} = f32[1,1,3,48] "
+                f"  %down_scale_slice.{rank} = f32[1,1,3,6144]{{3,2,1,0}} "
                 f"slice(%packed_down_scale), slice={{[0:1], [{rank}:{rank + 1}], "
-                "[0:3], [0:48]}}",
-                f"  %down_scale_seed.{rank} = f32[3,48] "
+                "[0:3], [0:6144]}}",
+                f"  %down_scale_seed.{rank} = f32[3,6144]{{1,0}} "
                 f"reshape(%down_scale_slice.{rank})",
-                f"  %down_scale_inner.{rank} = f32[3,128,48] "
+                f"  %down_scale_inner.{rank} = f32[3,128,6144]{{2,1,0}} "
                 f"broadcast(%down_scale_seed.{rank}), dimensions={{0,2}}",
-                f"  %down_scale_middle.{rank} = f32[384,48] "
+                f"  %down_scale_wide.{rank} = f32[384,6144]{{1,0}} "
                 f"reshape(%down_scale_inner.{rank})",
-                f"  %down_scale_outer.{rank} = f32[384,48,128] "
-                f"broadcast(%down_scale_middle.{rank}), dimensions={{0,1}}",
-                f"  %down_scale_wide.{rank} = f32[384,6144] "
-                f"reshape(%down_scale_outer.{rank})",
                 f"  %down_scaled.{rank} = f32[384,6144] multiply("
                 f"%down_f32.{rank}, %down_scale_wide.{rank}), {scope}mul\"}}",
                 f"  %down_weight.{rank} = bf16[384,6144]{{1,0}} "
@@ -497,10 +485,10 @@ def _synthetic_dense_envelope_optimized_hlo() -> str:
         "padding=0_31x0_0\n"
         "  %residual = bf16[1,6144] parameter(1)\n"
         "  %norm = bf16[6144] parameter(6)\n"
-        "  %packed_gate_bits = u8[1,8,6144,768] parameter(2)\n"
-        "  %packed_gate_scale = f32[1,8,48,6] parameter(3)\n"
-        "  %packed_down_bits = u8[1,8,384,6144] parameter(4)\n"
-        "  %packed_down_scale = f32[1,8,3,48] parameter(5)"
+        "  %packed_gate_bits = f8e4m3fn[1,8,6144,768]{3,2,1,0} parameter(2)\n"
+        "  %packed_gate_scale = f32[1,8,48,768]{3,2,1,0} parameter(3)\n"
+        "  %packed_down_bits = f8e4m3fn[1,8,384,6144]{3,2,1,0} parameter(4)\n"
+        "  %packed_down_scale = f32[1,8,3,6144]{3,2,1,0} parameter(5)"
     )
     entry = "\n".join(
         (
@@ -508,10 +496,10 @@ def _synthetic_dense_envelope_optimized_hlo() -> str:
             "  %combined_residual = bf16[1,6144] parameter(1)",
             "  %post_norm = bf16[6144] parameter(2)",
             "  %norm = bf16[6144] parameter(7)",
-            "  %packed_gate_bits = u8[1,8,6144,768] parameter(3)",
-            "  %packed_gate_scale = f32[1,8,48,6] parameter(4)",
-            "  %packed_down_bits = u8[1,8,384,6144] parameter(5)",
-            "  %packed_down_scale = f32[1,8,3,48] parameter(6)",
+            "  %packed_gate_bits = f8e4m3fn[1,8,6144,768]{3,2,1,0} parameter(3)",
+            "  %packed_gate_scale = f32[1,8,48,768]{3,2,1,0} parameter(4)",
+            "  %packed_down_bits = f8e4m3fn[1,8,384,6144]{3,2,1,0} parameter(5)",
+            "  %packed_down_scale = f32[1,8,3,6144]{3,2,1,0} parameter(6)",
         )
     )
     assert prefix in hlo
@@ -628,6 +616,55 @@ def _synthetic_dense_envelope_optimized_hlo() -> str:
         1,
     )
     return hlo
+
+
+def _with_exact_scheduled_dense_tiling(hlo: str) -> str:
+    gate = {
+        "convolution_algorithm_config": {"emitter": "EmitAllBatchInSublanes"},
+        "megacore_config": {
+            "megacore_allreduce_bytes": "98304",
+            "megacore_split_dim": "2",
+        },
+        "window_config": {
+            "cost_model_type": "COST_MODEL_TYPE_CLASSIC",
+            "input_window_bounds": ["4", "24"],
+            "is_mask": False,
+            "iteration_bounds": ["1", "1", "2"],
+            "kernel_window_bounds": ["384", "6"],
+            "output_window_bounds": ["4", "6"],
+            "pad_input_on_minor_dim": "0",
+            "pad_output_on_minor_dim": "0",
+        },
+    }
+    down = {
+        "convolution_algorithm_config": {"emitter": "EmitAllBatchInSublanes"},
+        "megacore_config": {
+            "megacore_allreduce_bytes": None,
+            "megacore_split_dim": "0",
+        },
+        "window_config": {
+            "cost_model_type": "COST_MODEL_TYPE_CLASSIC",
+            "input_window_bounds": ["4", "3"],
+            "is_mask": False,
+            "iteration_bounds": ["8", "1", "1"],
+            "kernel_window_bounds": ["48", "6"],
+            "output_window_bounds": ["4", "6"],
+            "pad_input_on_minor_dim": "0",
+            "pad_output_on_minor_dim": "0",
+        },
+    }
+    lines = []
+    for line in hlo.splitlines():
+        if " convolution(" in line and " = f32[32,768]" in line:
+            line += ", backend_config=" + json.dumps(gate, separators=(",", ":"))
+        elif " convolution(" in line and " = f32[32,6144]" in line:
+            line += ", backend_config=" + json.dumps(down, separators=(",", ":"))
+        lines.append(line)
+    lines[0] = lines[0].replace(
+        "HloModule dense_convolution,",
+        "HloModule dense_convolution, is_scheduled=true,",
+    )
+    return "\n".join(lines)
 
 
 def _synthetic_dense_envelope_externalized_gate_hlo() -> str:
@@ -789,7 +826,9 @@ def _synthetic_dense_envelope_tpu_corrections_hlo() -> str:
     assert hlo.count(old_weighted) == 8
     hlo = hlo.replace(old_weighted, corrected_weighted)
 
-    copy_anchor = "  %packed_down_scale = f32[1,8,3,48] parameter(6)"
+    copy_anchor = (
+        "  %packed_down_scale = f32[1,8,3,6144]{3,2,1,0} parameter(6)"
+    )
     copy_values = "\n".join(
         (
             copy_anchor,
@@ -816,16 +855,16 @@ def _synthetic_dense_envelope_tpu_corrections_hlo() -> str:
 def _synthetic_final_layout_async_down_scale_hlo() -> str:
     hlo = _synthetic_final_layout_optimized_hlo()
     direct = (
-        "  %down_scale_slice.0 = f32[1,1,3,48] "
+        "  %down_scale_slice.0 = f32[1,1,3,6144]{3,2,1,0} "
         "slice(%packed_down_scale), "
-        "slice={[0:1], [0:1], [0:3], [0:48]}}"
+        "slice={[0:1], [0:1], [0:3], [0:6144]}}"
     )
     asynchronous = "\n".join(
         (
-            "  %down_scale_slice_start.0 = ((f32[1,8,3,48]), "
-            "f32[1,1,3,48], s32[]) slice-start(%packed_down_scale), "
-            "slice={[0:1], [0:1], [0:3], [0:48]}}",
-            "  %down_scale_slice.0 = f32[1,1,3,48] "
+            "  %down_scale_slice_start.0 = ((f32[1,8,3,6144]{3,2,1,0}), "
+            "f32[1,1,3,6144]{3,2,1,0}, s32[]) slice-start(%packed_down_scale), "
+            "slice={[0:1], [0:1], [0:3], [0:6144]}}",
+            "  %down_scale_slice.0 = f32[1,1,3,6144]{3,2,1,0} "
             "slice-done(%down_scale_slice_start.0)",
         )
     )
@@ -1104,10 +1143,10 @@ slot = NamedSharding(mesh, P("lp4", None, None, None))
 contracts = (
     ((1, 6144), jnp.bfloat16, replicated),
     ((1, 6144), jnp.bfloat16, replicated),
-    ((4, 8, 6144, 768), jnp.uint8, slot),
-    ((4, 8, 48, 6), jnp.float32, slot),
-    ((4, 8, 384, 6144), jnp.uint8, slot),
-    ((4, 8, 3, 48), jnp.float32, slot),
+    ((4, 8, 6144, 768), jnp.float8_e4m3fn, slot),
+    ((4, 8, 48, 768), jnp.float32, slot),
+    ((4, 8, 384, 6144), jnp.float8_e4m3fn, slot),
+    ((4, 8, 3, 6144), jnp.float32, slot),
     ((6144,), jnp.bfloat16, replicated),
 )
 arguments = tuple(
@@ -1196,10 +1235,10 @@ contracts = (
     ((1, 6144), jnp.bfloat16, replicated),
     ((1, 6144), jnp.bfloat16, replicated),
     ((6144,), jnp.bfloat16, replicated),
-    ((4, 8, 6144, 768), jnp.uint8, slot),
-    ((4, 8, 48, 6), jnp.float32, slot),
-    ((4, 8, 384, 6144), jnp.uint8, slot),
-    ((4, 8, 3, 48), jnp.float32, slot),
+    ((4, 8, 6144, 768), jnp.float8_e4m3fn, slot),
+    ((4, 8, 48, 768), jnp.float32, slot),
+    ((4, 8, 384, 6144), jnp.float8_e4m3fn, slot),
+    ((4, 8, 3, 6144), jnp.float32, slot),
     ((6144,), jnp.bfloat16, replicated),
 )
 arguments = tuple(
@@ -1548,7 +1587,9 @@ def test_dense_cross_layer_hlo_contract_requires_layer1_only_result() -> None:
 
 
 def test_dense_final_layout_hlo_contract_requires_accepted_weight_layout() -> None:
-    accepted = _synthetic_final_layout_optimized_hlo()
+    accepted = _with_exact_scheduled_dense_tiling(
+        _synthetic_final_layout_optimized_hlo()
+    )
     contract = MODULE._validate_optimized_hlo(
         accepted,
         compile_rows=32,
@@ -1558,15 +1599,36 @@ def test_dense_final_layout_hlo_contract_requires_accepted_weight_layout() -> No
     assert contract["passed"], contract
     assert contract["exact_accepted_weight_layout"] is True
     assert contract["exact_packed_weight_lineage"] is True
+    assert contract["scheduled_kernel_geometry_required"] is True
+    assert contract["exact_accepted_kernel_geometry"] is True
+    for source, replacement in (
+        ('"kernel_window_bounds":["384","6"]', '"kernel_window_bounds":["48","6"]'),
+        ('"iteration_bounds":["8","1","1"]', '"iteration_bounds":["6","1","1"]'),
+        ('"input_window_bounds":["4","24"]', '"input_window_bounds":["999","999"]'),
+        ('"pad_input_on_minor_dim":"0"', '"pad_input_on_minor_dim":"1"'),
+        ('"cost_model_type":"COST_MODEL_TYPE_CLASSIC"', '"cost_model_type":"ROGUE"'),
+        ('"is_mask":false', '"is_mask":true'),
+    ):
+        wrong_tiling = accepted.replace(source, replacement, 1)
+        assert wrong_tiling != accepted
+        rejected = MODULE._validate_optimized_hlo(
+            wrong_tiling,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+        )
+        assert rejected["passed"] is False
+        assert rejected["exact_accepted_kernel_geometry"] is False
+        assert "accepted dense convolution tiling drifted" in rejected["violations"]
     no_owner_scale = accepted.replace(
-        "  %gate_scale_slice.0 = f32[1,1,48,6] "
+        "  %gate_scale_slice.0 = f32[1,1,48,768]{3,2,1,0} "
         "slice(%packed_gate_scale), "
-        "slice={[0:1], [0:1], [0:48], [0:6]}",
-        "  %gate_scale_no_owner.0 = f32[8,48,6] "
+        "slice={[0:1], [0:1], [0:48], [0:768]}",
+        "  %gate_scale_no_owner.0 = f32[8,48,768]{2,1,0} "
         "reshape(%packed_gate_scale)\n"
-        "  %gate_scale_slice.0 = f32[1,48,6] "
+        "  %gate_scale_slice.0 = f32[1,48,768]{2,1,0} "
         "slice(%gate_scale_no_owner.0), "
-        "slice={[0:1], [0:48], [0:6]}",
+        "slice={[0:1], [0:48], [0:768]}",
         1,
     )
     assert no_owner_scale != accepted
@@ -1645,33 +1707,51 @@ def test_dense_final_layout_hlo_contract_requires_accepted_weight_layout() -> No
             1,
         ),
         accepted.replace(
-            "  %down_fp8.0 = f8e4m3fn[384,6144] "
-            "bitcast-convert(%down_bits.0)",
-            "  %rogue_down_bits.0 = u8[384,6144] add("
+            "  %down_f32.0 = f32[384,6144] convert(%down_bits.0)",
+            "  %rogue_down_bits.0 = f8e4m3fn[384,6144] add("
             "%down_bits.0, %down_bits.0)\n"
-            "  %down_fp8.0 = f8e4m3fn[384,6144] "
-            "bitcast-convert(%rogue_down_bits.0)",
+            "  %down_f32.0 = f32[384,6144] convert(%rogue_down_bits.0)",
             1,
         ),
         accepted.replace(
-            "  %gate_bits_slice.0 = u8[1,1,6144,768] "
+            "  %gate_bits_slice.0 = f8e4m3fn[1,1,6144,768]{3,2,1,0} "
             "slice(%packed_gate_bits), slice={[0:1], [0:1], [0:6144], [0:768]}",
-            "  %reassociated_gate_bits.0 = u8[1,6144,8,768] "
+            "  %reassociated_gate_bits.0 = f8e4m3fn[1,6144,8,768]{3,2,1,0} "
             "reshape(%packed_gate_bits)\n"
-            "  %gate_bits_slice.0 = u8[1,6144,1,768] "
+            "  %gate_bits_slice.0 = f8e4m3fn[1,6144,1,768]{3,2,1,0} "
             "slice(%reassociated_gate_bits.0), "
             "slice={[0:1], [0:6144], [0:1], [0:768]}",
             1,
         ),
         accepted.replace(
-            "  %gate_scale_seed.0 = f32[48,6] "
+            "  %gate_scale_seed.0 = f32[48,768]{1,0} "
             "reshape(%gate_scale_slice.0)\n"
-            "  %gate_scale_inner.0 = f32[48,128,6] "
+            "  %gate_scale_inner.0 = f32[48,128,768]{2,1,0} "
             "broadcast(%gate_scale_seed.0), dimensions={0,2}",
-            "  %gate_scale_seed.0 = f32[6,48] "
+            "  %gate_scale_seed.0 = f32[768,48]{1,0} "
             "reshape(%gate_scale_slice.0)\n"
-            "  %gate_scale_inner.0 = f32[6,128,48] "
+            "  %gate_scale_inner.0 = f32[768,128,48]{2,1,0} "
             "broadcast(%gate_scale_seed.0), dimensions={0,2}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_bits.0 = f8e4m3fn[6144,768]{1,0} bitcast",
+            "%gate_bits.0 = f8e4m3fn[6144,768]{0,1} bitcast",
+            1,
+        ),
+        accepted.replace(
+            "%down_bits.0 = f8e4m3fn[384,6144]{1,0} bitcast",
+            "%down_bits.0 = f8e4m3fn[384,6144]{0,1} bitcast",
+            1,
+        ),
+        accepted.replace(
+            "%gate_scale_wide.0 = f32[6144,768]{1,0} reshape",
+            "%gate_scale_wide.0 = f32[6144,768]{0,1} reshape",
+            1,
+        ),
+        accepted.replace(
+            "%down_scale_wide.0 = f32[384,6144]{1,0} reshape",
+            "%down_scale_wide.0 = f32[384,6144]{0,1} reshape",
             1,
         ),
     )
@@ -1692,7 +1772,7 @@ def test_dense_final_layout_hlo_contract_requires_accepted_weight_layout() -> No
     not REAL_FINAL_LAYOUT_OPTIMIZED_HLO.exists(),
     reason="protected final-layout optimized HLO is unavailable",
 )
-def test_dense_final_layout_real_hlo_binds_folded_scale_lowerings() -> None:
+def test_dense_final_layout_real_hlo_records_rejected_compressed_scales() -> None:
     optimized_hlo = REAL_FINAL_LAYOUT_OPTIMIZED_HLO.read_text()
     assert sha256(optimized_hlo.encode()).hexdigest() == (
         REAL_FINAL_LAYOUT_OPTIMIZED_HLO_SHA256
@@ -1703,42 +1783,12 @@ def test_dense_final_layout_real_hlo_binds_folded_scale_lowerings() -> None:
         layer1_only=True,
         final_dense_layout=True,
     )
-    assert contract["passed"], contract
-    assert contract["exact_accepted_weight_layout"] is True
-    assert contract["exact_packed_weight_lineage"] is True
-    gate_rogue = optimized_hlo.replace(
-        "  ROOT %bitcast.350 = f32[1,6,48,128]",
-        "  %rogue_gate_inner = f32[48,128,6] add("
-        "%broadcast_in_dim.137, %broadcast_in_dim.137)\n"
-        "  ROOT %bitcast.350 = f32[1,6,48,128]",
-        1,
-    ).replace(
-        "bitcast(%broadcast_in_dim.137)",
-        "bitcast(%rogue_gate_inner)",
-        1,
-    )
-    down_rogue = optimized_hlo.replace(
-        "  %bitcast.450 = f32[48,8,48,128]",
-        "  %rogue_down_outer = f32[384,48,128] add("
-        "%broadcast_in_dim.101, %broadcast_in_dim.101)\n"
-        "  %bitcast.450 = f32[48,8,48,128]",
-        1,
-    ).replace(
-        "bitcast(%broadcast_in_dim.101)",
-        "bitcast(%rogue_down_outer)",
-        1,
-    )
-    assert gate_rogue != optimized_hlo and down_rogue != optimized_hlo
-    for mutated in (gate_rogue, down_rogue):
-        rejected = MODULE._validate_optimized_hlo(
-            mutated,
-            compile_rows=32,
-            layer1_only=True,
-            final_dense_layout=True,
-        )
-        assert rejected["passed"] is False
-        assert rejected["exact_packed_weight_lineage"] is False
-        assert "packed dense weight lineage drifted" in rejected["violations"]
+    assert contract["passed"] is False
+    assert contract["scheduled_kernel_geometry_required"] is True
+    assert contract["exact_packed_weight_lineage"] is False
+    assert contract["exact_accepted_kernel_geometry"] is False
+    assert "packed dense weight lineage drifted" in contract["violations"]
+    assert "accepted dense convolution tiling drifted" in contract["violations"]
 
 
 def test_dense_final_layout_accepts_only_exact_async_rank_slice() -> None:
@@ -1752,8 +1802,8 @@ def test_dense_final_layout_accepts_only_exact_async_rank_slice() -> None:
     assert contract["passed"], contract
     assert contract["exact_packed_weight_lineage"] is True
     wrong_rank = optimized_hlo.replace(
-        "slice={[0:1], [0:1], [0:3], [0:48]}}",
-        "slice={[0:1], [1:2], [0:3], [0:48]}}",
+        "slice={[0:1], [0:1], [0:3], [0:6144]}}",
+        "slice={[0:1], [1:2], [0:3], [0:6144]}}",
         1,
     )
     assert wrong_rank != optimized_hlo
@@ -1857,7 +1907,9 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
     assert stable["passed"], stable
     assert stable["dense_envelope"] is True
 
-    optimized_hlo = _synthetic_dense_envelope_optimized_hlo()
+    optimized_hlo = _with_exact_scheduled_dense_tiling(
+        _synthetic_dense_envelope_optimized_hlo()
+    )
     optimized = MODULE._validate_optimized_hlo(
         optimized_hlo,
         compile_rows=32,
@@ -1866,6 +1918,7 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
         dense_envelope=True,
     )
     assert optimized["passed"], optimized
+    assert optimized["exact_accepted_kernel_geometry"] is True
     predense = optimized["lineage"]["predense_rmsnorm_contract"]
     assert predense["exact_operand_graph"] is True
     assert predense["exact_gate_input_binding"] is True
@@ -1903,8 +1956,8 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
             1,
         ),
         stablehlo.replace(
-            "%869 = stablehlo.convert %6",
-            "%869 = stablehlo.convert %20",
+                "%821 = stablehlo.convert %6",
+                "%821 = stablehlo.convert %20",
             1,
         ),
         stablehlo.replace(
@@ -2050,7 +2103,7 @@ def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
     ),
     reason="protected dense-envelope HLO is unavailable",
 )
-def test_dense_envelope_replays_failed_protected_compile_exactly() -> None:
+def test_dense_envelope_replays_db547_and_rejects_old_tiling() -> None:
     optimized_hlo = REAL_DENSE_ENVELOPE_OPTIMIZED_HLO.read_text()
     stablehlo = REAL_DENSE_ENVELOPE_STABLEHLO.read_text()
     assert sha256(optimized_hlo.encode()).hexdigest() == (
@@ -2073,112 +2126,17 @@ def test_dense_envelope_replays_failed_protected_compile_exactly() -> None:
         final_dense_layout=True,
         dense_envelope=True,
     )
-    assert optimized["passed"], optimized
-    assert stable["passed"], stable
+    assert optimized["passed"] is False
+    assert stable["passed"] is False
+    assert optimized["scheduled_kernel_geometry_required"] is True
+    assert optimized["exact_packed_weight_lineage"] is False
+    assert optimized["exact_accepted_kernel_geometry"] is False
+    assert "packed dense weight lineage drifted" in optimized["violations"]
+    assert "accepted dense convolution tiling drifted" in optimized["violations"]
     predense = optimized["lineage"]["predense_rmsnorm_contract"]
     assert predense["fused_gate_binding_count"] == 8
     assert predense["weighted_value_count"] == 8
     assert predense["exact_carried_residual_binding"] is True
-
-    correction_line = next(
-        line
-        for line in optimized_hlo.splitlines()
-        if line.lstrip().startswith("%mul.372 =")
-    )
-    wrong_correction = optimized_hlo.replace(
-        correction_line,
-        correction_line.replace(
-            '"original_type":"BF16"', '"original_type":"F32"'
-        ),
-        1,
-    )
-    slice_line = next(
-        line
-        for line in optimized_hlo.splitlines()
-        if line.lstrip().startswith("%slice-start =")
-    )
-    wrong_slice = optimized_hlo.replace(
-        slice_line,
-        slice_line.replace(
-            "slice={[0:1], [0:1], [0:3], [0:48]}",
-            "slice={[0:1], [1:2], [0:3], [0:48]}",
-        ),
-        1,
-    )
-    wrong_weighted_result = optimized_hlo.replace(
-        "  ROOT %convert.243 = bf16[32,6144]",
-        "  %rogue_weighted = f32[32,6144] add(%mul.372, %mul.372)\n"
-        "  ROOT %convert.243 = bf16[32,6144]",
-        1,
-    ).replace(
-        "convert(%mul.372)", "convert(%rogue_weighted)", 1
-    )
-    rsqrt_broadcast_line = next(
-        line
-        for line in optimized_hlo.splitlines()
-        if line.lstrip().startswith("%mul.374 =")
-    )
-    normalized_line = next(
-        line
-        for line in optimized_hlo.splitlines()
-        if line.lstrip().startswith("%mul.373 =")
-    )
-    wrong_rsqrt_layout = optimized_hlo.replace(
-        rsqrt_broadcast_line,
-        rsqrt_broadcast_line
-        + "\n  %rogue_rsqrt_layout = f32[32,6144]{0,1} "
-        "bitcast(%mul.374)",
-        1,
-    ).replace(
-        normalized_line,
-        normalized_line.replace(
-            "multiply(%add.824, %mul.374)",
-            "multiply(%add.824, %rogue_rsqrt_layout)",
-        ),
-        1,
-    )
-    assert all(
-        mutated != optimized_hlo
-        for mutated in (
-            wrong_correction,
-            wrong_slice,
-            wrong_weighted_result,
-            wrong_rsqrt_layout,
-        )
-    )
-    correction_contract = MODULE._validate_optimized_hlo(
-        wrong_correction,
-        compile_rows=32,
-        layer1_only=True,
-        final_dense_layout=True,
-        dense_envelope=True,
-    )
-    slice_contract = MODULE._validate_optimized_hlo(
-        wrong_slice,
-        compile_rows=32,
-        layer1_only=True,
-        final_dense_layout=True,
-        dense_envelope=True,
-    )
-    result_contract = MODULE._validate_optimized_hlo(
-        wrong_weighted_result,
-        compile_rows=32,
-        layer1_only=True,
-        final_dense_layout=True,
-        dense_envelope=True,
-    )
-    layout_contract = MODULE._validate_optimized_hlo(
-        wrong_rsqrt_layout,
-        compile_rows=32,
-        layer1_only=True,
-        final_dense_layout=True,
-        dense_envelope=True,
-    )
-    assert correction_contract["passed"] is False
-    assert result_contract["passed"] is False
-    assert layout_contract["passed"] is False
-    assert slice_contract["passed"] is False
-    assert slice_contract["exact_packed_weight_lineage"] is False
 
 
 @pytest.mark.skipif(
@@ -2634,7 +2592,7 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "GLM_GREENFIELD_DENSE_LAYER1_ONLY",
         "GLM_GREENFIELD_DENSE_FINAL_LAYOUT",
         "GLM_GREENFIELD_DENSE_ENVELOPE",
-        "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba",
+        "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4",
         'strict_census pre',
         'strict_census post',
         'rollback_provisional_db',
@@ -2659,6 +2617,8 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "final_layout_record",
         "final_layout_hlo",
         "final_layout_lineage",
+        "final_layout_kernel_geometry",
+        "final_layout_scheduled_geometry",
         "final_layout_constraint",
         "envelope",
         "envelope_fusion",
@@ -2909,9 +2869,11 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "cross_layer_mode",
         "final_layout",
             "final_layout_record",
-            "final_layout_hlo",
-            "final_layout_lineage",
-            "final_layout_constraint",
+                "final_layout_hlo",
+                "final_layout_lineage",
+                "final_layout_kernel_geometry",
+                "final_layout_scheduled_geometry",
+                "final_layout_constraint",
             "envelope",
             "envelope_fusion",
             "envelope_graph",
@@ -2999,14 +2961,17 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             )
             runner["hlo"]["optimized_contract"].update(
                 {
+                    "exact_accepted_kernel_geometry": True,
                     "exact_accepted_weight_layout": True,
                     "exact_packed_weight_lineage": True,
+                    "scheduled_kernel_geometry_required": True,
                     "accepted_weight_layouts": {
                         label: [
                             {
                                 "accepted": True,
                                 "accepted_layout": True,
                                 "convolution": f"%{label}.{index}",
+                                "exact_convolution_tiling": True,
                                 "exact_packed_dequant": True,
                                 "parameter_sources": [
                                     f"%{label}_bits",
@@ -3031,6 +2996,14 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             elif mutation == "final_layout_lineage":
                 runner["hlo"]["optimized_contract"][
                     "exact_packed_weight_lineage"
+                ] = False
+            elif mutation == "final_layout_kernel_geometry":
+                runner["hlo"]["optimized_contract"][
+                    "accepted_weight_layouts"
+                ]["gate_up"][0]["exact_convolution_tiling"] = False
+            elif mutation == "final_layout_scheduled_geometry":
+                runner["hlo"]["optimized_contract"][
+                    "scheduled_kernel_geometry_required"
                 ] = False
             elif mutation == "final_layout_constraint":
                 runner["hlo"]["stablehlo_contract"][
@@ -3237,12 +3210,16 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     assert environment["final_dense_layout"] is final_layout
     if final_layout:
         assert environment["final_layout_records_sha256"] == (
-            "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+            "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4"
         )
+        assert environment["exact_accepted_kernel_geometry"] is True
+        assert environment["scheduled_kernel_geometry_required"] is True
         assert summary["final_layout_records"] == MODULE._FINAL_DENSE_LAYOUT_RECORDS
         assert summary["final_layout_records_sha256"] == (
-            "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba"
+            "45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4"
         )
+        assert summary["exact_accepted_kernel_geometry"] is True
+        assert summary["scheduled_kernel_geometry_required"] is True
     assert environment["result_mode"] == (
         "layer1_only"
         if mutation in ("cross_layer", "final_layout", "envelope")
