@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-12 UTC
+**Updated:** 2026-08-13 UTC
 
 ## Authority and isolation
 
@@ -44,16 +44,25 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `f32[32,768] convolution(bf16[32,6144], bf16[6144,768])`, then BF16 conversion; down uses
   `f32[32,6144] convolution(bf16[32,384], bf16[384,6144])`, then BF16 conversion and the already-
   proved global StrategyND BF16 association. The greenfield virtual dense path instead uses the
-  fused Pallas SwiGLU/down kernel for each virtual shard. The bounded replacement is implemented:
-  eight one-row virtual convolution chains reuse DB538's exact StrategyND-attention state and
-  accepted layer-1 normalized target, with manifest-bound stage-0 weights and a default-off,
-  serialized protected wrapper. Its one new-diff Sol audit found four publication/HLO gaps and one
-  final exact-arithmetic gap. Corrections authenticate every DB prefix and archive byte, pin exact
-  StableHLO weight/source order, SwiGLU operands, the barrier-rounded DB533 `y -> x -> z` forests,
-  and residual/RMSNorm semantics. The three reported arithmetic mutations now refuse; the affected
-  suite passes 56/56 and static checks pass. Exact next is correction-only confirmation by the same
-  reviewer, commit/push, then one protected discriminator. Only an exact result may be integrated
-  before the next 8K retry; a nonexact result triggers the smallest post-MLP oracle capture.
+  fused Pallas SwiGLU/down kernel for each virtual shard. The reviewed bounded replacement is pushed
+  at `86f0796817936ff0c3197b436083d68f1c424c7a`. Its first protected run ending
+  `20260813T000326337357270Z` emitted exact pre-fusion StableHLO and optimized TPU HLO, then refused
+  before execution because the optimized validator did not yet follow convolution/SwiGLU and DB533
+  association values across TPU-created nested and tuple-output fusions. There is no tensor result,
+  classification, DB row, summary or `SUCCESS`; failure cleanup is authenticated 8/8. Preserved
+  optimized/StableHLO SHAs are `e3a2538f...7ca0` / `a32a3cf8...70f6`.
+- The bounded correction now maps only exact callee roots/tuple indices to caller values, recursively
+  resolves SwiGLU parameters to the same-rank gate convolution, recognizes TPU BF16 correction
+  metadata, rebuilds all 27 physical DB533 components across fusions, and pins TPU's ordered three-
+  band pad/max plus 24-segment dynamic-update chain. The preserved real HLO passes; wrong BF16
+  metadata, y padding, z offset and physical leaf mutations refuse. The CPU-only affected suite
+  passes 58/58 and compile/diff checks pass. The first correction-only review reproduced three
+  remaining broad-dependency/decoy edges in nested SwiGLU: extra arithmetic before the nested
+  source, a dead BF16 convert, and extra arithmetic before down convolution. All now require exact
+  identity through bounded unary layout transforms and live producer BF16 semantics; all three
+  preserved-HLO mutations refuse. Exact next is confirmation by that same reviewer, commit/push and
+  one serialized discriminator retry. Only an exact result may be integrated before the next 8K
+  retry; a nonexact result triggers the smallest post-MLP oracle capture.
 - Protected DB538/item1822 completed the four independent post-latent arms at pushed pin
   `e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc`. Every arm first reproduces accepted post-`W_UV`
   SHA `79a6e290...2e9d`, so W_UV is closed. Neither local nor accepted StrategyND association at

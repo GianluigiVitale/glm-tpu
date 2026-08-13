@@ -16,6 +16,16 @@ import pytest
 REPO = Path(__file__).resolve().parents[3]
 SCRIPT = REPO / "scripts/greenfield/probe_layer0_dense_convolution.py"
 WRAPPER = REPO / "scripts/greenfield/run_layer0_projection_reduction_probe.sh"
+REAL_OPTIMIZED_HLO = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_HLO",
+        "/home/gianl/glm-run/greenfield_layer0_dense_convolution_"
+        "20260813T000326337357270Z/hlo/dense_convolution.optimized_hlo.txt",
+    )
+)
+REAL_OPTIMIZED_HLO_SHA256 = (
+    "e3a2538f8d158f2113e93563ba3ba3a24e51a57b45981db33a7b3b7fdc857ca0"
+)
 SPEC = importlib.util.spec_from_file_location("dense_convolution_probe", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -382,6 +392,81 @@ def test_dense_convolution_hlo_contract_binds_fused_component_root() -> None:
     )
     assert not mixed["passed"]
     assert not mixed["lineage"]["association_edge_graph"]["y"]["exact"]
+
+
+@pytest.mark.skipif(
+    not REAL_OPTIMIZED_HLO.exists(),
+    reason="protected real dense-convolution HLO is not mounted",
+)
+def test_dense_convolution_hlo_contract_replays_real_tpu_fusions() -> None:
+    assert MODULE._file_sha256(REAL_OPTIMIZED_HLO) == REAL_OPTIMIZED_HLO_SHA256
+    hlo = REAL_OPTIMIZED_HLO.read_text()
+    exact = MODULE._validate_optimized_hlo(hlo)
+    assert exact["passed"], exact["violations"]
+
+    missing_silu_round = hlo.splitlines()
+    for index, line in enumerate(missing_silu_round):
+        if line.lstrip().startswith("%mul.237 ="):
+            missing_silu_round[index] = line.replace(
+                '"original_type":"BF16"', '"original_type":"F32"'
+            )
+            break
+    dead_silu_round = list(missing_silu_round)
+    dead_silu_round.insert(
+        index + 1,
+        "  %dead_silu_round = bf16[1,384]{1,0:T(2,128)(2,1)} "
+        "convert(%mul.237)",
+    )
+    rogue_gate = hlo.replace(
+        "  %convert_bitcast_fusion.7 = bf16[1,1,6144]",
+        "  %rogue_gate.0 = bf16[1,768]{1,0:T(2,128)(2,1)S(3)} "
+        "add(%fusion.77, %fusion.77)\n"
+        "  %convert_bitcast_fusion.7 = bf16[1,1,6144]",
+        1,
+    ).replace(
+        "fusion(%bitcast.405, %bitcast.422, %fusion.77), kind=kOutput, "
+        "calls=%fused_computation.162",
+        "fusion(%bitcast.405, %bitcast.422, %rogue_gate.0), kind=kOutput, "
+        "calls=%fused_computation.162",
+        1,
+    )
+    rogue_activation = hlo.replace(
+        "  %conv_general_dilated.95 = f32[1,6144]",
+        "  %rogue_activation.0 = bf16[1,384]{1,0:T(2,128)(2,1)} "
+        "add(%fusion.79, %fusion.79)\n"
+        "  %conv_general_dilated.95 = f32[1,6144]",
+        1,
+    ).replace(
+        "convolution(%fusion.79, %fusion.69)",
+        "convolution(%rogue_activation.0, %fusion.69)",
+        1,
+    )
+    mutations = (
+        hlo.replace(
+            "padding=0_0x0_0x0_0x0_4096",
+            "padding=0_0x0_0x0_0x0_4095",
+            1,
+        ),
+        hlo.replace(
+            "%constant.136 = s32[] constant(5888)",
+            "%constant.136 = s32[] constant(5632)",
+            1,
+        ),
+        "\n".join(missing_silu_round) + "\n",
+        "\n".join(dead_silu_round) + "\n",
+        rogue_gate,
+        rogue_activation,
+        hlo.replace(
+            "add(%get-tuple-element.19, %get-tuple-element.16)",
+            "add(%get-tuple-element.19, %get-tuple-element.19)",
+            1,
+        ),
+    )
+    assert all(value != hlo for value in mutations)
+    assert all(
+        not MODULE._validate_optimized_hlo(value)["passed"]
+        for value in mutations
+    )
 
 
 def test_dense_convolution_hlo_contract_rejects_wrong_geometry_and_group() -> None:

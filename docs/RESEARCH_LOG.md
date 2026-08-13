@@ -8024,3 +8024,40 @@ unmotivated arithmetic variants.
   ShellCheck, all five wrapper Python heredocs and diff checks pass. This remains local readiness;
   the same reviewer returned `APPROVE COMMIT` for staged SHA `61d7a917...8cda`. Only commit/push
   and the protected four-chip discriminator remain.
+
+## 2026-08-13 00:03--00:31 — first dense discriminator preserves real TPU fusion forms
+
+- The reviewed discriminator was committed/pushed as
+  `86f0796817936ff0c3197b436083d68f1c424c7a` and launched once under tag
+  `greenfield_layer0_dense_convolution_20260813T000326337357270Z`. Its strict pre-census passed
+  8/8 and the protected checkpoint compiled, but the optimized-HLO contract refused before model
+  execution. TPU placed the eight gate and down convolutions in single-output fusions, nested each
+  SwiGLU in the down fusion, split the DB533 leaf adds into tuple-output fusions, lowered the y
+  concatenate to a three-pad maximum fusion and lowered the z concatenate to 24 ordered
+  dynamic-update-slice fusions. The arithmetic candidate did not run and this is not correctness or
+  performance evidence.
+- The run has no tensor/classification/DB/summary/`SUCCESS`. Runner, optimized-HLO, StableHLO,
+  pre-census and failure-census SHAs are `94dddfb8...1353`, `e3a2538f...7ca0`,
+  `a32a3cf8...70f6`, `d4de1214...b628` and `f802071a...29c`; cleanup is authenticated 8/8.
+- The correction maps an internal value outward only when it is the exact unary-unwrapped callee
+  root or exact tuple element. It uses those values to prove the same-rank gate/down bijection,
+  ordered eight-row stack and nested SwiGLU source/result flow. TPU's explicit
+  `float_type_correction_info.original_type=BF16` is accepted as the backend representation of the
+  StableHLO-pinned BF16 rounds.
+- The association proof is now computation-independent: all 82 scoped adds are externalized through
+  exact caller results, then rebuilt into three y and 24 z three-add components with exact physical
+  row identities and DB533 adjacent/cross pairing. It separately proves the y pad/max fusion's exact
+  offsets and `-inf` leaves and the z chain's exact segment-to-offset mapping and predecessor chain.
+  The preserved TPU HLO passes while corrupting a SwiGLU BF16 correction, y pad, z offset or y leaf
+  refuses. The portable direct/fused tests remain green; the protected replay is SHA-pinned and
+  skips when the evidence mount is unavailable.
+- A broad local test invocation initially inherited the TPU backend and was terminated without a
+  protected workflow or result; an immediate fleet census showed 8/8 zero work. The corrected
+  `JAX_PLATFORMS=cpu` affected suite passes 58/58 in 17.56 seconds. Compileall and diff checks pass.
+  The correction-only Sol review then reproduced three optimized-HLO fail-opens: a same-shaped add
+  inserted between the rank-0 gate convolution and nested SwiGLU, a dead BF16 conversion masking
+  F32 SwiGLU producer semantics, and a same-shaped add inserted between activated SwiGLU and down
+  convolution. The source and down edges now require exact identity after only bounded unary layout
+  transforms, while BF16 validity belongs to each live producer rather than any convert user. All
+  three preserved-real-HLO mutations now refuse. The focused and affected CPU suites pass 16/16 and
+  58/58; exact next is same-reviewer confirmation, commit/push, then one protected retry.

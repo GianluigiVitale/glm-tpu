@@ -23,10 +23,12 @@ if str(REPO) not in sys.path:
 
 from scripts.greenfield.probe_layer0_projection_reduction import (  # noqa: E402
     _compare_bits,
+    _computation_id,
     _file_sha256,
     _instruction_key,
     _load_weights,
     _shape_signatures,
+    _tuple_index,
     _value_depends_on,
 )
 
@@ -276,15 +278,93 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
             return is_one(operand(item, 0))
         return False
 
-    def exact_bf16_round(item: Any) -> bool:
-        if len(item.result_shapes) == 1 and item.result_shapes[0].dtype == "bf16":
-            return True
-        return any(
-            user.raw_opcode == "convert"
-            and len(user.result_shapes) == 1
-            and user.result_shapes[0].dtype == "bf16"
-            for user in users.get(_instruction_key(item), ())
+    def has_bf16_correction(item: Any) -> bool:
+        compact = re.sub(r"\s+", "", item.raw_line)
+        return (
+            '"float_type_correction_info":' in compact
+            and '"original_type":"BF16"' in compact
         )
+
+    def exact_bf16_round(item: Any) -> bool:
+        return (
+            len(item.result_shapes) == 1
+            and item.result_shapes[0].dtype == "bf16"
+        ) or has_bf16_correction(item)
+
+    instructions_by_computation: dict[str, list[Any]] = {}
+    callers_by_computation: dict[str, list[Any]] = {}
+    for item in module.instructions:
+        instructions_by_computation.setdefault(
+            _computation_id(item.computation), []
+        ).append(item)
+        if item.raw_opcode == "fusion":
+            match = re.search(r"\bcalls=%?([^,\s}\]]+)", item.raw_line)
+            if match is not None:
+                callers_by_computation.setdefault(match.group(1), []).append(item)
+
+    external_value_memo: dict[tuple[str, str], tuple[Any, ...]] = {}
+
+    def exact_external_values(item: Any) -> tuple[Any, ...]:
+        """Map one exact internal value to its caller result/GTE values."""
+
+        key = _instruction_key(item)
+        if key in external_value_memo:
+            return external_value_memo[key]
+        if item.computation.startswith("ENTRY "):
+            result = (item,)
+            external_value_memo[key] = result
+            return result
+        computation = _computation_id(item.computation)
+        roots = [
+            value
+            for value in instructions_by_computation.get(computation, ())
+            if value.raw_line.lstrip().startswith("ROOT ")
+        ]
+        callers = callers_by_computation.get(computation, ())
+        if len(roots) != 1 or len(callers) != 1:
+            external_value_memo[key] = ()
+            return ()
+        root = roots[0]
+        caller = callers[0]
+        result = []
+        if root.raw_opcode == "tuple":
+            for index, name in enumerate(root.operand_names):
+                value = by_key.get((root.computation, name))
+                if unwrap(value) is not item:
+                    continue
+                selected = [
+                    user
+                    for user in users.get(_instruction_key(caller), ())
+                    if user.raw_opcode == "get-tuple-element"
+                    and _tuple_index(user) == index
+                ]
+                if len(selected) != 1:
+                    external_value_memo[key] = ()
+                    return ()
+                result.append(selected[0])
+        elif unwrap(root) is item:
+            result.append(caller)
+        external_value_memo[key] = tuple(result)
+        return tuple(result)
+
+    def external_parameter_value(item: Any | None) -> Any | None:
+        """Resolve a nested-fusion parameter to its exact outer operand."""
+
+        seen: set[tuple[str, str]] = set()
+        while item is not None and item.raw_opcode == "parameter":
+            key = _instruction_key(item)
+            if key in seen or item.computation.startswith("ENTRY "):
+                break
+            seen.add(key)
+            match = re.search(r"\bparameter\(([0-9]+)\)", item.raw_line)
+            callers = callers_by_computation.get(
+                _computation_id(item.computation), ()
+            )
+            if match is None or len(callers) != 1:
+                return None
+            index = int(match.group(1))
+            item = operand(callers[0], index)
+        return item
     convolutions = [
         item for item in module.instructions if item.raw_opcode == "convolution"
     ]
@@ -366,6 +446,8 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
     lineage: dict[str, Any] = {}
     gate_by_rank: dict[int | None, Any] = {}
     down_by_rank: dict[int | None, Any] = {}
+    gate_value_by_rank: dict[int, Any] = {}
+    down_value_by_rank: dict[int, Any] = {}
     if len(gate_up) == 8 and len(down) == 8:
         gate_by_rank = {virtual_rank(item): item for item in gate_up}
         down_by_rank = {virtual_rank(item): item for item in down}
@@ -379,11 +461,26 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
             range(8)
         ):
             violations.append("optimized virtual-rank scopes drifted")
+        else:
+            for rank in range(8):
+                gate_values = exact_external_values(gate_by_rank[rank])
+                down_values = exact_external_values(down_by_rank[rank])
+                if len(gate_values) == 1:
+                    gate_value_by_rank[rank] = gate_values[0]
+                if len(down_values) == 1:
+                    down_value_by_rank[rank] = down_values[0]
         down_to_gate = {
             item.name: [
                 producer.name
-                for producer in gate_up
-                if _value_depends_on(module, item, producer)
+                for rank, producer in gate_by_rank.items()
+                if rank is not None
+                and rank in gate_value_by_rank
+                and virtual_rank(item) in down_value_by_rank
+                and _value_depends_on(
+                    module,
+                    down_value_by_rank[virtual_rank(item)],
+                    gate_value_by_rank[rank],
+                )
             ]
             for item in down
         }
@@ -559,49 +656,19 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                         f"virtual rank {rank} optimized SwiGLU source is absent"
                     )
                     continue
-                if source.computation == gate_by_rank[rank].computation:
-                    source_bound = _value_depends_on(
-                        module, source, gate_by_rank[rank]
-                    )
-                    result_bound = _value_depends_on(
-                        module, down_by_rank[rank], activated
-                    )
-                else:
-                    callee = re.match(
-                        r"%?([^\s(]+)", source.computation
-                    )
-                    parameter_match = re.search(
-                        r"\bparameter\(([0-9]+)\)", source.raw_line
-                    )
-                    callers = [
-                        item
-                        for item in module.instructions
-                        if item.raw_opcode == "fusion"
-                        and callee is not None
-                        and re.search(
-                            rf"\bcalls=%?{re.escape(callee.group(1))}(?:[,\s}}])",
-                            item.raw_line,
-                        )
-                        and virtual_rank(item) == rank
-                    ]
-                    if (
-                        len(callers) != 1
-                        or parameter_match is None
-                        or int(parameter_match.group(1))
-                        >= len(callers[0].operand_names)
-                    ):
-                        source_bound = False
-                        result_bound = False
-                    else:
-                        caller_source = operand(
-                            callers[0], int(parameter_match.group(1))
-                        )
-                        source_bound = caller_source is not None and _value_depends_on(
-                            module, caller_source, gate_by_rank[rank]
-                        )
-                        result_bound = _value_depends_on(
-                            module, down_by_rank[rank], callers[0]
-                        )
+                outer_source = external_parameter_value(source)
+                source_bound = (
+                    outer_source is not None
+                    and rank in gate_value_by_rank
+                    and unwrap(outer_source) is unwrap(gate_value_by_rank[rank])
+                )
+                activated_values = exact_external_values(activated)
+                result_bound = (
+                    len(activated_values) == 1
+                    and unwrap(operand(down_by_rank[rank], 0))
+                    is unwrap(activated_values[0])
+                    and rank in down_value_by_rank
+                )
                 if not source_bound or not result_bound:
                     violations.append(
                         f"virtual rank {rank} optimized fused SwiGLU binding drifted"
@@ -611,9 +678,9 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
             lineage["activation_contract"] = activation_contract
     if collective is not None:
         source_convolutions = {
-            item.name
-            for item in down
-            if _value_depends_on(module, collective, item)
+            down_by_rank[rank].name
+            for rank, value in down_value_by_rank.items()
+            if _value_depends_on(module, collective, value)
         }
         lineage["collective_convolution_sources"] = sorted(source_convolutions)
         if source_convolutions != {item.name for item in down}:
@@ -644,8 +711,11 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                 [
                     rank
                     for rank in range(8)
-                    if operand is not None
-                    and _value_depends_on(module, operand, down_by_rank[rank])
+                    if rank in down_value_by_rank
+                    and operand is not None
+                    and _value_depends_on(
+                        module, operand, down_value_by_rank[rank]
+                    )
                 ]
                 for operand in stack_operands
             ]
@@ -751,47 +821,53 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     "optimized StrategyND y/x/z add geometry drifted: "
                     f"{expected_association_shapes}"
                 )
-            elif any(
-                not (
-                    item.computation == collective.computation
-                    and _value_depends_on(module, item, collective)
-                    and _value_depends_on(module, root_operands[0], item)
-                )
-                and not any(
-                    _value_depends_on(module, caller, collective)
-                    and _value_depends_on(module, root_operands[0], caller)
-                    for caller in module.instructions
-                    if caller.raw_opcode == "fusion"
-                    and (
-                        match := re.search(
-                            r"\bcalls=%?([^,\s}\]]+)", caller.raw_line
+            def association_add_is_live(item: Any) -> bool:
+                values = exact_external_values(item)
+                if len(values) == 1:
+                    external = values[0]
+                else:
+                    computation = _computation_id(item.computation)
+                    roots = [
+                        value
+                        for value in instructions_by_computation.get(
+                            computation, ()
                         )
-                    )
-                    and match.group(1)
-                    == item.computation.removeprefix("%").split(None, 1)[0]
-                )
-                for item in association_adds
+                        if value.raw_line.lstrip().startswith("ROOT ")
+                    ]
+                    callers = callers_by_computation.get(computation, ())
+                    if (
+                        len(roots) != 1
+                        or len(callers) != 1
+                        or not local_depends(roots[0], item)
+                    ):
+                        return False
+                    external = callers[0]
+                return _value_depends_on(
+                    module, external, collective
+                ) and _value_depends_on(module, root_operands[0], external)
+
+            if expected_association_shapes == {"y": 9, "x": 1, "z": 72} and any(
+                not association_add_is_live(item) for item in association_adds
             ):
                 violations.append("optimized StrategyND add lineage drifted")
-            else:
-                shape_labels = {
-                    (2, 4, 1, 2048): "y",
-                    (4, 1, 6144): "x",
-                    (256,): "z",
-                }
-
+            if expected_association_shapes == {"y": 9, "x": 1, "z": 72}:
                 def normalized_dimensions(item: Any) -> tuple[int, ...]:
                     dimensions = item.result_shapes[0].dimensions
                     while dimensions and dimensions[0] == 1:
                         dimensions = dimensions[1:]
                     return dimensions
 
+                add_by_external_key = {
+                    _instruction_key(values[0]): _instruction_key(item)
+                    for item in association_adds
+                    if len(values := exact_external_values(item)) == 1
+                }
+
                 def nearest_adds(
                     item: Any | None,
                     candidates: set[tuple[str, str]],
-                    computation: str,
                 ) -> set[tuple[str, str]]:
-                    if item is None or item.computation != computation:
+                    if item is None:
                         return set()
                     pending = [_instruction_key(item)]
                     seen: set[tuple[str, str]] = set()
@@ -804,6 +880,10 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                         if key in candidates:
                             found.add(key)
                             continue
+                        external_add = add_by_external_key.get(key)
+                        if external_add in candidates:
+                            found.add(external_add)
+                            continue
                         value = by_key.get(key)
                         if value is not None:
                             pending.extend(
@@ -811,101 +891,6 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                                 for name in value.operand_names
                             )
                     return found
-
-                association_graph: dict[str, Any] = {}
-                for dimensions, label in shape_labels.items():
-                    values = [
-                        item
-                        for item in association_adds
-                        if normalized_dimensions(item) == dimensions
-                    ]
-                    if label == "x":
-                        exact = (
-                            len(values) == 1
-                            and len(values[0].operand_names) == 2
-                            and unwrap(operand(values[0], 0))
-                            is not unwrap(operand(values[0], 1))
-                            and exact_bf16_round(values[0])
-                        )
-                        association_graph[label] = {
-                            "component_count": 1 if exact else 0,
-                            "exact": exact,
-                        }
-                        if not exact:
-                            violations.append(
-                                "optimized StrategyND x edge graph drifted"
-                            )
-                        continue
-                    candidates_by_computation: dict[
-                        str, set[tuple[str, str]]
-                    ] = {}
-                    for item in values:
-                        candidates_by_computation.setdefault(
-                            item.computation, set()
-                        ).add(_instruction_key(item))
-                    component_count = 0
-                    exact = True
-                    for computation, candidates in candidates_by_computation.items():
-                        parents: dict[
-                            tuple[str, str], set[tuple[str, str]]
-                        ] = {}
-                        for key in candidates:
-                            item = by_key[key]
-                            if (
-                                len(item.operand_names) != 2
-                                or unwrap(operand(item, 0))
-                                is unwrap(operand(item, 1))
-                                or not exact_bf16_round(item)
-                            ):
-                                exact = False
-                                continue
-                            parents[key] = set().union(
-                                *(
-                                    nearest_adds(
-                                        operand(item, index),
-                                        candidates,
-                                        computation,
-                                    )
-                                    for index in range(2)
-                                )
-                            )
-                            parents[key].discard(key)
-                        children = Counter(
-                            child
-                            for parent_values in parents.values()
-                            for child in parent_values
-                        )
-                        roots = [
-                            key for key in candidates if children[key] == 0
-                        ]
-                        leaves = [
-                            key for key, parent_values in parents.items()
-                            if not parent_values
-                        ]
-                        local_components = len(candidates) // 3
-                        if (
-                            len(candidates) % 3
-                            or len(roots) != local_components
-                            or len(leaves) != 2 * local_components
-                            or any(
-                                len(parent_values) not in (0, 2)
-                                for parent_values in parents.values()
-                            )
-                            or any(count != 1 for count in children.values())
-                        ):
-                            exact = False
-                        component_count += local_components
-                    expected_components = 3 if label == "y" else 24
-                    if component_count != expected_components:
-                        exact = False
-                    association_graph[label] = {
-                        "component_count": component_count,
-                        "exact": exact,
-                    }
-                    if not exact:
-                        violations.append(
-                            f"optimized StrategyND {label} edge graph drifted"
-                        )
 
                 all_association_add_keys = {
                     _instruction_key(item) for item in association_adds
@@ -1033,139 +1018,109 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                         return row_slices[0][0][0], 0
                     raise AssertionError(label)
 
-                def called_computation(item: Any) -> str | None:
-                    match = re.search(r"\bcalls=%?([^,\s}\]]+)", item.raw_line)
-                    return None if match is None else match.group(1)
-
-                callers_by_computation: dict[str, list[Any]] = {}
-                for item in module.instructions:
-                    if item.raw_opcode != "fusion":
-                        continue
-                    callee = called_computation(item)
-                    if callee is not None:
-                        callers_by_computation.setdefault(callee, []).append(item)
-
                 def component_value(root: Any) -> Any | None:
-                    if root.computation == root_operands[0].computation:
-                        return root
-                    computation = root.computation.removeprefix("%").split(None, 1)[0]
-                    callee_roots = [
-                        item
-                        for item in module.instructions
-                        if item.computation == root.computation
-                        and item.raw_line.lstrip().startswith("ROOT ")
-                    ]
-                    if (
-                        len(callee_roots) != 1
-                        or len(callee_roots[0].result_shapes) != 1
-                        or unwrap(callee_roots[0]) is not root
-                    ):
-                        return None
-                    callers = [
-                        item
-                        for item in callers_by_computation.get(computation, ())
-                        if _value_depends_on(module, root_operands[0], item)
-                    ]
-                    return callers[0] if len(callers) == 1 else None
+                    values = exact_external_values(root)
+                    return values[0] if len(values) == 1 else None
 
                 def exact_components(
                     label: str,
                     values: list[Any],
                     expected_count: int,
                 ) -> tuple[bool, dict[int, Any], dict[str, Any]]:
-                    candidates_by_computation: dict[
-                        str, set[tuple[str, str]]
-                    ] = {}
-                    for item in values:
-                        candidates_by_computation.setdefault(
-                            item.computation, set()
-                        ).add(_instruction_key(item))
+                    candidates = {_instruction_key(item) for item in values}
                     components: dict[int, Any] = {}
                     pairings: dict[str, list[list[int]]] = {}
                     exact = True
-                    for computation, candidates in candidates_by_computation.items():
-                        parents: dict[
-                            tuple[str, str], set[tuple[str, str]]
-                        ] = {}
-                        for key in candidates:
-                            value = by_key[key]
-                            parents[key] = set().union(
-                                *(
-                                    nearest_adds(
-                                        operand(value, index),
-                                        candidates,
-                                        computation,
-                                    )
-                                    for index in range(2)
-                                )
+                    parents: dict[tuple[str, str], set[tuple[str, str]]] = {}
+                    for key in candidates:
+                        value = by_key[key]
+                        if (
+                            len(value.operand_names) != 2
+                            or unwrap(operand(value, 0))
+                            is unwrap(operand(value, 1))
+                            or not exact_bf16_round(value)
+                        ):
+                            exact = False
+                        parents[key] = set().union(
+                            *(
+                                nearest_adds(operand(value, index), candidates)
+                                for index in range(2)
                             )
-                            parents[key].discard(key)
-                        children = Counter(
-                            child
-                            for parent_values in parents.values()
-                            for child in parent_values
                         )
-                        roots = [
-                            key for key in candidates if children[key] == 0
-                        ]
-                        for root_key in roots:
-                            leaf_adds = parents.get(root_key, set())
-                            if (
-                                len(leaf_adds) != 2
-                                or any(parents.get(key) for key in leaf_adds)
-                            ):
-                                exact = False
-                                continue
-                            component_pairs: list[frozenset[int]] = []
-                            component_ids: set[int] = set()
-                            for leaf_key in leaf_adds:
-                                leaf = by_key[leaf_key]
-                                identities = [
-                                    branch_identity(
-                                        operand(leaf, index), computation, label
-                                    )
-                                    for index in range(2)
-                                ]
-                                if (
-                                    any(value is None for value in identities)
-                                    or identities[0] == identities[1]
-                                ):
-                                    exact = False
-                                    continue
-                                typed_identities = [
-                                    value for value in identities if value is not None
-                                ]
-                                if len({value[1] for value in typed_identities}) != 1:
-                                    exact = False
-                                    continue
-                                component_ids.add(typed_identities[0][1])
-                                component_pairs.append(
-                                    frozenset(value[0] for value in typed_identities)
+                        parents[key].discard(key)
+                    children = Counter(
+                        child
+                        for parent_values in parents.values()
+                        for child in parent_values
+                    )
+                    roots = [key for key in candidates if children[key] == 0]
+                    leaves = [key for key, values in parents.items() if not values]
+                    if (
+                        len(candidates) != expected_count * 3
+                        or len(roots) != expected_count
+                        or len(leaves) != expected_count * 2
+                        or any(len(values) not in (0, 2) for values in parents.values())
+                        or any(count != 1 for count in children.values())
+                    ):
+                        exact = False
+                    for root_key in roots:
+                        leaf_adds = parents.get(root_key, set())
+                        if (
+                            len(leaf_adds) != 2
+                            or any(parents.get(key) for key in leaf_adds)
+                        ):
+                            exact = False
+                            continue
+                        component_pairs: list[frozenset[int]] = []
+                        component_ids: set[int] = set()
+                        for leaf_key in leaf_adds:
+                            leaf = by_key[leaf_key]
+                            identities = [
+                                branch_identity(
+                                    operand(leaf, index), leaf.computation, label
                                 )
-                            if len(component_ids) != 1 or len(component_pairs) != 2:
-                                exact = False
-                                continue
-                            component_id = next(iter(component_ids))
-                            expected_pairs = (
-                                {frozenset((0, 3)), frozenset((1, 2))}
-                                if component_id % 2
-                                else {frozenset((0, 1)), frozenset((2, 3))}
-                            )
+                                for index in range(2)
+                            ]
                             if (
-                                set(component_pairs) != expected_pairs
-                                or set().union(*component_pairs) != set(range(4))
-                                or component_id in components
+                                any(value is None for value in identities)
+                                or identities[0] == identities[1]
                             ):
                                 exact = False
                                 continue
-                            value = component_value(by_key[root_key])
-                            if value is None:
+                            typed_identities = [
+                                value for value in identities if value is not None
+                            ]
+                            if len({value[1] for value in typed_identities}) != 1:
                                 exact = False
                                 continue
-                            components[component_id] = value
-                            pairings[str(component_id)] = sorted(
-                                [sorted(pair) for pair in component_pairs]
+                            component_ids.add(typed_identities[0][1])
+                            component_pairs.append(
+                                frozenset(value[0] for value in typed_identities)
                             )
+                        if len(component_ids) != 1 or len(component_pairs) != 2:
+                            exact = False
+                            continue
+                        component_id = next(iter(component_ids))
+                        expected_pairs = (
+                            {frozenset((0, 3)), frozenset((1, 2))}
+                            if component_id % 2
+                            else {frozenset((0, 1)), frozenset((2, 3))}
+                        )
+                        if (
+                            set(component_pairs) != expected_pairs
+                            or set().union(*component_pairs) != set(range(4))
+                            or component_id in components
+                        ):
+                            exact = False
+                            continue
+                        value = component_value(by_key[root_key])
+                        if value is None:
+                            exact = False
+                            continue
+                        components[component_id] = value
+                        pairings[str(component_id)] = sorted(
+                            [sorted(pair) for pair in component_pairs]
+                        )
                     if set(components) != set(range(expected_count)):
                         exact = False
                     return exact, components, {
@@ -1196,9 +1151,7 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                                 component_id
                                 for component_id, value in components.items()
                                 if operand(item, index) is not None
-                                and _value_depends_on(
-                                    module, operand(item, index), value
-                                )
+                                and unwrap(operand(item, index)) is unwrap(value)
                             ]
                             for index in range(len(item.operand_names))
                         ]
@@ -1211,6 +1164,219 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     if len(candidates) != 1:
                         return None, orders
                     return candidates[0], orders[0]
+
+                def parameter_index(item: Any | None) -> int | None:
+                    if item is None or item.raw_opcode != "parameter":
+                        return None
+                    match = re.search(r"\bparameter\(([0-9]+)\)", item.raw_line)
+                    return None if match is None else int(match.group(1))
+
+                def integer_constant(item: Any | None) -> int | None:
+                    if item is None or item.raw_opcode != "constant":
+                        return None
+                    match = re.search(r"\bconstant\((-?[0-9]+)\)", item.raw_line)
+                    return None if match is None else int(match.group(1))
+
+                def called_root(caller: Any) -> Any | None:
+                    match = re.search(
+                        r"\bcalls=%?([^,\s}\]]+)", caller.raw_line
+                    )
+                    if match is None:
+                        return None
+                    roots = [
+                        item
+                        for item in instructions_by_computation.get(
+                            match.group(1), ()
+                        )
+                        if item.raw_line.lstrip().startswith("ROOT ")
+                    ]
+                    return roots[0] if len(roots) == 1 else None
+
+                def ordered_padded_concatenate(
+                    components: dict[int, Any], consumer: Any
+                ) -> tuple[Any | None, list[list[int]]]:
+                    matches = []
+                    for caller in module.instructions:
+                        if (
+                            caller.raw_opcode != "fusion"
+                            or normalized_dimensions(caller)
+                            != (2, 4, 1, 6144)
+                            or len(caller.operand_names) != 3
+                            or not _value_depends_on(module, consumer, caller)
+                        ):
+                            continue
+                        caller_order = [
+                            [
+                                component_id
+                                for component_id, value in components.items()
+                                if unwrap(operand(caller, index)) is unwrap(value)
+                            ]
+                            for index in range(3)
+                        ]
+                        flattened = [values[0] for values in caller_order if len(values) == 1]
+                        if sorted(flattened) != list(range(3)):
+                            continue
+                        root = called_root(caller)
+                        if root is None:
+                            continue
+                        computation = _computation_id(root.computation)
+                        callee_items = instructions_by_computation.get(computation, ())
+                        pads = [item for item in callee_items if item.raw_opcode == "pad"]
+                        maxima = [
+                            item for item in callee_items if item.raw_opcode == "maximum"
+                        ]
+                        negative_infinity = [
+                            item
+                            for item in callee_items
+                            if item.raw_opcode == "constant"
+                            and "constant(-inf)" in item.raw_line
+                        ]
+                        exact = (
+                            len(pads) == 3
+                            and len(maxima) == 2
+                            and len(negative_infinity) == 1
+                            and all(has_bf16_correction(item) for item in maxima)
+                            and all(local_depends(root, item) for item in pads)
+                        )
+
+                        maximum_keys: set[tuple[str, str]] = set()
+
+                        def maximum_pad_leaves(
+                            item: Any | None,
+                        ) -> set[tuple[str, str]] | None:
+                            item = unwrap(item)
+                            if item is None:
+                                return None
+                            if item.raw_opcode == "pad":
+                                return {_instruction_key(item)}
+                            if (
+                                item.raw_opcode != "maximum"
+                                or not has_bf16_correction(item)
+                                or len(item.operand_names) != 2
+                            ):
+                                return None
+                            maximum_keys.add(_instruction_key(item))
+                            left = maximum_pad_leaves(operand(item, 0))
+                            right = maximum_pad_leaves(operand(item, 1))
+                            if left is None or right is None:
+                                return None
+                            return left | right
+
+                        pad_leaves = maximum_pad_leaves(root)
+                        exact = exact and (
+                            pad_leaves
+                            == {_instruction_key(item) for item in pads}
+                            and maximum_keys
+                            == {_instruction_key(item) for item in maxima}
+                        )
+                        for caller_index, values in enumerate(caller_order):
+                            if len(values) != 1:
+                                exact = False
+                                continue
+                            component_id = values[0]
+                            parameter_pads = [
+                                item
+                                for item in pads
+                                if parameter_index(unwrap(operand(item, 0)))
+                                == caller_index
+                            ]
+                            low = component_id * 2048
+                            high = (2 - component_id) * 2048
+                            expected_padding = (
+                                f"padding=0_0x0_0x0_0x{low}_{high}"
+                            )
+                            if (
+                                len(parameter_pads) != 1
+                                or expected_padding
+                                not in re.sub(r"\s+", "", parameter_pads[0].raw_line)
+                                or unwrap(operand(parameter_pads[0], 1))
+                                is not negative_infinity[0]
+                                or _shape_signatures(parameter_pads[0].operand_shapes)
+                                != ("bf16[2,4,1,2048]", "bf16[]")
+                                or _shape_signatures(parameter_pads[0].result_shapes)
+                                != ("bf16[2,4,1,6144]",)
+                            ):
+                                exact = False
+                        if exact:
+                            matches.append(caller)
+                    if len(matches) != 1:
+                        return None, []
+                    return matches[0], [[index] for index in range(3)]
+
+                def ordered_dynamic_update_chain(
+                    components: dict[int, Any], consumer: Any
+                ) -> tuple[Any | None, list[list[int]]]:
+                    callers: dict[int, Any] = {}
+                    for caller in module.instructions:
+                        if (
+                            caller.raw_opcode != "fusion"
+                            or normalized_dimensions(caller) != (6144,)
+                            or len(caller.operand_names) not in (1, 2)
+                        ):
+                            continue
+                        direct_components = [
+                            (index, component_id)
+                            for index in range(len(caller.operand_names))
+                            for component_id, value in components.items()
+                            if unwrap(operand(caller, index)) is unwrap(value)
+                        ]
+                        if len(direct_components) != 1:
+                            continue
+                        update_index, component_id = direct_components[0]
+                        root = unwrap(called_root(caller))
+                        if (
+                            root is None
+                            or root.raw_opcode != "dynamic-update-slice"
+                            or len(root.operand_names) != 4
+                            or _shape_signatures(root.operand_shapes)
+                            != (
+                                "bf16[1,6144]",
+                                "bf16[1,256]",
+                                "s32[]",
+                                "s32[]",
+                            )
+                            or _shape_signatures(root.result_shapes)
+                            != ("bf16[1,6144]",)
+                            or parameter_index(unwrap(operand(root, 1)))
+                            != update_index
+                            or integer_constant(unwrap(operand(root, 2))) != 0
+                            or integer_constant(unwrap(operand(root, 3)))
+                            != component_id * 256
+                            or component_id in callers
+                        ):
+                            continue
+                        base = unwrap(operand(root, 0))
+                        if component_id == 0:
+                            exact_base = (
+                                len(caller.operand_names) == 1
+                                and update_index == 0
+                                and base is not None
+                                and base.raw_opcode == "custom-call"
+                                and not base.operand_names
+                                and 'custom_call_target="AllocateBuffer"'
+                                in base.raw_line
+                            )
+                        else:
+                            exact_base = (
+                                len(caller.operand_names) == 2
+                                and update_index == 1
+                                and parameter_index(base) == 0
+                            )
+                        if exact_base:
+                            callers[component_id] = caller
+                    if set(callers) != set(range(len(components))):
+                        return None, []
+                    for component_id in range(1, len(components)):
+                        if unwrap(operand(callers[component_id], 0)) is not unwrap(
+                            callers[component_id - 1]
+                        ):
+                            return None, []
+                    result = callers[len(components) - 1]
+                    if not _value_depends_on(module, consumer, result):
+                        return None, []
+                    return result, [
+                        [component_id] for component_id in range(len(components))
+                    ]
 
                 y_values = [
                     item
@@ -1233,7 +1399,16 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                 z_exact, z_components, z_details = exact_components(
                     "z", z_values, 24
                 )
-                x_exact = len(x_values) == 1
+                association_graph = {
+                    "y": {"component_count": len(y_components)},
+                    "x": {"component_count": 1 if len(x_values) == 1 else 0},
+                    "z": {"component_count": len(z_components)},
+                }
+                x_exact = (
+                    len(x_values) == 1
+                    and len(x_values[0].operand_names) == 2
+                    and exact_bf16_round(x_values[0])
+                )
                 x_value = component_value(x_values[0]) if x_exact else None
                 if x_exact:
                     x_identities = [
@@ -1255,6 +1430,15 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     if y_exact and x_exact and x_value is not None
                     else (None, [])
                 )
+                if (
+                    y_concat is None
+                    and y_exact
+                    and x_exact
+                    and x_value is not None
+                ):
+                    y_concat, y_order = ordered_padded_concatenate(
+                        y_components, x_value
+                    )
                 if y_concat is None:
                     y_exact = False
                     x_exact = False
@@ -1272,6 +1456,10 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     if z_exact
                     else (None, [])
                 )
+                if z_concat is None and z_exact:
+                    z_concat, z_order = ordered_dynamic_update_chain(
+                        z_components, root_operands[0]
+                    )
                 if z_concat is None:
                     z_exact = False
                 association_graph["y"].update(
