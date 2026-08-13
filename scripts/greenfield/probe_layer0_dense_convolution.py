@@ -776,8 +776,10 @@ def _validate_optimized_hlo(
             scale_shapes = {
                 "seed": (48, 6),
                 "inner": (48, 128, 6),
+                "folded_inner": (1, 6, 48, 128),
                 "middle": (6144, 6),
                 "outer": (6144, 6, 128),
+                "folded_outer": None,
                 "wide": (6144, 768),
             }
         elif label == "down":
@@ -785,8 +787,10 @@ def _validate_optimized_hlo(
             scale_shapes = {
                 "seed": (3, 48),
                 "inner": (3, 128, 48),
+                "folded_inner": None,
                 "middle": (384, 48),
                 "outer": (384, 48, 128),
+                "folded_outer": (48, 8, 48, 128),
                 "wide": (384, 6144),
             }
         else:
@@ -844,7 +848,7 @@ def _validate_optimized_hlo(
                     == payload_shape
                     == tuple(value for value in result_shape if value != 1)
                 )
-            return (source_shape, result_shape) in {
+            exact_scale_edges = {
                 (
                     tuple((1, 1) + scale_shapes["seed"]),
                     scale_shapes["seed"],
@@ -856,6 +860,33 @@ def _validate_optimized_hlo(
                 (scale_shapes["inner"], scale_shapes["middle"]),
                 (scale_shapes["outer"], scale_shapes["wide"]),
             }
+            if scale_shapes["folded_inner"] is not None:
+                exact_scale_edges.update(
+                    {
+                        (
+                            scale_shapes["inner"],
+                            scale_shapes["folded_inner"],
+                        ),
+                        (
+                            scale_shapes["folded_inner"],
+                            scale_shapes["middle"],
+                        ),
+                    }
+                )
+            if scale_shapes["folded_outer"] is not None:
+                exact_scale_edges.update(
+                    {
+                        (
+                            scale_shapes["outer"],
+                            scale_shapes["folded_outer"],
+                        ),
+                        (
+                            scale_shapes["folded_outer"],
+                            scale_shapes["wide"],
+                        ),
+                    }
+                )
+            return (source_shape, result_shape) in exact_scale_edges
 
         visiting: set[tuple[tuple[str, str], bool]] = set()
 
@@ -959,7 +990,46 @@ def _validate_optimized_hlo(
             return False, []
         root = nonarithmetic_layout(called_root(immediate))
         f32_shape = weight_shape.replace("bf16", "f32", 1)
-        fp8_shape = weight_shape.replace("bf16", "f8e4m3fn", 1)
+        weight_dimensions = tuple(
+            int(value)
+            for value in re.search(r"\[([^]]+)\]", weight_shape).group(1).split(",")
+        )
+
+        def exact_singleton_payload(item: Any | None, dtype: str) -> bool:
+            return bool(
+                item is not None
+                and len(item.result_shapes) == 1
+                and item.result_shapes[0].dtype == dtype
+                and tuple(
+                    value
+                    for value in item.result_shapes[0].dimensions
+                    if value != 1
+                )
+                == weight_dimensions
+            )
+
+        def unwrap_singleton_payload(
+            item: Any | None,
+            dtype: str,
+        ) -> Any | None:
+            seen: set[tuple[str, str]] = set()
+            while (
+                item is not None
+                and item.raw_opcode
+                in {"bitcast", "copy", "optimization-barrier", "reshape"}
+                and len(item.operand_names) == 1
+                and _instruction_key(item) not in seen
+            ):
+                seen.add(_instruction_key(item))
+                source = operand(item, 0)
+                if not (
+                    exact_singleton_payload(item, dtype)
+                    and exact_singleton_payload(source, dtype)
+                ):
+                    return None
+                item = source
+            return item
+
         if (
             root is None
             or root.raw_opcode != "convert"
@@ -981,20 +1051,24 @@ def _validate_optimized_hlo(
         scale = None
         bits = None
         for index in range(2):
-            candidate = nonarithmetic_layout(operand(scaled, index))
+            candidate = unwrap_singleton_payload(
+                operand(scaled, index), "f32"
+            )
             if (
                 candidate is None
                 or candidate.raw_opcode != "convert"
-                or _shape_signatures(candidate.result_shapes) != (f32_shape,)
+                or not exact_singleton_payload(candidate, "f32")
                 or virtual_rank(candidate) != rank
                 or len(candidate.operand_names) != 1
             ):
                 continue
-            bitcast = nonarithmetic_layout(operand(candidate, 0))
+            bitcast = unwrap_singleton_payload(
+                operand(candidate, 0), "f8e4m3fn"
+            )
             if (
                 bitcast is None
                 or bitcast.raw_opcode != "bitcast-convert"
-                or _shape_signatures(bitcast.result_shapes) != (fp8_shape,)
+                or not exact_singleton_payload(bitcast, "f8e4m3fn")
                 or virtual_rank(bitcast) != rank
                 or len(bitcast.operand_names) != 1
             ):

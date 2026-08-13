@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -52,6 +53,16 @@ REAL_M32_LAYER1_STABLEHLO = (
 )
 REAL_M32_LAYER1_STABLEHLO_SHA256 = (
     "c77c126ed2ceeead3f00e71c5467463612ab2f88b1ab58f7993ee09164bd6474"
+)
+REAL_FINAL_LAYOUT_OPTIMIZED_HLO = Path(
+    os.environ.get(
+        "GLM_DENSE_CONVOLUTION_REAL_FINAL_LAYOUT_HLO",
+        "/home/gianl/glm-run/greenfield_layer0_dense_final_layout_cross_layer_"
+        "20260813T082823269638806Z/hlo/dense_convolution.optimized_hlo.txt",
+    )
+)
+REAL_FINAL_LAYOUT_OPTIMIZED_HLO_SHA256 = (
+    "caa2569ad56c953ae7cdbe8bf1583bcafd13bb8188435bca34ec818650a2e39e"
 )
 ACCEPTED_M32_ROOT = Path(
     "/home/gianl/gcs-models/oracles/greenfield/glm52/"
@@ -1210,6 +1221,59 @@ def test_dense_final_layout_hlo_contract_requires_accepted_weight_layout() -> No
     )
     assert all(mutated != accepted for mutated in source_mutations)
     for mutated in source_mutations:
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+        )
+        assert rejected["passed"] is False
+        assert rejected["exact_packed_weight_lineage"] is False
+        assert "packed dense weight lineage drifted" in rejected["violations"]
+
+
+@pytest.mark.skipif(
+    not REAL_FINAL_LAYOUT_OPTIMIZED_HLO.exists(),
+    reason="protected final-layout optimized HLO is unavailable",
+)
+def test_dense_final_layout_real_hlo_binds_folded_scale_lowerings() -> None:
+    optimized_hlo = REAL_FINAL_LAYOUT_OPTIMIZED_HLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        REAL_FINAL_LAYOUT_OPTIMIZED_HLO_SHA256
+    )
+    contract = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+    )
+    assert contract["passed"], contract
+    assert contract["exact_accepted_weight_layout"] is True
+    assert contract["exact_packed_weight_lineage"] is True
+    gate_rogue = optimized_hlo.replace(
+        "  ROOT %bitcast.350 = f32[1,6,48,128]",
+        "  %rogue_gate_inner = f32[48,128,6] add("
+        "%broadcast_in_dim.137, %broadcast_in_dim.137)\n"
+        "  ROOT %bitcast.350 = f32[1,6,48,128]",
+        1,
+    ).replace(
+        "bitcast(%broadcast_in_dim.137)",
+        "bitcast(%rogue_gate_inner)",
+        1,
+    )
+    down_rogue = optimized_hlo.replace(
+        "  %bitcast.450 = f32[48,8,48,128]",
+        "  %rogue_down_outer = f32[384,48,128] add("
+        "%broadcast_in_dim.101, %broadcast_in_dim.101)\n"
+        "  %bitcast.450 = f32[48,8,48,128]",
+        1,
+    ).replace(
+        "bitcast(%broadcast_in_dim.101)",
+        "bitcast(%rogue_down_outer)",
+        1,
+    )
+    assert gate_rogue != optimized_hlo and down_rogue != optimized_hlo
+    for mutated in (gate_rogue, down_rogue):
         rejected = MODULE._validate_optimized_hlo(
             mutated,
             compile_rows=32,
