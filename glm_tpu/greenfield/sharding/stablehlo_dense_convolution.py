@@ -29,6 +29,54 @@ _CONVOLUTION_ATTRIBUTES = (
 )
 
 
+def _expand_dependency_barriers(stablehlo: str) -> tuple[str, list[str]]:
+    """Expose the two exact results of the virtual-shard ordering barrier.
+
+    The shared StableHLO parser models one SSA result per node, while JAX emits
+    ``%n:2`` plus ``%n#0``/``%n#1`` for a tuple-valued optimization barrier.
+    Expand only the exact two-value form used here into parser-only nodes.  Each
+    result retains both operands, so the dense contract can prove the live
+    weight result is ordered after the preceding shard result.
+    """
+
+    pattern = re.compile(
+        r"^(?P<indent>\s*)(?P<name>%[A-Za-z0-9_.$-]+):2\s*=\s*"
+        r"stablehlo\.optimization_barrier\s+"
+        r"(?P<left>%[A-Za-z0-9_.$#-]+),\s*"
+        r"(?P<right>%[A-Za-z0-9_.$#-]+)\s*:\s*"
+        r"(?P<left_type>tensor<[^>]+>),\s*"
+        r"(?P<right_type>tensor<[^>]+>)\s*$"
+    )
+    lines: list[str] = []
+    errors: list[str] = []
+    for line_number, line in enumerate(stablehlo.splitlines(), start=1):
+        if ":2" not in line or "stablehlo.optimization_barrier" not in line:
+            lines.append(line)
+            continue
+        match = pattern.fullmatch(line)
+        if match is None:
+            errors.append(
+                "dense dependency barrier has an unknown StableHLO form at "
+                f"line {line_number}"
+            )
+            lines.append(line)
+            continue
+        values = match.groupdict()
+        lines.extend(
+            (
+                f"{values['indent']}{values['name']}#0 = "
+                "stablehlo.optimization_barrier "
+                f"{values['left']}, {values['right']} : "
+                f"{values['left_type']}",
+                f"{values['indent']}{values['name']}#1 = "
+                "stablehlo.optimization_barrier "
+                f"{values['right']}, {values['left']} : "
+                f"{values['right_type']}",
+            )
+        )
+    return "\n".join(lines), errors
+
+
 def _expect_unary(
     graph: _StableGraph,
     source: str,
@@ -185,15 +233,49 @@ def _expect_convolution(
 def _expect_accepted_gate_up_layout(
     graph: _StableGraph,
     output: str,
-) -> str:
+) -> tuple[str, str | None, str | None]:
     """Bind one gate/up RHS to the exact accepted layout constraint."""
 
+    dependency: str | None = None
+    dependency_output: str | None = None
     node = _expect_node(
         graph,
         output,
-        opcode="custom_call",
+        opcode=(
+            "optimization_barrier"
+            if "#" in output
+            else "custom_call"
+        ),
         result_type="tensor<6144x768xbf16>",
     )
+    if node.opcode == "optimization_barrier":
+        if (
+            not node.name.endswith("#0")
+            or len(node.operands) != 2
+            or graph.node(node.operands[1]).result_type
+            != "tensor<32x6144xbf16>"
+        ):
+            raise _MatchError(
+                f"{node.name}: virtual-shard dependency barrier drifted"
+            )
+        dependency = node.operands[1]
+        dependency_output = node.name[:-1] + "1"
+        sibling = _expect_node(
+            graph,
+            dependency_output,
+            opcode="optimization_barrier",
+            result_type="tensor<32x6144xbf16>",
+        )
+        if sibling.operands != (dependency, node.operands[0]):
+            raise _MatchError(
+                f"{sibling.name}: predecessor barrier result drifted"
+            )
+        node = _expect_node(
+            graph,
+            node.operands[0],
+            opcode="custom_call",
+            result_type="tensor<6144x768xbf16>",
+        )
     normalized = re.sub(r"\s+", "", node.raw_line)
     if (
         len(node.operands) != 1
@@ -207,7 +289,7 @@ def _expect_accepted_gate_up_layout(
         or "result_layouts=[dense<[1,0]>:tensor<2xindex>]" not in normalized
     ):
         raise _MatchError(f"{node.name}: accepted gate/up layout drifted")
-    return node.operands[0]
+    return node.operands[0], dependency, dependency_output
 
 
 def _match_fp8_decode(
@@ -288,16 +370,20 @@ def _match_one_shard(
     *,
     compile_rows: int,
     final_dense_layout: bool = False,
-) -> tuple[int, tuple[str, ...], str]:
+) -> tuple[int, tuple[str, ...], str, str | None, str | None]:
     row_type = f"tensor<{compile_rows}x"
     if len(gate_up.operands) != 2:
         raise _MatchError(f"{gate_up.name}: gate/up operand arity drifted")
     normalized = gate_up.operands[0]
     decoded_gate_up = gate_up.operands[1]
+    dependency: str | None = None
+    dependency_output: str | None = None
     if final_dense_layout:
-        decoded_gate_up = _expect_accepted_gate_up_layout(
-            graph, decoded_gate_up
-        )
+        (
+            decoded_gate_up,
+            dependency,
+            dependency_output,
+        ) = _expect_accepted_gate_up_layout(graph, decoded_gate_up)
     gate_bits, gate_scales = _match_fp8_decode(
         graph,
         decoded_gate_up,
@@ -684,7 +770,7 @@ def _match_one_shard(
             down_scale_root,
         )),
     )
-    return shard, roots, down_bf16.name
+    return shard, roots, down_bf16.name, dependency, dependency_output
 
 
 def _validate_m32_input_pad(
@@ -1175,7 +1261,11 @@ def validate_dense_convolution_stablehlo(
         raise ValueError(
             "dense-envelope StableHLO proof requires final-layout mode"
         )
-    graphs, parse_errors = _parse_graphs(stablehlo)
+    parsed_stablehlo, dependency_errors = _expand_dependency_barriers(
+        stablehlo
+    )
+    graphs, parse_errors = _parse_graphs(parsed_stablehlo)
+    violations.extend(dependency_errors)
     violations.extend(parse_errors)
     matched_shards: list[int] = []
     layout_constraint_count = sum(
@@ -1220,9 +1310,18 @@ def validate_dense_convolution_stablehlo(
                 f"expected={expected_layout_constraints} "
                 f"found={len(layout_constraints)}"
             )
-        rows: dict[int, tuple[tuple[str, ...], str]] = {}
+        rows: dict[
+            int,
+            tuple[tuple[str, ...], str, str | None, str | None],
+        ] = {}
         for convolution in gate_up:
-            shard, roots, result = _match_one_shard(
+            (
+                shard,
+                roots,
+                result,
+                dependency,
+                dependency_output,
+            ) = _match_one_shard(
                 graph,
                 convolution,
                 compile_rows=compile_rows,
@@ -1230,17 +1329,42 @@ def validate_dense_convolution_stablehlo(
             )
             if shard in rows:
                 raise _MatchError(f"duplicate dense virtual shard {shard}")
-            rows[shard] = (roots, result)
+            rows[shard] = (
+                roots,
+                result,
+                dependency,
+                dependency_output,
+            )
         if set(rows) != set(range(8)):
             raise _MatchError(f"dense virtual shard set drifted: {sorted(rows)}")
         matched_shards = sorted(rows)
-        if len({roots for roots, _result in rows.values()}) != 1:
+        if len(
+            {
+                roots
+                for roots, _result, _dependency, _dependency_output
+                in rows.values()
+            }
+        ) != 1:
             raise _MatchError("dense virtual shards use different layer sources")
+        if final_dense_layout and (
+            rows[0][2] is not None
+            or any(
+                rows[shard][2] != rows[shard - 1][1]
+                for shard in range(1, 8)
+            )
+        ):
+            raise _MatchError(
+                "dense virtual shards lost the exact rank-ordered dependency"
+            )
         broadcast_rows = compile_rows
         broadcasts = tuple(
             _expect_broadcast(
                 graph,
-                rows[shard][1],
+                (
+                    rows[shard + 1][3]
+                    if final_dense_layout and shard < 7
+                    else rows[shard][1]
+                ),
                 dimensions=(1, 2),
                 result_type=f"tensor<1x{broadcast_rows}x6144xbf16>",
             ).name

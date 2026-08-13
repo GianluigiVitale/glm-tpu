@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Current clean pushed baseline is `077dffbb218697f5f6943395a94b0f2ead980e99`. Its one
+  protected retry, tag `greenfield_layer0_dense_envelope_cross_layer_20260813T111019310055824Z`,
+  compiled the real checkpoint but failed closed in optimized-HLO validation before arithmetic.
+  There is no runner, numerical comparison, DB row, archive, summary or `SUCCESS`; pre/failure
+  censuses are both 8/8 clean. Optimized-HLO, StableHLO and runner-log SHAs are
+  `68b7ca3d...55ab`, `dcf710b5...dc7a` and `e001e4bf...07ca`.
+- The HLO is decisive mechanism evidence. All eight down convolutions now have the accepted
+  `[48,6]` / `[8,1,1]` schedule. Seven gate convolutions have the accepted `[384,6]` /
+  `[1,1,2]` schedule, but virtual rank 1 alone reads the entry FP8 parameter before the shared
+  device copy completes and retains `[48,6]` / `[1,1,16]`. The old validator also rejected the
+  exact rank-zero down-scale copy `{3,1,2,0}->{3,2,1,0}`; the bounded provenance correction pins
+  that exact real transition and now proves all 16 weight paths. A wrong transition refuses.
+- Active uncommitted correction orders each virtual gate/down pair after the preceding down result
+  with a value-preserving two-result optimization barrier. Generated StableHLO contains exactly
+  seven predecessor edges; both returned values remain live and a cross-wired edge refuses. This
+  is intended to prevent the one pre-copy gate during TPU optimization without changing model
+  arithmetic; only the next scheduled TPU HLO can prove that outcome. The complete affected suite
+  passes 82/82.
+  Exact next: one Sol audit of this new diff only, commit/push, then one serialized protected
+  dense-envelope retry. Only an exact layer-1 row authorizes full-decoder integration.
+
 - Current clean pushed baseline is `09c0ea0aaf191a9cd7a71c9c8dad5b215855f5a4`. Protected
   DB547/tag `greenfield_layer0_dense_envelope_cross_layer_20260813T101232103323778Z` completed
   from that reviewed pin with strict DB/archive/SUCCESS publication and authenticated 8/8 cleanup.

@@ -869,26 +869,67 @@ def _validate_optimized_hlo(
                 "copy",
                 "optimization-barrier",
             }:
-                return source_shape == result_shape and (
-                    not scheduled_module
-                    or (
-                        result_minor_to_major(item) is not None
-                        and result_minor_to_major(item)
-                        == result_minor_to_major(source)
+                if source_shape != result_shape:
+                    return False
+                if not scheduled_module:
+                    return True
+                source_layout = result_minor_to_major(source)
+                result_layout = result_minor_to_major(item)
+                if source_layout == result_layout and result_layout is not None:
+                    return True
+                # TPU's accepted down-scale lowering copies the exact selected
+                # [1,3,6144] rank seed from its packed physical association to
+                # canonical row-major order before removing the singleton.
+                # Pin both sides; no other layout-changing copy is admitted.
+                return bool(
+                    label == "down"
+                    and scale
+                    and (
+                        (
+                            source_shape == (1, 3, 6144)
+                            and source_layout == (2, 0, 1)
+                            and result_layout == (2, 1, 0)
+                        )
+                        or (
+                            source_shape == (1, 1, 3, 6144)
+                            and source_layout == (3, 1, 2, 0)
+                            and result_layout == (3, 2, 1, 0)
+                        )
                     )
                 )
             if item.raw_opcode not in {"bitcast", "reshape"}:
                 return False
-            if scheduled_module and not (
-                exact_row_major_layout(source) and exact_row_major_layout(item)
-            ):
-                return False
             if selected_rank:
-                return (source_shape, result_shape) in {
+                if (source_shape, result_shape) not in {
                     (expected_shape, expected_shape[1:]),
                     (expected_shape[1:], expected_shape),
-                }
+                }:
+                    return False
+                if not scheduled_module:
+                    return True
+                source_layout = result_minor_to_major(source)
+                result_layout = result_minor_to_major(item)
+
+                def remove_owner_axis(
+                    layout: tuple[int, ...] | None,
+                ) -> tuple[int, ...] | None:
+                    if layout is None or 0 not in layout:
+                        return None
+                    return tuple(
+                        axis - 1 if axis > 0 else axis
+                        for axis in layout
+                        if axis != 0
+                    )
+
+                if source_shape == expected_shape:
+                    return remove_owner_axis(source_layout) == result_layout
+                return remove_owner_axis(result_layout) == source_layout
             if not scale:
+                if scheduled_module and not (
+                    exact_row_major_layout(source)
+                    and exact_row_major_layout(item)
+                ):
+                    return False
                 return (
                     tuple(value for value in source_shape if value != 1)
                     == payload_shape
@@ -905,7 +946,34 @@ def _validate_optimized_hlo(
                 ),
                 (scale_shapes["inner"], scale_shapes["wide"]),
             }
-            return (source_shape, result_shape) in exact_scale_edges
+            edge = (source_shape, result_shape)
+            if edge not in exact_scale_edges:
+                return False
+            if not scheduled_module:
+                return True
+            source_layout = result_minor_to_major(source)
+            result_layout = result_minor_to_major(item)
+            exact_scale_layouts = {
+                (
+                    tuple((1, 1) + scale_shapes["seed"]),
+                    scale_shapes["seed"],
+                ): (
+                    tuple(reversed(range(len(scale_shapes["seed"]) + 2))),
+                    tuple(reversed(range(len(scale_shapes["seed"])))),
+                ),
+                (
+                    tuple((1,) + scale_shapes["seed"]),
+                    scale_shapes["seed"],
+                ): (
+                    tuple(reversed(range(len(scale_shapes["seed"]) + 1))),
+                    tuple(reversed(range(len(scale_shapes["seed"])))),
+                ),
+                (scale_shapes["inner"], scale_shapes["wide"]): (
+                    tuple(reversed(range(len(scale_shapes["inner"])))),
+                    tuple(reversed(range(len(scale_shapes["wide"])))),
+                ),
+            }
+            return (source_layout, result_layout) == exact_scale_layouts[edge]
 
         visiting: set[tuple[tuple[str, str], bool]] = set()
 

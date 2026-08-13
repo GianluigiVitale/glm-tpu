@@ -8193,3 +8193,32 @@ unmotivated arithmetic variants.
   publication. Wrong ranks, scale reassociation, arithmetic detours and wrong gate/down tilings
   refuse. This is local readiness only; one Sol audit, commit/push and one serialized protected
   discriminator are next.
+
+## 2026-08-13 11:10--11:31 — accepted-scale retry isolates one pre-copy gate
+
+- Commit `077dffbb218697f5f6943395a94b0f2ead980e99` was launched once under protected tag
+  `greenfield_layer0_dense_envelope_cross_layer_20260813T111019310055824Z`. The real checkpoint
+  compiled, then the optimized-HLO contract refused before arithmetic. No runner, tensor verdict,
+  DB row, archive, summary or terminal `SUCCESS` exists. Preflight and failure-exit censuses each
+  authenticate all eight hosts clean. Optimized-HLO, StableHLO, runner-log, pre-census and
+  failure-census SHAs are `68b7ca3d...55ab`, `dcf710b5...dc7a`, `e001e4bf...07ca`,
+  `cad6fd74...969` and `c330861a...5c7`.
+- This preserved HLO resolves the refusal. Every down convolution already uses the accepted
+  kernel/input/output windows and `[8,1,1]` iteration schedule. Gate ranks 0 and 2--7 use the
+  accepted `[384,6]` / `[1,1,2]` schedule. Gate rank 1 alone consumes the entry FP8 parameter
+  while the shared device copy is in flight, so it retains `[48,6]` / `[1,1,16]`. This is a
+  physical scheduler-source asymmetry, not a numerical result.
+- The down provenance refusal was a checker omission: the real rank-zero scale slice uses the
+  exact layout copy `{3,1,2,0}->{3,2,1,0}` before singleton removal. The matcher now admits only
+  that pinned shape/layout transition and proves all eight gate plus all eight down paths; changing
+  its destination layout refuses. The old HLO remains fail-closed solely on gate rank 1 geometry.
+- The bounded source correction places each virtual gate/down pair after its predecessor through a
+  two-result, value-preserving optimization barrier. Pre-fusion validation expands only that exact
+  tuple spelling, requires rank zero to have no predecessor, and requires ranks 1--7 to consume the
+  immediately prior rounded down result. Both barrier results remain live: the returned gate value
+  feeds the current contraction and the returned predecessor replaces the preceding stack value.
+  Cross-wiring a predecessor refuses. This is a diagnostic-only/default-off compiler-scheduling
+  hypothesis until scheduled TPU HLO proves all eight accepted gate contractions. The affected CPU
+  suite passes 82/82 and compilation/diff checks pass. Exact next is one new-diff Sol audit,
+  commit/push, and one protected retry; only an exact accepted layer-1 row permits production
+  integration and another complete 8K decoder.

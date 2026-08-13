@@ -593,6 +593,7 @@ def _virtual_dense_final_layout_convolution_down_partials(
         raise ValueError("final-layout dense weight dtypes drifted")
 
     partials = []
+    previous_partial = None
     for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
         with jax.named_scope(
             f"greenfield_dense_convolution_virtual_rank_{shard:02d}"
@@ -614,6 +615,23 @@ def _virtual_dense_final_layout_convolution_down_partials(
                 gate_up_weight,
                 Layout(major_to_minor=(0, 1)),
             )
+            if previous_partial is not None:
+                # A PP8 owner executes eight virtual legacy-DCP shards on one
+                # physical chip.  Keep their gate/down pairs ordered without
+                # changing any tensor value.  Otherwise TPU scheduling may run
+                # one gate directly from the entry parameter while the shared
+                # FP8 input copy is in flight, assigning only that gate the
+                # non-accepted contraction geometry.
+                with jax.named_scope(
+                    "greenfield_dense_convolution_virtual_rank_dependency"
+                ):
+                    gate_up_weight, previous_partial = lax.optimization_barrier(
+                        (gate_up_weight, previous_partial)
+                    )
+                    # JAX's ordering guarantee requires every barrier operand
+                    # to be consumed through its corresponding output.  Make
+                    # the returned predecessor the value ultimately stacked.
+                    partials[-1] = previous_partial
             gate_up = _dense_bf16_convolution(
                 normalized,
                 gate_up_weight,
@@ -623,16 +641,15 @@ def _virtual_dense_final_layout_convolution_down_partials(
             activated = (gate * jax.nn.sigmoid(gate) * up).astype(
                 jnp.bfloat16
             )
-            partials.append(
-                _dense_bf16_convolution(
-                    activated,
-                    _decode_dense_fp8_expanded_output_scale_in_out(
-                        down_bits_in_out[shard],
-                        down_scale_in_out[shard],
-                        block_rows=block_shape[0],
-                    ),
-                )
+            previous_partial = _dense_bf16_convolution(
+                activated,
+                _decode_dense_fp8_expanded_output_scale_in_out(
+                    down_bits_in_out[shard],
+                    down_scale_in_out[shard],
+                    block_rows=block_shape[0],
+                ),
             )
+            partials.append(previous_partial)
     return jnp.stack(tuple(partials), axis=0)
 
 
