@@ -19,6 +19,23 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed commit `5352cf30401daacabed2c1df7cba12e54198977d` closes the four
+  complete-decoder proof mismatches from the 16:12 run. Sol approved staged SHA `f93060ff...a7a7`;
+  the complete affected suite passed 144/144. Its protected retry, tag ending
+  `densefinalconv_oracle_dsa_trace2_20260813T170943422054487Z`, proves the token decoder and DSA
+  observer HLO contracts now pass exactly. The run then failed closed before execution only in the
+  separately compiled teacher-forced prefill contract: all 24 dense down convolutions were live
+  inside the loop body, but the generic liveness graph did not cross the outer `while` body ROOT.
+  There are no tokens, DSA/timing/XPlane/HBM result, DB row, archive, summary or `SUCCESS`;
+  rollback is `NO_PROVISIONAL_DB_RUN` and failure cleanup is authenticated 8/8.
+- The preserved prefill optimized/StableHLO/contract SHAs are `c742bca2...a5e0`,
+  `0acb7f04...9757` and `1cad5b2d...6d0`. The bounded correction adds only the exact while-body
+  parameter/ROOT value-flow edges already modeled for call/fusion/conditional boundaries. The
+  SHA-pinned real prefill now passes all 24 gate/down convolutions, exact gate-to-down bijection,
+  exact down-to-ENTRY liveness, all three StableHLO packed groups and zero dead rows. A synthetic
+  outer-loop case passes and a disconnected body refuses. Exact next: affected tests, one
+  correction-only Sol audit, commit/push and one serialized protected 8K retry. Gate D remains open.
+
 - Clean pushed pin `5dc58b0607173d5aa842b22405cb45c2b334073c` contains the reviewed,
   default-off production integration of DB548's selected final-layout dense formulation. The direct
   runtime loader's U8 FP8 storage is bitcast to E4M3FN only at the arithmetic boundary; exact

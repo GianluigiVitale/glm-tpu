@@ -1064,9 +1064,14 @@ def _validate_dense_final_layout_convolution_hlo(
         if source in by_key and target in by_key:
             forward_edges.setdefault(source, []).append((target, kind, index))
 
-    call_opcodes = {"call", "conditional", "fusion"}
+    call_opcodes = {"call", "conditional", "fusion", "while"}
     for instruction in module.instructions:
         target = (instruction.computation, instruction.name)
+        structural_line = re.sub(
+            r'"(?:\\.|[^"\\])*"',
+            '""',
+            re.sub(r"/\*.*?\*/", "", instruction.raw_line),
+        )
         if instruction.opcode == "parameter":
             continue
         if instruction.opcode == "tuple":
@@ -1099,12 +1104,36 @@ def _validate_dense_final_layout_convolution_hlo(
                     "ordinary",
                 )
         called = re.search(
-            r"\bcalls=(%[A-Za-z0-9_.:-]+)", instruction.raw_line
+            r"\bcalls=(%[A-Za-z0-9_.:-]+)", structural_line
         )
         if called is None:
+            while_body = re.search(
+                r"\bbody=(%[A-Za-z0-9_.:-]+)",
+                structural_line,
+            )
+            if (
+                instruction.opcode == "while"
+                and len(instruction.operand_names) == 1
+                and while_body is not None
+            ):
+                symbol = while_body.group(1)
+                parameter = parameters.get(symbol, {}).get(0)
+                if parameter is not None:
+                    add_edge(
+                        (
+                            instruction.computation,
+                            instruction.operand_names[0],
+                        ),
+                        parameter,
+                        "identity",
+                    )
+                root = roots.get(symbol)
+                if root is not None:
+                    add_edge(root, target, "identity")
+                continue
             branch_match = re.search(
                 r"\bbranch_computations=\{([^}]*)\}",
-                instruction.raw_line,
+                structural_line,
             )
             if branch_match is None:
                 continue

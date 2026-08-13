@@ -5,6 +5,25 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 17:45 UTC — decoder proof passes; outer prefill-loop liveness isolated
+
+- Commit `5352cf30401daacabed2c1df7cba12e54198977d` was approved on staged SHA
+  `f93060ff...a7a7`, passed the complete affected suite 144/144, and was pushed. The single
+  protected 8K retry used the same sealed runtime pack and exact Gate-D flags under tag ending
+  `densefinalconv_oracle_dsa_trace2_20260813T170943422054487Z`.
+- The complete token decoder and its DSA observer now pass their HLO contracts. The run progressed
+  to the separately compiled teacher-forced prefill and refused before execution because the
+  optimized dense liveness graph stopped at the prefill's outer `while` body ROOT. No token, DSA,
+  timing, XPlane, HBM, DB, archive or performance result exists. Rollback is
+  `NO_PROVISIONAL_DB_RUN`; authenticated failure cleanup is 8/8.
+- Prefill optimized/StableHLO/contract SHAs are `c742bca2...a5e0`, `0acb7f04...9757` and
+  `1cad5b2d...6d0`. The exact correction models the while body like the already-proven call,
+  fusion and conditional boundaries: its sole tuple operand maps to body parameter zero and the
+  exact body ROOT maps to the while result, with tuple indices retained. The preserved real
+  prefill replay now passes 24/24 gate and down contractions, gate/down bijection, down-to-ENTRY
+  liveness, all three packed StableHLO groups and zero dead rows. A disconnected body refuses.
+  One correction-only audit precedes commit/push and the next serialized retry; Gate D stays open.
+
 ## 2026-08-13 16:45 UTC — complete dense decoder reaches protected HLO; validator drift isolated
 
 - Reviewed pin `5dc58b0607173d5aa842b22405cb45c2b334073c` was pushed. Its plan-aware

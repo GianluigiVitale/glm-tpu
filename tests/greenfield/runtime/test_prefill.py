@@ -73,10 +73,12 @@ def test_protected_8k_prefill_repair_has_four_chunks_per_layer() -> None:
 
 @pytest.mark.parametrize("pregathered_b512_attention", [False, True])
 @pytest.mark.parametrize("strategy_nd_attention_projection", [False, True])
+@pytest.mark.parametrize("dense_final_layout_convolution", [False, True])
 def test_prefill_hlo_forwards_exact_head_key_contract(
     monkeypatch,
     pregathered_b512_attention: bool,
     strategy_nd_attention_projection: bool,
+    dense_final_layout_convolution: bool,
 ) -> None:
     captured: dict[str, object] = {}
 
@@ -94,6 +96,7 @@ def test_prefill_hlo_forwards_exact_head_key_contract(
         dsa_head_key_exact_association=True,
         dsa_query_backend="reference",
         dsa_query_exact_association=True,
+        dense_final_layout_convolution=dense_final_layout_convolution,
         feature_fuse_route_weighting=False,
         feature_output_tile=256,
         feature_reconstruct_down_fp32=True,
@@ -134,6 +137,10 @@ def test_prefill_hlo_forwards_exact_head_key_contract(
     assert (
         captured["strategy_nd_attention_projection"]
         is strategy_nd_attention_projection
+    )
+    assert (
+        captured["dense_final_layout_convolution"]
+        is dense_final_layout_convolution
     )
     assert contract["passed"] is True
 

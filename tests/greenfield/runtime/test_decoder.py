@@ -430,6 +430,84 @@ def test_dense_final_layout_hlo_pins_one_row_geometry_and_ranks() -> None:
     assert not dead["optimized_exact_down_result_liveness"]
 
 
+def test_dense_final_layout_hlo_follows_prefill_while_result() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_dense_final_layout_convolution_hlo,
+    )
+
+    optimized, _stable_fixture = _synthetic_dense_final_layout_hlo()
+    body = optimized.replace("ENTRY main {", "%prefill_body {", 1)
+    down_values = [f"%down_round_{rank}" for rank in range(8)]
+    sums = []
+    previous = down_values[0]
+    for index, value in enumerate(down_values[1:], start=1):
+        name = f"%down_sum_{index}"
+        sums.append(
+            f"  {name} = bf16[1,6144]{{1,0}} add({previous}, {value})"
+        )
+        previous = name
+    body = re.sub(
+        r"  ROOT %out = .*\n}",
+        "\n".join(
+            (
+                *sums,
+                "  ROOT %body_out = (bf16[1,6144]{1,0}) "
+                f"tuple({previous})",
+                "}",
+            )
+        ),
+        body,
+        count=1,
+    )
+    prefill = "\n".join(
+        (
+            body,
+            "",
+            "ENTRY main {",
+            "  %initial = (bf16[1,6144]{1,0}) parameter(0)",
+            "  %loop = (bf16[1,6144]{1,0}) while(%initial), "
+            "condition=%prefill_condition, body=%prefill_body",
+            "  %result = bf16[1,6144]{1,0} "
+            "get-tuple-element(%loop), index=0",
+            "  ROOT %out = bf16[1,6144]{1,0} copy(%result)",
+            "}",
+        )
+    )
+    stable = _runtime_dense_final_layout_stablehlo()
+    accepted = _validate_dense_final_layout_convolution_hlo(
+        prefill,
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert accepted["passed"], accepted
+    assert accepted["optimized_exact_down_result_liveness"]
+
+    disconnected = _validate_dense_final_layout_convolution_hlo(
+        prefill.replace("body=%prefill_body", "body=%unrelated_body", 1),
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not disconnected["passed"]
+    assert not disconnected["optimized_exact_down_result_liveness"]
+
+    decoy = _validate_dense_final_layout_convolution_hlo(
+        prefill.replace(
+            "condition=%prefill_condition, body=%prefill_body",
+            "condition=%prefill_condition, body=%unrelated_body, "
+            'metadata={op_name="body=%prefill_body"} '
+            "/* body=%prefill_body */",
+            1,
+        ),
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not decoy["passed"]
+    assert not decoy["optimized_exact_down_result_liveness"]
+
+
 def test_dense_final_layout_kernel_traces_loader_u8_storage() -> None:
     import jax
     import jax.numpy as jnp
