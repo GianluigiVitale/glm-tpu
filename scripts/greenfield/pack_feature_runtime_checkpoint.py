@@ -39,8 +39,10 @@ from glm_tpu.greenfield.checkpoint.runtime_feature import (  # noqa: E402
 )
 from glm_tpu.greenfield.model import (  # noqa: E402
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    LEGACY_DENSE_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
+    build_decoder_feature_fused_qkv_dense_runtime_weight_layout,
     build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_feature_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
@@ -191,7 +193,17 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
     )
     target_schedule = build_pipeline_schedule(target_plan)
-    if getattr(args, "fused_qkv_a", False):
+    if getattr(args, "dense_convolution", False):
+        if not getattr(args, "fused_qkv_a", False):
+            raise RuntimeError(
+                "dense convolution derivative requires fused qkv-a"
+            )
+        layout = build_decoder_feature_fused_qkv_dense_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            source_layout,
+        )
+    elif getattr(args, "fused_qkv_a", False):
         layout = build_decoder_feature_fused_qkv_runtime_weight_layout(
             target_plan,
             target_schedule,
@@ -242,6 +254,8 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         common["attention_projection_layout"] = (
             layout.attention_projection_layout
         )
+    if layout.dense_projection_layout != LEGACY_DENSE_RUNTIME_LAYOUT:
+        common["dense_projection_layout"] = layout.dense_projection_layout
     control: dict[str, Any] = {
         "artifact_kind": FEATURE_RUNTIME_PACK_CONTROL_KIND,
         **common,
@@ -745,6 +759,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topology-capture", type=Path)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--fused-qkv-a", action="store_true")
+    parser.add_argument("--dense-convolution", action="store_true")
     return parser.parse_args()
 
 

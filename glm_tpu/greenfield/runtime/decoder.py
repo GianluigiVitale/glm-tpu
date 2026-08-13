@@ -47,7 +47,9 @@ from ..model.state import DecoderStateLayout
 from ..model.weights import (
     COMPLETE_EXPERT_RUNTIME_LAYOUT,
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+    LEGACY_DENSE_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
 )
@@ -56,6 +58,9 @@ from ..sharding.hlo_contract import (
     HloModule,
     HloShape,
     parse_hlo_module,
+)
+from ..sharding.stablehlo_dense_convolution import (
+    validate_dense_final_layout_decoder_stablehlo,
 )
 from ..sharding.stablehlo_strategy_nd import (
     validate_strategy_nd_attention_stablehlo,
@@ -600,6 +605,7 @@ class DecoderStepProgram:
     main_rope_table_enabled: bool
     pregathered_b512_attention: bool
     strategy_nd_attention_projection: bool
+    dense_final_layout_convolution: bool
     main_rope_table_host: Any | None
     main_rope_table_sha256: str | None
     main_rope_table_bytes_per_device: int
@@ -878,6 +884,406 @@ def _validate_fused_qkv_a_decoder_association(
         "prefill_index_repair_computation_count": repair_computation_count,
         "passed": not violations,
         "required_shapes": required_shapes,
+        "violations": violations,
+    }
+
+
+def _validate_dense_final_layout_convolution_hlo(
+    optimized_hlo: str,
+    stablehlo: str | None,
+    *,
+    dense_layers: int,
+    enabled: bool,
+    module: HloModule | None = None,
+) -> dict[str, Any]:
+    """Pin the true-row-one production form of the DB548 dense arithmetic.
+
+    The protected probe already proves the eight-shard arithmetic and packed
+    source lineage in isolation.  The complete decoder must independently
+    prove that all three dense layers select that primitive, retain one live
+    row, use the accepted ``[in, out]`` RHS layout, and do not silently fall
+    back to the old fused Pallas dense kernel.
+    """
+
+    if not isinstance(enabled, bool):
+        raise PlanValidationError(
+            "dense final-layout convolution HLO flag must be boolean"
+        )
+    if module is None:
+        module = parse_hlo_module(optimized_hlo)
+    stablehlo_available = stablehlo is not None
+    stablehlo_text = stablehlo or ""
+    by_key = {
+        (instruction.computation, instruction.name): instruction
+        for instruction in module.instructions
+    }
+
+    def exact_rhs_layout(
+        instruction: HloInstruction, shape: str
+    ) -> bool:
+        if len(instruction.operand_names) != 2:
+            return False
+        producer = by_key.get(
+            (instruction.computation, instruction.operand_names[1])
+        )
+        return bool(
+            producer is not None
+            and producer.opcode
+            in {
+                "bitcast",
+                "copy",
+                "convert",
+                "fusion",
+                "optimization-barrier",
+                "parameter",
+                "reshape",
+            }
+            and re.search(
+                rf"=\s*{re.escape(shape)}\{{1,0(?::|\}})",
+                producer.raw_line,
+            )
+        )
+
+    expected_per_kind = 8 * dense_layers if enabled else 0
+    expected_rank_count = dense_layers if enabled else 0
+    gate: list[HloInstruction] = []
+    down: list[HloInstruction] = []
+    malformed_scoped: list[str] = []
+    rank_counts = {
+        "gate_up": Counter(),
+        "down": Counter(),
+    }
+    scope = re.compile(
+        r"(?:^|/)greenfield_dense_convolution_virtual_rank_(0[0-7])/"
+    )
+    for instruction in module.instructions:
+        op_name = instruction.op_name or ""
+        match = scope.search(op_name)
+        if match is None or instruction.raw_opcode != "convolution":
+            continue
+        rank = int(match.group(1))
+        operands = _hlo_shape_signature(instruction.operand_shapes)
+        results = _hlo_shape_signature(instruction.result_shapes)
+        exact_dimensions = "dim_labels=bf_io->bf" in re.sub(
+            r"\s+", "", instruction.raw_line
+        )
+        if (
+            operands == ("bf16[1,6144]", "bf16[6144,768]")
+            and results == ("f32[1,768]",)
+            and exact_dimensions
+            and exact_rhs_layout(instruction, "bf16[6144,768]")
+        ):
+            gate.append(instruction)
+            rank_counts["gate_up"][rank] += 1
+        elif (
+            operands == ("bf16[1,384]", "bf16[384,6144]")
+            and results == ("f32[1,6144]",)
+            and exact_dimensions
+            and exact_rhs_layout(instruction, "bf16[384,6144]")
+        ):
+            down.append(instruction)
+            rank_counts["down"][rank] += 1
+        else:
+            malformed_scoped.append(instruction.name)
+
+    normalized_stable = tuple(
+        re.sub(r"\s+", "", line)
+        for line in stablehlo_text.splitlines()
+        if "stablehlo.convolution" in line
+    )
+    stable_attributes = (
+        "dim_numbers=[b,f]x[i,o]->[b,f]",
+        "window={stride=[],pad=[],lhs_dilate=[],rhs_dilate=[],reverse=[]}",
+        "batch_group_count=1:i64,feature_group_count=1:i64",
+        "precision_config=[#stablehlo<precisionDEFAULT>,"
+        "#stablehlo<precisionDEFAULT>]",
+    )
+    stable_gate = [
+        line
+        for line in normalized_stable
+        if "(tensor<1x6144xbf16>,tensor<6144x768xbf16>)"
+        "->tensor<1x768xf32>" in line
+        and all(attribute in line for attribute in stable_attributes)
+    ]
+    stable_down = [
+        line
+        for line in normalized_stable
+        if "(tensor<1x384xbf16>,tensor<384x6144xbf16>)"
+        "->tensor<1x6144xf32>" in line
+        and all(attribute in line for attribute in stable_attributes)
+    ]
+    stable_layout_constraints = sum(
+        "@LayoutConstraint(" in line
+        and "tensor<6144x768xbf16>" in line
+        for line in stablehlo_text.splitlines()
+    )
+    stable_dead_rows = sum(
+        signature in stablehlo_text
+        for signature in (
+            "tensor<32x6144xbf16>",
+            "tensor<32x768xf32>",
+            "tensor<32x384xbf16>",
+        )
+    )
+    expected_ranks = {
+        rank: expected_rank_count for rank in range(8)
+    }
+    observed_rank_counts = {
+        label: dict(sorted(counts.items()))
+        for label, counts in rank_counts.items()
+    }
+    parameters: dict[str, dict[int, tuple[str, str]]] = {}
+    roots: dict[str, tuple[str, str]] = {}
+
+    def computation_symbol(value: str) -> str:
+        parts = value.split()
+        if parts and parts[0] == "ENTRY":
+            parts = parts[1:]
+        return parts[0] if parts else value
+
+    for instruction in module.instructions:
+        symbol = computation_symbol(instruction.computation)
+        if instruction.opcode == "parameter":
+            match = re.search(r"\bparameter\(([0-9]+)\)", instruction.raw_line)
+            if match is not None:
+                parameters.setdefault(symbol, {})[int(match.group(1))] = (
+                    instruction.computation,
+                    instruction.name,
+                )
+        if instruction.raw_line.lstrip().startswith("ROOT "):
+            roots[symbol] = (instruction.computation, instruction.name)
+
+    # Follow actual value flow through fusion/call boundaries.  Caller
+    # operands enter only through the corresponding callee parameter, and a
+    # callee reaches its call result only through its ROOT.  This prevents an
+    # unused argument or a dead convolution from satisfying liveness.
+    forward_edges: dict[
+        tuple[str, str],
+        list[tuple[tuple[str, str], str, int | None]],
+    ] = {}
+
+    def add_edge(
+        source: tuple[str, str],
+        target: tuple[str, str],
+        kind: str,
+        index: int | None = None,
+    ) -> None:
+        if source in by_key and target in by_key:
+            forward_edges.setdefault(source, []).append((target, kind, index))
+
+    call_opcodes = {"call", "fusion"}
+    for instruction in module.instructions:
+        target = (instruction.computation, instruction.name)
+        if instruction.opcode == "parameter":
+            continue
+        if instruction.opcode == "tuple":
+            for index, operand_name in enumerate(instruction.operand_names):
+                add_edge(
+                    (instruction.computation, operand_name),
+                    target,
+                    "tuple",
+                    index,
+                )
+        elif instruction.opcode == "get-tuple-element":
+            index_match = re.search(
+                r"\bindex=([0-9]+)", instruction.raw_line
+            )
+            if instruction.operand_names and index_match is not None:
+                add_edge(
+                    (
+                        instruction.computation,
+                        instruction.operand_names[0],
+                    ),
+                    target,
+                    "get-tuple-element",
+                    int(index_match.group(1)),
+                )
+        elif instruction.opcode not in call_opcodes:
+            for operand_name in instruction.operand_names:
+                add_edge(
+                    (instruction.computation, operand_name),
+                    target,
+                    "ordinary",
+                )
+        called = re.search(
+            r"\bcalls=(%[A-Za-z0-9_.:-]+)", instruction.raw_line
+        )
+        if called is None:
+            continue
+        symbol = called.group(1)
+        for index, operand_name in enumerate(instruction.operand_names):
+            parameter = parameters.get(symbol, {}).get(index)
+            if parameter is not None:
+                add_edge(
+                    (instruction.computation, operand_name),
+                    parameter,
+                    "identity",
+                )
+        root = roots.get(symbol)
+        if root is not None:
+            add_edge(root, target, "identity")
+
+    gate_keys = {(item.computation, item.name) for item in gate}
+    down_keys = {(item.computation, item.name) for item in down}
+    entry_root_keys = {
+        (instruction.computation, instruction.name)
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+        and instruction.raw_line.lstrip().startswith("ROOT ")
+    }
+
+    def first_reached_targets(
+        seed: tuple[str, str], targets: set[tuple[str, str]]
+    ) -> set[tuple[str, str]]:
+        ValuePath = tuple[int, ...] | None
+        pending: list[tuple[tuple[str, str], ValuePath]] = [(seed, ())]
+        visited: set[tuple[tuple[str, str], ValuePath]] = {(seed, ())}
+        reached: set[tuple[str, str]] = set()
+        while pending:
+            current, path = pending.pop()
+            for target, kind, index in forward_edges.get(current, ()):
+                target_instruction = by_key[target]
+                if kind == "identity":
+                    target_path = path
+                elif kind == "tuple":
+                    assert index is not None
+                    target_path = None if path is None else (index, *path)
+                elif kind == "get-tuple-element":
+                    assert index is not None
+                    if path is None or path == ():
+                        # The seed is never an unclassified tuple.  Reaching a
+                        # GTE without a concrete tuple-element path means an
+                        # intervening operation erased provenance; fail closed
+                        # instead of allowing every index.
+                        continue
+                    elif path[0] != index:
+                        continue
+                    else:
+                        target_path = path[1:]
+                else:
+                    exact_tuple_identity = (
+                        target_instruction.opcode
+                        in {"copy", "optimization-barrier"}
+                        and len(target_instruction.operand_names) == 1
+                        and len(target_instruction.result_shapes) > 1
+                    )
+                    target_path = (
+                        path
+                        if exact_tuple_identity
+                        else None
+                        if len(target_instruction.result_shapes) > 1
+                        else ()
+                    )
+                if target in targets:
+                    reached.add(target)
+                    continue
+                state = (target, target_path)
+                if state not in visited:
+                    visited.add(state)
+                    pending.append(state)
+        return reached
+
+    gate_down_links = {
+        key: first_reached_targets(key, down_keys) for key in gate_keys
+    }
+    down_root_links = {
+        key: first_reached_targets(key, entry_root_keys) for key in down_keys
+    }
+    exact_gate_down_bijection = bool(
+        enabled
+        and len(gate_down_links) == expected_per_kind
+        and all(len(targets) == 1 for targets in gate_down_links.values())
+        and Counter(
+            target
+            for targets in gate_down_links.values()
+            for target in targets
+        )
+        == Counter({key: 1 for key in down_keys})
+    )
+    exact_down_result_liveness = bool(
+        enabled
+        and len(down_root_links) == expected_per_kind
+        and all(targets for targets in down_root_links.values())
+    )
+    exact_stablehlo = (
+        validate_dense_final_layout_decoder_stablehlo(
+            stablehlo_text,
+            dense_layers=dense_layers,
+        )
+        if enabled and stablehlo_available
+        else {
+            "dense_layer_group_count": 0,
+            "exact_live_result_count": 0,
+            "exact_runtime_u8_bitcast_count": 0,
+            "gate_up_layout_constraint_count": 0,
+            "matched_virtual_shard_count": 0,
+            "passed": not enabled,
+            "violations": [],
+        }
+    )
+    violations = []
+    if enabled and not stablehlo_available:
+        violations.append(
+            "dense final-layout contract requires paired StableHLO"
+        )
+    if malformed_scoped:
+        violations.append(
+            "dense final-layout scoped convolution geometry drifted: "
+            f"{malformed_scoped}"
+        )
+    if len(gate) != expected_per_kind or len(down) != expected_per_kind:
+        violations.append(
+            "dense final-layout optimized convolution count drifted: "
+            f"expected={expected_per_kind}/{expected_per_kind} "
+            f"observed={len(gate)}/{len(down)}"
+        )
+    if enabled and any(
+        dict(counts) != expected_ranks for counts in rank_counts.values()
+    ):
+        violations.append(
+            "dense final-layout virtual-rank bijection drifted: "
+            f"{observed_rank_counts}"
+        )
+    if enabled and not exact_gate_down_bijection:
+        violations.append(
+            "dense final-layout gate/up and down convolutions are not live/bijective"
+        )
+    if enabled and not exact_down_result_liveness:
+        violations.append(
+            "dense final-layout down convolutions do not reach the decoder result"
+        )
+    if enabled and not exact_stablehlo["passed"]:
+        violations.append(
+            "dense final-layout exact StableHLO lineage drifted: "
+            f"{exact_stablehlo['violations']}"
+        )
+    if len(stable_gate) != expected_per_kind or len(stable_down) != expected_per_kind:
+        violations.append(
+            "dense final-layout StableHLO convolution count/arithmetic drifted: "
+            f"expected={expected_per_kind}/{expected_per_kind} "
+            f"observed={len(stable_gate)}/{len(stable_down)}"
+        )
+    if stable_layout_constraints != expected_per_kind:
+        violations.append(
+            "dense final-layout StableHLO layout-constraint count drifted: "
+            f"expected={expected_per_kind} observed={stable_layout_constraints}"
+        )
+    if enabled and stable_dead_rows:
+        violations.append("dense final-layout decoder contains M32/dead-row state")
+    return {
+        "applicable": enabled,
+        "expected_convolution_count_per_kind": expected_per_kind,
+        "gate_up_convolution_count": len(gate),
+        "down_convolution_count": len(down),
+        "optimized_virtual_rank_counts": observed_rank_counts,
+        "optimized_exact_gate_down_bijection": exact_gate_down_bijection,
+        "optimized_exact_down_result_liveness": exact_down_result_liveness,
+        "stablehlo_exact_arithmetic_contract": exact_stablehlo,
+        "stablehlo_gate_up_convolution_count": len(stable_gate),
+        "stablehlo_down_convolution_count": len(stable_down),
+        "stablehlo_layout_constraint_count": stable_layout_constraints,
+        "stablehlo_dead_row_signature_count": stable_dead_rows,
+        "passed": not violations,
         "violations": violations,
     }
 
@@ -1242,6 +1648,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
     strategy_nd_attention_projection: bool = False,
+    dense_final_layout_convolution: bool = False,
     prefill_index_repair: bool = False,
     module: HloModule | None = None,
 ) -> dict[str, Any]:
@@ -1274,7 +1681,7 @@ def _validate_pallas_stage_linear_decoder_calls(
             0 if dsa_head_key_exact_association else full_indexer_layers
         ),
         "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": (
-            dense_layers
+            0 if dense_final_layout_convolution else dense_layers
         ),
     }
     custom_calls = [
@@ -3269,6 +3676,7 @@ def validate_decoder_step_hlo(
     main_rope_table_enabled: bool = False,
     pregathered_b512_attention: bool = False,
     strategy_nd_attention_projection: bool = False,
+    dense_final_layout_convolution: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -3308,6 +3716,10 @@ def validate_decoder_step_hlo(
     if not isinstance(strategy_nd_attention_projection, bool):
         raise PlanValidationError(
             "StrategyND attention-projection HLO flag must be boolean"
+        )
+    if not isinstance(dense_final_layout_convolution, bool):
+        raise PlanValidationError(
+            "dense final-layout convolution HLO flag must be boolean"
         )
     if strategy_nd_attention_projection and not pregathered_b512_attention:
         raise PlanValidationError(
@@ -3422,13 +3834,18 @@ def validate_decoder_step_hlo(
         for layer in stage.layers
     )
     layers = schedule.layer_count
+    dense_layers = sum(
+        layer.mlp_kind == "dense"
+        for stage in schedule.stages
+        for layer in stage.layers
+    )
     reduction_arity_counts: dict[str, int] = {}
     expected_reduction_arity_counts: dict[str, int] = {}
     reduction_result_shape_counts: dict[str, int] = {}
     expected_reduction_result_shape_counts: dict[str, int] = {}
     reduction_component_count = 0
     expected_reduction_component_count = 0
-    sparse_layers = 0
+    sparse_layers = layers - dense_layers
     if backend_contract == "cpu_reference":
         expected_gathers = 4 * layers + 3 * full_layers + (
             2 if complete_token_path else 0
@@ -3437,12 +3854,6 @@ def validate_decoder_step_hlo(
             1 if complete_token_path else 0
         )
     else:
-        dense_layers = sum(
-            layer.mlp_kind == "dense"
-            for stage in schedule.stages
-            for layer in stage.layers
-        )
-        sparse_layers = layers - dense_layers
         if (
             config.stage_count,
             config.local_parallel_size,
@@ -3466,6 +3877,7 @@ def validate_decoder_step_hlo(
         expected_gathers = (
             (0 if pregathered_b512_attention else 2 * layers)
             + (layers if strategy_nd_attention_projection else 0)
+            + (dense_layers if dense_final_layout_convolution else 0)
             + 3 * full_layers
         )
         (
@@ -3725,6 +4137,9 @@ def validate_decoder_step_hlo(
                 strategy_nd_attention_projection=(
                     strategy_nd_attention_projection
                 ),
+                dense_final_layout_convolution=(
+                    dense_final_layout_convolution
+                ),
                 prefill_index_repair=prefill_index_repair,
                 module=module,
             )
@@ -3811,6 +4226,16 @@ def validate_decoder_step_hlo(
     violations.extend(
         strategy_nd_attention_stablehlo_contract["violations"]
     )
+    dense_final_layout_contract = (
+        _validate_dense_final_layout_convolution_hlo(
+            optimized_hlo,
+            stablehlo,
+            dense_layers=dense_layers,
+            enabled=dense_final_layout_convolution,
+            module=module,
+        )
+    )
+    violations.extend(dense_final_layout_contract["violations"])
     return {
         "backend_contract": backend_contract,
         "collective_count": len(collectives),
@@ -3872,6 +4297,10 @@ def validate_decoder_step_hlo(
         "pregathered_b512_attention": pregathered_b512_attention,
         "strategy_nd_attention_projection": (
             strategy_nd_attention_projection
+        ),
+        "dense_final_layout_convolution": dense_final_layout_convolution,
+        "dense_final_layout_convolution_contract": (
+            dense_final_layout_contract
         ),
         "pregathered_b512_attention_contract": (
             pregathered_attention_contract
@@ -4768,8 +5197,22 @@ def _dsa_weights(weight: Any, slot: int) -> DsaFp8Weights:
     )
 
 
-def _dense_weights(weight: Any, slot: int) -> DenseFp8Weights:
+def _dense_weights(
+    weight: Any,
+    slot: int,
+    *,
+    final_layout_convolution: bool = False,
+) -> DenseFp8Weights:
     base = f"dense.slot_{slot:02d}"
+    if final_layout_convolution:
+        return DenseFp8Weights(
+            weight(f"{base}.merged_gate_up.weight_bits_in_out"),
+            weight(f"{base}.merged_gate_up.scale_inv_in_out"),
+            None,
+            None,
+            weight(f"{base}.down.weight_bits_in_out"),
+            weight(f"{base}.down.scale_inv_in_out"),
+        )
     return DenseFp8Weights(
         weight(f"{base}.gate.weight_bits"),
         weight(f"{base}.gate.scale_inv"),
@@ -4828,6 +5271,7 @@ def _execute_stage(
     attention_projection_backend: AttentionProjectionBackend,
     pregathered_b512_attention: bool,
     strategy_nd_attention_projection: bool,
+    dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -4880,7 +5324,11 @@ def _execute_stage(
             current_full_slot = None
         if layer.mlp_kind == "dense":
             assert layer.dense_slot is not None
-            dense = _dense_weights(weight, layer.dense_slot)
+            dense = _dense_weights(
+                weight,
+                layer.dense_slot,
+                final_layout_convolution=dense_final_layout_convolution,
+            )
             moe = None
         else:
             assert layer.sparse_slot is not None
@@ -5058,6 +5506,7 @@ def _execute_stage_split(
     attention_projection_backend: AttentionProjectionBackend,
     pregathered_b512_attention: bool,
     strategy_nd_attention_projection: bool,
+    dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
@@ -5123,7 +5572,11 @@ def _execute_stage_split(
             current_full_slot = None
         if layer.mlp_kind == "dense":
             assert layer.dense_slot is not None
-            dense = _dense_weights(weight, layer.dense_slot)
+            dense = _dense_weights(
+                weight,
+                layer.dense_slot,
+                final_layout_convolution=dense_final_layout_convolution,
+            )
             moe = None
         else:
             assert layer.sparse_slot is not None
@@ -5195,6 +5648,7 @@ def _execute_stage_split(
                 strategy_nd_attention_projection
             ),
             main_rope_table_row=main_rope_table_row,
+            dense_final_layout_convolution=dense_final_layout_convolution,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
             prefill_index_inputs = prefill_index_inputs.at[
@@ -5309,6 +5763,7 @@ def build_decoder_step_program(
     main_rope_table_enabled: bool = False,
     pregathered_b512_attention: bool = False,
     strategy_nd_attention_projection: bool = False,
+    dense_final_layout_convolution: bool = False,
     complete_token_path: bool = False,
     observe_dsa_events: bool = False,
     observe_dsa_internals: bool = False,
@@ -5415,6 +5870,10 @@ def build_decoder_step_program(
         raise PlanValidationError(
             "decoder StrategyND attention-projection flag must be boolean"
         )
+    if not isinstance(dense_final_layout_convolution, bool):
+        raise PlanValidationError(
+            "decoder dense final-layout convolution flag must be boolean"
+        )
     if not isinstance(complete_token_path, bool):
         raise PlanValidationError("complete token-path flag must be boolean")
     if not isinstance(split_residual_state, bool):
@@ -5443,6 +5902,15 @@ def build_decoder_step_program(
     if strategy_nd_attention_projection and not split_residual_state:
         raise PlanValidationError(
             "StrategyND attention projection requires split residual state"
+        )
+    if dense_final_layout_convolution and not (
+        strategy_nd_attention_projection
+        and linear_backend == "pallas"
+        and split_residual_state
+    ):
+        raise PlanValidationError(
+            "dense final-layout convolution requires the protected StrategyND "
+            "split Pallas path"
         )
     if not isinstance(observe_dsa_events, bool):
         raise PlanValidationError("DSA event-observation flag must be boolean")
@@ -5580,6 +6048,17 @@ def build_decoder_step_program(
             f"backend={attention_projection_backend!r} "
             f"expected={expected_attention_layout!r} "
             f"observed={weight_layout.attention_projection_layout!r}"
+        )
+    expected_dense_layout = (
+        FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT
+        if dense_final_layout_convolution
+        else LEGACY_DENSE_RUNTIME_LAYOUT
+    )
+    if weight_layout.dense_projection_layout != expected_dense_layout:
+        raise PlanValidationError(
+            "decoder dense backend and runtime layout disagree: "
+            f"expected={expected_dense_layout!r} "
+            f"observed={weight_layout.dense_projection_layout!r}"
         )
     hashes = (
         schedule.plan_hash,
@@ -5996,6 +6475,9 @@ def build_decoder_step_program(
                             strategy_nd_attention_projection=(
                                 strategy_nd_attention_projection
                             ),
+                            dense_final_layout_convolution=(
+                                dense_final_layout_convolution
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
@@ -6062,6 +6544,9 @@ def build_decoder_step_program(
                             strategy_nd_attention_projection=(
                                 strategy_nd_attention_projection
                             ),
+                            dense_final_layout_convolution=(
+                                dense_final_layout_convolution
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
@@ -6126,6 +6611,9 @@ def build_decoder_step_program(
                             strategy_nd_attention_projection=(
                                 strategy_nd_attention_projection
                             ),
+                            dense_final_layout_convolution=(
+                                dense_final_layout_convolution
+                            ),
                             main_rope_table_row=main_rope_table_row,
                             dsa_observation=values[4],
                         ),
@@ -6185,6 +6673,9 @@ def build_decoder_step_program(
                         strategy_nd_attention_projection=(
                             strategy_nd_attention_projection
                         ),
+                        dense_final_layout_convolution=(
+                            dense_final_layout_convolution
+                        ),
                         main_rope_table_row=main_rope_table_row,
                         prefill_index_inputs=values[4],
                     ),
@@ -6236,6 +6727,9 @@ def build_decoder_step_program(
                         ),
                         strategy_nd_attention_projection=(
                             strategy_nd_attention_projection
+                        ),
+                        dense_final_layout_convolution=(
+                            dense_final_layout_convolution
                         ),
                         main_rope_table_row=main_rope_table_row,
                     ),
@@ -7739,6 +8233,7 @@ def build_decoder_step_program(
         strategy_nd_attention_projection=(
             strategy_nd_attention_projection
         ),
+        dense_final_layout_convolution=dense_final_layout_convolution,
         main_rope_table_host=main_rope_table_host,
         main_rope_table_sha256=main_rope_table_digest,
         main_rope_table_bytes_per_device=main_rope_table_bytes,

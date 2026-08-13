@@ -557,10 +557,10 @@ def _virtual_dense_final_layout_convolution_down_partials(
     row-major ``[in, out]`` convolution operands without changing any values.
     """
 
-    if compile_rows != 32:
-        raise ValueError("final-layout dense discriminator requires M32")
+    if compile_rows not in (1, 32):
+        raise ValueError("final-layout dense requires one or 32 compile rows")
     expected = {
-        "normalized": (32, 6144),
+        "normalized": (compile_rows, 6144),
         "merged_bits_in_out": (8, 6144, 768),
         "merged_scale_in_out": (8, 48, 768),
         "down_bits_in_out": (8, 384, 6144),
@@ -584,13 +584,24 @@ def _virtual_dense_final_layout_convolution_down_partials(
     if normalized.dtype != jnp.bfloat16:
         raise ValueError("final-layout dense input must be BF16")
     if any(
-        value.dtype != jnp.float8_e4m3fn
+        value.dtype not in (jnp.uint8, jnp.float8_e4m3fn)
         for value in (merged_bits_in_out, down_bits_in_out)
     ) or any(
         value.dtype != jnp.float32
         for value in (merged_scale_in_out, down_scale_in_out)
     ):
         raise ValueError("final-layout dense weight dtypes drifted")
+    # Runtime checkpoints preserve FP8 payloads as their exact U8 bit
+    # patterns.  Reinterpret those bytes only at this arithmetic boundary;
+    # converting numerically would corrupt every non-trivial FP8 value.
+    if merged_bits_in_out.dtype == jnp.uint8:
+        merged_bits_in_out = lax.bitcast_convert_type(
+            merged_bits_in_out, jnp.float8_e4m3fn
+        )
+    if down_bits_in_out.dtype == jnp.uint8:
+        down_bits_in_out = lax.bitcast_convert_type(
+            down_bits_in_out, jnp.float8_e4m3fn
+        )
 
     partials = []
     previous_partial = None
@@ -2117,20 +2128,41 @@ def stage_local_dense_fp8_mapped(
     virtual_tp32_reduction_association: (
         VirtualTp32ReductionAssociation | None
     ) = None,
+    final_layout_convolution: bool = False,
     capture_ingredients: bool = False,
 ) -> Any | StageLocalDenseFp8ObservedResult:
     """Execute one dense SwiGLU from local raw shards and one local combine."""
 
     groups = _axis_groups(axis_index_groups)
+    if not isinstance(final_layout_convolution, bool):
+        raise ValueError("dense final-layout convolution flag must be boolean")
     if residual.ndim != 2 or residual.shape[0] != 1:
         raise ValueError("dense decode residual must contain exactly one row")
     hidden = residual.shape[1]
     if norm_weight.shape != (hidden,):
         raise ValueError("dense norm shape disagrees with hidden size")
-    if gate_bits.shape != up_bits.shape or gate_bits.shape[1] != hidden:
-        raise ValueError("dense local gate/up shards are invalid")
-    if down_bits.shape != (hidden, gate_bits.shape[0]):
-        raise ValueError("dense local down shard is invalid")
+    if final_layout_convolution:
+        expected = {
+            "gate_bits": (8, hidden, 768),
+            "gate_scale": (8, 48, 768),
+            "down_bits": (8, 384, hidden),
+            "down_scale": (8, 3, hidden),
+        }
+        values = {
+            "gate_bits": gate_bits,
+            "gate_scale": gate_scale,
+            "down_bits": down_bits,
+            "down_scale": down_scale,
+        }
+        if up_bits is not None or up_scale is not None or any(
+            value.shape != expected[name] for name, value in values.items()
+        ):
+            raise ValueError("dense final-layout convolution shards are invalid")
+    else:
+        if gate_bits.shape != up_bits.shape or gate_bits.shape[1] != hidden:
+            raise ValueError("dense local gate/up shards are invalid")
+        if down_bits.shape != (hidden, gate_bits.shape[0]):
+            raise ValueError("dense local down shard is invalid")
     if not isinstance(add_residual, bool):
         raise ValueError("dense residual-add flag must be boolean")
     if not isinstance(reconstruct_down_fp32, bool):
@@ -2143,7 +2175,8 @@ def stage_local_dense_fp8_mapped(
     ):
         raise ValueError("dense virtual TP32 association is unknown")
     if virtual_tp32_reduction_association is not None and (
-        reconstruct_down_fp32 or linear_backend != "pallas"
+        reconstruct_down_fp32
+        or (linear_backend != "pallas" and not final_layout_convolution)
     ):
         raise ValueError(
             "dense virtual TP32 association requires the BF16 Pallas path"
@@ -2155,6 +2188,15 @@ def stage_local_dense_fp8_mapped(
     ):
         raise ValueError(
             "dense ingredient capture requires the production BF16 Pallas path"
+        )
+    if final_layout_convolution and (
+        virtual_tp32_reduction_association
+        != STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+        or reconstruct_down_fp32
+        or capture_ingredients
+    ):
+        raise ValueError(
+            "dense final-layout convolution requires isolated StrategyND BF16 reduction"
         )
     if precomputed_normalized is None:
         normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
@@ -2180,16 +2222,28 @@ def stage_local_dense_fp8_mapped(
         else None
     )
     if virtual_tp32_reduction_association is not None:
-        local_partials = _virtual_dense_down_partials(
-            normalized,
-            gate_bits,
-            gate_scale,
-            up_bits,
-            up_scale,
-            down_bits,
-            down_scale,
-            block_shape=block_shape,
-            linear_interpret=linear_interpret,
+        local_partials = (
+            _virtual_dense_final_layout_convolution_down_partials(
+                normalized,
+                gate_bits,
+                gate_scale,
+                down_bits,
+                down_scale,
+                block_shape=block_shape,
+                compile_rows=1,
+            )
+            if final_layout_convolution
+            else _virtual_dense_down_partials(
+                normalized,
+                gate_bits,
+                gate_scale,
+                up_bits,
+                up_scale,
+                down_bits,
+                down_scale,
+                block_shape=block_shape,
+                linear_interpret=linear_interpret,
+            )
         )
         if (
             virtual_tp32_reduction_association

@@ -24,10 +24,16 @@ from glm_tpu.greenfield.checkpoint import (
     verify_runtime_packed_checkpoint,
 )
 from glm_tpu.greenfield.errors import CheckpointValidationError
-from glm_tpu.greenfield.checkpoint.runtime_feature import _transform_qkv_a
+from glm_tpu.greenfield.checkpoint.runtime_feature import (
+    _transform_dense,
+    _transform_qkv_a,
+)
 from glm_tpu.greenfield.model import (
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
+    build_decoder_dense_convolution_runtime_weight_layout,
+    build_decoder_feature_fused_qkv_dense_runtime_weight_layout,
     build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_feature_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
@@ -96,6 +102,149 @@ def test_fused_qkv_a_transform_matches_shard_major_n82_semantics() -> None:
             np.asarray([2.0, 2.0, 2.0, 2.0, 5.0], dtype=np.float32),
             (32, 1, 5),
         ),
+    )
+
+
+def test_dense_convolution_transform_matches_exact_virtual_shards() -> None:
+    gate = np.arange(16 * 8, dtype=np.uint8).reshape(16, 8)
+    up = gate + np.uint8(31)
+    packed = np.frombuffer(
+        _transform_dense(
+            [bytearray(gate.tobytes()), bytearray(up.tobytes())],
+            source_shapes=[gate.shape, up.shape],
+            destination_shape=(8, 8, 4),
+            dtype="F8_E4M3",
+            transform="pack_dense_gate_up_bits_in_out",
+        ),
+        dtype=np.uint8,
+    ).reshape(8, 8, 4)
+    np.testing.assert_array_equal(
+        packed,
+        np.concatenate(
+            (
+                gate.reshape(8, 2, 8).transpose(0, 2, 1),
+                up.reshape(8, 2, 8).transpose(0, 2, 1),
+            ),
+            axis=-1,
+        ),
+    )
+
+    scales = np.arange(8 * 2, dtype=np.float32).reshape(8, 2)
+    packed_scales = np.frombuffer(
+        _transform_dense(
+            [bytearray(scales.tobytes()), bytearray((scales + 1).tobytes())],
+            source_shapes=[scales.shape, scales.shape],
+            destination_shape=(8, 2, 256),
+            dtype="F32",
+            transform="pack_dense_gate_up_scales_in_out",
+        ),
+        dtype="<f4",
+    ).reshape(8, 2, 256)
+    expected_scales = np.concatenate(
+        (
+            np.repeat(scales.reshape(8, 1, 2).transpose(0, 2, 1), 128, -1),
+            np.repeat(
+                (scales + 1).reshape(8, 1, 2).transpose(0, 2, 1),
+                128,
+                -1,
+            ),
+        ),
+        axis=-1,
+    )
+    np.testing.assert_array_equal(packed_scales, expected_scales)
+
+    down = np.arange(8 * 16, dtype=np.uint8).reshape(8, 16)
+    packed_down = np.frombuffer(
+        _transform_dense(
+            [bytearray(down.tobytes())],
+            source_shapes=[down.shape],
+            destination_shape=(8, 2, 8),
+            dtype="F8_E4M3",
+            transform="pack_dense_down_bits_in_out",
+        ),
+        dtype=np.uint8,
+    ).reshape(8, 2, 8)
+    np.testing.assert_array_equal(
+        packed_down, down.reshape(8, 8, 2).transpose(1, 2, 0)
+    )
+
+
+def test_dense_convolution_layout_replaces_only_dense_state() -> None:
+    source_plan = _small_feature_source_plan()
+    source_plan = replace(
+        source_plan,
+        geometry=replace(
+            source_plan.geometry,
+            hidden_size=128,
+            dense_intermediate_size=4096,
+            q_lora_rank=128,
+            kv_lora_rank=128,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
+    schedule = build_pipeline_schedule(source_plan)
+    source = build_decoder_runtime_weight_layout(source_plan, schedule)
+    target = build_decoder_dense_convolution_runtime_weight_layout(
+        source_plan, schedule, source
+    )
+    assert target.dense_projection_layout == (
+        FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT
+    )
+    assert [
+        spec.name for spec in target.specs if spec.slot_kind == "dense"
+    ] == [
+        "dense.slot_00.merged_gate_up.weight_bits_in_out",
+        "dense.slot_00.merged_gate_up.scale_inv_in_out",
+        "dense.slot_00.down.weight_bits_in_out",
+        "dense.slot_00.down.scale_inv_in_out",
+    ]
+    assert all(
+        len(tensor.sources) in (0, 1, 2)
+        for device in target.devices
+        for tensor in device.tensors
+    )
+
+
+def test_feature_qkv_dense_layout_composes_each_slot_once() -> None:
+    source_plan = _small_feature_source_plan()
+    source_plan = replace(
+        source_plan,
+        geometry=replace(
+            source_plan.geometry,
+            hidden_size=128,
+            dense_intermediate_size=4096,
+            q_lora_rank=128,
+            kv_lora_rank=30,
+            qk_nope_head_dim=2,
+            qk_rope_head_dim=2,
+            v_head_dim=2,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
+    schedule = build_pipeline_schedule(source_plan)
+    source = build_decoder_runtime_weight_layout(source_plan, schedule)
+    target_plan = replace(
+        source_plan, expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT
+    )
+    target = build_decoder_feature_fused_qkv_dense_runtime_weight_layout(
+        target_plan,
+        build_pipeline_schedule(target_plan),
+        source,
+    )
+    names = [spec.name for spec in target.specs]
+    assert len(names) == len(set(names))
+    assert target.attention_projection_layout != SEPARATE_QKV_A_RUNTIME_LAYOUT
+    assert target.dense_projection_layout == (
+        FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT
+    )
+    assert sum(".qkv_a.weight_bits" in name for name in names) == 1
+    assert sum(".merged_gate_up.weight_bits_in_out" in name for name in names) == 1
+    assert sum(".down.weight_bits_in_out" in name for name in names) == 1
+    assert all(
+        tuple(tensor.spec.name for tensor in device.tensors) == tuple(names)
+        for device in target.devices
     )
 
 

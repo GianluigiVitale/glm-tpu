@@ -19,6 +19,32 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected DB549/item1833 completed from pushed pin `57f6a052214e3394c86c2b2ebe0073f9989aca3b`
+  under tag `greenfield_layer0_dense_envelope_split_rms_20260813T134012434338842Z`.
+  It proves the accepted scalar-only layer-1 RMS schedule exactly in TPU HLO, but its numerical
+  result returns to `1,073/6,144` mismatches (observed SHA `229dc8ac...812f`). This conclusively
+  rejects the RMS schedule as the source of DB548's one-ULP improvement. DB548 remains the best
+  measured dense formulation: one BF16 ULP at index 2795, not exact and not performance evidence.
+- The active default-off production integration carries DB548's final-layout dense formulation into
+  the real true-row-one decoder without importing legacy execution. It adds deterministic offline
+  gate/up/down FP8+scale transforms for all three dense layers, direct manifest-bound loading, the
+  eight-virtual-rank convolution path at `M=1`, decoder/DSA-observer/prefill HLO gates, and protected
+  wrapper publication. The wrapper directly pins local/remote DB548 selection evidence and the
+  DB549 rejected challenger, including sealed DB rows and packed tensor hashes.
+- Focused checkpoint/HLO/wrapper tests pass `58/58`; the extracted DB548/549 prerequisite validator
+  passes the live sealed artifacts and DB. No complete 8K decoder, timing, XPlane, DB row or
+  promotion claim has yet been produced by this integration. Exact next: finish affected validation,
+  one new-diff-only Sol audit, commit/push, create the plan-aware dense runtime derivative, then run
+  exactly one protected complete 8K Gate-D retry. Gate D remains open and DB484 remains the only
+  decoder performance result.
+- The one bounded Sol bulk audit found and the correction closes two pre-launch blockers: the direct
+  runtime loader retains FP8 as exact U8 storage bits, so the dense arithmetic boundary now performs
+  a shape-preserving `bitcast_convert_type` to E4M3FN; and the complete-decoder HLO gate now reuses
+  the exact dense StableHLO matcher and independently proves gate/down/result liveness. Regression
+  mutations for an arithmetic RHS, unrelated layout constraint and dead convolutions all refuse.
+  A loader-shaped U8 trace passes. This is validation only; the correction still needs its delta
+  audit and protected 8K execution before Gate D can close.
+
 - Reviewed correction `ca7c78e9eef55040a5fbcf9c0572c3fcf274a022` moved the identity barriers
   to the reduction inputs and ran once under tag
   `greenfield_layer0_dense_envelope_split_rms_20260813T130459893823080Z`. The protected HLO now

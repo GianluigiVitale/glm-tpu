@@ -385,6 +385,10 @@ def _transform_contract(
     if transform in (
         "fuse_qkv_a_output_shards",
         "fuse_qkv_a_expanded_scales",
+        "pack_dense_gate_up_bits_in_out",
+        "pack_dense_gate_up_scales_in_out",
+        "pack_dense_down_bits_in_out",
+        "pack_dense_down_scales_in_out",
     ):
         return None, None, None, None
     axis_and_transpose = {
@@ -588,6 +592,98 @@ def _transform_qkv_a(
     return packed.tobytes(order="C")
 
 
+def _transform_dense(
+    raw_values: Sequence[bytearray],
+    *,
+    source_shapes: Sequence[tuple[int, ...]],
+    destination_shape: tuple[int, ...],
+    dtype: str,
+    transform: str,
+) -> bytes:
+    """Pack one physical owner's dense state into eight exact in/out shards."""
+
+    import numpy as np
+
+    if len(raw_values) != len(source_shapes):
+        raise CheckpointValidationError("dense transform source count drifted")
+    if dtype == "F8_E4M3":
+        storage_dtype = np.dtype("u1")
+    elif dtype == "F32":
+        storage_dtype = np.dtype("<f4")
+    else:
+        raise CheckpointValidationError("dense transform dtype drifted")
+    values = tuple(
+        np.frombuffer(raw, dtype=storage_dtype).reshape(shape)
+        for raw, shape in zip(raw_values, source_shapes, strict=True)
+    )
+    if transform == "pack_dense_gate_up_bits_in_out":
+        if len(values) != 2 or any(value.ndim != 2 for value in values):
+            raise CheckpointValidationError("dense gate/up bit sources drifted")
+        gate, up = values
+        if gate.shape != up.shape or gate.shape[0] % 8:
+            raise CheckpointValidationError("dense gate/up bit geometry drifted")
+        local = gate.shape[0] // 8
+        packed = np.concatenate(
+            (
+                gate.reshape(8, local, gate.shape[1]).transpose(0, 2, 1),
+                up.reshape(8, local, up.shape[1]).transpose(0, 2, 1),
+            ),
+            axis=-1,
+        )
+    elif transform == "pack_dense_gate_up_scales_in_out":
+        if len(values) != 2 or any(value.ndim != 2 for value in values):
+            raise CheckpointValidationError("dense gate/up scale sources drifted")
+        gate, up = values
+        if gate.shape != up.shape or gate.shape[0] % 8:
+            raise CheckpointValidationError("dense gate/up scale geometry drifted")
+        local = gate.shape[0] // 8
+        packed = np.concatenate(
+            (
+                np.repeat(
+                    gate.reshape(8, local, gate.shape[1]).transpose(0, 2, 1),
+                    128,
+                    axis=-1,
+                ),
+                np.repeat(
+                    up.reshape(8, local, up.shape[1]).transpose(0, 2, 1),
+                    128,
+                    axis=-1,
+                ),
+            ),
+            axis=-1,
+        )
+    elif transform == "pack_dense_down_bits_in_out":
+        if len(values) != 1 or values[0].ndim != 2:
+            raise CheckpointValidationError("dense down bit source drifted")
+        (down,) = values
+        if down.shape[1] % 8:
+            raise CheckpointValidationError("dense down bit geometry drifted")
+        local = down.shape[1] // 8
+        packed = down.reshape(down.shape[0], 8, local).transpose(1, 2, 0)
+    elif transform == "pack_dense_down_scales_in_out":
+        if len(values) != 1 or values[0].ndim != 2:
+            raise CheckpointValidationError("dense down scale source drifted")
+        (down,) = values
+        if down.shape[1] % 8:
+            raise CheckpointValidationError("dense down scale geometry drifted")
+        local = down.shape[1] // 8
+        packed = np.repeat(
+            down.reshape(down.shape[0], 8, local).transpose(1, 2, 0),
+            128,
+            axis=-1,
+        )
+    else:
+        raise CheckpointValidationError(
+            f"unsupported dense runtime transform {transform!r}"
+        )
+    if packed.shape != destination_shape:
+        raise CheckpointValidationError(
+            "dense transform destination shape drifted: "
+            f"expected={destination_shape} observed={packed.shape}"
+        )
+    return np.ascontiguousarray(packed).tobytes(order="C")
+
+
 def stream_feature_runtime_stage(
     *,
     source_plans: Sequence[RuntimeDestinationFilePlan],
@@ -750,14 +846,25 @@ def stream_feature_runtime_stage(
             if transform in (
                 "fuse_qkv_a_output_shards",
                 "fuse_qkv_a_expanded_scales",
+                "pack_dense_gate_up_bits_in_out",
+                "pack_dense_gate_up_scales_in_out",
+                "pack_dense_down_bits_in_out",
+                "pack_dense_down_scales_in_out",
             ):
                 for destination_slot, binding in enumerate(bindings):
-                    if len(binding.sources) != 2 or any(
+                    expected_sources = (
+                        2
+                        if transform.startswith(
+                            ("fuse_qkv_a_", "pack_dense_gate_up_")
+                        )
+                        else 1
+                    )
+                    if len(binding.sources) != expected_sources or any(
                         source.source_device_slot != destination_slot
                         for source in binding.sources
                     ):
                         raise CheckpointValidationError(
-                            "fused qkv-a transform moved physical ownership"
+                            "local runtime transform moved physical ownership"
                         )
                     source_values = []
                     for source_leaf in binding.sources:
@@ -785,17 +892,30 @@ def stream_feature_runtime_stage(
                                 byte_count=source_tensor.byte_count,
                             )
                         )
-                    value = _transform_qkv_a(
-                        source_values[0],
-                        source_values[1],
-                        q_shape=binding.sources[0].shape,
-                        kv_shape=binding.sources[1].shape,
-                        destination_shape=destinations[
-                            destination_slot
-                        ].spec.shape,
-                        dtype=destinations[destination_slot].spec.dtype,
-                        transform=transform,
-                    )
+                    if transform.startswith("fuse_qkv_a_"):
+                        value = _transform_qkv_a(
+                            source_values[0],
+                            source_values[1],
+                            q_shape=binding.sources[0].shape,
+                            kv_shape=binding.sources[1].shape,
+                            destination_shape=destinations[
+                                destination_slot
+                            ].spec.shape,
+                            dtype=destinations[destination_slot].spec.dtype,
+                            transform=transform,
+                        )
+                    else:
+                        value = _transform_dense(
+                            source_values,
+                            source_shapes=tuple(
+                                source.shape for source in binding.sources
+                            ),
+                            destination_shape=destinations[
+                                destination_slot
+                            ].spec.shape,
+                            dtype=destinations[destination_slot].spec.dtype,
+                            transform=transform,
+                        )
                     tensor_bytes[destination_slot] += _write(
                         outputs[destination_slot],
                         value,

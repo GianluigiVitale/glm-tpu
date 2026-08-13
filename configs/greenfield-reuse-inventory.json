@@ -424,6 +424,17 @@
       "reason": "Protected DB537 identifies three bitwise-exact B512 arms on both accepted and table-on cache inputs, including the simplest local H16 arm; both B128 controls retain 216/32768 mismatches. The default-off adaptation places only each lane's owned rows into canonical selected slots, reconstructs [1,2048,640] with one LP4 BF16 sum, runs local 16-head B512 attention and removes the old query/output/LSE/validity gathers. It reuses the packed checkpoint, striped cache, exact DSA selection, pre-gathered Pallas kernel and protected wrapper; no full cache, legacy execution, full-pod state or dead batch row is introduced. The complete dab03de 8K run makes event 0 exact but still diverges entering layer 1, so the exact latent is now reused by one bounded post-latent projection/reduction probe rather than another full-decoder guess."
     },
     {
+      "id": "greenfield-final-layout-dense-production",
+      "category": "checkpoint layout and numerical production adaptation",
+      "source_repo": "glm-tpu greenfield protected dense probes and existing runtime packer",
+      "source_pin": "DB548 3d5b2ee840c41bcd86a1e1936a95db2d4a8e73f9 / DB549 57f6a052214e3394c86c2b2ebe0073f9989aca3b / final-layout manifest 45bfd64e45956627516c36603ccee53d85d713ce6476761e68f1170c51901ba4",
+      "source_paths": ["glm_tpu/greenfield/checkpoint/runtime_feature.py", "glm_tpu/greenfield/checkpoint/runtime_feature_loader.py", "glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/pack_feature_runtime_checkpoint.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh", "/home/gianl/glm-run/greenfield_layer0_dense_envelope_cross_layer_20260813T120703034434907Z", "/home/gianl/glm-run/greenfield_layer0_dense_envelope_split_rms_20260813T134012434338842Z"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/model/weights.py", "glm_tpu/greenfield/checkpoint/runtime_feature.py", "glm_tpu/greenfield/checkpoint/runtime_feature_loader.py", "glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/kernels/layer.py", "glm_tpu/greenfield/runtime/decoder.py", "scripts/greenfield/compile_short_decoder.py", "scripts/greenfield/run_short_decoder_compile_pp8.sh"],
+      "gate": "D",
+      "reason": "DB548's final-layout dense envelope leaves one BF16 ULP while DB549's exact accepted scalar RMS schedule regresses to 1,073 mismatches, selecting the unsplit DB548 formulation for the next complete decoder. Reuse the existing plan-aware derivative packer/loader with deterministic owner-local FP8 and expanded-scale transforms and the existing protected wrapper. Execute true M=1 with topology-local PP8 state; never repartition at runtime or import legacy execution. Default-off integration is not promoted until the complete protected 8K token, DSA, HLO, HBM, wall, archive and cleanup contract passes."
+    },
+    {
       "id": "greenfield-layer0-attention-schedule-discriminator",
       "category": "bounded diagnostic evidence",
       "source_repo": "glm-tpu greenfield runtime and protected artifacts",

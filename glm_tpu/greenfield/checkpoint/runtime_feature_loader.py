@@ -10,6 +10,7 @@ from typing import Any
 
 from ..errors import CheckpointValidationError
 from ..model.weights import (
+    LEGACY_DENSE_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
 )
@@ -229,6 +230,8 @@ def verify_feature_runtime_packed_checkpoint(
         common["attention_projection_layout"] = (
             layout.attention_projection_layout
         )
+    if layout.dense_projection_layout != LEGACY_DENSE_RUNTIME_LAYOUT:
+        common["dense_projection_layout"] = layout.dense_projection_layout
     for name, value in (("control", control), ("manifest", manifest)):
         for field, expected in common.items():
             if value.get(field) != expected:

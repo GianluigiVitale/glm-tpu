@@ -67,8 +67,8 @@ class DsaFp8Weights(NamedTuple):
 class DenseFp8Weights(NamedTuple):
     gate_bits: Any
     gate_scale: Any
-    up_bits: Any
-    up_scale: Any
+    up_bits: Any | None
+    up_scale: Any | None
     down_bits: Any
     down_scale: Any
 
@@ -589,6 +589,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     virtual_tp32_attention_only: bool = False,
     replicated_monolithic_attention: bool = False,
     pregathered_b512_attention: bool = False,
+    dense_final_layout_convolution: bool = False,
     capture_ingredients: bool = False,
 ) -> StageLocalSplitLayerFp8Result | StageLocalSplitLayerFp8ObservedResult:
     """Execute one layer while preserving legacy hidden/residual association."""
@@ -607,6 +608,8 @@ def stage_local_transformer_layer_fp8_split_mapped(
         )
     if not isinstance(pregathered_b512_attention, bool):
         raise ValueError("layer pregathered-B512 attention flag must be boolean")
+    if not isinstance(dense_final_layout_convolution, bool):
+        raise ValueError("layer dense final-layout flag must be boolean")
     if not isinstance(virtual_tp32_attention_only, bool):
         raise ValueError("layer virtual-TP32 attention-only flag must be boolean")
     if not isinstance(capture_ingredients, bool):
@@ -869,10 +872,13 @@ def stage_local_transformer_layer_fp8_split_mapped(
             add_residual=False,
             reconstruct_down_fp32=reconstruct_dense_down_fp32,
             virtual_tp32_reduction_association=(
-                None
+                STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+                if dense_final_layout_convolution
+                else None
                 if virtual_tp32_attention_only
                 else virtual_tp32_reduction_association
             ),
+            final_layout_convolution=dense_final_layout_convolution,
             capture_ingredients=capture_ingredients,
         )
         if capture_ingredients:

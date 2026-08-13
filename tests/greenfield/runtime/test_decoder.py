@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import replace
+from functools import lru_cache
+from pathlib import Path
 
 import pytest
 
@@ -145,6 +148,312 @@ ENTRY main {
     )
     assert dead["violations"]
     assert dead["forbidden_shapes"] == ["bf16[32,6144]"]
+
+
+def _synthetic_dense_final_layout_hlo() -> tuple[str, str]:
+    optimized = [
+        "HloModule dense_final_layout, replica_count=1, num_partitions=32",
+        "",
+        "ENTRY main {",
+        "  %gate_lhs = bf16[1,6144]{1,0} parameter(0)",
+        "  %gate_rhs = bf16[6144,768]{1,0} parameter(1)",
+        "  %down_lhs = bf16[1,384]{1,0} parameter(2)",
+        "  %down_rhs = bf16[384,6144]{1,0} parameter(3)",
+    ]
+    stable = ["module {", "  func.func @main() {"]
+    for rank in range(8):
+        optimized.extend(
+            (
+                f"  %gate_{rank} = f32[1,768]{{1,0}} convolution("
+                "%gate_lhs, %gate_rhs), dim_labels=bf_io->bf, "
+                "metadata={op_name=\"jit(mapped)/shard_map/"
+                f"greenfield_dense_convolution_virtual_rank_{rank:02d}/"
+                "conv_general_dilated\"}",
+                f"  %down_{rank} = f32[1,6144]{{1,0}} convolution("
+                f"%activated_{rank}, %down_rhs), dim_labels=bf_io->bf, "
+                "metadata={op_name=\"jit(mapped)/shard_map/"
+                f"greenfield_dense_convolution_virtual_rank_{rank:02d}/"
+                "conv_general_dilated\"}",
+            )
+        )
+        optimized.insert(
+            -1,
+            f"  %gate_round_{rank} = bf16[1,768]{{1,0}} convert(%gate_{rank})",
+        )
+        optimized.insert(
+            -1,
+            f"  %activated_{rank} = bf16[1,384]{{1,0}} "
+            f"slice(%gate_round_{rank}), slice={{[0:1], [0:384]}}",
+        )
+        optimized.append(
+            f"  %down_round_{rank} = bf16[1,6144]{{1,0}} convert(%down_{rank})"
+        )
+        stable.extend(
+            (
+                f"    %layout_{rank} = stablehlo.custom_call "
+                f"@LayoutConstraint(%weight_{rank}) : "
+                "(tensor<6144x768xbf16>) -> tensor<6144x768xbf16>",
+                f"    %gate_{rank} = stablehlo.convolution(%lhs, "
+                f"%layout_{rank}) dim_numbers = [b, f]x[i, o]->[b, f], "
+                "window = {stride = [], pad = [], lhs_dilate = [], "
+                "rhs_dilate = [], reverse = []} {batch_group_count = 1 : "
+                "i64, feature_group_count = 1 : i64, precision_config = "
+                "[#stablehlo<precision DEFAULT>, #stablehlo<precision "
+                "DEFAULT>]} : (tensor<1x6144xbf16>, "
+                "tensor<6144x768xbf16>) -> tensor<1x768xf32>",
+                f"    %down_{rank} = stablehlo.convolution(%activated, "
+                f"%down_weight_{rank}) dim_numbers = [b, f]x[i, o]->[b, f], "
+                "window = {stride = [], pad = [], lhs_dilate = [], "
+                "rhs_dilate = [], reverse = []} {batch_group_count = 1 : "
+                "i64, feature_group_count = 1 : i64, precision_config = "
+                "[#stablehlo<precision DEFAULT>, #stablehlo<precision "
+                "DEFAULT>]} : (tensor<1x384xbf16>, "
+                "tensor<384x6144xbf16>) -> tensor<1x6144xf32>",
+            )
+        )
+    down_types = ", ".join("bf16[1,6144]" for _ in range(8))
+    down_values = ", ".join(f"%down_round_{rank}" for rank in range(8))
+    optimized.extend((f"  ROOT %out = ({down_types}) tuple({down_values})", "}"))
+    stable.extend(("    return", "  }", "}"))
+    return "\n".join(optimized), "\n".join(stable)
+
+
+@lru_cache(maxsize=1)
+def _runtime_dense_final_layout_stablehlo() -> str:
+    program = r'''
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.stage_local import (
+    STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+    _reduce_virtual_tp32_bf16_partials,
+    _virtual_dense_final_layout_convolution_down_partials,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("lp4",))
+replicated = NamedSharding(mesh, P())
+slot = NamedSharding(mesh, P("lp4", None, None, None))
+contracts = (
+    ((1, 6144), jnp.bfloat16, replicated),
+    ((4, 8, 6144, 768), jnp.uint8, slot),
+    ((4, 8, 48, 768), jnp.float32, slot),
+    ((4, 8, 384, 6144), jnp.uint8, slot),
+    ((4, 8, 3, 6144), jnp.float32, slot),
+)
+arguments = tuple(
+    jax.ShapeDtypeStruct(shape, dtype, sharding=sharding)
+    for shape, dtype, sharding in contracts
+)
+
+def local(normalized, merged_bits, merged_scale, down_bits, down_scale):
+    partials = _virtual_dense_final_layout_convolution_down_partials(
+        normalized,
+        merged_bits[0],
+        merged_scale[0],
+        down_bits[0],
+        down_scale[0],
+        block_shape=(128, 128),
+        compile_rows=1,
+    )
+    return _reduce_virtual_tp32_bf16_partials(
+        partials,
+        axis_name="lp4",
+        groups=((0, 1, 2, 3),),
+        association=STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+    )
+
+mapped = jax.shard_map(
+    local,
+    mesh=mesh,
+    in_specs=(P(), P("lp4", None, None, None),
+              P("lp4", None, None, None),
+              P("lp4", None, None, None),
+              P("lp4", None, None, None)),
+    out_specs=P(),
+    check_vma=False,
+)
+print(jax.jit(mapped).lower(*arguments).as_text())
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=Path(__file__).resolve().parents[3],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    return completed.stdout
+
+
+def test_dense_final_layout_hlo_pins_one_row_geometry_and_ranks() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_dense_final_layout_convolution_hlo,
+    )
+
+    optimized, _stable_fixture = _synthetic_dense_final_layout_hlo()
+    stable = _runtime_dense_final_layout_stablehlo()
+    accepted = _validate_dense_final_layout_convolution_hlo(
+        optimized,
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert accepted["passed"], accepted
+    assert accepted["gate_up_convolution_count"] == 8
+    assert accepted["down_convolution_count"] == 8
+    assert accepted["optimized_exact_gate_down_bijection"]
+    assert accepted["optimized_exact_down_result_liveness"]
+    assert accepted["stablehlo_exact_arithmetic_contract"] == {
+        "dense_layer_group_count": 1,
+        "exact_live_result_count": 1,
+        "exact_runtime_u8_bitcast_count": 2,
+        "gate_up_layout_constraint_count": 8,
+        "matched_virtual_shard_count": 8,
+        "passed": True,
+        "violations": [],
+    }
+    wrong_row = _validate_dense_final_layout_convolution_hlo(
+        optimized.replace(
+            "%gate_0 = f32[1,768]{1,0} convolution(",
+            "%gate_0 = f32[32,768]{1,0} convolution(",
+            1,
+        ),
+        stable.replace("tensor<1x6144xbf16>", "tensor<32x6144xbf16>", 1),
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not wrong_row["passed"]
+    missing_rank = _validate_dense_final_layout_convolution_hlo(
+        optimized.replace(
+            "greenfield_dense_convolution_virtual_rank_07/",
+            "greenfield_dense_convolution_virtual_rank_06/",
+        ),
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not missing_rank["passed"]
+
+    rogue_rhs = _validate_dense_final_layout_convolution_hlo(
+        optimized.replace(
+            "  %down_lhs = bf16[1,384]{1,0} parameter(2)",
+            "  %down_lhs = bf16[1,384]{1,0} parameter(2)\n"
+            "  %rogue_gate_rhs = bf16[6144,768]{1,0} "
+            "add(%gate_rhs, %gate_rhs)",
+            1,
+        ).replace(
+            "convolution(%gate_lhs, %gate_rhs)",
+            "convolution(%gate_lhs, %rogue_gate_rhs)",
+            1,
+        ),
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not rogue_rhs["passed"]
+
+    unrelated_constraint = re.sub(
+        r"(@LayoutConstraint\()%[A-Za-z0-9_.$#-]+(\))",
+        r"\1%arg5\2",
+        stable,
+        count=1,
+    )
+    unrelated = _validate_dense_final_layout_convolution_hlo(
+        optimized,
+        unrelated_constraint,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not unrelated["passed"]
+    assert not unrelated["stablehlo_exact_arithmetic_contract"]["passed"]
+
+    wrong_tuple_element = optimized.replace(
+        "  %down_rhs = bf16[384,6144]{1,0} parameter(3)",
+        "  %down_rhs = bf16[384,6144]{1,0} parameter(3)\n"
+        "  %rogue_gate_value = bf16[1,768]{1,0} parameter(4)",
+        1,
+    ).replace(
+        "  %activated_0 = bf16[1,384]{1,0} slice(%gate_round_0)",
+        "  %tuple_decoy = (bf16[1,768]{1,0}, bf16[1,768]{1,0}) "
+        "tuple(%gate_round_0, %rogue_gate_value)\n"
+        "  %gte_decoy = bf16[1,768]{1,0} "
+        "get-tuple-element(%tuple_decoy), index=1\n"
+        "  %activated_0 = bf16[1,384]{1,0} slice(%gte_decoy)",
+        1,
+    )
+    wrong_element = _validate_dense_final_layout_convolution_hlo(
+        wrong_tuple_element,
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not wrong_element["passed"]
+    assert not wrong_element["optimized_exact_gate_down_bijection"]
+
+    copied_wrong_tuple_element = wrong_tuple_element.replace(
+        "  %gte_decoy = bf16[1,768]{1,0} "
+        "get-tuple-element(%tuple_decoy), index=1",
+        "  %tuple_copy = (bf16[1,768]{1,0}, bf16[1,768]{1,0}) "
+        "copy(%tuple_decoy)\n"
+        "  %gte_decoy = bf16[1,768]{1,0} "
+        "get-tuple-element(%tuple_copy), index=1",
+        1,
+    )
+    copied_wrong_element = _validate_dense_final_layout_convolution_hlo(
+        copied_wrong_tuple_element,
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not copied_wrong_element["passed"]
+    assert not copied_wrong_element["optimized_exact_gate_down_bijection"]
+
+    dead = _validate_dense_final_layout_convolution_hlo(
+        re.sub(
+            r"  ROOT %out = .*",
+            "  ROOT %out = bf16[1,6144]{1,0} copy(%down_round_0)",
+            optimized,
+            count=1,
+        ),
+        stable,
+        dense_layers=1,
+        enabled=True,
+    )
+    assert not dead["passed"]
+    assert not dead["optimized_exact_down_result_liveness"]
+
+
+def test_dense_final_layout_kernel_traces_loader_u8_storage() -> None:
+    import jax
+    import jax.numpy as jnp
+
+    from glm_tpu.greenfield.kernels.stage_local import (
+        _virtual_dense_final_layout_convolution_down_partials,
+    )
+
+    arguments = (
+        jax.ShapeDtypeStruct((1, 6144), jnp.bfloat16),
+        jax.ShapeDtypeStruct((8, 6144, 768), jnp.uint8),
+        jax.ShapeDtypeStruct((8, 48, 768), jnp.float32),
+        jax.ShapeDtypeStruct((8, 384, 6144), jnp.uint8),
+        jax.ShapeDtypeStruct((8, 3, 6144), jnp.float32),
+    )
+    result = jax.eval_shape(
+        lambda *values: _virtual_dense_final_layout_convolution_down_partials(
+            *values,
+            block_shape=(128, 128),
+            compile_rows=1,
+        ),
+        *arguments,
+    )
+    assert result.shape == (8, 1, 6144)
+    assert result.dtype == jnp.bfloat16
 
 
 def _repair_scoped_shape_hlo(*, include_unscoped: bool = False) -> str:
@@ -2931,6 +3240,7 @@ def test_teacher_forced_prefill_builder_rejects_invalid_contracts() -> None:
     complete = SimpleNamespace(
         complete_token_path=True,
         config=config,
+        dense_final_layout_convolution=False,
         main_rope_table_enabled=False,
         observe_prefill_index_inputs=False,
     )
@@ -2965,6 +3275,7 @@ def test_teacher_forced_prefill_builder_rejects_invalid_contracts() -> None:
         SimpleNamespace(
             complete_token_path=True,
             config=config,
+            dense_final_layout_convolution=False,
             main_rope_table_enabled=True,
             observe_prefill_index_inputs=False,
         ),

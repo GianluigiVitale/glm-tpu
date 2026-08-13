@@ -5,6 +5,36 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 14:29 UTC — split RMS rejected; best dense path enters production integration
+
+- Protected DB549/item1833 completed from `57f6a052214e3394c86c2b2ebe0073f9989aca3b`.
+  The TPU HLO matches the accepted scalar-only RMS schedule, exact recompute and output-fusion
+  contracts, but the tensor returns to `1,073/6,144` mismatches, first index 1, maximum error
+  `0.0078125`, observed SHA `229dc8ac...812f`. This rejects RMS scheduling as the source of DB548's
+  improvement. Runner/tensor/summary/`SUCCESS` SHAs are `7f53f4e6...4e10`, `89ef1e38...1153`,
+  `8d3c6b73...2822`, and `894f4164...4a0b`; DB/archive and 8/8 cleanup pass.
+- Evidence now selects DB548's unsplit final-layout dense envelope for the next complete decoder:
+  one BF16 ULP at layer-1 index 2795 versus 1,073 for the challenger. This is bounded internal error,
+  not exact token/DSA or performance proof. The selected packed record manifest is
+  `45bfd64e...1ba4` and contains direct E4M3FN gate/up/down weights plus output-expanded FP32 scales.
+- A default-off production bulk now applies that formulation to all three dense layers in the real
+  `M=1` decoder. It extends the existing plan-aware checkpoint derivative rather than repacking at
+  runtime, loads the final tensors directly, removes the three old dense Pallas kernels, and pins
+  24 gate/up plus 24 down convolutions in decoder, DSA observer and teacher-forced prefill HLO. The
+  protected launcher authenticates both DB548 selection and DB549 rejection locally, remotely and
+  in the live DB before execution. Focused checkpoint/HLO/wrapper tests pass `58/58`; no TPU run or
+  performance claim exists yet. One diff-only audit, commit/push, pack and one protected 8K retry
+  are next.
+- A bounded independent review of that bulk caught two launch blockers before TPU use. Runtime FP8
+  payloads intentionally arrive as U8 bit storage, while the first implementation required an
+  E4M3FN array; the kernel boundary now bitcasts those bytes exactly and a loader-shaped U8 trace
+  produces the expected `bf16[8,1,6144]` partials. The previous complete-decoder HLO check also
+  counted exact shapes without proving live value flow. It now composes the exact StableHLO
+  bits/scales/dequant/SwiGLU/down/StrategyND matcher with optimized-HLO gate-to-down and
+  down-to-result liveness. Arithmetic-RHS, unrelated-layout-constraint and dead-convolution
+  mutations refuse. Dense probe tests pass `55/55`; affected production tests pass `83/83` after
+  supplying the test-only `safetensors` dependency. No TPU or performance result is claimed.
+
 ## 2026-08-13 13:05 UTC — reduction-side barriers achieve the accepted scalar RMS schedule
 
 - Reviewed commit `ca7c78e9eef55040a5fbcf9c0572c3fcf274a022` ran once under protected tag

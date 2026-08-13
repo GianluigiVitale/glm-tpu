@@ -37,6 +37,7 @@ from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     verify_runtime_packed_checkpoint,
 )
 from glm_tpu.greenfield.model import (  # noqa: E402
+    FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     FUSED_QKV_A_N82_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
     build_decoder_state_layout,
@@ -1490,6 +1491,12 @@ def parse_args() -> argparse.Namespace:
             )
         ),
     )
+    parser.add_argument(
+        "--dense-final-layout-convolution",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--short-context-oracle-dir", type=Path)
     parser.add_argument("--short-context-oracle-manifest-sha256")
     parser.add_argument("--short-context-dsa-oracle-dir", type=Path)
@@ -1592,6 +1599,9 @@ def main() -> int:
     )
     args.strategy_nd_attention_projection = bool(
         args.strategy_nd_attention_projection
+    )
+    args.dense_final_layout_convolution = bool(
+        args.dense_final_layout_convolution
     )
     args.observe_layer_residuals = bool(args.observe_layer_residuals)
     args.observe_dsa_internals = bool(args.observe_dsa_internals)
@@ -1857,6 +1867,17 @@ def main() -> int:
         raise ValueError(
             "StrategyND attention projection requires the protected 8K "
             "pregathered-B512 production path"
+        )
+    if args.dense_final_layout_convolution and not (
+        args.strategy_nd_attention_projection
+        and args.context_capacity == 8192
+        and dsa_oracle_mode
+        and not observe_layer0_discriminator
+        and not args.observe_layer0_ingredients
+    ):
+        raise ValueError(
+            "dense final-layout convolution requires the protected 8K "
+            "StrategyND production path"
         )
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("protected decoder compile requires process ids 0..7")
@@ -2150,6 +2171,7 @@ def main() -> int:
             fused_qkv_a=(
                 attention_projection_backend == "fused_n82_convolution"
             ),
+            dense_convolution=args.dense_final_layout_convolution,
         )
         pack_context = _build_feature_context(
             context_args,
@@ -2187,6 +2209,13 @@ def main() -> int:
             pack_context.layout,
             pack_context.source_runtime_checkpoint,
         )
+        if args.dense_final_layout_convolution != (
+            runtime_manifest.get("dense_projection_layout")
+            == FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT
+        ):
+            raise ValueError(
+                "dense final-layout flag and runtime manifest disagree"
+            )
         sparse_moe_backend = "pallas_feature"
         linear_backend = (
             "pallas" if args.runtime_kind == "pallas_feature_linear" else "reference"
@@ -2321,6 +2350,9 @@ def main() -> int:
             strategy_nd_attention_projection=(
                 args.strategy_nd_attention_projection
             ),
+            dense_final_layout_convolution=(
+                args.dense_final_layout_convolution
+            ),
             attention_projection_backend=attention_projection_backend,
             complete_token_path=args.complete_token_path,
             build_layer0_residual_discriminator=(
@@ -2370,6 +2402,9 @@ def main() -> int:
                 strategy_nd_attention_projection=(
                     args.strategy_nd_attention_projection
                 ),
+                dense_final_layout_convolution=(
+                    args.dense_final_layout_convolution
+                ),
                 attention_projection_backend=(
                     attention_projection_backend
                 ),
@@ -2418,6 +2453,9 @@ def main() -> int:
                     ),
                     strategy_nd_attention_projection=(
                         args.strategy_nd_attention_projection
+                    ),
+                    dense_final_layout_convolution=(
+                        args.dense_final_layout_convolution
                     ),
                     attention_projection_backend=(
                         attention_projection_backend
@@ -3110,6 +3148,9 @@ def main() -> int:
             strategy_nd_attention_projection=(
                 decoder.strategy_nd_attention_projection
             ),
+            dense_final_layout_convolution=(
+                decoder.dense_final_layout_convolution
+            ),
         )
         if jax.process_index() == 0:
             hlo_dir = args.output.parent / "hlo"
@@ -3224,6 +3265,9 @@ def main() -> int:
                 ),
                 strategy_nd_attention_projection=(
                     dsa_observer.strategy_nd_attention_projection
+                ),
+                dense_final_layout_convolution=(
+                    dsa_observer.dense_final_layout_convolution
                 ),
             )
             dsa_observer_isolation_contract = (
@@ -5157,6 +5201,9 @@ def main() -> int:
             ),
             "strategy_nd_attention_projection": (
                 decoder.strategy_nd_attention_projection
+            ),
+            "dense_final_layout_convolution": (
+                decoder.dense_final_layout_convolution
             ),
             "main_rope_table_sha256": decoder.main_rope_table_sha256,
             "main_rope_table_shape": (

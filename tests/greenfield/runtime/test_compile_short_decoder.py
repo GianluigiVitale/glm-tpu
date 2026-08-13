@@ -502,6 +502,55 @@ def test_strategy_nd_attention_projection_is_default_off_and_db539_protected() -
     assert runner.index("strict_census post") < runner.index("pv.start_run(")
 
 
+def test_dense_final_layout_convolution_is_default_off_and_db548_selected() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    runner = PROTECTED_RUNNER.read_text()
+    decoder = (REPO / "glm_tpu/greenfield/runtime/decoder.py").read_text()
+    prefill = (REPO / "glm_tpu/greenfield/runtime/prefill.py").read_text()
+
+    assert '"--dense-final-layout-convolution"' in compiler
+    assert (
+        '"--dense-final-layout-convolution",\n'
+        '        type=int,\n'
+        '        choices=(0, 1),\n'
+        '        default=0,' in compiler
+    )
+    assert "dense_final_layout_convolution: bool = False" in decoder
+    assert "decoder.dense_final_layout_convolution" in prefill
+    assert (
+        "readonly DENSE_FINAL_LAYOUT_CONVOLUTION="
+        "${GLM_GREENFIELD_DENSE_FINAL_LAYOUT_CONVOLUTION:-0}" in runner
+    )
+    assert (
+        '--dense-final-layout-convolution "$dense_final_layout_convolution"'
+        in runner
+    )
+    assert "requires the complete protected 8K exactness chain" in runner
+    assert (
+        "greenfield_layer0_dense_envelope_cross_layer_"
+        "20260813T120703034434907Z" in runner
+    )
+    assert (
+        "greenfield_layer0_dense_envelope_split_rms_"
+        "20260813T134012434338842Z" in runner
+    )
+    assert "dense prerequisite contract drifted" in runner
+    assert "DB549 split-RMS decision evidence drifted" in runner
+    assert "dense final-layout direct remote $remote_file hash drifted" in runner
+    assert "validate_dense_final_layout_hlo" in runner
+    assert 'expected = 24 if dense_final_layout_convolution else 0' in runner
+    assert 'contract["optimized_exact_gate_down_bijection"]' in runner
+    assert 'contract["optimized_exact_down_result_liveness"]' in runner
+    assert 'contract["stablehlo_exact_arithmetic_contract"]' in runner
+    assert 'exact_stable["exact_runtime_u8_bitcast_count"]' in runner
+    assert "greenfield_dense_final_layout_convolution_prerequisite_db_run" in runner
+    assert "548 if dense_final_layout_convolution else None" in runner
+    assert "greenfield_dense_final_layout_convolution_decision_db_run" in runner
+    assert "549 if dense_final_layout_convolution else None" in runner
+    assert '"dense_final_layout_convolution_prerequisite"' in runner
+    assert "_densefinalconv" in runner
+
+
 def test_protected_runner_seals_archive_before_terminal_success() -> None:
     runner = PROTECTED_RUNNER.read_text()
 
@@ -583,9 +632,10 @@ def test_short_decoder_rollback_removes_each_committed_prefix(
             "greenfield_complete_token_path": True,
             "greenfield_run_tag": tag,
             "greenfield_short_context_dsa_oracle": True,
-            "greenfield_short_context_oracle": True,
-            "greenfield_strategy_nd_attention_projection": True,
-            "runtime_manifest_sha256": runtime_manifest,
+                "greenfield_short_context_oracle": True,
+                "greenfield_strategy_nd_attention_projection": True,
+                "greenfield_dense_final_layout_convolution": False,
+                "runtime_manifest_sha256": runtime_manifest,
         },
         note=(
             "Protected real 78-layer 8K transformer-body compile/run with "
@@ -629,9 +679,10 @@ def test_short_decoder_rollback_removes_each_committed_prefix(
             "8k",
             "1",
             "1",
-            "1",
-            "1",
-        ],
+                "1",
+                "1",
+                "0",
+            ],
         input=_short_decoder_rollback_program(),
         text=True,
         capture_output=True,
@@ -671,6 +722,7 @@ def test_short_decoder_rollback_refuses_nonidentical_run(tmp_path: Path) -> None
             "greenfield_short_context_dsa_oracle": True,
             "greenfield_short_context_oracle": True,
             "greenfield_strategy_nd_attention_projection": True,
+            "greenfield_dense_final_layout_convolution": False,
             "runtime_manifest_sha256": runtime_manifest,
         },
         note=(
@@ -695,6 +747,7 @@ def test_short_decoder_rollback_refuses_nonidentical_run(tmp_path: Path) -> None
             "1",
             "1",
             "1",
+            "0",
         ],
         input=_short_decoder_rollback_program(),
         text=True,

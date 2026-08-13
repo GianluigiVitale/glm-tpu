@@ -17,6 +17,7 @@ from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     verify_feature_runtime_packed_checkpoint,
 )
 from glm_tpu.greenfield.model import (  # noqa: E402
+    FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     FUSED_QKV_A_N82_RUNTIME_LAYOUT,
 )
 from scripts.greenfield.pack_feature_runtime_checkpoint import (  # noqa: E402
@@ -63,6 +64,10 @@ def main() -> int:
             manifest.get("attention_projection_layout")
             == FUSED_QKV_A_N82_RUNTIME_LAYOUT
         ),
+        dense_convolution=(
+            manifest.get("dense_projection_layout")
+            == FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT
+        ),
     )
     context = _build_context(context_args, manifest["pack_code_hash"])
     expectation = build_load_expectation(manifest)
@@ -83,6 +88,7 @@ def main() -> int:
         "attention_projection_layout": (
             context.layout.attention_projection_layout
         ),
+        "dense_projection_layout": context.layout.dense_projection_layout,
         "runtime_file_bytes": manifest["runtime_file_bytes"],
         "runtime_layout_hash": expectation.runtime_layout_hash,
         "runtime_layout_manifest_sha256": (expectation.runtime_layout_manifest_sha256),

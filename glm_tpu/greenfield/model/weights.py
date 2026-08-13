@@ -40,12 +40,20 @@ _RUNTIME_SOURCE_TRANSFORMS = frozenset(
         "concat_experts_slice_scale_contraction",
         "fuse_qkv_a_output_shards",
         "fuse_qkv_a_expanded_scales",
+        "pack_dense_gate_up_bits_in_out",
+        "pack_dense_gate_up_scales_in_out",
+        "pack_dense_down_bits_in_out",
+        "pack_dense_down_scales_in_out",
     )
 )
 COMPLETE_EXPERT_RUNTIME_LAYOUT = "complete_expert_identity"
 FEATURE_EXPERT_RUNTIME_LAYOUT = "expert_intermediate_feature_lp4_pallas_kn_v1"
 SEPARATE_QKV_A_RUNTIME_LAYOUT = "separate_q_a_kv_a_v1"
 FUSED_QKV_A_N82_RUNTIME_LAYOUT = "fused_qkv_a_virtual_tp32_n82_v1"
+LEGACY_DENSE_RUNTIME_LAYOUT = "legacy_dense_output_major_v1"
+FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT = (
+    "virtual_tp32_dense_convolution_in_out_v1"
+)
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -303,6 +311,97 @@ class DeviceRuntimeTensor:
                         "fused qkv-a expanded scale shape does not reconcile"
                     )
             expected_shape = self.spec.shape
+        elif self.transform in (
+            "pack_dense_gate_up_bits_in_out",
+            "pack_dense_gate_up_scales_in_out",
+            "pack_dense_down_bits_in_out",
+            "pack_dense_down_scales_in_out",
+        ):
+            virtual_shards = 8
+            if any(
+                source.source_device_slot is None
+                or source.selected_shape is not None
+                for source in self.sources
+            ):
+                raise PlanValidationError(
+                    "packed dense sources require explicit complete owners"
+                )
+            if self.transform.startswith("pack_dense_gate_up_"):
+                if len(self.sources) != 2:
+                    raise PlanValidationError(
+                        "packed dense gate/up requires two source tensors"
+                    )
+                gate, up = self.sources
+                if gate.shape != up.shape:
+                    raise PlanValidationError(
+                        "packed dense gate/up source shapes drifted"
+                    )
+                if self.transform.endswith("bits_in_out"):
+                    if self.spec.dtype != "F8_E4M3" or len(gate.shape) != 2:
+                        raise PlanValidationError(
+                            "packed dense gate/up bits must be FP8 matrices"
+                        )
+                    output, hidden = gate.shape
+                    if output % virtual_shards:
+                        raise PlanValidationError(
+                            "packed dense gate/up output is not virtual-shard divisible"
+                        )
+                    expected_shape = (
+                        virtual_shards,
+                        hidden,
+                        2 * output // virtual_shards,
+                    )
+                else:
+                    if self.spec.dtype != "F32" or len(gate.shape) != 2:
+                        raise PlanValidationError(
+                            "packed dense gate/up scales must be FP32 matrices"
+                        )
+                    output_blocks, input_blocks = gate.shape
+                    if output_blocks % virtual_shards:
+                        raise PlanValidationError(
+                            "packed dense gate/up scales are not virtual-shard divisible"
+                        )
+                    expected_shape = (
+                        virtual_shards,
+                        input_blocks,
+                        2 * output_blocks * 128 // virtual_shards,
+                    )
+            else:
+                if len(self.sources) != 1:
+                    raise PlanValidationError(
+                        "packed dense down requires one source tensor"
+                    )
+                (down,) = self.sources
+                if self.transform.endswith("bits_in_out"):
+                    if self.spec.dtype != "F8_E4M3" or len(down.shape) != 2:
+                        raise PlanValidationError(
+                            "packed dense down bits must be an FP8 matrix"
+                        )
+                    hidden, contraction = down.shape
+                    if contraction % virtual_shards:
+                        raise PlanValidationError(
+                            "packed dense down contraction is not virtual-shard divisible"
+                        )
+                    expected_shape = (
+                        virtual_shards,
+                        contraction // virtual_shards,
+                        hidden,
+                    )
+                else:
+                    if self.spec.dtype != "F32" or len(down.shape) != 2:
+                        raise PlanValidationError(
+                            "packed dense down scales must be an FP32 matrix"
+                        )
+                    hidden_blocks, contraction_blocks = down.shape
+                    if contraction_blocks % virtual_shards:
+                        raise PlanValidationError(
+                            "packed dense down scales are not virtual-shard divisible"
+                        )
+                    expected_shape = (
+                        virtual_shards,
+                        contraction_blocks // virtual_shards,
+                        hidden_blocks * 128,
+                    )
         else:
             if len(self.sources) < 2 or any(
                 source.source_device_slot is None for source in self.sources
@@ -344,7 +443,11 @@ class DeviceRuntimeTensor:
     def derived_bytes(self) -> int:
         if self.is_padding:
             return 0
-        if self.transform == "fuse_qkv_a_expanded_scales":
+        if self.transform in (
+            "fuse_qkv_a_expanded_scales",
+            "pack_dense_gate_up_scales_in_out",
+            "pack_dense_down_scales_in_out",
+        ):
             return self.spec.byte_count - self.source_byte_count
         return 0
 
@@ -438,6 +541,7 @@ class DecoderRuntimeWeightLayout:
     devices: tuple[DeviceRuntimeWeightLayout, ...]
     routed_expert_layout: str = COMPLETE_EXPERT_RUNTIME_LAYOUT
     attention_projection_layout: str = SEPARATE_QKV_A_RUNTIME_LAYOUT
+    dense_projection_layout: str = LEGACY_DENSE_RUNTIME_LAYOUT
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "specs", tuple(self.specs))
@@ -456,6 +560,11 @@ class DecoderRuntimeWeightLayout:
             raise PlanValidationError(
                 "runtime attention projection layout is invalid"
             )
+        if self.dense_projection_layout not in (
+            LEGACY_DENSE_RUNTIME_LAYOUT,
+            FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
+        ):
+            raise PlanValidationError("runtime dense projection layout is invalid")
         spec_names = tuple(spec.name for spec in self.specs)
         if len(set(spec_names)) != len(spec_names):
             raise PlanValidationError("runtime weight specs are duplicate")
@@ -516,6 +625,8 @@ class DecoderRuntimeWeightLayout:
             value["attention_projection_layout"] = (
                 self.attention_projection_layout
             )
+        if self.dense_projection_layout != LEGACY_DENSE_RUNTIME_LAYOUT:
+            value["dense_projection_layout"] = self.dense_projection_layout
         return value
 
 
@@ -1378,4 +1489,294 @@ def build_decoder_feature_fused_qkv_runtime_weight_layout(
         devices=tuple(devices),
         routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
         attention_projection_layout=FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+    )
+
+
+def build_decoder_dense_convolution_runtime_weight_layout(
+    plan: ExecutionPlan,
+    schedule: PipelineSchedule,
+    source_layout: DecoderRuntimeWeightLayout,
+) -> DecoderRuntimeWeightLayout:
+    """Derive exact virtual-TP32 dense convolution inputs offline.
+
+    The source is the complete-owner runtime layout.  Dense gate/up shards are
+    merged and transposed into eight ``[in, out]`` virtual shards; their small
+    FP32 block scales are expanded only along the output dimension.  Down
+    shards receive the reciprocal layout.  All transforms preserve the
+    existing physical owner and checkpoint bytes.
+    """
+
+    if schedule.plan_hash != plan.plan_hash:
+        raise PlanValidationError(
+            "dense convolution schedule belongs to another plan"
+        )
+    if plan.local_parallel_size != 4:
+        raise PlanValidationError(
+            "virtual-TP32 dense convolution currently requires PP8 LP4"
+        )
+    source_specs = {spec.name: spec for spec in source_layout.specs}
+    if len(source_specs) != len(source_layout.specs):
+        raise PlanValidationError("dense convolution source specs are duplicate")
+    target_specs: list[RuntimeTensorSpec] = []
+    for spec in source_layout.specs:
+        if spec.slot_kind != "dense":
+            target_specs.append(spec)
+            continue
+        if spec.name.endswith(".gate.weight_bits"):
+            up = source_specs.get(spec.name.replace(".gate.", ".up."))
+            if up is None or up.shape != spec.shape or spec.dtype != "F8_E4M3":
+                raise PlanValidationError(
+                    "dense gate/up weight source geometry drifted"
+                )
+            output, hidden = spec.shape
+            if output % 8:
+                raise PlanValidationError(
+                    "dense gate/up output is not virtual-shard divisible"
+                )
+            target_specs.append(
+                replace(
+                    spec,
+                    name=spec.name.replace(
+                        ".gate.weight_bits",
+                        ".merged_gate_up.weight_bits_in_out",
+                    ),
+                    shape=(8, hidden, 2 * output // 8),
+                )
+            )
+        elif spec.name.endswith(".gate.scale_inv"):
+            up = source_specs.get(spec.name.replace(".gate.", ".up."))
+            if up is None or up.shape != spec.shape or spec.dtype != "F32":
+                raise PlanValidationError(
+                    "dense gate/up scale source geometry drifted"
+                )
+            output_blocks, input_blocks = spec.shape
+            if output_blocks % 8:
+                raise PlanValidationError(
+                    "dense gate/up scale output is not virtual-shard divisible"
+                )
+            target_specs.append(
+                replace(
+                    spec,
+                    name=spec.name.replace(
+                        ".gate.scale_inv",
+                        ".merged_gate_up.scale_inv_in_out",
+                    ),
+                    shape=(
+                        8,
+                        input_blocks,
+                        2 * output_blocks * 128 // 8,
+                    ),
+                )
+            )
+        elif spec.name.endswith((".up.weight_bits", ".up.scale_inv")):
+            continue
+        elif spec.name.endswith(".down.weight_bits"):
+            hidden, contraction = spec.shape
+            if spec.dtype != "F8_E4M3" or contraction % 8:
+                raise PlanValidationError("dense down weight geometry drifted")
+            target_specs.append(
+                replace(
+                    spec,
+                    name=spec.name.replace(
+                        ".down.weight_bits", ".down.weight_bits_in_out"
+                    ),
+                    shape=(8, contraction // 8, hidden),
+                )
+            )
+        elif spec.name.endswith(".down.scale_inv"):
+            hidden_blocks, contraction_blocks = spec.shape
+            if spec.dtype != "F32" or contraction_blocks % 8:
+                raise PlanValidationError("dense down scale geometry drifted")
+            target_specs.append(
+                replace(
+                    spec,
+                    name=spec.name.replace(
+                        ".down.scale_inv", ".down.scale_inv_in_out"
+                    ),
+                    shape=(
+                        8,
+                        contraction_blocks // 8,
+                        hidden_blocks * 128,
+                    ),
+                )
+            )
+        else:
+            raise PlanValidationError(
+                f"unknown dense runtime tensor {spec.name!r}"
+            )
+
+    devices = []
+    for source_device in source_layout.devices:
+        source_by_name = {
+            tensor.spec.name: tensor for tensor in source_device.tensors
+        }
+        tensors = []
+        for target_spec in target_specs:
+            if target_spec.slot_kind != "dense":
+                source = source_by_name[target_spec.name]
+                tensors.append(
+                    DeviceRuntimeTensor(target_spec, ())
+                    if source.is_padding
+                    else DeviceRuntimeTensor(
+                        target_spec,
+                        (
+                            RuntimeSourceLeaf(
+                                name=target_spec.name,
+                                dtype=target_spec.dtype,
+                                shape=target_spec.shape,
+                                source_device_slot=source_device.device_slot,
+                            ),
+                        ),
+                        transform="identity_runtime_tensor",
+                    )
+                )
+                continue
+            base = target_spec.name.rsplit(".", 2)[0]
+            if ".merged_gate_up." in target_spec.name:
+                suffix = (
+                    ".weight_bits"
+                    if target_spec.value_class == "fp8_weight"
+                    else ".scale_inv"
+                )
+                gate_name = base + ".gate" + suffix
+                up_name = gate_name.replace(".gate.", ".up.")
+                gate = source_by_name[gate_name]
+                up = source_by_name[up_name]
+                if gate.is_padding != up.is_padding:
+                    raise PlanValidationError(
+                        "dense gate/up source liveness differs"
+                    )
+                if gate.is_padding:
+                    tensors.append(DeviceRuntimeTensor(target_spec, ()))
+                    continue
+                sources = tuple(
+                    RuntimeSourceLeaf(
+                        name=name,
+                        dtype=source_by_name[name].spec.dtype,
+                        shape=source_by_name[name].spec.shape,
+                        source_device_slot=source_device.device_slot,
+                    )
+                    for name in (gate_name, up_name)
+                )
+                transform = (
+                    "pack_dense_gate_up_bits_in_out"
+                    if target_spec.value_class == "fp8_weight"
+                    else "pack_dense_gate_up_scales_in_out"
+                )
+            else:
+                source_name = target_spec.name.replace("_in_out", "")
+                source = source_by_name[source_name]
+                if source.is_padding:
+                    tensors.append(DeviceRuntimeTensor(target_spec, ()))
+                    continue
+                sources = (
+                    RuntimeSourceLeaf(
+                        name=source_name,
+                        dtype=source.spec.dtype,
+                        shape=source.spec.shape,
+                        source_device_slot=source_device.device_slot,
+                    ),
+                )
+                transform = (
+                    "pack_dense_down_bits_in_out"
+                    if target_spec.value_class == "fp8_weight"
+                    else "pack_dense_down_scales_in_out"
+                )
+            tensors.append(
+                DeviceRuntimeTensor(target_spec, sources, transform=transform)
+            )
+        devices.append(
+            DeviceRuntimeWeightLayout(
+                stage_id=source_device.stage_id,
+                device_slot=source_device.device_slot,
+                device_id=source_device.device_id,
+                tensors=tuple(tensors),
+            )
+        )
+    return DecoderRuntimeWeightLayout(
+        plan_hash=plan.plan_hash,
+        schedule_hash=schedule.schedule_hash,
+        specs=tuple(target_specs),
+        devices=tuple(devices),
+        routed_expert_layout=source_layout.routed_expert_layout,
+        attention_projection_layout=source_layout.attention_projection_layout,
+        dense_projection_layout=FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
+    )
+
+
+def build_decoder_feature_fused_qkv_dense_runtime_weight_layout(
+    plan: ExecutionPlan,
+    schedule: PipelineSchedule,
+    source_layout: DecoderRuntimeWeightLayout,
+) -> DecoderRuntimeWeightLayout:
+    """Compose feature experts, fused qkv-a, and dense final layout."""
+
+    feature_qkv = build_decoder_feature_fused_qkv_runtime_weight_layout(
+        plan, schedule, source_layout
+    )
+    dense = build_decoder_dense_convolution_runtime_weight_layout(
+        plan, schedule, source_layout
+    )
+    dense_specs = {
+        spec.name: spec for spec in dense.specs if spec.slot_kind == "dense"
+    }
+    specs_list: list[RuntimeTensorSpec] = []
+    for source_spec in feature_qkv.specs:
+        if source_spec.slot_kind != "dense":
+            specs_list.append(source_spec)
+        elif source_spec.name.endswith(".gate.weight_bits"):
+            prefix = source_spec.name.rsplit(".", 2)[0].replace(".gate", "")
+            specs_list.extend(
+                spec
+                for spec in dense.specs
+                if spec.slot_kind == "dense"
+                and spec.name.startswith(f"{prefix}.")
+            )
+    specs = tuple(specs_list)
+    expected_dense_count = schedule.maximum_dense_slots * 4
+    if len(dense_specs) != expected_dense_count:
+        raise PlanValidationError("dense final-layout spec count drifted")
+    devices = []
+    for feature_device, dense_device in zip(
+        feature_qkv.devices, dense.devices, strict=True
+    ):
+        if (
+            feature_device.stage_id,
+            feature_device.device_slot,
+            feature_device.device_id,
+        ) != (
+            dense_device.stage_id,
+            dense_device.device_slot,
+            dense_device.device_id,
+        ):
+            raise PlanValidationError(
+                "feature/qkv and dense final-layout ownership disagree"
+            )
+        feature_by_name = {
+            tensor.spec.name: tensor for tensor in feature_device.tensors
+        }
+        dense_by_name = {
+            tensor.spec.name: tensor for tensor in dense_device.tensors
+        }
+        devices.append(
+            DeviceRuntimeWeightLayout(
+                stage_id=feature_device.stage_id,
+                device_slot=feature_device.device_slot,
+                device_id=feature_device.device_id,
+                tensors=tuple(
+                    dense_by_name[spec.name]
+                    if spec.slot_kind == "dense"
+                    else feature_by_name[spec.name]
+                    for spec in specs
+                ),
+            )
+        )
+    return DecoderRuntimeWeightLayout(
+        plan_hash=plan.plan_hash,
+        schedule_hash=schedule.schedule_hash,
+        specs=specs,
+        devices=tuple(devices),
+        routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+        attention_projection_layout=FUSED_QKV_A_N82_RUNTIME_LAYOUT,
+        dense_projection_layout=FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     )

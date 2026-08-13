@@ -706,6 +706,9 @@ def validate_teacher_forced_prefill_hlo(
         strategy_nd_attention_projection=(
             decoder.strategy_nd_attention_projection
         ),
+        dense_final_layout_convolution=(
+            decoder.dense_final_layout_convolution
+        ),
     )
     module = parse_hlo_module(optimized_hlo)
     expected_fused_qkv_internal_loops = (

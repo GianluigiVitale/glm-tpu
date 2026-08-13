@@ -233,6 +233,8 @@ def _expect_convolution(
 def _expect_accepted_gate_up_layout(
     graph: _StableGraph,
     output: str,
+    *,
+    compile_rows: int,
 ) -> tuple[str, str | None, str | None]:
     """Bind one gate/up RHS to the exact accepted layout constraint."""
 
@@ -248,7 +250,7 @@ def _expect_accepted_gate_up_layout(
         if (
             len(node.operands) != 2
             or graph.node(node.operands[1]).result_type
-            != "tensor<32x6144xbf16>"
+            != f"tensor<{compile_rows}x6144xbf16>"
         ):
             raise _MatchError(
                 f"{node.name}: virtual-shard dependency barrier drifted"
@@ -259,7 +261,7 @@ def _expect_accepted_gate_up_layout(
             graph,
             dependency_output,
             opcode="optimization_barrier",
-            result_type="tensor<32x6144xbf16>",
+            result_type=f"tensor<{compile_rows}x6144xbf16>",
         )
         if sibling.operands != (dependency, node.operands[0]):
             raise _MatchError(
@@ -382,7 +384,9 @@ def _match_one_shard(
             decoded_gate_up,
             dependency,
             dependency_output,
-        ) = _expect_accepted_gate_up_layout(graph, decoded_gate_up)
+        ) = _expect_accepted_gate_up_layout(
+            graph, decoded_gate_up, compile_rows=compile_rows
+        )
     gate_bits, gate_scales = _match_fp8_decode(
         graph,
         decoded_gate_up,
@@ -1631,6 +1635,261 @@ def validate_dense_convolution_stablehlo(
         "live_rows": 1,
         "result_mode": "layer1_only" if layer1_only else "dense_and_layer1",
         "split_layer1_rms": split_layer1_rms,
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
+def validate_dense_final_layout_decoder_stablehlo(
+    stablehlo: str,
+    *,
+    dense_layers: int,
+) -> dict[str, object]:
+    """Prove every live one-row dense chain in the complete decoder.
+
+    The layer-0 probe validator above deliberately accepts one isolated
+    manual-computation body.  A complete decoder contains three independent
+    dense groups in the same body, so cardinality alone is unsafe: dead or
+    cross-wired convolutions could satisfy it.  This contract reuses the exact
+    per-shard matcher, groups its eight shards by their five physical inputs,
+    binds each group to its StrategyND tree, and requires every tree result to
+    reach the function return.
+    """
+
+    if not isinstance(dense_layers, int) or isinstance(dense_layers, bool):
+        raise ValueError("dense decoder layer count must be an integer")
+    if dense_layers < 0:
+        raise ValueError("dense decoder layer count must be non-negative")
+    parsed, dependency_errors = _expand_dependency_barriers(stablehlo)
+    graphs, parse_errors = _parse_graphs(parsed)
+    violations = [*dependency_errors, *parse_errors]
+    matched_groups = 0
+    matched_shards = 0
+    live_results = 0
+    runtime_u8_bitcasts = 0
+    layout_constraints = 0
+    try:
+        candidates = [
+            (graph, node)
+            for graph in graphs
+            for node in graph.nodes.values()
+            if node.opcode == "convolution"
+            and node.result_type == "tensor<1x768xf32>"
+        ]
+        if len(candidates) != 8 * dense_layers:
+            raise _MatchError(
+                "dense decoder gate/up convolution count drifted: "
+                f"expected={8 * dense_layers} found={len(candidates)}"
+            )
+        rows_by_group: dict[
+            tuple[str, tuple[str, ...]],
+            dict[int, tuple[str, str | None, str | None]],
+        ] = {}
+        graph_by_name = {graph.name: graph for graph in graphs}
+        for graph, convolution in candidates:
+            shard, roots, result, dependency, dependency_output = (
+                _match_one_shard(
+                    graph,
+                    convolution,
+                    compile_rows=1,
+                    final_dense_layout=True,
+                )
+            )
+            group = rows_by_group.setdefault((graph.name, roots), {})
+            if shard in group:
+                raise _MatchError(
+                    f"duplicate dense decoder virtual shard {shard}"
+                )
+            group[shard] = (result, dependency, dependency_output)
+            matched_shards += 1
+
+        if len(rows_by_group) != dense_layers:
+            raise _MatchError(
+                "dense decoder physical-input group count drifted: "
+                f"expected={dense_layers} found={len(rows_by_group)}"
+            )
+
+        dense_outputs: set[tuple[str, str]] = set()
+        external_runtime_sources: set[str] = set()
+
+        def exact_owner_unit_source(
+            graph: _StableGraph,
+            value: str,
+            *,
+            local_type: str,
+        ) -> str:
+            node = graph.nodes.get(value)
+            if node is None:
+                return value
+            owner_type = local_type.replace("tensor<", "tensor<1x", 1)
+            if (
+                node.opcode != "reshape"
+                or len(node.operands) != 1
+                or node.tensor_types[-2:] != (owner_type, local_type)
+                or node.operands[0] in graph.nodes
+            ):
+                raise _MatchError(
+                    f"{value}: dense owner-unit removal drifted"
+                )
+            return node.operands[0]
+
+        for (graph_name, roots), rows in rows_by_group.items():
+            graph = graph_by_name[graph_name]
+            if set(rows) != set(range(8)):
+                raise _MatchError(
+                    "dense decoder virtual-shard set drifted: "
+                    f"{sorted(rows)}"
+                )
+            if rows[0][1] is not None or any(
+                rows[shard][1] != rows[shard - 1][0]
+                for shard in range(1, 8)
+            ):
+                raise _MatchError(
+                    "dense decoder virtual shards lost rank ordering"
+                )
+
+            # The runtime loader exposes exact FP8 storage bytes as U8.  Both
+            # packed bit roots must cross one shape-preserving bitcast before
+            # any shard slice; numeric conversion is forbidden.
+            for root, ui8_type, fp8_type in (
+                (
+                    roots[1],
+                    "tensor<8x6144x768xui8>",
+                    "tensor<8x6144x768xf8E4M3FN>",
+                ),
+                (
+                    roots[3],
+                    "tensor<8x384x6144xui8>",
+                    "tensor<8x384x6144xf8E4M3FN>",
+                ),
+            ):
+                bitcast = _expect_node(
+                    graph, root, opcode="bitcast_convert", result_type=fp8_type
+                )
+                if (
+                    len(bitcast.operands) != 1
+                    or bitcast.tensor_types[-2:] != (ui8_type, fp8_type)
+                ):
+                    raise _MatchError(
+                        f"{root}: dense runtime U8/FP8 bitcast drifted"
+                    )
+                external_runtime_sources.add(
+                    exact_owner_unit_source(
+                        graph,
+                        bitcast.operands[0],
+                        local_type=ui8_type,
+                    )
+                )
+                runtime_u8_bitcasts += 1
+            for scale_root, scale_type in (
+                (roots[2], "tensor<8x48x768xf32>"),
+                (roots[4], "tensor<8x3x6144xf32>"),
+            ):
+                external_runtime_sources.add(
+                    exact_owner_unit_source(
+                        graph, scale_root, local_type=scale_type
+                    )
+                )
+
+            broadcasts = tuple(
+                _expect_broadcast(
+                    graph,
+                    (
+                        rows[shard + 1][2]
+                        if shard < 7
+                        else rows[shard][0]
+                    ),
+                    dimensions=(1, 2),
+                    result_type="tensor<1x1x6144xbf16>",
+                ).name
+                for shard in range(8)
+            )
+            stack = _expect_concat(
+                graph,
+                broadcasts,
+                dimension=0,
+                result_type="tensor<8x1x6144xbf16>",
+            )
+            gathered_input = _expect_broadcast(
+                graph,
+                stack.name,
+                dimensions=(1, 2, 3),
+                result_type="tensor<1x8x1x6144xbf16>",
+            )
+            gather = _only(
+                (
+                    node
+                    for node in graph.matching_users(
+                        gathered_input.name,
+                        opcode="all_gather",
+                        result_type="tensor<4x8x1x6144xbf16>",
+                    )
+                    if node.operands == (gathered_input.name,)
+                ),
+                "dense decoder StrategyND all-gather",
+            )
+            normalized_gather = re.sub(r"\s+", "", gather.raw_line)
+            if (
+                gather.all_gather_dimension != 0
+                or not gather.use_global_device_ids
+                or "replica_groups=dense<[[0,1,2,3]]>:tensor<1x4xi64>"
+                not in normalized_gather
+            ):
+                raise _MatchError(
+                    f"{gather.name}: dense decoder gather group drifted"
+                )
+            dense_output = _match_reduction_tree(graph, gather)
+            output_key = (graph.name, dense_output)
+            if output_key in dense_outputs:
+                raise _MatchError("dense decoder groups share one tree result")
+            dense_outputs.add(output_key)
+
+            pending = [dense_output]
+            reached = {dense_output}
+            is_live = False
+            while pending:
+                current = pending.pop()
+                for user in graph.users.get(current, ()):
+                    if user.opcode == "return":
+                        is_live = True
+                        pending.clear()
+                        break
+                    if user.name not in reached:
+                        reached.add(user.name)
+                        pending.append(user.name)
+            if not is_live:
+                raise _MatchError(
+                    f"{dense_output}: dense decoder result is not live"
+                )
+            live_results += 1
+            matched_groups += 1
+
+        if len(external_runtime_sources) != 4 * dense_layers:
+            raise _MatchError(
+                "dense decoder packed bits/scales source bijection drifted"
+            )
+        layout_constraints = sum(
+            1
+            for graph in graphs
+            for node in graph.nodes.values()
+            if node.opcode == "custom_call"
+            and "@LayoutConstraint(" in node.raw_line
+            and node.result_type == "tensor<6144x768xbf16>"
+        )
+        if layout_constraints != 8 * dense_layers:
+            raise _MatchError(
+                "dense decoder layout-constraint count drifted: "
+                f"expected={8 * dense_layers} found={layout_constraints}"
+            )
+    except _MatchError as error:
+        violations.append(str(error))
+
+    return {
+        "dense_layer_group_count": matched_groups,
+        "exact_live_result_count": live_results,
+        "exact_runtime_u8_bitcast_count": runtime_u8_bitcasts,
+        "gate_up_layout_constraint_count": layout_constraints,
+        "matched_virtual_shard_count": matched_shards,
         "passed": not violations,
         "violations": violations,
     }

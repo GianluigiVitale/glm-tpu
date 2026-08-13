@@ -16,15 +16,29 @@ readonly TOPOLOGY_RUN=/home/gianl/glm-run/greenfield_topology_20260805T125842425
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 readonly FUSED_QKV_A=${GLM_GREENFIELD_FEATURE_RUNTIME_FUSED_QKV_A:-0}
+readonly DENSE_CONVOLUTION=${GLM_GREENFIELD_FEATURE_RUNTIME_DENSE_CONVOLUTION:-0}
 [[ $FUSED_QKV_A == 0 || $FUSED_QKV_A == 1 ]] || {
   echo "feature-runtime fused qkv-a flag must be 0 or 1" >&2
   exit 2
 }
+[[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
+  echo "feature-runtime dense convolution flag must be 0 or 1" >&2
+  exit 2
+}
+if [[ $DENSE_CONVOLUTION == 1 && $FUSED_QKV_A != 1 ]]; then
+  echo "dense convolution runtime requires fused qkv-a" >&2
+  exit 2
+fi
 FUSED_QKV_A_FLAG=
+DENSE_CONVOLUTION_FLAG=
 DEFAULT_TAG=greenfield_runtime_feature_pack_pp8_$(date -u +%Y%m%dT%H%M%S%NZ)
 if [[ $FUSED_QKV_A == 1 ]]; then
   FUSED_QKV_A_FLAG=--fused-qkv-a
   DEFAULT_TAG=greenfield_runtime_feature_qkv_pack_pp8_$(date -u +%Y%m%dT%H%M%S%NZ)
+fi
+if [[ $DENSE_CONVOLUTION == 1 ]]; then
+  DENSE_CONVOLUTION_FLAG=--dense-convolution
+  DEFAULT_TAG=greenfield_runtime_feature_qkv_dense_pack_pp8_$(date -u +%Y%m%dT%H%M%S%NZ)
 fi
 TAG=${GLM_GREENFIELD_FEATURE_RUNTIME_PACK_TAG:-$DEFAULT_TAG}
 RUN_DIR=/home/gianl/glm-run/$TAG
@@ -138,16 +152,21 @@ FUSED_ARGS=()
 if [[ -n $FUSED_QKV_A_FLAG ]]; then
   FUSED_ARGS+=("$FUSED_QKV_A_FLAG")
 fi
+DENSE_ARGS=()
+if [[ -n $DENSE_CONVOLUTION_FLAG ]]; then
+  DENSE_ARGS+=("$DENSE_CONVOLUTION_FLAG")
+fi
 say "preparing content-addressed feature-runtime layout and empty destination"
 cd "$WORKTREE"
 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py \
   prepare "${COMMON_ARGS[@]}" --run-dir "$RUN_DIR/pack_control" \
   "${RESUME_ARGS[@]}" "${FUSED_ARGS[@]}" \
+  "${DENSE_ARGS[@]}" \
   >"$RUN_DIR/prepare.txt" 2>&1
 
 say "authenticating and streaming eight host-local stages"
 # shellcheck disable=SC2016
-pack_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; source_checkpoint='"$SOURCE_CHECKPOINT_ROOT"'; source_packed_sha='"$SOURCE_PACKED_MANIFEST_SHA"'; source_runtime='"$SOURCE_RUNTIME_ROOT"'; source_runtime_sha='"$SOURCE_RUNTIME_MANIFEST_SHA"'; topology='"$TOPOLOGY_RUN"'; destination='"$CHECKPOINT_DESTINATION"'; pin='"$PIN"'; resume='"$RESUME_FLAG"'; fused='"$FUSED_QKV_A_FLAG"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag/host_pack; capture="$topology/topology.rank${idx}.json"; mkdir -p "$run"; cd "$wt"; set +e; timeout --signal=TERM --kill-after=60 21600 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py pack-stage --source-checkpoint-root "$source_checkpoint" --source-packed-manifest-sha256 "$source_packed_sha" --source-runtime-root "$source_runtime" --source-runtime-manifest-sha256 "$source_runtime_sha" --destination "$destination" --run-dir "$run" --expected-code-hash "$pin" --topology-capture "$capture" $resume $fused >"$run/pack.log" 2>&1; rc=$?; set -e; gcloud storage cp --recursive --no-clobber "$run" "$remote/host_records/worker${idx}/" >/dev/null 2>&1 || true; if [[ $rc -eq 0 ]]; then echo "PACK_HOST_OK $(hostname)"; else tail -100 "$run/pack.log" >&2 || true; echo "PACK_HOST_FAILED $(hostname) rc=$rc" >&2; exit "$rc"; fi'
+pack_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; source_checkpoint='"$SOURCE_CHECKPOINT_ROOT"'; source_packed_sha='"$SOURCE_PACKED_MANIFEST_SHA"'; source_runtime='"$SOURCE_RUNTIME_ROOT"'; source_runtime_sha='"$SOURCE_RUNTIME_MANIFEST_SHA"'; topology='"$TOPOLOGY_RUN"'; destination='"$CHECKPOINT_DESTINATION"'; pin='"$PIN"'; resume='"$RESUME_FLAG"'; fused='"$FUSED_QKV_A_FLAG"'; dense='"$DENSE_CONVOLUTION_FLAG"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag/host_pack; capture="$topology/topology.rank${idx}.json"; mkdir -p "$run"; cd "$wt"; set +e; timeout --signal=TERM --kill-after=60 21600 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py pack-stage --source-checkpoint-root "$source_checkpoint" --source-packed-manifest-sha256 "$source_packed_sha" --source-runtime-root "$source_runtime" --source-runtime-manifest-sha256 "$source_runtime_sha" --destination "$destination" --run-dir "$run" --expected-code-hash "$pin" --topology-capture "$capture" $resume $fused $dense >"$run/pack.log" 2>&1; rc=$?; set -e; gcloud storage cp --recursive --no-clobber "$run" "$remote/host_records/worker${idx}/" >/dev/null 2>&1 || true; if [[ $rc -eq 0 ]]; then echo "PACK_HOST_OK $(hostname)"; else tail -100 "$run/pack.log" >&2 || true; echo "PACK_HOST_FAILED $(hostname) rc=$rc" >&2; exit "$rc"; fi'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$pack_command" >"$RUN_DIR/pack.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/pack.txt" PACK_HOST_OK || {
@@ -157,7 +176,8 @@ has_eight_unique_markers "$RUN_DIR/pack.txt" PACK_HOST_OK || {
 
 say "finalizing only after all 32 payloads and transform sidecars reconcile"
 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py \
-  finalize "${COMMON_ARGS[@]}" --run-dir "$RUN_DIR/final" "${FUSED_ARGS[@]}" \
+  finalize "${COMMON_ARGS[@]}" --run-dir "$RUN_DIR/final" \
+  "${FUSED_ARGS[@]}" "${DENSE_ARGS[@]}" \
   >"$RUN_DIR/finalize.txt" 2>&1
 RUNTIME_MANIFEST_SHA=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
