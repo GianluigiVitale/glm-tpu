@@ -19,6 +19,26 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Pushed correction `9cbb5a68ca426fcac5ff6a404bb8b47a793b3957` received Sol approval at
+  staged SHA `18647918...96d1` and launched once under tag
+  `greenfield_layer0_captured_rms_replay_20260813T211240092773251Z`. The control proof now passes.
+  The accepted-split arm also compiles with the exact accepted scalar schedule, but its proof fails
+  before arithmetic because SPMD exposes the live rsqrt shard through an exact
+  `f32[32] -> f32[1]` bitcast. The generic same-element layout walker intentionally did not cross
+  that partitioned view, and the broad scheduled-value candidate set counted the scoped rsqrt as a
+  second reduction. Accepted-split optimized/StableHLO SHAs are `c8fdc9d6...8d55` and
+  `b079e88d...e95b`; control SHAs are `4d5f88bb...c2c` and `b4fdb677...720d`.
+- There is again no runner JSON, tensor result, comparison, summary, DB row, terminal `SUCCESS`,
+  arithmetic verdict or performance claim. Rollback is `NO_PROVISIONAL_DB_RUN`; failure cleanup is
+  authenticated 8/8 and the diagnostic files are preserved. The bounded correction admits only
+  the exact `f32[32] -> f32[1]` bitcast whose sole source is the exact scoped rsqrt fusion, which in
+  turn consumes the accepted scheduled reduction; scheduled candidates are exactly scoped
+  `reduce_sum` values, not every layer-1 `f32[32]` helper. Direct reduction bypass and inserted
+  arithmetic refuse. Sol's first correction audit also caught quoted-metadata layout spoofing and a
+  second rogue rsqrt operand; both parser-valid mutations now refuse after string sanitization and
+  exact sole-operand binding. Exact next remains affected tests, one final correction audit,
+  commit/push and one serialized captured-byte replay; no complete checkpoint is loaded.
+
 - Reviewed/pushed replay pin `1fcd2a400b087e5b3f970626df90e1b9310c86f3` launched once under
   `greenfield_layer0_captured_rms_replay_20260813T210310956272256Z`. It failed safely before
   arithmetic after about ten seconds because the optimized-HLO proof expected the gather operand

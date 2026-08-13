@@ -13,6 +13,7 @@ import sys
 import numpy as np
 import pytest
 import google_crc32c
+from jaxlib import xla_client
 
 
 REPO = Path(__file__).resolve().parents[3]
@@ -33,6 +34,17 @@ REAL_FAILED_CONTROL_HLO = Path(
 )
 REAL_FAILED_CONTROL_HLO_SHA256 = (
     "fc208e238305cf112a69214944e0af47ab39ff51651d5b603cb9b88d7c45cecd"
+)
+REAL_ACCEPTED_SPLIT_HLO = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_CAPTURED_RMS_SPLIT_HLO",
+        "/home/gianl/glm-run/"
+        "greenfield_layer0_captured_rms_replay_20260813T211240092773251Z/"
+        "hlo/accepted_split.optimized_hlo.txt",
+    )
+)
+REAL_ACCEPTED_SPLIT_HLO_SHA256 = (
+    "c8fdc9d63ff87644d4b6cd7525bf23c475b081c87624865e1f53179c3a168d55"
 )
 SPEC = importlib.util.spec_from_file_location("captured_rms_probe", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -69,6 +81,11 @@ def _captured_rms_optimized_hlo() -> str:
   ROOT %r = f32[32] add(%a, %b)
 }}
 
+%rsqrt (a: f32[32]) -> f32[32] {{
+  %a = f32[32] parameter(0)
+  ROOT %r = f32[32] copy(%a)
+}}
+
 %output (a: bf16[1,6144], b: bf16[1,6144], c: bf16[1,6144], d: bf16[1,6144]) -> bf16[1,6144] {{
   %a = bf16[1,6144] parameter(0)
   %b = bf16[1,6144] parameter(1)
@@ -83,9 +100,10 @@ ENTRY %main (p0: bf16[1,8,1,6144], p1: bf16[32,6144], p2: bf16[6144]) -> bf16[1,
   %p0 = bf16[1,8,1,6144] parameter(0)
   %g = bf16[4,8,1,6144] all-gather(%p0), channel_id=1, replica_groups={{{{0,1,2,3}}}}, dimensions={{0}}, use_global_device_ids=true, metadata={{op_name="jit/local/greenfield_captured_rms_strategy_gather/all_gather"}}
   %p1 = bf16[32,6144] parameter(1)
-  %s = f32[32] fusion(%g, %p1), kind=kLoop, calls=%rms, metadata={{op_name="jit/local/greenfield_captured_rms_layer1/reduce"}}, backend_config={config}
+  %s = f32[32] fusion(%g, %p1), kind=kLoop, calls=%rms, metadata={{op_name="jit/local/greenfield_captured_rms_layer1/split_reduction/reduce_sum"}}, backend_config={config}
+  %r = f32[32] fusion(%s), kind=kLoop, calls=%rsqrt, metadata={{op_name="jit/local/greenfield_captured_rms_layer1/split_reduction/rsqrt"}}
   %p2 = bf16[6144] parameter(2)
-  ROOT %out = bf16[1,6144] fusion(%g, %p1, %p2, %s), kind=kLoop, calls=%output
+  ROOT %out = bf16[1,6144] fusion(%g, %p1, %p2, %r), kind=kLoop, calls=%output
 }}
 """
 
@@ -200,8 +218,8 @@ def test_captured_rms_optimized_contract_refuses_decoys() -> None:
   ROOT %z = bf16[32,6144] add(%y, %dbc)
 }"""
     wide = accepted.replace(narrow_output, wide_output, 1).replace(
-        "  ROOT %out = bf16[1,6144] fusion(%g, %p1, %p2, %s), kind=kLoop, calls=%output",
-        "  %wide = bf16[32,6144] fusion(%g, %p1, %p2, %s), kind=kLoop, calls=%output\n"
+        "  ROOT %out = bf16[1,6144] fusion(%g, %p1, %p2, %r), kind=kLoop, calls=%output",
+        "  %wide = bf16[32,6144] fusion(%g, %p1, %p2, %r), kind=kLoop, calls=%output\n"
         "  ROOT %row0 = bf16[1,6144] slice(%wide), slice={[0:1],[0:6144]}",
         1,
     )
@@ -234,12 +252,12 @@ def test_captured_rms_optimized_contract_refuses_decoys() -> None:
             1,
         ),
         accepted.replace(
-            "greenfield_captured_rms_layer1/reduce",
-            "not_the_live_rms/reduce",
+            "greenfield_captured_rms_layer1/split_reduction/reduce_sum",
+            "not_the_live_rms/split_reduction/reduce_sum",
             1,
         ).replace(
             "  %p2 = bf16[6144] parameter(2)",
-            "  %decoy = f32[32] fusion(%g, %p1), kind=kLoop, calls=%rms, metadata={op_name=\"greenfield_captured_rms_layer1/reduce\"}, backend_config="
+            "  %decoy = f32[32] fusion(%g, %p1), kind=kLoop, calls=%rms, metadata={op_name=\"greenfield_captured_rms_layer1/split_reduction/reduce_sum\"}, backend_config="
             + json.dumps(
                 {
                     "window_config": {
@@ -263,24 +281,24 @@ def test_captured_rms_optimized_contract_refuses_decoys() -> None:
             1,
         ),
         accepted.replace(
-            "fusion(%g, %p1, %p2, %s)",
-            "fusion(%g, %p1, %p1, %s)",
+            "fusion(%g, %p1, %p2, %r)",
+            "fusion(%g, %p1, %p1, %r)",
             1,
         ),
         accepted.replace(
-            "  ROOT %out = bf16[1,6144] fusion(%g, %p1, %p2, %s), kind=kLoop, calls=%output",
-            "  %out = bf16[1,6144] fusion(%g, %p1, %p2, %s), kind=kLoop, calls=%output\n"
+            "  ROOT %out = bf16[1,6144] fusion(%g, %p1, %p2, %r), kind=kLoop, calls=%output",
+            "  %out = bf16[1,6144] fusion(%g, %p1, %p2, %r), kind=kLoop, calls=%output\n"
             "  ROOT %rogue = bf16[1,6144] add(%out, %out)",
             1,
         ),
         accepted.replace(
             "  %p2 = bf16[6144] parameter(2)",
-            "  %rogue_s = f32[32] add(%s, %s)\n"
+            "  %rogue_r = f32[32] add(%r, %r)\n"
             "  %p2 = bf16[6144] parameter(2)",
             1,
         ).replace(
-            "fusion(%g, %p1, %p2, %s)",
-            "fusion(%g, %p1, %p2, %rogue_s)",
+            "fusion(%g, %p1, %p2, %r)",
+            "fusion(%g, %p1, %p2, %rogue_r)",
             1,
         ),
         wide.replace(
@@ -310,6 +328,79 @@ def test_protected_control_hlo_uses_exact_owner_preserving_gather() -> None:
         hlo, split_layer1_rms=False
     )
     assert contract["passed"], contract
+
+
+@pytest.mark.skipif(
+    not REAL_ACCEPTED_SPLIT_HLO.exists(),
+    reason="protected captured-RMS accepted-split HLO is unavailable",
+)
+def test_protected_split_hlo_uses_exact_partitioned_rsqrt_bridge() -> None:
+    hlo = REAL_ACCEPTED_SPLIT_HLO.read_text()
+    assert sha256(hlo.encode()).hexdigest() == REAL_ACCEPTED_SPLIT_HLO_SHA256
+    contract = MODULE._validate_captured_rms_optimized_hlo(
+        hlo, split_layer1_rms=True
+    )
+    assert contract["passed"], contract
+    bypass = hlo.replace(
+        "bitcast(%add_rsqrt_fusion)",
+        "bitcast(%multiply_reduce_fusion)",
+        1,
+    )
+    rogue = hlo.replace(
+        "  %bitcast.123 = f32[1]",
+        "  %rogue_rsqrt = f32[32]{0:T(128)S(3)} "
+        "add(%add_rsqrt_fusion, %add_rsqrt_fusion)\n"
+        "  %bitcast.123 = f32[1]",
+        1,
+    ).replace(
+        "bitcast(%add_rsqrt_fusion)",
+        "bitcast(%rogue_rsqrt)",
+        1,
+    )
+    wrong_layout = hlo.replace(
+        "%bitcast.123 = f32[1]{0:T(128)S(3)}",
+        "%bitcast.123 = f32[1]{0}",
+        1,
+    ).replace(
+        "bitcast(%add_rsqrt_fusion)",
+        'bitcast(%add_rsqrt_fusion), metadata={op_name="= f32[1]{0:T(128)S(3)} bitcast("}',
+        1,
+    )
+    rogue_second_operand = hlo.replace(
+        "%fused_computation.142 (param_0.322: f32[32])",
+        "%fused_computation.142 (param_0.322: f32[32], rogue: f32[32])",
+        1,
+    ).replace(
+        "  %param_0.322 = f32[32]{0:T(128)S(3)} parameter(0)",
+        "  %param_0.322 = f32[32]{0:T(128)S(3)} parameter(0)\n"
+        "  %rogue = f32[32]{0:T(128)S(3)} parameter(1)",
+        1,
+    ).replace(
+        "  ROOT %rsqrt.5 = f32[32]{0:T(128)S(3)} rsqrt(%add.736)",
+        "  %rsqrt.5 = f32[32]{0:T(128)S(3)} rsqrt(%add.736)\n"
+        "  ROOT %rogue_rsqrt.1 = f32[32]{0:T(128)S(3)} "
+        "add(%rsqrt.5, %rogue)",
+        1,
+    ).replace(
+        "fusion(%multiply_reduce_fusion), kind=kLoop, calls=%fused_computation.142",
+        "fusion(%multiply_reduce_fusion, %multiply_reduce_fusion), "
+        "kind=kLoop, calls=%fused_computation.142",
+        1,
+    )
+    xla_client._xla.hlo_module_from_text(wrong_layout)
+    xla_client._xla.hlo_module_from_text(rogue_second_operand)
+    assert not MODULE._validate_captured_rms_optimized_hlo(
+        bypass, split_layer1_rms=True
+    )["passed"]
+    assert not MODULE._validate_captured_rms_optimized_hlo(
+        rogue, split_layer1_rms=True
+    )["passed"]
+    assert not MODULE._validate_captured_rms_optimized_hlo(
+        wrong_layout, split_layer1_rms=True
+    )["passed"]
+    assert not MODULE._validate_captured_rms_optimized_hlo(
+        rogue_second_operand, split_layer1_rms=True
+    )["passed"]
 
 
 @pytest.mark.skipif(

@@ -5,6 +5,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 21:15 UTC — control proof passes; split arm exposes exact partitioned rsqrt bridge
+
+- Sol approved staged correction SHA `18647918...96d1`; pushed commit
+  `9cbb5a68ca426fcac5ff6a404bb8b47a793b3957` then launched one protected bounded replay under
+  `greenfield_layer0_captured_rms_replay_20260813T211240092773251Z`. The corrected control arm
+  passes its StableHLO and optimized-HLO contracts. The accepted-split arm compiles with the exact
+  accepted scalar reduction schedule but fails closed before arithmetic on its result-liveness
+  proof.
+- The preserved accepted-split HLO has the exact scheduled `f32[32]` reduction, then the exact
+  scoped rsqrt fusion, then one SPMD partition-view bitcast `f32[32] -> f32[1]` feeding the live
+  output fusion. The generic layout walker requires equal logical element counts, so it correctly
+  did not infer this compiler-specific edge without an explicit proof. The old broad scheduled
+  candidate set also counted that scoped `f32[32]` rsqrt as a second reduction. Optimized/StableHLO
+  SHAs are `c8fdc9d6...8d55` and `b079e88d...e95b`.
+- No runner JSON, NPZ, numerical comparison, summary, DB row, terminal archive, `SUCCESS`, Gate-D
+  advancement or performance result exists. Rollback is `NO_PROVISIONAL_DB_RUN`; the authenticated
+  failure census is 8/8 clean and diagnostic evidence is preserved remotely.
+- The proof-only correction permits exactly one `f32[32] -> f32[1]` bitcast bridge whose sole input
+  is the exact scoped rsqrt fusion and whose rsqrt input is the exact accepted scheduled reduction.
+  Direct reduction bypass and inserted arithmetic are refusal regressions; only scoped
+  `reduce_sum` values are reduction candidates. Sol's first correction review identified two
+  additional parser-valid fail-opens: quoted metadata could spoof physical layouts, and the rsqrt
+  caller could have a second rogue operand. The correction now strips quoted strings and comments
+  before layout matching and requires the exact scheduled reduction to be the rsqrt fusion's sole
+  operand; both mutations parse with XLA and refuse. After affected tests and one final
+  correction-only audit, commit/push and rerun this bounded replay once.
+
 ## 2026-08-13 21:07 UTC — first captured-RMS replay fails only on owner-singleton HLO spelling
 
 - Reviewed/pushed commit `1fcd2a400b087e5b3f970626df90e1b9310c86f3` launched the protected

@@ -598,9 +598,11 @@ def _validate_captured_rms_optimized_hlo(
     scheduled_reductions = [
         item
         for item in module.instructions
-        if _shape_signatures(item.result_shapes) == ("f32[32]",)
+        if item.computation.startswith("ENTRY ")
+        and _shape_signatures(item.result_shapes) == ("f32[32]",)
         and "greenfield_captured_rms_layer1"
         in (item.op_name or "")
+        and (item.op_name or "").split("/")[-1] == "reduce_sum"
     ]
     accepted_scheduled_reductions = [
         item for item in scheduled_reductions if _exact_accepted_rms_schedule(item)
@@ -615,7 +617,44 @@ def _validate_captured_rms_optimized_hlo(
             if operand is None:
                 continue
             candidate = unwrap_layout(operand)
-            if _instruction_key(candidate) == _instruction_key(schedule):
+            candidate_layout_line = re.sub(
+                r'"(?:\\.|[^"\\])*"', '""', candidate.raw_line
+            )
+            candidate_layout_line = re.sub(
+                r"/\*.*?\*/", "", candidate_layout_line
+            )
+            if (
+                candidate.raw_opcode == "bitcast"
+                and _shape_signatures(candidate.operand_shapes)
+                == ("f32[32]",)
+                and _shape_signatures(candidate.result_shapes)
+                == ("f32[1]",)
+                and len(candidate.operand_names) == 1
+                and re.search(
+                    r"=\s*f32\[1\]\{0:T\(128\)S\(3\)\}\s+bitcast\(",
+                    candidate_layout_line,
+                )
+                is not None
+            ):
+                predecessor = by_key.get(
+                    (candidate.computation, candidate.operand_names[0])
+                )
+                if predecessor is not None:
+                    predecessor_layout_line = re.sub(
+                        r'"(?:\\.|[^"\\])*"', '""', predecessor.raw_line
+                    )
+                    predecessor_layout_line = re.sub(
+                        r"/\*.*?\*/", "", predecessor_layout_line
+                    )
+                    if re.search(
+                        r"=\s*f32\[32\]\{0:T\(128\)S\(3\)\}\s+fusion\(",
+                        predecessor_layout_line,
+                    ) is not None:
+                        candidate = predecessor
+            if (
+                not split_layer1_rms
+                and _instruction_key(candidate) == _instruction_key(schedule)
+            ):
                 matches += 1
                 continue
             if (
@@ -623,17 +662,15 @@ def _validate_captured_rms_optimized_hlo(
                 and "greenfield_captured_rms_layer1"
                 in (candidate.op_name or "")
                 and (candidate.op_name or "").split("/")[-1] == "rsqrt"
-                and sum(
-                    1
-                    for name in candidate.operand_names
-                    if (
-                        (source := by_key.get((candidate.computation, name)))
-                        is not None
-                        and _instruction_key(unwrap_layout(source))
-                        == _instruction_key(schedule)
+                and len(candidate.operand_names) == 1
+                and (
+                    source := by_key.get(
+                        (candidate.computation, candidate.operand_names[0])
                     )
                 )
-                == 1
+                is not None
+                and _instruction_key(unwrap_layout(source))
+                == _instruction_key(schedule)
             ):
                 matches += 1
         return matches == 1
