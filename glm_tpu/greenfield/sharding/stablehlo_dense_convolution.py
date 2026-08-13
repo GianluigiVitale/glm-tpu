@@ -716,6 +716,7 @@ def _match_rmsnorm(
     dense_output: str,
     *,
     layer1_only: bool = False,
+    residual_is_m32: bool = False,
 ) -> tuple[str, str, str]:
     rows = 32 if layer1_only else 1
     row_type = f"tensor<{rows}x6144x"
@@ -764,7 +765,7 @@ def _match_rmsnorm(
         result_type=f"{row_type}f32>",
     )
     residual = residual.operands[0]
-    if layer1_only:
+    if layer1_only and not residual_is_m32:
         residual_pad = _expect_node(
             graph,
             residual,
@@ -807,33 +808,58 @@ def _match_rmsnorm(
         dimensions=(0,),
         result_type=scalar_row_type,
     )
-    width = _expect_constant_broadcast(
+    mean = _only(
+        (
+            node
+            for node in graph.matching_users(
+                summed.name,
+                opcode="divide",
+                result_type=scalar_row_type,
+            )
+            if len(node.operands) == 2 and node.operands[0] == summed.name
+        ),
+        "RMSNorm mean division",
+    )
+    width = _expect_node(
         graph,
+        mean.operands[1],
+        opcode="broadcast_in_dim",
+        result_type=scalar_row_type,
+    )
+    _require_constant_broadcast(
+        graph,
+        width,
         literal="6.144000e+03",
         scalar_type="tensor<f32>",
         result_type=scalar_row_type,
         dimensions=(),
     )
-    mean = _expect_binary(
+    variance = _only(
+        (
+            node
+            for node in graph.matching_users(
+                mean.name,
+                opcode="add",
+                result_type=scalar_row_type,
+            )
+            if len(node.operands) == 2 and mean.name in node.operands
+        ),
+        "RMSNorm epsilon addition",
+    )
+    epsilon_name = next(name for name in variance.operands if name != mean.name)
+    epsilon = _expect_node(
         graph,
-        summed.name,
-        width.name,
-        opcode="divide",
+        epsilon_name,
+        opcode="broadcast_in_dim",
         result_type=scalar_row_type,
     )
-    epsilon = _expect_constant_broadcast(
+    _require_constant_broadcast(
         graph,
+        epsilon,
         literal="9.99999974E-6",
         scalar_type="tensor<f32>",
         result_type=scalar_row_type,
         dimensions=(),
-    )
-    variance = _expect_binary(
-        graph,
-        mean.name,
-        epsilon.name,
-        opcode="add",
-        result_type=scalar_row_type,
     )
     reciprocal = _expect_unary(
         graph,
@@ -860,32 +886,40 @@ def _match_rmsnorm(
         opcode="convert",
         result_type=f"{row_type}bf16>",
     )
-    norm_weight_seed = _only(
+    output = _only(
         (
             node
-            for node in graph.nodes.values()
-            if node.opcode == "broadcast_in_dim"
-            and node.dimensions == (1,)
-            and node.result_type == "tensor<1x6144xbf16>"
-            and len(node.operands) == 1
+            for node in graph.matching_users(
+                rounded.name,
+                opcode="multiply",
+                result_type=f"{row_type}bf16>",
+            )
+            if len(node.operands) == 2 and rounded.name in node.operands
         ),
-        "layer-1 RMSNorm weight broadcast",
+        "layer-1 RMSNorm weighted output",
     )
-    norm_weight = norm_weight_seed
-    if layer1_only:
-        norm_weight = _expect_broadcast(
-            graph,
-            norm_weight_seed.name,
-            dimensions=(0, 1),
-            result_type="tensor<32x6144xbf16>",
-        )
-    output = _expect_binary(
+    norm_weight_name = next(
+        name for name in output.operands if name != rounded.name
+    )
+    norm_weight = _expect_node(
         graph,
-        rounded.name,
-        norm_weight.name,
-        opcode="multiply",
+        norm_weight_name,
+        opcode="broadcast_in_dim",
         result_type=f"{row_type}bf16>",
     )
+    if layer1_only:
+        if norm_weight.dimensions != (0, 1) or len(norm_weight.operands) != 1:
+            raise _MatchError("layer-1 RMSNorm M32 weight broadcast drifted")
+        norm_weight_seed = _expect_node(
+            graph,
+            norm_weight.operands[0],
+            opcode="broadcast_in_dim",
+            result_type="tensor<1x6144xbf16>",
+        )
+    else:
+        norm_weight_seed = norm_weight
+    if norm_weight_seed.dimensions != (1,) or len(norm_weight_seed.operands) != 1:
+        raise _MatchError("layer-1 RMSNorm weight seed drifted")
     returned_output = output.name
     if layer1_only:
         returned_output = _expect_slice(
@@ -917,12 +951,176 @@ def _match_rmsnorm(
     return residual, norm_weight_seed.operands[0], returned_output
 
 
+def _match_predense_rmsnorm(
+    graph: _StableGraph,
+    helpers: dict[str, _StableGraph],
+    normalized_output: str,
+    carried_residual: str,
+) -> tuple[tuple[str, str], str]:
+    """Bind the exact M32 fused add/RMSNorm feeding every gate convolution."""
+
+    row_bf16 = "tensor<32x6144xbf16>"
+    row_f32 = "tensor<32x6144xf32>"
+    scalar_row = "tensor<32x1xf32>"
+    output = _expect_node(
+        graph, normalized_output, opcode="multiply", result_type=row_bf16
+    )
+    if len(output.operands) != 2:
+        raise _MatchError("pre-dense RMSNorm weighted output arity drifted")
+    rounded_candidates = [
+        graph.node(name)
+        for name in output.operands
+        if graph.node(name).opcode == "convert"
+        and graph.node(name).result_type == row_bf16
+    ]
+    weight_candidates = [
+        graph.node(name)
+        for name in output.operands
+        if graph.node(name).opcode == "broadcast_in_dim"
+        and graph.node(name).result_type == row_bf16
+        and graph.node(name).dimensions == (0, 1)
+    ]
+    rounded = _only(rounded_candidates, "pre-dense RMSNorm BF16 round")
+    weight = _only(weight_candidates, "pre-dense RMSNorm weight broadcast")
+    normalized = _expect_node(
+        graph, rounded.operands[0], opcode="multiply", result_type=row_f32
+    )
+    if len(normalized.operands) != 2:
+        raise _MatchError("pre-dense normalized multiply arity drifted")
+    combined_candidates = [
+        graph.node(name)
+        for name in normalized.operands
+        if graph.node(name).opcode == "add"
+        and graph.node(name).result_type == row_f32
+    ]
+    scale_candidates = [
+        graph.node(name)
+        for name in normalized.operands
+        if graph.node(name).opcode == "broadcast_in_dim"
+        and graph.node(name).result_type == row_f32
+        and graph.node(name).dimensions == (0, 1)
+    ]
+    combined = _only(combined_candidates, "pre-dense FP32 residual add")
+    scale = _only(scale_candidates, "pre-dense reciprocal broadcast")
+    carried = _expect_node(
+        graph, carried_residual, opcode="convert", result_type=row_bf16
+    )
+    if carried.operands != (combined.name,):
+        raise _MatchError("pre-dense carried residual differs from the FP32 sum")
+    square = _expect_unary(
+        graph, combined.name, opcode="square", result_type=row_f32
+    )
+    reduce = _only(
+        (
+            node
+            for node in graph.matching_users(
+                square.name, opcode="reduce", result_type="tensor<32xf32>"
+            )
+            if len(node.operands) == 2 and node.operands[0] == square.name
+        ),
+        "pre-dense RMSNorm sum reduction",
+    )
+    if reduce.dimensions != (1,):
+        raise _MatchError("pre-dense RMSNorm reduction axis drifted")
+    if "appliesstablehlo.add" not in re.sub(r"\s+", "", reduce.raw_line):
+        raise _MatchError("pre-dense RMSNorm reduction combiner drifted")
+    zero = _expect_node(
+        graph, reduce.operands[1], opcode="constant", result_type="tensor<f32>"
+    )
+    if zero.constant_literal != "0.000000e+00":
+        raise _MatchError("pre-dense RMSNorm reduction zero drifted")
+    if len(scale.operands) != 1:
+        raise _MatchError("pre-dense reciprocal broadcast source drifted")
+    reciprocal = _expect_node(
+        graph, scale.operands[0], opcode="rsqrt", result_type=scalar_row
+    )
+    variance = _expect_node(
+        graph, reciprocal.operands[0], opcode="add", result_type=scalar_row
+    )
+    if len(variance.operands) != 2:
+        raise _MatchError("pre-dense variance add arity drifted")
+    mean = _only(
+        (
+            graph.node(name)
+            for name in variance.operands
+            if graph.node(name).opcode == "divide"
+            and graph.node(name).result_type == scalar_row
+        ),
+        "pre-dense RMSNorm mean",
+    )
+    epsilon = _only(
+        (
+            graph.node(name)
+            for name in variance.operands
+            if graph.node(name).opcode == "broadcast_in_dim"
+            and graph.node(name).result_type == scalar_row
+        ),
+        "pre-dense RMSNorm epsilon",
+    )
+    _require_constant_broadcast(
+        graph,
+        epsilon,
+        literal="9.99999974E-6",
+        scalar_type="tensor<f32>",
+        result_type=scalar_row,
+        dimensions=(),
+    )
+    if len(mean.operands) != 2:
+        raise _MatchError("pre-dense mean division arity drifted")
+    summed = _expect_node(
+        graph,
+        mean.operands[0],
+        opcode="broadcast_in_dim",
+        result_type=scalar_row,
+    )
+    if summed.dimensions != (0,) or summed.operands != (reduce.name,):
+        raise _MatchError("pre-dense reduction broadcast drifted")
+    width = _expect_node(
+        graph,
+        mean.operands[1],
+        opcode="broadcast_in_dim",
+        result_type=scalar_row,
+    )
+    _require_constant_broadcast(
+        graph,
+        width,
+        literal="6.144000e+03",
+        scalar_type="tensor<f32>",
+        result_type=scalar_row,
+        dimensions=(),
+    )
+    sources = []
+    for name in combined.operands:
+        converted = _expect_node(
+            graph, name, opcode="convert", result_type=row_f32
+        )
+        call = _expect_node(
+            graph,
+            converted.operands[0],
+            opcode="call",
+            result_type=row_bf16,
+        )
+        sources.append(_validate_m32_input_pad(graph, helpers, call.name))
+    if len(set(sources)) != 2:
+        raise _MatchError("pre-dense add inputs are duplicated")
+    weight_seed = _expect_node(
+        graph,
+        weight.operands[0],
+        opcode="broadcast_in_dim",
+        result_type="tensor<1x6144xbf16>",
+    )
+    if weight_seed.dimensions != (1,) or len(weight_seed.operands) != 1:
+        raise _MatchError("pre-dense RMSNorm weight seed drifted")
+    return (sources[0], sources[1]), weight_seed.operands[0]
+
+
 def validate_dense_convolution_stablehlo(
     stablehlo: str,
     *,
     compile_rows: int = 1,
     layer1_only: bool = False,
     final_dense_layout: bool = False,
+    dense_envelope: bool = False,
 ) -> dict[str, object]:
     """Validate all eight exact dense chains and the exact StrategyND tree."""
 
@@ -932,6 +1130,10 @@ def validate_dense_convolution_stablehlo(
     if final_dense_layout and (compile_rows != 32 or not layer1_only):
         raise ValueError(
             "final-layout dense StableHLO proof requires M32 layer1-only"
+        )
+    if dense_envelope and not final_dense_layout:
+        raise ValueError(
+            "dense-envelope StableHLO proof requires final-layout mode"
         )
     graphs, parse_errors = _parse_graphs(stablehlo)
     violations.extend(parse_errors)
@@ -1058,6 +1260,7 @@ def validate_dense_convolution_stablehlo(
             helpers,
             dense_output,
             layer1_only=layer1_only,
+            residual_is_m32=dense_envelope,
         )
         layer_roots = next(iter(rows.values()))[0]
         root_contracts = (
@@ -1084,11 +1287,29 @@ def validate_dense_convolution_stablehlo(
             )
         )
         normalized_root = layer_roots[0]
-        if compile_rows == 32:
+        if compile_rows == 32 and not dense_envelope:
             normalized_root = _validate_m32_input_pad(
                 graph, helpers, normalized_root
             )
-        manual_arguments = [normalized_root]
+        if dense_envelope:
+            predense_sources, predense_norm = _match_predense_rmsnorm(
+                graph,
+                helpers,
+                layer_roots[0],
+                residual,
+            )
+            gate_users = {
+                node.name
+                for node in graph.users.get(layer_roots[0], ())
+                if node.opcode == "convolution"
+            }
+            if gate_users != {node.name for node in gate_up}:
+                raise _MatchError(
+                    "pre-dense RMSNorm output does not feed exactly eight gate convolutions"
+                )
+            manual_arguments = [*predense_sources, predense_norm]
+        else:
+            manual_arguments = [normalized_root]
         for root, tensor_types in zip(layer_roots[1:], root_contracts, strict=True):
             node = _expect_node(
                 graph,
@@ -1099,7 +1320,10 @@ def validate_dense_convolution_stablehlo(
             if node.tensor_types[-2:] != tensor_types or len(node.operands) != 1:
                 raise _MatchError(f"{root}: dense checkpoint source reshape drifted")
             manual_arguments.append(node.operands[0])
-        manual_arguments.extend((residual, norm_weight))
+        if dense_envelope:
+            manual_arguments.append(norm_weight)
+        else:
+            manual_arguments.extend((residual, norm_weight))
         manual_call = re.search(
             r"sdy\.manual_computation\(([^)]*)\)", stablehlo
         )
@@ -1109,7 +1333,18 @@ def validate_dense_convolution_stablehlo(
             else [value.strip() for value in manual_call.group(1).split(",")]
         )
         expected_manual_arguments = (
-            ["%arg7", "%arg9", "%arg10", "%arg11", "%arg12", "%arg8", "%arg13"]
+            [
+                "%arg8",
+                "%arg9",
+                "%arg10",
+                "%arg11",
+                "%arg12",
+                "%arg13",
+                "%arg14",
+                "%arg15",
+            ]
+            if dense_envelope
+            else ["%arg7", "%arg9", "%arg10", "%arg11", "%arg12", "%arg8", "%arg13"]
             if final_dense_layout
             else [
                 "%arg9",
@@ -1124,7 +1359,10 @@ def validate_dense_convolution_stablehlo(
             ]
         )
         expected_outer_arguments = [
-            f"%arg{index}" for index in range(7 if final_dense_layout else 9)
+            f"%arg{index}"
+            for index in range(
+                8 if dense_envelope else 7 if final_dense_layout else 9
+            )
         ]
         if (
             len(set(manual_arguments)) != len(expected_manual_arguments)
@@ -1167,6 +1405,7 @@ def validate_dense_convolution_stablehlo(
         "compile_rows": compile_rows,
         "convolution_count": stablehlo.count("stablehlo.convolution"),
         "down_convolution_count": 8 if matched_shards == list(range(8)) else 0,
+        "dense_envelope": dense_envelope,
         "final_dense_layout": final_dense_layout,
         "gate_up_convolution_count": 8 if matched_shards == list(range(8)) else 0,
         "gate_up_layout_constraint_count": layout_constraint_count,

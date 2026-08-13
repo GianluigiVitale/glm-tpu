@@ -320,6 +320,8 @@ def _load_db538(args: argparse.Namespace) -> tuple[np.ndarray, ...]:
         normalized_local.view(ml_dtypes.bfloat16),
         post_attention,
         accepted_layer1,
+        attention_local.view(ml_dtypes.bfloat16),
+        residual.view(ml_dtypes.bfloat16),
     )
 
 
@@ -404,6 +406,7 @@ def _validate_stablehlo(
     compile_rows: int = 1,
     layer1_only: bool = False,
     final_dense_layout: bool = False,
+    dense_envelope: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.stablehlo_dense_convolution import (
         validate_dense_convolution_stablehlo,
@@ -414,6 +417,7 @@ def _validate_stablehlo(
         compile_rows=compile_rows,
         layer1_only=layer1_only,
         final_dense_layout=final_dense_layout,
+        dense_envelope=dense_envelope,
     )
 
 
@@ -423,6 +427,7 @@ def _validate_optimized_hlo(
     compile_rows: int = 1,
     layer1_only: bool = False,
     final_dense_layout: bool = False,
+    dense_envelope: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -434,6 +439,10 @@ def _validate_optimized_hlo(
     if final_dense_layout and (compile_rows != 32 or not layer1_only):
         raise ValueError(
             "final-layout dense optimized-HLO proof requires M32 layer1-only"
+        )
+    if dense_envelope and not final_dense_layout:
+        raise ValueError(
+            "dense-envelope optimized-HLO proof requires final-layout mode"
         )
     module = parse_hlo_module(optimized_hlo)
     by_key = {_instruction_key(item): item for item in module.instructions}
@@ -691,12 +700,12 @@ def _validate_optimized_hlo(
     }
     expected_packed_parameters = {
         "gate_up": (
-            (2, "u8[1,8,6144,768]"),
-            (3, "f32[1,8,48,6]"),
+            (3 if dense_envelope else 2, "u8[1,8,6144,768]"),
+            (4 if dense_envelope else 3, "f32[1,8,48,6]"),
         ),
         "down": (
-            (4, "u8[1,8,384,6144]"),
-            (5, "f32[1,8,3,48]"),
+            (5 if dense_envelope else 4, "u8[1,8,384,6144]"),
+            (6 if dense_envelope else 5, "f32[1,8,3,48]"),
         ),
     }
 
@@ -986,6 +995,12 @@ def _validate_optimized_hlo(
         """Bind one live convolution RHS to its exact packed bits/scale pair."""
 
         immediate = nonarithmetic_layout(weight)
+        if (
+            immediate is not None
+            and immediate.raw_opcode == "parameter"
+            and not immediate.computation.startswith("ENTRY ")
+        ):
+            immediate = nonarithmetic_layout(external_parameter_value(immediate))
         if immediate is None:
             return False, []
         root = nonarithmetic_layout(called_root(immediate))
@@ -1215,7 +1230,8 @@ def _validate_optimized_hlo(
     exact_packed_weight_lineage = (
         not final_dense_layout
         or (
-            set(entry_parameters) == set(range(7))
+            set(entry_parameters)
+            == set(range(8 if dense_envelope else 7))
             and all(
                 record["exact_packed_dequant"]
                 for records in accepted_weight_layouts.values()
@@ -1802,7 +1818,7 @@ def _validate_optimized_hlo(
             violations.append("probe results bypass the dense StrategyND collective")
         else:
             dense_consumer = dense_result or layer1_result
-            entry_parameters = [
+            result_entry_parameters = [
                 item
                 for item in module.instructions
                 if item.computation.startswith("ENTRY ")
@@ -1816,7 +1832,7 @@ def _validate_optimized_hlo(
             parameter_sources = [
                 {
                     parameter.name
-                    for parameter in entry_parameters
+                    for parameter in result_entry_parameters
                     if _value_depends_on(module, result, parameter)
                 }
                 for result in results
@@ -1826,7 +1842,9 @@ def _validate_optimized_hlo(
                 sorted(values) for values in parameter_sources
             ]
             if layer1_only:
-                expected_parameters = {item.name for item in entry_parameters}
+                expected_parameters = {
+                    item.name for item in result_entry_parameters
+                }
                 if parameter_sources != [expected_parameters]:
                     violations.append(
                         "layer-1-only result does not consume every exact input"
@@ -1837,7 +1855,7 @@ def _validate_optimized_hlo(
                 layer1_only_sources = parameter_sources[1] - parameter_sources[0]
                 layer1_only_shapes = {
                     shape
-                    for parameter in entry_parameters
+                    for parameter in result_entry_parameters
                     if parameter.name in layer1_only_sources
                     for shape in _shape_signatures(parameter.result_shapes)
                 }
@@ -2593,12 +2611,20 @@ def _validate_optimized_hlo(
                     )
                 )
             )
+            entry_norm_parameters = (
+                [entry_parameters.get(7)]
+                if dense_envelope
+                else [
+                    item
+                    for item in module.instructions
+                    if item.computation.startswith("ENTRY ")
+                    and item.raw_opcode == "parameter"
+                    and _shape_signatures(item.result_shapes)
+                    == ("bf16[6144]",)
+                ]
+            )
             entry_norm_parameters = [
-                item
-                for item in module.instructions
-                if item.computation.startswith("ENTRY ")
-                and item.raw_opcode == "parameter"
-                and _shape_signatures(item.result_shapes) == ("bf16[6144]",)
+                item for item in entry_norm_parameters if item is not None
             ]
 
             semantic_layout_only = layout_only | {
@@ -2626,11 +2652,6 @@ def _validate_optimized_hlo(
                     ):
                         value = external_parameter_value(value)
                         continue
-                    if value.raw_opcode == "parameter" and not value.computation.startswith(
-                        "ENTRY "
-                    ):
-                        value = external_parameter_value(value)
-                        continue
                     return False
                 return value is source
 
@@ -2645,6 +2666,144 @@ def _validate_optimized_hlo(
                     exact_semantic_source(value, candidate)
                     for candidate in candidates
                 )
+
+            predense_layout_opcodes = {"bitcast", "copy", "reshape"}
+
+            def exact_predense_layout_edge(value: Any) -> bool:
+                """Accept only dtype/value-preserving layout movement."""
+
+                return bool(
+                    value.raw_opcode in predense_layout_opcodes
+                    and len(value.operand_names) == 1
+                    and len(value.operand_shapes) == 1
+                    and len(value.result_shapes) == 1
+                    and value.operand_shapes[0].dtype
+                    == value.result_shapes[0].dtype
+                    and value.operand_shapes[0].element_count
+                    == value.result_shapes[0].element_count
+                )
+
+            def predense_external_values(source: Any) -> tuple[Any, ...]:
+                """Return the unique exact value at every enclosing caller."""
+
+                def exact_predense_external_value(item: Any) -> Any | None:
+                    computation = _computation_id(item.computation)
+                    roots = [
+                        value
+                        for value in instructions_by_computation.get(
+                            computation, ()
+                        )
+                        if value.raw_line.lstrip().startswith("ROOT ")
+                    ]
+                    callers = callers_by_computation.get(computation, ())
+                    if len(roots) != 1 or len(callers) != 1:
+                        return None
+                    root = roots[0]
+                    caller = callers[0]
+                    if root.raw_opcode != "tuple":
+                        return caller if predense_unwrap(root) is item else None
+                    selected_indexes = [
+                        index
+                        for index, name in enumerate(root.operand_names)
+                        if predense_unwrap(
+                            by_key.get((root.computation, name))
+                        )
+                        is item
+                    ]
+                    if len(selected_indexes) != 1:
+                        return None
+                    selected = [
+                        user
+                        for user in users.get(_instruction_key(caller), ())
+                        if user.raw_opcode == "get-tuple-element"
+                        and _tuple_index(user) == selected_indexes[0]
+                    ]
+                    return selected[0] if len(selected) == 1 else None
+
+                result = [source]
+                seen: set[tuple[str, str]] = set()
+                while not source.computation.startswith("ENTRY "):
+                    key = _instruction_key(source)
+                    if key in seen:
+                        return ()
+                    seen.add(key)
+                    external = exact_predense_external_value(source)
+                    if external is None:
+                        break
+                    source = external
+                    result.append(source)
+                return tuple(result)
+
+            def exact_predense_source(
+                value: Any | None,
+                source: Any,
+                *,
+                allow_broadcast: bool = False,
+            ) -> bool:
+                """Trace an exact pre-dense value without arithmetic or casts."""
+
+                candidates = predense_external_values(source)
+                if not candidates:
+                    return False
+                candidate_keys = {
+                    _instruction_key(candidate) for candidate in candidates
+                }
+                seen: set[tuple[str, str]] = set()
+                while value is not None and _instruction_key(value) not in seen:
+                    key = _instruction_key(value)
+                    if key in candidate_keys:
+                        return True
+                    seen.add(key)
+                    if exact_predense_layout_edge(value):
+                        value = operand(value, 0)
+                        continue
+                    if (
+                        allow_broadcast
+                        and value.raw_opcode in {"broadcast", "broadcast-in-dim"}
+                        and len(value.operand_names) == 1
+                        and len(value.operand_shapes) == 1
+                        and len(value.result_shapes) == 1
+                        and value.operand_shapes[0].dtype
+                        == value.result_shapes[0].dtype
+                    ):
+                        value = operand(value, 0)
+                        continue
+                    if (
+                        value.raw_opcode == "parameter"
+                        and not value.computation.startswith("ENTRY ")
+                    ):
+                        value = external_parameter_value(value)
+                        continue
+                    return False
+                return False
+
+            def exact_local_predense_source(
+                value: Any | None, source: Any
+            ) -> bool:
+                """Require one exact value edge within a single computation."""
+
+                if value is None or value.computation != source.computation:
+                    return False
+                seen: set[tuple[str, str]] = set()
+                while value is not None and _instruction_key(value) not in seen:
+                    if value is source:
+                        return True
+                    seen.add(_instruction_key(value))
+                    if not exact_predense_layout_edge(value):
+                        return False
+                    value = operand(value, 0)
+                return False
+
+            def predense_unwrap(value: Any | None) -> Any | None:
+                seen: set[tuple[str, str]] = set()
+                while (
+                    value is not None
+                    and _instruction_key(value) not in seen
+                    and exact_predense_layout_edge(value)
+                ):
+                    seen.add(_instruction_key(value))
+                    value = operand(value, 0)
+                return value
 
             def exact_m32_row0_chain_source(
                 value: Any | None, source: Any
@@ -2700,6 +2859,40 @@ def _validate_optimized_hlo(
                     if (
                         value.raw_opcode in semantic_layout_only
                         and len(value.operand_names) == 1
+                    ):
+                        value = operand(value, 0)
+                        continue
+                    if value.raw_opcode != "constant":
+                        return False
+                    match = re.search(
+                        r"\bconstant\(([-+]?(?:[0-9]+(?:\.[0-9]*)?|"
+                        r"\.[0-9]+)(?:[eE][-+]?[0-9]+)?)\)",
+                        value.raw_line,
+                    )
+                    return (
+                        match is not None
+                        and np.float32(float(match.group(1))) == expected
+                    )
+                return False
+
+            def exact_predense_constant(
+                value: Any | None, expected: np.float32
+            ) -> bool:
+                """Match a constant through layout/broadcast only, never casts."""
+
+                seen: set[tuple[str, str]] = set()
+                while value is not None and _instruction_key(value) not in seen:
+                    seen.add(_instruction_key(value))
+                    if exact_predense_layout_edge(value):
+                        value = operand(value, 0)
+                        continue
+                    if (
+                        value.raw_opcode in {"broadcast", "broadcast-in-dim"}
+                        and len(value.operand_names) == 1
+                        and len(value.operand_shapes) == 1
+                        and len(value.result_shapes) == 1
+                        and value.operand_shapes[0].dtype
+                        == value.result_shapes[0].dtype
                     ):
                         value = operand(value, 0)
                         continue
@@ -3050,6 +3243,373 @@ def _validate_optimized_hlo(
             ):
                 direct_rms_exact = exact_reduction_operand_graph
             rms_contract["direct_exact_operand_graph"] = direct_rms_exact
+            predense_contract = {
+                "enabled": dense_envelope,
+                "exact_fused_gate_ownership": not dense_envelope,
+                "exact_gate_input_binding": not dense_envelope,
+                "exact_operand_graph": not dense_envelope,
+                "exact_carried_residual_binding": not dense_envelope,
+                "fused_gate_binding_count": 0,
+                "weighted_value_count": 0,
+            }
+            if dense_envelope:
+                predense_scope = (
+                    "greenfield_dense_convolution_predense_rmsnorm"
+                )
+                predense_items = [
+                    item
+                    for item in module.instructions
+                    if predense_scope in (item.op_name or "").split("/")
+                ]
+                predense_post_norm = entry_parameters.get(2)
+                predense_inputs = (
+                    entry_parameters.get(0),
+                    entry_parameters.get(1),
+                )
+
+                def exact_predense_input(
+                    value: Any | None, expected: Any | None
+                ) -> bool:
+                    value = predense_unwrap(value)
+                    if (
+                        value is None
+                        or expected is None
+                        or value.raw_opcode != "convert"
+                        or _shape_signatures(value.result_shapes)
+                        != ("f32[32,6144]",)
+                        or len(value.operand_names) != 1
+                    ):
+                        return False
+                    padded = predense_unwrap(operand(value, 0))
+                    if (
+                        padded is None
+                        or padded.raw_opcode != "pad"
+                        or _shape_signatures(padded.operand_shapes)
+                        != ("bf16[1,6144]", "bf16[]")
+                        or _shape_signatures(padded.result_shapes)
+                        != ("bf16[32,6144]",)
+                        or len(padded.operand_names) != 2
+                        or "padding=0_31x0_0"
+                        not in re.sub(r"\s+", "", padded.raw_line)
+                        or not exact_predense_constant(
+                            operand(padded, 1), np.float32(0.0)
+                        )
+                    ):
+                        return False
+                    return exact_predense_source(operand(padded, 0), expected)
+
+                predense_residual_adds = [
+                    item
+                    for item in predense_items
+                    if item.raw_opcode == "add"
+                    and _shape_signatures(item.result_shapes)
+                    == ("f32[32,6144]",)
+                    and len(item.operand_names) == 2
+                    and any(
+                        exact_predense_input(
+                            operand(item, 0), predense_inputs[index]
+                        )
+                        and exact_predense_input(
+                            operand(item, 1), predense_inputs[1 - index]
+                        )
+                        for index in range(2)
+                    )
+                ]
+                predense_squares = [
+                    item
+                    for item in predense_items
+                    if (item.op_name or "").split("/")[-1] == "square"
+                    and _shape_signatures(item.result_shapes)
+                    == ("f32[32,6144]",)
+                    and item.raw_opcode in {"multiply", "square"}
+                ]
+                predense_reductions = [
+                    item
+                    for item in predense_items
+                    if item.raw_opcode == "reduce"
+                    and _shape_signatures(item.result_shapes) == ("f32[32]",)
+                ]
+                predense_means = [
+                    item
+                    for item in predense_items
+                    if (item.op_name or "").split("/")[-1] == "div"
+                    and item.raw_opcode in {"divide", "multiply"}
+                    and _shape_signatures(item.result_shapes)
+                    == ("f32[32,1]",)
+                    and len(item.operand_names) == 2
+                ]
+                predense_variances = [
+                    item
+                    for item in predense_items
+                    if item.raw_opcode == "add"
+                    and _shape_signatures(item.result_shapes)
+                    == ("f32[32,1]",)
+                    and len(item.operand_names) == 2
+                ]
+                predense_rsqrt = [
+                    item
+                    for item in predense_items
+                    if item.raw_opcode == "rsqrt"
+                    and _shape_signatures(item.result_shapes)
+                    == ("f32[32,1]",)
+                    and len(item.operand_names) == 1
+                ]
+                predense_normalized = [
+                    item
+                    for item in predense_items
+                    if (item.op_name or "").split("/")[-1] == "mul"
+                    and item.raw_opcode == "multiply"
+                    and _shape_signatures(item.result_shapes)
+                    == ("f32[32,6144]",)
+                    and len(item.operand_names) == 2
+                ]
+                predense_weighted = [
+                    item
+                    for item in predense_items
+                    if (item.op_name or "").split("/")[-1] == "mul"
+                    and item.raw_opcode == "multiply"
+                    and _shape_signatures(item.result_shapes)
+                    == ("bf16[32,6144]",)
+                    and len(item.operand_names) == 2
+                    and exact_bf16_round(item)
+                ]
+
+                exact_predense_graphs: list[tuple[Any, Any]] = []
+                for residual_add in predense_residual_adds:
+                    for square in predense_squares:
+                        square_inputs = tuple(
+                            operand(square, index)
+                            for index in range(len(square.operand_names))
+                        )
+                        if not (
+                            square_inputs
+                            and all(
+                                exact_predense_source(value, residual_add)
+                                for value in square_inputs
+                            )
+                        ):
+                            continue
+                        for reduction in predense_reductions:
+                            if not (
+                                len(reduction.operand_names) == 2
+                                and exact_predense_source(
+                                    operand(reduction, 0), square
+                                )
+                                and exact_predense_constant(
+                                    operand(reduction, 1), np.float32(0.0)
+                                )
+                                and "dimensions={1}"
+                                in re.sub(r"\s+", "", reduction.raw_line)
+                                and exact_add_reducer(reduction)
+                            ):
+                                continue
+                            for mean in predense_means:
+                                if mean.raw_opcode == "divide":
+                                    exact_mean = exact_predense_source(
+                                        operand(mean, 0), reduction
+                                    ) and exact_predense_constant(
+                                        operand(mean, 1), np.float32(6144.0)
+                                    )
+                                else:
+                                    exact_mean = any(
+                                        exact_predense_source(
+                                            operand(mean, index), reduction
+                                        )
+                                        and exact_predense_constant(
+                                            operand(mean, 1 - index),
+                                            np.float32(1.0 / 6144.0),
+                                        )
+                                        for index in range(2)
+                                    )
+                                if not exact_mean:
+                                    continue
+                                for variance in predense_variances:
+                                    if not any(
+                                        exact_predense_source(
+                                            operand(variance, index), mean
+                                        )
+                                        and exact_predense_constant(
+                                            operand(variance, 1 - index),
+                                            np.float32(1.0e-5),
+                                        )
+                                        for index in range(2)
+                                    ):
+                                        continue
+                                    for rsqrt in predense_rsqrt:
+                                        if not exact_predense_source(
+                                            operand(rsqrt, 0), variance
+                                        ):
+                                            continue
+                                        for normalized_value in predense_normalized:
+                                            if not any(
+                                                exact_predense_source(
+                                                    operand(
+                                                        normalized_value, index
+                                                    ),
+                                                    residual_add,
+                                                )
+                                                and exact_predense_source(
+                                                    operand(
+                                                        normalized_value,
+                                                        1 - index,
+                                                    ),
+                                                    rsqrt,
+                                                    allow_broadcast=True,
+                                                )
+                                                for index in range(2)
+                                            ):
+                                                continue
+                                            rounded_values = [
+                                                item
+                                                for item in module.instructions
+                                                if item.raw_opcode == "convert"
+                                                and _shape_signatures(
+                                                    item.result_shapes
+                                                )
+                                                == ("bf16[32,6144]",)
+                                                and len(item.operand_names) == 1
+                                                and exact_predense_source(
+                                                    operand(item, 0),
+                                                    normalized_value,
+                                                )
+                                            ]
+                                            for weighted in predense_weighted:
+                                                if predense_post_norm is None:
+                                                    continue
+                                                if any(
+                                                    exact_predense_source(
+                                                        operand(
+                                                            weighted,
+                                                            round_index,
+                                                        ),
+                                                        rounded,
+                                                    )
+                                                    and exact_predense_source(
+                                                        operand(
+                                                            weighted,
+                                                            1 - round_index,
+                                                        ),
+                                                        predense_post_norm,
+                                                        allow_broadcast=True,
+                                                    )
+                                                    for rounded in rounded_values
+                                                    for round_index in range(2)
+                                                ):
+                                                    exact_predense_graphs.append(
+                                                        (weighted, residual_add)
+                                                    )
+
+                exact_predense_graphs = list(
+                    {
+                        (
+                            _instruction_key(weighted),
+                            _instruction_key(residual_add),
+                        ): (weighted, residual_add)
+                        for weighted, residual_add in exact_predense_graphs
+                    }.values()
+                )
+                weighted_values = {
+                    _instruction_key(weighted): weighted
+                    for weighted, _residual_add in exact_predense_graphs
+                }
+                gate_bindings = {
+                    f"{gate.computation}:{gate.name}": [
+                        f"{weighted.computation}:{weighted.name}"
+                        f"->{candidate.name}"
+                        for weighted in weighted_values.values()
+                        for candidate in predense_external_values(weighted)
+                        if candidate.computation == gate.computation
+                        and exact_local_predense_source(
+                            operand(gate, 0), candidate
+                        )
+                    ]
+                    for gate in gate_up
+                }
+                exact_gate_input_binding = (
+                    len(gate_bindings) == 8
+                    and all(len(values) == 1 for values in gate_bindings.values())
+                )
+                fused_gate_binding_count = sum(
+                    1
+                    for gate in gate_up
+                    if not gate.computation.startswith("ENTRY ")
+                    and len(
+                        gate_bindings.get(
+                            f"{gate.computation}:{gate.name}", ()
+                        )
+                    )
+                    == 1
+                )
+                exact_fused_gate_ownership = fused_gate_binding_count == 8
+                carried_values: list[tuple[Any, Any]] = []
+                for _weighted, residual_add in exact_predense_graphs:
+                    for item in module.instructions:
+                        if (
+                            item.raw_opcode == "convert"
+                            and _shape_signatures(item.result_shapes)
+                            == ("bf16[32,6144]",)
+                            and len(item.operand_names) == 1
+                            and exact_predense_source(
+                                operand(item, 0), residual_add
+                            )
+                        ):
+                            carried_values.append((item, residual_add))
+                post_residual_add = (
+                    exact_reduction_pairs[0][2]
+                    if len(exact_reduction_pairs) == 1
+                    else None
+                )
+
+                def exact_carried_operand(
+                    value: Any | None, carried: Any
+                ) -> bool:
+                    value = predense_unwrap(value)
+                    return bool(
+                        value is not None
+                        and value.raw_opcode == "convert"
+                        and _shape_signatures(value.operand_shapes)
+                        == ("bf16[32,6144]",)
+                        and _shape_signatures(value.result_shapes)
+                        == ("f32[32,6144]",)
+                        and len(value.operand_names) == 1
+                        and exact_predense_source(operand(value, 0), carried)
+                    )
+
+                carried_bindings = [
+                    item.name
+                    for item, _residual_add in carried_values
+                    if post_residual_add is not None
+                    and any(
+                        exact_carried_operand(
+                            operand(post_residual_add, index), item
+                        )
+                        for index in range(len(post_residual_add.operand_names))
+                    )
+                ]
+                exact_carried_residual_binding = len(set(carried_bindings)) == 1
+                exact_predense_operand_graph = bool(
+                    exact_predense_graphs
+                    and len(weighted_values) in {1, 8}
+                    and exact_gate_input_binding
+                    and exact_fused_gate_ownership
+                )
+                predense_contract.update(
+                    {
+                        "carried_values": sorted(set(carried_bindings)),
+                        "exact_carried_residual_binding": (
+                            exact_carried_residual_binding
+                        ),
+                        "exact_gate_input_binding": exact_gate_input_binding,
+                        "exact_fused_gate_ownership": (
+                            exact_fused_gate_ownership
+                        ),
+                        "exact_operand_graph": exact_predense_operand_graph,
+                        "fused_gate_binding_count": fused_gate_binding_count,
+                        "gate_bindings": gate_bindings,
+                        "weighted_value_count": len(weighted_values),
+                    }
+                )
+            lineage["predense_rmsnorm_contract"] = predense_contract
             if (
                 not {
                     "add",
@@ -3065,7 +3625,7 @@ def _validate_optimized_hlo(
                 or not exact_cross_fusion_reduction_lineage
                 or not all(
                     _value_depends_on(module, layer1_result, parameter)
-                    for parameter in entry_parameters
+                    for parameter in result_entry_parameters
                     if any(
                         shape in {"bf16[1,6144]", "bf16[6144]"}
                         for shape in _shape_signatures(parameter.result_shapes)
@@ -3073,6 +3633,18 @@ def _validate_optimized_hlo(
                 )
             ):
                 violations.append("optimized residual/RMSNorm graph drifted")
+            if dense_envelope and not all(
+                predense_contract[name]
+                for name in (
+                    "exact_gate_input_binding",
+                    "exact_fused_gate_ownership",
+                    "exact_operand_graph",
+                    "exact_carried_residual_binding",
+                )
+            ):
+                violations.append(
+                    "optimized pre-dense fused RMSNorm envelope drifted"
+                )
     custom_calls = [
         item.name
         for item in module.instructions
@@ -3094,6 +3666,7 @@ def _validate_optimized_hlo(
         "collective_count": len(collectives),
         "compile_rows": compile_rows,
         "convolution_count": len(convolutions),
+        "dense_envelope": dense_envelope,
         "down_convolution_count": len(down),
         "exact_accepted_weight_layout": exact_accepted_weight_layout,
         "exact_packed_weight_lineage": exact_packed_weight_lineage,
@@ -3116,6 +3689,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--compile-rows", type=int, choices=(1, 32), default=1)
     parser.add_argument("--layer1-only", action="store_true")
     parser.add_argument("--final-dense-layout", action="store_true")
+    parser.add_argument("--dense-envelope", action="store_true")
     parser.add_argument("--db538-runner", type=Path, required=True)
     parser.add_argument("--db538-runner-sha256", required=True)
     parser.add_argument("--db538-tensor", type=Path, required=True)
@@ -3155,7 +3729,17 @@ def main() -> int:
         raise RuntimeError(
             "final-layout discriminator requires accepted M32 layer-1-only mode"
         )
-    normalized, post_attention, accepted_layer1_bits = _load_db538(args)
+    if args.dense_envelope and not args.final_dense_layout:
+        raise RuntimeError(
+            "dense-envelope discriminator requires final-layout mode"
+        )
+    (
+        normalized,
+        post_attention,
+        accepted_layer1_bits,
+        attention_update,
+        combined_residual,
+    ) = _load_db538(args)
     m32_arguments = (
         args.accepted_m32_hlo,
         args.accepted_m32_hlo_sha256,
@@ -3204,21 +3788,48 @@ def main() -> int:
     if args.final_dense_layout:
         assert packed_final_layout is not None
         slot_four = NamedSharding(mesh, P("lp4", None, None, None))
-        arguments = (
-            jax.device_put(normalized, replicated),
-            jax.device_put(post_attention, replicated),
-            *(jax.device_put(value, slot_four) for value in packed_final_layout),
-            jax.device_put(weights[_DENSE_WEIGHT_NAMES[6]], replicated),
-        )
-        in_specs = (
-            P(),
-            P(),
-            P("lp4", None, None, None),
-            P("lp4", None, None, None),
-            P("lp4", None, None, None),
-            P("lp4", None, None, None),
-            P(),
-        )
+        if args.dense_envelope:
+            arguments = (
+                jax.device_put(attention_update, replicated),
+                jax.device_put(combined_residual, replicated),
+                jax.device_put(
+                    weights["attention.slot_00.post_norm"], replicated
+                ),
+                *(
+                    jax.device_put(value, slot_four)
+                    for value in packed_final_layout
+                ),
+                jax.device_put(weights[_DENSE_WEIGHT_NAMES[6]], replicated),
+            )
+            in_specs = (
+                P(),
+                P(),
+                P(),
+                P("lp4", None, None, None),
+                P("lp4", None, None, None),
+                P("lp4", None, None, None),
+                P("lp4", None, None, None),
+                P(),
+            )
+        else:
+            arguments = (
+                jax.device_put(normalized, replicated),
+                jax.device_put(post_attention, replicated),
+                *(
+                    jax.device_put(value, slot_four)
+                    for value in packed_final_layout
+                ),
+                jax.device_put(weights[_DENSE_WEIGHT_NAMES[6]], replicated),
+            )
+            in_specs = (
+                P(),
+                P(),
+                P("lp4", None, None, None),
+                P("lp4", None, None, None),
+                P("lp4", None, None, None),
+                P("lp4", None, None, None),
+                P(),
+            )
     else:
         arguments = (
             jax.device_put(normalized, replicated),
@@ -3261,6 +3872,8 @@ def main() -> int:
         partials: Any,
         post_attention_residual: Any,
         layer1_norm: Any,
+        *,
+        residual_is_m32: bool = False,
     ) -> Any:
         if args.compile_rows == 32:
             with jax.named_scope(
@@ -3292,12 +3905,13 @@ def main() -> int:
                     mode="constant",
                     constant_values=jnp.bfloat16(0),
                 )
-                rms_residual = jnp.pad(
-                    post_attention_residual,
-                    ((0, 31), (0, 0)),
-                    mode="constant",
-                    constant_values=jnp.bfloat16(0),
-                )
+                if not residual_is_m32:
+                    rms_residual = jnp.pad(
+                        post_attention_residual,
+                        ((0, 31), (0, 0)),
+                        mode="constant",
+                        constant_values=jnp.bfloat16(0),
+                    )
         with jax.named_scope("greenfield_dense_convolution_layer1_rmsnorm"):
             layer1 = fused_add_rms_norm(
                 rms_dense_update,
@@ -3357,9 +3971,63 @@ def main() -> int:
         )
         return finish_dense(partials, post_attention_residual, layer1_norm)
 
+    def local_dense_envelope(
+        attention_value: Any,
+        residual_value: Any,
+        post_norm: Any,
+        merged_bits_slot: Any,
+        merged_scale_slot: Any,
+        down_bits_slot: Any,
+        down_scale_slot: Any,
+        layer1_norm: Any,
+    ) -> Any:
+        with jax.named_scope(
+            "greenfield_dense_convolution_predense_m32_geometry"
+        ):
+            attention_m32 = jnp.pad(
+                attention_value,
+                ((0, 31), (0, 0)),
+                mode="constant",
+                constant_values=jnp.bfloat16(0),
+            )
+            residual_m32 = jnp.pad(
+                residual_value,
+                ((0, 31), (0, 0)),
+                mode="constant",
+                constant_values=jnp.bfloat16(0),
+            )
+        with jax.named_scope(
+            "greenfield_dense_convolution_predense_rmsnorm"
+        ):
+            dense_input, post_attention_m32 = fused_add_rms_norm(
+                attention_m32,
+                residual_m32,
+                post_norm,
+                epsilon=1e-5,
+            )
+        partials = _virtual_dense_final_layout_convolution_down_partials(
+            dense_input,
+            merged_bits_slot[0],
+            merged_scale_slot[0],
+            down_bits_slot[0],
+            down_scale_slot[0],
+            block_shape=(128, 128),
+            compile_rows=args.compile_rows,
+        )
+        return finish_dense(
+            partials,
+            post_attention_m32,
+            layer1_norm,
+            residual_is_m32=True,
+        )
+
     out_specs = P() if args.layer1_only else (P(), P())
     mapped = jax.shard_map(
-        local_final_layout if args.final_dense_layout else local,
+        local_dense_envelope
+        if args.dense_envelope
+        else local_final_layout
+        if args.final_dense_layout
+        else local,
         mesh=mesh,
         in_specs=in_specs,
         out_specs=out_specs,
@@ -3373,6 +4041,7 @@ def main() -> int:
         compile_rows=args.compile_rows,
         layer1_only=args.layer1_only,
         final_dense_layout=args.final_dense_layout,
+        dense_envelope=args.dense_envelope,
     )
     stablehlo_path = args.hlo_dir / "dense_convolution.stablehlo.mlir"
     stablehlo_path.write_text(stablehlo)
@@ -3387,6 +4056,7 @@ def main() -> int:
         compile_rows=args.compile_rows,
         layer1_only=args.layer1_only,
         final_dense_layout=args.final_dense_layout,
+        dense_envelope=args.dense_envelope,
     )
     optimized_path = args.hlo_dir / "dense_convolution.optimized_hlo.txt"
     optimized_path.write_text(optimized_hlo)
@@ -3411,7 +4081,9 @@ def main() -> int:
     comparison = _compare_bits(accepted_layer1_bits, layer1_bits)
     exact = comparison["elementwise_exact"]
     arm = (
-        "accepted_m32_dense_final_layout_cross_layer"
+        "accepted_m32_dense_envelope_cross_layer"
+        if args.dense_envelope
+        else "accepted_m32_dense_final_layout_cross_layer"
         if args.final_dense_layout
         else "accepted_m32_dense_cross_layer"
         if args.layer1_only
@@ -3430,6 +4102,7 @@ def main() -> int:
         "diagnostic_dead_rows": args.compile_rows - 1,
         "exact": exact,
         "exact_arms": [arm] if exact else [],
+        "dense_envelope": args.dense_envelope,
         "final_dense_layout": args.final_dense_layout,
         "final_layout_records": final_layout_records,
         "hlo": {
@@ -3450,6 +4123,15 @@ def main() -> int:
             "db538_summary_sha256": args.db538_summary_sha256,
             "db538_success_sha256": args.db538_success_sha256,
             "post_attention_residual_sha256": _POST_ATTENTION_RESIDUAL_SHA256,
+            **(
+                {
+                    "attention_update_sha256": _ATTENTION_UPDATE_SHA256,
+                    "combined_residual_sha256": _COMBINED_RESIDUAL_SHA256,
+                    "normalized_mlp_sha256": _NORMALIZED_MLP_SHA256,
+                }
+                if args.dense_envelope
+                else {}
+            ),
             **accepted_m32_source,
         },
         "status": "SUCCESS",
@@ -3469,6 +4151,17 @@ def main() -> int:
             post_attention
         ).view(np.uint16),
     }
+    if args.dense_envelope:
+        tensors.update(
+            {
+                "attention_update_bfloat16_bits": np.ascontiguousarray(
+                    attention_update
+                ).view(np.uint16),
+                "combined_residual_bfloat16_bits": np.ascontiguousarray(
+                    combined_residual
+                ).view(np.uint16),
+            }
+        )
     if dense_update_bits is not None:
         tensors["dense_update_bfloat16_bits"] = dense_update_bits
     np.savez(args.tensor_output, **tensors)

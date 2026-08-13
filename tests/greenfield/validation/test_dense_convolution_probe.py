@@ -469,6 +469,260 @@ def _synthetic_final_layout_optimized_hlo() -> str:
     return hlo
 
 
+def _synthetic_dense_envelope_optimized_hlo() -> str:
+    hlo = _synthetic_final_layout_optimized_hlo()
+    prefix = (
+        "  %normalized = bf16[1,6144] parameter(0)\n"
+        "  %m32_zero = bf16[] constant(0)\n"
+        "  %m32_padded = bf16[32,6144] pad(%normalized, %m32_zero), "
+        "padding=0_31x0_0\n"
+        "  %residual = bf16[1,6144] parameter(1)\n"
+        "  %norm = bf16[6144] parameter(6)\n"
+        "  %packed_gate_bits = u8[1,8,6144,768] parameter(2)\n"
+        "  %packed_gate_scale = f32[1,8,48,6] parameter(3)\n"
+        "  %packed_down_bits = u8[1,8,384,6144] parameter(4)\n"
+        "  %packed_down_scale = f32[1,8,3,48] parameter(5)"
+    )
+    entry = "\n".join(
+        (
+            "  %attention = bf16[1,6144] parameter(0)",
+            "  %combined_residual = bf16[1,6144] parameter(1)",
+            "  %post_norm = bf16[6144] parameter(2)",
+            "  %norm = bf16[6144] parameter(7)",
+            "  %packed_gate_bits = u8[1,8,6144,768] parameter(3)",
+            "  %packed_gate_scale = f32[1,8,48,6] parameter(4)",
+            "  %packed_down_bits = u8[1,8,384,6144] parameter(5)",
+            "  %packed_down_scale = f32[1,8,3,48] parameter(6)",
+        )
+    )
+    assert prefix in hlo
+    hlo = hlo.replace(prefix, entry, 1)
+    hlo = hlo.replace(
+        "  %residual_m32 = bf16[32,6144] pad(%residual, %rms_zero), "
+        "padding=0_31x0_0\n",
+        "",
+        1,
+    ).replace(
+        "  %residual_f32 = f32[32,6144] convert(%residual_m32)",
+        "  %residual_f32 = f32[32,6144] convert(%predense_carried)",
+        1,
+    )
+    gate_computations = []
+    scope = (
+        'metadata={op_name="jit(probe)/'
+        'greenfield_dense_convolution_predense_rmsnorm/'
+    )
+    for rank in range(8):
+        gate_scope = (
+            f"jit(probe)/greenfield_dense_convolution_virtual_rank_{rank:02d}/"
+            "gate_up"
+        )
+        direct_gate = (
+            f"  %gate_up.{rank} = f32[32,768] convolution("
+            f"%m32_padded, %gate_up_weight.{rank}), dim_labels=bf_io->bf, "
+            f'metadata={{op_name="{gate_scope}"}}'
+        )
+        gate_arguments = (
+            f"%attention, %combined_residual, %post_norm, "
+            f"%gate_up_weight.{rank}"
+        )
+        if rank == 0:
+            fused_gate = "\n".join(
+                (
+                    "  %gate_pair.0 = (f32[32,768], bf16[32,6144]) "
+                    f"fusion({gate_arguments}), kind=kOutput, "
+                    "calls=%predense_gate_0",
+                    "  %gate_up.0 = f32[32,768] get-tuple-element("
+                    "%gate_pair.0), index=0",
+                    "  %predense_carried = bf16[32,6144] "
+                    "get-tuple-element(%gate_pair.0), index=1",
+                )
+            )
+        else:
+            fused_gate = (
+                f"  %gate_up.{rank} = f32[32,768] fusion("
+                f"{gate_arguments}), kind=kOutput, "
+                f"calls=%predense_gate_{rank}"
+            )
+        assert direct_gate in hlo
+        hlo = hlo.replace(direct_gate, fused_gate, 1)
+        body = [
+            f"%predense_gate_{rank} {{",
+            "  %gate_attention = bf16[1,6144] parameter(0)",
+            "  %gate_residual = bf16[1,6144] parameter(1)",
+            "  %gate_norm = bf16[6144] parameter(2)",
+            "  %gate_rhs = bf16[6144,768]{1,0} parameter(3)",
+            "  %gate_zero = bf16[] constant(0)",
+            "  %gate_f32_zero = f32[] constant(0)",
+            "  %gate_attention_m32 = bf16[32,6144] pad("
+            "%gate_attention, %gate_zero), padding=0_31x0_0",
+            "  %gate_residual_m32 = bf16[32,6144] pad("
+            "%gate_residual, %gate_zero), padding=0_31x0_0",
+            "  %gate_attention_f32 = f32[32,6144] "
+            "convert(%gate_attention_m32)",
+            "  %gate_residual_f32 = f32[32,6144] "
+            "convert(%gate_residual_m32)",
+            "  %gate_sum = f32[32,6144] add("
+            "%gate_attention_f32, %gate_residual_f32), " + scope + 'add"}',
+            "  %gate_carried = bf16[32,6144] convert(%gate_sum)",
+            "  %gate_square = f32[32,6144] multiply("
+            "%gate_sum, %gate_sum), " + scope + 'square"}',
+            "  %gate_sum_squares = f32[32] reduce("
+            "%gate_square, %gate_f32_zero), dimensions={1}, "
+            "to_apply=%sum_reducer, " + scope + 'reduce_sum"}',
+            "  %gate_sum_row = f32[32,1] reshape(%gate_sum_squares)",
+            "  %gate_width = f32[32,1] constant(6144)",
+            "  %gate_mean = f32[32,1] divide("
+            "%gate_sum_row, %gate_width), " + scope + 'div"}',
+            "  %gate_epsilon = f32[32,1] constant(0.00001)",
+            "  %gate_variance = f32[32,1] add("
+            "%gate_mean, %gate_epsilon), " + scope + 'add"}',
+            "  %gate_inverse = f32[32,1] rsqrt(%gate_variance), "
+            + scope + 'rsqrt"}',
+            "  %gate_inverse_wide = f32[32,6144] broadcast("
+            "%gate_inverse), dimensions={0,1}",
+            "  %gate_normalized = f32[32,6144] multiply("
+            "%gate_sum, %gate_inverse_wide), " + scope + 'mul"}',
+            "  %gate_rounded = bf16[32,6144] convert(%gate_normalized)",
+            "  %gate_norm_seed = bf16[1,6144] broadcast("
+            "%gate_norm), dimensions={1}",
+            "  %gate_norm_wide = bf16[32,6144] broadcast("
+            "%gate_norm_seed), dimensions={0,1}",
+            "  %gate_weighted = bf16[32,6144] multiply("
+            "%gate_rounded, %gate_norm_wide), " + scope + 'mul"}',
+            f"  %gate_value.{rank} = f32[32,768] convolution("
+            "%gate_weighted, %gate_rhs), dim_labels=bf_io->bf, "
+            f'metadata={{op_name="{gate_scope}"}}',
+        ]
+        if rank == 0:
+            body.append(
+                "  ROOT %gate_root.0 = (f32[32,768], bf16[32,6144]) "
+                "tuple(%gate_value.0, %gate_carried)"
+            )
+        else:
+            body.append(f"  ROOT %gate_root.{rank} = f32[32,768] copy(%gate_value.{rank})")
+        body.append("}")
+        gate_computations.append("\n".join(body))
+    hlo = hlo.replace(
+        "ENTRY main {",
+        "\n".join(gate_computations) + "\n\nENTRY main {",
+        1,
+    )
+    return hlo
+
+
+def _synthetic_dense_envelope_externalized_gate_hlo() -> str:
+    """Move each exact RMS output across a fusion boundary before its gate."""
+
+    hlo = _synthetic_dense_envelope_optimized_hlo()
+    for rank in range(8):
+        gate_scope = (
+            f"jit(probe)/greenfield_dense_convolution_virtual_rank_{rank:02d}/"
+            "gate_up"
+        )
+        internal_gate = (
+            f"  %gate_value.{rank} = f32[32,768] convolution("
+            "%gate_weighted, %gate_rhs), dim_labels=bf_io->bf, "
+            f'metadata={{op_name="{gate_scope}"}}\n'
+        )
+        assert internal_gate in hlo
+        hlo = hlo.replace(internal_gate, "", 1)
+        if rank == 0:
+            hlo = hlo.replace(
+                "ROOT %gate_root.0 = (f32[32,768], bf16[32,6144]) "
+                "tuple(%gate_value.0, %gate_carried)",
+                "ROOT %gate_root.0 = (bf16[32,6144], bf16[32,6144]) "
+                "tuple(%gate_weighted, %gate_carried)",
+                1,
+            ).replace(
+                "  %gate_pair.0 = (f32[32,768], bf16[32,6144]) fusion(",
+                "  %gate_pair.0 = (bf16[32,6144], bf16[32,6144]) fusion(",
+                1,
+            ).replace(
+                "  %gate_up.0 = f32[32,768] get-tuple-element("
+                "%gate_pair.0), index=0",
+                "  %m32_padded.0 = bf16[32,6144] get-tuple-element("
+                "%gate_pair.0), index=0\n"
+                "  %gate_up.0 = f32[32,768] convolution("
+                "%m32_padded.0, %gate_up_weight.0), dim_labels=bf_io->bf, "
+                f'metadata={{op_name="{gate_scope}"}}',
+                1,
+            )
+        else:
+            hlo = hlo.replace(
+                f"ROOT %gate_root.{rank} = f32[32,768] "
+                f"copy(%gate_value.{rank})",
+                f"ROOT %gate_root.{rank} = bf16[32,6144] "
+                "copy(%gate_weighted)",
+                1,
+            ).replace(
+                f"  %gate_up.{rank} = f32[32,768] fusion(",
+                f"  %m32_padded.{rank} = bf16[32,6144] fusion(",
+                1,
+            )
+            caller_end = f"calls=%predense_gate_{rank}"
+            replacement = (
+                caller_end
+                + f"\n  %gate_up.{rank} = f32[32,768] convolution("
+                + f"%m32_padded.{rank}, %gate_up_weight.{rank}), "
+                + "dim_labels=bf_io->bf, "
+                + f'metadata={{op_name="{gate_scope}"}}'
+            )
+            hlo = hlo.replace(caller_end, replacement, 1)
+    return hlo
+
+
+def _synthetic_dense_envelope_nested_rms_hlo() -> str:
+    """Put exact RMS arithmetic in a nested producer inside each gate fusion."""
+
+    hlo = _synthetic_dense_envelope_optimized_hlo()
+    rms_computations = []
+    for rank in range(8):
+        computation_start = hlo.index(f"%predense_gate_{rank} {{")
+        arithmetic_start = hlo.index("  %gate_zero =", computation_start)
+        arithmetic_end = hlo.index("  %gate_value.", arithmetic_start)
+        arithmetic = hlo[arithmetic_start:arithmetic_end]
+        nested_arithmetic = (
+            arithmetic.replace("%gate_attention", "%rms_attention")
+            .replace("%gate_residual", "%rms_residual")
+            .replace("%gate_norm", "%rms_norm")
+            .replace("%gate_", "%rms_")
+        )
+        rms_computations.append(
+            "\n".join(
+                (
+                    f"%predense_rms_{rank} {{",
+                    "  %rms_attention = bf16[1,6144] parameter(0)",
+                    "  %rms_residual = bf16[1,6144] parameter(1)",
+                    "  %rms_norm = bf16[6144] parameter(2)",
+                    nested_arithmetic.rstrip(),
+                    "  ROOT %rms_root = (bf16[32,6144], bf16[32,6144]) "
+                    "tuple(%rms_weighted, %rms_carried)",
+                    "}",
+                )
+            )
+        )
+        nested_call = "\n".join(
+            (
+                "  %gate_rms_pair = (bf16[32,6144], bf16[32,6144]) "
+                "fusion(%gate_attention, %gate_residual, %gate_norm), "
+                f"kind=kLoop, calls=%predense_rms_{rank}",
+                "  %gate_weighted = bf16[32,6144] get-tuple-element("
+                "%gate_rms_pair), index=0",
+                "  %gate_carried = bf16[32,6144] get-tuple-element("
+                "%gate_rms_pair), index=1",
+                "",
+            )
+        )
+        hlo = hlo[:arithmetic_start] + nested_call + hlo[arithmetic_end:]
+    hlo = hlo.replace(
+        "%predense_gate_0 {",
+        "\n".join(rms_computations) + "\n\n%predense_gate_0 {",
+        1,
+    )
+    return hlo
+
+
 def _synthetic_m32_hlo_with_fused_live_row(*, rogue_return: bool) -> str:
     hlo = _synthetic_m32_hlo()
     start = hlo.index("  %stack =")
@@ -787,6 +1041,98 @@ mapped = jax.shard_map(
     local,
     mesh=mesh,
     in_specs=(P(), P(), P("lp4", None, None, None),
+              P("lp4", None, None, None),
+              P("lp4", None, None, None),
+              P("lp4", None, None, None), P()),
+    out_specs=P(),
+    check_vma=False,
+)
+print(jax.jit(mapped).lower(*arguments).as_text())
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=REPO,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    return completed.stdout
+
+
+@lru_cache(maxsize=1)
+def _exact_dense_envelope_stablehlo() -> str:
+    program = r'''
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
+from glm_tpu.greenfield.kernels.stage_local import (
+    STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+    _reduce_virtual_tp32_bf16_partials,
+    _virtual_dense_final_layout_convolution_down_partials,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("lp4",))
+replicated = NamedSharding(mesh, P())
+slot = NamedSharding(mesh, P("lp4", None, None, None))
+contracts = (
+    ((1, 6144), jnp.bfloat16, replicated),
+    ((1, 6144), jnp.bfloat16, replicated),
+    ((6144,), jnp.bfloat16, replicated),
+    ((4, 8, 6144, 768), jnp.uint8, slot),
+    ((4, 8, 48, 6), jnp.float32, slot),
+    ((4, 8, 384, 6144), jnp.uint8, slot),
+    ((4, 8, 3, 48), jnp.float32, slot),
+    ((6144,), jnp.bfloat16, replicated),
+)
+arguments = tuple(
+    jax.ShapeDtypeStruct(shape, dtype, sharding=sharding)
+    for shape, dtype, sharding in contracts
+)
+
+def local(attention, residual, post_norm, merged_bits, merged_scale,
+          down_bits, down_scale, layer1_norm):
+    attention = jnp.pad(
+        attention, ((0, 31), (0, 0)), constant_values=jnp.bfloat16(0),
+    )
+    residual = jnp.pad(
+        residual, ((0, 31), (0, 0)), constant_values=jnp.bfloat16(0),
+    )
+    normalized, post_attention = fused_add_rms_norm(
+        attention, residual, post_norm, epsilon=1e-5,
+    )
+    partials = _virtual_dense_final_layout_convolution_down_partials(
+        normalized, merged_bits[0], merged_scale[0],
+        down_bits[0], down_scale[0], block_shape=(128, 128),
+        compile_rows=32,
+    )
+    partials = jax.lax.optimization_barrier(partials)[:, :1, :]
+    with jax.named_scope("greenfield_strategy_nd_row0_dense_convolution_down"):
+        update = _reduce_virtual_tp32_bf16_partials(
+            partials,
+            axis_name="lp4",
+            groups=((0, 1, 2, 3),),
+            association=STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
+        )
+    update = jnp.pad(
+        update, ((0, 31), (0, 0)), constant_values=jnp.bfloat16(0),
+    )
+    layer1 = fused_add_rms_norm(
+        update, post_attention, layer1_norm, epsilon=1e-5,
+    )[0]
+    return layer1[:1, :]
+
+mapped = jax.shard_map(
+    local,
+    mesh=mesh,
+    in_specs=(P(), P(), P(), P("lp4", None, None, None),
               P("lp4", None, None, None),
               P("lp4", None, None, None),
               P("lp4", None, None, None), P()),
@@ -1363,6 +1709,143 @@ def test_dense_final_layout_stablehlo_binds_packed_shards_and_sources() -> None:
     )["passed"]
 
 
+def test_dense_envelope_contract_binds_both_rmsnorm_boundaries() -> None:
+    stablehlo = _exact_dense_envelope_stablehlo()
+    stable = MODULE._validate_stablehlo(
+        stablehlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert stable["passed"], stable
+    assert stable["dense_envelope"] is True
+
+    optimized_hlo = _synthetic_dense_envelope_optimized_hlo()
+    optimized = MODULE._validate_optimized_hlo(
+        optimized_hlo,
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert optimized["passed"], optimized
+    predense = optimized["lineage"]["predense_rmsnorm_contract"]
+    assert predense["exact_operand_graph"] is True
+    assert predense["exact_gate_input_binding"] is True
+    assert predense["exact_fused_gate_ownership"] is True
+    assert predense["fused_gate_binding_count"] == 8
+    assert predense["exact_carried_residual_binding"] is True
+    nested = MODULE._validate_optimized_hlo(
+        _synthetic_dense_envelope_nested_rms_hlo(),
+        compile_rows=32,
+        layer1_only=True,
+        final_dense_layout=True,
+        dense_envelope=True,
+    )
+    assert nested["passed"], nested
+    assert nested["lineage"]["predense_rmsnorm_contract"][
+        "exact_fused_gate_ownership"
+    ] is True
+
+    stable_mutations = (
+        stablehlo.replace(
+            "stablehlo.convolution(%20,",
+            "stablehlo.convolution(%6,",
+            1,
+        ),
+        stablehlo.replace(
+            "%869 = stablehlo.convert %6",
+            "%869 = stablehlo.convert %20",
+            1,
+        ),
+        stablehlo.replace(
+            "%14 = stablehlo.rsqrt %13",
+            "%14 = stablehlo.rsqrt %11",
+            1,
+        ),
+        stablehlo.replace(
+            "applies stablehlo.add",
+            "applies stablehlo.maximum",
+            1,
+        ),
+    )
+    assert all(value != stablehlo for value in stable_mutations)
+    for mutated in stable_mutations:
+        rejected = MODULE._validate_stablehlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+        )
+        assert rejected["passed"] is False
+
+    optimized_mutations = (
+        optimized_hlo.replace(
+            "convolution(%gate_weighted, %gate_rhs)",
+            "convolution(%gate_carried, %gate_rhs)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "  %gate_value.0 =",
+            "  %rogue_predense = bf16[32,6144] add("
+            "%gate_weighted, %gate_weighted)\n"
+            "  %gate_value.0 =",
+            1,
+        ).replace(
+            "convolution(%gate_weighted, %gate_rhs)",
+            "convolution(%rogue_predense, %gate_rhs)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "  %residual_f32 = f32[32,6144] "
+            "convert(%predense_carried)",
+            "  %residual_f32 = f32[32,6144] convert(%attention)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "  %gate_inverse = f32[32,1] rsqrt(%gate_variance)",
+            "  %gate_rogue_variance = f32[32,1] add("
+            "%gate_variance, %gate_variance)\n"
+            "  %gate_inverse = f32[32,1] rsqrt(%gate_rogue_variance)",
+            1,
+        ),
+        optimized_hlo.replace(
+            "  %gate_value.",
+            "  %gate_materialized = bf16[32,6144] "
+            "optimization-barrier(%gate_weighted)\n"
+            "  %gate_value.",
+        ).replace(
+            "convolution(%gate_weighted, %gate_rhs)",
+            "convolution(%gate_materialized, %gate_rhs)",
+        ),
+        optimized_hlo.replace(
+            "  %gate_value.",
+            "  %gate_s16 = s16[32,6144] convert(%gate_weighted)\n"
+            "  %gate_reconverted = bf16[32,6144] convert(%gate_s16)\n"
+            "  %gate_value.",
+        ).replace(
+            "convolution(%gate_weighted, %gate_rhs)",
+            "convolution(%gate_reconverted, %gate_rhs)",
+        ),
+        _synthetic_dense_envelope_externalized_gate_hlo(),
+    )
+    assert all(value != optimized_hlo for value in optimized_mutations)
+    for mutated in optimized_mutations:
+        rejected = MODULE._validate_optimized_hlo(
+            mutated,
+            compile_rows=32,
+            layer1_only=True,
+            final_dense_layout=True,
+            dense_envelope=True,
+        )
+        assert rejected["passed"] is False
+        assert "optimized pre-dense fused RMSNorm envelope drifted" in (
+            rejected["violations"]
+        )
+
+
 @pytest.mark.skipif(
     not ACCEPTED_M32_ROOT.exists(),
     reason="accepted DB532 lowering evidence is not mounted",
@@ -1815,6 +2298,7 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS",
         "GLM_GREENFIELD_DENSE_LAYER1_ONLY",
         "GLM_GREENFIELD_DENSE_FINAL_LAYOUT",
+        "GLM_GREENFIELD_DENSE_ENVELOPE",
         "01d019dfa316f9fc75cc64d293c3678c41d5425cbbd73b7e44d65f03fa6a4fba",
         'strict_census pre',
         'strict_census post',
@@ -1841,6 +2325,10 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "final_layout_hlo",
         "final_layout_lineage",
         "final_layout_constraint",
+        "envelope",
+        "envelope_fusion",
+        "envelope_graph",
+        "envelope_source",
         "classification",
         "comparison",
         "source",
@@ -1875,6 +2363,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "code_hash": pin,
         "compile_rows": 1,
         "diagnostic_dead_rows": 0,
+        "dense_envelope": False,
         "exact": True,
         "exact_arms": ["accepted_dense_convolution"],
         "final_dense_layout": False,
@@ -1886,6 +2375,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "collective_count": 1,
                 "compile_rows": 1,
                 "convolution_count": 16,
+                "dense_envelope": False,
                 "down_convolution_count": 8,
                 "final_dense_layout": False,
                 "gate_up_convolution_count": 8,
@@ -1993,6 +2483,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 },
                 "convolution_count": 16,
                 "compile_rows": 1,
+                "dense_envelope": False,
                 "down_convolution_count": 8,
                 "final_dense_layout": False,
                 "gate_up_convolution_count": 8,
@@ -2076,6 +2567,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     compile_rows = 1
     layer1_only = False
     final_layout = False
+    dense_envelope = False
     if mutation in (
         "m32",
         "cross_layer",
@@ -2085,12 +2577,21 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "final_layout_hlo",
             "final_layout_lineage",
             "final_layout_constraint",
+            "envelope",
+            "envelope_fusion",
+            "envelope_graph",
+            "envelope_source",
         ):
         compile_rows = 32
-        layer1_only = mutation.startswith(("cross_layer", "final_layout"))
-        final_layout = mutation.startswith("final_layout")
+        dense_envelope = mutation.startswith("envelope")
+        layer1_only = mutation.startswith(
+            ("cross_layer", "final_layout", "envelope")
+        )
+        final_layout = mutation.startswith(("final_layout", "envelope"))
         arm = (
-            "accepted_m32_dense_final_layout_cross_layer"
+            "accepted_m32_dense_envelope_cross_layer"
+            if dense_envelope
+            else "accepted_m32_dense_final_layout_cross_layer"
             if final_layout
             else "accepted_m32_dense_cross_layer"
             if layer1_only
@@ -2102,12 +2603,16 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 "classification": f"{arm}_exact",
                 "compile_rows": 32,
                 "diagnostic_dead_rows": 31,
+                "dense_envelope": dense_envelope,
                 "exact_arms": [arm],
                 "final_dense_layout": final_layout,
                 "result_mode": result_mode,
             }
         )
         runner["hlo"]["optimized_contract"]["compile_rows"] = 32
+        runner["hlo"]["optimized_contract"][
+            "dense_envelope"
+        ] = dense_envelope
         runner["hlo"]["optimized_contract"][
             "final_dense_layout"
         ] = final_layout
@@ -2121,10 +2626,15 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             ] = [
                 [
                     f"%parameter.{index}"
-                    for index in range(7 if final_layout else 9)
+                    for index in range(
+                        8 if dense_envelope else 7 if final_layout else 9
+                    )
                 ]
             ]
         runner["hlo"]["stablehlo_contract"]["compile_rows"] = 32
+        runner["hlo"]["stablehlo_contract"][
+            "dense_envelope"
+        ] = dense_envelope
         runner["hlo"]["stablehlo_contract"][
             "final_dense_layout"
         ] = final_layout
@@ -2191,6 +2701,41 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                 runner["hlo"]["stablehlo_contract"][
                     "gate_up_layout_constraint_count"
                 ] = 7
+            if dense_envelope:
+                runner["source"].update(
+                    {
+                        "attention_update_sha256": (
+                            "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7"
+                        ),
+                        "combined_residual_sha256": (
+                            "02d045b9a0ec5ab22a711bd6a964564f707be0848683381104e83331020e31a3"
+                        ),
+                        "normalized_mlp_sha256": (
+                            "082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f"
+                        ),
+                    }
+                )
+                runner["hlo"]["optimized_contract"]["lineage"][
+                    "predense_rmsnorm_contract"
+                ] = {
+                    "enabled": True,
+                    "exact_carried_residual_binding": True,
+                    "exact_fused_gate_ownership": True,
+                    "exact_gate_input_binding": True,
+                    "exact_operand_graph": True,
+                    "fused_gate_binding_count": 8,
+                    "weighted_value_count": 1,
+                }
+                if mutation == "envelope_graph":
+                    runner["hlo"]["optimized_contract"]["lineage"][
+                        "predense_rmsnorm_contract"
+                    ]["exact_operand_graph"] = False
+                elif mutation == "envelope_fusion":
+                    runner["hlo"]["optimized_contract"]["lineage"][
+                        "predense_rmsnorm_contract"
+                    ]["fused_gate_binding_count"] = 7
+                elif mutation == "envelope_source":
+                    runner["source"]["attention_update_sha256"] = "0" * 64
         if mutation == "cross_layer_mode":
             runner["result_mode"] = "dense_and_layer1"
     elif mutation == "classification":
@@ -2259,9 +2804,13 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e",
             "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134",
             str(compile_rows),
-            str(int(layer1_only)),
-            str(int(final_layout)),
-            "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
+                str(int(layer1_only)),
+                str(int(final_layout)),
+                str(int(dense_envelope)),
+                "68afed86921584fb673abb11a563e359a1533210ec2483e71ee79b88c2b0bde7",
+                "02d045b9a0ec5ab22a711bd6a964564f707be0848683381104e83331020e31a3",
+                "082125fead43b25f10686705c1b6473153f4092dd5bc476f8e01a86629f0758f",
+                "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
             "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
             "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
             "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
@@ -2276,15 +2825,24 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "m32",
         "cross_layer",
         "final_layout",
+        "envelope",
         "nonexact",
     ):
         assert completed.returncode != 0
         return
     assert completed.returncode == 0, completed.stdout + completed.stderr
     summary = json.loads((run_dir / "summary.json").read_text())
-    expected_exact = mutation in ("none", "m32", "cross_layer", "final_layout")
+    expected_exact = mutation in (
+        "none",
+        "m32",
+        "cross_layer",
+        "final_layout",
+        "envelope",
+    )
     expected_arm = (
-        "accepted_m32_dense_final_layout_cross_layer"
+        "accepted_m32_dense_envelope_cross_layer"
+        if mutation == "envelope"
+        else "accepted_m32_dense_final_layout_cross_layer"
         if mutation == "final_layout"
         else "accepted_m32_dense_cross_layer"
         if mutation == "cross_layer"
@@ -2311,7 +2869,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     assert run is not None
     assert run[0:2] == (
         (
-            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-envelope-cross-layer"
+            if mutation == "envelope"
+            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-final-layout-cross-layer"
             if mutation == "final_layout"
             else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-cross-layer"
             if mutation == "cross_layer"
@@ -2322,7 +2882,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             )
         ),
         (
-            "native-jax-accepted-dense-final-layout-v1"
+            "native-jax-accepted-dense-envelope-v1"
+            if mutation == "envelope"
+            else "native-jax-accepted-dense-final-layout-v1"
             if mutation == "final_layout"
             else "native-jax-db542-dense-cross-layer-v1"
             if mutation == "cross_layer"
@@ -2336,6 +2898,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     environment = json.loads(run[2])
     assert environment["greenfield_run_tag"] == tag
     assert environment["compile_rows"] == compile_rows
+    assert environment["dense_envelope"] is dense_envelope
     assert environment["final_dense_layout"] is final_layout
     if final_layout:
         assert environment["final_layout_records_sha256"] == (
@@ -2347,11 +2910,13 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         )
     assert environment["result_mode"] == (
         "layer1_only"
-        if mutation in ("cross_layer", "final_layout")
+        if mutation in ("cross_layer", "final_layout", "envelope")
         else "dense_and_layer1"
     )
     assert run[3] == (
-        "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
+        "Protected layer-0 accepted dense fusion-envelope discriminator; no performance claim."
+        if mutation == "envelope"
+        else "Protected layer-0 accepted final-layout dense cross-layer discriminator; no performance claim."
         if mutation == "final_layout"
         else "Protected layer-0 accepted-M32 dense cross-layer fusion discriminator; no performance claim."
         if mutation == "cross_layer"
@@ -2363,7 +2928,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     )
     assert item == (
         (
-            "greenfield_layer0_dense_final_layout_cross_layer"
+            "greenfield_layer0_dense_envelope_cross_layer"
+            if mutation == "envelope"
+            else "greenfield_layer0_dense_final_layout_cross_layer"
             if mutation == "final_layout"
             else "greenfield_layer0_dense_m32_cross_layer"
             if mutation == "cross_layer"
@@ -2378,7 +2945,9 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     )
     assert metric == (
         (
-            "greenfield_layer0_dense_final_layout_cross_layer"
+            "greenfield_layer0_dense_envelope_cross_layer"
+            if mutation == "envelope"
+            else "greenfield_layer0_dense_final_layout_cross_layer"
             if mutation == "final_layout"
             else "greenfield_layer0_dense_m32_cross_layer"
             if mutation == "cross_layer"

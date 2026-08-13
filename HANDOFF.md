@@ -19,6 +19,25 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Current clean pushed baseline is `cb1b613fba8ba1194602e4f50940f582a763741f`. Protected DB546
+  (`greenfield_layer0_dense_final_layout_cross_layer_20260813T084105898153921Z`) passed exact
+  packed-checkpoint lineage and accepted `{1,0}` layouts for all 16 dense convolution RHS values,
+  plus the complete M32/SwiGLU/DB533/downstream layer-1 RMS HLO contract. It still produced the
+  identical `1,073/6,144` mismatch and observed SHA `229dc8ac...812f`; final weight layout is not
+  the cause. DB546 has local/remote `SUCCESS`, exact DB linkage and clean 8/8 pre/post censuses.
+- The preserved DB543 raw dense-input capture compares bitwise exact to DB540 at the normalized
+  MLP boundary (`0/6,144`, SHA `082125fe...758f`). This is diagnostic recovery, not a sealed DB543
+  publication. Together with DB546 it confines the remaining defect to the dense MLP/compiler
+  fusion envelope.
+- Active uncommitted step: a default-off `GLM_GREENFIELD_DENSE_ENVELOPE=1` discriminator recomputes
+  pre-dense fused add/RMSNorm from exact DB538 attention/residual inputs inside the same compiled
+  final-layout dense and downstream layer-1 RMS program. Exact StableHLO/optimized-HLO contracts
+  bind both RMSNorm graphs, all gate inputs and the carried residual. Do not launch it until the
+  complete affected suite, diff check and one bounded Sol review approve the exact diff. Then
+  commit/push and run exactly one serialized protected discriminator. Its numerical verdict decides
+  whether Gate-D correction is in this fusion envelope or needs a smaller accepted dense-kernel
+  reproduction; no blind full 8K retry is justified first.
+
 - Gates A--C are complete. Gate D has one accepted 2K result, DB484, at `244.091151 ms/token` and
   `4.096830 tok/s`; it does not pass Gate E. Complete 8K exactness remains open. DB484 is still the
   only decoder performance result.

@@ -5,6 +5,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 08:49 UTC — Gate-D dense boundary narrowed to compiler fusion envelope
+
+- Eleven reviewed commits landed in the preceding eight hours. Protected DB540--DB546 exercised
+  standalone dense arithmetic, accepted M32 geometry, cross-layer layer-1 RMSNorm, and final packed
+  weight layout. The latest clean pushed pin `cb1b613fba8ba1194602e4f50940f582a763741f`
+  produced protected DB546 and archived `SUCCESS` at
+  `gs://driftbench-dsv4-uc/results/greenfield_layer0_dense_final_layout_cross_layer_20260813T084105898153921Z`.
+- DB546 proves all 16 convolution RHS values have the accepted `{1,0}` layout and exact packed
+  checkpoint lineage, while exact StableHLO, optimized-HLO, SwiGLU, DB533 association, downstream
+  residual and layer-1 RMSNorm contracts all pass. The numerical result is nevertheless unchanged:
+  `1,073/6,144` mismatches, first index 1, max `0.0078125`, mean
+  `3.4686963772401214e-05`, observed SHA `229dc8ac...812f` versus accepted
+  `9936ee1e...3039`. Final physical weight layout is therefore rejected as the cause.
+- The preserved raw legacy DB543 dense-input capture was recovered locally without TPU work. Its
+  normalized layer-0 MLP input is bitwise identical to DB540 (`0/6,144`, SHA
+  `082125fe...758f`), localizing the first open boundary to the dense MLP/compiler fusion rather
+  than attention or the pre-dense residual/RMSNorm value. DB543 itself remains unsealed diagnostic
+  evidence and is not claimed as a protected publication.
+- The remaining bounded hypothesis is now implemented default-off as the dense-envelope
+  discriminator: exact DB538 attention update plus combined residual are padded to accepted M32,
+  the exact pre-dense fused add/RMSNorm is recomputed inside the same compiled program as the
+  final-layout gate/up, SwiGLU/down, DB533 reduction and downstream layer-1 RMSNorm. Its StableHLO
+  and optimized-HLO contracts bind both RMSNorm graphs, all eight gate inputs and the carried
+  residual, and reject bypass, added-arithmetic and cross-wire mutations. No TPU run or performance
+  claim has been made from this uncommitted implementation; full validation and one bounded audit
+  precede the protected discriminator.
+
 ## 2026-08-13 — Gate-D dense-convolution candidate rejected; publication-only correction pending
 
 - Complete 8K exactness remains the active Gate D. The latest full protected run generated the
