@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 21:07 UTC — first captured-RMS replay fails only on owner-singleton HLO spelling
+
+- Reviewed/pushed commit `1fcd2a400b087e5b3f970626df90e1b9310c86f3` launched the protected
+  captured-byte replay once under tag
+  `greenfield_layer0_captured_rms_replay_20260813T210310956272256Z`. It passed remote vacancy,
+  exact sync and the authenticated 8/8 pre-census, then failed closed before arithmetic in about
+  ten seconds. No complete checkpoint was loaded.
+- The failure is one exact proof assumption, not a collective or numerical result. The validator
+  expected the local gather operand as `bf16[8,1,6144]`; the TPU preserves the owner singleton as
+  `bf16[1,8,1,6144]`. The real operation still has the required group `{{0,1,2,3}}`, dimension 0
+  and result `bf16[4,8,1,6144]`. Optimized/StableHLO SHAs are `fc208e23...5cecd` and
+  `b4fdb677...720d`.
+- There is no replay runner JSON, NPZ, comparison, summary, results-DB row, terminal archive,
+  `SUCCESS`, arithmetic verdict, Gate-D advancement or performance claim. Rollback is
+  `NO_PROVISIONAL_DB_RUN`; failure cleanup is authenticated 8/8. Exactly eight failure artifacts
+  are retained in the approved bucket under the tag's nonterminal `diagnostic/` subtree.
+- The correction accepts only the exact protected four-dimensional operand, strengthens dimension
+  parsing against metadata/comment decoys, rejects the squeezed three-dimensional form, and pins
+  the failed real optimized HLO as a positive replay. Focused captured-RMS tests pass 6/6. One
+  correction-only Sol audit, commit/push and one serialized protected retry are next.
+
 ## 2026-08-13 20:42 UTC — protected 32-partial capture closes capture integrity; one RMS replay remains
 
 - Reviewed/pushed commits `1987770bb89f436253686f789c0b5ccbfebc2335` and

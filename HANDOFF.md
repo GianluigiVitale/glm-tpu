@@ -19,6 +19,22 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed replay pin `1fcd2a400b087e5b3f970626df90e1b9310c86f3` launched once under
+  `greenfield_layer0_captured_rms_replay_20260813T210310956272256Z`. It failed safely before
+  arithmetic after about ten seconds because the optimized-HLO proof expected the gather operand
+  as squeezed `bf16[8,1,6144]`; the real TPU lowering preserves the owner singleton as
+  `bf16[1,8,1,6144]`. The actual gather is otherwise exact: group `{{0,1,2,3}}`, dimension 0 and
+  output `bf16[4,8,1,6144]`. Optimized/StableHLO SHAs are `fc208e23...5cecd` and
+  `b4fdb677...720d`; runner-log SHA is `52503ebf...29a`. There is no runner JSON, tensor result,
+  summary, DB row, terminal `SUCCESS`, arithmetic verdict or performance claim. Rollback reports
+  `NO_PROVISIONAL_DB_RUN`, the failure census is 8/8 clean, and eight diagnostic objects are
+  preserved remotely below the nonterminal `diagnostic/` subtree.
+- The bounded correction pins the exact real four-dimensional gather operand, parses the gather
+  dimension after removing strings/comments, rejects the obsolete squeezed operand, and replays
+  the SHA-pinned protected HLO as a positive regression. The focused captured-RMS file passes 6/6.
+  Exact next: affected tests, one correction-only Sol audit, commit/push and one serialized
+  captured-byte retry. This is still a small four-chip replay; no complete checkpoint is loaded.
+
 - Reviewed/pushed capture pins `1987770bb89f436253686f789c0b5ccbfebc2335` and
   `c0ef9525bcd893bdad377af2b56e5ebd5fb13b34` produced the protected no-DB artifact
   `greenfield_layer0_dense_partial_capture_20260813T200736889447458Z`. It seals all 32 real BF16

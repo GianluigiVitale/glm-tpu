@@ -460,6 +460,16 @@ def _validate_captured_rms_optimized_hlo(
         in (item.op_name or "").split("/")
     ]
     gather = gathers[0] if len(gathers) == 1 else None
+    gather_dimensions_exact = False
+    if gather is not None:
+        sanitized_gather = re.sub(r"/\*.*?\*/", "", gather.raw_line)
+        sanitized_gather = re.sub(
+            r'"(?:\\.|[^"\\])*"', '""', sanitized_gather
+        )
+        sanitized_gather = re.sub(r"\s+", "", sanitized_gather)
+        gather_dimensions_exact = re.findall(
+            r"\bdimensions=\{([^}]*)\}", sanitized_gather
+        ) == ["0"]
     if module.num_partitions != 4 or module.num_replicas not in (None, 1):
         violations.append("captured RMS optimized module cardinality drifted")
     if async_collectives:
@@ -474,10 +484,10 @@ def _validate_captured_rms_optimized_hlo(
         or gather.replica_groups != ((0, 1, 2, 3),)
         or not gather.use_global_device_ids
         or _shape_signatures(gather.operand_shapes)
-        != ("bf16[8,1,6144]",)
+        != ("bf16[1,8,1,6144]",)
         or _shape_signatures(gather.result_shapes)
         not in {("bf16[4,8,1,6144]",), ("bf16[32,1,6144]",)}
-        or "dimensions={0}" not in gather.raw_line
+        or not gather_dimensions_exact
     ):
         violations.append("captured RMS gather geometry drifted")
     roots = [

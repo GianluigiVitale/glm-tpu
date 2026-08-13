@@ -23,6 +23,17 @@ REAL_CAPTURE = Path(
     "greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/"
     "dense_partial_capture.npz"
 )
+REAL_FAILED_CONTROL_HLO = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_CAPTURED_RMS_CONTROL_HLO",
+        "/home/gianl/glm-run/"
+        "greenfield_layer0_captured_rms_replay_20260813T210310956272256Z/"
+        "hlo/control.optimized_hlo.txt",
+    )
+)
+REAL_FAILED_CONTROL_HLO_SHA256 = (
+    "fc208e238305cf112a69214944e0af47ab39ff51651d5b603cb9b88d7c45cecd"
+)
 SPEC = importlib.util.spec_from_file_location("captured_rms_probe", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -70,8 +81,7 @@ def _captured_rms_optimized_hlo() -> str:
 
 ENTRY %main (p0: bf16[1,8,1,6144], p1: bf16[32,6144], p2: bf16[6144]) -> bf16[1,6144] {{
   %p0 = bf16[1,8,1,6144] parameter(0)
-  %slot = bf16[8,1,6144] slice(%p0), slice={{[0:1],[0:8],[0:1],[0:6144]}}
-  %g = bf16[4,8,1,6144] all-gather(%slot), channel_id=1, replica_groups={{{{0,1,2,3}}}}, dimensions={{0}}, use_global_device_ids=true, metadata={{op_name="jit/local/greenfield_captured_rms_strategy_gather/all_gather"}}
+  %g = bf16[4,8,1,6144] all-gather(%p0), channel_id=1, replica_groups={{{{0,1,2,3}}}}, dimensions={{0}}, use_global_device_ids=true, metadata={{op_name="jit/local/greenfield_captured_rms_strategy_gather/all_gather"}}
   %p1 = bf16[32,6144] parameter(1)
   %s = f32[32] fusion(%g, %p1), kind=kLoop, calls=%rms, metadata={{op_name="jit/local/greenfield_captured_rms_layer1/reduce"}}, backend_config={config}
   %p2 = bf16[6144] parameter(2)
@@ -206,6 +216,17 @@ def test_captured_rms_optimized_contract_refuses_decoys() -> None:
             1,
         ),
         accepted.replace(
+            "dimensions={0}",
+            '/* dimensions={0} */ dimensions={1}, metadata={op_name="dimensions={0}"}',
+            1,
+        ),
+        accepted.replace(
+            "%g = bf16[4,8,1,6144] all-gather(%p0)",
+            "%slot = bf16[8,1,6144] slice(%p0), slice={[0:1],[0:8],[0:1],[0:6144]}\n"
+            "  %g = bf16[4,8,1,6144] all-gather(%slot)",
+            1,
+        ),
+        accepted.replace(
             "  %p2 = bf16[6144] parameter(2)",
             "  %dead_start = bf16[4,8,1,6144] all-reduce-start(%g), replica_groups={{0,1,2,3}}, to_apply=%output\n"
             "  %dead_done = bf16[4,8,1,6144] all-reduce-done(%dead_start)\n"
@@ -276,6 +297,19 @@ def test_captured_rms_optimized_contract_refuses_decoys() -> None:
         )["passed"]
         for mutation in mutations
     )
+
+
+@pytest.mark.skipif(
+    not REAL_FAILED_CONTROL_HLO.exists(),
+    reason="protected captured-RMS control HLO is unavailable",
+)
+def test_protected_control_hlo_uses_exact_owner_preserving_gather() -> None:
+    hlo = REAL_FAILED_CONTROL_HLO.read_text()
+    assert sha256(hlo.encode()).hexdigest() == REAL_FAILED_CONTROL_HLO_SHA256
+    contract = MODULE._validate_captured_rms_optimized_hlo(
+        hlo, split_layer1_rms=False
+    )
+    assert contract["passed"], contract
 
 
 @pytest.mark.skipif(
