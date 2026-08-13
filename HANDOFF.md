@@ -19,6 +19,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed capture pins `1987770bb89f436253686f789c0b5ccbfebc2335` and
+  `c0ef9525bcd893bdad377af2b56e5ebd5fb13b34` produced the protected no-DB artifact
+  `greenfield_layer0_dense_partial_capture_20260813T200736889447458Z`. It seals all 32 real BF16
+  down partials as `[4,8,1,6144]` SHA `9d9f65dd...16e35`, the carried M32 residual SHA
+  `f583581f...2dc0`, layer-1 norm SHA `10e34f4f...6c87` and accepted target SHA
+  `9936ee1e...3039`. Runner/tensor/summary/`SUCCESS` SHAs are `d22b35f6...8343`,
+  `f194d757...4298`, `c349b5fd...e416` and `6cac8976...0b85`; archive verification and
+  authenticated post-census pass 8/8. A separate NumPy reconstruction of DB533's exact StrategyND
+  tree over those bytes produces dense-update SHA `efde8532...b4fc`, identical to DB548.
+- The active bounded delta adds two separately compiled four-chip arms over only those sealed bytes:
+  a control that must reproduce DB548 and the DB549 accepted scalar-RMS schedule. It reuses the
+  existing protected wrapper, is default-off, writes no DB row, pins local/remote sources and exact
+  StableHLO/optimized-HLO contracts, and publishes `SUCCESS` last. Focused source, mutation,
+  no-DB-publication and affected dense tests pass locally. Exact next is one consolidated Sol audit,
+  one commit/push and one protected captured-byte replay. No complete checkpoint is loaded. An exact
+  split result authorizes production integration; a nonexact result closes RMS scheduling and
+  leaves the captured dense partial boundary as the remaining arithmetic source.
+
 - Clean pushed pin `2c3b84eebc287682625ab54ac3cc3dfd143e8230` closes the outer-prefill-loop
   liveness proof and was used for one protected 8K retry, tag ending
   `densefinalconv_oracle_dsa_trace2_20260813T175401077722428Z`. All decoder, DSA-observer and

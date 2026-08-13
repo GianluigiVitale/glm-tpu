@@ -950,6 +950,14 @@ def _match_rmsnorm(
     )
     if reduce.dimensions != (1,) or len(reduce.operands) != 2:
         raise _MatchError(f"{reduce.name}: RMSNorm reduction drifted")
+    sanitized_reduce = re.sub(
+        r'"(?:\\.|[^"\\])*"', '""', reduce.raw_line
+    )
+    sanitized_reduce = re.sub(r"/\*.*?\*/", "", sanitized_reduce)
+    if re.findall(
+        r"\bapplies\s+stablehlo\.([a-z0-9_]+)", sanitized_reduce
+    ) != ["add"]:
+        raise _MatchError(f"{reduce.name}: RMSNorm reduction combiner drifted")
     zero = _expect_node(
         graph, reduce.operands[1], opcode="constant", result_type="tensor<f32>"
     )
@@ -1125,6 +1133,223 @@ def _match_rmsnorm(
     ]:
         raise _MatchError("layer-1-only probe externalizes the dense update")
     return residual, norm_weight_seed.operands[0], returned_output
+
+
+def validate_captured_dense_rms_stablehlo(
+    stablehlo: str,
+    *,
+    split_layer1_rms: bool,
+) -> dict[str, object]:
+    """Prove a captured-partial StrategyND reduction and layer-1 RMSNorm.
+
+    This is the pre-fusion half of the bounded Gate-D replay.  It deliberately
+    contains no dense contractions: the input is the sealed set of 32 real
+    BF16 down partials.  The contract reuses the exact DB533 tree and exact
+    layer-1 RMS matcher used by the full dense probe, then additionally binds
+    the three replay inputs and the outer ``sdy.manual_computation`` result.
+    """
+
+    if not isinstance(split_layer1_rms, bool):
+        raise TypeError("captured RMS split flag must be boolean")
+    graphs, violations = _parse_graphs(stablehlo)
+    try:
+        graph = _only(
+            (item for item in graphs if item.name == "main"),
+            "captured RMS main graph",
+        )
+        helpers = {item.name: item for item in graphs if item is not graph}
+        gather = _only(
+            (
+                node
+                for node in graph.nodes.values()
+                if node.opcode == "all_gather"
+                and node.result_type == "tensor<4x8x1x6144xbf16>"
+                and node.tensor_types[-2:]
+                == (
+                    "tensor<1x8x1x6144xbf16>",
+                    "tensor<4x8x1x6144xbf16>",
+                )
+            ),
+            "captured RMS LP4 all-gather",
+        )
+        sanitized_gather = re.sub(
+            r'"(?:\\.|[^"\\])*"', '""', gather.raw_line
+        )
+        sanitized_gather = re.sub(r"/\*.*?\*/", "", sanitized_gather)
+        normalized_gather = re.sub(r"\s+", "", sanitized_gather)
+        groups = re.findall(
+            r"\breplica_groups=dense<\[\[[0-9,]+\]\]>:tensor<1x4xi64>",
+            normalized_gather,
+        )
+        if (
+            gather.all_gather_dimension != 0
+            or not gather.use_global_device_ids
+            or groups
+            != [
+                "replica_groups=dense<[[0,1,2,3]]>:tensor<1x4xi64>"
+            ]
+            or len(gather.operands) != 1
+        ):
+            raise _MatchError(f"{gather.name}: captured RMS gather drifted")
+
+        allowed_input_ops = {
+            "broadcast_in_dim",
+            "copy",
+            "optimization_barrier",
+            "reshape",
+            "slice",
+        }
+        pending = [gather.operands[0]]
+        seen: set[str] = set()
+        terminals: set[str] = set()
+        while pending:
+            name = pending.pop()
+            if name in seen:
+                continue
+            seen.add(name)
+            if name not in graph.nodes:
+                terminals.add(name)
+                continue
+            node = graph.node(name)
+            if node.opcode not in allowed_input_ops or len(node.operands) != 1:
+                raise _MatchError(
+                    f"{node.name}: captured partial input arithmetic drifted"
+                )
+            input_type, output_type = node.tensor_types[-2:]
+            input_dims = tuple(
+                int(value)
+                for value in re.search(r"tensor<([0-9x]+)xbf16>", input_type)
+                .group(1)
+                .split("x")
+            )
+            output_dims = tuple(
+                int(value)
+                for value in re.search(r"tensor<([0-9x]+)xbf16>", output_type)
+                .group(1)
+                .split("x")
+            )
+            input_elements = 1
+            output_elements = 1
+            for dimension in input_dims:
+                input_elements *= dimension
+            for dimension in output_dims:
+                output_elements *= dimension
+            if input_elements != output_elements:
+                raise _MatchError(
+                    f"{node.name}: captured partial layout changed element count"
+                )
+            if node.opcode == "slice" and (
+                node.slice_ranges is None
+                or tuple(stop - start for start, stop in node.slice_ranges)
+                != output_dims
+            ):
+                raise _MatchError(
+                    f"{node.name}: captured partial slice drifted"
+                )
+            pending.extend(node.operands)
+        if terminals != {"%arg3"}:
+            raise _MatchError(
+                f"captured partial gather source drifted: {sorted(terminals)}"
+            )
+
+        dense_output = _match_reduction_tree(graph, gather)
+        residual, norm_weight, returned_output = _match_rmsnorm(
+            graph,
+            helpers,
+            dense_output,
+            layer1_only=True,
+            residual_is_m32=True,
+            split_layer1_rms=split_layer1_rms,
+        )
+        if residual != "%arg4" or norm_weight != "%arg5":
+            raise _MatchError(
+                "captured RMS residual/norm input identity drifted: "
+                f"residual={residual} norm={norm_weight}"
+            )
+
+        manual_matches = list(
+            re.finditer(
+                r"(?m)^\s*(%[A-Za-z0-9_.-]+)\s*=\s*"
+                r"sdy\.manual_computation\(([^)]*)\)",
+                stablehlo,
+            )
+        )
+        if len(manual_matches) != 1:
+            raise _MatchError("captured RMS manual computation is not unique")
+        manual_result = manual_matches[0].group(1)
+        manual_operands = tuple(
+            re.findall(r"%[A-Za-z0-9_.$#-]+", manual_matches[0].group(2))
+        )
+        if manual_operands != ("%arg0", "%arg1", "%arg2"):
+            raise _MatchError(
+                f"captured RMS manual operands drifted: {manual_operands}"
+            )
+        manual_line = next(
+            line
+            for line in stablehlo.splitlines()
+            if f"{manual_result} = sdy.manual_computation" in line
+        )
+        if re.findall(
+            r"(%arg[0-9]+):\s*(tensor<[^>]+>)", manual_line
+        ) != [
+            ("%arg3", "tensor<1x8x1x6144xbf16>"),
+            ("%arg4", "tensor<32x6144xbf16>"),
+            ("%arg5", "tensor<6144xbf16>"),
+        ]:
+            raise _MatchError("captured RMS manual block arguments drifted")
+        _only(
+            (
+                node
+                for node in graph.nodes.values()
+                if node.opcode == "return"
+                and node.raw_line.startswith("return ")
+                and node.operands == (manual_result,)
+            ),
+            "captured RMS outer manual return",
+        )
+        if returned_output not in graph.nodes:
+            raise _MatchError("captured RMS exact result disappeared")
+    except (AttributeError, _MatchError, ValueError) as error:
+        violations.append(str(error))
+
+    collective_counts = {
+        opcode: sum(
+            node.opcode == opcode
+            for item in graphs
+            for node in item.nodes.values()
+        )
+        for opcode in (
+            "all_gather",
+            "all_reduce",
+            "all_to_all",
+            "collective_broadcast",
+            "collective_permute",
+            "reduce_scatter",
+        )
+    }
+    if collective_counts != {
+        "all_gather": 1,
+        "all_reduce": 0,
+        "all_to_all": 0,
+        "collective_broadcast": 0,
+        "collective_permute": 0,
+        "reduce_scatter": 0,
+    }:
+        violations.append(
+            f"captured RMS collective contract drifted: {collective_counts}"
+        )
+    if "stablehlo.convolution" in stablehlo:
+        violations.append("captured RMS replay contains a convolution")
+    if "xla_python_cpu_callback" in stablehlo or "host_callback" in stablehlo:
+        violations.append("captured RMS replay contains a host callback")
+    return {
+        "collective_counts": collective_counts,
+        "exact_result_binding": not violations,
+        "live_rows": 1,
+        "split_layer1_rms": split_layer1_rms,
+        "passed": not violations,
+        "violations": violations,
+    }
 
 
 def _match_predense_rmsnorm(

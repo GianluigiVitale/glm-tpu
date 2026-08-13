@@ -90,6 +90,46 @@ readonly ACCEPTED_M32_SUCCESS_SHA=6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1ab
 readonly ACCEPTED_M32_RAW_HLO_SHA=3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775
 readonly ACCEPTED_M32_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/decode_projection_lowering/8k/$ACCEPTED_M32_TAG
 
+readonly CAPTURED_RMS_SOURCE_TAG=greenfield_layer0_dense_partial_capture_20260813T200736889447458Z
+readonly CAPTURED_RMS_SOURCE_DIR=/home/gianl/glm-run/$CAPTURED_RMS_SOURCE_TAG
+readonly CAPTURED_RMS_SOURCE_TENSOR=$CAPTURED_RMS_SOURCE_DIR/dense_partial_capture.npz
+readonly CAPTURED_RMS_SOURCE_RUNNER=$CAPTURED_RMS_SOURCE_DIR/runner.json
+readonly CAPTURED_RMS_SOURCE_SUMMARY=$CAPTURED_RMS_SOURCE_DIR/summary.json
+readonly CAPTURED_RMS_SOURCE_SUCCESS=$CAPTURED_RMS_SOURCE_DIR/SUCCESS
+readonly CAPTURED_RMS_SOURCE_TENSOR_SHA=f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298
+readonly CAPTURED_RMS_SOURCE_RUNNER_SHA=d22b35f664409485b697fdb579665dc4b1ecf42683a2aaff9e9a4d7481ee8343
+readonly CAPTURED_RMS_SOURCE_SUMMARY_SHA=c349b5fd458f34986d8cc59c0f026af6b0a4c4e998f8691d6f6aa83a9b55e416
+readonly CAPTURED_RMS_SOURCE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa470bd44b0b85
+readonly CAPTURED_RMS_SOURCE_REMOTE=$APPROVED_BUCKET/results/$CAPTURED_RMS_SOURCE_TAG
+
+readonly CAPTURED_RMS_DB548_TAG=greenfield_layer0_dense_envelope_cross_layer_20260813T120703034434907Z
+readonly CAPTURED_RMS_DB548_DIR=/home/gianl/glm-run/$CAPTURED_RMS_DB548_TAG
+readonly CAPTURED_RMS_DB548_TENSOR=$CAPTURED_RMS_DB548_DIR/dense_envelope_cross_layer.npz
+readonly CAPTURED_RMS_DB548_RUNNER=$CAPTURED_RMS_DB548_DIR/runner.json
+readonly CAPTURED_RMS_DB548_SUMMARY=$CAPTURED_RMS_DB548_DIR/summary.json
+readonly CAPTURED_RMS_DB548_SUCCESS=$CAPTURED_RMS_DB548_DIR/SUCCESS
+readonly CAPTURED_RMS_DB548_HLO=$CAPTURED_RMS_DB548_DIR/hlo/dense_convolution.optimized_hlo.txt
+readonly CAPTURED_RMS_DB548_TENSOR_SHA=6cb76623bd79e1712b6c323fa786e516abd05f6f0ca51a367bc871c4a920480f
+readonly CAPTURED_RMS_DB548_RUNNER_SHA=0c9035409382db3e96bfee080af73f46c226e559908fc6869387da4a21f49112
+readonly CAPTURED_RMS_DB548_SUMMARY_SHA=916f6ea202575c663e57ad768413a0015a04cf72450207a753e125965c9ae080
+readonly CAPTURED_RMS_DB548_SUCCESS_SHA=a81433c33c14de0083c05d2d8dc1ebf34df0908356f18ca45c410efecf1d39f1
+readonly CAPTURED_RMS_DB548_HLO_SHA=5f4dd83793da67be6a8c580949920e93f8c64fe8205816738e7d04890640a877
+readonly CAPTURED_RMS_DB548_REMOTE=$APPROVED_BUCKET/results/$CAPTURED_RMS_DB548_TAG
+
+readonly CAPTURED_RMS_DB549_TAG=greenfield_layer0_dense_envelope_split_rms_20260813T134012434338842Z
+readonly CAPTURED_RMS_DB549_DIR=/home/gianl/glm-run/$CAPTURED_RMS_DB549_TAG
+readonly CAPTURED_RMS_DB549_TENSOR=$CAPTURED_RMS_DB549_DIR/dense_envelope_split_rms.npz
+readonly CAPTURED_RMS_DB549_RUNNER=$CAPTURED_RMS_DB549_DIR/runner.json
+readonly CAPTURED_RMS_DB549_SUMMARY=$CAPTURED_RMS_DB549_DIR/summary.json
+readonly CAPTURED_RMS_DB549_SUCCESS=$CAPTURED_RMS_DB549_DIR/SUCCESS
+readonly CAPTURED_RMS_DB549_HLO=$CAPTURED_RMS_DB549_DIR/hlo/dense_convolution.optimized_hlo.txt
+readonly CAPTURED_RMS_DB549_TENSOR_SHA=89ef1e3893bc39a349827debdbe37fcc8f3e009f9a5d3b8e48f87667863a1153
+readonly CAPTURED_RMS_DB549_RUNNER_SHA=7f53f4e6dc4f400b8a47b893507ba5a293a46a844d2e22f06d815648df334e10
+readonly CAPTURED_RMS_DB549_SUMMARY_SHA=8d3c6b7350928003f63d902bc4c6d54a59ed95687ba09c33502ed513cef12822
+readonly CAPTURED_RMS_DB549_SUCCESS_SHA=894f4164b0924a7df100e8989d52c0c010c3588f862a9961147364e99fec4a0b
+readonly CAPTURED_RMS_DB549_HLO_SHA=faf38fa987d174421d2631bc4921deee88bc30b50d557fbb02046c50fd9741c9
+readonly CAPTURED_RMS_DB549_REMOTE=$APPROVED_BUCKET/results/$CAPTURED_RMS_DB549_TAG
+
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 HARNESS_GIT=$(git -C "$WORKTREE" rev-parse --short HEAD)
 FORK_GIT=$(git -C /home/gianl/tpu-inference rev-parse --short HEAD)
@@ -100,6 +140,7 @@ DENSE_FINAL_LAYOUT=${GLM_GREENFIELD_DENSE_FINAL_LAYOUT:-0}
 DENSE_ENVELOPE=${GLM_GREENFIELD_DENSE_ENVELOPE:-0}
 DENSE_SPLIT_LAYER1_RMS=${GLM_GREENFIELD_DENSE_SPLIT_LAYER1_RMS:-0}
 DENSE_CAPTURE_PARTIALS=${GLM_GREENFIELD_DENSE_CAPTURE_PARTIALS:-0}
+CAPTURED_RMS_REPLAY=${GLM_GREENFIELD_CAPTURED_RMS_REPLAY:-0}
 [[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
   exit 2
@@ -128,6 +169,18 @@ DENSE_CAPTURE_PARTIALS=${GLM_GREENFIELD_DENSE_CAPTURE_PARTIALS:-0}
   echo "GLM_GREENFIELD_DENSE_CAPTURE_PARTIALS must be 0 or 1" >&2
   exit 2
 }
+[[ $CAPTURED_RMS_REPLAY == 0 || $CAPTURED_RMS_REPLAY == 1 ]] || {
+  echo "GLM_GREENFIELD_CAPTURED_RMS_REPLAY must be 0 or 1" >&2
+  exit 2
+}
+if [[ $CAPTURED_RMS_REPLAY == 1 && \
+      ! ( $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS == 1 && \
+          $DENSE_LAYER1_ONLY == 0 && $DENSE_FINAL_LAYOUT == 0 && \
+          $DENSE_ENVELOPE == 0 && $DENSE_SPLIT_LAYER1_RMS == 0 && \
+          $DENSE_CAPTURE_PARTIALS == 0 ) ]]; then
+  echo "captured RMS replay is exclusive of dense/checkpoint modes" >&2
+  exit 2
+fi
 if [[ $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS != 1 ]]; then
   echo "projection/reduction mode requires compile rows 1" >&2
   exit 2
@@ -158,7 +211,10 @@ if [[ $DENSE_CAPTURE_PARTIALS == 1 && \
   echo "dense partial capture requires the unsplit M32 final-layout envelope" >&2
   exit 2
 fi
-if [[ $DENSE_CONVOLUTION == 1 ]]; then
+if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  TAG=${GLM_GREENFIELD_CAPTURED_RMS_TAG:-greenfield_layer0_captured_rms_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  TENSOR_BASENAME=captured_rms_replay.npz
+elif [[ $DENSE_CONVOLUTION == 1 ]]; then
   if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
     TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_partial_capture_$(date -u +%Y%m%dT%H%M%S%NZ)}
     TENSOR_BASENAME=dense_partial_capture.npz
@@ -215,6 +271,260 @@ if [[ $DENSE_SPLIT_LAYER1_RMS == 1 ]]; then
   split_layer1_rms_probe_args=(--split-layer1-rms)
 fi
 capture_partials_probe_args=()
+validate_captured_rms_replay() {
+  /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$elapsed" "$TAG" \
+    "$CAPTURED_RMS_SOURCE_TENSOR_SHA" "$CAPTURED_RMS_SOURCE_RUNNER_SHA" \
+    "$CAPTURED_RMS_SOURCE_SUMMARY_SHA" "$CAPTURED_RMS_SOURCE_SUCCESS_SHA" \
+    "$CAPTURED_RMS_DB548_TENSOR_SHA" "$CAPTURED_RMS_DB548_RUNNER_SHA" \
+    "$CAPTURED_RMS_DB548_SUMMARY_SHA" "$CAPTURED_RMS_DB548_SUCCESS_SHA" \
+    "$CAPTURED_RMS_DB548_HLO_SHA" "$CAPTURED_RMS_DB549_TENSOR_SHA" \
+    "$CAPTURED_RMS_DB549_RUNNER_SHA" "$CAPTURED_RMS_DB549_SUMMARY_SHA" \
+    "$CAPTURED_RMS_DB549_SUCCESS_SHA" "$CAPTURED_RMS_DB549_HLO_SHA" <<'PY'
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+import math
+from pathlib import Path
+import sys
+
+import numpy as np
+
+(
+    run_dir_text,
+    pin,
+    elapsed_text,
+    run_tag,
+    capture_tensor_sha,
+    capture_runner_sha,
+    capture_summary_sha,
+    capture_success_sha,
+    db548_tensor_sha,
+    db548_runner_sha,
+    db548_summary_sha,
+    db548_success_sha,
+    db548_hlo_sha,
+    db549_tensor_sha,
+    db549_runner_sha,
+    db549_summary_sha,
+    db549_success_sha,
+    db549_hlo_sha,
+) = sys.argv[1:]
+run_dir = Path(run_dir_text)
+runner_path = run_dir / "runner.json"
+tensor_path = run_dir / "captured_rms_replay.npz"
+runner = json.loads(runner_path.read_text())
+
+def file_sha(path: Path) -> str:
+    return sha256(path.read_bytes()).hexdigest()
+
+def array_sha(value: np.ndarray) -> str:
+    return sha256(np.ascontiguousarray(value).tobytes(order="C")).hexdigest()
+
+def exact_int(value: object) -> bool:
+    return type(value) is int
+
+def finite_float(value: object) -> bool:
+    return type(value) is float and math.isfinite(value)
+
+expected_source = {
+    "capture_runner_sha256": capture_runner_sha,
+    "capture_summary_sha256": capture_summary_sha,
+    "capture_success_sha256": capture_success_sha,
+    "capture_tensor_sha256": capture_tensor_sha,
+    "db548_hlo_sha256": db548_hlo_sha,
+    "db548_runner_sha256": db548_runner_sha,
+    "db548_summary_sha256": db548_summary_sha,
+    "db548_success_sha256": db548_success_sha,
+    "db548_tensor_sha256": db548_tensor_sha,
+    "db549_hlo_sha256": db549_hlo_sha,
+    "db549_runner_sha256": db549_runner_sha,
+    "db549_summary_sha256": db549_summary_sha,
+    "db549_success_sha256": db549_success_sha,
+    "db549_tensor_sha256": db549_tensor_sha,
+}
+arms = runner.get("arms")
+if not (
+    runner.get("artifact_kind") == "glm52_layer0_captured_rms_replay"
+    and isinstance(arms, dict)
+    and set(arms) == {"control", "accepted_split"}
+    and runner.get("code_hash") == pin
+    and runner.get("control_admissible") is True
+    and runner.get("dense_update_sha256")
+    == "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc"
+    and runner.get("live_rows") == 1
+    and runner.get("performance_claim") is False
+    and runner.get("position") == 8155
+    and runner.get("source") == expected_source
+    and runner.get("status") == "SUCCESS"
+):
+    raise SystemExit("captured RMS runner identity drifted")
+
+expected_collectives = {
+    "all_gather": 1,
+    "all_reduce": 0,
+    "all_to_all": 0,
+    "collective_broadcast": 0,
+    "collective_permute": 0,
+    "reduce_scatter": 0,
+}
+for name, split in (("control", False), ("accepted_split", True)):
+    arm = arms[name]
+    stable = arm.get("hlo", {}).get("stablehlo_contract", {})
+    optimized = arm.get("hlo", {}).get("optimized_contract", {})
+    stable_path = run_dir / "hlo" / f"{name}.stablehlo.mlir"
+    optimized_path = run_dir / "hlo" / f"{name}.optimized_hlo.txt"
+    if not (
+        arm.get("split_layer1_rms") is split
+        and stable.get("passed") is True
+        and stable.get("violations") == []
+        and stable.get("collective_counts") == expected_collectives
+        and stable.get("exact_result_binding") is True
+        and stable.get("live_rows") == 1
+        and stable.get("split_layer1_rms") is split
+        and optimized.get("passed") is True
+        and optimized.get("violations") == []
+        and optimized.get("async_collectives") == []
+        and optimized.get("collective_count") == 1
+        and optimized.get("exact_output_fusion") is True
+        and optimized.get("exact_result_binding") is True
+        and optimized.get("exact_scheduled_reduction_binding") is True
+        and optimized.get("live_rows") == 1
+        and optimized.get("num_partitions") == 4
+        and optimized.get("num_replicas") in (None, 1)
+        and optimized.get("performance_claim") is False
+        and optimized.get("split_layer1_rms") is split
+        and (
+            len(optimized.get("accepted_scheduled_reduction_values", [])) == 1
+            if split
+            else optimized.get("accepted_scheduled_reduction_values") == []
+        )
+        and arm.get("hlo", {}).get("stablehlo_sha256")
+        == file_sha(stable_path)
+        and arm.get("hlo", {}).get("optimized_sha256")
+        == file_sha(optimized_path)
+    ):
+        raise SystemExit(f"captured RMS {name} HLO contract drifted")
+
+control = arms["control"]
+control_comparison = control.get("comparison", {})
+if not (
+    control.get("output_sha256")
+    == "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005"
+    and control_comparison.get("elementwise_exact") is True
+    and control_comparison.get("expected_sha256") == control["output_sha256"]
+    and control_comparison.get("observed_sha256") == control["output_sha256"]
+    and exact_int(control_comparison.get("mismatch_count"))
+    and control_comparison.get("mismatch_count") == 0
+    and control_comparison.get("first_mismatch_index") is None
+    and finite_float(control_comparison.get("max_abs_error"))
+    and control_comparison.get("max_abs_error") == 0.0
+    and finite_float(control_comparison.get("mean_abs_error"))
+    and control_comparison.get("mean_abs_error") == 0.0
+    and control_comparison.get("shape") == [6144]
+):
+    raise SystemExit("captured RMS control comparison drifted")
+
+split = arms["accepted_split"]
+comparison = split.get("comparison", {})
+exact = runner.get("exact")
+expected_sha = "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039"
+common = bool(
+    comparison.get("expected_sha256") == expected_sha
+    and comparison.get("observed_sha256") == split.get("output_sha256")
+    and comparison.get("shape") == [6144]
+    and exact_int(comparison.get("mismatch_count"))
+    and finite_float(comparison.get("max_abs_error"))
+    and finite_float(comparison.get("mean_abs_error"))
+)
+exact_schema = bool(
+    exact is True
+    and runner.get("classification") == "captured_partials_split_rms_exact"
+    and runner.get("exact_arms") == ["accepted_split"]
+    and split.get("output_sha256") == expected_sha
+    and comparison.get("elementwise_exact") is True
+    and exact_int(comparison.get("mismatch_count"))
+    and comparison.get("mismatch_count") == 0
+    and comparison.get("first_mismatch_index") is None
+    and finite_float(comparison.get("max_abs_error"))
+    and comparison.get("max_abs_error") == 0.0
+    and finite_float(comparison.get("mean_abs_error"))
+    and comparison.get("mean_abs_error") == 0.0
+)
+nonexact_schema = bool(
+    exact is False
+    and runner.get("classification") == "captured_partials_split_rms_nonexact"
+    and runner.get("exact_arms") == []
+    and split.get("output_sha256") != expected_sha
+    and comparison.get("elementwise_exact") is False
+    and 1 <= comparison.get("mismatch_count", 0) <= 6144
+    and exact_int(comparison.get("first_mismatch_index"))
+    and 0 <= comparison["first_mismatch_index"] < 6144
+    and 0.0 < comparison.get("mean_abs_error", 0.0)
+    <= comparison.get("max_abs_error", 0.0)
+)
+if not common or not (exact_schema or nonexact_schema):
+    raise SystemExit("captured RMS split comparison drifted")
+
+with np.load(tensor_path, allow_pickle=False) as payload:
+    if set(payload.files) != {
+        "accepted_layer1_normalized_bfloat16_bits",
+        "control_layer1_normalized_bfloat16_bits",
+        "db548_layer1_normalized_bfloat16_bits",
+        "split_layer1_normalized_bfloat16_bits",
+    }:
+        raise SystemExit("captured RMS tensor key set drifted")
+    expected_arrays = {
+        "accepted_layer1_normalized_bfloat16_bits": expected_sha,
+        "control_layer1_normalized_bfloat16_bits": control["output_sha256"],
+        "db548_layer1_normalized_bfloat16_bits": control["output_sha256"],
+        "split_layer1_normalized_bfloat16_bits": split["output_sha256"],
+    }
+    for name, expected_array_sha in expected_arrays.items():
+        value = np.ascontiguousarray(payload[name])
+        if (
+            value.dtype != np.uint16
+            or value.shape != (6144,)
+            or array_sha(value) != expected_array_sha
+        ):
+            raise SystemExit(f"captured RMS tensor drifted: {name}")
+
+summary = {
+    "artifact_kind": runner["artifact_kind"],
+    "arms": {
+        name: {
+            "comparison": arms[name]["comparison"],
+            "hlo": {
+                "optimized_sha256": arms[name]["hlo"]["optimized_sha256"],
+                "stablehlo_sha256": arms[name]["hlo"]["stablehlo_sha256"],
+            },
+            "output_sha256": arms[name]["output_sha256"],
+            "split_layer1_rms": arms[name]["split_layer1_rms"],
+        }
+        for name in ("control", "accepted_split")
+    },
+    "classification": runner["classification"],
+    "code_hash": pin,
+    "control_admissible": True,
+    "elapsed_seconds": int(elapsed_text),
+    "exact": exact,
+    "exact_arms": runner["exact_arms"],
+    "live_rows": 1,
+    "performance_claim": False,
+    "position": 8155,
+    "results_db_run_id": None,
+    "run_tag": run_tag,
+    "runner_sha256": file_sha(runner_path),
+    "source": expected_source,
+    "status": "SUCCESS",
+    "tensor_sha256": file_sha(tensor_path),
+}
+(run_dir / "summary.json").write_text(
+    json.dumps(summary, indent=2, sort_keys=True) + "\n"
+)
+print("CAPTURED_RMS_REPLAY_VALID")
+PY
+}
 if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
   capture_partials_probe_args=(--capture-partials)
 fi
@@ -289,7 +599,7 @@ strict_census() {
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   local command
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_projection_reduction[.]py|[p]robe_layer0_dense_convolution[.]py|[p]robe_layer0_attention_arithmetic[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[p]robe_layer0_projection_reduction[.]py|[p]robe_layer0_dense_convolution[.]py|[p]robe_layer0_captured_rms[.]py|[p]robe_layer0_attention_arithmetic[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
     --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
@@ -299,6 +609,10 @@ post_census_done=0
 terminal_success_done=0
 
 rollback_provisional_db() {
+  if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+    echo "NO_PROVISIONAL_DB_RUN" >"$RUN_DIR/provisional_db_rollback.txt"
+    return 0
+  fi
   /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$TAG" "$PIN" \
     "$DENSE_CONVOLUTION" "$RUN_DIR" "$DB538_TENSOR_SHA" \
     "$CHECKPOINT_MANIFEST_SHA" "$HARNESS_GIT" "$FORK_GIT" \
@@ -821,6 +1135,37 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR PIN=$PIN"
+if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  require_sha "$CAPTURED_RMS_SOURCE_TENSOR" "$CAPTURED_RMS_SOURCE_TENSOR_SHA" "captured RMS source tensor"
+  require_sha "$CAPTURED_RMS_SOURCE_RUNNER" "$CAPTURED_RMS_SOURCE_RUNNER_SHA" "captured RMS source runner"
+  require_sha "$CAPTURED_RMS_SOURCE_SUMMARY" "$CAPTURED_RMS_SOURCE_SUMMARY_SHA" "captured RMS source summary"
+  require_sha "$CAPTURED_RMS_SOURCE_SUCCESS" "$CAPTURED_RMS_SOURCE_SUCCESS_SHA" "captured RMS source SUCCESS"
+  require_sha "$CAPTURED_RMS_DB548_TENSOR" "$CAPTURED_RMS_DB548_TENSOR_SHA" "captured RMS DB548 tensor"
+  require_sha "$CAPTURED_RMS_DB548_RUNNER" "$CAPTURED_RMS_DB548_RUNNER_SHA" "captured RMS DB548 runner"
+  require_sha "$CAPTURED_RMS_DB548_SUMMARY" "$CAPTURED_RMS_DB548_SUMMARY_SHA" "captured RMS DB548 summary"
+  require_sha "$CAPTURED_RMS_DB548_SUCCESS" "$CAPTURED_RMS_DB548_SUCCESS_SHA" "captured RMS DB548 SUCCESS"
+  require_sha "$CAPTURED_RMS_DB548_HLO" "$CAPTURED_RMS_DB548_HLO_SHA" "captured RMS DB548 HLO"
+  require_sha "$CAPTURED_RMS_DB549_TENSOR" "$CAPTURED_RMS_DB549_TENSOR_SHA" "captured RMS DB549 tensor"
+  require_sha "$CAPTURED_RMS_DB549_RUNNER" "$CAPTURED_RMS_DB549_RUNNER_SHA" "captured RMS DB549 runner"
+  require_sha "$CAPTURED_RMS_DB549_SUMMARY" "$CAPTURED_RMS_DB549_SUMMARY_SHA" "captured RMS DB549 summary"
+  require_sha "$CAPTURED_RMS_DB549_SUCCESS" "$CAPTURED_RMS_DB549_SUCCESS_SHA" "captured RMS DB549 SUCCESS"
+  require_sha "$CAPTURED_RMS_DB549_HLO" "$CAPTURED_RMS_DB549_HLO_SHA" "captured RMS DB549 HLO"
+
+  require_remote_sha "$CAPTURED_RMS_SOURCE_REMOTE/dense_partial_capture.npz" "$CAPTURED_RMS_SOURCE_TENSOR_SHA" "captured RMS source tensor"
+  require_remote_sha "$CAPTURED_RMS_SOURCE_REMOTE/runner.json" "$CAPTURED_RMS_SOURCE_RUNNER_SHA" "captured RMS source runner"
+  require_remote_sha "$CAPTURED_RMS_SOURCE_REMOTE/summary.json" "$CAPTURED_RMS_SOURCE_SUMMARY_SHA" "captured RMS source summary"
+  require_remote_sha "$CAPTURED_RMS_SOURCE_REMOTE/SUCCESS" "$CAPTURED_RMS_SOURCE_SUCCESS_SHA" "captured RMS source SUCCESS"
+  require_remote_sha "$CAPTURED_RMS_DB548_REMOTE/dense_envelope_cross_layer.npz" "$CAPTURED_RMS_DB548_TENSOR_SHA" "captured RMS DB548 tensor"
+  require_remote_sha "$CAPTURED_RMS_DB548_REMOTE/runner.json" "$CAPTURED_RMS_DB548_RUNNER_SHA" "captured RMS DB548 runner"
+  require_remote_sha "$CAPTURED_RMS_DB548_REMOTE/summary.json" "$CAPTURED_RMS_DB548_SUMMARY_SHA" "captured RMS DB548 summary"
+  require_remote_sha "$CAPTURED_RMS_DB548_REMOTE/SUCCESS" "$CAPTURED_RMS_DB548_SUCCESS_SHA" "captured RMS DB548 SUCCESS"
+  require_remote_sha "$CAPTURED_RMS_DB548_REMOTE/hlo/dense_convolution.optimized_hlo.txt" "$CAPTURED_RMS_DB548_HLO_SHA" "captured RMS DB548 HLO"
+  require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/dense_envelope_split_rms.npz" "$CAPTURED_RMS_DB549_TENSOR_SHA" "captured RMS DB549 tensor"
+  require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/runner.json" "$CAPTURED_RMS_DB549_RUNNER_SHA" "captured RMS DB549 runner"
+  require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/summary.json" "$CAPTURED_RMS_DB549_SUMMARY_SHA" "captured RMS DB549 summary"
+  require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/SUCCESS" "$CAPTURED_RMS_DB549_SUCCESS_SHA" "captured RMS DB549 SUCCESS"
+  require_remote_sha "$CAPTURED_RMS_DB549_REMOTE/hlo/dense_convolution.optimized_hlo.txt" "$CAPTURED_RMS_DB549_HLO_SHA" "captured RMS DB549 HLO"
+else
 require_sha "$ATTENTION_TENSOR" "$ATTENTION_TENSOR_SHA" "DB537 tensor"
 require_sha "$ATTENTION_RUNNER" "$ATTENTION_RUNNER_SHA" "DB537 runner"
 require_sha "$ATTENTION_SUCCESS" "$ATTENTION_SUCCESS_SHA" "DB537 SUCCESS"
@@ -922,6 +1267,7 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
     require_remote_sha "$ACCEPTED_M32_REMOTE/SUCCESS" "$ACCEPTED_M32_SUCCESS_SHA" "accepted M32 SUCCESS"
   fi
 fi
+fi
 
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -929,7 +1275,51 @@ strict_census pre || {
 }
 
 started=$(date +%s)
-if [[ $DENSE_CONVOLUTION == 1 ]]; then
+if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  say "replaying sealed dense partials through isolated layer-1 RMS arms"
+  (
+    cd "$WORKTREE"
+    JAX_PLATFORMS=tpu \
+      TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+      TPU_PROCESS_BOUNDS=1,1,1 \
+      TPU_VISIBLE_DEVICES=0,1,2,3 \
+      PYTHONPATH="$WORKTREE" \
+      /home/gianl/vllm-env/bin/python \
+        scripts/greenfield/probe_layer0_captured_rms.py \
+        --expected-code-hash "$PIN" \
+        --capture-tensor "$CAPTURED_RMS_SOURCE_TENSOR" \
+        --capture-tensor-sha256 "$CAPTURED_RMS_SOURCE_TENSOR_SHA" \
+        --capture-runner "$CAPTURED_RMS_SOURCE_RUNNER" \
+        --capture-runner-sha256 "$CAPTURED_RMS_SOURCE_RUNNER_SHA" \
+        --capture-summary "$CAPTURED_RMS_SOURCE_SUMMARY" \
+        --capture-summary-sha256 "$CAPTURED_RMS_SOURCE_SUMMARY_SHA" \
+        --capture-success "$CAPTURED_RMS_SOURCE_SUCCESS" \
+        --capture-success-sha256 "$CAPTURED_RMS_SOURCE_SUCCESS_SHA" \
+        --db548-tensor "$CAPTURED_RMS_DB548_TENSOR" \
+        --db548-tensor-sha256 "$CAPTURED_RMS_DB548_TENSOR_SHA" \
+        --db548-runner "$CAPTURED_RMS_DB548_RUNNER" \
+        --db548-runner-sha256 "$CAPTURED_RMS_DB548_RUNNER_SHA" \
+        --db548-summary "$CAPTURED_RMS_DB548_SUMMARY" \
+        --db548-summary-sha256 "$CAPTURED_RMS_DB548_SUMMARY_SHA" \
+        --db548-success "$CAPTURED_RMS_DB548_SUCCESS" \
+        --db548-success-sha256 "$CAPTURED_RMS_DB548_SUCCESS_SHA" \
+        --db548-hlo "$CAPTURED_RMS_DB548_HLO" \
+        --db548-hlo-sha256 "$CAPTURED_RMS_DB548_HLO_SHA" \
+        --db549-tensor "$CAPTURED_RMS_DB549_TENSOR" \
+        --db549-tensor-sha256 "$CAPTURED_RMS_DB549_TENSOR_SHA" \
+        --db549-runner "$CAPTURED_RMS_DB549_RUNNER" \
+        --db549-runner-sha256 "$CAPTURED_RMS_DB549_RUNNER_SHA" \
+        --db549-summary "$CAPTURED_RMS_DB549_SUMMARY" \
+        --db549-summary-sha256 "$CAPTURED_RMS_DB549_SUMMARY_SHA" \
+        --db549-success "$CAPTURED_RMS_DB549_SUCCESS" \
+        --db549-success-sha256 "$CAPTURED_RMS_DB549_SUCCESS_SHA" \
+        --db549-hlo "$CAPTURED_RMS_DB549_HLO" \
+        --db549-hlo-sha256 "$CAPTURED_RMS_DB549_HLO_SHA" \
+        --output "$RUN_DIR/runner.json" \
+        --tensor-output "$RUN_DIR/$TENSOR_BASENAME" \
+        --hlo-dir "$RUN_DIR/hlo"
+  ) >"$RUN_DIR/runner.log" 2>&1
+elif [[ $DENSE_CONVOLUTION == 1 ]]; then
   say "running accepted dense-convolution arithmetic arm at M=$DENSE_COMPILE_ROWS"
   (
     cd "$WORKTREE"
@@ -1006,7 +1396,9 @@ strict_census post || {
 }
 post_census_done=1
 
-if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
+if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  validate_captured_rms_replay
+elif [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
   /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$elapsed" "$TAG" \
     "$DB538_RUNNER_SHA" "$DB538_TENSOR_SHA" "$DB538_SUMMARY_SHA" \
     "$DB538_SUCCESS_SHA" "$CHECKPOINT_MANIFEST_SHA" \
@@ -2128,12 +2520,181 @@ remote_remote_objects_sha=$(gcloud storage cat "$REMOTE_PREFIX/remote_objects.js
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" <<'PY'
 from hashlib import sha256
+import base64
 import json
 from pathlib import Path
 import sys
 
+import google_crc32c
+
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
+if summary.get("artifact_kind") == "glm52_layer0_captured_rms_replay":
+    runner = json.loads((root / "runner.json").read_text())
+    arms = summary.get("arms")
+    exact = summary.get("exact")
+    exact_schema = bool(
+        exact is True
+        and summary.get("classification")
+        == "captured_partials_split_rms_exact"
+        and summary.get("exact_arms") == ["accepted_split"]
+    )
+    nonexact_schema = bool(
+        exact is False
+        and summary.get("classification")
+        == "captured_partials_split_rms_nonexact"
+        and summary.get("exact_arms") == []
+    )
+    expected_arms = {
+        arm_name: {
+            "comparison": runner["arms"][arm_name]["comparison"],
+            "hlo": {
+                "optimized_sha256": runner["arms"][arm_name]["hlo"][
+                    "optimized_sha256"
+                ],
+                "stablehlo_sha256": runner["arms"][arm_name]["hlo"][
+                    "stablehlo_sha256"
+                ],
+            },
+            "output_sha256": runner["arms"][arm_name]["output_sha256"],
+            "split_layer1_rms": runner["arms"][arm_name][
+                "split_layer1_rms"
+            ],
+        }
+        for arm_name in ("control", "accepted_split")
+    }
+    actual_hlo_hashes = {
+        arm_name: {
+            "optimized_sha256": sha256(
+                (root / "hlo" / f"{arm_name}.optimized_hlo.txt").read_bytes()
+            ).hexdigest(),
+            "stablehlo_sha256": sha256(
+                (root / "hlo" / f"{arm_name}.stablehlo.mlir").read_bytes()
+            ).hexdigest(),
+        }
+        for arm_name in ("control", "accepted_split")
+    }
+    evidence_records = {}
+    for line in (root / "evidence.sha256").read_text().splitlines():
+        digest, relative = line.split(None, 1)
+        evidence_records[relative.strip()] = digest
+
+    def local_crc32c(path: Path) -> str:
+        checksum = google_crc32c.Checksum()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+                checksum.update(chunk)
+        return base64.b64encode(checksum.digest()).decode()
+
+    ledger = json.loads((root / "remote_objects.json").read_text())
+    ledger_by_path = {
+        record["path"]: record for record in ledger.get("objects", ())
+    }
+    expected_ledger_paths = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.name not in {"SUCCESS", "remote_objects.json"}
+    }
+    exact_ledger = bool(
+        set(ledger_by_path) == expected_ledger_paths
+        and all(
+            record.get("size") == (root / relative).stat().st_size
+            and record.get("crc32c") == local_crc32c(root / relative)
+            and isinstance(record.get("generation"), str)
+            and record["generation"]
+            for relative, record in ledger_by_path.items()
+        )
+    )
+    evidence_bound = bool(
+        evidence_records.get("summary.json")
+        == sha256((root / "summary.json").read_bytes()).hexdigest()
+        and evidence_records.get("runner.json")
+        == sha256((root / "runner.json").read_bytes()).hexdigest()
+        and evidence_records.get("captured_rms_replay.npz")
+        == sha256((root / "captured_rms_replay.npz").read_bytes()).hexdigest()
+        and all(
+            evidence_records.get(f"hlo/{arm_name}.{suffix}") == digest
+            for arm_name in ("control", "accepted_split")
+            for suffix, digest in (
+                ("optimized_hlo.txt", actual_hlo_hashes[arm_name]["optimized_sha256"]),
+                ("stablehlo.mlir", actual_hlo_hashes[arm_name]["stablehlo_sha256"]),
+            )
+        )
+    )
+    if not (
+        summary.get("code_hash") == sys.argv[3]
+        and runner.get("artifact_kind") == summary["artifact_kind"]
+        and runner.get("code_hash") == summary["code_hash"]
+        and runner.get("classification") == summary.get("classification")
+        and runner.get("control_admissible")
+        is summary.get("control_admissible")
+        and runner.get("exact") is summary.get("exact")
+        and runner.get("exact_arms") == summary.get("exact_arms")
+        and runner.get("source") == summary.get("source")
+        and arms == expected_arms
+        and all(
+            actual_hlo_hashes[arm_name] == arms[arm_name]["hlo"]
+            for arm_name in ("control", "accepted_split")
+        )
+        and evidence_bound
+        and exact_ledger
+        and summary.get("control_admissible") is True
+        and summary.get("live_rows") == 1
+        and summary.get("performance_claim") is False
+        and summary.get("position") == 8155
+        and summary.get("results_db_run_id") is None
+        and summary.get("status") == "SUCCESS"
+        and (exact_schema or nonexact_schema)
+        and isinstance(arms, dict)
+        and set(arms) == {"control", "accepted_split"}
+        and arms["control"].get("output_sha256")
+        == "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005"
+        and arms["control"].get("comparison", {}).get("elementwise_exact")
+        is True
+        and arms["accepted_split"].get("comparison", {}).get(
+            "elementwise_exact"
+        )
+        is exact
+        and summary.get("runner_sha256")
+        == sha256((root / "runner.json").read_bytes()).hexdigest()
+        and summary.get("tensor_sha256")
+        == sha256((root / "captured_rms_replay.npz").read_bytes()).hexdigest()
+    ):
+        raise SystemExit("captured RMS replay summary drifted before SUCCESS")
+    values = {
+        "artifact_kind": summary["artifact_kind"],
+        "classification": summary["classification"],
+        "code_hash": sys.argv[3],
+        "control_admissible": "true",
+        "evidence_sha256": sha256(
+            (root / "evidence.sha256").read_bytes()
+        ).hexdigest(),
+        "exact": str(exact).lower(),
+        "exact_arms": ",".join(summary["exact_arms"]) or "none",
+        "live_rows": "1",
+        "performance_claim": "false",
+        "remote_objects_sha256": sha256(
+            (root / "remote_objects.json").read_bytes()
+        ).hexdigest(),
+        "remote_prefix": sys.argv[2],
+        "results_db_run_id": "none",
+        "runner_sha256": summary["runner_sha256"],
+        "tensor_sha256": summary["tensor_sha256"],
+    }
+    for arm_name, arm in sorted(arms.items()):
+        values[f"arm_{arm_name}_optimized_hlo_sha256"] = arm["hlo"][
+            "optimized_sha256"
+        ]
+        values[f"arm_{arm_name}_output_sha256"] = arm["output_sha256"]
+        values[f"arm_{arm_name}_stablehlo_sha256"] = arm["hlo"][
+            "stablehlo_sha256"
+        ]
+    for key, value in sorted(summary.get("source", {}).items()):
+        values[f"source_{key}"] = value
+    (root / "SUCCESS").write_text(
+        "".join(f"{key}={value}\n" for key, value in sorted(values.items()))
+    )
+    raise SystemExit(0)
 if summary.get("artifact_kind") == "glm52_layer0_dense_partial_capture":
     records = summary.get("capture_records")
     records_sha = sha256(

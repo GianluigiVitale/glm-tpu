@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 20:42 UTC — protected 32-partial capture closes capture integrity; one RMS replay remains
+
+- Reviewed/pushed commits `1987770bb89f436253686f789c0b5ccbfebc2335` and
+  `c0ef9525bcd893bdad377af2b56e5ebd5fb13b34` completed the protected capture
+  `greenfield_layer0_dense_partial_capture_20260813T200736889447458Z`. The diagnostic uses the
+  accepted scheduled geometry for all 16 dense contractions and returns the 32 already-rounded
+  BF16 down partials before StrategyND reduction. It has no results-DB row and no performance claim;
+  local/remote evidence verification and the authenticated terminal census pass 8/8.
+- The partial array is `[4,8,1,6144]`/`uint16`, SHA `9d9f65dd...16e35`. The carried M32 residual,
+  layer-1 norm and accepted output SHAs are `f583581f...2dc0`, `10e34f4f...6c87` and
+  `9936ee1e...3039`. NPZ/runner/summary/`SUCCESS` SHAs are `f194d757...4298`,
+  `d22b35f6...8343`, `c349b5fd...e416` and `6cac8976...0b85`.
+- An independent NumPy replay of the exact DB533 physical permutation and every BF16-rounded
+  `y -> x -> z` add produces dense-update SHA `efde8532...b4fc`, exactly matching the integrated
+  DB548 update. This proves the capture bytes and ordering are coherent; no new full-model capture
+  or reduction-tree search is justified.
+- The active default-off captured-RMS discriminator compiles two isolated four-chip programs over
+  only those sealed inputs. The control must reproduce DB548 SHA `9b52a04e...4005`; the challenger
+  applies DB549's accepted scalar-only RMS schedule and compares to `9936ee1e...3039`. Exact
+  StableHLO pins the StrategyND tree and RMS arithmetic; optimized HLO pins the sole LP4 gather,
+  liveness, no async/host/Pallas/convolution work and the accepted scheduled reduction. The existing
+  protected wrapper supplies lease/census, exact local/remote provenance, no-DB publication,
+  CRC-equal archive and terminal `SUCCESS`. Focused tests pass locally. Exact next is one combined
+  Sol audit and one protected replay; this is mechanism readiness, not a numerical result.
+
 ## 2026-08-13 19:05 UTC — full prefill exposes layer-0 dense arithmetic as the Gate-D blocker
 
 - Reviewed/pushed pin `2c3b84eebc287682625ab54ac3cc3dfd143e8230` was used for one protected
