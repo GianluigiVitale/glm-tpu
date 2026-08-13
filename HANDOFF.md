@@ -19,6 +19,25 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Pushed pin `20bcf778869a5a9d871df21796d1bbf92876a1fe` completed the protected
+  one-contraction discriminator under tag
+  `greenfield_layer0_isolated_dense_replay_20260813T225647267633552Z`. Arithmetic and both exact
+  HLO gates completed in seven seconds; the complete census/archive/`SUCCESS`-last workflow took
+  about 70 seconds. Every one of the 32 isolated BF16 down partials is bitwise identical to the
+  integrated captured partial at `0` mismatches for every virtual rank. Replaying either set
+  produces the same DB548 layer-1 SHA `9b52a04e...4005`, still one BF16 ULP low at hidden index
+  2795 (`48422` versus accepted `48423`). This conclusively rejects eight-sibling contraction
+  scheduling as the cause; do not repeat it or run another full decoder for that hypothesis.
+- Runner/tensor/summary/`SUCCESS` SHAs are `128a0663...0e4d`, `ffbc4801...6f4`,
+  `b02584df...20f8` and `7882a929...975a`. The result is deliberately no-DB/non-performance
+  evidence, local/remote CRC verification passes, and cleanup is authenticated 8/8. The bounded
+  successor extends the same compiled replay with a hidden-2795 sensitivity sweep. An offline
+  exhaustive one-leaf search over BF16 code deltas `[-32,32]` collapses to only 15 distinct dense
+  update values, bits `47802..47816`; those unique candidates are executed through the unchanged
+  proven StrategyND/RMS program in one launch. This identifies the exact dense-update bit required
+  by the accepted row before inspecting only the causal contraction/fusion edge. No Gate-D or
+  performance claim exists yet.
+
 - The current default-off batch replaces the one-hour iteration loop with a direct contraction
   discriminator. `probe_layer0_isolated_dense.py` loads only the pinned layer-0 dense weights and
   sealed position-8155 inputs, compiles one M32 virtual contraction per LP4 chip, executes that

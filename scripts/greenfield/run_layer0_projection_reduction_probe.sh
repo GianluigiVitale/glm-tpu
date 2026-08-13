@@ -670,6 +670,11 @@ with np.load(tensor_path, allow_pickle=False) as payload:
         "control_layer1_normalized_bfloat16_bits",
         "isolated_dense_virtual_partials_bfloat16_bits",
         "isolated_layer1_normalized_bfloat16_bits",
+        "sensitivity_candidate_dense_update_bfloat16_bits",
+        "sensitivity_candidate_model_rank",
+        "sensitivity_candidate_partial_bit_delta",
+        "sensitivity_candidate_partial_bits",
+        "sensitivity_layer1_normalized_bfloat16_bits",
     }
     if set(payload.files) != expected_keys:
         raise SystemExit("isolated dense tensor key set drifted")
@@ -688,6 +693,21 @@ with np.load(tensor_path, allow_pickle=False) as payload:
     isolated = np.ascontiguousarray(
         payload["isolated_layer1_normalized_bfloat16_bits"]
     )
+    sensitivity_dense = np.ascontiguousarray(
+        payload["sensitivity_candidate_dense_update_bfloat16_bits"]
+    )
+    sensitivity_rank = np.ascontiguousarray(
+        payload["sensitivity_candidate_model_rank"]
+    )
+    sensitivity_delta = np.ascontiguousarray(
+        payload["sensitivity_candidate_partial_bit_delta"]
+    )
+    sensitivity_partial_bits = np.ascontiguousarray(
+        payload["sensitivity_candidate_partial_bits"]
+    )
+    sensitivity_outputs = np.ascontiguousarray(
+        payload["sensitivity_layer1_normalized_bfloat16_bits"]
+    )
 if not (
     all(value.dtype == np.uint16 for value in (accepted, captured, control, isolated_partials, isolated))
     and accepted.shape == control.shape == isolated.shape == (6144,)
@@ -698,6 +718,16 @@ if not (
     == "9d9f65dddc7b622875872a33a6522c330c8fb5490c8cba14526553c211516e35"
     and array_sha(control)
     == "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005"
+    and sensitivity_dense.dtype == np.uint16
+    and sensitivity_rank.dtype == np.int16
+    and sensitivity_delta.dtype == np.int16
+    and sensitivity_partial_bits.dtype == np.int32
+    and sensitivity_outputs.dtype == np.uint16
+    and sensitivity_dense.ndim == sensitivity_rank.ndim
+    == sensitivity_delta.ndim == sensitivity_partial_bits.ndim == 1
+    and sensitivity_outputs.shape == (sensitivity_dense.size, 6144)
+    and sensitivity_rank.shape == sensitivity_delta.shape
+    == sensitivity_partial_bits.shape == sensitivity_dense.shape
 ):
     raise SystemExit("isolated dense tensor identity drifted")
 comparison = compare(accepted, isolated)
@@ -725,6 +755,150 @@ expected_partial = {
 }
 if runner.get("partial_comparison") != expected_partial:
     raise SystemExit("isolated dense partial comparison drifted")
+
+physical_model_positions = (
+    0, 16, 4, 20, 8, 24, 12, 28,
+    1, 17, 5, 21, 9, 25, 13, 29,
+    2, 18, 6, 22, 10, 26, 14, 30,
+    3, 19, 7, 23, 11, 27, 15, 31,
+)
+
+def reduce_feature_bits(value: np.ndarray, hidden_index: int) -> int:
+    model = value.reshape(32, 1, 6144)[:, 0, hidden_index].view(
+        ml_dtypes.bfloat16
+    )
+    physical = np.stack(tuple(model[index] for index in physical_model_positions))
+    physical_y_x_z = np.transpose(physical.reshape(4, 4, 2), (1, 2, 0))
+
+    def add(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+        return np.asarray(left + right, dtype=ml_dtypes.bfloat16)
+
+    def reduce_four(values: np.ndarray, cross: bool) -> np.ndarray:
+        if cross:
+            return add(add(values[0], values[3]), add(values[1], values[2]))
+        return add(add(values[0], values[1]), add(values[2], values[3]))
+
+    y_reduced = reduce_four(
+        physical_y_x_z, 2048 <= hidden_index < 4096
+    )
+    x_reduced = add(y_reduced[0], y_reduced[1])
+    reduced = reduce_four(x_reduced, bool((hidden_index // 256) % 2))
+    return int(np.asarray(reduced).view(np.uint16))
+
+def expected_sensitivity_records() -> list[dict[str, object]]:
+    hidden_index = 2795
+    baseline = reduce_feature_bits(captured, hidden_index)
+    flat = captured.reshape(32, 1, 6144)
+    producers: dict[int, list[tuple[int, int, int, int]]] = {
+        baseline: [(-1, 0, -1, -1)]
+    }
+    for model_rank in range(32):
+        original = int(flat[model_rank, 0, hidden_index])
+        for delta in range(-32, 33):
+            if delta == 0 or not 0 <= original + delta <= 0xFFFF:
+                continue
+            mutated = captured.copy()
+            mutated.reshape(32, 1, 6144)[model_rank, 0, hidden_index] = (
+                np.uint16(original + delta)
+            )
+            dense_bits = reduce_feature_bits(mutated, hidden_index)
+            producers.setdefault(dense_bits, []).append(
+                (model_rank, delta, original, original + delta)
+            )
+    records: list[dict[str, object]] = []
+    for candidate_id, dense_bits in enumerate(sorted(producers)):
+        available = producers[dense_bits]
+        representative = min(
+            available,
+            key=lambda item: (
+                abs(item[1]),
+                item[0] if item[0] >= 0 else -1,
+                item[1],
+            ),
+        )
+        model_rank, delta, original, mutated = representative
+        minimum_abs = min(abs(item[1]) for item in available)
+        records.append({
+            "candidate_id": candidate_id,
+            "dense_update_bits": dense_bits,
+            "minimum_abs_partial_bit_delta": minimum_abs,
+            "minimum_delta_producers": [
+                {"model_rank": item[0], "partial_bit_delta": item[1]}
+                for item in available
+                if abs(item[1]) == minimum_abs
+            ],
+            "representative_model_rank": model_rank,
+            "representative_owner": model_rank // 8 if model_rank >= 0 else -1,
+            "representative_virtual_rank": model_rank % 8 if model_rank >= 0 else -1,
+            "representative_original_partial_bits": original,
+            "representative_mutated_partial_bits": mutated,
+            "representative_partial_bit_delta": delta,
+        })
+    return records
+
+expected_sensitivity = expected_sensitivity_records()
+actual_sensitivity = runner.get("sensitivity", {})
+actual_candidates = actual_sensitivity.get("candidates")
+if not isinstance(actual_candidates, list) or len(actual_candidates) != len(
+    expected_sensitivity
+):
+    raise SystemExit("isolated dense sensitivity candidate count drifted")
+exact_candidate_ids = []
+for index, (expected_candidate, actual_candidate) in enumerate(
+    zip(expected_sensitivity, actual_candidates, strict=True)
+):
+    candidate_comparison = compare(accepted, sensitivity_outputs[index])
+    expected_with_result = {
+        **expected_candidate,
+        "comparison": candidate_comparison,
+        "output_sha256": array_sha(sensitivity_outputs[index]),
+    }
+    if actual_candidate != expected_with_result:
+        raise SystemExit("isolated dense sensitivity candidate drifted")
+    if candidate_comparison["elementwise_exact"]:
+        exact_candidate_ids.append(index)
+if not (
+    actual_sensitivity.get("baseline_dense_update_bits") == 47808
+    and actual_sensitivity.get("candidate_count") == len(expected_sensitivity)
+    and actual_sensitivity.get("exact_candidate_ids") == exact_candidate_ids
+    and actual_sensitivity.get("hidden_index") == 2795
+    and actual_sensitivity.get("partial_bit_delta_limit") == 32
+    and np.array_equal(
+        sensitivity_dense,
+        np.asarray(
+            [item["dense_update_bits"] for item in expected_sensitivity],
+            dtype=np.uint16,
+        ),
+    )
+    and np.array_equal(
+        sensitivity_rank,
+        np.asarray(
+            [item["representative_model_rank"] for item in expected_sensitivity],
+            dtype=np.int16,
+        ),
+    )
+    and np.array_equal(
+        sensitivity_delta,
+        np.asarray(
+            [
+                item["representative_partial_bit_delta"]
+                for item in expected_sensitivity
+            ],
+            dtype=np.int16,
+        ),
+    )
+    and np.array_equal(
+        sensitivity_partial_bits,
+        np.asarray(
+            [
+                item["representative_mutated_partial_bits"]
+                for item in expected_sensitivity
+            ],
+            dtype=np.int32,
+        ),
+    )
+):
+    raise SystemExit("isolated dense sensitivity manifest drifted")
 exact = runner["exact"]
 if not (
     runner.get("classification")
@@ -822,6 +996,7 @@ summary = {
     "partial_comparison": expected_partial,
     "performance_claim": False,
     "position": 8155,
+    "sensitivity": actual_sensitivity,
     "results_db_run_id": None,
     "run_tag": run_tag,
     "runner_sha256": file_sha(runner_path),
@@ -2985,6 +3160,7 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
         == summary.get("isolated_layer1_sha256")
         and runner.get("partial_comparison")
         == summary.get("partial_comparison")
+        and runner.get("sensitivity") == summary.get("sensitivity")
         and all(
             actual_hlo[name] == summary["hlo"][name]
             and actual_hlo[name]["optimized_sha256"]
@@ -3026,6 +3202,22 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
         "remote_prefix": sys.argv[2],
         "results_db_run_id": "none",
         "runner_sha256": summary["runner_sha256"],
+        "sensitivity_baseline_dense_update_bits": str(
+            summary["sensitivity"]["baseline_dense_update_bits"]
+        ),
+        "sensitivity_candidate_count": str(
+            summary["sensitivity"]["candidate_count"]
+        ),
+        "sensitivity_exact_candidate_ids": (
+            ",".join(
+                str(value)
+                for value in summary["sensitivity"]["exact_candidate_ids"]
+            )
+            or "none"
+        ),
+        "sensitivity_hidden_index": str(
+            summary["sensitivity"]["hidden_index"]
+        ),
         "tensor_sha256": summary["tensor_sha256"],
         "virtual_contractions_per_chip": "1",
         "virtual_rank_batches": "8",

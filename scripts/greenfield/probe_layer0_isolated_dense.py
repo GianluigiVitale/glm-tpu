@@ -26,6 +26,7 @@ from scripts.greenfield.probe_layer0_captured_rms import (  # noqa: E402
     _array_sha256,
     _build_arm,
     _load_sources,
+    _reproduce_dense_update,
     _validate_captured_rms_optimized_hlo,
 )
 from scripts.greenfield.probe_layer0_dense_convolution import (  # noqa: E402
@@ -40,6 +41,8 @@ from scripts.greenfield.probe_layer0_projection_reduction import (  # noqa: E402
 
 
 _POSITION = 8155
+_SENSITIVITY_HIDDEN_INDEX = 2795
+_SENSITIVITY_PARTIAL_BIT_DELTA_LIMIT = 32
 
 
 def _git_head() -> str:
@@ -155,6 +158,130 @@ def _partial_comparison(
         "mismatch_count": int(np.count_nonzero(mismatch)),
         "per_virtual_rank": per_rank,
     }
+
+
+def _reduce_feature_bits(
+    partial_bits: np.ndarray,
+    *,
+    hidden_index: int,
+) -> int:
+    """Replay the DB533 tree for one hidden feature using exact BF16 adds."""
+
+    from glm_tpu.greenfield.kernels.stage_local import (
+        STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
+    )
+
+    if partial_bits.dtype != np.uint16 or partial_bits.shape != (
+        4,
+        8,
+        1,
+        6144,
+    ):
+        raise ValueError("sensitivity partial geometry drifted")
+    if not 0 <= hidden_index < 6144:
+        raise ValueError("sensitivity hidden index is out of range")
+
+    model = partial_bits.reshape(32, 1, 6144)[:, 0, hidden_index].view(
+        ml_dtypes.bfloat16
+    )
+    physical = np.stack(
+        tuple(
+            model[index]
+            for index in STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE
+        )
+    )
+    physical_y_x_z = np.transpose(physical.reshape(4, 4, 2), (1, 2, 0))
+
+    def add(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+        return np.asarray(left + right, dtype=ml_dtypes.bfloat16)
+
+    def reduce_four(values: np.ndarray, *, cross: bool) -> np.ndarray:
+        if cross:
+            return add(add(values[0], values[3]), add(values[1], values[2]))
+        return add(add(values[0], values[1]), add(values[2], values[3]))
+
+    y_cross = 2048 <= hidden_index < 4096
+    y_reduced = reduce_four(physical_y_x_z, cross=y_cross)
+    x_reduced = add(y_reduced[0], y_reduced[1])
+    z_cross = bool((hidden_index // 256) % 2)
+    reduced = reduce_four(x_reduced, cross=z_cross)
+    return int(np.asarray(reduced).view(np.uint16))
+
+
+def _build_sensitivity_candidates(
+    partial_bits: np.ndarray,
+) -> list[dict[str, Any]]:
+    """Deduplicate one-leaf BF16 perturbations by reduced dense value."""
+
+    hidden_index = _SENSITIVITY_HIDDEN_INDEX
+    baseline_dense_bits = _reduce_feature_bits(
+        partial_bits, hidden_index=hidden_index
+    )
+    reproduced = _reproduce_dense_update(partial_bits)
+    if int(reproduced[0, hidden_index]) != baseline_dense_bits:
+        raise RuntimeError("scalar sensitivity reduction drifted from DB533 replay")
+
+    flat = partial_bits.reshape(32, 1, 6144)
+    producers: dict[int, list[tuple[int, int, int, int]]] = {
+        baseline_dense_bits: [(-1, 0, -1, -1)]
+    }
+    for model_rank in range(32):
+        original_bits = int(flat[model_rank, 0, hidden_index])
+        for delta in range(
+            -_SENSITIVITY_PARTIAL_BIT_DELTA_LIMIT,
+            _SENSITIVITY_PARTIAL_BIT_DELTA_LIMIT + 1,
+        ):
+            if delta == 0 or not 0 <= original_bits + delta <= 0xFFFF:
+                continue
+            mutated = partial_bits.copy()
+            mutated.reshape(32, 1, 6144)[model_rank, 0, hidden_index] = (
+                np.uint16(original_bits + delta)
+            )
+            dense_bits = _reduce_feature_bits(
+                mutated, hidden_index=hidden_index
+            )
+            producers.setdefault(dense_bits, []).append(
+                (model_rank, delta, original_bits, original_bits + delta)
+            )
+
+    records: list[dict[str, Any]] = []
+    for candidate_id, dense_bits in enumerate(sorted(producers)):
+        available = producers[dense_bits]
+        representative = min(
+            available,
+            key=lambda value: (
+                abs(value[1]),
+                value[0] if value[0] >= 0 else -1,
+                value[1],
+            ),
+        )
+        model_rank, delta, original_bits, mutated_bits = representative
+        minimum_abs_delta = min(abs(value[1]) for value in available)
+        minimum_producers = [
+            {
+                "model_rank": value[0],
+                "partial_bit_delta": value[1],
+            }
+            for value in available
+            if abs(value[1]) == minimum_abs_delta
+        ]
+        records.append(
+            {
+                "candidate_id": candidate_id,
+                "dense_update_bits": dense_bits,
+                "minimum_abs_partial_bit_delta": minimum_abs_delta,
+                "minimum_delta_producers": minimum_producers,
+                "representative_model_rank": model_rank,
+                "representative_owner": model_rank // 8 if model_rank >= 0 else -1,
+                "representative_virtual_rank": (
+                    model_rank % 8 if model_rank >= 0 else -1
+                ),
+                "representative_original_partial_bits": original_bits,
+                "representative_mutated_partial_bits": mutated_bits,
+                "representative_partial_bit_delta": delta,
+            }
+        )
+    return records
 
 
 def parse_args() -> argparse.Namespace:
@@ -325,6 +452,70 @@ def main() -> int:
     partial_comparison = _partial_comparison(
         captured_partial_bits, isolated_partial_bits
     )
+    sensitivity_candidates = _build_sensitivity_candidates(
+        captured_partial_bits
+    )
+    baseline_dense_bits = _reproduce_dense_update(captured_partial_bits)
+    sensitivity_outputs = []
+    for candidate in sensitivity_candidates:
+        candidate_partials = captured_partial_bits.copy()
+        model_rank = candidate["representative_model_rank"]
+        if model_rank >= 0:
+            candidate_partials.reshape(32, 1, 6144)[
+                model_rank, 0, _SENSITIVITY_HIDDEN_INDEX
+            ] = np.uint16(candidate["representative_mutated_partial_bits"])
+        candidate_dense_bits = _reproduce_dense_update(candidate_partials)
+        dense_mismatch = np.argwhere(candidate_dense_bits != baseline_dense_bits)
+        if (
+            int(candidate_dense_bits[0, _SENSITIVITY_HIDDEN_INDEX])
+            != candidate["dense_update_bits"]
+            or (
+                candidate["dense_update_bits"]
+                == int(baseline_dense_bits[0, _SENSITIVITY_HIDDEN_INDEX])
+                and bool(dense_mismatch.size)
+            )
+            or (
+                candidate["dense_update_bits"]
+                != int(baseline_dense_bits[0, _SENSITIVITY_HIDDEN_INDEX])
+                and (
+                    dense_mismatch.shape != (1, 2)
+                    or tuple(int(value) for value in dense_mismatch[0])
+                    != (0, _SENSITIVITY_HIDDEN_INDEX)
+                )
+            )
+        ):
+            raise RuntimeError("sensitivity candidate dense update drifted")
+        output = rms_compiled(
+            jax.device_put(
+                candidate_partials.view(ml_dtypes.bfloat16),
+                partial_sharding,
+            ),
+            *rms_arguments[1:],
+        )
+        jax.block_until_ready(output)
+        output_bits = np.ascontiguousarray(
+            np.asarray(output).reshape(6144)
+        ).view(np.uint16)
+        comparison = _compare_bits(accepted_bits, output_bits)
+        candidate["comparison"] = comparison
+        candidate["output_sha256"] = _array_sha256(output_bits)
+        sensitivity_outputs.append(output_bits)
+    sensitivity_output_bits = np.stack(sensitivity_outputs)
+    sensitivity_exact_candidate_ids = [
+        candidate["candidate_id"]
+        for candidate in sensitivity_candidates
+        if candidate["comparison"]["elementwise_exact"]
+    ]
+    sensitivity = {
+        "baseline_dense_update_bits": int(
+            baseline_dense_bits[0, _SENSITIVITY_HIDDEN_INDEX]
+        ),
+        "candidate_count": len(sensitivity_candidates),
+        "candidates": sensitivity_candidates,
+        "exact_candidate_ids": sensitivity_exact_candidate_ids,
+        "hidden_index": _SENSITIVITY_HIDDEN_INDEX,
+        "partial_bit_delta_limit": _SENSITIVITY_PARTIAL_BIT_DELTA_LIMIT,
+    }
     classification = (
         "isolated_virtual_contractions_exact"
         if exact
@@ -357,6 +548,7 @@ def main() -> int:
         "partial_comparison": partial_comparison,
         "performance_claim": False,
         "position": _POSITION,
+        "sensitivity": sensitivity,
         "source": {
             "capture_runner_sha256": args.capture_runner_sha256,
             "capture_summary_sha256": args.capture_summary_sha256,
@@ -388,6 +580,32 @@ def main() -> int:
         control_layer1_normalized_bfloat16_bits=control_bits,
         isolated_dense_virtual_partials_bfloat16_bits=isolated_partial_bits,
         isolated_layer1_normalized_bfloat16_bits=isolated_bits,
+        sensitivity_candidate_dense_update_bfloat16_bits=np.asarray(
+            [candidate["dense_update_bits"] for candidate in sensitivity_candidates],
+            dtype=np.uint16,
+        ),
+        sensitivity_candidate_model_rank=np.asarray(
+            [
+                candidate["representative_model_rank"]
+                for candidate in sensitivity_candidates
+            ],
+            dtype=np.int16,
+        ),
+        sensitivity_candidate_partial_bit_delta=np.asarray(
+            [
+                candidate["representative_partial_bit_delta"]
+                for candidate in sensitivity_candidates
+            ],
+            dtype=np.int16,
+        ),
+        sensitivity_candidate_partial_bits=np.asarray(
+            [
+                candidate["representative_mutated_partial_bits"]
+                for candidate in sensitivity_candidates
+            ],
+            dtype=np.int32,
+        ),
+        sensitivity_layer1_normalized_bfloat16_bits=sensitivity_output_bits,
     )
     print(json.dumps(result, sort_keys=True))
     return 0

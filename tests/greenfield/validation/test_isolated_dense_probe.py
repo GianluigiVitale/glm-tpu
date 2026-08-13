@@ -337,6 +337,35 @@ def test_isolated_partial_comparison_reports_each_virtual_rank() -> None:
     }
 
 
+@pytest.mark.skipif(
+    not REAL_CAPTURE.exists(),
+    reason="sealed isolated-dense source is unavailable",
+)
+def test_isolated_dense_sensitivity_deduplicates_reduced_values() -> None:
+    with np.load(REAL_CAPTURE, allow_pickle=False) as payload:
+        captured = np.ascontiguousarray(
+            payload["dense_virtual_partials_bfloat16_bits"]
+        )
+    candidates = MODULE._build_sensitivity_candidates(captured)
+    assert [item["candidate_id"] for item in candidates] == list(
+        range(len(candidates))
+    )
+    assert [item["dense_update_bits"] for item in candidates] == list(
+        range(47802, 47817)
+    )
+    baseline = next(
+        item for item in candidates if item["dense_update_bits"] == 47808
+    )
+    assert baseline["representative_model_rank"] == -1
+    assert baseline["representative_partial_bit_delta"] == 0
+    plus_one = next(
+        item for item in candidates if item["dense_update_bits"] == 47809
+    )
+    assert plus_one["minimum_delta_producers"] == [
+        {"model_rank": 25, "partial_bit_delta": 5}
+    ]
+
+
 def test_isolated_dense_wrapper_is_default_off_and_no_db() -> None:
     wrapper = WRAPPER.read_text()
     assert "GLM_GREENFIELD_ISOLATED_DENSE_REPLAY:-0" in wrapper
@@ -496,6 +525,18 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
     }
     partial_comparison = MODULE._partial_comparison(captured, captured)
     comparison = MODULE._compare_bits(accepted, accepted)
+    sensitivity_candidates = MODULE._build_sensitivity_candidates(captured)
+    for candidate in sensitivity_candidates:
+        candidate["comparison"] = comparison
+        candidate["output_sha256"] = MODULE._array_sha256(accepted)
+    sensitivity = {
+        "baseline_dense_update_bits": 47808,
+        "candidate_count": len(sensitivity_candidates),
+        "candidates": sensitivity_candidates,
+        "exact_candidate_ids": list(range(len(sensitivity_candidates))),
+        "hidden_index": 2795,
+        "partial_bit_delta_limit": 32,
+    }
     pin = "a" * 40
     runner = {
         "artifact_kind": "glm52_layer0_isolated_dense_replay",
@@ -511,6 +552,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "partial_comparison": partial_comparison,
         "performance_claim": False,
         "position": 8155,
+        "sensitivity": sensitivity,
         "source": source,
         "status": "SUCCESS",
         "virtual_contractions_per_chip": 1,
@@ -544,6 +586,34 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         control_layer1_normalized_bfloat16_bits=control,
         isolated_dense_virtual_partials_bfloat16_bits=captured,
         isolated_layer1_normalized_bfloat16_bits=accepted,
+        sensitivity_candidate_dense_update_bfloat16_bits=np.asarray(
+            [item["dense_update_bits"] for item in sensitivity_candidates],
+            dtype=np.uint16,
+        ),
+        sensitivity_candidate_model_rank=np.asarray(
+            [
+                item["representative_model_rank"]
+                for item in sensitivity_candidates
+            ],
+            dtype=np.int16,
+        ),
+        sensitivity_candidate_partial_bit_delta=np.asarray(
+            [
+                item["representative_partial_bit_delta"]
+                for item in sensitivity_candidates
+            ],
+            dtype=np.int16,
+        ),
+        sensitivity_candidate_partial_bits=np.asarray(
+            [
+                item["representative_mutated_partial_bits"]
+                for item in sensitivity_candidates
+            ],
+            dtype=np.int32,
+        ),
+        sensitivity_layer1_normalized_bfloat16_bits=np.stack(
+            [accepted] * len(sensitivity_candidates)
+        ),
     )
     completed = subprocess.run(
         [
@@ -629,3 +699,11 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
     success = (run_dir / "SUCCESS").read_text()
     assert "artifact_kind=glm52_layer0_isolated_dense_replay\n" in success
     assert "results_db_run_id=none\n" in success
+    assert "sensitivity_baseline_dense_update_bits=47808\n" in success
+    assert "sensitivity_candidate_count=15\n" in success
+    assert (
+        "sensitivity_exact_candidate_ids="
+        + ",".join(str(value) for value in range(15))
+        + "\n"
+    ) in success
+    assert "sensitivity_hidden_index=2795\n" in success

@@ -5,6 +5,26 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-13 22:58 UTC — seven-second contraction replay closes sibling scheduling
+
+- Reviewed/pushed pin `20bcf778869a5a9d871df21796d1bbf92876a1fe` ran once as protected tag
+  `greenfield_layer0_isolated_dense_replay_20260813T225647267633552Z`. Exact StableHLO and
+  scheduled-HLO contracts pass; arithmetic took seven seconds and the complete protected wrapper
+  finished in about 70 seconds.
+- All 32 isolated down partials are bitwise identical to the integrated capture: zero mismatches
+  for every virtual rank and tensor SHA `9d9f65dd...16e35`. Their layer-1 result is therefore the
+  same DB548 SHA `9b52a04e...4005`, with the sole known mismatch at hidden 2795, observed BF16 bits
+  `48422` versus accepted `48423`. One-contraction-per-chip versus eight sibling contractions does
+  not change the arithmetic and is rejected as the cause.
+- Runner/tensor/summary/`SUCCESS` SHAs are `128a0663...0e4d`, `ffbc4801...6f4`,
+  `b02584df...20f8` and `7882a929...975a`; local/remote archive verification and authenticated
+  8/8 cleanup pass. There is intentionally no DB row, performance result or Gate-D promotion.
+- The next probe stays on the same sealed bytes and compiled StrategyND/RMS executable. It sweeps
+  every one-leaf BF16 code delta in `[-32,32]` at hidden 2795, deduplicates the 2,048 logical
+  mutations to 15 actual dense-update values (`47802..47816`), then runs only those 15 values.
+  This is the direct sensitivity discriminator needed before changing another production edge;
+  no complete checkpoint or decoder retry is authorized yet.
+
 ## 2026-08-13 22:12 UTC — direct one-contraction-per-chip discriminator is locally complete
 
 - Added one default-off diagnostic that compiles exactly one layer-0 virtual dense contraction per
