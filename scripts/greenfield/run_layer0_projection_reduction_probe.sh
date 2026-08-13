@@ -76,23 +76,59 @@ readonly DB538_RUN_ID=538
 readonly DB538_REMOTE=$APPROVED_BUCKET/results/$DB538_TAG
 readonly POST_ATTENTION_RESIDUAL_SHA=a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e
 
+readonly ACCEPTED_M32_TAG=greenfield_accepted_decode_projection_lowering_20260811T184908676873350Z
+readonly ACCEPTED_M32_ROOT=/home/gianl/gcs-models/oracles/greenfield/glm52/decode_projection_lowering/8k/$ACCEPTED_M32_TAG
+readonly ACCEPTED_M32_HLO=$ACCEPTED_M32_ROOT/accepted_decode_projection_lowering/jit_step_fun_impl.m32.after_codegen_hlo.txt.gz
+readonly ACCEPTED_M32_SUMMARY=$ACCEPTED_M32_ROOT/accepted_decode_projection_lowering/summary.json
+readonly ACCEPTED_M32_SUCCESS=$ACCEPTED_M32_ROOT/SUCCESS
+readonly ACCEPTED_M32_HLO_SHA=25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c
+readonly ACCEPTED_M32_SUMMARY_SHA=409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3
+readonly ACCEPTED_M32_SUCCESS_SHA=6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278
+readonly ACCEPTED_M32_RAW_HLO_SHA=3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775
+readonly ACCEPTED_M32_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/decode_projection_lowering/8k/$ACCEPTED_M32_TAG
+
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 HARNESS_GIT=$(git -C "$WORKTREE" rev-parse --short HEAD)
 FORK_GIT=$(git -C /home/gianl/tpu-inference rev-parse --short HEAD)
 DENSE_CONVOLUTION=${GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE:-0}
+DENSE_COMPILE_ROWS=${GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS:-1}
 [[ $DENSE_CONVOLUTION == 0 || $DENSE_CONVOLUTION == 1 ]] || {
   echo "GLM_GREENFIELD_DENSE_CONVOLUTION_PROBE must be 0 or 1" >&2
   exit 2
 }
+[[ $DENSE_COMPILE_ROWS == 1 || $DENSE_COMPILE_ROWS == 32 ]] || {
+  echo "GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS must be 1 or 32" >&2
+  exit 2
+}
+if [[ $DENSE_CONVOLUTION == 0 && $DENSE_COMPILE_ROWS != 1 ]]; then
+  echo "projection/reduction mode requires compile rows 1" >&2
+  exit 2
+fi
 if [[ $DENSE_CONVOLUTION == 1 ]]; then
-  TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_convolution_$(date -u +%Y%m%dT%H%M%S%NZ)}
-  TENSOR_BASENAME=dense_convolution.npz
+  if [[ $DENSE_COMPILE_ROWS == 32 ]]; then
+    TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_m32_convolution_$(date -u +%Y%m%dT%H%M%S%NZ)}
+    TENSOR_BASENAME=dense_m32_convolution.npz
+  else
+    TAG=${GLM_GREENFIELD_DENSE_CONVOLUTION_TAG:-greenfield_layer0_dense_convolution_$(date -u +%Y%m%dT%H%M%S%NZ)}
+    TENSOR_BASENAME=dense_convolution.npz
+  fi
 else
   TAG=${GLM_GREENFIELD_PROJECTION_REDUCTION_TAG:-greenfield_layer0_projection_reduction_$(date -u +%Y%m%dT%H%M%S%NZ)}
   TENSOR_BASENAME=projection_reduction.npz
 fi
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
+m32_probe_args=()
+if [[ $DENSE_COMPILE_ROWS == 32 ]]; then
+  m32_probe_args=(
+    --accepted-m32-hlo "$ACCEPTED_M32_HLO"
+    --accepted-m32-hlo-sha256 "$ACCEPTED_M32_HLO_SHA"
+    --accepted-m32-summary "$ACCEPTED_M32_SUMMARY"
+    --accepted-m32-summary-sha256 "$ACCEPTED_M32_SUMMARY_SHA"
+    --accepted-m32-success "$ACCEPTED_M32_SUCCESS"
+    --accepted-m32-success-sha256 "$ACCEPTED_M32_SUCCESS_SHA"
+  )
+fi
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing layer-0 arithmetic probe outside $BRANCH" >&2
@@ -177,6 +213,9 @@ rollback_provisional_db() {
   /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$TAG" "$PIN" \
     "$DENSE_CONVOLUTION" "$RUN_DIR" "$DB538_TENSOR_SHA" \
     "$CHECKPOINT_MANIFEST_SHA" "$HARNESS_GIT" "$FORK_GIT" \
+    "$DENSE_COMPILE_ROWS" "$ACCEPTED_M32_HLO_SHA" \
+    "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
+    "$ACCEPTED_M32_RAW_HLO_SHA" \
     >"$RUN_DIR/provisional_db_rollback.txt" <<'PY'
 from __future__ import annotations
 
@@ -194,34 +233,60 @@ import sys
     checkpoint_manifest_sha,
     harness_git,
     fork_git,
+    dense_compile_rows_text,
+    accepted_m32_hlo_sha,
+    accepted_m32_summary_sha,
+    accepted_m32_success_sha,
+    accepted_m32_raw_hlo_sha,
 ) = sys.argv[1:]
 dense = dense_text == "1"
+compile_rows = int(dense_compile_rows_text)
 runner_path = __import__("pathlib").Path(run_dir) / "runner.json"
 if not runner_path.is_file():
     raise SystemExit("refusing rollback without the producing runner")
 runner = json.loads(runner_path.read_text())
 model = (
-    "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+    (
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+        if compile_rows == 32
+        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+    )
     if dense
     else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
 )
 revision = (
-    "native-jax-db538-dense-convolution-v1"
+    (
+        "native-jax-db532-dense-m32-discriminator-v1"
+        if compile_rows == 32
+        else "native-jax-db538-dense-convolution-v1"
+    )
     if dense
     else "native-jax-db537-strategy-nd-v1"
 )
 benchmark = (
-    "greenfield_layer0_dense_convolution"
+    (
+        "greenfield_layer0_dense_m32_convolution"
+        if compile_rows == 32
+        else "greenfield_layer0_dense_convolution"
+    )
     if dense
     else "greenfield_layer0_projection_reduction"
 )
 note = (
-    "Protected layer-0 dense convolution discriminator; no performance claim."
+    (
+        "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+        if compile_rows == 32
+        else "Protected layer-0 dense convolution discriminator; no performance claim."
+    )
     if dense
     else "Protected layer-0 projection/reduction discriminator; no performance claim."
 )
 engine = (
-    "greenfield_dense_convolution_probe"
+    (
+        "greenfield_dense_m32_convolution_probe"
+        if compile_rows == 32
+        else "greenfield_dense_convolution_probe"
+    )
     if dense
     else "greenfield_projection_reduction_probe"
 )
@@ -234,6 +299,17 @@ expected_environment = {
         {
             "checkpoint_manifest_sha256": checkpoint_manifest_sha,
             "db538_tensor_sha256": db538_tensor_sha,
+            "compile_rows": compile_rows,
+            **(
+                {
+                    "accepted_m32_hlo_raw_sha256": accepted_m32_raw_hlo_sha,
+                    "accepted_m32_hlo_sha256": accepted_m32_hlo_sha,
+                    "accepted_m32_summary_sha256": accepted_m32_summary_sha,
+                    "accepted_m32_success_sha256": accepted_m32_success_sha,
+                }
+                if compile_rows == 32
+                else {}
+            ),
         }
         if dense
         else {
@@ -256,11 +332,25 @@ if (
             != "glm52_layer0_dense_convolution_probe"
             or runner.get("source", {}).get("db538_tensor_sha256")
             != db538_tensor_sha
+            or runner.get("compile_rows") != compile_rows
+            or runner.get("live_rows") != 1
+            or runner.get("diagnostic_dead_rows") != compile_rows - 1
             or runner.get("classification")
             not in {
-                "accepted_dense_convolution_exact",
-                "accepted_dense_convolution_nonexact",
+                f"{'accepted_m32_dense_convolution' if compile_rows == 32 else 'accepted_dense_convolution'}_exact",
+                f"{'accepted_m32_dense_convolution' if compile_rows == 32 else 'accepted_dense_convolution'}_nonexact",
             }
+            or (
+                compile_rows == 32
+                and runner.get("source", {})
+                != {
+                    **runner.get("source", {}),
+                    "accepted_m32_hlo_raw_sha256": accepted_m32_raw_hlo_sha,
+                    "accepted_m32_hlo_sha256": accepted_m32_hlo_sha,
+                    "accepted_m32_summary_sha256": accepted_m32_summary_sha,
+                    "accepted_m32_success_sha256": accepted_m32_success_sha,
+                }
+            )
         )
     )
     or (
@@ -314,7 +404,11 @@ summaries = connection.execute(
     (run_id,),
 ).fetchall()
 expected_prompt = (
-    "Sealed exact StrategyND attention boundary at first 8K decode row."
+    (
+        "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
+        if compile_rows == 32
+        else "Sealed exact StrategyND attention boundary at first 8K decode row."
+    )
     if dense
     else "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
 )
@@ -324,9 +418,11 @@ expected_raw = json.dumps(
         "exact_arms": runner["exact_arms"],
         "mismatch_counts": (
             {
-                "accepted_dense_convolution": runner[
-                    "layer1_comparison"
-                ]["mismatch_count"]
+                (
+                    "accepted_m32_dense_convolution"
+                    if compile_rows == 32
+                    else "accepted_dense_convolution"
+                ): runner["layer1_comparison"]["mismatch_count"]
             }
             if dense
             else {
@@ -427,6 +523,11 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
   require_sha "$DB538_TENSOR" "$DB538_TENSOR_SHA" "DB538 tensor"
   require_sha "$DB538_SUMMARY" "$DB538_SUMMARY_SHA" "DB538 summary"
   require_sha "$DB538_SUCCESS" "$DB538_SUCCESS_SHA" "DB538 SUCCESS"
+  if [[ $DENSE_COMPILE_ROWS == 32 ]]; then
+    require_sha "$ACCEPTED_M32_HLO" "$ACCEPTED_M32_HLO_SHA" "accepted M32 HLO"
+    require_sha "$ACCEPTED_M32_SUMMARY" "$ACCEPTED_M32_SUMMARY_SHA" "accepted M32 summary"
+    require_sha "$ACCEPTED_M32_SUCCESS" "$ACCEPTED_M32_SUCCESS_SHA" "accepted M32 SUCCESS"
+  fi
   /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$DB538_RUN_ID" \
     "$DB538_TAG" "$DB538_CODE_HASH" <<'PY'
 import json
@@ -497,6 +598,11 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
   require_remote_sha "$DB538_REMOTE/projection_reduction.npz" "$DB538_TENSOR_SHA" "DB538 tensor"
   require_remote_sha "$DB538_REMOTE/summary.json" "$DB538_SUMMARY_SHA" "DB538 summary"
   require_remote_sha "$DB538_REMOTE/SUCCESS" "$DB538_SUCCESS_SHA" "DB538 SUCCESS"
+  if [[ $DENSE_COMPILE_ROWS == 32 ]]; then
+    require_remote_sha "$ACCEPTED_M32_REMOTE/accepted_decode_projection_lowering/jit_step_fun_impl.m32.after_codegen_hlo.txt.gz" "$ACCEPTED_M32_HLO_SHA" "accepted M32 HLO"
+    require_remote_sha "$ACCEPTED_M32_REMOTE/accepted_decode_projection_lowering/summary.json" "$ACCEPTED_M32_SUMMARY_SHA" "accepted M32 summary"
+    require_remote_sha "$ACCEPTED_M32_REMOTE/SUCCESS" "$ACCEPTED_M32_SUCCESS_SHA" "accepted M32 SUCCESS"
+  fi
 fi
 
 strict_census pre || {
@@ -506,7 +612,7 @@ strict_census pre || {
 
 started=$(date +%s)
 if [[ $DENSE_CONVOLUTION == 1 ]]; then
-  say "running accepted dense-convolution arithmetic arm"
+  say "running accepted dense-convolution arithmetic arm at M=$DENSE_COMPILE_ROWS"
   (
     cd "$WORKTREE"
     JAX_PLATFORMS=tpu \
@@ -517,6 +623,7 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
       /home/gianl/vllm-env/bin/python \
         scripts/greenfield/probe_layer0_dense_convolution.py \
         --expected-code-hash "$PIN" \
+        --compile-rows "$DENSE_COMPILE_ROWS" \
         --db538-runner "$DB538_RUNNER" \
         --db538-runner-sha256 "$DB538_RUNNER_SHA" \
         --db538-tensor "$DB538_TENSOR" \
@@ -527,6 +634,7 @@ if [[ $DENSE_CONVOLUTION == 1 ]]; then
         --db538-success-sha256 "$DB538_SUCCESS_SHA" \
         --checkpoint-root "$CHECKPOINT_ROOT" \
         --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
+        "${m32_probe_args[@]}" \
         --output "$RUN_DIR/runner.json" \
         --tensor-output "$RUN_DIR/$TENSOR_BASENAME" \
         --hlo-dir "$RUN_DIR/hlo"
@@ -579,7 +687,10 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$TAG" \
   "$DENSE_CONVOLUTION" "$DB538_RUNNER_SHA" "$DB538_TENSOR_SHA" \
   "$DB538_SUMMARY_SHA" "$DB538_SUCCESS_SHA" \
-  "$POST_ATTENTION_RESIDUAL_SHA" "$CHECKPOINT_MANIFEST_SHA" <<'PY'
+  "$POST_ATTENTION_RESIDUAL_SHA" "$CHECKPOINT_MANIFEST_SHA" \
+  "$DENSE_COMPILE_ROWS" "$ACCEPTED_M32_HLO_SHA" \
+  "$ACCEPTED_M32_SUMMARY_SHA" "$ACCEPTED_M32_SUCCESS_SHA" \
+  "$ACCEPTED_M32_RAW_HLO_SHA" <<'PY'
 from __future__ import annotations
 
 import json
@@ -602,17 +713,24 @@ import sys
     db538_success_sha,
     post_attention_sha,
     checkpoint_manifest_sha,
+    dense_compile_rows_text,
+    accepted_m32_hlo_sha,
+    accepted_m32_summary_sha,
+    accepted_m32_success_sha,
+    accepted_m32_raw_hlo_sha,
 ) = sys.argv[1:]
 dense = dense_text == "1"
+compile_rows = int(dense_compile_rows_text)
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if dense:
     exact = runner.get("exact")
-    classification = (
-        "accepted_dense_convolution_exact"
-        if exact is True
-        else "accepted_dense_convolution_nonexact"
+    arm = (
+        "accepted_m32_dense_convolution"
+        if compile_rows == 32
+        else "accepted_dense_convolution"
     )
+    classification = f"{arm}_{'exact' if exact is True else 'nonexact'}"
     comparison = runner.get("layer1_comparison", {})
     stable = runner.get("hlo", {}).get("stablehlo_contract", {})
     optimized = runner.get("hlo", {}).get("optimized_contract", {})
@@ -649,7 +767,7 @@ if dense:
         )
     else:
         numerical_comparison_valid = False
-    source_valid = source == {
+    expected_source = {
         "checkpoint_manifest_sha256": checkpoint_manifest_sha,
         "db538_runner_sha256": db538_runner_sha,
         "db538_tensor_sha256": db538_tensor_sha,
@@ -657,6 +775,14 @@ if dense:
         "db538_success_sha256": db538_success_sha,
         "post_attention_residual_sha256": post_attention_sha,
     }
+    if compile_rows == 32:
+        expected_source.update({
+            "accepted_m32_hlo_raw_sha256": accepted_m32_raw_hlo_sha,
+            "accepted_m32_hlo_sha256": accepted_m32_hlo_sha,
+            "accepted_m32_summary_sha256": accepted_m32_summary_sha,
+            "accepted_m32_success_sha256": accepted_m32_success_sha,
+        })
+    source_valid = source == expected_source
     comparison_valid = (
         comparison.get("shape") == [6144]
         and comparison.get("expected_sha256")
@@ -672,6 +798,8 @@ if dense:
     stable_valid = (
         stable.get("passed") is True
         and stable.get("violations") == []
+        and stable.get("compile_rows") == compile_rows
+        and stable.get("live_rows") == 1
         and stable.get("collective_counts") == {
             "all_gather": 1,
             "all_reduce": 0,
@@ -722,6 +850,8 @@ if dense:
     optimized_valid = (
         optimized.get("passed") is True
         and optimized.get("violations") == []
+        and optimized.get("compile_rows") == compile_rows
+        and optimized.get("live_rows") == 1
         and optimized.get("async_collectives") == []
         and optimized.get("collective_count") == 1
         and optimized.get("convolution_count") == 16
@@ -784,6 +914,10 @@ if dense:
         )
         and len(optimized_lineage.get("collective_convolution_sources", []))
         == 8
+        and (
+            compile_rows == 1
+            or len(optimized_lineage.get("m32_live_row_slices", [])) == 1
+        )
     )
     weights_valid = (
         isinstance(weight_records, list)
@@ -834,9 +968,12 @@ if dense:
         and runner["artifact_kind"] == "glm52_layer0_dense_convolution_probe"
         and runner.get("position") == 8155
         and runner.get("performance_claim") is False
+        and runner.get("compile_rows") == compile_rows
+        and runner.get("live_rows") == 1
+        and runner.get("diagnostic_dead_rows") == compile_rows - 1
         and runner.get("classification") == classification
         and runner["exact_arms"]
-        == (["accepted_dense_convolution"] if exact else [])
+        == ([arm] if exact else [])
         and comparison_valid
         and source_valid
         and stable_valid
@@ -867,27 +1004,47 @@ if not runner_valid:
     raise SystemExit("layer-0 arithmetic runner contract failed")
 
 model = (
-    "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+    (
+        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+        if compile_rows == 32
+        else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+    )
     if dense
     else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
 )
 revision = (
-    "native-jax-db538-dense-convolution-v1"
+    (
+        "native-jax-db532-dense-m32-discriminator-v1"
+        if compile_rows == 32
+        else "native-jax-db538-dense-convolution-v1"
+    )
     if dense
     else "native-jax-db537-strategy-nd-v1"
 )
 benchmark = (
-    "greenfield_layer0_dense_convolution"
+    (
+        "greenfield_layer0_dense_m32_convolution"
+        if compile_rows == 32
+        else "greenfield_layer0_dense_convolution"
+    )
     if dense
     else "greenfield_layer0_projection_reduction"
 )
 engine = (
-    "greenfield_dense_convolution_probe"
+    (
+        "greenfield_dense_m32_convolution_probe"
+        if compile_rows == 32
+        else "greenfield_dense_convolution_probe"
+    )
     if dense
     else "greenfield_projection_reduction_probe"
 )
 note = (
-    "Protected layer-0 dense convolution discriminator; no performance claim."
+    (
+        "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+        if compile_rows == 32
+        else "Protected layer-0 dense convolution discriminator; no performance claim."
+    )
     if dense
     else "Protected layer-0 projection/reduction discriminator; no performance claim."
 )
@@ -911,6 +1068,25 @@ run_id = pv.start_run(
                     "checkpoint_manifest_sha256"
                 ],
                 "db538_tensor_sha256": runner["source"]["db538_tensor_sha256"],
+                "compile_rows": compile_rows,
+                **(
+                    {
+                        "accepted_m32_hlo_raw_sha256": runner["source"][
+                            "accepted_m32_hlo_raw_sha256"
+                        ],
+                        "accepted_m32_hlo_sha256": runner["source"][
+                            "accepted_m32_hlo_sha256"
+                        ],
+                        "accepted_m32_summary_sha256": runner["source"][
+                            "accepted_m32_summary_sha256"
+                        ],
+                        "accepted_m32_success_sha256": runner["source"][
+                            "accepted_m32_success_sha256"
+                        ],
+                    }
+                    if compile_rows == 32
+                    else {}
+                ),
             }
             if dense
             else {
@@ -934,7 +1110,11 @@ pv.record_item(
     benchmark=benchmark,
     item_id="position8155",
     prompt=(
-        "Sealed exact StrategyND attention boundary at first 8K decode row."
+        (
+            "Sealed exact StrategyND attention boundary with diagnostic accepted-M32 dense geometry."
+            if compile_rows == 32
+            else "Sealed exact StrategyND attention boundary at first 8K decode row."
+        )
         if dense
         else "Sealed exact B512 latent and layer-0 residual at first 8K decode row."
     ),
@@ -944,7 +1124,7 @@ pv.record_item(
             "classification": runner["classification"],
             "exact_arms": runner["exact_arms"],
             "mismatch_counts": (
-                {"accepted_dense_convolution": runner["layer1_comparison"]["mismatch_count"]}
+                {arm: runner["layer1_comparison"]["mismatch_count"]}
                 if dense
                 else {
                     name: arm["layer1_comparison"]["mismatch_count"]
@@ -971,10 +1151,14 @@ summary = {
     "artifact_kind": runner["artifact_kind"],
     "classification": runner["classification"],
     "code_hash": pin,
+    "compile_rows": compile_rows if dense else 1,
+    "diagnostic_dead_rows": compile_rows - 1 if dense else 0,
     "elapsed_seconds": int(elapsed),
     "exact_arms": runner["exact_arms"],
+    "live_rows": 1,
     "performance_claim": False,
     "results_db_run_id": run_id,
+    "source": runner.get("source", {}),
     "status": "SUCCESS",
 }
 (run_dir / "summary.json").write_text(
@@ -1071,6 +1255,9 @@ summary = json.loads((root / "summary.json").read_text())
 values = {
     "artifact_kind": summary["artifact_kind"],
     "code_hash": sys.argv[3],
+    "compile_rows": summary["compile_rows"],
+    "live_rows": summary["live_rows"],
+    "diagnostic_dead_rows": summary["diagnostic_dead_rows"],
     "results_db_run_id": summary["results_db_run_id"],
     "classification": summary["classification"],
     "exact_arms": ",".join(summary["exact_arms"]) or "none",
@@ -1081,6 +1268,8 @@ values = {
     ).hexdigest(),
     "remote_prefix": sys.argv[2],
 }
+for key, value in sorted(summary.get("source", {}).items()):
+    values[f"source_{key}"] = value
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in values.items())
 )

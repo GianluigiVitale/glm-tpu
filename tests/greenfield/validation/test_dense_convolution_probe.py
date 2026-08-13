@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 from functools import lru_cache
+from types import SimpleNamespace
 
 import pytest
 
@@ -25,6 +26,11 @@ REAL_OPTIMIZED_HLO = Path(
 )
 REAL_OPTIMIZED_HLO_SHA256 = (
     "e3a2538f8d158f2113e93563ba3ba3a24e51a57b45981db33a7b3b7fdc857ca0"
+)
+ACCEPTED_M32_ROOT = Path(
+    "/home/gianl/gcs-models/oracles/greenfield/glm52/"
+    "decode_projection_lowering/8k/"
+    "greenfield_accepted_decode_projection_lowering_20260811T184908676873350Z"
 )
 SPEC = importlib.util.spec_from_file_location("dense_convolution_probe", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -235,6 +241,90 @@ def _synthetic_hlo() -> str:
     return "\n".join(lines)
 
 
+def _synthetic_m32_hlo() -> str:
+    head, tail = _synthetic_hlo().split("  %stack =", 1)
+    head = head.replace(
+        "  %normalized = bf16[1,6144] parameter(0)",
+        "  %normalized = bf16[1,6144] parameter(0)\n"
+        "  %m32_zero = bf16[] constant(0)\n"
+        "  %m32_padded = bf16[32,6144] pad(%normalized, %m32_zero), "
+        "padding=0_31x0_0",
+    )
+    head = head.replace("convolution(%normalized,", "convolution(%m32_padded,")
+    for before, after in (
+        ("f32[1,768]", "f32[32,768]"),
+        ("bf16[1,768]", "bf16[32,768]"),
+        ("bf16[1,384]", "bf16[32,384]"),
+        ("f32[1,6144]", "f32[32,6144]"),
+    ):
+        head = head.replace(before, after)
+    head = head.replace(
+        "slice={[0:1], [0:384]}", "slice={[0:32], [0:384]}"
+    ).replace(
+        "slice={[0:1], [384:768]}", "slice={[0:32], [384:768]}"
+    )
+    for index in range(8):
+        head = head.replace(
+            f"  %down_bf16.{index} = bf16[1,6144] ",
+            f"  %down_bf16.{index} = bf16[32,6144] ",
+        ).replace(
+            f"  %down_row.{index} = bf16[1,1,6144] "
+            f"reshape(%down_bf16.{index})",
+            f"  %down_row.{index} = bf16[1,32,6144] "
+            f"reshape(%down_bf16.{index})",
+        )
+    tail = tail.replace(
+        "bf16[8,1,6144] concatenate(",
+        "bf16[8,32,6144] concatenate(",
+        1,
+    ).replace(
+        "  %gather = bf16[4,8,1,6144] all-gather(%stack)",
+        "  %m32_anchor = bf16[8,32,6144] optimization-barrier(%stack)\n"
+        "  %m32_live = bf16[8,1,6144] slice(%m32_anchor), "
+        "slice={[0:8], [0:1], [0:6144]}\n"
+        "  %gather = bf16[4,8,1,6144] all-gather(%m32_live)",
+        1,
+    )
+    return head + "  %stack =" + tail
+
+
+def _synthetic_m32_hlo_with_fused_live_row(*, rogue_return: bool) -> str:
+    hlo = _synthetic_m32_hlo()
+    start = hlo.index("  %stack =")
+    end = hlo.index("\n  %gather =", start)
+    body = hlo[start:end]
+    parameters = []
+    for index in range(8):
+        parameters.append(f"%p{index}: bf16[1,32,6144]")
+        body = body.replace(f"%down_row.{index}", f"%p{index}")
+    if rogue_return:
+        body = body.replace("  %m32_live =", "  %m32_exact =", 1)
+        body += (
+            "\n  ROOT %m32_live = bf16[8,1,6144] "
+            "add(%m32_exact, %m32_exact)"
+        )
+    else:
+        body = body.replace("  %m32_live =", "  ROOT %m32_live =", 1)
+    computation = (
+        "%fused_m32_live ("
+        + ", ".join(parameters)
+        + ") -> bf16[8,1,6144] {\n"
+        + "".join(
+            f"  %p{index} = bf16[1,32,6144] parameter({index})\n"
+            for index in range(8)
+        )
+        + body
+        + "\n}\n\n"
+    )
+    caller = (
+        "  %m32_live = bf16[8,1,6144] fusion("
+        + ", ".join(f"%down_row.{index}" for index in range(8))
+        + "), kind=kLoop, calls=%fused_m32_live"
+    )
+    header = hlo.index("\n") + 1
+    return hlo[:header] + computation + hlo[header:start] + caller + hlo[end:]
+
+
 def _synthetic_hlo_with_fused_y0(*, rogue_return: str | None) -> str:
     hlo = _synthetic_hlo()
     start_marker = "  %association_y_leaf.0.0 ="
@@ -292,8 +382,9 @@ def _synthetic_hlo_with_fused_y0(*, rogue_return: str | None) -> str:
     )
 
 
-@lru_cache(maxsize=1)
-def _exact_stablehlo() -> str:
+@lru_cache(maxsize=2)
+def _exact_stablehlo(compile_rows: int = 1) -> str:
+    assert compile_rows in (1, 32)
     program = r'''
 import jax
 import jax.numpy as jnp
@@ -352,6 +443,27 @@ mapped = jax.shard_map(
 )
 print(jax.jit(mapped).lower(*arguments).as_text())
 '''
+    if compile_rows == 32:
+        program = program.replace(
+            "def local(normalized, residual, gate_bits, gate_scale, up_bits, up_scale,\n"
+            "          down_bits, down_scale, norm):\n"
+            "    partials = _virtual_dense_convolution_down_partials(",
+            "def local(normalized, residual, gate_bits, gate_scale, up_bits, up_scale,\n"
+            "          down_bits, down_scale, norm):\n"
+            "    normalized = jnp.pad(normalized, ((0, 31), (0, 0)), "
+            "constant_values=jnp.bfloat16(0))\n"
+            "    partials = _virtual_dense_convolution_down_partials(",
+        ).replace(
+            "down_bits[0], down_scale[0], block_shape=(128, 128),\n"
+            "    )\n"
+            "    with jax.named_scope",
+            "down_bits[0], down_scale[0], block_shape=(128, 128), "
+            "compile_rows=32,\n"
+            "    )\n"
+            "    partials = jax.lax.optimization_barrier(partials)\n"
+            "    partials = partials[:, :1, :]\n"
+            "    with jax.named_scope",
+        )
     environment = dict(os.environ)
     environment["JAX_PLATFORMS"] = "cpu"
     environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
@@ -375,6 +487,131 @@ def test_dense_convolution_hlo_contract_accepts_exact_graph() -> None:
     assert optimized["passed"], optimized["violations"]
     assert optimized["gate_up_convolution_count"] == 8
     assert optimized["down_convolution_count"] == 8
+
+
+def test_dense_convolution_m32_hlo_contract_accepts_only_live_row() -> None:
+    stablehlo = _exact_stablehlo(32)
+    stable = MODULE._validate_stablehlo(stablehlo, compile_rows=32)
+    optimized_hlo = _synthetic_m32_hlo()
+    optimized = MODULE._validate_optimized_hlo(
+        optimized_hlo, compile_rows=32
+    )
+    assert stable["passed"], stable["violations"]
+    assert optimized["passed"], optimized["violations"]
+    assert stable["compile_rows"] == optimized["compile_rows"] == 32
+    assert stable["live_rows"] == optimized["live_rows"] == 1
+    assert not MODULE._validate_stablehlo(stablehlo)["passed"]
+    assert not MODULE._validate_optimized_hlo(optimized_hlo)["passed"]
+
+    wrong_pad = stablehlo.replace("high = [31, 0]", "high = [30, 0]", 1)
+    wrong_live_row = stablehlo.replace(
+        "[0:8, 0:1, 0:6144]", "[0:8, 1:2, 0:6144]", 1
+    )
+    anchor_line = next(
+        line
+        for line in stablehlo.splitlines()
+        if "stablehlo.optimization_barrier" in line
+        and "tensor<8x32x6144xbf16>" in line
+    )
+    missing_anchor = stablehlo.replace(
+        anchor_line,
+        anchor_line.replace(
+            "stablehlo.optimization_barrier", "stablehlo.reshape"
+        ),
+        1,
+    )
+    reordered_anchor = stablehlo.replace(
+        anchor_line + "\n",
+        "",
+        1,
+    ).replace(
+        "stablehlo.slice %369 [0:8, 0:1, 0:6144]",
+        "stablehlo.slice %368 [0:8, 0:1, 0:6144]",
+        1,
+    )
+    assert (
+        wrong_pad != stablehlo
+        and wrong_live_row != stablehlo
+        and missing_anchor != stablehlo
+        and reordered_anchor != stablehlo
+    )
+    assert not MODULE._validate_stablehlo(
+        wrong_pad, compile_rows=32
+    )["passed"]
+    assert not MODULE._validate_stablehlo(
+        wrong_live_row, compile_rows=32
+    )["passed"]
+    assert not MODULE._validate_stablehlo(
+        missing_anchor, compile_rows=32
+    )["passed"]
+    assert not MODULE._validate_stablehlo(
+        reordered_anchor, compile_rows=32
+    )["passed"]
+
+    optimized_wrong_row = optimized_hlo.replace(
+        "slice={[0:8], [0:1], [0:6144]}",
+        "slice={[0:8], [1:2], [0:6144]}",
+        1,
+    )
+    assert optimized_wrong_row != optimized_hlo
+    assert not MODULE._validate_optimized_hlo(
+        optimized_wrong_row, compile_rows=32
+    )["passed"]
+    optimized_extra_arithmetic = optimized_hlo.replace(
+        "  %gather = bf16[4,8,1,6144] all-gather(%m32_live)",
+        "  %m32_rogue = bf16[8,1,6144] add(%m32_live, %m32_live)\n"
+        "  %gather = bf16[4,8,1,6144] all-gather(%m32_rogue)",
+        1,
+    )
+    assert optimized_extra_arithmetic != optimized_hlo
+    assert not MODULE._validate_optimized_hlo(
+        optimized_extra_arithmetic, compile_rows=32
+    )["passed"]
+
+    fused = MODULE._validate_optimized_hlo(
+        _synthetic_m32_hlo_with_fused_live_row(rogue_return=False),
+        compile_rows=32,
+    )
+    assert fused["passed"], fused["violations"]
+    fused_rogue = MODULE._validate_optimized_hlo(
+        _synthetic_m32_hlo_with_fused_live_row(rogue_return=True),
+        compile_rows=32,
+    )
+    assert not fused_rogue["passed"]
+
+
+@pytest.mark.skipif(
+    not ACCEPTED_M32_ROOT.exists(),
+    reason="accepted DB532 lowering evidence is not mounted",
+)
+def test_dense_convolution_m32_source_is_bound_to_db532() -> None:
+    arguments = SimpleNamespace(
+        accepted_m32_hlo=(
+            ACCEPTED_M32_ROOT
+            / "accepted_decode_projection_lowering/"
+            "jit_step_fun_impl.m32.after_codegen_hlo.txt.gz"
+        ),
+        accepted_m32_hlo_sha256=(
+            "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c"
+        ),
+        accepted_m32_summary=(
+            ACCEPTED_M32_ROOT / "accepted_decode_projection_lowering/summary.json"
+        ),
+        accepted_m32_summary_sha256=(
+            "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3"
+        ),
+        accepted_m32_success=ACCEPTED_M32_ROOT / "SUCCESS",
+        accepted_m32_success_sha256=(
+            "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278"
+        ),
+    )
+    source = MODULE._load_accepted_m32_source(arguments)
+    assert source["accepted_m32_hlo_raw_sha256"] == (
+        "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775"
+    )
+    arguments.accepted_m32_summary_sha256 = "0" * 64
+    with pytest.raises(RuntimeError, match="accepted M32 summary SHA-256 drifted"):
+        MODULE._load_accepted_m32_source(arguments)
 
 
 def test_dense_convolution_hlo_contract_binds_fused_component_root() -> None:
@@ -652,6 +889,8 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
         "probe_layer0_dense_convolution.py",
         "DB538_RUN_ID=538",
         "DB538_CODE_HASH=e2a3a74a3b2ef1fa8f3b9cb1c5d7ec65f833eafc",
+        "ACCEPTED_M32_HLO_SHA=25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
+        "GLM_GREENFIELD_DENSE_CONVOLUTION_COMPILE_ROWS",
         'strict_census pre',
         'strict_census post',
         'rollback_provisional_db',
@@ -669,6 +908,7 @@ def test_dense_convolution_wrapper_pins_db538_and_protected_publication() -> Non
     "mutation",
     (
         "none",
+        "m32",
         "classification",
         "comparison",
         "source",
@@ -700,15 +940,19 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
         "artifact_kind": "glm52_layer0_dense_convolution_probe",
         "classification": "accepted_dense_convolution_exact",
         "code_hash": pin,
+        "compile_rows": 1,
+        "diagnostic_dead_rows": 0,
         "exact": True,
         "exact_arms": ["accepted_dense_convolution"],
         "hlo": {
             "optimized_contract": {
                 "async_collectives": [],
                 "collective_count": 1,
+                "compile_rows": 1,
                 "convolution_count": 16,
                 "down_convolution_count": 8,
                 "gate_up_convolution_count": 8,
+                "live_rows": 1,
                 "lineage": {
                     "activation_contract": {
                         str(rank): {
@@ -805,8 +1049,10 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
                     "reduce_scatter": 0,
                 },
                 "convolution_count": 16,
+                "compile_rows": 1,
                 "down_convolution_count": 8,
                 "gate_up_convolution_count": 8,
+                "live_rows": 1,
                 "matched_virtual_shards": list(range(8)),
                 "passed": True,
                 "violations": [],
@@ -828,6 +1074,7 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "shape": [6144],
         },
         "performance_claim": False,
+        "live_rows": 1,
         "position": 8155,
         "source": {
             "checkpoint_manifest_sha256": (
@@ -880,7 +1127,39 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             for slot in range(4)
         ],
     }
-    if mutation == "classification":
+    compile_rows = 1
+    if mutation == "m32":
+        compile_rows = 32
+        runner.update(
+            {
+                "classification": "accepted_m32_dense_convolution_exact",
+                "compile_rows": 32,
+                "diagnostic_dead_rows": 31,
+                "exact_arms": ["accepted_m32_dense_convolution"],
+            }
+        )
+        runner["hlo"]["optimized_contract"]["compile_rows"] = 32
+        runner["hlo"]["optimized_contract"]["lineage"][
+            "m32_live_row_slices"
+        ] = ["%m32_live"]
+        runner["hlo"]["stablehlo_contract"]["compile_rows"] = 32
+        runner["source"].update(
+            {
+                "accepted_m32_hlo_raw_sha256": (
+                    "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775"
+                ),
+                "accepted_m32_hlo_sha256": (
+                    "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c"
+                ),
+                "accepted_m32_summary_sha256": (
+                    "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3"
+                ),
+                "accepted_m32_success_sha256": (
+                    "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278"
+                ),
+            }
+        )
+    elif mutation == "classification":
         runner["classification"] = "accepted_dense_convolution_nonexact"
     elif mutation == "comparison":
         runner["layer1_comparison"]["mismatch_count"] = 1
@@ -941,20 +1220,30 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
             "7744356f63b67cc813901499d0828c029ea5a9c985a5dac65525700457f79985",
             "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e",
             "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134",
+            str(compile_rows),
+            "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
+            "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
+            "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
+            "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
         ],
         input=record_program,
         text=True,
         capture_output=True,
         check=False,
     )
-    if mutation not in ("none", "nonexact"):
+    if mutation not in ("none", "m32", "nonexact"):
         assert completed.returncode != 0
         return
     assert completed.returncode == 0, completed.stdout + completed.stderr
     summary = json.loads((run_dir / "summary.json").read_text())
-    expected_exact = mutation == "none"
+    expected_exact = mutation in ("none", "m32")
+    expected_arm = (
+        "accepted_m32_dense_convolution"
+        if mutation == "m32"
+        else "accepted_dense_convolution"
+    )
     assert summary["exact_arms"] == (
-        ["accepted_dense_convolution"] if expected_exact else []
+        [expected_arm] if expected_exact else []
     )
     connection = sqlite3.connect(database)
     run = connection.execute(
@@ -969,20 +1258,40 @@ def test_dense_convolution_wrapper_records_authenticated_diagnostic(
     connection.close()
     assert run is not None
     assert run[0:2] == (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution",
-        "native-jax-db538-dense-convolution-v1",
+        (
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+            if mutation == "m32"
+            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        ),
+        (
+            "native-jax-db532-dense-m32-discriminator-v1"
+            if mutation == "m32"
+            else "native-jax-db538-dense-convolution-v1"
+        ),
     )
-    assert json.loads(run[2])["greenfield_run_tag"] == tag
+    environment = json.loads(run[2])
+    assert environment["greenfield_run_tag"] == tag
+    assert environment["compile_rows"] == compile_rows
     assert run[3] == (
-        "Protected layer-0 dense convolution discriminator; no performance claim."
+        "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+        if mutation == "m32"
+        else "Protected layer-0 dense convolution discriminator; no performance claim."
     )
     assert item == (
-        "greenfield_layer0_dense_convolution",
+        (
+            "greenfield_layer0_dense_m32_convolution"
+            if mutation == "m32"
+            else "greenfield_layer0_dense_convolution"
+        ),
         int(expected_exact),
         float(expected_exact),
     )
     assert metric == (
-        "greenfield_layer0_dense_convolution",
+        (
+            "greenfield_layer0_dense_m32_convolution"
+            if mutation == "m32"
+            else "greenfield_layer0_dense_convolution"
+        ),
         "probe_contract_valid",
         1.0,
     )

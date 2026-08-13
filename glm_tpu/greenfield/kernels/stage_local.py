@@ -369,7 +369,7 @@ def _dense_bf16_convolution(lhs: Any, weight_in_out: Any) -> Any:
 
     if lhs.ndim != 2 or weight_in_out.ndim != 2:
         raise ValueError("dense convolution operands must be rank two")
-    if lhs.shape[0] != 1 or lhs.shape[1] != weight_in_out.shape[0]:
+    if lhs.shape[0] not in (1, 32) or lhs.shape[1] != weight_in_out.shape[0]:
         raise ValueError("dense convolution operand geometry drifted")
     if lhs.dtype != jnp.bfloat16 or weight_in_out.dtype != jnp.bfloat16:
         raise ValueError("dense convolution operands must be BF16")
@@ -393,18 +393,22 @@ def _virtual_dense_convolution_down_partials(
     down_scale: Any,
     *,
     block_shape: tuple[int, int],
+    compile_rows: int = 1,
 ) -> Any:
-    """Replay the accepted one-row dense arithmetic for eight virtual ranks.
+    """Replay accepted dense arithmetic for eight virtual ranks.
 
     The accepted M32 executable gives each physical tensor rank one merged
     gate/up ``[6144, 768]`` convolution, a BF16 SwiGLU boundary and one
     ``[384, 6144]`` down convolution.  PP8 stores eight consecutive legacy
-    ranks on each owner.  This helper virtualizes those ranks without creating
-    token rows: every convolution still has exactly one live row.
+    ranks on each owner.  Production callers use the default one-row shape.
+    ``compile_rows=32`` exists only for the bounded accepted-M32 arithmetic
+    discriminator; callers must slice its sole live row before any reduction.
     """
 
+    if compile_rows not in (1, 32):
+        raise ValueError("virtual dense convolution compile rows must be 1 or 32")
     expected = {
-        "normalized": (1, 6144),
+        "normalized": (compile_rows, 6144),
         "gate_bits": (3072, 6144),
         "gate_scale": (24, 48),
         "up_bits": (3072, 6144),

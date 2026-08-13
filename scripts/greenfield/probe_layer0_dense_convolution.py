@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import gzip
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -51,6 +52,12 @@ _COMBINED_RESIDUAL_SHA256 = (
 _POST_ATTENTION_RESIDUAL_SHA256 = (
     "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
 )
+_ACCEPTED_M32_CODE_HASH = "ec114ae91f65c10fc3a77dcffa7ca283fa7be129"
+_ACCEPTED_M32_LEGACY_HASH = "b3c25df47ac98783912dc658878181ec0a8ae16d"
+_ACCEPTED_M32_RAW_HLO_SHA256 = (
+    "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775"
+)
+_ACCEPTED_M32_RUN_ID = 532
 _DENSE_WEIGHT_NAMES = (
     "dense.slot_00.gate.weight_bits",
     "dense.slot_00.gate.scale_inv",
@@ -197,20 +204,103 @@ def _load_db538(args: argparse.Namespace) -> tuple[np.ndarray, ...]:
     )
 
 
-def _validate_stablehlo(stablehlo: str) -> dict[str, Any]:
+def _load_accepted_m32_source(args: argparse.Namespace) -> dict[str, str]:
+    """Authenticate the exact accepted M32 lowering that motivates the arm."""
+
+    required = (
+        args.accepted_m32_hlo,
+        args.accepted_m32_hlo_sha256,
+        args.accepted_m32_summary,
+        args.accepted_m32_summary_sha256,
+        args.accepted_m32_success,
+        args.accepted_m32_success_sha256,
+    )
+    if any(value is None for value in required):
+        raise RuntimeError("M32 discriminator requires the complete DB532 source")
+    _require_file(
+        args.accepted_m32_hlo,
+        args.accepted_m32_hlo_sha256,
+        "accepted M32 HLO",
+    )
+    _require_file(
+        args.accepted_m32_summary,
+        args.accepted_m32_summary_sha256,
+        "accepted M32 summary",
+    )
+    _require_file(
+        args.accepted_m32_success,
+        args.accepted_m32_success_sha256,
+        "accepted M32 SUCCESS",
+    )
+    raw_digest = sha256()
+    with gzip.open(args.accepted_m32_hlo, "rb") as stream:
+        for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            raw_digest.update(chunk)
+    summary = json.loads(args.accepted_m32_summary.read_text())
+    hlo = summary.get("hlo", {})
+    if (
+        summary.get("artifact_kind")
+        != "accepted_decode_projection_lowering_v1"
+        or summary.get("code_hash") != _ACCEPTED_M32_CODE_HASH
+        or summary.get("legacy_code_hash") != _ACCEPTED_M32_LEGACY_HASH
+        or summary.get("diagnostic_only") is not True
+        or summary.get("performance_claim") is not False
+        or summary.get("status") != "SUCCESS"
+        or summary.get("hlo_raw_sha256") != _ACCEPTED_M32_RAW_HLO_SHA256
+        or raw_digest.hexdigest() != _ACCEPTED_M32_RAW_HLO_SHA256
+        or hlo.get("category_counts")
+        != {"attention": 78, "dense_mlp": 3, "moe_tuple": 75}
+        or hlo.get("compile_bucket_rows") != 32
+        or hlo.get("partition_count") != 32
+        or hlo.get("reduction_dtype") != "bf16"
+        or hlo.get("result_width") != 6144
+    ):
+        raise RuntimeError("accepted M32 lowering contract drifted")
+    success = dict(
+        line.split("=", 1)
+        for line in args.accepted_m32_success.read_text().splitlines()
+        if line
+    )
+    if (
+        success.get("code_hash") != _ACCEPTED_M32_CODE_HASH
+        or success.get("legacy_repository_pin") != _ACCEPTED_M32_LEGACY_HASH
+        or success.get("source_run_id") != str(_ACCEPTED_M32_RUN_ID)
+        or success.get("accepted_decode_projection_capture") != "true"
+        or success.get("accepted_decode_projection_diagnostic_only") != "true"
+        or success.get("accepted_decode_projection_reduction_dtype") != "bf16"
+        or success.get("accepted_decode_projection_strategy") != "StrategyND"
+    ):
+        raise RuntimeError("accepted M32 terminal contract drifted")
+    return {
+        "accepted_m32_hlo_raw_sha256": _ACCEPTED_M32_RAW_HLO_SHA256,
+        "accepted_m32_hlo_sha256": args.accepted_m32_hlo_sha256,
+        "accepted_m32_success_sha256": args.accepted_m32_success_sha256,
+        "accepted_m32_summary_sha256": args.accepted_m32_summary_sha256,
+    }
+
+
+def _validate_stablehlo(
+    stablehlo: str, *, compile_rows: int = 1
+) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.stablehlo_dense_convolution import (
         validate_dense_convolution_stablehlo,
     )
 
-    return validate_dense_convolution_stablehlo(stablehlo)
+    return validate_dense_convolution_stablehlo(
+        stablehlo, compile_rows=compile_rows
+    )
 
 
-def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
+def _validate_optimized_hlo(
+    optimized_hlo: str, *, compile_rows: int = 1
+) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
         parse_hlo_module,
     )
 
+    if compile_rows not in (1, 32):
+        raise ValueError("dense optimized-HLO compile rows must be 1 or 32")
     module = parse_hlo_module(optimized_hlo)
     by_key = {_instruction_key(item): item for item in module.instructions}
     users: dict[tuple[str, str], list[Any]] = {}
@@ -231,7 +321,35 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
             return None
         return by_key.get((item.computation, item.operand_names[index]))
 
-    def unwrap(item: Any | None) -> Any | None:
+    def is_m32_row0_slice(item: Any) -> bool:
+        if compile_rows != 32 or item.raw_opcode != "slice":
+            return False
+        operand_shapes = _shape_signatures(item.operand_shapes)
+        result_shapes = _shape_signatures(item.result_shapes)
+        if len(operand_shapes) != 1 or len(result_shapes) != 1:
+            return False
+        compact = re.sub(r"\s+", "", item.raw_line)
+        two_dimensional = re.fullmatch(
+            r"(bf16|f32)\[32,([0-9]+)\]", operand_shapes[0]
+        )
+        if two_dimensional is not None:
+            dtype, width = two_dimensional.groups()
+            return (
+                result_shapes[0] == f"{dtype}[1,{width}]"
+                and f"slice={{[0:1],[0:{width}]}}" in compact
+            )
+        three_dimensional = re.fullmatch(
+            r"(bf16|f32)\[8,32,([0-9]+)\]", operand_shapes[0]
+        )
+        if three_dimensional is None:
+            return False
+        dtype, width = three_dimensional.groups()
+        return (
+            result_shapes[0] == f"{dtype}[8,1,{width}]"
+            and f"slice={{[0:8],[0:1],[0:{width}]}}" in compact
+        )
+
+    def unwrap_layout(item: Any | None) -> Any | None:
         seen: set[tuple[str, str]] = set()
         while (
             item is not None
@@ -241,6 +359,18 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
         ):
             seen.add(_instruction_key(item))
             item = operand(item, 0)
+        return item
+
+    def unwrap(item: Any | None) -> Any | None:
+        seen: set[tuple[str, str]] = set()
+        while item is not None and _instruction_key(item) not in seen:
+            seen.add(_instruction_key(item))
+            if item.raw_opcode in layout_only or is_m32_row0_slice(item):
+                if len(item.operand_names) != 1:
+                    return item
+                item = operand(item, 0)
+                continue
+            return item
         return item
 
     def local_depends(value: Any | None, source: Any) -> bool:
@@ -330,7 +460,7 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
         if root.raw_opcode == "tuple":
             for index, name in enumerate(root.operand_names):
                 value = by_key.get((root.computation, name))
-                if unwrap(value) is not item:
+                if unwrap_layout(value) is not item:
                     continue
                 selected = [
                     user
@@ -342,10 +472,23 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     external_value_memo[key] = ()
                     return ()
                 result.append(selected[0])
-        elif unwrap(root) is item:
+        elif unwrap_layout(root) is item:
             result.append(caller)
         external_value_memo[key] = tuple(result)
         return tuple(result)
+
+    def fully_externalized_value(item: Any) -> Any | None:
+        seen: set[tuple[str, str]] = set()
+        while not item.computation.startswith("ENTRY "):
+            key = _instruction_key(item)
+            if key in seen:
+                return None
+            seen.add(key)
+            values = exact_external_values(item)
+            if len(values) != 1:
+                return None
+            item = values[0]
+        return item
 
     def external_parameter_value(item: Any | None) -> Any | None:
         """Resolve a nested-fusion parameter to its exact outer operand."""
@@ -365,6 +508,23 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
             index = int(match.group(1))
             item = operand(callers[0], index)
         return item
+
+    def exact_layout_source(value: Any | None, source: Any) -> bool:
+        item = value
+        seen: set[tuple[str, str]] = set()
+        while item is not None and _instruction_key(item) not in seen:
+            seen.add(_instruction_key(item))
+            if item.raw_opcode in layout_only and len(item.operand_names) == 1:
+                item = operand(item, 0)
+                continue
+            if item.raw_opcode == "parameter" and not item.computation.startswith(
+                "ENTRY "
+            ):
+                item = external_parameter_value(item)
+                continue
+            break
+        return unwrap(item) is unwrap(source)
+
     convolutions = [
         item for item in module.instructions if item.raw_opcode == "convolution"
     ]
@@ -388,15 +548,28 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
         exact_dimension_labels = "dim_labels=bf_io->bf" in re.sub(
             r"\s+", "", item.raw_line
         )
-        if exact_dimension_labels and (operands, results) in {
-            (("bf16[1,6144]", "bf16[6144,768]"), ("f32[1,768]",)),
-            (("bf16[8,6144]", "bf16[6144,768]"), ("f32[8,768]",)),
-        }:
+        gate_geometries = {
+            (
+                (f"bf16[{compile_rows},6144]", "bf16[6144,768]"),
+                (f"f32[{compile_rows},768]",),
+            )
+        }
+        down_geometries = {
+            (
+                (f"bf16[{compile_rows},384]", "bf16[384,6144]"),
+                (f"f32[{compile_rows},6144]",),
+            )
+        }
+        if compile_rows == 1:
+            gate_geometries.add(
+                (("bf16[8,6144]", "bf16[6144,768]"), ("f32[8,768]",))
+            )
+            down_geometries.add(
+                (("bf16[8,384]", "bf16[384,6144]"), ("f32[8,6144]",))
+            )
+        if exact_dimension_labels and (operands, results) in gate_geometries:
             gate_up.append(item)
-        elif exact_dimension_labels and (operands, results) in {
-            (("bf16[1,384]", "bf16[384,6144]"), ("f32[1,6144]",)),
-            (("bf16[8,384]", "bf16[384,6144]"), ("f32[8,6144]",)),
-        }:
+        elif exact_dimension_labels and (operands, results) in down_geometries:
             down.append(item)
         else:
             unexpected.append(item.name)
@@ -511,7 +684,12 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     f"{wrong_rank_edges}"
                 )
             activation_contract: dict[str, Any] = {}
-            activation_shapes = {"bf16[1,384]", "f32[1,384]", "bf16[8,384]", "f32[8,384]"}
+            activation_shapes = {
+                f"bf16[{compile_rows},384]",
+                f"f32[{compile_rows},384]",
+            }
+            if compile_rows == 1:
+                activation_shapes.update({"bf16[8,384]", "f32[8,384]"})
             for rank in range(8):
                 scoped = [
                     item
@@ -562,7 +740,7 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                 if (
                     gate is None
                     or gate.raw_opcode != "slice"
-                    or "slice={[0:1],[0:384]}"
+                    or f"slice={{[0:{compile_rows}],[0:384]}}"
                     not in re.sub(r"\s+", "", gate.raw_line)
                     or unwrap(operand(exponential, 0)) is not negate
                 ):
@@ -640,7 +818,7 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     or len(activated_operands) != 2
                     or up is None
                     or up.raw_opcode != "slice"
-                    or "slice={[0:1],[384:768]}"
+                    or f"slice={{[0:{compile_rows}],[384:768]}}"
                     not in re.sub(r"\s+", "", up.raw_line)
                     or unwrap(operand(gate, 0)) is not unwrap(operand(up, 0))
                     or not exact_bf16_round(silu)
@@ -685,14 +863,42 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
         lineage["collective_convolution_sources"] = sorted(source_convolutions)
         if source_convolutions != {item.name for item in down}:
             violations.append("collective does not consume exactly eight down results")
-        stack_candidates = [
+        all_stack_candidates = [
             item
             for item in module.instructions
             if item.raw_opcode == "concatenate"
-            and _shape_signatures(item.result_shapes) == ("bf16[8,1,6144]",)
+            and _shape_signatures(item.result_shapes)
+            in {
+                (f"bf16[8,{compile_rows},6144]",),
+                (f"f32[8,{compile_rows},6144]",),
+            }
             and len(item.operand_names) == 8
-            and _value_depends_on(module, collective, item)
         ]
+        live_row_slices: list[Any] = []
+        if compile_rows == 32:
+            stack_slice_pairs = [
+                (stack, item)
+                for stack in all_stack_candidates
+                for item in module.instructions
+                if is_m32_row0_slice(item)
+                and exact_layout_source(operand(item, 0), stack)
+                and (
+                    (external := fully_externalized_value(item)) is not None
+                )
+                and unwrap_layout(operand(collective, 0))
+                is unwrap_layout(external)
+            ]
+            stack_candidates = [stack for stack, _item in stack_slice_pairs]
+            live_row_slices = [item for _stack, item in stack_slice_pairs]
+            lineage["m32_live_row_slices"] = [
+                item.name for item in live_row_slices
+            ]
+        else:
+            stack_candidates = [
+                item
+                for item in all_stack_candidates
+                if _value_depends_on(module, collective, item)
+            ]
         if len(stack_candidates) != 1:
             violations.append(
                 "optimized dense stack is absent or ambiguous: "
@@ -713,8 +919,12 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
                     for rank in range(8)
                     if rank in down_value_by_rank
                     and operand is not None
-                    and _value_depends_on(
-                        module, operand, down_value_by_rank[rank]
+                    and (
+                        exact_layout_source(operand, down_value_by_rank[rank])
+                        if compile_rows == 32
+                        else _value_depends_on(
+                            module, operand, down_value_by_rank[rank]
+                        )
                     )
                 ]
                 for operand in stack_operands
@@ -722,6 +932,11 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
             lineage["ordered_stack_sources"] = ordered_sources
             if ordered_sources != [[rank] for rank in range(8)]:
                 violations.append("optimized dense stack row order drifted")
+            if compile_rows == 32 and len(live_row_slices) != 1:
+                violations.append(
+                    "optimized M32 exact live-row slice drifted: "
+                    f"{lineage['m32_live_row_slices']}"
+                )
     roots = [
         item
         for item in module.instructions
@@ -1604,10 +1819,12 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
     return {
         "async_collectives": async_collectives,
         "collective_count": len(collectives),
+        "compile_rows": compile_rows,
         "convolution_count": len(convolutions),
         "down_convolution_count": len(down),
         "gate_up_convolution_count": len(gate_up),
         "lineage": lineage,
+        "live_rows": 1,
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
         "passed": not violations,
@@ -1619,6 +1836,7 @@ def _validate_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-code-hash", required=True)
+    parser.add_argument("--compile-rows", type=int, choices=(1, 32), default=1)
     parser.add_argument("--db538-runner", type=Path, required=True)
     parser.add_argument("--db538-runner-sha256", required=True)
     parser.add_argument("--db538-tensor", type=Path, required=True)
@@ -1629,6 +1847,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db538-success-sha256", required=True)
     parser.add_argument("--checkpoint-root", type=Path, required=True)
     parser.add_argument("--checkpoint-manifest-sha256", required=True)
+    parser.add_argument("--accepted-m32-hlo", type=Path)
+    parser.add_argument("--accepted-m32-hlo-sha256")
+    parser.add_argument("--accepted-m32-summary", type=Path)
+    parser.add_argument("--accepted-m32-summary-sha256")
+    parser.add_argument("--accepted-m32-success", type=Path)
+    parser.add_argument("--accepted-m32-success-sha256")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tensor-output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
@@ -1645,6 +1869,21 @@ def main() -> int:
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
     normalized, post_attention, accepted_layer1_bits = _load_db538(args)
+    m32_arguments = (
+        args.accepted_m32_hlo,
+        args.accepted_m32_hlo_sha256,
+        args.accepted_m32_summary,
+        args.accepted_m32_summary_sha256,
+        args.accepted_m32_success,
+        args.accepted_m32_success_sha256,
+    )
+    if args.compile_rows == 1 and any(
+        value is not None for value in m32_arguments
+    ):
+        raise RuntimeError("accepted M32 source is forbidden for the M1 arm")
+    accepted_m32_source = (
+        _load_accepted_m32_source(args) if args.compile_rows == 32 else {}
+    )
     weights, weight_records = _load_weights(
         args.checkpoint_root,
         manifest_sha256=args.checkpoint_manifest_sha256,
@@ -1703,8 +1942,19 @@ def main() -> int:
         down_scale_slot: Any,
         layer1_norm: Any,
     ) -> tuple[Any, Any]:
+        dense_input = normalized_input
+        if args.compile_rows == 32:
+            with jax.named_scope(
+                "greenfield_dense_convolution_m32_compile_geometry"
+            ):
+                dense_input = jnp.pad(
+                    normalized_input,
+                    ((0, 31), (0, 0)),
+                    mode="constant",
+                    constant_values=jnp.bfloat16(0),
+                )
         partials = _virtual_dense_convolution_down_partials(
-            normalized_input,
+            dense_input,
             gate_bits_slot[0],
             gate_scale_slot[0],
             up_bits_slot[0],
@@ -1712,7 +1962,17 @@ def main() -> int:
             down_bits_slot[0],
             down_scale_slot[0],
             block_shape=(128, 128),
+            compile_rows=args.compile_rows,
         )
+        if args.compile_rows == 32:
+            with jax.named_scope(
+                "greenfield_dense_convolution_m32_geometry_anchor"
+            ):
+                partials = lax.optimization_barrier(partials)
+            with jax.named_scope(
+                "greenfield_dense_convolution_m32_live_row"
+            ):
+                partials = partials[:, :1, :]
         with jax.named_scope(
             "greenfield_strategy_nd_row0_dense_convolution_down"
         ):
@@ -1741,7 +2001,9 @@ def main() -> int:
     args.hlo_dir.mkdir(parents=True, exist_ok=True)
     lowered = jax.jit(mapped).lower(*arguments)
     stablehlo = lowered.as_text()
-    stablehlo_contract = _validate_stablehlo(stablehlo)
+    stablehlo_contract = _validate_stablehlo(
+        stablehlo, compile_rows=args.compile_rows
+    )
     stablehlo_path = args.hlo_dir / "dense_convolution.stablehlo.mlir"
     stablehlo_path.write_text(stablehlo)
     if not stablehlo_contract["passed"]:
@@ -1750,7 +2012,9 @@ def main() -> int:
         )
     compiled = lowered.compile()
     optimized_hlo = compiled.as_text()
-    optimized_contract = _validate_optimized_hlo(optimized_hlo)
+    optimized_contract = _validate_optimized_hlo(
+        optimized_hlo, compile_rows=args.compile_rows
+    )
     optimized_path = args.hlo_dir / "dense_convolution.optimized_hlo.txt"
     optimized_path.write_text(optimized_hlo)
     if not optimized_contract["passed"]:
@@ -1767,16 +2031,20 @@ def main() -> int:
     )
     comparison = _compare_bits(accepted_layer1_bits, layer1_bits)
     exact = comparison["elementwise_exact"]
+    arm = (
+        "accepted_m32_dense_convolution"
+        if args.compile_rows == 32
+        else "accepted_dense_convolution"
+    )
+    classification = f"{arm}_{'exact' if exact else 'nonexact'}"
     result = {
         "artifact_kind": "glm52_layer0_dense_convolution_probe",
-        "classification": (
-            "accepted_dense_convolution_exact"
-            if exact
-            else "accepted_dense_convolution_nonexact"
-        ),
+        "classification": classification,
         "code_hash": code_hash,
+        "compile_rows": args.compile_rows,
+        "diagnostic_dead_rows": args.compile_rows - 1,
         "exact": exact,
-        "exact_arms": ["accepted_dense_convolution"] if exact else [],
+        "exact_arms": [arm] if exact else [],
         "hlo": {
             "optimized_contract": optimized_contract,
             "optimized_sha256": sha256(optimized_hlo.encode()).hexdigest(),
@@ -1785,6 +2053,7 @@ def main() -> int:
         },
         "layer1_comparison": comparison,
         "performance_claim": False,
+        "live_rows": 1,
         "position": _POSITION,
         "source": {
             "checkpoint_manifest_sha256": args.checkpoint_manifest_sha256,
@@ -1793,6 +2062,7 @@ def main() -> int:
             "db538_summary_sha256": args.db538_summary_sha256,
             "db538_success_sha256": args.db538_success_sha256,
             "post_attention_residual_sha256": _POST_ATTENTION_RESIDUAL_SHA256,
+            **accepted_m32_source,
         },
         "status": "SUCCESS",
         "weight_records": weight_records,
@@ -1803,6 +2073,7 @@ def main() -> int:
     np.savez(
         args.tensor_output,
         accepted_layer1_normalized_bfloat16_bits=accepted_layer1_bits,
+        compile_rows=np.array(args.compile_rows, dtype=np.int32),
         dense_update_bfloat16_bits=dense_update_bits,
         layer1_normalized_bfloat16_bits=layer1_bits,
         normalized_mlp_bfloat16_bits=np.ascontiguousarray(normalized).view(

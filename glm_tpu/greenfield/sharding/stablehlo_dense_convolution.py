@@ -241,8 +241,12 @@ def _match_fp8_decode(
 
 
 def _match_one_shard(
-    graph: _StableGraph, gate_up: _StableNode
+    graph: _StableGraph,
+    gate_up: _StableNode,
+    *,
+    compile_rows: int,
 ) -> tuple[int, tuple[str, ...], str]:
+    row_type = f"tensor<{compile_rows}x"
     if len(gate_up.operands) != 2:
         raise _MatchError(f"{gate_up.name}: gate/up operand arity drifted")
     normalized = gate_up.operands[0]
@@ -261,9 +265,9 @@ def _match_one_shard(
         gate_up,
         operands=(normalized, gate_up.operands[1]),
         tensor_types=(
-            "tensor<1x6144xbf16>",
+            f"{row_type}6144xbf16>",
             "tensor<6144x768xbf16>",
-            "tensor<1x768xf32>",
+            f"{row_type}768xf32>",
         ),
     )
     merged_bits = _expect_node(
@@ -339,28 +343,34 @@ def _match_one_shard(
         raise _MatchError(f"{gate_up.name}: gate/up scale slices cross-wired")
 
     gate_up_bf16 = _expect_unary(
-        graph, gate_up.name, opcode="convert", result_type="tensor<1x768xbf16>"
+        graph,
+        gate_up.name,
+        opcode="convert",
+        result_type=f"{row_type}768xbf16>",
     )
     gate = _expect_slice(
         graph,
         gate_up_bf16.name,
-        ((0, 1), (0, 384)),
-        "tensor<1x384xbf16>",
+        ((0, compile_rows), (0, 384)),
+        f"{row_type}384xbf16>",
     )
     up = _expect_slice(
         graph,
         gate_up_bf16.name,
-        ((0, 1), (384, 768)),
-        "tensor<1x384xbf16>",
+        ((0, compile_rows), (384, 768)),
+        f"{row_type}384xbf16>",
     )
     negated = _expect_unary(
-        graph, gate.name, opcode="negate", result_type="tensor<1x384xbf16>"
+        graph,
+        gate.name,
+        opcode="negate",
+        result_type=f"{row_type}384xbf16>",
     )
     exponential = _expect_unary(
         graph,
         negated.name,
         opcode="exponential",
-        result_type="tensor<1x384xbf16>",
+        result_type=f"{row_type}384xbf16>",
     )
     denominator = _only(
         (
@@ -368,7 +378,7 @@ def _match_one_shard(
             for node in graph.matching_users(
                 exponential.name,
                 opcode="add",
-                result_type="tensor<1x384xbf16>",
+                result_type=f"{row_type}384xbf16>",
             )
             if len(node.operands) == 2
             and node.operands[1] == exponential.name
@@ -381,7 +391,7 @@ def _match_one_shard(
         one_denominator,
         literal="1.000000e+00",
         scalar_type="tensor<bf16>",
-        result_type="tensor<1x384xbf16>",
+        result_type=f"{row_type}384xbf16>",
         dimensions=(),
     )
     sigmoid = _only(
@@ -390,7 +400,7 @@ def _match_one_shard(
             for node in graph.matching_users(
                 denominator.name,
                 opcode="divide",
-                result_type="tensor<1x384xbf16>",
+                result_type=f"{row_type}384xbf16>",
             )
             if len(node.operands) == 2
             and node.operands[1] == denominator.name
@@ -403,7 +413,7 @@ def _match_one_shard(
         one_numerator,
         literal="1.000000e+00",
         scalar_type="tensor<bf16>",
-        result_type="tensor<1x384xbf16>",
+        result_type=f"{row_type}384xbf16>",
         dimensions=(),
     )
     if one_numerator.name == one_denominator.name:
@@ -413,14 +423,14 @@ def _match_one_shard(
         gate.name,
         sigmoid.name,
         opcode="multiply",
-        result_type="tensor<1x384xbf16>",
+        result_type=f"{row_type}384xbf16>",
     )
     activated = _expect_binary(
         graph,
         silu.name,
         up.name,
         opcode="multiply",
-        result_type="tensor<1x384xbf16>",
+        result_type=f"{row_type}384xbf16>",
     )
     down = _only(
         (
@@ -428,7 +438,7 @@ def _match_one_shard(
             for node in graph.matching_users(
                 activated.name,
                 opcode="convolution",
-                result_type="tensor<1x6144xf32>",
+                result_type=f"{row_type}6144xf32>",
             )
             if len(node.operands) == 2 and node.operands[0] == activated.name
         ),
@@ -449,9 +459,9 @@ def _match_one_shard(
         down,
         operands=(activated.name, down.operands[1]),
         tensor_types=(
-            "tensor<1x384xbf16>",
+            f"{row_type}384xbf16>",
             "tensor<384x6144xbf16>",
-            "tensor<1x6144xf32>",
+            f"{row_type}6144xf32>",
         ),
     )
     down_bits_transpose = _expect_node(
@@ -493,7 +503,10 @@ def _match_one_shard(
     ):
         raise _MatchError(f"{down_scale_slice.name}: down scale slice drifted")
     down_bf16 = _expect_unary(
-        graph, down.name, opcode="convert", result_type="tensor<1x6144xbf16>"
+        graph,
+        down.name,
+        opcode="convert",
+        result_type=f"{row_type}6144xbf16>",
     )
     roots = (
         normalized,
@@ -505,6 +518,69 @@ def _match_one_shard(
         down_scale_slice.operands[0],
     )
     return shard, roots, down_bf16.name
+
+
+def _validate_m32_input_pad(
+    graph: _StableGraph,
+    helpers: dict[str, _StableGraph],
+    call_name: str,
+) -> str:
+    call = _expect_node(
+        graph,
+        call_name,
+        opcode="call",
+        result_type="tensor<32x6144xbf16>",
+    )
+    if (
+        len(call.operands) != 2
+        or call.tensor_types[-3:]
+        != (
+            "tensor<1x6144xbf16>",
+            "tensor<bf16>",
+            "tensor<32x6144xbf16>",
+        )
+        or call.callee is None
+        or call.callee not in helpers
+    ):
+        raise _MatchError("M32 discriminator row-pad call drifted")
+    zero = _expect_node(
+        graph,
+        call.operands[1],
+        opcode="constant",
+        result_type="tensor<bf16>",
+    )
+    if zero.constant_literal not in {"0.000000e+00", "0.000000E+00"}:
+        raise _MatchError("M32 discriminator padding is not BF16 zero")
+    helper = helpers[call.callee]
+    expected_header = (
+        f"func.funcprivate@{call.callee}(%arg0:tensor<1x6144xbf16>,"
+        "%arg1:tensor<bf16>)->tensor<32x6144xbf16>{"
+    )
+    if re.sub(r"\s+", "", helper.header) != expected_header:
+        raise _MatchError("M32 discriminator row-pad helper signature drifted")
+    pads = [node for node in helper.nodes.values() if node.opcode == "pad"]
+    returns = [
+        node for node in helper.nodes.values() if node.opcode == "return"
+    ]
+    if len(pads) != 1 or len(returns) != 1 or len(helper.nodes) != 2:
+        raise _MatchError("M32 discriminator row-pad helper body drifted")
+    pad = pads[0]
+    if (
+        pad.operands != ("%arg0", "%arg1")
+        or pad.tensor_types[-3:]
+        != (
+            "tensor<1x6144xbf16>",
+            "tensor<bf16>",
+            "tensor<32x6144xbf16>",
+        )
+        or pad.result_type != "tensor<32x6144xbf16>"
+        or pad.pad_low != (0, 0)
+        or pad.pad_high != (31, 0)
+        or pad.pad_interior != (0, 0)
+        or returns[0].operands != (pad.name,)
+    ):
+        raise _MatchError("M32 discriminator row-pad helper semantics drifted")
+    return call.operands[0]
 
 
 def _match_rmsnorm(
@@ -629,10 +705,14 @@ def _match_rmsnorm(
     return residual.operands[0], norm_weight.operands[0], output.name
 
 
-def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
+def validate_dense_convolution_stablehlo(
+    stablehlo: str, *, compile_rows: int = 1
+) -> dict[str, object]:
     """Validate all eight exact dense chains and the exact StrategyND tree."""
 
     violations: list[str] = []
+    if compile_rows not in (1, 32):
+        raise ValueError("dense StableHLO compile rows must be 1 or 32")
     graphs, parse_errors = _parse_graphs(stablehlo)
     violations.extend(parse_errors)
     matched_shards: list[int] = []
@@ -645,13 +725,13 @@ def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
             node
             for node in graph.nodes.values()
             if node.opcode == "convolution"
-            and node.result_type == "tensor<1x768xf32>"
+            and node.result_type == f"tensor<{compile_rows}x768xf32>"
         ]
         down = [
             node
             for node in graph.nodes.values()
             if node.opcode == "convolution"
-            and node.result_type == "tensor<1x6144xf32>"
+            and node.result_type == f"tensor<{compile_rows}x6144xf32>"
         ]
         if len(gate_up) != 8 or len(down) != 8:
             raise _MatchError(
@@ -660,7 +740,9 @@ def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
             )
         rows: dict[int, tuple[tuple[str, ...], str]] = {}
         for convolution in gate_up:
-            shard, roots, result = _match_one_shard(graph, convolution)
+            shard, roots, result = _match_one_shard(
+                graph, convolution, compile_rows=compile_rows
+            )
             if shard in rows:
                 raise _MatchError(f"duplicate dense virtual shard {shard}")
             rows[shard] = (roots, result)
@@ -669,12 +751,13 @@ def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
         matched_shards = sorted(rows)
         if len({roots for roots, _result in rows.values()}) != 1:
             raise _MatchError("dense virtual shards use different layer sources")
+        broadcast_rows = compile_rows
         broadcasts = tuple(
             _expect_broadcast(
                 graph,
                 rows[shard][1],
                 dimensions=(1, 2),
-                result_type="tensor<1x1x6144xbf16>",
+                result_type=f"tensor<1x{broadcast_rows}x6144xbf16>",
             ).name
             for shard in range(8)
         )
@@ -682,11 +765,26 @@ def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
             graph,
             broadcasts,
             dimension=0,
-            result_type="tensor<8x1x6144xbf16>",
+            result_type=f"tensor<8x{broadcast_rows}x6144xbf16>",
         )
+        if compile_rows == 1:
+            live_stack = stack
+        else:
+            anchored_stack = _expect_unary(
+                graph,
+                stack.name,
+                opcode="optimization_barrier",
+                result_type="tensor<8x32x6144xbf16>",
+            )
+            live_stack = _expect_slice(
+                graph,
+                anchored_stack.name,
+                ((0, 8), (0, 1), (0, 6144)),
+                "tensor<8x1x6144xbf16>",
+            )
         gathered_input = _expect_broadcast(
             graph,
-            stack.name,
+            live_stack.name,
             dimensions=(1, 2, 3),
             result_type="tensor<1x8x1x6144xbf16>",
         )
@@ -721,7 +819,13 @@ def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
             ("tensor<1x6144x3072xui8>", "tensor<6144x3072xui8>"),
             ("tensor<1x48x24xf32>", "tensor<48x24xf32>"),
         )
-        manual_arguments = [layer_roots[0]]
+        normalized_root = layer_roots[0]
+        if compile_rows == 32:
+            helpers = {item.name: item for item in graphs if item is not graph}
+            normalized_root = _validate_m32_input_pad(
+                graph, helpers, normalized_root
+            )
+        manual_arguments = [normalized_root]
         for root, tensor_types in zip(layer_roots[1:], root_contracts, strict=True):
             node = _expect_node(
                 graph,
@@ -759,7 +863,8 @@ def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
             or outer_arguments != [f"%arg{index}" for index in range(9)]
         ):
             raise _MatchError("dense probe manual argument ownership drifted")
-        if len(graphs) != 1:
+        expected_graph_count = 2 if compile_rows == 32 else 1
+        if len(graphs) != expected_graph_count:
             raise _MatchError("dense probe contains unexpected helper functions")
     except _MatchError as error:
         violations.append(str(error))
@@ -783,16 +888,18 @@ def validate_dense_convolution_stablehlo(stablehlo: str) -> dict[str, object]:
         "reduce_scatter": 0,
     }:
         violations.append(f"pre-fusion collective contract drifted: {collective_counts}")
-    if "tensor<32x6144xbf16>" in stablehlo:
+    if compile_rows == 1 and "tensor<32x6144xbf16>" in stablehlo:
         violations.append("dense convolution reconstructed 32 token rows")
     if "xla_python_cpu_callback" in stablehlo or "host_callback" in stablehlo:
         violations.append("pre-fusion module contains a host callback")
     return {
         "collective_counts": collective_counts,
+        "compile_rows": compile_rows,
         "convolution_count": stablehlo.count("stablehlo.convolution"),
         "down_convolution_count": 8 if matched_shards == list(range(8)) else 0,
         "gate_up_convolution_count": 8 if matched_shards == list(range(8)) else 0,
         "matched_virtual_shards": matched_shards,
+        "live_rows": 1,
         "passed": not violations,
         "violations": violations,
     }

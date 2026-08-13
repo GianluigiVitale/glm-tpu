@@ -660,11 +660,16 @@ def _rollback_program() -> str:
 
 
 @pytest.mark.parametrize("state", ("run", "item", "summary"))
-@pytest.mark.parametrize("dense", (False, True), ids=("projection", "dense"))
+@pytest.mark.parametrize(
+    ("dense", "compile_rows"),
+    ((False, 1), (True, 1), (True, 32)),
+    ids=("projection", "dense", "dense_m32"),
+)
 def test_projection_reduction_rollback_removes_each_committed_prefix(
     tmp_path: Path,
     state: str,
     dense: bool,
+    compile_rows: int,
 ) -> None:
     provenance_path = REPO / "bench/provenance.py"
     specification = importlib.util.spec_from_file_location(
@@ -675,7 +680,7 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
     specification.loader.exec_module(provenance)
 
     database = tmp_path / f"{state}.db"
-    tag = f"rollback_{dense}_{state}"
+    tag = f"rollback_{dense}_{compile_rows}_{state}"
     pin = subprocess.check_output(
         ["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True
     ).strip()
@@ -691,47 +696,119 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
         text=True,
     ).strip()
     model = (
-        "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        (
+            "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-m32-convolution"
+            if compile_rows == 32
+            else "zai-org/GLM-5.2-FP8:greenfield-layer0-dense-convolution"
+        )
         if dense
         else "zai-org/GLM-5.2-FP8:greenfield-layer0-projection-reduction"
     )
     revision = (
-        "native-jax-db538-dense-convolution-v1"
+        (
+            "native-jax-db532-dense-m32-discriminator-v1"
+            if compile_rows == 32
+            else "native-jax-db538-dense-convolution-v1"
+        )
         if dense
         else "native-jax-db537-strategy-nd-v1"
     )
     benchmark = (
-        "greenfield_layer0_dense_convolution"
+        (
+            "greenfield_layer0_dense_m32_convolution"
+            if compile_rows == 32
+            else "greenfield_layer0_dense_convolution"
+        )
         if dense
         else "greenfield_layer0_projection_reduction"
     )
     engine = (
-        "greenfield_dense_convolution_probe"
+        (
+            "greenfield_dense_m32_convolution_probe"
+            if compile_rows == 32
+            else "greenfield_dense_convolution_probe"
+        )
         if dense
         else "greenfield_projection_reduction_probe"
     )
     note = (
-        "Protected layer-0 dense convolution discriminator; no performance claim."
+        (
+            "Protected layer-0 accepted-M32 dense arithmetic discriminator; no performance claim."
+            if compile_rows == 32
+            else "Protected layer-0 dense convolution discriminator; no performance claim."
+        )
         if dense
         else "Protected layer-0 projection/reduction discriminator; no performance claim."
     )
     if dense:
+        arm = (
+            "accepted_m32_dense_convolution"
+            if compile_rows == 32
+            else "accepted_dense_convolution"
+        )
         runner = {
             "artifact_kind": "glm52_layer0_dense_convolution_probe",
-            "classification": "accepted_dense_convolution_nonexact",
+            "classification": f"{arm}_nonexact",
             "code_hash": pin,
+            "compile_rows": compile_rows,
+            "diagnostic_dead_rows": compile_rows - 1,
             "exact": False,
             "exact_arms": [],
+            "live_rows": 1,
             "layer1_comparison": {"mismatch_count": 7},
-            "source": {"db538_tensor_sha256": db538_tensor_sha},
+            "source": {
+                "db538_tensor_sha256": db538_tensor_sha,
+                **(
+                    {
+                        "accepted_m32_hlo_raw_sha256": (
+                            "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775"
+                        ),
+                        "accepted_m32_hlo_sha256": (
+                            "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c"
+                        ),
+                        "accepted_m32_summary_sha256": (
+                            "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3"
+                        ),
+                        "accepted_m32_success_sha256": (
+                            "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278"
+                        ),
+                    }
+                    if compile_rows == 32
+                    else {}
+                ),
+            },
             "status": "SUCCESS",
         }
         source_environment = {
             "checkpoint_manifest_sha256": checkpoint_manifest_sha,
+            "compile_rows": compile_rows,
             "db538_tensor_sha256": db538_tensor_sha,
+            **(
+                {
+                    "accepted_m32_hlo_raw_sha256": (
+                        "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775"
+                    ),
+                    "accepted_m32_hlo_sha256": (
+                        "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c"
+                    ),
+                    "accepted_m32_summary_sha256": (
+                        "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3"
+                    ),
+                    "accepted_m32_success_sha256": (
+                        "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278"
+                    ),
+                }
+                if compile_rows == 32
+                else {}
+            ),
         }
-        mismatch_counts = {"accepted_dense_convolution": 7}
-        prompt = "Sealed exact StrategyND attention boundary at first 8K decode row."
+        mismatch_counts = {arm: 7}
+        prompt = (
+            "Sealed exact StrategyND attention boundary with diagnostic "
+            "accepted-M32 dense geometry."
+            if compile_rows == 32
+            else "Sealed exact StrategyND attention boundary at first 8K decode row."
+        )
     else:
         arm_names = (
             "local_attention_local_dense",
@@ -829,6 +906,11 @@ def test_projection_reduction_rollback_removes_each_committed_prefix(
             checkpoint_manifest_sha,
             harness_git,
             fork_git,
+            str(compile_rows),
+            "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
+            "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
+            "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
+            "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
         ],
         input=_rollback_program(),
         text=True,
@@ -891,8 +973,11 @@ def test_dense_rollback_refuses_unauthenticated_rows(
         "artifact_kind": "glm52_layer0_dense_convolution_probe",
         "classification": "accepted_dense_convolution_nonexact",
         "code_hash": pin,
+        "compile_rows": 1,
+        "diagnostic_dead_rows": 0,
         "exact": False,
         "exact_arms": [],
+        "live_rows": 1,
         "layer1_comparison": {"mismatch_count": 7},
         "source": {"db538_tensor_sha256": tensor_sha},
         "status": "SUCCESS",
@@ -910,6 +995,7 @@ def test_dense_rollback_refuses_unauthenticated_rows(
             "GLM_ENGINE": "greenfield_dense_convolution_probe",
             "checkpoint_manifest_sha256": checkpoint_manifest_sha,
             "classification": runner["classification"],
+            "compile_rows": 1,
             "db538_tensor_sha256": tensor_sha,
             "greenfield_code_hash": pin,
             "greenfield_run_tag": tag,
@@ -982,6 +1068,11 @@ def test_dense_rollback_refuses_unauthenticated_rows(
             checkpoint_manifest_sha,
             harness_git,
             fork_git,
+            "1",
+            "25041bfbcf319b6c6fc4c5888cb22548b246cccba784791796fe9e8f57199e4c",
+            "409c845c2c9d67a1d6de36f0cccd25d2982850ee86c35645b0839fc78a1507a3",
+            "6ef516dc42e046a996aa1fe542a4b11af5c2a14450e1aba7bfac98ddbf257278",
+            "3cd750810982608f9a3a7d557497c58f61159cc3dcdeb521f1377ba8c93fb775",
         ],
         input=_rollback_program(),
         text=True,
