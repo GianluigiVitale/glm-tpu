@@ -105,8 +105,7 @@ DENSE_RMS_ARRAY_RECORDS = {
 
 @dataclass(frozen=True, slots=True)
 class DenseRmsInputs:
-    attention_update_bits: np.ndarray
-    combined_residual_bits: np.ndarray
+    post_attention_residual_bits: np.ndarray
     layer1_norm_bits: np.ndarray
     accepted_layer1_bits: np.ndarray
 
@@ -137,7 +136,7 @@ def _raw_sha256(value: np.ndarray) -> str:
 
 
 def load_dense_rms_inputs(path: Path) -> DenseRmsInputs:
-    """Load only immutable residual/norm/target tensors from the sealed capture."""
+    """Load the direct residual, norm, and target from the sealed bundle."""
 
     if not path.is_file() or _file_sha256(path) != DENSE_RMS_SOURCE_NPZ_SHA256:
         raise BenchmarkValidationError("dense RMS source NPZ SHA-256 drifted")
@@ -160,8 +159,9 @@ def load_dense_rms_inputs(path: Path) -> DenseRmsInputs:
     if arrays["compile_rows"].tolist() != [32]:
         raise BenchmarkValidationError("dense RMS source compile rows drifted")
     return DenseRmsInputs(
-        attention_update_bits=arrays["attention_update_bfloat16_bits"],
-        combined_residual_bits=arrays["combined_residual_bfloat16_bits"],
+        post_attention_residual_bits=arrays[
+            "post_attention_residual_bfloat16_bits"
+        ],
         layer1_norm_bits=arrays["layer1_input_norm_bfloat16_bits"],
         accepted_layer1_bits=arrays[
             "accepted_layer1_normalized_bfloat16_bits"
@@ -577,6 +577,27 @@ def _validate_exact_dense_rms_value_flow(
     bf16_m32 = (("bf16", (32, 6144)),)
     bf16_m1 = (("bf16", (1, 6144)),)
     f32_m1 = (("f32", (1, 6144)),)
+    entry_parameters = {
+        int(match.group(1)): _shape_signature(item)
+        for item in report.module.instructions
+        if item.computation.startswith("ENTRY ")
+        and item.raw_opcode == "parameter"
+        and (match := re.search(r"\bparameter\(([0-9]+)\)", item.raw_line))
+        is not None
+    }
+    direct_residual = entry_parameters == {
+        0: (("u16", (1, 32, 6144)),),
+        1: (("bf16", (1, 6144)),),
+        2: (("bf16", (6144,)),),
+    }
+    hybrid_control = entry_parameters == {
+        0: (("u16", (1, 32, 6144)),),
+        1: (("bf16", (1, 6144)),),
+        2: (("bf16", (1, 6144)),),
+        3: (("bf16", (6144,)),),
+    }
+    if not (direct_residual or hybrid_control):
+        raise BenchmarkValidationError("dense RMS replay ENTRY inputs drifted")
 
     def semantic_opcode(
         value: _ResolvedHloValue | None,
@@ -643,7 +664,7 @@ def _validate_exact_dense_rms_value_flow(
             )
         return False
 
-    def exact_carried(value: _ResolvedHloValue | None) -> bool:
+    def exact_hybrid_carried(value: _ResolvedHloValue | None) -> bool:
         value = semantic_opcode(value, "convert", bf16_m32)
         if value is None:
             return False
@@ -657,6 +678,17 @@ def _validate_exact_dense_rms_value_flow(
                 and exact_padded_f32(operands[1 - left], 2)
                 for left in range(2)
             )
+        )
+
+    def exact_direct_residual_f32(
+        value: _ResolvedHloValue | None,
+    ) -> bool:
+        value = graph.semantic(value)
+        return bool(
+            value is not None
+            and value.instruction.raw_opcode == "convert"
+            and graph.shape(value) == f32_m32
+            and exact_pad(graph.operand(value, 0), 1, "bf16")
         )
 
     reduction_value = graph.value(reduction)
@@ -687,12 +719,14 @@ def _validate_exact_dense_rms_value_flow(
         )
 
     def exact_carried_f32(value: _ResolvedHloValue | None) -> bool:
+        if direct_residual:
+            return exact_direct_residual_f32(value)
         value = graph.semantic(value)
         return bool(
             value is not None
             and value.instruction.raw_opcode == "convert"
             and graph.shape(value) == f32_m32
-            and exact_carried(graph.operand(value, 0))
+            and exact_hybrid_carried(graph.operand(value, 0))
         )
 
     def exact_sum(value: _ResolvedHloValue | None, *, rows: int = 32) -> bool:
@@ -945,7 +979,9 @@ def _validate_exact_dense_rms_value_flow(
         ):
             return False
         return graph.exact_parameter(
-            graph.operand(value, 0), 3, (("bf16", (6144,)),)
+            graph.operand(value, 0),
+            2 if direct_residual else 3,
+            (("bf16", (6144,)),),
         )
 
     def exact_normalized_lift(
@@ -1078,10 +1114,16 @@ def _validate_exact_dense_rms_value_flow(
         )
     return {
         "exact_collective_input": True,
-        "exact_residual_round": True,
+        "exact_direct_residual": direct_residual,
+        "exact_residual_round": hybrid_control,
         "exact_reduction_operand_graph": True,
         "exact_weighted_operand_graph": True,
         "exact_result_binding": True,
+        "residual_source_mode": (
+            "direct_post_attention_residual"
+            if direct_residual
+            else "hybrid_attention_plus_combined_control"
+        ),
     }
 
 
@@ -1125,12 +1167,16 @@ def validate_strategy_nd_dense_rms_hlo(
         if match is None:
             raise BenchmarkValidationError("dense RMS ENTRY parameter index drifted")
         parameter_records[int(match.group(1))] = _shape_signature(item)
-    if len(parameters) != 4 or parameter_records != {
+    if parameter_records not in ({
+        0: (("u16", (1, 32, 6144)),),
+        1: (("bf16", (1, 6144)),),
+        2: (("bf16", (6144,)),),
+    }, {
         0: (("u16", (1, 32, 6144)),),
         1: (("bf16", (1, 6144)),),
         2: (("bf16", (1, 6144)),),
         3: (("bf16", (6144,)),),
-    }:
+    }):
         raise BenchmarkValidationError("dense RMS replay ENTRY inputs drifted")
 
     scheduled = tuple(
@@ -1182,8 +1228,7 @@ def _replay_function() -> Any:
 
     def replay(
         local_partial_bits: Any,
-        attention_update: Any,
-        combined_residual: Any,
+        post_attention_residual: Any,
         layer1_norm: Any,
     ) -> Any:
         with jax.named_scope("strategy_nd_dense_rms_collective"):
@@ -1192,26 +1237,16 @@ def _replay_function() -> Any:
             )
             dense_m32 = lax.psum(local_partials, "member")
         with jax.named_scope("strategy_nd_dense_rms_residual"):
-            attention_m32 = jnp.pad(
-                attention_update,
+            residual_m32 = jnp.pad(
+                post_attention_residual,
                 ((0, 31), (0, 0)),
                 mode="constant",
                 constant_values=jnp.bfloat16(0),
             )
-            residual_source_m32 = jnp.pad(
-                combined_residual,
-                ((0, 31), (0, 0)),
-                mode="constant",
-                constant_values=jnp.bfloat16(0),
-            )
-            carried_residual = (
-                attention_m32.astype(jnp.float32)
-                + residual_source_m32.astype(jnp.float32)
-            ).astype(jnp.bfloat16)
         with jax.named_scope("strategy_nd_dense_rms_layer1"):
             layer1, _ = fused_add_rms_norm(
                 dense_m32,
-                carried_residual,
+                residual_m32,
                 layer1_norm,
                 epsilon=1e-5,
             )
@@ -1249,17 +1284,13 @@ def build_strategy_nd_dense_rms_replay(
     mapped = jax.shard_map(
         _replay_function(),
         mesh=mesh,
-        in_specs=(P("member", None, None), P(), P(), P()),
+        in_specs=(P("member", None, None), P(), P()),
         out_specs=P(),
         check_vma=False,
     )
     examples = (
         jax.device_put(
             np.zeros((32, 32, 6144), dtype=np.uint16), input_sharding
-        ),
-        jax.device_put(
-            np.zeros((1, 6144), dtype=np.uint16).view(ml_dtypes.bfloat16),
-            replicated,
         ),
         jax.device_put(
             np.zeros((1, 6144), dtype=np.uint16).view(ml_dtypes.bfloat16),
@@ -1273,7 +1304,11 @@ def build_strategy_nd_dense_rms_replay(
     lowered = jax.jit(mapped).lower(*examples)
     stablehlo = lowered.as_text()
     stablehlo_contract = validate_strategy_nd_dense_rms_stablehlo(stablehlo)
-    if not stablehlo_contract["passed"]:
+    if not (
+        stablehlo_contract["passed"]
+        and stablehlo_contract.get("residual_source_mode")
+        == "direct_post_attention_residual"
+    ):
         raise BenchmarkValidationError(
             f"dense RMS StableHLO failed: {stablehlo_contract}"
         )
@@ -1283,6 +1318,12 @@ def build_strategy_nd_dense_rms_replay(
         report, algorithm, optimized_contract = validate_strategy_nd_dense_rms_hlo(
             optimized_hlo, members
         )
+        if optimized_contract.get("residual_source_mode") != (
+            "direct_post_attention_residual"
+        ):
+            raise BenchmarkValidationError(
+                "dense RMS optimized HLO does not consume the direct residual"
+            )
     else:
         report = lint_hlo(
             parse_hlo_module(optimized_hlo),
@@ -1327,11 +1368,7 @@ def execute_strategy_nd_dense_rms_replay(
     arguments = (
         jax.device_put(distributed, compiled.input_sharding),
         jax.device_put(
-            inputs.attention_update_bits.view(ml_dtypes.bfloat16),
-            compiled.replicated_sharding,
-        ),
-        jax.device_put(
-            inputs.combined_residual_bits.view(ml_dtypes.bfloat16),
+            inputs.post_attention_residual_bits.view(ml_dtypes.bfloat16),
             compiled.replicated_sharding,
         ),
         jax.device_put(

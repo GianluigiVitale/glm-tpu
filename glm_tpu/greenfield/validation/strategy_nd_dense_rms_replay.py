@@ -537,6 +537,10 @@ def validate_strategy_nd_dense_rms_replay(
     if (
         stable_contract != reference["stablehlo_contract"]
         or optimized_contract != reference["optimized_hlo_contract"]
+        or stable_contract.get("residual_source_mode")
+        != "direct_post_attention_residual"
+        or optimized_contract.get("residual_source_mode")
+        != "direct_post_attention_residual"
         or algorithm != STRATEGY_ND_ALGORITHM
         or json.loads(contract_path.read_text())
         != {

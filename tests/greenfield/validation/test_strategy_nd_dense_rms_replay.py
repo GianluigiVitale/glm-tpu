@@ -152,6 +152,72 @@ ENTRY %main (p0: u16[1,32,6144], p1: bf16[1,6144], p2: bf16[1,6144], p3: bf16[61
 '''
 
 
+def _synthetic_exact_direct_dense_rms_hlo() -> str:
+    text = _synthetic_exact_dense_rms_hlo()
+    reduce_start = text.index("%reduce_body ")
+    reduce_end = text.index("\n%rsqrt_body", reduce_start)
+    layout = ACCEPTED_DECODE_RESULT_LAYOUT
+    reduce_body = f'''%reduce_body (dense: bf16[32,6144], residual: bf16[1,6144]) -> f32[32] {{
+  %dense = bf16[32,6144]{layout} parameter(0)
+  %residual = bf16[1,6144]{{1,0}} parameter(1)
+  %zero_bf16 = bf16[] constant(0)
+  %residual_pad = bf16[32,6144]{{1,0}} pad(%residual, %zero_bf16), padding=0_31x0_0
+  %residual_f32 = f32[32,6144]{{1,0}} convert(%residual_pad)
+  %dense_f32 = f32[32,6144]{{1,0}} convert(%dense)
+  %summed = f32[32,6144]{{1,0}} add(%dense_f32, %residual_f32)
+  %square = f32[32,6144]{{1,0}} multiply(%summed, %summed)
+  %zero = f32[] constant(0)
+  ROOT %reduce = f32[32]{{0}} reduce(%square, %zero), dimensions={{1}}, to_apply=%f32_add
+}}
+'''
+    text = text[:reduce_start] + reduce_body + text[reduce_end:]
+    output_start = text.index("%output_body ")
+    output_end = text.index("\nENTRY %main", output_start)
+    output_body = f'''%output_body (dense: bf16[32,6144], residual: bf16[1,6144], inverse: f32[32], weight: bf16[6144]) -> u16[1,6144] {{
+  %dense = bf16[32,6144]{layout} parameter(0)
+  %residual = bf16[1,6144]{{1,0}} parameter(1)
+  %inverse = f32[32]{{0}} parameter(2)
+  %weight = bf16[6144]{{0}} parameter(3)
+  %zero_bf16 = bf16[] constant(0)
+  %residual_pad = bf16[32,6144]{{1,0}} pad(%residual, %zero_bf16), padding=0_31x0_0
+  %residual_f32 = f32[32,6144]{{1,0}} convert(%residual_pad)
+  %dense_f32 = f32[32,6144]{{1,0}} convert(%dense)
+  %summed = f32[32,6144]{{1,0}} add(%dense_f32, %residual_f32)
+  %inverse_wide = f32[32,6144]{{1,0}} broadcast(%inverse), dimensions={{0}}
+  %normalized = f32[32,6144]{{1,0}} multiply(%summed, %inverse_wide)
+  %normalized_bf16 = bf16[32,6144]{{1,0}} convert(%normalized)
+  %normalized_f32 = f32[32,6144]{{1,0}} convert(%normalized_bf16)
+  %weight_wide = bf16[32,6144]{{1,0}} broadcast(%weight), dimensions={{1}}
+  %weight_f32 = f32[32,6144]{{1,0}} convert(%weight_wide)
+  %weighted = f32[32,6144]{{1,0}} multiply(%normalized_f32, %weight_f32)
+  %weighted_bf16 = bf16[32,6144]{{1,0}} convert(%weighted)
+  %row = bf16[1,6144]{{1,0}} slice(%weighted_bf16), slice={{[0:1], [0:6144]}}
+  ROOT %bits = u16[1,6144]{{1,0}} bitcast-convert(%row)
+}}
+'''
+    text = text[:output_start] + output_body + text[output_end:]
+    entry_start = text.index("ENTRY %main")
+    old_entry = text[entry_start:]
+    collective_line = next(
+        line for line in old_entry.splitlines() if " all-reduce(" in line
+    )
+    scheduled_backend = next(
+        line for line in old_entry.splitlines() if " %scheduled = " in line
+    ).split("backend_config=", 1)[1]
+    entry = f'''ENTRY %main (p0: u16[1,32,6144], p1: bf16[1,6144], p2: bf16[6144]) -> u16[1,6144] {{
+  %p0 = u16[1,32,6144]{{2,1,0:T(8,128)(2,1)}} parameter(0)
+  %p1 = bf16[1,6144]{{1,0}} parameter(1)
+  %p2 = bf16[6144]{{0}} parameter(2)
+  %input = bf16[32,6144]{layout} fusion(%p0), kind=kLoop, calls=%input_body
+{collective_line}
+  %scheduled = f32[32]{{0}} fusion(%collective, %p1), kind=kLoop, calls=%reduce_body, metadata={{op_name="strategy_nd_dense_rms_layer1/reduce_sum"}}, backend_config={scheduled_backend}
+  %inverse = f32[32]{{0}} fusion(%scheduled), kind=kLoop, calls=%rsqrt_body
+  ROOT %output = u16[1,6144]{{1,0}} fusion(%collective, %p1, %inverse, %p2), kind=kLoop, calls=%output_body
+}}
+'''
+    return text[:entry_start] + entry
+
+
 def _synthetic_exact_dense_rms_tuple_hlo() -> str:
     text = _synthetic_exact_dense_rms_hlo()
     text = text.replace(
@@ -256,8 +322,7 @@ def _synthetic_exact_dense_rms_m1_hlo() -> str:
 @pytest.mark.skipif(not REAL_RMS_SOURCE.is_file(), reason="sealed RMS source absent")
 def test_sealed_rms_source_loads_exact_target() -> None:
     inputs = load_dense_rms_inputs(REAL_RMS_SOURCE)
-    assert inputs.attention_update_bits.shape == (1, 6144)
-    assert inputs.combined_residual_bits.shape == (1, 6144)
+    assert inputs.post_attention_residual_bits.shape == (1, 6144)
     assert inputs.layer1_norm_bits.shape == (6144,)
     assert inputs.accepted_layer1_bits.shape == (6144,)
     assert int(inputs.accepted_layer1_bits[2795]) == 48423
@@ -325,6 +390,29 @@ def test_dense_rms_optimized_hlo_binds_exact_live_arithmetic() -> None:
     assert contract["exact_collective_input"] is True
     assert contract["exact_reduction_operand_graph"] is True
     assert contract["exact_weighted_operand_graph"] is True
+    direct_accepted = _synthetic_exact_direct_dense_rms_hlo()
+    xla_client._xla.hlo_module_from_text(direct_accepted)
+    _, _, direct_contract = validate_strategy_nd_dense_rms_hlo(
+        direct_accepted, tuple(range(32))
+    )
+    assert direct_contract["exact_direct_residual"] is True
+    assert direct_contract["exact_residual_round"] is False
+    assert direct_contract["residual_source_mode"] == (
+        "direct_post_attention_residual"
+    )
+    for mutation in (
+        direct_accepted.replace(
+            "%summed = f32[32,6144]{1,0} add(%dense_f32, %residual_f32)",
+            "%summed = f32[32,6144]{1,0} add(%dense_f32, %dense_f32)",
+        ),
+        direct_accepted.replace(
+            "%residual_pad = bf16[32,6144]{1,0} pad(%residual, %zero_bf16), padding=0_31x0_0",
+            "%residual_pad = bf16[32,6144]{1,0} pad(%residual, %zero_bf16), padding=31_0x0_0",
+        ),
+    ):
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(Exception):
+            validate_strategy_nd_dense_rms_hlo(mutation, tuple(range(32)))
     tuple_accepted = _synthetic_exact_dense_rms_tuple_hlo()
     xla_client._xla.hlo_module_from_text(tuple_accepted)
     _, _, tuple_contract = validate_strategy_nd_dense_rms_hlo(
@@ -398,6 +486,7 @@ def test_dense_rms_optimized_hlo_binds_exact_live_arithmetic() -> None:
 def test_dense_rms_stablehlo_binds_collective_residual_norm_and_result() -> None:
     code = f"""
 import sys
+import re
 sys.path.insert(0, {str(REPO)!r})
 from glm_tpu.greenfield.benchmarking.dense_rms_replay import build_strategy_nd_dense_rms_replay
 from glm_tpu.greenfield.sharding.stablehlo_dense_convolution import validate_strategy_nd_dense_rms_stablehlo
@@ -411,6 +500,18 @@ residual_add = next(
     line for line in text.splitlines()
     if "stablehlo.add" in line and "tensor<32x6144xf32>" in line
 )
+reducer_add = next(
+    line for line in text.splitlines()
+    if "stablehlo.add" in line and "tensor<bf16>" in line
+)
+live_slice = next(
+    line for line in text.splitlines()
+    if "stablehlo.slice" in line and "[0:1, 0:6144]" in line
+)
+residual_operands = re.search(
+    r"stablehlo.add\\s+(%[A-Za-z0-9_.-]+),\\s*(%[A-Za-z0-9_.-]+)",
+    residual_add,
+).groups()
 mutations = {{
     "wrong_group": text.replace(
         "30, 31]]> : tensor<1x32xi64>",
@@ -418,14 +519,14 @@ mutations = {{
         1,
     ),
     "wrong_reducer": text.replace(
-        "stablehlo.add %arg8, %arg9 : tensor<bf16>",
-        "stablehlo.maximum %arg8, %arg9 : tensor<bf16>",
+        reducer_add,
+        reducer_add.replace("stablehlo.add", "stablehlo.maximum", 1),
         1,
     ),
     "wrong_reducer_quoted_decoy": text.replace(
-        "stablehlo.add %arg8, %arg9 : tensor<bf16>",
-        'stablehlo.maximum %arg8, %arg9 : tensor<bf16> '
-        'loc("stablehlo.add %arg8, %arg9 : tensor<bf16>")',
+        reducer_add,
+        reducer_add.replace("stablehlo.add", "stablehlo.maximum", 1)
+        + ' loc("' + reducer_add.strip() + '")',
         1,
     ),
     "rogue_collective_input": text.replace(
@@ -436,12 +537,15 @@ mutations = {{
     ),
     "duplicate_residual_source": text.replace(
         residual_add,
-        residual_add.replace("%6, %7", "%6, %6"),
+        residual_add.replace(
+            f"{{residual_operands[0]}}, {{residual_operands[1]}}",
+            f"{{residual_operands[0]}}, {{residual_operands[0]}}",
+        ),
         1,
     ),
     "wrong_live_row": text.replace(
-        "stablehlo.slice %26 [0:1, 0:6144]",
-        "stablehlo.slice %26 [1:2, 0:6144]",
+        live_slice,
+        live_slice.replace("[0:1, 0:6144]", "[1:2, 0:6144]"),
         1,
     ),
     "wrong_outer_result": text.replace(

@@ -1511,12 +1511,61 @@ def validate_strategy_nd_dense_rms_stablehlo(
     """Prove the global StrategyND result is consumed by exact layer-1 RMSNorm."""
 
     graphs, violations = _parse_graphs(stablehlo)
+    residual_source_mode: str | None = None
     try:
         graph = _only(
             (item for item in graphs if item.name == "main"),
             "StrategyND RMS main graph",
         )
         helpers = {item.name: item for item in graphs if item is not graph}
+        manual_matches = list(
+            re.finditer(
+                r"(?m)^\s*(%[A-Za-z0-9_.-]+)\s*=\s*"
+                r"sdy\.manual_computation\(([^)]*)\)",
+                stablehlo,
+            )
+        )
+        if len(manual_matches) != 1:
+            raise _MatchError("StrategyND RMS manual computation is not unique")
+        manual_result = manual_matches[0].group(1)
+        outer_operands = tuple(
+            re.findall(r"%[A-Za-z0-9_.$#-]+", manual_matches[0].group(2))
+        )
+        manual_line = next(
+            line
+            for line in stablehlo.splitlines()
+            if f"{manual_result} = sdy.manual_computation" in line
+        )
+        block_arguments = tuple(
+            re.findall(r"(%arg[0-9]+):\s*(tensor<[^>]+>)", manual_line)
+        )
+        direct_arguments = (
+            ("%arg3", "tensor<1x32x6144xui16>"),
+            ("%arg4", "tensor<1x6144xbf16>"),
+            ("%arg5", "tensor<6144xbf16>"),
+        )
+        hybrid_arguments = (
+            ("%arg4", "tensor<1x32x6144xui16>"),
+            ("%arg5", "tensor<1x6144xbf16>"),
+            ("%arg6", "tensor<1x6144xbf16>"),
+            ("%arg7", "tensor<6144xbf16>"),
+        )
+        if outer_operands == ("%arg0", "%arg1", "%arg2") and (
+            block_arguments == direct_arguments
+        ):
+            residual_source_mode = "direct_post_attention_residual"
+            physical_input = "%arg3"
+            residual_inputs = ("%arg4",)
+            expected_norm = "%arg5"
+        elif outer_operands == ("%arg0", "%arg1", "%arg2", "%arg3") and (
+            block_arguments == hybrid_arguments
+        ):
+            residual_source_mode = "hybrid_attention_plus_combined_control"
+            physical_input = "%arg4"
+            residual_inputs = ("%arg5", "%arg6")
+            expected_norm = "%arg7"
+        else:
+            raise _MatchError("StrategyND RMS outer/block arguments drifted")
         collective = _only(
             (node for node in graph.nodes.values() if node.opcode == "all_reduce"),
             "StrategyND RMS all-reduce",
@@ -1526,7 +1575,7 @@ def validate_strategy_nd_dense_rms_stablehlo(
                 node
                 for node in graph.nodes.values()
                 if node.opcode == "reshape"
-                and node.operands == ("%arg4",)
+                and node.operands == (physical_input,)
                 and node.tensor_types[-2:]
                 == (
                     "tensor<1x32x6144xui16>",
@@ -1593,67 +1642,52 @@ def validate_strategy_nd_dense_rms_stablehlo(
             return_bitcast_u16=True,
             split_layer1_rms=False,
         )
-        residual_round = _expect_node(
-            graph,
-            residual,
-            opcode="convert",
-            result_type="tensor<32x6144xbf16>",
-        )
-        residual_add = _expect_node(
-            graph,
-            residual_round.operands[0],
-            opcode="add",
-            result_type="tensor<32x6144xf32>",
-        )
-        residual_sources: list[str] = []
-        for operand in residual_add.operands:
-            conversion = _expect_node(
-                graph,
-                operand,
-                opcode="convert",
-                result_type="tensor<32x6144xf32>",
-            )
+        residual_sources: list[str]
+        if residual_source_mode == "direct_post_attention_residual":
             pad = _expect_node(
                 graph,
-                conversion.operands[0],
+                residual,
                 opcode="call",
                 result_type="tensor<32x6144xbf16>",
             )
-            residual_sources.append(
+            residual_sources = [
                 _validate_m32_input_pad(graph, helpers, pad.name)
+            ]
+        else:
+            residual_round = _expect_node(
+                graph,
+                residual,
+                opcode="convert",
+                result_type="tensor<32x6144xbf16>",
             )
-        if tuple(residual_sources) != ("%arg5", "%arg6") or norm_weight != "%arg7":
+            residual_add = _expect_node(
+                graph,
+                residual_round.operands[0],
+                opcode="add",
+                result_type="tensor<32x6144xf32>",
+            )
+            residual_sources = []
+            for operand in residual_add.operands:
+                conversion = _expect_node(
+                    graph,
+                    operand,
+                    opcode="convert",
+                    result_type="tensor<32x6144xf32>",
+                )
+                pad = _expect_node(
+                    graph,
+                    conversion.operands[0],
+                    opcode="call",
+                    result_type="tensor<32x6144xbf16>",
+                )
+                residual_sources.append(
+                    _validate_m32_input_pad(graph, helpers, pad.name)
+                )
+        if tuple(residual_sources) != residual_inputs or norm_weight != expected_norm:
             raise _MatchError(
                 "StrategyND RMS residual/norm source identity drifted: "
                 f"sources={residual_sources} norm={norm_weight}"
             )
-
-        manual_matches = list(
-            re.finditer(
-                r"(?m)^\s*(%[A-Za-z0-9_.-]+)\s*=\s*"
-                r"sdy\.manual_computation\(([^)]*)\)",
-                stablehlo,
-            )
-        )
-        if len(manual_matches) != 1:
-            raise _MatchError("StrategyND RMS manual computation is not unique")
-        manual_result = manual_matches[0].group(1)
-        if tuple(
-            re.findall(r"%[A-Za-z0-9_.$#-]+", manual_matches[0].group(2))
-        ) != ("%arg0", "%arg1", "%arg2", "%arg3"):
-            raise _MatchError("StrategyND RMS outer operands drifted")
-        manual_line = next(
-            line
-            for line in stablehlo.splitlines()
-            if f"{manual_result} = sdy.manual_computation" in line
-        )
-        if re.findall(r"(%arg[0-9]+):\s*(tensor<[^>]+>)", manual_line) != [
-            ("%arg4", "tensor<1x32x6144xui16>"),
-            ("%arg5", "tensor<1x6144xbf16>"),
-            ("%arg6", "tensor<1x6144xbf16>"),
-            ("%arg7", "tensor<6144xbf16>"),
-        ]:
-            raise _MatchError("StrategyND RMS manual block arguments drifted")
         _only(
             (
                 node
@@ -1704,6 +1738,9 @@ def validate_strategy_nd_dense_rms_stablehlo(
         "exact_result_binding": not violations,
         "live_rows": 1,
         "passed": not violations,
+        "residual_source_mode": (
+            residual_source_mode if not violations else None
+        ),
         "violations": violations,
     }
 
