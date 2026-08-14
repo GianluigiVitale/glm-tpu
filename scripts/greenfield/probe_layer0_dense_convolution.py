@@ -753,6 +753,7 @@ def _validate_optimized_hlo(
     accepted_gate_singleton: bool = False,
     accepted_gate_dequant_fusion: bool = False,
     preceding_attention_collective: bool = False,
+    accepted_source_context: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -802,6 +803,14 @@ def _validate_optimized_hlo(
     if preceding_attention_collective and not integrated_dense_rms:
         raise ValueError(
             "preceding attention collective requires integrated dense RMS"
+        )
+    if accepted_source_context and not integrated_dense_rms:
+        raise ValueError(
+            "accepted source context requires integrated dense RMS"
+        )
+    if accepted_source_context and preceding_attention_collective:
+        raise ValueError(
+            "accepted source context has its own attention collective proof"
         )
     if accepted_gate_singleton and not (isolated_dense or integrated_dense_rms):
         raise ValueError(
@@ -2003,7 +2012,13 @@ def _validate_optimized_hlo(
             set(entry_parameters)
             == set(
                 range(
-                    7 if isolated_dense else 8 if dense_envelope else 7
+                    7
+                    if isolated_dense
+                    else 9
+                    if accepted_source_context
+                    else 8
+                    if dense_envelope
+                    else 7
                 )
             )
             and all(
@@ -2046,7 +2061,14 @@ def _validate_optimized_hlo(
         if isolated_dense and collectives:
             violations.append("isolated dense program contains a collective")
         if integrated_dense_rms and (
-            len(collectives) != (2 if preceding_attention_collective else 1)
+            len(collectives)
+            != (
+                3
+                if accepted_source_context
+                else 2
+                if preceding_attention_collective
+                else 1
+            )
             or len(scoped) != 1
             or scoped[0].opcode != "all-reduce"
             or scoped[0].replica_groups != (tuple(range(32)),)
@@ -3030,6 +3052,8 @@ def _validate_optimized_hlo(
         }
         if preceding_attention_collective:
             result["preceding_attention_collective"] = True
+        if accepted_source_context:
+            result["accepted_source_context"] = True
         return result
 
     if len(collectives) != 1 or len(scoped) != 1:

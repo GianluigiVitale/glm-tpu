@@ -60,6 +60,7 @@ from .gate_c import (
     validate_gate_c_hlo,
 )
 from .integrated_dense_rms import (
+    ACCEPTED_SOURCE_VALIDITY,
     CHECKPOINT_SUCCESS_SHA256,
     CompiledIntegratedDenseRms,
     IntegratedDenseRmsInputs,
@@ -72,6 +73,7 @@ from .integrated_dense_rms import (
     validate_integrated_checkpoint_success,
 )
 from .integrated_dense_rms_hlo import (
+    INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256,
     INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
@@ -110,6 +112,7 @@ from .paired_transport import (
 )
 
 __all__ = [
+    "ACCEPTED_SOURCE_VALIDITY",
     "ACCEPTED_DENSE_PARTIALS_KEYS",
     "ACCEPTED_DENSE_PARTIALS_NPZ_SHA256",
     "ACCEPTED_DENSE_PARTIALS_RAW_SHA256",
@@ -136,6 +139,7 @@ __all__ = [
     "GateCDsaResult",
     "GateCIndexShareResult",
     "INTEGRATED_DENSE_RMS_STABLEHLO_SHA256",
+    "INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256",
     "INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256",
     "INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256",
     "INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256",

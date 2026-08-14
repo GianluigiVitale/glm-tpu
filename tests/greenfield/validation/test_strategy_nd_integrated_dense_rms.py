@@ -18,6 +18,7 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
     validate_integrated_checkpoint_success,
 )
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
+    INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256,
     INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
@@ -25,7 +26,6 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     _validate_split_predense_value_flow,
     integrated_dense_rms_hlo_policy,
     validate_integrated_dense_rms_hlo,
-    validate_integrated_dense_rms_stablehlo,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import (
     HloContractPolicy,
@@ -222,7 +222,8 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import validate_in
 compiled = build_integrated_dense_rms(tuple(range(32)), validate_hlo=False)
 contract = validate_integrated_dense_rms_stablehlo(compiled.stablehlo)
 assert contract["passed"]
-from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import integrated_dense_rms_hlo_policy, _validate_preceding_attention_input
+from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import integrated_dense_rms_hlo_policy, _validate_accepted_attention_input, _validate_preceding_attention_input
+from glm_tpu.greenfield.benchmarking.dense_rms_replay import _validate_exact_dense_rms_value_flow
 from glm_tpu.greenfield.sharding.hlo_contract import lint_hlo, parse_hlo_module
 report = lint_hlo(parse_hlo_module(compiled.optimized_hlo), integrated_dense_rms_hlo_policy(tuple(range(32))))
 assert report.valid, [item.to_dict() for item in report.violations]
@@ -397,6 +398,125 @@ for forbidden in (
     else:
         raise AssertionError("invalid pre-dense split mode combination passed")
 print(predense_contract["exact_graph_sha256"])
+accepted = build_integrated_dense_rms(
+    tuple(range(32)),
+    validate_hlo=False,
+    accepted_source_context=True,
+)
+accepted_contract = validate_integrated_dense_rms_stablehlo(
+    accepted.stablehlo,
+    accepted_source_context=True,
+)
+assert accepted_contract["passed"]
+assert accepted.accepted_source_context is True
+assert accepted_contract["exact_embedding_collective"] is True
+accepted_report = lint_hlo(
+    parse_hlo_module(accepted.optimized_hlo),
+    integrated_dense_rms_hlo_policy(
+        tuple(range(32)), accepted_source_context=True
+    ),
+)
+assert accepted_report.valid, [
+    item.to_dict() for item in accepted_report.violations
+]
+embedding = next(
+    item for item in accepted_report.module.collectives
+    if "accepted_source_context_embedding_collective" in (item.op_name or "")
+)
+attention = next(
+    item for item in accepted_report.module.collectives
+    if "accepted_source_context_attention_collective" in (item.op_name or "")
+)
+assert _validate_preceding_attention_input(
+    accepted_report, embedding, parameter_index=1
+)["exact_attention_parameter_index"] == 1
+assert _validate_accepted_attention_input(
+    accepted_report, attention, embedding
+)["exact_attention_embedding_guard"] is True
+dense = next(
+    item for item in accepted_report.module.collectives
+    if "integrated_dense_rms_strategy_nd_collective" in (item.op_name or "")
+)
+accepted_root = next(
+    item for item in accepted_report.module.instructions
+    if item.computation.startswith("ENTRY ")
+    and item.raw_line.lstrip().startswith("ROOT ")
+)
+# CPU lowers the scalar TPU RMS schedule into reduce-windows, so it cannot
+# positively satisfy the protected scheduled validator.  It can and must
+# still reach that later schedule check without misclassifying the real
+# convolution-fed accepted dense collective as the sealed-U16 replay mode.
+try:
+    _validate_exact_dense_rms_value_flow(
+        accepted_report,
+        dense,
+        accepted_root,
+        accepted_root,
+        integrated_dense=True,
+        require_split_output_fusion=True,
+        accepted_embedding_reduction=embedding,
+        accepted_attention_reduction=attention,
+    )
+except ValueError as exc:
+    assert "exact sealed BF16 partial" not in str(exc)
+else:
+    raise AssertionError("CPU graph unexpectedly satisfied the TPU schedule")
+for old, new, validator in (
+    (
+        "slice={[0:1], [0:1]}",
+        "slice={[1:2], [0:1]}",
+        "attention",
+    ),
+    (
+        "direction=EQ, metadata={op_name=\"jit(integrated)/shard_map/accepted_source_context_embedding_input/eq\"",
+        "direction=NE, metadata={op_name=\"jit(integrated)/shard_map/accepted_source_context_embedding_input/eq\"",
+        "embedding",
+    ),
+    (
+        "%convert.209 = f32[32,6144]{1,0} convert(%convert.210)",
+        "%rogue_attention_s16 = s16[32,6144]{1,0} convert(%convert.210)\n"
+        "  %convert.209 = f32[32,6144]{1,0} convert(%rogue_attention_s16)",
+        "attention",
+    ),
+    (
+        "%convert.209 = f32[32,6144]{1,0} convert(%convert.210)",
+        "%convert.209 = f32[32,6144]{0,1} convert(%convert.210)",
+        "attention",
+    ),
+):
+    mutation = accepted.optimized_hlo.replace(
+        old, new, 1 if validator == "attention" else -1
+    )
+    assert mutation != accepted.optimized_hlo
+    xla_client._xla.hlo_module_from_text(mutation)
+    mutated_report = lint_hlo(
+        parse_hlo_module(mutation),
+        integrated_dense_rms_hlo_policy(
+            tuple(range(32)), accepted_source_context=True
+        ),
+    )
+    mutated_embedding = next(
+        item for item in mutated_report.module.collectives
+        if "accepted_source_context_embedding_collective" in (item.op_name or "")
+    )
+    mutated_attention = next(
+        item for item in mutated_report.module.collectives
+        if "accepted_source_context_attention_collective" in (item.op_name or "")
+    )
+    try:
+        if validator == "embedding":
+            _validate_preceding_attention_input(
+                mutated_report, mutated_embedding, parameter_index=1
+            )
+        else:
+            _validate_accepted_attention_input(
+                mutated_report, mutated_attention, mutated_embedding
+            )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted source {validator} mutation passed")
+print(accepted_contract["exact_graph_sha256"])
 '''
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -420,6 +540,7 @@ print(predense_contract["exact_graph_sha256"])
         INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256
         in completed.stdout
     )
+    assert INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256 in completed.stdout
 
 
 def test_integrated_policy_requires_the_exact_scope() -> None:
@@ -434,6 +555,14 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
     )
     assert ordinal.repeated_region_patterns == (
         r"integrated_dense_rms_preceding_attention_collective",
+        r"integrated_dense_rms_strategy_nd_collective",
+    )
+    accepted = integrated_dense_rms_hlo_policy(
+        tuple(range(32)), accepted_source_context=True
+    )
+    assert accepted.repeated_region_patterns == (
+        r"accepted_source_context_embedding_collective",
+        r"accepted_source_context_attention_collective",
         r"integrated_dense_rms_strategy_nd_collective",
     )
 
@@ -775,6 +904,12 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     assert predense_exact["classification"] == (
         "integrated_dense_predense_split_rms_exact_accepted"
     )
+    accepted_source_exact = _recompute_comparison(
+        expected.copy(), expected, accepted_source_context=True
+    )
+    assert accepted_source_exact["classification"] == (
+        "integrated_dense_accepted_source_context_exact_accepted"
+    )
     digest = array_sha256(expected)
     capture = {
         "invocation_count": 2,
@@ -833,6 +968,21 @@ def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
         split_layer1_rms=True,
         split_predense_rms=True,
     )
+    accepted_record = {
+        "accepted_source_context": True,
+        "optimized_hlo_sha256": "1" * 64,
+        "performance_claim": False,
+        "split_layer1_rms": False,
+        "stablehlo_sha256": "2" * 64,
+        "validated": False,
+    }
+    _validate_hlo_prevalidation(
+        accepted_record,
+        optimized_hlo_sha256="1" * 64,
+        stablehlo_sha256="2" * 64,
+        split_layer1_rms=False,
+        accepted_source_context=True,
+    )
     for key, value in (
         ("validated", True),
         ("performance_claim", True),
@@ -869,6 +1019,11 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_PREDENSE_SPLIT_RMS_REPLAY:-0"
         in wrapper
     )
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ACCEPTED_SOURCE_CONTEXT_REPLAY:-0"
+        in wrapper
+    )
+    assert "--integrated-accepted-source-context" in wrapper
     assert "--integrated-preceding-attention-collective" in wrapper
     assert "--integrated-split-predense-rms" in wrapper
     assert "--integrated-split-layer1-rms" in wrapper

@@ -30,6 +30,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
+    ACCEPTED_SOURCE_VALIDITY,
     ACCEPTED_DENSE_PARTIALS_KEYS,
     ACCEPTED_DENSE_PARTIALS_NPZ_SHA256,
     ACCEPTED_DENSE_PARTIALS_RAW_SHA256,
@@ -209,6 +210,11 @@ def parse_args() -> argparse.Namespace:
         "--integrated-split-predense-rms",
         action="store_true",
         help="use the accepted scalar-only pre-dense RMS schedule",
+    )
+    parser.add_argument(
+        "--integrated-accepted-source-context",
+        action="store_true",
+        help="recreate the accepted embedding/predicate/attention source graph",
     )
     parser.add_argument(
         "--allow-unprotected-test-config",
@@ -677,8 +683,11 @@ def _run_strategy_nd_integrated_dense_rms(
         args.integrated_preceding_attention_collective
     )
     split_predense_rms = bool(args.integrated_split_predense_rms)
+    accepted_source_context = bool(args.integrated_accepted_source_context)
     label = (
-        "strategy_nd_integrated_dense_predense_split_rms_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
+        if accepted_source_context
+        else "strategy_nd_integrated_dense_predense_split_rms_bfloat16_32x6144"
         if split_predense_rms
         else "strategy_nd_integrated_dense_ordinal_rms_bfloat16_32x6144"
         if preceding_attention_collective
@@ -694,6 +703,7 @@ def _run_strategy_nd_integrated_dense_rms(
         split_layer1_rms=split_layer1_rms,
         preceding_attention_collective=preceding_attention_collective,
         split_predense_rms=split_predense_rms,
+        accepted_source_context=accepted_source_context,
     )
     stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
     optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
@@ -711,6 +721,11 @@ def _run_strategy_nd_integrated_dense_rms(
                 "optimized_hlo_sha256": optimized_hlo_sha,
                 "performance_claim": False,
                 "split_layer1_rms": split_layer1_rms,
+                **(
+                    {"accepted_source_context": True}
+                    if accepted_source_context
+                    else {}
+                ),
                 **(
                     {"split_predense_rms": True}
                     if split_predense_rms
@@ -735,6 +750,7 @@ def _run_strategy_nd_integrated_dense_rms(
         split_layer1_rms=split_layer1_rms,
         preceding_attention_collective=preceding_attention_collective,
         split_predense_rms=split_predense_rms,
+        accepted_source_context=accepted_source_context,
     )
     optimized_hlo_contract = validate_integrated_dense_rms_hlo(
         compiled.optimized_hlo,
@@ -742,6 +758,7 @@ def _run_strategy_nd_integrated_dense_rms(
         split_layer1_rms=split_layer1_rms,
         preceding_attention_collective=preceding_attention_collective,
         split_predense_rms=split_predense_rms,
+        accepted_source_context=accepted_source_context,
     )
     compiled = replace(
         compiled,
@@ -784,7 +801,9 @@ def _run_strategy_nd_integrated_dense_rms(
         "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
     )
     classification_prefix = (
-        "integrated_dense_predense_split_rms"
+        "integrated_dense_accepted_source_context"
+        if accepted_source_context
+        else "integrated_dense_predense_split_rms"
         if split_predense_rms
         else "integrated_dense_ordinal_rms"
         if preceding_attention_collective
@@ -824,6 +843,11 @@ def _run_strategy_nd_integrated_dense_rms(
         "layer1_norm": array_sha256(inputs.layer1_norm_bits),
         "post_attention_norm": array_sha256(inputs.post_attention_norm_bits),
         "output": array_sha256(output_bits),
+        **(
+            {"accepted_source_validity": array_sha256(ACCEPTED_SOURCE_VALIDITY)}
+            if accepted_source_context
+            else {}
+        ),
         **{
             f"physical_{name}": digest
             for name, digest in physical_weight_hashes.items()
@@ -902,6 +926,11 @@ def _run_strategy_nd_integrated_dense_rms(
         "stablehlo_contract": dict(compiled.stablehlo_contract),
         "stablehlo_sha256": stablehlo_sha,
         "split_layer1_rms": split_layer1_rms,
+        **(
+            {"accepted_source_context": True}
+            if accepted_source_context
+            else {}
+        ),
         **({"split_predense_rms": True} if split_predense_rms else {}),
         **(
             {"preceding_attention_collective": True}
@@ -1190,6 +1219,15 @@ def main() -> int:
     ):
         raise ValueError(
             "pre-dense split RMS requires the disjoint integrated layer-1 split arm"
+        )
+    if args.integrated_accepted_source_context and (
+        args.mode != "strategy_nd_integrated_dense_rms"
+        or args.integrated_split_layer1_rms
+        or args.integrated_preceding_attention_collective
+        or args.integrated_split_predense_rms
+    ):
+        raise ValueError(
+            "accepted source context requires the disjoint integrated dense RMS arm"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:

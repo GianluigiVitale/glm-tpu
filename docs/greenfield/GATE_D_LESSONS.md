@@ -137,6 +137,20 @@ branches from the search tree.
   not only the JSON destination. A completed device call without terminal artifact collection remains
   diagnostic, even when all host records agree numerically.
 
+## Iteration budget and closure rule
+
+- A new Gate-D hypothesis gets one coherent implementation batch, forced-device HLO generation,
+  adversarial local tests, terminal-wrapper execution and one immutable review before metal. Do not
+  discover CLI/schema/archive defects through sequential TPU launches.
+- Timebox the local batch. If the exact observed HLO delta cannot be encoded and locally refused
+  within one work block, stop adding arms and build a structural diff tool for the two preserved
+  graphs instead.
+- After the composed accepted-source discriminator, a nonexact result ends manual one-variable
+  guessing. Preserve both scheduled graphs and automatically diff live SSA source, dtype, layout,
+  fusion ownership and backend geometry from pinned inputs to the first unequal result.
+- Gate D closes only with the complete protected decoder. A bitwise-exact bounded row authorizes
+  that confirmation; it does not itself close the gate.
+
 ## Decision after the model-free replays
 
 - Hardware row zero equals DB533 software. Freeze dense arithmetic and standalone association.

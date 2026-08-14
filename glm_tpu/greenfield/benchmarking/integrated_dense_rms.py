@@ -35,6 +35,10 @@ POST_ATTENTION_NORM_RAW_SHA256 = (
 CHECKPOINT_SUCCESS_SHA256 = (
     "368ef308c7937258c181cdc42fecddf8a7f7ca7bab04470d39cb622aaa3c5b24"
 )
+ACCEPTED_SOURCE_VALIDITY = np.asarray(
+    (True,) + (False,) * 31,
+    dtype=np.bool_,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +72,7 @@ class CompiledIntegratedDenseRms:
     optimized_hlo: str
     stablehlo_contract: Mapping[str, Any]
     optimized_hlo_contract: Mapping[str, Any]
+    accepted_source_context: bool
     preceding_attention_collective: bool
     split_predense_rms: bool
     split_layer1_rms: bool
@@ -350,6 +355,180 @@ def _integrated_function(
     return integrated
 
 
+def _accepted_source_context_function() -> Any:
+    """Recreate the accepted embedding/attention/dense source context once."""
+
+    import jax
+    from jax import lax
+    import jax.numpy as jnp
+
+    def integrated(
+        attention_update: Any,
+        embedding_row: Any,
+        valid_rows: Any,
+        post_attention_norm: Any,
+        merged_bits: Any,
+        merged_scale: Any,
+        down_bits: Any,
+        down_scale: Any,
+        layer1_norm: Any,
+    ) -> Any:
+        with jax.named_scope("accepted_source_context_embedding_input"):
+            embedding_input_m32 = jnp.pad(
+                embedding_row,
+                ((0, 31), (0, 0)),
+                constant_values=jnp.bfloat16(0),
+            )
+            is_embedding_owner = lax.axis_index("member") == jnp.int32(0)
+            local_embedding = jnp.where(
+                is_embedding_owner,
+                embedding_input_m32,
+                jnp.zeros_like(embedding_input_m32),
+            )
+        with jax.named_scope("accepted_source_context_embedding_collective"):
+            embedding_m32 = lax.psum(local_embedding, "member")
+
+        with jax.named_scope("accepted_source_context_attention_input"):
+            attention_input_m32 = jnp.pad(
+                attention_update,
+                ((0, 31), (0, 0)),
+                constant_values=jnp.bfloat16(0),
+            )
+            is_attention_owner = lax.axis_index("member") == jnp.int32(0)
+            local_attention = jnp.where(
+                is_attention_owner,
+                attention_input_m32,
+                jnp.zeros_like(attention_input_m32),
+            )
+            # The accepted attention path is downstream of the embedding
+            # lookup.  The bounded graph starts from its sealed final BF16
+            # attention row, so retain that ordering through a non-arithmetic
+            # finite-source guard rather than letting XLA coalesce the two
+            # independent psums into one tuple collective.
+            embedding_is_finite = jnp.isfinite(embedding_m32[0, 0])
+            local_attention = lax.select(
+                embedding_is_finite,
+                local_attention,
+                jnp.zeros_like(local_attention),
+            )
+        with jax.named_scope("accepted_source_context_attention_collective"):
+            attention_m32 = lax.psum(local_attention, "member")
+
+        def source_sum(scope: str, barrier_order: int) -> Any:
+            with jax.named_scope(scope):
+                if barrier_order == 0:
+                    attention_source, embedding_source, validity_source = (
+                        lax.optimization_barrier(
+                            (attention_m32, embedding_m32, valid_rows)
+                        )
+                    )
+                elif barrier_order == 1:
+                    embedding_source, validity_source, attention_source = (
+                        lax.optimization_barrier(
+                            (embedding_m32, valid_rows, attention_m32)
+                        )
+                    )
+                elif barrier_order == 2:
+                    validity_source, attention_source, embedding_source = (
+                        lax.optimization_barrier(
+                            (valid_rows, attention_m32, embedding_m32)
+                        )
+                    )
+                else:
+                    validity_source, embedding_source, attention_source = (
+                        lax.optimization_barrier(
+                            (valid_rows, embedding_m32, attention_m32)
+                        )
+                    )
+                selected_embedding = jnp.where(
+                    validity_source[:, None],
+                    embedding_source,
+                    jnp.full_like(
+                        embedding_source, jnp.bfloat16(jnp.nan)
+                    ),
+                )
+                return (
+                    attention_source.astype(jnp.float32)
+                    + selected_embedding.astype(jnp.float32)
+                )
+
+        with jax.named_scope("accepted_source_context_predense_norm"):
+            with jax.named_scope("accepted_source_context_predense_reduction"):
+                reduction_sum = source_sum(
+                    "accepted_source_context_predense_reduction_sources",
+                    0,
+                )
+                predense_inverse = lax.rsqrt(
+                    jnp.mean(
+                        lax.square(reduction_sum), axis=-1, keepdims=True
+                    )
+                    + jnp.float32(1e-5)
+                )
+            with jax.named_scope("accepted_source_context_predense_recompute"):
+                predense_sum = source_sum(
+                    "accepted_source_context_predense_gate_sources",
+                    1,
+                )
+                normalized = (
+                    (predense_sum * predense_inverse).astype(
+                        post_attention_norm.dtype
+                    )
+                    * post_attention_norm
+                ).astype(attention_m32.dtype)
+
+        with jax.named_scope("integrated_dense_rms_contraction"):
+            local_partials = _virtual_dense_final_layout_convolution_down_partials(
+                normalized,
+                merged_bits[0],
+                merged_scale[0],
+                down_bits[0],
+                down_scale[0],
+                block_shape=(128, 128),
+                compile_rows=32,
+                virtual_shards=1,
+                accepted_gate_singleton=True,
+                accepted_gate_dequant_fusion=True,
+            )
+            local_partial = local_partials[0]
+        with jax.named_scope("integrated_dense_rms_strategy_nd_collective"):
+            dense_m32 = lax.psum(local_partial, "member")
+
+        with jax.named_scope("accepted_source_context_layer1_norm"):
+            with jax.named_scope("accepted_source_context_layer1_reduction"):
+                reduction_dense = lax.optimization_barrier(dense_m32)
+                reduction_carried = source_sum(
+                    "accepted_source_context_layer1_reduction_sources",
+                    2,
+                ).astype(jnp.bfloat16)
+                reduction_sum = (
+                    reduction_dense.astype(jnp.float32)
+                    + reduction_carried.astype(jnp.float32)
+                )
+                layer1_inverse = lax.rsqrt(
+                    jnp.mean(
+                        lax.square(reduction_sum), axis=-1, keepdims=True
+                    )
+                    + jnp.float32(1e-5)
+                )
+            with jax.named_scope("accepted_source_context_layer1_recompute"):
+                output_carried = source_sum(
+                    "accepted_source_context_layer1_output_sources",
+                    3,
+                ).astype(jnp.bfloat16)
+                output_sum = (
+                    dense_m32.astype(jnp.float32)
+                    + output_carried.astype(jnp.float32)
+                )
+                layer1 = (
+                    (output_sum * layer1_inverse).astype(layer1_norm.dtype)
+                    * layer1_norm
+                ).astype(dense_m32.dtype)
+        with jax.named_scope("integrated_dense_rms_live_row"):
+            return lax.bitcast_convert_type(layer1[:1, :], jnp.uint16)
+
+    return integrated
+
+
 def build_integrated_dense_rms(
     member_device_ids: Sequence[int],
     *,
@@ -358,6 +537,7 @@ def build_integrated_dense_rms(
     split_layer1_rms: bool = False,
     preceding_attention_collective: bool = False,
     split_predense_rms: bool = False,
+    accepted_source_context: bool = False,
 ) -> CompiledIntegratedDenseRms:
     """Compile the exact one-rank-per-chip diagnostic on 32 devices."""
 
@@ -390,6 +570,16 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "integrated dense RMS pre-dense split flag must be boolean"
         )
+    if not isinstance(accepted_source_context, bool):
+        raise BenchmarkValidationError(
+            "integrated dense RMS accepted-source flag must be boolean"
+        )
+    if accepted_source_context and any(
+        (split_layer1_rms, preceding_attention_collective, split_predense_rms)
+    ):
+        raise BenchmarkValidationError(
+            "accepted source context is a distinct integrated discriminator"
+        )
     if preceding_attention_collective and not split_layer1_rms:
         raise BenchmarkValidationError(
             "preceding attention collective requires the frozen split RMS arm"
@@ -402,35 +592,66 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "pre-dense split RMS and rejected ordinal arms are disjoint"
         )
-    mapped = jax.shard_map(
-        _integrated_function(
+    mapped_function = (
+        _accepted_source_context_function()
+        if accepted_source_context
+        else _integrated_function(
             split_layer1_rms=split_layer1_rms,
             preceding_attention_collective=preceding_attention_collective,
             split_predense_rms=split_predense_rms,
-        ),
+        )
+    )
+    in_specs = (
+        (
+            P(),
+            P(),
+            P(),
+            P(),
+            P("member", None, None, None),
+            P("member", None, None, None),
+            P("member", None, None, None),
+            P("member", None, None, None),
+            P(),
+        )
+        if accepted_source_context
+        else (
+            P(),
+            P(),
+            P(),
+            P("member", None, None, None),
+            P("member", None, None, None),
+            P("member", None, None, None),
+            P("member", None, None, None),
+            P(),
+        )
+    )
+    mapped = jax.shard_map(
+        mapped_function,
         mesh=mesh,
-        in_specs=(
-            P(),
-            P(),
-            P(),
-            P("member", None, None, None),
-            P("member", None, None, None),
-            P("member", None, None, None),
-            P("member", None, None, None),
-            P(),
-        ),
+        in_specs=in_specs,
         out_specs=P(),
         check_vma=False,
     )
-    examples = (
+    common_examples = (
         jax.ShapeDtypeStruct((1, 6144), jnp.bfloat16, sharding=replicated),
         jax.ShapeDtypeStruct((1, 6144), jnp.bfloat16, sharding=replicated),
+    )
+    tail_examples = (
         jax.ShapeDtypeStruct((6144,), jnp.bfloat16, sharding=replicated),
         jax.ShapeDtypeStruct((32, 1, 6144, 768), jnp.float8_e4m3fn, sharding=member),
         jax.ShapeDtypeStruct((32, 1, 48, 768), jnp.float32, sharding=member),
         jax.ShapeDtypeStruct((32, 1, 384, 6144), jnp.float8_e4m3fn, sharding=member),
         jax.ShapeDtypeStruct((32, 1, 3, 6144), jnp.float32, sharding=member),
         jax.ShapeDtypeStruct((6144,), jnp.bfloat16, sharding=replicated),
+    )
+    examples = (
+        common_examples
+        + (
+            jax.ShapeDtypeStruct((32,), jnp.bool_, sharding=replicated),
+        )
+        + tail_examples
+        if accepted_source_context
+        else common_examples + tail_examples
     )
     lowered = jax.jit(mapped).lower(*examples)
     stablehlo = lowered.as_text()
@@ -447,6 +668,7 @@ def build_integrated_dense_rms(
             split_layer1_rms=split_layer1_rms,
             preceding_attention_collective=preceding_attention_collective,
             split_predense_rms=split_predense_rms,
+            accepted_source_context=accepted_source_context,
         )
         optimized_hlo_contract = validate_integrated_dense_rms_hlo(
             optimized_hlo,
@@ -454,6 +676,7 @@ def build_integrated_dense_rms(
             split_layer1_rms=split_layer1_rms,
             preceding_attention_collective=preceding_attention_collective,
             split_predense_rms=split_predense_rms,
+            accepted_source_context=accepted_source_context,
         )
     else:
         stablehlo_contract = {
@@ -473,6 +696,7 @@ def build_integrated_dense_rms(
         optimized_hlo=optimized_hlo,
         stablehlo_contract=stablehlo_contract,
         optimized_hlo_contract=optimized_hlo_contract,
+        accepted_source_context=accepted_source_context,
         preceding_attention_collective=preceding_attention_collective,
         split_predense_rms=split_predense_rms,
         split_layer1_rms=split_layer1_rms,
@@ -490,7 +714,7 @@ def execute_integrated_dense_rms(
 
     _validate_weights(weights)
     _validate_inputs(inputs)
-    arguments = (
+    common_arguments = (
         jax.device_put(
             inputs.attention_update_bits.view(ml_dtypes.bfloat16),
             compiled.replicated_sharding,
@@ -499,6 +723,8 @@ def execute_integrated_dense_rms(
             inputs.combined_residual_bits.view(ml_dtypes.bfloat16),
             compiled.replicated_sharding,
         ),
+    )
+    tail_arguments = (
         jax.device_put(
             inputs.post_attention_norm_bits.view(ml_dtypes.bfloat16),
             compiled.replicated_sharding,
@@ -511,6 +737,18 @@ def execute_integrated_dense_rms(
             inputs.layer1_norm_bits.view(ml_dtypes.bfloat16),
             compiled.replicated_sharding,
         ),
+    )
+    arguments = (
+        common_arguments
+        + (
+            jax.device_put(
+                ACCEPTED_SOURCE_VALIDITY,
+                compiled.replicated_sharding,
+            ),
+        )
+        + tail_arguments
+        if compiled.accepted_source_context
+        else common_arguments + tail_arguments
     )
 
     def execute_once() -> tuple[np.ndarray, tuple[str, ...]]:

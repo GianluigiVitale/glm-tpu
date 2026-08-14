@@ -5,6 +5,25 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 20:17--20:55 UTC — accepted source-context discriminator is locally assembled
+
+- The existing seconds-scale integrated harness now has one default-off, disjoint accepted-source
+  mode. It reconstructs the sealed embedding row through a 32-chip StrategyND reduction, carries
+  the exact `[true,false×31]` validity vector, reconstructs the sealed attention row through the
+  next StrategyND reduction, recomputes the pre-dense fused RMS/gate path, performs the real
+  final-layout dense contraction/reduction, and recomputes the accepted scalar-only layer-1 path.
+- Forced 32-device CPU lowering has exactly three dependent collectives in embedding, attention,
+  dense order and four distinct downstream source recomputations. StableHLO SHA is
+  `b46a58b1cb7576b8124b02ac09b722e07ddebf6cf7663ac5e404f64414144fed`;
+  the current CPU optimized-HLO SHA is
+  `044ac7d06d33c340187c33a83ad3969b3e74b3aa25edbb6a85f249b36e29ed9d`.
+  Exact owner/source/finite-guard mutations refuse.
+- Runner, terminal revalidator, fleet hashes, protected wrapper and `SUCCESS` schema carry the new
+  mode end to end. The two focused validation files pass 20/20 and Bash/Python syntax plus diff
+  checks pass. No TPU work or performance claim occurred. One immutable bulk audit remains before
+  commit/push and a single protected sub-minute discriminator. A nonexact result ends manual arms
+  and moves to automated live-SSA HLO diff; only an exact row authorizes protected 8K.
+
 ## 2026-08-14 20:13--20:16 UTC — exact pre-dense scalar/gate fusion is nonexact; source context remains
 
 - Reviewed/pushed pin `fb207a42c76d95aa561c3150026b58877a93d9f2` ran once under protected

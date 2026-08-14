@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from ..benchmarking import (
+    ACCEPTED_SOURCE_VALIDITY,
     ACCEPTED_TP32_MODEL_AXIS_RECIPE,
     CHECKPOINT_SUCCESS_SHA256,
     DENSE_RMS_SOURCE_NPZ_SHA256,
@@ -121,12 +122,15 @@ def _validate_hlo_prevalidation(
     split_layer1_rms: bool,
     preceding_attention_collective: bool = False,
     split_predense_rms: bool = False,
+    accepted_source_context: bool = False,
 ) -> None:
     expected_fields = set(EXPECTED_HLO_PREVALIDATION_FIELDS)
     if preceding_attention_collective:
         expected_fields.add("preceding_attention_collective")
     if split_predense_rms:
         expected_fields.add("split_predense_rms")
+    if accepted_source_context:
+        expected_fields.add("accepted_source_context")
     if not (
         type(record) is dict
         and set(record) == expected_fields
@@ -139,6 +143,10 @@ def _validate_hlo_prevalidation(
         and (
             not split_predense_rms
             or record["split_predense_rms"] is True
+        )
+        and (
+            not accepted_source_context
+            or record["accepted_source_context"] is True
         )
         and record["split_layer1_rms"] is split_layer1_rms
         and record["validated"] is False
@@ -154,6 +162,7 @@ def _recompute_comparison(
     split_layer1_rms: bool = False,
     preceding_attention_collective: bool = False,
     split_predense_rms: bool = False,
+    accepted_source_context: bool = False,
 ) -> dict[str, Any]:
     mismatch_indices = np.flatnonzero(observed != expected)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -166,7 +175,9 @@ def _recompute_comparison(
     error = np.abs(observed_values - expected_values)
     observed_sha = _raw_sha256(observed)
     prefix = (
-        "integrated_dense_predense_split_rms"
+        "integrated_dense_accepted_source_context"
+        if accepted_source_context
+        else "integrated_dense_predense_split_rms"
         if split_predense_rms
         else "integrated_dense_ordinal_rms"
         if preceding_attention_collective
@@ -228,6 +239,7 @@ def validate_strategy_nd_integrated_dense_rms(
     expected_split_layer1_rms: bool = False,
     expected_preceding_attention_collective: bool = False,
     expected_split_predense_rms: bool = False,
+    expected_accepted_source_context: bool = False,
 ) -> dict[str, Any]:
     """Reload every source/fleet/artifact byte and recompute the verdict."""
 
@@ -245,16 +257,27 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("preceding attention expectation must be boolean")
     if not isinstance(expected_split_predense_rms, bool):
         raise ValueError("pre-dense split expectation must be boolean")
+    if not isinstance(expected_accepted_source_context, bool):
+        raise ValueError("accepted source-context expectation must be boolean")
     if expected_preceding_attention_collective and not expected_split_layer1_rms:
         raise ValueError("preceding attention collective requires split RMS")
     if expected_split_predense_rms and not expected_split_layer1_rms:
         raise ValueError("pre-dense split RMS requires layer-1 split RMS")
     if expected_split_predense_rms and expected_preceding_attention_collective:
         raise ValueError("pre-dense split RMS and rejected ordinal arms are disjoint")
+    if expected_accepted_source_context and any(
+        (
+            expected_split_layer1_rms,
+            expected_preceding_attention_collective,
+            expected_split_predense_rms,
+        )
+    ):
+        raise ValueError("accepted source context is a disjoint integrated arm")
     legacy_schema = bool(
         not expected_split_layer1_rms
         and not expected_preceding_attention_collective
         and not expected_split_predense_rms
+        and not expected_accepted_source_context
         and expected_code_hash == LEGACY_INTEGRATED_CODE_HASH
         and expected_run_tag == LEGACY_INTEGRATED_RUN_TAG
     )
@@ -339,6 +362,8 @@ def validate_strategy_nd_integrated_dense_rms(
         expected_replay_fields.add("preceding_attention_collective")
     if expected_split_predense_rms:
         expected_replay_fields.add("split_predense_rms")
+    if expected_accepted_source_context:
+        expected_replay_fields.add("accepted_source_context")
     if any(
         type(item) is not dict or set(item) != expected_replay_fields
         for item in items
@@ -367,6 +392,10 @@ def validate_strategy_nd_integrated_dense_rms(
         and (
             not expected_split_predense_rms
             or reference["split_predense_rms"] is True
+        )
+        and (
+            not expected_accepted_source_context
+            or reference["accepted_source_context"] is True
         )
         and (
             legacy_schema
@@ -466,6 +495,7 @@ def validate_strategy_nd_integrated_dense_rms(
         split_layer1_rms=expected_split_layer1_rms,
         preceding_attention_collective=expected_preceding_attention_collective,
         split_predense_rms=expected_split_predense_rms,
+        accepted_source_context=expected_accepted_source_context,
     )
     recorded = reference["comparison"]
     if not (
@@ -499,6 +529,15 @@ def validate_strategy_nd_integrated_dense_rms(
         "layer1_norm": array_sha256(inputs.layer1_norm_bits),
         "output": array_sha256(arrays["hardware_layer1_bits"]),
         "post_attention_norm": array_sha256(inputs.post_attention_norm_bits),
+        **(
+            {
+                "accepted_source_validity": array_sha256(
+                    ACCEPTED_SOURCE_VALIDITY
+                )
+            }
+            if expected_accepted_source_context
+            else {}
+        ),
         **{
             f"physical_{name}": digest
             for name, digest in physical_weight_hashes.items()
@@ -517,7 +556,9 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense fleet hashes drifted")
 
     label = (
-        "strategy_nd_integrated_dense_predense_split_rms_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
+        if expected_accepted_source_context
+        else "strategy_nd_integrated_dense_predense_split_rms_bfloat16_32x6144"
         if expected_split_predense_rms
         else "strategy_nd_integrated_dense_ordinal_rms_bfloat16_32x6144"
         if expected_preceding_attention_collective
@@ -552,6 +593,7 @@ def validate_strategy_nd_integrated_dense_rms(
         split_layer1_rms=expected_split_layer1_rms,
         preceding_attention_collective=expected_preceding_attention_collective,
         split_predense_rms=expected_split_predense_rms,
+        accepted_source_context=expected_accepted_source_context,
     )
     optimized_contract = validate_integrated_dense_rms_hlo(
         optimized_hlo,
@@ -559,6 +601,7 @@ def validate_strategy_nd_integrated_dense_rms(
         split_layer1_rms=expected_split_layer1_rms,
         preceding_attention_collective=expected_preceding_attention_collective,
         split_predense_rms=expected_split_predense_rms,
+        accepted_source_context=expected_accepted_source_context,
     )
     if legacy_schema:
         stable_contract = dict(stable_contract)
@@ -575,6 +618,7 @@ def validate_strategy_nd_integrated_dense_rms(
                 expected_preceding_attention_collective
             ),
             split_predense_rms=expected_split_predense_rms,
+            accepted_source_context=expected_accepted_source_context,
         )
     if not (
         stable_contract == reference["stablehlo_contract"]
@@ -590,7 +634,9 @@ def validate_strategy_nd_integrated_dense_rms(
 
     result = {
         "artifact_kind": (
-            "glm52_strategy_nd_integrated_dense_predense_split_rms"
+            "glm52_strategy_nd_integrated_dense_accepted_source_context"
+            if expected_accepted_source_context
+            else "glm52_strategy_nd_integrated_dense_predense_split_rms"
             if expected_split_predense_rms
             else "glm52_strategy_nd_integrated_dense_ordinal_rms"
             if expected_preceding_attention_collective
@@ -624,4 +670,6 @@ def validate_strategy_nd_integrated_dense_rms(
         result["preceding_attention_collective"] = True
     if expected_split_predense_rms:
         result["split_predense_rms"] = True
+    if expected_accepted_source_context:
+        result["accepted_source_context"] = True
     return result

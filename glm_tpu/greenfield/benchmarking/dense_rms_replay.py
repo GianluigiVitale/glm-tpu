@@ -573,6 +573,8 @@ def _validate_exact_dense_rms_value_flow(
     integrated_dense: bool = False,
     require_split_output_fusion: bool = False,
     preceding_attention_reduction: HloInstruction | None = None,
+    accepted_embedding_reduction: HloInstruction | None = None,
+    accepted_attention_reduction: HloInstruction | None = None,
 ) -> Mapping[str, Any]:
     """Bind sealed inputs through the exact live collective/RMS result."""
 
@@ -585,6 +587,24 @@ def _validate_exact_dense_rms_value_flow(
     ):
         raise BenchmarkValidationError(
             "preceding attention reduction requires integrated split RMS"
+        )
+    accepted_source_context = bool(
+        accepted_embedding_reduction is not None
+        and accepted_attention_reduction is not None
+    )
+    if (accepted_embedding_reduction is None) != (
+        accepted_attention_reduction is None
+    ):
+        raise BenchmarkValidationError(
+            "accepted source context requires both source reductions"
+        )
+    if accepted_source_context and not (
+        integrated_dense
+        and require_split_output_fusion
+        and preceding_attention_reduction is None
+    ):
+        raise BenchmarkValidationError(
+            "accepted source reductions require integrated split RMS"
         )
     graph = _ExactDenseRmsGraph(report)
     f32_m32 = (("f32", (32, 6144)),)
@@ -620,10 +640,31 @@ def _validate_exact_dense_rms_value_flow(
         6: (("f32", (1, 1, 3, 6144)),),
         7: (("bf16", (6144,)),),
     }
-    if not (direct_residual or hybrid_control or integrated_control):
+    integrated_accepted = integrated_dense and entry_parameters == {
+        0: (("bf16", (1, 6144)),),
+        1: (("bf16", (1, 6144)),),
+        2: (("pred", (32,)),),
+        3: (("bf16", (6144,)),),
+        4: (("f8e4m3fn", (1, 1, 6144, 768)),),
+        5: (("f32", (1, 1, 48, 768)),),
+        6: (("f8e4m3fn", (1, 1, 384, 6144)),),
+        7: (("f32", (1, 1, 3, 6144)),),
+        8: (("bf16", (6144,)),),
+    }
+    if accepted_source_context != integrated_accepted:
+        raise BenchmarkValidationError(
+            "accepted source reduction/schema mode drifted"
+        )
+    if not (
+        direct_residual
+        or hybrid_control
+        or integrated_control
+        or integrated_accepted
+    ):
         raise BenchmarkValidationError("dense RMS replay ENTRY inputs drifted")
     pin_integrated_split_layouts = bool(
-        integrated_control and require_split_output_fusion
+        (integrated_control or integrated_accepted)
+        and require_split_output_fusion
     )
     accepted_bf16_m32_prefix = (
         "bf16[32,6144]{1,0:T(8,128)(2,1)S(3)}"
@@ -715,6 +756,8 @@ def _validate_exact_dense_rms_value_flow(
         if addition is None or len(addition.instruction.operand_names) != 2:
             return False
         operands = [graph.operand(addition, index) for index in range(2)]
+        if integrated_accepted:
+            return exact_accepted_carried(value)
         if integrated_control and preceding_attention_reduction is not None:
             def exact_attention_collective_f32(
                 candidate: _ResolvedHloValue | None,
@@ -746,6 +789,100 @@ def _validate_exact_dense_rms_value_flow(
                 )
                 for left in range(2)
             )
+        )
+
+    def exact_predicate_broadcast(
+        value: _ResolvedHloValue | None,
+    ) -> bool:
+        value = graph.semantic(value)
+        return bool(
+            value is not None
+            and value.instruction.raw_opcode
+            in {"broadcast", "broadcast-in-dim"}
+            and graph.shape(value) == (("pred", (32, 6144)),)
+            and re.findall(
+                r"\bdimensions=\{([^}]*)\}", graph.clean(value.instruction)
+            )
+            == ["0"]
+            and graph.exact_parameter(
+                graph.operand(value, 0), 2, (("pred", (32,)),)
+            )
+        )
+
+    def exact_nan(value: _ResolvedHloValue | None) -> bool:
+        value = graph.identity(value)
+        while value is not None and value.instruction.raw_opcode in {
+            "broadcast",
+            "broadcast-in-dim",
+        }:
+            value = graph.identity(graph.operand(value, 0))
+        return bool(
+            value is not None
+            and value.instruction.raw_opcode == "constant"
+            and re.findall(
+                r"\bconstant\(([^)]*)\)", graph.clean(value.instruction)
+            )
+            == ["nan"]
+        )
+
+    def exact_external_f32(
+        value: _ResolvedHloValue | None,
+        reduction: HloInstruction,
+    ) -> bool:
+        value = graph.semantic(value)
+        if value is None:
+            return False
+        if value.instruction.raw_opcode == "convert" and graph.shape(value) == f32_m32:
+            return graph.exact_external(graph.operand(value, 0), reduction)
+        return bool(
+            graph.shape(value) == f32_m32
+            and graph.exact_external(value, reduction)
+        )
+
+    def exact_selected_embedding_f32(
+        value: _ResolvedHloValue | None,
+    ) -> bool:
+        value = graph.semantic(value)
+        if (
+            value is not None
+            and value.instruction.raw_opcode == "convert"
+            and graph.shape(value) == f32_m32
+        ):
+            value = graph.semantic(graph.operand(value, 0))
+        if (
+            value is None
+            or value.instruction.raw_opcode != "select"
+            or graph.shape(value) not in {f32_m32, bf16_m32}
+            or len(value.instruction.operand_names) != 3
+            or not exact_predicate_broadcast(graph.operand(value, 0))
+        ):
+            return False
+        branches = [graph.operand(value, index) for index in (1, 2)]
+        return bool(
+            exact_external_f32(
+                branches[0], accepted_embedding_reduction
+            )
+            and exact_nan(branches[1])
+        )
+
+    def exact_accepted_carried(
+        value: _ResolvedHloValue | None,
+    ) -> bool:
+        value = semantic_opcode(value, "convert", bf16_m32)
+        addition = (
+            semantic_opcode(graph.operand(value, 0), "add", f32_m32)
+            if value is not None
+            else None
+        )
+        if addition is None or len(addition.instruction.operand_names) != 2:
+            return False
+        operands = [graph.operand(addition, index) for index in range(2)]
+        return any(
+            exact_external_f32(
+                operands[index], accepted_attention_reduction
+            )
+            and exact_selected_embedding_f32(operands[1 - index])
+            for index in range(2)
         )
 
     def exact_direct_residual_f32(
@@ -960,7 +1097,7 @@ def _validate_exact_dense_rms_value_flow(
     if (
         len(reduction.operand_names) != 1
         or (
-            not integrated_control
+            not (integrated_control or integrated_accepted)
             and not exact_partial_input(graph.operand(reduction_value, 0))
         )
     ):
@@ -1197,7 +1334,13 @@ def _validate_exact_dense_rms_value_flow(
             return False
         return graph.exact_parameter(
             graph.operand(value, 0),
-            7 if integrated_control else 2 if direct_residual else 3,
+            8
+            if integrated_accepted
+            else 7
+            if integrated_control
+            else 2
+            if direct_residual
+            else 3,
             (("bf16", (6144,)),),
         )
 
@@ -1385,12 +1528,16 @@ def _validate_exact_dense_rms_value_flow(
     result = {
         "exact_collective_input": True,
         "exact_direct_residual": direct_residual,
-        "exact_residual_round": hybrid_control or integrated_control,
+        "exact_residual_round": (
+            hybrid_control or integrated_control or integrated_accepted
+        ),
         "exact_reduction_operand_graph": True,
         "exact_weighted_operand_graph": True,
         "exact_result_binding": True,
         "residual_source_mode": (
-            "integrated_attention_plus_combined_residual"
+            "accepted_embedding_predicate_plus_attention"
+            if integrated_accepted
+            else "integrated_attention_plus_combined_residual"
             if integrated_control
             else
             "direct_post_attention_residual"
@@ -1400,6 +1547,8 @@ def _validate_exact_dense_rms_value_flow(
     }
     if preceding_attention_reduction is not None:
         result["preceding_attention_collective"] = True
+    if accepted_source_context:
+        result["accepted_source_context"] = True
     if require_split_output_fusion:
         exact_schedule = bool(
             scheduled_signature == (("f32", (32,)),)

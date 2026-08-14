@@ -19,6 +19,16 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The composed accepted-source-context discriminator is locally assembled but not yet committed or
+  run. It is a disjoint/default-off nine-input graph: sealed attention row, checkpoint-identical
+  embedding row, exact validity vector, both norm weights and real final-layout dense weights. Its
+  forced-32 CPU StableHLO SHA is `b46a58b1...44fed`; it contains exactly embedding -> attention ->
+  dense collectives and four distinct accepted-source recomputations. Runner/sealer propagation,
+  adversarial source mutations and terminal `SUCCESS` execution pass in the 20-test focused set.
+  Exact next is one immutable bulk Sol audit, commit/push, then one protected seconds-scale run. A
+  bitwise-exact row authorizes the protected 8K confirmation; a miss ends manual arms and starts an
+  automated live-SSA HLO diff.
+
 - Reviewed/pushed pin `fb207a42c76d95aa561c3150026b58877a93d9f2` completed the protected
   pre-dense scalar/gate-fusion discriminator under tag
   `greenfield_strategy_nd_integrated_dense_predense_split_rms_20260814T201339130390866Z` in
