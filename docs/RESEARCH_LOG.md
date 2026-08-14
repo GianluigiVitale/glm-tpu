@@ -8871,3 +8871,33 @@ unmotivated arithmetic variants.
   declared root directories, uploads the JSON into `host_records/`, then removes only worker zero's
   duplicate root JSON before census/terminal validation/archive. Exact next is one correction-only
   review, commit/push and a repeat of the same seconds-scale replay.
+
+## 2026-08-14 11:52--11:54 — protected physical StrategyND replay is bitwise exact
+
+- Reviewed/pushed pin `75101d5921046ebf211dfa1d011b9456c39962ec` completed the corrected
+  model-free replay under tag
+  `greenfield_strategy_nd_dense_replay_20260814T115211488885490Z`. The exact 32-chip operation and
+  deterministic repeat completed in 22 seconds without loading checkpoint weights or executing a
+  decoder layer.
+- Physical row zero is bitwise identical to the independently reconstructed DB533 software tree:
+  `0/6,144` mismatches, common raw SHA
+  `efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc`, and hidden-2795 BF16 bits
+  `47808`. Optimized-HLO SHA is
+  `59b1eef00ee291c2ff893ff57cbaa9496545673ea6903b3950944b849813adf0`.
+- Terminal validation reloaded all eight exact-schema fleet records, DB550 and DB533 sources, HLO,
+  input/output NPYs and topology, then reconstructed the physical input, software tree and complete
+  comparison. Summary, `SUCCESS`, remote ledger, post-census and evidence SHAs are
+  `3fb92e28fc47ca519ba26995f1f0964d02121db7d9375416054e7ada2639ad53`,
+  `da839bd37c4f3187308de9520c12d51cafc6c5ed90850802a081d3f6358d3012`,
+  `e9083a69bdd1c55b6370b13280ad2218746b49fba051b447f4b2cbc8105fbd08`,
+  `b4e3e02946b8db1d80cf21fe2987e298796c5679946a665bf3aad20087508f84`, and
+  `8af9cf7271ae5b0b769594e6083f51583b9364d00c9bd415d466931311e94116`.
+  Remote publication under the approved prefix was `SUCCESS`-last after authenticated 8/8 cleanup;
+  the run is diagnostic-only and has no DB performance row.
+- This closes packed weights, every dense contraction, all 32 accepted pre-reduction partials and
+  standalone physical StrategyND association. A naive inverse-scalar sweep does not reproduce the
+  sealed control arithmetic and cannot justify a coordinate or scalar patch. The next bounded
+  discriminator consumes the same global collective directly in the carried-residual/layer-1
+  RMSNorm graph in one compiled 32-chip program, using sealed DB548 residual/norm/target tensors.
+  Only a complete 6,144-value exact structural result authorizes production integration and one
+  protected full-8K confirmation.

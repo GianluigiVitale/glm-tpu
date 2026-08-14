@@ -545,23 +545,12 @@ def _validate_fingerprint_value_flow(
         )
 
 
-def validate_strategy_nd_fingerprint_hlo(
-    optimized_hlo: str,
-    member_device_ids: Sequence[int],
-) -> tuple[HloLintReport, Mapping[str, Any]]:
-    report = lint_hlo(
-        parse_hlo_module(optimized_hlo),
-        strategy_nd_fingerprint_hlo_policy(member_device_ids),
-    )
-    report.raise_for_violations()
-    reductions = tuple(
-        item for item in report.module.collectives if item.opcode == "all-reduce"
-    )
-    if len(reductions) != 1:
-        raise BenchmarkValidationError(
-            f"fingerprint requires one physical all-reduce, found {len(reductions)}"
-        )
-    reduction = reductions[0]
+def validate_strategy_nd_reduction(
+    report: HloLintReport,
+    reduction: HloInstruction,
+) -> Mapping[str, Any]:
+    """Validate the shared physical StrategyND operation, excluding consumers."""
+
     if reduction.raw_opcode != "all-reduce":
         raise BenchmarkValidationError(
             "fingerprint requires one synchronous all-reduce"
@@ -634,8 +623,29 @@ def validate_strategy_nd_fingerprint_hlo(
         raise BenchmarkValidationError(
             "fingerprint all-reduce reducer is not the exact scalar BF16 add"
         )
+    return dict(algorithm)
+
+
+def validate_strategy_nd_fingerprint_hlo(
+    optimized_hlo: str,
+    member_device_ids: Sequence[int],
+) -> tuple[HloLintReport, Mapping[str, Any]]:
+    report = lint_hlo(
+        parse_hlo_module(optimized_hlo),
+        strategy_nd_fingerprint_hlo_policy(member_device_ids),
+    )
+    report.raise_for_violations()
+    reductions = tuple(
+        item for item in report.module.collectives if item.opcode == "all-reduce"
+    )
+    if len(reductions) != 1:
+        raise BenchmarkValidationError(
+            f"fingerprint requires one physical all-reduce, found {len(reductions)}"
+        )
+    reduction = reductions[0]
+    algorithm = validate_strategy_nd_reduction(report, reduction)
     _validate_fingerprint_value_flow(report, reduction)
-    return report, dict(algorithm)
+    return report, algorithm
 
 
 def _fingerprint_function() -> Any:

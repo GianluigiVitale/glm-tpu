@@ -96,6 +96,9 @@ from .short_context_logprob_oracle import (
     normalize_sample_logprobs,
 )
 from .strategy_nd_dense_replay import validate_strategy_nd_dense_replay
+from .strategy_nd_dense_rms_replay import (
+    validate_strategy_nd_dense_rms_replay,
+)
 
 __all__ = (
     "AcceptedAttentionUpdateCaptureConfig",
@@ -165,4 +168,5 @@ __all__ = (
     "pack_stage_local_index_keys",
     "stitch_stage_local_scores",
     "validate_strategy_nd_dense_replay",
+    "validate_strategy_nd_dense_rms_replay",
 )

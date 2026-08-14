@@ -35,23 +35,31 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `e5977248...582c`, `663adbf1...8a05` and `c4759173...4683`. The classification is
   `accepted_dense_partials_exact_db548`; accepted capture/comparison manifest SHAs are
   `21c17898...84e4` / `4238b9dc...5050`.
-- The next discriminator is no longer an hour-long model run. Replay these immutable 32 partials
-  through one exact-shape M32 StrategyND BF16 all-reduce on the existing 32-chip slice, with the
-  accepted operand layout/algorithm and exact HLO proof. Compare its row-zero bits directly with
-  the current DB533 software replay. If they differ, correct only the combine association in the
-  existing 70--80 second four-chip loop; if they agree, the remaining boundary is the carried
-  residual/layer-1 normalization reference and contraction work stays frozen.
-- That model-free replay is now implemented locally and remains unlaunched. It reuses the exact
-  DB533 M32 executable, reorders DB550's model-axis tensor onto the accepted physical device ids,
-  executes one `bf16[32,6144]` StrategyND all-reduce twice for determinism, and independently
-  recomputes physical row zero in NumPy. The strengthened HLO gate pins the synchronous collective,
-  operand/result layouts, exact scalar BF16-add reducer and byte-pinned backend. Terminal validation
-  reloads all eight host records, the five immutable DB550 source files, HLO and all NPY outputs,
-  then reconstructs the input, software result and classification. The dedicated protected wrapper
-  has exact pin sync, exclusive lease, pre/post census, remote CRC equality and `SUCCESS`-last
-  publication; it is diagnostic-only with no performance claim. The affected benchmark suite passes
-  91/91 on CPU and shell/JSON/diff checks pass. Exact next is one bulk Sol audit, one correction batch
-  if needed, then commit/push and this short model-free protected run—not another checkpoint load.
+- Reviewed/pushed pin `75101d5921046ebf211dfa1d011b9456c39962ec` completed that protected
+  model-free replay under tag
+  `greenfield_strategy_nd_dense_replay_20260814T115211488885490Z`. One exact physical
+  `bf16[32,6144]` StrategyND all-reduce and its deterministic repeat completed in 22 seconds. The
+  hardware row zero is bitwise identical to the independently reconstructed DB533 software tree:
+  `0/6,144` mismatches, common raw SHA
+  `efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc`, and hidden 2795 bits
+  `47808`. Optimized-HLO SHA is
+  `59b1eef00ee291c2ff893ff57cbaa9496545673ea6903b3950944b849813adf0`.
+- The terminal validator reloaded all eight host records, exact DB550/DB533 sources, HLO and raw
+  arrays, then reconstructed the topology, physical input order, software tree and comparison.
+  Summary/`SUCCESS`/remote-ledger/post-census/evidence SHAs are `3fb92e28...9ad53`,
+  `da839bd3...3012`, `e9083a69...bd08`, `b4e3e029...8f84`, and `8af9cf72...4116`.
+  The approved remote prefix is
+  `gs://driftbench-dsv4-uc/results/greenfield_strategy_nd_dense_replay_20260814T115211488885490Z`;
+  publication was `SUCCESS`-last after authenticated 8/8 zero work. This is diagnostic-only with no
+  DB performance row or throughput claim.
+- Dense contractions and the standalone physical StrategyND combine are now frozen. A naive scalar
+  inverse sweep cannot reproduce even the control row under a simplified two-BF16-round model, so
+  do not patch hidden 2795 or search a free RMS scalar. The remaining bounded discriminator is the
+  exact global StrategyND combine consumed by the carried-residual/layer-1 RMSNorm graph in the
+  *same compiled 32-chip executable*. It must reuse sealed DB550 partials and DB548 residual/norm
+  inputs, prove the complete collective-to-live-output HLO, and compare directly with the accepted
+  layer-1 row. Only after this seconds-scale replay identifies an exact structural boundary may the
+  correction enter production and authorize one complete protected 8K confirmation.
 
 - Reviewed/pushed correction `d1edb65dc45f99d65d15a8d046d2e97f0ac023f9` completed the protected
   internal gate-dequant replay under tag

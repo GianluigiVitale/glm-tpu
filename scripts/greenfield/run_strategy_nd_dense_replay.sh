@@ -32,9 +32,33 @@ readonly DB533_ANALYSIS_SHA=e7e34828365ca3d6cae0052f8d0e2e802143c6ca83810153db31
 readonly DB533_SUMMARY_SHA=3ca82073f69fbe56526e1765594c7e8e9a738c73eb2a62b2df6d9a0c4d3136b7
 readonly DB533_SUCCESS_SHA=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 readonly DB533_HLO_CONTRACT_SHA=966a5dd8be19c409ac616dc194fe8e7dc78ae6c253132c7a73dcdeb8e0c040bc
+readonly RMS_SOURCE_TAG=greenfield_layer0_dense_partial_capture_20260813T200736889447458Z
+readonly RMS_SOURCE_DIR=/home/gianl/glm-run/$RMS_SOURCE_TAG
+readonly RMS_SOURCE_REMOTE=$APPROVED_BUCKET/results/$RMS_SOURCE_TAG
+readonly RMS_SOURCE_NPZ=$RMS_SOURCE_DIR/dense_partial_capture.npz
+readonly RMS_SOURCE_RUNNER=$RMS_SOURCE_DIR/runner.json
+readonly RMS_SOURCE_SUMMARY=$RMS_SOURCE_DIR/summary.json
+readonly RMS_SOURCE_SUCCESS=$RMS_SOURCE_DIR/SUCCESS
+readonly RMS_SOURCE_REMOTE_OBJECTS=$RMS_SOURCE_DIR/remote_objects.json
+readonly RMS_SOURCE_NPZ_SHA=f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298
+readonly RMS_SOURCE_RUNNER_SHA=d22b35f664409485b697fdb579665dc4b1ecf42683a2aaff9e9a4d7481ee8343
+readonly RMS_SOURCE_SUMMARY_SHA=c349b5fd458f34986d8cc59c0f026af6b0a4c4e998f8691d6f6aa83a9b55e416
+readonly RMS_SOURCE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa470bd44b0b85
+readonly RMS_SOURCE_REMOTE_OBJECTS_SHA=5ffef6b346754dd7e8cc5953a81f1d4f7a14235fbd567d1b2302505f2e9d60d8
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_STRATEGY_ND_REPLAY_TAG:-greenfield_strategy_nd_dense_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
+RMS_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY:-0}
+[[ $RMS_REPLAY == 0 || $RMS_REPLAY == 1 ]] || {
+  echo "GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY must be 0 or 1" >&2
+  exit 2
+}
+if [[ $RMS_REPLAY == 1 ]]; then
+  TAG=${GLM_GREENFIELD_STRATEGY_ND_RMS_TAG:-greenfield_strategy_nd_dense_rms_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REPLAY_OUTPUT_DIR=rms_replay
+else
+  TAG=${GLM_GREENFIELD_STRATEGY_ND_REPLAY_TAG:-greenfield_strategy_nd_dense_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REPLAY_OUTPUT_DIR=replay
+fi
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -50,8 +74,11 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "dirty worktree or append-only run path already exists" >&2
   exit 2
 }
-mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/hlo" "$RUN_DIR/replay" \
-  "$RUN_DIR/source" "$RUN_DIR/source_db533"
+mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/hlo" \
+  "$RUN_DIR/$REPLAY_OUTPUT_DIR" "$RUN_DIR/source" "$RUN_DIR/source_db533"
+if [[ $RMS_REPLAY == 1 ]]; then
+  mkdir -p "$RUN_DIR/source_rms"
+fi
 
 say() {
   echo "[strategy-nd-replay $(date -u +%H:%M:%S)] $*" |
@@ -132,6 +159,14 @@ require_sha "$DB533_ANALYSIS" "$DB533_ANALYSIS_SHA" "DB533 analysis"
 require_sha "$DB533_SUMMARY" "$DB533_SUMMARY_SHA" "DB533 summary"
 require_sha "$DB533_SUCCESS" "$DB533_SUCCESS_SHA" "DB533 SUCCESS"
 require_sha "$DB533_HLO_CONTRACT" "$DB533_HLO_CONTRACT_SHA" "DB533 HLO contract"
+if [[ $RMS_REPLAY == 1 ]]; then
+  require_sha "$RMS_SOURCE_NPZ" "$RMS_SOURCE_NPZ_SHA" "dense RMS tensor source"
+  require_sha "$RMS_SOURCE_RUNNER" "$RMS_SOURCE_RUNNER_SHA" "dense RMS runner source"
+  require_sha "$RMS_SOURCE_SUMMARY" "$RMS_SOURCE_SUMMARY_SHA" "dense RMS summary source"
+  require_sha "$RMS_SOURCE_SUCCESS" "$RMS_SOURCE_SUCCESS_SHA" "dense RMS SUCCESS source"
+  require_sha "$RMS_SOURCE_REMOTE_OBJECTS" "$RMS_SOURCE_REMOTE_OBJECTS_SHA" \
+    "dense RMS remote ledger source"
+fi
 [[ $(gcloud storage cat "$SOURCE_REMOTE/dense_partials_capture/dense_partials.npz" |
   sha256sum | awk '{print $1}') == "$SOURCE_NPZ_SHA" ]] || {
   say "ABORT: remote DB550 dense partials drifted"
@@ -177,6 +212,33 @@ require_sha "$DB533_HLO_CONTRACT" "$DB533_HLO_CONTRACT_SHA" "DB533 HLO contract"
   say "ABORT: remote DB533 HLO contract drifted"
   exit 1
 }
+if [[ $RMS_REPLAY == 1 ]]; then
+  [[ $(gcloud storage cat "$RMS_SOURCE_REMOTE/dense_partial_capture.npz" |
+    sha256sum | awk '{print $1}') == "$RMS_SOURCE_NPZ_SHA" ]] || {
+    say "ABORT: remote dense RMS tensor source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$RMS_SOURCE_REMOTE/runner.json" |
+    sha256sum | awk '{print $1}') == "$RMS_SOURCE_RUNNER_SHA" ]] || {
+    say "ABORT: remote dense RMS runner source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$RMS_SOURCE_REMOTE/summary.json" |
+    sha256sum | awk '{print $1}') == "$RMS_SOURCE_SUMMARY_SHA" ]] || {
+    say "ABORT: remote dense RMS summary source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$RMS_SOURCE_REMOTE/SUCCESS" |
+    sha256sum | awk '{print $1}') == "$RMS_SOURCE_SUCCESS_SHA" ]] || {
+    say "ABORT: remote dense RMS SUCCESS source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$RMS_SOURCE_REMOTE/remote_objects.json" |
+    sha256sum | awk '{print $1}') == "$RMS_SOURCE_REMOTE_OBJECTS_SHA" ]] || {
+    say "ABORT: remote dense RMS ledger source drifted"
+    exit 1
+  }
+fi
 cp "$SOURCE_NPZ" "$RUN_DIR/source/dense_partials.npz"
 cp "$SOURCE_CAPTURE" "$RUN_DIR/source/capture.json"
 cp "$SOURCE_COMPARISON" "$RUN_DIR/source/comparison.json"
@@ -186,6 +248,13 @@ cp "$DB533_ANALYSIS" "$RUN_DIR/source_db533/analysis.json"
 cp "$DB533_SUMMARY" "$RUN_DIR/source_db533/summary.json"
 cp "$DB533_SUCCESS" "$RUN_DIR/source_db533/SUCCESS"
 cp "$DB533_HLO_CONTRACT" "$RUN_DIR/source_db533/hlo_contract.json"
+if [[ $RMS_REPLAY == 1 ]]; then
+  cp "$RMS_SOURCE_NPZ" "$RUN_DIR/source_rms/dense_partial_capture.npz"
+  cp "$RMS_SOURCE_RUNNER" "$RUN_DIR/source_rms/runner.json"
+  cp "$RMS_SOURCE_SUMMARY" "$RUN_DIR/source_rms/summary.json"
+  cp "$RMS_SOURCE_SUCCESS" "$RUN_DIR/source_rms/SUCCESS"
+  cp "$RMS_SOURCE_REMOTE_OBJECTS" "$RUN_DIR/source_rms/remote_objects.json"
+fi
 
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
@@ -209,11 +278,20 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
   exit 1
 }
 coordinator="$coordinator:8476"
-say "launching one model-free M32 reduction (plus one deterministic repeat)"
+if [[ $RMS_REPLAY == 1 ]]; then
+  say "launching one model-free M32 reduction consumed by residual/RMSNorm (plus one deterministic repeat)"
+else
+  say "launching one model-free M32 reduction (plus one deterministic repeat)"
+fi
 started=$(date +%s)
 
-# shellcheck disable=SC2016
-capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; source_remote='"$SOURCE_REMOTE"'; source_sha='"$SOURCE_NPZ_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/replay" "$run/source"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/replay/* "$remote/diagnostic_replay/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; gcloud storage cp "$source_remote/dense_partials_capture/dense_partials.npz" "$run/source/dense_partials.npz" >/dev/null; [[ $(sha256sum "$run/source/dense_partials.npz" | awk '\''{print $1}'\'') == "$source_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_dense_replay --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-replay-input "$run/source/dense_partials.npz"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/replay/* "$remote/replay/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
+if [[ $RMS_REPLAY == 1 ]]; then
+  # shellcheck disable=SC2016
+  capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; source_remote='"$SOURCE_REMOTE"'; source_sha='"$SOURCE_NPZ_SHA"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/rms_replay" "$run/source" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/rms_replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/rms_replay/* "$remote/diagnostic_rms_replay/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; gcloud storage cp "$source_remote/dense_partials_capture/dense_partials.npz" "$run/source/dense_partials.npz" >/dev/null; [[ $(sha256sum "$run/source/dense_partials.npz" | awk '\''{print $1}'\'') == "$source_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_dense_rms_replay --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-replay-input "$run/source/dense_partials.npz" --association-rms-input "$run/source_rms/dense_partial_capture.npz"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/rms_replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/rms_replay/* "$remote/rms_replay/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
+else
+  # shellcheck disable=SC2016
+  capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; source_remote='"$SOURCE_REMOTE"'; source_sha='"$SOURCE_NPZ_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/replay" "$run/source"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/replay/* "$remote/diagnostic_replay/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; gcloud storage cp "$source_remote/dense_partials_capture/dense_partials.npz" "$run/source/dense_partials.npz" >/dev/null; [[ $(sha256sum "$run/source/dense_partials.npz" | awk '\''{print $1}'\'') == "$source_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_dense_replay --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-replay-input "$run/source/dense_partials.npz"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/replay/* "$remote/replay/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
+fi
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$capture_command" >"$RUN_DIR/capture.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/capture.txt" REPLAY_UPLOAD_OK || {
@@ -226,7 +304,8 @@ say "device replay workflow completed in ${elapsed}s"
 gcloud storage cp "$REMOTE_PREFIX/host_records/collective.rank*.json" \
   "$RUN_DIR/host_records/" >/dev/null
 gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/hlo/" >/dev/null
-gcloud storage cp "$REMOTE_PREFIX/replay/*" "$RUN_DIR/replay/" >/dev/null
+gcloud storage cp "$REMOTE_PREFIX/$REPLAY_OUTPUT_DIR/*" \
+  "$RUN_DIR/$REPLAY_OUTPUT_DIR/" >/dev/null
 # Worker zero shares the orchestrator filesystem. Its root output is only the
 # producer location that keeps HLO/replay siblings at their declared paths;
 # the authenticated fleet copy lives under host_records.
@@ -239,18 +318,26 @@ strict_census post || {
 post_census_done=1
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
-  "$RUN_DIR" "$PIN" "$TAG" "$elapsed" <<'PY'
+  "$RUN_DIR" "$PIN" "$TAG" "$elapsed" "$RMS_REPLAY" <<'PY'
 from __future__ import annotations
 
 import json
 from pathlib import Path
 import sys
 
-from glm_tpu.greenfield.validation import validate_strategy_nd_dense_replay
+from glm_tpu.greenfield.validation import (
+    validate_strategy_nd_dense_replay,
+    validate_strategy_nd_dense_rms_replay,
+)
 
-run_dir, pin, run_tag, elapsed = sys.argv[1:]
+run_dir, pin, run_tag, elapsed, rms_replay = sys.argv[1:]
 run_dir = Path(run_dir)
-summary = validate_strategy_nd_dense_replay(
+validator = (
+    validate_strategy_nd_dense_rms_replay
+    if rms_replay == "1"
+    else validate_strategy_nd_dense_replay
+)
+summary = validator(
     run_dir,
     expected_code_hash=pin,
     expected_run_tag=run_tag,
@@ -261,18 +348,24 @@ summary["results_db_role"] = "diagnostic_only_no_performance_row"
 (run_dir / "summary.json").write_text(
     json.dumps(summary, indent=2, sort_keys=True) + "\n"
 )
-print(
-    "STRATEGY_ND_DENSE_REPLAY_VALID "
-    f"classification={summary['classification']} "
-    f"mismatches={summary['row0_mismatch_count']}"
+label = (
+    "STRATEGY_ND_DENSE_RMS_REPLAY_VALID"
+    if rms_replay == "1"
+    else "STRATEGY_ND_DENSE_REPLAY_VALID"
 )
+mismatches = summary.get("mismatch_count", summary.get("row0_mismatch_count"))
+print(f"{label} classification={summary['classification']} mismatches={mismatches}")
 PY
 
 say "freezing and archiving model-free replay evidence"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
+evidence_dirs=(host_records hlo "$REPLAY_OUTPUT_DIR" source source_db533)
+if [[ $RMS_REPLAY == 1 ]]; then
+  evidence_dirs+=(source_rms)
+fi
 (
   cd "$RUN_DIR"
-  find host_records hlo replay source source_db533 -type f -print0 | sort -z | xargs -0 sha256sum
+  find "${evidence_dirs[@]}" -type f -print0 | sort -z | xargs -0 sha256sum
   sha256sum capture.txt census_pre.txt census_post.txt orchestrator.sealed.log \
     remote_prefix_preflight.txt summary.json sync.txt
 ) >"$RUN_DIR/evidence.sha256"
@@ -336,7 +429,7 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
   exit 1
 }
 
-/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" <<'PY'
+/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$RMS_REPLAY" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
@@ -361,7 +454,7 @@ if observed != expected:
     )
 PY
 
-/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" <<'PY'
+/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$RMS_REPLAY" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -369,25 +462,57 @@ import sys
 
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
-values = {
+rms_replay = sys.argv[3] == "1"
+common = {
     "artifact_kind": summary["artifact_kind"],
     "classification": summary["classification"],
     "code_hash": summary["code_hash"],
     "diagnostic_only": "true",
-    "hardware_hidden_2795_bfloat16_bits": summary["hardware_hidden_2795_bfloat16_bits"],
-    "hardware_row0_raw_sha256": summary["hardware_row0_raw_sha256"],
-    "row0_exact": str(summary["row0_exact"]).lower(),
-    "row0_mismatch_count": summary["row0_mismatch_count"],
-    "software_hidden_2795_bfloat16_bits": summary["software_hidden_2795_bfloat16_bits"],
-    "software_row0_raw_sha256": summary["software_row0_raw_sha256"],
-    "source_db_run_id": summary["source"]["db_run_id"],
-    "source_npz_sha256": summary["source"]["npz_sha256"],
-    "source_success_sha256": summary["source"]["success_sha256"],
     "evidence_sha256": sha256((root / "evidence.sha256").read_bytes()).hexdigest(),
     "post_census_sha256": sha256((root / "census_post.txt").read_bytes()).hexdigest(),
     "remote_objects_sha256": sha256((root / "remote_objects.json").read_bytes()).hexdigest(),
     "remote_prefix": sys.argv[2],
 }
+if rms_replay:
+    source = summary["source"]
+    values = {
+        **common,
+        "elementwise_exact": str(summary["elementwise_exact"]).lower(),
+        "expected_hidden_2795_bfloat16_bits": summary["expected_hidden_2795_bfloat16_bits"],
+        "expected_raw_sha256": summary["expected_raw_sha256"],
+        "mismatch_count": summary["mismatch_count"],
+        "observed_hidden_2795_bfloat16_bits": summary["observed_hidden_2795_bfloat16_bits"],
+        "observed_raw_sha256": summary["observed_raw_sha256"],
+        "optimized_hlo_sha256": summary["optimized_hlo_sha256"],
+        "performance_claim": "false",
+        "source_db550_npz_sha256": source["db550_npz_sha256"],
+        "source_db550_raw_sha256": source["db550_raw_sha256"],
+        "source_db550_run_id": source["db550_run_id"],
+        "source_db550_tag": source["db550_tag"],
+        "source_rms_code_hash": source["rms_code_hash"],
+        "source_rms_npz_sha256": source["rms_npz_sha256"],
+        "source_rms_remote_objects_sha256": source["rms_remote_objects_sha256"],
+        "source_rms_runner_sha256": source["rms_runner_sha256"],
+        "source_rms_success_sha256": source["rms_success_sha256"],
+        "source_rms_summary_sha256": source["rms_summary_sha256"],
+        "source_rms_tag": source["rms_tag"],
+        "stablehlo_sha256": summary["stablehlo_sha256"],
+        "summary_sha256": sha256((root / "summary.json").read_bytes()).hexdigest(),
+        "topology_hash": summary["topology_hash"],
+    }
+else:
+    values = {
+        **common,
+        "hardware_hidden_2795_bfloat16_bits": summary["hardware_hidden_2795_bfloat16_bits"],
+        "hardware_row0_raw_sha256": summary["hardware_row0_raw_sha256"],
+        "row0_exact": str(summary["row0_exact"]).lower(),
+        "row0_mismatch_count": summary["row0_mismatch_count"],
+        "software_hidden_2795_bfloat16_bits": summary["software_hidden_2795_bfloat16_bits"],
+        "software_row0_raw_sha256": summary["software_row0_raw_sha256"],
+        "source_db_run_id": summary["source"]["db_run_id"],
+        "source_npz_sha256": summary["source"]["npz_sha256"],
+        "source_success_sha256": summary["source"]["success_sha256"],
+    }
 (root / "SUCCESS").write_text(
     "".join(f"{key}={value}\n" for key, value in values.items())
 )
@@ -403,6 +528,10 @@ terminal_success_done=1
 
 trap - EXIT
 classification=$(sed -n 's/^classification=//p' "$RUN_DIR/SUCCESS")
-mismatches=$(sed -n 's/^row0_mismatch_count=//p' "$RUN_DIR/SUCCESS")
+if [[ $RMS_REPLAY == 1 ]]; then
+  mismatches=$(sed -n 's/^mismatch_count=//p' "$RUN_DIR/SUCCESS")
+else
+  mismatches=$(sed -n 's/^row0_mismatch_count=//p' "$RUN_DIR/SUCCESS")
+fi
 echo "SUCCESS classification=$classification mismatches=$mismatches elapsed=${elapsed}s"
 echo "ARCHIVE=$REMOTE_PREFIX"

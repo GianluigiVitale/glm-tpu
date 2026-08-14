@@ -947,7 +947,9 @@ def _match_rmsnorm(
     dense_output: str,
     *,
     layer1_only: bool = False,
+    dense_is_m32: bool = False,
     residual_is_m32: bool = False,
+    return_bitcast_u16: bool = False,
     split_layer1_rms: bool = False,
 ) -> tuple[str, str, str]:
     rows = 32 if layer1_only else 1
@@ -971,7 +973,11 @@ def _match_rmsnorm(
             raise _MatchError(f"{call.name}: M32 RMSNorm pad source drifted")
         return call.name
 
-    dense_value = exact_m32_pad(dense_output) if layer1_only else dense_output
+    dense_value = (
+        dense_output
+        if dense_is_m32 or not layer1_only
+        else exact_m32_pad(dense_output)
+    )
     reduction_dense_value = dense_value
     if split_layer1_rms:
         reduction_dense_value = _expect_unary(
@@ -1214,10 +1220,17 @@ def _match_rmsnorm(
             ((0, 1), (0, 6144)),
             "tensor<1x6144xbf16>",
         ).name
+    if return_bitcast_u16:
+        if not layer1_only:
+            raise _MatchError("U16 RMS replay return requires one live M32 row")
+        returned_output = _expect_unary(
+            graph,
+            returned_output,
+            opcode="bitcast_convert",
+            result_type="tensor<1x6144xui16>",
+        ).name
     expected_return = (
-        (returned_output,)
-        if layer1_only
-        else (dense_output, returned_output)
+        (returned_output,) if layer1_only else (dense_output, returned_output)
     )
     _only(
         (
@@ -1230,7 +1243,7 @@ def _match_rmsnorm(
         if layer1_only
         else "probe dense/layer-1 return",
     )
-    if layer1_only and graph.users.get(dense_output, ()) != [
+    if layer1_only and not dense_is_m32 and graph.users.get(dense_output, ()) != [
         graph.node(dense_value)
     ]:
         raise _MatchError("layer-1-only probe externalizes the dense update")
@@ -1487,6 +1500,209 @@ def validate_captured_dense_rms_stablehlo(
         "exact_result_binding": not violations,
         "live_rows": 1,
         "split_layer1_rms": split_layer1_rms,
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
+def validate_strategy_nd_dense_rms_stablehlo(
+    stablehlo: str,
+) -> dict[str, object]:
+    """Prove the global StrategyND result is consumed by exact layer-1 RMSNorm."""
+
+    graphs, violations = _parse_graphs(stablehlo)
+    try:
+        graph = _only(
+            (item for item in graphs if item.name == "main"),
+            "StrategyND RMS main graph",
+        )
+        helpers = {item.name: item for item in graphs if item is not graph}
+        collective = _only(
+            (node for node in graph.nodes.values() if node.opcode == "all_reduce"),
+            "StrategyND RMS all-reduce",
+        )
+        reshape = _only(
+            (
+                node
+                for node in graph.nodes.values()
+                if node.opcode == "reshape"
+                and node.operands == ("%arg4",)
+                and node.tensor_types[-2:]
+                == (
+                    "tensor<1x32x6144xui16>",
+                    "tensor<32x6144xui16>",
+                )
+            ),
+            "StrategyND RMS physical input reshape",
+        )
+        payload = _expect_unary(
+            graph,
+            reshape.name,
+            opcode="bitcast_convert",
+            result_type="tensor<32x6144xbf16>",
+        )
+        if (
+            payload.tensor_types[-2:]
+            != ("tensor<32x6144xui16>", "tensor<32x6144xbf16>")
+            or collective.operands != (payload.name,)
+        ):
+            raise _MatchError("StrategyND RMS collective input lineage drifted")
+
+        without_comments = re.sub(r"/\*.*?\*/", "", stablehlo, flags=re.S)
+        expected_members = ", ".join(str(value) for value in range(32))
+        collective_head = re.compile(
+            rf'^\s*{re.escape(collective.name)}\s*=\s*'
+            rf'"stablehlo\.all_reduce"\({re.escape(payload.name)}\)\s*'
+            rf'<\{{channel_handle\s*=\s*#stablehlo\.channel_handle'
+            rf'<handle\s*=\s*1,\s*type\s*=\s*1>,\s*'
+            rf'replica_groups\s*=\s*dense<\[\[{expected_members}\]\]>'
+            rf'\s*:\s*tensor<1x32xi64>,\s*use_global_device_ids\}}>\s*\(\{{\s*$',
+            re.M,
+        )
+        collective_heads = tuple(collective_head.finditer(without_comments))
+        if len(collective_heads) != 1:
+            raise _MatchError("StrategyND RMS replica group/channel drifted")
+        reducer_region = re.compile(
+            r'\A\s*'
+            r'\s*\^bb0\((%[A-Za-z0-9_.$#-]+):\s*tensor<bf16>,\s*'
+            r'(%[A-Za-z0-9_.$#-]+):\s*tensor<bf16>\):\s*\n'
+            r'\s*(%[A-Za-z0-9_.$#-]+)\s*=\s*stablehlo\.add\s+\1,\s*\2\s*'
+            r':\s*tensor<bf16>(?:\s+loc\([^\n]+\))?\s*\n'
+            r'\s*stablehlo\.return\s+\3\s*:\s*tensor<bf16>'
+            r'(?:\s+loc\([^\n]+\))?\s*\n'
+            r'\s*\}\)\s*:\s*\(tensor<32x6144xbf16>\)\s*->\s*'
+            r'tensor<32x6144xbf16>(?:\s+loc\([^\n]+\))?\s*(?:\n|\Z)',
+        )
+        # Match only the selected collective's immediately following region.
+        # Quoted location text is removed from that tail so neither metadata
+        # nor a later reducer can satisfy the live arithmetic contract.
+        reducer_tail = re.sub(
+            r'"(?:\\.|[^"\\])*"', '""',
+            without_comments[collective_heads[0].end():],
+        )
+        if reducer_region.match(reducer_tail) is None:
+            raise _MatchError("StrategyND RMS BF16 reducer/result drifted")
+
+        residual, norm_weight, returned_output = _match_rmsnorm(
+            graph,
+            helpers,
+            collective.name,
+            layer1_only=True,
+            dense_is_m32=True,
+            residual_is_m32=True,
+            return_bitcast_u16=True,
+            split_layer1_rms=False,
+        )
+        residual_round = _expect_node(
+            graph,
+            residual,
+            opcode="convert",
+            result_type="tensor<32x6144xbf16>",
+        )
+        residual_add = _expect_node(
+            graph,
+            residual_round.operands[0],
+            opcode="add",
+            result_type="tensor<32x6144xf32>",
+        )
+        residual_sources: list[str] = []
+        for operand in residual_add.operands:
+            conversion = _expect_node(
+                graph,
+                operand,
+                opcode="convert",
+                result_type="tensor<32x6144xf32>",
+            )
+            pad = _expect_node(
+                graph,
+                conversion.operands[0],
+                opcode="call",
+                result_type="tensor<32x6144xbf16>",
+            )
+            residual_sources.append(
+                _validate_m32_input_pad(graph, helpers, pad.name)
+            )
+        if tuple(residual_sources) != ("%arg5", "%arg6") or norm_weight != "%arg7":
+            raise _MatchError(
+                "StrategyND RMS residual/norm source identity drifted: "
+                f"sources={residual_sources} norm={norm_weight}"
+            )
+
+        manual_matches = list(
+            re.finditer(
+                r"(?m)^\s*(%[A-Za-z0-9_.-]+)\s*=\s*"
+                r"sdy\.manual_computation\(([^)]*)\)",
+                stablehlo,
+            )
+        )
+        if len(manual_matches) != 1:
+            raise _MatchError("StrategyND RMS manual computation is not unique")
+        manual_result = manual_matches[0].group(1)
+        if tuple(
+            re.findall(r"%[A-Za-z0-9_.$#-]+", manual_matches[0].group(2))
+        ) != ("%arg0", "%arg1", "%arg2", "%arg3"):
+            raise _MatchError("StrategyND RMS outer operands drifted")
+        manual_line = next(
+            line
+            for line in stablehlo.splitlines()
+            if f"{manual_result} = sdy.manual_computation" in line
+        )
+        if re.findall(r"(%arg[0-9]+):\s*(tensor<[^>]+>)", manual_line) != [
+            ("%arg4", "tensor<1x32x6144xui16>"),
+            ("%arg5", "tensor<1x6144xbf16>"),
+            ("%arg6", "tensor<1x6144xbf16>"),
+            ("%arg7", "tensor<6144xbf16>"),
+        ]:
+            raise _MatchError("StrategyND RMS manual block arguments drifted")
+        _only(
+            (
+                node
+                for node in graph.nodes.values()
+                if node.opcode == "return"
+                and node.raw_line.startswith("return ")
+                and node.operands == (manual_result,)
+            ),
+            "StrategyND RMS outer return",
+        )
+        if returned_output not in graph.nodes:
+            raise _MatchError("StrategyND RMS exact result disappeared")
+    except (AttributeError, _MatchError, StopIteration, ValueError) as error:
+        violations.append(str(error))
+
+    collective_counts = {
+        opcode: sum(
+            node.opcode == opcode
+            for item in graphs
+            for node in item.nodes.values()
+        )
+        for opcode in (
+            "all_gather",
+            "all_reduce",
+            "all_to_all",
+            "collective_broadcast",
+            "collective_permute",
+            "reduce_scatter",
+        )
+    }
+    if collective_counts != {
+        "all_gather": 0,
+        "all_reduce": 1,
+        "all_to_all": 0,
+        "collective_broadcast": 0,
+        "collective_permute": 0,
+        "reduce_scatter": 0,
+    }:
+        violations.append(
+            f"StrategyND RMS collective contract drifted: {collective_counts}"
+        )
+    if "stablehlo.convolution" in stablehlo:
+        violations.append("StrategyND RMS replay contains a convolution")
+    if "xla_python_cpu_callback" in stablehlo or "host_callback" in stablehlo:
+        violations.append("StrategyND RMS replay contains a host callback")
+    return {
+        "collective_counts": collective_counts,
+        "exact_result_binding": not violations,
+        "live_rows": 1,
         "passed": not violations,
         "violations": violations,
     }

@@ -9,9 +9,13 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   mismatches and raw SHA `9d9f65dd...16e35`.
 - Therefore checkpoint packing, FP8 decode/scales, SwiGLU, all 16 contractions, scheduled fusion
   geometry and rank-local outputs are closed. Do not reopen or rerun those hypotheses.
-- The one remaining layer-0 discriminator is physical M32 StrategyND association versus the
-  carried-residual/layer-1 RMSNorm boundary. Gate D is not closed until the complete 8K decoder has
-  exact tokens and DSA plus its trace, wall, memory and integrity evidence.
+- The protected 32-chip replay proves the physical M32 StrategyND row zero exactly matches the
+  DB533 software tree: `0 / 6,144` mismatches, common raw SHA `efde8532...b4fc`, hidden-2795 bits
+  `47808`. Standalone physical association is closed too.
+- The remaining discriminator is whether consuming that global collective directly inside the
+  carried-residual/layer-1 RMSNorm graph changes scheduled fusion/arithmetic. Gate D is not closed
+  until that boundary is exact and the complete 8K decoder has exact tokens and DSA plus its trace,
+  wall, memory and integrity evidence.
 
 ## Evidence ladder
 
@@ -50,6 +54,9 @@ branches from the search tree.
   exact execution equivalence.
 - Capture pre-reduction partials before changing contractions. Exact partials plus a wrong combined
   row localize the fault to association; exact combination moves investigation downstream.
+- Do not infer a global RMS correction scalar from NumPy arithmetic that does not first reproduce
+  the sealed TPU control row bitwise. Scheduled BF16 conversion/fusion can skip representable output
+  codes at individual coordinates; a scalar sweep over the wrong arithmetic model is not evidence.
 
 ## Review and run discipline
 
@@ -68,9 +75,10 @@ branches from the search tree.
 
 ## Decision after the model-free replay
 
-- Hardware row zero differs from DB533 software: change only the bounded four-chip combine
-  association, prove it with the same real replay, then integrate.
-- Hardware row zero equals DB533 software: freeze dense arithmetic and inspect only carried residual
-  and layer-1 RMSNorm provenance/arithmetic.
+- Hardware row zero equals DB533 software. Freeze dense arithmetic and standalone association.
+- The next replay must put global StrategyND combine and downstream residual/RMSNorm in one compiled
+  program. A separate four-chip/software replay cannot prove or reject cross-boundary fusion.
+- Integrate only a structural boundary that makes the entire 6,144-value accepted row exact. Never
+  patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
 
-Do not return to hour-scale hypothesis runs or already exact contractions in either branch.
+Do not return to hour-scale hypothesis runs or already exact contractions.
