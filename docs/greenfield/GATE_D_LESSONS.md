@@ -12,18 +12,20 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 - The protected 32-chip replay proves the physical M32 StrategyND row zero exactly matches the
   DB533 software tree: `0 / 6,144` mismatches, common raw SHA `efde8532...b4fc`, hidden-2795 bits
   `47808`. Standalone physical association is closed too.
-- The first global-collective/RMS replay reproduced DB548's one-ULP control, but its residual inputs
-  came from a greenfield ingredient run while its target came from an accepted legacy run. It is a
-  hybrid control, not an accepted-boundary discriminator. The missing authoritative tensor is the
-  accepted layer-0 post-attention residual at position 8,155.
-- Capture that residual once with the existing non-returning legacy dense-boundary observer. Then
-  replay the already-proved accepted dense partials, physical StrategyND combine and layer-1 RMSNorm
-  using only one coherent accepted event. Gate D remains open until that row and the complete 8K
-  decoder are exact with trace, wall, memory and integrity evidence.
-- DB551 proved that even a non-returning callback perturbs execution if it consumes a tensor that
-  production otherwise keeps fused. Observing both the dense result and carried residual changed
-  DSA from event 1 onward. The retry must consume only the residual; DB550 already proves the dense
-  output, so it must not be observed again.
+- The first global-collective/RMS replay reproduced DB548's one-ULP control, but its reconstructed
+  residual history was hybrid. It validates replay mechanics, not an accepted boundary.
+- DB551 proved that observing dense plus residual perturbs downstream DSA. The residual-only retry
+  proved a stronger rule: even a non-returning single-tensor debug consumer can change fusion or
+  scheduling. It produced the correct token but DSA diverged from event 1, so it was refused and
+  rolled back. Do not repeat legacy boundary captures.
+- The refused residual row was nevertheless byte-identical to DB548's already sealed direct
+  post-attention residual, SHA `a105fdbd...99f8e`. This equality does not promote the observer or
+  turn the source bundle into an accepted oracle; it only proves another hour-scale capture cannot
+  supply new bytes.
+- Use those sealed bytes in the three-input model-free StrategyND/RMS graph to decide the structural
+  fusion hypothesis in seconds. Only an exact full 6,144-value output may authorize integration,
+  and Gate D remains open until the resulting complete protected 8K decoder passes DSA, trace,
+  wall, memory and integrity gates.
 
 ## Evidence ladder
 
@@ -54,6 +56,9 @@ branches from the search tree.
 - “Non-returning” is necessary but not sufficient: adding a debug consumer can itself force
   materialization. Capture only the smallest missing value and never observe an already-closed
   intermediate in the same hook.
+- When even that smallest consumer perturbs the oracle, stop capturing. Reuse already sealed equal
+  bytes for diagnostic replay, label the provenance limitation explicitly, and require a later
+  uninstrumented end-to-end confirmation.
 - An oracle observation is accepted only if the observer run itself retains exact raw output and
   exact DSA events. Prefer existing consumed inputs or pre-hooks that return nothing.
 - Never treat a numerically plausible observed tensor as an oracle after the observer perturbs the
@@ -100,9 +105,10 @@ branches from the search tree.
 ## Decision after the model-free replays
 
 - Hardware row zero equals DB533 software. Freeze dense arithmetic and standalone association.
-- The global StrategyND/RMS program is mechanically valid and completes in roughly 24 seconds, but
-  its first source bundle was hybrid. Rerun it only after replacing the greenfield residual history
-  with the directly captured accepted post-attention residual.
+- The global StrategyND/RMS program is mechanically valid and completes in roughly 24 seconds. Its
+  next form consumes DB548's sealed direct post-attention residual rather than reconstructing that
+  residual from separate operands. Treat the result as a structural diagnostic because the
+  residual-only observer was not DSA-exact.
 - Integrate only a structural boundary that makes the entire 6,144-value accepted row exact. Never
   patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
 

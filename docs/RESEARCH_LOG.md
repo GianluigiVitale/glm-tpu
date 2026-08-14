@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 16:40 UTC — residual capture is observer-sensitive; switch to sealed direct replay
+
+- Protected tag `greenfield_legacy_layer0_dense_boundary_p8155_20260814T152901147381444Z`
+  completed the exact 8K passkey item with the correct raw output and 100% item accuracy in 27.4
+  seconds after loading 703.7 GiB. The residual-only non-returning observer still changed downstream
+  execution: decode positions, producer-layer ids and valid counts remained exact, but selected
+  positions differed at 557,434 entries and selected scores at 573,438, beginning at event 1/layer
+  1. The run therefore refused sealing. Provisional DB552 was authenticated and rolled back; no
+  capture/comparison/archive/terminal `SUCCESS` exists, and cleanup ended 8/8 `CENSUS_OK`.
+- The raw observer row itself is `uint16[6144]`, SHA
+  `a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e`, exactly equal to the
+  already sealed DB548 post-attention residual. This equality does not make the perturbed observer
+  an accepted oracle, but it makes another full-model capture non-informative. Legacy boundary
+  capture is now frozen.
+- Reworked the existing model-free StrategyND-to-layer-1-RMS replay to consume three inputs only:
+  the sealed physical dense partials, DB548's direct post-attention residual and the layer-1 norm.
+  The former attention-update plus combined-residual reconstruction is absent from the production
+  replay build and both StableHLO and optimized-HLO contracts publish and require
+  `direct_post_attention_residual`. Focused tests pass 7/7; the complete greenfield validation
+  package passes 304/304 with two unrelated deprecation warnings. This remains a diagnostic source
+  bundle. If its complete row is bitwise exact, integrate the same structural boundary and run one
+  protected 8K confirmation; otherwise inspect only the resulting exact HLO/arithmetic difference.
+  Sol approved immutable staged diff `df911c40...6c41` with no high/medium blocker; implementation
+  commit is `dc2a42e`.
+
 ## 2026-08-14 09:30 UTC — direct accepted-partial oracle tap replaces hour-scale iteration
 
 - Implemented the missing default-off legacy oracle tap at exact layer-0 `down_proj`: every

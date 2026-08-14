@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected residual-only observer attempt
+  `greenfield_legacy_layer0_dense_boundary_p8155_20260814T152901147381444Z` ran at greenfield pin
+  `728d865f02ea1016abd9e325f910de78a3d4a641` and legacy pin
+  `2c4fbc155157ad52a4e61cf59f92984d1101e142`. It loaded the full model and completed the exact
+  8K item correctly in 27.4 seconds, but DSA diverged from event 1/layer 1 onward: decode positions,
+  producer layer ids and valid counts remained exact, while selected positions/scores did not.
+  Therefore it is not an accepted oracle and no capture/comparison/archive/`SUCCESS` was sealed.
+  Provisional DB552 was authenticated and rolled back; failure cleanup ended 8/8 clean.
+- The residual-only observer nevertheless wrote one raw `uint16[6144]` layer-0 post-attention row
+  with SHA `a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e`, byte-identical to
+  the already sealed DB548 post-attention residual. This does not promote the perturbed observer,
+  but it proves another hour-scale capture would only reproduce bytes already available. Do not
+  repeat legacy boundary captures.
+- Exact next is a model-free three-input StrategyND/RMS replay using sealed DB550 dense partials,
+  DB548's direct post-attention residual and the sealed layer-1 norm/target. This is a structural
+  diagnostic, not accepted-oracle evidence: only a bitwise-exact 6,144-value row may authorize the
+  matching production boundary change, followed by one complete protected 8K Gate-D run. The
+  direct replay focused suite passes 7/7 and the full validation package passes 304/304 on CPU;
+  Sol approved staged diff `df911c40...6c41` with no high/medium blocker and the implementation is
+  committed at `dc2a42e`. Exact next is one serialized protected direct replay.
+
 - Reviewed/pushed pin `7129bf38aa783fb91d109e4a0865874ad562c738` ran the protected global
   StrategyND-to-layer-1-RMS executable under tag
   `greenfield_strategy_nd_dense_rms_replay_20260814T132047565832633Z`. Device work completed in
