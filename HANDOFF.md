@@ -19,6 +19,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected compile acquisition completed exactly once at reviewed/pushed pin `63e7017` under tag
+  `greenfield_strategy_nd_integrated_dense_native_source_context_20260814T232117436126702Z`.
+  All eight hosts compiled the intended 13-input native graph, synchronized after atomically
+  writing both graphs, and then refused on the deliberately empty StableHLO pin before arithmetic.
+  Pre/failure censuses are both 8/8 clean; there is no output tensor, numerical verdict, DB row,
+  terminal archive or `SUCCESS`. StableHLO/optimized-HLO/prevalidation SHAs are
+  `0884c34e...83d66`, `4b13a9f1...af63` and `6702cc9c...d233`; the partial diagnostic prefix is
+  `gs://driftbench-dsv4-uc/results/greenfield_strategy_nd_integrated_dense_native_source_context_20260814T232117436126702Z`.
+- Those exact preserved graphs now validate locally without recompilation. The complete optimized
+  graph is byte-pinned and separately reports the exact 13-input schema, three ordered StrategyND
+  collectives, native embedding gather, structured W_UV Pallas call, row-parallel attention
+  convolution, two final-layout dense convolutions, pre-dense/layer-1 scalar RMS and the live U16
+  row. Four parser-valid source/result/layout mutations refuse. The focused file passes 16/16 in
+  eight seconds and the forced-CPU dense/projection/integrated regression set passes 109/109 in
+  90.81 seconds. Exact next is one immutable Sol review of this validator batch, correction closure
+  if needed, commit/push, then one protected numerical row expected to take roughly 41 seconds.
+  Only `0 / 6,144` mismatches authorizes the complete protected 8K Gate-D confirmation.
+
 - The bounded native-source successor is now locally assembled as one default-off 13-input graph:
   real sharded embedding lookup/validity, the sealed DB537 B512 attended latent, native `W_UV`,
   row-parallel attention projection, the frozen accepted pre-dense/dense StrategyND path and the
@@ -29,15 +47,11 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `db87981c...e7dc`; the four already-frozen dense hashes remain unchanged. The protected wrapper
   authenticates the complete DB537 source locally/remotely, remains default-off/disjoint, and
   writes both compiler graphs plus a nonvalidating manifest before any semantic validation or
-  arithmetic. The exact TPU StableHLO/optimized-HLO forms are deliberately unpinned, so the first
-  protected attempt can only acquire those graphs and fail closed; it cannot publish a numerical
-  result or `SUCCESS`. The one immutable Sol review found two pre-launch gaps and both are corrected:
+  arithmetic. The one immutable Sol review found two pre-launch gaps and both are corrected:
   the native attention psum now remains causally downstream of the embedding psum through the exact
   finite guard, and all eight JAX processes synchronize after process 0 atomically writes the HLO
-  evidence but before the intentional validator refusal. Exact next is correction closure,
-  commit/push, then this single sub-minute compile acquisition. Correct the validators locally from
-  the preserved graph, then run one numerical bounded row. Full 8K remains forbidden until all
-  6,144 values are exact.
+  evidence but before the intentional validator refusal. The completed acquisition and current
+  exact next action are recorded above. Full 8K remains forbidden until all 6,144 values are exact.
 
 - The automatic live-SSA comparison is complete and runs locally in about 13 seconds. Its report
   is `live_ssa_diff.json`, SHA `aadf8589...b81b`, beside the protected 1,031-mismatch run. Both

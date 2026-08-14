@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 23:21--23:55 UTC — native TPU graph acquired once; validator iteration is local
+
+- Reviewed/pushed pin `63e7017684df4aed9cfbdbc93c57129f0cf20f1e` ran the intentionally
+  fail-closed compile acquisition once as
+  `greenfield_strategy_nd_integrated_dense_native_source_context_20260814T232117436126702Z`.
+  All eight hosts compiled and synchronized after process 0 atomically persisted the graphs. The
+  empty StableHLO pin then refused on every host before arithmetic. Pre/failure censuses are 8/8
+  clean; there is no output tensor, numerical verdict, DB row, terminal archive, `SUCCESS` or
+  performance result. Partial diagnostic objects are preserved at the matching approved-bucket
+  result prefix.
+- The preserved StableHLO is 48,466 bytes / 476 lines at SHA
+  `0884c34e137688bb66c96dfeffbdd5c0bacfd4710d52c6be45d83b4fbe683d66`; optimized HLO is
+  173,800 bytes / 994 lines at SHA
+  `4b13a9f123ae75ae2b196673d96788360ee5f6bd72ebd0d7cad9865a0feaaf63`; the nonvalidating
+  prevalidation SHA is `6702cc9c2373b65c1412a3e89fe8bd2a0f61c4503e0f26a7535a29076c19d233`.
+- Local validation now byte-pins both complete graphs and reports the exact 13-input schema, three
+  ordered full-pod StrategyND reductions, native embedding gather, structured W_UV Pallas call,
+  row-parallel attention projection, two final-layout dense contractions, pre-dense/layer-1 scalar
+  RMS and one live U16 row. The full digest makes any source edge, fusion body, layout or backend
+  change fail closed; four parser-valid source/result/layout mutations refuse. The focused file
+  passes 16/16 in 8.08 seconds and the forced-CPU dense/projection/integrated set passes 109/109 in
+  90.81 seconds. Exact next is one immutable review/correction closure, commit/push,
+  then one separate protected numerical row. Only zero mismatches across all 6,144 BF16 values
+  authorizes the full protected 8K Gate-D confirmation.
+
 ## 2026-08-14 22:18--23:00 UTC — native source graph is locally assembled and fail-closed
 
 - Implemented one default-off bounded graph containing the real 32-way sharded embedding

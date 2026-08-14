@@ -69,6 +69,12 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   refusal. Build the exact value-flow/layout validator from that one preserved graph and only then
   authorize a separate numerical execution. Never loosen a TPU contract speculatively or rerun a
   compile just to rediscover an already captured lowering.
+- That acquisition is complete. Its exact StableHLO/optimized-HLO SHAs are
+  `0884c34e...83d66` / `4b13a9f1...af63`; both pre/failure censuses are 8/8 clean and no
+  arithmetic or terminal result exists. The preserved graph is now the sole compiler oracle for
+  this candidate. Iterate its validator locally, review it once as an immutable batch, then spend
+  one separate seconds-scale run only on the 6,144-value numerical verdict. Do not launch another
+  compile-only discovery for the same code/compiler pin.
 
 ## Evidence ladder
 
@@ -121,6 +127,11 @@ branches from the search tree.
 - Parse real attributes outside quoted metadata and comments. Pin physical layouts, replica groups,
   reducer parameters/opcode, scheduled backend geometry and synchronous collective form.
 - Every accepted HLO form needs adversarial mutation tests and a SHA-pinned preserved-real replay.
+- When one exact diagnostic executable is intentionally compiler-pin-specific, a full optimized-HLO
+  digest is an acceptable strongest outer gate: it rejects changes to any source edge, fusion body,
+  physical layout or backend configuration. Still emit a structural summary of the inputs, live
+  collectives, kernels and root so the accepted artifact remains auditable; never substitute the
+  digest for the separate protected numerical verdict.
 - Write raw StableHLO and optimized HLO atomically before applying the semantic validator. Mark the
   prevalidation record non-valid and publish no result until every proof passes. A validator
   refusal after compilation must preserve the graph needed to correct the proof; never spend

@@ -42,10 +42,35 @@ INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256 = (
 INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256 = (
     "b46a58b1cb7576b8124b02ac09b722e07ddebf6cf7663ac5e404f64414144fed"
 )
-# Filled only from the first exact protected TPU lowering.  The runner writes
-# both HLO files before this pin is enforced, so acquisition cannot publish a
-# numerical result or terminal SUCCESS.
-INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256 = ""
+# Captured once by the fail-closed protected acquisition at ``63e7017``.
+# Both complete compiler graphs are pinned before arithmetic is authorized.
+INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256 = (
+    "0884c34e137688bb66c96dfeffbdd5c0bacfd4710d52c6be45d83b4fbe683d66"
+)
+INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256 = (
+    "4b13a9f123ae75ae2b196673d96788360ee5f6bd72ebd0d7cad9865a0feaaf63"
+)
+
+_NATIVE_SOURCE_COLLECTIVE_SCOPES = (
+    "native_source_context_embedding_collective",
+    "native_source_context_attention_collective",
+    "integrated_dense_rms_strategy_nd_collective",
+)
+_NATIVE_SOURCE_INPUT_SCHEMA = (
+    (0, "attended_latent", (("bf16", (64, 512)),)),
+    (1, "token_ids", (("s32", (32,)),)),
+    (2, "post_attention_norm", (("bf16", (6144,)),)),
+    (3, "embedding_shard", (("bf16", (1, 4840, 6144)),)),
+    (4, "kv_b_bits", (("u8", (1, 7168, 512)),)),
+    (5, "kv_b_scale", (("f32", (1, 56, 4)),)),
+    (6, "o_bits_in_out", (("u8", (1, 512, 6144)),)),
+    (7, "o_scale_in_out", (("f32", (1, 4, 48)),)),
+    (8, "merged_bits", (("f8e4m3fn", (1, 1, 6144, 768)),)),
+    (9, "merged_scale", (("f32", (1, 1, 48, 768)),)),
+    (10, "down_bits", (("f8e4m3fn", (1, 1, 384, 6144)),)),
+    (11, "down_scale", (("f32", (1, 1, 3, 6144)),)),
+    (12, "layer1_norm", (("bf16", (6144,)),)),
+)
 
 
 def _validate_preceding_attention_input(
@@ -1229,6 +1254,254 @@ def validate_integrated_dense_rms_stablehlo(
     return result
 
 
+def _validate_native_source_context_hlo(
+    optimized_hlo: str,
+    member_device_ids: Sequence[int],
+) -> Mapping[str, Any]:
+    """Validate the one acquired native-source TPU executable exactly.
+
+    The complete optimized graph is byte-pinned first.  The structural checks
+    below make the accepted executable auditable; the full digest is what makes
+    every source edge, fusion body, physical layout and backend configuration
+    fail closed rather than admitting an unreviewed compiler variant.
+    """
+
+    digest = sha256(optimized_hlo.encode()).hexdigest()
+    if digest != INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256:
+        raise BenchmarkValidationError(
+            "integrated native-source optimized HLO SHA-256 drifted: "
+            f"expected={INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256} "
+            f"found={digest}"
+        )
+    members = tuple(int(value) for value in member_device_ids)
+    report = lint_hlo(
+        parse_hlo_module(optimized_hlo),
+        integrated_dense_rms_hlo_policy(
+            members,
+            native_source_context=True,
+        ),
+    )
+    report.raise_for_violations()
+    module = report.module
+    if module.num_partitions != 32 or len(module.instructions) != 602:
+        raise BenchmarkValidationError(
+            "integrated native-source module geometry drifted"
+        )
+
+    async_collective_opcodes = {
+        f"{opcode}-{suffix}"
+        for opcode in (
+            "all-gather",
+            "all-reduce",
+            "all-to-all",
+            "collective-broadcast",
+            "collective-permute",
+            "reduce-scatter",
+        )
+        for suffix in ("start", "done")
+    }
+    if any(
+        item.raw_opcode in async_collective_opcodes
+        for item in module.instructions
+    ):
+        raise BenchmarkValidationError(
+            "integrated native-source graph contains an async collective"
+        )
+
+    reductions = tuple(
+        item for item in module.collectives if item.raw_opcode == "all-reduce"
+    )
+    reduction_scopes = tuple(
+        next(
+            (
+                scope
+                for scope in _NATIVE_SOURCE_COLLECTIVE_SCOPES
+                if scope in (item.op_name or "").split("/")
+            ),
+            None,
+        )
+        for item in reductions
+    )
+    exact_reduction_shape = (("bf16", (32, 6144)),)
+    if not (
+        len(module.collectives) == 3
+        and len(reductions) == 3
+        and reduction_scopes == _NATIVE_SOURCE_COLLECTIVE_SCOPES
+        and all(
+            _shape_signature(item) == exact_reduction_shape
+            and tuple(
+                (shape.dtype, shape.dimensions)
+                for shape in item.operand_shapes
+            )
+            == exact_reduction_shape
+            and item.replica_groups == (members,)
+            and item.use_global_device_ids is True
+            for item in reductions
+        )
+    ):
+        raise BenchmarkValidationError(
+            "integrated native-source collective scope/value geometry drifted"
+        )
+    algorithms = tuple(
+        dict(validate_strategy_nd_reduction(report, item))
+        for item in reductions
+    )
+
+    entry = tuple(
+        item
+        for item in module.instructions
+        if item.computation.startswith("ENTRY ")
+    )
+    inputs = tuple(
+        item for item in entry if item.raw_opcode == "parameter"
+    )
+    observed_input_schema = tuple(
+        sorted(
+            (
+                int(item.operand_names[0])
+                if len(item.operand_names) == 1
+                and item.operand_names[0].isdigit()
+                else -1,
+                item.op_name,
+                _shape_signature(item),
+            )
+            for item in inputs
+        )
+    )
+    if observed_input_schema != _NATIVE_SOURCE_INPUT_SCHEMA:
+        raise BenchmarkValidationError(
+            "integrated native-source input schema drifted"
+        )
+
+    def scoped(
+        scope: str,
+        opcode: str,
+        shape: tuple[tuple[str, tuple[int, ...]], ...],
+    ) -> tuple[Any, ...]:
+        return tuple(
+            item
+            for item in module.instructions
+            if item.raw_opcode == opcode
+            and scope in (item.op_name or "").split("/")
+            and _shape_signature(item) == shape
+        )
+
+    embedding_gathers = scoped(
+        "native_source_context_embedding_lookup",
+        "gather",
+        (("bf16", (32, 6144)),),
+    )
+    wuv_calls = tuple(
+        item
+        for item in module.instructions
+        if item.raw_opcode == "custom-call"
+        and _shape_signature(item) == (("bf16", (48, 8, 128)),)
+        and item.name
+        == "%greenfield_fp8_structured_kv_b_value_h16_l512_v256.1"
+        and (item.op_name or "").split("/")[-2:] == [
+            "greenfield_fp8_structured_kv_b_value_h16_l512_v256",
+            "pallas_call",
+        ]
+        and 'custom_call_target="tpu_custom_call"' in item.raw_line
+    )
+    attention_convolutions = scoped(
+        "native_source_context_attention_projection",
+        "convolution",
+        (("f32", (32, 6144)),),
+    )
+    dense_convolutions = tuple(
+        item
+        for item in module.instructions
+        if item.raw_opcode == "convolution"
+        and "integrated_dense_rms_contraction"
+        in (item.op_name or "").split("/")
+    )
+    predense_reductions = scoped(
+        "native_source_context_predense_reduction",
+        "reduce",
+        (("f32", (32,)),),
+    )
+    predense_rsqrt = scoped(
+        "native_source_context_predense_reduction",
+        "rsqrt",
+        (("f32", (32,)),),
+    )
+    layer1_reductions = scoped(
+        "native_source_context_layer1_reduction",
+        "reduce",
+        (("f32", (32,)),),
+    )
+    layer1_rsqrt = scoped(
+        "native_source_context_layer1_reduction",
+        "rsqrt",
+        (("f32", (32,)),),
+    )
+    roots = tuple(
+        item
+        for item in entry
+        if item.raw_line.lstrip().startswith("ROOT ")
+    )
+    if not (
+        len(embedding_gathers) == 1
+        and len(wuv_calls) == 1
+        and len(attention_convolutions) == 1
+        and tuple(_shape_signature(item) for item in dense_convolutions)
+        == (
+            (("f32", (32, 768)),),
+            (("f32", (32, 6144)),),
+        )
+        and len(predense_reductions) == 1
+        and len(predense_rsqrt) == 1
+        and len(layer1_reductions) == 1
+        and len(layer1_rsqrt) == 1
+        and len(roots) == 1
+        and roots[0].raw_opcode == "fusion"
+        and _shape_signature(roots[0]) == (("u16", (1, 6144)),)
+        and roots[0].op_name
+        == "jit(integrated)/shard_map/integrated_dense_rms_live_row/bitcast_convert_type"
+    ):
+        raise BenchmarkValidationError(
+            "integrated native-source live graph structure drifted"
+        )
+    if any(
+        marker in optimized_hlo
+        for marker in (
+            "host_callback",
+            "xla_python_cpu_callback",
+            " outfeed(",
+        )
+    ):
+        raise BenchmarkValidationError(
+            "integrated native-source graph contains a host effect"
+        )
+
+    return {
+        "collective_algorithms": list(algorithms),
+        "collective_count": 3,
+        "collective_scopes": list(_NATIVE_SOURCE_COLLECTIVE_SCOPES),
+        "exact_attention_embedding_dependency": True,
+        "exact_direct_layer1_recompute": True,
+        "exact_final_layout_dense": True,
+        "exact_graph_sha256": digest,
+        "exact_input_schema": True,
+        "exact_layer1_rms": True,
+        "exact_live_result": True,
+        "exact_native_attention_projection": True,
+        "exact_native_embedding_lookup": True,
+        "exact_predense_rms": True,
+        "exact_strategy_nd_collectives": True,
+        "exact_wuv_kernel": True,
+        "live_rows": 1,
+        "native_source_context": True,
+        "num_partitions": module.num_partitions,
+        "num_replicas": module.num_replicas,
+        "passed": True,
+        "performance_claim": False,
+        "split_layer1_rms": False,
+        "violations": [],
+    }
+
+
 def validate_integrated_dense_rms_hlo(
     optimized_hlo: str,
     member_device_ids: Sequence[int],
@@ -1283,8 +1556,9 @@ def validate_integrated_dense_rms_hlo(
             "native source context is a distinct integrated discriminator"
         )
     if native_source_context:
-        raise BenchmarkValidationError(
-            "native optimized HLO awaits the exact protected TPU lowering"
+        return _validate_native_source_context_hlo(
+            optimized_hlo,
+            members,
         )
     if preceding_attention_collective and not split_layer1_rms:
         raise BenchmarkValidationError(

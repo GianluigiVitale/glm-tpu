@@ -25,6 +25,8 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
 )
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256,
     INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
@@ -101,6 +103,24 @@ REAL_ACCEPTED_SOURCE_TPU_HLO = Path(
 )
 REAL_ACCEPTED_SOURCE_TPU_HLO_SHA256 = (
     "081d1b1f3609085a2b455357f8f6f9186c7bb3c5c218c1d10c734bea2b0163f8"
+)
+REAL_NATIVE_SOURCE_TPU_RUN = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_INTEGRATED_NATIVE_SOURCE_TPU_RUN",
+        "/home/gianl/glm-run/"
+        "greenfield_strategy_nd_integrated_dense_native_source_context_"
+        "20260814T232117436126702Z",
+    )
+)
+REAL_NATIVE_SOURCE_TPU_HLO = (
+    REAL_NATIVE_SOURCE_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_source_context_"
+    "bfloat16_32x6144.optimized_hlo.txt"
+)
+REAL_NATIVE_SOURCE_TPU_STABLEHLO = (
+    REAL_NATIVE_SOURCE_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_source_context_"
+    "bfloat16_32x6144.stablehlo.mlir"
 )
 REAL_LEGACY_INTEGRATED_RUN = Path(
     "/home/gianl/glm-run/"
@@ -726,9 +746,7 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
             accepted_source_context=True,
             native_source_context=True,
         )
-    with pytest.raises(
-        ValueError, match="native source StableHLO is not pinned"
-    ):
+    with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
         validate_integrated_dense_rms_stablehlo(
             "module awaiting protected lowering",
             native_source_context=True,
@@ -1091,6 +1109,93 @@ def test_real_accepted_source_tpu_hlo_and_mutation_refusals() -> None:
         xla_client._xla.hlo_module_from_text(mutation)
         with pytest.raises(ValueError):
             validate(mutation)
+
+
+@pytest.mark.skipif(
+    not REAL_NATIVE_SOURCE_TPU_HLO.is_file()
+    or not REAL_NATIVE_SOURCE_TPU_STABLEHLO.is_file(),
+    reason="protected native-source integrated TPU HLO absent",
+)
+def test_real_native_source_tpu_hlo_and_mutation_refusals() -> None:
+    from jaxlib import xla_client
+
+    optimized_hlo = REAL_NATIVE_SOURCE_TPU_HLO.read_text()
+    stablehlo = REAL_NATIVE_SOURCE_TPU_STABLEHLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256
+    )
+    assert sha256(stablehlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256
+    )
+    stable_contract = validate_integrated_dense_rms_stablehlo(
+        stablehlo,
+        native_source_context=True,
+    )
+    optimized_contract = validate_integrated_dense_rms_hlo(
+        optimized_hlo,
+        tuple(range(32)),
+        native_source_context=True,
+    )
+    assert stable_contract["passed"] is True
+    assert optimized_contract["passed"] is True
+    assert optimized_contract["native_source_context"] is True
+    assert optimized_contract["exact_graph_sha256"] == (
+        INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256
+    )
+    assert optimized_contract["collective_scopes"] == [
+        "native_source_context_embedding_collective",
+        "native_source_context_attention_collective",
+        "integrated_dense_rms_strategy_nd_collective",
+    ]
+    assert optimized_contract["collective_count"] == 3
+    assert optimized_contract["exact_input_schema"] is True
+    assert optimized_contract["exact_native_embedding_lookup"] is True
+    assert optimized_contract["exact_wuv_kernel"] is True
+    assert optimized_contract["exact_native_attention_projection"] is True
+    assert optimized_contract["exact_attention_embedding_dependency"] is True
+    assert optimized_contract["exact_final_layout_dense"] is True
+    assert optimized_contract["exact_predense_rms"] is True
+    assert optimized_contract["exact_layer1_rms"] is True
+    assert optimized_contract["exact_live_result"] is True
+
+    replacements = (
+        (
+            "all-reduce(%broadcast_select_fusion.1), channel_id=1",
+            "all-reduce(%psum.21), channel_id=1",
+        ),
+        (
+            "all-reduce(%fusion.10), channel_id=1",
+            "all-reduce(%psum.22), channel_id=1",
+        ),
+        (
+            "fusion(%convert_add_fusion, %psum.23, %copy-done.7, %bitcast.89)",
+            "fusion(%convert_add_fusion, %psum.22, %copy-done.7, %bitcast.89)",
+        ),
+        (
+            "ROOT %multiply_bitcast-convert_fusion = "
+            "u16[1,6144]{1,0:T(2,128)(2,1)} fusion(",
+            "ROOT %multiply_bitcast-convert_fusion = "
+            "u16[1,6144]{0,1} fusion(",
+        ),
+    )
+    mutations = tuple(
+        optimized_hlo.replace(old, new, 1) for old, new in replacements
+    )
+    assert all(mutation != optimized_hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
+            validate_integrated_dense_rms_hlo(
+                mutation,
+                tuple(range(32)),
+                native_source_context=True,
+            )
+
+    with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
+        validate_integrated_dense_rms_stablehlo(
+            stablehlo.replace("stablehlo.add", "stablehlo.maximum", 1),
+            native_source_context=True,
+        )
 
 
 def test_checkpoint_success_pin_and_missing_mutated_refusals(
