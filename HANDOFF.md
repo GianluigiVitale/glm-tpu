@@ -19,6 +19,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected one-graph run
+  `greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z` completed at reviewed
+  pin `d7872b582181e8c2518da2d8785b109a733e92b1` in 48 seconds and sealed a complete no-DB archive
+  with 8/8 clean-fleet proof. Keeping pre-dense RMS, all real final-layout contractions, the
+  physical StrategyND psum and layer-1 RMS in one executable still exactly reproduces DB548's
+  control: one mismatch at hidden 2795, expected/observed BF16 bits 48423/48422 and observed SHA
+  `9b52a04e...4005`. Optimized/StableHLO SHAs are `0d875e66...d3f` / `0ae728d6...3b2`;
+  summary/`SUCCESS`/remote-ledger/post-census SHAs are `e54ad3b0...1a5c`, `e7cd3ee2...544d`,
+  `f14e3a17...8be3` and `32c9615d...4061`.
+- Exact HLO comparison now identifies one untested live structural difference. The accepted
+  full-model layer-1 reduction is scalar-only `f32[32]` with output/iteration windows `2x48` /
+  `2x1` and megacore split dimension 0; the integrated control emits a tuple
+  `(f32[32], f32[32,6144])` with `4x24` / `1x2` and split dimension 1. The default-off split
+  challenger preserves the same one-graph contraction and psum but schedules only the scalar RMS
+  reduction and recomputes the live residual sum in the output fusion. Run this sub-minute
+  discriminator once after review. An exact row authorizes one protected 8K; a rejection closes
+  RMS scheduling and moves only to collective-site/ordinal context. Do not reopen weights,
+  contractions, standalone association, direct residual substitution, observers or scalar patches.
 - Protected direct-residual replay `greenfield_strategy_nd_dense_rms_replay_20260814T165204489161611Z`
   completed at pin `ef144e309d79bade8bf26ec93ba1160fa3f4ab31` in 34 seconds and sealed a
   complete no-DB archive with 8/8 clean-fleet proof. Its output is exactly the already rejected

@@ -5,6 +5,26 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 18:00 UTC — one-graph control rejected; scalar RMS schedule isolated
+
+- Protected tag `greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z` ran the
+  complete bounded contraction-to-RMS graph at reviewed/pushed pin
+  `d7872b582181e8c2518da2d8785b109a733e92b1`. Device workflow completed in 48 seconds; exact
+  StableHLO/optimized-HLO, checkpoint/source hashes, deterministic repeated output, complete remote
+  object equality and authenticated 8/8 cleanup all pass. Summary/`SUCCESS`/remote-ledger/
+  post-census SHAs are `e54ad3b0...1a5c`, `e7cd3ee2...544d`, `f14e3a17...8be3` and
+  `32c9615d...4061`. This is no-DB diagnostic evidence, not performance evidence.
+- The one-graph result remains exactly DB548's control: one mismatch at hidden 2795, expected bits
+  48423, observed bits 48422, accepted/observed SHAs `9936ee1e...d3039` /
+  `9b52a04e...4005`. This closes externalization of the real contraction/psum/RMS sequence as the
+  cause by itself.
+- SHA-pinned accepted HLO localizes one remaining scheduled boundary. Its first dense psum feeds a
+  scalar-only `f32[32]` RMS reduction with output windows `2x48`, iteration `2x1` and megacore split
+  dimension 0. The integrated control instead schedules `(f32[32], f32[32,6144])` with `4x24`,
+  `1x2` and split dimension 1. A default-off split challenger now keeps the same graph but restores
+  the accepted scalar reduction/recompute boundary. It is the only authorized next TPU diagnostic;
+  full 8K remains frozen until its complete row is bitwise exact.
+
 ## 2026-08-14 17:05 UTC — direct residual replay rejected; one-graph boundary is the final discriminator
 
 - Reviewed/pushed pin `ef144e309d79bade8bf26ec93ba1160fa3f4ab31` completed protected tag

@@ -56,6 +56,7 @@ readonly CHECKPOINT_REMOTE=$APPROVED_BUCKET/checkpoints/greenfield/glm52/runtime
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 RMS_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY:-0}
 INTEGRATED_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_RMS_REPLAY:-0}
+INTEGRATED_SPLIT_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_SPLIT_RMS_REPLAY:-0}
 [[ $RMS_REPLAY == 0 || $RMS_REPLAY == 1 ]] || {
   echo "GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY must be 0 or 1" >&2
   exit 2
@@ -64,11 +65,21 @@ INTEGRATED_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_RMS_REPLAY:-0}
   echo "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_RMS_REPLAY must be 0 or 1" >&2
   exit 2
 }
+[[ $INTEGRATED_SPLIT_REPLAY == 0 || $INTEGRATED_SPLIT_REPLAY == 1 ]] || {
+  echo "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_SPLIT_RMS_REPLAY must be 0 or 1" >&2
+  exit 2
+}
+if [[ $INTEGRATED_SPLIT_REPLAY == 1 ]]; then
+  INTEGRATED_REPLAY=1
+fi
 [[ $((RMS_REPLAY + INTEGRATED_REPLAY)) -le 1 ]] || {
   echo "dense RMS replay modes are mutually exclusive" >&2
   exit 2
 }
-if [[ $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $INTEGRATED_SPLIT_REPLAY == 1 ]]; then
+  TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_SPLIT_RMS_TAG:-greenfield_strategy_nd_integrated_dense_split_rms_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REPLAY_OUTPUT_DIR=integrated_dense_rms
+elif [[ $INTEGRATED_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_RMS_TAG:-greenfield_strategy_nd_integrated_dense_rms_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REPLAY_OUTPUT_DIR=integrated_dense_rms
 elif [[ $RMS_REPLAY == 1 ]]; then
@@ -316,7 +327,11 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 }
 coordinator="$coordinator:8476"
 if [[ $INTEGRATED_REPLAY == 1 ]]; then
-  say "launching real one-rank contractions, physical StrategyND, and both RMS boundaries in one graph"
+  if [[ $INTEGRATED_SPLIT_REPLAY == 1 ]]; then
+    say "launching one-graph contractions/StrategyND with the accepted scalar-only layer-1 RMS schedule"
+  else
+    say "launching real one-rank contractions, physical StrategyND, and both RMS boundaries in one graph"
+  fi
 elif [[ $RMS_REPLAY == 1 ]]; then
   say "launching one model-free M32 reduction consumed by residual/RMSNorm (plus one deterministic repeat)"
 else
@@ -325,8 +340,12 @@ fi
 started=$(date +%s)
 
 if [[ $INTEGRATED_REPLAY == 1 ]]; then
+  integrated_extra=""
+  if [[ $INTEGRATED_SPLIT_REPLAY == 1 ]]; then
+    integrated_extra="--integrated-split-layer1-rms"
+  fi
   # shellcheck disable=SC2016
-  capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; checkpoint='"$CHECKPOINT_ROOT"'; manifest_sha='"$CHECKPOINT_MANIFEST_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/integrated_dense_rms" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/diagnostic_integrated_dense_rms/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; [[ $(sha256sum "$checkpoint/runtime_manifest.json" | awk '\''{print $1}'\'') == "$manifest_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_integrated_dense_rms --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-rms-input "$run/source_rms/dense_partial_capture.npz" --checkpoint-root "$checkpoint" --checkpoint-manifest-sha256 "$manifest_sha"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/integrated_dense_rms/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
+  capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; checkpoint='"$CHECKPOINT_ROOT"'; manifest_sha='"$CHECKPOINT_MANIFEST_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/integrated_dense_rms" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/diagnostic_integrated_dense_rms/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; [[ $(sha256sum "$checkpoint/runtime_manifest.json" | awk '\''{print $1}'\'') == "$manifest_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_integrated_dense_rms '"$integrated_extra"' --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-rms-input "$run/source_rms/dense_partial_capture.npz" --checkpoint-root "$checkpoint" --checkpoint-manifest-sha256 "$manifest_sha"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/integrated_dense_rms/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
 elif [[ $RMS_REPLAY == 1 ]]; then
   # shellcheck disable=SC2016
   capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; source_remote='"$SOURCE_REMOTE"'; source_sha='"$SOURCE_NPZ_SHA"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/rms_replay" "$run/source" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/rms_replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/rms_replay/* "$remote/diagnostic_rms_replay/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; gcloud storage cp "$source_remote/dense_partials_capture/dense_partials.npz" "$run/source/dense_partials.npz" >/dev/null; [[ $(sha256sum "$run/source/dense_partials.npz" | awk '\''{print $1}'\'') == "$source_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_dense_rms_replay --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-replay-input "$run/source/dense_partials.npz" --association-rms-input "$run/source_rms/dense_partial_capture.npz"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/rms_replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/rms_replay/* "$remote/rms_replay/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
@@ -361,7 +380,7 @@ post_census_done=1
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$TAG" "$elapsed" "$RMS_REPLAY" \
-  "$INTEGRATED_REPLAY" "$CHECKPOINT_ROOT" <<'PY'
+  "$INTEGRATED_REPLAY" "$CHECKPOINT_ROOT" "$INTEGRATED_SPLIT_REPLAY" <<'PY'
 from __future__ import annotations
 
 import json
@@ -374,7 +393,7 @@ from glm_tpu.greenfield.validation import (
     validate_strategy_nd_integrated_dense_rms,
 )
 
-run_dir, pin, run_tag, elapsed, rms_replay, integrated_replay, checkpoint = sys.argv[1:]
+run_dir, pin, run_tag, elapsed, rms_replay, integrated_replay, checkpoint, split = sys.argv[1:]
 run_dir = Path(run_dir)
 if integrated_replay == "1":
     summary = validate_strategy_nd_integrated_dense_rms(
@@ -382,6 +401,7 @@ if integrated_replay == "1":
         checkpoint_root=Path(checkpoint),
         expected_code_hash=pin,
         expected_run_tag=run_tag,
+        expected_split_layer1_rms=split == "1",
     )
 else:
     validator = (
@@ -509,7 +529,7 @@ if observed != expected:
 PY
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \
-  "$RMS_REPLAY" "$INTEGRATED_REPLAY" <<'PY'
+  "$RMS_REPLAY" "$INTEGRATED_REPLAY" "$INTEGRATED_SPLIT_REPLAY" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -519,6 +539,7 @@ root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
 rms_replay = sys.argv[3] == "1"
 integrated_replay = sys.argv[4] == "1"
+integrated_split_replay = sys.argv[5] == "1"
 common = {
     "artifact_kind": summary["artifact_kind"],
     "classification": summary["classification"],
@@ -548,6 +569,7 @@ if rms_replay or integrated_replay:
         "topology_hash": summary["topology_hash"],
     }
     if integrated_replay:
+        values["split_layer1_rms"] = str(integrated_split_replay).lower()
         values["source_checkpoint_manifest_sha256"] = source[
             "checkpoint_manifest_sha256"
         ]

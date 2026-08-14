@@ -571,9 +571,14 @@ def _validate_exact_dense_rms_value_flow(
     root: HloInstruction,
     *,
     integrated_dense: bool = False,
+    require_split_output_fusion: bool = False,
 ) -> Mapping[str, Any]:
     """Bind sealed inputs through the exact live collective/RMS result."""
 
+    if not isinstance(require_split_output_fusion, bool):
+        raise BenchmarkValidationError(
+            "dense RMS split-output ownership flag must be boolean"
+        )
     graph = _ExactDenseRmsGraph(report)
     f32_m32 = (("f32", (32, 6144)),)
     bf16_m32 = (("bf16", (32, 6144)),)
@@ -709,6 +714,11 @@ def _validate_exact_dense_rms_value_flow(
     reduction_value = graph.value(reduction)
     scheduled_signature = _shape_signature(scheduled)
     tuple_sum_consumed = [False]
+    split_output_owners: dict[str, set[str]] = {
+        "normalized": set(),
+        "sum": set(),
+        "weighted": set(),
+    }
 
     def exact_schedule_projection(
         value: _ResolvedHloValue | None, index: int
@@ -744,9 +754,22 @@ def _validate_exact_dense_rms_value_flow(
             and exact_hybrid_carried(graph.operand(value, 0))
         )
 
-    def exact_sum(value: _ResolvedHloValue | None, *, rows: int = 32) -> bool:
+    def exact_sum(
+        value: _ResolvedHloValue | None,
+        *,
+        rows: int = 32,
+        track_split_output: bool = False,
+    ) -> bool:
         if rows == 1:
-            return graph.exact_row0(value, exact_sum, dtype="f32")
+            return graph.exact_row0(
+                value,
+                lambda candidate, *, rows: exact_sum(
+                    candidate,
+                    rows=rows,
+                    track_split_output=track_split_output,
+                ),
+                dtype="f32",
+            )
         from_tuple_schedule = exact_schedule_projection(value, 1)
         value = semantic_opcode(value, "add", f32_m32)
         if value is None or len(value.instruction.operand_names) != 2:
@@ -759,6 +782,8 @@ def _validate_exact_dense_rms_value_flow(
         )
         if exact and from_tuple_schedule:
             tuple_sum_consumed[0] = True
+        if exact and track_split_output:
+            split_output_owners["sum"].add(value.instruction.computation)
         return exact
 
     def exact_partial_input(value: _ResolvedHloValue | None) -> bool:
@@ -949,28 +974,45 @@ def _validate_exact_dense_rms_value_flow(
         )
 
     def exact_normalized_f32(
-        value: _ResolvedHloValue | None, *, rows: int
+        value: _ResolvedHloValue | None,
+        *,
+        rows: int,
+        track_split_output: bool = False,
     ) -> bool:
         shape = (("f32", (rows, 6144)),)
         value = semantic_opcode(value, "multiply", shape)
         if value is None or len(value.instruction.operand_names) != 2:
             return False
         operands = [graph.operand(value, index) for index in range(2)]
-        return any(
-            exact_sum(operands[index], rows=rows)
-            and exact_rsqrt_broadcast(operands[1 - index], rows=rows)
-            for index in range(2)
-        )
+        for index in range(2):
+            if exact_sum(
+                operands[index],
+                rows=rows,
+                track_split_output=track_split_output,
+            ) and exact_rsqrt_broadcast(operands[1 - index], rows=rows):
+                if track_split_output:
+                    split_output_owners["normalized"].add(
+                        value.instruction.computation
+                    )
+                return True
+        return False
 
     def exact_normalized_bf16(
-        value: _ResolvedHloValue | None, *, rows: int
+        value: _ResolvedHloValue | None,
+        *,
+        rows: int,
+        track_split_output: bool = False,
     ) -> bool:
         value = semantic_opcode(
             value, "convert", (("bf16", (rows, 6144)),)
         )
         return bool(
             value is not None
-            and exact_normalized_f32(graph.operand(value, 0), rows=rows)
+            and exact_normalized_f32(
+                graph.operand(value, 0),
+                rows=rows,
+                track_split_output=track_split_output,
+            )
         )
 
     def exact_weight_f32(
@@ -1004,18 +1046,28 @@ def _validate_exact_dense_rms_value_flow(
         )
 
     def exact_normalized_lift(
-        value: _ResolvedHloValue | None, *, rows: int
+        value: _ResolvedHloValue | None,
+        *,
+        rows: int,
+        track_split_output: bool = False,
     ) -> bool:
         value = graph.semantic(value)
         return bool(
             value is not None
             and value.instruction.raw_opcode == "convert"
             and graph.shape(value) == (("f32", (rows, 6144)),)
-            and exact_normalized_bf16(graph.operand(value, 0), rows=rows)
+            and exact_normalized_bf16(
+                graph.operand(value, 0),
+                rows=rows,
+                track_split_output=track_split_output,
+            )
         )
 
     def exact_weighted_bf16(
-        value: _ResolvedHloValue | None, *, rows: int
+        value: _ResolvedHloValue | None,
+        *,
+        rows: int,
+        track_split_output: bool = False,
     ) -> bool:
         value = semantic_opcode(
             value, "convert", (("bf16", (rows, 6144)),)
@@ -1028,14 +1080,25 @@ def _validate_exact_dense_rms_value_flow(
         if multiply is None or len(multiply.instruction.operand_names) != 2:
             return False
         operands = [graph.operand(multiply, index) for index in range(2)]
-        return any(
-            exact_normalized_lift(operands[index], rows=rows)
-            and exact_weight_f32(operands[1 - index], rows=rows)
-            for index in range(2)
-        )
+        for index in range(2):
+            if exact_normalized_lift(
+                operands[index],
+                rows=rows,
+                track_split_output=track_split_output,
+            ) and exact_weight_f32(operands[1 - index], rows=rows):
+                if track_split_output:
+                    split_output_owners["weighted"].add(
+                        multiply.instruction.computation
+                    )
+                return True
+        return False
 
     def exact_final_bf16_row(value: _ResolvedHloValue | None) -> bool:
-        if exact_weighted_bf16(value, rows=1):
+        if exact_weighted_bf16(
+            value,
+            rows=1,
+            track_split_output=require_split_output_fusion,
+        ):
             return True
         value = graph.semantic(value)
         if (
@@ -1047,7 +1110,11 @@ def _validate_exact_dense_rms_value_flow(
                 re.sub(r"\s+", "", graph.clean(value.instruction)),
             )
             == ["{[0:1],[0:6144]}"]
-            and exact_weighted_bf16(graph.operand(value, 0), rows=32)
+            and exact_weighted_bf16(
+                graph.operand(value, 0),
+                rows=32,
+                track_split_output=require_split_output_fusion,
+            )
         ):
             return True
         # TPU/CPU may lift the already rounded M32 BF16 result, take row zero,
@@ -1068,7 +1135,11 @@ def _validate_exact_dense_rms_value_flow(
         lift = semantic_opcode(graph.operand(row, 0), "convert", f32_m32)
         return bool(
             lift is not None
-            and exact_weighted_bf16(graph.operand(lift, 0), rows=32)
+            and exact_weighted_bf16(
+                graph.operand(lift, 0),
+                rows=32,
+                track_split_output=require_split_output_fusion,
+            )
         )
 
     output = semantic_opcode(graph.value(root), "bitcast-convert", (("u16", (1, 6144)),))
@@ -1131,7 +1202,7 @@ def _validate_exact_dense_rms_value_flow(
         raise BenchmarkValidationError(
             "dense RMS tuple schedule does not feed the live normalized result"
         )
-    return {
+    result = {
         "exact_collective_input": True,
         "exact_direct_residual": direct_residual,
         "exact_residual_round": hybrid_control or integrated_control,
@@ -1147,6 +1218,36 @@ def _validate_exact_dense_rms_value_flow(
             else "hybrid_attention_plus_combined_control"
         ),
     }
+    if require_split_output_fusion:
+        exact_schedule = bool(
+            scheduled_signature == (("f32", (32,)),)
+            and _exact_accepted_rms_schedule(scheduled)
+        )
+        owner_sets = tuple(split_output_owners.values())
+        exact_output_fusion = bool(
+            all(len(values) == 1 for values in owner_sets)
+            and len(set().union(*owner_sets)) == 1
+            and not next(iter(split_output_owners["weighted"])).startswith(
+                "ENTRY "
+            )
+        )
+        if not (
+            exact_schedule
+            and len(split_output_owners["sum"]) == 1
+            and exact_output_fusion
+        ):
+            raise BenchmarkValidationError(
+                "dense RMS accepted split output-fusion ownership drifted: "
+                f"schedule={exact_schedule} owners={split_output_owners}"
+            )
+        result.update(
+            {
+                "exact_accepted_scheduled_reduction": True,
+                "split_output_fusion_exact": True,
+                "split_recompute_exact": True,
+            }
+        )
+    return result
 
 
 def validate_strategy_nd_dense_rms_hlo(

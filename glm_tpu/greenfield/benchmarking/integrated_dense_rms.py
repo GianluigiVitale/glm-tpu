@@ -68,6 +68,7 @@ class CompiledIntegratedDenseRms:
     optimized_hlo: str
     stablehlo_contract: Mapping[str, Any]
     optimized_hlo_contract: Mapping[str, Any]
+    split_layer1_rms: bool
 
 
 def _validate_inputs(inputs: IntegratedDenseRmsInputs) -> None:
@@ -204,7 +205,7 @@ def model_axis_weights_to_physical(
     return np.ascontiguousarray(physical)
 
 
-def _integrated_function() -> Any:
+def _integrated_function(*, split_layer1_rms: bool = False) -> Any:
     import jax
     from jax import lax
     import jax.numpy as jnp
@@ -254,12 +255,40 @@ def _integrated_function() -> Any:
         with jax.named_scope("integrated_dense_rms_strategy_nd_collective"):
             dense_m32 = lax.psum(local_partial, "member")
         with jax.named_scope("integrated_dense_rms_layer1_norm"):
-            layer1, _ = fused_add_rms_norm(
-                dense_m32,
-                carried,
-                layer1_norm,
-                epsilon=1e-5,
-            )
+            if split_layer1_rms:
+                # The accepted full-model M32 HLO schedules only the scalar
+                # reduction here, then recomputes the residual sum in the
+                # live weighted-output fusion.  Keep that exact boundary in
+                # the same graph as the real contraction and physical psum.
+                with jax.named_scope("accepted_split_reduction"):
+                    reduction_dense = lax.optimization_barrier(dense_m32)
+                    reduction_residual = lax.optimization_barrier(carried)
+                    reduction_sum = (
+                        reduction_dense.astype(jnp.float32)
+                        + reduction_residual.astype(jnp.float32)
+                    )
+                    inverse = lax.rsqrt(
+                        jnp.mean(
+                            lax.square(reduction_sum), axis=-1, keepdims=True
+                        )
+                        + jnp.float32(1e-5)
+                    )
+                with jax.named_scope("accepted_split_recompute"):
+                    output_sum = (
+                        dense_m32.astype(jnp.float32)
+                        + carried.astype(jnp.float32)
+                    )
+                    layer1 = (
+                        (output_sum * inverse).astype(layer1_norm.dtype)
+                        * layer1_norm
+                    ).astype(dense_m32.dtype)
+            else:
+                layer1, _ = fused_add_rms_norm(
+                    dense_m32,
+                    carried,
+                    layer1_norm,
+                    epsilon=1e-5,
+                )
         with jax.named_scope("integrated_dense_rms_live_row"):
             return lax.bitcast_convert_type(layer1[:1, :], jnp.uint16)
 
@@ -271,6 +300,7 @@ def build_integrated_dense_rms(
     *,
     devices: Sequence[Any] | None = None,
     validate_hlo: bool = True,
+    split_layer1_rms: bool = False,
 ) -> CompiledIntegratedDenseRms:
     """Compile the exact one-rank-per-chip diagnostic on 32 devices."""
 
@@ -291,8 +321,12 @@ def build_integrated_dense_rms(
     )
     member = NamedSharding(mesh, P("member", None, None, None))
     replicated = NamedSharding(mesh, P())
+    if not isinstance(split_layer1_rms, bool):
+        raise BenchmarkValidationError(
+            "integrated dense RMS split flag must be boolean"
+        )
     mapped = jax.shard_map(
-        _integrated_function(),
+        _integrated_function(split_layer1_rms=split_layer1_rms),
         mesh=mesh,
         in_specs=(
             P(),
@@ -327,9 +361,13 @@ def build_integrated_dense_rms(
             validate_integrated_dense_rms_stablehlo,
         )
 
-        stablehlo_contract = validate_integrated_dense_rms_stablehlo(stablehlo)
+        stablehlo_contract = validate_integrated_dense_rms_stablehlo(
+            stablehlo, split_layer1_rms=split_layer1_rms
+        )
         optimized_hlo_contract = validate_integrated_dense_rms_hlo(
-            optimized_hlo, members
+            optimized_hlo,
+            members,
+            split_layer1_rms=split_layer1_rms,
         )
     else:
         stablehlo_contract = {
@@ -349,6 +387,7 @@ def build_integrated_dense_rms(
         optimized_hlo=optimized_hlo,
         stablehlo_contract=stablehlo_contract,
         optimized_hlo_contract=optimized_hlo_contract,
+        split_layer1_rms=split_layer1_rms,
     )
 
 

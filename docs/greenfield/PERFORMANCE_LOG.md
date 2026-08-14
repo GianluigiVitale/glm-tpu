@@ -1349,3 +1349,11 @@ The subsequent StableHLO verifier correction is also not performance evidence. I
 execution and changes no arithmetic; it makes the protected compiler gate prove the ordered K512
 slices and exact DB533 reduction tree before timing is allowed. DB484 remains the only accepted
 decoder measurement until the complete protected 8K run passes.
+
+## Integrated layer-0 dense/RMS diagnostics — no performance result
+
+The protected one-graph run at `d7872b5` completed its diagnostic workflow in 48 seconds and
+reproduced DB548's single layer-1 mismatch. It has no decoder loop, warmed token distribution,
+XPlane, HBM peak or profiler-free serving wall, and writes no performance DB row. Its elapsed time
+is orchestration/diagnostic time, not token latency. DB484 remains the only accepted PP8 decoder
+measurement at `244.091151 ms/token` / `4.096830 tok/s`; Gates D and E remain open.

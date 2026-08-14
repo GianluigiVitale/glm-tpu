@@ -11,7 +11,9 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.dense_rms_replay import (
     DENSE_RMS_SOURCE_NPZ_SHA256,
+    _validate_exact_dense_rms_value_flow,
     load_dense_rms_inputs,
+    strategy_nd_dense_rms_hlo_policy,
     validate_strategy_nd_dense_rms_hlo,
 )
 from glm_tpu.greenfield.benchmarking.association_fingerprint import (
@@ -216,6 +218,92 @@ def _synthetic_exact_direct_dense_rms_hlo() -> str:
 }}
 '''
     return text[:entry_start] + entry
+
+
+def _synthetic_externalized_split_output_hlo() -> str:
+    """Move the exact output recompute behind a separate fusion boundary."""
+
+    text = _synthetic_exact_dense_rms_hlo()
+    layout = ACCEPTED_DECODE_RESULT_LAYOUT
+    recompute = f'''%recompute_body (dense: bf16[32,6144], attention: bf16[1,6144], residual: bf16[1,6144]) -> f32[32,6144] {{
+  %dense = bf16[32,6144]{layout} parameter(0)
+  %attention = bf16[1,6144]{{1,0}} parameter(1)
+  %residual = bf16[1,6144]{{1,0}} parameter(2)
+  %zero_bf16 = bf16[] constant(0)
+  %attention_pad = bf16[32,6144]{{1,0}} pad(%attention, %zero_bf16), padding=0_31x0_0
+  %residual_pad = bf16[32,6144]{{1,0}} pad(%residual, %zero_bf16), padding=0_31x0_0
+  %attention_f32 = f32[32,6144]{{1,0}} convert(%attention_pad)
+  %residual_f32 = f32[32,6144]{{1,0}} convert(%residual_pad)
+  %residual_add = f32[32,6144]{{1,0}} add(%attention_f32, %residual_f32)
+  %carried = bf16[32,6144]{{1,0}} convert(%residual_add)
+  %carried_f32 = f32[32,6144]{{1,0}} convert(%carried)
+  %dense_f32 = f32[32,6144]{{1,0}} convert(%dense)
+  ROOT %summed = f32[32,6144]{{1,0}} add(%dense_f32, %carried_f32)
+}}
+
+'''
+    output_start = text.index("%output_body ")
+    output_end = text.index("\nENTRY %main", output_start)
+    output = '''%output_body (summed: f32[32,6144], inverse: f32[32], weight: bf16[6144]) -> u16[1,6144] {
+  %summed = f32[32,6144]{1,0} parameter(0)
+  %inverse = f32[32]{0} parameter(1)
+  %weight = bf16[6144]{0} parameter(2)
+  %inverse_wide = f32[32,6144]{1,0} broadcast(%inverse), dimensions={0}
+  %normalized = f32[32,6144]{1,0} multiply(%summed, %inverse_wide)
+  %normalized_bf16 = bf16[32,6144]{1,0} convert(%normalized)
+  %normalized_f32 = f32[32,6144]{1,0} convert(%normalized_bf16)
+  %weight_wide = bf16[32,6144]{1,0} broadcast(%weight), dimensions={1}
+  %weight_f32 = f32[32,6144]{1,0} convert(%weight_wide)
+  %weighted = f32[32,6144]{1,0} multiply(%normalized_f32, %weight_f32)
+  %weighted_bf16 = bf16[32,6144]{1,0} convert(%weighted)
+  %row = bf16[1,6144]{1,0} slice(%weighted_bf16), slice={[0:1], [0:6144]}
+  ROOT %bits = u16[1,6144]{1,0} bitcast-convert(%row)
+}
+'''
+    text = text[:output_start] + recompute + output + text[output_end:]
+    return text.replace(
+        "  %inverse = f32[32]{0} fusion(%scheduled), kind=kLoop, calls=%rsqrt_body\n"
+        "  ROOT %output = u16[1,6144]{1,0} fusion(%collective, %p1, %p2, %inverse, %p3), kind=kLoop, calls=%output_body",
+        "  %inverse = f32[32]{0} fusion(%scheduled), kind=kLoop, calls=%rsqrt_body\n"
+        "  %recomputed = f32[32,6144]{1,0} fusion(%collective, %p1, %p2), "
+        "kind=kLoop, calls=%recompute_body\n"
+        "  ROOT %output = u16[1,6144]{1,0} fusion(%recomputed, %inverse, %p3), "
+        "kind=kLoop, calls=%output_body",
+        1,
+    )
+
+
+def _validate_split_output_ownership(
+    hlo: str, *, require: bool = True
+) -> dict[str, object]:
+    from glm_tpu.greenfield.sharding.hlo_contract import lint_hlo, parse_hlo_module
+
+    report = lint_hlo(
+        parse_hlo_module(hlo),
+        strategy_nd_dense_rms_hlo_policy(tuple(range(32))),
+    )
+    report.raise_for_violations()
+    reduction = next(
+        item for item in report.module.collectives if item.opcode == "all-reduce"
+    )
+    entry = [
+        item
+        for item in report.module.instructions
+        if item.computation.startswith("ENTRY ")
+    ]
+    scheduled = next(item for item in entry if item.name == "%scheduled")
+    root = next(
+        item for item in entry if item.raw_line.lstrip().startswith("ROOT ")
+    )
+    return dict(
+        _validate_exact_dense_rms_value_flow(
+            report,
+            reduction,
+            scheduled,
+            root,
+            require_split_output_fusion=require,
+        )
+    )
 
 
 def _synthetic_exact_dense_rms_tuple_hlo() -> str:
@@ -483,6 +571,26 @@ def test_dense_rms_optimized_hlo_binds_exact_live_arithmetic() -> None:
             validate_strategy_nd_dense_rms_hlo(mutation, tuple(range(32)))
 
 
+def test_split_rms_requires_recompute_inside_live_output_fusion() -> None:
+    from jaxlib import xla_client
+
+    accepted = _synthetic_exact_dense_rms_hlo()
+    xla_client._xla.hlo_module_from_text(accepted)
+    contract = _validate_split_output_ownership(accepted)
+    assert contract["exact_accepted_scheduled_reduction"] is True
+    assert contract["split_recompute_exact"] is True
+    assert contract["split_output_fusion_exact"] is True
+
+    externalized = _synthetic_externalized_split_output_hlo()
+    assert externalized != accepted
+    xla_client._xla.hlo_module_from_text(externalized)
+    assert _validate_split_output_ownership(externalized, require=False)[
+        "exact_result_binding"
+    ] is True
+    with pytest.raises(Exception, match="split output-fusion ownership"):
+        _validate_split_output_ownership(externalized)
+
+
 def test_dense_rms_stablehlo_binds_collective_residual_norm_and_result() -> None:
     code = f"""
 import sys
@@ -590,7 +698,7 @@ def test_protected_wrapper_keeps_rms_replay_default_off_and_success_last() -> No
     )
 
 
-def test_protected_wrapper_success_heredoc_executes_both_modes(
+def test_protected_wrapper_success_heredoc_executes_all_modes(
     tmp_path: Path,
 ) -> None:
     wrapper = (
@@ -598,7 +706,8 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
     ).read_text()
     marker = (
         '/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \\\n'
-        '  "$RMS_REPLAY" "$INTEGRATED_REPLAY" <<\'PY\'\n'
+        '  "$RMS_REPLAY" "$INTEGRATED_REPLAY" '
+        '"$INTEGRATED_SPLIT_REPLAY" <<\'PY\'\n'
         'from hashlib import sha256'
     )
     start = wrapper.index(marker) + marker.index("from hashlib")
@@ -611,6 +720,7 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
     summaries = (
         (
             "1",
+            "0",
             "0",
             {
                 **common,
@@ -627,6 +737,7 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
             },
         ),
         (
+            "0",
             "0",
             "0",
             {
@@ -646,6 +757,30 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
         ),
         (
             "0",
+            "1",
+            "0",
+            {
+                **common,
+                "elementwise_exact": True,
+                "expected_hidden_2795_bfloat16_bits": 48423,
+                "expected_raw_sha256": "a" * 64,
+                "mismatch_count": 0,
+                "observed_hidden_2795_bfloat16_bits": 48423,
+                "observed_raw_sha256": "a" * 64,
+                "optimized_hlo_sha256": "b" * 64,
+                "source": {
+                    "checkpoint_manifest_sha256": "e" * 64,
+                    "checkpoint_success_sha256": "9" * 64,
+                    "rms_npz_sha256": "f" * 64,
+                    "rms_tag": "unit-rms",
+                },
+                "stablehlo_sha256": "c" * 64,
+                "topology_hash": "d" * 64,
+            },
+        ),
+        (
+            "0",
+            "1",
             "1",
             {
                 **common,
@@ -667,8 +802,8 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
             },
         ),
     )
-    for rms_mode, integrated_mode, summary in summaries:
-        run_dir = tmp_path / f"{rms_mode}-{integrated_mode}"
+    for rms_mode, integrated_mode, split_mode, summary in summaries:
+        run_dir = tmp_path / f"{rms_mode}-{integrated_mode}-{split_mode}"
         run_dir.mkdir()
         (run_dir / "summary.json").write_text(json.dumps(summary))
         for name in ("evidence.sha256", "census_post.txt", "remote_objects.json"):
@@ -681,6 +816,7 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
                 "gs://unit/result",
                 rms_mode,
                 integrated_mode,
+                split_mode,
             ],
             input=body,
             text=True,
@@ -690,3 +826,5 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
         assert completed.returncode == 0, completed.stdout + completed.stderr
         success = (run_dir / "SUCCESS").read_text()
         assert "classification=unit\n" in success
+        if integrated_mode == "1":
+            assert f"split_layer1_rms={split_mode == '1'}".lower() in success

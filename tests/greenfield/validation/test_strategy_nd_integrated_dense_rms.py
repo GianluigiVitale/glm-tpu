@@ -18,6 +18,7 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
 )
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256,
     integrated_dense_rms_hlo_policy,
     validate_integrated_dense_rms_stablehlo,
 )
@@ -91,6 +92,21 @@ except ValueError:
 else:
     raise AssertionError("StableHLO mutation was accepted")
 print(contract["exact_graph_sha256"])
+split = build_integrated_dense_rms(
+    tuple(range(32)), validate_hlo=False, split_layer1_rms=True
+)
+split_contract = validate_integrated_dense_rms_stablehlo(
+    split.stablehlo, split_layer1_rms=True
+)
+assert split_contract["passed"] and split_contract["split_layer1_rms"] is True
+assert split.split_layer1_rms is True
+try:
+    validate_integrated_dense_rms_stablehlo(split.stablehlo)
+except ValueError:
+    pass
+else:
+    raise AssertionError("split StableHLO passed the tuple-schedule contract")
+print(split_contract["exact_graph_sha256"])
 '''
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -108,6 +124,7 @@ print(contract["exact_graph_sha256"])
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert INTEGRATED_DENSE_RMS_STABLEHLO_SHA256 in completed.stdout
+    assert INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256 in completed.stdout
 
 
 def test_integrated_policy_requires_the_exact_scope() -> None:
@@ -146,6 +163,12 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     exact = _recompute_comparison(expected.copy(), expected)
     assert exact["classification"] == "integrated_dense_rms_exact_accepted"
     assert exact["mismatch_count"] == 0
+    split_exact = _recompute_comparison(
+        expected.copy(), expected, split_layer1_rms=True
+    )
+    assert split_exact["classification"] == (
+        "integrated_dense_split_rms_exact_accepted"
+    )
     digest = array_sha256(expected)
     capture = {
         "invocation_count": 2,
@@ -165,6 +188,11 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         REPO / "scripts/greenfield/run_strategy_nd_dense_replay.sh"
     ).read_text()
     assert "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_RMS_REPLAY:-0" in wrapper
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_SPLIT_RMS_REPLAY:-0"
+        in wrapper
+    )
+    assert "--integrated-split-layer1-rms" in wrapper
     assert "--mode strategy_nd_integrated_dense_rms" in wrapper
     assert "validate_strategy_nd_integrated_dense_rms" in wrapper
     assert '"$RMS_REPLAY" "$INTEGRATED_REPLAY"' in wrapper

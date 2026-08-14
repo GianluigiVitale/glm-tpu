@@ -91,6 +91,7 @@ EXPECTED_REPLAY_FIELDS = {
     "source",
     "stablehlo_contract",
     "stablehlo_sha256",
+    "split_layer1_rms",
 }
 EXPECTED_CAPTURE_FIELDS = {
     "invocation_count",
@@ -104,6 +105,8 @@ EXPECTED_CAPTURE_FIELDS = {
 def _recompute_comparison(
     observed: np.ndarray,
     expected: np.ndarray,
+    *,
+    split_layer1_rms: bool = False,
 ) -> dict[str, Any]:
     mismatch_indices = np.flatnonzero(observed != expected)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -115,17 +118,22 @@ def _recompute_comparison(
     ).view(np.float32)
     error = np.abs(observed_values - expected_values)
     observed_sha = _raw_sha256(observed)
+    prefix = (
+        "integrated_dense_split_rms"
+        if split_layer1_rms
+        else "integrated_dense_rms"
+    )
     return {
         "classification": (
-            "integrated_dense_rms_exact_accepted"
+            f"{prefix}_exact_accepted"
             if first is None
-            else "integrated_dense_rms_matches_db548_control"
+            else f"{prefix}_matches_db548_control"
             if observed_sha
             == "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005"
-            else "integrated_dense_rms_matches_rejected_db549"
+            else f"{prefix}_matches_rejected_db549"
             if observed_sha
             == "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
-            else "integrated_dense_rms_nonexact_new_result"
+            else f"{prefix}_nonexact_new_result"
         ),
         "elementwise_exact": first is None,
         "expected_hidden_2795_bfloat16_bits": int(expected[2795]),
@@ -166,6 +174,7 @@ def validate_strategy_nd_integrated_dense_rms(
     checkpoint_root: Path,
     expected_code_hash: str,
     expected_run_tag: str,
+    expected_split_layer1_rms: bool = False,
 ) -> dict[str, Any]:
     """Reload every source/fleet/artifact byte and recompute the verdict."""
 
@@ -177,6 +186,8 @@ def validate_strategy_nd_integrated_dense_rms(
         _load_weights,
     )
 
+    if not isinstance(expected_split_layer1_rms, bool):
+        raise ValueError("integrated dense RMS split expectation must be boolean")
     host_paths = sorted((run_dir / "host_records").glob("collective.rank*.json"))
     records = [json.loads(path.read_text()) for path in host_paths]
     if len(records) != 8:
@@ -269,6 +280,7 @@ def validate_strategy_nd_integrated_dense_rms(
         and reference["collective_groups"] == [list(range(32))]
         and reference["diagnostic_only"] is True
         and reference["performance_claim"] is False
+        and reference["split_layer1_rms"] is expected_split_layer1_rms
         and _is_sha256(reference["optimized_hlo_sha256"])
         and _is_sha256(reference["stablehlo_sha256"])
     ):
@@ -358,7 +370,9 @@ def validate_strategy_nd_integrated_dense_rms(
     if not np.array_equal(arrays["accepted_layer1_bits"], inputs.accepted_layer1_bits):
         raise ValueError("integrated dense target differs from sealed source")
     comparison = _recompute_comparison(
-        arrays["hardware_layer1_bits"], arrays["accepted_layer1_bits"]
+        arrays["hardware_layer1_bits"],
+        arrays["accepted_layer1_bits"],
+        split_layer1_rms=expected_split_layer1_rms,
     )
     recorded = reference["comparison"]
     if not (
@@ -409,7 +423,11 @@ def validate_strategy_nd_integrated_dense_rms(
     ):
         raise ValueError("integrated dense fleet hashes drifted")
 
-    label = "strategy_nd_integrated_dense_rms_bfloat16_32x6144"
+    label = (
+        "strategy_nd_integrated_dense_split_rms_bfloat16_32x6144"
+        if expected_split_layer1_rms
+        else "strategy_nd_integrated_dense_rms_bfloat16_32x6144"
+    )
     hlo_dir = run_dir / "hlo"
     stable_path = hlo_dir / f"{label}.stablehlo.mlir"
     optimized_path = hlo_dir / f"{label}.optimized_hlo.txt"
@@ -428,9 +446,14 @@ def validate_strategy_nd_integrated_dense_rms(
         == reference["optimized_hlo_sha256"]
     ):
         raise ValueError("integrated dense HLO SHA-256 drifted")
-    stable_contract = validate_integrated_dense_rms_stablehlo(stablehlo)
+    stable_contract = validate_integrated_dense_rms_stablehlo(
+        stablehlo,
+        split_layer1_rms=expected_split_layer1_rms,
+    )
     optimized_contract = validate_integrated_dense_rms_hlo(
-        optimized_hlo, tuple(range(32))
+        optimized_hlo,
+        tuple(range(32)),
+        split_layer1_rms=expected_split_layer1_rms,
     )
     if not (
         stable_contract == reference["stablehlo_contract"]
@@ -445,7 +468,11 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense HLO terminal replay drifted")
 
     return {
-        "artifact_kind": "glm52_strategy_nd_integrated_dense_rms",
+        "artifact_kind": (
+            "glm52_strategy_nd_integrated_dense_split_rms"
+            if expected_split_layer1_rms
+            else "glm52_strategy_nd_integrated_dense_rms"
+        ),
         "classification": comparison["classification"],
         "code_hash": expected_code_hash,
         "diagnostic_only": True,
@@ -463,6 +490,7 @@ def validate_strategy_nd_integrated_dense_rms(
         "performance_claim": False,
         "run_tag": expected_run_tag,
         "source": dict(EXPECTED_SOURCE),
+        "split_layer1_rms": expected_split_layer1_rms,
         "stablehlo_sha256": reference["stablehlo_sha256"],
         "status": "SUCCESS",
         "topology_hash": EXPECTED_TOPOLOGY_HASH,

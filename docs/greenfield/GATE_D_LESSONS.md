@@ -26,10 +26,14 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   mismatches and SHA `229dc8ac...812f`. Equal external BF16 bytes do not preserve the compiler
   context of a fused producer/consumer boundary. Direct residual substitution and every standalone
   StrategyND/RMS variant are now closed.
-- The final bounded discriminator keeps pre-dense RMS, real final-layout contraction, the physical
-  32-chip psum and layer-1 RMS in one compiled graph. It loads layer 0 only. Only an exact full
-  6,144-value row may authorize the matching production boundary and one complete protected 8K;
-  Gate D remains open until that 8K passes DSA, trace, wall, memory and integrity gates.
+- The first one-graph discriminator kept pre-dense RMS, real final-layout contraction, the physical
+  32-chip psum and layer-1 RMS together, yet exactly reproduced DB548's sole hidden-2795 mismatch.
+  That closes graph externalization alone. Its preserved HLO then exposed a concrete untested
+  boundary: accepted schedules only the scalar RMS reduction, while the control schedules a tuple
+  containing the full residual sum. The final bounded challenger restores only that schedule and
+  recomputation boundary. Only an exact full 6,144-value row may authorize the matching production
+  change and one complete protected 8K; Gate D remains open until that 8K passes DSA, trace, wall,
+  memory and integrity gates.
 
 ## Evidence ladder
 
@@ -41,7 +45,9 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 When a replay with byte-identical external tensors changes the result, the externalization boundary
 itself is the experiment. Move the minimum producer and consumer into one graph; do not recapture
-the same bytes or invent another scalar/association theory.
+the same bytes or invent another scalar/association theory. If the integrated result still differs,
+compare its exact scheduled HLO against the accepted HLO and test one observed structural delta at
+a time; never infer a new arithmetic theory from source code alone.
 
 A full checkpoint/8K run is forbidden while a smaller capture or replay can decide the same
 hypothesis. Compile once and replay sealed values. Keep negative results: they permanently remove
@@ -116,8 +122,10 @@ branches from the search tree.
 - The global StrategyND/RMS program is mechanically valid and completes in tens of seconds. Both
   hybrid and direct-residual forms are nonexact; the direct form exactly reproduces DB549 and is
   permanently rejected.
-- The only remaining local test is the one-graph contraction→StrategyND→RMS boundary. It reuses the
-  packed checkpoint and sealed inputs and must remain no-DB/default-off until bitwise exact.
+- The one-graph contraction→StrategyND→RMS control reproduces DB548 and is closed. The remaining
+  local test is its accepted scalar-only RMS schedule/recompute form, selected directly from the
+  accepted-vs-control HLO differential. It reuses the packed checkpoint and sealed inputs and must
+  remain no-DB/default-off until bitwise exact.
 - Integrate only a structural boundary that makes the entire 6,144-value accepted row exact. Never
   patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
 

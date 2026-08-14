@@ -188,6 +188,11 @@ def parse_args() -> argparse.Namespace:
         help="exact runtime manifest hash for integrated dense RMS",
     )
     parser.add_argument(
+        "--integrated-split-layer1-rms",
+        action="store_true",
+        help="use the accepted scalar-only layer-1 RMS schedule",
+    )
+    parser.add_argument(
         "--allow-unprotected-test-config",
         action="store_true",
         help="permit fewer than the protected 75/200/1000 contract",
@@ -649,12 +654,18 @@ def _run_strategy_nd_integrated_dense_rms(
             )
         }
     )
-    label = "strategy_nd_integrated_dense_rms_bfloat16_32x6144"
+    split_layer1_rms = bool(args.integrated_split_layer1_rms)
+    label = (
+        "strategy_nd_integrated_dense_split_rms_bfloat16_32x6144"
+        if split_layer1_rms
+        else "strategy_nd_integrated_dense_rms_bfloat16_32x6144"
+    )
     multihost_utils.sync_global_devices(f"greenfield-integrated-start-{label}")
     compiled = build_integrated_dense_rms(
         physical_ids,
         devices=jax.devices(),
         validate_hlo=True,
+        split_layer1_rms=split_layer1_rms,
     )
     stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
     optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
@@ -693,14 +704,19 @@ def _run_strategy_nd_integrated_dense_rms(
     db549_rejected_sha = (
         "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
     )
+    classification_prefix = (
+        "integrated_dense_split_rms"
+        if split_layer1_rms
+        else "integrated_dense_rms"
+    )
     classification = (
-        "integrated_dense_rms_exact_accepted"
+        f"{classification_prefix}_exact_accepted"
         if first is None
-        else "integrated_dense_rms_matches_db548_control"
+        else f"{classification_prefix}_matches_db548_control"
         if output_raw_sha == db548_control_sha
-        else "integrated_dense_rms_matches_rejected_db549"
+        else f"{classification_prefix}_matches_rejected_db549"
         if output_raw_sha == db549_rejected_sha
-        else "integrated_dense_rms_nonexact_new_result"
+        else f"{classification_prefix}_nonexact_new_result"
     )
     comparison = {
         "classification": classification,
@@ -810,6 +826,7 @@ def _run_strategy_nd_integrated_dense_rms(
         },
         "stablehlo_contract": dict(compiled.stablehlo_contract),
         "stablehlo_sha256": stablehlo_sha,
+        "split_layer1_rms": split_layer1_rms,
     }
 
 
@@ -1072,6 +1089,12 @@ def main() -> int:
             raise ValueError("integrated dense RMS requires exact checkpoint inputs")
     elif args.checkpoint_root or args.checkpoint_manifest_sha256:
         raise ValueError("checkpoint inputs are valid only for integrated dense RMS")
+    if args.integrated_split_layer1_rms and args.mode != (
+        "strategy_nd_integrated_dense_rms"
+    ):
+        raise ValueError(
+            "integrated split RMS is valid only for integrated dense RMS"
+        )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(

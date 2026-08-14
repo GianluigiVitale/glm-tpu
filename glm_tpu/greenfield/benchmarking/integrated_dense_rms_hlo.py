@@ -23,6 +23,9 @@ from .dense_rms_replay import (
 INTEGRATED_DENSE_RMS_STABLEHLO_SHA256 = (
     "0ae728d6d6ddedbc7d2818975f07b03bc518f26950091bdb592c6574c07853b2"
 )
+INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256 = (
+    "7086b1d0209ce509c7b513f7e4f8ce5c9a232ca658f784617f23ef710fc67568"
+)
 
 
 def integrated_dense_rms_hlo_policy(
@@ -52,14 +55,25 @@ def integrated_dense_rms_hlo_policy(
 
 def validate_integrated_dense_rms_stablehlo(
     stablehlo: str,
+    *,
+    split_layer1_rms: bool = False,
 ) -> Mapping[str, Any]:
     """Pin the complete exact eight-input StableHLO graph byte-for-byte."""
 
+    if not isinstance(split_layer1_rms, bool):
+        raise BenchmarkValidationError(
+            "integrated dense RMS split flag must be boolean"
+        )
+    expected = (
+        INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256
+        if split_layer1_rms
+        else INTEGRATED_DENSE_RMS_STABLEHLO_SHA256
+    )
     digest = sha256(stablehlo.encode()).hexdigest()
-    if digest != INTEGRATED_DENSE_RMS_STABLEHLO_SHA256:
+    if digest != expected:
         raise BenchmarkValidationError(
             "integrated dense RMS StableHLO SHA-256 drifted: "
-            f"expected={INTEGRATED_DENSE_RMS_STABLEHLO_SHA256} found={digest}"
+            f"expected={expected} found={digest}"
         )
     return {
         "exact_graph_sha256": digest,
@@ -69,6 +83,7 @@ def validate_integrated_dense_rms_stablehlo(
         "exact_strategy_nd_collective": True,
         "exact_layer1_rms": True,
         "exact_live_result": True,
+        "split_layer1_rms": split_layer1_rms,
         "passed": True,
         "performance_claim": False,
         "violations": [],
@@ -78,6 +93,8 @@ def validate_integrated_dense_rms_stablehlo(
 def validate_integrated_dense_rms_hlo(
     optimized_hlo: str,
     member_device_ids: Sequence[int],
+    *,
+    split_layer1_rms: bool = False,
 ) -> Mapping[str, Any]:
     """Bind real contractions through one BF16 StrategyND and layer-1 ROOT."""
 
@@ -86,6 +103,10 @@ def validate_integrated_dense_rms_hlo(
     )
 
     members = tuple(int(value) for value in member_device_ids)
+    if not isinstance(split_layer1_rms, bool):
+        raise BenchmarkValidationError(
+            "integrated dense RMS split flag must be boolean"
+        )
     report = lint_hlo(
         parse_hlo_module(optimized_hlo),
         integrated_dense_rms_hlo_policy(members),
@@ -127,6 +148,15 @@ def validate_integrated_dense_rms_hlo(
         raise BenchmarkValidationError(
             "integrated dense RMS accepted layer-1 schedule drifted"
         )
+    expected_schedule_shape = (
+        (("f32", (32,)),)
+        if split_layer1_rms
+        else (("f32", (32,)), ("f32", (32, 6144)))
+    )
+    if _shape_signature(scheduled[0]) != expected_schedule_shape:
+        raise BenchmarkValidationError(
+            "integrated dense RMS layer-1 schedule form drifted"
+        )
     contraction = _validate_optimized_hlo(
         optimized_hlo,
         compile_rows=32,
@@ -161,6 +191,7 @@ def validate_integrated_dense_rms_hlo(
         scheduled[0],
         roots[0],
         integrated_dense=True,
+        require_split_output_fusion=split_layer1_rms,
     )
     if (
         exact_rms.get("residual_source_mode")
@@ -172,6 +203,17 @@ def validate_integrated_dense_rms_hlo(
                 "exact_reduction_operand_graph",
                 "exact_weighted_operand_graph",
                 "exact_result_binding",
+            )
+        )
+        or (
+            split_layer1_rms
+            and not all(
+                exact_rms.get(name) is True
+                for name in (
+                    "exact_accepted_scheduled_reduction",
+                    "split_output_fusion_exact",
+                    "split_recompute_exact",
+                )
             )
         )
     ):
@@ -196,5 +238,6 @@ def validate_integrated_dense_rms_hlo(
         "num_replicas": report.module.num_replicas,
         "passed": True,
         "performance_claim": False,
+        "split_layer1_rms": split_layer1_rms,
         "violations": [],
     }
