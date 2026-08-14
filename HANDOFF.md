@@ -19,6 +19,20 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected scalar-only run
+  `greenfield_strategy_nd_integrated_dense_split_rms_20260814T185445451138390Z`
+  completed at reviewed pin `36d53a801c6405b81ee15e45b2053c7a2f31d514` in 43 seconds with a
+  complete same-region archive and authenticated 8/8 clean fleet. It is numerically rejected:
+  1,073/6,144 mismatches, first index 1, hidden-2795 expected/observed bits 48423/48422, and
+  observed SHA `229dc8ac...812f`, exactly DB549. This closes RMS scalar schedule/recomputation.
+- Accepted-HLO comparison now leaves one concrete untested delta: accepted layer 0 executes the
+  attention psum immediately before dense psum (dense is collective ordinal 953); the integrated
+  controls contain only dense psum. Exact next is a seconds-scale, no-DB discriminator that first
+  reconstructs the already sealed attention BF16 row with rank-zero-plus-zero-peers StrategyND,
+  then runs the unchanged dense psum and layer-1 RMS. Only a bitwise-exact 6,144-value row may
+  authorize one protected 8K. Do not reopen weights, contractions, association, residual, RMS,
+  observers or scalar patches.
+
 - Reviewed/pushed pin `7bbe71e3c6325c58e2449712e2907e76d2d32cc5` launched the scalar-only
   one-graph challenger under tag
   `greenfield_strategy_nd_integrated_dense_split_rms_20260814T182610477998565Z`. All eight hosts

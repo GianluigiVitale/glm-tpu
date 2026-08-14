@@ -572,12 +572,19 @@ def _validate_exact_dense_rms_value_flow(
     *,
     integrated_dense: bool = False,
     require_split_output_fusion: bool = False,
+    preceding_attention_reduction: HloInstruction | None = None,
 ) -> Mapping[str, Any]:
     """Bind sealed inputs through the exact live collective/RMS result."""
 
     if not isinstance(require_split_output_fusion, bool):
         raise BenchmarkValidationError(
             "dense RMS split-output ownership flag must be boolean"
+        )
+    if preceding_attention_reduction is not None and not (
+        integrated_dense and require_split_output_fusion
+    ):
+        raise BenchmarkValidationError(
+            "preceding attention reduction requires integrated split RMS"
         )
     graph = _ExactDenseRmsGraph(report)
     f32_m32 = (("f32", (32, 6144)),)
@@ -708,6 +715,28 @@ def _validate_exact_dense_rms_value_flow(
         if addition is None or len(addition.instruction.operand_names) != 2:
             return False
         operands = [graph.operand(addition, index) for index in range(2)]
+        if integrated_control and preceding_attention_reduction is not None:
+            def exact_attention_collective_f32(
+                candidate: _ResolvedHloValue | None,
+            ) -> bool:
+                candidate = graph.semantic(candidate)
+                return bool(
+                    candidate is not None
+                    and candidate.instruction.raw_opcode == "convert"
+                    and graph.shape(candidate) == f32_m32
+                    and graph.exact_external(
+                        graph.operand(candidate, 0),
+                        preceding_attention_reduction,
+                    )
+                )
+
+            return bool(
+                any(
+                    exact_attention_collective_f32(operands[left])
+                    and exact_padded_f32(operands[1 - left], 1)
+                    for left in range(2)
+                )
+            )
         source_indexes = (0, 1) if integrated_control else (1, 2)
         return bool(
             any(
@@ -1369,6 +1398,8 @@ def _validate_exact_dense_rms_value_flow(
             else "hybrid_attention_plus_combined_control"
         ),
     }
+    if preceding_attention_reduction is not None:
+        result["preceding_attention_collective"] = True
     if require_split_output_fusion:
         exact_schedule = bool(
             scheduled_signature == (("f32", (32,)),)

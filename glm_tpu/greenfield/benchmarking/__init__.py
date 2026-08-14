@@ -72,6 +72,7 @@ from .integrated_dense_rms import (
     validate_integrated_checkpoint_success,
 )
 from .integrated_dense_rms_hlo import (
+    INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
     integrated_dense_rms_hlo_policy,
     validate_integrated_dense_rms_hlo,
@@ -133,6 +134,7 @@ __all__ = [
     "GateCDsaResult",
     "GateCIndexShareResult",
     "INTEGRATED_DENSE_RMS_STABLEHLO_SHA256",
+    "INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256",
     "IntegratedDenseRmsInputs",
     "IntegratedDenseWeights",
     "POST_ATTENTION_NORM_RAW_SHA256",

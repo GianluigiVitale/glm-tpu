@@ -45,6 +45,10 @@ from .strategy_nd_dense_rms_replay import (
 CHECKPOINT_MANIFEST_SHA256 = (
     "de46d38e404c637209f95505291105e89a6e7f95270fe91375a55ea79b5f7134"
 )
+LEGACY_INTEGRATED_CODE_HASH = "d7872b582181e8c2518da2d8785b109a733e92b1"
+LEGACY_INTEGRATED_RUN_TAG = (
+    "greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z"
+)
 EXPECTED_SOURCE = {
     "checkpoint_manifest_sha256": CHECKPOINT_MANIFEST_SHA256,
     "checkpoint_success_sha256": CHECKPOINT_SUCCESS_SHA256,
@@ -115,12 +119,20 @@ def _validate_hlo_prevalidation(
     optimized_hlo_sha256: str,
     stablehlo_sha256: str,
     split_layer1_rms: bool,
+    preceding_attention_collective: bool = False,
 ) -> None:
+    expected_fields = set(EXPECTED_HLO_PREVALIDATION_FIELDS)
+    if preceding_attention_collective:
+        expected_fields.add("preceding_attention_collective")
     if not (
         type(record) is dict
-        and set(record) == EXPECTED_HLO_PREVALIDATION_FIELDS
+        and set(record) == expected_fields
         and record["optimized_hlo_sha256"] == optimized_hlo_sha256
         and record["stablehlo_sha256"] == stablehlo_sha256
+        and (
+            not preceding_attention_collective
+            or record["preceding_attention_collective"] is True
+        )
         and record["split_layer1_rms"] is split_layer1_rms
         and record["validated"] is False
         and record["performance_claim"] is False
@@ -133,6 +145,7 @@ def _recompute_comparison(
     expected: np.ndarray,
     *,
     split_layer1_rms: bool = False,
+    preceding_attention_collective: bool = False,
 ) -> dict[str, Any]:
     mismatch_indices = np.flatnonzero(observed != expected)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -145,7 +158,9 @@ def _recompute_comparison(
     error = np.abs(observed_values - expected_values)
     observed_sha = _raw_sha256(observed)
     prefix = (
-        "integrated_dense_split_rms"
+        "integrated_dense_ordinal_rms"
+        if preceding_attention_collective
+        else "integrated_dense_split_rms"
         if split_layer1_rms
         else "integrated_dense_rms"
     )
@@ -201,6 +216,7 @@ def validate_strategy_nd_integrated_dense_rms(
     expected_code_hash: str,
     expected_run_tag: str,
     expected_split_layer1_rms: bool = False,
+    expected_preceding_attention_collective: bool = False,
 ) -> dict[str, Any]:
     """Reload every source/fleet/artifact byte and recompute the verdict."""
 
@@ -214,6 +230,16 @@ def validate_strategy_nd_integrated_dense_rms(
 
     if not isinstance(expected_split_layer1_rms, bool):
         raise ValueError("integrated dense RMS split expectation must be boolean")
+    if not isinstance(expected_preceding_attention_collective, bool):
+        raise ValueError("preceding attention expectation must be boolean")
+    if expected_preceding_attention_collective and not expected_split_layer1_rms:
+        raise ValueError("preceding attention collective requires split RMS")
+    legacy_schema = bool(
+        not expected_split_layer1_rms
+        and not expected_preceding_attention_collective
+        and expected_code_hash == LEGACY_INTEGRATED_CODE_HASH
+        and expected_run_tag == LEGACY_INTEGRATED_RUN_TAG
+    )
     host_paths = sorted((run_dir / "host_records").glob("collective.rank*.json"))
     records = [json.loads(path.read_text()) for path in host_paths]
     if len(records) != 8:
@@ -288,10 +314,18 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense fleet agreement drifted")
 
     items = [record["association_integrated_dense_rms"] for record in records]
-    if any(type(item) is not dict or set(item) != EXPECTED_REPLAY_FIELDS for item in items):
+    expected_replay_fields = set(EXPECTED_REPLAY_FIELDS)
+    if legacy_schema:
+        expected_replay_fields.remove("split_layer1_rms")
+    if expected_preceding_attention_collective:
+        expected_replay_fields.add("preceding_attention_collective")
+    if any(
+        type(item) is not dict or set(item) != expected_replay_fields
+        for item in items
+    ):
         raise ValueError("integrated dense nested schema drifted")
     reference = items[0]
-    for field in EXPECTED_REPLAY_FIELDS - {"artifact_manifest"}:
+    for field in expected_replay_fields - {"artifact_manifest"}:
         if any(item[field] != reference[field] for item in items[1:]):
             raise ValueError(f"integrated dense fleet field differs: {field}")
     if not (
@@ -306,7 +340,14 @@ def validate_strategy_nd_integrated_dense_rms(
         and reference["collective_groups"] == [list(range(32))]
         and reference["diagnostic_only"] is True
         and reference["performance_claim"] is False
-        and reference["split_layer1_rms"] is expected_split_layer1_rms
+        and (
+            not expected_preceding_attention_collective
+            or reference["preceding_attention_collective"] is True
+        )
+        and (
+            legacy_schema
+            or reference["split_layer1_rms"] is expected_split_layer1_rms
+        )
         and _is_sha256(reference["optimized_hlo_sha256"])
         and _is_sha256(reference["stablehlo_sha256"])
     ):
@@ -399,6 +440,7 @@ def validate_strategy_nd_integrated_dense_rms(
         arrays["hardware_layer1_bits"],
         arrays["accepted_layer1_bits"],
         split_layer1_rms=expected_split_layer1_rms,
+        preceding_attention_collective=expected_preceding_attention_collective,
     )
     recorded = reference["comparison"]
     if not (
@@ -450,7 +492,9 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense fleet hashes drifted")
 
     label = (
-        "strategy_nd_integrated_dense_split_rms_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_ordinal_rms_bfloat16_32x6144"
+        if expected_preceding_attention_collective
+        else "strategy_nd_integrated_dense_split_rms_bfloat16_32x6144"
         if expected_split_layer1_rms
         else "strategy_nd_integrated_dense_rms_bfloat16_32x6144"
     )
@@ -459,12 +503,14 @@ def validate_strategy_nd_integrated_dense_rms(
     optimized_path = hlo_dir / f"{label}.optimized_hlo.txt"
     contract_path = hlo_dir / f"{label}.hlo_contract.json"
     prevalidation_path = hlo_dir / f"{label}.hlo_prevalidation.json"
-    if {path.name for path in hlo_dir.iterdir() if path.is_file()} != {
+    expected_hlo_files = {
         stable_path.name,
         optimized_path.name,
         contract_path.name,
-        prevalidation_path.name,
-    }:
+    }
+    if not legacy_schema:
+        expected_hlo_files.add(prevalidation_path.name)
+    if {path.name for path in hlo_dir.iterdir() if path.is_file()} != expected_hlo_files:
         raise ValueError("integrated dense HLO artifact set drifted")
     stablehlo = stable_path.read_text()
     optimized_hlo = optimized_path.read_text()
@@ -477,18 +523,29 @@ def validate_strategy_nd_integrated_dense_rms(
     stable_contract = validate_integrated_dense_rms_stablehlo(
         stablehlo,
         split_layer1_rms=expected_split_layer1_rms,
+        preceding_attention_collective=expected_preceding_attention_collective,
     )
     optimized_contract = validate_integrated_dense_rms_hlo(
         optimized_hlo,
         tuple(range(32)),
         split_layer1_rms=expected_split_layer1_rms,
+        preceding_attention_collective=expected_preceding_attention_collective,
     )
-    _validate_hlo_prevalidation(
-        json.loads(prevalidation_path.read_text()),
-        optimized_hlo_sha256=reference["optimized_hlo_sha256"],
-        stablehlo_sha256=reference["stablehlo_sha256"],
-        split_layer1_rms=expected_split_layer1_rms,
-    )
+    if legacy_schema:
+        stable_contract = dict(stable_contract)
+        optimized_contract = dict(optimized_contract)
+        stable_contract.pop("split_layer1_rms")
+        optimized_contract.pop("split_layer1_rms")
+    if not legacy_schema:
+        _validate_hlo_prevalidation(
+            json.loads(prevalidation_path.read_text()),
+            optimized_hlo_sha256=reference["optimized_hlo_sha256"],
+            stablehlo_sha256=reference["stablehlo_sha256"],
+            split_layer1_rms=expected_split_layer1_rms,
+            preceding_attention_collective=(
+                expected_preceding_attention_collective
+            ),
+        )
     if not (
         stable_contract == reference["stablehlo_contract"]
         and optimized_contract == reference["optimized_hlo_contract"]
@@ -501,9 +558,11 @@ def validate_strategy_nd_integrated_dense_rms(
     ):
         raise ValueError("integrated dense HLO terminal replay drifted")
 
-    return {
+    result = {
         "artifact_kind": (
-            "glm52_strategy_nd_integrated_dense_split_rms"
+            "glm52_strategy_nd_integrated_dense_ordinal_rms"
+            if expected_preceding_attention_collective
+            else "glm52_strategy_nd_integrated_dense_split_rms"
             if expected_split_layer1_rms
             else "glm52_strategy_nd_integrated_dense_rms"
         ),
@@ -529,3 +588,6 @@ def validate_strategy_nd_integrated_dense_rms(
         "status": "SUCCESS",
         "topology_hash": EXPECTED_TOPOLOGY_HASH,
     }
+    if expected_preceding_attention_collective:
+        result["preceding_attention_collective"] = True
+    return result

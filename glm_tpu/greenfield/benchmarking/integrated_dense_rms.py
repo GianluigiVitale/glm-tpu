@@ -68,6 +68,7 @@ class CompiledIntegratedDenseRms:
     optimized_hlo: str
     stablehlo_contract: Mapping[str, Any]
     optimized_hlo_contract: Mapping[str, Any]
+    preceding_attention_collective: bool
     split_layer1_rms: bool
 
 
@@ -205,7 +206,11 @@ def model_axis_weights_to_physical(
     return np.ascontiguousarray(physical)
 
 
-def _integrated_function(*, split_layer1_rms: bool = False) -> Any:
+def _integrated_function(
+    *,
+    split_layer1_rms: bool = False,
+    preceding_attention_collective: bool = False,
+) -> Any:
     import jax
     from jax import lax
     import jax.numpy as jnp
@@ -231,6 +236,22 @@ def _integrated_function(*, split_layer1_rms: bool = False) -> Any:
                 ((0, 31), (0, 0)),
                 constant_values=jnp.bfloat16(0),
             )
+        if preceding_attention_collective:
+            # The accepted full decoder executes its layer-0 attention psum
+            # immediately before the dense psum.  Recreate only that physical
+            # collective context from the already-sealed final BF16 attention
+            # row: rank zero contributes it and every other rank contributes
+            # exact zeros, so the value is unchanged under any add tree.
+            with jax.named_scope(
+                "integrated_dense_rms_preceding_attention_collective"
+            ):
+                is_owner = lax.axis_index("member") == jnp.int32(0)
+                local_attention = jnp.where(
+                    is_owner,
+                    attention_m32,
+                    jnp.zeros_like(attention_m32),
+                )
+                attention_m32 = lax.psum(local_attention, "member")
         with jax.named_scope("integrated_dense_rms_predense_norm"):
             normalized, carried = fused_add_rms_norm(
                 attention_m32,
@@ -301,6 +322,7 @@ def build_integrated_dense_rms(
     devices: Sequence[Any] | None = None,
     validate_hlo: bool = True,
     split_layer1_rms: bool = False,
+    preceding_attention_collective: bool = False,
 ) -> CompiledIntegratedDenseRms:
     """Compile the exact one-rank-per-chip diagnostic on 32 devices."""
 
@@ -325,8 +347,19 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "integrated dense RMS split flag must be boolean"
         )
+    if not isinstance(preceding_attention_collective, bool):
+        raise BenchmarkValidationError(
+            "integrated dense RMS preceding-attention flag must be boolean"
+        )
+    if preceding_attention_collective and not split_layer1_rms:
+        raise BenchmarkValidationError(
+            "preceding attention collective requires the frozen split RMS arm"
+        )
     mapped = jax.shard_map(
-        _integrated_function(split_layer1_rms=split_layer1_rms),
+        _integrated_function(
+            split_layer1_rms=split_layer1_rms,
+            preceding_attention_collective=preceding_attention_collective,
+        ),
         mesh=mesh,
         in_specs=(
             P(),
@@ -362,12 +395,15 @@ def build_integrated_dense_rms(
         )
 
         stablehlo_contract = validate_integrated_dense_rms_stablehlo(
-            stablehlo, split_layer1_rms=split_layer1_rms
+            stablehlo,
+            split_layer1_rms=split_layer1_rms,
+            preceding_attention_collective=preceding_attention_collective,
         )
         optimized_hlo_contract = validate_integrated_dense_rms_hlo(
             optimized_hlo,
             members,
             split_layer1_rms=split_layer1_rms,
+            preceding_attention_collective=preceding_attention_collective,
         )
     else:
         stablehlo_contract = {
@@ -387,6 +423,7 @@ def build_integrated_dense_rms(
         optimized_hlo=optimized_hlo,
         stablehlo_contract=stablehlo_contract,
         optimized_hlo_contract=optimized_hlo_contract,
+        preceding_attention_collective=preceding_attention_collective,
         split_layer1_rms=split_layer1_rms,
     )
 

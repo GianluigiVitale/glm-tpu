@@ -5,6 +5,25 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 18:54--20:00 UTC — scalar schedule rejected; collective ordinal isolated
+
+- Protected tag `greenfield_strategy_nd_integrated_dense_split_rms_20260814T185445451138390Z`
+  ran at reviewed/pushed pin `36d53a801c6405b81ee15e45b2053c7a2f31d514`. The bounded workflow
+  completed in 43 seconds, sealed exact source/checkpoint/HLO/output provenance to the approved
+  bucket, and ended with authenticated 8/8 zero work.
+- The accepted scalar-only RMS schedule did not recover exactness. The result is exactly rejected
+  DB549: 1,073/6,144 mismatches, first index 1, hidden-2795 bits 48422 versus accepted 48423,
+  maximum/mean error `0.0078125` / `3.4686963772401214e-05`, and observed SHA
+  `229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f`. RMS scheduling,
+  output-fusion recomputation and scalar correction are closed.
+- Exact accepted-vs-integrated HLO comparison leaves collective context as the sole observed live
+  delta: accepted attention psum directly precedes dense psum, whereas the controls compile dense
+  psum alone. The new default-off discriminator adds one value-preserving attention StrategyND
+  reduction (rank zero contributes the sealed row; all peers exact zero) immediately before the
+  unchanged dense reduction. Its full forced-32 StableHLO is SHA-pinned and mutation-tested. This
+  remains a seconds-scale layer-0 diagnostic; a full 8K is forbidden unless its complete row is
+  bitwise exact.
+
 ## 2026-08-14 18:26--18:38 UTC — scalar challenger compiles; exact TPU HLO recovered in seconds
 
 - Reviewed/pushed pin `7bbe71e3c6325c58e2449712e2907e76d2d32cc5` launched tag

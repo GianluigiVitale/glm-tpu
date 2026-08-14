@@ -201,6 +201,11 @@ def parse_args() -> argparse.Namespace:
         help="use the accepted scalar-only layer-1 RMS schedule",
     )
     parser.add_argument(
+        "--integrated-preceding-attention-collective",
+        action="store_true",
+        help="recreate the accepted attention-then-dense collective ordinal",
+    )
+    parser.add_argument(
         "--allow-unprotected-test-config",
         action="store_true",
         help="permit fewer than the protected 75/200/1000 contract",
@@ -663,8 +668,13 @@ def _run_strategy_nd_integrated_dense_rms(
         }
     )
     split_layer1_rms = bool(args.integrated_split_layer1_rms)
+    preceding_attention_collective = bool(
+        args.integrated_preceding_attention_collective
+    )
     label = (
-        "strategy_nd_integrated_dense_split_rms_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_ordinal_rms_bfloat16_32x6144"
+        if preceding_attention_collective
+        else "strategy_nd_integrated_dense_split_rms_bfloat16_32x6144"
         if split_layer1_rms
         else "strategy_nd_integrated_dense_rms_bfloat16_32x6144"
     )
@@ -674,6 +684,7 @@ def _run_strategy_nd_integrated_dense_rms(
         devices=jax.devices(),
         validate_hlo=False,
         split_layer1_rms=split_layer1_rms,
+        preceding_attention_collective=preceding_attention_collective,
     )
     stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
     optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
@@ -693,6 +704,11 @@ def _run_strategy_nd_integrated_dense_rms(
                 "split_layer1_rms": split_layer1_rms,
                 "stablehlo_sha256": stablehlo_sha,
                 "validated": False,
+                **(
+                    {"preceding_attention_collective": True}
+                    if preceding_attention_collective
+                    else {}
+                ),
             },
         )
     from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
@@ -703,11 +719,13 @@ def _run_strategy_nd_integrated_dense_rms(
     stablehlo_contract = validate_integrated_dense_rms_stablehlo(
         compiled.stablehlo,
         split_layer1_rms=split_layer1_rms,
+        preceding_attention_collective=preceding_attention_collective,
     )
     optimized_hlo_contract = validate_integrated_dense_rms_hlo(
         compiled.optimized_hlo,
         physical_ids,
         split_layer1_rms=split_layer1_rms,
+        preceding_attention_collective=preceding_attention_collective,
     )
     compiled = replace(
         compiled,
@@ -750,7 +768,9 @@ def _run_strategy_nd_integrated_dense_rms(
         "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
     )
     classification_prefix = (
-        "integrated_dense_split_rms"
+        "integrated_dense_ordinal_rms"
+        if preceding_attention_collective
+        else "integrated_dense_split_rms"
         if split_layer1_rms
         else "integrated_dense_rms"
     )
@@ -864,6 +884,11 @@ def _run_strategy_nd_integrated_dense_rms(
         "stablehlo_contract": dict(compiled.stablehlo_contract),
         "stablehlo_sha256": stablehlo_sha,
         "split_layer1_rms": split_layer1_rms,
+        **(
+            {"preceding_attention_collective": True}
+            if preceding_attention_collective
+            else {}
+        ),
     }
 
 
@@ -1131,6 +1156,13 @@ def main() -> int:
     ):
         raise ValueError(
             "integrated split RMS is valid only for integrated dense RMS"
+        )
+    if args.integrated_preceding_attention_collective and (
+        args.mode != "strategy_nd_integrated_dense_rms"
+        or not args.integrated_split_layer1_rms
+    ):
+        raise ValueError(
+            "preceding attention collective requires integrated split RMS"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:

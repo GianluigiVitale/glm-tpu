@@ -752,6 +752,7 @@ def _validate_optimized_hlo(
     integrated_dense_rms: bool = False,
     accepted_gate_singleton: bool = False,
     accepted_gate_dequant_fusion: bool = False,
+    preceding_attention_collective: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -797,6 +798,10 @@ def _validate_optimized_hlo(
     ):
         raise ValueError(
             "integrated dense RMS proof requires the M32 final-layout envelope"
+        )
+    if preceding_attention_collective and not integrated_dense_rms:
+        raise ValueError(
+            "preceding attention collective requires integrated dense RMS"
         )
     if accepted_gate_singleton and not (isolated_dense or integrated_dense_rms):
         raise ValueError(
@@ -1955,6 +1960,12 @@ def _validate_optimized_hlo(
             )
         )
     ]
+    attention_scoped = [
+        item
+        for item in collectives
+        if "integrated_dense_rms_preceding_attention_collective"
+        in (item.op_name or "").split("/")
+    ]
     violations = []
     expected_virtual_ranks = (
         {0} if isolated_dense or integrated_dense_rms else set(range(8))
@@ -2035,7 +2046,7 @@ def _validate_optimized_hlo(
         if isolated_dense and collectives:
             violations.append("isolated dense program contains a collective")
         if integrated_dense_rms and (
-            len(collectives) != 1
+            len(collectives) != (2 if preceding_attention_collective else 1)
             or len(scoped) != 1
             or scoped[0].opcode != "all-reduce"
             or scoped[0].replica_groups != (tuple(range(32)),)
@@ -2047,6 +2058,21 @@ def _validate_optimized_hlo(
         ):
             violations.append(
                 "integrated dense program lacks one exact BF16 StrategyND collective"
+            )
+        if preceding_attention_collective and (
+            len(attention_scoped) != 1
+            or len(scoped) != 1
+            or attention_scoped[0].opcode != "all-reduce"
+            or attention_scoped[0].replica_groups != (tuple(range(32)),)
+            or not attention_scoped[0].use_global_device_ids
+            or _shape_signatures(attention_scoped[0].operand_shapes)
+            != ("bf16[32,6144]",)
+            or _shape_signatures(attention_scoped[0].result_shapes)
+            != ("bf16[32,6144]",)
+            or attention_scoped[0].index >= scoped[0].index
+        ):
+            violations.append(
+                "integrated dense program lacks the ordered preceding attention collective"
             )
 
         def value_shape(item: Any | None) -> tuple[str, tuple[int, ...]] | None:
@@ -2831,12 +2857,21 @@ def _validate_optimized_hlo(
                     != ("f32[32,6144]",)
                     or len(residual_add.operand_names) != 2
                     or not any(
-                        exact_carried_pad(
-                            operand(residual_add, 0), carried_inputs[index]
+                        (
+                            exact_dense_value_path(
+                                operand(residual_add, index),
+                                attention_scoped[0],
+                                allow_live_row_slice=False,
+                                allow_bf16_round=True,
+                            )
+                            if preceding_attention_collective
+                            and len(attention_scoped) == 1
+                            else exact_carried_pad(
+                                operand(residual_add, index), carried_inputs[0]
+                            )
                         )
                         and exact_carried_pad(
-                            operand(residual_add, 1),
-                            carried_inputs[1 - index],
+                            operand(residual_add, 1 - index), carried_inputs[1]
                         )
                         for index in range(2)
                     )
@@ -2939,7 +2974,7 @@ def _validate_optimized_hlo(
         ]
         if custom_calls or forbidden:
             violations.append("isolated dense program contains host/Pallas effects")
-        return {
+        result = {
             "accepted_gate_singleton": accepted_gate_singleton,
             "accepted_gate_dequant_fusion": accepted_gate_dequant_fusion,
             "accepted_down_schedule": bool(
@@ -2993,6 +3028,9 @@ def _validate_optimized_hlo(
             "unexpected_convolutions": unexpected,
             "violations": violations,
         }
+        if preceding_attention_collective:
+            result["preceding_attention_collective"] = True
+        return result
 
     if len(collectives) != 1 or len(scoped) != 1:
         violations.append(

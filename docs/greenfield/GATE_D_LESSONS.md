@@ -30,10 +30,11 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   32-chip psum and layer-1 RMS together, yet exactly reproduced DB548's sole hidden-2795 mismatch.
   That closes graph externalization alone. Its preserved HLO then exposed a concrete untested
   boundary: accepted schedules only the scalar RMS reduction, while the control schedules a tuple
-  containing the full residual sum. The final bounded challenger restores only that schedule and
-  recomputation boundary. Only an exact full 6,144-value row may authorize the matching production
-  change and one complete protected 8K; Gate D remains open until that 8K passes DSA, trace, wall,
-  memory and integrity gates.
+  containing the full residual sum. The protected scalar-only challenger was still nonexact and
+  exactly reproduced rejected DB549: 1,073/6,144 mismatches, SHA `229dc8ac...812f`. RMS schedule
+  and recomputation are therefore closed too. The only remaining observed HLO delta is collective
+  site/ordinal context: accepted executes its attention psum immediately before its dense psum,
+  while every bounded control compiled dense psum in isolation. Test that one delta only.
 
 ## Evidence ladder
 
@@ -134,10 +135,12 @@ branches from the search tree.
 - The global StrategyND/RMS program is mechanically valid and completes in tens of seconds. Both
   hybrid and direct-residual forms are nonexact; the direct form exactly reproduces DB549 and is
   permanently rejected.
-- The one-graph contraction→StrategyND→RMS control reproduces DB548 and is closed. The remaining
-  local test is its accepted scalar-only RMS schedule/recompute form, selected directly from the
-  accepted-vs-control HLO differential. It reuses the packed checkpoint and sealed inputs and must
-  remain no-DB/default-off until bitwise exact.
+- The one-graph contraction→StrategyND→RMS control reproduces DB548 and is closed. Its accepted
+  scalar-only RMS schedule/recompute challenger exactly reproduces DB549 and is closed as well.
+  The remaining bounded discriminator reconstructs the already sealed attention row with a first
+  value-preserving StrategyND reduction (rank zero supplies the row; peers supply exact zero), then
+  runs the unchanged dense reduction second. This isolates collective site/ordinal context, loads
+  only layer-0 weights, and remains no-DB/default-off until all 6,144 values are exact.
 - The first scalar-only launch reached the intended schedule but failed only in proof. Recovered TPU
   HLO shows the final fusion forms the M1 F32 sum from two independently sliced BF16 row-zero
   sources. This exact lowering is now the sole admitted correction; it does not reopen RMS

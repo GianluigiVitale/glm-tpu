@@ -18,6 +18,7 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
     validate_integrated_checkpoint_success,
 )
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
+    INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256,
     integrated_dense_rms_hlo_policy,
@@ -29,6 +30,7 @@ from glm_tpu.greenfield.validation.strategy_nd_integrated_dense_rms import (
     _recompute_comparison,
     _validate_capture,
     _validate_hlo_prevalidation,
+    validate_strategy_nd_integrated_dense_rms,
 )
 
 
@@ -55,6 +57,11 @@ REAL_SPLIT_TPU_HLO = Path(
 REAL_SPLIT_TPU_HLO_SHA256 = (
     "212aa36a9587ff390e6b0c18b654187d96e158eb896eaece1af51cda35df4e27"
 )
+REAL_LEGACY_INTEGRATED_RUN = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z"
+)
+REAL_CHECKPOINT_ROOT = REAL_STAGE0_SLOT0.parents[2]
 
 
 def test_model_axis_weights_are_bijectively_mapped_to_physical_ids() -> None:
@@ -96,7 +103,7 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import validate_in
 compiled = build_integrated_dense_rms(tuple(range(32)), validate_hlo=False)
 contract = validate_integrated_dense_rms_stablehlo(compiled.stablehlo)
 assert contract["passed"]
-from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import integrated_dense_rms_hlo_policy
+from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import integrated_dense_rms_hlo_policy, _validate_preceding_attention_input
 from glm_tpu.greenfield.sharding.hlo_contract import lint_hlo, parse_hlo_module
 report = lint_hlo(parse_hlo_module(compiled.optimized_hlo), integrated_dense_rms_hlo_policy(tuple(range(32))))
 assert report.valid, [item.to_dict() for item in report.violations]
@@ -122,6 +129,116 @@ except ValueError:
 else:
     raise AssertionError("split StableHLO passed the tuple-schedule contract")
 print(split_contract["exact_graph_sha256"])
+ordinal = build_integrated_dense_rms(
+    tuple(range(32)),
+    validate_hlo=False,
+    split_layer1_rms=True,
+    preceding_attention_collective=True,
+)
+ordinal_contract = validate_integrated_dense_rms_stablehlo(
+    ordinal.stablehlo,
+    split_layer1_rms=True,
+    preceding_attention_collective=True,
+)
+assert ordinal_contract["passed"]
+assert ordinal.preceding_attention_collective is True
+ordinal_report = lint_hlo(
+    parse_hlo_module(ordinal.optimized_hlo),
+    integrated_dense_rms_hlo_policy(
+        tuple(range(32)), preceding_attention_collective=True
+    ),
+)
+assert ordinal_report.valid, [item.to_dict() for item in ordinal_report.violations]
+attention = tuple(
+    item for item in ordinal_report.module.collectives
+    if "integrated_dense_rms_preceding_attention_collective"
+    in (item.op_name or "").split("/")
+)
+assert len(attention) == 1
+assert _validate_preceding_attention_input(
+    ordinal_report, attention[0]
+)["exact_attention_collective_input"]
+for old, new in (
+    ("%constant.1.clone.2 = s32[] constant(0)", "%constant.1.clone.2 = s32[] constant(1)"),
+    ("select(%select_n.11, %convert.166, %broadcast.50)", "select(%select_n.11, %broadcast.50, %broadcast.50)"),
+    ("select(%select_n.11, %convert.166, %broadcast.50)", "select(%select_n.11, %broadcast.50, %convert.166)"),
+    ("%broadcast_select_fusion = f32[32,6144]{1,0} fusion(", "%broadcast_select_fusion = f32[32,6144]{0,1} fusion("),
+    ("%broadcast.50 = f32[32,6144]{1,0} broadcast(", "%broadcast.50 = f32[32,6144]{0,1} broadcast("),
+    ('direction=EQ, metadata={op_name="jit(integrated)/shard_map/integrated_dense_rms_preceding_attention_collective/eq"', 'direction=NE, metadata={op_name="jit(integrated)/shard_map/integrated_dense_rms_preceding_attention_collective/eq"'),
+):
+    mutation = ordinal.optimized_hlo.replace(old, new, 1)
+    assert mutation != ordinal.optimized_hlo
+    mutated_report = lint_hlo(
+        parse_hlo_module(mutation),
+        integrated_dense_rms_hlo_policy(
+            tuple(range(32)), preceding_attention_collective=True
+        ),
+    )
+    mutated_attention = tuple(
+        item for item in mutated_report.module.collectives
+        if "integrated_dense_rms_preceding_attention_collective"
+        in (item.op_name or "").split("/")
+    )
+    try:
+        _validate_preceding_attention_input(
+            mutated_report, mutated_attention[0]
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("preceding attention mutation was accepted")
+equivalent = ordinal.optimized_hlo.replace(
+    'direction=EQ, metadata={op_name="jit(integrated)/shard_map/integrated_dense_rms_preceding_attention_collective/eq"',
+    'direction=NE, metadata={op_name="jit(integrated)/shard_map/integrated_dense_rms_preceding_attention_collective/eq"',
+    1,
+).replace(
+    "select(%select_n.11, %convert.166, %broadcast.50)",
+    "select(%select_n.11, %broadcast.50, %convert.166)",
+    1,
+)
+assert equivalent != ordinal.optimized_hlo
+from jaxlib import xla_client
+xla_client._xla.hlo_module_from_text(equivalent)
+equivalent_report = lint_hlo(
+    parse_hlo_module(equivalent),
+    integrated_dense_rms_hlo_policy(
+        tuple(range(32)), preceding_attention_collective=True
+    ),
+)
+equivalent_attention = tuple(
+    item for item in equivalent_report.module.collectives
+    if "integrated_dense_rms_preceding_attention_collective"
+    in (item.op_name or "").split("/")
+)
+assert _validate_preceding_attention_input(
+    equivalent_report, equivalent_attention[0]
+)["exact_attention_collective_input"]
+equivalent_zero_layout = equivalent.replace(
+    "%broadcast.50 = f32[32,6144]{1,0} broadcast(",
+    "%broadcast.50 = f32[32,6144]{0,1} broadcast(",
+    1,
+)
+assert equivalent_zero_layout != equivalent
+equivalent_zero_report = lint_hlo(
+    parse_hlo_module(equivalent_zero_layout),
+    integrated_dense_rms_hlo_policy(
+        tuple(range(32)), preceding_attention_collective=True
+    ),
+)
+equivalent_zero_attention = tuple(
+    item for item in equivalent_zero_report.module.collectives
+    if "integrated_dense_rms_preceding_attention_collective"
+    in (item.op_name or "").split("/")
+)
+try:
+    _validate_preceding_attention_input(
+        equivalent_zero_report, equivalent_zero_attention[0]
+    )
+except ValueError:
+    pass
+else:
+    raise AssertionError("NE zero-branch layout mutation was accepted")
+print(ordinal_contract["exact_graph_sha256"])
 '''
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -140,6 +257,7 @@ print(split_contract["exact_graph_sha256"])
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert INTEGRATED_DENSE_RMS_STABLEHLO_SHA256 in completed.stdout
     assert INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256 in completed.stdout
+    assert INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256 in completed.stdout
 
 
 def test_integrated_policy_requires_the_exact_scope() -> None:
@@ -149,6 +267,13 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
     )
     with pytest.raises(ValueError, match="physical ids"):
         integrated_dense_rms_hlo_policy(tuple(reversed(range(32))))
+    ordinal = integrated_dense_rms_hlo_policy(
+        tuple(range(32)), preceding_attention_collective=True
+    )
+    assert ordinal.repeated_region_patterns == (
+        r"integrated_dense_rms_preceding_attention_collective",
+        r"integrated_dense_rms_strategy_nd_collective",
+    )
 
 
 @pytest.mark.skipif(
@@ -274,6 +399,23 @@ def test_checkpoint_success_pin_and_missing_mutated_refusals(
         validate_integrated_checkpoint_success(checkpoint)
 
 
+@pytest.mark.skipif(
+    not REAL_LEGACY_INTEGRATED_RUN.is_dir() or not REAL_CHECKPOINT_ROOT.is_dir(),
+    reason="sealed legacy integrated run/checkpoint absent",
+)
+def test_genuine_legacy_integrated_archive_still_revalidates() -> None:
+    summary = validate_strategy_nd_integrated_dense_rms(
+        REAL_LEGACY_INTEGRATED_RUN,
+        checkpoint_root=REAL_CHECKPOINT_ROOT,
+        expected_code_hash="d7872b582181e8c2518da2d8785b109a733e92b1",
+        expected_run_tag=REAL_LEGACY_INTEGRATED_RUN.name,
+    )
+    assert summary["classification"] == (
+        "integrated_dense_rms_matches_db548_control"
+    )
+    assert summary["mismatch_count"] == 1
+
+
 def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     expected = np.arange(6144, dtype=np.uint16)
     exact = _recompute_comparison(expected.copy(), expected)
@@ -284,6 +426,15 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     )
     assert split_exact["classification"] == (
         "integrated_dense_split_rms_exact_accepted"
+    )
+    ordinal_exact = _recompute_comparison(
+        expected.copy(),
+        expected,
+        split_layer1_rms=True,
+        preceding_attention_collective=True,
+    )
+    assert ordinal_exact["classification"] == (
+        "integrated_dense_ordinal_rms_exact_accepted"
     )
     digest = array_sha256(expected)
     capture = {
@@ -300,9 +451,23 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
 
 
 def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
+    legacy = {
+        "optimized_hlo_sha256": "1" * 64,
+        "performance_claim": False,
+        "split_layer1_rms": True,
+        "stablehlo_sha256": "2" * 64,
+        "validated": False,
+    }
+    _validate_hlo_prevalidation(
+        legacy,
+        optimized_hlo_sha256="1" * 64,
+        stablehlo_sha256="2" * 64,
+        split_layer1_rms=True,
+    )
     record = {
         "optimized_hlo_sha256": "1" * 64,
         "performance_claim": False,
+        "preceding_attention_collective": True,
         "split_layer1_rms": True,
         "stablehlo_sha256": "2" * 64,
         "validated": False,
@@ -312,10 +477,12 @@ def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
         optimized_hlo_sha256="1" * 64,
         stablehlo_sha256="2" * 64,
         split_layer1_rms=True,
+        preceding_attention_collective=True,
     )
     for key, value in (
         ("validated", True),
         ("performance_claim", True),
+        ("preceding_attention_collective", False),
         ("split_layer1_rms", False),
         ("optimized_hlo_sha256", "3" * 64),
     ):
@@ -327,6 +494,7 @@ def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
                 optimized_hlo_sha256="1" * 64,
                 stablehlo_sha256="2" * 64,
                 split_layer1_rms=True,
+                preceding_attention_collective=True,
             )
 
 
@@ -339,6 +507,11 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_SPLIT_RMS_REPLAY:-0"
         in wrapper
     )
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ORDINAL_RMS_REPLAY:-0"
+        in wrapper
+    )
+    assert "--integrated-preceding-attention-collective" in wrapper
     assert "--integrated-split-layer1-rms" in wrapper
     assert "--mode strategy_nd_integrated_dense_rms" in wrapper
     assert "validate_strategy_nd_integrated_dense_rms" in wrapper
