@@ -2290,17 +2290,20 @@ def _validate_optimized_hlo(
                         value is None
                         or value.raw_opcode != "fusion"
                         or fusion_kind(value) != "kLoop"
-                        or result_minor_to_major(value) != (1, 0)
+                        or not exact_row_major_layout(value)
                         or len(value.operand_names) != 1
                         or operand(value, 0) is not gate_bits_parameter
+                        or gate_bits_parameter is None
+                        or value_shape(value) != value_shape(gate_bits_parameter)
                     ):
                         return False
                     copy_root = called_root(value)
                     if (
                         copy_root is None
                         or copy_root.raw_opcode != "copy"
-                        or result_minor_to_major(copy_root) != (1, 0)
+                        or not exact_row_major_layout(copy_root)
                         or len(copy_root.operand_names) != 1
+                        or value_shape(copy_root) != value_shape(value)
                     ):
                         return False
                     copy_parameters = [
@@ -2313,7 +2316,9 @@ def _validate_optimized_hlo(
                     return bool(
                         len(copy_parameters) == 1
                         and parameter_index(copy_parameters[0]) == 0
-                        and result_minor_to_major(copy_parameters[0]) == (1, 0)
+                        and exact_row_major_layout(copy_parameters[0])
+                        and value_shape(copy_parameters[0])
+                        == value_shape(value)
                         and operand(copy_root, 0) is copy_parameters[0]
                     )
 
@@ -2326,12 +2331,30 @@ def _validate_optimized_hlo(
                     for index in range(2):
                         candidate = operand(gate_dequant_scaled, index)
                         other = operand(gate_dequant_scaled, 1 - index)
+                        decoded = candidate
                         if (
                             candidate is not None
-                            and candidate.raw_opcode == "convert"
+                            and candidate.raw_opcode == "bitcast"
+                            and value_shape(candidate)
+                            == ("f32", (6144, 768))
+                            and exact_row_major_layout(candidate)
                             and len(candidate.operand_names) == 1
+                        ):
+                            decoded = operand(candidate, 0)
+                        if (
+                            candidate is not None
+                            and exact_row_major_layout(candidate)
+                            and decoded is not None
+                            and decoded.raw_opcode == "convert"
+                            and value_shape(decoded)
+                            in {
+                                ("f32", (6144, 768)),
+                                ("f32", (1, 1, 6144, 768)),
+                            }
+                            and exact_row_major_layout(decoded)
+                            and len(decoded.operand_names) == 1
                             and exact_gate_bits_copy_source(
-                                operand(candidate, 0)
+                                operand(decoded, 0)
                             )
                             and other is gate_scale_parameter
                         ):
@@ -2346,32 +2369,46 @@ def _validate_optimized_hlo(
                 exact_gate_dequant_physical_signature = bool(
                     gate_weight is not None
                     and fusion_kind(gate_weight) == "kLoop"
-                    and result_minor_to_major(gate_weight) == (1, 0)
+                    and exact_row_major_layout(gate_weight)
                     and len(gate_weight_operands) == 2
                     and all(
-                        result_minor_to_major(item) == (1, 0)
+                        exact_row_major_layout(item)
                         for item in gate_weight_operands
                     )
                     and gate_dequant_root is not None
-                    and result_minor_to_major(gate_dequant_root) == (1, 0)
+                    and exact_row_major_layout(gate_dequant_root)
                     and gate_dequant_scaled is not None
-                    and result_minor_to_major(gate_dequant_scaled) == (1, 0)
+                    and exact_row_major_layout(gate_dequant_scaled)
                     and gate_dequant_decoded is not None
-                    and result_minor_to_major(gate_dequant_decoded) == (1, 0)
+                    and exact_row_major_layout(gate_dequant_decoded)
                     and gate_scale_parameter is not None
-                    and result_minor_to_major(gate_scale_parameter) == (1, 0)
+                    and value_shape(gate_scale_parameter)
+                    == ("f32", (6144, 768))
+                    and exact_row_major_layout(gate_scale_parameter)
                     and gate_bits_parameter is not None
-                    and result_minor_to_major(gate_bits_parameter) == (1, 0)
+                    and value_shape(gate_bits_parameter)
+                    in {
+                        ("f8e4m3fn", (6144, 768)),
+                        ("f8e4m3fn", (1, 1, 6144, 768)),
+                    }
+                    and exact_row_major_layout(gate_bits_parameter)
+                    and set(gate_dequant_parameters) == {0, 1}
                 )
                 exact_gate_dequant_fusion_boundary = bool(
                     gate_weight is not None
                     and gate_weight.raw_opcode == "fusion"
                     and gate_weight.computation == gate_up[0].computation
                     and _shape_signatures(gate_weight.operand_shapes)
-                    == (
-                        "f32[6144,768]",
-                        "f8e4m3fn[6144,768]",
-                    )
+                    in {
+                        (
+                            "f32[6144,768]",
+                            "f8e4m3fn[6144,768]",
+                        ),
+                        (
+                            "f32[6144,768]",
+                            "f8e4m3fn[1,1,6144,768]",
+                        ),
+                    }
                     and value_shape(gate_weight)
                     == ("bf16", (6144, 768))
                     and exact_gate_dequant

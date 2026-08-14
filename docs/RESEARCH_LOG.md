@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 00:36 UTC — short probe fails fast on rank-4 FP8 validator assumption
+
+- Reviewed/pushed pin `aa259df7a658da1270e8ae3d8039718ff00679d1` ran once under protected tag
+  `greenfield_layer0_isolated_dense_replay_20260814T003513546316672Z`. It reached the real TPU compile
+  and optimized-HLO check in under one minute, then refused 16 seconds after replay launch; total
+  protected preflight-to-cleanup time was 63 seconds. No complete decoder was launched.
+- This is a validator false-negative, not a numerical result. The live TPU HLO formed the desired
+  external rank-three gate result and an internal `kLoop` dequant fusion; accepted gate/down schedule,
+  packed bits/scale lineage, activation, carried residual, down and ENTRY-result contracts all pass.
+  The new physical predicate alone failed because it required rank-two FP8. TPU retains the exact
+  owner singleton shape `f8e4m3fn[1,1,6144,768]` through the value-preserving copy fusion and F32
+  conversion, then performs an exact row-major singleton-removal bitcast before the scaled multiply.
+- No arithmetic output, comparison, DB row, performance claim or terminal `SUCCESS` exists. Failure
+  evidence is present only under the remote `diagnostic/...` subtree; cleanup is authenticated
+  8/8 clean. Stable/optimized HLO SHAs are `30981310...9949` and `565d1fab...7f40`.
+- The local correction accepts only the rank-two oracle form or this exact owner-singleton form,
+  pins row-major physical layouts by logical rank, and still requires the sole-parameter/ROOT-copy
+  `kLoop` lineage. The preserved real TPU HLO now passes all fields locally, and a portable rank-four
+  positive joins the existing wrong-layout/kind/arithmetic refusals. Review this correction, then
+  rerun the same short probe; do not escalate to 8K.
+
 ## 2026-08-14 00:19 UTC — internal gate-dequant discriminator is locally ready
 
 - Added a default-off, isolated-only `accepted_gate_dequant_fusion` challenger. It removes the

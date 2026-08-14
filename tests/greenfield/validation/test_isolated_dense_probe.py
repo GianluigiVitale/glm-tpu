@@ -348,6 +348,39 @@ def test_isolated_dense_optimized_contract_pins_schedule_and_liveness() -> None:
     direct_fp8_result = MODULE._validate_isolated_optimized_hlo(direct_fp8)
     assert direct_fp8_result["passed"], direct_fp8_result
     assert direct_fp8_result["exact_gate_dequant_fusion_boundary"]
+    singleton_fp8 = accepted
+    for name in (
+        "%gate_bits_copy_parameter",
+        "%gate_bits_copy_root",
+        "%gate_bits_inner",
+        "%gate_bits_copied_inner",
+        "%gate_bits_parameter",
+    ):
+        singleton_fp8 = singleton_fp8.replace(
+            f"{name} = f8e4m3fn[6144,768]{{1,0}}",
+            f"{name} = f8e4m3fn[1,1,6144,768]{{3,2,1,0}}",
+            1,
+        )
+    singleton_fp8 = singleton_fp8.replace(
+        "%gate_decoded_inner = f32[6144,768]{1,0} "
+        "convert(%gate_bits_copied_inner)",
+        "%gate_decoded_singleton_inner = f32[1,1,6144,768]{3,2,1,0} "
+        "convert(%gate_bits_copied_inner), metadata={op_name=\"jit/local/"
+        "greenfield_dense_convolution_virtual_rank_00/"
+        "convert_element_type\"}\n"
+        "  %gate_decoded_inner = f32[6144,768]{1,0} "
+        "bitcast(%gate_decoded_singleton_inner)",
+        1,
+    ).replace(
+        "fusion(%carried, %gate_scale_wide, %gate_bits_flat)",
+        "fusion(%carried, %gate_scale_wide, %gate_bits_slice)",
+        1,
+    )
+    singleton_fp8_result = MODULE._validate_isolated_optimized_hlo(
+        singleton_fp8
+    )
+    assert singleton_fp8_result["passed"], singleton_fp8_result
+    assert singleton_fp8_result["exact_gate_dequant_fusion_boundary"]
     direct_singleton = MODULE._validate_isolated_optimized_hlo(
         _optimized_hlo(external_gate_singleton=False)
     )

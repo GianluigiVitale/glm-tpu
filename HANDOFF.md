@@ -19,7 +19,23 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
-- The next sub-minute discriminator is locally complete but has no TPU result yet. A new
+- Reviewed pin `aa259df7a658da1270e8ae3d8039718ff00679d1` was exercised once under
+  `greenfield_layer0_isolated_dense_replay_20260814T003513546316672Z`. The protected harness failed
+  fast at the optimized-HLO boundary: replay launch to refusal took 16 seconds and the whole
+  census-to-cleanup workflow took 63 seconds. The compiler did form the desired live internal gate
+  dequant fusion and all existing schedule, packed-lineage, activation/down/result contracts passed,
+  but the new physical predicate assumed FP8 was already rank two. Actual TPU HLO keeps exact owner
+  singleton shape `f8e4m3fn[1,1,6144,768]` through its `kLoop` copy and F32 conversion, then bitcasts
+  to `[6144,768]`. No arithmetic ran, no numerical/DB/performance result or terminal `SUCCESS` exists.
+  Partial diagnostic evidence is archived under the same remote prefix; optimized-HLO SHA is
+  `565d1fab...7f40`. Failure cleanup ended 8/8 `CENSUS_OK`.
+- The local correction now admits exactly the immutable rank-two accepted form or this rank-four
+  owner-singleton form, requiring row-major physical order at every rank, the exact singleton-removal
+  bitcast, and the same sole-parameter/ROOT-copy `kLoop` proof. The preserved real TPU HLO now passes
+  with no violations and a portable rank-four regression is included. Exact next remains correction
+  review followed by the same short protected replay, never the full decoder.
+
+- Pin `aa259df` introduced the sub-minute discriminator exercised above. Its
   `accepted_gate_dequant_fusion` switch is default-off, restricted to the one-virtual-shard
   isolated probe, and removes only the decoded-weight layout/materialization boundary. Its exact
   StableHLO and optimized-HLO contracts require raw FP8 bits plus expanded F32 scales to dequantize
@@ -27,8 +43,8 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   from outside is refused. The wrapper pins the accepted count of three internal gate-dequant
   fusions and DB548's eight materialized-BF16 gate fusions through `SUCCESS`. Isolated tests pass
   8/8, the affected dense/HLO/wrapper suite passes 67/67, and decoder regressions pass 37/37;
-  Python/shell/JSON/diff checks pass. Exact next is one bulk Sol audit, then one ~70-second
-  protected replay. Do not run the complete decoder from local evidence.
+  Python/shell/JSON/diff checks passed before launch. The rank-four correction above supersedes
+  its original physical predicate. Do not run the complete decoder from this diagnostic evidence.
 
 - Reviewed/pushed pin `73c6bc295727c50e490120c5440d58a876973498` completed the protected
   gate-singleton replay under tag
