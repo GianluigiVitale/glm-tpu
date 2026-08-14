@@ -1089,10 +1089,13 @@ def _validate_optimized_hlo(
         and item.raw_opcode == "parameter"
         and parameter_index(item) is not None
     }
+    packed_parameter_start = (
+        4 if accepted_source_context else 3 if dense_envelope else 2
+    )
     expected_packed_parameters = {
         "gate_up": (
             (
-                3 if dense_envelope else 2,
+                packed_parameter_start,
                 (
                     "f8e4m3fn[1,1,6144,768]"
                     if isolated_dense or integrated_dense_rms
@@ -1100,7 +1103,7 @@ def _validate_optimized_hlo(
                 ),
             ),
             (
-                4 if dense_envelope else 3,
+                packed_parameter_start + 1,
                 (
                     "f32[1,1,48,768]"
                     if isolated_dense or integrated_dense_rms
@@ -1110,7 +1113,7 @@ def _validate_optimized_hlo(
         ),
         "down": (
             (
-                5 if dense_envelope else 4,
+                packed_parameter_start + 2,
                 (
                     "f8e4m3fn[1,1,384,6144]"
                     if isolated_dense or integrated_dense_rms
@@ -1118,7 +1121,7 @@ def _validate_optimized_hlo(
                 ),
             ),
             (
-                6 if dense_envelope else 5,
+                packed_parameter_start + 3,
                 (
                     "f32[1,1,3,6144]"
                     if isolated_dense or integrated_dense_rms

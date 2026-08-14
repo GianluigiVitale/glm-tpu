@@ -316,15 +316,12 @@ def _validate_accepted_attention_input(
             ),
             (("pred", (32, 6144)),): (
                 "pred[32,6144]{1,0:T(8,128)(4,1)}",
-                "pred[32,6144]{1,0:T(8,128)(4,1)S(3)}",
             ),
             (("pred", (1, 1)),): (
-                "pred[1,1]{1,0:T(8,128)(4,1)}",
-                "pred[1,1]{1,0:T(8,128)(4,1)S(3)}",
+                "pred[1,1]{1,0:T(4,128)(4,1)}",
             ),
             (("pred", ()),): (
                 "pred[]{:T(512)}",
-                "pred[]{:T(512)S(6)}",
             ),
         }
         prefixes = (tpu_prefixes if tpu_layout else cpu_prefixes).get(
@@ -772,12 +769,16 @@ def _validate_split_predense_value_flow(
         value: _ResolvedHloValue | None,
     ) -> bool:
         value = graph.semantic(value)
+        lifted_bf16 = False
         if (
             value is not None
             and value.instruction.raw_opcode == "convert"
             and graph.shape(value) == f32_m32
         ):
             value = graph.semantic(graph.operand(value, 0))
+            lifted_bf16 = bool(
+                value is not None and graph.shape(value) == bf16_m32
+            )
         if (
             value is None
             or value.instruction.raw_opcode != "select"
@@ -788,7 +789,15 @@ def _validate_split_predense_value_flow(
             return False
         branches = [graph.operand(value, index) for index in (1, 2)]
         return bool(
-            exact_external_f32(branches[0], accepted_embedding_reduction)
+            (
+                graph.exact_external(
+                    branches[0], accepted_embedding_reduction
+                )
+                if lifted_bf16
+                else exact_external_f32(
+                    branches[0], accepted_embedding_reduction
+                )
+            )
             and exact_nan(branches[1])
         )
 

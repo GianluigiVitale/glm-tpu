@@ -43,6 +43,11 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   separate M1 BF16 rows and pads them inside the fusion. The residual source is independently
   exact: its SHA `02d045b9...1a3` equals checkpoint embedding row 220 byte for byte. Test the full
   accepted source context once; do not reopen the individual ordinal or RMS theories.
+- That composed discriminator's first protected attempt compiled in about 25 seconds and stopped
+  before arithmetic on an over-strict HLO guard. Its exact scheduled TPU graph was recovered and is
+  now the regression oracle: optimized-HLO SHA `081d1b1f...163f8`. The validator passes that graph
+  locally in about 1.3 seconds and rejects mutations of every newly admitted source/layout edge.
+  Never repeat a protected compile merely to iterate a validator against this same graph.
 
 ## Evidence ladder
 

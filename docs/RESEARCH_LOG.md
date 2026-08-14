@@ -5,6 +5,28 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 21:24--21:36 UTC — accepted-source TPU graph is recovered and locally proven
+
+- Reviewed/pushed pin `2cd66fd001e4378ca2537044839f15dd5721d26d` launched the default-off
+  accepted-source-context discriminator once as
+  `greenfield_strategy_nd_integrated_dense_accepted_source_context_20260814T212452244910289Z`.
+  All eight hosts compiled in about 25 seconds, then the optimized-HLO contract refused before
+  arithmetic on the accepted attention/embedding guard. No numerical output, terminal summary or
+  `SUCCESS` exists; pre/failure censuses both prove 8/8 zero work and partial diagnostics are
+  preserved.
+- The compiled graph was recovered from the diagnostic archive and now provides the fast iteration
+  boundary. Optimized-HLO SHA is
+  `081d1b1f3609085a2b455357f8f6f9186c7bb3c5c218c1d10c734bea2b0163f8`; StableHLO SHA remains
+  `b46a58b1cb7576b8124b02ac09b722e07ddebf6cf7663ac5e404f64414144fed`.
+  Direct local validation takes about 1.3 seconds.
+- The refusal was entirely proof-side. Real TPU lowering uses predicate `[1,1]` layout
+  `T(4,128)(4,1)`, preserves the validity-selected embedding row in BF16 before F32 conversion,
+  shifts packed weight parameters by the added validity input, and distinguishes the non-`S(3)`
+  internal layer-1 BF16 round from the `S(3)` externalized carried row. The validator now pins those
+  exact forms and the recovered graph passes. Parser-valid mutations of every new layout/source and
+  packed-parameter edge refuse. Focused real-HLO tests pass 13/13 and dense-convolution tests pass
+  59/59. One correction-only audit precedes commit/push and the single protected numerical retry.
+
 ## 2026-08-14 20:17--20:55 UTC — accepted source-context discriminator is locally assembled
 
 - The existing seconds-scale integrated harness now has one default-off, disjoint accepted-source

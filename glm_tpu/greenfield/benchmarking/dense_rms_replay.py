@@ -669,6 +669,9 @@ def _validate_exact_dense_rms_value_flow(
     accepted_bf16_m32_prefix = (
         "bf16[32,6144]{1,0:T(8,128)(2,1)S(3)}"
     )
+    accepted_bf16_m32_internal_round_prefix = (
+        "bf16[32,6144]{1,0:T(8,128)(2,1)}"
+    )
     accepted_bf16_m1_prefix = "bf16[1,6144]{1,0:T(2,128)(2,1)}"
     accepted_f32_m1_prefix = "f32[1,6144]{1,0:T(1,128)}"
     accepted_u16_m1_prefix = "u16[1,6144]{1,0:T(2,128)(2,1)}"
@@ -746,10 +749,20 @@ def _validate_exact_dense_rms_value_flow(
             )
         return False
 
-    def exact_hybrid_carried(value: _ResolvedHloValue | None) -> bool:
+    def exact_hybrid_carried(
+        value: _ResolvedHloValue | None, *, externalized: bool = False
+    ) -> bool:
         value = semantic_opcode(value, "convert", bf16_m32)
-        if value is None or not exact_split_prefix(
-            value, accepted_bf16_m32_prefix
+        if value is None or (
+            pin_integrated_split_layouts
+            and not graph.exact_prefix(
+                value.instruction,
+                (
+                    accepted_bf16_m32_prefix
+                    if not integrated_accepted or externalized
+                    else accepted_bf16_m32_internal_round_prefix
+                ),
+            )
         ):
             return False
         addition = semantic_opcode(graph.operand(value, 0), "add", f32_m32)
@@ -843,12 +856,16 @@ def _validate_exact_dense_rms_value_flow(
         value: _ResolvedHloValue | None,
     ) -> bool:
         value = graph.semantic(value)
+        lifted_bf16 = False
         if (
             value is not None
             and value.instruction.raw_opcode == "convert"
             and graph.shape(value) == f32_m32
         ):
             value = graph.semantic(graph.operand(value, 0))
+            lifted_bf16 = bool(
+                value is not None and graph.shape(value) == bf16_m32
+            )
         if (
             value is None
             or value.instruction.raw_opcode != "select"
@@ -859,8 +876,14 @@ def _validate_exact_dense_rms_value_flow(
             return False
         branches = [graph.operand(value, index) for index in (1, 2)]
         return bool(
-            exact_external_f32(
-                branches[0], accepted_embedding_reduction
+            (
+                graph.exact_external(
+                    branches[0], accepted_embedding_reduction
+                )
+                if lifted_bf16
+                else exact_external_f32(
+                    branches[0], accepted_embedding_reduction
+                )
             )
             and exact_nan(branches[1])
         )
@@ -997,7 +1020,7 @@ def _validate_exact_dense_rms_value_flow(
                 return False
             if direct_residual:
                 return exact_pad(candidate, 1, "bf16")
-            return exact_hybrid_carried(candidate)
+            return exact_hybrid_carried(candidate, externalized=True)
 
         return exact_row0_f32_source(value, exact_carried_bf16)
 

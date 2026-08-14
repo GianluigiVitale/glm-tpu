@@ -77,6 +77,19 @@ REAL_ORDINAL_TPU_HLO = Path(
 REAL_ORDINAL_TPU_HLO_SHA256 = (
     "433d4938b398769f4db442a7ce5af3baa365fc2137850233f0e9df8162dd042b"
 )
+REAL_ACCEPTED_SOURCE_TPU_HLO = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_INTEGRATED_ACCEPTED_SOURCE_TPU_HLO",
+        "/home/gianl/glm-run/"
+        "greenfield_strategy_nd_integrated_dense_accepted_source_context_"
+        "20260814T212452244910289Z/recovered_hlo/"
+        "strategy_nd_integrated_dense_accepted_source_context_"
+        "bfloat16_32x6144.optimized_hlo.txt",
+    )
+)
+REAL_ACCEPTED_SOURCE_TPU_HLO_SHA256 = (
+    "081d1b1f3609085a2b455357f8f6f9186c7bb3c5c218c1d10c734bea2b0163f8"
+)
 REAL_LEGACY_INTEGRATED_RUN = Path(
     "/home/gianl/glm-run/"
     "greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z"
@@ -828,6 +841,95 @@ def test_real_predense_value_flow_and_mutation_refusals() -> None:
             "add(%convert_element_type.132, %convert_element_type.132),",
             1,
         ),
+    )
+    assert all(mutation != hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError):
+            validate(mutation)
+
+
+@pytest.mark.skipif(
+    not REAL_ACCEPTED_SOURCE_TPU_HLO.is_file(),
+    reason="protected accepted-source integrated TPU HLO absent",
+)
+def test_real_accepted_source_tpu_hlo_and_mutation_refusals() -> None:
+    from jaxlib import xla_client
+
+    hlo = REAL_ACCEPTED_SOURCE_TPU_HLO.read_text()
+    assert sha256(hlo.encode()).hexdigest() == (
+        REAL_ACCEPTED_SOURCE_TPU_HLO_SHA256
+    )
+
+    def validate(value: str) -> dict[str, object]:
+        return validate_integrated_dense_rms_hlo(
+            value,
+            tuple(range(32)),
+            accepted_source_context=True,
+        )
+
+    exact = validate(hlo)
+    assert exact["passed"] is True
+    assert exact["accepted_source_context"] is True
+    assert exact["exact_accepted_attention_input"] is True
+    assert exact["exact_attention_embedding_guard"] is True
+    assert exact["exact_predense_gate_input"] is True
+    assert exact["exact_reduction_operand_graph"] is True
+    assert exact["exact_weighted_operand_graph"] is True
+    assert exact["exact_result_binding"] is True
+    assert exact["residual_source_mode"] == (
+        "accepted_embedding_predicate_plus_attention"
+    )
+    contraction = exact["contraction"]
+    assert isinstance(contraction, dict)
+    assert contraction["exact_packed_weight_lineage"] is True
+    assert contraction["exact_accepted_weight_layout"] is True
+
+    replacements = (
+        (
+            "%is_finite.6 = pred[1,1]{1,0:T(4,128)(4,1)} is-finite(",
+            "%is_finite.6 = pred[1,1]{1,0:T(8,128)(4,1)} is-finite(",
+        ),
+        (
+            "%select_n.42 = bf16[32,6144]{1,0:T(8,128)(2,1)} "
+            "select(%broadcast_in_dim.45, %param_1.120, %broadcast.38)",
+            "%select_n.42 = bf16[32,6144]{1,0:T(8,128)(2,1)} "
+            "select(%broadcast_in_dim.45, %param_0.131, %broadcast.38)",
+        ),
+        (
+            "%select_n.40 = bf16[32,6144]{1,0:T(8,128)(2,1)} "
+            "select(%broadcast_in_dim.43, %param_2.83, %broadcast.36)",
+            "%select_n.40 = bf16[32,6144]{1,0:T(8,128)(2,1)} "
+            "select(%broadcast_in_dim.43, %param_1.119, %broadcast.36)",
+        ),
+        (
+            "%convert_element_type.135 = "
+            "bf16[32,6144]{1,0:T(8,128)(2,1)} convert(",
+            "%convert_element_type.135 = "
+            "bf16[32,6144]{1,0:T(8,128)(2,1)S(3)} convert(",
+        ),
+        (
+            "ROOT %convert.2 = "
+            "bf16[32,6144]{1,0:T(8,128)(2,1)S(3)} convert(",
+            "ROOT %convert.2 = "
+            "bf16[32,6144]{1,0:T(8,128)(2,1)} convert(",
+        ),
+    )
+    mutations = [hlo.replace(old, new, 1) for old, new in replacements]
+    mutations.append(
+        hlo.replace(
+            "%param.12 = bf16[6144]{0:T(1024)(128)(2,1)} "
+            "parameter(3)",
+            "%param.12 = bf16[6144]{0:T(1024)(128)(2,1)} "
+            "parameter(4)",
+            1,
+        ).replace(
+            "%param.13 = f8e4m3fn[1,1,6144,768]"
+            "{3,2,1,0:T(32,128)(4,1)} parameter(4)",
+            "%param.13 = f8e4m3fn[1,1,6144,768]"
+            "{3,2,1,0:T(32,128)(4,1)} parameter(3)",
+            1,
+        )
     )
     assert all(mutation != hlo for mutation in mutations)
     for mutation in mutations:

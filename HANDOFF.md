@@ -19,15 +19,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
-- The composed accepted-source-context discriminator is locally assembled but not yet committed or
-  run. It is a disjoint/default-off nine-input graph: sealed attention row, checkpoint-identical
-  embedding row, exact validity vector, both norm weights and real final-layout dense weights. Its
-  forced-32 CPU StableHLO SHA is `b46a58b1...44fed`; it contains exactly embedding -> attention ->
-  dense collectives and four distinct accepted-source recomputations. Runner/sealer propagation,
-  adversarial source mutations and terminal `SUCCESS` execution pass in the 20-test focused set.
-  Exact next is one immutable bulk Sol audit, commit/push, then one protected seconds-scale run. A
-  bitwise-exact row authorizes the protected 8K confirmation; a miss ends manual arms and starts an
-  automated live-SSA HLO diff.
+- Reviewed/pushed pin `2cd66fd001e4378ca2537044839f15dd5721d26d` launched the composed
+  accepted-source-context discriminator once under tag
+  `greenfield_strategy_nd_integrated_dense_accepted_source_context_20260814T212452244910289Z`.
+  All eight hosts synchronized and compiled the intended nine-input graph in about 25 seconds, but
+  optimized-HLO validation refused before arithmetic with `accepted attention collective
+  input/embedding guard drifted`. There is no output tensor, numerical verdict, terminal summary or
+  `SUCCESS`; pre/failure censuses authenticate 8/8 clean and partial diagnostics remain archived.
+- The exact scheduled graph was recovered locally rather than recompiling: optimized-HLO SHA
+  `081d1b1f...163f8`, StableHLO SHA `b46a58b1...44fed`. Direct replay exposed four proof-only TPU
+  lowerings: predicate `[1,1]` uses `T(4,128)(4,1)`; the validity select stays BF16 before F32;
+  accepted-source weight parameters begin at index four; and layer-1's internal BF16 round is
+  non-`S(3)` while the externalized carried row is `S(3)`. The bounded validator now admits only
+  those exact forms. The SHA-pinned real graph passes locally in about 1.3 seconds; wrong predicate
+  layout, embedding source, layer-1 source, internal/external round layout and packed-parameter
+  order all refuse. The focused real replay passes 13/13 and the dense-convolution suite 59/59.
+- Exact next is one correction-only Sol review of this immutable recovered-HLO batch, commit/push,
+  and one protected numerical retry. A bitwise-exact row authorizes the protected 8K confirmation;
+  a miss ends manual arms and starts the automated live-SSA HLO diff.
 
 - Reviewed/pushed pin `fb207a42c76d95aa561c3150026b58877a93d9f2` completed the protected
   pre-dense scalar/gate-fusion discriminator under tag
