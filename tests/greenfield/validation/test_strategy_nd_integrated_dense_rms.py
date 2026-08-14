@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from hashlib import sha256
 from pathlib import Path
 import subprocess
 import sys
@@ -20,12 +21,14 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256,
     integrated_dense_rms_hlo_policy,
+    validate_integrated_dense_rms_hlo,
     validate_integrated_dense_rms_stablehlo,
 )
 from glm_tpu.greenfield.validation.strategy_nd_integrated_dense_rms import (
     CHECKPOINT_SUCCESS_SHA256,
     _recompute_comparison,
     _validate_capture,
+    _validate_hlo_prevalidation,
 )
 
 
@@ -39,6 +42,18 @@ REAL_STAGE0_SLOT0 = Path(
     "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/"
     "PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/"
     "base_decoder_runtime_feature/stage_00/device_slot_00.safetensors"
+)
+REAL_SPLIT_TPU_HLO = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_INTEGRATED_SPLIT_TPU_HLO",
+        "/home/gianl/glm-run/"
+        "greenfield_recover_integrated_split_hlo_20260814T192500000000000Z/"
+        "recovery_hlo/worker0/"
+        "module_0012.jit_integrated.cl_914450892.after_codegen.txt",
+    )
+)
+REAL_SPLIT_TPU_HLO_SHA256 = (
+    "212aa36a9587ff390e6b0c18b654187d96e158eb896eaece1af51cda35df4e27"
 )
 
 
@@ -136,6 +151,107 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
         integrated_dense_rms_hlo_policy(tuple(reversed(range(32))))
 
 
+@pytest.mark.skipif(
+    not REAL_SPLIT_TPU_HLO.is_file(),
+    reason="protected split integrated TPU HLO absent",
+)
+def test_real_split_tpu_hlo_and_row_recompute_mutations() -> None:
+    from jaxlib import xla_client
+
+    hlo = REAL_SPLIT_TPU_HLO.read_text()
+    assert sha256(hlo.encode()).hexdigest() == REAL_SPLIT_TPU_HLO_SHA256
+    contract = validate_integrated_dense_rms_hlo(
+        hlo,
+        tuple(range(32)),
+        split_layer1_rms=True,
+    )
+    assert contract["exact_accepted_scheduled_reduction"] is True
+    assert contract["split_output_fusion_exact"] is True
+    assert contract["split_recompute_exact"] is True
+    replacements = (
+        (
+            "%slice.36 = bf16[1,6144]{1,0:T(2,128)(2,1)} "
+            "slice(%param_1.98), slice={[0:1], [0:6144]}",
+            "%slice.36 = bf16[1,6144]{1,0:T(2,128)(2,1)} "
+            "slice(%param_1.98), slice={[1:2], [0:6144]}",
+        ),
+        (
+            "%add.55 = f32[1,6144]{1,0:T(1,128)} "
+            "add(%convert_element_type.145, %convert_element_type.144)",
+            "%add.55 = f32[1,6144]{1,0:T(1,128)} "
+            "add(%convert_element_type.145, %convert_element_type.145)",
+        ),
+        (
+            "%param_1.98 = bf16[32,6144]{1,0:T(8,128)(2,1)S(3)} parameter(1)",
+            "%param_1.98 = bf16[32,6144]{1,0} parameter(1)",
+        ),
+        (
+            "%slice.36 = bf16[1,6144]{1,0:T(2,128)(2,1)} slice(",
+            "%slice.36 = bf16[1,6144]{1,0} slice(",
+        ),
+        (
+            "%convert_element_type.145 = f32[1,6144]{1,0:T(1,128)} convert(",
+            "%convert_element_type.145 = f32[1,6144]{1,0} convert(",
+        ),
+        (
+            "%add.55 = f32[1,6144]{1,0:T(1,128)} add(",
+            "%add.55 = f32[1,6144]{1,0} add(",
+        ),
+        (
+            "%mul.113 = f32[1,6144]{1,0:T(1,128)} broadcast(",
+            "%mul.113 = f32[1,6144]{1,0} broadcast(",
+        ),
+        (
+            "%mul.111 = f32[1,6144]{1,0:T(1,128)} multiply(",
+            "%mul.111 = f32[1,6144]{1,0} multiply(",
+        ),
+        (
+            "%convert_element_type.141 = bf16[1,6144]{1,0:T(2,128)(2,1)} convert(",
+            "%convert_element_type.141 = bf16[1,6144]{1,0} convert(",
+        ),
+        (
+            "%convert.2 = f32[1,6144]{1,0:T(1,128)} convert(",
+            "%convert.2 = f32[1,6144]{1,0} convert(",
+        ),
+        (
+            "%mul.112 = bf16[1,6144]{1,0:T(2,128)(2,1)} broadcast(",
+            "%mul.112 = bf16[1,6144]{1,0} broadcast(",
+        ),
+        (
+            "%convert.3 = f32[1,6144]{1,0:T(1,128)} convert(",
+            "%convert.3 = f32[1,6144]{1,0} convert(",
+        ),
+        (
+            "%mul.109 = f32[1,6144]{1,0:T(1,128)} multiply(",
+            "%mul.109 = f32[1,6144]{1,0} multiply(",
+        ),
+        (
+            "%convert.4 = bf16[1,6144]{1,0:T(2,128)(2,1)} convert(",
+            "%convert.4 = bf16[1,6144]{1,0} convert(",
+        ),
+        (
+            "ROOT %bitcast_convert_type.4 = u16[1,6144]{1,0:T(2,128)(2,1)} "
+            "bitcast-convert(",
+            "ROOT %bitcast_convert_type.4 = u16[1,6144]{1,0} bitcast-convert(",
+        ),
+        (
+            "ROOT %multiply_bitcast-convert_fusion = "
+            "u16[1,6144]{1,0:T(2,128)(2,1)} fusion(",
+            "ROOT %multiply_bitcast-convert_fusion = u16[1,6144]{1,0} fusion(",
+        ),
+    )
+    mutations = tuple(hlo.replace(old, new, 1) for old, new in replacements)
+    assert all(mutation != hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError):
+            validate_integrated_dense_rms_hlo(
+                mutation,
+                tuple(range(32)),
+                split_layer1_rms=True,
+            )
+
+
 def test_checkpoint_success_pin_and_missing_mutated_refusals(
     tmp_path: Path,
 ) -> None:
@@ -183,6 +299,37 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
         _validate_capture(capture, expected)
 
 
+def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
+    record = {
+        "optimized_hlo_sha256": "1" * 64,
+        "performance_claim": False,
+        "split_layer1_rms": True,
+        "stablehlo_sha256": "2" * 64,
+        "validated": False,
+    }
+    _validate_hlo_prevalidation(
+        record,
+        optimized_hlo_sha256="1" * 64,
+        stablehlo_sha256="2" * 64,
+        split_layer1_rms=True,
+    )
+    for key, value in (
+        ("validated", True),
+        ("performance_claim", True),
+        ("split_layer1_rms", False),
+        ("optimized_hlo_sha256", "3" * 64),
+    ):
+        mutation = dict(record)
+        mutation[key] = value
+        with pytest.raises(ValueError, match="prevalidation record drifted"):
+            _validate_hlo_prevalidation(
+                mutation,
+                optimized_hlo_sha256="1" * 64,
+                stablehlo_sha256="2" * 64,
+                split_layer1_rms=True,
+            )
+
+
 def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
     wrapper = (
         REPO / "scripts/greenfield/run_strategy_nd_dense_replay.sh"
@@ -198,4 +345,15 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
     assert '"$RMS_REPLAY" "$INTEGRATED_REPLAY"' in wrapper
     assert wrapper.index("strict_census post") < wrapper.index(
         '"$REMOTE_PREFIX/SUCCESS" >/dev/null'
+    )
+    runner = (
+        REPO / "scripts/greenfield/microbench_collectives.py"
+    ).read_text()
+    start = runner.index("def _run_strategy_nd_integrated_dense_rms(")
+    end = runner.index("\ndef _run_strategy_nd_fingerprint(", start)
+    integrated = runner[start:end]
+    assert "validate_hlo=False" in integrated
+    assert "hlo_prevalidation.json" in integrated
+    assert integrated.index("hlo_prevalidation.json") < integrated.index(
+        "execute_integrated_dense_rms("
     )

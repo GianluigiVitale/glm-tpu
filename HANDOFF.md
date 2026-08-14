@@ -19,6 +19,25 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `7bbe71e3c6325c58e2449712e2907e76d2d32cc5` launched the scalar-only
+  one-graph challenger under tag
+  `greenfield_strategy_nd_integrated_dense_split_rms_20260814T182610477998565Z`. All eight hosts
+  compiled the intended graph in about 22 seconds, but the optimized-HLO validator refused before
+  arithmetic because it recognized only an M32 F32 sum followed by row-zero slicing. No output
+  tensor, numerical verdict, terminal archive or `SUCCESS` exists; failure cleanup is 8/8 clean and
+  only partial diagnostics were uploaded.
+- A serialized compile-only recovery at the same clean pin and sealed inputs preserved the exact
+  TPU after-codegen HLO under
+  `greenfield_recover_integrated_split_hlo_20260814T192500000000000Z`; SHA is
+  `212aa36a...e27`. It proves the live output fusion instead slices the collective and carried BF16
+  M32 sources independently to M1, converts both to F32, adds them, applies the accepted scalar
+  rsqrt, performs the exact BF16 round/weight path and returns that value. This is the same exact
+  arithmetic, not a new hypothesis. Row-one, duplicated-source and every M32-input/M1-live-path
+  physical-layout mutation now refuse in the local correction, while the pinned real HLO passes.
+  The runner also writes StableHLO/optimized
+  HLO plus a non-validating manifest before validation so future proof failures cannot lose the
+  compiler evidence. Exact next is one bulk review, commit/push, then the same seconds-scale
+  protected numerical replay. A full 8K remains forbidden until all 6,144 values are exact.
 - Protected one-graph run
   `greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z` completed at reviewed
   pin `d7872b582181e8c2518da2d8785b109a733e92b1` in 48 seconds and sealed a complete no-DB archive
@@ -33,8 +52,9 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `2x1` and megacore split dimension 0; the integrated control emits a tuple
   `(f32[32], f32[32,6144])` with `4x24` / `1x2` and split dimension 1. The default-off split
   challenger preserves the same one-graph contraction and psum but schedules only the scalar RMS
-  reduction and recomputes the live residual sum in the output fusion. Run this sub-minute
-  discriminator once after review. An exact row authorizes one protected 8K; a rejection closes
+  reduction and recomputes the live residual sum in the output fusion. Its first protected launch
+  exposed and localized the proof-only false negative recorded above. An exact row authorizes one
+  protected 8K; a numerical rejection closes
   RMS scheduling and moves only to collective-site/ordinal context. Do not reopen weights,
   contractions, standalone association, direct residual substitution, observers or scalar patches.
 - Protected direct-residual replay `greenfield_strategy_nd_dense_rms_replay_20260814T165204489161611Z`

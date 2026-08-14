@@ -5,6 +5,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 18:26--18:38 UTC — scalar challenger compiles; exact TPU HLO recovered in seconds
+
+- Reviewed/pushed pin `7bbe71e3c6325c58e2449712e2907e76d2d32cc5` launched tag
+  `greenfield_strategy_nd_integrated_dense_split_rms_20260814T182610477998565Z`. The complete
+  one-graph scalar-schedule challenger compiled on all eight hosts in roughly 22 seconds, then its
+  optimized-HLO proof refused before execution. There is no output array, arithmetic verdict,
+  summary, terminal ledger or `SUCCESS`; authenticated failure cleanup is 8/8 clean. This is not a
+  numerical rejection of the challenger.
+- The runner originally wrote HLO only after `build(... validate_hlo=True)` returned, so the proof
+  refusal also discarded the already compiled graph. A serialized compile-only recovery reused the
+  same clean pin and sealed inputs under
+  `greenfield_recover_integrated_split_hlo_20260814T192500000000000Z`. It executed no arithmetic,
+  preserved 40 compiler artifacts per host, archived them under the approved bucket and ended with
+  8/8 clean census. Process-zero after-codegen HLO SHA is
+  `212aa36a9587ff390e6b0c18b654187d96e158eb896eaece1af51cda35df4e27`.
+- The HLO localizes the proof false negative exactly. The output fusion slices row zero separately
+  from the BF16 StrategyND result and the BF16 carried residual, converts both M1 rows to F32, adds
+  them, multiplies by the accepted scalar rsqrt, rounds to BF16, applies the layer-1 BF16 weight and
+  returns the live bits. The validator had accepted only a full M32 F32 add followed by a row-zero
+  slice. The bounded correction admits this exact second lowering, rejects row-one and duplicated
+  source mutations, and requires sum/normalized/weighted operations to share the live non-ENTRY
+  output fusion. Exact accepted layouts are pinned from both BF16 M32 fusion parameters through
+  every M1 convert/add/rsqrt/round/weight edge and both internal/ENTRY U16 results; parser-valid
+  untiled mutations refuse. The protected runner now writes raw StableHLO/optimized HLO and a
+  `validated=false` prevalidation record before running proof gates. Exact next is one review and
+  one seconds-scale numerical replay; full 8K remains frozen.
+
 ## 2026-08-14 18:00 UTC — one-graph control rejected; scalar RMS schedule isolated
 
 - Protected tag `greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z` ran the

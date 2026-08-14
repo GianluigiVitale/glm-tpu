@@ -11,6 +11,7 @@ record and never claims model throughput.
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -85,6 +86,13 @@ def _atomic_write(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    temporary.replace(path)
+
+
+def _atomic_write_text(path: Path, value: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
+    temporary.write_text(value)
     temporary.replace(path)
 
 
@@ -664,11 +672,48 @@ def _run_strategy_nd_integrated_dense_rms(
     compiled = build_integrated_dense_rms(
         physical_ids,
         devices=jax.devices(),
-        validate_hlo=True,
+        validate_hlo=False,
         split_layer1_rms=split_layer1_rms,
     )
     stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
     optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
+    replay_dir = args.output.parent / "integrated_dense_rms"
+    hlo_dir = args.output.parent / "hlo"
+    stablehlo_path = hlo_dir / f"{label}.stablehlo.mlir"
+    optimized_hlo_path = hlo_dir / f"{label}.optimized_hlo.txt"
+    contract_path = hlo_dir / f"{label}.hlo_contract.json"
+    if jax.process_index() == 0:
+        _atomic_write_text(stablehlo_path, compiled.stablehlo)
+        _atomic_write_text(optimized_hlo_path, compiled.optimized_hlo)
+        _atomic_write(
+            hlo_dir / f"{label}.hlo_prevalidation.json",
+            {
+                "optimized_hlo_sha256": optimized_hlo_sha,
+                "performance_claim": False,
+                "split_layer1_rms": split_layer1_rms,
+                "stablehlo_sha256": stablehlo_sha,
+                "validated": False,
+            },
+        )
+    from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
+        validate_integrated_dense_rms_hlo,
+        validate_integrated_dense_rms_stablehlo,
+    )
+
+    stablehlo_contract = validate_integrated_dense_rms_stablehlo(
+        compiled.stablehlo,
+        split_layer1_rms=split_layer1_rms,
+    )
+    optimized_hlo_contract = validate_integrated_dense_rms_hlo(
+        compiled.optimized_hlo,
+        physical_ids,
+        split_layer1_rms=split_layer1_rms,
+    )
+    compiled = replace(
+        compiled,
+        stablehlo_contract=stablehlo_contract,
+        optimized_hlo_contract=optimized_hlo_contract,
+    )
     fleet_stablehlo_hashes = _fleet_digest(
         multihost_utils,
         stablehlo_sha,
@@ -756,15 +801,7 @@ def _run_strategy_nd_integrated_dense_rms(
         for key, value in stable_hashes.items()
     }
     artifact_manifest: dict[str, Any] = {}
-    replay_dir = args.output.parent / "integrated_dense_rms"
-    hlo_dir = args.output.parent / "hlo"
     if jax.process_index() == 0:
-        hlo_dir.mkdir(parents=True, exist_ok=True)
-        stablehlo_path = hlo_dir / f"{label}.stablehlo.mlir"
-        optimized_hlo_path = hlo_dir / f"{label}.optimized_hlo.txt"
-        contract_path = hlo_dir / f"{label}.hlo_contract.json"
-        stablehlo_path.write_text(compiled.stablehlo)
-        optimized_hlo_path.write_text(compiled.optimized_hlo)
         _atomic_write(
             contract_path,
             {

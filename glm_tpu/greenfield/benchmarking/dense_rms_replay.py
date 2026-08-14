@@ -615,6 +615,23 @@ def _validate_exact_dense_rms_value_flow(
     }
     if not (direct_residual or hybrid_control or integrated_control):
         raise BenchmarkValidationError("dense RMS replay ENTRY inputs drifted")
+    pin_integrated_split_layouts = bool(
+        integrated_control and require_split_output_fusion
+    )
+    accepted_bf16_m32_prefix = (
+        "bf16[32,6144]{1,0:T(8,128)(2,1)S(3)}"
+    )
+    accepted_bf16_m1_prefix = "bf16[1,6144]{1,0:T(2,128)(2,1)}"
+    accepted_f32_m1_prefix = "f32[1,6144]{1,0:T(1,128)}"
+    accepted_u16_m1_prefix = "u16[1,6144]{1,0:T(2,128)(2,1)}"
+
+    def exact_split_prefix(
+        value: _ResolvedHloValue, signature: str
+    ) -> bool:
+        return bool(
+            not pin_integrated_split_layouts
+            or graph.exact_prefix(value.instruction, signature)
+        )
 
     def semantic_opcode(
         value: _ResolvedHloValue | None,
@@ -683,7 +700,9 @@ def _validate_exact_dense_rms_value_flow(
 
     def exact_hybrid_carried(value: _ResolvedHloValue | None) -> bool:
         value = semantic_opcode(value, "convert", bf16_m32)
-        if value is None:
+        if value is None or not exact_split_prefix(
+            value, accepted_bf16_m32_prefix
+        ):
             return False
         addition = semantic_opcode(graph.operand(value, 0), "add", f32_m32)
         if addition is None or len(addition.instruction.operand_names) != 2:
@@ -754,6 +773,68 @@ def _validate_exact_dense_rms_value_flow(
             and exact_hybrid_carried(graph.operand(value, 0))
         )
 
+    def exact_row0_f32_source(
+        value: _ResolvedHloValue | None,
+        source_match: Any,
+    ) -> bool:
+        value = semantic_opcode(value, "convert", f32_m1)
+        if value is None or not exact_split_prefix(value, accepted_f32_m1_prefix):
+            return False
+        row = graph.semantic(graph.operand(value, 0))
+        if (
+            row is None
+            or row.instruction.raw_opcode != "slice"
+            or graph.shape(row) != bf16_m1
+            or not exact_split_prefix(row, accepted_bf16_m1_prefix)
+            or re.findall(
+                r"\bslice=(\{\[[^}\n]+\]\})",
+                re.sub(r"\s+", "", graph.clean(row.instruction)),
+            )
+            != ["{[0:1],[0:6144]}"]
+            or len(row.instruction.operand_names) != 1
+        ):
+            return False
+        if pin_integrated_split_layouts:
+            parameter = graph.by_key.get(
+                (
+                    row.instruction.computation,
+                    row.instruction.operand_names[0],
+                )
+            )
+            if not (
+                parameter is not None
+                and parameter.raw_opcode == "parameter"
+                and graph.exact_prefix(parameter, accepted_bf16_m32_prefix)
+            ):
+                return False
+        return bool(
+            source_match(graph.operand(row, 0), rows=32)
+        )
+
+    def exact_collective_row0_f32(
+        value: _ResolvedHloValue | None,
+    ) -> bool:
+        return exact_row0_f32_source(
+            value,
+            lambda candidate, *, rows: bool(
+                rows == 32 and graph.exact_external(candidate, reduction)
+            ),
+        )
+
+    def exact_carried_row0_f32(
+        value: _ResolvedHloValue | None,
+    ) -> bool:
+        def exact_carried_bf16(
+            candidate: _ResolvedHloValue | None, *, rows: int
+        ) -> bool:
+            if rows != 32:
+                return False
+            if direct_residual:
+                return exact_pad(candidate, 1, "bf16")
+            return exact_hybrid_carried(candidate)
+
+        return exact_row0_f32_source(value, exact_carried_bf16)
+
     def exact_sum(
         value: _ResolvedHloValue | None,
         *,
@@ -761,7 +842,7 @@ def _validate_exact_dense_rms_value_flow(
         track_split_output: bool = False,
     ) -> bool:
         if rows == 1:
-            return graph.exact_row0(
+            if graph.exact_row0(
                 value,
                 lambda candidate, *, rows: exact_sum(
                     candidate,
@@ -769,7 +850,28 @@ def _validate_exact_dense_rms_value_flow(
                     track_split_output=track_split_output,
                 ),
                 dtype="f32",
+            ):
+                return True
+            if not require_split_output_fusion:
+                return False
+            recompute = semantic_opcode(value, "add", f32_m1)
+            if (
+                recompute is None
+                or not exact_split_prefix(recompute, accepted_f32_m1_prefix)
+                or len(recompute.instruction.operand_names) != 2
+            ):
+                return False
+            operands = [graph.operand(recompute, index) for index in range(2)]
+            exact = any(
+                exact_collective_row0_f32(operands[left])
+                and exact_carried_row0_f32(operands[1 - left])
+                for left in range(2)
             )
+            if exact and track_split_output:
+                split_output_owners["sum"].add(
+                    recompute.instruction.computation
+                )
+            return exact
         from_tuple_schedule = exact_schedule_projection(value, 1)
         value = semantic_opcode(value, "add", f32_m32)
         if value is None or len(value.instruction.operand_names) != 2:
@@ -939,6 +1041,10 @@ def _validate_exact_dense_rms_value_flow(
             value is None
             or value.instruction.raw_opcode not in {"broadcast", "broadcast-in-dim"}
             or graph.shape(value) != expected_shape
+            or (
+                rows == 1
+                and not exact_split_prefix(value, accepted_f32_m1_prefix)
+            )
         ):
             return False
         dimensions = re.findall(
@@ -981,7 +1087,14 @@ def _validate_exact_dense_rms_value_flow(
     ) -> bool:
         shape = (("f32", (rows, 6144)),)
         value = semantic_opcode(value, "multiply", shape)
-        if value is None or len(value.instruction.operand_names) != 2:
+        if (
+            value is None
+            or (
+                rows == 1
+                and not exact_split_prefix(value, accepted_f32_m1_prefix)
+            )
+            or len(value.instruction.operand_names) != 2
+        ):
             return False
         operands = [graph.operand(value, index) for index in range(2)]
         for index in range(2):
@@ -1008,6 +1121,10 @@ def _validate_exact_dense_rms_value_flow(
         )
         return bool(
             value is not None
+            and (
+                rows != 1
+                or exact_split_prefix(value, accepted_bf16_m1_prefix)
+            )
             and exact_normalized_f32(
                 graph.operand(value, 0),
                 rows=rows,
@@ -1022,7 +1139,13 @@ def _validate_exact_dense_rms_value_flow(
         if value is None:
             return False
         if value.instruction.raw_opcode == "convert":
-            return exact_weight_bf16(graph.operand(value, 0), rows=rows)
+            return bool(
+                (
+                    rows != 1
+                    or exact_split_prefix(value, accepted_f32_m1_prefix)
+                )
+                and exact_weight_bf16(graph.operand(value, 0), rows=rows)
+            )
         return False
 
     def exact_weight_bf16(
@@ -1033,6 +1156,10 @@ def _validate_exact_dense_rms_value_flow(
             value is None
             or value.instruction.raw_opcode not in {"broadcast", "broadcast-in-dim"}
             or graph.shape(value) != (("bf16", (rows, 6144)),)
+            or (
+                rows == 1
+                and not exact_split_prefix(value, accepted_bf16_m1_prefix)
+            )
             or re.findall(
                 r"\bdimensions=\{([^}]*)\}", graph.clean(value.instruction)
             )
@@ -1056,6 +1183,10 @@ def _validate_exact_dense_rms_value_flow(
             value is not None
             and value.instruction.raw_opcode == "convert"
             and graph.shape(value) == (("f32", (rows, 6144)),)
+            and (
+                rows != 1
+                or exact_split_prefix(value, accepted_f32_m1_prefix)
+            )
             and exact_normalized_bf16(
                 graph.operand(value, 0),
                 rows=rows,
@@ -1072,12 +1203,22 @@ def _validate_exact_dense_rms_value_flow(
         value = semantic_opcode(
             value, "convert", (("bf16", (rows, 6144)),)
         )
-        if value is None:
+        if value is None or (
+            rows == 1
+            and not exact_split_prefix(value, accepted_bf16_m1_prefix)
+        ):
             return False
         multiply = semantic_opcode(
             graph.operand(value, 0), "multiply", (("f32", (rows, 6144)),)
         )
-        if multiply is None or len(multiply.instruction.operand_names) != 2:
+        if (
+            multiply is None
+            or (
+                rows == 1
+                and not exact_split_prefix(multiply, accepted_f32_m1_prefix)
+            )
+            or len(multiply.instruction.operand_names) != 2
+        ):
             return False
         operands = [graph.operand(multiply, index) for index in range(2)]
         for index in range(2):
@@ -1142,7 +1283,17 @@ def _validate_exact_dense_rms_value_flow(
             )
         )
 
+    if pin_integrated_split_layouts and not graph.exact_prefix(
+        root, accepted_u16_m1_prefix
+    ):
+        raise BenchmarkValidationError(
+            "dense RMS live ENTRY result layout drifted"
+        )
     output = semantic_opcode(graph.value(root), "bitcast-convert", (("u16", (1, 6144)),))
+    if output is not None and not exact_split_prefix(
+        output, accepted_u16_m1_prefix
+    ):
+        output = None
     if output is None or not exact_final_bf16_row(graph.operand(output, 0)):
         output_operand = graph.semantic(
             graph.operand(output, 0) if output is not None else None

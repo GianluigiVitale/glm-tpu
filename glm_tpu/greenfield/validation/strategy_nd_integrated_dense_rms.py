@@ -100,6 +100,32 @@ EXPECTED_CAPTURE_FIELDS = {
     "repeated_local_replica_output_sha256",
     "repeated_output_bits_sha256",
 }
+EXPECTED_HLO_PREVALIDATION_FIELDS = {
+    "optimized_hlo_sha256",
+    "performance_claim",
+    "split_layer1_rms",
+    "stablehlo_sha256",
+    "validated",
+}
+
+
+def _validate_hlo_prevalidation(
+    record: object,
+    *,
+    optimized_hlo_sha256: str,
+    stablehlo_sha256: str,
+    split_layer1_rms: bool,
+) -> None:
+    if not (
+        type(record) is dict
+        and set(record) == EXPECTED_HLO_PREVALIDATION_FIELDS
+        and record["optimized_hlo_sha256"] == optimized_hlo_sha256
+        and record["stablehlo_sha256"] == stablehlo_sha256
+        and record["split_layer1_rms"] is split_layer1_rms
+        and record["validated"] is False
+        and record["performance_claim"] is False
+    ):
+        raise ValueError("integrated dense HLO prevalidation record drifted")
 
 
 def _recompute_comparison(
@@ -432,10 +458,12 @@ def validate_strategy_nd_integrated_dense_rms(
     stable_path = hlo_dir / f"{label}.stablehlo.mlir"
     optimized_path = hlo_dir / f"{label}.optimized_hlo.txt"
     contract_path = hlo_dir / f"{label}.hlo_contract.json"
+    prevalidation_path = hlo_dir / f"{label}.hlo_prevalidation.json"
     if {path.name for path in hlo_dir.iterdir() if path.is_file()} != {
         stable_path.name,
         optimized_path.name,
         contract_path.name,
+        prevalidation_path.name,
     }:
         raise ValueError("integrated dense HLO artifact set drifted")
     stablehlo = stable_path.read_text()
@@ -453,6 +481,12 @@ def validate_strategy_nd_integrated_dense_rms(
     optimized_contract = validate_integrated_dense_rms_hlo(
         optimized_hlo,
         tuple(range(32)),
+        split_layer1_rms=expected_split_layer1_rms,
+    )
+    _validate_hlo_prevalidation(
+        json.loads(prevalidation_path.read_text()),
+        optimized_hlo_sha256=reference["optimized_hlo_sha256"],
+        stablehlo_sha256=reference["stablehlo_sha256"],
         split_layer1_rms=expected_split_layer1_rms,
     )
     if not (

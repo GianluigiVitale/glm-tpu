@@ -86,6 +86,18 @@ branches from the search tree.
 - Parse real attributes outside quoted metadata and comments. Pin physical layouts, replica groups,
   reducer parameters/opcode, scheduled backend geometry and synchronous collective form.
 - Every accepted HLO form needs adversarial mutation tests and a SHA-pinned preserved-real replay.
+- Write raw StableHLO and optimized HLO atomically before applying the semantic validator. Mark the
+  prevalidation record non-valid and publish no result until every proof passes. A validator
+  refusal after compilation must preserve the graph needed to correct the proof; never spend
+  another protected attempt rediscovering an HLO that was already available in memory.
+- When a validator rejects a new compiler form, recover or dump that exact scheduled graph first.
+  Add only the exact value-flow-equivalent lowering observed there, then require mutations of each
+  newly admitted edge to refuse. Do not weaken the proof from an exception string or source-level
+  expectation.
+- Value-flow equality does not prove physical execution equality. For an admitted TPU lowering,
+  pin the physical layouts at every source parameter, slice/reshape boundary, arithmetic result and
+  live root whose reinterpretation can change association or row ownership; test parser-valid
+  layout-only mutations as well as opcode/source mutations.
 
 ## Numerical rules
 
@@ -126,6 +138,10 @@ branches from the search tree.
   local test is its accepted scalar-only RMS schedule/recompute form, selected directly from the
   accepted-vs-control HLO differential. It reuses the packed checkpoint and sealed inputs and must
   remain no-DB/default-off until bitwise exact.
+- The first scalar-only launch reached the intended schedule but failed only in proof. Recovered TPU
+  HLO shows the final fusion forms the M1 F32 sum from two independently sliced BF16 row-zero
+  sources. This exact lowering is now the sole admitted correction; it does not reopen RMS
+  arithmetic or authorize a decoder run until the complete protected row is exact.
 - Integrate only a structural boundary that makes the entire 6,144-value accepted row exact. Never
   patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
 
