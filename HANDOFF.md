@@ -34,9 +34,10 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   mechanics only. Never combine same-position tensors from different executions without an
   explicit coherent-event manifest.
 - The exact next datum is the accepted layer-0 post-attention residual at position 8155. The
-  default-off, non-returning dense-boundary observer and protected 8K wrapper already exist at
-  legacy pin `8443ea64f4574335091130f0e4f1dfef258c91f7`; the previous launch failed before model load
-  only on an old disk-reserve check and produced no tensor. Seal that residual once, then replace
+  default-off, non-returning dense-boundary observer and protected 8K wrapper already exist. The
+  hook is unchanged in the reviewed latest observer pin
+  `4e3aa9666cefa38deba9c2824d5125c2e32ab2cf`; the previous launch failed before model load only on
+  an old disk-reserve check and produced no tensor. Seal that residual once, then replace
   the hybrid reconstruction with the direct accepted row and rerun the same 24-second executable.
   No dense contraction, association or scalar hypothesis may be reopened.
 

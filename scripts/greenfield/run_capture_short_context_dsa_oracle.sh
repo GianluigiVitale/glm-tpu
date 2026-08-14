@@ -145,9 +145,12 @@ elif [[ $INTERNAL_CAPTURE == 1 ]]; then
     readonly OBSERVER_COMMIT_DISTANCE=11
     readonly LEGACY_PIN=0c2f7f28a075a51f5eb51dc98bbb74e363d3290f
   elif [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
-    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-8443ea64f
-    readonly OBSERVER_COMMIT_DISTANCE=10
-    readonly LEGACY_PIN=8443ea64f4574335091130f0e4f1dfef258c91f7
+    # The later dense-partial observer preserves the already-reviewed
+    # dense-boundary hook byte-for-byte and is the clean branch head deployed
+    # by the shared protected wrapper.
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-4e3aa9666
+    readonly OBSERVER_COMMIT_DISTANCE=12
+    readonly LEGACY_PIN=4e3aa9666cefa38deba9c2824d5125c2e32ab2cf
   elif [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-23ab8780f
     readonly OBSERVER_COMMIT_DISTANCE=9

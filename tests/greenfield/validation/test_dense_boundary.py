@@ -438,8 +438,8 @@ def test_protected_wrapper_pins_dense_boundary_sources_and_cleanup() -> None:
     assert "GLM_GREENFIELD_DSA_INTERNALS_MODE=dense_boundary" in launcher
     assert "GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE=8k" in launcher
     for exact in (
-        "LEGACY_PIN=8443ea64f4574335091130f0e4f1dfef258c91f7",
-        "OBSERVER_COMMIT_DISTANCE=10",
+        "LEGACY_PIN=4e3aa9666cefa38deba9c2824d5125c2e32ab2cf",
+        "OBSERVER_COMMIT_DISTANCE=12",
         "DENSE_CONVOLUTION_RUN_ID=540",
         "DENSE_CONVOLUTION_CODE_HASH=2f63779309b25c71c1cc7d35ff97715ae4bf631e",
         "DENSE_CONVOLUTION_RUNNER_SHA=876353e2504d728343223f03be9092a08d2662924ceb4b88d6f09563101bad91",
@@ -448,6 +448,7 @@ def test_protected_wrapper_pins_dense_boundary_sources_and_cleanup() -> None:
         "DENSE_CONVOLUTION_SUCCESS_SHA=d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799",
     ):
         assert exact in wrapper
+    assert "later dense-partial observer preserves" in wrapper
     assert '"post_attention_residual_nonexact"' in wrapper
     assert '"layer0_post_attention_residual"' in wrapper
     assert '"dense_boundary_residual_exact": str(residual_exact).lower()' in wrapper
