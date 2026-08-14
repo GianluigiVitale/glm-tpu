@@ -34,9 +34,15 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   exactly reproduced rejected DB549: 1,073/6,144 mismatches, SHA `229dc8ac...812f`. RMS schedule
   and layer-1 recomputation are therefore closed too. The protected attention-before-dense
   ordinal challenger produced the identical rejected row, so collective site/ordinal context is
-  closed as well. The remaining observed HLO delta is pre-dense RMS scheduling: accepted retains
-  only the scalar reduction and recomputes the rounded residual/normalized value in the gate
-  fusion; the control retains a scalar-plus-full-residual tuple. Test that boundary only.
+  closed as an isolated arm. The protected scalar-only pre-dense challenger then reproduced the
+  same rejected DB549 row despite exact gate-fusion recomputation, so pre-dense RMS scheduling is
+  closed too.
+- The next boundary is the composition that none of those isolated arms tested. Accepted HLO
+  carries the M32 embedding StrategyND result, its validity predicate and the attention StrategyND
+  result directly into both downstream fused norms. The greenfield discriminator supplies exact
+  separate M1 BF16 rows and pads them inside the fusion. The residual source is independently
+  exact: its SHA `02d045b9...1a3` equals checkpoint embedding row 220 byte for byte. Test the full
+  accepted source context once; do not reopen the individual ordinal or RMS theories.
 
 ## Evidence ladder
 
@@ -141,10 +147,11 @@ branches from the search tree.
   scalar-only RMS schedule/recompute challenger exactly reproduces DB549 and is closed as well.
   The ordinal discriminator reconstructed the sealed attention row through a first
   value-preserving StrategyND reduction, then ran dense second; its protected output was unchanged
-  from rejected DB549. Freeze that arm. The remaining bounded discriminator restores accepted
-  scalar-only pre-dense RMS plus gate-fusion recomputation while retaining the already frozen
-  layer-1 split. It loads only layer-0 weights and remains no-DB/default-off until all 6,144 values
-  are exact.
+  from rejected DB549. Freeze that arm. The pre-dense scalar/gate-fusion discriminator also
+  reproduced DB549 and is frozen. The remaining bounded discriminator combines the already proven
+  pieces in the exact accepted source context: embedding M32 collective and validity select,
+  attention M32 collective, pre-dense scalar/gate fusion, dense psum and layer-1 scalar/recompute.
+  It loads only layer-0 weights and remains no-DB/default-off until all 6,144 values are exact.
 - The first scalar-only launch reached the intended schedule but failed only in proof. Recovered TPU
   HLO shows the final fusion forms the M1 F32 sum from two independently sliced BF16 row-zero
   sources. This exact lowering is now the sole admitted correction; it does not reopen RMS

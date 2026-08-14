@@ -19,6 +19,30 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `fb207a42c76d95aa561c3150026b58877a93d9f2` completed the protected
+  pre-dense scalar/gate-fusion discriminator under tag
+  `greenfield_strategy_nd_integrated_dense_predense_split_rms_20260814T201339130390866Z` in
+  42 seconds. Exact StableHLO/optimized-HLO value-flow validation passed, the same-region archive
+  was published `SUCCESS`-last, and authenticated cleanup ended 8/8 clean. Summary, `SUCCESS`,
+  remote-ledger and post-census SHAs are `e8e81db6...693a9`, `dbb98bc8...dad8`,
+  `aa114e4e...0db5` and `3f643318...9ffef5`; optimized/StableHLO SHAs are
+  `64227ad4...f3d8` / `1fc33c9a...f693`.
+- The result is numerically identical to rejected DB549: 1,073/6,144 mismatches, first index 1,
+  hidden-2795 expected/observed bits 48423/48422, expected/observed SHAs `9936ee1e...d3039` /
+  `229dc8ac...812f`, and maximum/mean error `0.0078125` / `3.468696e-05`. Scalar-only pre-dense
+  RMS scheduling and recomputation inside the live gate fusion are closed; do not repeat them.
+- Exact source inspection corrects the remaining boundary. Accepted layer 0 carries an M32
+  embedding-gather StrategyND result plus its validity predicate and the attention StrategyND
+  result directly into both pre-dense and layer-1 fused arithmetic. The discriminator above used
+  the exact separate BF16 attention and residual rows but materialized them as M1 inputs and padded
+  them inside the downstream fusion. The residual bytes themselves are not suspect: sealed SHA
+  `02d045b9...1a3` is byte-identical to checkpoint embedding row 220 for the first generated token.
+  Previous arms tested attention ordinal and pre-dense fusion separately, never this full accepted
+  source context together. Exact next is one default-off seconds-scale layer-0 graph containing the
+  embedding collective/validity select, attention collective, accepted pre-dense gate fusion,
+  dense collective and accepted layer-1 scalar/recompute path. Only a bitwise-exact 6,144-value row
+  may authorize the protected 8K decoder.
+
 - Protected ordinal-context run
   `greenfield_strategy_nd_integrated_dense_ordinal_rms_20260814T193832987684744Z`
   completed at reviewed/pushed pin `02092a9afc400106f244adae6aafcd17e34003ab` in 42 seconds.

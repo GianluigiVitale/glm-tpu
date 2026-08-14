@@ -5,6 +5,34 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 20:13--20:16 UTC — exact pre-dense scalar/gate fusion is nonexact; source context remains
+
+- Reviewed/pushed pin `fb207a42c76d95aa561c3150026b58877a93d9f2` ran once under protected
+  tag `greenfield_strategy_nd_integrated_dense_predense_split_rms_20260814T201339130390866Z`.
+  Device work, exact StableHLO/optimized-HLO validation, terminal revalidation, same-region archive
+  and authenticated 8/8 cleanup completed in 42 seconds. The archive was published `SUCCESS`-last.
+- The complete 6,144-value row is unchanged from rejected DB549: 1,073 mismatches, first index 1,
+  hidden-2795 expected/observed bits 48423/48422, expected/observed SHAs
+  `9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039` /
+  `229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f`, maximum error
+  `0.0078125` and mean error `3.4686963772401214e-05`. This closes scalar-only pre-dense RMS
+  scheduling and exact recomputation inside the live gate fusion.
+- Optimized/StableHLO SHAs are `64227ad4454dc448f2cf1a5562d5050ef97646ec3d0d134060f73a99b565f3d8` /
+  `1fc33c9a12c1dfb2185c063962c56229258597be4ac60505f090e5044bc6f693`.
+  Summary, `SUCCESS`, remote-ledger and post-census SHAs are
+  `e8e81db6ac001fcf280dc030c18531037b6cce22a0701c21a8db18eb0ee693a9`,
+  `dbb98bc80a2b41ab933b228b20957ef049f525e2f6a383ce691e85fcf981dad8`,
+  `aa114e4e7641ae65e78d8b8a4f0570f9acc1998a83fd341aca41ab3ee4d20db5` and
+  `3f643318c9a6266d1a1856ebeb3ebcedd3666edb1c17310c444784a5ba9ffef5`.
+- Exact accepted-HLO inspection shows the untested delta is now the composed source context, not
+  another scalar formula. Accepted layer 0 carries the M32 embedding StrategyND result plus its
+  validity predicate and the attention StrategyND result directly into pre-dense and layer-1
+  fusions. The latest graph supplied the exact separate BF16 rows as M1 inputs and padded them
+  inside those fusions. The sealed residual SHA `02d045b9...1a3` independently equals checkpoint
+  embedding row 220 byte for byte, so the bytes are frozen. The next discriminator recreates the
+  full accepted collective/select/fusion context once in the existing seconds-scale layer-0 graph;
+  no complete 8K is authorized unless all 6,144 outputs are bitwise exact.
+
 ## 2026-08-14 19:38--20:00 UTC — collective ordinal rejected; pre-dense scalar schedule isolated
 
 - Reviewed/pushed pin `02092a9afc400106f244adae6aafcd17e34003ab` ran the exact
