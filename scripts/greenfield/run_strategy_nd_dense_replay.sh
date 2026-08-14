@@ -45,6 +45,19 @@ readonly RMS_SOURCE_RUNNER_SHA=d22b35f664409485b697fdb579665dc4b1ecf42683a2aaff9
 readonly RMS_SOURCE_SUMMARY_SHA=c349b5fd458f34986d8cc59c0f026af6b0a4c4e998f8691d6f6aa83a9b55e416
 readonly RMS_SOURCE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa470bd44b0b85
 readonly RMS_SOURCE_REMOTE_OBJECTS_SHA=5ffef6b346754dd7e8cc5953a81f1d4f7a14235fbd567d1b2302505f2e9d60d8
+readonly NATIVE_SOURCE_TAG=greenfield_layer0_attention_arithmetic_20260812T114701365714147Z
+readonly NATIVE_SOURCE_DIR=/home/gianl/gcs-models/results/$NATIVE_SOURCE_TAG
+readonly NATIVE_SOURCE_REMOTE=$APPROVED_BUCKET/results/$NATIVE_SOURCE_TAG
+readonly NATIVE_SOURCE_NPZ=$NATIVE_SOURCE_DIR/attention_arithmetic.npz
+readonly NATIVE_SOURCE_RUNNER=$NATIVE_SOURCE_DIR/runner.json
+readonly NATIVE_SOURCE_SUMMARY=$NATIVE_SOURCE_DIR/summary.json
+readonly NATIVE_SOURCE_SUCCESS=$NATIVE_SOURCE_DIR/SUCCESS
+readonly NATIVE_SOURCE_REMOTE_OBJECTS=$NATIVE_SOURCE_DIR/remote_objects.json
+readonly NATIVE_SOURCE_NPZ_SHA=7d5ebe15dd006a70d77f17d41eb47f25f58c6d6784ee332fbc638f2916581f61
+readonly NATIVE_SOURCE_RUNNER_SHA=7961622c297567a021edf2ab335f0d046db6665e8130e210bbd78919a2d7a4ec
+readonly NATIVE_SOURCE_SUMMARY_SHA=9793f89aa0f0bbe2532106707e0a38600058d9ad5f30f36813f36c5fd7298540
+readonly NATIVE_SOURCE_SUCCESS_SHA=ecc2b873c29ffd9bc6551136e90352b33523f50873827b00ae91279a4db3153c
+readonly NATIVE_SOURCE_REMOTE_OBJECTS_SHA=c3e3f5b9d5452ce6c2a7a699b1f781efc4b3d741d072022f2a98991faf9b621c
 readonly CHECKPOINT_TAG=greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z
 readonly CHECKPOINT_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/$CHECKPOINT_TAG
 readonly CHECKPOINT_MANIFEST=$CHECKPOINT_ROOT/runtime_manifest.json
@@ -60,6 +73,7 @@ INTEGRATED_SPLIT_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_SPLIT_RMS_REPLAY
 INTEGRATED_ORDINAL_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ORDINAL_RMS_REPLAY:-0}
 INTEGRATED_PREDENSE_SPLIT_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_PREDENSE_SPLIT_RMS_REPLAY:-0}
 INTEGRATED_ACCEPTED_SOURCE_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ACCEPTED_SOURCE_CONTEXT_REPLAY:-0}
+INTEGRATED_NATIVE_SOURCE_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_SOURCE_CONTEXT_REPLAY:-0}
 [[ $RMS_REPLAY == 0 || $RMS_REPLAY == 1 ]] || {
   echo "GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY must be 0 or 1" >&2
   exit 2
@@ -84,9 +98,17 @@ INTEGRATED_ACCEPTED_SOURCE_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ACCEPT
   echo "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ACCEPTED_SOURCE_CONTEXT_REPLAY must be 0 or 1" >&2
   exit 2
 }
-[[ $INTEGRATED_ACCEPTED_SOURCE_REPLAY == 0 || \
+[[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 0 || $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]] || {
+  echo "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_SOURCE_CONTEXT_REPLAY must be 0 or 1" >&2
+  exit 2
+}
+[[ $((INTEGRATED_ACCEPTED_SOURCE_REPLAY + INTEGRATED_NATIVE_SOURCE_REPLAY)) -le 1 ]] || {
+  echo "accepted and native source contexts are mutually exclusive" >&2
+  exit 2
+}
+[[ $((INTEGRATED_ACCEPTED_SOURCE_REPLAY + INTEGRATED_NATIVE_SOURCE_REPLAY)) -eq 0 || \
   $((INTEGRATED_SPLIT_REPLAY + INTEGRATED_ORDINAL_REPLAY + INTEGRATED_PREDENSE_SPLIT_REPLAY)) -eq 0 ]] || {
-  echo "accepted source context and prior integrated discriminators are mutually exclusive" >&2
+  echo "source contexts and prior integrated discriminators are mutually exclusive" >&2
   exit 2
 }
 [[ $((INTEGRATED_ORDINAL_REPLAY + INTEGRATED_PREDENSE_SPLIT_REPLAY)) -le 1 ]] || {
@@ -107,11 +129,17 @@ fi
 if [[ $INTEGRATED_ACCEPTED_SOURCE_REPLAY == 1 ]]; then
   INTEGRATED_REPLAY=1
 fi
+if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+  INTEGRATED_REPLAY=1
+fi
 [[ $((RMS_REPLAY + INTEGRATED_REPLAY)) -le 1 ]] || {
   echo "dense RMS replay modes are mutually exclusive" >&2
   exit 2
 }
-if [[ $INTEGRATED_ACCEPTED_SOURCE_REPLAY == 1 ]]; then
+if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+  TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_SOURCE_CONTEXT_TAG:-greenfield_strategy_nd_integrated_dense_native_source_context_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REPLAY_OUTPUT_DIR=integrated_dense_rms
+elif [[ $INTEGRATED_ACCEPTED_SOURCE_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ACCEPTED_SOURCE_CONTEXT_TAG:-greenfield_strategy_nd_integrated_dense_accepted_source_context_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REPLAY_OUTPUT_DIR=integrated_dense_rms
 elif [[ $INTEGRATED_PREDENSE_SPLIT_REPLAY == 1 ]]; then
@@ -152,6 +180,9 @@ mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/hlo" \
   "$RUN_DIR/$REPLAY_OUTPUT_DIR" "$RUN_DIR/source" "$RUN_DIR/source_db533"
 if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
   mkdir -p "$RUN_DIR/source_rms"
+fi
+if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+  mkdir -p "$RUN_DIR/source_native"
 fi
 
 say() {
@@ -241,6 +272,45 @@ if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
   require_sha "$RMS_SOURCE_REMOTE_OBJECTS" "$RMS_SOURCE_REMOTE_OBJECTS_SHA" \
     "dense RMS remote ledger source"
 fi
+if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+  require_sha "$NATIVE_SOURCE_NPZ" "$NATIVE_SOURCE_NPZ_SHA" \
+    "native attention tensor source"
+  require_sha "$NATIVE_SOURCE_RUNNER" "$NATIVE_SOURCE_RUNNER_SHA" \
+    "native attention runner source"
+  require_sha "$NATIVE_SOURCE_SUMMARY" "$NATIVE_SOURCE_SUMMARY_SHA" \
+    "native attention summary source"
+  require_sha "$NATIVE_SOURCE_SUCCESS" "$NATIVE_SOURCE_SUCCESS_SHA" \
+    "native attention SUCCESS source"
+  require_sha "$NATIVE_SOURCE_REMOTE_OBJECTS" \
+    "$NATIVE_SOURCE_REMOTE_OBJECTS_SHA" "native attention remote ledger"
+fi
+if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+  [[ $(gcloud storage cat "$NATIVE_SOURCE_REMOTE/attention_arithmetic.npz" |
+    sha256sum | awk '{print $1}') == "$NATIVE_SOURCE_NPZ_SHA" ]] || {
+    say "ABORT: remote native attention tensor source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$NATIVE_SOURCE_REMOTE/runner.json" |
+    sha256sum | awk '{print $1}') == "$NATIVE_SOURCE_RUNNER_SHA" ]] || {
+    say "ABORT: remote native attention runner source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$NATIVE_SOURCE_REMOTE/summary.json" |
+    sha256sum | awk '{print $1}') == "$NATIVE_SOURCE_SUMMARY_SHA" ]] || {
+    say "ABORT: remote native attention summary source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$NATIVE_SOURCE_REMOTE/SUCCESS" |
+    sha256sum | awk '{print $1}') == "$NATIVE_SOURCE_SUCCESS_SHA" ]] || {
+    say "ABORT: remote native attention SUCCESS source drifted"
+    exit 1
+  }
+  [[ $(gcloud storage cat "$NATIVE_SOURCE_REMOTE/remote_objects.json" |
+    sha256sum | awk '{print $1}') == "$NATIVE_SOURCE_REMOTE_OBJECTS_SHA" ]] || {
+    say "ABORT: remote native attention ledger source drifted"
+    exit 1
+  }
+fi
 if [[ $INTEGRATED_REPLAY == 1 ]]; then
   require_sha "$CHECKPOINT_MANIFEST" "$CHECKPOINT_MANIFEST_SHA" \
     "integrated dense checkpoint manifest"
@@ -319,6 +389,14 @@ if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
     exit 1
   }
 fi
+if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+  cp "$NATIVE_SOURCE_NPZ" "$RUN_DIR/source_native/attention_arithmetic.npz"
+  cp "$NATIVE_SOURCE_RUNNER" "$RUN_DIR/source_native/runner.json"
+  cp "$NATIVE_SOURCE_SUMMARY" "$RUN_DIR/source_native/summary.json"
+  cp "$NATIVE_SOURCE_SUCCESS" "$RUN_DIR/source_native/SUCCESS"
+  cp "$NATIVE_SOURCE_REMOTE_OBJECTS" \
+    "$RUN_DIR/source_native/remote_objects.json"
+fi
 if [[ $INTEGRATED_REPLAY == 1 ]]; then
   [[ $(gcloud storage cat "$CHECKPOINT_REMOTE/runtime_manifest.json" |
     sha256sum | awk '{print $1}') == "$CHECKPOINT_MANIFEST_SHA" ]] || {
@@ -371,7 +449,9 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 }
 coordinator="$coordinator:8476"
 if [[ $INTEGRATED_REPLAY == 1 ]]; then
-  if [[ $INTEGRATED_ACCEPTED_SOURCE_REPLAY == 1 ]]; then
+  if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+    say "launching native embedding/attention source-context discriminator"
+  elif [[ $INTEGRATED_ACCEPTED_SOURCE_REPLAY == 1 ]]; then
     say "launching the accepted embedding/predicate/attention source-context discriminator"
   elif [[ $INTEGRATED_PREDENSE_SPLIT_REPLAY == 1 ]]; then
     say "launching accepted scalar-only pre-dense and layer-1 RMS discriminator"
@@ -403,8 +483,11 @@ if [[ $INTEGRATED_REPLAY == 1 ]]; then
   if [[ $INTEGRATED_ACCEPTED_SOURCE_REPLAY == 1 ]]; then
     integrated_extra="$integrated_extra --integrated-accepted-source-context"
   fi
+  if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+    integrated_extra="$integrated_extra --integrated-native-source-context --native-attention-input /home/gianl/glm-run/$TAG/source_native/attention_arithmetic.npz"
+  fi
   # shellcheck disable=SC2016
-  capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; checkpoint='"$CHECKPOINT_ROOT"'; manifest_sha='"$CHECKPOINT_MANIFEST_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/integrated_dense_rms" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/diagnostic_integrated_dense_rms/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; [[ $(sha256sum "$checkpoint/runtime_manifest.json" | awk '\''{print $1}'\'') == "$manifest_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_integrated_dense_rms '"$integrated_extra"' --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-rms-input "$run/source_rms/dense_partial_capture.npz" --checkpoint-root "$checkpoint" --checkpoint-manifest-sha256 "$manifest_sha"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/integrated_dense_rms/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
+  capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; native_remote='"$NATIVE_SOURCE_REMOTE"'; native_sha='"$NATIVE_SOURCE_NPZ_SHA"'; native_mode='"$INTEGRATED_NATIVE_SOURCE_REPLAY"'; checkpoint='"$CHECKPOINT_ROOT"'; manifest_sha='"$CHECKPOINT_MANIFEST_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/integrated_dense_rms" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/diagnostic_integrated_dense_rms/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; [[ $(sha256sum "$checkpoint/runtime_manifest.json" | awk '\''{print $1}'\'') == "$manifest_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; if [[ "$native_mode" == 1 ]]; then mkdir -p "$run/source_native"; gcloud storage cp "$native_remote/attention_arithmetic.npz" "$run/source_native/attention_arithmetic.npz" >/dev/null; [[ $(sha256sum "$run/source_native/attention_arithmetic.npz" | awk '\''{print $1}'\'') == "$native_sha" ]]; fi; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_integrated_dense_rms '"$integrated_extra"' --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-rms-input "$run/source_rms/dense_partial_capture.npz" --checkpoint-root "$checkpoint" --checkpoint-manifest-sha256 "$manifest_sha"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/integrated_dense_rms/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
 elif [[ $RMS_REPLAY == 1 ]]; then
   # shellcheck disable=SC2016
   capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; source_remote='"$SOURCE_REMOTE"'; source_sha='"$SOURCE_NPZ_SHA"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/rms_replay" "$run/source" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/rms_replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/rms_replay/* "$remote/diagnostic_rms_replay/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; gcloud storage cp "$source_remote/dense_partials_capture/dense_partials.npz" "$run/source/dense_partials.npz" >/dev/null; [[ $(sha256sum "$run/source/dense_partials.npz" | awk '\''{print $1}'\'') == "$source_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_dense_rms_replay --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-replay-input "$run/source/dense_partials.npz" --association-rms-input "$run/source_rms/dense_partial_capture.npz"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/rms_replay/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/rms_replay/* "$remote/rms_replay/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
@@ -441,7 +524,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$TAG" "$elapsed" "$RMS_REPLAY" \
   "$INTEGRATED_REPLAY" "$CHECKPOINT_ROOT" "$INTEGRATED_SPLIT_REPLAY" \
   "$INTEGRATED_ORDINAL_REPLAY" "$INTEGRATED_PREDENSE_SPLIT_REPLAY" \
-  "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" <<'PY'
+  "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \
+  "$INTEGRATED_NATIVE_SOURCE_REPLAY" <<'PY'
 from __future__ import annotations
 
 import json
@@ -454,7 +538,7 @@ from glm_tpu.greenfield.validation import (
     validate_strategy_nd_integrated_dense_rms,
 )
 
-run_dir, pin, run_tag, elapsed, rms_replay, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source = sys.argv[1:]
+run_dir, pin, run_tag, elapsed, rms_replay, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source, native_source = sys.argv[1:]
 run_dir = Path(run_dir)
 if integrated_replay == "1":
     summary = validate_strategy_nd_integrated_dense_rms(
@@ -466,6 +550,7 @@ if integrated_replay == "1":
         expected_preceding_attention_collective=ordinal == "1",
         expected_split_predense_rms=predense_split == "1",
         expected_accepted_source_context=accepted_source == "1",
+        expected_native_source_context=native_source == "1",
     )
 else:
     validator = (
@@ -500,6 +585,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 evidence_dirs=(host_records hlo "$REPLAY_OUTPUT_DIR" source source_db533)
 if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
   evidence_dirs+=(source_rms)
+fi
+if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
+  evidence_dirs+=(source_native)
 fi
 (
   cd "$RUN_DIR"
@@ -595,7 +683,8 @@ PY
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \
   "$RMS_REPLAY" "$INTEGRATED_REPLAY" "$INTEGRATED_SPLIT_REPLAY" \
   "$INTEGRATED_ORDINAL_REPLAY" "$INTEGRATED_PREDENSE_SPLIT_REPLAY" \
-  "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" <<'PY'
+  "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \
+  "$INTEGRATED_NATIVE_SOURCE_REPLAY" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -609,6 +698,7 @@ integrated_split_replay = sys.argv[5] == "1"
 integrated_ordinal_replay = sys.argv[6] == "1"
 integrated_predense_split_replay = sys.argv[7] == "1"
 integrated_accepted_source_replay = sys.argv[8] == "1"
+integrated_native_source_replay = sys.argv[9] == "1"
 common = {
     "artifact_kind": summary["artifact_kind"],
     "classification": summary["classification"],
@@ -645,6 +735,24 @@ if rms_replay or integrated_replay:
             values["split_predense_rms"] = "true"
         if integrated_accepted_source_replay:
             values["accepted_source_context"] = "true"
+        if integrated_native_source_replay:
+            values["native_source_context"] = "true"
+            values["source_native_npz_sha256"] = source[
+                "native_npz_sha256"
+            ]
+            values["source_native_remote_objects_sha256"] = source[
+                "native_remote_objects_sha256"
+            ]
+            values["source_native_runner_sha256"] = source[
+                "native_runner_sha256"
+            ]
+            values["source_native_success_sha256"] = source[
+                "native_success_sha256"
+            ]
+            values["source_native_summary_sha256"] = source[
+                "native_summary_sha256"
+            ]
+            values["source_native_tag"] = source["native_tag"]
         values["source_checkpoint_manifest_sha256"] = source[
             "checkpoint_manifest_sha256"
         ]

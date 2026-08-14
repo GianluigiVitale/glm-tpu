@@ -19,6 +19,26 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The bounded native-source successor is now locally assembled as one default-off 13-input graph:
+  real sharded embedding lookup/validity, the sealed DB537 B512 attended latent, native `W_UV`,
+  row-parallel attention projection, the frozen accepted pre-dense/dense StrategyND path and the
+  accepted layer-1 scalar/output fusion. A forced-32 CPU abstract trace proves the complete global
+  argument/sharding contract in about 1.5 seconds without attempting TPU Pallas lowering. The real
+  checkpoint packing preflight passes and fixes physical embedding/KV-B/O hashes at
+  `051c67f8...ff3e`, `33d7cefc...ad0c`, `87372d43...dbc8`, `3da0841f...626` and
+  `db87981c...e7dc`; the four already-frozen dense hashes remain unchanged. The protected wrapper
+  authenticates the complete DB537 source locally/remotely, remains default-off/disjoint, and
+  writes both compiler graphs plus a nonvalidating manifest before any semantic validation or
+  arithmetic. The exact TPU StableHLO/optimized-HLO forms are deliberately unpinned, so the first
+  protected attempt can only acquire those graphs and fail closed; it cannot publish a numerical
+  result or `SUCCESS`. The one immutable Sol review found two pre-launch gaps and both are corrected:
+  the native attention psum now remains causally downstream of the embedding psum through the exact
+  finite guard, and all eight JAX processes synchronize after process 0 atomically writes the HLO
+  evidence but before the intentional validator refusal. Exact next is correction closure,
+  commit/push, then this single sub-minute compile acquisition. Correct the validators locally from
+  the preserved graph, then run one numerical bounded row. Full 8K remains forbidden until all
+  6,144 values are exact.
+
 - The automatic live-SSA comparison is complete and runs locally in about 13 seconds. Its report
   is `live_ssa_diff.json`, SHA `aadf8589...b81b`, beside the protected 1,031-mismatch run. Both
   pre-dense and layer-1 arithmetic trees are identical (semantic SHAs `6b0fb9c1...1ee2` and

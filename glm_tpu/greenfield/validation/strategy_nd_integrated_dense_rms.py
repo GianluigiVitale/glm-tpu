@@ -18,9 +18,18 @@ from ..benchmarking import (
     DENSE_RMS_SOURCE_NPZ_SHA256,
     DENSE_RMS_SOURCE_TAG,
     IntegratedDenseWeights,
+    NATIVE_SOURCE_ATTENDED_LATENT_KEY,
+    NATIVE_SOURCE_NPZ_SHA256,
+    NATIVE_SOURCE_REMOTE_OBJECTS_SHA256,
+    NATIVE_SOURCE_RUNNER_SHA256,
+    NATIVE_SOURCE_SUCCESS_SHA256,
+    NATIVE_SOURCE_SUMMARY_SHA256,
+    NATIVE_SOURCE_TAG,
     array_sha256,
+    assemble_native_source_weights,
     load_integrated_dense_rms_inputs,
     model_axis_weights_to_physical,
+    native_source_inputs,
     validate_integrated_dense_rms_hlo,
     validate_integrated_dense_rms_stablehlo,
     validate_integrated_checkpoint_success,
@@ -55,6 +64,15 @@ EXPECTED_SOURCE = {
     "checkpoint_success_sha256": CHECKPOINT_SUCCESS_SHA256,
     "rms_npz_sha256": DENSE_RMS_SOURCE_NPZ_SHA256,
     "rms_tag": DENSE_RMS_SOURCE_TAG,
+}
+EXPECTED_NATIVE_SOURCE = {
+    **EXPECTED_SOURCE,
+    "native_npz_sha256": NATIVE_SOURCE_NPZ_SHA256,
+    "native_remote_objects_sha256": NATIVE_SOURCE_REMOTE_OBJECTS_SHA256,
+    "native_runner_sha256": NATIVE_SOURCE_RUNNER_SHA256,
+    "native_success_sha256": NATIVE_SOURCE_SUCCESS_SHA256,
+    "native_summary_sha256": NATIVE_SOURCE_SUMMARY_SHA256,
+    "native_tag": NATIVE_SOURCE_TAG,
 }
 EXPECTED_RECORD_FIELDS = {
     "association_dense_replay",
@@ -123,6 +141,7 @@ def _validate_hlo_prevalidation(
     preceding_attention_collective: bool = False,
     split_predense_rms: bool = False,
     accepted_source_context: bool = False,
+    native_source_context: bool = False,
 ) -> None:
     expected_fields = set(EXPECTED_HLO_PREVALIDATION_FIELDS)
     if preceding_attention_collective:
@@ -131,6 +150,8 @@ def _validate_hlo_prevalidation(
         expected_fields.add("split_predense_rms")
     if accepted_source_context:
         expected_fields.add("accepted_source_context")
+    if native_source_context:
+        expected_fields.add("native_source_context")
     if not (
         type(record) is dict
         and set(record) == expected_fields
@@ -148,6 +169,10 @@ def _validate_hlo_prevalidation(
             not accepted_source_context
             or record["accepted_source_context"] is True
         )
+        and (
+            not native_source_context
+            or record["native_source_context"] is True
+        )
         and record["split_layer1_rms"] is split_layer1_rms
         and record["validated"] is False
         and record["performance_claim"] is False
@@ -163,6 +188,7 @@ def _recompute_comparison(
     preceding_attention_collective: bool = False,
     split_predense_rms: bool = False,
     accepted_source_context: bool = False,
+    native_source_context: bool = False,
 ) -> dict[str, Any]:
     mismatch_indices = np.flatnonzero(observed != expected)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -175,7 +201,9 @@ def _recompute_comparison(
     error = np.abs(observed_values - expected_values)
     observed_sha = _raw_sha256(observed)
     prefix = (
-        "integrated_dense_accepted_source_context"
+        "integrated_dense_native_source_context"
+        if native_source_context
+        else "integrated_dense_accepted_source_context"
         if accepted_source_context
         else "integrated_dense_predense_split_rms"
         if split_predense_rms
@@ -230,6 +258,26 @@ def _validate_capture(capture: object, output: np.ndarray) -> None:
         raise ValueError("integrated dense deterministic capture drifted")
 
 
+def _validate_native_source_files(source_dir: Path) -> Path:
+    expected = {
+        "attention_arithmetic.npz": NATIVE_SOURCE_NPZ_SHA256,
+        "remote_objects.json": NATIVE_SOURCE_REMOTE_OBJECTS_SHA256,
+        "runner.json": NATIVE_SOURCE_RUNNER_SHA256,
+        "SUCCESS": NATIVE_SOURCE_SUCCESS_SHA256,
+        "summary.json": NATIVE_SOURCE_SUMMARY_SHA256,
+    }
+    if (
+        not source_dir.is_dir()
+        or {path.name for path in source_dir.iterdir() if path.is_file()}
+        != set(expected)
+    ):
+        raise ValueError("native source file set drifted")
+    for name, digest in expected.items():
+        if _file_sha256(source_dir / name) != digest:
+            raise ValueError(f"native source file drifted: {name}")
+    return source_dir / "attention_arithmetic.npz"
+
+
 def validate_strategy_nd_integrated_dense_rms(
     run_dir: Path,
     *,
@@ -240,6 +288,7 @@ def validate_strategy_nd_integrated_dense_rms(
     expected_preceding_attention_collective: bool = False,
     expected_split_predense_rms: bool = False,
     expected_accepted_source_context: bool = False,
+    expected_native_source_context: bool = False,
 ) -> dict[str, Any]:
     """Reload every source/fleet/artifact byte and recompute the verdict."""
 
@@ -259,6 +308,10 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("pre-dense split expectation must be boolean")
     if not isinstance(expected_accepted_source_context, bool):
         raise ValueError("accepted source-context expectation must be boolean")
+    if not isinstance(expected_native_source_context, bool):
+        raise ValueError("native source-context expectation must be boolean")
+    if expected_accepted_source_context and expected_native_source_context:
+        raise ValueError("accepted and native source contexts are disjoint")
     if expected_preceding_attention_collective and not expected_split_layer1_rms:
         raise ValueError("preceding attention collective requires split RMS")
     if expected_split_predense_rms and not expected_split_layer1_rms:
@@ -273,11 +326,20 @@ def validate_strategy_nd_integrated_dense_rms(
         )
     ):
         raise ValueError("accepted source context is a disjoint integrated arm")
+    if expected_native_source_context and any(
+        (
+            expected_split_layer1_rms,
+            expected_preceding_attention_collective,
+            expected_split_predense_rms,
+        )
+    ):
+        raise ValueError("native source context is a disjoint integrated arm")
     legacy_schema = bool(
         not expected_split_layer1_rms
         and not expected_preceding_attention_collective
         and not expected_split_predense_rms
         and not expected_accepted_source_context
+        and not expected_native_source_context
         and expected_code_hash == LEGACY_INTEGRATED_CODE_HASH
         and expected_run_tag == LEGACY_INTEGRATED_RUN_TAG
     )
@@ -364,6 +426,8 @@ def validate_strategy_nd_integrated_dense_rms(
         expected_replay_fields.add("split_predense_rms")
     if expected_accepted_source_context:
         expected_replay_fields.add("accepted_source_context")
+    if expected_native_source_context:
+        expected_replay_fields.add("native_source_context")
     if any(
         type(item) is not dict or set(item) != expected_replay_fields
         for item in items
@@ -374,7 +438,12 @@ def validate_strategy_nd_integrated_dense_rms(
         if any(item[field] != reference[field] for item in items[1:]):
             raise ValueError(f"integrated dense fleet field differs: {field}")
     if not (
-        reference["source"] == EXPECTED_SOURCE
+        reference["source"]
+        == (
+            EXPECTED_NATIVE_SOURCE
+            if expected_native_source_context
+            else EXPECTED_SOURCE
+        )
         and _is_int_list(
             reference["accepted_model_axis_device_ids"],
             list(EXPECTED_MODEL_AXIS_DEVICE_IDS),
@@ -396,6 +465,10 @@ def validate_strategy_nd_integrated_dense_rms(
         and (
             not expected_accepted_source_context
             or reference["accepted_source_context"] is True
+        )
+        and (
+            not expected_native_source_context
+            or reference["native_source_context"] is True
         )
         and (
             legacy_schema
@@ -452,10 +525,18 @@ def validate_strategy_nd_integrated_dense_rms(
         arrays[name] = np.ascontiguousarray(value)
 
     _validate_rms_source_files(run_dir / "source_rms")
+    native_source_path = (
+        _validate_native_source_files(run_dir / "source_native")
+        if expected_native_source_context
+        else None
+    )
+    if not expected_native_source_context and (run_dir / "source_native").exists():
+        raise ValueError("unexpected native source directory")
     validate_integrated_checkpoint_success(checkpoint_root)
     weights, checkpoint_records = _load_weights(
         checkpoint_root,
         manifest_sha256=CHECKPOINT_MANIFEST_SHA256,
+        include_embedding=expected_native_source_context,
     )
     packed, packed_records = _pack_dense_final_layout(weights)
     if not (
@@ -485,6 +566,33 @@ def validate_strategy_nd_integrated_dense_rms(
         name: array_sha256(getattr(physical_weights, name))
         for name in ("merged_bits", "merged_scale", "down_bits", "down_scale")
     }
+    native_inputs = None
+    if expected_native_source_context:
+        assert native_source_path is not None
+        with np.load(native_source_path, allow_pickle=False) as payload:
+            if NATIVE_SOURCE_ATTENDED_LATENT_KEY not in payload.files:
+                raise ValueError("native source latent is absent")
+            latent = np.ascontiguousarray(
+                payload[NATIVE_SOURCE_ATTENDED_LATENT_KEY]
+            )
+        native_inputs = native_source_inputs(latent, inputs)
+        native_weights = assemble_native_source_weights(
+            weights,
+            physical_weights,
+            EXPECTED_MODEL_AXIS_DEVICE_IDS,
+        )
+        physical_weight_hashes.update(
+            {
+                name: array_sha256(getattr(native_weights, name))
+                for name in (
+                    "embedding",
+                    "kv_b_bits",
+                    "kv_b_scale",
+                    "o_bits_in_out",
+                    "o_scale_in_out",
+                )
+            }
+        )
     if reference["physical_weight_hashes"] != physical_weight_hashes:
         raise ValueError("integrated dense physical weight hashes drifted")
     if not np.array_equal(arrays["accepted_layer1_bits"], inputs.accepted_layer1_bits):
@@ -496,6 +604,7 @@ def validate_strategy_nd_integrated_dense_rms(
         preceding_attention_collective=expected_preceding_attention_collective,
         split_predense_rms=expected_split_predense_rms,
         accepted_source_context=expected_accepted_source_context,
+        native_source_context=expected_native_source_context,
     )
     recorded = reference["comparison"]
     if not (
@@ -524,11 +633,28 @@ def validate_strategy_nd_integrated_dense_rms(
     _validate_capture(reference["capture"], arrays["hardware_layer1_bits"])
     expected_fleet = {
         "accepted_target": array_sha256(arrays["accepted_layer1_bits"]),
-        "attention_update": array_sha256(inputs.attention_update_bits),
-        "combined_residual": array_sha256(inputs.combined_residual_bits),
         "layer1_norm": array_sha256(inputs.layer1_norm_bits),
         "output": array_sha256(arrays["hardware_layer1_bits"]),
         "post_attention_norm": array_sha256(inputs.post_attention_norm_bits),
+        **(
+            {
+                "attended_latent": array_sha256(
+                    native_inputs.attended_latent_bits
+                ),
+                "native_source_token_ids": array_sha256(
+                    native_inputs.token_ids
+                ),
+            }
+            if native_inputs is not None
+            else {
+                "attention_update": array_sha256(
+                    inputs.attention_update_bits
+                ),
+                "combined_residual": array_sha256(
+                    inputs.combined_residual_bits
+                ),
+            }
+        ),
         **(
             {
                 "accepted_source_validity": array_sha256(
@@ -556,7 +682,9 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense fleet hashes drifted")
 
     label = (
-        "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_native_source_context_bfloat16_32x6144"
+        if expected_native_source_context
+        else "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
         if expected_accepted_source_context
         else "strategy_nd_integrated_dense_predense_split_rms_bfloat16_32x6144"
         if expected_split_predense_rms
@@ -594,6 +722,7 @@ def validate_strategy_nd_integrated_dense_rms(
         preceding_attention_collective=expected_preceding_attention_collective,
         split_predense_rms=expected_split_predense_rms,
         accepted_source_context=expected_accepted_source_context,
+        native_source_context=expected_native_source_context,
     )
     optimized_contract = validate_integrated_dense_rms_hlo(
         optimized_hlo,
@@ -602,6 +731,7 @@ def validate_strategy_nd_integrated_dense_rms(
         preceding_attention_collective=expected_preceding_attention_collective,
         split_predense_rms=expected_split_predense_rms,
         accepted_source_context=expected_accepted_source_context,
+        native_source_context=expected_native_source_context,
     )
     if legacy_schema:
         stable_contract = dict(stable_contract)
@@ -619,6 +749,7 @@ def validate_strategy_nd_integrated_dense_rms(
             ),
             split_predense_rms=expected_split_predense_rms,
             accepted_source_context=expected_accepted_source_context,
+            native_source_context=expected_native_source_context,
         )
     if not (
         stable_contract == reference["stablehlo_contract"]
@@ -634,7 +765,9 @@ def validate_strategy_nd_integrated_dense_rms(
 
     result = {
         "artifact_kind": (
-            "glm52_strategy_nd_integrated_dense_accepted_source_context"
+            "glm52_strategy_nd_integrated_dense_native_source_context"
+            if expected_native_source_context
+            else "glm52_strategy_nd_integrated_dense_accepted_source_context"
             if expected_accepted_source_context
             else "glm52_strategy_nd_integrated_dense_predense_split_rms"
             if expected_split_predense_rms
@@ -660,7 +793,11 @@ def validate_strategy_nd_integrated_dense_rms(
         "optimized_hlo_sha256": reference["optimized_hlo_sha256"],
         "performance_claim": False,
         "run_tag": expected_run_tag,
-        "source": dict(EXPECTED_SOURCE),
+        "source": dict(
+            EXPECTED_NATIVE_SOURCE
+            if expected_native_source_context
+            else EXPECTED_SOURCE
+        ),
         "split_layer1_rms": expected_split_layer1_rms,
         "stablehlo_sha256": reference["stablehlo_sha256"],
         "status": "SUCCESS",
@@ -672,4 +809,6 @@ def validate_strategy_nd_integrated_dense_rms(
         result["split_predense_rms"] = True
     if expected_accepted_source_context:
         result["accepted_source_context"] = True
+    if expected_native_source_context:
+        result["native_source_context"] = True
     return result

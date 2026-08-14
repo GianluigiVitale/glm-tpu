@@ -5,6 +5,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 22:18--23:00 UTC — native source graph is locally assembled and fail-closed
+
+- Implemented one default-off bounded graph containing the real 32-way sharded embedding
+  lookup/validity, sealed DB537 B512 attended latent, native structured `W_UV`, row-parallel
+  attention projection, frozen final-layout dense contractions/StrategyND and layer-1 RMS/output.
+  It imports no legacy execution and reuses the existing greenfield kernels, checkpoint loader,
+  physical model-axis map and protected integrated wrapper.
+- Forced-32 CPU abstract evaluation traces all 13 global inputs to one replicated `uint16[1,6144]`
+  result in about 1.5 seconds. This catches graph argument/sharding drift without TPU work; CPU
+  correctly cannot lower the real non-interpret Pallas calls. The focused source/wrapper suite
+  passes 15/15, the projection loader suite passes 34/34, and Python/Bash/ShellCheck/diff checks
+  pass.
+- A real-checkpoint packing preflight succeeds. Physical hashes are embedding
+  `051c67f8...ff3e`, KV-B bits/scales `33d7cefc...ad0c` / `87372d43...dbc8`, O bits/scales
+  `3da0841f...626` / `db87981c...e7dc`; frozen dense bits/scales are
+  `cedfd76b...5397`, `289075c8...686`, `13f2029b...f0a` and `7c81061e...8a93`.
+- Runner, terminal revalidator and wrapper bind the exact DB537 five-file source and the pinned
+  final-layout checkpoint. Both HLO files and a nonvalidating manifest are written before
+  validation. Native StableHLO/optimized-HLO contracts intentionally refuse until the first exact
+  TPU lowering is captured, so the acquisition cannot execute arithmetic or publish `SUCCESS`.
+  The one immutable review found and locally closed two acquisition-only gaps: the native attention
+  branch now retains the accepted embedding-finite dependency before its psum, and all eight JAX
+  processes synchronize after process 0 atomically persists the graphs but before the intentional
+  validator refusal. No TPU work, numerical result, Gate-D promotion or performance claim occurred.
+  Exact next is correction closure, commit/push, one sub-minute compile acquisition, then local
+  exact HLO/mutation proof before the separate bounded numerical run.
+
 ## 2026-08-14 22:00--22:18 UTC — automatic live-SSA diff localizes native source boundaries
 
 - Added a local-only, hash-bound structural comparison of the accepted layer-0 after-codegen HLO

@@ -42,6 +42,10 @@ INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256 = (
 INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256 = (
     "b46a58b1cb7576b8124b02ac09b722e07ddebf6cf7663ac5e404f64414144fed"
 )
+# Filled only from the first exact protected TPU lowering.  The runner writes
+# both HLO files before this pin is enforced, so acquisition cannot publish a
+# numerical result or terminal SUCCESS.
+INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256 = ""
 
 
 def _validate_preceding_attention_input(
@@ -1033,6 +1037,7 @@ def integrated_dense_rms_hlo_policy(
     *,
     preceding_attention_collective: bool = False,
     accepted_source_context: bool = False,
+    native_source_context: bool = False,
 ) -> HloContractPolicy:
     """Require the diagnostic's exact full-pod collective scope and group."""
 
@@ -1049,11 +1054,26 @@ def integrated_dense_rms_hlo_policy(
         raise BenchmarkValidationError(
             "accepted-source-context flag must be boolean"
         )
-    if preceding_attention_collective and accepted_source_context:
+    if not isinstance(native_source_context, bool):
         raise BenchmarkValidationError(
-            "accepted source context has distinct collective scopes"
+            "native-source-context flag must be boolean"
+        )
+    if sum(
+        bool(value)
+        for value in (
+            preceding_attention_collective,
+            accepted_source_context,
+            native_source_context,
+        )
+    ) > 1:
+        raise BenchmarkValidationError(
+            "integrated source-context collective scopes are disjoint"
         )
     patterns = (
+        r"native_source_context_embedding_collective",
+        r"native_source_context_attention_collective",
+        r"integrated_dense_rms_strategy_nd_collective",
+    ) if native_source_context else (
         r"accepted_source_context_embedding_collective",
         r"accepted_source_context_attention_collective",
         r"integrated_dense_rms_strategy_nd_collective",
@@ -1073,7 +1093,7 @@ def integrated_dense_rms_hlo_policy(
             CollectiveExpectation(
                 "all-reduce",
                 3
-                if accepted_source_context
+                if accepted_source_context or native_source_context
                 else 2
                 if preceding_attention_collective
                 else 1,
@@ -1092,6 +1112,7 @@ def validate_integrated_dense_rms_stablehlo(
     preceding_attention_collective: bool = False,
     split_predense_rms: bool = False,
     accepted_source_context: bool = False,
+    native_source_context: bool = False,
 ) -> Mapping[str, Any]:
     """Pin the complete exact eight-input StableHLO graph byte-for-byte."""
 
@@ -1111,11 +1132,25 @@ def validate_integrated_dense_rms_stablehlo(
         raise BenchmarkValidationError(
             "integrated dense accepted-source flag must be boolean"
         )
+    if not isinstance(native_source_context, bool):
+        raise BenchmarkValidationError(
+            "integrated dense native-source flag must be boolean"
+        )
+    if accepted_source_context and native_source_context:
+        raise BenchmarkValidationError(
+            "accepted and native source contexts are disjoint"
+        )
     if accepted_source_context and any(
         (split_layer1_rms, preceding_attention_collective, split_predense_rms)
     ):
         raise BenchmarkValidationError(
             "accepted source context is a distinct integrated discriminator"
+        )
+    if native_source_context and any(
+        (split_layer1_rms, preceding_attention_collective, split_predense_rms)
+    ):
+        raise BenchmarkValidationError(
+            "native source context is a distinct integrated discriminator"
         )
     if preceding_attention_collective and not split_layer1_rms:
         raise BenchmarkValidationError(
@@ -1130,7 +1165,9 @@ def validate_integrated_dense_rms_stablehlo(
             "pre-dense split RMS and rejected ordinal arms are disjoint"
         )
     expected = (
-        INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256
+        INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256
+        if native_source_context
+        else INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256
         if accepted_source_context
         else INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256
         if split_predense_rms
@@ -1141,6 +1178,10 @@ def validate_integrated_dense_rms_stablehlo(
         else INTEGRATED_DENSE_RMS_STABLEHLO_SHA256
     )
     digest = sha256(stablehlo.encode()).hexdigest()
+    if native_source_context and not expected:
+        raise BenchmarkValidationError(
+            "native source StableHLO is not pinned: " f"found={digest}"
+        )
     if digest != expected:
         raise BenchmarkValidationError(
             "integrated dense RMS StableHLO SHA-256 drifted: "
@@ -1173,6 +1214,18 @@ def validate_integrated_dense_rms_stablehlo(
                 "exact_direct_layer1_recompute": True,
             }
         )
+    if native_source_context:
+        result.update(
+            {
+                "native_source_context": True,
+                "exact_embedding_collective": True,
+                "exact_validity_predicate": True,
+                "exact_attention_collective": True,
+                "exact_native_embedding_lookup": True,
+                "exact_native_attention_projection": True,
+                "exact_direct_layer1_recompute": True,
+            }
+        )
     return result
 
 
@@ -1184,6 +1237,7 @@ def validate_integrated_dense_rms_hlo(
     preceding_attention_collective: bool = False,
     split_predense_rms: bool = False,
     accepted_source_context: bool = False,
+    native_source_context: bool = False,
 ) -> Mapping[str, Any]:
     """Bind real contractions through one BF16 StrategyND and layer-1 ROOT."""
 
@@ -1208,11 +1262,29 @@ def validate_integrated_dense_rms_hlo(
         raise BenchmarkValidationError(
             "integrated dense accepted-source flag must be boolean"
         )
+    if not isinstance(native_source_context, bool):
+        raise BenchmarkValidationError(
+            "integrated dense native-source flag must be boolean"
+        )
+    if accepted_source_context and native_source_context:
+        raise BenchmarkValidationError(
+            "accepted and native source contexts are disjoint"
+        )
     if accepted_source_context and any(
         (split_layer1_rms, preceding_attention_collective, split_predense_rms)
     ):
         raise BenchmarkValidationError(
             "accepted source context is a distinct integrated discriminator"
+        )
+    if native_source_context and any(
+        (split_layer1_rms, preceding_attention_collective, split_predense_rms)
+    ):
+        raise BenchmarkValidationError(
+            "native source context is a distinct integrated discriminator"
+        )
+    if native_source_context:
+        raise BenchmarkValidationError(
+            "native optimized HLO awaits the exact protected TPU lowering"
         )
     if preceding_attention_collective and not split_layer1_rms:
         raise BenchmarkValidationError(
@@ -1232,6 +1304,7 @@ def validate_integrated_dense_rms_hlo(
             members,
             preceding_attention_collective=preceding_attention_collective,
             accepted_source_context=accepted_source_context,
+            native_source_context=native_source_context,
         ),
     )
     report.raise_for_violations()

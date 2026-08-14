@@ -78,6 +78,9 @@ _WEIGHT_CONTRACT: dict[str, tuple[tuple[int, ...], str, bool]] = {
     "dense.slot_00.down.scale_inv": ((48, 24), "float32", False),
     "attention.slot_01.input_norm": ((6144,), "bfloat16", True),
 }
+_EMBEDDING_WEIGHT_CONTRACT = {
+    "global.embedding": ((38720, 6144), "bfloat16", False),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -330,7 +333,10 @@ def _load_association_analysis(
 
 
 def _load_weights(
-    checkpoint_root: Path, *, manifest_sha256: str
+    checkpoint_root: Path,
+    *,
+    manifest_sha256: str,
+    include_embedding: bool = False,
 ) -> tuple[dict[str, np.ndarray], list[dict[str, Any]]]:
     from safetensors import safe_open
 
@@ -352,9 +358,12 @@ def _load_weights(
     }
     if len(manifest_files) != 32 or None in manifest_files:
         raise RuntimeError("runtime checkpoint filenames are not unique")
-    by_name: dict[str, list[np.ndarray]] = {
-        name: [] for name in _WEIGHT_CONTRACT
-    }
+    if not isinstance(include_embedding, bool):
+        raise RuntimeError("embedding weight selector must be boolean")
+    contract = dict(_WEIGHT_CONTRACT)
+    if include_embedding:
+        contract.update(_EMBEDDING_WEIGHT_CONTRACT)
+    by_name: dict[str, list[np.ndarray]] = {name: [] for name in contract}
     records: list[dict[str, Any]] = []
     for slot in range(4):
         relative = Path(
@@ -390,7 +399,7 @@ def _load_weights(
             raise RuntimeError(f"slot {slot} tensor names are not unique")
         slot_records = []
         with safe_open(tensor_path, framework="np") as handle:
-            for name, (shape, dtype, _) in _WEIGHT_CONTRACT.items():
+            for name, (shape, dtype, _) in contract.items():
                 record = manifest_tensors.get(name)
                 if record is None or name not in handle.keys():
                     raise RuntimeError(f"slot {slot} lacks {name}")
@@ -415,14 +424,14 @@ def _load_weights(
                 "tensors": slot_records,
             }
         )
-    for name, (_, _, replicated) in _WEIGHT_CONTRACT.items():
+    for name, (_, _, replicated) in contract.items():
         if replicated and any(
             not np.array_equal(by_name[name][0], value)
             for value in by_name[name][1:]
         ):
             raise RuntimeError(f"replicated tensor differs across slots: {name}")
     result: dict[str, np.ndarray] = {}
-    for name, (_, _, replicated) in _WEIGHT_CONTRACT.items():
+    for name, (_, _, replicated) in contract.items():
         result[name] = by_name[name][0] if replicated else np.stack(by_name[name])
     return result, records
 

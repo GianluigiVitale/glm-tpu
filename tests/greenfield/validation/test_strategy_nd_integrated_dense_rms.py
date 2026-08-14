@@ -12,9 +12,15 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.association_fingerprint import array_sha256
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
+    NATIVE_SOURCE_ATTENDED_LATENT_KEY,
+    NATIVE_SOURCE_ATTENDED_LATENT_SHA256,
+    NATIVE_SOURCE_NPZ_SHA256,
+    NATIVE_SOURCE_TOKEN_IDS,
     POST_ATTENTION_NORM_RAW_SHA256,
+    _raw_sha256,
     load_integrated_dense_rms_inputs,
     model_axis_weights_to_physical,
+    native_source_inputs,
     validate_integrated_checkpoint_success,
 )
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
@@ -26,6 +32,7 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     _validate_split_predense_value_flow,
     integrated_dense_rms_hlo_policy,
     validate_integrated_dense_rms_hlo,
+    validate_integrated_dense_rms_stablehlo,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import (
     HloContractPolicy,
@@ -37,6 +44,7 @@ from glm_tpu.greenfield.validation.strategy_nd_integrated_dense_rms import (
     _recompute_comparison,
     _validate_capture,
     _validate_hlo_prevalidation,
+    _validate_native_source_files,
     validate_strategy_nd_integrated_dense_rms,
 )
 
@@ -46,6 +54,10 @@ REAL_SOURCE = Path(
     "/home/gianl/glm-run/"
     "greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/"
     "dense_partial_capture.npz"
+)
+REAL_NATIVE_SOURCE = Path(
+    "/home/gianl/gcs-models/results/"
+    "greenfield_layer0_attention_arithmetic_20260812T114701365714147Z"
 )
 REAL_STAGE0_SLOT0 = Path(
     "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/"
@@ -204,6 +216,128 @@ def test_model_axis_weights_are_bijectively_mapped_to_physical_ids() -> None:
         assert np.array_equal(physical[physical_id], value[source_rank])
     with pytest.raises(ValueError, match="bijectively cover"):
         model_axis_weights_to_physical(value, tuple([0] * 32))
+
+
+def test_native_source_graph_abstractly_traces_all_thirteen_inputs() -> None:
+    code = r'''
+import numpy as np
+import jax
+import jax.numpy as jnp
+from jax.sharding import Mesh, PartitionSpec as P
+from glm_tpu.greenfield.benchmarking.integrated_dense_rms import _native_source_context_function
+
+mesh = Mesh(np.asarray(jax.devices(), dtype=object), ("member",))
+mapped = jax.shard_map(
+    _native_source_context_function(),
+    mesh=mesh,
+    in_specs=(
+        P(), P(), P(),
+        P("member", None, None), P("member", None, None),
+        P("member", None, None), P("member", None, None),
+        P("member", None, None), P("member", None, None, None),
+        P("member", None, None, None), P("member", None, None, None),
+        P("member", None, None, None), P(),
+    ),
+    out_specs=P(),
+    check_vma=False,
+)
+arguments = (
+    jax.ShapeDtypeStruct((64, 512), jnp.bfloat16),
+    jax.ShapeDtypeStruct((32,), jnp.int32),
+    jax.ShapeDtypeStruct((6144,), jnp.bfloat16),
+    jax.ShapeDtypeStruct((32, 4840, 6144), jnp.bfloat16),
+    jax.ShapeDtypeStruct((32, 7168, 512), jnp.uint8),
+    jax.ShapeDtypeStruct((32, 56, 4), jnp.float32),
+    jax.ShapeDtypeStruct((32, 512, 6144), jnp.uint8),
+    jax.ShapeDtypeStruct((32, 4, 48), jnp.float32),
+    jax.ShapeDtypeStruct((32, 1, 6144, 768), jnp.float8_e4m3fn),
+    jax.ShapeDtypeStruct((32, 1, 48, 768), jnp.float32),
+    jax.ShapeDtypeStruct((32, 1, 384, 6144), jnp.float8_e4m3fn),
+    jax.ShapeDtypeStruct((32, 1, 3, 6144), jnp.float32),
+    jax.ShapeDtypeStruct((6144,), jnp.bfloat16),
+)
+output = jax.eval_shape(mapped, *arguments)
+assert output.shape == (1, 6144)
+assert output.dtype == jnp.uint16
+'''
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=REPO,
+        env={
+            **os.environ,
+            "JAX_PLATFORMS": "cpu",
+            "PYTHONPATH": str(REPO),
+            "XLA_FLAGS": "--xla_force_host_platform_device_count=32",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    source = (
+        REPO
+        / "glm_tpu/greenfield/benchmarking/integrated_dense_rms.py"
+    ).read_text()
+    start = source.index("def _native_source_context_function()")
+    end = source.index("\ndef build_integrated_dense_rms(", start)
+    native = source[start:end]
+    projection = native.index(
+        'with jax.named_scope("native_source_context_attention_projection")'
+    )
+    finite_guard = native.index(
+        "embedding_is_finite = jnp.isfinite(embedding_m32[0, 0])"
+    )
+    guarded_select = native.index(
+        "local_attention = lax.select(", finite_guard
+    )
+    collective = native.index(
+        'with jax.named_scope("native_source_context_attention_collective")'
+    )
+    assert projection < finite_guard < guarded_select < collective
+
+
+@pytest.mark.skipif(
+    not REAL_NATIVE_SOURCE.is_dir()
+    or not REAL_SOURCE.is_file()
+    or not REAL_STAGE0_SLOT0.is_file(),
+    reason="protected native/integrated source absent",
+)
+def test_real_native_source_is_exactly_pinned_and_mutations_refuse(
+    tmp_path: Path,
+) -> None:
+    from safetensors import safe_open
+
+    for name in (
+        "attention_arithmetic.npz",
+        "remote_objects.json",
+        "runner.json",
+        "SUCCESS",
+        "summary.json",
+    ):
+        shutil.copy2(REAL_NATIVE_SOURCE / name, tmp_path / name)
+    native_path = _validate_native_source_files(tmp_path)
+    assert sha256(native_path.read_bytes()).hexdigest() == NATIVE_SOURCE_NPZ_SHA256
+
+    with safe_open(REAL_STAGE0_SLOT0, framework="np") as handle:
+        post_norm = np.ascontiguousarray(
+            handle.get_tensor("attention.slot_00.post_norm")
+        )
+    base = load_integrated_dense_rms_inputs(REAL_SOURCE, post_norm)
+    with np.load(native_path, allow_pickle=False) as payload:
+        latent = np.ascontiguousarray(payload[NATIVE_SOURCE_ATTENDED_LATENT_KEY])
+    assert _raw_sha256(latent) == NATIVE_SOURCE_ATTENDED_LATENT_SHA256
+    native = native_source_inputs(latent, base)
+    assert np.array_equal(native.token_ids, NATIVE_SOURCE_TOKEN_IDS)
+
+    changed = latent.copy()
+    changed.view(np.uint8)[0] ^= np.uint8(1)
+    with pytest.raises(ValueError, match="attended latent drifted"):
+        native_source_inputs(changed, base)
+    (tmp_path / "rogue").write_text("not part of the sealed source")
+    with pytest.raises(ValueError, match="native source file set drifted"):
+        _validate_native_source_files(tmp_path)
 
 
 @pytest.mark.skipif(
@@ -578,6 +712,27 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
         r"accepted_source_context_attention_collective",
         r"integrated_dense_rms_strategy_nd_collective",
     )
+    native = integrated_dense_rms_hlo_policy(
+        tuple(range(32)), native_source_context=True
+    )
+    assert native.repeated_region_patterns == (
+        r"native_source_context_embedding_collective",
+        r"native_source_context_attention_collective",
+        r"integrated_dense_rms_strategy_nd_collective",
+    )
+    with pytest.raises(ValueError, match="disjoint"):
+        integrated_dense_rms_hlo_policy(
+            tuple(range(32)),
+            accepted_source_context=True,
+            native_source_context=True,
+        )
+    with pytest.raises(
+        ValueError, match="native source StableHLO is not pinned"
+    ):
+        validate_integrated_dense_rms_stablehlo(
+            "module awaiting protected lowering",
+            native_source_context=True,
+        )
 
 
 def test_portable_predense_schedule_is_bound_to_fused_gate() -> None:
@@ -1012,6 +1167,12 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     assert accepted_source_exact["classification"] == (
         "integrated_dense_accepted_source_context_exact_accepted"
     )
+    native_source_exact = _recompute_comparison(
+        expected.copy(), expected, native_source_context=True
+    )
+    assert native_source_exact["classification"] == (
+        "integrated_dense_native_source_context_exact_accepted"
+    )
     digest = array_sha256(expected)
     capture = {
         "invocation_count": 2,
@@ -1085,6 +1246,21 @@ def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
         split_layer1_rms=False,
         accepted_source_context=True,
     )
+    native_record = {
+        "native_source_context": True,
+        "optimized_hlo_sha256": "1" * 64,
+        "performance_claim": False,
+        "split_layer1_rms": False,
+        "stablehlo_sha256": "2" * 64,
+        "validated": False,
+    }
+    _validate_hlo_prevalidation(
+        native_record,
+        optimized_hlo_sha256="1" * 64,
+        stablehlo_sha256="2" * 64,
+        split_layer1_rms=False,
+        native_source_context=True,
+    )
     for key, value in (
         ("validated", True),
         ("performance_claim", True),
@@ -1125,7 +1301,13 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ACCEPTED_SOURCE_CONTEXT_REPLAY:-0"
         in wrapper
     )
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_SOURCE_CONTEXT_REPLAY:-0"
+        in wrapper
+    )
     assert "--integrated-accepted-source-context" in wrapper
+    assert "--integrated-native-source-context" in wrapper
+    assert "--native-attention-input" in wrapper
     assert "--integrated-preceding-attention-collective" in wrapper
     assert "--integrated-split-predense-rms" in wrapper
     assert "--integrated-split-layer1-rms" in wrapper
@@ -1143,6 +1325,17 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
     integrated = runner[start:end]
     assert "validate_hlo=False" in integrated
     assert "hlo_prevalidation.json" in integrated
+    persisted = integrated.index(
+        'f"greenfield-integrated-hlo-persisted-{label}"'
+    )
+    stable_validator = integrated.index(
+        "stablehlo_contract = validate_integrated_dense_rms_stablehlo("
+    )
+    assert integrated.index("hlo_prevalidation.json") < persisted
+    assert persisted < stable_validator
     assert integrated.index("hlo_prevalidation.json") < integrated.index(
         "execute_integrated_dense_rms("
+    )
+    assert integrated.index("hlo_prevalidation.json") < integrated.index(
+        "execute_native_source_context("
     )

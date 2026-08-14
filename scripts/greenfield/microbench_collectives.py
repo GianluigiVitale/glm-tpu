@@ -50,9 +50,17 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     DENSE_RMS_SOURCE_SUMMARY_SHA256,
     DENSE_RMS_SOURCE_TAG,
     IntegratedDenseWeights,
+    NATIVE_SOURCE_ATTENDED_LATENT_KEY,
+    NATIVE_SOURCE_NPZ_SHA256,
+    NATIVE_SOURCE_REMOTE_OBJECTS_SHA256,
+    NATIVE_SOURCE_RUNNER_SHA256,
+    NATIVE_SOURCE_SUCCESS_SHA256,
+    NATIVE_SOURCE_SUMMARY_SHA256,
+    NATIVE_SOURCE_TAG,
     StrategyNdFingerprintConfig,
     accepted_tp32_model_axis_device_ids,
     array_sha256,
+    assemble_native_source_weights,
     benchmark_collective_chain,
     build_collective_chain,
     build_strategy_nd_dense_rms_replay,
@@ -60,11 +68,13 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     build_strategy_nd_fingerprint,
     execute_strategy_nd_dense_rms_replay,
     execute_integrated_dense_rms,
+    execute_native_source_context,
     execute_strategy_nd_fingerprint,
     generate_strategy_nd_input_bits,
     load_dense_rms_inputs,
     load_integrated_dense_rms_inputs,
     model_axis_weights_to_physical,
+    native_source_inputs,
     validate_integrated_checkpoint_success,
     model_axis_to_physical_input_bits,
     replay_db533_strategy_nd_row0_bits,
@@ -215,6 +225,16 @@ def parse_args() -> argparse.Namespace:
         "--integrated-accepted-source-context",
         action="store_true",
         help="recreate the accepted embedding/predicate/attention source graph",
+    )
+    parser.add_argument(
+        "--integrated-native-source-context",
+        action="store_true",
+        help="run native embedding and attention producers in the bounded graph",
+    )
+    parser.add_argument(
+        "--native-attention-input",
+        type=Path,
+        help="SHA-pinned DB537 attention arithmetic NPZ",
     )
     parser.add_argument(
         "--allow-unprotected-test-config",
@@ -653,9 +673,11 @@ def _run_strategy_nd_integrated_dense_rms(
     physical_ids = tuple(sorted(device.device_id for device in topology.devices))
     if physical_ids != tuple(range(32)):
         raise RuntimeError("integrated dense RMS requires physical ids 0..31")
+    native_source_context = bool(args.integrated_native_source_context)
     weights, checkpoint_records = _load_weights(
         args.checkpoint_root,
         manifest_sha256=args.checkpoint_manifest_sha256,
+        include_embedding=native_source_context,
     )
     packed, packed_records = _pack_dense_final_layout(weights)
     if packed_records != _FINAL_DENSE_LAYOUT_RECORDS:
@@ -678,6 +700,28 @@ def _run_strategy_nd_integrated_dense_rms(
             )
         }
     )
+    native_inputs = None
+    native_weights = None
+    if native_source_context:
+        native_path = args.native_attention_input
+        if (
+            native_path is None
+            or _file_sha256(native_path)
+            != NATIVE_SOURCE_NPZ_SHA256
+        ):
+            raise RuntimeError("DB537 native attention source drifted")
+        with np.load(native_path, allow_pickle=False) as payload:
+            if NATIVE_SOURCE_ATTENDED_LATENT_KEY not in payload.files:
+                raise RuntimeError("DB537 exact attended latent is absent")
+            attended_latent_bits = np.ascontiguousarray(
+                payload[NATIVE_SOURCE_ATTENDED_LATENT_KEY]
+            )
+        native_inputs = native_source_inputs(attended_latent_bits, inputs)
+        native_weights = assemble_native_source_weights(
+            weights,
+            physical_weights,
+            model_axis_device_ids,
+        )
     split_layer1_rms = bool(args.integrated_split_layer1_rms)
     preceding_attention_collective = bool(
         args.integrated_preceding_attention_collective
@@ -685,7 +729,9 @@ def _run_strategy_nd_integrated_dense_rms(
     split_predense_rms = bool(args.integrated_split_predense_rms)
     accepted_source_context = bool(args.integrated_accepted_source_context)
     label = (
-        "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_native_source_context_bfloat16_32x6144"
+        if native_source_context
+        else "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
         if accepted_source_context
         else "strategy_nd_integrated_dense_predense_split_rms_bfloat16_32x6144"
         if split_predense_rms
@@ -704,6 +750,7 @@ def _run_strategy_nd_integrated_dense_rms(
         preceding_attention_collective=preceding_attention_collective,
         split_predense_rms=split_predense_rms,
         accepted_source_context=accepted_source_context,
+        native_source_context=native_source_context,
     )
     stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
     optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
@@ -722,6 +769,11 @@ def _run_strategy_nd_integrated_dense_rms(
                 "performance_claim": False,
                 "split_layer1_rms": split_layer1_rms,
                 **(
+                    {"native_source_context": True}
+                    if native_source_context
+                    else {}
+                ),
+                **(
                     {"accepted_source_context": True}
                     if accepted_source_context
                     else {}
@@ -738,8 +790,14 @@ def _run_strategy_nd_integrated_dense_rms(
                     if preceding_attention_collective
                     else {}
                 ),
-            },
-        )
+                },
+            )
+    # The native acquisition intentionally fails in the validator below.
+    # Do not let another process tear down distributed JAX before process 0
+    # has durably written the graphs needed for local validator iteration.
+    multihost_utils.sync_global_devices(
+        f"greenfield-integrated-hlo-persisted-{label}"
+    )
     from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
         validate_integrated_dense_rms_hlo,
         validate_integrated_dense_rms_stablehlo,
@@ -751,6 +809,7 @@ def _run_strategy_nd_integrated_dense_rms(
         preceding_attention_collective=preceding_attention_collective,
         split_predense_rms=split_predense_rms,
         accepted_source_context=accepted_source_context,
+        native_source_context=native_source_context,
     )
     optimized_hlo_contract = validate_integrated_dense_rms_hlo(
         compiled.optimized_hlo,
@@ -759,6 +818,7 @@ def _run_strategy_nd_integrated_dense_rms(
         preceding_attention_collective=preceding_attention_collective,
         split_predense_rms=split_predense_rms,
         accepted_source_context=accepted_source_context,
+        native_source_context=native_source_context,
     )
     compiled = replace(
         compiled,
@@ -777,12 +837,22 @@ def _run_strategy_nd_integrated_dense_rms(
         label="integrated dense RMS optimized HLO",
         num_processes=args.num_processes,
     )
-    output_bits, capture = execute_integrated_dense_rms(
-        compiled,
-        physical_weights,
-        inputs,
-    )
-    expected_bits = inputs.accepted_layer1_bits
+    if native_source_context:
+        if native_weights is None or native_inputs is None:
+            raise RuntimeError("native source inputs were not assembled")
+        output_bits, capture = execute_native_source_context(
+            compiled,
+            native_weights,
+            native_inputs,
+        )
+        expected_bits = native_inputs.accepted_layer1_bits
+    else:
+        output_bits, capture = execute_integrated_dense_rms(
+            compiled,
+            physical_weights,
+            inputs,
+        )
+        expected_bits = inputs.accepted_layer1_bits
     mismatch_indices = np.flatnonzero(output_bits != expected_bits)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
     observed_values = (
@@ -801,7 +871,9 @@ def _run_strategy_nd_integrated_dense_rms(
         "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
     )
     classification_prefix = (
-        "integrated_dense_accepted_source_context"
+        "integrated_dense_native_source_context"
+        if native_source_context
+        else "integrated_dense_accepted_source_context"
         if accepted_source_context
         else "integrated_dense_predense_split_rms"
         if split_predense_rms
@@ -836,13 +908,49 @@ def _run_strategy_nd_integrated_dense_rms(
         name: array_sha256(getattr(physical_weights, name))
         for name in ("merged_bits", "merged_scale", "down_bits", "down_scale")
     }
+    if native_source_context:
+        assert native_weights is not None
+        physical_weight_hashes.update(
+            {
+                name: array_sha256(getattr(native_weights, name))
+                for name in (
+                    "embedding",
+                    "kv_b_bits",
+                    "kv_b_scale",
+                    "o_bits_in_out",
+                    "o_scale_in_out",
+                )
+            }
+        )
     stable_hashes = {
         "accepted_target": array_sha256(expected_bits),
-        "attention_update": array_sha256(inputs.attention_update_bits),
-        "combined_residual": array_sha256(inputs.combined_residual_bits),
         "layer1_norm": array_sha256(inputs.layer1_norm_bits),
         "post_attention_norm": array_sha256(inputs.post_attention_norm_bits),
         "output": array_sha256(output_bits),
+        **(
+            {}
+            if native_source_context
+            else {
+                "attention_update": array_sha256(
+                    inputs.attention_update_bits
+                ),
+                "combined_residual": array_sha256(
+                    inputs.combined_residual_bits
+                ),
+            }
+        ),
+        **(
+            {
+                "attended_latent": array_sha256(
+                    native_inputs.attended_latent_bits
+                ),
+                "native_source_token_ids": array_sha256(
+                    native_inputs.token_ids
+                ),
+            }
+            if native_source_context and native_inputs is not None
+            else {}
+        ),
         **(
             {"accepted_source_validity": array_sha256(ACCEPTED_SOURCE_VALIDITY)}
             if accepted_source_context
@@ -922,10 +1030,29 @@ def _run_strategy_nd_integrated_dense_rms(
             "checkpoint_success_sha256": CHECKPOINT_SUCCESS_SHA256,
             "rms_npz_sha256": DENSE_RMS_SOURCE_NPZ_SHA256,
             "rms_tag": DENSE_RMS_SOURCE_TAG,
+            **(
+                {
+                    "native_npz_sha256": NATIVE_SOURCE_NPZ_SHA256,
+                    "native_remote_objects_sha256": (
+                        NATIVE_SOURCE_REMOTE_OBJECTS_SHA256
+                    ),
+                    "native_runner_sha256": NATIVE_SOURCE_RUNNER_SHA256,
+                    "native_success_sha256": NATIVE_SOURCE_SUCCESS_SHA256,
+                    "native_summary_sha256": NATIVE_SOURCE_SUMMARY_SHA256,
+                    "native_tag": NATIVE_SOURCE_TAG,
+                }
+                if native_source_context
+                else {}
+            ),
         },
         "stablehlo_contract": dict(compiled.stablehlo_contract),
         "stablehlo_sha256": stablehlo_sha,
         "split_layer1_rms": split_layer1_rms,
+        **(
+            {"native_source_context": True}
+            if native_source_context
+            else {}
+        ),
         **(
             {"accepted_source_context": True}
             if accepted_source_context
@@ -1228,6 +1355,24 @@ def main() -> int:
     ):
         raise ValueError(
             "accepted source context requires the disjoint integrated dense RMS arm"
+        )
+    if args.integrated_native_source_context and (
+        args.mode != "strategy_nd_integrated_dense_rms"
+        or args.integrated_accepted_source_context
+        or args.integrated_split_layer1_rms
+        or args.integrated_preceding_attention_collective
+        or args.integrated_split_predense_rms
+        or args.native_attention_input is None
+        or not args.native_attention_input.is_file()
+    ):
+        raise ValueError(
+            "native source context requires its disjoint integrated mode and DB537 input"
+        )
+    if args.native_attention_input is not None and not (
+        args.integrated_native_source_context
+    ):
+        raise ValueError(
+            "native attention input is valid only for native source context"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:

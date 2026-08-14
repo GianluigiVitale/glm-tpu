@@ -62,6 +62,13 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   result also consumes all sources in one fusion, while the candidate materializes the carried
   embedding+attention sum in an extra fusion. Preserve producer/consumer fusion ownership whenever
   bitwise exactness depends on scheduled association.
+- The native-source successor must be tested in two distinct steps. Forced-32 CPU `eval_shape`
+  proves its 13-input global sharding/shape contract in about 1.5 seconds, but CPU cannot lower the
+  real non-interpret Pallas kernels. The first protected attempt is therefore compile acquisition
+  only: atomically preserve StableHLO/optimized HLO before an intentionally absent exact pin forces
+  refusal. Build the exact value-flow/layout validator from that one preserved graph and only then
+  authorize a separate numerical execution. Never loosen a TPU contract speculatively or rerun a
+  compile just to rediscover an already captured lowering.
 
 ## Evidence ladder
 
@@ -126,6 +133,13 @@ branches from the search tree.
   pin the physical layouts at every source parameter, slice/reshape boundary, arithmetic result and
   live root whose reinterpretation can change association or row ownership; test parser-valid
   layout-only mutations as well as opcode/source mutations.
+- Causal ordering is part of the graph contract even when a dependency is numerically inert. If a
+  sealed-input reconstruction replaces an upstream producer, retain the accepted finite/validity
+  guard or equivalent exact SSA dependency before the next collective; otherwise XLA may coalesce
+  or reorder independent reductions and invalidate the discriminator.
+- In a multi-host compile-acquisition run, process 0 writing HLO is not enough. Synchronize every
+  JAX process after the atomic graph/prevalidation writes and before an intentionally failing
+  validator, so peer teardown cannot destroy the only compiler evidence.
 
 ## Numerical rules
 
@@ -169,6 +183,10 @@ branches from the search tree.
   fusion ownership and backend geometry from pinned inputs to the first unequal result.
 - Gate D closes only with the complete protected decoder. A bitwise-exact bounded row authorizes
   that confirmation; it does not itself close the gate.
+- When a real kernel cannot lower on CPU, keep the local/metal boundary narrow: abstractly trace
+  the full graph and test all source/checkpoint/wrapper schemas locally, then spend one protected
+  compile solely to acquire the TPU-specific lowering. The acquisition must be structurally
+  incapable of arithmetic publication.
 
 ## Decision after the model-free replays
 
