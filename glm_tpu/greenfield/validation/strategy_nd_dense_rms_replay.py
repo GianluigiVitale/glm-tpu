@@ -392,7 +392,7 @@ def validate_strategy_nd_dense_rms_replay(
         or reference["collective_algorithm"] != STRATEGY_ND_ALGORITHM
         or reference["diagnostic_only"] is not True
         or reference["performance_claim"] is not False
-        or type(reference["accepted_model_axis_recipe"]) is not dict
+        or type(reference["accepted_model_axis_recipe"]) is not str
         or type(reference["collective_algorithm"]) is not dict
         or type(reference["source"]) is not dict
         or type(reference["artifact_manifest"]) is not dict

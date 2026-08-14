@@ -8901,3 +8901,28 @@ unmotivated arithmetic variants.
   RMSNorm graph in one compiled 32-chip program, using sealed DB548 residual/norm/target tensors.
   Only a complete 6,144-value exact structural result authorizes production integration and one
   protected full-8K confirmation.
+
+## 2026-08-14 13:20--13:22 — fast downstream replay exposes a cross-run oracle flaw
+
+- Reviewed/pushed pin `7129bf38aa783fb91d109e4a0865874ad562c738` ran the physical M32
+  StrategyND reduction directly into the carried-residual/layer-1 RMSNorm graph. Device work took
+  24 seconds and all eight hosts reported the same optimized-HLO SHA
+  `68830c402bc6b9ac2a551a6e175101d0ffe31e3bb8ecc0069f97e8f9450d1320`; StableHLO SHA is
+  `b27a59568e6bdeb0be6d9a7ac4af87cc1ad7ffe3400079acd5830b4c29bb6ac3`.
+- The output reproduces DB548 rather than the accepted row: exactly one mismatch at hidden 2795,
+  expected/observed bits `48423/48422`, max error `0.000244140625`, comparison SHA
+  `b3776f353e27294966567d8d226f8ea1fe7ab4e328e58eeac3609457e50d9acb`. Post-census SHA
+  `bbc0914eb9da966e82c9947ded2ccc199af7e12df3d60997da3652f4e00ad029` proves 8/8 clean.
+  A terminal string/dict type-check bug refused later publication, so this failed diagnostic has no
+  summary, remote ledger or `SUCCESS`.
+- Provenance inspection changes the interpretation more fundamentally: DB548's residual ingredients
+  came from `greenfield_table_on_layer0_ingredients_p8155_20260812T021718885910564Z`, while its
+  accepted layer-1 target came from
+  `greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z`. Reproducing that hybrid
+  bundle cannot prove or reject accepted legacy residual/RMS arithmetic. DB550 partials, DB539's
+  attention update and the physical StrategyND combine remain exact and frozen.
+- The next evidence is one accepted position-8155 post-attention residual captured by the existing
+  default-off, non-returning legacy dense-boundary observer. After sealing it, the same seconds-scale
+  executable will consume a coherent accepted partial/residual/norm/target chain. The durable rule
+  is recorded in `docs/greenfield/GATE_D_LESSONS.md`: same position/model/shape does not establish
+  one event; source coherence must be validated before TPU launch.

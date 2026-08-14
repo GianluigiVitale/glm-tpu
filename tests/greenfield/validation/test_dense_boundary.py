@@ -3,6 +3,8 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import ml_dtypes
 import numpy as np
@@ -34,6 +36,20 @@ def _file_sha256(path: Path) -> str:
 
 def _array_sha256(value: np.ndarray) -> str:
     return sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
+
+
+def _manifest_sha256(value: dict[str, object]) -> str:
+    payload = dict(value)
+    payload.pop("manifest_sha256", None)
+    return sha256(
+        json.dumps(
+            payload,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
 
 
 def _bits(values: np.ndarray) -> np.ndarray:
@@ -321,7 +337,9 @@ def test_comparison_classifies_first_open_boundary(
     }
 
 
-def test_comparison_refuses_residual_or_layer1_verdict_drift(tmp_path: Path) -> None:
+def test_comparison_classifies_residual_and_refuses_layer1_verdict_drift(
+    tmp_path: Path,
+) -> None:
     dense, residual, accepted_layer1, candidate_layer1 = _fixture_values()
     accepted_residual = residual.copy()
     accepted_residual[9] ^= np.uint16(1)
@@ -334,20 +352,23 @@ def test_comparison_refuses_residual_or_layer1_verdict_drift(tmp_path: Path) -> 
         accepted_layer1=accepted_layer1,
         candidate_layer1=candidate_layer1,
     )
-    with pytest.raises(ValueError, match="residual prerequisite"):
-        compare_dense_boundary_candidate(
-            _config(
-                tmp_path,
-                accepted=accepted,
-                probe=probe,
-                hashes=hashes,
-                dense=dense,
-                residual=residual,
-                accepted_layer1=accepted_layer1,
-                candidate_layer1=candidate_layer1,
-                output="residual-drift",
-            )
+    result = compare_dense_boundary_candidate(
+        _config(
+            tmp_path,
+            accepted=accepted,
+            probe=probe,
+            hashes=hashes,
+            dense=dense,
+            residual=residual,
+            accepted_layer1=accepted_layer1,
+            candidate_layer1=candidate_layer1,
+            output="residual-drift",
         )
+    )
+    assert result["classification"] == "post_attention_residual_nonexact"
+    assert result["first_open_boundary"] == "layer0_post_attention_residual"
+    assert result["post_attention_residual"]["elementwise_exact"] is False
+    assert result["post_attention_residual"]["mismatch_count"] == 1
 
     runner_path = probe / "runner.json"
     runner = json.loads(runner_path.read_text())
@@ -427,6 +448,9 @@ def test_protected_wrapper_pins_dense_boundary_sources_and_cleanup() -> None:
         "DENSE_CONVOLUTION_SUCCESS_SHA=d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799",
     ):
         assert exact in wrapper
+    assert '"post_attention_residual_nonexact"' in wrapper
+    assert '"layer0_post_attention_residual"' in wrapper
+    assert '"dense_boundary_residual_exact": str(residual_exact).lower()' in wrapper
     assert wrapper.index("protected DB540 live DB identity drifted") < wrapper.index(
         "strict_census pre"
     )
@@ -436,3 +460,196 @@ def test_protected_wrapper_pins_dense_boundary_sources_and_cleanup() -> None:
     assert wrapper.index("validate_exact_remote_object_set(root, prefix, listing)") < (
         wrapper.index('(root / "SUCCESS").write_text')
     )
+
+
+def _run_dense_boundary_terminal(
+    root: Path,
+    *,
+    residual_exact: bool,
+    mutation: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    wrapper = (
+        Path(__file__).resolve().parents[3]
+        / "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
+    ).read_text()
+    marker = (
+        'PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \\\n'
+        '  "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \\\n'
+    )
+    start = wrapper.index(marker) + len(marker)
+    start = wrapper.index("from hashlib import sha256", start)
+    body = wrapper[start : wrapper.index("\nPY\n", start)]
+
+    oracle_pin = "b3c25df47ac98783912dc658878181ec0a8ae16d"
+    (root / "oracle").mkdir(parents=True)
+    (root / "oracle" / "manifest.json").write_text(
+        json.dumps({"artifact_kind": "unit", "manifest_sha256": "a" * 64})
+    )
+    (root / "evidence_sha256.json").write_text("{}\n")
+    (root / "remote_objects.json").write_text("{}\n")
+    (root / "dsa_exact_comparison.json").write_text('{"exact": true}\n')
+
+    capture: dict[str, object] = {
+        "artifact_kind": "glm52_accepted_dense_boundary_capture",
+        "capture_layout": "replicated_logical_live_rows",
+        "capture_mode": "dense_boundary",
+        "capture_process_indices": [0],
+        "diagnostic_only": True,
+        "format_version": 1,
+        "layer_name": LAYER_NAME,
+        "legacy_code_hash": LEGACY_HASH,
+        "model_id": "zai-org/GLM-5.2-FP8",
+        "oracle_pin": oracle_pin,
+        "performance_claim": False,
+        "position": 8155,
+        "process_count": 8,
+        "process_files": [{
+            "byte_count": 1,
+            "path": "source.proc0.npz",
+            "process_index": 0,
+            "sha256": "4" * 64,
+        }],
+        "run_tag": "unit-dense-boundary",
+        "tensor_file": {
+            "byte_count": 1,
+            "filename": "dense_boundary.npz",
+            "sha256": "5" * 64,
+        },
+        "tensors": {
+            "dense_update": {"shape": [WIDTH], "sha256": "6" * 64},
+            "post_attention_residual": {
+                "shape": [WIDTH],
+                "sha256": "7" * 64,
+            },
+        },
+    }
+    capture["manifest_sha256"] = _manifest_sha256(capture)
+    zero = np.zeros((WIDTH,), dtype=np.uint16)
+    dense = _comparison(zero, zero)
+    residual_observed = zero.copy()
+    if not residual_exact:
+        residual_observed[9] = np.uint16(1)
+    residual = _comparison(zero, residual_observed)
+    comparison: dict[str, object] = {
+        "accepted_capture_manifest_sha256": capture["manifest_sha256"],
+        "artifact_kind": "glm52_accepted_greenfield_dense_boundary_comparison",
+        "classification": (
+            "dense_update_exact_layer1_fused_norm_open"
+            if residual_exact
+            else "post_attention_residual_nonexact"
+        ),
+        "dense_update": dense,
+        "diagnostic_only": True,
+        "first_open_boundary": (
+            "layer1_fused_add_rmsnorm"
+            if residual_exact
+            else "layer0_post_attention_residual"
+        ),
+        "format_version": 1,
+        "legacy_code_hash": LEGACY_HASH,
+        "oracle_pin": oracle_pin,
+        "performance_claim": False,
+        "position": 8155,
+        "post_attention_residual": residual,
+        "probe": {
+            "code_hash": "2f63779309b25c71c1cc7d35ff97715ae4bf631e",
+            "run_id": 540,
+            "runner_sha256": "876353e2504d728343223f03be9092a08d2662924ceb4b88d6f09563101bad91",
+            "success_sha256": "d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799",
+            "summary_sha256": "9b277ca495d3b9e9ce497d2bf78a520a2672f133e68228d14a10937d4a4b1449",
+            "tag": "greenfield_layer0_dense_convolution_20260813T005213127235575Z",
+            "tensor_sha256": "2cdf128976eb7e04d5c84e012f066d1766361af57896cd22f83c01c7d704e1b9",
+        },
+        "status": "SUCCESS",
+    }
+    comparison["manifest_sha256"] = _manifest_sha256(comparison)
+    if mutation == "boolean_error":
+        residual["max_abs_error"] = True
+        comparison["manifest_sha256"] = _manifest_sha256(comparison)
+    elif mutation == "invalid_sha":
+        residual["expected_sha256"] = "not-a-sha"
+        comparison["manifest_sha256"] = _manifest_sha256(comparison)
+    elif mutation == "comparison_manifest":
+        comparison["manifest_sha256"] = "0" * 64
+    elif mutation == "capture_manifest":
+        capture["manifest_sha256"] = "0" * 64
+    elif mutation == "dense_bool":
+        dense["elementwise_exact"] = 1
+        comparison["manifest_sha256"] = _manifest_sha256(comparison)
+
+    capture_dir = root / "dense_boundary_capture"
+    comparison_dir = root / "dense_boundary_comparison"
+    capture_dir.mkdir()
+    comparison_dir.mkdir()
+    (capture_dir / "capture.json").write_text(json.dumps(capture))
+    (comparison_dir / "comparison.json").write_text(json.dumps(comparison))
+    args = [
+        str(root),
+        "gs://unit/result",
+        "a" * 40,
+        LEGACY_HASH,
+        "1",
+        "1",
+        "1",
+        "1",
+        "1",
+        "0",
+        "0",
+        "0",
+        "dense_boundary",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "unit-tag",
+        "unused",
+        "0" * 64,
+        "0" * 64,
+        "0" * 64,
+        "0" * 64,
+        oracle_pin,
+    ]
+    return subprocess.run(
+        [sys.executable, "-", *args],
+        input=body,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize("residual_exact", [True, False])
+def test_dense_boundary_terminal_accepts_exact_numerical_schemas(
+    tmp_path: Path,
+    residual_exact: bool,
+) -> None:
+    completed = _run_dense_boundary_terminal(
+        tmp_path / str(residual_exact), residual_exact=residual_exact
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "boolean_error",
+        "invalid_sha",
+        "comparison_manifest",
+        "capture_manifest",
+        "dense_bool",
+    ],
+)
+def test_dense_boundary_terminal_refuses_schema_mutations(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    completed = _run_dense_boundary_terminal(
+        tmp_path / mutation,
+        residual_exact=False,
+        mutation=mutation,
+    )
+    assert completed.returncode != 0

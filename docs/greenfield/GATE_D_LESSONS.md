@@ -12,10 +12,14 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 - The protected 32-chip replay proves the physical M32 StrategyND row zero exactly matches the
   DB533 software tree: `0 / 6,144` mismatches, common raw SHA `efde8532...b4fc`, hidden-2795 bits
   `47808`. Standalone physical association is closed too.
-- The remaining discriminator is whether consuming that global collective directly inside the
-  carried-residual/layer-1 RMSNorm graph changes scheduled fusion/arithmetic. Gate D is not closed
-  until that boundary is exact and the complete 8K decoder has exact tokens and DSA plus its trace,
-  wall, memory and integrity evidence.
+- The first global-collective/RMS replay reproduced DB548's one-ULP control, but its residual inputs
+  came from a greenfield ingredient run while its target came from an accepted legacy run. It is a
+  hybrid control, not an accepted-boundary discriminator. The missing authoritative tensor is the
+  accepted layer-0 post-attention residual at position 8,155.
+- Capture that residual once with the existing non-returning legacy dense-boundary observer. Then
+  replay the already-proved accepted dense partials, physical StrategyND combine and layer-1 RMSNorm
+  using only one coherent accepted event. Gate D remains open until that row and the complete 8K
+  decoder are exact with trace, wall, memory and integrity evidence.
 
 ## Evidence ladder
 
@@ -28,6 +32,16 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 A full checkpoint/8K run is forbidden while a smaller capture or replay can decide the same
 hypothesis. Compile once and replay sealed values. Keep negative results: they permanently remove
 branches from the search tree.
+
+## Source-coherence rules
+
+- Shape, position, model id and tensor SHA are not enough to combine evidence from separate runs.
+  Every replay input and target must carry one coherent event identity: run/tag, code pin, prompt,
+  layer, position, semantic role and capture point.
+- If sources intentionally differ, label the result a hybrid control and forbid an accepted-oracle
+  conclusion. Reproducing that control validates replay mechanics only.
+- Build and validate the source-coherence manifest before launching TPU work. Do not discover after
+  execution that the target and an input came from different arithmetic histories.
 
 ## Observer-effect rules
 
@@ -73,11 +87,12 @@ branches from the search tree.
   not only the JSON destination. A completed device call without terminal artifact collection remains
   diagnostic, even when all host records agree numerically.
 
-## Decision after the model-free replay
+## Decision after the model-free replays
 
 - Hardware row zero equals DB533 software. Freeze dense arithmetic and standalone association.
-- The next replay must put global StrategyND combine and downstream residual/RMSNorm in one compiled
-  program. A separate four-chip/software replay cannot prove or reject cross-boundary fusion.
+- The global StrategyND/RMS program is mechanically valid and completes in roughly 24 seconds, but
+  its first source bundle was hybrid. Rerun it only after replacing the greenfield residual history
+  with the directly captured accepted post-attention residual.
 - Integrate only a structural boundary that makes the entire 6,144-value accepted row exact. Never
   patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
 

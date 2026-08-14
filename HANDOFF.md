@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `7129bf38aa783fb91d109e4a0865874ad562c738` ran the protected global
+  StrategyND-to-layer-1-RMS executable under tag
+  `greenfield_strategy_nd_dense_rms_replay_20260814T132047565832633Z`. Device work completed in
+  24 seconds, exact StableHLO/optimized-HLO artifacts were preserved, and all eight hosts ended
+  clean. The output exactly reproduces DB548's control: one mismatch at hidden 2795, expected bits
+  `48423`, observed `48422`, expected/observed SHAs `9936ee1e...d3039` / `9b52a04e...4005`.
+  This is not a terminal sealed result: a wrong terminal Python type assertion refused publication,
+  so there is no summary, ledger or `SUCCESS`.
+- More importantly, source provenance shows this replay cannot classify the accepted boundary.
+  Its DB550 dense partials and DB539 attention update are accepted, but its
+  `combined_residual`/post-attention history came from the table-on greenfield ingredient run while
+  its target came from a separate accepted legacy run. Matching DB548 therefore validates replay
+  mechanics only. Never combine same-position tensors from different executions without an
+  explicit coherent-event manifest.
+- The exact next datum is the accepted layer-0 post-attention residual at position 8155. The
+  default-off, non-returning dense-boundary observer and protected 8K wrapper already exist at
+  legacy pin `8443ea64f4574335091130f0e4f1dfef258c91f7`; the previous launch failed before model load
+  only on an old disk-reserve check and produced no tensor. Seal that residual once, then replace
+  the hybrid reconstruction with the direct accepted row and rerun the same 24-second executable.
+  No dense contraction, association or scalar hypothesis may be reopened.
+
 - Protected accepted-oracle DB550/item1834 completed under tag
   `greenfield_legacy_layer0_dense_partials_p8155_20260814T100132090917640Z` at reviewed greenfield
   pin `1800abc99c89abf90b3e61029968be70d615f0b4` and legacy observer pin
@@ -54,12 +75,9 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   DB performance row or throughput claim.
 - Dense contractions and the standalone physical StrategyND combine are now frozen. A naive scalar
   inverse sweep cannot reproduce even the control row under a simplified two-BF16-round model, so
-  do not patch hidden 2795 or search a free RMS scalar. The remaining bounded discriminator is the
-  exact global StrategyND combine consumed by the carried-residual/layer-1 RMSNorm graph in the
-  *same compiled 32-chip executable*. It must reuse sealed DB550 partials and DB548 residual/norm
-  inputs, prove the complete collective-to-live-output HLO, and compare directly with the accepted
-  layer-1 row. Only after this seconds-scale replay identifies an exact structural boundary may the
-  correction enter production and authorize one complete protected 8K confirmation.
+  do not patch hidden 2795 or search a free RMS scalar. The downstream replay machinery is proven,
+  but it must consume the freshly sealed accepted post-attention residual rather than DB548's
+  hybrid residual history before it can classify the layer-1 boundary.
 
 - Reviewed/pushed correction `d1edb65dc45f99d65d15a8d046d2e97f0ac023f9` completed the protected
   internal gate-dequant replay under tag

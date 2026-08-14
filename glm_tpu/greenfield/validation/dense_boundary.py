@@ -527,10 +527,11 @@ def compare_dense_boundary_candidate(
     if observed_layer1["elementwise_exact"] or layer1 != observed_layer1:
         raise ValueError("dense-convolution layer1 verdict drifted")
     residual = _comparison(accepted["post_attention_residual"], candidate_residual)
-    if not residual["elementwise_exact"]:
-        raise ValueError("accepted post-attention residual prerequisite failed")
     dense = _comparison(accepted["dense_update"], candidate_dense)
-    if dense["elementwise_exact"]:
+    if not residual["elementwise_exact"]:
+        classification = "post_attention_residual_nonexact"
+        first_open = "layer0_post_attention_residual"
+    elif dense["elementwise_exact"]:
         classification = "dense_update_exact_layer1_fused_norm_open"
         first_open = "layer1_fused_add_rmsnorm"
     else:

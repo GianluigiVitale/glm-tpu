@@ -1805,6 +1805,55 @@ def manifest_sha256(value):
     ).encode("utf-8")
     return sha256(encoded).hexdigest()
 
+def is_sha256(value):
+    return (
+        type(value) is str
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+def valid_dense_boundary_numeric(value):
+    expected_keys = {
+        "elementwise_exact",
+        "expected_sha256",
+        "first_mismatch_index",
+        "max_abs_error",
+        "mean_abs_error",
+        "mismatch_count",
+        "observed_sha256",
+        "shape",
+    }
+    if (
+        type(value) is not dict
+        or set(value) != expected_keys
+        or type(value["elementwise_exact"]) is not bool
+        or not is_sha256(value["expected_sha256"])
+        or not is_sha256(value["observed_sha256"])
+        or type(value["mismatch_count"]) is not int
+        or not 0 <= value["mismatch_count"] <= 6144
+        or type(value["max_abs_error"]) is not float
+        or type(value["mean_abs_error"]) is not float
+        or not math.isfinite(value["max_abs_error"])
+        or not math.isfinite(value["mean_abs_error"])
+        or value["shape"] != [6144]
+    ):
+        return False
+    if value["elementwise_exact"]:
+        return (
+            value["mismatch_count"] == 0
+            and value["first_mismatch_index"] is None
+            and value["expected_sha256"] == value["observed_sha256"]
+            and value["max_abs_error"] == 0.0
+            and value["mean_abs_error"] == 0.0
+        )
+    return (
+        1 <= value["mismatch_count"] <= 6144
+        and type(value["first_mismatch_index"]) is int
+        and 0 <= value["first_mismatch_index"] < 6144
+        and value["expected_sha256"] != value["observed_sha256"]
+        and 0.0 < value["mean_abs_error"] <= value["max_abs_error"]
+    )
+
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
@@ -2037,8 +2086,48 @@ if sys.argv[8] == "1":
         comparison = json.loads(comparison_path.read_text())
         dense = comparison["dense_update"]
         residual = comparison["post_attention_residual"]
+        expected_capture_keys = {
+            "artifact_kind",
+            "capture_layout",
+            "capture_mode",
+            "capture_process_indices",
+            "diagnostic_only",
+            "format_version",
+            "layer_name",
+            "legacy_code_hash",
+            "manifest_sha256",
+            "model_id",
+            "oracle_pin",
+            "performance_claim",
+            "position",
+            "process_count",
+            "process_files",
+            "run_tag",
+            "tensor_file",
+            "tensors",
+        }
+        expected_comparison_keys = {
+            "accepted_capture_manifest_sha256",
+            "artifact_kind",
+            "classification",
+            "dense_update",
+            "diagnostic_only",
+            "first_open_boundary",
+            "format_version",
+            "legacy_code_hash",
+            "manifest_sha256",
+            "oracle_pin",
+            "performance_claim",
+            "position",
+            "post_attention_residual",
+            "probe",
+            "status",
+        }
         if (
             not exact_dsa["exact"]
+            or type(capture) is not dict
+            or set(capture) != expected_capture_keys
+            or capture["manifest_sha256"] != manifest_sha256(capture)
             or capture["artifact_kind"]
             != "glm52_accepted_dense_boundary_capture"
             or capture["capture_layout"]
@@ -2057,23 +2146,32 @@ if sys.argv[8] == "1":
                 value["shape"] != [6144]
                 for value in capture["tensors"].values()
             )
+            or type(comparison) is not dict
+            or set(comparison) != expected_comparison_keys
+            or comparison["manifest_sha256"] != manifest_sha256(comparison)
+            or comparison["accepted_capture_manifest_sha256"]
+            != capture["manifest_sha256"]
             or comparison["artifact_kind"]
             != "glm52_accepted_greenfield_dense_boundary_comparison"
+            or comparison["format_version"] != 1
+            or comparison["legacy_code_hash"] != sys.argv[4]
+            or comparison["oracle_pin"] != capture["oracle_pin"]
+            or comparison["position"] != 8155
             or comparison["status"] != "SUCCESS"
             or comparison["diagnostic_only"] is not True
             or comparison["performance_claim"] is not False
             or comparison["classification"] not in {
+                "post_attention_residual_nonexact",
                 "dense_update_exact_layer1_fused_norm_open",
                 "dense_mlp_output_nonexact",
             }
             or comparison["first_open_boundary"] not in {
+                "layer0_post_attention_residual",
                 "layer1_fused_add_rmsnorm",
                 "dense_mlp_input_or_arithmetic",
             }
-            or dense["shape"] != [6144]
-            or residual["shape"] != [6144]
-            or residual["elementwise_exact"] is not True
-            or residual["mismatch_count"] != 0
+            or not valid_dense_boundary_numeric(dense)
+            or not valid_dense_boundary_numeric(residual)
             or comparison["probe"] != {
                 "code_hash": "2f63779309b25c71c1cc7d35ff97715ae4bf631e",
                 "run_id": 540,
@@ -2085,12 +2183,25 @@ if sys.argv[8] == "1":
             }
         ):
             raise SystemExit("dense-boundary comparison evidence drifted")
-        expected_boundary = (
-            "layer1_fused_add_rmsnorm"
-            if dense["elementwise_exact"]
-            else "dense_mlp_input_or_arithmetic"
-        )
-        if comparison["first_open_boundary"] != expected_boundary:
+        residual_exact = residual["elementwise_exact"]
+        if residual_exact:
+            expected_classification = (
+                "dense_update_exact_layer1_fused_norm_open"
+                if dense["elementwise_exact"]
+                else "dense_mlp_output_nonexact"
+            )
+            expected_boundary = (
+                "layer1_fused_add_rmsnorm"
+                if dense["elementwise_exact"]
+                else "dense_mlp_input_or_arithmetic"
+            )
+        else:
+            expected_classification = "post_attention_residual_nonexact"
+            expected_boundary = "layer0_post_attention_residual"
+        if (
+            comparison["classification"] != expected_classification
+            or comparison["first_open_boundary"] != expected_boundary
+        ):
             raise SystemExit("dense-boundary classification contradiction")
         lines.update({
             "accepted_dense_boundary_capture": "true",
@@ -2127,7 +2238,7 @@ if sys.argv[8] == "1":
             "dense_boundary_first_open_boundary": comparison[
                 "first_open_boundary"
             ],
-            "dense_boundary_residual_exact": "true",
+            "dense_boundary_residual_exact": str(residual_exact).lower(),
             "dense_boundary_probe_runner_sha256": comparison["probe"][
                 "runner_sha256"
             ],
