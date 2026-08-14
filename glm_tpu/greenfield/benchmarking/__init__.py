@@ -73,7 +73,9 @@ from .integrated_dense_rms import (
 )
 from .integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256,
     integrated_dense_rms_hlo_policy,
     validate_integrated_dense_rms_hlo,
     validate_integrated_dense_rms_stablehlo,
@@ -135,6 +137,8 @@ __all__ = [
     "GateCIndexShareResult",
     "INTEGRATED_DENSE_RMS_STABLEHLO_SHA256",
     "INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256",
+    "INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256",
+    "INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256",
     "IntegratedDenseRmsInputs",
     "IntegratedDenseWeights",
     "POST_ATTENTION_NORM_RAW_SHA256",

@@ -32,9 +32,11 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   boundary: accepted schedules only the scalar RMS reduction, while the control schedules a tuple
   containing the full residual sum. The protected scalar-only challenger was still nonexact and
   exactly reproduced rejected DB549: 1,073/6,144 mismatches, SHA `229dc8ac...812f`. RMS schedule
-  and recomputation are therefore closed too. The only remaining observed HLO delta is collective
-  site/ordinal context: accepted executes its attention psum immediately before its dense psum,
-  while every bounded control compiled dense psum in isolation. Test that one delta only.
+  and layer-1 recomputation are therefore closed too. The protected attention-before-dense
+  ordinal challenger produced the identical rejected row, so collective site/ordinal context is
+  closed as well. The remaining observed HLO delta is pre-dense RMS scheduling: accepted retains
+  only the scalar reduction and recomputes the rounded residual/normalized value in the gate
+  fusion; the control retains a scalar-plus-full-residual tuple. Test that boundary only.
 
 ## Evidence ladder
 
@@ -137,10 +139,12 @@ branches from the search tree.
   permanently rejected.
 - The one-graph contraction→StrategyND→RMS control reproduces DB548 and is closed. Its accepted
   scalar-only RMS schedule/recompute challenger exactly reproduces DB549 and is closed as well.
-  The remaining bounded discriminator reconstructs the already sealed attention row with a first
-  value-preserving StrategyND reduction (rank zero supplies the row; peers supply exact zero), then
-  runs the unchanged dense reduction second. This isolates collective site/ordinal context, loads
-  only layer-0 weights, and remains no-DB/default-off until all 6,144 values are exact.
+  The ordinal discriminator reconstructed the sealed attention row through a first
+  value-preserving StrategyND reduction, then ran dense second; its protected output was unchanged
+  from rejected DB549. Freeze that arm. The remaining bounded discriminator restores accepted
+  scalar-only pre-dense RMS plus gate-fusion recomputation while retaining the already frozen
+  layer-1 split. It loads only layer-0 weights and remains no-DB/default-off until all 6,144 values
+  are exact.
 - The first scalar-only launch reached the intended schedule but failed only in proof. Recovered TPU
   HLO shows the final fusion forms the M1 F32 sum from two independently sliced BF16 row-zero
   sources. This exact lowering is now the sole admitted correction; it does not reopen RMS

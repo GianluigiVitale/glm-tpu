@@ -19,11 +19,18 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
 )
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_RMS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256,
+    _validate_split_predense_value_flow,
     integrated_dense_rms_hlo_policy,
     validate_integrated_dense_rms_hlo,
     validate_integrated_dense_rms_stablehlo,
+)
+from glm_tpu.greenfield.sharding.hlo_contract import (
+    HloContractPolicy,
+    lint_hlo,
+    parse_hlo_module,
 )
 from glm_tpu.greenfield.validation.strategy_nd_integrated_dense_rms import (
     CHECKPOINT_SUCCESS_SHA256,
@@ -57,11 +64,123 @@ REAL_SPLIT_TPU_HLO = Path(
 REAL_SPLIT_TPU_HLO_SHA256 = (
     "212aa36a9587ff390e6b0c18b654187d96e158eb896eaece1af51cda35df4e27"
 )
+REAL_ORDINAL_TPU_HLO = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_INTEGRATED_ORDINAL_TPU_HLO",
+        "/home/gianl/glm-run/"
+        "greenfield_strategy_nd_integrated_dense_ordinal_rms_"
+        "20260814T193832987684744Z/hlo/"
+        "strategy_nd_integrated_dense_ordinal_rms_bfloat16_32x6144."
+        "optimized_hlo.txt",
+    )
+)
+REAL_ORDINAL_TPU_HLO_SHA256 = (
+    "433d4938b398769f4db442a7ce5af3baa365fc2137850233f0e9df8162dd042b"
+)
 REAL_LEGACY_INTEGRATED_RUN = Path(
     "/home/gianl/glm-run/"
     "greenfield_strategy_nd_integrated_dense_rms_20260814T174146122417710Z"
 )
 REAL_CHECKPOINT_ROOT = REAL_STAGE0_SLOT0.parents[2]
+
+
+def _synthetic_predense_gate_hlo() -> str:
+    return r'''HloModule predense_gate, num_partitions=32
+
+%f32_add (x: f32[], y: f32[]) -> f32[] {
+  %x = f32[] parameter(0)
+  %y = f32[] parameter(1)
+  ROOT %add = f32[] add(%x, %y)
+}
+
+%predense_reduce (attention: bf16[1,6144], residual: bf16[1,6144]) -> f32[32] {
+  %attention = bf16[1,6144]{1,0} parameter(0)
+  %residual = bf16[1,6144]{1,0} parameter(1)
+  %zero_bf16 = bf16[] constant(0)
+  %attention_pad = bf16[32,6144]{1,0} pad(%attention, %zero_bf16), padding=0_31x0_0
+  %residual_pad = bf16[32,6144]{1,0} pad(%residual, %zero_bf16), padding=0_31x0_0
+  %attention_f32 = f32[32,6144]{1,0} convert(%attention_pad)
+  %residual_f32 = f32[32,6144]{1,0} convert(%residual_pad)
+  %sum = f32[32,6144]{1,0} add(%attention_f32, %residual_f32)
+  %square = f32[32,6144]{1,0} multiply(%sum, %sum)
+  %zero = f32[] constant(0)
+  ROOT %reduce = f32[32]{0} reduce(%square, %zero), dimensions={1}, to_apply=%f32_add
+}
+
+%predense_rsqrt (reduced: f32[32]) -> f32[32] {
+  %reduced = f32[32]{0} parameter(0)
+  %scale = f32[] constant(0.000162760422)
+  %scale_wide = f32[32]{0} broadcast(%scale), dimensions={}
+  %mean = f32[32]{0} multiply(%reduced, %scale_wide)
+  %epsilon = f32[] constant(1e-05)
+  %epsilon_wide = f32[32]{0} broadcast(%epsilon), dimensions={}
+  %variance = f32[32]{0} add(%mean, %epsilon_wide)
+  ROOT %inverse = f32[32]{0} rsqrt(%variance)
+}
+
+%predense_norm (attention: bf16[1,6144], residual: bf16[1,6144], inverse: f32[32], weight: bf16[6144]) -> bf16[32,6144] {
+  %attention = bf16[1,6144]{1,0} parameter(0)
+  %residual = bf16[1,6144]{1,0} parameter(1)
+  %inverse = f32[32]{0} parameter(2)
+  %weight = bf16[6144]{0} parameter(3)
+  %zero_bf16 = bf16[] constant(0)
+  %attention_pad = bf16[32,6144]{1,0} pad(%attention, %zero_bf16), padding=0_31x0_0
+  %residual_pad = bf16[32,6144]{1,0} pad(%residual, %zero_bf16), padding=0_31x0_0
+  %attention_f32 = f32[32,6144]{1,0} convert(%attention_pad)
+  %residual_f32 = f32[32,6144]{1,0} convert(%residual_pad)
+  %sum = f32[32,6144]{1,0} add(%attention_f32, %residual_f32)
+  %inverse_wide = f32[32,6144]{1,0} broadcast(%inverse), dimensions={0}
+  %normalized = f32[32,6144]{1,0} multiply(%sum, %inverse_wide)
+  %normalized_bf16 = bf16[32,6144]{1,0} convert(%normalized)
+  %normalized_f32 = f32[32,6144]{1,0} convert(%normalized_bf16)
+  %weight_wide = bf16[32,6144]{1,0} broadcast(%weight), dimensions={1}
+  %weight_f32 = f32[32,6144]{1,0} convert(%weight_wide)
+  %weighted = f32[32,6144]{1,0} multiply(%normalized_f32, %weight_f32)
+  ROOT %weighted_bf16 = bf16[32,6144]{1,0} convert(%weighted)
+}
+
+%gate_body (attention: bf16[1,6144], residual: bf16[1,6144], inverse: f32[32], norm: bf16[6144], gate_weight: bf16[6144,768]) -> bf16[32,1,768] {
+  %attention = bf16[1,6144]{1,0} parameter(0)
+  %residual = bf16[1,6144]{1,0} parameter(1)
+  %inverse = f32[32]{0} parameter(2)
+  %norm = bf16[6144]{0} parameter(3)
+  %gate_weight = bf16[6144,768]{1,0} parameter(4)
+  %gate_lhs = bf16[32,6144]{1,0} fusion(%attention, %residual, %inverse, %norm), kind=kLoop, calls=%predense_norm
+  %gate = f32[32,768]{1,0} convolution(%gate_lhs, %gate_weight), dim_labels=bf_io->bf
+  %gate_bf16 = bf16[32,768]{1,0} convert(%gate)
+  ROOT %gate_result = bf16[32,1,768]{2,1,0} bitcast(%gate_bf16)
+}
+
+ENTRY %main (p0: bf16[1,6144], p1: bf16[1,6144], p2: bf16[6144], p3: f8e4m3fn[1,1,6144,768], p4: f32[1,1,48,768], p5: f8e4m3fn[1,1,384,6144], p6: f32[1,1,3,6144], p7: bf16[6144]) -> bf16[32,1,768] {
+  %p0 = bf16[1,6144]{1,0} parameter(0)
+  %p1 = bf16[1,6144]{1,0} parameter(1)
+  %p2 = bf16[6144]{0} parameter(2)
+  %p3 = f8e4m3fn[1,1,6144,768]{3,2,1,0} parameter(3)
+  %p4 = f32[1,1,48,768]{3,2,1,0} parameter(4)
+  %p5 = f8e4m3fn[1,1,384,6144]{3,2,1,0} parameter(5)
+  %p6 = f32[1,1,3,6144]{3,2,1,0} parameter(6)
+  %p7 = bf16[6144]{0} parameter(7)
+  %scheduled = f32[32]{0} fusion(%p0, %p1), kind=kLoop, calls=%predense_reduce
+  %inverse = f32[32]{0} fusion(%scheduled), kind=kLoop, calls=%predense_rsqrt
+  %zero = bf16[] constant(0)
+  %gate_weight = bf16[6144,768]{1,0} broadcast(%zero), dimensions={}
+  ROOT %gate_call = bf16[32,1,768]{2,1,0} fusion(%p0, %p1, %inverse, %p2, %gate_weight), kind=kOutput, calls=%gate_body
+}
+'''
+
+
+def _synthetic_predense_report(hlo: str) -> object:
+    return lint_hlo(
+        parse_hlo_module(hlo),
+        HloContractPolicy(
+            name="synthetic-predense-gate",
+            total_devices=32,
+            repeated_region_patterns=(),
+            maximum_repeated_collective_group_size=32,
+            forbidden_row_width_pairs=(),
+            require_repeated_region=False,
+        ),
+    )
 
 
 def test_model_axis_weights_are_bijectively_mapped_to_physical_ids() -> None:
@@ -239,6 +358,45 @@ except ValueError:
 else:
     raise AssertionError("NE zero-branch layout mutation was accepted")
 print(ordinal_contract["exact_graph_sha256"])
+predense = build_integrated_dense_rms(
+    tuple(range(32)),
+    validate_hlo=False,
+    split_layer1_rms=True,
+    split_predense_rms=True,
+)
+predense_contract = validate_integrated_dense_rms_stablehlo(
+    predense.stablehlo,
+    split_layer1_rms=True,
+    split_predense_rms=True,
+)
+assert predense_contract["passed"]
+assert predense.split_predense_rms is True
+assert predense_contract["split_predense_rms"] is True
+try:
+    validate_integrated_dense_rms_stablehlo(
+        predense.stablehlo, split_layer1_rms=True
+    )
+except ValueError:
+    pass
+else:
+    raise AssertionError("pre-dense split StableHLO passed the old split arm")
+for forbidden in (
+    {"split_layer1_rms": False, "split_predense_rms": True},
+    {
+        "split_layer1_rms": True,
+        "split_predense_rms": True,
+        "preceding_attention_collective": True,
+    },
+):
+    try:
+        build_integrated_dense_rms(
+            tuple(range(32)), validate_hlo=False, **forbidden
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid pre-dense split mode combination passed")
+print(predense_contract["exact_graph_sha256"])
 '''
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -258,6 +416,10 @@ print(ordinal_contract["exact_graph_sha256"])
     assert INTEGRATED_DENSE_RMS_STABLEHLO_SHA256 in completed.stdout
     assert INTEGRATED_DENSE_SPLIT_RMS_STABLEHLO_SHA256 in completed.stdout
     assert INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256 in completed.stdout
+    assert (
+        INTEGRATED_DENSE_PREDENSE_SPLIT_RMS_STABLEHLO_SHA256
+        in completed.stdout
+    )
 
 
 def test_integrated_policy_requires_the_exact_scope() -> None:
@@ -276,12 +438,74 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
     )
 
 
+def test_portable_predense_schedule_is_bound_to_fused_gate() -> None:
+    from jaxlib import xla_client
+
+    def validate(hlo: str) -> dict[str, object]:
+        report = _synthetic_predense_report(hlo)
+        report.raise_for_violations()
+        return dict(
+            _validate_split_predense_value_flow(
+                report,
+                next(
+                    item
+                    for item in report.module.instructions
+                    if item.name == "%scheduled"
+                ),
+                next(
+                    item
+                    for item in report.module.instructions
+                    if item.name == "%gate"
+                ),
+            )
+        )
+
+    hlo = _synthetic_predense_gate_hlo()
+    xla_client._xla.hlo_module_from_text(hlo)
+    exact = validate(hlo)
+    assert exact["exact_predense_gate_fusion_ownership"] is True
+    assert exact["exact_predense_scheduled_rsqrt"] is True
+    mutations = (
+        hlo.replace(
+            "  %inverse = f32[32]{0} fusion(%scheduled),",
+            "  %rogue_scalar = f32[32]{0} add(%scheduled, %scheduled)\n"
+            "  %inverse = f32[32]{0} fusion(%rogue_scalar),",
+            1,
+        ),
+        hlo.replace(
+            "  %gate = f32[32,768]{1,0} convolution(%gate_lhs, %gate_weight),",
+            "  %rogue_gate_lhs = bf16[32,6144]{1,0} "
+            "add(%gate_lhs, %gate_lhs)\n"
+            "  %gate = f32[32,768]{1,0} "
+            "convolution(%rogue_gate_lhs, %gate_weight),",
+            1,
+        ),
+        hlo.replace(
+            "  %sum = f32[32,6144]{1,0} "
+            "add(%attention_f32, %residual_f32)",
+            "  %sum = f32[32,6144]{1,0} "
+            "add(%attention_f32, %attention_f32)",
+            1,
+        ),
+    )
+    assert all(mutation != hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError):
+            validate(mutation)
+
+
 @pytest.mark.skipif(
     not REAL_SPLIT_TPU_HLO.is_file(),
     reason="protected split integrated TPU HLO absent",
 )
 def test_real_split_tpu_hlo_and_row_recompute_mutations() -> None:
     from jaxlib import xla_client
+
+    from glm_tpu.greenfield.sharding.hlo_contract import (
+        lint_hlo,
+        parse_hlo_module,
+    )
 
     hlo = REAL_SPLIT_TPU_HLO.read_text()
     assert sha256(hlo.encode()).hexdigest() == REAL_SPLIT_TPU_HLO_SHA256
@@ -293,6 +517,25 @@ def test_real_split_tpu_hlo_and_row_recompute_mutations() -> None:
     assert contract["exact_accepted_scheduled_reduction"] is True
     assert contract["split_output_fusion_exact"] is True
     assert contract["split_recompute_exact"] is True
+    report = lint_hlo(
+        parse_hlo_module(hlo),
+        integrated_dense_rms_hlo_policy(tuple(range(32))),
+    )
+    predense = _validate_split_predense_value_flow(
+        report,
+        next(
+            item
+            for item in report.module.instructions
+            if item.name == "%multiply_reduce_fusion.1"
+        ),
+        next(
+            item
+            for item in report.module.instructions
+            if item.name == "%conv_general_dilated.15"
+        ),
+    )
+    assert predense["exact_predense_gate_input"] is True
+    assert predense["exact_predense_scheduled_rsqrt"] is True
     replacements = (
         (
             "%slice.36 = bf16[1,6144]{1,0:T(2,128)(2,1)} "
@@ -377,6 +620,93 @@ def test_real_split_tpu_hlo_and_row_recompute_mutations() -> None:
             )
 
 
+@pytest.mark.skipif(
+    not REAL_ORDINAL_TPU_HLO.is_file(),
+    reason="protected ordinal integrated TPU HLO absent",
+)
+def test_real_predense_value_flow_and_mutation_refusals() -> None:
+    from jaxlib import xla_client
+
+    from glm_tpu.greenfield.sharding.hlo_contract import (
+        lint_hlo,
+        parse_hlo_module,
+    )
+
+    hlo = REAL_ORDINAL_TPU_HLO.read_text()
+    assert sha256(hlo.encode()).hexdigest() == REAL_ORDINAL_TPU_HLO_SHA256
+
+    def validate(value: str) -> dict[str, object]:
+        report = lint_hlo(
+            parse_hlo_module(value),
+            integrated_dense_rms_hlo_policy(
+                tuple(range(32)), preceding_attention_collective=True
+            ),
+        )
+        report.raise_for_violations()
+        scheduled = next(
+            item
+            for item in report.module.instructions
+            if item.name == "%multiply_reduce_fusion.1"
+        )
+        gate = next(
+            item
+            for item in report.module.instructions
+            if item.name == "%conv_general_dilated.15"
+        )
+        attention = next(
+            item
+            for item in report.module.collectives
+            if "integrated_dense_rms_preceding_attention_collective"
+            in (item.op_name or "").split("/")
+        )
+        return dict(
+            _validate_split_predense_value_flow(
+                report,
+                scheduled,
+                gate,
+                preceding_attention_reduction=attention,
+            )
+        )
+
+    exact = validate(hlo)
+    assert exact["exact_predense_scheduled_reduction"] is True
+    assert exact["exact_predense_scheduled_rsqrt"] is True
+    assert exact["exact_predense_recompute"] is True
+    assert exact["exact_predense_gate_fusion_ownership"] is True
+    mutations = (
+        hlo.replace(
+            "  %add_rsqrt_fusion.1 = f32[32]{0:T(128)S(3)} "
+            "fusion(%get-tuple-element),",
+            "  %rogue_predense_scalar = f32[32]{0:T(128)S(3)} "
+            "add(%get-tuple-element, %get-tuple-element)\n"
+            "  %add_rsqrt_fusion.1 = f32[32]{0:T(128)S(3)} "
+            "fusion(%rogue_predense_scalar),",
+            1,
+        ),
+        hlo.replace(
+            "  %conv_general_dilated.15 = f32[32,768]{1,0:T(8,128)} "
+            "convolution(%fusion.23, %fusion.22),",
+            "  %rogue_predense_gate = bf16[32,6144]"
+            "{1,0:T(8,128)(2,1)} add(%fusion.23, %fusion.23)\n"
+            "  %conv_general_dilated.15 = f32[32,768]{1,0:T(8,128)} "
+            "convolution(%rogue_predense_gate, %fusion.22),",
+            1,
+        ),
+        hlo.replace(
+            "  %add.48 = f32[32,6144]{1,0:T(8,128)} "
+            "add(%convert_element_type.132, %convert_element_type.131),",
+            "  %add.48 = f32[32,6144]{1,0:T(8,128)} "
+            "add(%convert_element_type.132, %convert_element_type.132),",
+            1,
+        ),
+    )
+    assert all(mutation != hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError):
+            validate(mutation)
+
+
 def test_checkpoint_success_pin_and_missing_mutated_refusals(
     tmp_path: Path,
 ) -> None:
@@ -436,6 +766,15 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     assert ordinal_exact["classification"] == (
         "integrated_dense_ordinal_rms_exact_accepted"
     )
+    predense_exact = _recompute_comparison(
+        expected.copy(),
+        expected,
+        split_layer1_rms=True,
+        split_predense_rms=True,
+    )
+    assert predense_exact["classification"] == (
+        "integrated_dense_predense_split_rms_exact_accepted"
+    )
     digest = array_sha256(expected)
     capture = {
         "invocation_count": 2,
@@ -479,6 +818,21 @@ def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
         split_layer1_rms=True,
         preceding_attention_collective=True,
     )
+    predense_record = {
+        "optimized_hlo_sha256": "1" * 64,
+        "performance_claim": False,
+        "split_layer1_rms": True,
+        "split_predense_rms": True,
+        "stablehlo_sha256": "2" * 64,
+        "validated": False,
+    }
+    _validate_hlo_prevalidation(
+        predense_record,
+        optimized_hlo_sha256="1" * 64,
+        stablehlo_sha256="2" * 64,
+        split_layer1_rms=True,
+        split_predense_rms=True,
+    )
     for key, value in (
         ("validated", True),
         ("performance_claim", True),
@@ -511,7 +865,12 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ORDINAL_RMS_REPLAY:-0"
         in wrapper
     )
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_PREDENSE_SPLIT_RMS_REPLAY:-0"
+        in wrapper
+    )
     assert "--integrated-preceding-attention-collective" in wrapper
+    assert "--integrated-split-predense-rms" in wrapper
     assert "--integrated-split-layer1-rms" in wrapper
     assert "--mode strategy_nd_integrated_dense_rms" in wrapper
     assert "validate_strategy_nd_integrated_dense_rms" in wrapper

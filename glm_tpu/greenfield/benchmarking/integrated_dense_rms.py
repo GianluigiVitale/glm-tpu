@@ -69,6 +69,7 @@ class CompiledIntegratedDenseRms:
     stablehlo_contract: Mapping[str, Any]
     optimized_hlo_contract: Mapping[str, Any]
     preceding_attention_collective: bool
+    split_predense_rms: bool
     split_layer1_rms: bool
 
 
@@ -210,6 +211,7 @@ def _integrated_function(
     *,
     split_layer1_rms: bool = False,
     preceding_attention_collective: bool = False,
+    split_predense_rms: bool = False,
 ) -> Any:
     import jax
     from jax import lax
@@ -253,12 +255,44 @@ def _integrated_function(
                 )
                 attention_m32 = lax.psum(local_attention, "member")
         with jax.named_scope("integrated_dense_rms_predense_norm"):
-            normalized, carried = fused_add_rms_norm(
-                attention_m32,
-                residual_m32,
-                post_attention_norm,
-                epsilon=1e-5,
-            )
+            if split_predense_rms:
+                # The accepted layer-0 schedule keeps only the scalar RMS
+                # reduction live here.  It recomputes the rounded residual
+                # and normalized BF16 value in the gate contraction fusion.
+                # This is the pre-dense analogue of the already protected
+                # layer-1 split schedule below.
+                with jax.named_scope("accepted_predense_split_reduction"):
+                    reduction_attention = lax.optimization_barrier(
+                        attention_m32
+                    )
+                    reduction_residual = lax.optimization_barrier(residual_m32)
+                    reduction_sum = (
+                        reduction_attention.astype(jnp.float32)
+                        + reduction_residual.astype(jnp.float32)
+                    )
+                    inverse = lax.rsqrt(
+                        jnp.mean(
+                            lax.square(reduction_sum), axis=-1, keepdims=True
+                        )
+                        + jnp.float32(1e-5)
+                    )
+                with jax.named_scope("accepted_predense_split_recompute"):
+                    output_sum = (
+                        attention_m32.astype(jnp.float32)
+                        + residual_m32.astype(jnp.float32)
+                    )
+                    carried = output_sum.astype(attention_m32.dtype)
+                    normalized = (
+                        (output_sum * inverse).astype(post_attention_norm.dtype)
+                        * post_attention_norm
+                    ).astype(attention_m32.dtype)
+            else:
+                normalized, carried = fused_add_rms_norm(
+                    attention_m32,
+                    residual_m32,
+                    post_attention_norm,
+                    epsilon=1e-5,
+                )
         with jax.named_scope("integrated_dense_rms_contraction"):
             local_partials = _virtual_dense_final_layout_convolution_down_partials(
                 normalized,
@@ -323,6 +357,7 @@ def build_integrated_dense_rms(
     validate_hlo: bool = True,
     split_layer1_rms: bool = False,
     preceding_attention_collective: bool = False,
+    split_predense_rms: bool = False,
 ) -> CompiledIntegratedDenseRms:
     """Compile the exact one-rank-per-chip diagnostic on 32 devices."""
 
@@ -351,14 +386,27 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "integrated dense RMS preceding-attention flag must be boolean"
         )
+    if not isinstance(split_predense_rms, bool):
+        raise BenchmarkValidationError(
+            "integrated dense RMS pre-dense split flag must be boolean"
+        )
     if preceding_attention_collective and not split_layer1_rms:
         raise BenchmarkValidationError(
             "preceding attention collective requires the frozen split RMS arm"
+        )
+    if split_predense_rms and not split_layer1_rms:
+        raise BenchmarkValidationError(
+            "pre-dense split RMS requires the frozen layer-1 split RMS arm"
+        )
+    if split_predense_rms and preceding_attention_collective:
+        raise BenchmarkValidationError(
+            "pre-dense split RMS and rejected ordinal arms are disjoint"
         )
     mapped = jax.shard_map(
         _integrated_function(
             split_layer1_rms=split_layer1_rms,
             preceding_attention_collective=preceding_attention_collective,
+            split_predense_rms=split_predense_rms,
         ),
         mesh=mesh,
         in_specs=(
@@ -398,12 +446,14 @@ def build_integrated_dense_rms(
             stablehlo,
             split_layer1_rms=split_layer1_rms,
             preceding_attention_collective=preceding_attention_collective,
+            split_predense_rms=split_predense_rms,
         )
         optimized_hlo_contract = validate_integrated_dense_rms_hlo(
             optimized_hlo,
             members,
             split_layer1_rms=split_layer1_rms,
             preceding_attention_collective=preceding_attention_collective,
+            split_predense_rms=split_predense_rms,
         )
     else:
         stablehlo_contract = {
@@ -424,6 +474,7 @@ def build_integrated_dense_rms(
         stablehlo_contract=stablehlo_contract,
         optimized_hlo_contract=optimized_hlo_contract,
         preceding_attention_collective=preceding_attention_collective,
+        split_predense_rms=split_predense_rms,
         split_layer1_rms=split_layer1_rms,
     )
 

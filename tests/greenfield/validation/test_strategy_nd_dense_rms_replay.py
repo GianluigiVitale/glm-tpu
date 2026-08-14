@@ -708,7 +708,8 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
         '/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \\\n'
         '  "$RMS_REPLAY" "$INTEGRATED_REPLAY" '
         '"$INTEGRATED_SPLIT_REPLAY" \\\n'
-        '  "$INTEGRATED_ORDINAL_REPLAY" <<\'PY\'\n'
+        '  "$INTEGRATED_ORDINAL_REPLAY" '
+        '"$INTEGRATED_PREDENSE_SPLIT_REPLAY" <<\'PY\'\n'
         'from hashlib import sha256'
     )
     start = wrapper.index(marker) + marker.index("from hashlib")
@@ -721,6 +722,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
     summaries = (
         (
             "1",
+            "0",
             "0",
             "0",
             "0",
@@ -739,6 +741,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             },
         ),
         (
+            "0",
             "0",
             "0",
             "0",
@@ -763,29 +766,6 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             "1",
             "0",
             "0",
-            {
-                **common,
-                "elementwise_exact": True,
-                "expected_hidden_2795_bfloat16_bits": 48423,
-                "expected_raw_sha256": "a" * 64,
-                "mismatch_count": 0,
-                "observed_hidden_2795_bfloat16_bits": 48423,
-                "observed_raw_sha256": "a" * 64,
-                "optimized_hlo_sha256": "b" * 64,
-                "source": {
-                    "checkpoint_manifest_sha256": "e" * 64,
-                    "checkpoint_success_sha256": "9" * 64,
-                    "rms_npz_sha256": "f" * 64,
-                    "rms_tag": "unit-rms",
-                },
-                "stablehlo_sha256": "c" * 64,
-                "topology_hash": "d" * 64,
-            },
-        ),
-        (
-            "0",
-            "1",
-            "1",
             "0",
             {
                 **common,
@@ -810,6 +790,57 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             "0",
             "1",
             "1",
+            "0",
+            "0",
+            {
+                **common,
+                "elementwise_exact": True,
+                "expected_hidden_2795_bfloat16_bits": 48423,
+                "expected_raw_sha256": "a" * 64,
+                "mismatch_count": 0,
+                "observed_hidden_2795_bfloat16_bits": 48423,
+                "observed_raw_sha256": "a" * 64,
+                "optimized_hlo_sha256": "b" * 64,
+                "source": {
+                    "checkpoint_manifest_sha256": "e" * 64,
+                    "checkpoint_success_sha256": "9" * 64,
+                    "rms_npz_sha256": "f" * 64,
+                    "rms_tag": "unit-rms",
+                },
+                "stablehlo_sha256": "c" * 64,
+                "topology_hash": "d" * 64,
+            },
+        ),
+        (
+            "0",
+            "1",
+            "1",
+            "1",
+            "0",
+            {
+                **common,
+                "elementwise_exact": True,
+                "expected_hidden_2795_bfloat16_bits": 48423,
+                "expected_raw_sha256": "a" * 64,
+                "mismatch_count": 0,
+                "observed_hidden_2795_bfloat16_bits": 48423,
+                "observed_raw_sha256": "a" * 64,
+                "optimized_hlo_sha256": "b" * 64,
+                "source": {
+                    "checkpoint_manifest_sha256": "e" * 64,
+                    "checkpoint_success_sha256": "9" * 64,
+                    "rms_npz_sha256": "f" * 64,
+                    "rms_tag": "unit-rms",
+                },
+                "stablehlo_sha256": "c" * 64,
+                "topology_hash": "d" * 64,
+            },
+        ),
+        (
+            "0",
+            "1",
+            "1",
+            "0",
             "1",
             {
                 **common,
@@ -831,9 +862,17 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             },
         ),
     )
-    for rms_mode, integrated_mode, split_mode, ordinal_mode, summary in summaries:
+    for (
+        rms_mode,
+        integrated_mode,
+        split_mode,
+        ordinal_mode,
+        predense_split_mode,
+        summary,
+    ) in summaries:
         run_dir = tmp_path / (
-            f"{rms_mode}-{integrated_mode}-{split_mode}-{ordinal_mode}"
+            f"{rms_mode}-{integrated_mode}-{split_mode}-{ordinal_mode}-"
+            f"{predense_split_mode}"
         )
         run_dir.mkdir()
         (run_dir / "summary.json").write_text(json.dumps(summary))
@@ -849,6 +888,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
                 integrated_mode,
                 split_mode,
                 ordinal_mode,
+                predense_split_mode,
             ],
             input=body,
             text=True,
@@ -863,3 +903,6 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             assert (
                 "preceding_attention_collective=true\n" in success
             ) is (ordinal_mode == "1")
+            assert (
+                "split_predense_rms=true\n" in success
+            ) is (predense_split_mode == "1")

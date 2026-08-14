@@ -5,6 +5,24 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 19:38--20:00 UTC — collective ordinal rejected; pre-dense scalar schedule isolated
+
+- Reviewed/pushed pin `02092a9afc400106f244adae6aafcd17e34003ab` ran the exact
+  attention-before-dense ordinal discriminator as
+  `greenfield_strategy_nd_integrated_dense_ordinal_rms_20260814T193832987684744Z`. Device work
+  completed in 42 seconds; terminal validation, full CRC-bound remote object equality,
+  `SUCCESS`-last and authenticated 8/8 zero work all pass.
+- The added physical attention StrategyND reduction does not change a single output bit. The row
+  exactly reproduces rejected DB549: 1,073/6,144 mismatches, first index 1, hidden-2795 bits
+  48423/48422, expected/observed SHAs `9936ee1e...d3039` / `229dc8ac...812f`, and maximum/mean
+  errors `0.0078125` / `3.4686963772401214e-05`. Collective ordinal/context is closed.
+- The sealed HLO comparison exposes a narrower remaining boundary: accepted pre-dense RMS emits
+  only its `f32[32]` reduction and recomputes the rounded residual/normalized BF16 value inside
+  the gate fusion, whereas the current integrated graph emits a scalar-plus-full-residual tuple.
+  A default-off pre-dense split arm now encodes that observed schedule while retaining the already
+  frozen layer-1 split. It loads only layer-0 weights and remains a seconds-scale diagnostic; no
+  full 8K is authorized unless all 6,144 values are exact.
+
 ## 2026-08-14 18:54--20:00 UTC — scalar schedule rejected; collective ordinal isolated
 
 - Protected tag `greenfield_strategy_nd_integrated_dense_split_rms_20260814T185445451138390Z`

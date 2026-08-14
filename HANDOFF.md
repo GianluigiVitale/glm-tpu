@@ -19,6 +19,22 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected ordinal-context run
+  `greenfield_strategy_nd_integrated_dense_ordinal_rms_20260814T193832987684744Z`
+  completed at reviewed/pushed pin `02092a9afc400106f244adae6aafcd17e34003ab` in 42 seconds.
+  It sealed exact HLO/source/output provenance, a complete same-region archive and authenticated
+  8/8 cleanup. The result is unchanged from rejected DB549: 1,073/6,144 mismatches, first index 1,
+  hidden-2795 bits 48423/48422, expected/observed SHAs `9936ee1e...d3039` /
+  `229dc8ac...812f`, maximum/mean error `0.0078125` / `3.468696e-05`. Attention-before-dense
+  collective ordinal/context is closed; do not repeat it.
+- Reinspection of the preserved accepted and ordinal HLO finds the next exact live difference.
+  Accepted pre-dense RMS schedules only `f32[32]`, then recomputes the BF16 carried residual and
+  normalized value inside each gate contraction fusion. The bounded graph still schedules a
+  `(f32[32], bf16[32,6144])` tuple at that boundary. The default-off pre-dense split discriminator
+  restores that exact scalar-only/recompute boundary while retaining the already frozen layer-1
+  scalar schedule. It is a seconds-scale, layer-0-only run. An exact 6,144-value row alone may
+  authorize the protected 8K; weights, contractions, association, residual inputs, layer-1 RMS,
+  observers, scalar patches and the rejected ordinal arm remain frozen.
 - Protected scalar-only run
   `greenfield_strategy_nd_integrated_dense_split_rms_20260814T185445451138390Z`
   completed at reviewed pin `36d53a801c6405b81ee15e45b2053c7a2f31d514` in 43 seconds with a
