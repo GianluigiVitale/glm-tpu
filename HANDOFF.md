@@ -4897,3 +4897,11 @@ equality, and run-tag/hostname/JAX/local-device/full-v4-64 topology reconstructi
 suite passes 93/93, including the SHA-pinned real DB533 TPU HLO and all audit mutations. Exact next
 is one correction-only review, commit/push, then this short protected replay. No full checkpoint or
 decoder retry is authorized.
+
+The first run at reviewed pin `0ce64f8`, tag ending `20260814T114847629103066Z`, proved the new
+iteration loop is short: the device reduction plus repeat finished in 17 seconds, and all eight
+records provisionally report exact hardware versus DB533 software row zero. It is not terminal
+evidence: a wrapper path refactor placed process-zero HLO/NPYs under `host_records/`, so collection
+failed before terminal recomputation/archive/`SUCCESS`. Failure census is 8/8 clean. The bounded
+correction restores root output/derived artifact paths and removes only worker zero's duplicate JSON
+before publication. Exact next is correction-only review and the same seconds-scale replay.

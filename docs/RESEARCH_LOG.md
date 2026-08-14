@@ -8853,3 +8853,21 @@ unmotivated arithmetic variants.
 - Durable non-repeat rules from this investigation are consolidated in
   `docs/greenfield/GATE_D_LESSONS.md`; future compactions should use it with the handoff rather than
   reconstructing the rejected hypothesis tree from chat history.
+
+## 2026-08-14 11:48--11:50 — first model-free replay executes in 17 seconds; artifact collection refuses
+
+- Reviewed pin `0ce64f8f67be68076ea2f53ad1450deeb7c4ea05` launched once as
+  `greenfield_strategy_nd_dense_replay_20260814T114847629103066Z`. The exact 32-chip reduction and
+  deterministic repeat completed in 17 seconds. All eight host records provisionally agree on
+  `hardware_row0_exact_db533_software` with zero mismatches; this is not a terminal verdict because
+  the wrapper refused before reloading the process-zero HLO/NPYs, summary, ledger or `SUCCESS`.
+- The refusal is path coupling, not TPU arithmetic. Moving each JSON output beneath `host_records/`
+  also moved the benchmark's derived `hlo/` and `replay/` siblings there. JAX process zero ran on
+  launch worker two, while the uploader continued to inspect the declared root directories; the
+  orchestrator consequently found no remote `hlo/*` and exited. Failure census authenticates 8/8
+  zero work. Partial diagnostic evidence is preserved under the run prefix; no terminal archive or
+  performance/DB claim exists.
+- The bounded correction restores the producer JSON at the root so derived artifacts land in the
+  declared root directories, uploads the JSON into `host_records/`, then removes only worker zero's
+  duplicate root JSON before census/terminal validation/archive. Exact next is one correction-only
+  review, commit/push and a repeat of the same seconds-scale replay.

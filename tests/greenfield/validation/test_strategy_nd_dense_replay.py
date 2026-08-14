@@ -334,6 +334,8 @@ def test_protected_wrapper_is_default_exact_and_success_last() -> None:
     assert "strict_census pre" in wrapper and "strict_census post" in wrapper
     assert "google_crc32c" in wrapper
     assert "collective.rank${idx}.sha256" not in wrapper
+    assert '--output "$run/collective.rank${idx}.json"' in wrapper
+    assert 'rm -f "$RUN_DIR/collective.rank0.json"' in wrapper
     assert "remote nonterminal object set drifted" in wrapper
     assert 'GLM_GREENFIELD_RUN_TAG="$tag"' in wrapper
     assert wrapper.index('remote_objects.json" >/dev/null') < wrapper.index(

@@ -61,6 +61,10 @@ branches from the search tree.
 - Protected runs require clean code pins, exact source hashes, physical topology/host bindings,
   pre/post eight-host zero-work census, CRC-verified complete remote object equality and remote
   `SUCCESS` last. Diagnostics never become performance claims.
+- Treat a CLI output path as part of its API: this benchmark derives sibling `hlo/` and `replay/`
+  directories from the output parent. A wrapper path refactor must assert all derived artifact paths,
+  not only the JSON destination. A completed device call without terminal artifact collection remains
+  diagnostic, even when all host records agree numerically.
 
 ## Decision after the model-free replay
 
