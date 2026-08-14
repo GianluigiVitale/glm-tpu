@@ -48,6 +48,20 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   now the regression oracle: optimized-HLO SHA `081d1b1f...163f8`. The validator passes that graph
   locally in about 1.3 seconds and rejects mutations of every newly admitted source/layout edge.
   Never repeat a protected compile merely to iterate a validator against this same graph.
+- The corrected protected run is nonexact at 1,031/6,144 values, observed SHA
+  `3f633b26...28af`. It improves the frozen 1,073-value miss but does not justify integration. This
+  activates the closure rule below: manual arms are finished. Automatically diff the live accepted
+  and candidate SSA graphs before encoding any further challenger.
+- The automatic diff report (SHA `aadf8589...b81b`) proves both RMS arithmetic trees and gate/down
+  schedules already match. It also exposes a physical pre-dense predicate-boundary difference:
+  accepted carries `S(3)` while the candidate does not. Its first actionable delta is not a new
+  formula: accepted consumes native embedding lookup and row-parallel attention-projection
+  producers, whereas the candidate rebuilds their final BF16 rows from external M1 inputs. Reuse
+  the existing greenfield producers in one graph; do not simulate their outputs with another
+  pad/select/collective sequence. Preserve the accepted predicate boundary. The accepted layer-1
+  result also consumes all sources in one fusion, while the candidate materializes the carried
+  embedding+attention sum in an extra fusion. Preserve producer/consumer fusion ownership whenever
+  bitwise exactness depends on scheduled association.
 
 ## Evidence ladder
 

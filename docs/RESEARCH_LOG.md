@@ -5,6 +5,45 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 22:00--22:18 UTC — automatic live-SSA diff localizes native source boundaries
+
+- Added a local-only, hash-bound structural comparison of the accepted layer-0 after-codegen HLO
+  (`3cd75081...b775`) and protected composed candidate (`081d1b1f...63f8`). It expands fusion
+  arithmetic from semantic source roles, compares stable backend geometry and collective
+  projections, and traces live source-to-layer-1 paths. The generated report completes in about
+  13 seconds at SHA `aadf858909421c4a5be200e26ec4e17e00e3a68154695d5202dd0565bd9cb81b`.
+- The pre-dense and layer-1 reduction graphs match exactly at semantic SHAs
+  `6b0fb9c17c346b89c5498c981cc8d46f7cbf097e55e50fd7be7ddac3731c1ee2` and
+  `42a6c72a0f46961ef6e42d88b63e7cedd7807a0a3030fea17fa8886697f3bddf`. Pre-dense gate and
+  dense-projection scheduled geometry match, as do all three collective algorithms, result
+  layouts and groups. This freezes the dense/RMS arithmetic rather than reopening it.
+- Nine structural deltas remain: the three collective producer identities, three barrier ids, the
+  pre-dense validity-predicate physical boundary (`S(3)` accepted versus non-`S(3)` candidate), and
+  one extra candidate fusion on each embedding/attention path into layer 1. The first live
+  divergence is accepted native embedding lookup versus external M1 row reconstruction; attention
+  similarly differs at the native row-parallel projection. The next candidate therefore reuses the
+  existing greenfield native embedding and attention-projection producers, preserves the accepted
+  predicate boundary and restores the observed one-fusion layer-1 output. No TPU work, performance
+  claim or Gate-D promotion occurred.
+
+## 2026-08-14 21:39--21:42 UTC — composed source context improves but remains nonexact
+
+- Reviewed/pushed pin `64151ef4e2825744ac5ba676547502aa11594e33` completed the corrected
+  accepted-source-context discriminator as
+  `greenfield_strategy_nd_integrated_dense_accepted_source_context_20260814T213945734760843Z`.
+  Device workflow took 41 seconds; exact HLO/source/output terminal revalidation, same-region
+  object equality, `SUCCESS`-last and authenticated 8/8 cleanup all pass.
+- The full row is nonexact at 1,031/6,144 BF16 values, improving the frozen 1,073 mismatch result
+  by 42 values but not authorizing integration. First mismatch is 1; hidden 2795 remains expected /
+  observed 48423/48422; expected/observed SHAs are `9936ee1e...d3039` / `3f633b26...28af`;
+  maximum and mean errors are `0.0078125` and `3.3749432380621634e-05`. Optimized/StableHLO SHAs
+  remain `081d1b1f...163f8` / `b46a58b1...44fed`.
+- Summary, `SUCCESS`, remote ledger and post-census SHAs are `8f0362b8...c365`,
+  `2c3a027c...bcf9`, `ef7f38df...e464a` and `86eb718c...d691`. This ends manual single-variable
+  hypotheses. The next local-only task automatically compares the accepted and candidate live SSA
+  graphs from pinned sources through dtype/layout/fusion/schedule boundaries and reports the first
+  divergence before any further TPU launch.
+
 ## 2026-08-14 21:24--21:36 UTC — accepted-source TPU graph is recovered and locally proven
 
 - Reviewed/pushed pin `2cd66fd001e4378ca2537044839f15dd5721d26d` launched the default-off

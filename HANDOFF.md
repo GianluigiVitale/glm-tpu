@@ -19,6 +19,36 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The automatic live-SSA comparison is complete and runs locally in about 13 seconds. Its report
+  is `live_ssa_diff.json`, SHA `aadf8589...b81b`, beside the protected 1,031-mismatch run. Both
+  pre-dense and layer-1 arithmetic trees are identical (semantic SHAs `6b0fb9c1...1ee2` and
+  `42a6c72a...bddf`), and accepted/candidate pre-dense gate plus dense-projection backend geometry
+  match. All three StrategyND collective algorithms, result layouts and groups match too. The
+  layer-1 physical fusion signature matches; the pre-dense physical signature does not because the
+  accepted validity predicate carries `S(3)` and the candidate predicate does not.
+- The report identifies nine structural deltas, not another arithmetic theory: embedding,
+  attention and dense collective producer identities; each collective's barrier id; the pre-dense
+  predicate fusion-boundary layout; and an extra candidate fusion on the embedding and attention
+  paths into the layer-1 output. DB550 already proves the dense producer's numerical output exact,
+  so the actionable first divergence is the candidate's external M1 embedding/attention
+  reconstruction versus the accepted native embedding lookup and row-parallel attention
+  projection. Exact next is one default-off bounded graph that reuses those existing native
+  greenfield producers, preserves the accepted predicate boundary and restores the single layer-1
+  output fusion, followed by local HLO/mutation proof before any TPU retry.
+
+- Reviewed/pushed pin `64151ef4e2825744ac5ba676547502aa11594e33` completed the corrected
+  accepted-source-context discriminator under tag
+  `greenfield_strategy_nd_integrated_dense_accepted_source_context_20260814T213945734760843Z` in
+  41 seconds. Exact HLO/source/output revalidation, same-region `SUCCESS`-last archive and
+  authenticated 8/8 cleanup pass. The result is genuinely nonexact but new: 1,031/6,144 BF16
+  mismatches versus the previous 1,073, first index 1, hidden-2795 bits 48423/48422,
+  expected/observed SHAs `9936ee1e...d3039` / `3f633b26...28af`, and maximum/mean error
+  `0.0078125` / `3.374943e-05`. Summary, `SUCCESS`, remote-ledger and post-census SHAs are
+  `8f0362b8...c365`, `2c3a027c...bcf9`, `ef7f38df...e464a` and `86eb718c...d691`.
+- The composed source context is causal but insufficient. Per the recorded closure rule, manual
+  one-variable arms now stop permanently. The completed automatic comparison above supersedes the
+  former exact-next text; no unobserved one-variable hypothesis is authorized.
+
 - Reviewed/pushed pin `2cd66fd001e4378ca2537044839f15dd5721d26d` launched the composed
   accepted-source-context discriminator once under tag
   `greenfield_strategy_nd_integrated_dense_accepted_source_context_20260814T212452244910289Z`.
