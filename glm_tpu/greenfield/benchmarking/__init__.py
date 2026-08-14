@@ -1,6 +1,10 @@
 """Synthetic mechanism benchmarks for the topology-first engine."""
 
 from .association_fingerprint import (
+    ACCEPTED_DENSE_PARTIALS_KEYS,
+    ACCEPTED_DENSE_PARTIALS_NPZ_SHA256,
+    ACCEPTED_DENSE_PARTIALS_RAW_SHA256,
+    ACCEPTED_DENSE_PARTIALS_SHAPE,
     ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256,
     ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256,
     ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256,
@@ -14,6 +18,8 @@ from .association_fingerprint import (
     build_strategy_nd_fingerprint,
     execute_strategy_nd_fingerprint,
     generate_strategy_nd_input_bits,
+    model_axis_to_physical_input_bits,
+    replay_db533_strategy_nd_row0_bits,
     validate_strategy_nd_fingerprint_hlo,
 )
 from .collective_chain import (
@@ -67,6 +73,10 @@ from .paired_transport import (
 )
 
 __all__ = [
+    "ACCEPTED_DENSE_PARTIALS_KEYS",
+    "ACCEPTED_DENSE_PARTIALS_NPZ_SHA256",
+    "ACCEPTED_DENSE_PARTIALS_RAW_SHA256",
+    "ACCEPTED_DENSE_PARTIALS_SHAPE",
     "ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256",
     "ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256",
     "ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256",
@@ -99,6 +109,8 @@ __all__ = [
     "generate_strategy_nd_input_bits",
     "jax_dtype",
     "latency_distribution",
+    "model_axis_to_physical_input_bits",
+    "replay_db533_strategy_nd_row0_bits",
     "stage_local_dense_gate_c",
     "stage_local_dsa_fp8_gate_c",
     "stage_local_dsa_gate_c",

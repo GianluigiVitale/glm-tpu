@@ -29,6 +29,10 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
+    ACCEPTED_DENSE_PARTIALS_KEYS,
+    ACCEPTED_DENSE_PARTIALS_NPZ_SHA256,
+    ACCEPTED_DENSE_PARTIALS_RAW_SHA256,
+    ACCEPTED_DENSE_PARTIALS_SHAPE,
     ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256,
     ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256,
     ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256,
@@ -43,6 +47,8 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     build_strategy_nd_fingerprint,
     execute_strategy_nd_fingerprint,
     generate_strategy_nd_input_bits,
+    model_axis_to_physical_input_bits,
+    replay_db533_strategy_nd_row0_bits,
     validate_strategy_nd_fingerprint_hlo,
 )
 from glm_tpu.greenfield.topology import (  # noqa: E402
@@ -114,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode",
-        choices=("chain", "strategy_nd_fingerprint"),
+        choices=("chain", "strategy_nd_fingerprint", "strategy_nd_dense_replay"),
         default="chain",
     )
     parser.add_argument("--coordinator-address", required=True)
@@ -140,11 +146,213 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iterations", type=int, default=1000)
     parser.add_argument("--association-trials", type=int, default=32)
     parser.add_argument(
+        "--association-replay-input",
+        type=Path,
+        help="sealed DB550 dense-partial NPZ for strategy_nd_dense_replay",
+    )
+    parser.add_argument(
         "--allow-unprotected-test-config",
         action="store_true",
         help="permit fewer than the protected 75/200/1000 contract",
     )
     return parser.parse_args()
+
+
+def _raw_array_sha256(value: np.ndarray) -> str:
+    return sha256(np.ascontiguousarray(value).tobytes(order="C")).hexdigest()
+
+
+def _first_mismatch(actual: np.ndarray, expected: np.ndarray) -> int | None:
+    mismatches = np.flatnonzero(np.asarray(actual) != np.asarray(expected))
+    return None if not len(mismatches) else int(mismatches[0])
+
+
+def _run_strategy_nd_dense_replay(
+    args: argparse.Namespace,
+    jax: Any,
+    multihost_utils: Any,
+    topology: Any,
+) -> dict[str, Any]:
+    """Replay DB550's real partials through one exact accepted M32 reduction."""
+
+    source_path = args.association_replay_input
+    if source_path is None or not source_path.is_file():
+        raise RuntimeError("StrategyND dense replay requires a local sealed input NPZ")
+    source_file_sha = _file_sha256(source_path)
+    if source_file_sha != ACCEPTED_DENSE_PARTIALS_NPZ_SHA256:
+        raise RuntimeError("DB550 dense-partial NPZ SHA-256 drifted")
+    with np.load(source_path, allow_pickle=False) as payload:
+        if tuple(payload.files) != ACCEPTED_DENSE_PARTIALS_KEYS:
+            raise RuntimeError("DB550 dense-partial NPZ key order/set drifted")
+        accepted = np.ascontiguousarray(payload[ACCEPTED_DENSE_PARTIALS_KEYS[0]])
+        db548 = np.ascontiguousarray(payload[ACCEPTED_DENSE_PARTIALS_KEYS[1]])
+    for label, value in (("accepted", accepted), ("DB548", db548)):
+        if value.shape != ACCEPTED_DENSE_PARTIALS_SHAPE or value.dtype != np.uint16:
+            raise RuntimeError(f"{label} dense-partial geometry/dtype drifted")
+        if _raw_array_sha256(value) != ACCEPTED_DENSE_PARTIALS_RAW_SHA256:
+            raise RuntimeError(f"{label} dense-partial raw SHA-256 drifted")
+    if not np.array_equal(accepted, db548):
+        raise RuntimeError("DB550 accepted and DB548 dense partials are not bitwise equal")
+
+    physical_ids = tuple(sorted(device.device_id for device in topology.devices))
+    if physical_ids != tuple(range(32)):
+        raise RuntimeError("accepted M32 replay requires contiguous physical ids 0..31")
+    model_axis_device_ids = accepted_tp32_model_axis_device_ids(jax.devices())
+    model_bits = accepted.reshape(32, 6144)
+    physical_bits = model_axis_to_physical_input_bits(
+        model_bits, model_axis_device_ids
+    )
+    input_bits = physical_bits[None, ...]
+    software_row0 = replay_db533_strategy_nd_row0_bits(
+        model_bits, model_axis_device_ids
+    )
+    config = StrategyNdFingerprintConfig(trials=1, width=6144)
+    label = "strategy_nd_dense_partials_bfloat16_32x6144"
+
+    multihost_utils.sync_global_devices(f"greenfield-replay-start-{label}")
+    compiled = build_strategy_nd_fingerprint(
+        config,
+        physical_ids,
+        devices=jax.devices(),
+        enforce_hlo_contract=False,
+    )
+    hlo_sha256 = sha256(compiled.optimized_hlo.encode()).hexdigest()
+    fleet_hlo_hashes = _fleet_digest(
+        multihost_utils,
+        hlo_sha256,
+        label="replay optimized HLO",
+        num_processes=args.num_processes,
+    )
+    hlo_report, algorithm = validate_strategy_nd_fingerprint_hlo(
+        compiled.optimized_hlo, physical_ids
+    )
+    output_bits, capture = execute_strategy_nd_fingerprint(compiled, input_bits)
+    row0 = np.ascontiguousarray(output_bits[0, 0])
+    row_mismatch_counts = [
+        int(np.count_nonzero(row != software_row0)) for row in output_bits[0]
+    ]
+    first = _first_mismatch(row0, software_row0)
+    comparison = {
+        "classification": (
+            "hardware_row0_exact_db533_software"
+            if first is None
+            else "hardware_row0_differs_db533_software"
+        ),
+        "hardware_hidden_2795_bfloat16_bits": int(row0[2795]),
+        "hardware_row0_array_sha256": array_sha256(row0),
+        "hardware_row0_raw_sha256": _raw_array_sha256(row0),
+        "hidden_index": 2795,
+        "row0_exact": first is None,
+        "row0_first_mismatch_index": first,
+        "row0_mismatch_count": row_mismatch_counts[0],
+        "row_mismatch_counts": row_mismatch_counts,
+        "software_hidden_2795_bfloat16_bits": int(software_row0[2795]),
+        "software_row0_array_sha256": array_sha256(software_row0),
+        "software_row0_raw_sha256": _raw_array_sha256(software_row0),
+    }
+    stable_hashes = {
+        "input": array_sha256(input_bits),
+        "output": array_sha256(output_bits),
+        "software": array_sha256(software_row0),
+        "source_file": source_file_sha,
+        "source_raw": ACCEPTED_DENSE_PARTIALS_RAW_SHA256,
+    }
+    fleet_hashes = {
+        key: _fleet_digest(
+            multihost_utils,
+            value,
+            label=f"replay {key}",
+            num_processes=args.num_processes,
+        )
+        for key, value in stable_hashes.items()
+    }
+
+    artifact_manifest: dict[str, Any] = {}
+    artifact_dir = args.output.parent / "replay"
+    hlo_dir = args.output.parent / "hlo"
+    if jax.process_index() == 0:
+        hlo_dir.mkdir(parents=True, exist_ok=True)
+        hlo_path = hlo_dir / f"{label}.optimized_hlo.txt"
+        contract_path = hlo_dir / f"{label}.hlo_contract.json"
+        hlo_path.write_text(compiled.optimized_hlo)
+        _atomic_write(
+            contract_path,
+            {
+                "collective_algorithm": algorithm,
+                "decode_shape_admissible": True,
+                "hlo": hlo_report.to_dict(),
+                "valid": True,
+            },
+        )
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        paths = {
+            "physical_input_bits": artifact_dir / "physical_input_bits.npy",
+            "hardware_output_bits": artifact_dir / "hardware_output_bits.npy",
+            "software_row0_bits": artifact_dir / "software_row0_bits.npy",
+        }
+        _atomic_save(paths["physical_input_bits"], input_bits)
+        _atomic_save(paths["hardware_output_bits"], output_bits)
+        _atomic_save(paths["software_row0_bits"], software_row0)
+        _atomic_write(artifact_dir / "comparison.json", comparison)
+        for name, path in paths.items():
+            value = np.load(path, allow_pickle=False)
+            artifact_manifest[name] = {
+                "array_sha256": array_sha256(value),
+                "dtype": value.dtype.str,
+                "file": path.name,
+                "file_sha256": _file_sha256(path),
+                "shape": list(value.shape),
+            }
+        _atomic_write(artifact_dir / "manifest.json", artifact_manifest)
+
+    multihost_utils.sync_global_devices(f"greenfield-replay-end-{label}")
+    print(
+        "GREENFIELD_STRATEGY_ND_DENSE_REPLAY_OK "
+        f"launch_process={args.process_id} jax_process={jax.process_index()} "
+        f"classification={comparison['classification']} "
+        f"mismatches={comparison['row0_mismatch_count']} hlo={hlo_sha256}",
+        flush=True,
+    )
+    return {
+        "accepted_model_axis_device_ids": list(model_axis_device_ids),
+        "accepted_model_axis_recipe": ACCEPTED_TP32_MODEL_AXIS_RECIPE,
+        "artifact_manifest": artifact_manifest,
+        "capture": capture,
+        "collective_algorithm": algorithm,
+        "collective_groups": [list(physical_ids)],
+        "comparison": comparison,
+        "config": config.to_dict(),
+        "diagnostic_only": True,
+        "fleet_hashes": fleet_hashes,
+        "fleet_hlo_hashes": fleet_hlo_hashes,
+        "hlo": hlo_report.to_dict(),
+        "member_device_ids": list(physical_ids),
+        "optimized_hlo_sha256": hlo_sha256,
+        "performance_claim": False,
+        "source": {
+            "accepted_decode_projection_hlo_gzip_sha256": ACCEPTED_DECODE_PROJECTION_HLO_GZIP_SHA256,
+            "accepted_decode_projection_hlo_raw_sha256": ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256,
+            "accepted_decode_projection_manifest_sha256": ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256,
+            "accepted_dense_partials_raw_sha256": ACCEPTED_DENSE_PARTIALS_RAW_SHA256,
+            "capture_file_sha256": "9b6a4a6d608a0e88f9fbda3bc68be77e2ee43a0dda35a361a32c76f22fda01e6",
+            "capture_manifest_sha256": "21c178989ae2fa40df9d34922dc9736c4f4ba87d35dd3f7878a22485ef7184e4",
+            "comparison_manifest_sha256": "4238b9dcde7305a9f7a7cf35719eba6fe0b6c14d2a7a31480a8b9c192c245050",
+            "comparison_sha256": "92707ccac80a337bcae0c527148fc9133383067d25add36eb0b36f7e7c9198de",
+            "db_item_id": 1834,
+            "db_run_id": 550,
+            "db533_analysis_sha256": "e7e34828365ca3d6cae0052f8d0e2e802143c6ca83810153db3116423f994108",
+            "db533_code_hash": "a9e6307bdad70b883ba82456fbf8f4bdf8db5ac6",
+            "db533_hlo_contract_sha256": "966a5dd8be19c409ac616dc194fe8e7dc78ae6c253132c7a73dcdeb8e0c040bc",
+            "db533_item_id": 1818,
+            "db533_run_id": 533,
+            "db533_success_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "db533_summary_sha256": "3ca82073f69fbe56526e1765594c7e8e9a738c73eb2a62b2df6d9a0c4d3136b7",
+            "npz_sha256": source_file_sha,
+            "remote_objects_sha256": "663adbf1a11c32bbfc28b1030a0c329080d29fcf96fe4a2d77169e64e8858a05",
+            "success_sha256": "9605aa5c0f76fd9a5ec9b8e78b1aa720111cbc0633d7b962834004537f321b23",
+            "tag": "greenfield_legacy_layer0_dense_partials_p8155_20260814T100132090917640Z",
+        },
+    }
 
 
 def _run_strategy_nd_fingerprint(
@@ -366,7 +574,7 @@ def main() -> int:
         32,
     }:
         raise ValueError("groups must be unique sorted values from 2,4,8,32")
-    if args.mode == "strategy_nd_fingerprint" and (
+    if args.mode in ("strategy_nd_fingerprint", "strategy_nd_dense_replay") and (
         tuple(args.groups) != (32,)
         or tuple(args.operations) != (CollectiveKind.ALL_REDUCE,)
         or tuple(args.shape) != (32, 6144)
@@ -376,6 +584,10 @@ def main() -> int:
             "StrategyND fingerprint requires groups=32, operation=all_reduce, "
             "shape=32,6144, and dtype=bfloat16"
         )
+    if args.mode == "strategy_nd_dense_replay" and args.association_trials != 1:
+        raise ValueError("StrategyND dense replay requires association-trials=1")
+    if args.mode != "strategy_nd_dense_replay" and args.association_replay_input:
+        raise ValueError("association replay input is valid only for dense replay mode")
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(
@@ -383,6 +595,9 @@ def main() -> int:
         )
     if REPO != Path("/home/gianl/glm-tpu-topology-rewrite"):
         raise RuntimeError(f"wrong greenfield worktree: {REPO}")
+    run_tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "")
+    if args.mode == "strategy_nd_dense_replay" and not run_tag:
+        raise RuntimeError("StrategyND dense replay requires GLM_GREENFIELD_RUN_TAG")
 
     import jax
     from jax.experimental import multihost_utils
@@ -408,9 +623,14 @@ def main() -> int:
             num_processes=args.num_processes,
         )
         association_fingerprint = None
+        association_dense_replay = None
         matrix = []
         if args.mode == "strategy_nd_fingerprint":
             association_fingerprint = _run_strategy_nd_fingerprint(
+                args, jax, multihost_utils, topology
+            )
+        elif args.mode == "strategy_nd_dense_replay":
+            association_dense_replay = _run_strategy_nd_dense_replay(
                 args, jax, multihost_utils, topology
             )
         else:
@@ -497,6 +717,7 @@ def main() -> int:
                     multihost_utils.sync_global_devices(f"greenfield-chain-end-{label}")
 
         record = {
+            "association_dense_replay": association_dense_replay,
             "association_fingerprint": association_fingerprint,
             "captured_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "code_hash": code_hash,
@@ -508,7 +729,12 @@ def main() -> int:
             "matrix": matrix,
             "mechanism_only": True,
             "mode": args.mode,
-            "schema_version": 2 if association_fingerprint is not None else 1,
+            "run_tag": run_tag,
+            "schema_version": (
+                3
+                if association_dense_replay is not None
+                else 2 if association_fingerprint is not None else 1
+            ),
             "topology": topology.to_dict(),
             "topology_hash": topology.topology_hash,
         }

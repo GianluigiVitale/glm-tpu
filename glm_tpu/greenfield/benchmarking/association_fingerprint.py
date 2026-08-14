@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import re
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -66,6 +67,21 @@ _BALANCED_FOUR_WAY_TREES = (
     ((0, 1), (2, 3)),
     ((0, 2), (1, 3)),
     ((0, 3), (1, 2)),
+)
+
+# DB550 seals the accepted oracle's layer-0 pre-psum dense partials in model-
+# axis order.  These pins let a model-free run replay the real values through
+# the exact M32 collective without loading any checkpoint weights.
+ACCEPTED_DENSE_PARTIALS_NPZ_SHA256 = (
+    "e5977248acbe7582db351178b3fc823c6f87db46f8b6143b763319a6b299582c"
+)
+ACCEPTED_DENSE_PARTIALS_RAW_SHA256 = (
+    "9d9f65dddc7b622875872a33a6522c330c8fb5490c8cba14526553c211516e35"
+)
+ACCEPTED_DENSE_PARTIALS_SHAPE = (4, 8, 1, 6144)
+ACCEPTED_DENSE_PARTIALS_KEYS = (
+    "accepted_dense_partials_bfloat16_bits",
+    "db548_dense_partials_bfloat16_bits",
 )
 
 
@@ -170,6 +186,78 @@ def float32_to_bfloat16_bits(values: np.ndarray) -> np.ndarray:
     return ((raw + rounding_bias) >> 16).astype(np.uint16)
 
 
+def model_axis_to_physical_input_bits(
+    model_bits: np.ndarray,
+    model_axis_device_ids: Sequence[int],
+) -> np.ndarray:
+    """Reorder model-axis BF16 bits into sorted physical-device order."""
+
+    bits = np.asarray(model_bits)
+    if bits.dtype != np.uint16 or bits.ndim != 2 or bits.shape[0] != 32:
+        raise BenchmarkValidationError(
+            "model-axis BF16 bits must have shape [32,width] and dtype uint16"
+        )
+    mapping = tuple(int(device_id) for device_id in model_axis_device_ids)
+    if len(mapping) != 32 or sorted(mapping) != list(range(32)):
+        raise BenchmarkValidationError(
+            "model_axis_device_ids must bijectively map model positions to 0..31"
+        )
+    physical = np.empty_like(bits)
+    physical[np.asarray(mapping, dtype=np.int32)] = bits
+    return np.ascontiguousarray(physical)
+
+
+def replay_db533_strategy_nd_row0_bits(
+    model_bits: np.ndarray,
+    model_axis_device_ids: Sequence[int],
+) -> np.ndarray:
+    """Replay DB533's measured physical-row-zero BF16 association in NumPy."""
+
+    physical = model_axis_to_physical_input_bits(
+        model_bits, model_axis_device_ids
+    )
+    if physical.shape[1] != 6144:
+        raise BenchmarkValidationError(
+            "DB533 row-zero replay requires width 6144"
+        )
+    # Physical device ids are x-fastest in [z,y,x].  DB533's row-zero tree is
+    # y -> x -> z with column-dependent pincer pairing on y and z.
+    values = bfloat16_bits_to_float32(physical).reshape(4, 4, 2, 6144)
+    values = values.transpose(1, 2, 0, 3)  # [y,x,z,hidden]
+
+    def reduce_four(source: np.ndarray, *, cross: bool) -> np.ndarray:
+        if cross:
+            return _bf16_add(
+                _bf16_add(source[0], source[3]),
+                _bf16_add(source[1], source[2]),
+            )
+        return _bf16_add(
+            _bf16_add(source[0], source[1]),
+            _bf16_add(source[2], source[3]),
+        )
+
+    y_reduced = np.concatenate(
+        (
+            reduce_four(values[..., :2048], cross=False),
+            reduce_four(values[..., 2048:4096], cross=True),
+            reduce_four(values[..., 4096:], cross=False),
+        ),
+        axis=-1,
+    )
+    x_reduced = _bf16_add(y_reduced[0], y_reduced[1])
+    reduced = np.concatenate(
+        tuple(
+            reduce_four(
+                x_reduced[..., start : start + 256],
+                cross=bool((start // 256) % 2),
+            )
+            for start in range(0, 6144, 256)
+        ),
+        axis=-1,
+    )
+    return np.ascontiguousarray(float32_to_bfloat16_bits(reduced))
+
+
 def generate_strategy_nd_input_bits(
     config: StrategyNdFingerprintConfig,
 ) -> np.ndarray:
@@ -237,9 +325,10 @@ def strategy_nd_fingerprint_hlo_policy(
 
 def _backend_config(instruction: HloInstruction) -> Mapping[str, Any]:
     marker = "backend_config="
-    start = instruction.raw_line.find(marker)
-    if start < 0:
+    positions = _unquoted_attribute_positions(instruction.raw_line, marker)
+    if len(positions) != 1:
         raise BenchmarkValidationError("fingerprint all-reduce has no backend_config")
+    start = positions[0]
     value = instruction.raw_line[start + len(marker) :].lstrip()
     try:
         parsed, end = json.JSONDecoder().raw_decode(value)
@@ -254,6 +343,206 @@ def _backend_config(instruction: HloInstruction) -> Mapping[str, Any]:
     if not isinstance(parsed, dict):
         raise BenchmarkValidationError("fingerprint backend_config must be an object")
     return parsed
+
+
+def _unquoted_attribute_positions(value: str, marker: str) -> tuple[int, ...]:
+    """Locate HLO attributes outside quoted strings and C comments."""
+
+    positions: list[int] = []
+    index = 0
+    quoted = False
+    escaped = False
+    comment = False
+    while index < len(value):
+        if comment:
+            if value.startswith("*/", index):
+                comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if quoted:
+            character = value[index]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+            index += 1
+            continue
+        if value.startswith("/*", index):
+            comment = True
+            index += 2
+            continue
+        if value[index] == '"':
+            quoted = True
+            index += 1
+            continue
+        if value.startswith(marker, index):
+            positions.append(index)
+            index += len(marker)
+            continue
+        index += 1
+    return tuple(positions)
+
+
+def _unquoted_text(value: str) -> str:
+    result = list(value)
+    index = 0
+    quoted = False
+    escaped = False
+    comment = False
+    while index < len(value):
+        if comment:
+            result[index] = " "
+            if value.startswith("*/", index):
+                result[index + 1] = " "
+                comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if quoted:
+            result[index] = " "
+            character = value[index]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+            index += 1
+            continue
+        if value.startswith("/*", index):
+            result[index] = result[index + 1] = " "
+            comment = True
+            index += 2
+            continue
+        if value[index] == '"':
+            result[index] = " "
+            quoted = True
+        index += 1
+    return "".join(result)
+
+
+def _instruction_has_exact_prefix(
+    instruction: HloInstruction,
+    signature: str,
+) -> bool:
+    line = instruction.raw_line.lstrip()
+    if line.startswith("ROOT "):
+        line = line[len("ROOT ") :]
+    return line.startswith(
+        f"{instruction.name} = {signature} {instruction.raw_opcode}("
+    )
+
+
+def _computation_base(value: str) -> str:
+    return value.split(" ", 1)[0]
+
+
+def _validate_fingerprint_value_flow(
+    report: HloLintReport,
+    reduction: HloInstruction,
+) -> None:
+    """Bind the exact ENTRY input through the collective to its live result."""
+
+    entry = tuple(
+        item
+        for item in report.module.instructions
+        if item.computation == reduction.computation
+    )
+    roots = tuple(
+        item for item in entry if item.raw_line.lstrip().startswith("ROOT ")
+    )
+    parameters = tuple(item for item in entry if item.raw_opcode == "parameter")
+    exact_bf16 = f"bf16[32,6144]{ACCEPTED_DECODE_RESULT_LAYOUT}"
+    if len(roots) != 1 or len(parameters) != 1:
+        raise BenchmarkValidationError(
+            "fingerprint ENTRY input/result lineage is not unique"
+        )
+    parameter = parameters[0]
+    root = roots[0]
+
+    # The small synthetic fixture uses a direct BF16 ENTRY parameter.  TPU
+    # codegen uses the second exact form below.
+    if len(entry) == 2:
+        if (
+            parameter.operand_names != ("0",)
+            or not _instruction_has_exact_prefix(parameter, exact_bf16)
+            or reduction.operand_names != (parameter.name,)
+            or root is not reduction
+        ):
+            raise BenchmarkValidationError(
+                "fingerprint direct ENTRY operand layout/value flow drifted"
+            )
+        return
+
+    # Exact TPU lowering: U16 input -> one kLoop bitcast-convert/bitcast fusion
+    # -> synchronous all-reduce -> live U16 bitcast-convert ROOT.
+    if len(entry) != 4:
+        raise BenchmarkValidationError(
+            "fingerprint TPU ENTRY contains unapproved arithmetic or dead values"
+        )
+    fusion_candidates = tuple(item for item in entry if item.raw_opcode == "fusion")
+    if len(fusion_candidates) != 1:
+        raise BenchmarkValidationError("fingerprint input fusion is not unique")
+    fusion = fusion_candidates[0]
+    if (
+        parameter.operand_names != ("0",)
+        or not _instruction_has_exact_prefix(
+            parameter, "u16[1,32,6144]{2,1,0:T(8,128)(2,1)}"
+        )
+        or fusion.operand_names != (parameter.name,)
+        or not _instruction_has_exact_prefix(fusion, exact_bf16)
+        or reduction.operand_names != (fusion.name,)
+        or root.raw_opcode != "bitcast-convert"
+        or root.operand_names != (reduction.name,)
+        or not _instruction_has_exact_prefix(
+            root, "u16[32,6144]{1,0:T(8,128)(2,1)}"
+        )
+    ):
+        raise BenchmarkValidationError("fingerprint TPU ENTRY value flow drifted")
+    calls = re.findall(
+        r"(?:^|,\s*)calls=([A-Za-z0-9_.%:-]+)(?:,|$)",
+        _unquoted_text(fusion.raw_line),
+    )
+    if len(calls) != 1:
+        raise BenchmarkValidationError("fingerprint input fusion callee drifted")
+    callee = tuple(
+        item
+        for item in report.module.instructions
+        if _computation_base(item.computation) == calls[0]
+    )
+    callee_roots = tuple(
+        item for item in callee if item.raw_line.lstrip().startswith("ROOT ")
+    )
+    callee_parameters = tuple(
+        item for item in callee if item.raw_opcode == "parameter"
+    )
+    if len(callee) != 3 or len(callee_roots) != 1 or len(callee_parameters) != 1:
+        raise BenchmarkValidationError("fingerprint input fusion body drifted")
+    callee_parameter = callee_parameters[0]
+    conversion = tuple(item for item in callee if item.raw_opcode == "bitcast-convert")
+    callee_root = callee_roots[0]
+    if (
+        len(conversion) != 1
+        or callee_parameter.operand_names != ("0",)
+        or not _instruction_has_exact_prefix(
+            callee_parameter, "u16[1,32,6144]{2,1,0:T(8,128)(2,1)}"
+        )
+        or conversion[0].operand_names != (callee_parameter.name,)
+        or not _instruction_has_exact_prefix(
+            conversion[0], "bf16[1,32,6144]{2,1,0:T(8,128)(2,1)}"
+        )
+        or callee_root.raw_opcode != "bitcast"
+        or callee_root.operand_names != (conversion[0].name,)
+        or not _instruction_has_exact_prefix(callee_root, exact_bf16)
+    ):
+        raise BenchmarkValidationError(
+            "fingerprint input fusion is not the exact U16-to-BF16 layout path"
+        )
 
 
 def validate_strategy_nd_fingerprint_hlo(
@@ -273,6 +562,10 @@ def validate_strategy_nd_fingerprint_hlo(
             f"fingerprint requires one physical all-reduce, found {len(reductions)}"
         )
     reduction = reductions[0]
+    if reduction.raw_opcode != "all-reduce":
+        raise BenchmarkValidationError(
+            "fingerprint requires one synchronous all-reduce"
+        )
     shapes = tuple((shape.dtype, shape.dimensions) for shape in reduction.result_shapes)
     if shapes != (("bf16", (32, 6144)),):
         raise BenchmarkValidationError(
@@ -291,12 +584,57 @@ def validate_strategy_nd_fingerprint_hlo(
         raise BenchmarkValidationError(
             "fingerprint all-reduce does not preserve the accepted M32 TPU result layout"
         )
+    if len(reduction.operand_names) != 1:
+        raise BenchmarkValidationError(
+            "fingerprint all-reduce requires one exact M32 operand"
+        )
+    if not _instruction_has_exact_prefix(
+        reduction, f"bf16[32,6144]{ACCEPTED_DECODE_RESULT_LAYOUT}"
+    ):
+        raise BenchmarkValidationError(
+            "fingerprint all-reduce result does not preserve the accepted M32 TPU layout"
+        )
     backend = _backend_config(reduction)
     algorithm = backend.get("collective_algorithm_config")
     if algorithm != STRATEGY_ND_ALGORITHM:
         raise BenchmarkValidationError(
             "fingerprint collective algorithm differs from the byte-pinned accepted StrategyND config"
         )
+    to_apply_match = re.search(
+        r"(?:^|,\s*)to_apply=([A-Za-z0-9_.%:-]+)(?:,|$)",
+        _unquoted_text(reduction.raw_line),
+    )
+    if to_apply_match is None:
+        raise BenchmarkValidationError("fingerprint all-reduce reducer is missing")
+    reducer_name = to_apply_match.group(1)
+    reducer = tuple(
+        item
+        for item in report.module.instructions
+        if _computation_base(item.computation) == reducer_name
+    )
+    parameters = tuple(item for item in reducer if item.raw_opcode == "parameter")
+    roots = tuple(
+        item for item in reducer if item.raw_line.lstrip().startswith("ROOT ")
+    )
+    if (
+        len(reducer) != 3
+        or len(parameters) != 2
+        or {item.operand_names for item in parameters} != {("0",), ("1",)}
+        or any(
+            tuple((shape.dtype, shape.dimensions) for shape in item.result_shapes)
+            != (("bf16", ()),)
+            for item in parameters
+        )
+        or len(roots) != 1
+        or roots[0].raw_opcode != "add"
+        or set(roots[0].operand_names) != {item.name for item in parameters}
+        or tuple((shape.dtype, shape.dimensions) for shape in roots[0].result_shapes)
+        != (("bf16", ()),)
+    ):
+        raise BenchmarkValidationError(
+            "fingerprint all-reduce reducer is not the exact scalar BF16 add"
+        )
+    _validate_fingerprint_value_flow(report, reduction)
     return report, dict(algorithm)
 
 

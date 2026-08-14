@@ -19,6 +19,40 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected accepted-oracle DB550/item1834 completed under tag
+  `greenfield_legacy_layer0_dense_partials_p8155_20260814T100132090917640Z` at reviewed greenfield
+  pin `1800abc99c89abf90b3e61029968be70d615f0b4` and legacy observer pin
+  `4e3aa9666cefa38deba9c2824d5125c2e32ab2cf`. All 32 accepted layer-0 BF16 down
+  partials are bitwise identical to DB548 over all `196,608` values: zero mismatches, both tensor
+  SHAs `9d9f65dddc7b622875872a33a6522c330c8fb5490c8cba14526553c211516e35`.
+  This conclusively closes the dense contraction, packed weights, FP8 dequantization, SwiGLU and
+  per-rank down result as the source of the layer-1 one-ULP miss. Do not repeat any gate/down
+  contraction or rank-specific challenger.
+- The run retained the exact raw answer and DSA event tensors, linked the result to DB550, archived
+  545 source/compact objects plus the terminal records under the approved oracle prefix, and
+  published `SUCCESS` only after authenticated 8/8 zero work. Local/remote `SUCCESS` SHA is
+  `9605aa5c...1b23`; comparison/tensor/remote-ledger/census SHAs are `92707cca...98de`,
+  `e5977248...582c`, `663adbf1...8a05` and `c4759173...4683`. The classification is
+  `accepted_dense_partials_exact_db548`; accepted capture/comparison manifest SHAs are
+  `21c17898...84e4` / `4238b9dc...5050`.
+- The next discriminator is no longer an hour-long model run. Replay these immutable 32 partials
+  through one exact-shape M32 StrategyND BF16 all-reduce on the existing 32-chip slice, with the
+  accepted operand layout/algorithm and exact HLO proof. Compare its row-zero bits directly with
+  the current DB533 software replay. If they differ, correct only the combine association in the
+  existing 70--80 second four-chip loop; if they agree, the remaining boundary is the carried
+  residual/layer-1 normalization reference and contraction work stays frozen.
+- That model-free replay is now implemented locally and remains unlaunched. It reuses the exact
+  DB533 M32 executable, reorders DB550's model-axis tensor onto the accepted physical device ids,
+  executes one `bf16[32,6144]` StrategyND all-reduce twice for determinism, and independently
+  recomputes physical row zero in NumPy. The strengthened HLO gate pins the synchronous collective,
+  operand/result layouts, exact scalar BF16-add reducer and byte-pinned backend. Terminal validation
+  reloads all eight host records, the five immutable DB550 source files, HLO and all NPY outputs,
+  then reconstructs the input, software result and classification. The dedicated protected wrapper
+  has exact pin sync, exclusive lease, pre/post census, remote CRC equality and `SUCCESS`-last
+  publication; it is diagnostic-only with no performance claim. The affected benchmark suite passes
+  91/91 on CPU and shell/JSON/diff checks pass. Exact next is one bulk Sol audit, one correction batch
+  if needed, then commit/push and this short model-free protected run—not another checkpoint load.
+
 - Reviewed/pushed correction `d1edb65dc45f99d65d15a8d046d2e97f0ac023f9` completed the protected
   internal gate-dequant replay under tag
   `greenfield_layer0_isolated_dense_replay_20260814T085325133162588Z`. The real TPU program passed
@@ -4845,3 +4879,21 @@ The SHA-pinned real capture HLO now replays; a wrong live schedule masked by dea
 still refuses. Exact next: correction-only review, commit/push and one protected partial capture.
 Then enumerate reduction association offline against the captured accepted layer-1 target; only a
 0/6144 result authorizes production integration and one complete protected 8K retry.
+
+## Current exact next: minutes-scale DB550 StrategyND replay
+
+The non-repeat rules and durable lessons for this phase are consolidated in
+`docs/greenfield/GATE_D_LESSONS.md`; read it before changing or launching another Gate-D probe.
+
+DB550 now proves all 32 real layer-0 down partials are exact, so all checkpoint, dequant, SwiGLU,
+contraction, fusion and rank-local output theories are closed. The new discriminator loads only its
+sealed 787-KiB NPZ and executes one accepted-layout 32-chip StrategyND BF16 all-reduce plus one
+repeat. It does not load weights or execute a model layer.
+
+The one bulk Sol audit found three evidence-only gaps: HLO operand/root lineage, worker sidecars
+outside the archive ledger, and under-bound fleet topology records. One correction batch closes
+them with exact live input-to-all-reduce-to-root flow, no sidecars plus exact remote object-set
+equality, and run-tag/hostname/JAX/local-device/full-v4-64 topology reconstruction. The affected
+suite passes 93/93, including the SHA-pinned real DB533 TPU HLO and all audit mutations. Exact next
+is one correction-only review, commit/push, then this short protected replay. No full checkpoint or
+decoder retry is authorized.

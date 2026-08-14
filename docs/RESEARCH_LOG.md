@@ -8786,3 +8786,70 @@ unmotivated arithmetic variants.
   publication; it continues to require all 16 exact per-contraction source/schedule records and
   their live down-stack bijection. The SHA-pinned protected replay passes and the dead-schedule
   decoy remains rejected. One correction review/commit and one bounded capture retry are next.
+
+## 2026-08-14 10:01--10:58 — DB550 directly closes all 32 accepted dense partials
+
+- Reviewed greenfield pin `1800abc99c89abf90b3e61029968be70d615f0b4` and legacy observer pin
+  `4e3aa9666cefa38deba9c2824d5125c2e32ab2cf` completed the one-time accepted-oracle capture under
+  `greenfield_legacy_layer0_dense_partials_p8155_20260814T100132090917640Z`. It produced DB550 /
+  item1834 with the exact protected raw answer and exact DSA event tensors.
+- Every accepted pre-psum layer-0 dense partial is bitwise identical to DB548: shape
+  `[4,8,1,6144]`, `0/196608` mismatches, zero max/mean error, and equal accepted/DB548 SHA
+  `9d9f65dddc7b622875872a33a6522c330c8fb5490c8cba14526553c211516e35`. All 32 per-rank records
+  independently report zero mismatches. This rejects every remaining packed-weight, dequant,
+  gate/SwiGLU/down contraction, compiler-fusion and rank-local output theory; none may be rerun.
+- Comparison and sealed NPZ SHAs are `92707ccac80a337bcae0c527148fc9133383067d25add36eb0b36f7e7c9198de`
+  and `e5977248acbe7582db351178b3fc823c6f87db46f8b6143b763319a6b299582c`. Capture/comparison
+  manifest SHAs are `21c178989ae2fa40df9d34922dc9736c4f4ba87d35dd3f7878a22485ef7184e4` and
+  `4238b9dcde7305a9f7a7cf35719eba6fe0b6c14d2a7a31480a8b9c192c245050`.
+- The approved remote prefix contains 545 source/compact objects plus the terminal ledger and
+  `SUCCESS`. Remote ledger SHA is `663adbf1a11c32bbfc28b1030a0c329080d29fcf96fe4a2d77169e64e8858a05`;
+  local/remote `SUCCESS` SHA is `9605aa5c0f76fd9a5ec9b8e78b1aa720111cbc0633d7b962834004537f321b23`;
+  the post-census SHA is `c4759173bbdce5758b2453a4ff65e121e457d23c232f38a8bf0b85e95c9d4683`
+  and authenticates 8/8 zero work.
+- Exact next is a model-free replay of these sealed 32 values through one exact accepted-layout
+  M32 StrategyND BF16 all-reduce on the existing slice. This distinguishes hardware combine
+  association from carried-residual/layer-1-normalization provenance without another checkpoint
+  load. Only a combine mismatch may change the four-chip DB533 replay; otherwise dense arithmetic
+  remains closed and investigation advances past it.
+
+## 2026-08-14 — model-free DB550 StrategyND replay is locally ready
+
+- The next discriminator now loads only DB550's sealed 787-KiB NPZ. It maps the 32 model-axis rows
+  onto the accepted physical device ids, compiles the existing exact `bf16[32,6144]` M32
+  fingerprint, executes one StrategyND reduction plus one deterministic repeat, and compares
+  physical row zero to a separately recomputed DB533 NumPy tree. It never loads checkpoint weights
+  or runs a decoder layer.
+- The shared HLO contract is strengthened to require a synchronous all-reduce, exact accepted
+  operand and result layouts, one exact scalar BF16-add reducer, the full physical group and the
+  byte-pinned `RotatedPincerEmitter/StrategyND` backend. Wrong operand layout, maximum reducer and
+  async start forms refuse; the SHA-pinned DB533 real HLO still passes.
+- Terminal validation reloads eight fleet records, five exact DB550 source files, the process-zero
+  HLO and all raw NPYs; it re-derives physical input order, software row zero, every row mismatch
+  count and classification. The new dedicated protected wrapper provides an exclusive lease,
+  clean-pin fleet sync, pre/post census, CRC32C archive equality and remote `SUCCESS` last. It is
+  diagnostic-only and makes no performance claim.
+- The affected benchmark/validation suite passes 91/91 on CPU; Bash, ShellCheck, JSON, Python and
+  diff checks pass. This is mechanism readiness only. One bulk Sol audit and any single correction
+  batch precede commit/push and the short protected run.
+
+## 2026-08-14 — bulk replay audit closes in one bounded correction
+
+- The single bulk audit found no new arithmetic hypothesis. It found three proof gaps in the small
+  replay harness: the scheduled all-reduce was not bound to its exact live input and ENTRY result;
+  worker-created SHA sidecars were uploaded but absent from the orchestrator ledger; and terminal
+  validation accepted an arbitrary common topology hash without binding run, host, JAX process and
+  observed local-device order.
+- The correction now accepts only the exact direct fixture or exact protected U16-to-BF16 fusion,
+  synchronous StrategyND all-reduce and live U16 root. Rogue arithmetic, a dead exact reduction,
+  quoted layout decoys and duplicated reducer parameters refuse; the SHA-pinned DB533 TPU HLO still
+  passes. Worker sidecars are removed, and the wrapper requires the complete remote nonterminal
+  object set to equal the local set after CRC-ledger upload and before `SUCCESS`.
+- Every host record now carries the exact run tag and complete schema. The terminal reconstructs
+  `PhysicalTopology`, validates target v4-64, recomputes the accepted topology hash, pins the fleet
+  local-device matrix, and binds filename/launch/hostname plus JAX-process physical ownership. The
+  complete affected suite passes 93/93. One correction-only review remains before commit/push and
+  the minutes-scale protected replay; the full model remains frozen.
+- Durable non-repeat rules from this investigation are consolidated in
+  `docs/greenfield/GATE_D_LESSONS.md`; future compactions should use it with the handoff rather than
+  reconstructing the rejected hypothesis tree from chat history.
