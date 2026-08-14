@@ -29,6 +29,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=0
     ;;
   prompt_key | prompt_key_input)
     readonly PROMPT_KEY_CAPTURE=1
@@ -37,6 +38,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=0
     ;;
   attention_output)
     readonly PROMPT_KEY_CAPTURE=0
@@ -45,6 +47,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=0
     ;;
   attention_projection)
     readonly PROMPT_KEY_CAPTURE=0
@@ -53,6 +56,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=0
     ;;
   attention_update)
     readonly PROMPT_KEY_CAPTURE=0
@@ -61,6 +65,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_UPDATE_CAPTURE=1
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=0
     ;;
   dense_boundary)
     readonly PROMPT_KEY_CAPTURE=0
@@ -69,6 +74,7 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=1
     readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=0
     ;;
   dense_input)
     readonly PROMPT_KEY_CAPTURE=0
@@ -77,6 +83,16 @@ case "$INTERNAL_MODE" in
     readonly ATTENTION_UPDATE_CAPTURE=0
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=1
+    readonly DENSE_PARTIAL_CAPTURE=0
+    ;;
+  dense_partial)
+    readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=1
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
@@ -120,7 +136,11 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $DENSE_INPUT_CAPTURE == 1 ]]; then
+  if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-4e3aa9666
+    readonly OBSERVER_COMMIT_DISTANCE=12
+    readonly LEGACY_PIN=4e3aa9666cefa38deba9c2824d5125c2e32ab2cf
+  elif [[ $DENSE_INPUT_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-0c2f7f28a
     readonly OBSERVER_COMMIT_DISTANCE=11
     readonly LEGACY_PIN=0c2f7f28a075a51f5eb51dc98bbb74e363d3290f
@@ -202,6 +222,13 @@ readonly DENSE_CONVOLUTION_SUMMARY_SHA=9b277ca495d3b9e9ce497d2bf78a520a2672f133e
 readonly DENSE_CONVOLUTION_SUCCESS_SHA=d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799
 readonly DENSE_CONVOLUTION_RUN_ID=540
 readonly DENSE_CONVOLUTION_REMOTE=$APPROVED_BUCKET/results/$DENSE_CONVOLUTION_TAG
+readonly DENSE_PARTIAL_PROBE_TAG=greenfield_layer0_dense_partial_capture_20260813T200736889447458Z
+readonly DENSE_PARTIAL_PROBE_DIR=/home/gianl/glm-run/$DENSE_PARTIAL_PROBE_TAG
+readonly DENSE_PARTIAL_PROBE_RUNNER_SHA=d22b35f664409485b697fdb579665dc4b1ecf42683a2aaff9e9a4d7481ee8343
+readonly DENSE_PARTIAL_PROBE_TENSOR_SHA=f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298
+readonly DENSE_PARTIAL_PROBE_SUMMARY_SHA=c349b5fd458f34986d8cc59c0f026af6b0a4c4e998f8691d6f6aa83a9b55e416
+readonly DENSE_PARTIAL_PROBE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa470bd44b0b85
+readonly DENSE_PARTIAL_PROBE_REMOTE=$APPROVED_BUCKET/results/$DENSE_PARTIAL_PROBE_TAG
 readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
@@ -266,12 +293,32 @@ if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
 fi
 if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 || \
       $ATTENTION_UPDATE_CAPTURE == 1 || $DENSE_BOUNDARY_CAPTURE == 1 || \
-      $DENSE_INPUT_CAPTURE == 1 ]]; then
+      $DENSE_INPUT_CAPTURE == 1 || $DENSE_PARTIAL_CAPTURE == 1 ]]; then
   [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
      $PROFILE == 8k && $INTERNAL_TARGET_POSITION == 8155 && \
      $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
      $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
     echo "layer-0 boundary capture requires isolated 8K position 8155 mode" >&2
+    exit 2
+  }
+fi
+if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+  [[ -r $DENSE_PARTIAL_PROBE_DIR/runner.json &&
+     -r $DENSE_PARTIAL_PROBE_DIR/dense_partial_capture.npz &&
+     -r $DENSE_PARTIAL_PROBE_DIR/summary.json &&
+     -r $DENSE_PARTIAL_PROBE_DIR/SUCCESS ]] || {
+    echo "protected DB548 dense-partial evidence is unavailable" >&2
+    exit 2
+  }
+  [[ $(sha256sum "$DENSE_PARTIAL_PROBE_DIR/runner.json" | awk '{print $1}') == \
+     "$DENSE_PARTIAL_PROBE_RUNNER_SHA" &&
+     $(sha256sum "$DENSE_PARTIAL_PROBE_DIR/dense_partial_capture.npz" | awk '{print $1}') == \
+     "$DENSE_PARTIAL_PROBE_TENSOR_SHA" &&
+     $(sha256sum "$DENSE_PARTIAL_PROBE_DIR/summary.json" | awk '{print $1}') == \
+     "$DENSE_PARTIAL_PROBE_SUMMARY_SHA" &&
+     $(sha256sum "$DENSE_PARTIAL_PROBE_DIR/SUCCESS" | awk '{print $1}') == \
+     "$DENSE_PARTIAL_PROBE_SUCCESS_SHA" ]] || {
+    echo "protected DB548 dense-partial evidence identity drifted" >&2
     exit 2
   }
 fi
@@ -532,6 +579,8 @@ elif [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/dense_boundary_capture
 elif [[ $DENSE_INPUT_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/dense_input_capture
+elif [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/dense_partials_capture
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -655,6 +704,20 @@ if [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
     }
   done
 fi
+if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+  for spec in \
+    "$DENSE_PARTIAL_PROBE_RUNNER_SHA $DENSE_PARTIAL_PROBE_REMOTE/runner.json" \
+    "$DENSE_PARTIAL_PROBE_TENSOR_SHA $DENSE_PARTIAL_PROBE_REMOTE/dense_partial_capture.npz" \
+    "$DENSE_PARTIAL_PROBE_SUMMARY_SHA $DENSE_PARTIAL_PROBE_REMOTE/summary.json" \
+    "$DENSE_PARTIAL_PROBE_SUCCESS_SHA $DENSE_PARTIAL_PROBE_REMOTE/SUCCESS"; do
+    read -r expected uri <<<"$spec"
+    observed=$(gcloud storage cat "$uri" | sha256sum | awk '{print $1}')
+    [[ $observed == "$expected" ]] || {
+      say "ABORT: protected DB548 remote source hash drifted: $uri"
+      exit 1
+    }
+  done
+fi
 if [[ $DENSE_BOUNDARY_CAPTURE == 1 || $DENSE_INPUT_CAPTURE == 1 ]]; then
   for spec in \
     "$DENSE_CONVOLUTION_RUNNER_SHA $DENSE_CONVOLUTION_REMOTE/runner.json" \
@@ -703,6 +766,37 @@ stop_owned_runtime() {
 
 runtime_started=0
 post_census_done=0
+terminal_success_done=0
+
+rollback_dense_partial_db() {
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+    "$RESULTS_DB" "$TAG" "$HARNESS_SHORT" "$ORACLE_SHORT" \
+    "$LEGACY_PIN" "$LEGACY_SHORT" "$ORACLE_PIN" "$REMOTE_PREFIX" \
+    "$DUMP_PREFIX" "$INTERNAL_DUMP_PREFIX" \
+    >"$RUN_DIR/provisional_db_rollback.txt" 2>&1 <<'PY'
+from pathlib import Path
+import sys
+
+from glm_tpu.greenfield.validation.dense_partials import (
+    DensePartialsRollbackConfig,
+    rollback_dense_partial_oracle_run,
+)
+
+print(rollback_dense_partial_oracle_run(DensePartialsRollbackConfig(
+    results_db=Path(sys.argv[1]),
+    run_tag=sys.argv[2],
+    expected_harness_git=sys.argv[3],
+    expected_fork_git=sys.argv[4],
+    expected_legacy_pin=sys.argv[5],
+    expected_legacy_short=sys.argv[6],
+    expected_oracle_pin=sys.argv[7],
+    expected_remote_prefix=sys.argv[8],
+    expected_dump_prefix=sys.argv[9],
+    expected_internal_dump_prefix=sys.argv[10],
+)))
+PY
+}
+
 on_exit() {
   local status=$?
   if [[ $runtime_started -eq 1 ]]; then
@@ -711,11 +805,20 @@ on_exit() {
   if [[ $post_census_done -eq 0 ]]; then
     strict_census failure_exit || true
   fi
+  if [[ $status -ne 0 && $DENSE_PARTIAL_CAPTURE -eq 1 && \
+        $terminal_success_done -eq 0 ]]; then
+    if rollback_dense_partial_db; then
+      say "authenticated provisional dense-partial DB rollback complete"
+    else
+      say "WARNING: provisional dense-partial DB rollback refused; preserving row for diagnosis"
+    fi
+  fi
   if [[ $status -ne 0 ]]; then
     say "FAILED status=$status; preserving diagnostics"
     gcloud storage cp --recursive --no-clobber "$RUN_DIR" \
       "$REMOTE_PREFIX/diagnostic_local/" >/dev/null 2>&1 || true
   fi
+  return "$status"
 }
 trap on_exit EXIT
 
@@ -886,7 +989,12 @@ has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
   exit 1
 }
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
+  if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+    # Every host owns four physical model ranks. The device-side observer
+    # writes one exact pre-psum BF16 row per rank for the requested position.
+    # shellcheck disable=SC2016
+    internal_integrity='logs=/tmp/ray/session_latest/logs; armed=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] DENSE PARTIAL ARMED" "$logs" 2>/dev/null | tail -1); wrote=$(grep -Rhs --include="worker-*.out" --include="worker-*.err" -F "[GLM_DSA_DUMP_INTERNALS] first dense-partial file written" "$logs" 2>/dev/null | tail -1); files=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$INTERNAL_TARGET_POSITION"'.proc*.rank*.npz" 2>/dev/null | wc -l); ranks=$(find /tmp/'"$TAG"' -type f -name "internals.*.position'"$INTERNAL_TARGET_POSITION"'.proc*.rank*.npz" -printf "%f\n" 2>/dev/null | sed -n "s/.*\.rank\([0-9][0-9]\)\.npz$/\1/p" | sort -u | wc -l); errors=$(find /tmp/'"$TAG"' -type f -name "*.INTERNAL.ERROR.*" 2>/dev/null | wc -l); printf "%s\n%s\nfiles=%s ranks=%s errors=%s\n" "$armed" "$wrote" "$files" "$ranks" "$errors"; if [ -n "$armed" ] && [ -n "$wrote" ] && [ "$files" -eq 4 ] && [ "$ranks" -eq 4 ] && [ "$errors" -eq 0 ]; then echo "INTERNAL_OK $(hostname)"; echo "INTERNAL_OWNER $(hostname)"; else echo "INTERNAL_BAD $(hostname)"; fi'
+  elif [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     # Prompt prefill is replicated over the accepted model mesh. Permit one
     # independently produced file per JAX process and require every present
     # replica to be sealed bitwise by the post-run inspector.
@@ -907,7 +1015,12 @@ if [[ $INTERNAL_CAPTURE == 1 ]]; then
     "$RUN_DIR/fleet_internal_integrity.txt" || true)
   internal_nonowner_count=$(grep -c '^INTERNAL_NONOWNER ' \
     "$RUN_DIR/fleet_internal_integrity.txt" || true)
-  if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
+  if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+    [[ $internal_owner_count -eq 8 && $internal_nonowner_count -eq 0 ]] || {
+      say "ABORT: dense-partial physical-rank host coverage drifted"
+      exit 1
+    }
+  elif [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     ((internal_owner_count >= 1 && internal_owner_count <= 8 &&
       internal_owner_count + internal_nonowner_count == 8)) || {
       say "ABORT: prompt-key internal replica coverage drifted"
@@ -1020,9 +1133,20 @@ dump_count=$(find "$SOURCE_DIR" -type f -name 'topk.step*.evt*.proc*.npz' | wc -
 }
 internal_count=0
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  internal_count=$(find "$SOURCE_DIR" -type f \
-    -name "internals.*.position${INTERNAL_TARGET_POSITION}.proc*.npz" | wc -l)
-  if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
+  if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+    internal_count=$(find "$SOURCE_DIR" -type f \
+      -name "internals.*.position${INTERNAL_TARGET_POSITION}.proc*.rank*.npz" | wc -l)
+    [[ $internal_count -eq 32 ]] || {
+      say "ABORT: expected 32 physical dense-partial files, found $internal_count"
+      exit 1
+    }
+  else
+    internal_count=$(find "$SOURCE_DIR" -type f \
+      -name "internals.*.position${INTERNAL_TARGET_POSITION}.proc*.npz" | wc -l)
+  fi
+  if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+    :
+  elif [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
     ((internal_count >= 1 && internal_count <= 8)) || {
       say "ABORT: expected 1..8 prompt-key replica files, found $internal_count"
       exit 1
@@ -1261,7 +1385,26 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $DENSE_INPUT_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+  say "sealing accepted layer-0 pre-reduction dense partials and comparing DB548"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_accepted_dense_partials.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --db548-dir "$DENSE_PARTIAL_PROBE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --db548-runner-sha256 "$DENSE_PARTIAL_PROBE_RUNNER_SHA" \
+    --db548-tensor-sha256 "$DENSE_PARTIAL_PROBE_TENSOR_SHA" \
+    --db548-summary-sha256 "$DENSE_PARTIAL_PROBE_SUMMARY_SHA" \
+    --db548-success-sha256 "$DENSE_PARTIAL_PROBE_SUCCESS_SHA" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    >"$RUN_DIR/dense_partials_comparison_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $DENSE_INPUT_CAPTURE == 1 ]]; then
   say "sealing accepted layer-0 normalized dense-MLP input"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/capture_accepted_dense_input.py" \
@@ -1615,14 +1758,19 @@ listing = subprocess.run(
 validate_exact_remote_object_set(root, prefix, listing)
 PY
 
-/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$RUN_DIR" "$REMOTE_PREFIX" "$PIN" \
   "$LEGACY_PIN" "$run_id" "$item_row_id" "$dump_count" \
   "$INTERNAL_CAPTURE" "$internal_count" "$INTERNAL_COMPARE_LAYER0" \
   "$PROMPT_CACHE_CAPTURE" "$prompt_cache_source_count" "$INTERNAL_MODE" \
   "$PREFILL_PROJECTION_CAPTURE" "$prefill_profile_xplane_count" \
   "$prefill_profile_trace_count" "$prefill_profile_hlo_count" \
   "$MAIN_CACHE_CAPTURE" "$main_cache_source_count" \
-  "$DECODE_PROJECTION_CAPTURE" "$decode_projection_hlo_count" <<'PY'
+  "$DECODE_PROJECTION_CAPTURE" "$decode_projection_hlo_count" \
+  "$TAG" "$DENSE_PARTIAL_PROBE_DIR" \
+  "$DENSE_PARTIAL_PROBE_RUNNER_SHA" "$DENSE_PARTIAL_PROBE_TENSOR_SHA" \
+  "$DENSE_PARTIAL_PROBE_SUMMARY_SHA" "$DENSE_PARTIAL_PROBE_SUCCESS_SHA" \
+  "$ORACLE_PIN" <<'PY'
 from hashlib import sha256
 import json
 import math
@@ -1660,7 +1808,67 @@ def manifest_sha256(value):
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode == "dense_input":
+    if mode == "dense_partial":
+        from glm_tpu.greenfield.validation.dense_partials import (
+            DensePartialsCaptureConfig,
+            validate_dense_partials_artifacts,
+        )
+        if not exact_dsa["exact"]:
+            raise SystemExit("dense-partial DSA event tensors drifted")
+        capture_root = root / "dense_partials_capture"
+        comparison = validate_dense_partials_artifacts(
+            DensePartialsCaptureConfig(
+                source_dump_dir=root / "source_dumps",
+                db548_dir=Path(sys.argv[23]),
+                output_dir=capture_root,
+                expected_run_tag=sys.argv[22],
+                expected_legacy_code_hash=sys.argv[4],
+                expected_oracle_pin=sys.argv[28],
+                expected_db548_runner_sha256=sys.argv[24],
+                expected_db548_tensor_sha256=sys.argv[25],
+                expected_db548_summary_sha256=sys.argv[26],
+                expected_db548_success_sha256=sys.argv[27],
+            )
+        )
+        capture_path = capture_root / "capture.json"
+        comparison_path = capture_root / "comparison.json"
+        capture = json.loads(capture_path.read_text())
+        numeric = comparison["comparison"]
+        lines.update({
+            "accepted_dense_partials_capture": "true",
+            "accepted_dense_partials_capture_layout": capture["capture_layout"],
+            "accepted_dense_partials_capture_manifest_file_sha256": sha256(
+                capture_path.read_bytes()
+            ).hexdigest(),
+            "accepted_dense_partials_capture_manifest_sha256": capture[
+                "manifest_sha256"
+            ],
+            "accepted_dense_partials_comparison_file_sha256": sha256(
+                comparison_path.read_bytes()
+            ).hexdigest(),
+            "accepted_dense_partials_comparison_manifest_sha256": comparison[
+                "manifest_sha256"
+            ],
+            "accepted_dense_partials_diagnostic_only": "true",
+            "accepted_dense_partials_dsa_event_tensors_exact": "true",
+            "accepted_dense_partials_elementwise_exact_db548": str(
+                numeric["elementwise_exact"]
+            ).lower(),
+            "accepted_dense_partials_mismatch_count": str(
+                numeric["mismatch_count"]
+            ),
+            "accepted_dense_partials_sha256": numeric["expected_sha256"],
+            "accepted_dense_partials_source_file_count": sys.argv[9],
+            "accepted_oracle_pin": capture["oracle_pin"],
+            "db548_dense_partials_sha256": numeric["observed_sha256"],
+            "dense_partials_classification": comparison["classification"],
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_process_indices": "0,1,2,3,4,5,6,7",
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": capture["layer_name"],
+            "dsa_event_tensors_exact": "true",
+        })
+    elif mode == "dense_input":
         capture_path = root / "dense_input_capture" / "capture.json"
         comparison_path = (
             root / "dense_input_comparison" / "comparison.json"
@@ -2395,6 +2603,7 @@ remote_success_sha=$(gcloud storage cat "$REMOTE_PREFIX/SUCCESS" | sha256sum | a
   say "ABORT: remote SUCCESS checksum mismatch"
   exit 1
 }
+terminal_success_done=1
 
 manifest_sha=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \

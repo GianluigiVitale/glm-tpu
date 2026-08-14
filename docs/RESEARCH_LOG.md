@@ -5,6 +5,59 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 09:30 UTC — direct accepted-partial oracle tap replaces hour-scale iteration
+
+- Implemented the missing default-off legacy oracle tap at exact layer-0 `down_proj`: every
+  physical `model × dcp` rank writes its BF16 local result before the existing accepted psum,
+  identified as owner `rank//8` and virtual rank `rank%8`. The default path is structurally
+  unchanged. Forced-four-device tests observe all four rank-local values and prove the returned
+  reduction is unchanged in both live-row and ordinary branches. The focused legacy suite passes
+  46/46 and Sol approved the one reviewed diff SHA `52d23d03...befa`; pushed observer pin is
+  `4e3aa9666cefa38deba9c2824d5125c2e32ab2cf`.
+- Added a direct greenfield sealer/comparator and protected wrapper mode. It requires exactly 32
+  append-only raw files with four per host, validates exact provenance/dtype/shape/rank coverage,
+  seals accepted `[4,8,1,6144]` BF16 bits and compares every rank/coordinate directly with DB548.
+  The DB548 runner/tensor/summary/`SUCCESS` hashes were reverified locally and against the approved
+  remote archive. Terminal publication reopens the exact DB548 NPZ key, all 32 source files and
+  both sealed arrays and reconstructs the complete comparison. Failures before remote `SUCCESS`
+  equality authenticate and remove only this diagnostic's valid run/item/summary prefix; altered
+  rows are preserved and refused. A dedicated launcher fixes 8K/layer0/position8155 and every
+  unrelated capture off. Focused plus inherited wrapper/validation tests pass 148/148, including
+  coherent hash/owner/NPZ mutations and all four committed DB prefixes; shell/Python/diff checks
+  pass.
+- This is mechanism readiness, not a captured numerical result, DB row, performance claim or Gate-D
+  advancement. One accepted 753B load is still required because those values were never recorded.
+  After that single capture, the exact differing ranks/indices—if any—feed only the already-proven
+  70--80 second four-chip discriminator; no further hour-scale decoder run is authorized until the
+  bounded layer-1 row is `0/6,144`.
+
+## 2026-08-14 08:55 UTC — 79-second replay rejects internal gate dequantization
+
+- Reviewed/pushed correction `d1edb65dc45f99d65d15a8d046d2e97f0ac023f9` ran once under protected
+  tag `greenfield_layer0_isolated_dense_replay_20260814T085325133162588Z`. The corrected exact
+  rank-four owner-singleton matcher passed the preserved real TPU lowering. StableHLO and optimized
+  HLO then proved the intended FP8 bits plus expanded F32 scales dequantize inside the live accepted-
+  schedule gate fusion; all packed-source, activation, down, carried-residual and result contracts
+  passed. TPU arithmetic took 12 seconds and the complete protected workflow took 79 seconds.
+- The result is another clean numerical rejection. All 32 isolated BF16 down partials are bitwise
+  identical to DB548's sealed capture, with zero mismatches at every virtual rank. Layer 1 retains
+  exactly one mismatch at hidden index 2795: expected bits 48423 versus observed 48422, maximum
+  error `0.000244140625`, observed SHA `9b52a04e...4005`. Sensitivity remains unchanged: dense-update
+  bits 47808, with exact layer-1 candidates only at 47809 and 47810.
+- Runner/tensor/summary/`SUCCESS` SHAs are `67e734dd3dbcea8a184066b4b65cc867f53efeb5feb40dbd66bf66aa331dfa62`,
+  `455035b38999ca7750d71b6dc9d09b2ad5c3e8c47b0b28564bf9e7b7ae223e5f`,
+  `59b5a2344710af934e2c9b822073a2e1d6d298288ef21b47c14a186c3d70d662`, and
+  `d610da24fa30e8ca8fd0407e0e532ccc09d718c200031b7f7df0f1a1e622a84c`; remote ledger SHA is
+  `7a0ee1694771011c456c161e9256a45f3785abffddb0d11297a69f6e97d2a8d0`. The deliberately no-DB,
+  non-performance archive verifies at
+  `gs://driftbench-dsv4-uc/results/greenfield_layer0_isolated_dense_replay_20260814T085325133162588Z`,
+  and authenticated cleanup ended 8/8 clean.
+- This closes external singleton and internal gate-dequant materialization as causes. The decisive
+  missing datum is the accepted legacy program's 32 pre-reduction down partials; DB548 is a
+  greenfield capture, not that oracle. Build one default-off oracle-only position-8155 capture and
+  compare those 32 rows directly. Once sealed, every fix remains testable with the existing
+  70--80-second bounded four-chip replay; no complete decoder retry is authorized before equality.
+
 ## 2026-08-14 00:36 UTC — short probe fails fast on rank-4 FP8 validator assumption
 
 - Reviewed/pushed pin `aa259df7a658da1270e8ae3d8039718ff00679d1` ran once under protected tag

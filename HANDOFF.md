@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-13 UTC
+**Updated:** 2026-08-14 UTC
 
 ## Authority and isolation
 
@@ -18,6 +18,38 @@ legacy `AGENTS.md`/`CLAUDE.md`/`HANDOFF.md` files have no authority here. The in
 and pipeline-parallelism ban are superseded. Never edit/delete the owner's untracked main files.
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
+
+- Reviewed/pushed correction `d1edb65dc45f99d65d15a8d046d2e97f0ac023f9` completed the protected
+  internal gate-dequant replay under tag
+  `greenfield_layer0_isolated_dense_replay_20260814T085325133162588Z`. The real TPU program passed
+  every StableHLO and optimized-HLO contract, including the exact rank-four owner-singleton
+  FP8-to-F32-to-BF16 dequantization inside the accepted scheduled gate fusion. TPU arithmetic took
+  12 seconds and the complete pre-census-to-`SUCCESS` workflow took 79 seconds.
+- The numerical result rejects this boundary: all 32 BF16 down partials are bitwise identical to
+  DB548's sealed partial capture, and layer 1 remains nonexact only at hidden index 2795 (expected
+  bits 48423, observed 48422; SHA `9b52a04e...4005`). Runner/tensor/summary/`SUCCESS` SHAs are
+  `67e734dd...a62`, `455035b3...3e5f`, `59b5a234...d662`, and `d610da24...a84c`; remote ledger SHA
+  is `7a0ee169...a8d0`. The no-DB/non-performance archive verifies at the approved bucket and
+  cleanup is authenticated 8/8.
+- Do not repeat the singleton/dequant challengers or run the complete decoder. Current and DB548
+  partial equality is not accepted-oracle partial equality: the accepted program's 32 pre-reduction
+  down values were never captured. Exact next is one default-off oracle-only pre-reduction capture
+  at position 8155, followed by a direct 32-row bitwise diff. After that one capture, corrections
+  remain in the existing 70--80 second bounded four-chip loop rather than hour-long 8K runs.
+- The one-time oracle tap is now implemented and locally validated. Reviewed legacy pin
+  `4e3aa9666cefa38deba9c2824d5125c2e32ab2cf` observes the exact layer-0 down-projection value on
+  each physical model rank immediately before the unchanged accepted psum. Forced-four-device
+  tests prove all rank-local values are captured and the original reduced result is unchanged;
+  the focused legacy suite passes 46/46. The protected greenfield wrapper requires 32 append-only
+  files, four per host, authenticates local and remote DB548 sources, seals `[4,8,1,6144]` BF16
+  bits, emits rank-by-rank mismatch coordinates, requires full accepted token/DSA/state integrity,
+  archives with CRC equality and publishes `SUCCESS` only after 8/8 cleanup. Terminal publication
+  reloads the raw files, exact real DB548 tensor key and both sealed NPZ arrays, then reconstructs
+  every manifest and per-rank comparison instead of trusting recorded JSON. Any failure before
+  remote `SUCCESS` equality performs an authenticated prefix-aware rollback of only this
+  diagnostic's fresh DB row. The focused/inherited wrapper suite passes 148/148, including coherent
+  tensor/manifest mutations and every committed DB prefix. No accepted partial result exists until
+  the single protected capture runs; this is mechanism readiness only.
 
 - Reviewed pin `aa259df7a658da1270e8ae3d8039718ff00679d1` was exercised once under
   `greenfield_layer0_isolated_dense_replay_20260814T003513546316672Z`. The protected harness failed
