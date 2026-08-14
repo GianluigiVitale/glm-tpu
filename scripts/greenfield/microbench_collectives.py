@@ -37,6 +37,7 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     ACCEPTED_DECODE_PROJECTION_HLO_RAW_SHA256,
     ACCEPTED_DECODE_PROJECTION_MANIFEST_SHA256,
     ACCEPTED_TP32_MODEL_AXIS_RECIPE,
+    CHECKPOINT_SUCCESS_SHA256,
     CollectiveChainConfig,
     CollectiveKind,
     DENSE_RMS_SOURCE_CODE_HASH,
@@ -46,17 +47,23 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     DENSE_RMS_SOURCE_SUCCESS_SHA256,
     DENSE_RMS_SOURCE_SUMMARY_SHA256,
     DENSE_RMS_SOURCE_TAG,
+    IntegratedDenseWeights,
     StrategyNdFingerprintConfig,
     accepted_tp32_model_axis_device_ids,
     array_sha256,
     benchmark_collective_chain,
     build_collective_chain,
     build_strategy_nd_dense_rms_replay,
+    build_integrated_dense_rms,
     build_strategy_nd_fingerprint,
     execute_strategy_nd_dense_rms_replay,
+    execute_integrated_dense_rms,
     execute_strategy_nd_fingerprint,
     generate_strategy_nd_input_bits,
     load_dense_rms_inputs,
+    load_integrated_dense_rms_inputs,
+    model_axis_weights_to_physical,
+    validate_integrated_checkpoint_success,
     model_axis_to_physical_input_bits,
     replay_db533_strategy_nd_row0_bits,
     validate_strategy_nd_fingerprint_hlo,
@@ -135,6 +142,7 @@ def parse_args() -> argparse.Namespace:
             "strategy_nd_fingerprint",
             "strategy_nd_dense_replay",
             "strategy_nd_dense_rms_replay",
+            "strategy_nd_integrated_dense_rms",
         ),
         default="chain",
     )
@@ -169,6 +177,15 @@ def parse_args() -> argparse.Namespace:
         "--association-rms-input",
         type=Path,
         help="sealed residual/norm/target NPZ for strategy_nd_dense_rms_replay",
+    )
+    parser.add_argument(
+        "--checkpoint-root",
+        type=Path,
+        help="exact local final-layout checkpoint root for integrated dense RMS",
+    )
+    parser.add_argument(
+        "--checkpoint-manifest-sha256",
+        help="exact runtime manifest hash for integrated dense RMS",
     )
     parser.add_argument(
         "--allow-unprotected-test-config",
@@ -577,6 +594,225 @@ def _run_strategy_nd_dense_rms_replay(
     }
 
 
+def _run_strategy_nd_integrated_dense_rms(
+    args: argparse.Namespace,
+    jax: Any,
+    multihost_utils: Any,
+    topology: Any,
+) -> dict[str, Any]:
+    """Keep real rank-local contractions, StrategyND, and both RMS boundaries live."""
+
+    from scripts.greenfield.probe_layer0_dense_convolution import (
+        _FINAL_DENSE_LAYOUT_RECORDS,
+        _pack_dense_final_layout,
+    )
+    from scripts.greenfield.probe_layer0_projection_reduction import (
+        _load_weights,
+    )
+
+    if (
+        args.association_rms_input is None
+        or not args.association_rms_input.is_file()
+        or args.checkpoint_root is None
+        or not args.checkpoint_root.is_dir()
+        or not args.checkpoint_manifest_sha256
+    ):
+        raise RuntimeError(
+            "integrated dense RMS requires the sealed source and checkpoint"
+        )
+    validate_integrated_checkpoint_success(args.checkpoint_root)
+    physical_ids = tuple(sorted(device.device_id for device in topology.devices))
+    if physical_ids != tuple(range(32)):
+        raise RuntimeError("integrated dense RMS requires physical ids 0..31")
+    weights, checkpoint_records = _load_weights(
+        args.checkpoint_root,
+        manifest_sha256=args.checkpoint_manifest_sha256,
+    )
+    packed, packed_records = _pack_dense_final_layout(weights)
+    if packed_records != _FINAL_DENSE_LAYOUT_RECORDS:
+        raise RuntimeError("integrated dense final-layout records drifted")
+    inputs = load_integrated_dense_rms_inputs(
+        args.association_rms_input,
+        weights["attention.slot_00.post_norm"],
+    )
+    model_axis_device_ids = accepted_tp32_model_axis_device_ids(jax.devices())
+    physical_weights = IntegratedDenseWeights(
+        **{
+            name: model_axis_weights_to_physical(
+                value.reshape((32, 1) + value.shape[2:]),
+                model_axis_device_ids,
+            )
+            for name, value in zip(
+                ("merged_bits", "merged_scale", "down_bits", "down_scale"),
+                packed,
+                strict=True,
+            )
+        }
+    )
+    label = "strategy_nd_integrated_dense_rms_bfloat16_32x6144"
+    multihost_utils.sync_global_devices(f"greenfield-integrated-start-{label}")
+    compiled = build_integrated_dense_rms(
+        physical_ids,
+        devices=jax.devices(),
+        validate_hlo=True,
+    )
+    stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
+    optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
+    fleet_stablehlo_hashes = _fleet_digest(
+        multihost_utils,
+        stablehlo_sha,
+        label="integrated dense RMS StableHLO",
+        num_processes=args.num_processes,
+    )
+    fleet_hlo_hashes = _fleet_digest(
+        multihost_utils,
+        optimized_hlo_sha,
+        label="integrated dense RMS optimized HLO",
+        num_processes=args.num_processes,
+    )
+    output_bits, capture = execute_integrated_dense_rms(
+        compiled,
+        physical_weights,
+        inputs,
+    )
+    expected_bits = inputs.accepted_layer1_bits
+    mismatch_indices = np.flatnonzero(output_bits != expected_bits)
+    first = None if not len(mismatch_indices) else int(mismatch_indices[0])
+    observed_values = (
+        output_bits.astype(np.uint32) << np.uint32(16)
+    ).view(np.float32)
+    expected_values = (
+        expected_bits.astype(np.uint32) << np.uint32(16)
+    ).view(np.float32)
+    absolute_error = np.abs(observed_values - expected_values)
+    output_raw_sha = _raw_array_sha256(output_bits)
+    expected_raw_sha = _raw_array_sha256(expected_bits)
+    db548_control_sha = (
+        "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005"
+    )
+    db549_rejected_sha = (
+        "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
+    )
+    classification = (
+        "integrated_dense_rms_exact_accepted"
+        if first is None
+        else "integrated_dense_rms_matches_db548_control"
+        if output_raw_sha == db548_control_sha
+        else "integrated_dense_rms_matches_rejected_db549"
+        if output_raw_sha == db549_rejected_sha
+        else "integrated_dense_rms_nonexact_new_result"
+    )
+    comparison = {
+        "classification": classification,
+        "elementwise_exact": first is None,
+        "expected_hidden_2795_bfloat16_bits": int(expected_bits[2795]),
+        "expected_raw_sha256": expected_raw_sha,
+        "first_mismatch_index": first,
+        "max_absolute_error": float(np.max(absolute_error)),
+        "mean_absolute_error": float(np.mean(absolute_error, dtype=np.float64)),
+        "mismatch_count": int(len(mismatch_indices)),
+        "observed_hidden_2795_bfloat16_bits": int(output_bits[2795]),
+        "observed_raw_sha256": output_raw_sha,
+    }
+    physical_weight_hashes = {
+        name: array_sha256(getattr(physical_weights, name))
+        for name in ("merged_bits", "merged_scale", "down_bits", "down_scale")
+    }
+    stable_hashes = {
+        "accepted_target": array_sha256(expected_bits),
+        "attention_update": array_sha256(inputs.attention_update_bits),
+        "combined_residual": array_sha256(inputs.combined_residual_bits),
+        "layer1_norm": array_sha256(inputs.layer1_norm_bits),
+        "post_attention_norm": array_sha256(inputs.post_attention_norm_bits),
+        "output": array_sha256(output_bits),
+        **{
+            f"physical_{name}": digest
+            for name, digest in physical_weight_hashes.items()
+        },
+    }
+    fleet_hashes = {
+        key: _fleet_digest(
+            multihost_utils,
+            value,
+            label=f"integrated dense RMS {key}",
+            num_processes=args.num_processes,
+        )
+        for key, value in stable_hashes.items()
+    }
+    artifact_manifest: dict[str, Any] = {}
+    replay_dir = args.output.parent / "integrated_dense_rms"
+    hlo_dir = args.output.parent / "hlo"
+    if jax.process_index() == 0:
+        hlo_dir.mkdir(parents=True, exist_ok=True)
+        stablehlo_path = hlo_dir / f"{label}.stablehlo.mlir"
+        optimized_hlo_path = hlo_dir / f"{label}.optimized_hlo.txt"
+        contract_path = hlo_dir / f"{label}.hlo_contract.json"
+        stablehlo_path.write_text(compiled.stablehlo)
+        optimized_hlo_path.write_text(compiled.optimized_hlo)
+        _atomic_write(
+            contract_path,
+            {
+                "optimized": dict(compiled.optimized_hlo_contract),
+                "stablehlo": dict(compiled.stablehlo_contract),
+                "valid": True,
+            },
+        )
+        paths = {
+            "accepted_layer1_bits": replay_dir / "accepted_layer1_bits.npy",
+            "hardware_layer1_bits": replay_dir / "hardware_layer1_bits.npy",
+        }
+        for name, path in paths.items():
+            _atomic_save(
+                path,
+                expected_bits if name == "accepted_layer1_bits" else output_bits,
+            )
+            value = np.load(path, allow_pickle=False)
+            artifact_manifest[name] = {
+                "array_sha256": array_sha256(value),
+                "dtype": value.dtype.str,
+                "file": path.name,
+                "file_sha256": _file_sha256(path),
+                "shape": list(value.shape),
+            }
+        _atomic_write(replay_dir / "comparison.json", comparison)
+        _atomic_write(replay_dir / "manifest.json", artifact_manifest)
+    multihost_utils.sync_global_devices(f"greenfield-integrated-end-{label}")
+    print(
+        "GREENFIELD_STRATEGY_ND_INTEGRATED_DENSE_RMS_OK "
+        f"launch_process={args.process_id} jax_process={jax.process_index()} "
+        f"classification={classification} mismatches={len(mismatch_indices)} "
+        f"hlo={optimized_hlo_sha}",
+        flush=True,
+    )
+    return {
+        "accepted_model_axis_device_ids": list(model_axis_device_ids),
+        "accepted_model_axis_recipe": ACCEPTED_TP32_MODEL_AXIS_RECIPE,
+        "artifact_manifest": artifact_manifest,
+        "capture": dict(capture),
+        "checkpoint_records": checkpoint_records,
+        "collective_groups": [list(physical_ids)],
+        "comparison": comparison,
+        "diagnostic_only": True,
+        "final_layout_records": packed_records,
+        "fleet_hashes": fleet_hashes,
+        "fleet_hlo_hashes": fleet_hlo_hashes,
+        "fleet_stablehlo_hashes": fleet_stablehlo_hashes,
+        "member_device_ids": list(physical_ids),
+        "optimized_hlo_contract": dict(compiled.optimized_hlo_contract),
+        "optimized_hlo_sha256": optimized_hlo_sha,
+        "performance_claim": False,
+        "physical_weight_hashes": physical_weight_hashes,
+        "source": {
+            "checkpoint_manifest_sha256": args.checkpoint_manifest_sha256,
+            "checkpoint_success_sha256": CHECKPOINT_SUCCESS_SHA256,
+            "rms_npz_sha256": DENSE_RMS_SOURCE_NPZ_SHA256,
+            "rms_tag": DENSE_RMS_SOURCE_TAG,
+        },
+        "stablehlo_contract": dict(compiled.stablehlo_contract),
+        "stablehlo_sha256": stablehlo_sha,
+    }
+
+
 def _run_strategy_nd_fingerprint(
     args: argparse.Namespace,
     jax: Any,
@@ -800,6 +1036,7 @@ def main() -> int:
         "strategy_nd_fingerprint",
         "strategy_nd_dense_replay",
         "strategy_nd_dense_rms_replay",
+        "strategy_nd_integrated_dense_rms",
     }
     if args.mode in strategy_nd_modes and (
         tuple(args.groups) != (32,)
@@ -814,6 +1051,7 @@ def main() -> int:
     if args.mode in {
         "strategy_nd_dense_replay",
         "strategy_nd_dense_rms_replay",
+        "strategy_nd_integrated_dense_rms",
     } and args.association_trials != 1:
         raise ValueError("StrategyND real-data replay requires association-trials=1")
     if args.mode not in {
@@ -821,10 +1059,19 @@ def main() -> int:
         "strategy_nd_dense_rms_replay",
     } and args.association_replay_input:
         raise ValueError("association replay input is valid only for real-data replay")
-    if args.mode != "strategy_nd_dense_rms_replay" and args.association_rms_input:
+    rms_modes = {
+        "strategy_nd_dense_rms_replay",
+        "strategy_nd_integrated_dense_rms",
+    }
+    if args.mode not in rms_modes and args.association_rms_input:
         raise ValueError("association RMS input is valid only for dense RMS replay")
-    if args.mode == "strategy_nd_dense_rms_replay" and not args.association_rms_input:
+    if args.mode in rms_modes and not args.association_rms_input:
         raise ValueError("dense RMS replay requires association-rms-input")
+    if args.mode == "strategy_nd_integrated_dense_rms":
+        if not args.checkpoint_root or not args.checkpoint_manifest_sha256:
+            raise ValueError("integrated dense RMS requires exact checkpoint inputs")
+    elif args.checkpoint_root or args.checkpoint_manifest_sha256:
+        raise ValueError("checkpoint inputs are valid only for integrated dense RMS")
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(
@@ -836,6 +1083,7 @@ def main() -> int:
     if args.mode in {
         "strategy_nd_dense_replay",
         "strategy_nd_dense_rms_replay",
+        "strategy_nd_integrated_dense_rms",
     } and not run_tag:
         raise RuntimeError("StrategyND real-data replay requires GLM_GREENFIELD_RUN_TAG")
 
@@ -865,6 +1113,7 @@ def main() -> int:
         association_fingerprint = None
         association_dense_replay = None
         association_dense_rms_replay = None
+        association_integrated_dense_rms = None
         matrix = []
         if args.mode == "strategy_nd_fingerprint":
             association_fingerprint = _run_strategy_nd_fingerprint(
@@ -877,6 +1126,12 @@ def main() -> int:
         elif args.mode == "strategy_nd_dense_rms_replay":
             association_dense_rms_replay = _run_strategy_nd_dense_rms_replay(
                 args, jax, multihost_utils, topology
+            )
+        elif args.mode == "strategy_nd_integrated_dense_rms":
+            association_integrated_dense_rms = (
+                _run_strategy_nd_integrated_dense_rms(
+                    args, jax, multihost_utils, topology
+                )
             )
         else:
             for group_size in args.groups:
@@ -976,7 +1231,9 @@ def main() -> int:
             "mode": args.mode,
             "run_tag": run_tag,
             "schema_version": (
-                4
+                5
+                if association_integrated_dense_rms is not None
+                else 4
                 if association_dense_rms_replay is not None
                 else 3
                 if association_dense_replay is not None
@@ -989,6 +1246,10 @@ def main() -> int:
         }
         if association_dense_rms_replay is not None:
             record["association_dense_rms_replay"] = association_dense_rms_replay
+        if association_integrated_dense_rms is not None:
+            record["association_integrated_dense_rms"] = (
+                association_integrated_dense_rms
+            )
         _atomic_write(args.output, record)
         print(
             "GREENFIELD_COLLECTIVE_HOST_OK "

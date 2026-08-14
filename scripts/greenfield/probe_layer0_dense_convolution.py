@@ -749,6 +749,7 @@ def _validate_optimized_hlo(
     dense_envelope: bool = False,
     split_layer1_rms: bool = False,
     isolated_dense: bool = False,
+    integrated_dense_rms: bool = False,
     accepted_gate_singleton: bool = False,
     accepted_gate_dequant_fusion: bool = False,
 ) -> dict[str, Any]:
@@ -760,7 +761,8 @@ def _validate_optimized_hlo(
     if compile_rows not in (1, 32):
         raise ValueError("dense optimized-HLO compile rows must be 1 or 32")
     if final_dense_layout and (
-        compile_rows != 32 or (not layer1_only and not isolated_dense)
+        compile_rows != 32
+        or (not layer1_only and not isolated_dense and not integrated_dense_rms)
     ):
         raise ValueError(
             "final-layout dense optimized-HLO proof requires M32 layer1-only"
@@ -785,12 +787,23 @@ def _validate_optimized_hlo(
         raise ValueError(
             "isolated dense proof requires the M32 final-layout envelope"
         )
-    if accepted_gate_singleton and not isolated_dense:
+    if integrated_dense_rms and not (
+        compile_rows == 32
+        and final_dense_layout
+        and dense_envelope
+        and not layer1_only
+        and not isolated_dense
+        and not split_layer1_rms
+    ):
         raise ValueError(
-            "accepted gate singleton proof requires isolated dense mode"
+            "integrated dense RMS proof requires the M32 final-layout envelope"
+        )
+    if accepted_gate_singleton and not (isolated_dense or integrated_dense_rms):
+        raise ValueError(
+            "accepted gate singleton proof requires a one-rank dense mode"
         )
     if accepted_gate_dequant_fusion and not (
-        isolated_dense and accepted_gate_singleton
+        (isolated_dense or integrated_dense_rms) and accepted_gate_singleton
     ):
         raise ValueError(
             "accepted gate dequant fusion proof requires the isolated "
@@ -1068,7 +1081,7 @@ def _validate_optimized_hlo(
                 3 if dense_envelope else 2,
                 (
                     "f8e4m3fn[1,1,6144,768]"
-                    if isolated_dense
+                    if isolated_dense or integrated_dense_rms
                     else "f8e4m3fn[1,8,6144,768]"
                 ),
             ),
@@ -1076,7 +1089,7 @@ def _validate_optimized_hlo(
                 4 if dense_envelope else 3,
                 (
                     "f32[1,1,48,768]"
-                    if isolated_dense
+                    if isolated_dense or integrated_dense_rms
                     else "f32[1,8,48,768]"
                 ),
             ),
@@ -1086,7 +1099,7 @@ def _validate_optimized_hlo(
                 5 if dense_envelope else 4,
                 (
                     "f8e4m3fn[1,1,384,6144]"
-                    if isolated_dense
+                    if isolated_dense or integrated_dense_rms
                     else "f8e4m3fn[1,8,384,6144]"
                 ),
             ),
@@ -1094,7 +1107,7 @@ def _validate_optimized_hlo(
                 6 if dense_envelope else 5,
                 (
                     "f32[1,1,3,6144]"
-                    if isolated_dense
+                    if isolated_dense or integrated_dense_rms
                     else "f32[1,8,3,6144]"
                 ),
             ),
@@ -1378,7 +1391,7 @@ def _validate_optimized_hlo(
                 if item.raw_opcode == "parameter":
                     if item.computation.startswith("ENTRY "):
                         return item is expected and (
-                            selected_rank or isolated_dense
+                            selected_rank or isolated_dense or integrated_dense_rms
                         )
                     return walk(external_parameter_value(item), selected_rank)
                 if item.raw_opcode == "fusion":
@@ -1932,13 +1945,26 @@ def _validate_optimized_hlo(
     scoped = [
         item
         for item in collectives
-        if "greenfield_strategy_nd_row0_dense_convolution_down"
-        in (item.op_name or "").split("/")
+        if (
+            "greenfield_strategy_nd_row0_dense_convolution_down"
+            in (item.op_name or "").split("/")
+            or (
+                integrated_dense_rms
+                and "integrated_dense_rms_strategy_nd_collective"
+                in (item.op_name or "").split("/")
+            )
+        )
     ]
     violations = []
-    expected_virtual_ranks = {0} if isolated_dense else set(range(8))
+    expected_virtual_ranks = (
+        {0} if isolated_dense or integrated_dense_rms else set(range(8))
+    )
     expected_convolution_count = len(expected_virtual_ranks)
-    if module.num_partitions != 4 or module.num_replicas not in (None, 1):
+    expected_partitions = 32 if integrated_dense_rms else 4
+    if (
+        module.num_partitions != expected_partitions
+        or module.num_replicas not in (None, 1)
+    ):
         violations.append("optimized module cardinality drifted")
     if (
         len(gate_up) != expected_convolution_count
@@ -2005,9 +2031,23 @@ def _validate_optimized_hlo(
     if async_collectives:
         violations.append(f"async collectives are forbidden: {async_collectives}")
 
-    if isolated_dense:
-        if collectives:
+    if isolated_dense or integrated_dense_rms:
+        if isolated_dense and collectives:
             violations.append("isolated dense program contains a collective")
+        if integrated_dense_rms and (
+            len(collectives) != 1
+            or len(scoped) != 1
+            or scoped[0].opcode != "all-reduce"
+            or scoped[0].replica_groups != (tuple(range(32)),)
+            or not scoped[0].use_global_device_ids
+            or _shape_signatures(scoped[0].operand_shapes)
+            != ("bf16[32,6144]",)
+            or _shape_signatures(scoped[0].result_shapes)
+            != ("bf16[32,6144]",)
+        ):
+            violations.append(
+                "integrated dense program lacks one exact BF16 StrategyND collective"
+            )
 
         def value_shape(item: Any | None) -> tuple[str, tuple[int, ...]] | None:
             if item is None or len(item.result_shapes) != 1:
@@ -2820,7 +2860,27 @@ def _validate_optimized_hlo(
             }.values()
         )
         exact_result_binding = False
-        if (
+        exact_collective_input_binding = False
+        if integrated_dense_rms:
+            collective = scoped[0] if len(scoped) == 1 else None
+            collective_input = (
+                operand(collective, 0)
+                if collective is not None and len(collective.operand_names) == 1
+                else None
+            )
+            exact_carried_residual_binding = len(exact_carried_values) == 1
+            exact_collective_input_binding = bool(
+                down_external is not None
+                and collective_input is not None
+                and exact_dense_value_path(
+                    collective_input,
+                    down_external,
+                    allow_live_row_slice=False,
+                    allow_bf16_round=True,
+                )
+            )
+            exact_result_binding = exact_collective_input_binding
+        elif (
             len(roots) == 1
             and roots[0].raw_opcode == "tuple"
             and len(roots[0].operand_names) == 2
@@ -2856,7 +2916,11 @@ def _validate_optimized_hlo(
                 )
             )
         if not exact_result_binding:
-            violations.append("isolated dense exact result graph drifted")
+            violations.append(
+                "integrated dense collective input graph drifted"
+                if integrated_dense_rms
+                else "isolated dense exact result graph drifted"
+            )
 
         custom_calls = [
             item.name
@@ -2903,6 +2967,11 @@ def _validate_optimized_hlo(
             "exact_accepted_weight_layout": exact_accepted_weight_layout,
             "exact_activation_graph": exact_activation_graph,
             "exact_carried_residual_binding": exact_carried_residual_binding,
+            "exact_collective_input_binding": (
+                exact_collective_input_binding
+                if integrated_dense_rms
+                else False
+            ),
             "exact_gate_singleton_external_boundary": (
                 exact_gate_singleton_external_boundary
             ),
@@ -2913,7 +2982,8 @@ def _validate_optimized_hlo(
             "exact_result_binding": exact_result_binding,
             "final_dense_layout": final_dense_layout,
             "gate_up_convolution_count": len(gate_up),
-            "isolated_dense": True,
+            "integrated_dense_rms": integrated_dense_rms,
+            "isolated_dense": isolated_dense,
             "live_rows": 1,
             "num_partitions": module.num_partitions,
             "num_replicas": module.num_replicas,

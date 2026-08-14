@@ -19,6 +19,22 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected direct-residual replay `greenfield_strategy_nd_dense_rms_replay_20260814T165204489161611Z`
+  completed at pin `ef144e309d79bade8bf26ec93ba1160fa3f4ab31` in 34 seconds and sealed a
+  complete no-DB archive with 8/8 clean-fleet proof. Its output is exactly the already rejected
+  DB549 signature: 1,073/6,144 mismatches, first index 1, hidden-2795 expected/observed bits
+  48423/48422, and observed SHA `229dc8ac...812f` versus accepted `9936ee1e...d3039`.
+  Optimized/StableHLO SHAs are `ce41f2ff...3afe` / `aa13abab...4aba`. This conclusively rejects
+  direct post-attention residual substitution and closes all standalone StrategyND/RMS variants.
+- Exact next is one bounded integrated graph, not another capture or full 8K run. It consumes the
+  sealed DB548 attention-update/combined-residual inputs, exact post-attention norm, the real
+  final-layout layer-0 weights, layer-1 norm and target; each of the 32 chips computes one accepted
+  physical contraction, the same graph performs the BF16 StrategyND psum, and the same graph
+  executes layer-1 residual/RMS. This removes the external BF16-partial boundary while loading only
+  layer 0. If its complete 6,144-value row is exact, integrate the identical boundary and run one
+  protected 8K Gate-D confirmation. If it is nonexact, inspect only its preserved exact HLO; never
+  reopen contractions, standalone association, direct residual substitution or scalar RMS.
+
 - Protected residual-only observer attempt
   `greenfield_legacy_layer0_dense_boundary_p8155_20260814T152901147381444Z` ran at greenfield pin
   `728d865f02ea1016abd9e325f910de78a3d4a641` and legacy pin

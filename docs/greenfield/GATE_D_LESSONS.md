@@ -22,10 +22,14 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   post-attention residual, SHA `a105fdbd...99f8e`. This equality does not promote the observer or
   turn the source bundle into an accepted oracle; it only proves another hour-scale capture cannot
   supply new bytes.
-- Use those sealed bytes in the three-input model-free StrategyND/RMS graph to decide the structural
-  fusion hypothesis in seconds. Only an exact full 6,144-value output may authorize integration,
-  and Gate D remains open until the resulting complete protected 8K decoder passes DSA, trace,
-  wall, memory and integrity gates.
+- The protected direct-residual replay then exactly reproduced rejected DB549: 1,073/6,144
+  mismatches and SHA `229dc8ac...812f`. Equal external BF16 bytes do not preserve the compiler
+  context of a fused producer/consumer boundary. Direct residual substitution and every standalone
+  StrategyND/RMS variant are now closed.
+- The final bounded discriminator keeps pre-dense RMS, real final-layout contraction, the physical
+  32-chip psum and layer-1 RMS in one compiled graph. It loads layer 0 only. Only an exact full
+  6,144-value row may authorize the matching production boundary and one complete protected 8K;
+  Gate D remains open until that 8K passes DSA, trace, wall, memory and integrity gates.
 
 ## Evidence ladder
 
@@ -34,6 +38,10 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 3. Recompute all candidate arithmetic offline from sealed bits.
 4. Replay only the disputed operation on TPU with the real tensor and exact scheduled HLO.
 5. Integrate only a bitwise-exact result, then run one complete protected 8K confirmation.
+
+When a replay with byte-identical external tensors changes the result, the externalization boundary
+itself is the experiment. Move the minimum producer and consumer into one graph; do not recapture
+the same bytes or invent another scalar/association theory.
 
 A full checkpoint/8K run is forbidden while a smaller capture or replay can decide the same
 hypothesis. Compile once and replay sealed values. Keep negative results: they permanently remove
@@ -105,10 +113,11 @@ branches from the search tree.
 ## Decision after the model-free replays
 
 - Hardware row zero equals DB533 software. Freeze dense arithmetic and standalone association.
-- The global StrategyND/RMS program is mechanically valid and completes in roughly 24 seconds. Its
-  next form consumes DB548's sealed direct post-attention residual rather than reconstructing that
-  residual from separate operands. Treat the result as a structural diagnostic because the
-  residual-only observer was not DSA-exact.
+- The global StrategyND/RMS program is mechanically valid and completes in tens of seconds. Both
+  hybrid and direct-residual forms are nonexact; the direct form exactly reproduces DB549 and is
+  permanently rejected.
+- The only remaining local test is the one-graph contraction→StrategyND→RMS boundary. It reuses the
+  packed checkpoint and sealed inputs and must remain no-DB/default-off until bitwise exact.
 - Integrate only a structural boundary that makes the entire 6,144-value accepted row exact. Never
   patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
 

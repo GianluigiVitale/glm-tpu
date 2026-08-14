@@ -5,6 +5,26 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 17:05 UTC — direct residual replay rejected; one-graph boundary is the final discriminator
+
+- Reviewed/pushed pin `ef144e309d79bade8bf26ec93ba1160fa3f4ab31` completed protected tag
+  `greenfield_strategy_nd_dense_rms_replay_20260814T165204489161611Z` in 34 seconds. It consumed
+  DB550's exact 32 dense partials, DB548's sealed direct post-attention residual and the sealed
+  layer-1 norm/target. StableHLO/optimized-HLO, topology, deterministic repeat, source hashes,
+  remote object equality, `SUCCESS`-last and authenticated 8/8 cleanup all pass; no DB performance
+  row or throughput claim was created.
+- The output is not a new near miss: it exactly reproduces rejected DB549 at 1,073/6,144
+  mismatches, first index 1, maximum/mean error `0.0078125` / `3.4686963772401214e-05`, hidden-2795
+  bits 48422 versus accepted 48423, and SHA `229dc8ac...812f` versus accepted
+  `9936ee1e...d3039`. Optimized/StableHLO SHAs are `ce41f2ff...3afe` / `aa13abab...4aba`.
+  Direct residual substitution and all standalone reduction/RMS theories are closed.
+- The remaining compiler boundary is now testable without a full model: keep pre-dense residual/RMS,
+  one real final-layout contraction per physical chip, the 32-chip BF16 StrategyND psum and the
+  layer-1 residual/RMS in one compiled graph. This loads only layer-0 weights and reuses the sealed
+  inputs. Only a bitwise-exact full row authorizes production integration and one protected 8K
+  confirmation; a nonexact result must be localized from its preserved HLO rather than spawning
+  another broad or hour-scale theory.
+
 ## 2026-08-14 16:40 UTC — residual capture is observer-sensitive; switch to sealed direct replay
 
 - Protected tag `greenfield_legacy_layer0_dense_boundary_p8155_20260814T152901147381444Z`

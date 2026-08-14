@@ -569,6 +569,8 @@ def _validate_exact_dense_rms_value_flow(
     reduction: HloInstruction,
     scheduled: HloInstruction,
     root: HloInstruction,
+    *,
+    integrated_dense: bool = False,
 ) -> Mapping[str, Any]:
     """Bind sealed inputs through the exact live collective/RMS result."""
 
@@ -585,18 +587,28 @@ def _validate_exact_dense_rms_value_flow(
         and (match := re.search(r"\bparameter\(([0-9]+)\)", item.raw_line))
         is not None
     }
-    direct_residual = entry_parameters == {
+    direct_residual = not integrated_dense and entry_parameters == {
         0: (("u16", (1, 32, 6144)),),
         1: (("bf16", (1, 6144)),),
         2: (("bf16", (6144,)),),
     }
-    hybrid_control = entry_parameters == {
+    hybrid_control = not integrated_dense and entry_parameters == {
         0: (("u16", (1, 32, 6144)),),
         1: (("bf16", (1, 6144)),),
         2: (("bf16", (1, 6144)),),
         3: (("bf16", (6144,)),),
     }
-    if not (direct_residual or hybrid_control):
+    integrated_control = integrated_dense and entry_parameters == {
+        0: (("bf16", (1, 6144)),),
+        1: (("bf16", (1, 6144)),),
+        2: (("bf16", (6144,)),),
+        3: (("f8e4m3fn", (1, 1, 6144, 768)),),
+        4: (("f32", (1, 1, 48, 768)),),
+        5: (("f8e4m3fn", (1, 1, 384, 6144)),),
+        6: (("f32", (1, 1, 3, 6144)),),
+        7: (("bf16", (6144,)),),
+    }
+    if not (direct_residual or hybrid_control or integrated_control):
         raise BenchmarkValidationError("dense RMS replay ENTRY inputs drifted")
 
     def semantic_opcode(
@@ -672,10 +684,13 @@ def _validate_exact_dense_rms_value_flow(
         if addition is None or len(addition.instruction.operand_names) != 2:
             return False
         operands = [graph.operand(addition, index) for index in range(2)]
+        source_indexes = (0, 1) if integrated_control else (1, 2)
         return bool(
             any(
-                exact_padded_f32(operands[left], 1)
-                and exact_padded_f32(operands[1 - left], 2)
+                exact_padded_f32(operands[left], source_indexes[0])
+                and exact_padded_f32(
+                    operands[1 - left], source_indexes[1]
+                )
                 for left in range(2)
             )
         )
@@ -786,8 +801,12 @@ def _validate_exact_dense_rms_value_flow(
             )
         )
 
-    if len(reduction.operand_names) != 1 or not exact_partial_input(
-        graph.operand(reduction_value, 0)
+    if (
+        len(reduction.operand_names) != 1
+        or (
+            not integrated_control
+            and not exact_partial_input(graph.operand(reduction_value, 0))
+        )
     ):
         raise BenchmarkValidationError(
             "dense RMS StrategyND input is not the exact sealed BF16 partial"
@@ -980,7 +999,7 @@ def _validate_exact_dense_rms_value_flow(
             return False
         return graph.exact_parameter(
             graph.operand(value, 0),
-            2 if direct_residual else 3,
+            7 if integrated_control else 2 if direct_residual else 3,
             (("bf16", (6144,)),),
         )
 
@@ -1115,11 +1134,14 @@ def _validate_exact_dense_rms_value_flow(
     return {
         "exact_collective_input": True,
         "exact_direct_residual": direct_residual,
-        "exact_residual_round": hybrid_control,
+        "exact_residual_round": hybrid_control or integrated_control,
         "exact_reduction_operand_graph": True,
         "exact_weighted_operand_graph": True,
         "exact_result_binding": True,
         "residual_source_mode": (
+            "integrated_attention_plus_combined_residual"
+            if integrated_control
+            else
             "direct_post_attention_residual"
             if direct_residual
             else "hybrid_attention_plus_combined_control"

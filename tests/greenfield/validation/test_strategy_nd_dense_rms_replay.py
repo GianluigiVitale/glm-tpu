@@ -597,8 +597,9 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
         REPO / "scripts/greenfield/run_strategy_nd_dense_replay.sh"
     ).read_text()
     marker = (
-        '/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" '
-        '"$RMS_REPLAY" <<\'PY\'\nfrom hashlib import sha256'
+        '/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \\\n'
+        '  "$RMS_REPLAY" "$INTEGRATED_REPLAY" <<\'PY\'\n'
+        'from hashlib import sha256'
     )
     start = wrapper.index(marker) + marker.index("from hashlib")
     body = wrapper[start : wrapper.index("\nPY\n", start)]
@@ -610,6 +611,7 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
     summaries = (
         (
             "1",
+            "0",
             {
                 **common,
                 "elementwise_exact": True,
@@ -626,6 +628,7 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
         ),
         (
             "0",
+            "0",
             {
                 **common,
                 "hardware_hidden_2795_bfloat16_bits": 47808,
@@ -641,15 +644,44 @@ def test_protected_wrapper_success_heredoc_executes_both_modes(
                 },
             },
         ),
+        (
+            "0",
+            "1",
+            {
+                **common,
+                "elementwise_exact": True,
+                "expected_hidden_2795_bfloat16_bits": 48423,
+                "expected_raw_sha256": "a" * 64,
+                "mismatch_count": 0,
+                "observed_hidden_2795_bfloat16_bits": 48423,
+                "observed_raw_sha256": "a" * 64,
+                "optimized_hlo_sha256": "b" * 64,
+                "source": {
+                    "checkpoint_manifest_sha256": "e" * 64,
+                    "checkpoint_success_sha256": "9" * 64,
+                    "rms_npz_sha256": "f" * 64,
+                    "rms_tag": "unit-rms",
+                },
+                "stablehlo_sha256": "c" * 64,
+                "topology_hash": "d" * 64,
+            },
+        ),
     )
-    for mode, summary in summaries:
-        run_dir = tmp_path / mode
+    for rms_mode, integrated_mode, summary in summaries:
+        run_dir = tmp_path / f"{rms_mode}-{integrated_mode}"
         run_dir.mkdir()
         (run_dir / "summary.json").write_text(json.dumps(summary))
         for name in ("evidence.sha256", "census_post.txt", "remote_objects.json"):
             (run_dir / name).write_text(name)
         completed = subprocess.run(
-            [sys.executable, "-", str(run_dir), "gs://unit/result", mode],
+            [
+                sys.executable,
+                "-",
+                str(run_dir),
+                "gs://unit/result",
+                rms_mode,
+                integrated_mode,
+            ],
             input=body,
             text=True,
             capture_output=True,

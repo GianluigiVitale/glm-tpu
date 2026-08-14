@@ -99,6 +99,9 @@ from .strategy_nd_dense_replay import validate_strategy_nd_dense_replay
 from .strategy_nd_dense_rms_replay import (
     validate_strategy_nd_dense_rms_replay,
 )
+from .strategy_nd_integrated_dense_rms import (
+    validate_strategy_nd_integrated_dense_rms,
+)
 
 __all__ = (
     "AcceptedAttentionUpdateCaptureConfig",
@@ -169,4 +172,5 @@ __all__ = (
     "stitch_stage_local_scores",
     "validate_strategy_nd_dense_replay",
     "validate_strategy_nd_dense_rms_replay",
+    "validate_strategy_nd_integrated_dense_rms",
 )
