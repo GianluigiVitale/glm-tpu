@@ -1,4 +1,4 @@
-"""Seal the accepted layer-0 dense boundary and classify DB540."""
+"""Seal the accepted layer-0 carried residual and classify DB540."""
 
 from __future__ import annotations
 
@@ -25,9 +25,6 @@ PROBE_CODE_HASH = "2f63779309b25c71c1cc7d35ff97715ae4bf631e"
 PROBE_TAG = "greenfield_layer0_dense_convolution_20260813T005213127235575Z"
 PROBE_CLASSIFICATION = "accepted_dense_convolution_nonexact"
 PROBE_RUN_ID = 540
-PROBE_DENSE_UPDATE_SHA256 = (
-    "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc"
-)
 PROBE_POST_ATTENTION_RESIDUAL_SHA256 = (
     "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
 )
@@ -82,7 +79,6 @@ class DenseBoundaryComparisonConfig:
     expected_probe_tag: str = PROBE_TAG
     expected_position: int = POSITION
     expected_probe_run_id: int = PROBE_RUN_ID
-    expected_probe_dense_update_sha256: str = PROBE_DENSE_UPDATE_SHA256
     expected_probe_post_attention_residual_sha256: str = (
         PROBE_POST_ATTENTION_RESIDUAL_SHA256
     )
@@ -165,7 +161,7 @@ def _load_source_rows(
     )
     if len(paths) != len(config.expected_capture_process_indices):
         raise ValueError("dense-boundary capture file count drifted")
-    tensor_names = ("dense_update", "post_attention_residual")
+    tensor_names = ("post_attention_residual",)
     expected_keys = {
         "artifact_kind",
         "format_version",
@@ -191,7 +187,7 @@ def _load_source_rows(
                 raise ValueError(f"{path}: dense-boundary key set drifted")
             expected_scalars = {
                 "artifact_kind": SOURCE_KIND,
-                "format_version": 1,
+                "format_version": 2,
                 "capture_mode": "dense_boundary",
                 "process_count": config.expected_process_count,
                 "layer_name": config.expected_layer_name,
@@ -201,7 +197,6 @@ def _load_source_rows(
                 "code_hash": config.expected_legacy_code_hash,
                 "oracle_pin": config.expected_oracle_pin,
                 "model_id": config.expected_model_id,
-                "dense_update__dtype": "bfloat16",
                 "post_attention_residual__dtype": "bfloat16",
             }
             for name, expected in expected_scalars.items():
@@ -243,7 +238,7 @@ def _load_source_rows(
 def capture_accepted_dense_boundary(
     config: AcceptedDenseBoundaryCaptureConfig,
 ) -> dict[str, Any]:
-    """Validate raw observer output and seal both accepted BF16 rows."""
+    """Validate raw observer output and seal the accepted residual row."""
 
     _require_digest(config.expected_legacy_code_hash, length=40, name="legacy code hash")
     _require_digest(config.expected_oracle_pin, length=40, name="oracle pin")
@@ -269,7 +264,7 @@ def capture_accepted_dense_boundary(
         "capture_mode": "dense_boundary",
         "capture_process_indices": list(config.expected_capture_process_indices),
         "diagnostic_only": True,
-        "format_version": 1,
+        "format_version": 2,
         "layer_name": config.expected_layer_name,
         "legacy_code_hash": config.expected_legacy_code_hash,
         "model_id": config.expected_model_id,
@@ -306,7 +301,7 @@ def _load_capture(
         "capture_mode": "dense_boundary",
         "capture_process_indices": [0],
         "diagnostic_only": True,
-        "format_version": 1,
+        "format_version": 2,
         "layer_name": LAYER_NAME,
         "legacy_code_hash": config.expected_legacy_code_hash,
         "model_id": MODEL_ID,
@@ -338,7 +333,7 @@ def _load_capture(
         or _file_sha256(tensor_path) != file_record.get("sha256")
     ):
         raise ValueError("accepted dense-boundary tensor file drifted")
-    names = ("dense_update", "post_attention_residual")
+    names = ("post_attention_residual",)
     with np.load(tensor_path, allow_pickle=False) as payload:
         if set(payload.files) != {f"{name}_bfloat16_bits" for name in names}:
             raise ValueError("accepted dense-boundary tensor keys drifted")
@@ -388,7 +383,6 @@ def compare_dense_boundary_candidate(
         (config.expected_probe_tensor_sha256, "probe tensor"),
         (config.expected_probe_summary_sha256, "probe summary"),
         (config.expected_probe_success_sha256, "probe SUCCESS"),
-        (config.expected_probe_dense_update_sha256, "probe dense update"),
         (
             config.expected_probe_post_attention_residual_sha256,
             "probe post-attention residual",
@@ -472,9 +466,6 @@ def compare_dense_boundary_candidate(
         }
         if set(payload.files) != expected_keys:
             raise ValueError("dense-convolution tensor keys drifted")
-        candidate_dense = np.ascontiguousarray(
-            payload["dense_update_bfloat16_bits"]
-        )
         candidate_residual = np.ascontiguousarray(
             payload["post_attention_residual_bfloat16_bits"]
         )
@@ -485,14 +476,12 @@ def compare_dense_boundary_candidate(
             payload["layer1_normalized_bfloat16_bits"]
         )
     if (
-        candidate_dense.shape != (1, WIDTH)
-        or candidate_residual.shape != (1, WIDTH)
+        candidate_residual.shape != (1, WIDTH)
         or accepted_layer1.shape != (WIDTH,)
         or candidate_layer1.shape != (WIDTH,)
         or any(
             value.dtype != np.dtype(np.uint16)
             for value in (
-                candidate_dense,
                 candidate_residual,
                 accepted_layer1,
                 candidate_layer1,
@@ -500,10 +489,7 @@ def compare_dense_boundary_candidate(
         )
     ):
         raise ValueError("dense-convolution candidate shapes drifted")
-    candidate_dense = candidate_dense[0]
     candidate_residual = candidate_residual[0]
-    if _array_sha256(candidate_dense) != config.expected_probe_dense_update_sha256:
-        raise ValueError("dense-convolution dense-update identity drifted")
     if (
         _array_sha256(candidate_residual)
         != config.expected_probe_post_attention_residual_sha256
@@ -516,8 +502,7 @@ def compare_dense_boundary_candidate(
     if not all(
         np.isfinite(_decode(value)).all()
         for value in (
-            candidate_dense[0],
-            candidate_residual[0],
+            candidate_residual,
             accepted_layer1,
             candidate_layer1,
         )
@@ -527,24 +512,19 @@ def compare_dense_boundary_candidate(
     if observed_layer1["elementwise_exact"] or layer1 != observed_layer1:
         raise ValueError("dense-convolution layer1 verdict drifted")
     residual = _comparison(accepted["post_attention_residual"], candidate_residual)
-    dense = _comparison(accepted["dense_update"], candidate_dense)
     if not residual["elementwise_exact"]:
         classification = "post_attention_residual_nonexact"
         first_open = "layer0_post_attention_residual"
-    elif dense["elementwise_exact"]:
-        classification = "dense_update_exact_layer1_fused_norm_open"
-        first_open = "layer1_fused_add_rmsnorm"
     else:
-        classification = "dense_mlp_output_nonexact"
-        first_open = "dense_mlp_input_or_arithmetic"
+        classification = "post_attention_residual_exact_layer1_boundary_open"
+        first_open = "layer1_fused_add_rmsnorm"
     result: dict[str, Any] = {
         "artifact_kind": COMPARISON_KIND,
         "accepted_capture_manifest_sha256": capture["manifest_sha256"],
         "classification": classification,
-        "dense_update": dense,
         "diagnostic_only": True,
         "first_open_boundary": first_open,
-        "format_version": 1,
+        "format_version": 2,
         "legacy_code_hash": config.expected_legacy_code_hash,
         "oracle_pin": config.expected_oracle_pin,
         "performance_claim": False,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare the accepted layer-0 dense boundary with protected DB540."""
+"""Compare the accepted layer-0 carried residual with protected DB540."""
 
 from __future__ import annotations
 

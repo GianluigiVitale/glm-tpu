@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seal the accepted layer-0 MLP output and carried residual rows."""
+"""Seal the accepted layer-0 carried residual without observing dense output."""
 
 from __future__ import annotations
 

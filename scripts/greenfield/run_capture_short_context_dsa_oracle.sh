@@ -145,12 +145,10 @@ elif [[ $INTERNAL_CAPTURE == 1 ]]; then
     readonly OBSERVER_COMMIT_DISTANCE=11
     readonly LEGACY_PIN=0c2f7f28a075a51f5eb51dc98bbb74e363d3290f
   elif [[ $DENSE_BOUNDARY_CAPTURE == 1 ]]; then
-    # The later dense-partial observer preserves the already-reviewed
-    # dense-boundary hook byte-for-byte and is the clean branch head deployed
-    # by the shared protected wrapper.
-    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-4e3aa9666
-    readonly OBSERVER_COMMIT_DISTANCE=12
-    readonly LEGACY_PIN=4e3aa9666cefa38deba9c2824d5125c2e32ab2cf
+    # The residual-only contract must never materialize the dense output.
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-2c4fbc155
+    readonly OBSERVER_COMMIT_DISTANCE=13
+    readonly LEGACY_PIN=2c4fbc155157ad52a4e61cf59f92984d1101e142
   elif [[ $ATTENTION_UPDATE_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-23ab8780f
     readonly OBSERVER_COMMIT_DISTANCE=9
@@ -771,11 +769,12 @@ runtime_started=0
 post_census_done=0
 terminal_success_done=0
 
-rollback_dense_partial_db() {
+rollback_internal_capture_db() {
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
     "$RESULTS_DB" "$TAG" "$HARNESS_SHORT" "$ORACLE_SHORT" \
     "$LEGACY_PIN" "$LEGACY_SHORT" "$ORACLE_PIN" "$REMOTE_PREFIX" \
     "$DUMP_PREFIX" "$INTERNAL_DUMP_PREFIX" \
+    "$INTERNAL_MODE" \
     >"$RUN_DIR/provisional_db_rollback.txt" 2>&1 <<'PY'
 from pathlib import Path
 import sys
@@ -796,6 +795,7 @@ print(rollback_dense_partial_oracle_run(DensePartialsRollbackConfig(
     expected_remote_prefix=sys.argv[8],
     expected_dump_prefix=sys.argv[9],
     expected_internal_dump_prefix=sys.argv[10],
+    expected_internal_mode=sys.argv[11],
 )))
 PY
 }
@@ -808,12 +808,13 @@ on_exit() {
   if [[ $post_census_done -eq 0 ]]; then
     strict_census failure_exit || true
   fi
-  if [[ $status -ne 0 && $DENSE_PARTIAL_CAPTURE -eq 1 && \
+  if [[ $status -ne 0 && \
+        $((DENSE_PARTIAL_CAPTURE + DENSE_BOUNDARY_CAPTURE)) -eq 1 && \
         $terminal_success_done -eq 0 ]]; then
-    if rollback_dense_partial_db; then
-      say "authenticated provisional dense-partial DB rollback complete"
+    if rollback_internal_capture_db; then
+      say "authenticated provisional internal-capture DB rollback complete"
     else
-      say "WARNING: provisional dense-partial DB rollback refused; preserving row for diagnosis"
+      say "WARNING: provisional internal-capture DB rollback refused; preserving row for diagnosis"
     fi
   fi
   if [[ $status -ne 0 ]]; then
@@ -2081,13 +2082,14 @@ if sys.argv[8] == "1":
             "dsa_event_tensors_exact": "true",
         })
     elif mode == "dense_boundary":
+        import numpy as np
+
         capture_path = root / "dense_boundary_capture" / "capture.json"
         comparison_path = (
             root / "dense_boundary_comparison" / "comparison.json"
         )
         capture = json.loads(capture_path.read_text())
         comparison = json.loads(comparison_path.read_text())
-        dense = comparison["dense_update"]
         residual = comparison["post_attention_residual"]
         expected_capture_keys = {
             "artifact_kind",
@@ -2113,7 +2115,6 @@ if sys.argv[8] == "1":
             "accepted_capture_manifest_sha256",
             "artifact_kind",
             "classification",
-            "dense_update",
             "diagnostic_only",
             "first_open_boundary",
             "format_version",
@@ -2139,16 +2140,16 @@ if sys.argv[8] == "1":
             or capture["capture_process_indices"] != [0]
             or capture["diagnostic_only"] is not True
             or capture["performance_claim"] is not False
+            or capture["format_version"] != 2
             or capture["legacy_code_hash"] != sys.argv[4]
             or capture["oracle_pin"]
             != "b3c25df47ac98783912dc658878181ec0a8ae16d"
             or capture["position"] != 8155
-            or set(capture["tensors"])
-            != {"dense_update", "post_attention_residual"}
-            or any(
-                value["shape"] != [6144]
-                for value in capture["tensors"].values()
-            )
+            or capture["process_count"] != 8
+            or capture["run_tag"] != sys.argv[22]
+            or capture["model_id"] != "zai-org/GLM-5.2-FP8"
+            or capture["layer_name"] != "model.layers.0.self_attn.attn"
+            or set(capture["tensors"]) != {"post_attention_residual"}
             or type(comparison) is not dict
             or set(comparison) != expected_comparison_keys
             or comparison["manifest_sha256"] != manifest_sha256(comparison)
@@ -2156,7 +2157,7 @@ if sys.argv[8] == "1":
             != capture["manifest_sha256"]
             or comparison["artifact_kind"]
             != "glm52_accepted_greenfield_dense_boundary_comparison"
-            or comparison["format_version"] != 1
+            or comparison["format_version"] != 2
             or comparison["legacy_code_hash"] != sys.argv[4]
             or comparison["oracle_pin"] != capture["oracle_pin"]
             or comparison["position"] != 8155
@@ -2165,15 +2166,12 @@ if sys.argv[8] == "1":
             or comparison["performance_claim"] is not False
             or comparison["classification"] not in {
                 "post_attention_residual_nonexact",
-                "dense_update_exact_layer1_fused_norm_open",
-                "dense_mlp_output_nonexact",
+                "post_attention_residual_exact_layer1_boundary_open",
             }
             or comparison["first_open_boundary"] not in {
                 "layer0_post_attention_residual",
                 "layer1_fused_add_rmsnorm",
-                "dense_mlp_input_or_arithmetic",
             }
-            or not valid_dense_boundary_numeric(dense)
             or not valid_dense_boundary_numeric(residual)
             or comparison["probe"] != {
                 "code_hash": "2f63779309b25c71c1cc7d35ff97715ae4bf631e",
@@ -2186,21 +2184,132 @@ if sys.argv[8] == "1":
             }
         ):
             raise SystemExit("dense-boundary comparison evidence drifted")
+        tensor_record = capture["tensors"]["post_attention_residual"]
+        tensor_file = capture["tensor_file"]
+        process_files = capture["process_files"]
+        source_relative = (
+            process_files[0].get("path")
+            if type(process_files) is list and len(process_files) == 1
+            and type(process_files[0]) is dict
+            else None
+        )
+        source_parts = (
+            Path(source_relative).parts
+            if type(source_relative) is str
+            else ()
+        )
+        expected_source_name = (
+            "internals.model_layers_0_self_attn_attn.position8155.proc0.npz"
+        )
+        if (
+            type(tensor_record) is not dict
+            or set(tensor_record) != {"shape", "sha256"}
+            or tensor_record["shape"] != [6144]
+            or not is_sha256(tensor_record["sha256"])
+            or type(tensor_file) is not dict
+            or set(tensor_file) != {"byte_count", "filename", "sha256"}
+            or tensor_file["filename"] != "dense_boundary.npz"
+            or type(tensor_file["byte_count"]) is not int
+            or tensor_file["byte_count"] <= 0
+            or not is_sha256(tensor_file["sha256"])
+            or type(process_files) is not list
+            or len(process_files) != 1
+            or type(process_files[0]) is not dict
+            or set(process_files[0])
+            != {"byte_count", "path", "process_index", "sha256"}
+            or process_files[0]["process_index"] != 0
+            or type(process_files[0]["byte_count"]) is not int
+            or process_files[0]["byte_count"] <= 0
+            or not is_sha256(process_files[0]["sha256"])
+            or len(source_parts) != 2
+            or source_parts[0] not in {f"w{rank}" for rank in range(8)}
+            or source_parts[1] != expected_source_name
+        ):
+            raise SystemExit("dense-boundary capture ledger drifted")
+        tensor_path = capture_path.parent / tensor_file["filename"]
+        source_path = root / "source_dumps" / process_files[0]["path"]
+        if (
+            not tensor_path.is_file()
+            or tensor_path.stat().st_size != tensor_file["byte_count"]
+            or sha256(tensor_path.read_bytes()).hexdigest()
+            != tensor_file["sha256"]
+            or not source_path.is_file()
+            or source_path.stat().st_size != process_files[0]["byte_count"]
+            or sha256(source_path.read_bytes()).hexdigest()
+            != process_files[0]["sha256"]
+        ):
+            raise SystemExit("dense-boundary capture file drifted")
+        with np.load(tensor_path, allow_pickle=False) as payload:
+            if set(payload.files) != {"post_attention_residual_bfloat16_bits"}:
+                raise SystemExit("dense-boundary tensor keys drifted")
+            residual_bits = np.ascontiguousarray(
+                payload["post_attention_residual_bfloat16_bits"]
+            )
+        with np.load(source_path, allow_pickle=False) as payload:
+            expected_source_keys = {
+                "artifact_kind",
+                "format_version",
+                "capture_mode",
+                "process_index",
+                "process_count",
+                "layer_name",
+                "position",
+                "source_row",
+                "run_tag",
+                "code_hash",
+                "oracle_pin",
+                "model_id",
+                "post_attention_residual",
+                "post_attention_residual__dtype",
+            }
+            if set(payload.files) != expected_source_keys:
+                raise SystemExit("dense-boundary raw source schema drifted")
+            source_scalars = {
+                name: payload[name].item()
+                for name in expected_source_keys
+                if name not in {"post_attention_residual"}
+            }
+            source_residual_bits = np.ascontiguousarray(
+                payload["post_attention_residual"]
+            )
+        if source_scalars != {
+            "artifact_kind": "glm52_legacy_dense_boundary",
+            "format_version": 2,
+            "capture_mode": "dense_boundary",
+            "process_index": 0,
+            "process_count": 8,
+            "layer_name": "model.layers.0.self_attn.attn",
+            "position": 8155,
+            "source_row": 0,
+            "run_tag": sys.argv[22],
+            "code_hash": sys.argv[4],
+            "oracle_pin": capture["oracle_pin"],
+            "model_id": "zai-org/GLM-5.2-FP8",
+            "post_attention_residual__dtype": "bfloat16",
+        }:
+            raise SystemExit("dense-boundary raw source identity drifted")
+        residual_sha = sha256(residual_bits.tobytes(order="C")).hexdigest()
+        if (
+            residual_bits.shape != (6144,)
+            or residual_bits.dtype != np.dtype(np.uint16)
+            or not np.array_equal(source_residual_bits, residual_bits)
+            or residual_sha != tensor_record["sha256"]
+            or residual["expected_sha256"] != residual_sha
+            or residual["observed_sha256"]
+            != "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
+        ):
+            raise SystemExit("dense-boundary residual identity drifted")
         residual_exact = residual["elementwise_exact"]
-        if residual_exact:
-            expected_classification = (
-                "dense_update_exact_layer1_fused_norm_open"
-                if dense["elementwise_exact"]
-                else "dense_mlp_output_nonexact"
-            )
-            expected_boundary = (
-                "layer1_fused_add_rmsnorm"
-                if dense["elementwise_exact"]
-                else "dense_mlp_input_or_arithmetic"
-            )
-        else:
-            expected_classification = "post_attention_residual_nonexact"
-            expected_boundary = "layer0_post_attention_residual"
+        expected_classification = (
+            "post_attention_residual_exact_layer1_boundary_open"
+            if residual_exact
+            else "post_attention_residual_nonexact"
+        )
+        expected_boundary = (
+            "layer1_fused_add_rmsnorm"
+            if residual_exact
+            else "layer0_post_attention_residual"
+        )
         if (
             comparison["classification"] != expected_classification
             or comparison["first_open_boundary"] != expected_boundary
@@ -2221,9 +2330,6 @@ if sys.argv[8] == "1":
                 "manifest_sha256"
             ],
             "accepted_dense_boundary_source_file_count": sys.argv[9],
-            "accepted_dense_update_sha256": capture["tensors"][
-                "dense_update"
-            ]["sha256"],
             "accepted_post_attention_residual_sha256": capture["tensors"][
                 "post_attention_residual"
             ]["sha256"],
@@ -2235,9 +2341,6 @@ if sys.argv[8] == "1":
             "dense_boundary_comparison_manifest_sha256": comparison[
                 "manifest_sha256"
             ],
-            "dense_boundary_dense_update_exact": str(
-                dense["elementwise_exact"]
-            ).lower(),
             "dense_boundary_first_open_boundary": comparison[
                 "first_open_boundary"
             ],

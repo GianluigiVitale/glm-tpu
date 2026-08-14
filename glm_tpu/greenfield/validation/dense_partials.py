@@ -71,6 +71,7 @@ class DensePartialsRollbackConfig:
     expected_remote_prefix: str
     expected_dump_prefix: str
     expected_internal_dump_prefix: str
+    expected_internal_mode: str = "dense_partial"
     expected_prompt_sha256: str = PROTECTED_PROMPT_SHA256
     expected_raw_outputs: tuple[str, ...] = PROTECTED_RAW_OUTPUTS
 
@@ -447,7 +448,7 @@ def _rollback_environment(config: DensePartialsRollbackConfig) -> dict[str, Any]
         "GLM_DSA_DUMP_INTERNALS": config.expected_internal_dump_prefix,
         "GLM_DSA_DUMP_INTERNALS_CODE_HASH": config.expected_legacy_pin,
         "GLM_DSA_DUMP_INTERNALS_LAYER": LAYER_NAME,
-        "GLM_DSA_DUMP_INTERNALS_MODE": "dense_partial",
+        "GLM_DSA_DUMP_INTERNALS_MODE": config.expected_internal_mode,
         "GLM_DSA_DUMP_INTERNALS_MODEL_ID": MODEL_ID,
         "GLM_DSA_DUMP_INTERNALS_ORACLE_PIN": config.expected_oracle_pin,
         "GLM_DSA_DUMP_INTERNALS_POSITION": str(POSITION),
@@ -465,7 +466,7 @@ def _rollback_environment(config: DensePartialsRollbackConfig) -> dict[str, Any]
         "GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE": "0",
         "GLM_GREENFIELD_DSA_INTERNALS_CAPTURE": "1",
         "GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID": "0",
-        "GLM_GREENFIELD_DSA_INTERNALS_MODE": "dense_partial",
+        "GLM_GREENFIELD_DSA_INTERNALS_MODE": config.expected_internal_mode,
         "GLM_GREENFIELD_DSA_INTERNALS_POSITION": str(POSITION),
         "GLM_GREENFIELD_MAIN_CACHE_CAPTURE": "0",
         "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE": "0",
@@ -536,9 +537,11 @@ def _valid_timestamp(value: Any) -> bool:
 def rollback_dense_partial_oracle_run(
     config: DensePartialsRollbackConfig,
 ) -> str:
-    """Delete only an exact run/item/summary prefix from this diagnostic."""
+    """Delete only an exact dense-partial/boundary run prefix."""
     if not config.run_tag.strip():
         raise ValueError("rollback run tag must be non-empty")
+    if config.expected_internal_mode not in {"dense_partial", "dense_boundary"}:
+        raise ValueError("rollback internal mode is unsupported")
     _require_digest(config.expected_legacy_pin, length=40,
                     name="rollback legacy pin")
     _require_digest(config.expected_oracle_pin, length=40,
@@ -639,18 +642,28 @@ def rollback_dense_partial_oracle_run(
             raise ValueError("refusing summary without dense-partial item")
         expected_summaries = [
             (
-                "passkey_L8192_d0.5", asked_utc, 1, "acc", 100.0,
+                "passkey_L8192_d0.5", 1, "acc", 100.0,
                 None, None, "",
             ),
             (
-                "longctx_passkey", asked_utc, 0, "acc", 100.0,
+                "longctx_passkey", 0, "acc", 100.0,
                 None, None,
                 "aggregate over 1 cells x 1 trials; per-cell rows = passkey_L*_d*",
             ),
         ]
-        if summaries != expected_summaries[:len(summaries)]:
-            connection.rollback()
-            raise ValueError("refusing non-prefix dense-partial summary rollback")
+        for observed, expected in zip(summaries, expected_summaries, strict=False):
+            created_utc = observed[1]
+            if (
+                not _valid_timestamp(created_utc)
+                or (observed[0], *observed[2:]) != expected
+                or asked_utc is None
+                or not 0.0 <= (
+                    datetime.fromisoformat(created_utc)
+                    - datetime.fromisoformat(asked_utc)
+                ).total_seconds() <= 60.0
+            ):
+                connection.rollback()
+                raise ValueError("refusing non-prefix dense-partial summary rollback")
         connection.execute("DELETE FROM summary WHERE run_id=?", (run_id,))
         connection.execute("DELETE FROM items WHERE run_id=?", (run_id,))
         connection.execute("DELETE FROM runs WHERE run_id=?", (run_id,))

@@ -78,14 +78,13 @@ def _comparison(expected: np.ndarray, observed: np.ndarray) -> dict[str, object]
 
 def _write_source(
     path: Path,
-    dense: np.ndarray,
     residual: np.ndarray,
     **overrides: object,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fields: dict[str, np.ndarray] = {
         "artifact_kind": np.asarray("glm52_legacy_dense_boundary"),
-        "format_version": np.asarray(1, dtype=np.int64),
+        "format_version": np.asarray(2, dtype=np.int64),
         "capture_mode": np.asarray("dense_boundary"),
         "process_index": np.asarray(0, dtype=np.int64),
         "process_count": np.asarray(8, dtype=np.int64),
@@ -96,8 +95,6 @@ def _write_source(
         "code_hash": np.asarray(LEGACY_HASH),
         "oracle_pin": np.asarray(ORACLE_HASH),
         "model_id": np.asarray("zai-org/GLM-5.2-FP8"),
-        "dense_update": dense,
-        "dense_update__dtype": np.asarray("bfloat16"),
         "post_attention_residual": residual,
         "post_attention_residual__dtype": np.asarray("bfloat16"),
     }
@@ -105,12 +102,11 @@ def _write_source(
     np.savez(path, **fields)
 
 
-def _capture(tmp_path: Path, dense: np.ndarray, residual: np.ndarray) -> Path:
+def _capture(tmp_path: Path, residual: np.ndarray) -> Path:
     source = tmp_path / "source"
     safe_layer = LAYER_NAME.replace(".", "_")
     _write_source(
         source / f"internal.{safe_layer}.position8155.proc0.npz",
-        dense,
         residual,
     )
     output = tmp_path / "accepted"
@@ -221,7 +217,6 @@ def _config(
         expected_probe_code_hash=PROBE_HASH,
         expected_probe_tag=PROBE_TAG,
         expected_probe_run_id=PROBE_RUN_ID,
-        expected_probe_dense_update_sha256=_array_sha256(dense),
         expected_probe_post_attention_residual_sha256=_array_sha256(residual),
         expected_accepted_layer1_sha256=_array_sha256(accepted_layer1),
         expected_probe_layer1_sha256=_array_sha256(candidate_layer1),
@@ -237,17 +232,15 @@ def _fixture_values() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     return dense, residual, accepted_layer1, candidate_layer1
 
 
-def test_capture_seals_both_exact_rows(tmp_path: Path) -> None:
-    dense, residual, _, _ = _fixture_values()
-    output = _capture(tmp_path, dense, residual)
+def test_capture_seals_only_exact_residual(tmp_path: Path) -> None:
+    _, residual, _, _ = _fixture_values()
+    output = _capture(tmp_path, residual)
     manifest = json.loads((output / "capture.json").read_text())
     assert manifest["capture_mode"] == "dense_boundary"
-    assert set(manifest["tensors"]) == {
-        "dense_update",
-        "post_attention_residual",
-    }
+    assert manifest["format_version"] == 2
+    assert set(manifest["tensors"]) == {"post_attention_residual"}
     with np.load(output / "dense_boundary.npz", allow_pickle=False) as payload:
-        np.testing.assert_array_equal(payload["dense_update_bfloat16_bits"], dense)
+        assert set(payload.files) == {"post_attention_residual_bfloat16_bits"}
         np.testing.assert_array_equal(
             payload["post_attention_residual_bfloat16_bits"], residual
         )
@@ -258,18 +251,18 @@ def test_capture_seals_both_exact_rows(tmp_path: Path) -> None:
     [
         ({"run_tag": "wrong"}, "run_tag"),
         ({"source_row": 1}, "source_row"),
-        ({"dense_update__dtype": "float32"}, "dense_update__dtype"),
+        ({"format_version": 1}, "format_version"),
+        ({"post_attention_residual__dtype": "float32"}, "post_attention_residual__dtype"),
     ],
 )
 def test_capture_refuses_source_drift(
     tmp_path: Path, override: dict[str, object], match: str
 ) -> None:
-    dense, residual, _, _ = _fixture_values()
+    _, residual, _, _ = _fixture_values()
     source = tmp_path / "source"
     safe_layer = LAYER_NAME.replace(".", "_")
     _write_source(
         source / f"internal.{safe_layer}.position8155.proc0.npz",
-        dense,
         residual,
         **override,
     )
@@ -285,24 +278,9 @@ def test_capture_refuses_source_drift(
         )
 
 
-@pytest.mark.parametrize(
-    ("dense_exact", "classification", "boundary"),
-    [
-        (True, "dense_update_exact_layer1_fused_norm_open", "layer1_fused_add_rmsnorm"),
-        (False, "dense_mlp_output_nonexact", "dense_mlp_input_or_arithmetic"),
-    ],
-)
-def test_comparison_classifies_first_open_boundary(
-    tmp_path: Path,
-    dense_exact: bool,
-    classification: str,
-    boundary: str,
-) -> None:
+def test_comparison_classifies_exact_residual_boundary(tmp_path: Path) -> None:
     candidate_dense, residual, accepted_layer1, candidate_layer1 = _fixture_values()
-    accepted_dense = candidate_dense.copy()
-    if not dense_exact:
-        accepted_dense[7] ^= np.uint16(1)
-    accepted = _capture(tmp_path, accepted_dense, residual)
+    accepted = _capture(tmp_path, residual)
     probe = tmp_path / PROBE_TAG
     hashes = _write_probe(
         probe,
@@ -323,8 +301,9 @@ def test_comparison_classifies_first_open_boundary(
             candidate_layer1=candidate_layer1,
         )
     )
-    assert result["classification"] == classification
-    assert result["first_open_boundary"] == boundary
+    assert result["classification"] == "post_attention_residual_exact_layer1_boundary_open"
+    assert result["first_open_boundary"] == "layer1_fused_add_rmsnorm"
+    assert "dense_update" not in result
     assert result["post_attention_residual"]["elementwise_exact"] is True
     assert result["probe"] == {
         "code_hash": PROBE_HASH,
@@ -343,7 +322,7 @@ def test_comparison_classifies_residual_and_refuses_layer1_verdict_drift(
     dense, residual, accepted_layer1, candidate_layer1 = _fixture_values()
     accepted_residual = residual.copy()
     accepted_residual[9] ^= np.uint16(1)
-    accepted = _capture(tmp_path, dense, accepted_residual)
+    accepted = _capture(tmp_path, accepted_residual)
     probe = tmp_path / PROBE_TAG
     hashes = _write_probe(
         probe,
@@ -393,7 +372,7 @@ def test_comparison_classifies_residual_and_refuses_layer1_verdict_drift(
 
 def test_capture_and_comparison_are_append_only(tmp_path: Path) -> None:
     dense, residual, accepted_layer1, candidate_layer1 = _fixture_values()
-    accepted = _capture(tmp_path, dense, residual)
+    accepted = _capture(tmp_path, residual)
     with pytest.raises(FileExistsError, match="append-only"):
         capture_accepted_dense_boundary(
             AcceptedDenseBoundaryCaptureConfig(
@@ -438,8 +417,9 @@ def test_protected_wrapper_pins_dense_boundary_sources_and_cleanup() -> None:
     assert "GLM_GREENFIELD_DSA_INTERNALS_MODE=dense_boundary" in launcher
     assert "GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE=8k" in launcher
     for exact in (
-        "LEGACY_PIN=4e3aa9666cefa38deba9c2824d5125c2e32ab2cf",
-        "OBSERVER_COMMIT_DISTANCE=12",
+        "OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-2c4fbc155",
+        "OBSERVER_COMMIT_DISTANCE=13",
+        "LEGACY_PIN=2c4fbc155157ad52a4e61cf59f92984d1101e142",
         "DENSE_CONVOLUTION_RUN_ID=540",
         "DENSE_CONVOLUTION_CODE_HASH=2f63779309b25c71c1cc7d35ff97715ae4bf631e",
         "DENSE_CONVOLUTION_RUNNER_SHA=876353e2504d728343223f03be9092a08d2662924ceb4b88d6f09563101bad91",
@@ -448,8 +428,9 @@ def test_protected_wrapper_pins_dense_boundary_sources_and_cleanup() -> None:
         "DENSE_CONVOLUTION_SUCCESS_SHA=d4c01377daae55ea23b329b1b6dc819b9595dc80f7d35521d0cbdd7d28caa799",
     ):
         assert exact in wrapper
-    assert "later dense-partial observer preserves" in wrapper
+    assert "residual-only" in wrapper
     assert '"post_attention_residual_nonexact"' in wrapper
+    assert '"post_attention_residual_exact_layer1_boundary_open"' in wrapper
     assert '"layer0_post_attention_residual"' in wrapper
     assert '"dense_boundary_residual_exact": str(residual_exact).lower()' in wrapper
     assert wrapper.index("protected DB540 live DB identity drifted") < wrapper.index(
@@ -490,13 +471,54 @@ def _run_dense_boundary_terminal(
     (root / "remote_objects.json").write_text("{}\n")
     (root / "dsa_exact_comparison.json").write_text('{"exact": true}\n')
 
+    zero = np.zeros((WIDTH,), dtype=np.uint16)
+    residual_observed = zero.copy()
+    if not residual_exact:
+        residual_observed[9] = np.uint16(1)
+    observed_sha = _array_sha256(residual_observed)
+    body = body.replace(
+        "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e",
+        observed_sha,
+    )
+    capture_dir = root / "dense_boundary_capture"
+    comparison_dir = root / "dense_boundary_comparison"
+    source_dir = root / "source_dumps"
+    capture_dir.mkdir()
+    comparison_dir.mkdir()
+    source_dir.mkdir()
+    tensor_path = capture_dir / "dense_boundary.npz"
+    np.savez(tensor_path, post_attention_residual_bfloat16_bits=zero)
+    source_path = (
+        source_dir
+        / "w0"
+        / "internals.model_layers_0_self_attn_attn.position8155.proc0.npz"
+    )
+    source_path.parent.mkdir()
+    np.savez(
+        source_path,
+        artifact_kind=np.asarray("glm52_legacy_dense_boundary"),
+        format_version=np.asarray(2, dtype=np.int64),
+        capture_mode=np.asarray("dense_boundary"),
+        process_index=np.asarray(0, dtype=np.int64),
+        process_count=np.asarray(8, dtype=np.int64),
+        layer_name=np.asarray(LAYER_NAME),
+        position=np.asarray(8155, dtype=np.int32),
+        source_row=np.asarray(0, dtype=np.int32),
+        run_tag=np.asarray("unit-tag"),
+        code_hash=np.asarray(LEGACY_HASH),
+        oracle_pin=np.asarray(oracle_pin),
+        model_id=np.asarray("zai-org/GLM-5.2-FP8"),
+        post_attention_residual=zero,
+        post_attention_residual__dtype=np.asarray("bfloat16"),
+    )
+
     capture: dict[str, object] = {
         "artifact_kind": "glm52_accepted_dense_boundary_capture",
         "capture_layout": "replicated_logical_live_rows",
         "capture_mode": "dense_boundary",
         "capture_process_indices": [0],
         "diagnostic_only": True,
-        "format_version": 1,
+        "format_version": 2,
         "layer_name": LAYER_NAME,
         "legacy_code_hash": LEGACY_HASH,
         "model_id": "zai-org/GLM-5.2-FP8",
@@ -505,48 +527,44 @@ def _run_dense_boundary_terminal(
         "position": 8155,
         "process_count": 8,
         "process_files": [{
-            "byte_count": 1,
-            "path": "source.proc0.npz",
+            "byte_count": source_path.stat().st_size,
+            "path": (
+                "w0/internals.model_layers_0_self_attn_attn."
+                "position8155.proc0.npz"
+            ),
             "process_index": 0,
-            "sha256": "4" * 64,
+            "sha256": _file_sha256(source_path),
         }],
-        "run_tag": "unit-dense-boundary",
+        "run_tag": "unit-tag",
         "tensor_file": {
-            "byte_count": 1,
+            "byte_count": tensor_path.stat().st_size,
             "filename": "dense_boundary.npz",
-            "sha256": "5" * 64,
+            "sha256": _file_sha256(tensor_path),
         },
         "tensors": {
-            "dense_update": {"shape": [WIDTH], "sha256": "6" * 64},
             "post_attention_residual": {
                 "shape": [WIDTH],
-                "sha256": "7" * 64,
+                "sha256": _array_sha256(zero),
             },
         },
     }
     capture["manifest_sha256"] = _manifest_sha256(capture)
-    zero = np.zeros((WIDTH,), dtype=np.uint16)
-    dense = _comparison(zero, zero)
-    residual_observed = zero.copy()
-    if not residual_exact:
-        residual_observed[9] = np.uint16(1)
     residual = _comparison(zero, residual_observed)
     comparison: dict[str, object] = {
         "accepted_capture_manifest_sha256": capture["manifest_sha256"],
         "artifact_kind": "glm52_accepted_greenfield_dense_boundary_comparison",
         "classification": (
-            "dense_update_exact_layer1_fused_norm_open"
+            "post_attention_residual_exact_layer1_boundary_open"
             if residual_exact
             else "post_attention_residual_nonexact"
         ),
-        "dense_update": dense,
         "diagnostic_only": True,
         "first_open_boundary": (
             "layer1_fused_add_rmsnorm"
             if residual_exact
             else "layer0_post_attention_residual"
         ),
-        "format_version": 1,
+        "format_version": 2,
         "legacy_code_hash": LEGACY_HASH,
         "oracle_pin": oracle_pin,
         "performance_claim": False,
@@ -574,14 +592,14 @@ def _run_dense_boundary_terminal(
         comparison["manifest_sha256"] = "0" * 64
     elif mutation == "capture_manifest":
         capture["manifest_sha256"] = "0" * 64
-    elif mutation == "dense_bool":
-        dense["elementwise_exact"] = 1
-        comparison["manifest_sha256"] = _manifest_sha256(comparison)
+    elif mutation == "old_v1_dense_bearing":
+        capture["format_version"] = 1
+        capture["tensors"]["dense_update"] = {
+            "shape": [WIDTH],
+            "sha256": "6" * 64,
+        }
+        capture["manifest_sha256"] = _manifest_sha256(capture)
 
-    capture_dir = root / "dense_boundary_capture"
-    comparison_dir = root / "dense_boundary_comparison"
-    capture_dir.mkdir()
-    comparison_dir.mkdir()
     (capture_dir / "capture.json").write_text(json.dumps(capture))
     (comparison_dir / "comparison.json").write_text(json.dumps(comparison))
     args = [
@@ -641,7 +659,7 @@ def test_dense_boundary_terminal_accepts_exact_numerical_schemas(
         "invalid_sha",
         "comparison_manifest",
         "capture_manifest",
-        "dense_bool",
+        "old_v1_dense_bearing",
     ],
 )
 def test_dense_boundary_terminal_refuses_schema_mutations(

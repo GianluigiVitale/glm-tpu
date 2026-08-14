@@ -20,6 +20,10 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   replay the already-proved accepted dense partials, physical StrategyND combine and layer-1 RMSNorm
   using only one coherent accepted event. Gate D remains open until that row and the complete 8K
   decoder are exact with trace, wall, memory and integrity evidence.
+- DB551 proved that even a non-returning callback perturbs execution if it consumes a tensor that
+  production otherwise keeps fused. Observing both the dense result and carried residual changed
+  DSA from event 1 onward. The retry must consume only the residual; DB550 already proves the dense
+  output, so it must not be observed again.
 
 ## Evidence ladder
 
@@ -47,6 +51,9 @@ branches from the search tree.
 
 - Returning or materializing an internal tensor can change fusion and reduction association.
   DB541 is invalid for exactly this reason.
+- “Non-returning” is necessary but not sufficient: adding a debug consumer can itself force
+  materialization. Capture only the smallest missing value and never observe an already-closed
+  intermediate in the same hook.
 - An oracle observation is accepted only if the observer run itself retains exact raw output and
   exact DSA events. Prefer existing consumed inputs or pre-hooks that return nothing.
 - Never treat a numerically plausible observed tensor as an oracle after the observer perturbs the
@@ -82,6 +89,9 @@ branches from the search tree.
 - Protected runs require clean code pins, exact source hashes, physical topology/host bindings,
   pre/post eight-host zero-work census, CRC-verified complete remote object equality and remote
   `SUCCESS` last. Diagnostics never become performance claims.
+- Every capture mode that can commit a provenance row must arm the same exact prefix-aware rollback
+  before model execution. A mode is incomplete if a later DSA/sealing refusal can leave an
+  unauthenticated provisional row.
 - Treat a CLI output path as part of its API: this benchmark derives sibling `hlo/` and `replay/`
   directories from the output parent. A wrapper path refactor must assert all derived artifact paths,
   not only the JSON destination. A completed device call without terminal artifact collection remains

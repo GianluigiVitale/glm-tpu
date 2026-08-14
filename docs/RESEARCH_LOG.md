@@ -8926,3 +8926,23 @@ unmotivated arithmetic variants.
   executable will consume a coherent accepted partial/residual/norm/target chain. The durable rule
   is recorded in `docs/greenfield/GATE_D_LESSONS.md`: same position/model/shape does not establish
   one event; source coherence must be validated before TPU launch.
+
+## 2026-08-14 13:46--14:59 UTC — the two-output observer perturbs DSA and is rejected
+
+- Greenfield pin `91aa411402573cbef1c98a4736b5b00d250d73de` and legacy pin
+  `4e3aa9666cefa38deba9c2824d5125c2e32ab2cf` ran the 8K capture under tag
+  `greenfield_legacy_layer0_dense_boundary_p8155_20260814T134610676758377Z`. It produced
+  provisional DB551 and the exact raw answer, but the mandatory DSA comparison refused: 557,434
+  selected-position and 573,438 selected-score entries differ, first at step 0/event 1. Decode
+  positions, producer ids, valid counts and event 0 are exact.
+- The raw internal NPZ SHA is `864b421182c5702cc9db60c104eac9cb3ad1ac90a2d4a9a859a11a847dc5c375`.
+  Dense/residual row SHAs are the greenfield DB540 values `efde8532...b4fc` / `a105fdbd...8f8e`.
+  Passing both outputs to a debug callback added a consumer, materialized the fused boundary and
+  changed later arithmetic. These plausible values are diagnostic, not an accepted oracle.
+- No accepted capture/comparison/terminal `SUCCESS` exists. Oracle manifest, DSA tensor and 8/8
+  failure-census SHAs are `e929017c...24e2`, `a823f601...e36` and `32b524d0...5110`.
+- The correction is residual-only end to end: the hook never consumes `dense_update`; raw, capture,
+  comparison and terminal schemas are exact format v2 with one BF16 residual; publication rehashes
+  the raw source and sealed NPZ and rejects v1/dense-bearing artifacts. Authenticated rollback now
+  covers the mode and accepts exactly DB551 on an isolated DB copy. One reviewed recapture is the
+  only remaining hour-scale discriminator before the seconds-scale coherent replay.

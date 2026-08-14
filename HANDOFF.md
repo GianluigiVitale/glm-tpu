@@ -4932,3 +4932,27 @@ evidence: a wrapper path refactor placed process-zero HLO/NPYs under `host_recor
 failed before terminal recomputation/archive/`SUCCESS`. Failure census is 8/8 clean. The bounded
 correction restores root output/derived artifact paths and removes only worker zero's duplicate JSON
 before publication. Exact next is correction-only review and the same seconds-scale replay.
+
+## Current exact next: residual-only accepted-boundary capture
+
+The protected two-output boundary attempt at greenfield pin `91aa411402573cbef1c98a4736b5b00d250d73de`
+and legacy pin `4e3aa9666cefa38deba9c2824d5125c2e32ab2cf`, tag
+`greenfield_legacy_layer0_dense_boundary_p8155_20260814T134610676758377Z`, produced provisional
+DB551 and the exact raw answer but was correctly rejected by the mandatory DSA comparator. Decode
+positions, producer ids and valid counts are exact; selected positions differ in 557,434 entries
+and scores in 573,438, starting at step 0/event 1. Event 0 is exact.
+
+The unsealed observer NPZ SHA is `864b4211...c375`; its dense/residual row SHAs are exactly the
+greenfield DB540 values `efde8532...b4fc` / `a105fdbd...8f8e`. This is observer effect, not an
+accepted boundary: sending `dense_update` into `jax.debug.callback` added a consumer, materialized
+the dense-to-layer-1 fusion boundary and changed later DSA. There is no accepted capture,
+comparison, terminal archive or `SUCCESS`. Oracle manifest, DSA tensor and failure-census SHAs are
+`e929017c...24e2`, `a823f601...e36` and `32b524d0...5110`; cleanup is 8/8.
+
+The paired correction observes only `post_attention_residual`, uses exact residual-only format v2
+through raw/capture/comparison/terminal records, rejects v1/dense-bearing artifacts, rehashes raw
+and sealed NPZ bytes before publication, and extends authenticated provisional-DB rollback to this
+mode. The rollback accepts only DB551 on a copied protected database; apply it live after review.
+Exact next is one bulk legacy+greenfield review, commit/push/deploy, one residual-only protected
+capture, then the already-built seconds-scale coherent StrategyND+RMS replay. Do not observe or
+retest the DB550-proven dense result.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -561,3 +562,22 @@ def test_dense_partial_rollback_default_accepts_latest_protected_raw(
     assert connection.execute(
         "SELECT COUNT(*) FROM runs WHERE run_id=543").fetchone()[0] == 0
     connection.close()
+
+
+def test_dense_boundary_rollback_uses_exact_observer_mode(tmp_path: Path) -> None:
+    path = tmp_path / "results.db"
+    dense_partial = _write_rollback_db(path, prefix=3)
+    config = replace(
+        dense_partial,
+        expected_internal_mode="dense_boundary",
+    )
+    connection = sqlite3.connect(path)
+    connection.execute(
+        "UPDATE runs SET env_json=? WHERE run_id=1",
+        (json.dumps(_rollback_environment(config)),),
+    )
+    connection.commit()
+    connection.close()
+    assert rollback_dense_partial_oracle_run(config) == (
+        "ROLLED_BACK_PROVISIONAL_DB_RUN=1"
+    )
