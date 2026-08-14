@@ -126,9 +126,52 @@ def _config(label: str) -> str:
     )
 
 
-def _optimized_hlo(*, external_gate_singleton: bool = True) -> str:
+def _optimized_hlo(
+    *,
+    external_gate_singleton: bool = True,
+    fused_gate_dequant: bool = True,
+) -> str:
     gate_computation = ""
-    if external_gate_singleton:
+    gate_decode_entry = '''  %gate_decoded = f32[6144,768]{1,0} convert(%gate_bits_flat), metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/convert_element_type"}
+  %gate_scaled = f32[6144,768]{1,0} multiply(%gate_decoded, %gate_scale_wide), metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/mul"}
+  %gate_rhs = bf16[6144,768]{1,0} convert(%gate_scaled), metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/convert_element_type"}
+'''
+    if external_gate_singleton and fused_gate_dequant:
+        gate_computation = '''gate_bits_copy_fusion {
+  %gate_bits_copy_parameter = f8e4m3fn[6144,768]{1,0} parameter(0)
+  ROOT %gate_bits_copy_root = f8e4m3fn[6144,768]{1,0} copy(%gate_bits_copy_parameter)
+}
+
+gate_dequant_fusion {
+  %gate_scale_inner = f32[6144,768]{1,0} parameter(0)
+  %gate_bits_inner = f8e4m3fn[6144,768]{1,0} parameter(1)
+  %gate_bits_copied_inner = f8e4m3fn[6144,768]{1,0} fusion(%gate_bits_inner), kind=kLoop, calls=%gate_bits_copy_fusion
+  %gate_decoded_inner = f32[6144,768]{1,0} convert(%gate_bits_copied_inner), metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/convert_element_type"}
+  %gate_scaled_inner = f32[6144,768]{1,0} multiply(%gate_scale_inner, %gate_decoded_inner), metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/mul"}
+  ROOT %gate_rhs_inner = bf16[6144,768]{1,0} convert(%gate_scaled_inner), metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/convert_element_type"}
+}
+
+gate_fusion {
+  %gate_lhs = bf16[32,6144]{1,0} parameter(0)
+  %gate_scale_parameter = f32[6144,768]{1,0} parameter(1)
+  %gate_bits_parameter = f8e4m3fn[6144,768]{1,0} parameter(2)
+  %gate_rhs_internal = bf16[6144,768]{1,0} fusion(%gate_scale_parameter, %gate_bits_parameter), kind=kLoop, calls=%gate_dequant_fusion
+  %gate_dot = f32[32,768]{1,0} convolution(%gate_lhs, %gate_rhs_internal), dim_labels=bf_io->bf, metadata={op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/conv_general_dilated"}
+  %gate_round = bf16[32,768]{1,0} convert(%gate_dot)
+  ROOT %gate_singleton_root = bf16[32,1,768]{2,0,1} reshape(%gate_round)
+}
+'''
+        gate_execution = (
+            '  %gate_singleton = bf16[32,1,768]{2,0,1} '
+            'fusion(%carried, %gate_scale_wide, %gate_bits_flat), '
+            'kind=kOutput, calls=%gate_fusion, '
+            'metadata={op_name="jit/local/'
+            'greenfield_dense_convolution_virtual_rank_00/'
+            'conv_general_dilated"}, backend_config='
+            + _config("gate")
+        )
+        gate_decode_entry = ""
+    elif external_gate_singleton:
         gate_computation = '''gate_fusion {
   %gate_lhs = bf16[32,6144]{1,0} parameter(0)
   %gate_weight = bf16[6144,768]{1,0} parameter(1)
@@ -177,13 +220,11 @@ ENTRY main {{
   %down_scale = f32[1,1,3,6144]{{3,2,1,0}} parameter(6)
   %gate_bits_slice = f8e4m3fn[1,1,6144,768]{{3,2,1,0}} slice(%gate_bits), slice={{[0:1],[0:1],[0:6144],[0:768]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
   %gate_bits_flat = f8e4m3fn[6144,768]{{1,0}} reshape(%gate_bits_slice), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/reshape"}}
-  %gate_decoded = f32[6144,768]{{1,0}} convert(%gate_bits_flat), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/convert_element_type"}}
   %gate_scale_slice = f32[1,1,48,768]{{3,2,1,0}} slice(%gate_scale), slice={{[0:1],[0:1],[0:48],[0:768]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
   %gate_scale_seed = f32[48,768]{{1,0}} reshape(%gate_scale_slice), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/reshape"}}
   %gate_scale_expanded = f32[48,128,768]{{2,1,0}} broadcast(%gate_scale_seed), dimensions={{0,2}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/broadcast_in_dim"}}
   %gate_scale_wide = f32[6144,768]{{1,0}} reshape(%gate_scale_expanded), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/reshape"}}
-  %gate_scaled = f32[6144,768]{{1,0}} multiply(%gate_decoded, %gate_scale_wide), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/mul"}}
-  %gate_rhs = bf16[6144,768]{{1,0}} convert(%gate_scaled), metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/convert_element_type"}}
+{gate_decode_entry}
 {gate_execution}
   %gate_slice_rank3 = bf16[32,1,384]{{2,0,1}} slice(%gate_singleton), slice={{[0:32],[0:1],[0:384]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
   %up_slice_rank3 = bf16[32,1,384]{{2,0,1}} slice(%gate_singleton), slice={{[0:32],[0:1],[384:768]}}, metadata={{op_name="jit/local/greenfield_dense_convolution_virtual_rank_00/slice"}}
@@ -231,9 +272,12 @@ def test_isolated_dense_stablehlo_contract_accepts_u8_and_fp8() -> None:
     ):
         stablehlo = _stablehlo(bit_dtype=bit_dtype)
         result = validate_isolated_dense_partial_stablehlo(
-            stablehlo, accepted_gate_singleton=True
+            stablehlo,
+            accepted_gate_singleton=True,
+            accepted_gate_dequant_fusion=True,
         )
         assert result["passed"], result
+        assert result["accepted_gate_dequant_fusion"] is True
         assert result["accepted_gate_singleton"] is True
         assert result["convolution_count"] == 2
         assert result["matched_virtual_shards"] == [0]
@@ -257,13 +301,15 @@ def test_isolated_dense_stablehlo_contract_refuses_wrong_arithmetic() -> None:
     mutations = (
         stablehlo.replace("applies stablehlo.add", "applies stablehlo.maximum", 1),
         stablehlo.replace("[0:1, 0:1, 0:6144]", "[0:1, 1:2, 0:6144]", 1),
-        stablehlo.replace("stablehlo.multiply %49, %42", "stablehlo.add %49, %42", 1),
-        stablehlo.replace("sdy.return %62, %6", "sdy.return %62, %20", 1),
+        stablehlo.replace("stablehlo.multiply %47, %40", "stablehlo.add %47, %40", 1),
+        stablehlo.replace("sdy.return %60, %6", "sdy.return %60, %20", 1),
     )
     assert all(value != stablehlo for value in mutations)
     assert all(
         not validate_isolated_dense_partial_stablehlo(
-            value, accepted_gate_singleton=True
+            value,
+            accepted_gate_singleton=True,
+            accepted_gate_dequant_fusion=True,
         )["passed"]
         for value in mutations
     )
@@ -273,12 +319,35 @@ def test_isolated_dense_optimized_contract_pins_schedule_and_liveness() -> None:
     accepted = _optimized_hlo()
     result = MODULE._validate_isolated_optimized_hlo(accepted)
     assert result["passed"], result
+    assert result["accepted_gate_dequant_fusion"] is True
     assert result["accepted_gate_singleton"] is True
     assert result["exact_activation_graph"]
     assert result["exact_carried_residual_binding"]
     assert result["exact_gate_singleton_external_boundary"]
+    assert result["exact_gate_dequant_fusion_boundary"]
     assert result["exact_packed_weight_lineage"]
     assert result["exact_result_binding"]
+    direct_fp8 = accepted.replace(
+        '''gate_bits_copy_fusion {
+  %gate_bits_copy_parameter = f8e4m3fn[6144,768]{1,0} parameter(0)
+  ROOT %gate_bits_copy_root = f8e4m3fn[6144,768]{1,0} copy(%gate_bits_copy_parameter)
+}
+
+''',
+        "",
+        1,
+    ).replace(
+        "  %gate_bits_copied_inner = f8e4m3fn[6144,768]{1,0} fusion(%gate_bits_inner), kind=kLoop, calls=%gate_bits_copy_fusion\n",
+        "",
+        1,
+    ).replace(
+        "convert(%gate_bits_copied_inner)",
+        "convert(%gate_bits_inner)",
+        1,
+    )
+    direct_fp8_result = MODULE._validate_isolated_optimized_hlo(direct_fp8)
+    assert direct_fp8_result["passed"], direct_fp8_result
+    assert direct_fp8_result["exact_gate_dequant_fusion_boundary"]
     direct_singleton = MODULE._validate_isolated_optimized_hlo(
         _optimized_hlo(external_gate_singleton=False)
     )
@@ -286,7 +355,87 @@ def test_isolated_dense_optimized_contract_pins_schedule_and_liveness() -> None:
     assert not direct_singleton[
         "exact_gate_singleton_external_boundary"
     ]
+    materialized_gate_rhs = MODULE._validate_isolated_optimized_hlo(
+        _optimized_hlo(fused_gate_dequant=False)
+    )
+    assert materialized_gate_rhs[
+        "exact_gate_singleton_external_boundary"
+    ]
+    assert not materialized_gate_rhs["passed"]
+    assert not materialized_gate_rhs[
+        "exact_gate_dequant_fusion_boundary"
+    ]
     mutations = (
+        accepted.replace(
+            "%gate_scale_inner = f32[6144,768]{1,0}",
+            "%gate_scale_inner = f32[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_bits_inner = f8e4m3fn[6144,768]{1,0}",
+            "%gate_bits_inner = f8e4m3fn[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_scale_parameter = f32[6144,768]{1,0}",
+            "%gate_scale_parameter = f32[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_bits_parameter = f8e4m3fn[6144,768]{1,0}",
+            "%gate_bits_parameter = f8e4m3fn[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_decoded_inner = f32[6144,768]{1,0}",
+            "%gate_decoded_inner = f32[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_scaled_inner = f32[6144,768]{1,0}",
+            "%gate_scaled_inner = f32[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "ROOT %gate_rhs_inner = bf16[6144,768]{1,0}",
+            "ROOT %gate_rhs_inner = bf16[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "kind=kLoop, calls=%gate_dequant_fusion",
+            "kind=kInput, calls=%gate_dequant_fusion",
+            1,
+        ),
+        accepted.replace(
+            "kind=kLoop, calls=%gate_dequant_fusion",
+            "kind=kOutput, calls=%gate_dequant_fusion",
+            1,
+        ),
+        accepted.replace(
+            "%gate_bits_copy_parameter = f8e4m3fn[6144,768]{1,0}",
+            "%gate_bits_copy_parameter = f8e4m3fn[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_bits_copy_root = f8e4m3fn[6144,768]{1,0}",
+            "%gate_bits_copy_root = f8e4m3fn[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "%gate_bits_copied_inner = f8e4m3fn[6144,768]{1,0}",
+            "%gate_bits_copied_inner = f8e4m3fn[6144,768]{0,1}",
+            1,
+        ),
+        accepted.replace(
+            "kind=kLoop, calls=%gate_bits_copy_fusion",
+            "kind=kInput, calls=%gate_bits_copy_fusion",
+            1,
+        ),
+        accepted.replace(
+            "copy(%gate_bits_copy_parameter)",
+            "negate(%gate_bits_copy_parameter)",
+            1,
+        ),
         accepted.replace('"iteration_bounds":["1","1","2"]', '"iteration_bounds":["1","1","3"]', 1),
         accepted.replace(
             "  %down = f32[32,6144]",
@@ -312,18 +461,18 @@ def test_isolated_dense_optimized_contract_pins_schedule_and_liveness() -> None:
             1,
         ),
         accepted.replace(
-            "%gate_weight = bf16[6144,768]{1,0} parameter",
-            "%gate_weight = bf16[6144,768]{0,1} parameter",
+            "%gate_rhs_internal = bf16[6144,768]{1,0} fusion",
+            "%gate_rhs_internal = bf16[6144,768]{0,1} fusion",
             1,
         ),
         accepted.replace(
             "  %gate_dot = f32[32,768]{1,0} convolution",
             "  %rogue_gate_weight = bf16[6144,768]{1,0} "
-            "add(%gate_weight, %gate_weight)\n"
+            "add(%gate_rhs_internal, %gate_rhs_internal)\n"
             "  %gate_dot = f32[32,768]{1,0} convolution",
             1,
         ).replace(
-            "convolution(%gate_lhs, %gate_weight)",
+            "convolution(%gate_lhs, %gate_rhs_internal)",
             "convolution(%gate_lhs, %rogue_gate_weight)",
             1,
         ),
@@ -485,9 +634,11 @@ def test_gate_singleton_discriminator_is_bound_to_pinned_hlo() -> None:
         )
     )
     assert result == {
+        "accepted_internal_gate_dequant_count": 3,
         "accepted_rank2_gate_count": 0,
         "accepted_rank3_gate_count": 3,
         "challenger_selected": True,
+        "db548_materialized_bf16_gate_count": 8,
         "db548_rank2_gate_count": 8,
         "db548_rank3_gate_count": 0,
     }
@@ -540,11 +691,12 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "reduce_scatter": 0,
     }
     isolated_stable = {
+        "accepted_gate_dequant_fusion": True,
         "accepted_gate_singleton": True,
         "collective_counts": zero_collectives,
         "convolution_count": 2,
         "exact_result_binding": True,
-        "gate_up_layout_constraint_count": 1,
+        "gate_up_layout_constraint_count": 0,
         "matched_virtual_shards": [0],
         "runtime_u8_bitcast_count": 0,
         "virtual_contractions_per_chip": 1,
@@ -552,6 +704,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "violations": [],
     }
     isolated_optimized = {
+        "accepted_gate_dequant_fusion": True,
         "accepted_gate_singleton": True,
         "accepted_down_schedule": True,
         "accepted_gate_up_schedule": True,
@@ -566,6 +719,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "exact_activation_graph": True,
         "exact_carried_residual_binding": True,
         "exact_gate_singleton_external_boundary": True,
+        "exact_gate_dequant_fusion_boundary": True,
         "exact_packed_weight_lineage": True,
         "exact_result_binding": True,
         "final_dense_layout": True,
@@ -668,6 +822,7 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
     }
     pin = "a" * 40
     runner = {
+        "accepted_gate_dequant_fusion": True,
         "accepted_gate_singleton": True,
         "artifact_kind": "glm52_layer0_isolated_dense_replay",
         "classification": "isolated_virtual_contractions_exact",
@@ -677,9 +832,11 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
         "exact_arms": ["isolated_virtual_contractions"],
         "final_layout_records": records,
         "gate_singleton_discriminator": {
+            "accepted_internal_gate_dequant_count": 3,
             "accepted_rank2_gate_count": 0,
             "accepted_rank3_gate_count": 3,
             "challenger_selected": True,
+            "db548_materialized_bf16_gate_count": 8,
             "db548_rank2_gate_count": 8,
             "db548_rank3_gate_count": 0,
         },
@@ -836,7 +993,10 @@ def test_isolated_dense_wrapper_validates_exact_synthetic_result(
     success = (run_dir / "SUCCESS").read_text()
     assert "artifact_kind=glm52_layer0_isolated_dense_replay\n" in success
     assert "results_db_run_id=none\n" in success
+    assert "accepted_gate_dequant_fusion=true\n" in success
     assert "accepted_gate_singleton=true\n" in success
+    assert "gate_dequant_accepted_internal_count=3\n" in success
+    assert "gate_dequant_db548_materialized_count=8\n" in success
     assert "gate_singleton_accepted_rank3_count=3\n" in success
     assert "gate_singleton_db548_rank2_count=8\n" in success
     assert "sensitivity_baseline_dense_update_bits=47808\n" in success

@@ -91,17 +91,39 @@ def _validate_gate_singleton_discriminator(
             db548_hlo,
         )
     )
+    block_pattern = re.compile(r"(?ms)^%?[^\n{]+\{\n.*?^\}")
+    accepted_blocks = block_pattern.findall(accepted_hlo)
+    db548_blocks = block_pattern.findall(db548_hlo)
+    accepted_internal_dequant = sum(
+        "bf16[32,1,768]" in block
+        and "f8e4m3fn[6144,768]" in block
+        and "f32[6144,768]" in block
+        and "MergedColumnParallelLinear/shard_map/dot_general" in block
+        and "convolution(" in block
+        for block in accepted_blocks
+    )
+    db548_materialized_bf16 = sum(
+        "bf16[32,768]" in block
+        and "bf16[6144,768]" in block
+        and "greenfield_dense_convolution_virtual_rank_" in block
+        and "convolution(" in block
+        for block in db548_blocks
+    )
     result = {
+        "accepted_internal_gate_dequant_count": accepted_internal_dequant,
         "accepted_rank2_gate_count": accepted_rank2,
         "accepted_rank3_gate_count": accepted_rank3,
         "challenger_selected": True,
+        "db548_materialized_bf16_gate_count": db548_materialized_bf16,
         "db548_rank2_gate_count": db548_rank2,
         "db548_rank3_gate_count": db548_rank3,
     }
     if result != {
+        "accepted_internal_gate_dequant_count": 3,
         "accepted_rank2_gate_count": 0,
         "accepted_rank3_gate_count": 3,
         "challenger_selected": True,
+        "db548_materialized_bf16_gate_count": 8,
         "db548_rank2_gate_count": 8,
         "db548_rank3_gate_count": 0,
     }:
@@ -125,6 +147,7 @@ def _validate_isolated_optimized_hlo(optimized_hlo: str) -> dict[str, Any]:
         dense_envelope=True,
         isolated_dense=True,
         accepted_gate_singleton=True,
+        accepted_gate_dequant_fusion=True,
     )
 
 
@@ -177,6 +200,7 @@ def _build_isolated_partial(mesh: Any) -> Any:
                 compile_rows=32,
                 virtual_shards=1,
                 accepted_gate_singleton=True,
+                accepted_gate_dequant_fusion=True,
             )
         with jax.named_scope("greenfield_isolated_dense_live_row"):
             partials = lax.optimization_barrier(partials)
@@ -442,7 +466,9 @@ def main() -> int:
     lowered = jax.jit(mapped).lower(*rank_arguments[0])
     stablehlo = lowered.as_text()
     stable_contract = validate_isolated_dense_partial_stablehlo(
-        stablehlo, accepted_gate_singleton=True
+        stablehlo,
+        accepted_gate_singleton=True,
+        accepted_gate_dequant_fusion=True,
     )
     stable_path = args.hlo_dir / "isolated_dense.stablehlo.mlir"
     stable_path.write_text(stablehlo)
@@ -600,6 +626,7 @@ def main() -> int:
     )
     result = {
         "accepted_gate_singleton": True,
+        "accepted_gate_dequant_fusion": True,
         "artifact_kind": "glm52_layer0_isolated_dense_replay",
         "classification": classification,
         "code_hash": code_hash,

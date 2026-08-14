@@ -5,6 +5,46 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-14 00:19 UTC — internal gate-dequant discriminator is locally ready
+
+- Added a default-off, isolated-only `accepted_gate_dequant_fusion` challenger. It removes the
+  decoded gate-weight layout constraint/materialization barrier while leaving the logical FP8
+  decode, contraction, activation, down projection and live-row result unchanged. Production and
+  eight-virtual-shard paths remain byte-path unchanged because the flag defaults off and refuses
+  `virtual_shards != 1`.
+- StableHLO validation still proves the exact FP8 bits/scale decode and now requires zero gate
+  layout constraints for this challenger. Optimized-HLO validation binds the live scheduled gate
+  convolution to a nested dequant fusion consuming exactly expanded `f32[6144,768]` scales and
+  `f8e4m3fn[6144,768]` bits. A negative graph with an externally materialized BF16 RHS passes the
+  singleton boundary but fails the new dequant-fusion boundary.
+- The protected source discriminator pins three such internal gate-dequant fusions in accepted M32
+  HLO versus eight materialized-BF16 gate fusions in DB548; the wrapper carries both counts and the
+  selected flag through runner, summary and `SUCCESS`. Tests pass: isolated 8/8, combined dense
+  validation 67/67, decoder regression 37/37; Python compilation, bash syntax, shellcheck, JSON and
+  diff checks pass. No TPU run, numerical result, DB row or performance claim exists yet. Next is
+  one bulk Sol audit and one ~70-second protected isolated replay, not a full decoder.
+
+## 2026-08-14 00:00 UTC — eight-second replay rejects the external gate singleton
+
+- Reviewed/pushed pin `73c6bc295727c50e490120c5440d58a876973498` ran once under protected tag
+  `greenfield_layer0_isolated_dense_replay_20260813T235907551658906Z`. The scheduled gate fusion
+  exported the exact accepted `bf16[32,1,768]` result, both StableHLO and optimized-HLO contracts
+  passed, TPU arithmetic completed in eight seconds and the full census/archive/`SUCCESS`-last
+  workflow completed in about 76 seconds.
+- The numerical result is a clean rejection: all 32 isolated BF16 down partials remain bitwise
+  identical to the sealed DB548 capture, with zero mismatches for every virtual rank. The layer-1
+  output remains nonexact only at hidden index 2795, observed bits 48422 versus expected 48423,
+  SHA `9b52a04e...4005`. Preserving the accepted external singleton does not alter contraction
+  arithmetic and does not authorize a full 8K retry.
+- Runner/tensor/summary/`SUCCESS` SHAs are `9d21082d...9b50`, `455035b3...3e5f`,
+  `cd6edf2e...b8bcd` and `0e53e033...9f99`; remote ledger SHA is `532a84f2...a29f`.
+  Archive verification and authenticated 8/8 cleanup pass. There is no DB row, performance claim
+  or Gate-D promotion.
+- The next exact accepted-versus-current difference is narrower than result shape: accepted gate
+  fusions consume the FP8 bits and expanded F32 scales and perform dequantization internally;
+  DB548 and this replay pass a materialized BF16 RHS into the scheduled fusion. Keep the full 8K
+  run frozen and test only that fusion boundary with the same sub-minute protected probe.
+
 ## 2026-08-13 23:43 UTC — exact HLO differential selects a gate-singleton challenger
 
 - Offline inspection of the immutable accepted M32 HLO and DB548 HLO identifies one untested live

@@ -750,6 +750,7 @@ def _validate_optimized_hlo(
     split_layer1_rms: bool = False,
     isolated_dense: bool = False,
     accepted_gate_singleton: bool = False,
+    accepted_gate_dequant_fusion: bool = False,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import (
         COLLECTIVE_OPCODES,
@@ -787,6 +788,13 @@ def _validate_optimized_hlo(
     if accepted_gate_singleton and not isolated_dense:
         raise ValueError(
             "accepted gate singleton proof requires isolated dense mode"
+        )
+    if accepted_gate_dequant_fusion and not (
+        isolated_dense and accepted_gate_singleton
+    ):
+        raise ValueError(
+            "accepted gate dequant fusion proof requires the isolated "
+            "singleton mode"
         )
     module = parse_hlo_module(optimized_hlo)
     by_key = {_instruction_key(item): item for item in module.instructions}
@@ -1168,6 +1176,14 @@ def _validate_optimized_hlo(
         if match is None:
             return None
         return tuple(int(value) for value in match.group(1).split(","))
+
+    def fusion_kind(item: Any | None) -> str | None:
+        if item is None or item.raw_opcode != "fusion":
+            return None
+        matches = re.findall(
+            r"\bkind=(k[A-Za-z0-9_]+)", unquoted_hlo(item.raw_line)
+        )
+        return matches[0] if len(matches) == 1 else None
 
     def exact_row_major_layout(item: Any | None) -> bool:
         if item is None or len(item.result_shapes) != 1:
@@ -2221,6 +2237,9 @@ def _validate_optimized_hlo(
 
         exact_activation_graph = False
         exact_gate_singleton_external_boundary = not accepted_gate_singleton
+        exact_gate_dequant_fusion_boundary = (
+            not accepted_gate_dequant_fusion
+        )
         gate_external = None
         down_external = None
         if len(gate_up) == 1 and len(down) == 1:
@@ -2228,6 +2247,136 @@ def _validate_optimized_hlo(
             down_values = exact_external_values(down[0])
             gate_external = gate_values[0] if len(gate_values) == 1 else None
             down_external = down_values[0] if len(down_values) == 1 else None
+            if accepted_gate_dequant_fusion:
+                gate_weight = operand(gate_up[0], 1)
+                exact_gate_dequant, _ = exact_packed_dequant(
+                    gate_weight,
+                    label="gate_up",
+                    rank=0,
+                    weight_shape="bf16[6144,768]",
+                )
+                gate_dequant_root = (
+                    called_root(gate_weight)
+                    if gate_weight is not None
+                    and gate_weight.raw_opcode == "fusion"
+                    else None
+                )
+                gate_dequant_scaled = (
+                    operand(gate_dequant_root, 0)
+                    if gate_dequant_root is not None
+                    and gate_dequant_root.raw_opcode == "convert"
+                    else None
+                )
+                gate_dequant_parameters = {}
+                if gate_dequant_root is not None:
+                    gate_dequant_parameters = {
+                        parameter_index(item): item
+                        for item in instructions_by_computation.get(
+                            _computation_id(gate_dequant_root.computation),
+                            (),
+                        )
+                        if item.raw_opcode == "parameter"
+                        and parameter_index(item) is not None
+                    }
+                gate_scale_parameter = gate_dequant_parameters.get(0)
+                gate_bits_parameter = gate_dequant_parameters.get(1)
+
+                def exact_gate_bits_copy_source(
+                    value: Any | None,
+                ) -> bool:
+                    if value is gate_bits_parameter:
+                        return True
+                    if (
+                        value is None
+                        or value.raw_opcode != "fusion"
+                        or fusion_kind(value) != "kLoop"
+                        or result_minor_to_major(value) != (1, 0)
+                        or len(value.operand_names) != 1
+                        or operand(value, 0) is not gate_bits_parameter
+                    ):
+                        return False
+                    copy_root = called_root(value)
+                    if (
+                        copy_root is None
+                        or copy_root.raw_opcode != "copy"
+                        or result_minor_to_major(copy_root) != (1, 0)
+                        or len(copy_root.operand_names) != 1
+                    ):
+                        return False
+                    copy_parameters = [
+                        item
+                        for item in instructions_by_computation.get(
+                            _computation_id(copy_root.computation), ()
+                        )
+                        if item.raw_opcode == "parameter"
+                    ]
+                    return bool(
+                        len(copy_parameters) == 1
+                        and parameter_index(copy_parameters[0]) == 0
+                        and result_minor_to_major(copy_parameters[0]) == (1, 0)
+                        and operand(copy_root, 0) is copy_parameters[0]
+                    )
+
+                gate_dequant_decoded = None
+                if (
+                    gate_dequant_scaled is not None
+                    and gate_dequant_scaled.raw_opcode == "multiply"
+                    and len(gate_dequant_scaled.operand_names) == 2
+                ):
+                    for index in range(2):
+                        candidate = operand(gate_dequant_scaled, index)
+                        other = operand(gate_dequant_scaled, 1 - index)
+                        if (
+                            candidate is not None
+                            and candidate.raw_opcode == "convert"
+                            and len(candidate.operand_names) == 1
+                            and exact_gate_bits_copy_source(
+                                operand(candidate, 0)
+                            )
+                            and other is gate_scale_parameter
+                        ):
+                            gate_dequant_decoded = candidate
+                            break
+                gate_weight_operands = (
+                    tuple(operand(gate_weight, index) for index in range(2))
+                    if gate_weight is not None
+                    and len(gate_weight.operand_names) == 2
+                    else ()
+                )
+                exact_gate_dequant_physical_signature = bool(
+                    gate_weight is not None
+                    and fusion_kind(gate_weight) == "kLoop"
+                    and result_minor_to_major(gate_weight) == (1, 0)
+                    and len(gate_weight_operands) == 2
+                    and all(
+                        result_minor_to_major(item) == (1, 0)
+                        for item in gate_weight_operands
+                    )
+                    and gate_dequant_root is not None
+                    and result_minor_to_major(gate_dequant_root) == (1, 0)
+                    and gate_dequant_scaled is not None
+                    and result_minor_to_major(gate_dequant_scaled) == (1, 0)
+                    and gate_dequant_decoded is not None
+                    and result_minor_to_major(gate_dequant_decoded) == (1, 0)
+                    and gate_scale_parameter is not None
+                    and result_minor_to_major(gate_scale_parameter) == (1, 0)
+                    and gate_bits_parameter is not None
+                    and result_minor_to_major(gate_bits_parameter) == (1, 0)
+                )
+                exact_gate_dequant_fusion_boundary = bool(
+                    gate_weight is not None
+                    and gate_weight.raw_opcode == "fusion"
+                    and gate_weight.computation == gate_up[0].computation
+                    and _shape_signatures(gate_weight.operand_shapes)
+                    == (
+                        "f32[6144,768]",
+                        "f8e4m3fn[6144,768]",
+                    )
+                    and value_shape(gate_weight)
+                    == ("bf16", (6144, 768))
+                    and exact_gate_dequant
+                    and exact_gate_dequant_physical_signature
+                )
             if accepted_gate_singleton:
                 gate_callers = callers_by_computation.get(
                     _computation_id(gate_up[0].computation), ()
@@ -2476,6 +2625,10 @@ def _validate_optimized_hlo(
                 "isolated dense accepted gate singleton external boundary "
                 "drifted"
             )
+        if not exact_gate_dequant_fusion_boundary:
+            violations.append(
+                "isolated dense accepted gate dequant fusion boundary drifted"
+            )
 
         roots = [
             item
@@ -2687,6 +2840,7 @@ def _validate_optimized_hlo(
             violations.append("isolated dense program contains host/Pallas effects")
         return {
             "accepted_gate_singleton": accepted_gate_singleton,
+            "accepted_gate_dequant_fusion": accepted_gate_dequant_fusion,
             "accepted_down_schedule": bool(
                 len(accepted_weight_layouts["down"]) == 1
                 and accepted_weight_layouts["down"][0][
@@ -2714,6 +2868,9 @@ def _validate_optimized_hlo(
             "exact_carried_residual_binding": exact_carried_residual_binding,
             "exact_gate_singleton_external_boundary": (
                 exact_gate_singleton_external_boundary
+            ),
+            "exact_gate_dequant_fusion_boundary": (
+                exact_gate_dequant_fusion_boundary
             ),
             "exact_packed_weight_lineage": exact_packed_weight_lineage,
             "exact_result_binding": exact_result_binding,

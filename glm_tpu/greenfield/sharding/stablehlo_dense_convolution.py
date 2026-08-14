@@ -373,6 +373,7 @@ def _match_one_shard(
     final_dense_layout: bool = False,
     single_virtual_shard: bool = False,
     accepted_gate_singleton: bool = False,
+    accepted_gate_dequant_fusion: bool = False,
 ) -> tuple[int, tuple[str, ...], str, str | None, str | None]:
     row_type = f"tensor<{compile_rows}x"
     if len(gate_up.operands) != 2:
@@ -381,7 +382,7 @@ def _match_one_shard(
     decoded_gate_up = gate_up.operands[1]
     dependency: str | None = None
     dependency_output: str | None = None
-    if final_dense_layout:
+    if final_dense_layout and not accepted_gate_dequant_fusion:
         (
             decoded_gate_up,
             dependency,
@@ -1658,6 +1659,7 @@ def validate_isolated_dense_partial_stablehlo(
     stablehlo: str,
     *,
     accepted_gate_singleton: bool = False,
+    accepted_gate_dequant_fusion: bool = False,
 ) -> dict[str, object]:
     """Prove one exact M32 contraction per LP4 chip with no collective.
 
@@ -1667,6 +1669,10 @@ def validate_isolated_dense_partial_stablehlo(
     artifact manifest binds each of the eight runtime input batches.
     """
 
+    if accepted_gate_dequant_fusion and not accepted_gate_singleton:
+        raise ValueError(
+            "accepted gate dequant fusion requires the singleton contract"
+        )
     parsed, dependency_errors = _expand_dependency_barriers(stablehlo)
     graphs, parse_errors = _parse_graphs(parsed)
     violations = [*dependency_errors, *parse_errors]
@@ -1703,6 +1709,9 @@ def validate_isolated_dense_partial_stablehlo(
                 final_dense_layout=True,
                 single_virtual_shard=True,
                 accepted_gate_singleton=accepted_gate_singleton,
+                accepted_gate_dequant_fusion=(
+                    accepted_gate_dequant_fusion
+                ),
             )
         )
         if shard != 0 or dependency is not None or dependency_output is not None:
@@ -1763,7 +1772,10 @@ def validate_isolated_dense_partial_stablehlo(
             if node.opcode == "custom_call"
             and "@LayoutConstraint(" in node.raw_line
         ]
-        if len(layout_constraints) != 1:
+        expected_layout_constraints = (
+            0 if accepted_gate_dequant_fusion else 1
+        )
+        if len(layout_constraints) != expected_layout_constraints:
             raise _MatchError("isolated dense layout-constraint count drifted")
         manual_matches = list(
             re.finditer(
@@ -1852,6 +1864,7 @@ def validate_isolated_dense_partial_stablehlo(
     if "xla_python_cpu_callback" in stablehlo or "host_callback" in stablehlo:
         violations.append("isolated dense module contains a host callback")
     return {
+        "accepted_gate_dequant_fusion": accepted_gate_dequant_fusion,
         "accepted_gate_singleton": accepted_gate_singleton,
         "collective_counts": collective_counts,
         "convolution_count": stablehlo.count("stablehlo.convolution"),

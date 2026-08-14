@@ -656,14 +656,17 @@ expected_records = {
     },
 }
 expected_gate_singleton_discriminator = {
+    "accepted_internal_gate_dequant_count": 3,
     "accepted_rank2_gate_count": 0,
     "accepted_rank3_gate_count": 3,
     "challenger_selected": True,
+    "db548_materialized_bf16_gate_count": 8,
     "db548_rank2_gate_count": 8,
     "db548_rank3_gate_count": 0,
 }
 if not (
-    runner.get("accepted_gate_singleton") is True
+    runner.get("accepted_gate_dequant_fusion") is True
+    and runner.get("accepted_gate_singleton") is True
     and runner.get("artifact_kind") == "glm52_layer0_isolated_dense_replay"
     and runner.get("code_hash") == pin
     and runner.get("control_admissible") is True
@@ -947,14 +950,17 @@ expected_hlo_files = {
     ),
 }
 if not (
-    isolated_stable.get("accepted_gate_singleton") is True
+    isolated_stable.get("accepted_gate_dequant_fusion") is True
+    and isolated_stable.get("accepted_gate_singleton") is True
     and isolated_stable.get("passed") is True
     and isolated_stable.get("violations") == []
     and isolated_stable.get("convolution_count") == 2
     and isolated_stable.get("exact_result_binding") is True
+    and isolated_stable.get("gate_up_layout_constraint_count") == 0
     and isolated_stable.get("matched_virtual_shards") == [0]
     and isolated_stable.get("virtual_contractions_per_chip") == 1
     and not any(isolated_stable.get("collective_counts", {}).values())
+    and isolated_optimized.get("accepted_gate_dequant_fusion") is True
     and isolated_optimized.get("accepted_gate_singleton") is True
     and isolated_optimized.get("passed") is True
     and isolated_optimized.get("violations") == []
@@ -972,6 +978,7 @@ if not (
     and isolated_optimized.get(
         "exact_gate_singleton_external_boundary"
     ) is True
+    and isolated_optimized.get("exact_gate_dequant_fusion_boundary") is True
     and isolated_optimized.get("exact_packed_weight_lineage") is True
     and isolated_optimized.get("exact_result_binding") is True
     and isolated_optimized.get("final_dense_layout") is True
@@ -1000,6 +1007,7 @@ for name, (stable_path, optimized_path) in expected_hlo_files.items():
         raise SystemExit("isolated dense HLO file hash drifted")
 
 summary = {
+    "accepted_gate_dequant_fusion": True,
     "accepted_gate_singleton": True,
     "artifact_kind": runner["artifact_kind"],
     "classification": runner["classification"],
@@ -3182,7 +3190,9 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
         )
     )
     if not (
-        summary.get("accepted_gate_singleton") is True
+        summary.get("accepted_gate_dequant_fusion") is True
+        and runner.get("accepted_gate_dequant_fusion") is True
+        and summary.get("accepted_gate_singleton") is True
         and runner.get("accepted_gate_singleton") is True
         and summary.get("code_hash") == sys.argv[3]
         and runner.get("artifact_kind") == summary["artifact_kind"]
@@ -3227,6 +3237,7 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
     ):
         raise SystemExit("isolated dense replay summary drifted before SUCCESS")
     values = {
+        "accepted_gate_dequant_fusion": "true",
         "accepted_gate_singleton": "true",
         "artifact_kind": summary["artifact_kind"],
         "classification": summary["classification"],
@@ -3241,6 +3252,16 @@ if summary.get("artifact_kind") == "glm52_layer0_isolated_dense_replay":
         "gate_singleton_accepted_rank3_count": str(
             summary["gate_singleton_discriminator"][
                 "accepted_rank3_gate_count"
+            ]
+        ),
+        "gate_dequant_accepted_internal_count": str(
+            summary["gate_singleton_discriminator"][
+                "accepted_internal_gate_dequant_count"
+            ]
+        ),
+        "gate_dequant_db548_materialized_count": str(
+            summary["gate_singleton_discriminator"][
+                "db548_materialized_bf16_gate_count"
             ]
         ),
         "gate_singleton_db548_rank2_count": str(

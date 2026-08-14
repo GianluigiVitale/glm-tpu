@@ -19,6 +19,33 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The next sub-minute discriminator is locally complete but has no TPU result yet. A new
+  `accepted_gate_dequant_fusion` switch is default-off, restricted to the one-virtual-shard
+  isolated probe, and removes only the decoded-weight layout/materialization boundary. Its exact
+  StableHLO and optimized-HLO contracts require raw FP8 bits plus expanded F32 scales to dequantize
+  inside the live scheduled gate fusion; a materially identical challenger that passes a BF16 RHS
+  from outside is refused. The wrapper pins the accepted count of three internal gate-dequant
+  fusions and DB548's eight materialized-BF16 gate fusions through `SUCCESS`. Isolated tests pass
+  8/8, the affected dense/HLO/wrapper suite passes 67/67, and decoder regressions pass 37/37;
+  Python/shell/JSON/diff checks pass. Exact next is one bulk Sol audit, then one ~70-second
+  protected replay. Do not run the complete decoder from local evidence.
+
+- Reviewed/pushed pin `73c6bc295727c50e490120c5440d58a876973498` completed the protected
+  gate-singleton replay under tag
+  `greenfield_layer0_isolated_dense_replay_20260813T235907551658906Z`. The exact accepted-style
+  gate fusion exported `bf16[32,1,768]`, both HLO contracts passed, TPU arithmetic took eight
+  seconds and the complete protected workflow finished in about 76 seconds. Nevertheless every
+  one of the 32 BF16 down partials is bitwise identical to the sealed DB548 capture and the layer-1
+  row retains the sole index-2795 miss, SHA `9b52a04e...4005`. The external singleton boundary is
+  conclusively rejected; do not repeat it or authorize a full 8K run from it.
+- Runner/tensor/summary/`SUCCESS` SHAs are `9d21082d...9b50`, `455035b3...3e5f`,
+  `cd6edf2e...b8bcd` and `0e53e033...9f99`; remote ledger SHA is `532a84f2...a29f`.
+  Archive verification and authenticated 8/8 cleanup pass. This is intentionally no-DB,
+  non-performance evidence and does not advance Gate D. The next exact offline difference is
+  narrower: accepted gate contractions consume FP8 bits and expanded F32 scales inside the
+  scheduled gate fusion, whereas DB548/this replay materialize a decoded BF16 RHS before that
+  fusion. Test only that fusion boundary with the same sub-minute probe before any decoder retry.
+
 - The next bounded challenger is implemented locally and remains default-off. An exact offline
   differential over SHA-pinned HLO proves the accepted M32 program has three merged gate/up
   results shaped `bf16[32,1,768]` and zero `bf16[32,768]` equivalents, while DB548 has eight
@@ -35,9 +62,9 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   The protected wrapper authenticates both accepted and DB548 HLO sources and publishes the
   discriminator fields. Focused tests pass 8/8, the affected dense validation set passes 67/67,
   and the broader forced-CPU dense/runtime set passed 152/152 before the bounded correction;
-  Python compilation, shell syntax, shellcheck, JSON and diff checks pass. There is no TPU result
-  or Gate-D promotion yet. Exact next is one correction-only Sol confirmation, then one
-  ~70-second protected isolated replay—not a complete decoder.
+  Python compilation, shell syntax, shellcheck, JSON and diff checks pass. There was no TPU result
+  at local-review time; the protected result above supersedes that exact-next text and rejects the
+  challenger.
 
 - Reviewed/pushed pin `aa6f477a6cbde98d5f332aaf60b02d63f8cd4adc` completed the protected
   sensitivity sweep under tag

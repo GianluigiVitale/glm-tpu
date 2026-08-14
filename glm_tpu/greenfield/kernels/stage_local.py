@@ -549,6 +549,7 @@ def _virtual_dense_final_layout_convolution_down_partials(
     compile_rows: int = 32,
     virtual_shards: int = _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER,
     accepted_gate_singleton: bool = False,
+    accepted_gate_dequant_fusion: bool = False,
 ) -> Any:
     """Replay dense arithmetic from accepted ``[in, out]`` weight layout.
 
@@ -567,6 +568,12 @@ def _virtual_dense_final_layout_convolution_down_partials(
         raise ValueError("final-layout dense requires one or eight virtual shards")
     if not isinstance(accepted_gate_singleton, bool):
         raise ValueError("accepted gate singleton flag must be boolean")
+    if not isinstance(accepted_gate_dequant_fusion, bool):
+        raise ValueError("accepted gate dequant fusion flag must be boolean")
+    if accepted_gate_dequant_fusion and virtual_shards != 1:
+        raise ValueError(
+            "accepted gate dequant fusion is isolated-diagnostic only"
+        )
     expected = {
         "normalized": (compile_rows, 6144),
         "merged_bits_in_out": (virtual_shards, 6144, 768),
@@ -622,45 +629,38 @@ def _virtual_dense_final_layout_convolution_down_partials(
                 merged_scale_in_out[shard],
                 block_rows=block_shape[0],
             )
-            # The accepted M32 HLO keeps this decoded [in, out] operand in XLA
-            # minor-to-major {1,0}.  JAX's Layout API takes the reverse,
-            # major-to-minor order, hence (0,1) here.  Host-side final packing
-            # alone is insufficient: TPU layout assignment otherwise selects
-            # XLA {0,1} for gate/up while independently selecting the accepted
-            # layout for down.  This diagnostic-only, default-off
-            # discriminator pins the accepted gate/up operand without changing
-            # its values or dot dimension numbers.
-            gate_up_weight = with_layout_constraint(
-                gate_up_weight,
-                Layout(major_to_minor=(0, 1)),
-            )
-            if previous_partial is None:
-                # Rank zero has no predecessor, but it still needs the same
-                # decoded-weight materialization boundary as ranks one through
-                # seven.  Without it TPU leaves only rank zero's dequantization
-                # inside the contraction fusion and selects the narrow legacy
-                # schedule for that one rank.
-                with jax.named_scope(
-                    "greenfield_dense_convolution_virtual_rank_dependency"
-                ):
-                    gate_up_weight = lax.optimization_barrier(gate_up_weight)
-            else:
-                # A PP8 owner executes eight virtual legacy-DCP shards on one
-                # physical chip.  Keep their gate/down pairs ordered without
-                # changing any tensor value.  Otherwise TPU scheduling may run
-                # one gate directly from the entry parameter while the shared
-                # FP8 input copy is in flight, assigning only that gate the
-                # non-accepted contraction geometry.
-                with jax.named_scope(
-                    "greenfield_dense_convolution_virtual_rank_dependency"
-                ):
-                    gate_up_weight, previous_partial = lax.optimization_barrier(
-                        (gate_up_weight, previous_partial)
-                    )
-                    # JAX's ordering guarantee requires every barrier operand
-                    # to be consumed through its corresponding output.  Make
-                    # the returned predecessor the value ultimately stacked.
-                    partials[-1] = previous_partial
+            if not accepted_gate_dequant_fusion:
+                # The accepted M32 HLO keeps this decoded [in, out] operand in
+                # XLA minor-to-major {1,0}. JAX's Layout API takes the reverse,
+                # major-to-minor order, hence (0,1) here.
+                gate_up_weight = with_layout_constraint(
+                    gate_up_weight,
+                    Layout(major_to_minor=(0, 1)),
+                )
+                if previous_partial is None:
+                    # Ordinary final-layout execution materializes rank zero's
+                    # decoded RHS before its gate contraction.
+                    with jax.named_scope(
+                        "greenfield_dense_convolution_virtual_rank_dependency"
+                    ):
+                        gate_up_weight = lax.optimization_barrier(gate_up_weight)
+                else:
+                    # Keep the production eight-shard schedule ordered through
+                    # the immediately preceding rounded down partial.
+                    with jax.named_scope(
+                        "greenfield_dense_convolution_virtual_rank_dependency"
+                    ):
+                        gate_up_weight, previous_partial = (
+                            lax.optimization_barrier(
+                                (gate_up_weight, previous_partial)
+                            )
+                        )
+                        partials[-1] = previous_partial
+            # The isolated accepted-fusion challenger deliberately omits both
+            # materialization mechanisms. The optimized-HLO contract must then
+            # prove FP8 bits and expanded F32 scales are consumed by a dequant
+            # fusion inside the scheduled gate contraction, as in the accepted
+            # full-model HLO. The flag is default-off and single-shard only.
             gate_up = _dense_bf16_convolution(
                 normalized,
                 gate_up_weight,
