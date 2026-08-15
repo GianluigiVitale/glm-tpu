@@ -361,6 +361,7 @@ def main() -> int:
         expected_manifest_sha256=args.packed_manifest_sha256,
         mesh=mesh,
         physical_mesh=physical_mesh,
+        payload_subdirectory="packed",
     )
     load_seconds = time.perf_counter() - load_started
     oracle_manifest, oracle = _load_oracle(

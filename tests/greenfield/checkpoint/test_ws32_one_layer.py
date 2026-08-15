@@ -414,6 +414,12 @@ def test_ws32_one_layer_global_loader_uses_exact_final_owners(
     )
     config = replace(config, mesh_hash=physical.mesh_hash)
     manifest = pack_ws32_one_layer(config)
+    payload = config.output_dir / "packed"
+    payload.mkdir()
+    for record in manifest["files"]:
+        (config.output_dir / record["filename"]).replace(
+            payload / record["filename"]
+        )
     program = f'''\
 import json
 from pathlib import Path
@@ -426,11 +432,11 @@ from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
 rows=tuple(tuple(range(row*4,row*4+4)) for row in range(8))
 physical=Ws32PhysicalMesh(device_ids=rows,feature_groups=rows,expert_groups=tuple(tuple(row*4+column for row in range(8)) for column in range(4)))
 mesh=Mesh(np.asarray(jax.devices(),dtype=object).reshape(8,4),('expert','feature'))
-loaded=load_ws32_one_layer_global(Path({str(config.output_dir)!r}),expected_manifest_sha256={manifest['manifest_sha256']!r},mesh=mesh,physical_mesh=physical)
+loaded=load_ws32_one_layer_global(Path({str(config.output_dir)!r}),expected_manifest_sha256={manifest['manifest_sha256']!r},mesh=mesh,physical_mesh=physical,payload_subdirectory='packed')
 expected=np.empty((8,4,8),dtype=np.uint8)
 for row in range(8):
   for column in range(4):
-    with safe_open(Path({str(config.output_dir)!r})/f'device_slot_{{row*4+column:02d}}.safetensors',framework='np') as handle:
+    with safe_open(Path({str(config.output_dir)!r})/'packed'/f'device_slot_{{row*4+column:02d}}.safetensors',framework='np') as handle:
       expected[row,:,column*2:(column+1)*2]=handle.get_tensor('expert_gate_bits')[0]
 observed=np.asarray(jax.device_get(loaded.arrays['expert_gate_bits']))
 print(json.dumps({{'content_exact':bool(np.array_equal(observed,expected)),'slots':len(loaded.local_device_slots),'shapes':{{name:list(value.shape) for name,value in loaded.arrays.items()}},'specs':{{name:str(value.sharding.spec) for name,value in loaded.arrays.items()}}}},sort_keys=True))

@@ -911,6 +911,7 @@ def load_ws32_one_layer_slot(
     expected_manifest_sha256: str,
     device_slot: int,
     device: object | None = None,
+    payload_subdirectory: str | None = None,
 ) -> LoadedWs32OneLayerSlot:
     """Load one verified final owner, optionally directly onto one device."""
 
@@ -920,6 +921,20 @@ def load_ws32_one_layer_slot(
     import torch
 
     root = Path(output_dir)
+    if payload_subdirectory is None:
+        payload_root = root
+    else:
+        payload_path = Path(payload_subdirectory)
+        if (
+            not payload_subdirectory
+            or payload_path.is_absolute()
+            or len(payload_path.parts) != 1
+            or payload_path.name in (".", "..")
+        ):
+            raise ValueError("WS32 loader payload subdirectory is invalid")
+        payload_root = root / payload_path
+        if not payload_root.is_dir():
+            raise ValueError("WS32 loader payload subdirectory is missing")
     manifest = json.loads((root / "manifest.json").read_text())
     if manifest.get("manifest_sha256") != _manifest_hash(manifest) or (
         manifest.get("manifest_sha256") != expected_manifest_sha256
@@ -936,11 +951,11 @@ def load_ws32_one_layer_slot(
         raise ValueError("WS32 loader final owner is ambiguous")
     record = matches[0]
     _verify_ws32_file(
-        root, manifest, record, verify_tensor_hashes=True
+        payload_root, manifest, record, verify_tensor_hashes=True
     )
     arrays: dict[str, Any] = {}
     with safe_open(
-        root / record["filename"], framework="pt", device="cpu"
+        payload_root / record["filename"], framework="pt", device="cpu"
     ) as handle:
         for name in sorted(handle.keys()):
             tensor = handle.get_tensor(name).contiguous()
@@ -1059,6 +1074,7 @@ def load_ws32_one_layer_global(
     expected_manifest_sha256: str,
     mesh: object,
     physical_mesh: object,
+    payload_subdirectory: str | None = None,
 ) -> LoadedWs32OneLayerGlobal:
     """Direct-load this process's four files into the exact global mesh.
 
@@ -1115,6 +1131,7 @@ def load_ws32_one_layer_global(
             expected_manifest_sha256=expected_manifest_sha256,
             device_slot=slot_by_device_id[device_id],
             device=device,
+            payload_subdirectory=payload_subdirectory,
         )
         if loaded.device_slot != slot_by_device_id[device_id]:
             raise ValueError("WS32 local file/device binding drifted")
