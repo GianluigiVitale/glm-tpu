@@ -18,7 +18,11 @@ import numpy as np
 
 from ..errors import BenchmarkValidationError
 from ..kernels.reference.rmsnorm import fused_add_rms_norm
-from ..kernels.pallas import Fp8BlockMatmulConfig, fp8_structured_kv_b_value
+from ..kernels.pallas import (
+    Fp8BlockMatmulConfig,
+    fp8_structured_kv_b_value,
+    fused_add_rms_norm_m1,
+)
 from ..kernels.stage_local import (
     STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
     _decode_dense_fp8_in_out,
@@ -128,6 +132,7 @@ class CompiledIntegratedDenseRms:
     member_device_ids: tuple[int, ...]
     native_source_context: bool
     native_m32_output: bool
+    native_m1_pallas_output: bool
     stablehlo: str
     optimized_hlo: str
     stablehlo_contract: Mapping[str, Any]
@@ -771,12 +776,24 @@ def _accepted_source_context_function() -> Any:
     return integrated
 
 
-def _native_source_context_function(*, full_m32_output: bool = False) -> Any:
+def _native_source_context_function(
+    *,
+    full_m32_output: bool = False,
+    pallas_m1_output: bool = False,
+) -> Any:
     """Run the exact native embedding and attention producers in one graph."""
 
     if not isinstance(full_m32_output, bool):
         raise BenchmarkValidationError(
             "native source M32-output flag must be boolean"
+        )
+    if not isinstance(pallas_m1_output, bool):
+        raise BenchmarkValidationError(
+            "native source Pallas-M1-output flag must be boolean"
+        )
+    if full_m32_output and pallas_m1_output:
+        raise BenchmarkValidationError(
+            "native M32 and Pallas-M1 outputs are disjoint"
         )
 
     import jax
@@ -977,6 +994,27 @@ def _native_source_context_function(*, full_m32_output: bool = False) -> Any:
             dense_m32 = lax.psum(local_partial, "member")
 
         with jax.named_scope("native_source_context_layer1_norm"):
+            if pallas_m1_output:
+                with jax.named_scope(
+                    "native_source_context_layer1_pallas_m1_sources"
+                ):
+                    output_carried = source_sum(
+                        "native_source_context_layer1_output_sources",
+                        3,
+                    ).astype(jnp.bfloat16)
+                    dense_row = dense_m32[:1, :]
+                    carried_row = output_carried[:1, :]
+                with jax.named_scope(
+                    "native_source_context_layer1_pallas_m1"
+                ):
+                    layer1, _ = fused_add_rms_norm_m1(
+                        dense_row,
+                        carried_row,
+                        layer1_norm,
+                        epsilon=1e-5,
+                    )
+                with jax.named_scope("integrated_dense_rms_live_row"):
+                    return lax.bitcast_convert_type(layer1, jnp.uint16)
             with jax.named_scope("native_source_context_layer1_reduction"):
                 reduction_dense = lax.optimization_barrier(dense_m32)
                 reduction_carried = source_sum(
@@ -1023,6 +1061,7 @@ def build_integrated_dense_rms(
     accepted_source_context: bool = False,
     native_source_context: bool = False,
     native_m32_output: bool = False,
+    native_m1_pallas_output: bool = False,
 ) -> CompiledIntegratedDenseRms:
     """Compile the exact one-rank-per-chip diagnostic on 32 devices."""
 
@@ -1067,9 +1106,21 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "integrated dense RMS native M32-output flag must be boolean"
         )
+    if not isinstance(native_m1_pallas_output, bool):
+        raise BenchmarkValidationError(
+            "native Pallas-M1-output flag must be boolean"
+        )
     if native_m32_output and not native_source_context:
         raise BenchmarkValidationError(
             "native M32 output requires native source context"
+        )
+    if native_m1_pallas_output and not native_source_context:
+        raise BenchmarkValidationError(
+            "native Pallas-M1 output requires native source context"
+        )
+    if native_m32_output and native_m1_pallas_output:
+        raise BenchmarkValidationError(
+            "native M32 and Pallas-M1 outputs are disjoint"
         )
     if accepted_source_context and native_source_context:
         raise BenchmarkValidationError(
@@ -1100,7 +1151,10 @@ def build_integrated_dense_rms(
             "pre-dense split RMS and rejected ordinal arms are disjoint"
         )
     mapped_function = (
-        _native_source_context_function(full_m32_output=native_m32_output)
+        _native_source_context_function(
+            full_m32_output=native_m32_output,
+            pallas_m1_output=native_m1_pallas_output,
+        )
         if native_source_context
         else _accepted_source_context_function()
         if accepted_source_context
@@ -1224,6 +1278,7 @@ def build_integrated_dense_rms(
             accepted_source_context=accepted_source_context,
             native_source_context=native_source_context,
             native_m32_output=native_m32_output,
+            native_m1_pallas_output=native_m1_pallas_output,
         )
         optimized_hlo_contract = validate_integrated_dense_rms_hlo(
             optimized_hlo,
@@ -1234,6 +1289,7 @@ def build_integrated_dense_rms(
             accepted_source_context=accepted_source_context,
             native_source_context=native_source_context,
             native_m32_output=native_m32_output,
+            native_m1_pallas_output=native_m1_pallas_output,
         )
     else:
         stablehlo_contract = {
@@ -1251,6 +1307,7 @@ def build_integrated_dense_rms(
         member_device_ids=members,
         native_source_context=native_source_context,
         native_m32_output=native_m32_output,
+        native_m1_pallas_output=native_m1_pallas_output,
         stablehlo=stablehlo,
         optimized_hlo=optimized_hlo,
         stablehlo_contract=stablehlo_contract,

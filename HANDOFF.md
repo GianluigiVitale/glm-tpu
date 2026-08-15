@@ -19,6 +19,26 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `c17b772b646fe3507daf0ae437f844dd1d59421f` completed the protected
+  native full-M32 numerical discriminator under tag
+  `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T003019954601009Z`.
+  The 90-second device workflow is bitwise exact at `0 / 6,144`: hidden 2795 is 48423 on both
+  sides and expected/observed row SHA are both `9936ee1e...d3039`. The complete
+  `uint16[32,6144]` result has array SHA `2a4fe2dd...42dc`; optimized/StableHLO SHAs are
+  `5bb78e31...2046` / `289017ca...c1bb`. Exact source/HLO/artifact recomputation, deterministic
+  repeats, four local-replica agreement, same-region `SUCCESS`-last publication, local/remote
+  equality and authenticated 8/8 cleanup all pass. Summary, `SUCCESS`, remote ledger, post-census
+  and evidence SHAs are `26ae82f2...e757`, `b84785e8...0e6d`, `b83e7944...d8be`,
+  `0c78d19c...9a7a` and `41980b2c...15ad`. It is diagnostic-only and creates no performance DB
+  row.
+- The exact result identifies the required physical schedule, but its diagnostic tensor has one
+  live row and 31 NaN sentinel rows. It therefore cannot be copied into `decode_batch1`; the
+  specification forbids dead batch rows. Before spending another hour-scale run, reproduce its
+  row-zero weighted-output arithmetic in a true-M1 default-off production boundary, prove the
+  one-row HLO locally and validate it with the same bounded protected oracle. Exact next is this
+  one production integration/HLO batch, one immutable Sol review, one bounded M1 validation, then
+  one protected 8K closure run only if the M1 boundary is bitwise exact.
+
 - Reviewed/pushed pin `4a39dcdbba49045a5637250d0ba6d57ba876da16` launched the protected M32
   numerical discriminator once under tag
   `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T002503491762440Z`.

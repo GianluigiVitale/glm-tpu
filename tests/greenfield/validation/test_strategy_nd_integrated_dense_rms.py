@@ -273,6 +273,15 @@ def test_native_source_graph_abstractly_traces_all_thirteen_inputs() -> None:
         match="M32-output flag must be boolean",
     ):
         _native_source_context_function(full_m32_output=1)  # type: ignore[arg-type]
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="Pallas-M1-output flag must be boolean",
+    ):
+        _native_source_context_function(pallas_m1_output=1)  # type: ignore[arg-type]
+    with pytest.raises(BenchmarkValidationError, match="disjoint"):
+        _native_source_context_function(
+            full_m32_output=True, pallas_m1_output=True
+        )
 
     code = r'''
 import numpy as np
@@ -297,13 +306,15 @@ arguments = (
     jax.ShapeDtypeStruct((32, 1, 3, 6144), jnp.float32),
     jax.ShapeDtypeStruct((6144,), jnp.bfloat16),
 )
-for full_m32_output, expected_shape in (
-    (False, (1, 6144)),
-    (True, (32, 6144)),
+for full_m32_output, pallas_m1_output, expected_shape in (
+    (False, False, (1, 6144)),
+    (True, False, (32, 6144)),
+    (False, True, (1, 6144)),
 ):
     mapped = jax.shard_map(
         _native_source_context_function(
-            full_m32_output=full_m32_output
+            full_m32_output=full_m32_output,
+            pallas_m1_output=pallas_m1_output,
         ),
         mesh=mesh,
         in_specs=(
@@ -804,6 +815,19 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
             tuple(range(32)),
             native_source_context=True,
             native_m32_output=True,
+        )
+    with pytest.raises(ValueError, match="not pinned"):
+        validate_integrated_dense_rms_stablehlo(
+            "module awaiting protected Pallas-M1 lowering",
+            native_source_context=True,
+            native_m1_pallas_output=True,
+        )
+    with pytest.raises(ValueError, match="not pinned"):
+        validate_integrated_dense_rms_hlo(
+            "HloModule awaiting_protected_pallas_m1_lowering",
+            tuple(range(32)),
+            native_source_context=True,
+            native_m1_pallas_output=True,
         )
 
 
@@ -1596,9 +1620,15 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M32_OUTPUT_REPLAY:-0"
         in wrapper
     )
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_OUTPUT_REPLAY:-0"
+        in wrapper
+    )
     assert "--integrated-accepted-source-context" in wrapper
     assert "--integrated-native-source-context" in wrapper
     assert "--integrated-native-m32-output" in wrapper
+    assert "--integrated-native-m1-pallas-output" in wrapper
+    assert "native M32 and Pallas-M1 outputs are mutually exclusive" in wrapper
     assert "--native-attention-input" in wrapper
     assert "--integrated-preceding-attention-collective" in wrapper
     assert "--integrated-split-predense-rms" in wrapper

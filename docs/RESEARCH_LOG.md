@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 00:30--00:32 UTC — full-M32 layer-1 boundary is bitwise exact on TPU
+
+- Reviewed/pushed pin `c17b772b646fe3507daf0ae437f844dd1d59421f` completed tag
+  `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T003019954601009Z` in
+  90 seconds. The protected numerical verdict is exact at `0 / 6,144`; hidden 2795 is 48423 on
+  both sides and expected/observed row SHAs are both
+  `9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039`.
+- The complete retained `uint16[32,6144]` tensor has array SHA
+  `2a4fe2ddc589198bd8e02a005add3c0a9adaf1976f82ebc1692d421025f942dc`. Exact optimized and
+  StableHLO SHAs are `5bb78e31...2046` and `289017ca...c1bb`. Source/HLO/artifact
+  revalidation, repeat and local-replica equality, same-region object equality, remote
+  `SUCCESS`-last and authenticated 8/8 cleanup all pass. Summary/`SUCCESS`/ledger/post-census/
+  evidence SHAs are `26ae82f2...e757`, `b84785e8...0e6d`, `b83e7944...d8be`,
+  `0c78d19c...9a7a` and `41980b2c...15ad`. This remains diagnostic-only with no performance row.
+- The decisive diagnostic condition is physical extent and fusion ownership: retaining M32 through
+  the complete layer-1 residual add, RMSNorm and norm-weight multiply makes row zero exact, whereas
+  materializing the same sources at M1 produced 1,031 mismatches. Rows 1--31 in the exact artifact
+  are NaN sentinels, so this is an oracle schedule, not an admissible production tensor. Exact next
+  is a true-M1 implementation of that weighted-output arithmetic, local HLO proof, one immutable
+  review and one bounded protected validation. Only an exact M1 result may proceed to full 8K.
+
 ## 2026-08-15 00:25--00:27 UTC — numerical attempt stops on stack-frame-only HLO digest drift
 
 - Reviewed/pushed pin `4a39dcdbba49045a5637250d0ba6d57ba876da16` launched tag

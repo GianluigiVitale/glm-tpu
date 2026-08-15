@@ -105,6 +105,17 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   local replica and deterministic repeat, prove the separately compared row is exactly row zero of
   that array, and carry the mode/full hash into `SUCCESS`. Otherwise an exact row could be sealed
   without proving that the intended M32 graph actually supplied it.
+- The protected full-M32 discriminator is exact: `0 / 6,144`, common row SHA
+  `9936ee1e...d3039`, full-array SHA `2a4fe2dd...42dc`, with exact HLO/source/artifact/archive and
+  8/8 cleanup proof. This closes the layer-0 numerical hypothesis search. Do not add another
+  bounded arithmetic arm or revisit the 1,031/1,073-mismatch variants. The only authorized next
+  use is production integration of the same boundary followed by the complete protected 8K Gate-D
+  confirmation.
+- The exact discriminator's M32 tensor has one live row and 31 NaN sentinel rows. It is diagnostic
+  evidence only and must never enter `decode_batch1`. Production must keep one logical row, prove
+  no batch-32 dead rows or repeated full-pod hidden reconstruction, and reproduce row zero's
+  weighted-output arithmetic with a true-M1 physical kernel/boundary. Do not relabel sentinel rows
+  as virtual-rank state or weaken the dead-row linter to admit them.
 
 ## Evidence ladder
 
