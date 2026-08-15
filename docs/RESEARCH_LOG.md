@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 — WS32 complete-runtime integration reviewed; external launch path unavailable
+
+- Local commit `7fe3f19` implements the isolated 78-layer WS32 decoder composition, exact
+  117,060-to-2,310-per-slot placement, atomic 32-owner packer, sealed direct loader, and protected
+  eight-host offline pack wrapper. The immutable reviewed staged diff was
+  `09168503ea32b7b69787de427fbfcad3651067c9b64319826d73021bf420373f`.
+- The correction batch finalizes the manifest in a writable run directory against exact read-only
+  payload symlinks, skips already-created remote `host_records` during the later create-only
+  upload, requires a pinned/self-hashed checkpoint `SUCCESS` before direct load, revalidates all 32
+  payload CRC32Cs and generations immediately before sealing, and preserves distinct vacancy
+  proofs. Thirty focused tests, outer/evaluated-inner shell parsing, ShellCheck, ten embedded Python
+  compilations, and diff checks pass. The bounded Sol correction review returned `APPROVE COMMIT`.
+- The requested same-chat Fable audit did not execute: the authenticated Claude Max session returned
+  `Request timed out` through all ten automatic retries. No new chat, workflow, subagent, API key,
+  or API billing route was used.
+- No protected workflow was launched. `git push` is blocked in this sandbox by outbound DNS, and
+  `/snap/bin/gcloud` refuses under the sandbox's missing snap-confine capability. Therefore no
+  checkpoint/result prefix, TPU process, DB row, or performance evidence was created. Resume by
+  pushing `7fe3f19` from an outbound-capable environment, then run the reviewed offline pack once;
+  do not repeat the cleared audit.
+
 ## 2026-08-15 09:09--10:00 UTC — WS32 numerical baseline sealed; Pallas successor isolated
 
 - Protected tag `greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` sealed the exact

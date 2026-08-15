@@ -34,6 +34,19 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed local commit `7fe3f19` completes the isolated WS32 78-layer composition and atomic
+  final-owner runtime-checkpoint pack/load batch. Exact placement covers 117,060 base source
+  tensors as 2,310 final tensors and 24,567,890,256 payload bytes per slot; the decoder has an
+  exact 2,310-name bijection, 78 layers, a true one-row residual, and persistent expert-8 x
+  feature-4 ownership. Thirty focused tests pass. Correction audit SHA
+  `09168503...373f` closed the read-only GCSFuse manifest write, duplicate create-only
+  `host_records` upload, unsealed-load, and terminal payload-generation gaps; Sol returned
+  `APPROVE COMMIT`. Fable's same logged-in Max session exhausted its automatic retries on backend
+  `Request timed out` before reading and returned no review; no new chat/workflow/API was used.
+  Commit/push/pack then stopped outside the code: this Codex sandbox cannot resolve GitHub and its
+  `/snap/bin/gcloud` lacks the required snap-confine capability. No protected pack prefix, TPU
+  process, DB row, or performance claim was created. Exact next is push `7fe3f19` from an
+  outbound-capable shell, then run the reviewed offline wrapper once; do not re-audit this batch.
 - Protected tag `greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` at reviewed code
   `d3c3427` closes the readable WS32 layer's numerical/topology/load/HBM/archive discriminator.
   Normal/concentrated maximum absolute errors are `0.015625` / `0.03125`; the exact acquired HLO
