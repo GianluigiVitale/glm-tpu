@@ -421,5 +421,12 @@ branches from the search tree.
   The all-live feature-tiled M8 graph is also frozen: its protected output is byte-identical to the
   six-source arm and remains nonexact at 2,135/6,144. No true-M1 Pallas discriminator remains
   active. Select an architecture-level successor from existing production code and evidence.
+- The WS32 successor confirms that the old latency was an implementation boundary, not TPU-v4 ICI:
+  replacing whole-matrix dequantization with owner-selected raw-FP8 tile-local Pallas changes the
+  exact real-layer p50 from `516.5821635` / `1160.885836` ms to `1.256975` / `2.303685` ms while
+  retaining `0.03125` maximum error, 15/15 live inputs and only feature-4/expert-8 reductions. Carry
+  this body into the complete decoder; do not optimize the rejected readable body or reopen PP8
+  scalar arithmetic. A fast exact layer selects integration but never substitutes for the complete
+  protected decoder required to close Gate D.
 
 Do not return to hour-scale hypothesis runs or already exact contractions.

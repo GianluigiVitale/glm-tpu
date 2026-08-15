@@ -125,11 +125,16 @@ diagnostic-only normal/concentrated p50 is `516.5821635` / `1160.885836` ms, com
 protected PP8/PP16 real-layer sub-millisecond results. These timings are not token-throughput or
 production performance claims.
 
-The one remaining bounded WS32 discriminator is a distinct default-off raw-FP8 Pallas body. It
-selects one sealed `[out,in]` expert owner before invoking the existing tile-local decoder, so it
-requires neither a new pack nor an HBM transpose/decoded overlay. Forced-32 CPU execution already
-matches the reference within the protected bound and proves six exact feature-4/expert-8
-reductions for its smaller test geometry. One fail-closed protected compile acquisition must now
-pin its real StableHLO/optimized HLO before any arithmetic. If that acquired schedule is not live,
-local and materially faster, WS32 is evidence-rejected rather than extended to a full decoder.
+The distinct default-off raw-FP8 Pallas body is now protected and selected. Compile acquisition
+`greenfield_ws32_pallas_real_layer_hlo_20260815T094203579842098Z` pinned StableHLO/optimized HLO
+`fa11961d...6118` / `17ee208a...ff5d` and live closure `0a03b130...6a51`. The protected numerical
+run `greenfield_ws32_pallas_real_layer_numerical_20260815T163210555760825Z` at code `12e92cf`
+reproduced those pins with all 15 inputs, 27 live Pallas calls and exactly nine feature-4 plus one
+expert-8 reduction. Normal and all-eight-on-one-owner cases both have maximum absolute error
+`0.03125`; p50 is `1.256975` / `2.303685` ms. Peak measured HBM is 314,218,496 bytes/chip, the
+51-object `SUCCESS`-last archive passes, and pre/post censuses are 8/8 clean.
+
+This removes whole-matrix dequantization by roughly 411x/504x at this layer and selects WS32 Pallas
+for the complete short decoder. The timing remains a layer diagnostic, not token throughput. Gate D
+still requires protected complete-decoder 2K/8K exactness, HLO, HBM, integrity and wall evidence.
 An unchanged PP8 8K rerun and another M1/M32 arithmetic arm remain forbidden.

@@ -41,16 +41,15 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   bytes/chip and the 51-object `SUCCESS`-last archive plus 8/8 cleanup pass. Diagnostic p50 is
   `516.5821635` / `1160.885836` ms, so whole-matrix dequantization is correctness-passing but
   execution-rejected. It has no DB/token-performance claim.
-- The isolated default-off WS32 Pallas body selects the sealed `[out,in]` expert owner before the
-  raw-FP8 tile-local kernels. Compile acquisition
-  `greenfield_ws32_pallas_real_layer_hlo_20260815T094203579842098Z` proves 32 partitions, 15/15
-  live inputs, 18 F32 gate/up plus 9 BF16 down Pallas calls, and exactly nine feature-4 plus one
-  expert-8 reductions. StableHLO/optimized pins are `fa11961d0d3393d93191f9d591eb7d9efd12a32f54fc046a2983e200579e6118` /
-  `17ee208a3f828e72910f569bad7a8923a9e24a41001234bc3688223458e7ff5d`.
-  It executed no arithmetic and made no DB/performance/SUCCESS claim. The Fable-approved correction
-  preserves the acquired source coordinates, adds the fail-closed live-closure proof and a separate
-  protected numerical wrapper. Exact next is one Sol audit, commit/push, then the one protected
-  numerical/latency run.
+- Protected tag `greenfield_ws32_pallas_real_layer_numerical_20260815T163210555760825Z` at reviewed
+  code `12e92cf` selects the raw-FP8 Pallas WS32 body for integration. Normal/concentrated maximum
+  absolute error is `0.03125` / `0.03125`; diagnostic p50 is `1.256975` / `2.303685` ms versus the
+  readable body's `516.5821635` / `1160.885836` ms. Exact acquired pins `fa11961d...6118` /
+  `17ee208a...ff5d` and live-closure `0a03b130...6a51` reproduce with 15/15 live inputs, 27 live
+  Pallas calls and nine feature-4 plus one expert-8 reductions. Peak HBM is 314,218,496 bytes/chip.
+  The 51-object SUCCESS-last archive and clean 8/8 pre/post censuses pass; there is no DB/token-
+  performance claim. Exact next is complete short-decoder WS32 integration and protected 2K/8K
+  confirmation; the bounded layer alone does not close Gate D.
 
 - The six-day PP8 bitwise arithmetic search is closed. The native-XLA feature tile folded back to
   the rejected ordinary-M1 schedule; all three Pallas forms are nonexact. Do not add another
