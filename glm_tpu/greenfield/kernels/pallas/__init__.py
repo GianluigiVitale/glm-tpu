@@ -20,6 +20,7 @@ from .fp8_matmul import (
 )
 from .rmsnorm import (
     fused_add_rms_norm_m1,
+    source_fused_output_m1_feature_tiled_m8,
     source_fused_output_m1_m8_scratch,
     weighted_output_m1_m8_scratch,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "dsa_scores_pallas",
     "fp8_block_matmul",
     "fused_add_rms_norm_m1",
+    "source_fused_output_m1_feature_tiled_m8",
     "source_fused_output_m1_m8_scratch",
     "weighted_output_m1_m8_scratch",
     "fp8_block_matmul_f32",

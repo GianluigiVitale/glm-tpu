@@ -19,6 +19,19 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed primitive `9f1e600` implements the sole derived successor as an all-live
+  feature-tiled Pallas boundary: semantic BF16 `[1,6144]` sources reshape bijectively to
+  `[8,768]`, six `[8,128]` programs cover every feature exactly once, and a layout-only reshape
+  restores the true-M1 result. There are no NaN/dead sibling rows and no M32 kernel I/O. Independent
+  sentinel replay found zero mapping errors; focused CPU/JAXPR proof passes.
+- That primitive is now wired locally as the distinct, default-off
+  `native_m1_pallas_feature_tiled_output` diagnostic through graph construction, HLO validators,
+  host/terminal schemas and the protected wrapper. Its StableHLO and optimized-HLO pins are
+  deliberately empty. The first protected contact can therefore only atomically preserve both
+  compiler graphs and refuse before arithmetic, host result, comparison, DB row, ledger or terminal
+  `SUCCESS`. Forced-32 abstract tracing covers the complete 13-input graph and the focused suite is
+  41/41. Exact next is one immutable Sol review of this bulk, correction-only closure, commit/push,
+  then exactly one compile-only acquisition. Full 8K remains forbidden.
 - Reviewed/pushed HLO pin `4579e5f1740f6a5b8891962249c066e0070fe40f` completed and sealed the
   source-fused true-M1 discriminator as
   `greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_output_20260815T041349845317572Z`.

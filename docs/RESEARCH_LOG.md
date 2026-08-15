@@ -5,6 +5,23 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 04:17--04:38 UTC — all-live feature-tiled successor is locally fail-closed
+
+- Committed/pushed `9f1e600` adds `source_fused_output_m1_feature_tiled_m8`, the only successor
+  authorized by the rejected source-fused row. Exact semantic M1 dense/attention/embedding and norm
+  inputs reshape to all-live `[8,768]`; a six-program grid covers the 6,144 features with exact
+  `[8,128]` blocks, then one layout-only reshape restores `[1,6144]`. There are no dead/NaN sibling
+  rows and no M32 kernel operand or result. Independent sentinel replay found zero mapping errors.
+- Wired the primitive as a separate default-off diagnostic mode with a unique CLI/environment flag,
+  tag, label, classification, artifact kind, prevalidation field and `SUCCESS` field. It does not
+  reuse or relabel either frozen rejected Pallas arm. Both graph hashes remain deliberately empty,
+  so the protected runner must persist StableHLO and optimized HLO and fail before arithmetic or
+  terminal publication.
+- Forced-32 abstract tracing now covers this fifth native output shape alongside the controls;
+  flag disjointness, empty-pin refusal, prevalidation, terminal heredoc and wrapper propagation are
+  tested. Focused kernel/integrated/terminal suite passes 41/41. This is readiness only: one immutable
+  review and correction closure precede one compile-only acquisition. No full 8K run is authorized.
+
 ## 2026-08-15 04:13--04:17 UTC — source-fused true-M1 numerical verdict is nonexact
 
 - Pushed reviewed HLO pin `4579e5f1740f6a5b8891962249c066e0070fe40f` and ran exactly one bounded

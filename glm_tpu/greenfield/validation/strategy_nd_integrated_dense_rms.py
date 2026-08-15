@@ -152,6 +152,7 @@ def _validate_hlo_prevalidation(
     native_m32_output: bool = False,
     native_m1_pallas_output: bool = False,
     native_m1_pallas_sources_output: bool = False,
+    native_m1_pallas_feature_tiled_output: bool = False,
 ) -> None:
     expected_fields = set(EXPECTED_HLO_PREVALIDATION_FIELDS)
     if preceding_attention_collective:
@@ -168,6 +169,8 @@ def _validate_hlo_prevalidation(
         expected_fields.add("native_m1_pallas_output")
     if native_m1_pallas_sources_output:
         expected_fields.add("native_m1_pallas_sources_output")
+    if native_m1_pallas_feature_tiled_output:
+        expected_fields.add("native_m1_pallas_feature_tiled_output")
     if not (
         type(record) is dict
         and set(record) == expected_fields
@@ -201,6 +204,10 @@ def _validate_hlo_prevalidation(
             not native_m1_pallas_sources_output
             or record["native_m1_pallas_sources_output"] is True
         )
+        and (
+            not native_m1_pallas_feature_tiled_output
+            or record["native_m1_pallas_feature_tiled_output"] is True
+        )
         and record["split_layer1_rms"] is split_layer1_rms
         and record["validated"] is False
         and record["performance_claim"] is False
@@ -220,6 +227,7 @@ def _recompute_comparison(
     native_m32_output: bool = False,
     native_m1_pallas_output: bool = False,
     native_m1_pallas_sources_output: bool = False,
+    native_m1_pallas_feature_tiled_output: bool = False,
 ) -> dict[str, Any]:
     mismatch_indices = np.flatnonzero(observed != expected)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -232,7 +240,9 @@ def _recompute_comparison(
     error = np.abs(observed_values - expected_values)
     observed_sha = _raw_sha256(observed)
     prefix = (
-        "integrated_dense_native_m1_pallas_sources_output"
+        "integrated_dense_native_m1_pallas_feature_tiled_output"
+        if native_m1_pallas_feature_tiled_output
+        else "integrated_dense_native_m1_pallas_sources_output"
         if native_m1_pallas_sources_output
         else "integrated_dense_native_m1_pallas_output"
         if native_m1_pallas_output
@@ -360,6 +370,7 @@ def validate_strategy_nd_integrated_dense_rms(
     expected_native_m32_output: bool = False,
     expected_native_m1_pallas_output: bool = False,
     expected_native_m1_pallas_sources_output: bool = False,
+    expected_native_m1_pallas_feature_tiled_output: bool = False,
 ) -> dict[str, Any]:
     """Reload every source/fleet/artifact byte and recompute the verdict."""
 
@@ -389,6 +400,10 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError(
             "native source-fused Pallas-M1-output expectation must be boolean"
         )
+    if not isinstance(expected_native_m1_pallas_feature_tiled_output, bool):
+        raise ValueError(
+            "native all-live feature-tiled Pallas-M1 expectation must be boolean"
+        )
     if expected_native_m32_output and not expected_native_source_context:
         raise ValueError("native M32 output requires native source context")
     if expected_native_m1_pallas_output and not expected_native_source_context:
@@ -400,11 +415,19 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError(
             "native source-fused Pallas-M1 output requires native source context"
         )
+    if (
+        expected_native_m1_pallas_feature_tiled_output
+        and not expected_native_source_context
+    ):
+        raise ValueError(
+            "native all-live feature-tiled Pallas-M1 output requires native source context"
+        )
     if sum(
         (
             expected_native_m32_output,
             expected_native_m1_pallas_output,
             expected_native_m1_pallas_sources_output,
+            expected_native_m1_pallas_feature_tiled_output,
         )
     ) > 1:
         raise ValueError("native output modes are pairwise disjoint")
@@ -532,6 +555,8 @@ def validate_strategy_nd_integrated_dense_rms(
         expected_replay_fields.add("native_m1_pallas_output")
     if expected_native_m1_pallas_sources_output:
         expected_replay_fields.add("native_m1_pallas_sources_output")
+    if expected_native_m1_pallas_feature_tiled_output:
+        expected_replay_fields.add("native_m1_pallas_feature_tiled_output")
     if any(
         type(item) is not dict or set(item) != expected_replay_fields
         for item in items
@@ -585,6 +610,10 @@ def validate_strategy_nd_integrated_dense_rms(
         and (
             not expected_native_m1_pallas_sources_output
             or reference["native_m1_pallas_sources_output"] is True
+        )
+        and (
+            not expected_native_m1_pallas_feature_tiled_output
+            or reference["native_m1_pallas_feature_tiled_output"] is True
         )
         and (
             legacy_schema
@@ -755,6 +784,9 @@ def validate_strategy_nd_integrated_dense_rms(
         native_m1_pallas_sources_output=(
             expected_native_m1_pallas_sources_output
         ),
+        native_m1_pallas_feature_tiled_output=(
+            expected_native_m1_pallas_feature_tiled_output
+        ),
     )
     recorded = reference["comparison"]
     if not (
@@ -841,7 +873,9 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense fleet hashes drifted")
 
     label = (
-        "strategy_nd_integrated_dense_native_m1_pallas_sources_output_bfloat16_1x6144"
+        "strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_bfloat16_1x6144"
+        if expected_native_m1_pallas_feature_tiled_output
+        else "strategy_nd_integrated_dense_native_m1_pallas_sources_output_bfloat16_1x6144"
         if expected_native_m1_pallas_sources_output
         else "strategy_nd_integrated_dense_native_m1_pallas_output_bfloat16_1x6144"
         if expected_native_m1_pallas_output
@@ -893,6 +927,9 @@ def validate_strategy_nd_integrated_dense_rms(
         native_m1_pallas_sources_output=(
             expected_native_m1_pallas_sources_output
         ),
+        native_m1_pallas_feature_tiled_output=(
+            expected_native_m1_pallas_feature_tiled_output
+        ),
     )
     optimized_contract = validate_integrated_dense_rms_hlo(
         optimized_hlo,
@@ -906,6 +943,9 @@ def validate_strategy_nd_integrated_dense_rms(
         native_m1_pallas_output=expected_native_m1_pallas_output,
         native_m1_pallas_sources_output=(
             expected_native_m1_pallas_sources_output
+        ),
+        native_m1_pallas_feature_tiled_output=(
+            expected_native_m1_pallas_feature_tiled_output
         ),
     )
     if legacy_schema:
@@ -930,6 +970,9 @@ def validate_strategy_nd_integrated_dense_rms(
             native_m1_pallas_sources_output=(
                 expected_native_m1_pallas_sources_output
             ),
+            native_m1_pallas_feature_tiled_output=(
+                expected_native_m1_pallas_feature_tiled_output
+            ),
         )
     if not (
         stable_contract == reference["stablehlo_contract"]
@@ -945,7 +988,9 @@ def validate_strategy_nd_integrated_dense_rms(
 
     result = {
         "artifact_kind": (
-            "glm52_strategy_nd_integrated_dense_native_m1_pallas_sources_output"
+            "glm52_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output"
+            if expected_native_m1_pallas_feature_tiled_output
+            else "glm52_strategy_nd_integrated_dense_native_m1_pallas_sources_output"
             if expected_native_m1_pallas_sources_output
             else "glm52_strategy_nd_integrated_dense_native_m1_pallas_output"
             if expected_native_m1_pallas_output
@@ -1008,4 +1053,6 @@ def validate_strategy_nd_integrated_dense_rms(
         result["native_m1_pallas_output"] = True
     if expected_native_m1_pallas_sources_output:
         result["native_m1_pallas_sources_output"] = True
+    if expected_native_m1_pallas_feature_tiled_output:
+        result["native_m1_pallas_feature_tiled_output"] = True
     return result

@@ -182,6 +182,12 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   is not the dominant missing mechanism. A further physical-tile probe is justified only if every
   `8x128` lane holds live feature data and the external semantic result is still one row; never
   spend another run on NaN/dead sibling lanes or a renamed readable formula.
+- The authorized all-live successor now maps semantic `[1,6144]` feature order bijectively onto
+  `[8,768]`, executes six `[8,128]` programs with every lane live, and reshapes back to one row.
+  Treat this feature axis as a representation only, never as eight batch rows. Its protected mode
+  is disjoint and HLO-unpinned: acquire the TPU lowering once, require the observed schedule and
+  exact live value flow before arithmetic, and reject the route if it does not lower to the
+  intended all-live tile. Do not fall back to the frozen dead-lane kernel.
 
 ## Evidence ladder
 
