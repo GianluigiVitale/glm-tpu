@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 00:52--00:54 UTC — true-M1 Pallas TPU lowering acquired once
+
+- Reviewed/pushed pin `38d3d61723c14bce8855494d4c5be4d548c000ef` ran the intentionally
+  fail-closed acquisition as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_20260815T005237606917753Z`.
+  The 93-second protected wrapper compiled on all eight hosts, persisted the graphs and refused on
+  the deliberately empty StableHLO pin before arithmetic. No tensor, comparison, DB row, terminal
+  archive or `SUCCESS` exists; both censuses are authenticated 8/8 clean. The partial diagnostic
+  prefix contains exactly 28 objects.
+- StableHLO/optimized-HLO/prevalidation SHAs are `14c6c757...7702`, `1fa0957a...5813` and
+  `2438b4be...0859`. The optimized graph has 558 instructions and 32 partitions. Its one
+  `greenfield_fused_add_rms_norm_m1_h6144` TPU custom call consumes two `bf16[1,6144]` rows plus
+  one `bf16[6144]` norm weight, returns two `bf16[1,6144]` rows and feeds tuple result 0 directly
+  to the live `u16[1,6144]` root. No M32 tensor enters or leaves this Pallas kernel.
+- Both complete graph hashes are pinned. The preserved real graph passes locally; parser-valid
+  Pallas-input swaps, row-1 selection, tuple-result-1 selection and live-root rewiring plus
+  StableHLO operand/result swaps all refuse. Terminal recomputation and `SUCCESS` publication now
+  bind a distinct default-off Pallas-M1 mode. Focused integrated/kernel tests pass 24/24 on CPU.
+  Exact next is one immutable Sol audit/correction closure and one bounded protected numerical
+  execution. Only `0 / 6,144` authorizes production decoder integration and the complete 8K run.
+
 ## 2026-08-15 00:30--00:32 UTC — full-M32 layer-1 boundary is bitwise exact on TPU
 
 - Reviewed/pushed pin `c17b772b646fe3507daf0ae437f844dd1d59421f` completed tag

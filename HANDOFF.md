@@ -19,6 +19,23 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `38d3d61723c14bce8855494d4c5be4d548c000ef` ran the deliberately
+  fail-closed true-M1 Pallas compile acquisition once under tag
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_20260815T005237606917753Z`.
+  The 93-second wrapper reached the exact empty-pin refusal before arithmetic; there is no output,
+  comparison, DB row, terminal archive or `SUCCESS`. Pre/failure censuses are 8/8 clean and the
+  partial diagnostic prefix contains 28 objects only. StableHLO, optimized-HLO and prevalidation
+  SHAs are `14c6c757...7702`, `1fa0957a...5813` and `2438b4be...0859`.
+- The acquired 558-instruction / 32-partition graph has exactly one
+  `greenfield_fused_add_rms_norm_m1_h6144` TPU custom call. Its three inputs are two exact
+  `bf16[1,6144]` rows and one `bf16[6144]` weight; it returns two `bf16[1,6144]` rows and the live
+  U16 root consumes tuple result 0. No M32 tensor crosses the Pallas boundary. Both complete graph
+  digests are now pinned; parser-valid source-order, row-slice, tuple-index and root mutations
+  refuse locally. The terminal revalidator and wrapper now carry a distinct Pallas-M1 mode rather
+  than relabeling the native-source or M32 modes. Exact next is one immutable Sol review of this
+  HLO-pin/terminal batch, then one bounded protected 6,144-value execution. Full 8K remains
+  forbidden until that row is bitwise exact.
+
 - Reviewed/pushed pin `c17b772b646fe3507daf0ae437f844dd1d59421f` completed the protected
   native full-M32 numerical discriminator under tag
   `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T003019954601009Z`.

@@ -57,11 +57,14 @@ INTEGRATED_DENSE_NATIVE_M32_STABLEHLO_SHA256 = (
 INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256 = (
     "5bb78e31caa5f56d0038522d0af06488d6e0cd94a03c94df3b98e9455b6a2046"
 )
-# Deliberately empty until one fail-closed protected Pallas-M1 compile
-# acquisition preserves the exact TPU lowering.  Empty pins prohibit
-# arithmetic publication.
-INTEGRATED_DENSE_NATIVE_M1_PALLAS_STABLEHLO_SHA256 = ""
-INTEGRATED_DENSE_NATIVE_M1_PALLAS_OPTIMIZED_HLO_SHA256 = ""
+# Exact fail-closed protected Pallas-M1 compile acquisition. These pins are
+# required before any arithmetic execution or terminal publication.
+INTEGRATED_DENSE_NATIVE_M1_PALLAS_STABLEHLO_SHA256 = (
+    "14c6c7573461879d1fafc37e758211cc2448520e406fc520655fbf9d1d647702"
+)
+INTEGRATED_DENSE_NATIVE_M1_PALLAS_OPTIMIZED_HLO_SHA256 = (
+    "1fa0957ab6816c19c63eadaf2eb7a325318a3d88996dcd9fb66c44504b545813"
+)
 
 _NATIVE_SOURCE_COLLECTIVE_SCOPES = (
     "native_source_context_embedding_collective",
@@ -1292,7 +1295,15 @@ def validate_integrated_dense_rms_stablehlo(
     if native_m32_output:
         result["native_m32_output"] = True
     if native_m1_pallas_output:
-        result["native_m1_pallas_output"] = True
+        result.update(
+            {
+                "exact_m1_pallas_boundary": True,
+                "m1_pallas_live_rows": 1,
+                "m1_pallas_result_count": 2,
+                "native_m1_pallas_output": True,
+                "no_m32_pallas_io": True,
+            }
+        )
     return result
 
 
@@ -1340,7 +1351,13 @@ def _validate_native_source_context_hlo(
     )
     report.raise_for_violations()
     module = report.module
-    expected_instruction_count = 597 if native_m32_output else 602
+    expected_instruction_count = (
+        558
+        if native_m1_pallas_output
+        else 597
+        if native_m32_output
+        else 602
+    )
     if (
         module.num_partitions != 32
         or len(module.instructions) != expected_instruction_count
@@ -1514,10 +1531,82 @@ def _validate_native_source_context_hlo(
         "rsqrt",
         (("f32", (32,)),),
     )
+    entry_by_name = {item.name: item for item in entry}
+    pallas_calls = tuple(
+        item
+        for item in entry
+        if item.raw_opcode == "custom-call"
+        and item.name == "%greenfield_fused_add_rms_norm_m1_h6144.1"
+        and item.op_name
+        == (
+            "jit(integrated)/shard_map/native_source_context_layer1_norm/"
+            "native_source_context_layer1_pallas_m1/"
+            "greenfield_fused_add_rms_norm_m1_h6144/pallas_call"
+        )
+        and _shape_signature(item)
+        == (("bf16", (1, 6144)), ("bf16", (1, 6144)))
+        and tuple(
+            (shape.dtype, shape.dimensions) for shape in item.operand_shapes
+        )
+        == (
+            ("bf16", (1, 6144)),
+            ("bf16", (1, 6144)),
+            ("bf16", (6144,)),
+        )
+        and item.operand_names == ("%slice.53", "%fusion.40", "%copy-done.7")
+        and 'custom_call_target="tpu_custom_call"' in item.raw_line
+        and (
+            "operand_layout_constraints={bf16[1,6144]{1,0}, "
+            "bf16[1,6144]{1,0}, bf16[6144]{0}}"
+        )
+        in item.raw_line
+    )
+    pallas_source_slice = entry_by_name.get("%slice.53")
+    pallas_carried_fusion = entry_by_name.get("%fusion.40")
+    pallas_norm_copy = entry_by_name.get("%copy-done.7")
+    pallas_norm_start = entry_by_name.get("%copy-start.7")
+    pallas_output = entry_by_name.get("%get-tuple-element.20")
     roots = tuple(
         item
         for item in entry
         if item.raw_line.lstrip().startswith("ROOT ")
+    )
+    exact_m1_pallas_boundary = bool(
+        native_m1_pallas_output
+        and len(pallas_calls) == 1
+        and pallas_source_slice is not None
+        and pallas_source_slice.computation.startswith("ENTRY ")
+        and pallas_source_slice.raw_opcode == "slice"
+        and _shape_signature(pallas_source_slice) == (("bf16", (1, 6144)),)
+        and pallas_source_slice.operand_names == ("%psum.23",)
+        and "slice={[0:1], [0:6144]}" in pallas_source_slice.raw_line
+        and pallas_carried_fusion is not None
+        and pallas_carried_fusion.computation.startswith("ENTRY ")
+        and pallas_carried_fusion.raw_opcode == "fusion"
+        and _shape_signature(pallas_carried_fusion)
+        == (("bf16", (1, 6144)),)
+        and pallas_carried_fusion.operand_names
+        == ("%bitcast.89", "%psum.22", "%psum.21")
+        and "calls=%fused_computation.33" in pallas_carried_fusion.raw_line
+        and pallas_norm_copy is not None
+        and pallas_norm_copy.raw_opcode == "copy-done"
+        and pallas_norm_copy.operand_names == ("%copy-start.7",)
+        and _shape_signature(pallas_norm_copy) == (("bf16", (6144,)),)
+        and pallas_norm_start is not None
+        and pallas_norm_start.raw_opcode == "copy-start"
+        and pallas_norm_start.operand_names == ("%param.26",)
+        and pallas_output is not None
+        and pallas_output.raw_opcode == "get-tuple-element"
+        and pallas_output.operand_names
+        == ("%greenfield_fused_add_rms_norm_m1_h6144.1",)
+        and "index=0" in pallas_output.raw_line
+        and _shape_signature(pallas_output) == (("bf16", (1, 6144)),)
+        and len(layer1_reductions) == 0
+        and len(layer1_rsqrt) == 0
+        and len(roots) == 1
+        and roots[0].raw_opcode == "bitcast-convert"
+        and roots[0].operand_names == ("%get-tuple-element.20",)
+        and _shape_signature(roots[0]) == (("u16", (1, 6144)),)
     )
     if not (
         len(embedding_gathers) == 1
@@ -1530,17 +1619,27 @@ def _validate_native_source_context_hlo(
         )
         and len(predense_reductions) == 1
         and len(predense_rsqrt) == 1
-        and len(layer1_reductions) == 1
-        and len(layer1_rsqrt) == 1
+        and (
+            exact_m1_pallas_boundary
+            if native_m1_pallas_output
+            else len(layer1_reductions) == 1 and len(layer1_rsqrt) == 1
+        )
         and len(roots) == 1
-        and roots[0].raw_opcode == "fusion"
+        and roots[0].raw_opcode
+        == ("bitcast-convert" if native_m1_pallas_output else "fusion")
         and _shape_signature(roots[0]) == expected_root_shape
         and (
             expected_root_operands is None
             or roots[0].operand_names == expected_root_operands
         )
         and roots[0].op_name
-        == "jit(integrated)/shard_map/integrated_dense_rms_live_row/bitcast_convert_type"
+        == (
+            "jit(integrated)/shard_map/native_source_context_layer1_norm/"
+            "integrated_dense_rms_live_row/bitcast_convert_type"
+            if native_m1_pallas_output
+            else "jit(integrated)/shard_map/integrated_dense_rms_live_row/"
+            "bitcast_convert_type"
+        )
     ):
         raise BenchmarkValidationError(
             "integrated native-source live graph structure drifted"
@@ -1587,6 +1686,18 @@ def _validate_native_source_context_hlo(
                 "native_m32_output": True,
             }
             if native_m32_output
+            else {}
+        ),
+        **(
+            {
+                "exact_m1_pallas_boundary": True,
+                "m1_pallas_custom_call_count": 1,
+                "m1_pallas_live_result_index": 0,
+                "m1_pallas_result_count": 2,
+                "native_m1_pallas_output": True,
+                "no_m32_pallas_io": True,
+            }
+            if native_m1_pallas_output
             else {}
         ),
     }

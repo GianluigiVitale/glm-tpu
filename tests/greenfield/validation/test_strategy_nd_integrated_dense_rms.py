@@ -27,6 +27,8 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
 from glm_tpu.greenfield.errors import BenchmarkValidationError
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_M1_PALLAS_OPTIMIZED_HLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_M1_PALLAS_STABLEHLO_SHA256,
     INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256,
     INTEGRATED_DENSE_NATIVE_M32_STABLEHLO_SHA256,
     INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256,
@@ -143,6 +145,24 @@ REAL_NATIVE_M32_TPU_STABLEHLO = (
     REAL_NATIVE_M32_TPU_RUN
     / "hlo/strategy_nd_integrated_dense_native_m32_output_"
     "bfloat16_32x6144.stablehlo.mlir"
+)
+REAL_NATIVE_M1_PALLAS_TPU_RUN = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_INTEGRATED_NATIVE_M1_PALLAS_TPU_RUN",
+        "/home/gianl/glm-run/"
+        "greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_"
+        "20260815T005237606917753Z",
+    )
+)
+REAL_NATIVE_M1_PALLAS_TPU_HLO = (
+    REAL_NATIVE_M1_PALLAS_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_m1_pallas_output_"
+    "bfloat16_1x6144.optimized_hlo.txt"
+)
+REAL_NATIVE_M1_PALLAS_TPU_STABLEHLO = (
+    REAL_NATIVE_M1_PALLAS_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_m1_pallas_output_"
+    "bfloat16_1x6144.stablehlo.mlir"
 )
 REAL_NATIVE_M32_ACQUISITION_TPU_HLO = Path(
     "/home/gianl/glm-run/"
@@ -816,13 +836,13 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
             native_source_context=True,
             native_m32_output=True,
         )
-    with pytest.raises(ValueError, match="not pinned"):
+    with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
         validate_integrated_dense_rms_stablehlo(
             "module awaiting protected Pallas-M1 lowering",
             native_source_context=True,
             native_m1_pallas_output=True,
         )
-    with pytest.raises(ValueError, match="not pinned"):
+    with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
         validate_integrated_dense_rms_hlo(
             "HloModule awaiting_protected_pallas_m1_lowering",
             tuple(range(32)),
@@ -1362,6 +1382,100 @@ def test_real_native_m32_tpu_hlo_and_mutation_refusals() -> None:
         )
 
 
+@pytest.mark.skipif(
+    not REAL_NATIVE_M1_PALLAS_TPU_HLO.is_file()
+    or not REAL_NATIVE_M1_PALLAS_TPU_STABLEHLO.is_file(),
+    reason="protected native Pallas-M1 integrated TPU HLO absent",
+)
+def test_real_native_m1_pallas_tpu_hlo_and_mutation_refusals() -> None:
+    from jaxlib import xla_client
+
+    optimized_hlo = REAL_NATIVE_M1_PALLAS_TPU_HLO.read_text()
+    stablehlo = REAL_NATIVE_M1_PALLAS_TPU_STABLEHLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_M1_PALLAS_OPTIMIZED_HLO_SHA256
+    )
+    assert sha256(stablehlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_M1_PALLAS_STABLEHLO_SHA256
+    )
+    stable_contract = validate_integrated_dense_rms_stablehlo(
+        stablehlo,
+        native_source_context=True,
+        native_m1_pallas_output=True,
+    )
+    optimized_contract = validate_integrated_dense_rms_hlo(
+        optimized_hlo,
+        tuple(range(32)),
+        native_source_context=True,
+        native_m1_pallas_output=True,
+    )
+    assert stable_contract["exact_m1_pallas_boundary"] is True
+    assert stable_contract["m1_pallas_live_rows"] == 1
+    assert stable_contract["no_m32_pallas_io"] is True
+    assert optimized_contract["passed"] is True
+    assert optimized_contract["exact_m1_pallas_boundary"] is True
+    assert optimized_contract["m1_pallas_custom_call_count"] == 1
+    assert optimized_contract["m1_pallas_live_result_index"] == 0
+    assert optimized_contract["m1_pallas_result_count"] == 2
+    assert optimized_contract["live_rows"] == 1
+    assert optimized_contract["no_m32_pallas_io"] is True
+
+    replacements = (
+        (
+            "custom-call(%slice.53, %fusion.40, %copy-done.7)",
+            "custom-call(%fusion.40, %slice.53, %copy-done.7)",
+        ),
+        (
+            "slice(%psum.23), slice={[0:1], [0:6144]}",
+            "slice(%psum.23), slice={[1:2], [0:6144]}",
+        ),
+        (
+            "get-tuple-element(%greenfield_fused_add_rms_norm_m1_h6144.1), "
+            "index=0",
+            "get-tuple-element(%greenfield_fused_add_rms_norm_m1_h6144.1), "
+            "index=1",
+        ),
+        (
+            "bitcast-convert(%get-tuple-element.20)",
+            "bitcast-convert(%fusion.40)",
+        ),
+    )
+    mutations = tuple(
+        optimized_hlo.replace(old, new, 1) for old, new in replacements
+    )
+    assert all(mutation != optimized_hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
+            validate_integrated_dense_rms_hlo(
+                mutation,
+                tuple(range(32)),
+                native_source_context=True,
+                native_m1_pallas_output=True,
+            )
+
+    stable_mutations = (
+        stablehlo.replace(
+            "custom_call @tpu_custom_call(%213, %214, %arg26)",
+            "custom_call @tpu_custom_call(%214, %213, %arg26)",
+            1,
+        ),
+        stablehlo.replace(
+            "stablehlo.bitcast_convert %215#0",
+            "stablehlo.bitcast_convert %215#1",
+            1,
+        ),
+    )
+    assert all(mutation != stablehlo for mutation in stable_mutations)
+    for mutation in stable_mutations:
+        with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
+            validate_integrated_dense_rms_stablehlo(
+                mutation,
+                native_source_context=True,
+                native_m1_pallas_output=True,
+            )
+
+
 def test_checkpoint_success_pin_and_missing_mutated_refusals(
     tmp_path: Path,
 ) -> None:
@@ -1450,6 +1564,15 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     )
     assert native_m32_exact["classification"] == (
         "integrated_dense_native_m32_output_exact_accepted"
+    )
+    native_m1_pallas_exact = _recompute_comparison(
+        expected.copy(),
+        expected,
+        native_source_context=True,
+        native_m1_pallas_output=True,
+    )
+    assert native_m1_pallas_exact["classification"] == (
+        "integrated_dense_native_m1_pallas_output_exact_accepted"
     )
     digest = array_sha256(expected)
     capture = {
@@ -1572,6 +1695,18 @@ def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
         native_source_context=True,
         native_m32_output=True,
     )
+    native_m1_pallas_record = {
+        **native_record,
+        "native_m1_pallas_output": True,
+    }
+    _validate_hlo_prevalidation(
+        native_m1_pallas_record,
+        optimized_hlo_sha256="1" * 64,
+        stablehlo_sha256="2" * 64,
+        split_layer1_rms=False,
+        native_source_context=True,
+        native_m1_pallas_output=True,
+    )
     for key, value in (
         ("validated", True),
         ("performance_claim", True),
@@ -1636,9 +1771,14 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
     assert "--mode strategy_nd_integrated_dense_rms" in wrapper
     assert "validate_strategy_nd_integrated_dense_rms" in wrapper
     assert '"$RMS_REPLAY" "$INTEGRATED_REPLAY"' in wrapper
-    assert '"$INTEGRATED_NATIVE_M32_REPLAY" <<\'PY\'' in wrapper
+    assert '"$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" <<\'PY\'' in wrapper
     assert "expected_native_m32_output=native_m32 == \"1\"" in wrapper
+    assert (
+        "expected_native_m1_pallas_output=native_m1_pallas == \"1\""
+        in wrapper
+    )
     assert 'values["native_m32_output"] = "true"' in wrapper
+    assert 'values["native_m1_pallas_output"] = "true"' in wrapper
     assert '"full_m32_output_sha256"' in wrapper
     assert wrapper.index("strict_census post") < wrapper.index(
         '"$REMOTE_PREFIX/SUCCESS" >/dev/null'

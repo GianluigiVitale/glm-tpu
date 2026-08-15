@@ -116,6 +116,12 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   no batch-32 dead rows or repeated full-pod hidden reconstruction, and reproduce row zero's
   weighted-output arithmetic with a true-M1 physical kernel/boundary. Do not relabel sentinel rows
   as virtual-rank state or weaken the dead-row linter to admit them.
+- The true-M1 Pallas lowering has now been acquired once. Its exact StableHLO/optimized-HLO hashes
+  are `14c6c757...7702` / `1fa0957a...5813`; the Pallas call itself accepts and returns only
+  one-row tensors. Freeze this lowering and mutate/replay it locally. Do not spend another compile
+  acquisition on the same code/compiler pin, and do not confuse its upstream M32 diagnostic
+  producers with M32 Pallas I/O. One bounded numerical execution decides the kernel; only an exact
+  row authorizes decoder integration.
 
 ## Evidence ladder
 

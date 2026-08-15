@@ -150,6 +150,7 @@ def _validate_hlo_prevalidation(
     accepted_source_context: bool = False,
     native_source_context: bool = False,
     native_m32_output: bool = False,
+    native_m1_pallas_output: bool = False,
 ) -> None:
     expected_fields = set(EXPECTED_HLO_PREVALIDATION_FIELDS)
     if preceding_attention_collective:
@@ -162,6 +163,8 @@ def _validate_hlo_prevalidation(
         expected_fields.add("native_source_context")
     if native_m32_output:
         expected_fields.add("native_m32_output")
+    if native_m1_pallas_output:
+        expected_fields.add("native_m1_pallas_output")
     if not (
         type(record) is dict
         and set(record) == expected_fields
@@ -187,6 +190,10 @@ def _validate_hlo_prevalidation(
             not native_m32_output
             or record["native_m32_output"] is True
         )
+        and (
+            not native_m1_pallas_output
+            or record["native_m1_pallas_output"] is True
+        )
         and record["split_layer1_rms"] is split_layer1_rms
         and record["validated"] is False
         and record["performance_claim"] is False
@@ -204,6 +211,7 @@ def _recompute_comparison(
     accepted_source_context: bool = False,
     native_source_context: bool = False,
     native_m32_output: bool = False,
+    native_m1_pallas_output: bool = False,
 ) -> dict[str, Any]:
     mismatch_indices = np.flatnonzero(observed != expected)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -216,7 +224,9 @@ def _recompute_comparison(
     error = np.abs(observed_values - expected_values)
     observed_sha = _raw_sha256(observed)
     prefix = (
-        "integrated_dense_native_m32_output"
+        "integrated_dense_native_m1_pallas_output"
+        if native_m1_pallas_output
+        else "integrated_dense_native_m32_output"
         if native_m32_output
         else "integrated_dense_native_source_context"
         if native_source_context
@@ -338,6 +348,7 @@ def validate_strategy_nd_integrated_dense_rms(
     expected_accepted_source_context: bool = False,
     expected_native_source_context: bool = False,
     expected_native_m32_output: bool = False,
+    expected_native_m1_pallas_output: bool = False,
 ) -> dict[str, Any]:
     """Reload every source/fleet/artifact byte and recompute the verdict."""
 
@@ -361,8 +372,14 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("native source-context expectation must be boolean")
     if not isinstance(expected_native_m32_output, bool):
         raise ValueError("native M32-output expectation must be boolean")
+    if not isinstance(expected_native_m1_pallas_output, bool):
+        raise ValueError("native Pallas-M1-output expectation must be boolean")
     if expected_native_m32_output and not expected_native_source_context:
         raise ValueError("native M32 output requires native source context")
+    if expected_native_m1_pallas_output and not expected_native_source_context:
+        raise ValueError("native Pallas-M1 output requires native source context")
+    if expected_native_m32_output and expected_native_m1_pallas_output:
+        raise ValueError("native M32 and Pallas-M1 outputs are disjoint")
     if expected_accepted_source_context and expected_native_source_context:
         raise ValueError("accepted and native source contexts are disjoint")
     if expected_preceding_attention_collective and not expected_split_layer1_rms:
@@ -483,6 +500,8 @@ def validate_strategy_nd_integrated_dense_rms(
         expected_replay_fields.add("native_source_context")
     if expected_native_m32_output:
         expected_replay_fields.add("native_m32_output")
+    if expected_native_m1_pallas_output:
+        expected_replay_fields.add("native_m1_pallas_output")
     if any(
         type(item) is not dict or set(item) != expected_replay_fields
         for item in items
@@ -528,6 +547,10 @@ def validate_strategy_nd_integrated_dense_rms(
         and (
             not expected_native_m32_output
             or reference["native_m32_output"] is True
+        )
+        and (
+            not expected_native_m1_pallas_output
+            or reference["native_m1_pallas_output"] is True
         )
         and (
             legacy_schema
@@ -694,6 +717,7 @@ def validate_strategy_nd_integrated_dense_rms(
         accepted_source_context=expected_accepted_source_context,
         native_source_context=expected_native_source_context,
         native_m32_output=expected_native_m32_output,
+        native_m1_pallas_output=expected_native_m1_pallas_output,
     )
     recorded = reference["comparison"]
     if not (
@@ -780,7 +804,9 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense fleet hashes drifted")
 
     label = (
-        "strategy_nd_integrated_dense_native_m32_output_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_native_m1_pallas_output_bfloat16_1x6144"
+        if expected_native_m1_pallas_output
+        else "strategy_nd_integrated_dense_native_m32_output_bfloat16_32x6144"
         if expected_native_m32_output
         else "strategy_nd_integrated_dense_native_source_context_bfloat16_32x6144"
         if expected_native_source_context
@@ -824,6 +850,7 @@ def validate_strategy_nd_integrated_dense_rms(
         accepted_source_context=expected_accepted_source_context,
         native_source_context=expected_native_source_context,
         native_m32_output=expected_native_m32_output,
+        native_m1_pallas_output=expected_native_m1_pallas_output,
     )
     optimized_contract = validate_integrated_dense_rms_hlo(
         optimized_hlo,
@@ -834,6 +861,7 @@ def validate_strategy_nd_integrated_dense_rms(
         accepted_source_context=expected_accepted_source_context,
         native_source_context=expected_native_source_context,
         native_m32_output=expected_native_m32_output,
+        native_m1_pallas_output=expected_native_m1_pallas_output,
     )
     if legacy_schema:
         stable_contract = dict(stable_contract)
@@ -853,6 +881,7 @@ def validate_strategy_nd_integrated_dense_rms(
             accepted_source_context=expected_accepted_source_context,
             native_source_context=expected_native_source_context,
             native_m32_output=expected_native_m32_output,
+            native_m1_pallas_output=expected_native_m1_pallas_output,
         )
     if not (
         stable_contract == reference["stablehlo_contract"]
@@ -868,7 +897,9 @@ def validate_strategy_nd_integrated_dense_rms(
 
     result = {
         "artifact_kind": (
-            "glm52_strategy_nd_integrated_dense_native_m32_output"
+            "glm52_strategy_nd_integrated_dense_native_m1_pallas_output"
+            if expected_native_m1_pallas_output
+            else "glm52_strategy_nd_integrated_dense_native_m32_output"
             if expected_native_m32_output
             else "glm52_strategy_nd_integrated_dense_native_source_context"
             if expected_native_source_context
@@ -923,4 +954,6 @@ def validate_strategy_nd_integrated_dense_rms(
         result["native_source_context"] = True
     if expected_native_m32_output:
         result["native_m32_output"] = True
+    if expected_native_m1_pallas_output:
+        result["native_m1_pallas_output"] = True
     return result
