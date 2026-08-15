@@ -1,4 +1,4 @@
-"""True-row TPU fused residual-add/RMSNorm boundary.
+"""True-row TPU residual/RMS weighted-output boundaries.
 
 The protected Gate-D oracle showed that XLA's ordinary one-row elementwise
 fusion does not preserve the accepted BF16 weighted-output rounding.  This
@@ -16,6 +16,109 @@ import jax.numpy as jnp
 from jax import lax
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
+
+
+def weighted_output_m1_m8_scratch(
+    hidden_states: Any,
+    residual: Any,
+    inverse_rms: Any,
+    weight: Any,
+    *,
+    interpret: bool = False,
+) -> Any:
+    """Apply the final M1 add/round/weight step through an M8 VMEM tile.
+
+    The accepted M32 oracle processes row zero in a physical ``8 x 128``
+    output tile whose seven sibling rows are NaN sentinels.  This bounded
+    kernel recreates exactly that *internal* tile for each 128-wide feature
+    block while keeping every public input and the result at one logical row.
+    The inverse RMS is supplied by the caller so the probe changes only the
+    final output boundary, not reduction or reciprocal arithmetic.
+    """
+
+    if hidden_states.shape != residual.shape or hidden_states.ndim != 2:
+        raise ValueError("Pallas weighted-output inputs must share rank-two shape")
+    if hidden_states.shape[0] != 1:
+        raise ValueError("Pallas weighted-output requires exactly one live row")
+    width = int(hidden_states.shape[1])
+    if width <= 0 or width % 128:
+        raise ValueError(
+            "Pallas weighted-output width must be a positive multiple of 128"
+        )
+    if inverse_rms.shape != (1,) or inverse_rms.dtype != jnp.float32:
+        raise ValueError("Pallas weighted-output inverse must be FP32[1]")
+    if weight.shape != (width,):
+        raise ValueError("Pallas weighted-output weight must match hidden width")
+    if hidden_states.dtype != jnp.bfloat16 or residual.dtype != jnp.bfloat16:
+        raise ValueError("Pallas weighted-output activations must be BF16")
+    if weight.dtype != jnp.bfloat16:
+        raise ValueError("Pallas weighted-output weight must be BF16")
+    if not isinstance(interpret, bool):
+        raise ValueError("Pallas weighted-output interpret flag must be boolean")
+
+    def kernel(
+        hidden_ref: Any,
+        residual_ref: Any,
+        inverse_ref: Any,
+        weight_ref: Any,
+        output_ref: Any,
+        weighted_scratch_ref: Any,
+    ) -> None:
+        row_ids = jnp.arange(8, dtype=jnp.int32)[:, None]
+        live = row_ids == jnp.int32(0)
+        nan_lanes = jnp.full((8, 128), jnp.bfloat16(jnp.nan))
+        hidden_lanes = jnp.where(
+            live,
+            jnp.broadcast_to(hidden_ref[...], (8, 128)),
+            nan_lanes,
+        )
+        residual_lanes = jnp.where(
+            live,
+            jnp.broadcast_to(residual_ref[...], (8, 128)),
+            nan_lanes,
+        )
+        summed = hidden_lanes.astype(jnp.float32) + residual_lanes.astype(
+            jnp.float32
+        )
+        rounded = (
+            summed * inverse_ref[0].astype(jnp.float32)
+        ).astype(jnp.bfloat16)
+        weighted_scratch_ref[...] = (
+            rounded * jnp.broadcast_to(weight_ref[...], (8, 128))
+        ).astype(jnp.bfloat16)
+        output_ref[...] = weighted_scratch_ref[...][:1, :]
+
+    def row_index(feature_tile: Any) -> tuple[int, Any]:
+        return 0, feature_tile
+
+    def scalar_index(feature_tile: Any) -> tuple[int]:
+        del feature_tile
+        return (0,)
+
+    return pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct((1, width), jnp.bfloat16),
+        grid=(width // 128,),
+        in_specs=(
+            pl.BlockSpec((1, 128), row_index),
+            pl.BlockSpec((1, 128), row_index),
+            pl.BlockSpec((1,), scalar_index),
+            pl.BlockSpec((1, 128), row_index),
+        ),
+        out_specs=pl.BlockSpec((1, 128), row_index),
+        scratch_shapes=(pltpu.VMEM((8, 128), jnp.bfloat16),),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel",),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=f"greenfield_weighted_output_m1_m8_scratch_h{width}",
+        cost_estimate=pl.CostEstimate(
+            flops=width * 3,
+            bytes_accessed=width * 10,
+            transcendentals=0,
+        ),
+    )(hidden_states, residual, inverse_rms, weight[None, :])
 
 
 def fused_add_rms_norm_m1(

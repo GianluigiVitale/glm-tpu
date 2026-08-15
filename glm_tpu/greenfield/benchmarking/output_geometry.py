@@ -8,10 +8,12 @@ in one executable:
 
 * the accepted-shape M32 output control;
 * the ordinary M1 output control;
-* a logical M1 output whose concrete result layout uses the M32 TPU tile.
+* a true-M1 Pallas output with an internal M8-by-128 TPU scratch tile.
 
 Only the third arm is a production candidate.  The M32 arm is diagnostic and
-is retained solely to make the hardware comparison self-contained.
+is retained solely to make the hardware comparison self-contained.  The
+direct logical-M1/M32 result-layout override is permanently rejected by TPU
+XLA and is not repeated here.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ import ml_dtypes
 import numpy as np
 
 from ..errors import BenchmarkValidationError
+from ..kernels.pallas.rmsnorm import weighted_output_m1_m8_scratch
 from ..kernels.stage_local import (
     STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
 )
@@ -47,6 +50,7 @@ OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256 = ""
 
 M32_BF16_LAYOUT = "{1,0:T(8,128)(2,1)}"
 M1_AUTO_BF16_LAYOUT = "{1,0:T(2,128)(2,1)}"
+M1_PALLAS_M8_SCRATCH_SHAPE = (8, 128)
 OUTPUT_GEOMETRY_DENSE_ROW_RAW_SHA256 = (
     "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc"
 )
@@ -117,16 +121,16 @@ def compare_output_geometry_arrays(
 ) -> dict[str, Any]:
     """Recompute the decisive control/candidate numerical relationships."""
 
-    if set(outputs) != {"m32_control", "m1_auto", "m1_m32_tile"}:
+    if set(outputs) != {"m32_control", "m1_auto", "m1_pallas_m8"}:
         raise BenchmarkValidationError("output-geometry output set drifted")
     m32 = np.ascontiguousarray(outputs["m32_control"], dtype=np.uint16)
     auto = np.ascontiguousarray(outputs["m1_auto"], dtype=np.uint16)
-    tiled = np.ascontiguousarray(outputs["m1_m32_tile"], dtype=np.uint16)
+    pallas = np.ascontiguousarray(outputs["m1_pallas_m8"], dtype=np.uint16)
     accepted = np.ascontiguousarray(accepted_bits, dtype=np.uint16)
     if (
         m32.shape != (32, 6144)
         or auto.shape != (1, 6144)
-        or tiled.shape != (1, 6144)
+        or pallas.shape != (1, 6144)
         or accepted.shape != (6144,)
     ):
         raise BenchmarkValidationError("output-geometry comparison shape drifted")
@@ -134,25 +138,29 @@ def compare_output_geometry_arrays(
     comparisons = {
         "m32_control_vs_accepted": _pairwise_comparison(m32_row, accepted),
         "m1_auto_vs_m32_control": _pairwise_comparison(auto[0], m32_row),
-        "m1_m32_tile_vs_accepted": _pairwise_comparison(tiled[0], accepted),
-        "m1_m32_tile_vs_m32_control": _pairwise_comparison(tiled[0], m32_row),
+        "m1_pallas_m8_vs_accepted": _pairwise_comparison(pallas[0], accepted),
+        "m1_pallas_m8_vs_m32_control": _pairwise_comparison(
+            pallas[0], m32_row
+        ),
     }
     control_exact = comparisons["m32_control_vs_accepted"]["elementwise_exact"]
-    tiled_exact = comparisons["m1_m32_tile_vs_m32_control"]["elementwise_exact"]
+    pallas_exact = comparisons["m1_pallas_m8_vs_m32_control"][
+        "elementwise_exact"
+    ]
     auto_exact = comparisons["m1_auto_vs_m32_control"]["elementwise_exact"]
     classification = (
         "output_geometry_invalid_m32_control"
         if not control_exact
-        else "output_geometry_m1_m32_tile_exact_control"
-        if tiled_exact
-        else "output_geometry_m1_m32_tile_matches_auto_control"
-        if np.array_equal(tiled, auto)
-        else "output_geometry_m1_m32_tile_nonexact_new_result"
+        else "output_geometry_m1_pallas_m8_exact_control"
+        if pallas_exact
+        else "output_geometry_m1_pallas_m8_matches_auto_control"
+        if np.array_equal(pallas, auto)
+        else "output_geometry_m1_pallas_m8_nonexact_new_result"
     )
     return {
         "classification": classification,
         "m1_auto_exact_m32_control": bool(auto_exact),
-        "m1_m32_tile_exact_m32_control": bool(tiled_exact),
+        "m1_pallas_m8_exact_m32_control": bool(pallas_exact),
         "m32_control_exact_accepted": bool(control_exact),
         "pairwise": comparisons,
     }
@@ -320,32 +328,17 @@ def validate_output_geometry_hlo(optimized_hlo: str) -> Mapping[str, Any]:
     }
 
 
-def build_output_geometry_replay(
-    member_device_ids: Sequence[int],
-    *,
-    devices: Sequence[Any] | None = None,
-    validate_hlo: bool = True,
-) -> CompiledOutputGeometryReplay:
-    """Compile the three-arm output-geometry discriminator."""
+def _output_geometry_program(*, pallas_interpret: bool) -> Any:
+    """Return the shared-scalar three-arm function for abstract/local tests."""
 
     import jax
     import jax.numpy as jnp
     from jax import lax
-    from jax.experimental.layout import Format, Layout
-    from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-    runtime_devices = tuple(jax.devices() if devices is None else devices)
-    members = tuple(int(value) for value in member_device_ids)
-    by_id = {int(device.id): device for device in runtime_devices}
-    if members != tuple(range(32)) or set(by_id) != set(members):
+    if not isinstance(pallas_interpret, bool):
         raise BenchmarkValidationError(
-            "output-geometry replay requires global physical ids 0..31"
+            "output-geometry Pallas interpret flag must be boolean"
         )
-    mesh = Mesh(
-        np.asarray([by_id[device_id] for device_id in members], dtype=object),
-        ("member",),
-    )
-    replicated = NamedSharding(mesh, P())
 
     def weighted(
         dense: Any,
@@ -363,8 +356,6 @@ def build_output_geometry_replay(
         carried_m32: Any,
         dense_auto: Any,
         carried_auto: Any,
-        dense_tiled: Any,
-        carried_tiled: Any,
         weight: Any,
     ) -> tuple[Any, Any, Any]:
         with jax.named_scope("output_geometry_shared_m32_inverse"):
@@ -391,40 +382,54 @@ def build_output_geometry_replay(
                 shared_inverse[:1],
                 weight,
             )
-        with jax.named_scope("output_geometry_m1_m32_tile"):
-            m1_tiled = weighted(
-                lax.optimization_barrier(dense_tiled),
-                lax.optimization_barrier(carried_tiled),
+        with jax.named_scope("output_geometry_m1_pallas_m8_scratch"):
+            m1_pallas = weighted_output_m1_m8_scratch(
+                lax.optimization_barrier(dense_auto),
+                lax.optimization_barrier(carried_auto),
                 shared_inverse[:1],
                 weight,
+                interpret=pallas_interpret,
             )
-        return m32, m1_auto, m1_tiled
+            m1_pallas = lax.bitcast_convert_type(m1_pallas, jnp.uint16)
+        return m32, m1_auto, m1_pallas
 
-    m32_layout = Layout(
-        major_to_minor=(0, 1),
-        tiling=((8, 128), (2, 1)),
+    return program
+
+
+def build_output_geometry_replay(
+    member_device_ids: Sequence[int],
+    *,
+    devices: Sequence[Any] | None = None,
+    validate_hlo: bool = True,
+    pallas_interpret: bool = False,
+) -> CompiledOutputGeometryReplay:
+    """Compile the M32/M1/output-only-Pallas discriminator."""
+
+    import jax
+    import jax.numpy as jnp
+    from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+
+    runtime_devices = tuple(jax.devices() if devices is None else devices)
+    members = tuple(int(value) for value in member_device_ids)
+    by_id = {int(device.id): device for device in runtime_devices}
+    if members != tuple(range(32)) or set(by_id) != set(members):
+        raise BenchmarkValidationError(
+            "output-geometry replay requires global physical ids 0..31"
+        )
+    mesh = Mesh(
+        np.asarray([by_id[device_id] for device_id in members], dtype=object),
+        ("member",),
     )
-    m1_auto_layout = Layout(
-        major_to_minor=(0, 1),
-        tiling=((2, 128), (2, 1)),
-    )
-    output_formats = (
-        Format(m32_layout, replicated),
-        Format(m1_auto_layout, replicated),
-        Format(m32_layout, replicated),
-    )
+    replicated = NamedSharding(mesh, P())
+
     shapes = (
         (32, 6144),
         (32, 6144),
         (1, 6144),
         (1, 6144),
-        (1, 6144),
-        (1, 6144),
         (6144,),
     )
     dtypes = (
-        jnp.bfloat16,
-        jnp.bfloat16,
         jnp.bfloat16,
         jnp.bfloat16,
         jnp.bfloat16,
@@ -436,9 +441,9 @@ def build_output_geometry_replay(
         for shape, dtype in zip(shapes, dtypes, strict=True)
     )
     lowered = jax.jit(
-        program,
+        _output_geometry_program(pallas_interpret=pallas_interpret),
         in_shardings=(replicated,) * len(examples),
-        out_shardings=output_formats,
+        out_shardings=(replicated, replicated, replicated),
     ).lower(*examples)
     stablehlo = lowered.as_text()
     compiled = lowered.compile()
@@ -488,15 +493,13 @@ def execute_output_geometry_replay(
         jax.device_put(carried_m32, compiled.replicated_sharding),
         jax.device_put(dense, compiled.replicated_sharding),
         jax.device_put(carried, compiled.replicated_sharding),
-        jax.device_put(dense, compiled.replicated_sharding),
-        jax.device_put(carried, compiled.replicated_sharding),
         jax.device_put(weight, compiled.replicated_sharding),
     )
 
     def once() -> tuple[dict[str, np.ndarray], dict[str, tuple[str, ...]]]:
         result = compiled.compiled(*arguments)
         jax.block_until_ready(result)
-        names = ("m32_control", "m1_auto", "m1_m32_tile")
+        names = ("m32_control", "m1_auto", "m1_pallas_m8")
         values: dict[str, np.ndarray] = {}
         hashes: dict[str, tuple[str, ...]] = {}
         for name, output in zip(names, result, strict=True):

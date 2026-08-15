@@ -140,6 +140,13 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   For a final-layout discriminator, compute one shared scheduled M32 inverse inside the graph and
   feed that exact SSA value to every output-layout arm; otherwise scalar arithmetic and physical
   output geometry change simultaneously and the experiment cannot classify either mechanism.
+- A concrete `Format(Layout(...))` that lowers on forced CPU is still only a requested output
+  contract, not proof that TPU v4 accepts that tile for the logical shape. On the protected
+  `uint16[1,6144]` graph, TPU XLA selected `T(2,128)(2,1)` and refused the requested M32
+  `T(8,128)(2,1)` override before emitting executable HLO. Treat this as an evidence-backed shape/
+  tile legality rejection: never retry direct M1/M32 result coercion on this compiler pin. If the
+  physical-lane hypothesis remains necessary, keep public I/O true M1 and express the alternate
+  geometry only inside an explicitly bounded Pallas scratch/kernel.
 
 ## Evidence ladder
 

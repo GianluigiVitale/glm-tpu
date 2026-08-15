@@ -19,21 +19,32 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
-- The model-free output-geometry discriminator is now locally complete and default-off. One
-  executable computes the M32 RMS inverse once from the sealed dense/carried rows, then feeds that
-  identical live device value to three disjoint weighted-output arms: full M32 control, ordinary
-  logical M1 and logical M1 with the exact M32 `T(8,128)(2,1)` result tile. The corresponding result
-  layouts in forced-32 optimized HLO are exactly `T(8,128)`, `T(2,128)` and `T(8,128)`; the two M1
-  candidates remain logically `[1,6144]`. It loads no checkpoint/model weights, runs twice, retains
-  every complete output and recomputes all pairwise verdicts. Fleet/source/HLO/artifact/terminal/
-  archive contracts are wired through the existing protected wrapper and pass a complete synthetic
-  terminal replay plus 32 focused regressions. StableHLO and optimized-HLO pins remain deliberately
-  empty, so its first protected attempt can only persist the exact TPU graphs and refuse before
-  arithmetic. Exact next is one immutable Sol review, commit/push and one fail-closed compile
-  acquisition; then pin and mutation-test only that preserved graph before a separate numerical
-  replay. This replaces the former ambiguous instruction to hold a NumPy scalar fixed: that scalar
-  reproduces the rejected Pallas path, whereas all three decisive arms must consume the same
-  scheduled M32 reduction result.
+- Reviewed/pushed pin `c0833adb5a50fe730955d25380a3017614e4d820` attempted the model-free
+  output-geometry discriminator exactly once under tag
+  `greenfield_strategy_nd_output_geometry_20260815T015402359468169Z`. TPU compilation rejected the
+  requested logical-M1 M32 result tile on every host before HLO persistence or arithmetic:
+  XLA selected `T(2,128)(2,1)` for `uint16[1,6144]`, while the user output contract required
+  `T(8,128)(2,1)`, and raised `Unexpected XLA layout override`. The workflow ran from 01:54:04 to
+  01:55:06 UTC. There is no HLO, output tensor, host record, comparison, terminal summary, DB row,
+  remote ledger or terminal `SUCCESS`; the approved prefix contains 20 partial diagnostic/source
+  objects only. Capture SHA is `9bc436b3...0069`; pre/failure census SHAs are
+  `bf8e63b6...a68` / `6c91e73b...1b6`, both authenticated 8/8 clean. This is an evidence-backed
+  rejection of direct `Format(Layout(...T(8,128)...))` on a true logical M1 result. Do not rerun or
+  loosen it: TPU v4/XLA forces the M1 tile before an executable graph exists.
+- The output-only true-M1 Pallas successor is now locally complete, still default-off and still
+  deliberately HLO-unpinned. It reuses the same sealed rows and one shared device-computed M32
+  inverse, retains the M32 and ordinary-M1 controls, and changes only the final add/round/weight
+  boundary. The candidate's four public operands and result remain true M1; each 128-feature
+  program builds the observed first M32 tile internally as BF16 `[8,128]` VMEM with row zero live
+  and seven NaN physical sentinels, then returns only row zero. JAXPR proves M1 I/O and the exact
+  M8 scratch; the Pallas interpreter is bitwise equal to the readable boundary; source, terminal,
+  wrapper and prior integrated regressions pass 33/33. The single immutable Sol audit found one
+  pre-launch blocker—a rank-1 BF16 128-element weight block is illegal for TPU Mosaic—and the
+  correction now supplies rank-2 `[1,6144]` storage with exact `[1,128]` blocks. JAXPR pins four
+  rank-2 operand/output blocks and no rank-1 128 block; correction review approved commit. Exact
+  next is commit/push, then one fail-closed TPU compile acquisition. Only after the
+  preserved graphs are pinned and mutation-tested may a separate 6,144-value numerical replay run.
+  Full 8K remains forbidden until a complete true-M1 bounded row is bitwise exact.
 
 - Reviewed/pushed pin `97e0b66032d943a80c5263129397f3968a9168bf` completed the protected
   true-M1 Pallas discriminator under tag
@@ -51,13 +62,10 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   native M1 and exact M32 HLOs use the same M32 RMS reduction/inverse, but the M1 final fusion is
   `T(2,128)(2,1)`/megacore-split-1 and has 1,031 mismatches, while the exact full output is
   `T(8,128)(2,1)`/megacore-split-0. Do not rerun or tune the rejected Pallas formula.
-- Exact next is one model-free, multi-arm output-geometry replay using sealed rows and one shared
-  scheduled M32 scalar: retain an exact full-M32 control, an ordinary M1 control and a logical-M1 result with the
-  concrete M32 output tile. JAX `with_layout_constraint` cannot encode tiling (its lowering has an
-  explicit TODO); use a concrete `Format(Layout(...), replicated_sharding)` result contract. This
-  test must keep the candidate logically `[1,6144]`, preserve all arms in one run and decide
-  whether physical padding alone reproduces the accepted elementwise fusion. Full 8K remains
-  forbidden until a complete true-M1 bounded row is exact.
+- The former direct `Format(Layout(...))` next action was implemented at `c0833ad` and rejected by
+  TPU compilation as recorded above. Forced-CPU HLO was useful for construction but did not prove
+  TPU tile legality. The only remaining bounded route is internal physical scratch inside a true-M1
+  kernel; do not reopen direct logical-M1 layout coercion.
 
 - Reviewed/pushed pin `38d3d61723c14bce8855494d4c5be4d548c000ef` ran the deliberately
   fail-closed true-M1 Pallas compile acquisition once under tag

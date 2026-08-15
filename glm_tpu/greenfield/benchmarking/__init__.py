@@ -100,6 +100,7 @@ from .integrated_dense_rms_hlo import (
 )
 from .output_geometry import (
     M1_AUTO_BF16_LAYOUT,
+    M1_PALLAS_M8_SCRATCH_SHAPE,
     M32_BF16_LAYOUT,
     OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256,
     OUTPUT_GEOMETRY_DENSE_ROW_RAW_SHA256,
@@ -197,6 +198,7 @@ __all__ = [
     "OUTPUT_GEOMETRY_INVERSE_RAW_SHA256",
     "OUTPUT_GEOMETRY_STABLEHLO_SHA256",
     "M1_AUTO_BF16_LAYOUT",
+    "M1_PALLAS_M8_SCRATCH_SHAPE",
     "M32_BF16_LAYOUT",
     "POST_ATTENTION_NORM_RAW_SHA256",
     "assemble_native_source_weights",

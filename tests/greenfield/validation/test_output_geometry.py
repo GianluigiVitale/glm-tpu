@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
-import os
 import json
 import shutil
-import subprocess
-import sys
 
 import numpy as np
 import pytest
@@ -34,33 +31,33 @@ def test_output_geometry_pairwise_classification_is_decisive() -> None:
     m32 = np.full((32, 6144), np.uint16(0x7FC0), dtype=np.uint16)
     m32[0] = accepted
     auto = accepted.reshape(1, 6144).copy()
-    tiled = auto.copy()
+    pallas = auto.copy()
     result = geometry.compare_output_geometry_arrays(
         {
             "m32_control": m32,
             "m1_auto": auto,
-            "m1_m32_tile": tiled,
+            "m1_pallas_m8": pallas,
         },
         accepted,
     )
     assert result["classification"] == (
-        "output_geometry_m1_m32_tile_exact_control"
+        "output_geometry_m1_pallas_m8_exact_control"
     )
     assert result["m32_control_exact_accepted"] is True
-    assert result["m1_m32_tile_exact_m32_control"] is True
+    assert result["m1_pallas_m8_exact_m32_control"] is True
 
-    tiled[0, 17] ^= np.uint16(1)
+    pallas[0, 17] ^= np.uint16(1)
     result = geometry.compare_output_geometry_arrays(
         {
             "m32_control": m32,
             "m1_auto": auto,
-            "m1_m32_tile": tiled,
+            "m1_pallas_m8": pallas,
         },
         accepted,
     )
-    decisive = result["pairwise"]["m1_m32_tile_vs_m32_control"]
+    decisive = result["pairwise"]["m1_pallas_m8_vs_m32_control"]
     assert result["classification"] == (
-        "output_geometry_m1_m32_tile_nonexact_new_result"
+        "output_geometry_m1_pallas_m8_nonexact_new_result"
     )
     assert decisive["mismatch_count"] == 1
     assert decisive["first_mismatch_index"] == 17
@@ -91,57 +88,47 @@ def test_output_geometry_empty_hlo_pins_refuse_execution() -> None:
         geometry.validate_output_geometry_hlo("HloModule x")
 
 
-@pytest.mark.skipif(not REAL_SOURCE.is_file(), reason="sealed DB548 source absent")
-def test_output_geometry_forced32_preserves_three_exact_result_layouts() -> None:
-    script = f"""
-from pathlib import Path
-from glm_tpu.greenfield.benchmarking import output_geometry as geometry
-inputs = geometry.load_output_geometry_inputs(
-    Path({str(REAL_SOURCE)!r}),
-    geometry._PHYSICAL_DEVICE_BY_MODEL_POSITION,
-)
-compiled = geometry.build_output_geometry_replay(tuple(range(32)), validate_hlo=False)
-outputs, capture = geometry.execute_output_geometry_replay(compiled, inputs)
-assert outputs['m32_control'].shape == (32, 6144)
-assert outputs['m1_auto'].shape == (1, 6144)
-assert outputs['m1_m32_tile'].shape == (1, 6144)
-assert capture['invocation_count'] == 2
-header = compiled.optimized_hlo.splitlines()[0]
-expected = (
-    '(u16[32,6144]{{1,0:T(8,128)(2,1)}}, '
-    'u16[1,6144]{{1,0:T(2,128)(2,1)}}, '
-    'u16[1,6144]{{1,0:T(8,128)(2,1)}})'
-)
-assert expected in header, header
-"""
-    environment = dict(os.environ)
-    environment.update(
-        {
-            "JAX_PLATFORMS": "cpu",
-            "PYTHONPATH": str(REPO),
-            "XLA_FLAGS": "--xla_force_host_platform_device_count=32",
-        }
+def test_output_geometry_abstract_graph_preserves_true_m1_boundary() -> None:
+    import jax
+    import jax.numpy as jnp
+
+    shapes = (
+        jax.ShapeDtypeStruct((32, 6144), jnp.bfloat16),
+        jax.ShapeDtypeStruct((32, 6144), jnp.bfloat16),
+        jax.ShapeDtypeStruct((1, 6144), jnp.bfloat16),
+        jax.ShapeDtypeStruct((1, 6144), jnp.bfloat16),
+        jax.ShapeDtypeStruct((6144,), jnp.bfloat16),
     )
-    subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=REPO,
-        env=environment,
-        check=True,
-        timeout=60,
+    result = jax.eval_shape(
+        geometry._output_geometry_program(pallas_interpret=False),
+        *shapes,
     )
+    assert tuple(value.shape for value in result) == (
+        (32, 6144),
+        (1, 6144),
+        (1, 6144),
+    )
+    assert all(value.dtype == jnp.uint16 for value in result)
+    with pytest.raises(BenchmarkValidationError, match="interpret flag"):
+        geometry._output_geometry_program(pallas_interpret=1)  # type: ignore[arg-type]
 
 
 def test_output_geometry_wrapper_is_default_off_and_disjoint() -> None:
     wrapper = (REPO / "scripts/greenfield/run_strategy_nd_dense_replay.sh").read_text()
     runner = (REPO / "scripts/greenfield/microbench_collectives.py").read_text()
     assert "GLM_GREENFIELD_STRATEGY_ND_OUTPUT_GEOMETRY_REPLAY:-0" in wrapper
+    assert "GLM_GREENFIELD_STRATEGY_ND_OUTPUT_PALLAS_GEOMETRY_TAG" in wrapper
     assert "--mode strategy_nd_output_geometry" in wrapper
     assert "validate_output_geometry_replay" in wrapper
     assert "RMS_REPLAY + INTEGRATED_REPLAY + OUTPUT_GEOMETRY_REPLAY" in wrapper
     assert '"strategy_nd_output_geometry"' in runner
-    assert "Format(m32_layout, replicated)" in (
+    assert "weighted_output_m1_m8_scratch" in (
         REPO / "glm_tpu/greenfield/benchmarking/output_geometry.py"
     ).read_text()
+    kernel = (
+        REPO / "glm_tpu/greenfield/kernels/pallas/rmsnorm.py"
+    ).read_text()
+    assert "pltpu.VMEM((8, 128), jnp.bfloat16)" in kernel
 
 
 @pytest.mark.skipif(
@@ -171,7 +158,7 @@ def test_output_geometry_terminal_recomputes_every_artifact(
     )
     stable_contract = geometry.validate_output_geometry_stablehlo(stablehlo)
     optimized_contract = geometry.validate_output_geometry_hlo(optimized_hlo)
-    label = "strategy_nd_output_geometry_bfloat16_m32_m1_tiled"
+    label = "strategy_nd_output_geometry_bfloat16_m32_m1_pallas_m8"
     (run_dir / "hlo" / f"{label}.stablehlo.mlir").write_text(stablehlo)
     (run_dir / "hlo" / f"{label}.optimized_hlo.txt").write_text(optimized_hlo)
     (run_dir / "hlo" / f"{label}.hlo_prevalidation.json").write_text(
@@ -209,12 +196,12 @@ def test_output_geometry_terminal_recomputes_every_artifact(
     outputs = {
         "m32_control": m32,
         "m1_auto": inputs.accepted_bits.reshape(1, 6144).copy(),
-        "m1_m32_tile": inputs.accepted_bits.reshape(1, 6144).copy(),
+        "m1_pallas_m8": inputs.accepted_bits.reshape(1, 6144).copy(),
     }
     artifact_values = {
         "accepted_bits": inputs.accepted_bits,
         "m1_auto_bits": outputs["m1_auto"],
-        "m1_m32_tile_bits": outputs["m1_m32_tile"],
+        "m1_pallas_m8_bits": outputs["m1_pallas_m8"],
         "m32_control_bits": outputs["m32_control"],
     }
     manifest = {}
@@ -259,7 +246,7 @@ def test_output_geometry_terminal_recomputes_every_artifact(
         "dense": geometry.array_sha256(inputs.dense_bits),
         "inverse": geometry.array_sha256(inputs.inverse),
         "m1_auto": output_hashes["m1_auto"],
-        "m1_m32_tile": output_hashes["m1_m32_tile"],
+        "m1_pallas_m8": output_hashes["m1_pallas_m8"],
         "m32_control": output_hashes["m32_control"],
         "source_file": geometry.DENSE_RMS_SOURCE_NPZ_SHA256,
         "weight": geometry.array_sha256(inputs.weight_bits),
@@ -283,9 +270,12 @@ def test_output_geometry_terminal_recomputes_every_artifact(
         "optimized_hlo_sha256": optimized_digest,
         "output_layouts": {
             "m1_auto": geometry.M1_AUTO_BF16_LAYOUT,
-            "m1_m32_tile": geometry.M32_BF16_LAYOUT,
+            "m1_pallas_m8": geometry.M1_AUTO_BF16_LAYOUT,
             "m32_control": geometry.M32_BF16_LAYOUT,
         },
+        "pallas_internal_scratch_shape": list(
+            geometry.M1_PALLAS_M8_SCRATCH_SHAPE
+        ),
         "performance_claim": False,
         "source": terminal.EXPECTED_SOURCE,
         "stablehlo_contract": stable_contract,
@@ -319,17 +309,37 @@ def test_output_geometry_terminal_recomputes_every_artifact(
         expected_run_tag=run_tag,
     )
     assert summary["classification"] == (
-        "output_geometry_m1_m32_tile_exact_control"
+        "output_geometry_m1_pallas_m8_exact_control"
     )
     assert summary["mismatch_count"] == 0
 
+    record_paths = sorted((run_dir / "host_records").glob("*.json"))
+    for path in record_paths:
+        record = json.loads(path.read_text())
+        record["association_output_geometry"][
+            "pallas_internal_scratch_shape"
+        ] = [4, 128]
+        path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    with pytest.raises(ValueError, match="execution identity drifted"):
+        terminal.validate_output_geometry_replay(
+            run_dir,
+            expected_code_hash=code_hash,
+            expected_run_tag=run_tag,
+        )
+    for path in record_paths:
+        record = json.loads(path.read_text())
+        record["association_output_geometry"][
+            "pallas_internal_scratch_shape"
+        ] = list(geometry.M1_PALLAS_M8_SCRATCH_SHAPE)
+        path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+
     arrays = np.load(
-        run_dir / "output_geometry" / "m1_m32_tile_bits.npy",
+        run_dir / "output_geometry" / "m1_pallas_m8_bits.npy",
         allow_pickle=False,
     )
     arrays[0, 9] ^= np.uint16(1)
     np.save(
-        run_dir / "output_geometry" / "m1_m32_tile_bits.npy",
+        run_dir / "output_geometry" / "m1_pallas_m8_bits.npy",
         arrays,
         allow_pickle=False,
     )

@@ -162,7 +162,7 @@ fi
   exit 2
 }
 if [[ $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
-  TAG=${GLM_GREENFIELD_STRATEGY_ND_OUTPUT_GEOMETRY_TAG:-greenfield_strategy_nd_output_geometry_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  TAG=${GLM_GREENFIELD_STRATEGY_ND_OUTPUT_PALLAS_GEOMETRY_TAG:-greenfield_strategy_nd_output_pallas_geometry_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REPLAY_OUTPUT_DIR=output_geometry
 elif [[ $INTEGRATED_NATIVE_M1_PALLAS_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_OUTPUT_TAG:-greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_$(date -u +%Y%m%dT%H%M%S%NZ)}
@@ -483,7 +483,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 }
 coordinator="$coordinator:8476"
 if [[ $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
-  say "launching one shared-M32 reduction with M32, ordinary-M1 and tiled-M1 output arms"
+  say "launching one shared-M32 reduction with M32, ordinary-M1 and true-M1 Pallas-M8 output arms"
 elif [[ $INTEGRATED_REPLAY == 1 ]]; then
   if [[ $INTEGRATED_NATIVE_M32_REPLAY == 1 ]]; then
     say "launching native full-M32 layer-1 output discriminator"

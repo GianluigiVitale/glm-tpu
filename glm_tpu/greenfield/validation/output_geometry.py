@@ -19,6 +19,7 @@ from ..benchmarking import (
     DENSE_RMS_SOURCE_SUMMARY_SHA256,
     DENSE_RMS_SOURCE_TAG,
     M1_AUTO_BF16_LAYOUT,
+    M1_PALLAS_M8_SCRATCH_SHAPE,
     M32_BF16_LAYOUT,
     OUTPUT_GEOMETRY_DENSE_ROW_RAW_SHA256,
     OUTPUT_GEOMETRY_INVERSE_RAW_SHA256,
@@ -88,6 +89,7 @@ EXPECTED_REPLAY_FIELDS = {
     "optimized_hlo_contract",
     "optimized_hlo_sha256",
     "output_layouts",
+    "pallas_internal_scratch_shape",
     "performance_claim",
     "source",
     "stablehlo_contract",
@@ -100,7 +102,7 @@ EXPECTED_CAPTURE_FIELDS = {
     "repeated_local_replica_sha256",
     "repeated_output_sha256",
 }
-OUTPUT_NAMES = ("m32_control", "m1_auto", "m1_m32_tile")
+OUTPUT_NAMES = ("m32_control", "m1_auto", "m1_pallas_m8")
 
 
 def _validate_host_records(
@@ -187,7 +189,7 @@ def _load_artifacts(
     expected = {
         "accepted_bits": ((6144,), np.dtype(np.uint16)),
         "m1_auto_bits": ((1, 6144), np.dtype(np.uint16)),
-        "m1_m32_tile_bits": ((1, 6144), np.dtype(np.uint16)),
+        "m1_pallas_m8_bits": ((1, 6144), np.dtype(np.uint16)),
         "m32_control_bits": ((32, 6144), np.dtype(np.uint16)),
     }
     artifact_dir = run_dir / "output_geometry"
@@ -198,7 +200,7 @@ def _load_artifacts(
         "accepted_bits.npy",
         "comparison.json",
         "m1_auto_bits.npy",
-        "m1_m32_tile_bits.npy",
+        "m1_pallas_m8_bits.npy",
         "m32_control_bits.npy",
         "manifest.json",
     }:
@@ -234,7 +236,7 @@ def _validate_capture(
     hashes = {
         "m32_control": array_sha256(outputs["m32_control_bits"]),
         "m1_auto": array_sha256(outputs["m1_auto_bits"]),
-        "m1_m32_tile": array_sha256(outputs["m1_m32_tile_bits"]),
+        "m1_pallas_m8": array_sha256(outputs["m1_pallas_m8_bits"]),
     }
     if not (
         type(capture) is dict
@@ -300,9 +302,13 @@ def validate_output_geometry_replay(
         and reference["output_layouts"]
         == {
             "m1_auto": M1_AUTO_BF16_LAYOUT,
-            "m1_m32_tile": M32_BF16_LAYOUT,
+            "m1_pallas_m8": M1_AUTO_BF16_LAYOUT,
             "m32_control": M32_BF16_LAYOUT,
         }
+        and _is_int_list(
+            reference["pallas_internal_scratch_shape"],
+            list(M1_PALLAS_M8_SCRATCH_SHAPE),
+        )
         and _is_sha256(reference["stablehlo_sha256"])
         and _is_sha256(reference["optimized_hlo_sha256"])
     ):
@@ -352,7 +358,7 @@ def validate_output_geometry_replay(
     outputs = {
         "m32_control": arrays["m32_control_bits"],
         "m1_auto": arrays["m1_auto_bits"],
-        "m1_m32_tile": arrays["m1_m32_tile_bits"],
+        "m1_pallas_m8": arrays["m1_pallas_m8_bits"],
     }
     comparison = compare_output_geometry_arrays(outputs, source_inputs.accepted_bits)
     stored_comparison = json.loads(
@@ -368,7 +374,7 @@ def validate_output_geometry_replay(
         "dense": array_sha256(source_inputs.dense_bits),
         "inverse": array_sha256(source_inputs.inverse),
         "m1_auto": array_sha256(outputs["m1_auto"]),
-        "m1_m32_tile": array_sha256(outputs["m1_m32_tile"]),
+        "m1_pallas_m8": array_sha256(outputs["m1_pallas_m8"]),
         "m32_control": array_sha256(outputs["m32_control"]),
         "source_file": DENSE_RMS_SOURCE_NPZ_SHA256,
         "weight": array_sha256(source_inputs.weight_bits),
@@ -378,7 +384,7 @@ def validate_output_geometry_replay(
     }:
         raise ValueError("output-geometry fleet hashes failed recomputation")
 
-    label = "strategy_nd_output_geometry_bfloat16_m32_m1_tiled"
+    label = "strategy_nd_output_geometry_bfloat16_m32_m1_pallas_m8"
     hlo_dir = run_dir / "hlo"
     expected_hlo_files = {
         f"{label}.hlo_contract.json",
@@ -423,7 +429,7 @@ def validate_output_geometry_replay(
     }:
         raise ValueError("output-geometry HLO contract artifact drifted")
 
-    decisive = comparison["pairwise"]["m1_m32_tile_vs_m32_control"]
+    decisive = comparison["pairwise"]["m1_pallas_m8_vs_m32_control"]
     accepted_control = comparison["pairwise"]["m32_control_vs_accepted"]
     return {
         "artifact_kind": "glm52_strategy_nd_output_geometry_replay",

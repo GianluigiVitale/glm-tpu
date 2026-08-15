@@ -5,6 +5,56 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 02:00--02:16 UTC — output-only true-M1 Pallas successor is locally sealed
+
+- Reused the exact DB548 rows, DB533 dense reconstruction, accepted M32 control, shared
+  device-computed M32 inverse, existing protected output-geometry wrapper/terminal, and proven
+  Pallas VMEM conventions. No model/checkpoint loader or new protection stack was introduced.
+- The successor changes only the disputed final boundary. Its Pallas call accepts dense/carried
+  BF16 `[1,6144]`, FP32 inverse `[1]` and BF16 norm weight `[6144]`, then returns BF16
+  `[1,6144]`. Each of its 48 feature programs creates one internal BF16 `[8,128]` VMEM tile with
+  row zero live and the seven physical sibling rows set to the exact NaN sentinel pattern, performs
+  FP32 add/inverse multiply, BF16 round and BF16 weight multiply on that tile, and exposes only row
+  zero. Thus no M32 tensor or dead logical batch row crosses the kernel boundary.
+- The kernel Pallas interpreter is bitwise equal to the readable boundary, contract-drift cases
+  refuse, and JAXPR contains exact M1 input/result avals plus `Ref<vmem>{bf16[8,128]}`. Abstract
+  evaluation proves the complete three-arm output shapes `(32,6144)`, `(1,6144)`, `(1,6144)`.
+  Source/terminal/wrapper tests, kernel tests and the prior integrated suite pass 6/6, 9/9 and
+  18/18; Bash, ShellCheck, JSON and diff checks pass. One accidental local test invocation without
+  `JAX_PLATFORMS=cpu` waited in TPU client initialization and was terminated; no protected process,
+  fleet work or evidence mutation occurred.
+- The one immutable Sol audit caught a launch blocker locally: TPU Mosaic cannot tile the original
+  rank-1 BF16 weight with a 128-element block. The correction passes the same weight as rank-2
+  `[1,6144]` and uses `[1,128]` blocks; JAXPR now pins four rank-2 blocks and no rank-1 128 block.
+  Affected 9/9 and 6/6 tests pass and correction review returned `APPROVE COMMIT`.
+- Both TPU graph pins remain deliberately empty, so the first protected attempt can only compile,
+  atomically persist both graphs across the fleet barrier and refuse before arithmetic. Exact next
+  is commit/push and that single compile acquisition; all graph proof then iterates locally before
+  one separate numerical row.
+
+## 2026-08-15 01:54--01:55 UTC — TPU rejects direct M32 tiling on a logical-M1 result
+
+- Reviewed/pushed pin `c0833adb5a50fe730955d25380a3017614e4d820` launched the default-off
+  model-free output-geometry discriminator once as
+  `greenfield_strategy_nd_output_geometry_20260815T015402359468169Z`. The wrapper began at
+  01:54:04, launched at 01:54:49 and failed at 01:55:06 UTC: this was a 62-second protected
+  compile attempt, not an hour-scale model run.
+- All eight hosts failed identically during `lowered.compile()`. XLA assigned the only legal
+  `uint16[1,6144]` result layout `T(2,128)(2,1)` and rejected the requested user layout
+  `T(8,128)(2,1)` with `Unexpected XLA layout override`. Because compilation failed before the
+  caller regained control, no StableHLO/optimized-HLO files, arithmetic outputs or host records
+  exist. This conclusively rejects direct `Format(Layout(...))` as a way to preserve the accepted
+  M32 output tile on a true logical M1 tensor for this compiler/hardware pin.
+- There is no comparison, summary, DB row, remote ledger or terminal `SUCCESS`. The remote prefix
+  contains exactly 20 partial diagnostic/source objects under `diagnostic/`; capture SHA is
+  `9bc436b3...0069`. Pre/failure census SHAs are `bf8e63b6...a68` and `6c91e73b...1b6`, both 8/8
+  clean. Do not retry this route or weaken the requested-layout assertion.
+- Exact next is narrower than the rejected full-formula Pallas kernel: retain the shared accepted
+  device-computed M32 inverse, ordinary M1 output as control, and test only the final BF16
+  round/weight boundary in a true-M1 Pallas kernel with internal `8x128` VMEM geometry. Public
+  kernel I/O remains `[1,6144]`; the internal physical scratch, not an illegal logical result tile,
+  is the sole changed mechanism. Acquire and pin its TPU HLO before any numerical replay.
+
 ## 2026-08-15 01:20--01:43 UTC — three-arm output-geometry probe is locally sealed
 
 - Implemented one default-off, model-free executable that loads only the SHA-pinned DB548

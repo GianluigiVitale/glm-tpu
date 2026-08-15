@@ -50,6 +50,7 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     DENSE_RMS_SOURCE_SUMMARY_SHA256,
     DENSE_RMS_SOURCE_TAG,
     M1_AUTO_BF16_LAYOUT,
+    M1_PALLAS_M8_SCRATCH_SHAPE,
     M32_BF16_LAYOUT,
     OUTPUT_GEOMETRY_DENSE_ROW_RAW_SHA256,
     OUTPUT_GEOMETRY_INVERSE_RAW_SHA256,
@@ -1153,7 +1154,7 @@ def _run_strategy_nd_output_geometry(
     multihost_utils: Any,
     topology: Any,
 ) -> dict[str, Any]:
-    """Test the accepted M32 output tile on one logical live row."""
+    """Test an M8 internal output tile on one logical live row."""
 
     source_path = args.association_rms_input
     if source_path is None or not source_path.is_file():
@@ -1163,7 +1164,7 @@ def _run_strategy_nd_output_geometry(
         raise RuntimeError("output geometry requires physical ids 0..31")
     model_axis_device_ids = accepted_tp32_model_axis_device_ids(jax.devices())
     inputs = load_output_geometry_inputs(source_path, model_axis_device_ids)
-    label = "strategy_nd_output_geometry_bfloat16_m32_m1_tiled"
+    label = "strategy_nd_output_geometry_bfloat16_m32_m1_pallas_m8"
     multihost_utils.sync_global_devices(f"greenfield-output-geometry-start-{label}")
     compiled = build_output_geometry_replay(
         physical_ids,
@@ -1216,7 +1217,7 @@ def _run_strategy_nd_output_geometry(
         "dense": array_sha256(inputs.dense_bits),
         "inverse": array_sha256(inputs.inverse),
         "m1_auto": array_sha256(outputs["m1_auto"]),
-        "m1_m32_tile": array_sha256(outputs["m1_m32_tile"]),
+        "m1_pallas_m8": array_sha256(outputs["m1_pallas_m8"]),
         "m32_control": array_sha256(outputs["m32_control"]),
         "source_file": DENSE_RMS_SOURCE_NPZ_SHA256,
         "weight": array_sha256(inputs.weight_bits),
@@ -1243,7 +1244,7 @@ def _run_strategy_nd_output_geometry(
         artifacts = {
             "accepted_bits": inputs.accepted_bits,
             "m1_auto_bits": outputs["m1_auto"],
-            "m1_m32_tile_bits": outputs["m1_m32_tile"],
+            "m1_pallas_m8_bits": outputs["m1_pallas_m8"],
             "m32_control_bits": outputs["m32_control"],
         }
         for name, value in artifacts.items():
@@ -1260,7 +1261,7 @@ def _run_strategy_nd_output_geometry(
         _atomic_write(replay_dir / "comparison.json", comparison)
         _atomic_write(replay_dir / "manifest.json", artifact_manifest)
     multihost_utils.sync_global_devices(f"greenfield-output-geometry-end-{label}")
-    decisive = comparison["pairwise"]["m1_m32_tile_vs_m32_control"]
+    decisive = comparison["pairwise"]["m1_pallas_m8_vs_m32_control"]
     print(
         "GREENFIELD_STRATEGY_ND_OUTPUT_GEOMETRY_OK "
         f"launch_process={args.process_id} jax_process={jax.process_index()} "
@@ -1283,9 +1284,10 @@ def _run_strategy_nd_output_geometry(
         "optimized_hlo_sha256": optimized_hlo_sha,
         "output_layouts": {
             "m1_auto": M1_AUTO_BF16_LAYOUT,
-            "m1_m32_tile": M32_BF16_LAYOUT,
+            "m1_pallas_m8": M1_AUTO_BF16_LAYOUT,
             "m32_control": M32_BF16_LAYOUT,
         },
+        "pallas_internal_scratch_shape": list(M1_PALLAS_M8_SCRATCH_SHAPE),
         "performance_claim": False,
         "source": {
             "dense_row_raw_sha256": OUTPUT_GEOMETRY_DENSE_ROW_RAW_SHA256,
