@@ -82,6 +82,11 @@ INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_STABLEHLO_SHA256 = (
 INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_OPTIMIZED_HLO_SHA256 = (
     "afb68ab024200208499fc31d3c50e2d8ef5d1abb9b5097b9182671f3819bc2db"
 )
+# Deliberately empty until the first protected native-XLA feature-tiled
+# compile acquisition preserves both exact compiler graphs.  An empty pin
+# must refuse before arithmetic or terminal publication.
+INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_STABLEHLO_SHA256 = ""
+INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_OPTIMIZED_HLO_SHA256 = ""
 
 _NATIVE_SOURCE_COLLECTIVE_SCOPES = (
     "native_source_context_embedding_collective",
@@ -1639,6 +1644,7 @@ def validate_integrated_dense_rms_stablehlo(
     native_m1_pallas_output: bool = False,
     native_m1_pallas_sources_output: bool = False,
     native_m1_pallas_feature_tiled_output: bool = False,
+    native_m1_xla_feature_tiled_output: bool = False,
 ) -> Mapping[str, Any]:
     """Pin the complete exact eight-input StableHLO graph byte-for-byte."""
 
@@ -1678,6 +1684,10 @@ def validate_integrated_dense_rms_stablehlo(
         raise BenchmarkValidationError(
             "integrated dense native all-live feature-tiled Pallas flag must be boolean"
         )
+    if not isinstance(native_m1_xla_feature_tiled_output, bool):
+        raise BenchmarkValidationError(
+            "integrated dense native all-live feature-tiled XLA flag must be boolean"
+        )
     if native_m32_output and not native_source_context:
         raise BenchmarkValidationError(
             "native M32 output requires native source context"
@@ -1694,12 +1704,17 @@ def validate_integrated_dense_rms_stablehlo(
         raise BenchmarkValidationError(
             "native all-live feature-tiled Pallas output requires native source context"
         )
+    if native_m1_xla_feature_tiled_output and not native_source_context:
+        raise BenchmarkValidationError(
+            "native all-live feature-tiled XLA output requires native source context"
+        )
     if sum(
         (
             native_m32_output,
             native_m1_pallas_output,
             native_m1_pallas_sources_output,
             native_m1_pallas_feature_tiled_output,
+            native_m1_xla_feature_tiled_output,
         )
     ) > 1:
         raise BenchmarkValidationError(
@@ -1734,7 +1749,9 @@ def validate_integrated_dense_rms_stablehlo(
             "pre-dense split RMS and rejected ordinal arms are disjoint"
         )
     expected = (
-        INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_STABLEHLO_SHA256
+        INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_STABLEHLO_SHA256
+        if native_m1_xla_feature_tiled_output
+        else INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_STABLEHLO_SHA256
         if native_m1_pallas_feature_tiled_output
         else INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256
         if native_m1_pallas_sources_output
@@ -2003,6 +2020,7 @@ def _validate_native_source_context_hlo(
     native_m1_pallas_output: bool = False,
     native_m1_pallas_sources_output: bool = False,
     native_m1_pallas_feature_tiled_output: bool = False,
+    native_m1_xla_feature_tiled_output: bool = False,
 ) -> Mapping[str, Any]:
     """Validate the one acquired native-source TPU executable exactly.
 
@@ -2014,7 +2032,9 @@ def _validate_native_source_context_hlo(
 
     digest = sha256(optimized_hlo.encode()).hexdigest()
     expected = (
-        INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_OPTIMIZED_HLO_SHA256
+        INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_OPTIMIZED_HLO_SHA256
+        if native_m1_xla_feature_tiled_output
+        else INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_OPTIMIZED_HLO_SHA256
         if native_m1_pallas_feature_tiled_output
         else INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256
         if native_m1_pallas_sources_output
@@ -2966,6 +2986,7 @@ def validate_integrated_dense_rms_hlo(
     native_m1_pallas_output: bool = False,
     native_m1_pallas_sources_output: bool = False,
     native_m1_pallas_feature_tiled_output: bool = False,
+    native_m1_xla_feature_tiled_output: bool = False,
 ) -> Mapping[str, Any]:
     """Bind real contractions through one BF16 StrategyND and layer-1 ROOT."""
 
@@ -3010,6 +3031,10 @@ def validate_integrated_dense_rms_hlo(
         raise BenchmarkValidationError(
             "integrated dense native all-live feature-tiled Pallas flag must be boolean"
         )
+    if not isinstance(native_m1_xla_feature_tiled_output, bool):
+        raise BenchmarkValidationError(
+            "integrated dense native all-live feature-tiled XLA flag must be boolean"
+        )
     if native_m32_output and not native_source_context:
         raise BenchmarkValidationError(
             "native M32 output requires native source context"
@@ -3026,12 +3051,17 @@ def validate_integrated_dense_rms_hlo(
         raise BenchmarkValidationError(
             "native all-live feature-tiled Pallas output requires native source context"
         )
+    if native_m1_xla_feature_tiled_output and not native_source_context:
+        raise BenchmarkValidationError(
+            "native all-live feature-tiled XLA output requires native source context"
+        )
     if sum(
         (
             native_m32_output,
             native_m1_pallas_output,
             native_m1_pallas_sources_output,
             native_m1_pallas_feature_tiled_output,
+            native_m1_xla_feature_tiled_output,
         )
     ) > 1:
         raise BenchmarkValidationError(
@@ -3064,6 +3094,9 @@ def validate_integrated_dense_rms_hlo(
             ),
             native_m1_pallas_feature_tiled_output=(
                 native_m1_pallas_feature_tiled_output
+            ),
+            native_m1_xla_feature_tiled_output=(
+                native_m1_xla_feature_tiled_output
             ),
         )
     if preceding_attention_collective and not split_layer1_rms:

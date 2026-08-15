@@ -715,7 +715,8 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
         '  "$INTEGRATED_NATIVE_M32_REPLAY" \\\n'
         '  "$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" \\\n'
         '  "$INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY" \\\n'
-        '  "$INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY" <<\'PY\'\n'
+        '  "$INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY" \\\n'
+        '  "$INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY" <<\'PY\'\n'
         'from hashlib import sha256'
     )
     start = wrapper.index(marker) + marker.index("from hashlib")
@@ -936,6 +937,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
                 "0",
                 "0",
                 "0",
+                "0",
             ],
             input=body,
             text=True,
@@ -989,6 +991,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             "gs://unit/result",
             "0",
             "1",
+            "0",
             "0",
             "0",
             "0",
@@ -1061,6 +1064,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             "0",
             "1",
             "0",
+            "0",
         ],
         input=body,
         text=True,
@@ -1097,6 +1101,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             "0",
             "0",
             "1",
+            "0",
         ],
         input=body,
         text=True,
@@ -1107,3 +1112,40 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
     success = (feature_tiled_dir / "SUCCESS").read_text()
     assert "native_source_context=true\n" in success
     assert "native_m1_pallas_feature_tiled_output=true\n" in success
+
+    feature_tiled_xla_dir = tmp_path / "feature-tiled-xla"
+    feature_tiled_xla_dir.mkdir()
+    (feature_tiled_xla_dir / "summary.json").write_text(
+        (source_pallas_dir / "summary.json").read_text()
+    )
+    for name in ("evidence.sha256", "census_post.txt", "remote_objects.json"):
+        (feature_tiled_xla_dir / name).write_text(name)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(feature_tiled_xla_dir),
+            "gs://unit/result",
+            "0",
+            "0",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1",
+        ],
+        input=body,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    success = (feature_tiled_xla_dir / "SUCCESS").read_text()
+    assert "native_source_context=true\n" in success
+    assert "native_m1_xla_feature_tiled_output=true\n" in success

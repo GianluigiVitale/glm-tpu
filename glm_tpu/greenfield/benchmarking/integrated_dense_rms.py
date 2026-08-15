@@ -137,6 +137,7 @@ class CompiledIntegratedDenseRms:
     native_m1_pallas_output: bool
     native_m1_pallas_sources_output: bool
     native_m1_pallas_feature_tiled_output: bool
+    native_m1_xla_feature_tiled_output: bool
     stablehlo: str
     optimized_hlo: str
     stablehlo_contract: Mapping[str, Any]
@@ -786,6 +787,7 @@ def _native_source_context_function(
     pallas_m1_output: bool = False,
     pallas_m1_sources_output: bool = False,
     pallas_m1_feature_tiled_output: bool = False,
+    xla_m1_feature_tiled_output: bool = False,
 ) -> Any:
     """Run the exact native embedding and attention producers in one graph."""
 
@@ -805,12 +807,17 @@ def _native_source_context_function(
         raise BenchmarkValidationError(
             "native all-live feature-tiled Pallas-M1 flag must be boolean"
         )
+    if not isinstance(xla_m1_feature_tiled_output, bool):
+        raise BenchmarkValidationError(
+            "native all-live feature-tiled XLA-M1 flag must be boolean"
+        )
     if sum(
         (
             full_m32_output,
             pallas_m1_output,
             pallas_m1_sources_output,
             pallas_m1_feature_tiled_output,
+            xla_m1_feature_tiled_output,
         )
     ) > 1:
         raise BenchmarkValidationError(
@@ -1053,7 +1060,46 @@ def _native_source_context_function(
                     + jnp.float32(1e-5)
                 )
             with jax.named_scope("native_source_context_layer1_output"):
-                if (
+                if xla_m1_feature_tiled_output:
+                    with jax.named_scope(
+                        "native_source_context_layer1_xla_feature_tiled"
+                    ):
+                        (
+                            validity_source,
+                            embedding_source,
+                            attention_source,
+                        ) = lax.optimization_barrier(
+                            (valid_rows, embedding_m32, attention_m32)
+                        )
+                        tiled_shape = (8, 768)
+                        dense_tiled = dense_m32[:1, :].reshape(tiled_shape)
+                        attention_tiled = attention_source[:1, :].reshape(
+                            tiled_shape
+                        )
+                        embedding_tiled = embedding_source[:1, :].reshape(
+                            tiled_shape
+                        )
+                        selected_embedding = jnp.where(
+                            validity_source[:1, None],
+                            embedding_tiled,
+                            jnp.full_like(
+                                embedding_tiled, jnp.bfloat16(jnp.nan)
+                            ),
+                        )
+                        carried_tiled = (
+                            attention_tiled.astype(jnp.float32)
+                            + selected_embedding.astype(jnp.float32)
+                        ).astype(jnp.bfloat16)
+                        summed_tiled = dense_tiled.astype(jnp.float32) + (
+                            carried_tiled.astype(jnp.float32)
+                        )
+                        rounded_tiled = (
+                            summed_tiled * layer1_inverse[:1, :]
+                        ).astype(jnp.bfloat16)
+                        layer1 = (
+                            rounded_tiled * layer1_norm.reshape(tiled_shape)
+                        ).astype(jnp.bfloat16).reshape((1, 6144))
+                elif (
                     pallas_m1_sources_output
                     or pallas_m1_feature_tiled_output
                 ):
@@ -1122,6 +1168,7 @@ def build_integrated_dense_rms(
     native_m1_pallas_output: bool = False,
     native_m1_pallas_sources_output: bool = False,
     native_m1_pallas_feature_tiled_output: bool = False,
+    native_m1_xla_feature_tiled_output: bool = False,
 ) -> CompiledIntegratedDenseRms:
     """Compile the exact one-rank-per-chip diagnostic on 32 devices."""
 
@@ -1178,6 +1225,10 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "native all-live feature-tiled Pallas-M1-output flag must be boolean"
         )
+    if not isinstance(native_m1_xla_feature_tiled_output, bool):
+        raise BenchmarkValidationError(
+            "native all-live feature-tiled XLA-M1-output flag must be boolean"
+        )
     if native_m32_output and not native_source_context:
         raise BenchmarkValidationError(
             "native M32 output requires native source context"
@@ -1194,12 +1245,17 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "native all-live feature-tiled Pallas-M1 output requires native source context"
         )
+    if native_m1_xla_feature_tiled_output and not native_source_context:
+        raise BenchmarkValidationError(
+            "native all-live feature-tiled XLA-M1 output requires native source context"
+        )
     if sum(
         (
             native_m32_output,
             native_m1_pallas_output,
             native_m1_pallas_sources_output,
             native_m1_pallas_feature_tiled_output,
+            native_m1_xla_feature_tiled_output,
         )
     ) > 1:
         raise BenchmarkValidationError(
@@ -1240,6 +1296,9 @@ def build_integrated_dense_rms(
             pallas_m1_sources_output=native_m1_pallas_sources_output,
             pallas_m1_feature_tiled_output=(
                 native_m1_pallas_feature_tiled_output
+            ),
+            xla_m1_feature_tiled_output=(
+                native_m1_xla_feature_tiled_output
             ),
         )
         if native_source_context
@@ -1372,6 +1431,9 @@ def build_integrated_dense_rms(
             native_m1_pallas_feature_tiled_output=(
                 native_m1_pallas_feature_tiled_output
             ),
+            native_m1_xla_feature_tiled_output=(
+                native_m1_xla_feature_tiled_output
+            ),
         )
         optimized_hlo_contract = validate_integrated_dense_rms_hlo(
             optimized_hlo,
@@ -1388,6 +1450,9 @@ def build_integrated_dense_rms(
             ),
             native_m1_pallas_feature_tiled_output=(
                 native_m1_pallas_feature_tiled_output
+            ),
+            native_m1_xla_feature_tiled_output=(
+                native_m1_xla_feature_tiled_output
             ),
         )
     else:
@@ -1410,6 +1475,9 @@ def build_integrated_dense_rms(
         native_m1_pallas_sources_output=native_m1_pallas_sources_output,
         native_m1_pallas_feature_tiled_output=(
             native_m1_pallas_feature_tiled_output
+        ),
+        native_m1_xla_feature_tiled_output=(
+            native_m1_xla_feature_tiled_output
         ),
         stablehlo=stablehlo,
         optimized_hlo=optimized_hlo,

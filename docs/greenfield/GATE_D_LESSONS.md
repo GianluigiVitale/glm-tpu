@@ -188,6 +188,22 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   is disjoint and HLO-unpinned: acquire the TPU lowering once, require the observed schedule and
   exact live value flow before arithmetic, and reject the route if it does not lower to the
   intended all-live tile. Do not fall back to the frozen dead-lane kernel.
+- The protected all-live execution is complete and nonexact at 2,135/6,144. Its output is
+  byte-for-byte identical to the rejected six-source dead-lane arm (zero differing values, common
+  raw SHA `04adc5dc...950f`, common NPY SHA `e932a86a...c80a4`). Therefore dead lanes and feature
+  placement are not the missing mechanism. This closes the complete true-M1 Pallas equivalence
+  route. Do not add another scalar, layout, source-fusion, scratch or feature-tiling arm.
+- A new Gate-D successor must change the execution architecture while preserving the already
+  proven checkpoint/contraction/attention facts. It must use the mature PP8 production loader and
+  one-row/local-group contracts; it may not import legacy execution, admit M32 sentinel rows, or
+  reconstruct the hidden state over the full pod.
+- Permit exactly one final native-XLA mechanism discriminator before that production return: a
+  single semantic row may be represented bijectively as `[8,768]` so XLA, rather than a custom
+  Pallas formula, owns the full add/RMS/weight fusion. Compile once, prove the preserved HLO
+  offline, and execute at most one 6,144-value verdict. This is a full-pod one-layer oracle and
+  never a production architecture. If nonexact, stop bitwise internal-arithmetic iteration and use
+  the specification's bounded internal tensor comparison plus exact raw-token Gate-D contract on
+  the real PP8 decoder; do not invent a successor discriminator.
 
 ## Evidence ladder
 
@@ -349,7 +365,8 @@ branches from the search tree.
   patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
 - The output-only and six-source dead-lane M8 Pallas arms are frozen negative evidence at
   2,104/6,144 and 2,135/6,144 mismatches. Their near-identity rules out more scalar/layout tuning.
-  The only active discriminator is the acquired all-live feature-tiled M8 graph; its exact HLO is
-  already preserved and pinned, so proceed directly to one bounded numerical row after review.
+  The all-live feature-tiled M8 graph is also frozen: its protected output is byte-identical to the
+  six-source arm and remains nonexact at 2,135/6,144. No true-M1 Pallas discriminator remains
+  active. Select an architecture-level successor from existing production code and evidence.
 
 Do not return to hour-scale hypothesis runs or already exact contractions.

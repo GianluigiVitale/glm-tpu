@@ -264,6 +264,11 @@ def parse_args() -> argparse.Namespace:
         help="run the all-live 8x128 feature-tiled true-row Pallas boundary",
     )
     parser.add_argument(
+        "--integrated-native-m1-xla-feature-tiled-output",
+        action="store_true",
+        help="run the all-live feature-tiled native-XLA one-row boundary",
+    )
+    parser.add_argument(
         "--native-attention-input",
         type=Path,
         help="SHA-pinned DB537 attention arithmetic NPZ",
@@ -714,6 +719,9 @@ def _run_strategy_nd_integrated_dense_rms(
     native_m1_pallas_feature_tiled_output = bool(
         args.integrated_native_m1_pallas_feature_tiled_output
     )
+    native_m1_xla_feature_tiled_output = bool(
+        args.integrated_native_m1_xla_feature_tiled_output
+    )
     weights, checkpoint_records = _load_weights(
         args.checkpoint_root,
         manifest_sha256=args.checkpoint_manifest_sha256,
@@ -769,7 +777,9 @@ def _run_strategy_nd_integrated_dense_rms(
     split_predense_rms = bool(args.integrated_split_predense_rms)
     accepted_source_context = bool(args.integrated_accepted_source_context)
     label = (
-        "strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_bfloat16_1x6144"
+        "strategy_nd_integrated_dense_native_m1_xla_feature_tiled_output_bfloat16_1x6144"
+        if native_m1_xla_feature_tiled_output
+        else "strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_bfloat16_1x6144"
         if native_m1_pallas_feature_tiled_output
         else "strategy_nd_integrated_dense_native_m1_pallas_sources_output_bfloat16_1x6144"
         if native_m1_pallas_sources_output
@@ -804,6 +814,9 @@ def _run_strategy_nd_integrated_dense_rms(
         native_m1_pallas_sources_output=native_m1_pallas_sources_output,
         native_m1_pallas_feature_tiled_output=(
             native_m1_pallas_feature_tiled_output
+        ),
+        native_m1_xla_feature_tiled_output=(
+            native_m1_xla_feature_tiled_output
         ),
     )
     stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
@@ -845,6 +858,11 @@ def _run_strategy_nd_integrated_dense_rms(
                 **(
                     {"native_m1_pallas_feature_tiled_output": True}
                     if native_m1_pallas_feature_tiled_output
+                    else {}
+                ),
+                **(
+                    {"native_m1_xla_feature_tiled_output": True}
+                    if native_m1_xla_feature_tiled_output
                     else {}
                 ),
                 **(
@@ -890,6 +908,9 @@ def _run_strategy_nd_integrated_dense_rms(
         native_m1_pallas_feature_tiled_output=(
             native_m1_pallas_feature_tiled_output
         ),
+        native_m1_xla_feature_tiled_output=(
+            native_m1_xla_feature_tiled_output
+        ),
     )
     optimized_hlo_contract = validate_integrated_dense_rms_hlo(
         compiled.optimized_hlo,
@@ -904,6 +925,9 @@ def _run_strategy_nd_integrated_dense_rms(
         native_m1_pallas_sources_output=native_m1_pallas_sources_output,
         native_m1_pallas_feature_tiled_output=(
             native_m1_pallas_feature_tiled_output
+        ),
+        native_m1_xla_feature_tiled_output=(
+            native_m1_xla_feature_tiled_output
         ),
     )
     compiled = replace(
@@ -958,7 +982,9 @@ def _run_strategy_nd_integrated_dense_rms(
         "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
     )
     classification_prefix = (
-        "integrated_dense_native_m1_pallas_feature_tiled_output"
+        "integrated_dense_native_m1_xla_feature_tiled_output"
+        if native_m1_xla_feature_tiled_output
+        else "integrated_dense_native_m1_pallas_feature_tiled_output"
         if native_m1_pallas_feature_tiled_output
         else "integrated_dense_native_m1_pallas_sources_output"
         if native_m1_pallas_sources_output
@@ -1183,6 +1209,11 @@ def _run_strategy_nd_integrated_dense_rms(
         **(
             {"native_m1_pallas_feature_tiled_output": True}
             if native_m1_pallas_feature_tiled_output
+            else {}
+        ),
+        **(
+            {"native_m1_xla_feature_tiled_output": True}
+            if native_m1_xla_feature_tiled_output
             else {}
         ),
         **(
@@ -1684,6 +1715,7 @@ def main() -> int:
         and not args.integrated_native_m32_output
         and not args.integrated_native_m1_pallas_sources_output
         and not args.integrated_native_m1_pallas_feature_tiled_output
+        and not args.integrated_native_m1_xla_feature_tiled_output
     ):
         raise ValueError(
             "native Pallas-M1 output requires its disjoint native source-context mode"
@@ -1694,6 +1726,7 @@ def main() -> int:
         and not args.integrated_native_m32_output
         and not args.integrated_native_m1_pallas_output
         and not args.integrated_native_m1_pallas_feature_tiled_output
+        and not args.integrated_native_m1_xla_feature_tiled_output
     ):
         raise ValueError(
             "native source-fused Pallas-M1 output requires its disjoint native mode"
@@ -1704,9 +1737,21 @@ def main() -> int:
         and not args.integrated_native_m32_output
         and not args.integrated_native_m1_pallas_output
         and not args.integrated_native_m1_pallas_sources_output
+        and not args.integrated_native_m1_xla_feature_tiled_output
     ):
         raise ValueError(
             "native all-live feature-tiled Pallas-M1 output requires its disjoint native mode"
+        )
+    if args.integrated_native_m1_xla_feature_tiled_output and not (
+        args.integrated_native_source_context
+        and args.mode == "strategy_nd_integrated_dense_rms"
+        and not args.integrated_native_m32_output
+        and not args.integrated_native_m1_pallas_output
+        and not args.integrated_native_m1_pallas_sources_output
+        and not args.integrated_native_m1_pallas_feature_tiled_output
+    ):
+        raise ValueError(
+            "native all-live feature-tiled XLA-M1 output requires its disjoint native mode"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:

@@ -79,6 +79,7 @@ INTEGRATED_NATIVE_M32_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M32_
 INTEGRATED_NATIVE_M1_PALLAS_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_OUTPUT_REPLAY:-0}
 INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_SOURCES_OUTPUT_REPLAY:-0}
 INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_OUTPUT_REPLAY:-0}
+INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_OUTPUT_REPLAY:-0}
 [[ $RMS_REPLAY == 0 || $RMS_REPLAY == 1 ]] || {
   echo "GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY must be 0 or 1" >&2
   exit 2
@@ -127,7 +128,11 @@ INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_IN
   echo "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_OUTPUT_REPLAY must be 0 or 1" >&2
   exit 2
 }
-[[ $((INTEGRATED_NATIVE_M32_REPLAY + INTEGRATED_NATIVE_M1_PALLAS_REPLAY + INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY + INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY)) -le 1 ]] || {
+[[ $INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY == 0 || $INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY == 1 ]] || {
+  echo "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_OUTPUT_REPLAY must be 0 or 1" >&2
+  exit 2
+}
+[[ $((INTEGRATED_NATIVE_M32_REPLAY + INTEGRATED_NATIVE_M1_PALLAS_REPLAY + INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY + INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY + INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY)) -le 1 ]] || {
   echo "native output modes are mutually exclusive" >&2
   exit 2
 }
@@ -141,6 +146,9 @@ if [[ $INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY == 1 ]]; then
   INTEGRATED_NATIVE_SOURCE_REPLAY=1
 fi
 if [[ $INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY == 1 ]]; then
+  INTEGRATED_NATIVE_SOURCE_REPLAY=1
+fi
+if [[ $INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY == 1 ]]; then
   INTEGRATED_NATIVE_SOURCE_REPLAY=1
 fi
 [[ $((INTEGRATED_ACCEPTED_SOURCE_REPLAY + INTEGRATED_NATIVE_SOURCE_REPLAY)) -le 1 ]] || {
@@ -180,6 +188,9 @@ fi
 if [[ $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_STRATEGY_ND_OUTPUT_PALLAS_GEOMETRY_TAG:-greenfield_strategy_nd_output_pallas_geometry_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REPLAY_OUTPUT_DIR=output_geometry
+elif [[ $INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY == 1 ]]; then
+  TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_OUTPUT_TAG:-greenfield_strategy_nd_integrated_dense_native_m1_xla_feature_tiled_output_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REPLAY_OUTPUT_DIR=integrated_dense_rms
 elif [[ $INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_OUTPUT_TAG:-greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REPLAY_OUTPUT_DIR=integrated_dense_rms
@@ -507,7 +518,9 @@ coordinator="$coordinator:8476"
 if [[ $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   say "launching one shared-M32 reduction with M32, ordinary-M1 and true-M1 Pallas-M8 output arms"
 elif [[ $INTEGRATED_REPLAY == 1 ]]; then
-  if [[ $INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY == 1 ]]; then
+  if [[ $INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY == 1 ]]; then
+    say "launching native all-live feature-tiled XLA layer-1 discriminator"
+  elif [[ $INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY == 1 ]]; then
     say "launching native all-live feature-tiled true-M1 Pallas layer-1 discriminator"
   elif [[ $INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY == 1 ]]; then
     say "launching native source-fused true-M1 Pallas layer-1 output discriminator"
@@ -567,6 +580,9 @@ elif [[ $INTEGRATED_REPLAY == 1 ]]; then
   if [[ $INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY == 1 ]]; then
     integrated_extra="$integrated_extra --integrated-native-m1-pallas-feature-tiled-output"
   fi
+  if [[ $INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY == 1 ]]; then
+    integrated_extra="$integrated_extra --integrated-native-m1-xla-feature-tiled-output"
+  fi
   # shellcheck disable=SC2016
   capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; native_remote='"$NATIVE_SOURCE_REMOTE"'; native_sha='"$NATIVE_SOURCE_NPZ_SHA"'; native_mode='"$INTEGRATED_NATIVE_SOURCE_REPLAY"'; checkpoint='"$CHECKPOINT_ROOT"'; manifest_sha='"$CHECKPOINT_MANIFEST_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/integrated_dense_rms" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/diagnostic_integrated_dense_rms/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; [[ $(sha256sum "$checkpoint/runtime_manifest.json" | awk '\''{print $1}'\'') == "$manifest_sha" ]]; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; if [[ "$native_mode" == 1 ]]; then mkdir -p "$run/source_native"; gcloud storage cp "$native_remote/attention_arithmetic.npz" "$run/source_native/attention_arithmetic.npz" >/dev/null; [[ $(sha256sum "$run/source_native/attention_arithmetic.npz" | awk '\''{print $1}'\'') == "$native_sha" ]]; fi; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_integrated_dense_rms '"$integrated_extra"' --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-rms-input "$run/source_rms/dense_partial_capture.npz" --checkpoint-root "$checkpoint" --checkpoint-manifest-sha256 "$manifest_sha"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/integrated_dense_rms/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/integrated_dense_rms/* "$remote/integrated_dense_rms/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
 elif [[ $RMS_REPLAY == 1 ]]; then
@@ -611,7 +627,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$INTEGRATED_NATIVE_M32_REPLAY" \
   "$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" \
   "$INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY" \
-  "$INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY" <<'PY'
+  "$INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY" \
+  "$INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY" <<'PY'
 from __future__ import annotations
 
 import json
@@ -625,7 +642,7 @@ from glm_tpu.greenfield.validation import (
     validate_output_geometry_replay,
 )
 
-run_dir, pin, run_tag, elapsed, rms_replay, output_geometry, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source, native_source, native_m32, native_m1_pallas, native_m1_pallas_sources, native_m1_pallas_feature_tiled = sys.argv[1:]
+run_dir, pin, run_tag, elapsed, rms_replay, output_geometry, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source, native_source, native_m32, native_m1_pallas, native_m1_pallas_sources, native_m1_pallas_feature_tiled, native_m1_xla_feature_tiled = sys.argv[1:]
 run_dir = Path(run_dir)
 if output_geometry == "1":
     summary = validate_output_geometry_replay(
@@ -651,6 +668,9 @@ elif integrated_replay == "1":
         ),
         expected_native_m1_pallas_feature_tiled_output=(
             native_m1_pallas_feature_tiled == "1"
+        ),
+        expected_native_m1_xla_feature_tiled_output=(
+            native_m1_xla_feature_tiled == "1"
         ),
     )
 else:
@@ -792,7 +812,8 @@ PY
   "$INTEGRATED_NATIVE_M32_REPLAY" \
   "$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" \
   "$INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY" \
-  "$INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY" <<'PY'
+  "$INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY" \
+  "$INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -812,6 +833,7 @@ integrated_native_m32_replay = sys.argv[11] == "1"
 integrated_native_m1_pallas_replay = sys.argv[12] == "1"
 integrated_native_m1_pallas_sources_replay = sys.argv[13] == "1"
 integrated_native_m1_pallas_feature_tiled_replay = sys.argv[14] == "1"
+integrated_native_m1_xla_feature_tiled_replay = sys.argv[15] == "1"
 common = {
     "artifact_kind": summary["artifact_kind"],
     "classification": summary["classification"],
@@ -897,6 +919,8 @@ elif rms_replay or integrated_replay:
             values["native_m1_pallas_sources_output"] = "true"
         if integrated_native_m1_pallas_feature_tiled_replay:
             values["native_m1_pallas_feature_tiled_output"] = "true"
+        if integrated_native_m1_xla_feature_tiled_replay:
+            values["native_m1_xla_feature_tiled_output"] = "true"
         values["source_checkpoint_manifest_sha256"] = source[
             "checkpoint_manifest_sha256"
         ]

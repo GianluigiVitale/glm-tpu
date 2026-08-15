@@ -30,6 +30,8 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_NATIVE_M1_PALLAS_OPTIMIZED_HLO_SHA256,
     INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_OPTIMIZED_HLO_SHA256,
     INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_OPTIMIZED_HLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_STABLEHLO_SHA256,
     INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256,
     INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256,
     INTEGRATED_DENSE_NATIVE_M1_PALLAS_STABLEHLO_SHA256,
@@ -352,6 +354,13 @@ def test_native_source_graph_abstractly_traces_all_thirteen_inputs() -> None:
         _native_source_context_function(  # type: ignore[arg-type]
             pallas_m1_feature_tiled_output=1
         )
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="feature-tiled XLA-M1 flag must be boolean",
+    ):
+        _native_source_context_function(  # type: ignore[arg-type]
+            xla_m1_feature_tiled_output=1
+        )
     with pytest.raises(BenchmarkValidationError, match="disjoint"):
         _native_source_context_function(
             full_m32_output=True, pallas_m1_output=True
@@ -364,6 +373,11 @@ def test_native_source_graph_abstractly_traces_all_thirteen_inputs() -> None:
         _native_source_context_function(
             pallas_m1_sources_output=True,
             pallas_m1_feature_tiled_output=True,
+        )
+    with pytest.raises(BenchmarkValidationError, match="disjoint"):
+        _native_source_context_function(
+            pallas_m1_feature_tiled_output=True,
+            xla_m1_feature_tiled_output=True,
         )
 
     code = r'''
@@ -389,12 +403,13 @@ arguments = (
     jax.ShapeDtypeStruct((32, 1, 3, 6144), jnp.float32),
     jax.ShapeDtypeStruct((6144,), jnp.bfloat16),
 )
-for full_m32_output, pallas_m1_output, pallas_m1_sources_output, pallas_m1_feature_tiled_output, expected_shape in (
-    (False, False, False, False, (1, 6144)),
-    (True, False, False, False, (32, 6144)),
-    (False, True, False, False, (1, 6144)),
-    (False, False, True, False, (1, 6144)),
-    (False, False, False, True, (1, 6144)),
+for full_m32_output, pallas_m1_output, pallas_m1_sources_output, pallas_m1_feature_tiled_output, xla_m1_feature_tiled_output, expected_shape in (
+    (False, False, False, False, False, (1, 6144)),
+    (True, False, False, False, False, (32, 6144)),
+    (False, True, False, False, False, (1, 6144)),
+    (False, False, True, False, False, (1, 6144)),
+    (False, False, False, True, False, (1, 6144)),
+    (False, False, False, False, True, (1, 6144)),
 ):
     mapped = jax.shard_map(
         _native_source_context_function(
@@ -402,6 +417,7 @@ for full_m32_output, pallas_m1_output, pallas_m1_sources_output, pallas_m1_featu
             pallas_m1_output=pallas_m1_output,
             pallas_m1_sources_output=pallas_m1_sources_output,
             pallas_m1_feature_tiled_output=pallas_m1_feature_tiled_output,
+            xla_m1_feature_tiled_output=xla_m1_feature_tiled_output,
         ),
         mesh=mesh,
         in_specs=(
@@ -939,6 +955,21 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
             "module awaiting all-live feature-tiled Pallas-M1 lowering",
             native_source_context=True,
             native_m1_pallas_feature_tiled_output=True,
+        )
+    assert INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_STABLEHLO_SHA256 == ""
+    assert INTEGRATED_DENSE_NATIVE_M1_XLA_FEATURE_TILED_OPTIMIZED_HLO_SHA256 == ""
+    with pytest.raises(ValueError, match="StableHLO is not pinned"):
+        validate_integrated_dense_rms_stablehlo(
+            "module awaiting all-live feature-tiled XLA-M1 lowering",
+            native_source_context=True,
+            native_m1_xla_feature_tiled_output=True,
+        )
+    with pytest.raises(ValueError, match="optimized HLO is not pinned"):
+        validate_integrated_dense_rms_hlo(
+            "HloModule awaiting_all_live_feature_tiled_xla_m1_lowering",
+            tuple(range(32)),
+            native_source_context=True,
+            native_m1_xla_feature_tiled_output=True,
         )
     with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
         validate_integrated_dense_rms_hlo(
@@ -2332,12 +2363,17 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_OUTPUT_REPLAY:-0"
         in wrapper
     )
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_OUTPUT_REPLAY:-0"
+        in wrapper
+    )
     assert "--integrated-accepted-source-context" in wrapper
     assert "--integrated-native-source-context" in wrapper
     assert "--integrated-native-m32-output" in wrapper
     assert "--integrated-native-m1-pallas-output" in wrapper
     assert "--integrated-native-m1-pallas-sources-output" in wrapper
     assert "--integrated-native-m1-pallas-feature-tiled-output" in wrapper
+    assert "--integrated-native-m1-xla-feature-tiled-output" in wrapper
     assert "native output modes are mutually exclusive" in wrapper
     assert "--native-attention-input" in wrapper
     assert "--integrated-preceding-attention-collective" in wrapper
@@ -2349,7 +2385,7 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         '"$RMS_REPLAY" "$OUTPUT_GEOMETRY_REPLAY" "$INTEGRATED_REPLAY"'
         in wrapper
     )
-    assert '"$INTEGRATED_NATIVE_M1_PALLAS_FEATURE_TILED_REPLAY" <<\'PY\'' in wrapper
+    assert '"$INTEGRATED_NATIVE_M1_XLA_FEATURE_TILED_REPLAY" <<\'PY\'' in wrapper
     assert "expected_native_m32_output=native_m32 == \"1\"" in wrapper
     assert (
         "expected_native_m1_pallas_output=native_m1_pallas == \"1\""
@@ -2359,6 +2395,8 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
     assert 'native_m1_pallas_sources == "1"' in wrapper
     assert "expected_native_m1_pallas_feature_tiled_output=(" in wrapper
     assert 'native_m1_pallas_feature_tiled == "1"' in wrapper
+    assert "expected_native_m1_xla_feature_tiled_output=(" in wrapper
+    assert 'native_m1_xla_feature_tiled == "1"' in wrapper
     assert 'values["native_m32_output"] = "true"' in wrapper
     assert 'values["native_m1_pallas_output"] = "true"' in wrapper
     assert 'values["native_m1_pallas_sources_output"] = "true"' in wrapper
@@ -2366,6 +2404,7 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         'values["native_m1_pallas_feature_tiled_output"] = "true"'
         in wrapper
     )
+    assert 'values["native_m1_xla_feature_tiled_output"] = "true"' in wrapper
     assert '"full_m32_output_sha256"' in wrapper
     assert wrapper.index("strict_census post") < wrapper.index(
         '"$REMOTE_PREFIX/SUCCESS" >/dev/null'

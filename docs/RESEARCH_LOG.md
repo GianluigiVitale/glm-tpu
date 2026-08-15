@@ -5,6 +5,44 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 05:18--05:36 UTC — final native-XLA one-row discriminator wired locally
+
+- After the three Pallas forms converged on the same nonexact result, selected one final mechanism
+  discriminator rather than another custom-kernel formula: preserve one semantic row, reshape its
+  6,144 live features to `[8,768]`, and let native XLA own the complete BF16 add/RMS/weight fusion.
+  This tests whether the accepted native fusion can be retained without an M32 semantic result or
+  the rejected Pallas boundary.
+- Added a separate default-off flag, graph mode, labels/classification, prevalidation, host and
+  terminal schemas, protected wrapper propagation and fail-closed empty StableHLO/optimized-HLO
+  pins. Forced-32 abstract tracing covers the 13-input graph; affected kernel, graph and terminal
+  suites pass 42/42. No TPU work or performance claim occurred in this interval.
+- This is explicitly the last bounded arithmetic discriminator and is not itself production PP8.
+  One compile-only acquisition will preserve its lowering for offline proof; only an accepted
+  lowering permits one 6,144-value numerical verdict. A nonexact verdict terminates bitwise
+  arithmetic-arm iteration and returns work to the PP8 short decoder's bounded-internal-error plus
+  exact-token contract. It must not spawn another scalar/layout/kernel hypothesis.
+
+## 2026-08-15 05:14--05:18 UTC — all-live feature-tiled route rejected; true-M1 Pallas search closed
+
+- Committed/pushed reviewed HLO proof `aa1b6eb85e812f6c16108c79610f5f78d8afe421` and ran exactly
+  one protected 6,144-value discriminator as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_20260815T051453080366540Z`.
+  All eight workers reproduced StableHLO/optimized-HLO `89d3257b...30d4` /
+  `afb68ab0...c2db`; the device workflow took 92 seconds.
+- The result is nonexact at 2,135/6,144 BF16 values, first mismatch 0, maximum/mean absolute error
+  `0.001953125` / `5.819921110135814e-05`, and expected/observed raw row SHAs
+  `9936ee1e...d3039` / `04adc5dc...950f`. Hidden 2795 matches at 48423 but is not evidence of
+  exactness. The complete output has zero differences from the prior rejected source-fused arm;
+  both NPYs hash to `e932a86a...c80a4`. Making every `8x128` lane live therefore does not alter the
+  numerical path. Freeze all three true-M1 Pallas arms and do not invent another formula/layout
+  variant.
+- The archive contains exactly 46 objects / 11,159,286 bytes, terminal `SUCCESS` was uploaded last,
+  and cleanup is authenticated 8/8. Summary/`SUCCESS`/ledger/post-census/evidence SHAs are
+  `b6ba90dd...d3eeb`, `45047c98...ac52`, `c63f22cc...3a5f`, `45da6e1b...7c0c` and
+  `c8075355...cc74`. There is no DB or performance row. Gate D remains open and full 8K remains
+  unauthorized; the successor must be architecture-level and reuse the existing PP8 production
+  machinery plus preserved exact evidence.
+
 ## 2026-08-15 04:38--04:55 UTC — all-live feature-tiled TPU graph acquired once and pinned offline
 
 - Reviewed/pushed `c98cfc5d837c64b75805484c3a77225ae1eb824c`, then ran exactly one

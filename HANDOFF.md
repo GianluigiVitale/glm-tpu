@@ -19,6 +19,37 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The next and final bounded arithmetic discriminator is implemented locally, default-off, as
+  `native_m1_xla_feature_tiled_output`. It keeps one semantic row, bijectively reshapes the exact
+  native dense/attention/embedding sources to `[8,768]`, and lets native XLA own the complete
+  BF16 add/RMS/weight fusion; it does not call the rejected Pallas boundary. StableHLO and
+  optimized-HLO pins are deliberately empty, so its first protected contact can only preserve the
+  compiler graphs and refuse before arithmetic or publication. The graph, protected wrapper,
+  terminal schema, forced-32 tracing and empty-pin refusal are wired; focused tests pass 42/42.
+  This remains a one-layer full-pod diagnostic, not a production PP8 architecture. After one
+  immutable review, acquire the lowering once, prove it locally, then run at most one 6,144-value
+  verdict. If it is nonexact, end the bitwise arithmetic search and return to the PP8 decoder under
+  the documented bounded-internal-error plus exact-raw-token Gate-D contract; do not create another
+  scalar/layout/kernel arm.
+- Reviewed/pushed pin `aa1b6eb85e812f6c16108c79610f5f78d8afe421` completed and sealed the
+  all-live feature-tiled discriminator as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_20260815T051453080366540Z`.
+  It is conclusively nonexact at 2,135/6,144 BF16 values, first index 0, maximum/mean absolute
+  error `0.001953125` / `5.819921110135814e-05`, and expected/observed raw row SHAs
+  `9936ee1e...d3039` / `04adc5dc...950f`; hidden 2795 happens to match at 48423. Most
+  importantly, its complete output is byte-for-byte identical to the already rejected six-source
+  dead-lane arm: zero differing values and common NPY SHA `e932a86a...c80a4`. Feature remapping
+  therefore changes neither arithmetic nor output. Freeze the all-live arm and the complete
+  true-M1 Pallas equivalence route; do not add another scalar, layout, dead-lane, source-fusion or
+  feature-tile retry.
+- The protected device workflow took 92 seconds. The 46-object, 11,159,286-byte archive is sealed
+  at `gs://driftbench-dsv4-uc/results/greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_20260815T051453080366540Z`;
+  terminal `SUCCESS` was uploaded last and pre/post census is authenticated 8/8 clean. Summary,
+  `SUCCESS`, ledger, post-census and evidence SHAs are `b6ba90dd...d3eeb`,
+  `45047c98...ac52`, `c63f22cc...3a5f`, `45da6e1b...7c0c` and `c8075355...cc74`.
+  This remains diagnostic-only and has no DB/performance row. Full 8K is not authorized by this
+  result. Exact next is an architecture-level successor using the existing PP8 production paths
+  and preserved exact M32 evidence, not another bounded Pallas arithmetic arm.
 - Reviewed/pushed wiring `c98cfc5d837c64b75805484c3a77225ae1eb824c` completed exactly one
   fail-closed compile acquisition as
   `greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_20260815T044338647791046Z`.
@@ -30,14 +61,15 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   U16 `[8,768] -> [1,6144]` ENTRY-root path. No Pallas operand/result has an M32 batch axis and all
   6,144 features are live. Pre/failure censuses and a direct process check are 8/8 clean; no output,
   comparison, DB row, ledger or terminal `SUCCESS` exists. The partial remote prefix contains only
-  diagnostic/source evidence and three `diagnostic_hlo/` objects.
+  diagnostic/source evidence and three `diagnostic_hlo/` objects. This acquisition was later
+  consumed by the sealed nonexact run above; do not repeat it.
 - Both complete compiler hashes are now pinned locally. The structural proof binds exact row-zero
   dense/attention/embedding sources through the `[8,768]` reshapes, validity, M32-derived inverse,
   norm weight, ordered call operands/layouts and the live layout-only root. Parser-valid mutations
   of source order, row selection, inverse/weight binding, physical layout, output arithmetic and
-  root bypass all refuse even when their mutated digest is temporarily trusted. Exact next is one
-  immutable Sol review of this pin/proof batch, correction-only closure, commit/push, then one
-  protected 6,144-value numerical discriminator. Only `0 / 6,144` authorizes full 8K.
+  root bypass all refuse even when their mutated digest is temporarily trusted. The immutable Sol
+  review closed at staged SHA `57d8e500...92ce4`, and the protected numerical verdict is the
+  sealed nonexact result above.
 - Reviewed/pushed primitive `9f1e600` implements the sole derived successor as an all-live
   feature-tiled Pallas boundary: semantic BF16 `[1,6144]` sources reshape bijectively to
   `[8,768]`, six `[8,128]` programs cover every feature exactly once, and a layout-only reshape
