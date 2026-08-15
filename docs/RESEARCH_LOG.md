@@ -5,6 +5,29 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 00:05--00:35 UTC — exact full-M32 TPU lowering acquired; numerical retry remains
+
+- Reviewed/pushed pin `524cb1ff10294d94d33070a13f772d651980451d` ran the deliberately
+  fail-closed native full-M32 compile acquisition once as
+  `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T000518083058778Z`.
+  The eight-host workflow compiled in 34 seconds and refused at the empty StableHLO pin before
+  arithmetic. It has no output, comparison, DB row, terminal archive or `SUCCESS`; the failure
+  census is authenticated 8/8 clean and the remote prefix contains only partial diagnostics.
+- StableHLO, optimized HLO and prevalidation SHAs are `289017ca...c1bb`, `e1260889...e3ee` and
+  `b29241a2...bf1c`. The scheduled graph has 597 instructions/32 partitions and returns one live
+  `u16[32,6144]` fusion whose six ordered inputs are attention, dense, inverse-RMS, embedding,
+  validity and norm. This is the observed missing accepted boundary: the earlier pre-arithmetic M1
+  slices are gone. Full graph pins plus parser-valid root source/layout and StableHLO reducer
+  mutations refuse locally.
+- The diagnostic executor and terminal revalidator now retain the complete M32 U16 tensor, prove
+  row-zero identity, validate exact artifact file/array manifests, recompute the comparison, and
+  require repeat/local-replica full-array agreement. Mode and full-array SHA are carried into the
+  terminal summary/`SUCCESS`; old modes retain their exact schemas. Focused validation passes
+  17/17 and the forced-32 dense/projection/integrated regression set passes 110/110 in 90.22
+  seconds. No numerical claim exists yet. Exact next is one immutable review/correction closure,
+  then one seconds-scale protected numerical row. Full 8K remains forbidden unless it is exact at
+  all 6,144 values.
+
 ## 2026-08-14 23:21--23:55 UTC — native TPU graph acquired once; validator iteration is local
 
 - Reviewed/pushed pin `63e7017684df4aed9cfbdbc93c57129f0cf20f1e` ran the intentionally

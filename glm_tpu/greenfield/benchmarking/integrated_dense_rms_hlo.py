@@ -50,11 +50,13 @@ INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256 = (
 INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256 = (
     "4b13a9f123ae75ae2b196673d96788360ee5f6bd72ebd0d7cad9865a0feaaf63"
 )
-# Filled only after one protected compile-acquisition run has atomically
-# preserved the exact M32-output lowering.  Empty means arithmetic is
-# structurally impossible to authorize.
-INTEGRATED_DENSE_NATIVE_M32_STABLEHLO_SHA256 = ""
-INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256 = ""
+# Captured once by the fail-closed protected acquisition at ``524cb1f``.
+INTEGRATED_DENSE_NATIVE_M32_STABLEHLO_SHA256 = (
+    "289017cae42d14c5c04d456ab6b8636fddab526d19d53272f2d360014574c1bb"
+)
+INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256 = (
+    "e1260889170f1bdba1bc2a9c5713efc6fe8aa794f6d1847ba15769457376e3ee"
+)
 
 _NATIVE_SOURCE_COLLECTIVE_SCOPES = (
     "native_source_context_embedding_collective",
@@ -1313,7 +1315,11 @@ def _validate_native_source_context_hlo(
     )
     report.raise_for_violations()
     module = report.module
-    if module.num_partitions != 32 or len(module.instructions) != 602:
+    expected_instruction_count = 597 if native_m32_output else 602
+    if (
+        module.num_partitions != 32
+        or len(module.instructions) != expected_instruction_count
+    ):
         raise BenchmarkValidationError(
             "integrated native-source module geometry drifted"
         )
@@ -1353,6 +1359,23 @@ def _validate_native_source_context_hlo(
         for item in reductions
     )
     exact_reduction_shape = (("bf16", (32, 6144)),)
+    expected_root_shape = (
+        (("u16", (32, 6144)),)
+        if native_m32_output
+        else (("u16", (1, 6144)),)
+    )
+    expected_root_operands = (
+        (
+            "%psum.22",
+            "%psum.23",
+            "%add_rsqrt_fusion",
+            "%psum.21",
+            "%get-tuple-element.30",
+            "%copy-done.7",
+        )
+        if native_m32_output
+        else None
+    )
     if not (
         len(module.collectives) == 3
         and len(reductions) == 3
@@ -1486,7 +1509,11 @@ def _validate_native_source_context_hlo(
         and len(layer1_rsqrt) == 1
         and len(roots) == 1
         and roots[0].raw_opcode == "fusion"
-        and _shape_signature(roots[0]) == (("u16", (1, 6144)),)
+        and _shape_signature(roots[0]) == expected_root_shape
+        and (
+            expected_root_operands is None
+            or roots[0].operand_names == expected_root_operands
+        )
         and roots[0].op_name
         == "jit(integrated)/shard_map/integrated_dense_rms_live_row/bitcast_convert_type"
     ):
@@ -1521,7 +1548,7 @@ def _validate_native_source_context_hlo(
         "exact_predense_rms": True,
         "exact_strategy_nd_collectives": True,
         "exact_wuv_kernel": True,
-        "live_rows": 1,
+        "live_rows": 32 if native_m32_output else 1,
         "native_source_context": True,
         "num_partitions": module.num_partitions,
         "num_replicas": module.num_replicas,
@@ -1529,6 +1556,14 @@ def _validate_native_source_context_hlo(
         "performance_claim": False,
         "split_layer1_rms": False,
         "violations": [],
+        **(
+            {
+                "exact_m32_output_fusion": True,
+                "native_m32_output": True,
+            }
+            if native_m32_output
+            else {}
+        ),
     }
 
 

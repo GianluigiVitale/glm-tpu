@@ -27,6 +27,8 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
 from glm_tpu.greenfield.errors import BenchmarkValidationError
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256,
+    INTEGRATED_DENSE_NATIVE_M32_STABLEHLO_SHA256,
     INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256,
     INTEGRATED_DENSE_NATIVE_SOURCE_STABLEHLO_SHA256,
     INTEGRATED_DENSE_ORDINAL_RMS_STABLEHLO_SHA256,
@@ -122,6 +124,24 @@ REAL_NATIVE_SOURCE_TPU_HLO = (
 REAL_NATIVE_SOURCE_TPU_STABLEHLO = (
     REAL_NATIVE_SOURCE_TPU_RUN
     / "hlo/strategy_nd_integrated_dense_native_source_context_"
+    "bfloat16_32x6144.stablehlo.mlir"
+)
+REAL_NATIVE_M32_TPU_RUN = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_INTEGRATED_NATIVE_M32_TPU_RUN",
+        "/home/gianl/glm-run/"
+        "greenfield_strategy_nd_integrated_dense_native_m32_output_"
+        "20260815T000518083058778Z",
+    )
+)
+REAL_NATIVE_M32_TPU_HLO = (
+    REAL_NATIVE_M32_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_m32_output_"
+    "bfloat16_32x6144.optimized_hlo.txt"
+)
+REAL_NATIVE_M32_TPU_STABLEHLO = (
+    REAL_NATIVE_M32_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_m32_output_"
     "bfloat16_32x6144.stablehlo.mlir"
 )
 REAL_LEGACY_INTEGRATED_RUN = Path(
@@ -765,13 +785,13 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
             "module awaiting protected lowering",
             native_source_context=True,
         )
-    with pytest.raises(ValueError, match="StableHLO is not pinned"):
+    with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
         validate_integrated_dense_rms_stablehlo(
             "module awaiting protected M32 lowering",
             native_source_context=True,
             native_m32_output=True,
         )
-    with pytest.raises(ValueError, match="optimized HLO is not pinned"):
+    with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
         validate_integrated_dense_rms_hlo(
             "HloModule awaiting_protected_m32_lowering",
             tuple(range(32)),
@@ -1225,6 +1245,78 @@ def test_real_native_source_tpu_hlo_and_mutation_refusals() -> None:
         )
 
 
+@pytest.mark.skipif(
+    not REAL_NATIVE_M32_TPU_HLO.is_file()
+    or not REAL_NATIVE_M32_TPU_STABLEHLO.is_file(),
+    reason="protected native-M32 integrated TPU HLO absent",
+)
+def test_real_native_m32_tpu_hlo_and_mutation_refusals() -> None:
+    from jaxlib import xla_client
+
+    optimized_hlo = REAL_NATIVE_M32_TPU_HLO.read_text()
+    stablehlo = REAL_NATIVE_M32_TPU_STABLEHLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256
+    )
+    assert sha256(stablehlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_M32_STABLEHLO_SHA256
+    )
+    stable_contract = validate_integrated_dense_rms_stablehlo(
+        stablehlo,
+        native_source_context=True,
+        native_m32_output=True,
+    )
+    optimized_contract = validate_integrated_dense_rms_hlo(
+        optimized_hlo,
+        tuple(range(32)),
+        native_source_context=True,
+        native_m32_output=True,
+    )
+    assert stable_contract["native_m32_output"] is True
+    assert optimized_contract["passed"] is True
+    assert optimized_contract["native_m32_output"] is True
+    assert optimized_contract["exact_m32_output_fusion"] is True
+    assert optimized_contract["live_rows"] == 32
+    assert optimized_contract["exact_graph_sha256"] == (
+        INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256
+    )
+
+    replacements = (
+        (
+            "fusion(%psum.22, %psum.23, %add_rsqrt_fusion, %psum.21,",
+            "fusion(%psum.23, %psum.22, %add_rsqrt_fusion, %psum.21,",
+        ),
+        (
+            "u16[32,6144]{1,0:T(8,128)(2,1)} fusion(",
+            "u16[32,6144]{0,1} fusion(",
+        ),
+        (
+            "%get-tuple-element.30, /*index=5*/%copy-done.7),",
+            "%get-tuple-element.30, /*index=5*/%param.26),",
+        ),
+    )
+    mutations = tuple(
+        optimized_hlo.replace(old, new, 1) for old, new in replacements
+    )
+    assert all(mutation != optimized_hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
+            validate_integrated_dense_rms_hlo(
+                mutation,
+                tuple(range(32)),
+                native_source_context=True,
+                native_m32_output=True,
+            )
+
+    with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
+        validate_integrated_dense_rms_stablehlo(
+            stablehlo.replace("stablehlo.add", "stablehlo.maximum", 1),
+            native_source_context=True,
+            native_m32_output=True,
+        )
+
+
 def test_checkpoint_success_pin_and_missing_mutated_refusals(
     tmp_path: Path,
 ) -> None:
@@ -1305,6 +1397,15 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
     assert native_source_exact["classification"] == (
         "integrated_dense_native_source_context_exact_accepted"
     )
+    native_m32_exact = _recompute_comparison(
+        expected.copy(),
+        expected,
+        native_source_context=True,
+        native_m32_output=True,
+    )
+    assert native_m32_exact["classification"] == (
+        "integrated_dense_native_m32_output_exact_accepted"
+    )
     digest = array_sha256(expected)
     capture = {
         "invocation_count": 2,
@@ -1314,6 +1415,27 @@ def test_integrated_comparison_and_capture_are_recomputed_from_arrays() -> None:
         "repeated_output_bits_sha256": digest,
     }
     _validate_capture(capture, expected)
+    full = np.broadcast_to(expected, (32, 6144)).copy()
+    full_digest = array_sha256(full)
+    m32_capture = {
+        **capture,
+        "full_m32_output": True,
+        "full_output_sha256": full_digest,
+        "local_replica_full_output_sha256": [full_digest] * 4,
+        "repeated_full_output_sha256": full_digest,
+        "repeated_local_replica_full_output_sha256": [full_digest] * 4,
+    }
+    _validate_capture(m32_capture, expected, full_m32_output=full)
+    wrong_full = full.copy()
+    wrong_full[1, 0] += np.uint16(1)
+    with pytest.raises(ValueError, match="deterministic capture"):
+        _validate_capture(
+            m32_capture,
+            expected,
+            full_m32_output=wrong_full,
+        )
+    with pytest.raises(ValueError, match="deterministic capture"):
+        _validate_capture(m32_capture, expected)
     capture["invocation_count"] = True
     with pytest.raises(ValueError, match="deterministic capture"):
         _validate_capture(capture, expected)
@@ -1393,6 +1515,18 @@ def test_hlo_prevalidation_record_is_exact_and_non_promoting() -> None:
         split_layer1_rms=False,
         native_source_context=True,
     )
+    native_m32_record = {
+        **native_record,
+        "native_m32_output": True,
+    }
+    _validate_hlo_prevalidation(
+        native_m32_record,
+        optimized_hlo_sha256="1" * 64,
+        stablehlo_sha256="2" * 64,
+        split_layer1_rms=False,
+        native_source_context=True,
+        native_m32_output=True,
+    )
     for key, value in (
         ("validated", True),
         ("performance_claim", True),
@@ -1451,6 +1585,10 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
     assert "--mode strategy_nd_integrated_dense_rms" in wrapper
     assert "validate_strategy_nd_integrated_dense_rms" in wrapper
     assert '"$RMS_REPLAY" "$INTEGRATED_REPLAY"' in wrapper
+    assert '"$INTEGRATED_NATIVE_M32_REPLAY" <<\'PY\'' in wrapper
+    assert "expected_native_m32_output=native_m32 == \"1\"" in wrapper
+    assert 'values["native_m32_output"] = "true"' in wrapper
+    assert '"full_m32_output_sha256"' in wrapper
     assert wrapper.index("strict_census post") < wrapper.index(
         '"$REMOTE_PREFIX/SUCCESS" >/dev/null'
     )

@@ -856,7 +856,7 @@ def _run_strategy_nd_integrated_dense_rms(
     if native_source_context:
         if native_weights is None or native_inputs is None:
             raise RuntimeError("native source inputs were not assembled")
-        output_bits, capture = execute_native_source_context(
+        output_bits, capture, full_output_bits = execute_native_source_context(
             compiled,
             native_weights,
             native_inputs,
@@ -868,6 +868,7 @@ def _run_strategy_nd_integrated_dense_rms(
             physical_weights,
             inputs,
         )
+        full_output_bits = None
         expected_bits = inputs.accepted_layer1_bits
     mismatch_indices = np.flatnonzero(output_bits != expected_bits)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -946,6 +947,11 @@ def _run_strategy_nd_integrated_dense_rms(
         "post_attention_norm": array_sha256(inputs.post_attention_norm_bits),
         "output": array_sha256(output_bits),
         **(
+            {"full_m32_output": array_sha256(full_output_bits)}
+            if native_m32_output and full_output_bits is not None
+            else {}
+        ),
+        **(
             {}
             if native_source_context
             else {
@@ -1001,11 +1007,30 @@ def _run_strategy_nd_integrated_dense_rms(
         paths = {
             "accepted_layer1_bits": replay_dir / "accepted_layer1_bits.npy",
             "hardware_layer1_bits": replay_dir / "hardware_layer1_bits.npy",
+            **(
+                {
+                    "hardware_layer1_m32_bits": (
+                        replay_dir / "hardware_layer1_m32_bits.npy"
+                    )
+                }
+                if native_m32_output
+                else {}
+            ),
         }
         for name, path in paths.items():
+            if name == "hardware_layer1_m32_bits":
+                if full_output_bits is None:
+                    raise RuntimeError("native M32 output was not returned")
+                artifact = full_output_bits
+            else:
+                artifact = (
+                    expected_bits
+                    if name == "accepted_layer1_bits"
+                    else output_bits
+                )
             _atomic_save(
                 path,
-                expected_bits if name == "accepted_layer1_bits" else output_bits,
+                artifact,
             )
             value = np.load(path, allow_pickle=False)
             artifact_manifest[name] = {

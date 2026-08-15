@@ -123,6 +123,13 @@ EXPECTED_CAPTURE_FIELDS = {
     "repeated_local_replica_output_sha256",
     "repeated_output_bits_sha256",
 }
+EXPECTED_M32_CAPTURE_FIELDS = EXPECTED_CAPTURE_FIELDS | {
+    "full_m32_output",
+    "full_output_sha256",
+    "local_replica_full_output_sha256",
+    "repeated_full_output_sha256",
+    "repeated_local_replica_full_output_sha256",
+}
 EXPECTED_HLO_PREVALIDATION_FIELDS = {
     "optimized_hlo_sha256",
     "performance_claim",
@@ -142,6 +149,7 @@ def _validate_hlo_prevalidation(
     split_predense_rms: bool = False,
     accepted_source_context: bool = False,
     native_source_context: bool = False,
+    native_m32_output: bool = False,
 ) -> None:
     expected_fields = set(EXPECTED_HLO_PREVALIDATION_FIELDS)
     if preceding_attention_collective:
@@ -152,6 +160,8 @@ def _validate_hlo_prevalidation(
         expected_fields.add("accepted_source_context")
     if native_source_context:
         expected_fields.add("native_source_context")
+    if native_m32_output:
+        expected_fields.add("native_m32_output")
     if not (
         type(record) is dict
         and set(record) == expected_fields
@@ -173,6 +183,10 @@ def _validate_hlo_prevalidation(
             not native_source_context
             or record["native_source_context"] is True
         )
+        and (
+            not native_m32_output
+            or record["native_m32_output"] is True
+        )
         and record["split_layer1_rms"] is split_layer1_rms
         and record["validated"] is False
         and record["performance_claim"] is False
@@ -189,6 +203,7 @@ def _recompute_comparison(
     split_predense_rms: bool = False,
     accepted_source_context: bool = False,
     native_source_context: bool = False,
+    native_m32_output: bool = False,
 ) -> dict[str, Any]:
     mismatch_indices = np.flatnonzero(observed != expected)
     first = None if not len(mismatch_indices) else int(mismatch_indices[0])
@@ -201,7 +216,9 @@ def _recompute_comparison(
     error = np.abs(observed_values - expected_values)
     observed_sha = _raw_sha256(observed)
     prefix = (
-        "integrated_dense_native_source_context"
+        "integrated_dense_native_m32_output"
+        if native_m32_output
+        else "integrated_dense_native_source_context"
         if native_source_context
         else "integrated_dense_accepted_source_context"
         if accepted_source_context
@@ -237,11 +254,26 @@ def _recompute_comparison(
     }
 
 
-def _validate_capture(capture: object, output: np.ndarray) -> None:
+def _validate_capture(
+    capture: object,
+    output: np.ndarray,
+    *,
+    full_m32_output: np.ndarray | None = None,
+) -> None:
     output_sha = array_sha256(output)
+    expected_fields = (
+        EXPECTED_M32_CAPTURE_FIELDS
+        if full_m32_output is not None
+        else EXPECTED_CAPTURE_FIELDS
+    )
+    full_output_sha = (
+        array_sha256(full_m32_output)
+        if full_m32_output is not None
+        else None
+    )
     if not (
         type(capture) is dict
-        and set(capture) == EXPECTED_CAPTURE_FIELDS
+        and set(capture) == expected_fields
         and type(capture["invocation_count"]) is int
         and capture["invocation_count"] == 2
         and capture["output_bits_sha256"] == output_sha
@@ -254,6 +286,22 @@ def _validate_capture(capture: object, output: np.ndarray) -> None:
         )
         and capture["repeated_local_replica_output_sha256"]
         == capture["local_replica_output_sha256"]
+        and (
+            full_m32_output is None
+            or (
+                capture["full_m32_output"] is True
+                and capture["full_output_sha256"] == full_output_sha
+                and capture["repeated_full_output_sha256"] == full_output_sha
+                and type(capture["local_replica_full_output_sha256"]) is list
+                and len(capture["local_replica_full_output_sha256"]) == 4
+                and all(
+                    type(value) is str and value == full_output_sha
+                    for value in capture["local_replica_full_output_sha256"]
+                )
+                and capture["repeated_local_replica_full_output_sha256"]
+                == capture["local_replica_full_output_sha256"]
+            )
+        )
     ):
         raise ValueError("integrated dense deterministic capture drifted")
 
@@ -289,6 +337,7 @@ def validate_strategy_nd_integrated_dense_rms(
     expected_split_predense_rms: bool = False,
     expected_accepted_source_context: bool = False,
     expected_native_source_context: bool = False,
+    expected_native_m32_output: bool = False,
 ) -> dict[str, Any]:
     """Reload every source/fleet/artifact byte and recompute the verdict."""
 
@@ -310,6 +359,10 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("accepted source-context expectation must be boolean")
     if not isinstance(expected_native_source_context, bool):
         raise ValueError("native source-context expectation must be boolean")
+    if not isinstance(expected_native_m32_output, bool):
+        raise ValueError("native M32-output expectation must be boolean")
+    if expected_native_m32_output and not expected_native_source_context:
+        raise ValueError("native M32 output requires native source context")
     if expected_accepted_source_context and expected_native_source_context:
         raise ValueError("accepted and native source contexts are disjoint")
     if expected_preceding_attention_collective and not expected_split_layer1_rms:
@@ -428,6 +481,8 @@ def validate_strategy_nd_integrated_dense_rms(
         expected_replay_fields.add("accepted_source_context")
     if expected_native_source_context:
         expected_replay_fields.add("native_source_context")
+    if expected_native_m32_output:
+        expected_replay_fields.add("native_m32_output")
     if any(
         type(item) is not dict or set(item) != expected_replay_fields
         for item in items
@@ -471,6 +526,10 @@ def validate_strategy_nd_integrated_dense_rms(
             or reference["native_source_context"] is True
         )
         and (
+            not expected_native_m32_output
+            or reference["native_m32_output"] is True
+        )
+        and (
             legacy_schema
             or reference["split_layer1_rms"] is expected_split_layer1_rms
         )
@@ -504,8 +563,32 @@ def validate_strategy_nd_integrated_dense_rms(
     manifest = json.loads((artifact_dir / "manifest.json").read_text())
     if manifest != owners[0][1]["artifact_manifest"]:
         raise ValueError("integrated dense artifact manifest drifted")
+    expected_artifacts = {
+        "accepted_layer1_bits": (6144,),
+        "hardware_layer1_bits": (6144,),
+        **(
+            {"hardware_layer1_m32_bits": (32, 6144)}
+            if expected_native_m32_output
+            else {}
+        ),
+    }
+    expected_artifact_files = {
+        "comparison.json",
+        "manifest.json",
+        *(f"{name}.npy" for name in expected_artifacts),
+    }
+    if (
+        set(manifest) != set(expected_artifacts)
+        or {
+            path.name
+            for path in artifact_dir.iterdir()
+            if path.is_file()
+        }
+        != expected_artifact_files
+    ):
+        raise ValueError("integrated dense artifact manifest schema drifted")
     arrays: dict[str, np.ndarray] = {}
-    for name in ("accepted_layer1_bits", "hardware_layer1_bits"):
+    for name, shape in expected_artifacts.items():
         path = artifact_dir / f"{name}.npy"
         value = np.load(path, allow_pickle=False)
         artifact = manifest.get(name)
@@ -514,15 +597,20 @@ def validate_strategy_nd_integrated_dense_rms(
             and set(artifact)
             == {"array_sha256", "dtype", "file", "file_sha256", "shape"}
             and artifact["file"] == path.name
-            and artifact["shape"] == [6144]
+            and artifact["shape"] == list(shape)
             and artifact["dtype"] == np.dtype(np.uint16).str
-            and value.shape == (6144,)
+            and value.shape == shape
             and value.dtype == np.uint16
             and artifact["file_sha256"] == _file_sha256(path)
             and artifact["array_sha256"] == array_sha256(value)
         ):
             raise ValueError(f"integrated dense artifact drifted: {name}")
         arrays[name] = np.ascontiguousarray(value)
+    full_m32_output = arrays.get("hardware_layer1_m32_bits")
+    if full_m32_output is not None and not np.array_equal(
+        arrays["hardware_layer1_bits"], full_m32_output[0]
+    ):
+        raise ValueError("integrated dense M32 row zero drifted")
 
     _validate_rms_source_files(run_dir / "source_rms")
     native_source_path = (
@@ -605,6 +693,7 @@ def validate_strategy_nd_integrated_dense_rms(
         split_predense_rms=expected_split_predense_rms,
         accepted_source_context=expected_accepted_source_context,
         native_source_context=expected_native_source_context,
+        native_m32_output=expected_native_m32_output,
     )
     recorded = reference["comparison"]
     if not (
@@ -630,11 +719,20 @@ def validate_strategy_nd_integrated_dense_rms(
         == comparison
     ):
         raise ValueError("integrated dense comparison failed recomputation")
-    _validate_capture(reference["capture"], arrays["hardware_layer1_bits"])
+    _validate_capture(
+        reference["capture"],
+        arrays["hardware_layer1_bits"],
+        full_m32_output=full_m32_output,
+    )
     expected_fleet = {
         "accepted_target": array_sha256(arrays["accepted_layer1_bits"]),
         "layer1_norm": array_sha256(inputs.layer1_norm_bits),
         "output": array_sha256(arrays["hardware_layer1_bits"]),
+        **(
+            {"full_m32_output": array_sha256(full_m32_output)}
+            if full_m32_output is not None
+            else {}
+        ),
         "post_attention_norm": array_sha256(inputs.post_attention_norm_bits),
         **(
             {
@@ -682,7 +780,9 @@ def validate_strategy_nd_integrated_dense_rms(
         raise ValueError("integrated dense fleet hashes drifted")
 
     label = (
-        "strategy_nd_integrated_dense_native_source_context_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_native_m32_output_bfloat16_32x6144"
+        if expected_native_m32_output
+        else "strategy_nd_integrated_dense_native_source_context_bfloat16_32x6144"
         if expected_native_source_context
         else "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
         if expected_accepted_source_context
@@ -723,6 +823,7 @@ def validate_strategy_nd_integrated_dense_rms(
         split_predense_rms=expected_split_predense_rms,
         accepted_source_context=expected_accepted_source_context,
         native_source_context=expected_native_source_context,
+        native_m32_output=expected_native_m32_output,
     )
     optimized_contract = validate_integrated_dense_rms_hlo(
         optimized_hlo,
@@ -732,6 +833,7 @@ def validate_strategy_nd_integrated_dense_rms(
         split_predense_rms=expected_split_predense_rms,
         accepted_source_context=expected_accepted_source_context,
         native_source_context=expected_native_source_context,
+        native_m32_output=expected_native_m32_output,
     )
     if legacy_schema:
         stable_contract = dict(stable_contract)
@@ -750,6 +852,7 @@ def validate_strategy_nd_integrated_dense_rms(
             split_predense_rms=expected_split_predense_rms,
             accepted_source_context=expected_accepted_source_context,
             native_source_context=expected_native_source_context,
+            native_m32_output=expected_native_m32_output,
         )
     if not (
         stable_contract == reference["stablehlo_contract"]
@@ -765,7 +868,9 @@ def validate_strategy_nd_integrated_dense_rms(
 
     result = {
         "artifact_kind": (
-            "glm52_strategy_nd_integrated_dense_native_source_context"
+            "glm52_strategy_nd_integrated_dense_native_m32_output"
+            if expected_native_m32_output
+            else "glm52_strategy_nd_integrated_dense_native_source_context"
             if expected_native_source_context
             else "glm52_strategy_nd_integrated_dense_accepted_source_context"
             if expected_accepted_source_context
@@ -785,6 +890,11 @@ def validate_strategy_nd_integrated_dense_rms(
             "expected_hidden_2795_bfloat16_bits"
         ],
         "expected_raw_sha256": comparison["expected_raw_sha256"],
+        **(
+            {"full_m32_output_sha256": array_sha256(full_m32_output)}
+            if full_m32_output is not None
+            else {}
+        ),
         "mismatch_count": comparison["mismatch_count"],
         "observed_hidden_2795_bfloat16_bits": comparison[
             "observed_hidden_2795_bfloat16_bits"
@@ -811,4 +921,6 @@ def validate_strategy_nd_integrated_dense_rms(
         result["accepted_source_context"] = True
     if expected_native_source_context:
         result["native_source_context"] = True
+    if expected_native_m32_output:
+        result["native_m32_output"] = True
     return result

@@ -1348,8 +1348,8 @@ def execute_native_source_context(
     compiled: CompiledIntegratedDenseRms,
     weights: NativeSourceWeights,
     inputs: NativeSourceInputs,
-) -> tuple[np.ndarray, Mapping[str, Any]]:
-    """Execute the native source graph twice and return its replicated row."""
+) -> tuple[np.ndarray, Mapping[str, Any], np.ndarray]:
+    """Execute twice and return row zero, capture evidence and the full result."""
 
     import jax
 
@@ -1384,7 +1384,9 @@ def execute_native_source_context(
         ),
     )
 
-    def execute_once() -> tuple[np.ndarray, tuple[str, ...], tuple[str, ...]]:
+    def execute_once() -> tuple[
+        np.ndarray, np.ndarray, tuple[str, ...], tuple[str, ...]
+    ]:
         result = compiled.compiled(*arguments)
         jax.block_until_ready(result)
         local_full = tuple(
@@ -1403,12 +1405,20 @@ def execute_native_source_context(
             )
         rows = tuple(np.ascontiguousarray(value[0]) for value in local_full)
         row_hashes = tuple(array_sha256(value) for value in rows)
-        return rows[0], row_hashes, full_hashes
+        return (
+            rows[0],
+            np.ascontiguousarray(local_full[0]),
+            row_hashes,
+            full_hashes,
+        )
 
-    output, local_hashes, full_hashes = execute_once()
-    repeated, repeated_hashes, repeated_full_hashes = execute_once()
+    output, full_output, local_hashes, full_hashes = execute_once()
+    repeated, repeated_full, repeated_hashes, repeated_full_hashes = (
+        execute_once()
+    )
     if (
         not np.array_equal(output, repeated)
+        or not np.array_equal(full_output, repeated_full)
         or full_hashes != repeated_full_hashes
     ):
         raise BenchmarkValidationError("native source graph is nondeterministic")
@@ -1431,4 +1441,4 @@ def execute_native_source_context(
                 ),
             }
         )
-    return output, capture
+    return output, capture, full_output

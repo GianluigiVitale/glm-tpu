@@ -87,6 +87,17 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   value keeps the disputed physical extent live, after which the host comparator may select row
   zero. Prove the global output shape locally, but acquire and pin the real TPU fusion before any
   numerical execution.
+- That full-M32 acquisition is complete. The exact optimized graph SHA is
+  `e1260889...e3ee`; its live root is `u16[32,6144]` and consumes all six accepted source roles in
+  one fusion, so the disputed early M1 materialization is absent. The compile acquisition stopped
+  before arithmetic on its deliberately empty pin and ended 8/8 clean. Never rerun it merely to
+  inspect the same graph. Pin and mutation-test this preserved lowering locally, then run one
+  numerical replay.
+- When the compiled extent is itself the hypothesis, preserve the complete output artifact rather
+  than hashing and discarding it. Terminal proof must recompute the full array hash, bind every
+  local replica and deterministic repeat, prove the separately compared row is exactly row zero of
+  that array, and carry the mode/full hash into `SUCCESS`. Otherwise an exact row could be sealed
+  without proving that the intended M32 graph actually supplied it.
 
 ## Evidence ladder
 

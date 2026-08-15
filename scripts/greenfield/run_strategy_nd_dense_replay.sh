@@ -541,7 +541,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$INTEGRATED_REPLAY" "$CHECKPOINT_ROOT" "$INTEGRATED_SPLIT_REPLAY" \
   "$INTEGRATED_ORDINAL_REPLAY" "$INTEGRATED_PREDENSE_SPLIT_REPLAY" \
   "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \
-  "$INTEGRATED_NATIVE_SOURCE_REPLAY" <<'PY'
+  "$INTEGRATED_NATIVE_SOURCE_REPLAY" \
+  "$INTEGRATED_NATIVE_M32_REPLAY" <<'PY'
 from __future__ import annotations
 
 import json
@@ -554,7 +555,7 @@ from glm_tpu.greenfield.validation import (
     validate_strategy_nd_integrated_dense_rms,
 )
 
-run_dir, pin, run_tag, elapsed, rms_replay, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source, native_source = sys.argv[1:]
+run_dir, pin, run_tag, elapsed, rms_replay, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source, native_source, native_m32 = sys.argv[1:]
 run_dir = Path(run_dir)
 if integrated_replay == "1":
     summary = validate_strategy_nd_integrated_dense_rms(
@@ -567,6 +568,7 @@ if integrated_replay == "1":
         expected_split_predense_rms=predense_split == "1",
         expected_accepted_source_context=accepted_source == "1",
         expected_native_source_context=native_source == "1",
+        expected_native_m32_output=native_m32 == "1",
     )
 else:
     validator = (
@@ -700,7 +702,8 @@ PY
   "$RMS_REPLAY" "$INTEGRATED_REPLAY" "$INTEGRATED_SPLIT_REPLAY" \
   "$INTEGRATED_ORDINAL_REPLAY" "$INTEGRATED_PREDENSE_SPLIT_REPLAY" \
   "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \
-  "$INTEGRATED_NATIVE_SOURCE_REPLAY" <<'PY'
+  "$INTEGRATED_NATIVE_SOURCE_REPLAY" \
+  "$INTEGRATED_NATIVE_M32_REPLAY" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -715,6 +718,7 @@ integrated_ordinal_replay = sys.argv[6] == "1"
 integrated_predense_split_replay = sys.argv[7] == "1"
 integrated_accepted_source_replay = sys.argv[8] == "1"
 integrated_native_source_replay = sys.argv[9] == "1"
+integrated_native_m32_replay = sys.argv[10] == "1"
 common = {
     "artifact_kind": summary["artifact_kind"],
     "classification": summary["classification"],
@@ -769,6 +773,11 @@ if rms_replay or integrated_replay:
                 "native_summary_sha256"
             ]
             values["source_native_tag"] = source["native_tag"]
+        if integrated_native_m32_replay:
+            values["native_m32_output"] = "true"
+            values["full_m32_output_sha256"] = summary[
+                "full_m32_output_sha256"
+            ]
         values["source_checkpoint_manifest_sha256"] = source[
             "checkpoint_manifest_sha256"
         ]

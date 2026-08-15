@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-14 UTC
+**Updated:** 2026-08-15 UTC
 
 ## Authority and isolation
 
@@ -18,6 +18,29 @@ legacy `AGENTS.md`/`CLAUDE.md`/`HANDOFF.md` files have no authority here. The in
 and pipeline-parallelism ban are superseded. Never edit/delete the owner's untracked main files.
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
+
+- Reviewed/pushed pin `524cb1ff10294d94d33070a13f772d651980451d` launched the native full-M32
+  compile acquisition exactly once under tag
+  `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T000518083058778Z`.
+  All eight hosts compiled the intended graph, synchronized after the graphs were atomically
+  written, and refused on the deliberately empty StableHLO pin before arithmetic. The 34-second
+  device workflow produced no numerical tensor, DB row, terminal archive or `SUCCESS`; authenticated
+  failure cleanup is 8/8 clean. Its partial diagnostic prefix contains the failure account and the
+  three compiler artifacts, not a terminal result.
+- The recovered StableHLO/optimized-HLO/prevalidation SHAs are
+  `289017ca...c1bb`, `e1260889...e3ee` and `b29241a2...bf1c`. The 597-instruction,
+  32-partition optimized graph has one live `u16[32,6144]` root fusion consuming the ordered
+  attention psum, dense psum, scalar inverse, embedding psum, validity and layer-1 norm sources.
+  The disputed M1 materialization is absent. Exact graph digests and parser-valid root
+  source/layout/StableHLO reducer mutations now fail closed.
+- Terminal evidence is being closed locally before any numerical retry. The executor preserves
+  the full `uint16[32,6144]` tensor as well as row zero; terminal recomputation requires exact
+  artifact shape/dtype/file/array hashes, row-zero identity, two-invocation determinism and
+  four-local-replica agreement, and binds the M32 mode/full-array hash through the summary and
+  `SUCCESS`. The focused file passes 17/17 and the forced-32 dense/projection/integrated set passes
+  110/110 in 90.22 seconds. Exact next is one immutable Sol review/correction closure, commit/push,
+  then one protected seconds-scale numerical row. Only `0 / 6,144` authorizes the complete 8K
+  Gate-D confirmation; Gate D remains open until that full protected decoder passes.
 
 - Reviewed/pushed pin `4a7b27719573e26752f805ca04c63c49de20f4b1` completed the protected
   native-source numerical discriminator under tag
