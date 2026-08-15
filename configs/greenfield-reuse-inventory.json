@@ -333,7 +333,7 @@
       "disposition": "research_candidate",
       "greenfield_consumers": ["glm_tpu/greenfield/sharding/ws32.py", "glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/checkpoint/ws32_one_layer.py", "tests/greenfield/kernels/test_ws32.py", "tests/greenfield/checkpoint/test_ws32_one_layer.py", "docs/greenfield/WS32_2D_PROTOTYPE.md"],
       "gate": "G",
-      "reason": "The reciprocal expert/feature specs and FP32 partial-preservation rule are adapted into the independent GLM WS32 prototype. They establish the 8x4 ownership pattern, not a final packed checkpoint, TPU schedule, exact real layer, HBM result, Gate-D result, or performance claim."
+      "reason": "The reciprocal expert/feature specs and FP32 partial-preservation rule are adapted into the independent GLM WS32 prototype and sealed layer-3 final-owner derivative. They establish exact 8x4 layer ownership, not a complete-model packed checkpoint, TPU schedule, exact real layer result, HBM result, Gate-D result, or performance claim."
     },
     {
       "id": "quantized-2d-matmul-drafts",

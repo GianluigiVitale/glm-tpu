@@ -5,6 +5,23 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 07:06--07:09 UTC — real WS32 layer-3 final-owner artifact sealed
+
+- After one bulk Sol audit and correction-only closure, ran exactly one offline derivative from
+  sealed PP8 manifest `68ef8201...f938`. Packing and full tensor verification took 70 seconds and
+  wrote 32 equal 311,601,536-byte payload owners (311,603,080 file bytes each), 9,971,249,152
+  payload bytes total. Manifest `4bf8679de10ebbba055e9d0be991495080388c6355fa449f393c28f4751e1f40`
+  binds code `4c749a6`, WS32 mesh `de5f59cb...0a88`, exact source slots/slices and all tensor/file
+  hashes. Direct loader verification of slots 0 and 31 passed with 14 tensors each.
+- The approved prefix contains exactly 40 terminal objects. All 38 payload/evidence objects and
+  `remote_objects.json` were locally CRC32C-matched to remote sizes/generations before terminal
+  publication. `SUCCESS` was the final remote mutation and directly rehashed to CRC32C `Nd1G9w==`,
+  generation `1786777785681765`; its pinned ledger SHA is `51005c4c...ef840`.
+- The validated `/dev/shm` derivative was removed. JAX/TPU was never initialized, no DB/performance
+  row exists, and this is checkpoint-layout/direct-load evidence only. Next is one bounded real
+  layer compile/execution with exact packed-lineage, subgroup, live-root and oracle contracts—not
+  a complete decoder rerun.
+
 ## 2026-08-15 06:12--06:32 UTC — WS32 one-layer derivative reuses the sealed PP8 pack
 
 - Added a bounded WS32 layer-3 packer whose only source is protected PP8 one-layer manifest

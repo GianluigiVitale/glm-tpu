@@ -230,6 +230,10 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   a bounded real layer whose final-owner shards, packed lineage, subgroup reductions and live root
   are locally fail-closed before metal. Do not use the complete 8K decoder to discover a packer,
   HLO-validator, wrapper or archive defect.
+- Keep checkpoint and TPU discriminators separate. The reviewed real WS32 layer pack completed and
+  sealed in 70 seconds without initializing JAX/TPU, so packing, direct-load, byte provenance and
+  archive failures can never consume a full decoder run. Only its immutable manifest may enter the
+  later one-layer HLO/oracle experiment.
 - For WS32, the invariant is one logical row and a persistent local hidden shard. Feature-4 and
   expert-8 reductions are allowed; a repeated 32-chip group, physical `[32,6144]` activation, or
   hidden all-gather is immediate rejection.

@@ -91,22 +91,25 @@ already bind all 1,544 source leaves. The derivative:
   non-finite scales, checksum drift and wrong manifest identity.
 
 Tiny sealed-artifact tests reconstruct every routed expert and shared expert from the 32 derivative
-files back to its exact source bytes. The real layer-3 plan predicts 9,971,249,152 packed bytes,
-311,601,536 per chip, from 9,706,940,416 unique source bytes plus explicit shared/bias replication.
-No real derivative has been written or loaded on TPU yet, so this remains packer readiness rather
-than protected checkpoint evidence.
+files back to its exact source bytes. Protected offline artifact
+`greenfield_ws32_one_layer_pack_20260815T070628458699950Z` realizes the plan at code `4c749a6`:
+9,971,249,152 packed bytes, 311,601,536 per chip, from 9,706,940,416 unique source bytes plus
+explicit shared/bias replication. Manifest `4bf8679d...1f40`, direct loads for slots 0 and 31,
+local/remote CRC32C for 39 nonterminal objects, and terminal object-40 `SUCCESS` pass. The temporary
+pack was removed and JAX/TPU was never initialized, so this is protected checkpoint evidence—not a
+real-layer HLO, HBM, correctness, Gate-D or performance result.
 
 ## Bounded next discriminator
 
 Do not run a full decoder or hour-scale 8K workflow. The next WS32 step is one real layer-0 dense
 or one real MoE layer using already packed source leaves, with:
 
-1. run the reviewed final-owner derivative and direct loader for only that layer;
-2. generated StableHLO/optimized HLO persisted before execution;
-3. exact packed-bit/scale-to-dequant-to-dot-to-live-root lineage and subgroup bijection;
-4. one live row, no full hidden reconstruction, and only feature-4/expert-8 reductions;
-5. comparison against an existing sealed real-layer oracle;
-6. exact topology, HBM, archive, and authenticated cleanup evidence.
+1. load the sealed final-owner derivative directly on its exact physical slots;
+2. persist generated StableHLO/optimized HLO before execution;
+3. prove exact packed-bit/scale-to-dequant-to-dot-to-live-root lineage and subgroup bijection;
+4. retain one live row, no full hidden reconstruction, and only feature-4/expert-8 reductions;
+5. compare against the existing sealed layer-3 oracle;
+6. record exact topology, HBM, archive, and authenticated cleanup evidence.
 
 Only that bounded result decides whether WS32 advances toward a full decoder. An unchanged PP8 8K
 rerun and another M1/M32 arithmetic arm are both forbidden by the Gate-D closure evidence.

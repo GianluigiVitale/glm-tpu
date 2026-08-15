@@ -61,6 +61,17 @@ shards 38–40 and wrote four final PP8 files of 2,429,096,640 bytes each. Packe
 `SUCCESS` exist. This is checkpoint-layout mechanism evidence, not a DB-linked TPU performance run
 and not Gate B for the complete model.
 
+`greenfield_ws32_one_layer_pack_20260815T070628458699950Z` is the reviewed WS32 derivative of that
+sealed PP8 layer, at code `4c749a668235892ad90d8c8399ff264d3ebc4727`. Its 32 final-owner files
+carry 9,971,249,152 payload bytes, 311,601,536 per chip, with exact expert8/feature4 source slices,
+FP8-scale ownership, tensor/file hashes and physical mesh `de5f59cb...0a88`. Manifest SHA-256 is
+`4bf8679de10ebbba055e9d0be991495080388c6355fa449f393c28f4751e1f40`; slots 0 and 31 pass the
+independent direct loader. The approved checkpoint prefix has exactly 40 objects: all 39
+nonterminal objects passed local/remote CRC32C, size and generation equality before `SUCCESS` was
+uploaded last and directly rehashed (`Nd1G9w==`, generation `1786777785681765`). Temporary payloads
+were removed. This is durable checkpoint/direct-load evidence only; it has no DB row, JAX/TPU HLO,
+HBM, correctness, latency, token or Gate-D claim.
+
 `greenfield_one_layer_oracle_20260805T162210370718434Z` is the independent correctness artifact at
 code `27ebdec`. It reads 104 exact raw-source tensors at the same immutable source revision as the
 pack, never constructs a model, and records accepted legacy/vLLM file hashes. Normal routes

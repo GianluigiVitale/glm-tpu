@@ -80,8 +80,10 @@ open. See `WS32_2D_PROTOTYPE.md`.
 The next bounded reuse step derives WS32 layer 3 from the already sealed PP8 one-layer artifact
 `68ef8201...f938`; it does not reopen the three original checkpoint shards. The derivative's tiny
 test reconstructs all routed/shared source bytes after the 8x4 split and checks the append-only
-manifest plus direct slot loader. The real 9,971,249,152-byte derivative remains unexecuted pending
-review.
+manifest plus direct slot loader. Reviewed real artifact
+`greenfield_ws32_one_layer_pack_20260815T070628458699950Z` now seals all 9,971,249,152 bytes under
+manifest `4bf8679d...1f40`; its remote CRC/object set and direct slots 0/31 pass. This is checkpoint
+reuse evidence only, not TPU/HLO/Gate-D evidence.
 
 ### Gate H: speculation
 
