@@ -238,6 +238,115 @@ def source_fused_output_m1_m8_scratch(
     )
 
 
+def source_fused_output_m1_feature_tiled_m8(
+    dense: Any,
+    attention: Any,
+    embedding: Any,
+    validity: Any,
+    inverse_rms: Any,
+    weight: Any,
+    *,
+    interpret: bool = False,
+) -> Any:
+    """Use an all-live ``8 x 128`` feature tile and return one semantic row.
+
+    Unlike the rejected scratch discriminator, the eight physical rows here
+    are feature blocking, not seven dead batch rows.  Every lane owns one of
+    the 6,144 live features, and the final reshape restores exact row-major
+    feature order without arithmetic.
+    """
+
+    rows = (dense, attention, embedding)
+    if any(value.ndim != 2 or value.shape != dense.shape for value in rows):
+        raise ValueError("feature-tiled Pallas rows must share rank-two shape")
+    if dense.shape[0] != 1:
+        raise ValueError("feature-tiled Pallas output requires one semantic row")
+    width = int(dense.shape[1])
+    if width <= 0 or width % (8 * 128):
+        raise ValueError(
+            "feature-tiled Pallas width must be a positive multiple of 1024"
+        )
+    if any(value.dtype != jnp.bfloat16 for value in rows):
+        raise ValueError("feature-tiled Pallas rows must be BF16")
+    if validity.shape != (1,) or validity.dtype != jnp.bool_:
+        raise ValueError("feature-tiled Pallas validity must be BOOL[1]")
+    if inverse_rms.shape != (1,) or inverse_rms.dtype != jnp.float32:
+        raise ValueError("feature-tiled Pallas inverse must be FP32[1]")
+    if weight.shape != (width,) or weight.dtype != jnp.bfloat16:
+        raise ValueError("feature-tiled Pallas weight must be BF16[width]")
+    if not isinstance(interpret, bool):
+        raise ValueError("feature-tiled Pallas interpret flag must be boolean")
+
+    tiled_shape = (8, width // 8)
+
+    def kernel(
+        dense_ref: Any,
+        attention_ref: Any,
+        embedding_ref: Any,
+        validity_ref: Any,
+        inverse_ref: Any,
+        weight_ref: Any,
+        output_ref: Any,
+    ) -> None:
+        selected_embedding = jnp.where(
+            validity_ref[0],
+            embedding_ref[...],
+            jnp.full((8, 128), jnp.bfloat16(jnp.nan)),
+        )
+        carried = (
+            attention_ref[...].astype(jnp.float32)
+            + selected_embedding.astype(jnp.float32)
+        ).astype(jnp.bfloat16)
+        summed = dense_ref[...].astype(jnp.float32) + carried.astype(
+            jnp.float32
+        )
+        rounded = (
+            summed * inverse_ref[0].astype(jnp.float32)
+        ).astype(jnp.bfloat16)
+        output_ref[...] = (rounded * weight_ref[...]).astype(jnp.bfloat16)
+
+    def tile_index(feature_tile: Any) -> tuple[int, Any]:
+        return 0, feature_tile
+
+    def scalar_index(feature_tile: Any) -> tuple[int]:
+        del feature_tile
+        return (0,)
+
+    tiled_output = pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct(tiled_shape, jnp.bfloat16),
+        grid=(width // (8 * 128),),
+        in_specs=(
+            pl.BlockSpec((8, 128), tile_index),
+            pl.BlockSpec((8, 128), tile_index),
+            pl.BlockSpec((8, 128), tile_index),
+            pl.BlockSpec((1,), scalar_index),
+            pl.BlockSpec((1,), scalar_index),
+            pl.BlockSpec((8, 128), tile_index),
+        ),
+        out_specs=pl.BlockSpec((8, 128), tile_index),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel",),
+            disable_bounds_checks=True,
+        ),
+        interpret=interpret,
+        name=f"greenfield_source_fused_output_m1_feature_tiled_m8_h{width}",
+        cost_estimate=pl.CostEstimate(
+            flops=width * 5,
+            bytes_accessed=width * 14,
+            transcendentals=0,
+        ),
+    )(
+        dense.reshape(tiled_shape),
+        attention.reshape(tiled_shape),
+        embedding.reshape(tiled_shape),
+        validity,
+        inverse_rms,
+        weight.reshape(tiled_shape),
+    )
+    return tiled_output.reshape((1, width))
+
+
 def fused_add_rms_norm_m1(
     hidden_states: Any,
     residual: Any,

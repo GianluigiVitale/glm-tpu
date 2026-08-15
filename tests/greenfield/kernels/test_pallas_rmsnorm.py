@@ -7,6 +7,7 @@ import pytest
 
 from glm_tpu.greenfield.kernels.pallas.rmsnorm import (
     fused_add_rms_norm_m1,
+    source_fused_output_m1_feature_tiled_m8,
     source_fused_output_m1_m8_scratch,
     weighted_output_m1_m8_scratch,
 )
@@ -195,3 +196,89 @@ def test_source_fused_output_m1_m8_scratch_has_true_m1_io() -> None:
     assert "Ref<vmem>{bf16[8,128]}" in traced
     assert "out_avals=(ShapedArray(bfloat16[1,128]),)" in traced
     assert "bf16[32,128]" not in traced
+
+
+def test_source_fused_output_m1_feature_tiled_m8_is_all_live() -> None:
+    width = 1024
+    dense = jnp.linspace(-1.0, 2.0, width, dtype=jnp.float32)[None].astype(
+        jnp.bfloat16
+    )
+    attention = jnp.linspace(
+        0.5, -0.5, width, dtype=jnp.float32
+    )[None].astype(jnp.bfloat16)
+    embedding = jnp.linspace(
+        -0.25, 0.75, width, dtype=jnp.float32
+    )[None].astype(jnp.bfloat16)
+    validity = jnp.asarray([True], dtype=jnp.bool_)
+    inverse = jnp.asarray([0.9375], dtype=jnp.float32)
+    weight = jnp.linspace(0.25, 1.25, width, dtype=jnp.float32).astype(
+        jnp.bfloat16
+    )
+    carried = (
+        attention.astype(jnp.float32) + embedding.astype(jnp.float32)
+    ).astype(jnp.bfloat16)
+    expected = (
+        (
+            (dense.astype(jnp.float32) + carried.astype(jnp.float32))
+            * inverse[:, None]
+        ).astype(jnp.bfloat16)
+        * weight[None, :]
+    ).astype(jnp.bfloat16)
+    observed = source_fused_output_m1_feature_tiled_m8(
+        dense,
+        attention,
+        embedding,
+        validity,
+        inverse,
+        weight,
+        interpret=True,
+    )
+    np.testing.assert_array_equal(np.asarray(observed), np.asarray(expected))
+    assert observed.shape == (1, width)
+
+
+def test_source_fused_output_m1_feature_tiled_m8_jaxpr() -> None:
+    width = 1024
+    traced = str(
+        jax.make_jaxpr(source_fused_output_m1_feature_tiled_m8)(
+            jax.ShapeDtypeStruct((1, width), jnp.bfloat16),
+            jax.ShapeDtypeStruct((1, width), jnp.bfloat16),
+            jax.ShapeDtypeStruct((1, width), jnp.bfloat16),
+            jax.ShapeDtypeStruct((1,), jnp.bool_),
+            jax.ShapeDtypeStruct((1,), jnp.float32),
+            jax.ShapeDtypeStruct((width,), jnp.bfloat16),
+        )
+    )
+    assert "greenfield_source_fused_output_m1_feature_tiled_m8_h1024" in traced
+    assert traced.count(
+        "Blocked(block_size=8), Blocked(block_size=128)"
+    ) == 5
+    assert "out_avals=(ShapedArray(bfloat16[8,128]),)" in traced
+    assert "bf16[1,1024] = reshape" in traced
+    assert "Ref<vmem>{bf16[8,128]}" not in traced
+    assert "bf16[32,128]" not in traced
+
+
+def test_source_fused_output_m1_feature_tiled_m8_refuses_dead_rows() -> None:
+    width = 1024
+    valid = (
+        jnp.ones((1, width), jnp.bfloat16),
+        jnp.ones((1, width), jnp.bfloat16),
+        jnp.ones((1, width), jnp.bfloat16),
+        jnp.ones((1,), jnp.bool_),
+        jnp.ones((1,), jnp.float32),
+        jnp.ones((width,), jnp.bfloat16),
+    )
+    mutations = (
+        (jnp.ones((8, 128), jnp.bfloat16), *valid[1:]),
+        (*valid[:5], jnp.ones((512,), jnp.bfloat16)),
+        tuple(
+            jnp.ones((1, 128), jnp.bfloat16) if index < 3 else value
+            for index, value in enumerate(valid)
+        ),
+    )
+    for values in mutations:
+        with pytest.raises(ValueError):
+            source_fused_output_m1_feature_tiled_m8(
+                *values, interpret=True
+            )

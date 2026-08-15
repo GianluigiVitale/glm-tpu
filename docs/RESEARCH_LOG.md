@@ -5,6 +5,29 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 04:13--04:17 UTC — source-fused true-M1 numerical verdict is nonexact
+
+- Pushed reviewed HLO pin `4579e5f1740f6a5b8891962249c066e0070fe40f` and ran exactly one bounded
+  protected source-fused numerical discriminator as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_output_20260815T041349845317572Z`.
+  All eight workers reproduced the exact pinned StableHLO/optimized-HLO
+  `aa087f36...11583` / `c6e6cc38...9558f`; the device phase took 99 seconds.
+- The row is nonexact at 2,135/6,144 BF16 values, first index 0, expected/observed SHAs
+  `9936ee1e...d3039` / `04adc5dc...950f`, maximum error `0.001953125` and mean error
+  `5.819921110135814e-05`. Hidden 2795 matches at 48423 but is not evidence of exactness. Compared
+  with the frozen output-only Pallas row, only 106 values move: 26 become correct, 57 become wrong
+  and 23 remain wrong with different bits. Overall, 2,078 positions are wrong in both rows: 2,055
+  retain identical wrong bits and those 23 change bits. Moving native sources inside the kernel
+  therefore does not recover the dominant physical-output behavior.
+- The 44-object archive was CRC/object-set verified and published `SUCCESS` last; post-census is
+  authenticated 8/8 clean. Summary, `SUCCESS`, ledger, post-census and evidence SHAs are
+  `3d0b4308...b5c8`, `ad28ec6f...188f`, `bca3c9a5...9546`, `d7df1db2...b6f7` and
+  `c8f9f65b...41a40`. No DB/performance row exists. Freeze this arm. Full 8K remains forbidden.
+  Assess only the derived all-live feature-tiled `8x128` representation locally before any new
+  protected contact; it must preserve feature order and a true-M1 semantic root without NaN/dead
+  batch lanes. If it cannot, reject the true-M1 equivalence route rather than reopening manual
+  scalar/layout theories.
+
 ## 2026-08-15 03:34--04:05 UTC — final source-fused TPU graph acquired once and pinned offline
 
 - Pushed `37f8f005e8af88b19d6ced446b865ddad1ceb94d` and ran the one authorized

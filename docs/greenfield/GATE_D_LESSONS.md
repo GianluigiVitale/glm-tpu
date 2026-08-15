@@ -176,6 +176,12 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   files rather than rerunning the pod. After an immutable review, one numerical 6,144-value verdict
   decides this final observed boundary; exactness authorizes one full 8K confirmation but does not
   itself close Gate D.
+- That numerical verdict is nonexact at 2,135/6,144. Source fusion changes only 106 values relative
+  to the rejected output-only Pallas row. Both rows are wrong at 2,078 positions: 2,055 retain the
+  same wrong bits and 23 change to different wrong bits. Freeze both arms: native-source ownership
+  is not the dominant missing mechanism. A further physical-tile probe is justified only if every
+  `8x128` lane holds live feature data and the external semantic result is still one row; never
+  spend another run on NaN/dead sibling lanes or a renamed readable formula.
 
 ## Evidence ladder
 

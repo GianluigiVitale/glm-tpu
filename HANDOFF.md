@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed HLO pin `4579e5f1740f6a5b8891962249c066e0070fe40f` completed and sealed the
+  source-fused true-M1 discriminator as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_output_20260815T041349845317572Z`.
+  It is conclusively nonexact: 2,135/6,144 BF16 values differ, first index 0, maximum/mean absolute
+  error `0.001953125` / `5.819921110135814e-05`, and expected/observed row SHAs are
+  `9936ee1e...d3039` / `04adc5dc...950f`; hidden 2795 happens to match at 48423. The exact pinned
+  StableHLO/optimized-HLO SHAs remained `aa087f36...11583` / `c6e6cc38...9558f`, the device phase
+  took 99 seconds, terminal `SUCCESS` was published last, and post-census is 8/8 clean. Summary,
+  `SUCCESS`, ledger, post-census and evidence SHAs are `3d0b4308...b5c8`, `ad28ec6f...188f`,
+  `bca3c9a5...9546`, `d7df1db2...b6f7` and `c8f9f65b...41a40`. This is diagnostic-only and has no
+  DB/performance row.
+- Freeze this source-fused row and do not rerun/tune it. It differs from the rejected output-only
+  Pallas row at only 106/6,144 values: 26 changes improve, 57 worsen and 23 remain differently
+  wrong. In total 2,078 positions are wrong in both rows: 2,055 retain identical wrong bits and 23
+  change to different wrong bits. Native producer fusion therefore changes only a small fringe;
+  the dominant 2,104-value failure remains the dead-lane M8 Pallas output schedule.
+  The only derived bounded successor worth assessing is an all-live feature-tiled `8x128` boundary
+  that uses the accepted physical tile without seven NaN sibling rows. First prove its exact
+  feature ordering and true-M1 semantic root locally; if that cannot be fail-closed or its acquired
+  TPU schedule is not the accepted tile, reject the true-M1 equivalence route. No scalar/layout
+  tuning and no full 8K run are authorized first.
 - Reviewed/pushed implementation `37f8f005e8af88b19d6ced446b865ddad1ceb94d` completed exactly one
   fail-closed source-fused true-M1 compile acquisition as
   `greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_output_20260815T033445294988026Z`.
