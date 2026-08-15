@@ -75,6 +75,18 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   this candidate. Iterate its validator locally, review it once as an immutable batch, then spend
   one separate seconds-scale run only on the 6,144-value numerical verdict. Do not launch another
   compile-only discovery for the same code/compiler pin.
+- That numerical run is complete and exactly reproduces the prior candidate: 1,031/6,144
+  mismatches with observed SHA `3f633b26...28af`. Native embedding and attention producers did not
+  change the row, so do not repeat or cosmetically rearrange that source substitution. The decisive
+  scheduled difference is downstream: accepted keeps the entire layer-1 output calculation on
+  M32 inside one fusion, while the diagnostic materializes its carried sum and performs the final
+  arithmetic after M1 slicing. Preserve M32 through the layer-1 norm/weight calculation and slice
+  only the completed output. This is an observed HLO boundary, not a new numerical theory.
+- Make row selection an executor concern for this discriminator. Returning only M1 from the
+  compiled graph lets XLA legally pull the slice before arithmetic; returning the completed M32
+  value keeps the disputed physical extent live, after which the host comparator may select row
+  zero. Prove the global output shape locally, but acquire and pin the real TPU fusion before any
+  numerical execution.
 
 ## Evidence ladder
 

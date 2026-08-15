@@ -28,6 +28,18 @@ ACCEPTED_LAYER0_HLO_SHA256 = (
 CANDIDATE_LAYER0_HLO_SHA256 = (
     "081d1b1f3609085a2b455357f8f6f9186c7bb3c5c218c1d10c734bea2b0163f8"
 )
+NATIVE_SOURCE_LAYER0_HLO_SHA256 = (
+    "4b13a9f123ae75ae2b196673d96788360ee5f6bd72ebd0d7cad9865a0feaaf63"
+)
+
+CANDIDATE_PROFILE_ACCEPTED_SOURCE_CONTEXT = "accepted_source_context"
+CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT = "native_source_context"
+_CANDIDATE_PROFILES = frozenset(
+    (
+        CANDIDATE_PROFILE_ACCEPTED_SOURCE_CONTEXT,
+        CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT,
+    )
+)
 
 _STABLE_WINDOW_FIELDS = (
     "cost_model_type",
@@ -145,6 +157,10 @@ def _collective_projection(value: HloInstruction) -> dict[str, Any]:
 
 def _classify_producer(value: HloInstruction) -> str:
     op_name = value.op_name or ""
+    if "native_source_context_embedding_lookup" in op_name:
+        return "accepted_embedding_lookup"
+    if "native_source_context_attention_projection" in op_name:
+        return "accepted_row_parallel_projection"
     if "aten::embedding/jit(_take)/gather" in op_name:
         return "accepted_embedding_lookup"
     if "VllmRowParallelLinear/shard_map/dot_general" in op_name:
@@ -602,8 +618,15 @@ def _semantic_signature(
 
 
 def compare_layer0_live_ssa(
-    accepted_hlo: str, candidate_hlo: str
+    accepted_hlo: str,
+    candidate_hlo: str,
+    *,
+    candidate_profile: str = CANDIDATE_PROFILE_ACCEPTED_SOURCE_CONTEXT,
 ) -> dict[str, Any]:
+    if candidate_profile not in _CANDIDATE_PROFILES:
+        raise BenchmarkValidationError(
+            f"unsupported layer-0 candidate profile: {candidate_profile}"
+        )
     accepted_module = parse_hlo_module(accepted_hlo)
     candidate_module = parse_hlo_module(candidate_hlo)
     accepted = _entry_items(accepted_module)
@@ -636,18 +659,37 @@ def compare_layer0_live_ssa(
             "predense_reduction": _require(
                 candidate, "multiply_reduce_fusion.1"
             ),
-            "predense_gate": _require(candidate, "fusion.21"),
+            "predense_gate": _require(
+                candidate,
+                "fusion.30"
+                if candidate_profile
+                == CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT
+                else "fusion.21",
+            ),
             "layer1_reduction": _require(candidate, "multiply_reduce_fusion"),
             "layer1_output": _require(
                 candidate, "multiply_bitcast-convert_fusion"
             ),
-            "predense_validity": _require(candidate, "param.11"),
-            "layer1_validity": _require(candidate, "copy-done.5"),
+            "predense_validity": _require(
+                candidate,
+                "get-tuple-element.30"
+                if candidate_profile
+                == CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT
+                else "param.11",
+            ),
+            "layer1_validity": _require(
+                candidate,
+                "get-tuple-element.30"
+                if candidate_profile
+                == CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT
+                else "copy-done.5",
+            ),
         },
     }
 
     result: dict[str, Any] = {
         "artifact_kind": "glm52_layer0_live_ssa_diff",
+        "candidate_profile": candidate_profile,
         "diagnostic_only": True,
         "performance_claim": False,
     }
@@ -857,6 +899,32 @@ def compare_layer0_live_ssa(
         "accepted": accepted_paths,
         "candidate": candidate_paths,
     }
+    output_boundary = {
+        side: {
+            "name": anchors[side]["layer1_output"].name,
+            "opcode": anchors[side]["layer1_output"].raw_opcode,
+            "operand_names": list(
+                anchors[side]["layer1_output"].operand_names
+            ),
+            "result_prefix": _result_prefix(
+                anchors[side]["layer1_output"]
+            ),
+        }
+        for side in ("accepted", "candidate")
+    }
+    result["layer1_output_boundary"] = output_boundary
+    if (
+        output_boundary["accepted"]["result_prefix"]
+        != output_boundary["candidate"]["result_prefix"]
+    ):
+        differences.append(
+            {
+                "boundary": "layer1_output",
+                "kind": "output_result_geometry",
+                "accepted": output_boundary["accepted"],
+                "candidate": output_boundary["candidate"],
+            }
+        )
     for label in ("embedding", "attention", "dense"):
         if (
             accepted_paths[label]["fusion_count"]
@@ -884,10 +952,12 @@ def compare_layer0_live_ssa_files(
     *,
     accepted_sha256: str = ACCEPTED_LAYER0_HLO_SHA256,
     candidate_sha256: str = CANDIDATE_LAYER0_HLO_SHA256,
+    candidate_profile: str = CANDIDATE_PROFILE_ACCEPTED_SOURCE_CONTEXT,
 ) -> dict[str, Any]:
     return compare_layer0_live_ssa(
         _read_hlo(accepted_hlo_path, accepted_sha256),
         _read_hlo(candidate_hlo_path, candidate_sha256),
+        candidate_profile=candidate_profile,
     )
 
 

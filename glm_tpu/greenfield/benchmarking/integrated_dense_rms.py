@@ -127,6 +127,7 @@ class CompiledIntegratedDenseRms:
     replicated_sharding: Any
     member_device_ids: tuple[int, ...]
     native_source_context: bool
+    native_m32_output: bool
     stablehlo: str
     optimized_hlo: str
     stablehlo_contract: Mapping[str, Any]
@@ -770,8 +771,13 @@ def _accepted_source_context_function() -> Any:
     return integrated
 
 
-def _native_source_context_function() -> Any:
+def _native_source_context_function(*, full_m32_output: bool = False) -> Any:
     """Run the exact native embedding and attention producers in one graph."""
+
+    if not isinstance(full_m32_output, bool):
+        raise BenchmarkValidationError(
+            "native source M32-output flag must be boolean"
+        )
 
     import jax
     from jax import lax
@@ -1000,7 +1006,8 @@ def _native_source_context_function() -> Any:
                     * layer1_norm
                 ).astype(dense_m32.dtype)
         with jax.named_scope("integrated_dense_rms_live_row"):
-            return lax.bitcast_convert_type(layer1[:1, :], jnp.uint16)
+            captured = layer1 if full_m32_output else layer1[:1, :]
+            return lax.bitcast_convert_type(captured, jnp.uint16)
 
     return integrated
 
@@ -1015,6 +1022,7 @@ def build_integrated_dense_rms(
     split_predense_rms: bool = False,
     accepted_source_context: bool = False,
     native_source_context: bool = False,
+    native_m32_output: bool = False,
 ) -> CompiledIntegratedDenseRms:
     """Compile the exact one-rank-per-chip diagnostic on 32 devices."""
 
@@ -1055,6 +1063,14 @@ def build_integrated_dense_rms(
         raise BenchmarkValidationError(
             "integrated dense RMS native-source flag must be boolean"
         )
+    if not isinstance(native_m32_output, bool):
+        raise BenchmarkValidationError(
+            "integrated dense RMS native M32-output flag must be boolean"
+        )
+    if native_m32_output and not native_source_context:
+        raise BenchmarkValidationError(
+            "native M32 output requires native source context"
+        )
     if accepted_source_context and native_source_context:
         raise BenchmarkValidationError(
             "accepted and native source contexts are disjoint"
@@ -1084,7 +1100,7 @@ def build_integrated_dense_rms(
             "pre-dense split RMS and rejected ordinal arms are disjoint"
         )
     mapped_function = (
-        _native_source_context_function()
+        _native_source_context_function(full_m32_output=native_m32_output)
         if native_source_context
         else _accepted_source_context_function()
         if accepted_source_context
@@ -1207,6 +1223,7 @@ def build_integrated_dense_rms(
             split_predense_rms=split_predense_rms,
             accepted_source_context=accepted_source_context,
             native_source_context=native_source_context,
+            native_m32_output=native_m32_output,
         )
         optimized_hlo_contract = validate_integrated_dense_rms_hlo(
             optimized_hlo,
@@ -1216,6 +1233,7 @@ def build_integrated_dense_rms(
             split_predense_rms=split_predense_rms,
             accepted_source_context=accepted_source_context,
             native_source_context=native_source_context,
+            native_m32_output=native_m32_output,
         )
     else:
         stablehlo_contract = {
@@ -1232,6 +1250,7 @@ def build_integrated_dense_rms(
         replicated_sharding=replicated,
         member_device_ids=members,
         native_source_context=native_source_context,
+        native_m32_output=native_m32_output,
         stablehlo=stablehlo,
         optimized_hlo=optimized_hlo,
         stablehlo_contract=stablehlo_contract,
@@ -1365,31 +1384,51 @@ def execute_native_source_context(
         ),
     )
 
-    def execute_once() -> tuple[np.ndarray, tuple[str, ...]]:
+    def execute_once() -> tuple[np.ndarray, tuple[str, ...], tuple[str, ...]]:
         result = compiled.compiled(*arguments)
         jax.block_until_ready(result)
-        local = tuple(
-            np.asarray(jax.device_get(shard.data), dtype=np.uint16).reshape(6144)
+        local_full = tuple(
+            np.asarray(jax.device_get(shard.data), dtype=np.uint16).reshape(
+                (32, 6144) if compiled.native_m32_output else (1, 6144)
+            )
             for shard in sorted(
                 result.addressable_shards,
                 key=lambda shard: int(shard.device.id),
             )
         )
-        hashes = tuple(array_sha256(value) for value in local)
-        if not local or len(set(hashes)) != 1:
+        full_hashes = tuple(array_sha256(value) for value in local_full)
+        if not local_full or len(set(full_hashes)) != 1:
             raise BenchmarkValidationError(
                 "native source output differs across local replicas"
             )
-        return np.ascontiguousarray(local[0]), hashes
+        rows = tuple(np.ascontiguousarray(value[0]) for value in local_full)
+        row_hashes = tuple(array_sha256(value) for value in rows)
+        return rows[0], row_hashes, full_hashes
 
-    output, local_hashes = execute_once()
-    repeated, repeated_hashes = execute_once()
-    if not np.array_equal(output, repeated):
+    output, local_hashes, full_hashes = execute_once()
+    repeated, repeated_hashes, repeated_full_hashes = execute_once()
+    if (
+        not np.array_equal(output, repeated)
+        or full_hashes != repeated_full_hashes
+    ):
         raise BenchmarkValidationError("native source graph is nondeterministic")
-    return output, {
+    capture: dict[str, Any] = {
         "invocation_count": 2,
         "local_replica_output_sha256": list(local_hashes),
         "output_bits_sha256": array_sha256(output),
         "repeated_local_replica_output_sha256": list(repeated_hashes),
         "repeated_output_bits_sha256": array_sha256(repeated),
     }
+    if compiled.native_m32_output:
+        capture.update(
+            {
+                "full_m32_output": True,
+                "full_output_sha256": full_hashes[0],
+                "local_replica_full_output_sha256": list(full_hashes),
+                "repeated_full_output_sha256": repeated_full_hashes[0],
+                "repeated_local_replica_full_output_sha256": list(
+                    repeated_full_hashes
+                ),
+            }
+        )
+    return output, capture

@@ -19,6 +19,36 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `4a7b27719573e26752f805ca04c63c49de20f4b1` completed the protected
+  native-source numerical discriminator under tag
+  `greenfield_strategy_nd_integrated_dense_native_source_context_20260814T233839651436451Z`.
+  The 91-second device workflow passed exact StableHLO/optimized-HLO/source/terminal revalidation,
+  published the same-region archive `SUCCESS` last, created no DB/performance row, and finished
+  with authenticated 8/8 cleanup. The numerical row is nonexact: 1,031/6,144 BF16 mismatches,
+  first index 1, hidden-2795 expected/observed bits 48423/48422, expected/observed SHAs
+  `9936ee1e...d3039` / `3f633b26...28af`, and maximum/mean error `0.0078125` /
+  `3.374943e-05`. This is byte-identical to the rejected accepted-source-context candidate, so
+  replacing its external M1 sources with native embedding and attention producers did not change
+  the result and that hypothesis is closed.
+- The preserved optimized HLO exposes the remaining concrete boundary. Accepted layer 0 performs
+  the complete layer-1 residual add, BF16 round, scalar RMS normalization and norm-weight multiply
+  in one `bf16[32,6144]` output fusion before selecting the live row. The native diagnostic still
+  materializes the embedding+attention carried sum, slices both carried and dense values to M1,
+  and performs final layer-1 arithmetic on `bf16[1,6144]`. Exact next is one local byte-pinned
+  accepted-vs-native report and one default-off full-M32 layer-1-output discriminator. Only a
+  protected `0 / 6,144` row authorizes the complete 8K Gate-D confirmation; full 8K remains
+  forbidden meanwhile.
+- The accepted-vs-native comparison is now automated and byte-pinned. Report
+  `/home/gianl/glm-run/greenfield_strategy_nd_integrated_dense_native_source_context_20260814T233839651436451Z/live_ssa_diff.json`
+  has SHA `3cf9aefd...95d1` and records seven differences, including accepted
+  `bf16[32,6144]` versus candidate `u16[1,6144]` output-fusion geometry and two-versus-one
+  embedding/attention fusion crossings. The default-off native-M32 successor now retains the full
+  output through layer-1 norm/weight and captures row zero only in its executor. Forced-32 CPU
+  abstract tracing proves both `(1,6144)` and `(32,6144)` output modes, the new TPU HLO pins are
+  deliberately empty so arithmetic cannot run during compile acquisition, and the focused
+  validation/diff files pass 19/19. Exact next is one immutable Sol review of this batch, then one
+  protected compile acquisition—not a numerical or full-8K run.
+
 - Protected compile acquisition completed exactly once at reviewed/pushed pin `63e7017` under tag
   `greenfield_strategy_nd_integrated_dense_native_source_context_20260814T232117436126702Z`.
   All eight hosts compiled the intended 13-input native graph, synchronized after atomically

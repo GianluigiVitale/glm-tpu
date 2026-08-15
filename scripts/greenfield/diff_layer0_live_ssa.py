@@ -15,6 +15,8 @@ if str(REPO) not in sys.path:
 
 from glm_tpu.greenfield.benchmarking.live_ssa_diff import (  # noqa: E402
     ACCEPTED_LAYER0_HLO_SHA256,
+    CANDIDATE_PROFILE_ACCEPTED_SOURCE_CONTEXT,
+    CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT,
     CANDIDATE_LAYER0_HLO_SHA256,
     compare_layer0_live_ssa_files,
     write_layer0_live_ssa_report,
@@ -31,6 +33,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--candidate-sha256", default=CANDIDATE_LAYER0_HLO_SHA256
     )
+    parser.add_argument(
+        "--candidate-profile",
+        choices=(
+            CANDIDATE_PROFILE_ACCEPTED_SOURCE_CONTEXT,
+            CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT,
+        ),
+        default=CANDIDATE_PROFILE_ACCEPTED_SOURCE_CONTEXT,
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -42,6 +52,7 @@ def main() -> int:
         args.candidate_hlo,
         accepted_sha256=args.accepted_sha256,
         candidate_sha256=args.candidate_sha256,
+        candidate_profile=args.candidate_profile,
     )
     write_layer0_live_ssa_report(args.output, report)
     print(

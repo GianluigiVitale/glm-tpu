@@ -232,6 +232,11 @@ def parse_args() -> argparse.Namespace:
         help="run native embedding and attention producers in the bounded graph",
     )
     parser.add_argument(
+        "--integrated-native-m32-output",
+        action="store_true",
+        help="retain layer-1 output arithmetic on the full M32 value",
+    )
+    parser.add_argument(
         "--native-attention-input",
         type=Path,
         help="SHA-pinned DB537 attention arithmetic NPZ",
@@ -674,6 +679,7 @@ def _run_strategy_nd_integrated_dense_rms(
     if physical_ids != tuple(range(32)):
         raise RuntimeError("integrated dense RMS requires physical ids 0..31")
     native_source_context = bool(args.integrated_native_source_context)
+    native_m32_output = bool(args.integrated_native_m32_output)
     weights, checkpoint_records = _load_weights(
         args.checkpoint_root,
         manifest_sha256=args.checkpoint_manifest_sha256,
@@ -729,7 +735,9 @@ def _run_strategy_nd_integrated_dense_rms(
     split_predense_rms = bool(args.integrated_split_predense_rms)
     accepted_source_context = bool(args.integrated_accepted_source_context)
     label = (
-        "strategy_nd_integrated_dense_native_source_context_bfloat16_32x6144"
+        "strategy_nd_integrated_dense_native_m32_output_bfloat16_32x6144"
+        if native_m32_output
+        else "strategy_nd_integrated_dense_native_source_context_bfloat16_32x6144"
         if native_source_context
         else "strategy_nd_integrated_dense_accepted_source_context_bfloat16_32x6144"
         if accepted_source_context
@@ -751,6 +759,7 @@ def _run_strategy_nd_integrated_dense_rms(
         split_predense_rms=split_predense_rms,
         accepted_source_context=accepted_source_context,
         native_source_context=native_source_context,
+        native_m32_output=native_m32_output,
     )
     stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
     optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
@@ -771,6 +780,11 @@ def _run_strategy_nd_integrated_dense_rms(
                 **(
                     {"native_source_context": True}
                     if native_source_context
+                    else {}
+                ),
+                **(
+                    {"native_m32_output": True}
+                    if native_m32_output
                     else {}
                 ),
                 **(
@@ -810,6 +824,7 @@ def _run_strategy_nd_integrated_dense_rms(
         split_predense_rms=split_predense_rms,
         accepted_source_context=accepted_source_context,
         native_source_context=native_source_context,
+        native_m32_output=native_m32_output,
     )
     optimized_hlo_contract = validate_integrated_dense_rms_hlo(
         compiled.optimized_hlo,
@@ -819,6 +834,7 @@ def _run_strategy_nd_integrated_dense_rms(
         split_predense_rms=split_predense_rms,
         accepted_source_context=accepted_source_context,
         native_source_context=native_source_context,
+        native_m32_output=native_m32_output,
     )
     compiled = replace(
         compiled,
@@ -871,7 +887,9 @@ def _run_strategy_nd_integrated_dense_rms(
         "229dc8ace9bfa31fce6d6ccabc9fca49ccc55f30b9d1dd6f97a032f5117b812f"
     )
     classification_prefix = (
-        "integrated_dense_native_source_context"
+        "integrated_dense_native_m32_output"
+        if native_m32_output
+        else "integrated_dense_native_source_context"
         if native_source_context
         else "integrated_dense_accepted_source_context"
         if accepted_source_context
@@ -1048,6 +1066,7 @@ def _run_strategy_nd_integrated_dense_rms(
         "stablehlo_contract": dict(compiled.stablehlo_contract),
         "stablehlo_sha256": stablehlo_sha,
         "split_layer1_rms": split_layer1_rms,
+        **({"native_m32_output": True} if native_m32_output else {}),
         **(
             {"native_source_context": True}
             if native_source_context
@@ -1373,6 +1392,13 @@ def main() -> int:
     ):
         raise ValueError(
             "native attention input is valid only for native source context"
+        )
+    if args.integrated_native_m32_output and not (
+        args.integrated_native_source_context
+        and args.mode == "strategy_nd_integrated_dense_rms"
+    ):
+        raise ValueError(
+            "native M32 output requires the native source-context mode"
         )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:

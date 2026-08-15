@@ -9235,3 +9235,36 @@ unmotivated arithmetic variants.
   the raw source and sealed NPZ and rejects v1/dense-bearing artifacts. Authenticated rollback now
   covers the mode and accepts exactly DB551 on an isolated DB copy. One reviewed recapture is the
   only remaining hour-scale discriminator before the seconds-scale coherent replay.
+# 2026-08-14 23:50 UTC — native sources reproduce the same miss; M32 output boundary remains
+
+- Reviewed/pushed pin `4a7b27719573e26752f805ca04c63c49de20f4b1` completed protected tag
+  `greenfield_strategy_nd_integrated_dense_native_source_context_20260814T233839651436451Z`.
+  The 91-second workflow consumed the exact native embedding/attention sources, passed its
+  byte-pinned StableHLO and optimized-HLO contracts, source and terminal validation, complete
+  same-region `SUCCESS`-last archive, and authenticated 8/8 cleanup. It is diagnostic-only and
+  created no results-DB or performance row. StableHLO/optimized-HLO SHAs remain
+  `0884c34e...83d66` / `4b13a9f1...af63`; summary, `SUCCESS`, remote-ledger and post-census SHAs
+  are `0bc878f4...cdd5`, `b4c1c638...26d2`, `895a1110...d51` and `2738ec50...3069`.
+- The row is nonexact at 1,031/6,144 values, first mismatch 1, hidden-2795 bits 48423/48422,
+  expected/observed SHAs `9936ee1e...d3039` / `3f633b26...28af`, and maximum/mean error
+  `0.0078125` / `3.374943e-05`. It is byte-identical to the earlier accepted-source-context
+  candidate. Native embedding lookup and row-parallel attention projection therefore do not by
+  themselves repair the row and are closed as a standalone hypothesis.
+- Direct inspection of the two preserved live output fusions identifies the next bounded delta.
+  Accepted layer 0 retains the residual add, BF16 round, scalar inverse, normalization and norm
+  weight over the full physical `bf16[32,6144]` value in one output fusion, then selects row zero.
+  The native diagnostic materializes its carried embedding+attention sum, slices carried and dense
+  inputs to M1, and performs the final layer-1 arithmetic at `bf16[1,6144]`. The next discriminator
+  must retain the full M32 output arithmetic and capture only after it; no formula, weight,
+  contraction, association, RMS, source-byte or observer hypothesis is reopened. A bitwise-exact
+  protected row is still required before the complete 8K Gate-D run.
+- The exact comparison is now durable rather than manual: `live_ssa_diff.json`, SHA
+  `3cf9aefd...95d1`, reports seven differences and explicitly binds accepted
+  `bf16[32,6144]` output-fusion geometry against candidate `u16[1,6144]`, with native
+  embedding/attention each crossing two fusions versus one accepted fusion. A distinct default-off
+  native-M32 mode retains the full M32 value through layer-1 output arithmetic and exposes only its
+  row zero to the existing comparator after execution. Forced-32 abstract tracing proves the
+  13-input graph returns `(32,6144)` U16 in this mode. Its StableHLO/optimized-HLO pins are empty by
+  construction, so the first protected attempt can only preserve the compiler graphs and refuse
+  before arithmetic. Focused validation and diff tests pass 19/19; one immutable review precedes
+  that compile acquisition.

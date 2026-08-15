@@ -17,12 +17,14 @@ from glm_tpu.greenfield.benchmarking.integrated_dense_rms import (
     NATIVE_SOURCE_NPZ_SHA256,
     NATIVE_SOURCE_TOKEN_IDS,
     POST_ATTENTION_NORM_RAW_SHA256,
+    _native_source_context_function,
     _raw_sha256,
     load_integrated_dense_rms_inputs,
     model_axis_weights_to_physical,
     native_source_inputs,
     validate_integrated_checkpoint_success,
 )
+from glm_tpu.greenfield.errors import BenchmarkValidationError
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo import (
     INTEGRATED_DENSE_ACCEPTED_SOURCE_STABLEHLO_SHA256,
     INTEGRATED_DENSE_NATIVE_SOURCE_OPTIMIZED_HLO_SHA256,
@@ -239,6 +241,12 @@ def test_model_axis_weights_are_bijectively_mapped_to_physical_ids() -> None:
 
 
 def test_native_source_graph_abstractly_traces_all_thirteen_inputs() -> None:
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="M32-output flag must be boolean",
+    ):
+        _native_source_context_function(full_m32_output=1)  # type: ignore[arg-type]
+
     code = r'''
 import numpy as np
 import jax
@@ -247,20 +255,6 @@ from jax.sharding import Mesh, PartitionSpec as P
 from glm_tpu.greenfield.benchmarking.integrated_dense_rms import _native_source_context_function
 
 mesh = Mesh(np.asarray(jax.devices(), dtype=object), ("member",))
-mapped = jax.shard_map(
-    _native_source_context_function(),
-    mesh=mesh,
-    in_specs=(
-        P(), P(), P(),
-        P("member", None, None), P("member", None, None),
-        P("member", None, None), P("member", None, None),
-        P("member", None, None), P("member", None, None, None),
-        P("member", None, None, None), P("member", None, None, None),
-        P("member", None, None, None), P(),
-    ),
-    out_specs=P(),
-    check_vma=False,
-)
 arguments = (
     jax.ShapeDtypeStruct((64, 512), jnp.bfloat16),
     jax.ShapeDtypeStruct((32,), jnp.int32),
@@ -276,9 +270,29 @@ arguments = (
     jax.ShapeDtypeStruct((32, 1, 3, 6144), jnp.float32),
     jax.ShapeDtypeStruct((6144,), jnp.bfloat16),
 )
-output = jax.eval_shape(mapped, *arguments)
-assert output.shape == (1, 6144)
-assert output.dtype == jnp.uint16
+for full_m32_output, expected_shape in (
+    (False, (1, 6144)),
+    (True, (32, 6144)),
+):
+    mapped = jax.shard_map(
+        _native_source_context_function(
+            full_m32_output=full_m32_output
+        ),
+        mesh=mesh,
+        in_specs=(
+            P(), P(), P(),
+            P("member", None, None), P("member", None, None),
+            P("member", None, None), P("member", None, None),
+            P("member", None, None), P("member", None, None, None),
+            P("member", None, None, None), P("member", None, None, None),
+            P("member", None, None, None), P(),
+        ),
+        out_specs=P(),
+        check_vma=False,
+    )
+    output = jax.eval_shape(mapped, *arguments)
+    assert output.shape == expected_shape
+    assert output.dtype == jnp.uint16
 '''
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -300,7 +314,7 @@ assert output.dtype == jnp.uint16
         REPO
         / "glm_tpu/greenfield/benchmarking/integrated_dense_rms.py"
     ).read_text()
-    start = source.index("def _native_source_context_function()")
+    start = source.index("def _native_source_context_function(")
     end = source.index("\ndef build_integrated_dense_rms(", start)
     native = source[start:end]
     projection = native.index(
@@ -750,6 +764,19 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
         validate_integrated_dense_rms_stablehlo(
             "module awaiting protected lowering",
             native_source_context=True,
+        )
+    with pytest.raises(ValueError, match="StableHLO is not pinned"):
+        validate_integrated_dense_rms_stablehlo(
+            "module awaiting protected M32 lowering",
+            native_source_context=True,
+            native_m32_output=True,
+        )
+    with pytest.raises(ValueError, match="optimized HLO is not pinned"):
+        validate_integrated_dense_rms_hlo(
+            "HloModule awaiting_protected_m32_lowering",
+            tuple(range(32)),
+            native_source_context=True,
+            native_m32_output=True,
         )
 
 
@@ -1410,8 +1437,13 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
         "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_SOURCE_CONTEXT_REPLAY:-0"
         in wrapper
     )
+    assert (
+        "GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M32_OUTPUT_REPLAY:-0"
+        in wrapper
+    )
     assert "--integrated-accepted-source-context" in wrapper
     assert "--integrated-native-source-context" in wrapper
+    assert "--integrated-native-m32-output" in wrapper
     assert "--native-attention-input" in wrapper
     assert "--integrated-preceding-attention-collective" in wrapper
     assert "--integrated-split-predense-rms" in wrapper

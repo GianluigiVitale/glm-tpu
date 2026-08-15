@@ -9,7 +9,9 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.live_ssa_diff import (
     ACCEPTED_LAYER0_HLO_SHA256,
+    CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT,
     CANDIDATE_LAYER0_HLO_SHA256,
+    NATIVE_SOURCE_LAYER0_HLO_SHA256,
     _classify_producer,
     compare_layer0_live_ssa,
     compare_layer0_live_ssa_files,
@@ -36,6 +38,16 @@ REAL_CANDIDATE_HLO = Path(
         "greenfield_strategy_nd_integrated_dense_accepted_source_context_"
         "20260814T213945734760843Z/hlo/"
         "strategy_nd_integrated_dense_accepted_source_context_"
+        "bfloat16_32x6144.optimized_hlo.txt",
+    )
+)
+REAL_NATIVE_SOURCE_HLO = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_NATIVE_SOURCE_LAYER0_HLO",
+        "/home/gianl/glm-run/"
+        "greenfield_strategy_nd_integrated_dense_native_source_context_"
+        "20260814T233839651436451Z/hlo/"
+        "strategy_nd_integrated_dense_native_source_context_"
         "bfloat16_32x6144.optimized_hlo.txt",
     )
 )
@@ -111,6 +123,17 @@ def test_real_layer0_live_ssa_diff() -> None:
         label: record["fusion_count"]
         for label, record in report["layer1_output_paths"]["candidate"].items()
     } == {"attention": 2, "dense": 1, "embedding": 2}
+    assert report["layer1_output_boundary"]["accepted"][
+        "result_prefix"
+    ].startswith("bf16[32,6144]")
+    assert report["layer1_output_boundary"]["candidate"][
+        "result_prefix"
+    ].startswith("u16[1,6144]")
+    assert any(
+        item["boundary"] == "layer1_output"
+        and item["kind"] == "output_result_geometry"
+        for item in report["differences"]
+    )
     assert [
         (item["boundary"], item["kind"])
         for item in report["differences"]
@@ -122,6 +145,7 @@ def test_real_layer0_live_ssa_diff() -> None:
         ("dense_collective_input", "source_producer"),
         ("dense_collective", "barrier_config"),
         ("predense_reduction", "fusion_boundary_layout"),
+        ("layer1_output", "output_result_geometry"),
         ("layer1_output", "fusion_ownership"),
         ("layer1_output", "fusion_ownership"),
     ]
@@ -174,3 +198,42 @@ def test_real_layer0_live_ssa_diff() -> None:
         ]
         for label in ("attention", "embedding")
     } == {"attention": 3, "embedding": 3}
+
+
+@pytest.mark.skipif(
+    not (REAL_ACCEPTED_HLO.is_file() and REAL_NATIVE_SOURCE_HLO.is_file()),
+    reason="SHA-pinned accepted/native-source TPU HLO pair absent",
+)
+def test_real_native_source_layer0_live_ssa_diff() -> None:
+    report = compare_layer0_live_ssa_files(
+        REAL_ACCEPTED_HLO,
+        REAL_NATIVE_SOURCE_HLO,
+        accepted_sha256=ACCEPTED_LAYER0_HLO_SHA256,
+        candidate_sha256=NATIVE_SOURCE_LAYER0_HLO_SHA256,
+        candidate_profile=CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT,
+    )
+    assert report["status"] == "DIFF_IDENTIFIED"
+    assert report["candidate_profile"] == (
+        CANDIDATE_PROFILE_NATIVE_SOURCE_CONTEXT
+    )
+    assert all(
+        record["algorithm_result_match"] is True
+        for record in report["collectives"].values()
+    )
+    assert all(
+        record["semantic_match"] is True
+        and record["backend_match"] is True
+        for record in report["semantic_reductions"].values()
+    )
+    assert all(
+        record["match"] is True
+        for record in report["scheduled_geometry"].values()
+    )
+    assert {
+        label: record["fusion_count"]
+        for label, record in report["layer1_output_paths"]["accepted"].items()
+    } == {"attention": 1, "dense": 1, "embedding": 1}
+    assert {
+        label: record["fusion_count"]
+        for label, record in report["layer1_output_paths"]["candidate"].items()
+    } == {"attention": 2, "dense": 1, "embedding": 2}
