@@ -167,6 +167,15 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   exactly, while its external-row M32/ordinary-M1 controls reproduced the known 1,073-mismatch
   row. Freeze both. A successor is justified only when it moves the exact native producer roles
   proven by the accepted output fusion—not merely the same final BF16 row bits—inside the boundary.
+- The source-fused successor has now been compiled exactly once. Its StableHLO/optimized-HLO SHAs
+  are `aa087f36...11583` / `c6e6cc38...9558f`; it has true-M1 public I/O and one live Pallas call
+  consuming the exact dense, attention, embedding, validity, M32-derived inverse and norm-weight
+  roles. Freeze this lowering and iterate only on the recovered files. A compile-acquisition
+  failure archive is not a terminal result: say explicitly that `diagnostic_hlo/` exists while
+  tensor/comparison/DB/ledger/`SUCCESS` do not. Recover and authenticate those remote compiler
+  files rather than rerunning the pod. After an immutable review, one numerical 6,144-value verdict
+  decides this final observed boundary; exactness authorizes one full 8K confirmation but does not
+  itself close Gate D.
 
 ## Evidence ladder
 
@@ -216,6 +225,12 @@ branches from the search tree.
 - Operation names, counts, shapes, labels and metadata substrings are insufficient.
 - Bind exact SSA value flow from pinned inputs through dtype/layout transforms and arithmetic to
   the live ENTRY result. Reject dead correct decoys, rogue same-shape arithmetic and cross-wiring.
+- A caller name and callee name do not prove the callee arithmetic. Bind the complete selected
+  fusion body, reducer parameters/opcode and live ROOT operands; mutation-test arithmetic bypasses
+  inside both the reduction and post-reduction/rsqrt bodies.
+- When StableHLO uses quoted generic operation names, count anchored assignments after stripping
+  comments but retaining real quoted op names. A sanitizer that erases every string also erases the
+  collective cardinality it was supposed to prove.
 - Parse real attributes outside quoted metadata and comments. Pin physical layouts, replica groups,
   reducer parameters/opcode, scheduled backend geometry and synchronous collective form.
 - Every accepted HLO form needs adversarial mutation tests and a SHA-pinned preserved-real replay.

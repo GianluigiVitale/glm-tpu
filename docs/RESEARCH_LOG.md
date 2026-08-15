@@ -5,6 +5,30 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 03:34--04:05 UTC — final source-fused TPU graph acquired once and pinned offline
+
+- Pushed `37f8f005e8af88b19d6ced446b865ddad1ceb94d` and ran the one authorized
+  fail-closed compile acquisition as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_output_20260815T033445294988026Z`.
+  Every process compiled the same graph and stopped at the intentionally empty StableHLO pin before
+  device arithmetic. There is no output tensor, host record, comparison, summary, DB row, remote
+  ledger or terminal `SUCCESS`. Pre/failure censuses and a direct post-run process check prove 8/8
+  clean.
+- Failure traps uploaded the exact compiler artifacts under approved `diagnostic_hlo/`; they were
+  recovered locally after the run and authenticated against the remote bytes. Prevalidation,
+  StableHLO and optimized-HLO SHAs are `a87eb428...b3820`, `aa087f36...11583` and
+  `c6e6cc38...9558f`. The graph has 579 instructions and 32 partitions, exactly three intended
+  synchronous StrategyND reductions, one live six-input source-fused Pallas call and one true-M1
+  U16 root. No full M32 tensor crosses the Pallas boundary.
+- The acquired graph is now the only compiler oracle for this candidate. Complete digests plus
+  structural proof bind the dense/attention/embedding row-zero slices, validity conversion,
+  M32-derived inverse, layer-1 norm weight, ordered call operands/layouts and live root. Tests
+  deliberately admit parser-valid mutated digests and still reject source swaps, row-one selection,
+  wrong inverse/weight, root bypass, layout changes, a dead fourth StableHLO reduction, and exact
+  reduction/rsqrt fusion-body arithmetic bypasses. Focused kernel/integrated/terminal validation
+  passes 38/38. Correction-only closure of the same audit precedes one bounded 6,144-value
+  numerical run; no further compile discovery and no full 8K are authorized first.
+
 ## 2026-08-15 03:03--03:27 UTC — source-fused true-M1 candidate is locally fail-closed
 
 - Implemented the final observed source-fusion discriminator without reopening any rejected

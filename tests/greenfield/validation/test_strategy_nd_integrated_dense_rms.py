@@ -166,6 +166,24 @@ REAL_NATIVE_M1_PALLAS_TPU_STABLEHLO = (
     / "hlo/strategy_nd_integrated_dense_native_m1_pallas_output_"
     "bfloat16_1x6144.stablehlo.mlir"
 )
+REAL_NATIVE_M1_PALLAS_SOURCES_TPU_RUN = Path(
+    os.environ.get(
+        "GLM_GREENFIELD_INTEGRATED_NATIVE_M1_PALLAS_SOURCES_TPU_RUN",
+        "/home/gianl/glm-run/"
+        "greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_"
+        "output_20260815T033445294988026Z",
+    )
+)
+REAL_NATIVE_M1_PALLAS_SOURCES_TPU_HLO = (
+    REAL_NATIVE_M1_PALLAS_SOURCES_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_m1_pallas_sources_output_"
+    "bfloat16_1x6144.optimized_hlo.txt"
+)
+REAL_NATIVE_M1_PALLAS_SOURCES_TPU_STABLEHLO = (
+    REAL_NATIVE_M1_PALLAS_SOURCES_TPU_RUN
+    / "hlo/strategy_nd_integrated_dense_native_m1_pallas_sources_output_"
+    "bfloat16_1x6144.stablehlo.mlir"
+)
 REAL_NATIVE_M32_ACQUISITION_TPU_HLO = Path(
     "/home/gianl/glm-run/"
     "greenfield_strategy_nd_integrated_dense_native_m32_output_"
@@ -857,15 +875,19 @@ def test_integrated_policy_requires_the_exact_scope() -> None:
             native_source_context=True,
             native_m1_pallas_output=True,
         )
-    assert INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256 == ""
-    assert INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256 == ""
-    with pytest.raises(ValueError, match="StableHLO is not pinned"):
+    assert INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256 == (
+        "aa087f3616f0c9024964119ddfb8e7b7f4a1740606c30a95a85d69775c511583"
+    )
+    assert INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256 == (
+        "c6e6cc38fa5bc280c4152381e0f2a7a7e74608fa621b70f0394e47b7c295558f"
+    )
+    with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
         validate_integrated_dense_rms_stablehlo(
             "module awaiting protected source-fused Pallas-M1 lowering",
             native_source_context=True,
             native_m1_pallas_sources_output=True,
         )
-    with pytest.raises(ValueError, match="optimized HLO is not pinned"):
+    with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
         validate_integrated_dense_rms_hlo(
             "HloModule awaiting_source_fused_pallas_m1_lowering",
             tuple(range(32)),
@@ -1503,6 +1525,223 @@ def test_real_native_m1_pallas_tpu_hlo_and_mutation_refusals() -> None:
                 mutation,
                 native_source_context=True,
                 native_m1_pallas_output=True,
+            )
+
+
+@pytest.mark.skipif(
+    not REAL_NATIVE_M1_PALLAS_SOURCES_TPU_HLO.is_file()
+    or not REAL_NATIVE_M1_PALLAS_SOURCES_TPU_STABLEHLO.is_file(),
+    reason="protected source-fused Pallas-M1 integrated TPU HLO absent",
+)
+def test_real_native_m1_pallas_sources_hlo_and_mutation_refusals(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jaxlib import xla_client
+    import glm_tpu.greenfield.benchmarking.integrated_dense_rms_hlo as hlo_gate
+
+    optimized_hlo = REAL_NATIVE_M1_PALLAS_SOURCES_TPU_HLO.read_text()
+    stablehlo = REAL_NATIVE_M1_PALLAS_SOURCES_TPU_STABLEHLO.read_text()
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256
+    )
+    assert sha256(stablehlo.encode()).hexdigest() == (
+        INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256
+    )
+    stable_contract = validate_integrated_dense_rms_stablehlo(
+        stablehlo,
+        native_source_context=True,
+        native_m1_pallas_sources_output=True,
+    )
+    optimized_contract = validate_integrated_dense_rms_hlo(
+        optimized_hlo,
+        tuple(range(32)),
+        native_source_context=True,
+        native_m1_pallas_sources_output=True,
+    )
+    for contract in (stable_contract, optimized_contract):
+        assert contract["exact_m1_pallas_boundary"] is True
+        assert contract["exact_m1_pallas_source_binding"] is True
+        assert contract["m1_pallas_operand_count"] == 6
+        assert contract["m1_pallas_result_count"] == 1
+        assert contract["native_m1_pallas_sources_output"] is True
+        assert contract["no_m32_pallas_io"] is True
+    assert optimized_contract["m1_pallas_custom_call_count"] == 1
+    assert optimized_contract["live_rows"] == 1
+
+    replacements = (
+        (
+            "custom-call(%slice.66, %slice.50, %slice.51,",
+            "custom-call(%slice.50, %slice.66, %slice.51,",
+        ),
+        (
+            "%slice.66 = bf16[1,6144]{1,0:T(2,128)(2,1)S(3)} "
+            "slice(%psum.23), slice={[0:1], [0:6144]}",
+            "%slice.66 = bf16[1,6144]{1,0:T(2,128)(2,1)S(3)} "
+            "slice(%psum.23), slice={[1:2], [0:6144]}",
+        ),
+        (
+            "%convert_element_type.88, %bitcast.91, "
+            "/*index=5*/%broadcast_in_dim.95)",
+            "%convert_element_type.88, %bitcast.91, "
+            "/*index=5*/%slice.66)",
+        ),
+        (
+            "%bitcast.91 = f32[1]{0:T(128)S(3)} "
+            "bitcast(%add_rsqrt_fusion)",
+            "%bitcast.91 = f32[1]{0:T(128)S(3)} "
+            "bitcast(%multiply_reduce_fusion)",
+        ),
+        (
+            "bitcast-convert("
+            "%greenfield_source_fused_output_m1_m8_scratch_h6144.1)",
+            "bitcast-convert(%slice.66)",
+        ),
+        (
+            "bf16[1,6144]{1,0:T(2,128)(2,1)S(3)} custom-call(",
+            "bf16[1,6144]{0,1} custom-call(",
+        ),
+        (
+            "%psum.22 = bf16[32,6144]{1,0:T(8,128)(2,1)S(3)} "
+            "all-reduce(%broadcast_select_fusion.1)",
+            "%psum.22 = bf16[32,6144]{1,0:T(8,128)(2,1)S(3)} "
+            "all-reduce(%broadcast_select_fusion)",
+        ),
+        (
+            "%get-tuple-element.29 = "
+            "pred[32]{0:T(512)(128)(4,1)S(3)} "
+            "get-tuple-element(%compare_and_fusion), index=0",
+            "%get-tuple-element.29 = "
+            "pred[32]{0:T(512)(128)(4,1)S(3)} "
+            "get-tuple-element(%compare_and_fusion), index=1",
+        ),
+        (
+            "%add_rsqrt_fusion = f32[32]{0:T(128)S(3)} "
+            "fusion(%multiply_reduce_fusion)",
+            "%add_rsqrt_fusion = f32[32]{0:T(128)S(3)} "
+            "fusion(%multiply_reduce_fusion.1)",
+        ),
+        (
+            "%square.8 = f32[32,6144]{1,0:T(8,128)} "
+            "multiply(%add.143, %add.143)",
+            "%square.8 = f32[32,6144]{1,0:T(8,128)} "
+            "multiply(%convert_element_type.118, "
+            "%convert_element_type.118)",
+        ),
+        (
+            "%add.166 = f32[32]{0:T(128)} "
+            "add(%div.66, %broadcast.196)",
+            "%add.166 = f32[32]{0:T(128)} "
+            "add(%broadcast.198, %broadcast.196)",
+        ),
+    )
+    mutations = tuple(
+        optimized_hlo.replace(old, new, 1) for old, new in replacements
+    )
+    assert all(mutation != optimized_hlo for mutation in mutations)
+    for mutation in mutations:
+        xla_client._xla.hlo_module_from_text(mutation)
+        with pytest.raises(ValueError, match="optimized HLO SHA-256 drifted"):
+            validate_integrated_dense_rms_hlo(
+                mutation,
+                tuple(range(32)),
+                native_source_context=True,
+                native_m1_pallas_sources_output=True,
+            )
+        monkeypatch.setattr(
+            hlo_gate,
+            "INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256",
+            sha256(mutation.encode()).hexdigest(),
+        )
+        with pytest.raises(ValueError, match="drifted"):
+            validate_integrated_dense_rms_hlo(
+                mutation,
+                tuple(range(32)),
+                native_source_context=True,
+                native_m1_pallas_sources_output=True,
+            )
+
+    first_collective_start = stablehlo.index(
+        '      %37 = "stablehlo.all_reduce"'
+    )
+    first_collective_end = stablehlo.index(
+        "\n      %c_14 =", first_collective_start
+    )
+    first_collective = stablehlo[
+        first_collective_start:first_collective_end
+    ]
+    dead_fourth_collective = stablehlo.replace(
+        first_collective,
+        first_collective
+        + "\n"
+        + first_collective.replace("%37 =", "%237 =", 1),
+        1,
+    )
+    dead_private_function = r'''  func.func private @dead_collective(
+      %arg0: tensor<32x6144xbf16>) -> tensor<32x6144xbf16> {
+    %0 = "stablehlo.all_reduce"(%arg0) <{
+      channel_handle = #stablehlo.channel_handle<handle = 1, type = 1>,
+      replica_groups = dense<[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+        23, 24, 25, 26, 27, 28, 29, 30, 31]]> : tensor<1x32xi64>,
+      use_global_device_ids
+    }> ({
+    ^bb0(%arg1: tensor<bf16>, %arg2: tensor<bf16>):
+      %1 = stablehlo.add %arg1, %arg2 : tensor<bf16>
+      stablehlo.return %1 : tensor<bf16>
+    }) : (tensor<32x6144xbf16>) -> tensor<32x6144xbf16>
+    return %0 : tensor<32x6144xbf16>
+  }
+'''
+    assert stablehlo.endswith("}\n")
+    dead_private_collective = (
+        stablehlo[:-2] + dead_private_function + "}\n"
+    )
+    stable_mutations = (
+        stablehlo.replace(
+            "custom_call @tpu_custom_call(%226, %227, %228,",
+            "custom_call @tpu_custom_call(%227, %226, %228,",
+            1,
+        ),
+        stablehlo.replace(
+            "%226 = stablehlo.slice %204 [0:1, 0:6144]",
+            "%226 = stablehlo.slice %204 [1:2, 0:6144]",
+            1,
+        ),
+        stablehlo.replace(
+            "%235 = stablehlo.bitcast_convert %234",
+            "%235 = stablehlo.bitcast_convert %226",
+            1,
+        ),
+        stablehlo.replace(
+            "%234 = stablehlo.custom_call @tpu_custom_call("
+            "%226, %227, %228, %233, %231, %232)",
+            "// %234 = stablehlo.custom_call @tpu_custom_call("
+            "%226, %227, %228, %233, %231, %232)\n"
+            "      %234 = stablehlo.custom_call @tpu_custom_call("
+            "%227, %226, %228, %233, %231, %232)",
+            1,
+        ),
+        dead_fourth_collective,
+        dead_private_collective,
+    )
+    assert all(mutation != stablehlo for mutation in stable_mutations)
+    for mutation in stable_mutations:
+        with pytest.raises(ValueError, match="StableHLO SHA-256 drifted"):
+            validate_integrated_dense_rms_stablehlo(
+                mutation,
+                native_source_context=True,
+                native_m1_pallas_sources_output=True,
+            )
+        monkeypatch.setattr(
+            hlo_gate,
+            "INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256",
+            sha256(mutation.encode()).hexdigest(),
+        )
+        with pytest.raises(ValueError, match="StableHLO structure drifted"):
+            validate_integrated_dense_rms_stablehlo(
+                mutation,
+                native_source_context=True,
+                native_m1_pallas_sources_output=True,
             )
 
 

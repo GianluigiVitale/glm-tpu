@@ -19,6 +19,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed implementation `37f8f005e8af88b19d6ced446b865ddad1ceb94d` completed exactly one
+  fail-closed source-fused true-M1 compile acquisition as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_output_20260815T033445294988026Z`.
+  All eight hosts compiled and then refused on the deliberately empty StableHLO pin before
+  arithmetic. The three compiler artifacts were recovered from the approved remote
+  `diagnostic_hlo/` prefix and authenticated byte-for-byte: prevalidation
+  `a87eb428...b3820`, StableHLO `aa087f36...11583`, optimized HLO
+  `c6e6cc38...9558f`. The scheduled graph has 579 instructions, 32 partitions, exactly the three
+  intended StrategyND reductions and one live six-input source-fused Pallas call. Its public
+  sources/result are true M1; dense, attention and embedding are exact row-zero slices, validity,
+  the M32-derived inverse and layer-1 norm weight are ordered inputs, and the U16 ENTRY root
+  consumes the call directly. No host result, comparison, summary, DB row, ledger or terminal
+  `SUCCESS` exists. Pre/failure censuses and a direct post-run process check are 8/8 clean.
+- The recovered local files and remote objects have identical hashes. Both complete graph hashes
+  are now pinned locally, with a structural summary and parser-valid mutation refusals for source
+  swaps, row-one selection, wrong validity/inverse/weight, root bypass, physical-layout drift, a
+  dead fourth StableHLO reduction, and reduction/rsqrt fusion-body arithmetic bypasses. Focused
+  kernel/integrated/terminal validation passes 38/38. Do not compile this graph again merely to
+  inspect it. Exact next is correction-only Sol closure of this same review, commit/push, then one
+  bounded protected 6,144-value numerical execution. Only `0 / 6,144` authorizes production
+  integration and the complete protected 8K Gate-D confirmation.
 - Reviewed/pushed correction `59c3b973bc8bd7f78fc7504ddcf6cb4b378113b5` completed and sealed the
   output-only Pallas discriminator as
   `greenfield_strategy_nd_output_pallas_geometry_20260815T025949224210245Z`. The exact pinned

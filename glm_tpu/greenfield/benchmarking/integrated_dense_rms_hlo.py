@@ -65,10 +65,14 @@ INTEGRATED_DENSE_NATIVE_M1_PALLAS_STABLEHLO_SHA256 = (
 INTEGRATED_DENSE_NATIVE_M1_PALLAS_OPTIMIZED_HLO_SHA256 = (
     "1fa0957ab6816c19c63eadaf2eb7a325318a3d88996dcd9fb66c44504b545813"
 )
-# Deliberately empty until one protected compile acquisition persists the
-# exact source-fused Pallas graphs. Arithmetic cannot run while these are empty.
-INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256 = ""
-INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256 = ""
+# Captured once by the fail-closed protected acquisition at ``37f8f00``.
+# The acquisition stopped at the deliberately empty pin before arithmetic.
+INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256 = (
+    "aa087f3616f0c9024964119ddfb8e7b7f4a1740606c30a95a85d69775c511583"
+)
+INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256 = (
+    "c6e6cc38fa5bc280c4152381e0f2a7a7e74608fa621b70f0394e47b7c295558f"
+)
 
 _NATIVE_SOURCE_COLLECTIVE_SCOPES = (
     "native_source_context_embedding_collective",
@@ -90,6 +94,348 @@ _NATIVE_SOURCE_INPUT_SCHEMA = (
     (11, "down_scale", (("f32", (1, 1, 3, 6144)),)),
     (12, "layer1_norm", (("bf16", (6144,)),)),
 )
+
+
+def _stablehlo_code_only(value: str) -> str:
+    """Blank strings and both StableHLO comment forms, preserving offsets."""
+
+    result = list(value)
+    index = 0
+    quoted = False
+    escaped = False
+    block_comment = False
+    line_comment = False
+    while index < len(value):
+        if line_comment:
+            if value[index] == "\n":
+                line_comment = False
+            else:
+                result[index] = " "
+            index += 1
+            continue
+        if block_comment:
+            result[index] = " "
+            if value.startswith("*/", index):
+                result[index + 1] = " "
+                block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if quoted:
+            result[index] = " "
+            character = value[index]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+            index += 1
+            continue
+        if value.startswith("//", index):
+            result[index] = result[index + 1] = " "
+            line_comment = True
+            index += 2
+            continue
+        if value.startswith("/*", index):
+            result[index] = result[index + 1] = " "
+            block_comment = True
+            index += 2
+            continue
+        if value[index] == '"':
+            result[index] = " "
+            quoted = True
+        index += 1
+    if quoted or block_comment:
+        raise BenchmarkValidationError(
+            "integrated source-fused StableHLO has unterminated syntax"
+        )
+    return "".join(result)
+
+
+def _stablehlo_without_comments(value: str) -> str:
+    """Blank comments while retaining real quoted generic operation names."""
+
+    result = list(value)
+    index = 0
+    quoted = False
+    escaped = False
+    block_comment = False
+    line_comment = False
+    while index < len(value):
+        if line_comment:
+            if value[index] == "\n":
+                line_comment = False
+            else:
+                result[index] = " "
+            index += 1
+            continue
+        if block_comment:
+            result[index] = " "
+            if value.startswith("*/", index):
+                result[index + 1] = " "
+                block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if quoted:
+            character = value[index]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+            index += 1
+            continue
+        if value.startswith("//", index):
+            result[index] = result[index + 1] = " "
+            line_comment = True
+            index += 2
+            continue
+        if value.startswith("/*", index):
+            result[index] = result[index + 1] = " "
+            block_comment = True
+            index += 2
+            continue
+        if value[index] == '"':
+            quoted = True
+        index += 1
+    if quoted or block_comment:
+        raise BenchmarkValidationError(
+            "integrated source-fused StableHLO has unterminated syntax"
+        )
+    return "".join(result)
+
+
+def _exact_source_fused_layer1_rms_bodies(
+    report: Any,
+    reduction_caller: Any,
+    inverse_caller: Any,
+) -> bool:
+    """Bind the complete source-combine, square/reduce and rsqrt bodies."""
+
+    graph = _ExactDenseRmsGraph(report)
+    bf16_m32 = (("bf16", (32, 6144)),)
+    f32_m32 = (("f32", (32, 6144)),)
+    pred_32 = (("pred", (32,)),)
+    pred_m32 = (("pred", (32, 6144)),)
+    f32_32 = (("f32", (32,)),)
+    bf16_scalar = (("bf16", ()),)
+    f32_scalar = (("f32", ()),)
+
+    def exact_body(
+        computation: str,
+        specs: Mapping[
+            str,
+            tuple[
+                str,
+                tuple[str, ...],
+                tuple[tuple[str, tuple[int, ...]], ...],
+                bool,
+            ],
+        ],
+    ) -> bool:
+        items = graph.computations.get(computation, ())
+        if len(items) != len(specs):
+            return False
+        by_name = {item.name: item for item in items}
+        if len(by_name) != len(items) or set(by_name) != set(specs):
+            return False
+        for name, (opcode, operands, shape, is_root) in specs.items():
+            item = by_name[name]
+            if not (
+                item.raw_opcode == opcode
+                and item.operand_names == operands
+                and _shape_signature(item) == shape
+                and item.raw_line.lstrip().startswith("ROOT ") == is_root
+            ):
+                return False
+        return True
+
+    reduction_specs = {
+        "%param_0.225": ("parameter", ("0",), bf16_m32, False),
+        "%convert_element_type.118": (
+            "convert",
+            ("%param_0.225",),
+            f32_m32,
+            False,
+        ),
+        "%param_1.244": ("parameter", ("1",), bf16_m32, False),
+        "%convert_element_type.143": (
+            "convert",
+            ("%param_1.244",),
+            f32_m32,
+            False,
+        ),
+        "%param_3.131": ("parameter", ("3",), pred_32, False),
+        "%broadcast_in_dim.96": (
+            "broadcast",
+            ("%param_3.131",),
+            pred_m32,
+            False,
+        ),
+        "%param_2.194": ("parameter", ("2",), bf16_m32, False),
+        "%constant.118.clone.3": (
+            "constant",
+            ("nan",),
+            bf16_scalar,
+            False,
+        ),
+        "%broadcast.176": (
+            "broadcast",
+            ("%constant.118.clone.3",),
+            bf16_m32,
+            False,
+        ),
+        "%select_n.111": (
+            "select",
+            ("%broadcast_in_dim.96", "%param_2.194", "%broadcast.176"),
+            bf16_m32,
+            False,
+        ),
+        "%convert_element_type.142": (
+            "convert",
+            ("%select_n.111",),
+            f32_m32,
+            False,
+        ),
+        "%add.151": (
+            "add",
+            ("%convert_element_type.143", "%convert_element_type.142"),
+            f32_m32,
+            False,
+        ),
+        "%convert_element_type.141": (
+            "convert",
+            ("%add.151",),
+            bf16_m32,
+            False,
+        ),
+        "%convert_element_type.114": (
+            "convert",
+            ("%convert_element_type.141",),
+            f32_m32,
+            False,
+        ),
+        "%add.143": (
+            "add",
+            ("%convert_element_type.118", "%convert_element_type.114"),
+            f32_m32,
+            False,
+        ),
+        "%square.8": (
+            "multiply",
+            ("%add.143", "%add.143"),
+            f32_m32,
+            False,
+        ),
+        "%constant.114.clone.2": (
+            "constant",
+            ("0",),
+            f32_scalar,
+            False,
+        ),
+        "%reduce_sum.20": (
+            "reduce",
+            ("%square.8", "%constant.114.clone.2"),
+            f32_32,
+            True,
+        ),
+    }
+    reducer_specs = {
+        "%reduce_sum.6": ("parameter", ("0",), f32_scalar, False),
+        "%reduce_sum.7": ("parameter", ("1",), f32_scalar, False),
+        "%reduce_sum.8": (
+            "add",
+            ("%reduce_sum.6", "%reduce_sum.7"),
+            f32_scalar,
+            True,
+        ),
+    }
+    inverse_specs = {
+        "%param_0.206": ("parameter", ("0",), f32_32, False),
+        "%constant.119.clone.2": (
+            "constant",
+            ("0.000162760422",),
+            f32_scalar,
+            False,
+        ),
+        "%broadcast.198": (
+            "broadcast",
+            ("%constant.119.clone.2",),
+            f32_32,
+            False,
+        ),
+        "%div.66": (
+            "multiply",
+            ("%param_0.206", "%broadcast.198"),
+            f32_32,
+            False,
+        ),
+        "%constant.120.clone.2": (
+            "constant",
+            ("1e-05",),
+            f32_scalar,
+            False,
+        ),
+        "%broadcast.196": (
+            "broadcast",
+            ("%constant.120.clone.2",),
+            f32_32,
+            False,
+        ),
+        "%add.166": (
+            "add",
+            ("%div.66", "%broadcast.196"),
+            f32_32,
+            False,
+        ),
+        "%rsqrt.10": ("rsqrt", ("%add.166",), f32_32, True),
+    }
+    reduction_items = {
+        item.name: item
+        for item in graph.computations.get("fused_computation.13", ())
+    }
+    inverse_items = {
+        item.name: item
+        for item in graph.computations.get("fused_computation.63", ())
+    }
+    reduction_root = reduction_items.get("%reduce_sum.20")
+    reduction_zero = reduction_items.get("%constant.114.clone.2")
+    inverse_width = inverse_items.get("%constant.119.clone.2")
+    inverse_epsilon = inverse_items.get("%constant.120.clone.2")
+    reduction_clean = (
+        "" if reduction_root is None else graph.clean(reduction_root)
+    )
+    return bool(
+        reduction_caller is not None
+        and inverse_caller is not None
+        and _called_computation(reduction_caller) == "fused_computation.13"
+        and _called_computation(inverse_caller) == "fused_computation.63"
+        and exact_body("fused_computation.13", reduction_specs)
+        and exact_body("region_4.5", reducer_specs)
+        and exact_body("fused_computation.63", inverse_specs)
+        and reduction_root is not None
+        and re.findall(r"\bdimensions=\{([^}]*)\}", reduction_clean) == ["1"]
+        and re.findall(r"\bto_apply=%?([^,\s}\]]+)", reduction_clean)
+        == ["region_4.5"]
+        and graph.exact_reducer(graph.value(reduction_root))
+        and reduction_zero is not None
+        and graph.exact_constant(
+            graph.value(reduction_zero), np.float32(0.0)
+        )
+        and inverse_width is not None
+        and graph.exact_constant(
+            graph.value(inverse_width), np.float32(1.0 / 6144.0)
+        )
+        and inverse_epsilon is not None
+        and graph.exact_constant(
+            graph.value(inverse_epsilon), np.float32(1e-5)
+        )
+    )
 
 
 def _validate_preceding_attention_input(
@@ -1274,6 +1620,74 @@ def validate_integrated_dense_rms_stablehlo(
             "integrated dense RMS StableHLO SHA-256 drifted: "
             f"expected={expected} found={digest}"
         )
+    if native_m1_pallas_sources_output:
+        stable_code = _stablehlo_code_only(stablehlo)
+        stable_without_comments = _stablehlo_without_comments(stablehlo)
+        main_matches = re.findall(
+            r"func\.func public @main\b.*?(?=\n\s*func\.func private\b)",
+            stable_code,
+            flags=re.DOTALL,
+        )
+        comment_free_main_matches = re.findall(
+            r"func\.func public @main\b.*?(?=\n\s*func\.func private\b)",
+            stable_without_comments,
+            flags=re.DOTALL,
+        )
+        if len(main_matches) != 1 or len(comment_free_main_matches) != 1:
+            raise BenchmarkValidationError(
+                "integrated source-fused Pallas StableHLO main drifted"
+            )
+        main_code = main_matches[0]
+        collective_assignments = re.findall(
+            r'^\s*%[A-Za-z0-9_.-]+\s*=\s*"stablehlo\.all_reduce"\(',
+            stable_without_comments,
+            flags=re.MULTILINE,
+        )
+        exact_fragments = (
+            "%225:3 = stablehlo.optimization_barrier %21, %37, %138 : "
+            "tensor<32xi1>, tensor<32x6144xbf16>, tensor<32x6144xbf16>",
+            "%226 = stablehlo.slice %204 [0:1, 0:6144] : "
+            "(tensor<32x6144xbf16>) -> tensor<1x6144xbf16>",
+            "%227 = stablehlo.slice %225#2 [0:1, 0:6144] : "
+            "(tensor<32x6144xbf16>) -> tensor<1x6144xbf16>",
+            "%228 = stablehlo.slice %225#1 [0:1, 0:6144] : "
+            "(tensor<32x6144xbf16>) -> tensor<1x6144xbf16>",
+            "%229 = stablehlo.slice %225#0 [0:1] : "
+            "(tensor<32xi1>) -> tensor<1xi1>",
+            "%230 = stablehlo.slice %224 [0:1, 0:1] : "
+            "(tensor<32x1xf32>) -> tensor<1x1xf32>",
+            "%231 = stablehlo.reshape %230 : "
+            "(tensor<1x1xf32>) -> tensor<1xf32>",
+            "%232 = stablehlo.broadcast_in_dim %arg26, dims = [1] : "
+            "(tensor<6144xbf16>) -> tensor<1x6144xbf16>",
+            "%233 = stablehlo.convert %229 : "
+            "(tensor<1xi1>) -> tensor<1xi32>",
+            "%234 = stablehlo.custom_call @tpu_custom_call("
+            "%226, %227, %228, %233, %231, %232)",
+            "operand_layouts = [dense<[1, 0]> : tensor<2xindex>, "
+            "dense<[1, 0]> : tensor<2xindex>, "
+            "dense<[1, 0]> : tensor<2xindex>, "
+            "dense<0> : tensor<1xindex>, dense<0> : tensor<1xindex>, "
+            "dense<[1, 0]> : tensor<2xindex>]",
+            "result_layouts = [dense<[1, 0]> : tensor<2xindex>]}",
+            ": (tensor<1x6144xbf16>, tensor<1x6144xbf16>, "
+            "tensor<1x6144xbf16>, tensor<1xi32>, tensor<1xf32>, "
+            "tensor<1x6144xbf16>) -> tensor<1x6144xbf16>",
+            "%235 = stablehlo.bitcast_convert %234 : "
+            "(tensor<1x6144xbf16>) -> tensor<1x6144xui16>",
+            "sdy.return %235 : tensor<1x6144xui16>",
+            "return %0 : tensor<1x6144xui16>",
+        )
+        if (
+            any(main_code.count(fragment) != 1 for fragment in exact_fragments)
+            or main_code.count("sdy.manual_computation") != 1
+            or len(collective_assignments) != 3
+            or "all_reduce_start" in main_code
+            or "all_reduce_done" in main_code
+        ):
+            raise BenchmarkValidationError(
+                "integrated source-fused Pallas StableHLO structure drifted"
+            )
     result = {
         "exact_graph_sha256": digest,
         "exact_input_schema": True,
@@ -1322,6 +1736,18 @@ def validate_integrated_dense_rms_stablehlo(
                 "m1_pallas_live_rows": 1,
                 "m1_pallas_result_count": 2,
                 "native_m1_pallas_output": True,
+                "no_m32_pallas_io": True,
+            }
+        )
+    if native_m1_pallas_sources_output:
+        result.update(
+            {
+                "exact_m1_pallas_boundary": True,
+                "exact_m1_pallas_source_binding": True,
+                "m1_pallas_live_rows": 1,
+                "m1_pallas_operand_count": 6,
+                "m1_pallas_result_count": 1,
+                "native_m1_pallas_sources_output": True,
                 "no_m32_pallas_io": True,
             }
         )
@@ -1376,7 +1802,9 @@ def _validate_native_source_context_hlo(
     report.raise_for_violations()
     module = report.module
     expected_instruction_count = (
-        558
+        579
+        if native_m1_pallas_sources_output
+        else 558
         if native_m1_pallas_output
         else 597
         if native_m32_output
@@ -1456,6 +1884,12 @@ def _validate_native_source_context_hlo(
             and item.replica_groups == (members,)
             and item.use_global_device_ids is True
             for item in reductions
+        )
+        and tuple(item.operand_names for item in reductions)
+        == (
+            ("%broadcast_select_fusion",),
+            ("%broadcast_select_fusion.1",),
+            ("%fusion.10",),
         )
     ):
         raise BenchmarkValidationError(
@@ -1590,6 +2024,70 @@ def _validate_native_source_context_hlo(
     pallas_norm_copy = entry_by_name.get("%copy-done.7")
     pallas_norm_start = entry_by_name.get("%copy-start.7")
     pallas_output = entry_by_name.get("%get-tuple-element.20")
+    pallas_source_dense = entry_by_name.get("%slice.66")
+    pallas_source_attention = entry_by_name.get("%slice.50")
+    pallas_source_embedding = entry_by_name.get("%slice.51")
+    pallas_source_validity = entry_by_name.get("%bitcast.90")
+    pallas_source_validity_i32 = entry_by_name.get(
+        "%convert_element_type.88"
+    )
+    pallas_source_inverse = entry_by_name.get("%bitcast.91")
+    pallas_source_weight = entry_by_name.get("%broadcast_in_dim.95")
+    validity_tuple_value = entry_by_name.get("%get-tuple-element.29")
+    layer1_reduction_value = entry_by_name.get("%multiply_reduce_fusion")
+    layer1_inverse_value = entry_by_name.get("%add_rsqrt_fusion")
+    exact_source_fused_layer1_rms = _exact_source_fused_layer1_rms_bodies(
+        report,
+        layer1_reduction_value,
+        layer1_inverse_value,
+    )
+    source_fused_pallas_calls = tuple(
+        item
+        for item in entry
+        if item.raw_opcode == "custom-call"
+        and item.name
+        == "%greenfield_source_fused_output_m1_m8_scratch_h6144.1"
+        and item.op_name
+        == (
+            "jit(integrated)/shard_map/native_source_context_layer1_norm/"
+            "native_source_context_layer1_output/"
+            "native_source_context_layer1_pallas_sources/"
+            "greenfield_source_fused_output_m1_m8_scratch_h6144/"
+            "pallas_call"
+        )
+        and _shape_signature(item) == (("bf16", (1, 6144)),)
+        and item.raw_line.lstrip().startswith(
+            "%greenfield_source_fused_output_m1_m8_scratch_h6144.1 = "
+            "bf16[1,6144]{1,0:T(2,128)(2,1)S(3)} custom-call("
+        )
+        and tuple(
+            (shape.dtype, shape.dimensions) for shape in item.operand_shapes
+        )
+        == (
+            ("bf16", (1, 6144)),
+            ("bf16", (1, 6144)),
+            ("bf16", (1, 6144)),
+            ("s32", (1,)),
+            ("f32", (1,)),
+            ("bf16", (1, 6144)),
+        )
+        and item.operand_names
+        == (
+            "%slice.66",
+            "%slice.50",
+            "%slice.51",
+            "%convert_element_type.88",
+            "%bitcast.91",
+            "%broadcast_in_dim.95",
+        )
+        and 'custom_call_target="tpu_custom_call"' in item.raw_line
+        and (
+            "operand_layout_constraints={bf16[1,6144]{1,0}, "
+            "bf16[1,6144]{1,0}, bf16[1,6144]{1,0}, s32[1]{0}, "
+            "f32[1]{0}, bf16[1,6144]{1,0}}"
+        )
+        in item.raw_line
+    )
     roots = tuple(
         item
         for item in entry
@@ -1632,6 +2130,102 @@ def _validate_native_source_context_hlo(
         and roots[0].operand_names == ("%get-tuple-element.20",)
         and _shape_signature(roots[0]) == (("u16", (1, 6144)),)
     )
+    def exact_row_zero_slice(value: Any, source: str) -> bool:
+        if value is None:
+            return False
+        instruction = re.sub(r"/\*.*?\*/", "", value.raw_line)
+        instruction = instruction.split(", metadata=", 1)[0]
+        return bool(
+            value.raw_opcode == "slice"
+            and value.operand_names == (source,)
+            and _shape_signature(value) == (("bf16", (1, 6144)),)
+            and instruction.count("slice={[0:1], [0:6144]}") == 1
+            and value.raw_line.lstrip().startswith(
+                f"{value.name} = bf16[1,6144]{{1,0:T(2,128)(2,1)S(3)}} "
+            )
+        )
+
+    exact_m1_pallas_sources_boundary = bool(
+        native_m1_pallas_sources_output
+        and len(source_fused_pallas_calls) == 1
+        and exact_row_zero_slice(pallas_source_dense, "%psum.23")
+        and exact_row_zero_slice(pallas_source_attention, "%psum.22")
+        and exact_row_zero_slice(pallas_source_embedding, "%psum.21")
+        and pallas_source_validity is not None
+        and pallas_source_validity.raw_opcode == "bitcast"
+        and pallas_source_validity.operand_names
+        == ("%get-tuple-element.29",)
+        and _shape_signature(pallas_source_validity) == (("pred", (1,)),)
+        and pallas_source_validity.raw_line.lstrip().startswith(
+            "%bitcast.90 = pred[1]{0:T(512)(128)(4,1)S(3)} bitcast("
+        )
+        and validity_tuple_value is not None
+        and validity_tuple_value.raw_opcode == "get-tuple-element"
+        and validity_tuple_value.operand_names == ("%compare_and_fusion",)
+        and _shape_signature(validity_tuple_value) == (("pred", (32,)),)
+        and re.findall(
+            r"\bindex=(\d+)",
+            _stablehlo_code_only(validity_tuple_value.raw_line),
+        )
+        == ["0"]
+        and pallas_source_validity_i32 is not None
+        and pallas_source_validity_i32.raw_opcode == "convert"
+        and pallas_source_validity_i32.operand_names == ("%bitcast.90",)
+        and _shape_signature(pallas_source_validity_i32) == (("s32", (1,)),)
+        and pallas_source_validity_i32.raw_line.lstrip().startswith(
+            "%convert_element_type.88 = s32[1]{0:T(128)S(6)} convert("
+        )
+        and pallas_source_inverse is not None
+        and pallas_source_inverse.raw_opcode == "bitcast"
+        and pallas_source_inverse.operand_names == ("%add_rsqrt_fusion",)
+        and _shape_signature(pallas_source_inverse) == (("f32", (1,)),)
+        and pallas_source_inverse.raw_line.lstrip().startswith(
+            "%bitcast.91 = f32[1]{0:T(128)S(3)} bitcast("
+        )
+        and layer1_reduction_value is not None
+        and layer1_reduction_value.raw_opcode == "fusion"
+        and layer1_reduction_value.operand_names
+        == ("%psum.23", "%psum.22", "%psum.21", "%get-tuple-element.29")
+        and _shape_signature(layer1_reduction_value) == (("f32", (32,)),)
+        and "calls=%fused_computation.13"
+        in _stablehlo_code_only(layer1_reduction_value.raw_line)
+        and layer1_inverse_value is not None
+        and layer1_inverse_value.raw_opcode == "fusion"
+        and layer1_inverse_value.operand_names == ("%multiply_reduce_fusion",)
+        and _shape_signature(layer1_inverse_value) == (("f32", (32,)),)
+        and "calls=%fused_computation.63"
+        in _stablehlo_code_only(layer1_inverse_value.raw_line)
+        and exact_source_fused_layer1_rms
+        and pallas_norm_copy is not None
+        and pallas_norm_copy.raw_opcode == "copy-done"
+        and pallas_norm_copy.operand_names == ("%copy-start.7",)
+        and pallas_norm_start is not None
+        and pallas_norm_start.raw_opcode == "copy-start"
+        and pallas_norm_start.operand_names == ("%param.26",)
+        and pallas_source_weight is not None
+        and pallas_source_weight.raw_opcode == "reshape"
+        and pallas_source_weight.operand_names == ("%copy-done.7",)
+        and _shape_signature(pallas_source_weight)
+        == (("bf16", (1, 6144)),)
+        and pallas_source_weight.raw_line.lstrip().startswith(
+            "%broadcast_in_dim.95 = "
+            "bf16[1,6144]{1,0:T(2,128)(2,1)S(3)} reshape("
+        )
+        and len(layer1_reductions) == 1
+        and len(layer1_rsqrt) == 1
+        and len(roots) == 1
+        and roots[0].raw_opcode == "bitcast-convert"
+        and roots[0].operand_names
+        == ("%greenfield_source_fused_output_m1_m8_scratch_h6144.1",)
+        and _shape_signature(roots[0]) == (("u16", (1, 6144)),)
+        and roots[0].raw_line.lstrip().startswith(
+            "ROOT %bitcast_convert_type.8 = "
+            "u16[1,6144]{1,0:T(2,128)(2,1)} bitcast-convert("
+        )
+    )
+    pallas_output_mode = bool(
+        native_m1_pallas_output or native_m1_pallas_sources_output
+    )
     if not (
         len(embedding_gathers) == 1
         and len(wuv_calls) == 1
@@ -1646,11 +2240,13 @@ def _validate_native_source_context_hlo(
         and (
             exact_m1_pallas_boundary
             if native_m1_pallas_output
+            else exact_m1_pallas_sources_boundary
+            if native_m1_pallas_sources_output
             else len(layer1_reductions) == 1 and len(layer1_rsqrt) == 1
         )
         and len(roots) == 1
         and roots[0].raw_opcode
-        == ("bitcast-convert" if native_m1_pallas_output else "fusion")
+        == ("bitcast-convert" if pallas_output_mode else "fusion")
         and _shape_signature(roots[0]) == expected_root_shape
         and (
             expected_root_operands is None
@@ -1722,6 +2318,19 @@ def _validate_native_source_context_hlo(
                 "no_m32_pallas_io": True,
             }
             if native_m1_pallas_output
+            else {}
+        ),
+        **(
+            {
+                "exact_m1_pallas_boundary": True,
+                "exact_m1_pallas_source_binding": True,
+                "m1_pallas_custom_call_count": 1,
+                "m1_pallas_operand_count": 6,
+                "m1_pallas_result_count": 1,
+                "native_m1_pallas_sources_output": True,
+                "no_m32_pallas_io": True,
+            }
+            if native_m1_pallas_sources_output
             else {}
         ),
     }
