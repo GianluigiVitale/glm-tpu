@@ -19,6 +19,26 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `54b79bf8c6b8a69362cb6817baa92d44e3649ce8` attempted the output-only
+  Pallas compile acquisition exactly once as
+  `greenfield_strategy_nd_output_pallas_geometry_20260815T022444858045128Z`. The protected
+  wrapper ran from 02:24:47 to 02:25:48 UTC and every host refused before HLO persistence or
+  arithmetic with `NotImplementedError: Mosaic kernels cannot be automatically partitioned.
+  Please wrap the call in a shard_map.` This is a launch-composition defect, not a numerical or
+  kernel rejection: the standalone probe placed the otherwise locally proven Pallas call under
+  ordinary replicated `jax.jit`, unlike the already-working integrated Pallas path. There is no
+  HLO, output tensor, host record, comparison, summary, DB row, remote ledger or terminal
+  `SUCCESS`; the approved prefix contains exactly 20 diagnostic/source objects. Capture SHA is
+  `eb5ae5fc...24cd`; pre/failure census SHAs are `0dec2cf0...e6a` / `657175a1...903`, both
+  authenticated 8/8 clean.
+- The narrow correction wraps the complete three-arm function in an explicit replicated
+  32-device `jax.shard_map` before `jax.jit`, matching the proven integrated Pallas composition.
+  A forced-32 CPU regression now compiles the interpreted graph and requires
+  `sdy.manual_computation`; the affected output/kernel suite passes 16/16. Exact next is one
+  immutable correction review, commit/push and one fail-closed compile retry. HLO pins remain
+  empty, so that retry still cannot execute or publish arithmetic. Only after the preserved TPU
+  graphs are pinned and mutation-tested may one separate 6,144-value numerical replay run. Full
+  8K remains forbidden until the complete true-M1 row is bitwise exact.
 - Reviewed/pushed pin `c0833adb5a50fe730955d25380a3017614e4d820` attempted the model-free
   output-geometry discriminator exactly once under tag
   `greenfield_strategy_nd_output_geometry_20260815T015402359468169Z`. TPU compilation rejected the
@@ -31,7 +51,7 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   `bf8e63b6...a68` / `6c91e73b...1b6`, both authenticated 8/8 clean. This is an evidence-backed
   rejection of direct `Format(Layout(...T(8,128)...))` on a true logical M1 result. Do not rerun or
   loosen it: TPU v4/XLA forces the M1 tile before an executable graph exists.
-- The output-only true-M1 Pallas successor is now locally complete, still default-off and still
+- The output-only true-M1 Pallas successor was locally complete, default-off and deliberately
   deliberately HLO-unpinned. It reuses the same sealed rows and one shared device-computed M32
   inverse, retains the M32 and ordinary-M1 controls, and changes only the final add/round/weight
   boundary. The candidate's four public operands and result remain true M1; each 128-feature
@@ -41,10 +61,8 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   wrapper and prior integrated regressions pass 33/33. The single immutable Sol audit found one
   pre-launch blocker—a rank-1 BF16 128-element weight block is illegal for TPU Mosaic—and the
   correction now supplies rank-2 `[1,6144]` storage with exact `[1,128]` blocks. JAXPR pins four
-  rank-2 operand/output blocks and no rank-1 128 block; correction review approved commit. Exact
-  next is commit/push, then one fail-closed TPU compile acquisition. Only after the
-  preserved graphs are pinned and mutation-tested may a separate 6,144-value numerical replay run.
-  Full 8K remains forbidden until a complete true-M1 bounded row is bitwise exact.
+  rank-2 operand/output blocks and no rank-1 128 block; correction review approved commit. Its
+  first compile attempt exposed the missing explicit `shard_map` composition recorded above.
 
 - Reviewed/pushed pin `97e0b66032d943a80c5263129397f3968a9168bf` completed the protected
   true-M1 Pallas discriminator under tag

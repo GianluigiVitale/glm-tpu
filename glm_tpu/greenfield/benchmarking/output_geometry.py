@@ -440,11 +440,14 @@ def build_output_geometry_replay(
         jax.ShapeDtypeStruct(shape, dtype, sharding=replicated)
         for shape, dtype in zip(shapes, dtypes, strict=True)
     )
-    lowered = jax.jit(
+    mapped = jax.shard_map(
         _output_geometry_program(pallas_interpret=pallas_interpret),
-        in_shardings=(replicated,) * len(examples),
-        out_shardings=(replicated, replicated, replicated),
-    ).lower(*examples)
+        mesh=mesh,
+        in_specs=(P(),) * len(examples),
+        out_specs=(P(), P(), P()),
+        check_vma=False,
+    )
+    lowered = jax.jit(mapped).lower(*examples)
     stablehlo = lowered.as_text()
     compiled = lowered.compile()
     optimized_hlo = compiled.as_text()

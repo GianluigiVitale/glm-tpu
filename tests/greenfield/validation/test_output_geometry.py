@@ -3,7 +3,10 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
 import json
+import os
 import shutil
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -111,6 +114,33 @@ def test_output_geometry_abstract_graph_preserves_true_m1_boundary() -> None:
     assert all(value.dtype == jnp.uint16 for value in result)
     with pytest.raises(BenchmarkValidationError, match="interpret flag"):
         geometry._output_geometry_program(pallas_interpret=1)  # type: ignore[arg-type]
+
+
+def test_output_geometry_explicitly_shard_maps_pallas_before_jit() -> None:
+    environment = os.environ.copy()
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=32"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                (
+                    "from glm_tpu.greenfield.benchmarking.output_geometry import build_output_geometry_replay",
+                    "compiled = build_output_geometry_replay(tuple(range(32)), validate_hlo=False, pallas_interpret=True)",
+                    "assert len(compiled.member_device_ids) == 32",
+                    "assert 'sdy.manual_computation' in compiled.stablehlo",
+                )
+            ),
+        ],
+        cwd=REPO,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_output_geometry_wrapper_is_default_off_and_disjoint() -> None:

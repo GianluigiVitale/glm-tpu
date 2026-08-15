@@ -147,6 +147,12 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   tile legality rejection: never retry direct M1/M32 result coercion on this compiler pin. If the
   physical-lane hypothesis remains necessary, keep public I/O true M1 and express the alternate
   geometry only inside an explicitly bounded Pallas scratch/kernel.
+- A Mosaic/Pallas call in a replicated multi-device `jax.jit` is still subject to automatic
+  partitioning and TPU lowering refuses it before HLO persistence. Enclose the whole function in an
+  explicit `jax.shard_map` with exact replicated/local specs before `jax.jit`, as the proven
+  integrated path does. A single-device Pallas interpreter/JAXPR test does not exercise this
+  boundary; every standalone multi-device Pallas probe needs a forced-device regression that
+  compiles the mapped graph and proves `sdy.manual_computation` before metal.
 
 ## Evidence ladder
 

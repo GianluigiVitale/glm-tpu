@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 02:24--02:31 UTC — first Pallas-scratch acquisition isolates explicit-sharding defect
+
+- Reviewed/pushed pin `54b79bf8c6b8a69362cb6817baa92d44e3649ce8` launched the output-only
+  Pallas acquisition once as
+  `greenfield_strategy_nd_output_pallas_geometry_20260815T022444858045128Z`. The protected
+  wrapper ran from 02:24:47 to 02:25:48 UTC. All eight processes stopped before HLO persistence or
+  arithmetic with the identical JAX lowering error: `Mosaic kernels cannot be automatically
+  partitioned. Please wrap the call in a shard_map.`
+- This does not reject the Pallas kernel or its M8 scratch. The standalone output probe used an
+  ordinary replicated `jax.jit`, whereas every already-working TPU Pallas integration in this
+  engine enters the kernel from an explicit `jax.shard_map`. No StableHLO, optimized HLO, output,
+  host record, comparison, summary, DB row, remote ledger or terminal `SUCCESS` exists. The remote
+  prefix has exactly 20 partial diagnostic/source objects. Capture/pre-census/failure-census SHAs
+  are `eb5ae5fc...24cd`, `0dec2cf0...e6a` and `657175a1...903`; cleanup is authenticated 8/8.
+- Corrected the composition locally by shard-mapping the three-arm program with replicated input
+  and output specs before `jax.jit`. A forced-32 CPU subprocess now compiles the interpreted graph
+  and requires `sdy.manual_computation`, while the affected output/kernel tests pass 16/16. HLO
+  pins remain empty. Exact next is one immutable correction review, commit/push and one protected
+  compile-only retry; no numerical replay is authorized before the acquired graphs are pinned and
+  mutation-tested.
+
 ## 2026-08-15 02:00--02:16 UTC — output-only true-M1 Pallas successor is locally sealed
 
 - Reused the exact DB548 rows, DB533 dense reconstruction, accepted M32 control, shared
