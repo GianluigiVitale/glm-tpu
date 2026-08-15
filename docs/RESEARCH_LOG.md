@@ -5,7 +5,7 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
-## 2026-08-15 05:18--05:36 UTC — final native-XLA one-row discriminator wired locally
+## 2026-08-15 05:18--05:43 UTC — native-XLA feature tile acquired once and rejected by its schedule
 
 - After the three Pallas forms converged on the same nonexact result, selected one final mechanism
   discriminator rather than another custom-kernel formula: preserve one semantic row, reshape its
@@ -16,11 +16,23 @@ what you did, what you validated it against, the exact numbers, and the honest n
   terminal schemas, protected wrapper propagation and fail-closed empty StableHLO/optimized-HLO
   pins. Forced-32 abstract tracing covers the 13-input graph; affected kernel, graph and terminal
   suites pass 42/42. No TPU work or performance claim occurred in this interval.
-- This is explicitly the last bounded arithmetic discriminator and is not itself production PP8.
-  One compile-only acquisition will preserve its lowering for offline proof; only an accepted
-  lowering permits one 6,144-value numerical verdict. A nonexact verdict terminates bitwise
-  arithmetic-arm iteration and returns work to the PP8 short decoder's bounded-internal-error plus
-  exact-token contract. It must not spawn another scalar/layout/kernel hypothesis.
+- Sol approved immutable staged SHA `2ac29b4b...cb9b`; reviewed pin `6b3064f` then completed the
+  one compile-only acquisition as
+  `greenfield_strategy_nd_integrated_dense_native_m1_xla_feature_tiled_output_20260815T053956483733623Z`.
+  Every host stopped on the deliberately empty StableHLO pin after graph persistence and before
+  arithmetic. StableHLO/optimized-HLO/prevalidation SHAs are `d86e0782...b9bf`,
+  `84ae4260...5a20` and `40a5c733...3d08`; their local/remote CRC32C values are exactly
+  `4lTWYg==`, `ajtzZQ==` and `4jtnhw==`. The 28-object / 10,768,641-byte partial archive contains
+  no newly generated result tensor, run comparison, DB row, ledger or terminal `SUCCESS`; imported
+  source artifacts remain under `diagnostic/`, and cleanup is authenticated 8/8.
+- The schedule rejects the hypothesis without spending a numerical run. StableHLO exposes the
+  intended `[8,768]` feature representation, but optimized HLO has zero BF16/F32/U16 `[8,768]`
+  values. The complete live output is fused as `u16[1,6144]{1,0:T(2,128)(2,1)}` with megacore
+  split dimension 1 and iteration bounds `[1,2]`—the frozen ordinary-M1 schedule—not the accepted
+  M32 tile. The graph has 602 instructions, 32 partitions and the three intended reductions.
+  Keep the pins empty and do not execute it. This terminates bitwise arithmetic-arm iteration; the
+  next work is the actual PP8 short decoder under bounded internal error plus exact raw-token,
+  DSA, state/cache, HLO, HBM and wall contracts.
 
 ## 2026-08-15 05:14--05:18 UTC — all-live feature-tiled route rejected; true-M1 Pallas search closed
 

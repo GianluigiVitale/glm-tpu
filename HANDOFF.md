@@ -19,18 +19,24 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
-- The next and final bounded arithmetic discriminator is implemented locally, default-off, as
-  `native_m1_xla_feature_tiled_output`. It keeps one semantic row, bijectively reshapes the exact
-  native dense/attention/embedding sources to `[8,768]`, and lets native XLA own the complete
-  BF16 add/RMS/weight fusion; it does not call the rejected Pallas boundary. StableHLO and
-  optimized-HLO pins are deliberately empty, so its first protected contact can only preserve the
-  compiler graphs and refuse before arithmetic or publication. The graph, protected wrapper,
-  terminal schema, forced-32 tracing and empty-pin refusal are wired; focused tests pass 42/42.
-  This remains a one-layer full-pod diagnostic, not a production PP8 architecture. After one
-  immutable review, acquire the lowering once, prove it locally, then run at most one 6,144-value
-  verdict. If it is nonexact, end the bitwise arithmetic search and return to the PP8 decoder under
-  the documented bounded-internal-error plus exact-raw-token Gate-D contract; do not create another
-  scalar/layout/kernel arm.
+- Reviewed/pushed pin `6b3064f3f41137997133ea0dd343dca1ef064b25` completed the one authorized
+  native-XLA feature-tile compile acquisition as
+  `greenfield_strategy_nd_integrated_dense_native_m1_xla_feature_tiled_output_20260815T053956483733623Z`.
+  All eight hosts compiled, atomically preserved the graphs and refused on the intentionally empty
+  StableHLO pin before arithmetic/publication. StableHLO/optimized-HLO/prevalidation SHAs are
+  `d86e0782...b9bf`, `84ae4260...5a20` and `40a5c733...3d08`; local CRC32C values exactly match
+  remote `4lTWYg==`, `ajtzZQ==` and `4jtnhw==`. The partial prefix has exactly 28 objects /
+  10,768,641 bytes and no newly generated result tensor, run comparison, DB row, ledger or
+  terminal `SUCCESS`; imported source artifacts remain under `diagnostic/`.
+- The acquired schedule rejects the mechanism without a numerical run. StableHLO contains the
+  exact bijective `[1,6144] -> [8,768] -> [1,6144]` representation, but optimized HLO contains
+  zero BF16/F32/U16 `[8,768]` values: XLA folds it into a single live
+  `u16[1,6144]{1,0:T(2,128)(2,1)}` output fusion with megacore split dimension 1 and iteration
+  bounds `[1,2]`, the already rejected ordinary-M1 geometry. It has 602 instructions, 32
+  partitions, three intended reductions and no output Pallas call. Pre/failure censuses are 8/8
+  clean. Keep both pins empty and do not run it numerically. The Pallas and native-XLA bitwise
+  arithmetic searches are now closed; exact next is the real PP8 short decoder under bounded
+  internal tensor error plus exact raw tokens/DSA/state/cache/HLO/HBM/wall requirements.
 - Reviewed/pushed pin `aa1b6eb85e812f6c16108c79610f5f78d8afe421` completed and sealed the
   all-live feature-tiled discriminator as
   `greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_20260815T051453080366540Z`.

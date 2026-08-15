@@ -204,6 +204,12 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   never a production architecture. If nonexact, stop bitwise internal-arithmetic iteration and use
   the specification's bounded internal tensor comparison plus exact raw-token Gate-D contract on
   the real PP8 decoder; do not invent a successor discriminator.
+- The one acquisition proves this representation is not retained: `[8,768]` exists in StableHLO
+  but is absent from optimized HLO, whose live result is the already rejected M1
+  `T(2,128)(2,1)`/megacore-split-1 fusion. Reject on schedule and do not spend a numerical run.
+  Both custom-Pallas and native-XLA bitwise equivalence branches are closed. Resume only the real
+  PP8 short decoder and evaluate internal tensors under the documented bounded-error level while
+  keeping DSA ordering, raw tokens, state/cache integrity and physical topology contracts exact.
 
 ## Evidence ladder
 
