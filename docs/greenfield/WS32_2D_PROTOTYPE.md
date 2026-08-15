@@ -74,12 +74,34 @@ Forced 32-device CPU tests prove:
 CPU and synthetic HLO results prove semantics only. The current subgroup linter does not claim the
 complete packed-bits-to-live-root arithmetic lineage required for a protected real-layer result.
 
+## Bounded one-layer derivative
+
+`checkpoint/ws32_one_layer.py` reuses the sealed PP8 layer-3 artifact rather than rereading the
+753B checkpoint. Its source manifest is independently content-addressed and its four 2.4-GB files
+already bind all 1,544 source leaves. The derivative:
+
+- splits each pair of PP8 expert halves into two WS32 expert rows;
+- splits every routed hidden input/output dimension over four feature columns;
+- reconstructs the shared expert once from its four PP8 pieces and explicitly writes eight
+  expert-row replicas;
+- shards router weight over expert and feature while replicating only correction bias over feature;
+- stores FP8 payloads as exact U8 bits for direct JAX placement;
+- writes 32 append-only final-owner files with tensor/file/manifest SHA-256 records;
+- commits the manifest last and provides a one-slot direct loader that refuses non-finite FP8 bits,
+  non-finite scales, checksum drift and wrong manifest identity.
+
+Tiny sealed-artifact tests reconstruct every routed expert and shared expert from the 32 derivative
+files back to its exact source bytes. The real layer-3 plan predicts 9,971,249,152 packed bytes,
+311,601,536 per chip, from 9,706,940,416 unique source bytes plus explicit shared/bias replication.
+No real derivative has been written or loaded on TPU yet, so this remains packer readiness rather
+than protected checkpoint evidence.
+
 ## Bounded next discriminator
 
 Do not run a full decoder or hour-scale 8K workflow. The next WS32 step is one real layer-0 dense
 or one real MoE layer using already packed source leaves, with:
 
-1. an exact final-owner slice manifest and direct loader for only that layer;
+1. run the reviewed final-owner derivative and direct loader for only that layer;
 2. generated StableHLO/optimized HLO persisted before execution;
 3. exact packed-bit/scale-to-dequant-to-dot-to-live-root lineage and subgroup bijection;
 4. one live row, no full hidden reconstruction, and only feature-4/expert-8 reductions;

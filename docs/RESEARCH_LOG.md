@@ -5,6 +5,24 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 06:12--06:32 UTC — WS32 one-layer derivative reuses the sealed PP8 pack
+
+- Added a bounded WS32 layer-3 packer whose only source is protected PP8 one-layer manifest
+  `68ef8201...f938` and its four exact final-owner files. It does not reread the 753B checkpoint.
+  Routed experts are split to eight identity rows and four hidden-feature columns; the shared
+  expert is reconstructed once and explicitly replicated over expert rows; router weight is 2D
+  sharded and only correction bias is feature-replicated.
+- The derivative writes raw FP8 bytes as U8 and records exact source slots/slices, tensor hashes,
+  file hashes, mesh/code/source identities and a manifest committed last. A direct slot loader
+  verifies the local file and every tensor before optional device placement and refuses FP8 NaN
+  encodings, non-finite FP32 data and identity drift.
+- Tiny append-only tests reconstruct every routed expert and shared expert from all 32 final-owner
+  files back to exact source bytes, validate the loader, and refuse manifest/file corruption. The
+  real layer-3 byte plan is 9,971,249,152 packed bytes / 311,601,536 per chip from
+  9,706,940,416 unique source bytes. A read-only preflight rehashed all four real source files and
+  reproduced exact manifest `68ef8201...f938`; no real derivative, TPU load, HLO, HBM or performance
+  workflow ran. One bulk audit precedes that bounded protected step.
+
 ## 2026-08-15 05:43--06:12 UTC — bitwise search closes; WS32 prototype reuses existing 2D work
 
 - Treated the protected native-XLA schedule rejection as the terminal result for PP8 internal

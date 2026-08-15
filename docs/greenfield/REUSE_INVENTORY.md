@@ -77,6 +77,12 @@ persistent bytes per chip. This is capacity and forced-CPU mechanism evidence on
 owner manifest/packer, real TPU HLO, exact real layer, KV/temporary HBM and protected latency remain
 open. See `WS32_2D_PROTOTYPE.md`.
 
+The next bounded reuse step derives WS32 layer 3 from the already sealed PP8 one-layer artifact
+`68ef8201...f938`; it does not reopen the three original checkpoint shards. The derivative's tiny
+test reconstructs all routed/shared source bytes after the 8x4 split and checks the append-only
+manifest plus direct slot loader. The real 9,971,249,152-byte derivative remains unexecuted pending
+review.
+
 ### Gate H: speculation
 
 Do not rebuild GLM MTP plumbing. Pins `6beacb5d2` and `89e1d5b5a` already prove dense-MTP shared

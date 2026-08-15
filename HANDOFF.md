@@ -35,6 +35,14 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   performance result. Exact next is one bounded real-layer final-owner manifest/loader/HLO
   discriminator, not an hour-scale decoder run. See `docs/greenfield/WS32_2D_PROTOTYPE.md` and
   `docs/greenfield/GATE_D_LESSONS.md`.
+- The bounded WS32 layer-3 derivative is now implemented locally against the sealed PP8 artifact
+  manifest `68ef8201...f938`. It performs the exact expert8/feature4 splits, writes FP8 as U8,
+  records every tensor/file/source slice/checksum, commits its manifest last, and directly loads
+  one final owner without global reconstruction. Tiny-artifact tests reconstruct every routed and
+  shared tensor byte-for-byte and exercise corruption/identity refusal. The real derivative is
+  predicted at 9,971,249,152 bytes total / 311,601,536 bytes per chip but has not been written,
+  archived, loaded on TPU, or measured. Exact next is bulk review, then one protected pack/load/HLO
+  workflow; do not load the full model.
 - Reviewed/pushed pin `6b3064f3f41137997133ea0dd343dca1ef064b25` completed the one authorized
   native-XLA feature-tile compile acquisition as
   `greenfield_strategy_nd_integrated_dense_native_m1_xla_feature_tiled_output_20260815T053956483733623Z`.
